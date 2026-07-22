@@ -1,0 +1,67 @@
+# ============================================================================
+# Tutolage Pre-commit Configuration
+# ============================================================================
+# Install: pip install pre-commit && pre-commit install
+# Run:     pre-commit run --all-files
+# ============================================================================
+
+repos:
+  # General
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+      - id: detect-private-key
+
+  # Python - Ruff
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # Commit messages
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.13.0
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+
+  # ─────────────────────────────────────────────────────────────────
+  # Route coverage — validates utils/routeRegistry.ts against the
+  # actual /app filesystem. Fails commits that introduce a route
+  # without a backing file (or vice-versa).
+  # ─────────────────────────────────────────────────────────────────
+  - repo: local
+    hooks:
+      - id: route-coverage
+        name: Route registry ↔ filesystem coverage
+        description: Catch /menu cards pointing to non-existent routes before they ship.
+        entry: python3 scripts/route_coverage_check.py
+        language: system
+        pass_filenames: false
+        files: ^(frontend/utils/routeRegistry\.ts|frontend/app/.*\.tsx)$
+
+      # ─────────────────────────────────────────────────────────────────
+      # Frontend ESLint — enforces the 6 critical rules with ZERO warnings
+      # allowed, matching .github/workflows/lint.yml so debt cannot re-enter
+      # via a local commit. Critical rules:
+      #   1. @typescript-eslint/no-unused-vars
+      #   2. @typescript-eslint/array-type
+      #   3. react/no-unescaped-entities  (JSX entity escaping)
+      #   4. no-unused-expressions
+      #   5. react-hooks/exhaustive-deps
+      #   6. prefer-const
+      # ─────────────────────────────────────────────────────────────────
+      - id: frontend-eslint
+        name: Frontend ESLint (6 critical rules, --max-warnings=0)
+        description: Blocks commits that introduce any ESLint warning in the Expo frontend.
+        entry: bash -c 'cd frontend && yarn lint --max-warnings=0'
+        language: system
+        pass_filenames: false
+        files: ^frontend/.*\.(ts|tsx)$

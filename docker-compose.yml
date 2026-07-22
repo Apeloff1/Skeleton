@@ -1,0 +1,77 @@
+# ============================================================================
+# Tutolage Docker Compose
+# ============================================================================
+# Usage:
+#   docker compose up -d              # Start all services
+#   docker compose up -d backend      # Start backend only
+#   docker compose logs -f            # View logs
+#   docker compose down               # Stop all
+# ============================================================================
+
+services:
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      target: ${TARGET:-production}
+    container_name: tutolage-backend
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - MONGO_URL=mongodb://mongo:27017/tutolage
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - CHROMA_PERSIST_DIR=/app/data/chroma
+    volumes:
+      - backend_data:/app/data
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - tutolage
+
+  # Frontend (Expo Web)
+  frontend:
+    build:
+      context: ./frontend
+      target: development
+    container_name: tutolage-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - EXPO_PUBLIC_BACKEND_URL=http://backend:8001
+    depends_on:
+      - backend
+    networks:
+      - tutolage
+
+  # MongoDB
+  mongo:
+    image: mongo:7.0
+    container_name: tutolage-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tutolage
+
+networks:
+  tutolage:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  backend_data:

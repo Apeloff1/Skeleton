@@ -1,0 +1,145 @@
+# ============================================================================
+# Git Ignore for CodeDock
+# ============================================================================
+
+# ==========================================================================
+# Python
+# ==========================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# ==========================================================================
+# Node.js
+# ==========================================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ==========================================================================
+# Expo / React Native
+# ==========================================================================
+.expo/
+.expo-shared/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# ==========================================================================
+# IDE
+# ==========================================================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ==========================================================================
+# Environment
+# ==========================================================================
+.env.local
+.env.*.local
+!.env.example
+
+# ==========================================================================
+# Testing & Coverage
+# ==========================================================================
+.coverage
+htmlcov/
+coverage_html/
+coverage.xml
+*.cover
+.pytest_cache/
+.tox/
+.nox/
+
+# ==========================================================================
+# Build & Artifacts
+# ==========================================================================
+*.log
+*.tmp
+*.temp
+.cache/
+.ruff_cache/
+.mypy_cache/
+
+# ==========================================================================
+# Docker
+# ==========================================================================
+.docker/
+
+# ==========================================================================
+# Database
+# ==========================================================================
+*.db
+*.sqlite
+*.sqlite3
+chroma_data/
+
+# ==========================================================================
+# Secrets (NEVER commit these)
+# ==========================================================================
+secrets/
+*.pem
+*.key
+credentials.json
+service-account.json
+-e 
+# Environment files (keep .env for deployment — backend/.env & frontend/.env
+# are deployment-critical and MUST be in the build context). Local-only
+# overrides are still ignored via .env.local / .env.*.local above.
+.credentials
+# (.env / .env.* / *.env intentionally NOT ignored — backend/.env & frontend/.env
+#  are deployment-critical and must ship in the build context.)
+
+# testing-agent scratch workspaces
+.git_workspaces/
+backend/.git_workspaces/
+
+# Generated build / vault artifacts — never commit (large binaries)
+backend/data/builds_vault/
+backend/data/galaxy_vault/
+backend/data/**/zips/
+*.zip
+backend/data/build_artifacts/
+*.apk
+*.apk.idsig
+*.aab
+*.ipa
+
+# testing-agent reports (scratch)
+test_reports/
+.env
+.env.*
+*.env

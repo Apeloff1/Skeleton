@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"},{"v":{"$numberInt":"2"},"key":{"build_id":{"$numberInt":"1"},"phase":{"$numberInt":"1"},"created_at":{"$numberInt":"-1"}},"name":"build_id_1_phase_1_created_at_-1"}],"uuid":"0dbdeb7bbc5d4c809b59334923e6739e","collectionName":"swarm_discourse_logs","type":"collection"}

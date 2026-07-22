@@ -1,0 +1,93 @@
+{
+  "dataset_type": "skill_dataset",
+  "version": "2026.07.19",
+  "description": "Comprehensive skill bank for all 100 categories. Every role draws from this bank to define required and exercised skills. Used for agent matching, mastery tracking, and consistency enforcement.",
+  "skill_categories": {
+    "core_technical": [
+      "systems_architecture",
+      "performance_optimization",
+      "memory_management",
+      "concurrency_design",
+      "network_protocol_design",
+      "database_design",
+      "security_engineering",
+      "build_automation"
+    ],
+    "gameplay_systems": [
+      "combat_design",
+      "progression_systems",
+      "economy_design",
+      "resource_loop_design",
+      "ability_synergy_design",
+      "player_power_curve_balancing",
+      "difficulty_scaling",
+      "reward_system_design"
+    ],
+    "world_building": [
+      "procedural_generation",
+      "environmental_storytelling",
+      "faction_system_design",
+      "npc_behavior_systems",
+      "physics_simulation",
+      "ai_decision_making",
+      "pathfinding_navigation",
+      "dynamic_event_systems"
+    ],
+    "narrative_design": [
+      "character_arc_design",
+      "thematic_integration",
+      "pacing_tension_design",
+      "dialogue_voice_design",
+      "lore_consistency",
+      "player_agency_design",
+      "emotional_impact_design",
+      "mystery_revelation_design"
+    ],
+    "player_psychology": [
+      "mastery_motivation_design",
+      "social_belonging_systems",
+      "curiosity_exploration_hooks",
+      "autonomy_agency_design",
+      "progression_satisfaction",
+      "burnout_prevention",
+      "nostalgia_memorable_moment_design",
+      "loss_aversion_stakes_design"
+    ],
+    "ui_ux_information": [
+      "information_hierarchy",
+      "screen_real_estate_optimization",
+      "touch_target_design",
+      "animation_motion_design",
+      "error_feedback_design",
+      "accessibility_compliance",
+      "cross_platform_consistency",
+      "loading_waiting_experience"
+    ],
+    "quality_assurance": [
+      "exploit_reproduction",
+      "regression_testing",
+      "playtest_synthesis",
+      "balance_impact_analysis",
+      "usability_issue_documentation",
+      "accessibility_validation",
+      "performance_profiling",
+      "griefing_pattern_analysis"
+    ],
+    "live_operations": [
+      "seasonal_event_design",
+      "limited_time_content_balancing",
+      "community_challenge_systems",
+      "player_segmentation",
+      "live_economy_management",
+      "post_event_analysis",
+      "healthy_hype_building",
+      "long_term_content_calendar"
+    ]
+  },
+  "usage_rules": {
+    "minimum_skills_per_role": 4,
+    "maximum_skills_per_role": 8,
+    "must_include_one_from_core_technical_or_gameplay_systems": true,
+    "consistency_requirement": "Skills must be referenced in prompt_template and quality_criteria"
+  }
+}

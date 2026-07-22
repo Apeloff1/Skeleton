@@ -1,0 +1,146 @@
+{
+  "expansion_phase": "31_to_50",
+  "description": "Continuing expansion toward 100 total categories. Focus on specialized technical, design, and production domains.",
+  "new_categories": [
+    {
+      "category_id": 31,
+      "name": "Physics Simulation & Interaction Design",
+      "description": "Advanced physics, collision, destruction, fluid, and interactive simulation systems.",
+      "focus": "Believable, fun, and performant physics that enable creative player interaction.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 32,
+      "name": "AI Decision Making & Behavior Trees",
+      "description": "Designing intelligent decision systems, behavior trees, utility AI, and goal-oriented action planning.",
+      "focus": "NPCs and enemies that make interesting, readable decisions at scale.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 33,
+      "name": "Pathfinding, Navigation & Spatial Reasoning",
+      "description": "Robust pathfinding, navigation meshes, dynamic obstacles, and spatial awareness systems.",
+      "focus": "Characters that move intelligently through complex, changing environments.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 34,
+      "name": "Procedural Generation & Content Creation Systems",
+      "description": "Advanced procedural generation for levels, items, quests, stories, and entire worlds.",
+      "focus": "Content that feels hand-crafted while scaling massively.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 35,
+      "name": "Economy Design & Long-term Progression Loops",
+      "description": "Deep economic systems, resource loops, inflation control, and meaningful long-term progression.",
+      "focus": "Economies that remain healthy and engaging for years of play.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 36,
+      "name": "Quest & Mission Structure Design",
+      "description": "Branching quests, mission pacing, objective design, and narrative delivery through gameplay.",
+      "focus": "Quests that feel meaningful, clear, and integrated with core gameplay.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 37,
+      "name": "Multiplayer Architecture & State Synchronization",
+      "description": "Networking models, prediction, reconciliation, interest management, and scalability.",
+      "focus": "Responsive, fair, and scalable multiplayer across platforms and regions.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 38,
+      "name": "Anti-Cheat, Security & Integrity Systems",
+      "description": "Detection, prevention, and response systems for cheating, exploits, and abuse.",
+      "focus": "Protecting fair play while minimizing impact on legitimate players.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 39,
+      "name": "Audio Systems, Spatial Audio & Dynamic Mixing",
+      "description": "Advanced audio pipelines, spatial audio, occlusion, dynamic mixing, and procedural sound.",
+      "focus": "Audio that feels alive, provides clear feedback, and enhances emotion.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 40,
+      "name": "Visual Effects, Particles & Shader Systems",
+      "description": "High-quality VFX pipelines, particle systems, shaders, and post-processing.",
+      "focus": "Beautiful, readable, and performant visuals that support gameplay.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 41,
+      "name": "Animation Systems, Blending & Procedural Animation",
+      "description": "Animation pipelines, blending, IK, retargeting, and procedural animation layers.",
+      "focus": "Characters that move and emote expressively while remaining performant.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 42,
+      "name": "Asset Pipeline, Import & Validation Systems",
+      "description": "Robust asset pipelines, automated validation, optimization, and artist tooling.",
+      "focus": "Fast, reliable content production at scale with high quality.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 43,
+      "name": "Tooling, Editor Extensions & Production Workflow",
+      "description": "Custom editor tools, workflow automation, and production pipeline design.",
+      "focus": "Tools that dramatically increase team velocity and content quality.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 44,
+      "name": "Localization, Translation & Cultural Adaptation",
+      "description": "High-quality localization systems, cultural adaptation, and multi-language support.",
+      "focus": "Games that feel native in every supported language and culture.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 45,
+      "name": "Telemetry, Analytics & Player Behavior Systems",
+      "description": "Ethical data collection, analysis, visualization, and data-driven design loops.",
+      "focus": "Actionable insights that improve the game while respecting player privacy.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 46,
+      "name": "Live Ops, Events & Seasonal Content Systems",
+      "description": "Designing, deploying, and managing limited-time events and seasonal content.",
+      "focus": "Fresh, exciting content that brings players back without harming core experience.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 47,
+      "name": "Monetization Systems & Ethical Design",
+      "description": "Fair, transparent, and sustainable monetization systems and economy design.",
+      "focus": "Monetization that aligns with player enjoyment and long-term game health.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 48,
+      "name": "Accessibility Systems & Inclusive Design",
+      "description": "Comprehensive accessibility features, input remapping, visual/audio alternatives, and inclusive design.",
+      "focus": "Games that are playable and enjoyable by the widest possible audience.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 49,
+      "name": "Performance Profiling, Optimization & Budgeting",
+      "description": "Deep performance analysis, optimization strategies, and strict performance budgeting.",
+      "focus": "Games that run smoothly on target hardware while maintaining visual and gameplay quality.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 50,
+      "name": "Build Systems, CI/CD & Deployment Pipelines",
+      "description": "Robust build automation, continuous integration, testing, and deployment systems.",
+      "focus": "Fast, reliable iteration and safe deployment at scale.",
+      "target_roles_per_category": 100
+    }
+  ]
+}

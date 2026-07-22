@@ -1,0 +1,126 @@
+# ============================================================================
+# Tutolage Backend - Modern Python Project Configuration
+# ============================================================================
+# Package manager: uv (https://github.com/astral-sh/uv)
+# Linter/Formatter: ruff
+# Testing: pytest
+# ============================================================================
+
+[project]
+name = "tutolage"
+version = "15.0.0"
+description = "Tutolage - Ultimate AI-Powered Learning & Game Development Platform"
+readme = "../README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [
+    { name = "Tutolage Team", email = "team@tutolage.dev" }
+]
+keywords = [
+    "education", "ai", "learning", "game-development",
+    "fastapi", "llm", "tutor", "npc", "animation"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Education",
+    "Topic :: Games/Entertainment",
+]
+
+dependencies = [
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.25.0",
+    "python-multipart>=0.0.6",
+    "motor>=3.3.0",
+    "pymongo>=4.6.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "openai>=1.10.0",
+    "chromadb>=0.4.22",
+    "httpx>=0.26.0",
+    "python-dotenv>=1.0.0",
+    "loguru>=0.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "httpx>=0.26.0",
+    "ruff>=0.3.0",
+    "mypy>=1.8.0",
+    "pre-commit>=3.6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/tutolage/tutolage"
+Documentation = "https://docs.tutolage.dev"
+Repository = "https://github.com/tutolage/tutolage"
+
+# ============================================================================
+# Build System
+# ============================================================================
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# ============================================================================
+# UV Configuration
+# ============================================================================
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.3.0",
+    "pre-commit>=3.6.0",
+]
+
+# ============================================================================
+# Ruff Configuration (Linting + Formatting)
+# ============================================================================
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM"]
+ignore = ["E501", "B008", "B904"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["routes", "services"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ============================================================================
+# Pytest Configuration
+# ============================================================================
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-v --tb=short"
+markers = [
+    "unit: marks tests as unit tests",
+    "integration: marks tests as integration tests",
+]
+
+[tool.coverage.run]
+source = ["."]
+omit = ["tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:"]

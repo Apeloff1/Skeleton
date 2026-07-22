@@ -1,0 +1,35 @@
+name: Lint
+
+# Guards against ESLint debt silently re-accumulating in the Expo frontend.
+# Runs the project's flat config (eslint.config.js -> eslint-config-expo) on every push / PR.
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "frontend/**"
+  pull_request:
+    paths:
+      - "frontend/**"
+
+jobs:
+  eslint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      # `expo lint` auto-installs eslint + eslint-config-expo on first run (non-interactive in CI).
+      - name: Run ESLint (zero warnings allowed)
+        env:
+          CI: "true"
+        run: yarn lint --max-warnings=0

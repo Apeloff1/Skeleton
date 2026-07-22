@@ -1,0 +1,43 @@
+name: Route Coverage CI
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'frontend/utils/routeRegistry.ts'
+      - 'frontend/app/**'
+      - 'scripts/route_coverage_check.py'
+      - '.github/workflows/route-coverage.yml'
+  pull_request:
+    paths:
+      - 'frontend/utils/routeRegistry.ts'
+      - 'frontend/app/**'
+      - 'scripts/route_coverage_check.py'
+
+jobs:
+  route-coverage:
+    name: Validate registry ↔ filesystem
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run route coverage check (static)
+        run: python3 scripts/route_coverage_check.py
+
+      - name: Run route coverage check (JSON for artifact)
+        if: always()
+        run: python3 scripts/route_coverage_check.py --json > route-coverage.json || true
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: route-coverage-report
+          path: route-coverage.json
+          retention-days: 30
