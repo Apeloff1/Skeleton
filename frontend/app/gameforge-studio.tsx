@@ -16,6 +16,8 @@ import api, { _circuitBreakerStats } from '../src/utils/apiClient';
 import StudioLoginGate, { useStudioAuth } from '../src/auth/StudioLoginGate';
 import { authHeaders, getAuthToken, logout as authLogout } from '../src/auth/gameforgeAuth';
 import UnifiedVault from '../src/components/UnifiedVault';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 const S = '/api/gameforge/studio';
 const M = '/api/gameforge/map';
@@ -23,6 +25,7 @@ const BUILD = '/api/gameforge/build';
 const RT = '/api/gameforge/runtime';
 const PLAN = '/api/gameforge/planning';
 const TOOLS = '/api/gameforge/tools';
+const WF = '/api/gameforge/workflow';
 const AUTH = '/api/auth';
 const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
@@ -34,7 +37,7 @@ const CARD = '#111827';
 const BG = '#0b1220';
 const MUTE = '#94a3b8';
 const VC: Record<string, string> = { accept: GREEN, revise: '#f59e0b', reject: '#ef4444' };
-const TABS = ['Overview', 'Build', 'Vault', 'Map', 'Jeeves', 'Learn', 'Observe', 'Agents'] as const;
+const TABS = ['Overview', 'Build', 'Ship', 'Vault', 'Map', 'Jeeves', 'Learn', 'Observe', 'Agents'] as const;
 type Tab = typeof TABS[number];
 
 export default function GameforgeStudio() {
@@ -94,6 +97,15 @@ function StudioInner() {
   const [uniLogs, setUniLogs] = React.useState<any[]>([]);
   const [tools, setTools] = React.useState<any[]>([]);
   const [comboMsg, setComboMsg] = React.useState('');
+
+  // ── Ship tab: Autonomous Workflow (Prompt→…→Deployment) + JeevesVault ──
+  const [wfPrompt, setWfPrompt] = React.useState('A deep dark-fantasy roguelike RPG with emergent combat, meaningful progression, and branching quests');
+  const [wfIters, setWfIters] = React.useState(4);
+  const [wfBusy, setWfBusy] = React.useState(false);
+  const [wfResult, setWfResult] = React.useState<any>(null);
+  const [wfErr, setWfErr] = React.useState('');
+  const [vaultPkgs, setVaultPkgs] = React.useState<any[]>([]);
+  const [dlMsg, setDlMsg] = React.useState('');
   // Auth (session managed by the gate; this tab shows status + logout)
   const [logoutBusy, setLogoutBusy] = React.useState(false);
   // Audit + build ledger + role admin
@@ -190,13 +202,14 @@ function StudioInner() {
   React.useEffect(() => { loadOverview(); }, [loadOverview]);
   React.useEffect(() => {
     if (tab === 'Build') { loadBuild(); loadBuildsList(); }
+    else if (tab === 'Ship') loadVaultPkgs();
     else if (tab === 'Vault') loadVaultTab();
     else if (tab === 'Map') loadMap();
     else if (tab === 'Jeeves') loadJeeves();
     else if (tab === 'Learn') loadLearn();
     else if (tab === 'Observe') loadObserve();
     else if (tab === 'Agents') loadAgents();
-  }, [tab, loadBuild, loadBuildsList, loadVaultTab, loadMap, loadJeeves, loadLearn, loadObserve, loadAgents]);
+  }, [tab, loadBuild, loadBuildsList, loadVaultPkgs, loadVaultTab, loadMap, loadJeeves, loadLearn, loadObserve, loadAgents]);
 
   // Priority-4 Observability: live auto-refresh while on the Observe tab.
   React.useEffect(() => {
@@ -247,6 +260,52 @@ function StudioInner() {
     if (r.ok && r.data?.ok) setPlan(r.data);
     setBusy(false);
   };
+  const loadVaultPkgs = React.useCallback(async () => {
+    const r = await api.get<any>(`${WF}/vault?limit=25`, { timeoutMs: 15000 });
+    if (r.ok && r.data?.ok) setVaultPkgs(r.data.packages || []);
+  }, []);
+
+  const runWorkflow = async () => {
+    const p = wfPrompt.trim();
+    if (!p || wfBusy) return;
+    setWfBusy(true); setWfErr(''); setWfResult(null); setDlMsg('');
+    const r = await api.post<any>(`${WF}/run`,
+      { prompt: p, project_name: 'Studio', max_iterations: wfIters },
+      authOpts(118000));
+    if (r.ok && r.data?.ok) { setWfResult(r.data); await loadVaultPkgs(); }
+    else setWfErr(r.data?.detail || 'Workflow failed — please retry.');
+    setWfBusy(false);
+  };
+
+  const downloadPackage = async (pkg: any) => {
+    if (!pkg?.package_id) return;
+    setDlMsg(`Fetching ${pkg.package_name}…`);
+    const r = await api.get<any>(`${WF}/vault/${pkg.package_id}/download`, { timeoutMs: 30000 });
+    if (!r.ok || !r.data?.ok || !r.data?.content_base64) {
+      setDlMsg(`Download failed: ${r.data?.detail || 'unavailable'}`);
+      return;
+    }
+    const { content_base64, package_name, sha256 } = r.data;
+    try {
+      if (Platform.OS === 'web') {
+        const bytes = Uint8Array.from(atob(content_base64), (c) => c.charCodeAt(0));
+        const blob = new Blob([bytes], { type: 'application/zip' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = package_name; a.click();
+        URL.revokeObjectURL(url);
+        setDlMsg(`Downloaded ${package_name} (sha ${String(sha256).slice(0, 8)})`);
+      } else {
+        const path = `${FileSystem.cacheDirectory}${package_name}`;
+        await FileSystem.writeAsStringAsync(path, content_base64, { encoding: FileSystem.EncodingType.Base64 });
+        if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(path);
+        setDlMsg(`Saved ${package_name} — ready to share.`);
+      }
+    } catch (e: any) {
+      setDlMsg(`Saved to device failed: ${e?.message || e}`);
+    }
+  };
+
   const doLogout = async () => {
     setLogoutBusy(true);
     await authLogout();
@@ -432,6 +491,74 @@ function StudioInner() {
                     <Ionicons name="cloud-download-outline" size={16} color={GREEN} />
                     <Text style={s.ledgerFile} numberOfLines={1}>{bd.kind} · {bd.filename} · {(bd.size_bytes / 1024).toFixed(1)}KB</Text>
                     <Ionicons name="chevron-forward" size={14} color={MUTE} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
+
+          {tab === 'Ship' && (
+            <>
+              <Text style={s.h2}>🚀 Autonomous Workflow — Prompt → Ship</Text>
+              <View style={s.card}>
+                <Text style={s.qTxt}>Describe the game. Jeeves runs Testing → Concept → Production → Reflection with cross-iteration memory, then deploys a packaged build to the JeevesVault.</Text>
+                <TextInput
+                  testID="gs-wf-prompt" style={[s.input, { marginTop: 10, minHeight: 72, textAlignVertical: 'top' }]}
+                  value={wfPrompt} onChangeText={setWfPrompt} multiline
+                  placeholder="e.g. A cozy farming sim with crafting and co-op…" placeholderTextColor={MUTE}
+                  editable={!wfBusy}
+                />
+                <View style={s.chipRow}>
+                  {[2, 3, 4, 5, 6].map((n) => (
+                    <TouchableOpacity key={n} testID={`gs-wf-iter-${n}`} onPress={() => setWfIters(n)} disabled={wfBusy}
+                      style={[s.chip, wfIters === n && { backgroundColor: GREEN }]}>
+                      <Text style={[s.chipTxt, wfIters === n && { color: '#04120a', fontWeight: '800' }]}>{n} iters</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <TouchableOpacity testID="gs-wf-run" style={[s.bigBtn, { backgroundColor: GREEN, flex: 0, marginTop: 12 }]} onPress={runWorkflow} disabled={wfBusy}>
+                  {wfBusy ? <ActivityIndicator color="#04120a" size="small" /> : <Text style={s.bigBtnTxt}>▶ Run autonomous workflow</Text>}
+                </TouchableOpacity>
+                {!!wfErr && <Text style={[s.reply, { color: '#ef4444' }]}>{wfErr}</Text>}
+              </View>
+
+              {wfResult && (
+                <>
+                  <Text style={s.h2}>📊 Result</Text>
+                  <View style={s.card}>
+                    <View style={s.statRow}>
+                      <Stat label="Final Q" value={`${Math.round((wfResult.final_quality ?? 0) * 100)}%`} color={GREEN} />
+                      <Stat label="Iters" value={`${wfResult.iterations_run ?? 0}`} color={BLUE} />
+                      <Stat label="Deploy" value={wfResult.deploy_ready ? 'Ready' : 'Hold'} color={wfResult.deploy_ready ? GREEN : '#f59e0b'} />
+                      <Stat label="Strategy" value={`${wfResult.final_strategy ?? '—'}`} color="#a78bfa" />
+                    </View>
+                    <Text style={[s.qTxt, { marginTop: 4 }]}>🎮 {wfResult.genre} · {wfResult.scope} · {(wfResult.focus_systems || []).join(', ')}</Text>
+                    <Text style={[s.kTopic, { marginTop: 8 }]}>Quality trend</Text>
+                    <Text style={s.kText}>{(wfResult.quality_history || []).map((q: number) => `${Math.round(q * 100)}%`).join('  →  ')}</Text>
+                    {(wfResult.iterations || []).map((it: any) => (
+                      <View key={it.iteration} style={s.ledgerRow}>
+                        <View style={[s.badge, { backgroundColor: BLUE + '22', borderColor: BLUE }]}><Text style={[s.badgeTxt, { color: BLUE }]}>{it.strategy}</Text></View>
+                        <Text style={s.ledgerFile} numberOfLines={1}>Iteration {it.iteration}</Text>
+                        <Text style={s.actRooms}>{Math.round((it.quality ?? 0) * 100)}%</Text>
+                      </View>
+                    ))}
+                    {wfResult.deployment?.package && (
+                      <TouchableOpacity testID="gs-wf-download" style={[s.bigBtn, { backgroundColor: BLUE, flex: 0, marginTop: 12 }]} onPress={() => downloadPackage(wfResult.deployment.package)}>
+                        <Text style={[s.bigBtnTxt, { color: '#fff' }]}>⬇ Download {wfResult.deployment.package.package_name}</Text>
+                      </TouchableOpacity>
+                    )}
+                    {!!dlMsg && <Text style={s.reply}>{dlMsg}</Text>}
+                  </View>
+                </>
+              )}
+
+              <Text style={s.h2}>📦 JeevesVault ({vaultPkgs.length})</Text>
+              <View style={s.card}>
+                {vaultPkgs.length === 0 ? <Text style={s.empty}>No packages yet — run a workflow to ship one.</Text> : vaultPkgs.map((p: any) => (
+                  <TouchableOpacity key={p.package_id} testID={`gs-vault-pkg-${p.package_id}`} style={s.ledgerRow} onPress={() => downloadPackage(p)}>
+                    <Ionicons name="cube-outline" size={16} color={GREEN} />
+                    <Text style={s.ledgerFile} numberOfLines={1}>{p.package_name} · {(p.size_bytes / 1024).toFixed(1)}KB · Q{Math.round((p.quality ?? 0) * 100)}%</Text>
+                    <Ionicons name="cloud-download-outline" size={15} color={MUTE} />
                   </TouchableOpacity>
                 ))}
               </View>

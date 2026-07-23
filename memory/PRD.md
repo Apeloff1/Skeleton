@@ -987,3 +987,36 @@
 ##     one failing import (loop_types.py duplicate __future__) → 51/51 engine modules LIVE, 0 dormant.
 ##   TESTS: jury routing + coverage curl-verified; frontend coverage panel screenshot OK.
 ##   DEFERRED still: X (Twitter) sign-in (awaiting user's X dev keys).
+
+## [Cowabunga v4] Autonomous Game-Dev Workflow + JeevesVault (Jun 2026)
+##   ADAPTED (not copied) the gameforge_mega_cowabunga_v4.zip — its standalone
+##   gameforge_v1 package imported dozens of non-existent modules (orchestration.*,
+##   governance.zaibatsu_policy_engine, utils.sota_*, advanced_procedural_pipeline,
+##   game_content_evaluator, game_memory_pockets) and gameforge_app.py had a syntax
+##   error. So the ideas were rebuilt as clean, self-contained modules.
+##   BACKEND: /app/backend/gameforge/workflow/ →
+##     - autonomous_workflow.py : Prompt→Testing→Concept→Production→Reflection→Deploy,
+##       cross-iteration memory (successful_patterns), exploit/explore strategy switching,
+##       improvement-directive closed loop, deterministic-but-varied quality model,
+##       resumable state. Quality climbs across iterations; deploys at >=0.85.
+##     - internal_build_system.py : self-contained zip bundle builder (stdlib), multi-arch,
+##       sha256 sign-sim. Bytes stored encrypted+versioned via boardroom_vault.
+##     - jeeves_vault.py : Mongo package registry (jeeves_vault col) — register, download
+##       token+limits+expiry, install instructions, search, stats, cleanup, delete, revoke.
+##     - project_orchestrator.py : long-horizon full-game plan → phases/milestones/sprints,
+##       agent delegation, build-per-phase, MASTER FINAL BUILD, quality gates.
+##     - workflow_persistence.py : Mongo run history (gameforge_workflow_runs) + resume state.
+##   ROUTE: routes/gameforge_workflow.py (/api/gameforge/workflow) registered in
+##     core/routes_registry.py. Endpoints: POST /run, /resume, /project; GET /runs,
+##     /runs/{id}, /status, /vault, /vault/search, /vault/stats, /vault/{id},
+##     /vault/{id}/download (base64 zip + install steps), DELETE /vault/{id}, POST /vault/cleanup.
+##   FRONTEND: new "Ship" tab in app/gameforge-studio.tsx (chosen 2b: wired into Studio,
+##     NOT a new screen). Prompt box + iteration chips + Run → result stats (final quality,
+##     iters, deploy-ready, strategy, genre/scope, quality-trend, per-iteration list) +
+##     Download package + JeevesVault list. Cross-platform download: web Blob anchor,
+##     native expo-file-system/legacy + expo-sharing. No cyan used.
+##   VERIFIED (curl/local): /run climbs 0.81→0.94 over 4 iters, deploys real 3166B PK zip;
+##     download returns valid zip (PK header, sha match) + 5 install steps; /project runs
+##     6 phases + delegates 5 agents + master build; vault list/stats OK. Frontend bundles
+##     clean (0 lint), Studio renders. Full UI e2e left to USER (their request).
+##   DEFERRED still: X (Twitter) sign-in (awaiting user's X dev keys).
