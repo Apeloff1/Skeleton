@@ -59,6 +59,18 @@ CAPABILITIES: List[Dict] = [
     {"key": "governance", "name": "Governance & Audit", "weight": 8,
      "probes": ["/api/governance/reports", "/api/governance/audit"],
      "section": "2.1 Core Patterns"},
+    {"key": "cqrs_events", "name": "CQRS · Event Sourcing · Event Bus", "weight": 6,
+     "probes": ["/api/prood/events"],
+     "section": "2.1 Core Patterns"},
+    {"key": "collaboration", "name": "Real-time Collaboration", "weight": 6,
+     "probes": ["/api/collaboration/sessions"],
+     "section": "3. Frontend"},
+    {"key": "marketplace", "name": "Marketplace & Community", "weight": 6,
+     "probes": ["/api/marketplace/listings", "/api/creators"],
+     "section": "2.2 Key Systems"},
+    {"key": "testing_qa", "name": "Testing & QA Pipeline", "weight": 6,
+     "probes": ["/api/testing-qa/overview"],
+     "section": "5. Quality"},
 ]
 
 # Special capability scored from the coverage report's own overall_percent.
