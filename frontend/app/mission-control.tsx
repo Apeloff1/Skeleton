@@ -12,6 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../src/utils/apiClient';
+import ChurnPanel from '../src/components/ChurnPanel';
 
 const GREEN = '#22c55e';
 const BLUE = '#3b82f6';
@@ -34,6 +35,9 @@ export default function MissionControl() {
   const [plans, setPlans] = React.useState<any[]>([]);
   const [logs, setLogs] = React.useState<any[]>([]);
   const [coverage, setCoverage] = React.useState<any>(null);
+  const [prood, setProod] = React.useState<any>(null);
+  const [saga, setSaga] = React.useState<any>(null);
+  const [sagaBusy, setSagaBusy] = React.useState(false);
   const [activateMsg, setActivateMsg] = React.useState('');
   const [selftest, setSelftest] = React.useState<any>(null);
   const [testing, setTesting] = React.useState(false);
@@ -42,10 +46,11 @@ export default function MissionControl() {
   const [live, setLive] = React.useState(false);
 
   const load = React.useCallback(async () => {
-    const [st, h, pos, pl, lg, cov] = await Promise.all([
+    const [st, h, pos, pl, lg, cov, prd] = await Promise.all([
       api.get<any>(`${RT}/status`), api.get<any>(`${RT}/health`), api.get<any>(`${RT}/positions`),
       api.get<any>(`${PLAN}/plans?limit=6`), api.get<any>(`${S}/logs?limit=18`),
       api.get<any>('/api/gameforge/coverage', { timeoutMs: 20000 }),
+      api.get<any>('/api/prood/readiness', { timeoutMs: 25000 }),
     ]);
     if (st.ok) setStatus(st.data);
     if (h.ok) setHealth(h.data);
@@ -53,6 +58,7 @@ export default function MissionControl() {
     if (pl.ok) setPlans(pl.data?.plans || []);
     if (lg.ok) setLogs(lg.data?.logs || []);
     if (cov.ok) setCoverage(cov.data);
+    if (prd.ok) setProod(prd.data);
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -69,6 +75,15 @@ export default function MissionControl() {
     const r = await api.get<any>('/api/gameforge/coverage/selftest', { timeoutMs: 30000 });
     if (r.ok) setSelftest(r.data);
     setTesting(false);
+  };
+
+  const runSaga = async (failAt: string | null) => {
+    setSagaBusy(true); setSaga(null);
+    const r = await api.post<any>('/api/prood/saga/deploy',
+      { project_name: failAt ? 'SagaRollback' : 'SagaDeploy', fail_at: failAt },
+      { timeoutMs: 30000 });
+    if (r.ok) setSaga(r.data);
+    setSagaBusy(false);
   };
 
   React.useEffect(() => { load(); }, [load]);
@@ -112,6 +127,35 @@ export default function MissionControl() {
               <Ionicons name="sync-circle" size={16} color={GREEN} />
               <Text style={s.selfHealTxt}>Self-healing runtime active{health?.reaped ? ` · reaped ${health.reaped}` : ''} · {status?.groupchat ?? 0} chat msgs</Text>
             </View>
+
+            {prood && (
+              <>
+                <Text style={s.h2}>🏗️ PROOD Readiness ({prood.overall_percent}%)</Text>
+                <View style={s.card}>
+                  <View style={[s.readyBanner, { backgroundColor: (prood.overall_percent >= 95 ? GREEN : AMBER) + '22' }]}>
+                    <Ionicons name={prood.overall_percent >= 95 ? 'checkmark-circle' : 'construct'} size={16} color={prood.overall_percent >= 95 ? GREEN : AMBER} />
+                    <Text style={[s.readyTxt, { color: prood.overall_percent >= 95 ? GREEN : AMBER }]}>
+                      {prood.capabilities_live}/{prood.capabilities_total} capabilities live · weighted {prood.overall_percent}% complete
+                    </Text>
+                  </View>
+                  {(prood.capabilities || []).map((c: any) => {
+                    const col = c.status === 'live' ? GREEN : c.status === 'partial' ? AMBER : RED;
+                    return (
+                      <View key={c.key} style={{ marginTop: 8 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                            <View style={[s.dot, { backgroundColor: col }]} />
+                            <Text style={s.roomName} numberOfLines={1}>{c.name}</Text>
+                          </View>
+                          <Text style={[s.pct, { color: col }]}>{Math.round((c.score ?? 0) * 100)}%</Text>
+                        </View>
+                        <View style={s.covTrack}><View style={[s.covFill, { width: `${Math.round((c.score ?? 0) * 100)}%`, backgroundColor: col }]} /></View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </>
+            )}
 
             <Text style={s.h2}>📦 Zip Coverage ({coverage?.overall_percent ?? 0}%)</Text>
             <View style={s.card}>
@@ -181,6 +225,43 @@ export default function MissionControl() {
                   <Text style={s.roomMeta}>{p.horizon_days}d · success {Math.round((p.simulation?.success_probability ?? 0) * 100)}% · risk {Math.round((p.risk?.final_risk ?? 0) * 100)}% · {p.scenario}</Text>
                 </View>
               ))}
+            </View>
+
+            <Text style={s.h2}>🏛️ PROOD Architecture</Text>
+            <ChurnPanel projectName="MissionChurn" />
+            <View style={[s.card, { marginTop: 12 }]}>
+              <Text style={s.planObj}>Saga Orchestration (compensation & recovery)</Text>
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                <TouchableOpacity testID="mc-saga-ok" style={[s.activateBtn, { flex: 1, backgroundColor: GREEN }]} onPress={() => runSaga(null)} disabled={sagaBusy}>
+                  <Ionicons name="git-merge" size={15} color="#04120a" /><Text style={s.activateTxt}>Run saga</Text>
+                </TouchableOpacity>
+                <TouchableOpacity testID="mc-saga-fail" style={[s.activateBtn, { flex: 1, backgroundColor: AMBER }]} onPress={() => runSaga('deliver')} disabled={sagaBusy}>
+                  <Ionicons name="arrow-undo" size={15} color="#04120a" /><Text style={s.activateTxt}>Fail → rollback</Text>
+                </TouchableOpacity>
+              </View>
+              {sagaBusy && <View style={{ paddingVertical: 10, alignItems: 'center' }}><ActivityIndicator color={GREEN} /></View>}
+              {saga && (
+                <View style={{ marginTop: 10 }}>
+                  <View style={[s.readyBanner, { backgroundColor: (saga.status === 'completed' ? GREEN : AMBER) + '22' }]}>
+                    <Ionicons name={saga.status === 'completed' ? 'checkmark-circle' : 'refresh-circle'} size={16} color={saga.status === 'completed' ? GREEN : AMBER} />
+                    <Text style={[s.readyTxt, { color: saga.status === 'completed' ? GREEN : AMBER }]}>Saga {saga.status}</Text>
+                  </View>
+                  {(saga.forward_trace || []).map((t: any, i: number) => (
+                    <View key={`f${i}`} style={s.row}>
+                      <View style={[s.dot, { backgroundColor: t.status === 'ok' ? GREEN : RED }]} />
+                      <Text style={s.roomName}>→ {t.step}</Text>
+                      <Text style={[s.pct, { color: t.status === 'ok' ? GREEN : RED }]}>{t.status}</Text>
+                    </View>
+                  ))}
+                  {(saga.compensation_trace || []).map((t: any, i: number) => (
+                    <View key={`c${i}`} style={s.row}>
+                      <View style={[s.dot, { backgroundColor: BLUE }]} />
+                      <Text style={s.roomName}>↩ {t.step}</Text>
+                      <Text style={[s.pct, { color: BLUE }]}>{t.status}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
 
             <Text style={s.h2}>📜 Universal Logs</Text>

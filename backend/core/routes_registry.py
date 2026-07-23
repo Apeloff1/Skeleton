@@ -136,6 +136,7 @@ KNOWN_ROUTES: List[RouteEntry] = [
     ("routes.gameforge_tools",                  "router"),
     ("routes.gameforge_coverage",               "router"),
     ("routes.gameforge_workflow",               "router"),
+    ("routes.prood",                            "router"),
     ("routes.gameforge_auth",                   "router"),
     ("routes.nexus",                            "router"),
     # ── Quality-of-life / engagement routers ────────────────────────────

@@ -1020,3 +1020,28 @@
 ##     6 phases + delegates 5 agents + master build; vault list/stats OK. Frontend bundles
 ##     clean (0 lint), Studio renders. Full UI e2e left to USER (their request).
 ##   DEFERRED still: X (Twitter) sign-in (awaiting user's X dev keys).
+
+## [PROOD] Final Implementation — Readiness Audit + Architecture Patterns (Jun 2026)
+##   CONTEXT: 3 artifacts (PDF master doc + 2 zips). PROOD_CODE zip shipped only 6
+##   SKELETAL STUBS (hardcoded churn=93.2, billing=True, trivial event_bus, saga with
+##   NO compensation) — the existing backend already had far richer versions, so stubs
+##   were NOT copied (would regress). Implemented the genuinely-valuable pieces properly:
+##   BACKEND:
+##   - gameforge/prood/event_bus.py : real async pub/sub — error-isolated handlers,
+##     once(), unsubscribe, wildcard "*", bounded history, stats.
+##   - gameforge/prood/saga_orchestrator.py : REAL saga w/ compensation — forward
+##     execution + automatic rollback (reverse compensation) on failure, full trace.
+##   - routes/prood.py (/api/prood): GET /readiness (LIVE-PROBES 10 PROOD capabilities →
+##     real weighted completion %), GET /capabilities, POST /saga/deploy (real
+##     build→register→deliver saga w/ fail_at injection proving rollback), GET /events.
+##     Registered in core/routes_registry.py.
+##   FRONTEND:
+##   - src/components/ChurnPanel.tsx : real churn/quality-iteration panel (upgraded stub),
+##     wired to autonomous workflow. No cyan.
+##   - app/mission-control.tsx : added "PROOD Readiness" panel (99.5%, per-capability
+##     bars) + "PROOD Architecture" section (ChurnPanel + Saga run/rollback demo w/ trace).
+##   VERIFIED (curl + screenshot): /readiness = 99.5% (9/10 live, SOTA engines 95%);
+##     saga success = build→register→deliver all ok; saga fail@deliver = register
+##     auto-compensated (package deleted, ctx pkg=None); events published=5. Mission
+##     Control renders both panels, 0 lint, no cyan.
+##   PROJECT COMPLETE %: 99.5% (live-probed weighted, /api/prood/readiness).
