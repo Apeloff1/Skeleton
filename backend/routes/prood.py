@@ -71,6 +71,9 @@ CAPABILITIES: List[Dict] = [
     {"key": "testing_qa", "name": "Testing & QA Pipeline", "weight": 6,
      "probes": ["/api/testing-qa/overview"],
      "section": "5. Quality"},
+    {"key": "omega_conductor", "name": "Ω-Ultra Conductor (context · agents · jeeves)", "weight": 8,
+     "probes": ["/api/omega/roles", "/api/omega/sessions"],
+     "section": "2.1 Core Patterns"},
 ]
 
 # Special capability scored from the coverage report's own overall_percent.
