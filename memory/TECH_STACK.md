@@ -174,6 +174,16 @@ Every successful `POST /api/gameforge/studio/ship` now auto-attaches a Jeeves-co
 **Build Brief** (`out.build_brief`): narrative + 4 chart variations + competency spreadsheet +
 PDF — living release documentation Jeeves writes itself.
 
+### Cinematic quality + Press Kit (2026-06)
+- **Cinematic post** `gameforge/media/cinematic.py` — filmic color-grade (per-world mood),
+  bloom on highlights, atmospheric haze, radial vignette, S-curve contrast, film grain, 2.39:1
+  letterbox (cached masks → video-fast). Renderer upgraded: celestial glow, star/ember field,
+  4-layer parallax, rim-lit sprites, motion trails, particles. Stills now **1280×720 HD**,
+  video **1024×576** cinematic.
+- **Press Kit** `POST /api/jeeves/media/presskit` (background) → store-ready **ZIP**: 23 HD stills
+  + 2-min trailer + 1-min showcase + Jeeves fact-sheet PDF + README. `GET /presskit/download/{id}`.
+  Frontend Media Studio: "CINEMATIC · HD" badge + one-tap "Assemble Press Kit".
+
 ### Stage E — Ops & scale  ✅ COMPLETE (2026-06)
 - **E1** ✅ APScheduler `AsyncIOScheduler` (`core/scheduler.py`) — autonomic jobs:
   `lafs_online_sweep` (30m), `legion_drill` (10m), `fabric_snapshot` (5m). Started on boot,

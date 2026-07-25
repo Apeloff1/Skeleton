@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 
 from gameforge.media.studio import (
     GameWorld, render_image_set, produce_video, media_path, VIDEO_TYPES,
+    produce_presskit, presskit_path,
 )
 
 router = APIRouter(prefix="/api/jeeves/media", tags=["jeeves-media"])
@@ -101,3 +102,33 @@ async def download(job_id: str):
     if not path:
         raise HTTPException(status_code=404, detail="media not ready")
     return FileResponse(path, media_type="video/mp4", filename=f"{job_id}.mp4")
+
+
+# ── Press Kit — store-ready ZIP (images + trailer + showcase + fact-sheet) ──
+async def _run_presskit(job_id: str, game_name: str):
+    prog = _JOBS[job_id]
+    try:
+        world = _world(game_name)
+        result = await asyncio.to_thread(produce_presskit, world, job_id, prog)
+        prog.update(result); prog["status"] = "done"
+    except Exception as e:  # noqa: BLE001
+        prog["status"] = "error"; prog["error"] = str(e)[:300]
+
+
+@router.post("/presskit")
+async def presskit(req: MediaReq):
+    """Assemble a store-ready press kit ZIP in the background."""
+    job_id = f"{req.game_name}-presskit-{uuid.uuid4().hex[:8]}".replace(" ", "_")
+    _JOBS[job_id] = {"status": "rendering", "kind": "presskit",
+                     "game_name": req.game_name, "percent": 0.0, "stage": "queued"}
+    asyncio.create_task(_run_presskit(job_id, req.game_name))
+    return {"ok": True, "job_id": job_id, "status": "rendering",
+            "poll": f"/api/jeeves/media/video/{job_id}"}
+
+
+@router.get("/presskit/download/{job_id}")
+async def presskit_download(job_id: str):
+    path = presskit_path(job_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="press kit not ready")
+    return FileResponse(path, media_type="application/zip", filename=f"{job_id}_presskit.zip")

@@ -32,8 +32,10 @@ VIDEO_TYPES = {
     "clip120":   (120, 12, "gameplay",  "120s Gameplay"),
     "trailer":   (120, 12, "trailer",   "2-min Trailer"),
     "showcase":  (60,  15, "showcase",  "1-min Showcase"),
-    "letsplay":  (300, 10, "letsplay",  "5-min Let's Play w/ Commentary"),
+    "letsplay":  (300, 8,  "letsplay",  "5-min Let's Play w/ Commentary"),
 }
+_VW, _VH = 1024, 576      # cinematic video resolution (16:9, /8 aligned)
+_IW, _IH = 1280, 720      # HD still resolution
 
 
 def _img_b64(img) -> str:
@@ -51,26 +53,26 @@ def render_image_set(world: GameWorld) -> List[Dict]:
 
     # main character — portrait close-up
     push("main_character", f"{world.name} — Protagonist",
-         world.render_frame(3.0, 640, 360, camera_x=world.player_pos(3.0)[0] - 320,
+         world.render_frame(3.0, _IW, _IH, camera_x=world.player_pos(3.0)[0] - _IW / 2,
                             hud=False, portrait=0))
     # cast — a lineup of every cast member
     push("cast", f"{world.name} — Cast",
-         world.render_frame(8.0, 640, 360, hud=False, label="THE CAST"))
+         world.render_frame(8.0, _IW, _IH, hud=False, label="THE CAST"))
     # promos 1-3 — dramatic hero shots
     for i in range(1, 4):
         push(f"promo_{i}", f"{world.name} — Promo {i}",
-             world.render_frame(6.0 * i + 2, 640, 360, hud=False,
+             world.render_frame(6.0 * i + 2, _IW, _IH, hud=False,
                                 label=f"{world.name.upper()}"))
     # extended promos 4-10 — varied scenes
     for i in range(4, 11):
         push(f"promo_{i}", f"{world.name} — Extended Promo {i}",
-             world.render_frame(11.0 * i, 640, 360, hud=False,
+             world.render_frame(11.0 * i, _IW, _IH, hud=False,
                                 portrait=(i % len(world.cast))))
     # landscapes 10-20 — wide world regions (no player/HUD)
     for i in range(10, 21):
         cam = (world.world_len / 11) * (i - 10)
         push(f"landscape_{i}", f"{world.name} — Landscape {i}",
-             world.render_frame(i * 1.7, 800, 360, camera_x=cam, hud=False))
+             world.render_frame(i * 1.7, _IW, _IH, camera_x=cam, hud=False))
     return out
 
 
@@ -138,7 +140,7 @@ def _tts_mp3(text: str, path: str) -> bool:
 def produce_video(world: GameWorld, vtype: str, job_id: str,
                   progress: Optional[Dict] = None) -> Dict:
     dur, fps, mode, label = VIDEO_TYPES[vtype]
-    W, H = (640, 360)
+    W, H = (_VW, _VH)
     raw_path = os.path.join(_MEDIA_DIR, f"{job_id}.mp4")
     total = int(dur * fps)
     writer = iio.get_writer(raw_path, fps=fps, codec="libx264", quality=6,
@@ -187,4 +189,70 @@ def media_path(job_id: str) -> Optional[str]:
     return None
 
 
-__all__ = ["GameWorld", "render_image_set", "produce_video", "media_path", "VIDEO_TYPES"]
+def _factsheet_pdf(world: GameWorld, path: str):
+    """Jeeves-written one-page press fact-sheet."""
+    from reportlab.lib.pagesizes import LETTER
+    from reportlab.lib.units import inch
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    doc = SimpleDocTemplate(path, pagesize=LETTER, title=f"{world.name} Press Kit")
+    ss = getSampleStyleSheet()
+    h = ParagraphStyle("H", parent=ss["Title"], textColor=colors.HexColor("#7c3aed"))
+    sub = ParagraphStyle("S", parent=ss["Heading2"], textColor=colors.HexColor("#22c55e"))
+    story = [Paragraph(f"{world.name} — Official Press Kit", h), Spacer(1, 0.2 * inch),
+             Paragraph("Overview", sub),
+             Paragraph(f"{world.name} is a cinematic adventure through a hand-crafted world. "
+                       f"Featuring a cast of {len(world.cast)} — {', '.join(world.cast[:5])} — "
+                       f"across sprawling, atmospheric landscapes.", ss["BodyText"]),
+             Spacer(1, 0.15 * inch), Paragraph("Included Assets", sub),
+             Paragraph("23 hi-res stills (protagonist, cast, 10 promos, 11 landscapes), "
+                       "a 2-minute trailer and a 1-minute showcase — all rendered in-engine.",
+                       ss["BodyText"]),
+             Spacer(1, 0.15 * inch), Paragraph("Contact", sub),
+             Paragraph("Produced by Jeeves · GameForge Zaibatsu CNS", ss["BodyText"])]
+    doc.build(story)
+
+
+def produce_presskit(world: GameWorld, job_id: str, progress: Optional[Dict] = None) -> Dict:
+    """Bundle a store-ready ZIP: 23 stills + trailer + showcase + fact-sheet PDF."""
+    import zipfile
+    if progress is not None:
+        progress["stage"] = "images"; progress["percent"] = 5.0
+    imgs = render_image_set(world)
+    if progress is not None:
+        progress["stage"] = "trailer"; progress["percent"] = 30.0
+    produce_video(world, "trailer", f"{job_id}_trailer", None)
+    if progress is not None:
+        progress["stage"] = "showcase"; progress["percent"] = 65.0
+    produce_video(world, "showcase", f"{job_id}_showcase", None)
+    if progress is not None:
+        progress["stage"] = "packaging"; progress["percent"] = 90.0
+    pdf_path = os.path.join(_MEDIA_DIR, f"{job_id}_factsheet.pdf")
+    _factsheet_pdf(world, pdf_path)
+
+    zip_path = os.path.join(_MEDIA_DIR, f"{job_id}_presskit.zip")
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+        for im in imgs:
+            z.writestr(f"images/{im['key']}.png", base64.b64decode(im["base64"]))
+        for tag in ("trailer", "showcase"):
+            mp = media_path(f"{job_id}_{tag}")
+            if mp:
+                z.write(mp, f"video/{tag}.mp4")
+        z.write(pdf_path, "factsheet.pdf")
+        z.writestr("README.txt", f"{world.name} Press Kit — produced by Jeeves / GameForge.\n"
+                   f"{len(imgs)} stills, trailer, showcase, fact-sheet.\n")
+    if progress is not None:
+        progress["percent"] = 100.0; progress["stage"] = "done"
+    return {"ok": True, "job_id": job_id, "images": len(imgs),
+            "size_bytes": os.path.getsize(zip_path),
+            "download_url": f"/api/jeeves/media/presskit/download/{job_id}"}
+
+
+def presskit_path(job_id: str) -> Optional[str]:
+    p = os.path.join(_MEDIA_DIR, f"{job_id}_presskit.zip")
+    return p if os.path.exists(p) else None
+
+
+__all__ = ["GameWorld", "render_image_set", "produce_video", "media_path",
+           "produce_presskit", "presskit_path", "VIDEO_TYPES"]

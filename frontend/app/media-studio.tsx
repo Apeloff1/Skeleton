@@ -38,7 +38,9 @@ export default function MediaStudio() {
   const [images, setImages] = React.useState<any[]>([]);
   const [job, setJob] = React.useState<any>(null);
   const [vType, setVType] = React.useState<string>('');
+  const [pk, setPk] = React.useState<any>(null);
   const pollRef = React.useRef<any>(null);
+  const pkPollRef = React.useRef<any>(null);
 
   const genImages = async () => {
     setImgBusy(true); setImages([]);
@@ -64,7 +66,24 @@ export default function MediaStudio() {
     }, 3000);
   };
 
-  React.useEffect(() => () => stopPoll(), []);
+  React.useEffect(() => () => { stopPoll(); if (pkPollRef.current) clearInterval(pkPollRef.current); }, []);
+
+  const genPressKit = async () => {
+    if (pkPollRef.current) clearInterval(pkPollRef.current);
+    setPk({ status: 'rendering', percent: 0, stage: 'queued' });
+    const r = await api.post<any>('/api/jeeves/media/presskit', { game_name: game }, { timeoutMs: 30000 });
+    if (!r.ok) { setPk({ status: 'error' }); return; }
+    const id = r.data.job_id;
+    pkPollRef.current = setInterval(async () => {
+      const s = await api.get<any>(`/api/jeeves/media/video/${id}`);
+      if (s.ok) {
+        setPk({ ...s.data, job_id: id });
+        if (s.data.status === 'done' || s.data.status === 'error') clearInterval(pkPollRef.current);
+      }
+    }, 4000);
+  };
+
+  const pkUrl = pk?.status === 'done' && pk?.job_id ? `${BASE}/api/jeeves/media/presskit/download/${pk.job_id}` : null;
 
   const videoUrl = job?.status === 'done' && job?.job_id ? `${BASE}/api/jeeves/media/download/${job.job_id}` : null;
 
@@ -81,12 +100,32 @@ export default function MediaStudio() {
 
       <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 40 }}>
         <View style={st.card}>
-          <Text style={st.lbl}>Game</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <Text style={st.lbl}>Game</Text>
+            <View style={[st.chip, { backgroundColor: AMBER + '22' }]}>
+              <Ionicons name="film" size={11} color={AMBER} />
+              <Text style={[st.chipTxt, { color: AMBER }]}>CINEMATIC · HD</Text>
+            </View>
+          </View>
           <TextInput style={st.input} value={game} onChangeText={setGame} testID="game-input"
             placeholder="Game name" placeholderTextColor={MUTE} />
           <TouchableOpacity style={[st.btn, { backgroundColor: PURPLE }]} onPress={genImages} disabled={imgBusy} testID="gen-images">
             {imgBusy ? <ActivityIndicator color="#fff" /> : <Text style={st.btnTxt}>Generate In-Game Image Set (23)</Text>}
           </TouchableOpacity>
+          <TouchableOpacity style={[st.btn, { backgroundColor: AMBER, marginTop: 8 }]} onPress={genPressKit} testID="gen-presskit">
+            <Text style={[st.btnTxt, { color: '#0b1220' }]}>Assemble Press Kit ZIP 🎬</Text>
+          </TouchableOpacity>
+          {pk && pk.status === 'rendering' && (
+            <View style={{ marginTop: 12 }}>
+              <Text style={st.sub}>Building press kit · {pk.stage}… {pk.percent || 0}%</Text>
+              <View style={st.track}><View style={[st.fill, { width: `${pk.percent || 0}%`, backgroundColor: AMBER }]} /></View>
+            </View>
+          )}
+          {pkUrl && (
+            <TouchableOpacity style={[st.btn, { backgroundColor: GREEN, marginTop: 10 }]} onPress={() => Linking.openURL(pkUrl)} testID="download-presskit">
+              <Text style={[st.btnTxt, { color: '#0b1220' }]}>⬇ Download Press Kit ({Math.round((pk.size_bytes || 0) / 1048576)} MB)</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {images.length > 0 && (

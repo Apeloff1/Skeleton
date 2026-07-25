@@ -39,12 +39,18 @@ def _font(size: int):
         return ImageFont.load_default()
 
 
+def _rgba(hex_color: str, alpha: int) -> Tuple[int, int, int, int]:
+    h = hex_color.lstrip("#")
+    return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), max(0, min(255, alpha)))
+
+
 class GameWorld:
     def __init__(self, game_name: str, files: Optional[List[Dict]] = None):
         self.name = game_name or "Untitled"
         self.seed = _seed(self.name)
         rng = self.seed
         self.sky = _SKY[rng % len(_SKY)]
+        self.mood = ["ember", "night", "dusk", "forest"][rng % len(_SKY)]
         files = files or []
         # entity roster: prefer real gamefiles, else synthesise from the name
         names = [f.get("filename", f"entity{i}").split(".")[0][:12]
@@ -87,66 +93,118 @@ class GameWorld:
     # ── render ─────────────────────────────────────────────────
     def render_frame(self, t: float, W: int = 640, H: int = 360,
                      camera_x: Optional[float] = None, hud: bool = True,
-                     label: Optional[str] = None, portrait: Optional[int] = None) -> Image.Image:
+                     label: Optional[str] = None, portrait: Optional[int] = None,
+                     cinematic: bool = True) -> Image.Image:
         img = self._sky_bg(W, H)
-        d = ImageDraw.Draw(img)
+        d = ImageDraw.Draw(img, "RGBA")
         px, py = self.player_pos(t)
         cam = camera_x if camera_x is not None else px - W * 0.35
 
         def sx(wx):  # world→screen x
             return int(wx - cam)
 
-        # parallax hills (landscape)
+        # ── celestial body + glow (sun/moon) ──
+        sun_x, sun_y = int(W * 0.74), int(H * 0.24)
+        glow = "#f59e0b" if self.mood in ("ember", "dusk") else "#a5b4fc"
+        for rr, aa in ((90, 24), (60, 40), (34, 90)):
+            d.ellipse([sun_x - rr, sun_y - rr, sun_x + rr, sun_y + rr],
+                      fill=_rgba(glow, aa))
+        d.ellipse([sun_x - 22, sun_y - 22, sun_x + 22, sun_y + 22], fill=_rgba(glow, 235))
+
+        # ── star / ember field (deterministic) ──
+        for i in range(46):
+            r = (self.seed >> (i % 24)) ^ (i * 2654435761 & 0xFFFFFF)
+            sx0 = (r % W)
+            sy0 = ((r // W) % int(H * 0.6))
+            tw = 1 + ((r >> 3) % 2)
+            a = 90 + ((r >> 5) % 130)
+            d.ellipse([sx0, sy0, sx0 + tw, sy0 + tw], fill=_rgba("#e2e8f0", a))
+
+        # ── parallax terrain (4 depth-graded layers) ──
         ground_y = int(H * 0.72)
-        for layer, (speed, col, base) in enumerate([(0.3, (30, 27, 55), 40),
-                                                     (0.6, (44, 33, 74), 24),
-                                                     (1.0, (17, 24, 39), 8)]):
-            step = 80
+        layers = [(0.2, (26, 22, 48), 60), (0.4, (34, 28, 62), 42),
+                  (0.7, (44, 33, 74), 24), (1.0, (14, 20, 34), 6)]
+        for speed, col, base in layers:
+            step = int(80 * (W / 640))
             pts = [(W, H)]
             x = -((cam * speed) % step) - step
             while x < W + step:
                 wx = x + (cam * speed)
-                hy = ground_y + base - self.hills[int(wx / step) % len(self.hills)]
+                hy = ground_y + base - self.hills[int(wx / step) % len(self.hills)] * (H / 360)
                 pts.append((int(x), int(hy)))
                 x += step
             pts.append((0, H))
             d.polygon(pts, fill=col)
-        # ground
-        d.rectangle([0, ground_y + 40, W, H], fill=(12, 10, 24))
+        d.rectangle([0, int(ground_y + 40 * (H / 360)), W, H], fill=(10, 9, 20))
+
+        sc = H / 360.0  # sprite scale factor
+
+        def _sprite(cx, cy, color, rim="#ffffff", scale=1.0):
+            rr = int(11 * sc * scale)
+            # soft ground shadow
+            d.ellipse([cx - rr, cy + rr, cx + rr, cy + int(rr * 1.4)], fill=_rgba("#000000", 90))
+            # body
+            d.ellipse([cx - rr, cy - rr, cx + rr, cy + rr], fill=color)
+            # rim light
+            d.arc([cx - rr, cy - rr, cx + rr, cy + rr], 200, 340, fill=rim, width=max(1, int(2 * sc)))
+            # head glint
+            d.ellipse([cx - rr // 3, cy - rr // 2, cx + rr // 3, cy], fill=_rgba("#ffffff", 200))
 
         # entities
         for i in range(len(self.cast)):
             ex, ey = self.entity_pos(i, t)
             sxe = sx(ex)
-            if -30 < sxe < W + 30:
+            if -40 < sxe < W + 40:
                 col = _ENTITY_COLORS[i % len(_ENTITY_COLORS)]
-                eyp = int(ground_y - 18 - ey * 0.15)
-                d.ellipse([sxe - 10, eyp - 10, sxe + 10, eyp + 10], fill=col)
-                d.polygon([(sxe - 8, eyp + 8), (sxe + 8, eyp + 8), (sxe, eyp + 20)], fill=col)
+                eyp = int(ground_y - 18 * sc - ey * 0.15)
+                _sprite(sxe, eyp, col, scale=0.9)
 
-        # player (protagonist)
+        # player (protagonist) with motion trail
         pxs = sx(px)
-        pyp = int(ground_y - 22 - py * 0.15)
-        d.ellipse([pxs - 13, pyp - 13, pxs + 13, pyp + 13], fill="#7c3aed",
-                  outline="#ffffff", width=2)
-        d.ellipse([pxs - 5, pyp - 5, pxs + 5, pyp + 5], fill="#ffffff")
+        pyp = int(ground_y - 22 * sc - py * 0.15)
+        for k in range(1, 4):
+            tp = t - k * 0.12
+            tx = sx(self.player_pos(tp)[0])
+            ty = int(ground_y - 22 * sc - self.player_pos(tp)[1] * 0.15)
+            d.ellipse([tx - 10 * sc, ty - 10 * sc, tx + 10 * sc, ty + 10 * sc],
+                      fill=_rgba("#7c3aed", 60 - k * 15))
+        _sprite(pxs, pyp, "#7c3aed", rim="#ffffff", scale=1.25)
+
+        # ── floating embers / dust particles ──
+        for i in range(18):
+            r = (self.seed * (i + 3)) & 0xFFFFFF
+            fx = int((r + t * (20 + i)) % W)
+            fy = int(H - ((r >> 4) + t * (14 + i * 2)) % H)
+            d.ellipse([fx, fy, fx + 2, fy + 2], fill=_rgba(glow, 120))
 
         # portrait spotlight (character close-up framing)
         if portrait is not None:
             who = self.cast[portrait % len(self.cast)] if portrait > 0 else self.name
             col = "#7c3aed" if portrait == 0 else _ENTITY_COLORS[portrait % len(_ENTITY_COLORS)]
-            d.rectangle([0, 0, W, H], outline=col, width=6)
-            d.text((16, 16), who, font=_font(26), fill="#ffffff")
+            d.rectangle([0, 0, W, H], outline=col, width=max(4, int(6 * sc)))
 
+        if cinematic:
+            from gameforge.media.cinematic import grade
+            img = grade(img, mood=self.mood, bloom=True, grain=0.03, letterbox=True)
+            d = ImageDraw.Draw(img, "RGBA")
+
+        # ── text overlays (after grade so they stay crisp) ──
+        if portrait is not None:
+            who = self.cast[portrait % len(self.cast)] if portrait > 0 else self.name
+            d.text((18, 18), who, font=_font(int(26 * sc)), fill="#ffffff",
+                   stroke_width=2, stroke_fill="#000000")
         if hud:
-            d.rectangle([0, 0, W, 30], fill=(0, 0, 0))
-            d.text((10, 6), f"{self.name}", font=_font(16), fill="#22c55e")
-            d.text((W - 120, 6), f"t={t:.1f}s", font=_font(14), fill="#e2e8f0")
+            d.text((12, int(10 * sc)), f"{self.name}", font=_font(int(16 * sc)),
+                   fill="#22c55e", stroke_width=2, stroke_fill="#000000")
+            d.text((W - int(130 * sc), int(10 * sc)), f"t={t:.1f}s",
+                   font=_font(int(14 * sc)), fill="#e2e8f0", stroke_width=2, stroke_fill="#000000")
         if label:
-            tw = d.textlength(label, font=_font(22))
-            d.rectangle([(W - tw) / 2 - 12, H - 46, (W + tw) / 2 + 12, H - 12], fill=(0, 0, 0))
-            d.text(((W - tw) / 2, H - 42), label, font=_font(22), fill="#f59e0b")
+            f = _font(int(24 * sc))
+            tw = d.textlength(label, font=f)
+            d.text(((W - tw) / 2, H - int(52 * sc)), label, font=f, fill="#f59e0b",
+                   stroke_width=3, stroke_fill="#000000")
         return img
 
 
 __all__ = ["GameWorld"]
+
