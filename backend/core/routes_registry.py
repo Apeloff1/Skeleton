@@ -321,6 +321,54 @@ KNOWN_ROUTES_WITH_PREFIX: List[RouteEntry] = [
 ]
 
 
+# ───────────────────────────────────────────────────────────────────────
+# Stage A4 — LOGICAL ROUTE-TREE GROUPING
+# ───────────────────────────────────────────────────────────────────────
+# Rather than physically relocating 284 route modules (68 of which import
+# each other), the route tree is grouped *logically* by module-name prefix.
+# ``route_group_summary()`` classifies every declared route into one of these
+# buckets and reports the counts — giving an auditable, package-like view of
+# the API surface without risking a fragile cross-import reshuffle.
+ROUTE_GROUPS: List[Tuple[str, Tuple[str, ...]]] = [
+    ("gameforge", ("routes.gameforge",)),
+    ("prood",     ("routes.prood", "routes.churn", "routes.orchestrator", "routes.provenance")),
+    ("omega",     ("routes.omega",)),
+    ("lafs",      ("routes.lafs",)),
+    ("jeeves",    ("routes.jeeves",)),
+    ("agents",    ("routes.agent", "routes.multi_agent", "routes.pipeline_agents", "routes.swarm", "routes.groupchat")),
+    ("playable",  ("routes.playable", "routes.game_kb", "routes.game_modes", "routes.snowball", "routes.canon")),
+    ("worldforge", ("routes.worldforge", "routes.asset_genesis", "routes.faction")),
+    ("engines",   ("routes.world_engine", "routes.narrative_engine", "routes.logic_engine",
+                   "routes.physics_engine", "routes.math_engine", "routes.cs_engine")),
+    ("pipelines", ("routes.",)),  # any *_pipeline caught below via suffix
+    ("academy",   ("routes.academy", "routes.curriculum", "routes.reading", "routes.language",
+                   "routes.math_academy", "routes.class_")),
+    ("infra",     ("routes.health", "routes.boot", "routes.telemetry", "routes.observability",
+                   "routes.feature_flags", "routes.ops", "routes.governance", "routes.storage")),
+]
+
+
+def group_of(module_path: str) -> str:
+    """Classify a ``routes.xyz`` module path into a logical group name."""
+    if module_path.endswith("_pipeline"):
+        return "pipelines"
+    for name, prefixes in ROUTE_GROUPS:
+        if name == "pipelines":
+            continue
+        if any(module_path.startswith(p) for p in prefixes):
+            return name
+    return "other"
+
+
+def route_group_summary() -> dict:
+    """Return ``{group_name: [module, ...]}`` over all declared routes."""
+    summary: dict[str, list[str]] = {}
+    for entry in (*KNOWN_ROUTES, *KNOWN_ROUTES_WITH_PREFIX):
+        mod = entry[0]
+        summary.setdefault(group_of(mod), []).append(mod)
+    return {g: sorted(mods) for g, mods in sorted(summary.items())}
+
+
 def register_known_routes(app: FastAPI) -> dict:
     """Register every router declared in this module. Mounts the prefixed
     routers FIRST (so their /api/* paths are visible to OpenAPI before the
@@ -331,6 +379,10 @@ def register_known_routes(app: FastAPI) -> dict:
         "ok": r1["ok"] + r2["ok"],
         "skipped": r1["skipped"] + r2["skipped"],
         "skipped_names": r1["skipped_names"] + r2["skipped_names"],
+        # Stage A4 — logical route-tree grouping (no physical file moves; 68
+        # route modules cross-import each other so grouping is expressed as a
+        # classifier rather than a package reshuffle).
+        "groups": route_group_summary(),
     }
     # ★ Surface the report on /api/health/registry. Best-effort — the
     # diagnostic endpoint is optional, so a missing module never fails boot.
@@ -356,4 +408,7 @@ __all__ = [
     "register_known_routes",
     "KNOWN_ROUTES",
     "KNOWN_ROUTES_WITH_PREFIX",
+    "ROUTE_GROUPS",
+    "group_of",
+    "route_group_summary",
 ]

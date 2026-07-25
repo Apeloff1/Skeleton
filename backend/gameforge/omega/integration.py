@@ -26,6 +26,15 @@ from gameforge.omega.conductor import (
 _MAX_AGENTS = 250          # soft cap → evict oldest to bound background guardians
 _IQ_MAX = 200.0
 
+# ── Durable persistence (Stage A1) ────────────────────────────────────
+# The fabric's accumulated intelligence (System-IQ, total emissions, blocked
+# repeats and the recent growth log) is the ONLY state that must survive a
+# pod restart / fork — the conductors themselves rebuild fresh on boot. We
+# persist ONLY these scalar/log fields to Mongo (collection below), throttled
+# so a hot emission path never blocks on a DB round-trip.
+_PERSIST_COLLECTION = "omega_persistence"
+_PERSIST_ID = "fabric"
+
 
 class OmegaFabric:
     def __init__(self):
@@ -40,10 +49,72 @@ class OmegaFabric:
         self.blocked_repeats = 0
         self.growth_log: List[Dict] = []
 
+        self._loaded = False
+        self._last_persist = 0.0
+
+    # ── durable state helpers (A1) ────────────────────────────
+    def _persist_enabled(self) -> bool:
+        try:
+            from core.settings import get_settings
+            return get_settings().omega_persist
+        except Exception:  # noqa: BLE001
+            return True
+
+    def _persist_interval(self) -> float:
+        try:
+            from core.settings import get_settings
+            return float(get_settings().omega_persist_interval_s)
+        except Exception:  # noqa: BLE001
+            return 5.0
+
+    async def _load_state(self):
+        """Restore accumulated IQ / counters / recent growth from Mongo once."""
+        if self._loaded or not self._persist_enabled():
+            self._loaded = True
+            return
+        self._loaded = True
+        try:
+            from core.databases import core_db
+            doc = await core_db[_PERSIST_COLLECTION].find_one({"_id": _PERSIST_ID})
+            if doc:
+                self.system_iq = float(doc.get("system_iq", self.system_iq))
+                self.total_emissions = int(doc.get("total_emissions", 0))
+                self.blocked_repeats = int(doc.get("blocked_repeats", 0))
+                gl = doc.get("growth_log")
+                if isinstance(gl, list):
+                    self.growth_log = gl[-500:]
+        except Exception:  # noqa: BLE001 — never block boot on a cold DB
+            pass
+
+    async def _persist_state(self, force: bool = False):
+        """Throttled best-effort write of the fabric's durable state."""
+        if not self._persist_enabled():
+            return
+        now = time.time()
+        if not force and (now - self._last_persist) < self._persist_interval():
+            return
+        self._last_persist = now
+        try:
+            from core.databases import core_db
+            await core_db[_PERSIST_COLLECTION].update_one(
+                {"_id": _PERSIST_ID},
+                {"$set": {
+                    "system_iq": self.system_iq,
+                    "total_emissions": self.total_emissions,
+                    "blocked_repeats": self.blocked_repeats,
+                    "growth_log": self.growth_log[-50:],
+                    "updated_at": now,
+                }},
+                upsert=True,
+            )
+        except Exception:  # noqa: BLE001 — persistence must never break emissions
+            pass
+
     # ── lifecycle ─────────────────────────────────────────────
     async def ensure_started(self):
         if self._started:
             return
+        await self._load_state()
         await self.jeeves.begin("percent", 100.0, fresh=True)
         await self.agent_map.begin("percent", 100.0, fresh=True)
         self.jeeves.attach("agent-map", self.agent_map)
@@ -74,6 +145,13 @@ class OmegaFabric:
                                 "iq": self.system_iq, "ts": time.time()})
         if len(self.growth_log) > 500:
             self.growth_log = self.growth_log[-500:]
+        # Best-effort throttled durable persistence (A1). Fire-and-forget so
+        # the emission hot-path never awaits a DB round-trip.
+        try:
+            import asyncio
+            asyncio.get_running_loop().create_task(self._persist_state())
+        except Exception:  # noqa: BLE001
+            pass
 
     def _lafs_remember(self, author: str, content: str, topic: str):
         """Best-effort: persist emission into the LAFS knowledge ledger."""
@@ -148,6 +226,8 @@ class OmegaFabric:
             "total_emissions": self.total_emissions,
             "blocked_repeats": self.blocked_repeats,
             "agents_tracked": len(self.agents),
+            "persisted": self._persist_enabled(),
+            "restored": self._loaded,
             "jeeves": self.jeeves.snapshot("jeeves-mastermap") if self._started else None,
             "agent_map": self.agent_map.snapshot("agent-map") if self._started else None,
             "agents": self.list_agents(),
