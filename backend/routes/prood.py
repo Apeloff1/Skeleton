@@ -74,6 +74,9 @@ CAPABILITIES: List[Dict] = [
     {"key": "omega_conductor", "name": "Ω-Ultra Conductor (context · agents · jeeves)", "weight": 8,
      "probes": ["/api/omega/roles", "/api/omega/sessions"],
      "section": "2.1 Core Patterns"},
+    {"key": "lafs_ledger", "name": "LAFS Deep-Probability Knowledge Ledger", "weight": 8,
+     "probes": ["/api/lafs/stats", "/api/lafs/hierarchy"],
+     "section": "4. SOTA Capabilities"},
 ]
 
 # Special capability scored from the coverage report's own overall_percent.

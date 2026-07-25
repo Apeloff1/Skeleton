@@ -75,6 +75,18 @@ class OmegaFabric:
         if len(self.growth_log) > 500:
             self.growth_log = self.growth_log[-500:]
 
+    def _lafs_remember(self, author: str, content: str, topic: str):
+        """Best-effort: persist emission into the LAFS knowledge ledger."""
+        try:
+            from gameforge.lafs import lafs as _lafs
+            domain = "Agent" if author != "jeeves" else "Meta"
+            log_type = "Handoff" if author != "jeeves" else "Reflection"
+            _lafs.add_sheet(domain, log_type,
+                            {"content": content[:2000], "topic": topic, "author": author},
+                            author=author, tags=[topic])
+        except Exception:  # noqa: BLE001 — ledger must never break emissions
+            pass
+
     # ── emissions ─────────────────────────────────────────────
     async def agent_emit(self, agent_id: str, content: str,
                          topic: str = "general") -> Dict:
@@ -85,6 +97,7 @@ class OmegaFabric:
             cond = await self.register_agent(agent_id)
             snap = await cond.deliver_context(content, page_id=f"{agent_id}:{topic}")
             self._grow("agent_emit", agent_id)
+            self._lafs_remember(agent_id, content, topic)
             return {"accepted": True, "blocked": False, "system_iq": self.system_iq,
                     "progress": snap["context"]["percent"], "merkle": snap["merkle_root"][:16],
                     "seq": snap["global_seq"]}
@@ -101,6 +114,7 @@ class OmegaFabric:
             await self.ensure_started()
             snap = await self.jeeves.deliver_response(content, page_id=f"jeeves:{topic}")
             self._grow("jeeves_emit", "jeeves")
+            self._lafs_remember("jeeves", content, topic)
             return {"accepted": True, "blocked": False, "system_iq": self.system_iq,
                     "progress": snap["response"]["percent"], "merkle": snap["merkle_root"][:16],
                     "seq": snap["global_seq"]}

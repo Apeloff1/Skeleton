@@ -138,6 +138,7 @@ KNOWN_ROUTES: List[RouteEntry] = [
     ("routes.gameforge_workflow",               "router"),
     ("routes.prood",                            "router"),
     ("routes.omega_conductor",                  "router"),
+    ("routes.lafs",                             "router"),
     ("routes.gameforge_auth",                   "router"),
     ("routes.nexus",                            "router"),
     # ── Quality-of-life / engagement routers ────────────────────────────

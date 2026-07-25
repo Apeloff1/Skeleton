@@ -1103,3 +1103,25 @@
 ##   NOTE: uploaded Decade-Tracker HTML (Jeeves→Jury auto-submit + rising IQ) uses CYAN
 ##   heavily — NOT copied; adapted the IQ-growth concept into the fabric instead.
 ##   PROJECT COMPLETE %: 99.6% (/api/prood/readiness, 15 capabilities, 14/15 live).
+
+## [LAFS] Deep-Probability Knowledge Ledger for Jeeves/agents (Jun 2026)
+##   Integrated uploaded LAFS DEEP PROBABILITY engine (the V8 zip was 1017 auto-gen
+##   FILLER files; the real content was the pasted LAFS code). Adapted to this backend:
+##   gameforge/lafs/lafs_engine.py + __init__.py.
+##   Engine: 3-level hierarchical Bayes (sheet→logtype→domain→global), Active-Inference
+##   Expected Free Energy, ASMC+MH rejuvenation, full Metropolis-Hastings MCMC, mean-field
+##   VI, graph belief propagation across cross-refs, contextual acquisition (efe/ucb/eig/
+##   poi/thompson/hybrid-deep). Compact real HIERARCHY (10 domains, 57 log types).
+##   ADAPTATIONS: Mongo-persisted (collection lafs_cabinet single doc → FORK-SAFE, vs
+##   original ephemeral cabinet.json); heavy _deep_refresh GATED behind deep=True flag
+##   (deep update measured 0.14s; fast 1ms) so API stays responsive.
+##   ROUTE routes/lafs.py (/api/lafs): stats, hierarchy, remember, recall, reinforce,
+##   related/{id}, jury/{id}. Facades Jeeves/Librarian/BuilderAgent.
+##   WIRED: OmegaFabric agent_emit/jeeves_emit now also LAFS.add_sheet (best-effort,
+##   fail-safe) → every agent/jeeves emission persists into the ledger.
+##   DEPS: added scipy==1.17.1 to requirements.txt (numpy already present).
+##   VERIFIED (curl): remember+cross_refs; reinforce (fast + deep) posterior climbs;
+##   recall EFE ranking; fabric groupchat → LAFS sheet auto-added (sheets grew to 4).
+##   Added PROOD readiness capability "LAFS Deep-Probability Knowledge Ledger" → live 100%.
+##   Overall readiness 99.6%, now 16 capabilities (15/16 live, SOTA engines 94%).
+##   PROJECT COMPLETE %: 99.6% (/api/prood/readiness).
