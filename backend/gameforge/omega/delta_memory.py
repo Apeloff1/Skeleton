@@ -32,7 +32,7 @@ import numpy as np
 
 # A modality-tagged content payload: text string, or (modality, bytes/base64).
 Content = Union[str, bytes]
-MODALITIES = ("text", "image", "audio", "video", "vector")
+MODALITIES = ("text", "image", "audio", "video", "pdf", "document", "vector")
 
 
 def _bytes_of(content: Content, modality: str) -> bytes:
@@ -40,7 +40,7 @@ def _bytes_of(content: Content, modality: str) -> bytes:
     if isinstance(content, bytes):
         return content
     s = str(content)
-    if modality in ("image", "audio", "video"):
+    if modality in ("image", "audio", "video", "pdf", "document"):
         # strip data-URI header if present, then base64-decode
         if s.startswith("data:"):
             s = s.split(",", 1)[-1]

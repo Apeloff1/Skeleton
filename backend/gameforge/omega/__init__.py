@@ -22,12 +22,14 @@ from gameforge.omega.conductor import (
 )
 from gameforge.omega.integration import OmegaFabric, omega_fabric
 from gameforge.omega.delta_memory import DeltaMemory, delta_memory
+from gameforge.omega.legions import LegionCommand, legion_command, Legion
 
 __all__ = [
     "OmegaUltraConductor", "AgentToAgentConductor", "OrchestratorConductor",
     "UserToJeevesConductor", "ConductorRegistry", "conductor_registry",
     "OmegaFabric", "omega_fabric",
     "DeltaMemory", "delta_memory",
+    "LegionCommand", "legion_command", "Legion",
     "IntegrityError", "RecoverableError", "RepetitionError",
     "ConsensusError", "MarathonStateError", "QueueOverflowError",
 ]

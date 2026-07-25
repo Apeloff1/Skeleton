@@ -7,10 +7,13 @@
 import React from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity,
-  ActivityIndicator, RefreshControl, TextInput,
+  ActivityIndicator, RefreshControl, TextInput, Platform, Alert, Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import api from '../src/utils/apiClient';
 import ChurnPanel from '../src/components/ChurnPanel';
 import Svg, { Polyline, Circle, Line as SvgLine, Rect } from 'react-native-svg';
@@ -75,6 +78,9 @@ export default function MissionControl() {
   const [ask, setAsk] = React.useState('');
   const [asking, setAsking] = React.useState(false);
   const [askReply, setAskReply] = React.useState<any>(null);
+  const [legions, setLegions] = React.useState<any>(null);
+  const [mobilizing, setMobilizing] = React.useState(false);
+  const [attachment, setAttachment] = React.useState<any>(null);
   const [activateMsg, setActivateMsg] = React.useState('');
   const [selftest, setSelftest] = React.useState<any>(null);
   const [testing, setTesting] = React.useState(false);
@@ -83,7 +89,7 @@ export default function MissionControl() {
   const [live, setLive] = React.useState(false);
 
   const load = React.useCallback(async () => {
-    const [st, h, pos, pl, lg, cov, prd, fab, dl, hm, act, efe] = await Promise.all([
+    const [st, h, pos, pl, lg, cov, prd, fab, dl, hm, act, efe, lgn] = await Promise.all([
       api.get<any>(`${RT}/status`), api.get<any>(`${RT}/health`), api.get<any>(`${RT}/positions`),
       api.get<any>(`${PLAN}/plans?limit=6`), api.get<any>(`${S}/logs?limit=18`),
       api.get<any>('/api/gameforge/coverage', { timeoutMs: 20000 }),
@@ -93,6 +99,7 @@ export default function MissionControl() {
       api.get<any>('/api/omega/delta/heatmap?cells=8'),
       api.get<any>('/api/prood/logs?limit=12'),
       api.get<any>('/api/lafs/top-efe?k=5'),
+      api.get<any>('/api/omega/legions', { timeoutMs: 15000 }),
     ]);
     if (st.ok) setStatus(st.data);
     if (h.ok) setHealth(h.data);
@@ -106,16 +113,81 @@ export default function MissionControl() {
     if (hm.ok) setHeatmap(hm.data?.heatmap || []);
     if (act.ok) setActivity(act.data?.logs || []);
     if (efe.ok) setTopEfe(efe.data?.top || []);
+    if (lgn.ok) setLegions(lgn.data);
     setLoading(false);
     setRefreshing(false);
   }, []);
 
+  const mobilizeArmy = async () => {
+    setMobilizing(true);
+    const r = await api.post<any>('/api/omega/legions/mobilize',
+      { wave_size: 800, directive: 'commander wave from mission control' }, { timeoutMs: 30000 });
+    if (r.ok) {
+      const lgn = await api.get<any>('/api/omega/legions');
+      if (lgn.ok) setLegions(lgn.data);
+    }
+    setMobilizing(false);
+  };
+
+  const pickImage = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        if (!perm.canAskAgain) {
+          Alert.alert('Photos access needed', 'Enable photo access to attach an image.',
+            [{ text: 'Cancel' }, { text: 'Open Settings', onPress: () => Linking.openSettings() }]);
+        }
+        return;
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, base64: true, quality: 0.6,
+      });
+      if (!res.canceled && res.assets?.[0]?.base64) {
+        setAttachment({ modality: 'image', base64: res.assets[0].base64, name: 'image' });
+      }
+    } catch { /* no-op */ }
+  };
+
+  const readBase64 = async (uri: string, file?: File) => {
+    if (Platform.OS === 'web') {
+      if (file) {
+        return await new Promise<string>((resolve) => {
+          const rd = new FileReader();
+          rd.onload = () => resolve(String(rd.result).split(',')[1] || '');
+          rd.readAsDataURL(file);
+        });
+      }
+      const blob = await (await fetch(uri)).blob();
+      return await new Promise<string>((resolve) => {
+        const rd = new FileReader();
+        rd.onload = () => resolve(String(rd.result).split(',')[1] || '');
+        rd.readAsDataURL(blob);
+      });
+    }
+    return await FileSystem.readAsStringAsync(uri, { encoding: 'base64' as any });
+  };
+
+  const pickDoc = async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'video/*'], copyToCacheDirectory: true,
+      });
+      if (res.canceled || !res.assets?.[0]) return;
+      const a = res.assets[0];
+      const isPdf = (a.mimeType || '').includes('pdf') || (a.name || '').toLowerCase().endsWith('.pdf');
+      const b64 = await readBase64(a.uri, (a as any).file);
+      if (b64) setAttachment({ modality: isPdf ? 'pdf' : 'video', base64: b64, name: a.name || (isPdf ? 'document.pdf' : 'video') });
+    } catch { /* no-op */ }
+  };
+
   const askJeeves = async () => {
-    if (!ask.trim()) return;
+    if (!ask.trim() && !attachment) return;
     setAsking(true); setAskReply(null);
-    const r = await api.post<any>('/api/lafs/jeeves/ask', { query: ask.trim(), top_k: 5 },
-      { timeoutMs: 45000 });
+    const body: any = { query: ask.trim() || 'Analyze the attached file', top_k: 5 };
+    if (attachment) body[`${attachment.modality}_base64`] = attachment.base64;
+    const r = await api.post<any>('/api/lafs/jeeves/ask', body, { timeoutMs: 60000 });
     if (r.ok) setAskReply(r.data);
+    setAttachment(null);
     setAsking(false);
   };
 
@@ -357,6 +429,42 @@ export default function MissionControl() {
               </View>
             )}
 
+            {/* Legion Command — Jeeves' game-building army */}
+            {legions && (
+              <View style={[s.card, { marginBottom: 12 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={s.planObj}>⚔️ Legion Command</Text>
+                  <Text style={s.roomMeta}>{(legions.total_roster_agents || 0).toLocaleString()} agents</Text>
+                </View>
+                <Text style={[s.roomMeta, { marginTop: 4 }]}>
+                  {legions.legion_count} specialty legions · army competency {legions.army_competency}
+                </Text>
+                <View style={{ height: 8, backgroundColor: '#0b1220', borderRadius: 4, marginTop: 8, overflow: 'hidden' }}>
+                  <View style={{ height: 8, width: `${Math.min(100, (legions.army_competency / 1000) * 100)}%`, backgroundColor: PURPLE }} />
+                </View>
+                {(legions.legions || []).slice(0, 5).map((l: any) => (
+                  <View key={l.id} style={{ marginTop: 10 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ color: '#e2e8f0', fontSize: 12 }} numberOfLines={1}>{l.name}</Text>
+                      <Text style={s.roomMeta}>{l.competency} · {l.size.toLocaleString()}</Text>
+                    </View>
+                    <View style={{ height: 5, backgroundColor: '#0b1220', borderRadius: 3, marginTop: 3, overflow: 'hidden' }}>
+                      <View style={{ height: 5, width: `${Math.min(100, (l.competency / 1000) * 100)}%`, backgroundColor: GREEN }} />
+                    </View>
+                    <Text style={[s.roomMeta, { fontSize: 10 }]} numberOfLines={1}>{l.specialty}</Text>
+                  </View>
+                ))}
+                <TouchableOpacity testID="mobilize-army-btn" onPress={mobilizeArmy} disabled={mobilizing}
+                  style={[s.askBtn, { marginTop: 12, paddingVertical: 11, backgroundColor: PURPLE }, mobilizing && { opacity: 0.6 }]}>
+                  {mobilizing ? <ActivityIndicator size="small" color="#fff" />
+                    : <Text style={[s.askBtnTxt, { color: '#fff' }]}>Jeeves: Mobilize the Army ⚔️</Text>}
+                </TouchableOpacity>
+                <Text style={[s.roomMeta, { marginTop: 6, textAlign: 'center' }]}>
+                  {(legions.total_agents_activated || 0).toLocaleString()} agents activated to date
+                </Text>
+              </View>
+            )}
+
             {/* What Jeeves Knows — top-EFE canon + RAG ask */}
             <View style={[s.card, { marginBottom: 12 }]}>
               <Text style={s.planObj}>🧠 What Jeeves Knows</Text>
@@ -373,6 +481,12 @@ export default function MissionControl() {
                 </View>
               ))}
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                <TouchableOpacity testID="attach-image-btn" onPress={pickImage} style={s.attachBtn}>
+                  <Ionicons name="image-outline" size={18} color={BLUE} />
+                </TouchableOpacity>
+                <TouchableOpacity testID="attach-doc-btn" onPress={pickDoc} style={s.attachBtn}>
+                  <Ionicons name="document-attach-outline" size={18} color={AMBER} />
+                </TouchableOpacity>
                 <TextInput
                   testID="jeeves-ask-input"
                   value={ask} onChangeText={setAsk}
@@ -385,10 +499,22 @@ export default function MissionControl() {
                     : <Text style={s.askBtnTxt}>Ask</Text>}
                 </TouchableOpacity>
               </View>
+              {attachment && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                  <Ionicons name="attach" size={14} color={GREEN} />
+                  <Text style={[s.roomMeta, { color: GREEN, flex: 1 }]} numberOfLines={1}>
+                    {attachment.modality.toUpperCase()} attached · {attachment.name}
+                  </Text>
+                  <TouchableOpacity onPress={() => setAttachment(null)}>
+                    <Ionicons name="close-circle" size={16} color={MUTE} />
+                  </TouchableOpacity>
+                </View>
+              )}
               {askReply && (
                 <View style={{ marginTop: 10, backgroundColor: '#0b1220', borderRadius: 10, padding: 10 }}>
                   <Text style={[s.roomMeta, { marginBottom: 4 }]}>
                     {askReply.model} · grounded in {askReply.recalled_count} sheet(s)
+                    {askReply.modalities && askReply.modalities.length > 1 ? ` · ${askReply.modalities.join('+')}` : ''}
                   </Text>
                   <Text style={{ color: '#e2e8f0', fontSize: 13, lineHeight: 19 }}>{askReply.reply}</Text>
                 </View>
@@ -481,6 +607,7 @@ const s = StyleSheet.create({
   askInput: { flex: 1, backgroundColor: '#0b1220', borderColor: '#334155', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#e2e8f0', fontSize: 13 },
   askBtn: { backgroundColor: '#22c55e', borderRadius: 10, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', minWidth: 64 },
   askBtnTxt: { color: '#0b1220', fontWeight: '700', fontSize: 14 },
+  attachBtn: { backgroundColor: '#0b1220', borderColor: '#334155', borderWidth: 1, borderRadius: 10, width: 40, alignItems: 'center', justifyContent: 'center' },
   title: { color: '#f1f5f9', fontSize: 16, fontWeight: '700' },
   sub: { color: MUTE, fontSize: 11, marginTop: 1 },
   liveBtn: { backgroundColor: '#1e293b', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },

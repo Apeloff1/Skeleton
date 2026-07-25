@@ -201,16 +201,33 @@ class JeevesAskReq(BaseModel):
     query: str = Field(..., min_length=2)
     top_k: int = 6
     domain_filter: Optional[str] = None
-    image_base64: Optional[str] = None   # optional image → multimodal grounding
-    audio_base64: Optional[str] = None   # folded into Delta memory as audio modality
+    image_base64: Optional[str] = None   # optional image → vision grounding
+    audio_base64: Optional[str] = None   # folded into Delta memory (audio)
+    pdf_base64: Optional[str] = None     # text-extracted + folded (pdf)
+    video_base64: Optional[str] = None   # folded into Delta memory (video)
+
+
+def _extract_pdf_text(b64: str) -> str:
+    """Best-effort PDF → text (first pages) for RAG grounding."""
+    try:
+        import base64 as _b64, io
+        from pypdf import PdfReader
+        raw = b64.split(",", 1)[-1] if b64.startswith("data:") else b64
+        reader = PdfReader(io.BytesIO(_b64.b64decode(raw)))
+        out = []
+        for pg in reader.pages[:8]:
+            out.append(pg.extract_text() or "")
+        return "\n".join(out)[:4000]
+    except Exception:  # noqa: BLE001
+        return ""
 
 
 @router.post("/jeeves/ask")
 async def jeeves_ask(req: JeevesAskReq):
-    """Retrieval-augmented, MULTIMODAL Jeeves reply: recall the most relevant
-    high-EFE LAFS sheets, optionally caption an attached image via a vision
-    model, then generate a grounded answer. Any attached media is also folded
-    into the fixed-size Delta (KDA) memory so Jeeves 'remembers' it."""
+    """Retrieval-augmented, MULTIMODAL Jeeves reply. Recalls high-EFE canon,
+    optionally captions an attached image (vision), extracts text from an
+    attached PDF, and folds ALL attached media (image/audio/pdf/video) into the
+    fixed-size Delta (KDA) memory so Jeeves remembers them."""
     recalled = lafs.probability_search(
         req.query, domain_filter=req.domain_filter,
         acquisition="hybrid-deep", top_k=max(1, min(req.top_k, 12)))
@@ -225,32 +242,39 @@ async def jeeves_ask(req: JeevesAskReq):
         snippet = (payload.get("extract") or payload.get("content")
                    or payload.get("description") or str(payload))[:400]
         ctx_lines.append(f"[{i}] ({r.get('path')}) {snippet}")
+
+    # PDF text extraction → additional grounding context
+    pdf_text = _extract_pdf_text(req.pdf_base64) if req.pdf_base64 else ""
+    if pdf_text:
+        ctx_lines.append(f"[PDF] {pdf_text[:1200]}")
     context_block = "\n".join(ctx_lines) if ctx_lines else "(no canon recalled)"
 
     # ── fold any attached media into the Delta (KDA) multimodal memory ──
     modalities_seen = ["text"]
     try:
         from gameforge.omega import delta_memory as _dm
+        key = f"query:{req.query[:60]}"
         if req.image_base64:
-            _dm.write(f"query:{req.query[:60]}", req.image_base64, modality="image")
-            modalities_seen.append("image")
+            _dm.write(key, req.image_base64, modality="image"); modalities_seen.append("image")
         if req.audio_base64:
-            _dm.write(f"query:{req.query[:60]}", req.audio_base64, modality="audio")
-            modalities_seen.append("audio")
+            _dm.write(key, req.audio_base64, modality="audio"); modalities_seen.append("audio")
+        if req.pdf_base64:
+            _dm.write(key, pdf_text or req.pdf_base64, modality="pdf"); modalities_seen.append("pdf")
+        if req.video_base64:
+            _dm.write(key, req.video_base64, modality="video"); modalities_seen.append("video")
     except Exception:  # noqa: BLE001
         pass
 
     import os as _os
     api_key = _os.getenv("EMERGENT_LLM_KEY", "")
     reply, model = None, "extractive"
-    if api_key and (recalled or req.image_base64):
+    if api_key and (recalled or req.image_base64 or pdf_text):
         try:
             from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
             import uuid as _uuid
             system = ("You are Jeeves, the GameForge master orchestrator. Answer the user "
-                      "GROUNDED in the provided canon knowledge AND any attached image. "
-                      "Cite sheet numbers [n]. If canon is insufficient, say so briefly.")
-            # vision-capable model when an image is attached, else sonnet
+                      "GROUNDED in the provided canon knowledge, attached image, and any PDF "
+                      "text. Cite sheet numbers [n]. If canon is insufficient, say so briefly.")
             provider, mdl = ("openai", "gpt-4o") if req.image_base64 else ("anthropic", "claude-sonnet-4-6")
             chat = LlmChat(api_key=api_key, session_id=_uuid.uuid4().hex,
                            system_message=system).with_model(provider, mdl)
@@ -264,18 +288,20 @@ async def jeeves_ask(req: JeevesAskReq):
         except Exception:  # noqa: BLE001
             reply = None
     if not reply:
-        if recalled:
-            top = recalled[0].get("payload") or {}
-            head = (top.get("extract") or top.get("content")
-                    or top.get("description") or "").strip()
-            reply = (f"Based on {len(recalled)} recalled canon sheet(s): {head[:600]}"
-                     if head else f"Recalled {len(recalled)} related canon sheet(s) but no text payload.")
+        if recalled or pdf_text:
+            head = pdf_text.strip() if pdf_text else ""
+            if not head and recalled:
+                top = recalled[0].get("payload") or {}
+                head = (top.get("extract") or top.get("content") or top.get("description") or "").strip()
+            reply = (f"Based on {len(recalled)} canon sheet(s)"
+                     f"{' + attached PDF' if pdf_text else ''}: {head[:600]}"
+                     if head else f"Recalled {len(recalled)} related canon sheet(s).")
         else:
             reply = "Jeeves has no canon on this yet — try /api/lafs/learn/online to teach him."
 
     return {"ok": True, "query": req.query, "reply": reply, "model": model,
             "modalities": modalities_seen, "grounded_in": grounded,
-            "recalled_count": len(recalled)}
+            "pdf_chars": len(pdf_text), "recalled_count": len(recalled)}
 
 
 # ══════════════════════════════════════════════════════════════

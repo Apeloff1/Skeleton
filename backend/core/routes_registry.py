@@ -140,6 +140,7 @@ KNOWN_ROUTES: List[RouteEntry] = [
     ("routes.omega_conductor",                  "router"),
     ("routes.lafs",                             "router"),
     ("routes.agent_swarm",                      "router"),
+    ("routes.ops_scheduler",                    "router"),
     ("routes.gameforge_auth",                   "router"),
     ("routes.nexus",                            "router"),
     # ── Quality-of-life / engagement routers ────────────────────────────

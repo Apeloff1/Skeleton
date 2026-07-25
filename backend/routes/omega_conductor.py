@@ -278,3 +278,34 @@ async def delta_read(req: DeltaReadReq):
     stored concept (works cross-modally)."""
     from gameforge.omega import delta_memory
     return {"ok": True, **delta_memory.read(req.key, key_modality=req.key_modality)}
+
+
+# ══════════════════════════════════════════════════════════════
+# LEGION COMMAND — Jeeves commands named game-building legions in waves.
+# ══════════════════════════════════════════════════════════════
+class MobilizeReq(BaseModel):
+    legion: Optional[str] = None       # None → Jeeves mobilizes ALL legions
+    wave_size: int = 500
+    directive: str = "advance the build"
+
+
+@router.get("/legions")
+async def legions_roster():
+    """Full legion roster + collective army competency."""
+    from gameforge.omega import legion_command
+    return {"ok": True, **await legion_command.roster()}
+
+
+@router.post("/legions/mobilize")
+async def legions_mobilize(req: MobilizeReq):
+    """Mobilize one legion, or (when no legion given) have Jeeves mobilize the
+    ENTIRE army in a single large wave — all agents advancing together."""
+    from gameforge.omega import legion_command
+    if req.legion:
+        res = await legion_command.mobilize(req.legion, wave_size=req.wave_size,
+                                            directive=req.directive)
+        if not res.get("ok"):
+            raise HTTPException(status_code=404, detail=res.get("error", "unknown_legion"))
+        return res
+    return await legion_command.jeeves_mobilize_all(wave_size=req.wave_size,
+                                                    directive=req.directive)

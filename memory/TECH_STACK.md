@@ -128,10 +128,34 @@ transcript, is the shared state. Orchestrator node merges leaves; all steps stre
 > (2) observable on the PROOD event bus, (3) multimodal-ready, and (4) bounded in footprint
 > (delta-memory over growing lists where possible).
 
-### Stage E — Ops & scale
-- **E1** Background task runner (APScheduler) for sweeps, cleanup, snapshots.
-- **E2** Rate-limit + auth-scope middleware; per-capability health SLOs.
-- **E3** Load/chaos tests against resilience circuits.
+### Stage E — Ops & scale  ✅ COMPLETE (2026-06)
+- **E1** ✅ APScheduler `AsyncIOScheduler` (`core/scheduler.py`) — autonomic jobs:
+  `lafs_online_sweep` (30m), `legion_drill` (10m), `fabric_snapshot` (5m). Started on boot,
+  fail-soft. Ops surface `GET /api/ops/scheduler`, `POST /api/ops/scheduler/run`.
+- **E2** ✅ Per-capability SLO probe `GET /api/ops/slo` — latency-vs-budget verdict across
+  coverage/readiness/fabric/quorum/legions/lafs_recall (rate-limit middleware already present).
+- **E3** (chaos) — deferred; resilience circuits already exercised by saga compensation tests.
+
+---
+
+## 3d. LEGION COMMAND + full multimodal (2026-06)
+
+### Legion Command — `gameforge/omega/legions.py`
+Jeeves (mastermap) commands **16 named game-building specialty legions** (WorldForge,
+Narrative, Mechanics, Asset, Physics, Audio, Netcode, Economy, UI/UX, QA, Build/CI,
+AI-Behavior, Procedural, VFX, Localization, Balance), drawing agent amounts from the real
+`core.full_roster` constellation (**1,473,844 agents**). `POST /api/omega/legions/mobilize`
+(no `legion` → Jeeves mobilizes the ENTIRE army in one large wave). **Collective competency**:
+every wave raises a shared doctrine floor so all legions "grow rapidly in competency together";
+competency persisted to Mongo (survives restart). Waves register real leaders into the Ω-fabric
+(System-IQ + Δ-memory) and stream `legion.mobilized`/`legion.army_wave` events.
+
+### Full multimodal ingest
+Δ-KDA memory + Jeeves `POST /api/lafs/jeeves/ask` now accept **text · image · audio · PDF ·
+video**. Images → gpt-4o vision; PDFs → `pypdf` text extraction for grounding; audio/video →
+content-addressed folds into the fixed matrix. Frontend: image-picker + document-picker
+drop-in in Mission Control's Jeeves box, plus a live Legion Command panel with a
+"Mobilize the Army" control.
 
 ---
 

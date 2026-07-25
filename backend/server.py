@@ -3138,6 +3138,14 @@ async def lifespan(app: FastAPI):
     _tr.Thread(target=_kick_academy_thaw, daemon=True).start()
 
     logger.info(f"CodeDock Quantum Nexus v{SYSTEM_VERSION} ready to serve requests")
+    # Stage E — start the autonomic background scheduler (self-learning sweeps,
+    # legion drills, fabric snapshots). Fail-soft: never blocks readiness.
+    try:
+        from core.scheduler import start_scheduler
+        if start_scheduler():
+            logger.info("[BOOT] Stage-E scheduler started (lafs_sweep · legion_drill · fabric_snapshot)")
+    except Exception as _sch_ex:  # noqa: BLE001
+        logger.warning(f"[BOOT] scheduler start failed: {_sch_ex}")
     # Snapshot boot duration to readiness time so observability tools can
     # surface it without scraping logs.
     app.state._boot_ready_at = time.time()
