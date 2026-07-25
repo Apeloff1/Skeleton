@@ -153,6 +153,27 @@ FREE local generators (no LLM cost): **PDF** (reportlab), **spreadsheet** (openp
 - Frontend `app/jeeves-chat.tsx` — bubble UI, tier badges, inline chart/graph/visual images +
   downloadable PDF/XLSX chips, image + document attach. Linked from Mission Control.
 
+---
+
+## 3f. IN-GAME MEDIA STUDIO + Ship Build Brief (2026-06)
+
+### In-game media — `gameforge/media/{renderer,studio}.py` + `routes/jeeves_media.py`
+ACTUAL in-game rendering (server-side PIL reproduction of the shipped canvas engine — real
+frames of THIS game's world, NOT AI-imagined art). Deliverables:
+- **Image set** `POST /api/jeeves/media/images` → main character, cast, promo 1-3, extended
+  promo 4-10, landscapes 10-20 (23 real frames, base64 PNG).
+- **Videos** `POST /api/jeeves/media/video` (background job + `GET /video/{id}` progress +
+  `GET /download/{id}`): `clip30` (30s), `clip120` (120s), `trailer` (2-min montage),
+  `showcase` (1-min), `letsplay` (5-min + OpenAI-TTS **commentary** muxed via bundled ffmpeg).
+  Frames streamed to imageio-ffmpeg (static binary, no apt); cached sky gradient → fast renders.
+- Frontend `app/media-studio.tsx` — image grid + one-tap video products with live progress and
+  inline `expo-video` playback. Linked from Mission Control.
+
+### Ship Build Brief (action item)
+Every successful `POST /api/gameforge/studio/ship` now auto-attaches a Jeeves-composed
+**Build Brief** (`out.build_brief`): narrative + 4 chart variations + competency spreadsheet +
+PDF — living release documentation Jeeves writes itself.
+
 ### Stage E — Ops & scale  ✅ COMPLETE (2026-06)
 - **E1** ✅ APScheduler `AsyncIOScheduler` (`core/scheduler.py`) — autonomic jobs:
   `lafs_online_sweep` (30m), `legion_drill` (10m), `fabric_snapshot` (5m). Started on boot,

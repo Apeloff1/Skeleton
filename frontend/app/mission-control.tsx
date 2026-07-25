@@ -474,6 +474,11 @@ export default function MissionControl() {
                   <Ionicons name="chatbubbles-outline" size={14} color="#fff" />
                   <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Chat</Text>
                 </TouchableOpacity>
+                <TouchableOpacity testID="open-media-studio" onPress={() => router.push('/media-studio')}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: GREEN, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginLeft: 6 }}>
+                  <Ionicons name="videocam-outline" size={14} color="#0b1220" />
+                  <Text style={{ color: '#0b1220', fontSize: 12, fontWeight: '700' }}>Media</Text>
+                </TouchableOpacity>
               </View>
               {topEfe.length === 0 ? (
                 <Text style={[s.roomMeta, { marginTop: 6 }]}>No canon yet — teach Jeeves via online learning.</Text>

@@ -142,6 +142,7 @@ KNOWN_ROUTES: List[RouteEntry] = [
     ("routes.agent_swarm",                      "router"),
     ("routes.ops_scheduler",                    "router"),
     ("routes.jeeves_compose",                   "router"),
+    ("routes.jeeves_media",                     "router"),
     ("routes.gameforge_auth",                   "router"),
     ("routes.nexus",                            "router"),
     # ── Quality-of-life / engagement routers ────────────────────────────

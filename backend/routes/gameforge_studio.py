@@ -1092,6 +1092,21 @@ async def ship(b: ShipBody, user=Depends(_editor)):
                    "compensation_trace": result.compensation_trace, "error": result.error}
     out["ok"] = result.status == "completed"
 
+    # NEXT ACTION ITEM — Jeeves auto-composes a living "Build Brief" (PDF +
+    # competency spreadsheet + roadmap chart) for every successful ship.
+    if out["ok"]:
+        try:
+            from routes.jeeves_compose import compose as _compose, ComposeReq
+            brief = await _compose(ComposeReq(
+                query=f"Release build brief for {b.game_name}: readiness, legions, roadmap",
+                forms=["text", "pdf", "spreadsheet", "charts"],
+                title=f"{b.game_name} — Build Brief", needs_reasoning=False))
+            out["build_brief"] = {"artifact_count": brief.get("artifact_count"),
+                                  "artifacts": brief.get("artifacts"),
+                                  "text": brief.get("text")}
+        except Exception:  # noqa: BLE001
+            out["build_brief"] = None
+
     dispatch_to_rooms("ship", {"game": b.game_name, "pushed": out.get("pushed"),
                                "saga": result.status})
     _audit("ship", b.game_name, user)
