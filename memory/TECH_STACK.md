@@ -75,11 +75,20 @@ Each stage is independently shippable and testable; nothing rips out working cod
   classifier rather than a fragile package reshuffle.
 - Tests: `backend/tests/test_stage_a_hardening.py` (14) — 14/14 after the burst-flush fix.
 
-### Stage B — Distributed rigor ("Byzantine" done right)
-- **B1** Promote the PBFT-sim consensus to a real quorum over N in-process replicas with vote logs.
-- **B2** Wire SagaOrchestrator into the real deploy path (build→register→deliver) so every ship auto-rolls-back.
-- **B3** EventBus subscribers → stream saga/build/IQ events into Universal Logs live.
-- **B4** Idempotency keys + optimistic-concurrency versioning on all Mongo writes.
+### Stage B — Distributed rigor ("Byzantine" done right)  ✅ COMPLETE (2026-06)
+- **B1** ✅ REAL N-replica PBFT quorum — `gameforge/prood/quorum.py` (`QuorumConsensus`,
+  `Replica`, pre-prepare→prepare→commit, `n>=3f+1` safety, full vote log). API:
+  `POST /api/prood/quorum` (+ `faulty` injection), `GET /api/prood/quorum/status`.
+  Verified: decides within fault budget, fails safe beyond it.
+- **B2** ✅ SagaOrchestrator wired into the real Ship path — `POST /api/gameforge/studio/ship`
+  now runs build_web → build_source → git_commit → (push) as a compensating saga
+  (auto-rollback in reverse on any failure; `forward_trace` + `compensation_trace` returned).
+- **B3** ✅ Durable EventBus→Mongo sink — `gameforge/prood/event_sink.py` mirrors every
+  publish (saga.* / build.* / ship.* / quorum.* / iq.grow) into `prood_event_log`;
+  `GET /api/prood/logs` streams it (survives restart). Ω-fabric IQ growth publishes `iq.grow`.
+- **B4** ✅ Idempotency + optimistic-concurrency primitives — `core/mongo_guard.py`
+  (`idempotent_insert` unique-key no-op, `optimistic_update` `_ver` CAS). Applied to Ship
+  (`idempotency_key` → duplicate ship suppressed). Broad rollout is incremental per-path.
 
 ### Stage C — Cognition depth
 - **C1** LAFS auto-`reinforce(deep=True)` on Jury acceptance; nightly online-learning sweeps.
@@ -95,6 +104,40 @@ Each stage is independently shippable and testable; nothing rips out working cod
 - **E1** Background task runner (APScheduler) for sweeps, cleanup, snapshots.
 - **E2** Rate-limit + auth-scope middleware; per-capability health SLOs.
 - **E3** Load/chaos tests against resilience circuits.
+
+---
+
+## 3b. Advanced Layers (added 2026-06 — "get this to an advanced level")
+
+These stack ON TOP of A–E, each independently shippable & verified via `testing_agent`.
+
+### Stage F — Retrieval cognition (vector RAG)
+- **F1** Embedding-backed canon RAG (replace lexical top-k with real vectors: local
+  MiniLM/e5 via `sentence-transformers`, or hash-embeddings fallback) — persisted to a
+  `canon_vectors` collection with cosine ANN.
+- **F2** Jeeves RAG replies fold top-EFE LAFS sheets AND vector-recalled canon into the prompt.
+- **F3** Posterior-predictive "does this contradict canon?" gate on every new artifact.
+
+### Stage G — Secure execution & artifacts
+- **G1** Deterministic content-addressed artifact store (sha256 CAS) for builds/vault, GC by refcount.
+- **G2** Sandboxed game-code execution smoke-test (resource/time-boxed) before Ship gate.
+- **G3** Signed provenance receipts on every Ship (hash-chain already exists — attach to manifest).
+
+### Stage H — Distributed state integrity
+- **H1** Roll `core/mongo_guard` optimistic-concurrency out to ALL hot write paths (churn/
+  orchestrator/vault) + retry-with-backoff on `conflict`.
+- **H2** CRDT-style merge for concurrent KB artifact edits (last-writer-wins → causal merge).
+- **H3** Outbox pattern: EventBus publishes are written transactionally with their state change.
+
+### Stage I — Formal rigor & observability depth
+- **I1** Runtime invariant contracts (typed pre/post-conditions on saga steps + quorum decisions).
+- **I2** Distributed trace spans (correlation-id → per-step timing tree) surfaced in Mission Control.
+- **I3** SLO burn-rate alerts per PROOD capability; auto-open a "recovery" room on breach.
+
+### Stage J — Self-improving fabric
+- **J1** Ω-fabric System-IQ decay + reinforcement (IQ reflects RECENT validated novelty, not a monotonic counter).
+- **J2** Nightly LAFS online-learning sweeps (Wikipedia/free APIs) scheduled by E1's runner.
+- **J3** Auto-`reinforce(deep=True)` on Jury acceptance (Stage C1) feeding the fabric's growth signal.
 
 ---
 

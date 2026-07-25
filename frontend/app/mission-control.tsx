@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../src/utils/apiClient';
 import ChurnPanel from '../src/components/ChurnPanel';
+import Svg, { Polyline, Circle, Line as SvgLine } from 'react-native-svg';
 
 const GREEN = '#22c55e';
 const BLUE = '#3b82f6';
@@ -26,6 +27,34 @@ const MUTE = '#94a3b8';
 const RT = '/api/gameforge/runtime';
 const S = '/api/gameforge/studio';
 const PLAN = '/api/gameforge/planning';
+
+// System-IQ growth sparkline — charts the fabric's recent_growth IQ series so
+// the self-learning progress is visible at a glance.
+function IqSparkline({ points }: { points: number[] }) {
+  const W = 300, H = 64, PAD = 6;
+  if (!points || points.length < 2) {
+    return <Text style={s.roomMeta}>Emit through Jeeves/agents to grow System-IQ…</Text>;
+  }
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const span = Math.max(1, max - min);
+  const stepX = (W - PAD * 2) / (points.length - 1);
+  const coords = points.map((p, i) => {
+    const x = PAD + i * stepX;
+    const y = H - PAD - ((p - min) / span) * (H - PAD * 2);
+    return { x, y };
+  });
+  const poly = coords.map((c) => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
+  const last = coords[coords.length - 1];
+  return (
+    <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`}>
+      <SvgLine x1={PAD} y1={H - PAD} x2={W - PAD} y2={H - PAD} stroke="#1f2937" strokeWidth={1} />
+      <Polyline points={poly} fill="none" stroke={PURPLE} strokeWidth={2}
+        strokeLinejoin="round" strokeLinecap="round" />
+      <Circle cx={last.x} cy={last.y} r={3.5} fill={GREEN} />
+    </Svg>
+  );
+}
 
 export default function MissionControl() {
   const router = useRouter();
@@ -244,6 +273,20 @@ export default function MissionControl() {
                   <Stat label="Agents" value={`${fabric.agents_tracked}`} color={GREEN} />
                   <Stat label="Emissions" value={`${fabric.total_emissions}`} color={BLUE} />
                   <Stat label="Blocked" value={`${fabric.blocked_repeats}`} color={AMBER} />
+                </View>
+                <View style={{ marginTop: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <Text style={s.roomMeta}>System-IQ growth</Text>
+                    {fabric.persisted && (
+                      <View style={[s.readyBanner, { backgroundColor: GREEN + '18', marginTop: 0, paddingVertical: 2, paddingHorizontal: 8 }]}>
+                        <Ionicons name="save-outline" size={11} color={GREEN} />
+                        <Text style={[s.readyTxt, { color: GREEN, fontSize: 11 }]}>
+                          {fabric.restored ? 'persisted · restored' : 'persisted'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <IqSparkline points={(fabric.recent_growth || []).map((g: any) => g.iq).filter((n: any) => typeof n === 'number')} />
                 </View>
                 <Text style={[s.roomMeta, { marginTop: 8 }]}>{fabric.topology}</Text>
               </View>

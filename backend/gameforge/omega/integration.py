@@ -177,7 +177,15 @@ class OmegaFabric:
         # the emission hot-path never awaits a DB round-trip.
         try:
             import asyncio
-            asyncio.get_running_loop().create_task(self._persist_state())
+            loop = asyncio.get_running_loop()
+            loop.create_task(self._persist_state())
+            # B3 — stream the IQ growth onto the PROOD event bus (durable sink).
+            try:
+                from gameforge.prood import event_bus as _bus
+                loop.create_task(_bus.publish(
+                    "iq.grow", {"event": event, "agent": agent_id, "iq": self.system_iq}))
+            except Exception:  # noqa: BLE001
+                pass
         except Exception:  # noqa: BLE001
             pass
 

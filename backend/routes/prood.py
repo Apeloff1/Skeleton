@@ -21,7 +21,8 @@ import httpx
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from gameforge.prood import event_bus, saga_orchestrator
+from gameforge.prood import event_bus, saga_orchestrator, quorum_consensus, recent_events
+from gameforge.prood.quorum import QuorumConsensus
 from gameforge.prood.saga_orchestrator import SagaStep
 from gameforge.workflow.internal_build_system import create_internal_build_system
 from gameforge.workflow.jeeves_vault import jeeves_vault
@@ -226,3 +227,50 @@ async def saga_deploy(req: SagaDemoRequest):
 async def events():
     """PROOD EventBus stats + recent event history (observability)."""
     return {"ok": True, **event_bus.stats()}
+
+
+# ─────────────────────────────────────────────────────────────────────
+# B1 — REAL Byzantine quorum (N in-process replicas + vote logs)
+# ─────────────────────────────────────────────────────────────────────
+class QuorumRequest(BaseModel):
+    value: str = "canonical-emission"
+    n: int = 7
+    f: int = 2
+    faulty: Optional[List[int]] = None   # replica ids that equivocate
+
+
+@router.post("/quorum")
+async def run_quorum(req: QuorumRequest):
+    """Run one PBFT round over ``n`` replicas tolerating ``f`` Byzantine faults.
+    Pass ``faulty`` replica ids to prove the quorum still decides (or fails
+    safely when the fault budget is exceeded). Returns the full vote log."""
+    try:
+        qc = QuorumConsensus(n=req.n, f=req.f)
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
+    faulty = set(req.faulty or [])
+    result = qc.agree(req.value, proof=f"api:{time.time()}", faulty=faulty)
+    await event_bus.publish(
+        "quorum.decided" if result.decided else "quorum.failed",
+        {"value": req.value, "commit_count": result.commit_count, "faulty": sorted(faulty)},
+    )
+    return {"ok": True, **result.to_dict()}
+
+
+@router.get("/quorum/status")
+async def quorum_status():
+    """Current shared quorum configuration + last sequence."""
+    return {"ok": True, "n": quorum_consensus.n, "f": quorum_consensus.f,
+            "quorum_needed": quorum_consensus.quorum_needed,
+            "view": quorum_consensus.view, "seq": quorum_consensus.seq,
+            "safety_bound": "n >= 3f + 1"}
+
+
+# ─────────────────────────────────────────────────────────────────────
+# B3 — durable EventBus → Mongo log (survives restart, live feed)
+# ─────────────────────────────────────────────────────────────────────
+@router.get("/logs")
+async def prood_logs(limit: int = 60, severity: Optional[str] = None):
+    """Durable stream of distributed events (saga · build · quorum · IQ)."""
+    rows = await recent_events(limit=limit, severity=severity)
+    return {"ok": True, "count": len(rows), "logs": rows}

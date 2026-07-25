@@ -978,49 +978,94 @@ async def universal_logs(component: Optional[str] = None, severity: Optional[str
 class ShipBody(BaseModel):
     game_name: str
     push: bool = False
+    idempotency_key: Optional[str] = None
 
 
 @router.post("/ship")
 async def ship(b: ShipBody, user=Depends(_editor)):
-    """One-tap Ship It: real web + source build → commit source to Git → optional push."""
+    """One-tap Ship It — now a PROOD SAGA: build_web → build_source → git_commit
+    → (push). Any step failure triggers automatic compensation (rollback in
+    reverse) via the SagaOrchestrator, and every step emits an EventBus event
+    that is mirrored into the durable PROOD log."""
     from routes import gameforge_build as GB
+    from gameforge.prood import saga_orchestrator, event_bus
+    from gameforge.prood.saga_orchestrator import SagaStep
+
+    # B4 — idempotency guard: a retried ship (same key) is a safe no-op.
+    if b.idempotency_key:
+        try:
+            from core.mongo_guard import idempotent_insert
+            guard = idempotent_insert(
+                _db()["gameforge_ship_idem"], b.idempotency_key,
+                {"game_name": b.game_name, "ts": time.time()})
+            if guard.get("already"):
+                return {"ok": True, "game_name": b.game_name, "idempotent_replay": True,
+                        "note": "duplicate ship suppressed by idempotency key"}
+        except Exception:  # noqa: BLE001
+            pass
+
     out: dict = {"ok": True, "game_name": b.game_name, "steps": []}
 
-    web = await GB.build_web(GB.BuildBody(game_name=b.game_name))
-    out["web_build"] = {"ok": web.get("ok"), "download_url": web.get("download_url"),
-                        "size_bytes": web.get("size_bytes")}
-    out["steps"].append("web_build")
-    src = await GB.build_source(GB.BuildBody(game_name=b.game_name))
-    out["source_build"] = {"ok": src.get("ok"), "download_url": src.get("download_url"),
-                           "size_bytes": src.get("size_bytes")}
-    out["steps"].append("source_build")
+    # ── saga step actions ────────────────────────────────────────────
+    async def _s_web(ctx):
+        web = await GB.build_web(GB.BuildBody(game_name=b.game_name))
+        out["web_build"] = {"ok": web.get("ok"), "download_url": web.get("download_url"),
+                            "size_bytes": web.get("size_bytes")}
+        out["steps"].append("web_build")
+        await event_bus.publish("ship.build.web" if web.get("ok") else "ship.build.web.fail",
+                                {"game": b.game_name, "ok": web.get("ok")})
+        if not web.get("ok"):
+            raise RuntimeError("web build failed")
+        return {"web_build_id": web.get("build_id")}
 
-    # PRIORITY 6 — if a build step failed, raise an alarm + auto-recover the vault.
-    if not web.get("ok") or not src.get("ok"):
-        _raise_alarm("ship_build_failed",
-                     f"web={web.get('ok')} source={src.get('ok')} for {b.game_name}", "error")
+    async def _s_source(ctx):
+        src = await GB.build_source(GB.BuildBody(game_name=b.game_name))
+        out["source_build"] = {"ok": src.get("ok"), "download_url": src.get("download_url"),
+                               "size_bytes": src.get("size_bytes")}
+        out["steps"].append("source_build")
+        await event_bus.publish("ship.build.source" if src.get("ok") else "ship.build.source.fail",
+                                {"game": b.game_name, "ok": src.get("ok")})
+        if not src.get("ok"):
+            raise RuntimeError("source build failed")
+        return {"source_build_id": src.get("build_id"),
+                "package_name": src.get("package_name")}
+
+    async def _s_source_comp(ctx):
+        # compensation: a build failed downstream → restore the vault + alarm
+        _raise_alarm("ship_build_failed", f"rolling back builds for {b.game_name}", "error")
         out["recovery"] = _auto_rollback_latest()
         out["steps"].append("auto_recover")
+        await event_bus.publish("ship.source.compensated", {"game": b.game_name})
+        return {}
 
-    # commit a ship manifest into the vault, then git-commit it
-    committed = False
-    if boardroom_vault and _git:
-        manifest = f"SHIP {b.game_name} @ {time.time()}\nweb={web.get('build_id')}\nsource={src.get('build_id')}\n"
-        entry = boardroom_vault.put_file(f"{b.game_name}_ship_manifest.txt", manifest.encode("utf-8"),
-                                         {"kind": "ship_manifest"})
-        try:
-            committed = _git.commit_file_from_vault(entry.file_id, entry.version, f"Ship {b.game_name}")
-        except Exception:  # noqa: BLE001
-            committed = False
-        out["steps"].append("git_commit")
-    out["git_committed"] = committed
+    async def _s_commit(ctx):
+        committed = False
+        if boardroom_vault and _git:
+            manifest = (f"SHIP {b.game_name} @ {time.time()}\n"
+                        f"web={ctx.get('web_build_id')}\nsource={ctx.get('source_build_id')}\n")
+            entry = boardroom_vault.put_file(f"{b.game_name}_ship_manifest.txt",
+                                             manifest.encode("utf-8"), {"kind": "ship_manifest"})
+            try:
+                committed = _git.commit_file_from_vault(entry.file_id, entry.version,
+                                                        f"Ship {b.game_name}")
+            except Exception:  # noqa: BLE001
+                committed = False
+            out["steps"].append("git_commit")
+        out["git_committed"] = committed
+        await event_bus.publish("ship.commit", {"game": b.game_name, "committed": committed})
+        return {"committed": committed}
 
-    # optional push (only if remote+token configured)
-    if b.push:
+    async def _s_commit_comp(ctx):
+        out["recovery"] = _auto_rollback_latest()
+        await event_bus.publish("ship.commit.compensated", {"game": b.game_name})
+        return {}
+
+    async def _s_push(ctx):
         import os as _os
         remote, token = _os.getenv("GITHUB_REMOTE", ""), _os.getenv("GITHUB_TOKEN", "")
         if remote and token and _git:
-            auth_remote = remote.replace("https://", f"https://{token}@") if remote.startswith("https://") and "@" not in remote else remote
+            auth_remote = (remote.replace("https://", f"https://{token}@")
+                           if remote.startswith("https://") and "@" not in remote else remote)
             try:
                 out["pushed"] = _git.push_to_github(auth_remote)
             except Exception:  # noqa: BLE001
@@ -1029,8 +1074,26 @@ async def ship(b: ShipBody, user=Depends(_editor)):
             out["pushed"] = False
             out["push_note"] = "push inactive — set GITHUB_REMOTE + GITHUB_TOKEN"
         out["steps"].append("git_push")
+        await event_bus.publish("ship.push", {"game": b.game_name, "pushed": out.get("pushed")})
+        return {}
 
-    dispatch_to_rooms("ship", {"game": b.game_name, "pushed": out.get("pushed")})
+    steps = [
+        SagaStep("web_build", _s_web),
+        SagaStep("source_build", _s_source, compensate=_s_source_comp),
+        SagaStep("git_commit", _s_commit, compensate=_s_commit_comp),
+    ]
+    if b.push:
+        steps.append(SagaStep("git_push", _s_push))
+
+    saga_orchestrator.register_saga("gameforge_ship", steps)
+    result = await saga_orchestrator.execute_saga("gameforge_ship")
+
+    out["saga"] = {"status": result.status, "forward_trace": result.forward_trace,
+                   "compensation_trace": result.compensation_trace, "error": result.error}
+    out["ok"] = result.status == "completed"
+
+    dispatch_to_rooms("ship", {"game": b.game_name, "pushed": out.get("pushed"),
+                               "saga": result.status})
     _audit("ship", b.game_name, user)
     return out
 
