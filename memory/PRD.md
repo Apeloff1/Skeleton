@@ -1125,3 +1125,16 @@
 ##   Added PROOD readiness capability "LAFS Deep-Probability Knowledge Ledger" → live 100%.
 ##   Overall readiness 99.6%, now 16 capabilities (15/16 live, SOTA engines 94%).
 ##   PROJECT COMPLETE %: 99.6% (/api/prood/readiness).
+
+## [Online Learning] LAFS self-learning via free APIs + Refactor blueprint (Jun 2026)
+##   "Take the last part online": added /api/lafs/learn/online + /learn/batch — Jeeves
+##   fetches REAL Wikipedia REST summaries (compliant UA required: 403 without contact UA)
+##   and ingests into LAFS as Jeeves-Online sheets + reinforces (weight 1.5). Fulfils
+##   original Product Req #6 (compound Jeeves' brain via free external APIs).
+##   VERIFIED (curl): learned "Procedural generation" (posterior 0.62 w/ source URL),
+##   batch 3/3, recall surfaces online knowledge. Egress works (google 200); Wikipedia
+##   needs UA "GameForge-Jeeves/1.0 (https://emergent.sh; contact@emergent.sh)".
+##   REFACTOR: created /app/memory/TECH_STACK.md — detailed tech-stack + staged advancement
+##   roadmap (A foundation → B distributed rigor → C cognition → D frontend → E ops).
+##   NON-DESTRUCTIVE: did NOT convolute the working 99.6% app; awaiting user confirmation
+##   on refactor scope/order before touching production code.
