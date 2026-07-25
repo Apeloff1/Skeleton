@@ -7,13 +7,13 @@
 import React from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity,
-  ActivityIndicator, RefreshControl,
+  ActivityIndicator, RefreshControl, TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../src/utils/apiClient';
 import ChurnPanel from '../src/components/ChurnPanel';
-import Svg, { Polyline, Circle, Line as SvgLine } from 'react-native-svg';
+import Svg, { Polyline, Circle, Line as SvgLine, Rect } from 'react-native-svg';
 
 const GREEN = '#22c55e';
 const BLUE = '#3b82f6';
@@ -68,6 +68,13 @@ export default function MissionControl() {
   const [saga, setSaga] = React.useState<any>(null);
   const [sagaBusy, setSagaBusy] = React.useState(false);
   const [fabric, setFabric] = React.useState<any>(null);
+  const [delta, setDelta] = React.useState<any>(null);
+  const [heatmap, setHeatmap] = React.useState<number[][]>([]);
+  const [activity, setActivity] = React.useState<any[]>([]);
+  const [topEfe, setTopEfe] = React.useState<any[]>([]);
+  const [ask, setAsk] = React.useState('');
+  const [asking, setAsking] = React.useState(false);
+  const [askReply, setAskReply] = React.useState<any>(null);
   const [activateMsg, setActivateMsg] = React.useState('');
   const [selftest, setSelftest] = React.useState<any>(null);
   const [testing, setTesting] = React.useState(false);
@@ -76,12 +83,16 @@ export default function MissionControl() {
   const [live, setLive] = React.useState(false);
 
   const load = React.useCallback(async () => {
-    const [st, h, pos, pl, lg, cov, prd, fab] = await Promise.all([
+    const [st, h, pos, pl, lg, cov, prd, fab, dl, hm, act, efe] = await Promise.all([
       api.get<any>(`${RT}/status`), api.get<any>(`${RT}/health`), api.get<any>(`${RT}/positions`),
       api.get<any>(`${PLAN}/plans?limit=6`), api.get<any>(`${S}/logs?limit=18`),
       api.get<any>('/api/gameforge/coverage', { timeoutMs: 20000 }),
       api.get<any>('/api/prood/readiness', { timeoutMs: 25000 }),
       api.get<any>('/api/omega/fabric', { timeoutMs: 20000 }),
+      api.get<any>('/api/omega/delta/stats'),
+      api.get<any>('/api/omega/delta/heatmap?cells=8'),
+      api.get<any>('/api/prood/logs?limit=12'),
+      api.get<any>('/api/lafs/top-efe?k=5'),
     ]);
     if (st.ok) setStatus(st.data);
     if (h.ok) setHealth(h.data);
@@ -91,9 +102,22 @@ export default function MissionControl() {
     if (cov.ok) setCoverage(cov.data);
     if (prd.ok) setProod(prd.data);
     if (fab.ok) setFabric(fab.data);
+    if (dl.ok) setDelta(dl.data);
+    if (hm.ok) setHeatmap(hm.data?.heatmap || []);
+    if (act.ok) setActivity(act.data?.logs || []);
+    if (efe.ok) setTopEfe(efe.data?.top || []);
     setLoading(false);
     setRefreshing(false);
   }, []);
+
+  const askJeeves = async () => {
+    if (!ask.trim()) return;
+    setAsking(true); setAskReply(null);
+    const r = await api.post<any>('/api/lafs/jeeves/ask', { query: ask.trim(), top_k: 5 },
+      { timeoutMs: 45000 });
+    if (r.ok) setAskReply(r.data);
+    setAsking(false);
+  };
 
   const activateEngines = async () => {
     setActivateMsg('Activating all engines…');
@@ -291,6 +315,102 @@ export default function MissionControl() {
                 <Text style={[s.roomMeta, { marginTop: 8 }]}>{fabric.topology}</Text>
               </View>
             )}
+
+            {/* Delta (KDA) multimodal memory */}
+            {delta && (
+              <View style={[s.card, { marginBottom: 12 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={s.planObj}>Δ Delta Memory · KDA</Text>
+                  {delta.multimodal && (
+                    <View style={[s.readyBanner, { backgroundColor: BLUE + '22', marginTop: 0, paddingVertical: 2, paddingHorizontal: 8 }]}>
+                      <Ionicons name="layers-outline" size={12} color={BLUE} />
+                      <Text style={[s.readyTxt, { color: BLUE, fontSize: 11 }]}>multimodal</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={[s.roomMeta, { marginTop: 4 }]}>
+                  Fixed {delta.capacity_floats} floats · corrects, never appends
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 12, marginTop: 10 }}>
+                  <Svg width={132} height={132} viewBox="0 0 8 8">
+                    {heatmap.map((row, i) =>
+                      row.map((v, j) => {
+                        const mx = Math.max(0.0001, ...heatmap.flat());
+                        const a = Math.min(1, v / mx);
+                        return <Rect key={`${i}-${j}`} x={j} y={i} width={1} height={1}
+                          fill={PURPLE} opacity={0.12 + 0.88 * a} />;
+                      })
+                    )}
+                  </Svg>
+                  <View style={{ flex: 1, justifyContent: 'center' }}>
+                    <Stat label="Writes" value={`${delta.writes}`} color={GREEN} />
+                    <View style={{ height: 8 }} />
+                    <Stat label="Distinct keys" value={`${delta.distinct_keys}`} color={AMBER} />
+                    <View style={{ height: 8 }} />
+                    <Stat label="Spectral ‖M‖" value={`${delta.spectral_norm}`} color={PURPLE} />
+                  </View>
+                </View>
+                <Text style={[s.roomMeta, { marginTop: 8 }]}>
+                  {Object.entries(delta.modality_writes || {}).filter(([, c]: any) => c > 0)
+                    .map(([m, c]: any) => `${m}:${c}`).join(' · ') || 'text only'}
+                </Text>
+              </View>
+            )}
+
+            {/* What Jeeves Knows — top-EFE canon + RAG ask */}
+            <View style={[s.card, { marginBottom: 12 }]}>
+              <Text style={s.planObj}>🧠 What Jeeves Knows</Text>
+              {topEfe.length === 0 ? (
+                <Text style={[s.roomMeta, { marginTop: 6 }]}>No canon yet — teach Jeeves via online learning.</Text>
+              ) : topEfe.map((sheet: any, i: number) => (
+                <View key={sheet.id || i} style={{ paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#1f2937' }}>
+                  <Text style={{ color: '#e2e8f0', fontSize: 13 }} numberOfLines={1}>
+                    {sheet.path} <Text style={{ color: PURPLE }}>· EFE {sheet.efe}</Text>
+                  </Text>
+                  <Text style={s.roomMeta} numberOfLines={1}>
+                    posterior {sheet.posterior} · {(sheet.tags || []).slice(0, 3).join(', ')}
+                  </Text>
+                </View>
+              ))}
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                <TextInput
+                  testID="jeeves-ask-input"
+                  value={ask} onChangeText={setAsk}
+                  placeholder="Ask Jeeves (grounded in canon)…"
+                  placeholderTextColor={MUTE}
+                  style={s.askInput} />
+                <TouchableOpacity testID="jeeves-ask-btn" onPress={askJeeves} disabled={asking}
+                  style={[s.askBtn, asking && { opacity: 0.6 }]}>
+                  {asking ? <ActivityIndicator size="small" color="#0b1220" />
+                    : <Text style={s.askBtnTxt}>Ask</Text>}
+                </TouchableOpacity>
+              </View>
+              {askReply && (
+                <View style={{ marginTop: 10, backgroundColor: '#0b1220', borderRadius: 10, padding: 10 }}>
+                  <Text style={[s.roomMeta, { marginBottom: 4 }]}>
+                    {askReply.model} · grounded in {askReply.recalled_count} sheet(s)
+                  </Text>
+                  <Text style={{ color: '#e2e8f0', fontSize: 13, lineHeight: 19 }}>{askReply.reply}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Live distributed activity (PROOD event bus) */}
+            {activity.length > 0 && (
+              <View style={[s.card, { marginBottom: 12 }]}>
+                <Text style={s.planObj}>📡 Distributed Activity</Text>
+                {activity.map((e: any, i: number) => (
+                  <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 5 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4,
+                      backgroundColor: e.severity === 'error' ? RED : e.severity === 'warning' ? AMBER : GREEN }} />
+                    <Text style={{ color: '#cbd5e1', fontSize: 12, flex: 1 }} numberOfLines={1}>
+                      {e.event_type}
+                    </Text>
+                    <Text style={s.roomMeta}>{e.severity}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
             <ChurnPanel projectName="MissionChurn" />
             <View style={[s.card, { marginTop: 12 }]}>
               <Text style={s.planObj}>Saga Orchestration (compensation & recovery)</Text>
@@ -358,6 +478,9 @@ function Stat({ label, value, color }: { label: string; value: string; color: st
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#1f2937' },
+  askInput: { flex: 1, backgroundColor: '#0b1220', borderColor: '#334155', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#e2e8f0', fontSize: 13 },
+  askBtn: { backgroundColor: '#22c55e', borderRadius: 10, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', minWidth: 64 },
+  askBtnTxt: { color: '#0b1220', fontWeight: '700', fontSize: 14 },
   title: { color: '#f1f5f9', fontSize: 16, fontWeight: '700' },
   sub: { color: MUTE, fontSize: 11, marginTop: 1 },
   liveBtn: { backgroundColor: '#1e293b', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },

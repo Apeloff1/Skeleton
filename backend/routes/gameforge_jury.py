@@ -175,6 +175,28 @@ def _process_one(item: dict) -> dict:
                       "source": item.get("source"), "adjudicated": True,
                       "scrutiny_score": jury["scrutiny_score"], "ts": time.time()}},
             upsert=True)
+        # ── Stage C1: an accepted verdict is a validated belief → DEEP-reinforce
+        # it into the LAFS knowledge ledger (full MCMC/ASMC/VI) and stream the
+        # event onto the PROOD bus. Best-effort; never breaks the verdict.
+        try:
+            from gameforge.lafs import lafs as _lafs
+            sheet = _lafs.add_sheet(
+                "Meta", "Verdict",
+                {"topic": item.get("topic"), "content": (item.get("content") or "")[:2000],
+                 "source": item.get("source"), "scrutiny": jury["scrutiny_score"]},
+                author="JuryRoom", tags=["jury", "accepted", (item.get("topic") or "").lower()])
+            _lafs.reinforce(sheet.id, success=True, weight=2.0, tag="jury_accept", deep=True)
+            case["lafs_sheet_id"] = sheet.id
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            import asyncio as _asyncio
+            from gameforge.prood import event_bus as _bus
+            _asyncio.get_running_loop().create_task(
+                _bus.publish("jury.accepted",
+                             {"topic": item.get("topic"), "scrutiny": jury["scrutiny_score"]}))
+        except Exception:  # noqa: BLE001
+            pass
     elif verdict == "rejected":
         # Held in the Boardroom (not persisted to wiki).
         try:

@@ -84,6 +84,13 @@ class OmegaFabric:
                 gl = doc.get("growth_log")
                 if isinstance(gl, list):
                     self.growth_log = gl[-500:]
+                dm = doc.get("delta_memory")
+                if isinstance(dm, dict):
+                    try:
+                        from gameforge.omega.delta_memory import delta_memory as _dm
+                        _dm.load(dm)
+                    except Exception:  # noqa: BLE001
+                        pass
         except Exception:  # noqa: BLE001 — never block boot on a cold DB
             pass
 
@@ -103,6 +110,12 @@ class OmegaFabric:
         self._last_persist = now
         try:
             from core.databases import core_db
+            dm_doc = None
+            try:
+                from gameforge.omega.delta_memory import delta_memory as _dm
+                dm_doc = _dm.to_persist()
+            except Exception:  # noqa: BLE001
+                dm_doc = None
             await core_db[_PERSIST_COLLECTION].update_one(
                 {"_id": _PERSIST_ID},
                 {"$set": {
@@ -110,6 +123,7 @@ class OmegaFabric:
                     "total_emissions": self.total_emissions,
                     "blocked_repeats": self.blocked_repeats,
                     "growth_log": self.growth_log[-50:],
+                    "delta_memory": dm_doc,
                     "updated_at": now,
                 }},
                 upsert=True,
@@ -190,7 +204,8 @@ class OmegaFabric:
             pass
 
     def _lafs_remember(self, author: str, content: str, topic: str):
-        """Best-effort: persist emission into the LAFS knowledge ledger."""
+        """Best-effort: persist emission into the LAFS knowledge ledger AND fold
+        it into the fixed-size Delta (KDA) associative memory (topic → content)."""
         try:
             from gameforge.lafs import lafs as _lafs
             domain = "Agent" if author != "jeeves" else "Meta"
@@ -199,6 +214,11 @@ class OmegaFabric:
                             {"content": content[:2000], "topic": topic, "author": author},
                             author=author, tags=[topic])
         except Exception:  # noqa: BLE001 — ledger must never break emissions
+            pass
+        try:
+            from gameforge.omega.delta_memory import delta_memory as _dm
+            _dm.write(f"{author}:{topic}", content[:2000], modality="text")
+        except Exception:  # noqa: BLE001
             pass
 
     # ── emissions ─────────────────────────────────────────────
@@ -241,6 +261,13 @@ class OmegaFabric:
                     "system_iq": self.system_iq}
 
     # ── views ─────────────────────────────────────────────────
+    def _delta_stats(self):
+        try:
+            from gameforge.omega.delta_memory import delta_memory as _dm
+            return _dm.stats()
+        except Exception:  # noqa: BLE001
+            return None
+
     def agent_status(self, agent_id: str) -> Optional[Dict]:
         c = self.agents.get(agent_id)
         return c.snapshot(f"agent::{agent_id}") if c else None
@@ -264,6 +291,7 @@ class OmegaFabric:
             "agents_tracked": len(self.agents),
             "persisted": self._persist_enabled(),
             "restored": self._loaded,
+            "delta_memory": self._delta_stats(),
             "jeeves": self.jeeves.snapshot("jeeves-mastermap") if self._started else None,
             "agent_map": self.agent_map.snapshot("agent-map") if self._started else None,
             "agents": self.list_agents(),

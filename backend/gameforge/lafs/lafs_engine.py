@@ -428,6 +428,86 @@ class LeverArchFileSystem:
         self._save()
         return self.sheets[sheet_id].brief()
 
+    # ── Stage C2: multi-hop belief propagation + posterior-predictive checks ──
+    def belief_propagate(self, sheet_id: str, hops: int = 2, strength: float = 0.08) -> Dict:
+        """Propagate the source sheet's belief across ``hops`` graph hops with
+        geometric decay, returning a full trace of updated neighbors. This is
+        the multi-hop generalisation of ``_propagate_belief`` (1-hop)."""
+        self._load()
+        if sheet_id not in self.sheets:
+            return {"ok": False, "error": "sheet_not_found"}
+        src = self.sheets[sheet_id].prob
+        visited: Set[str] = {sheet_id}
+        frontier: Set[str] = {sheet_id}
+        trace: List[Dict] = []
+        for hop in range(1, hops + 1):
+            decay = strength * (0.6 ** (hop - 1))
+            nxt: Set[str] = set()
+            for sid in frontier:
+                for neigh in self.graph.get(sid, []):
+                    if neigh in visited or neigh not in self.sheets:
+                        continue
+                    tgt = self.sheets[neigh].prob
+                    before = tgt.posterior_mean
+                    tgt.alpha = (1 - decay) * tgt.alpha + decay * src.alpha
+                    tgt.beta = (1 - decay) * tgt.beta + decay * src.beta
+                    tgt._compute_expected_free_energy()
+                    trace.append({"sheet_id": neigh, "hop": hop,
+                                  "posterior_before": round(before, 4),
+                                  "posterior_after": round(tgt.posterior_mean, 4),
+                                  "decay": round(decay, 4)})
+                    visited.add(neigh); nxt.add(neigh)
+            frontier = nxt
+            if not frontier:
+                break
+        self._update_hyperpriors()
+        self._save()
+        return {"ok": True, "source": sheet_id, "hops": hops,
+                "updated": len(trace), "trace": trace}
+
+    def posterior_predictive_check(self, sheet_id: Optional[str] = None) -> Dict:
+        """Surface a posterior-predictive calibration check: how well each
+        sheet's Beta posterior predicts its own observed evidence (Brier +
+        credible-interval coverage)."""
+        self._load()
+        sheets = ([self.sheets[sheet_id]] if sheet_id and sheet_id in self.sheets
+                  else list(self.sheets.values()))
+        if not sheets:
+            return {"ok": False, "error": "no_sheets"}
+        briers, covered, total_obs = [], 0, 0
+        per_sheet = []
+        for s in sheets:
+            p = s.prob
+            brier = p.brier_calibration()
+            lo, hi = p.credible_interval()
+            obs = [1.0 if float(e) >= 0.5 else 0.0
+                   for e in getattr(p, "evidence_log", []) if isinstance(e, (int, float))]
+            in_ci = sum(1 for o in obs if lo <= o <= hi)
+            covered += in_ci
+            total_obs += len(obs)
+            briers.append(brier)
+            if sheet_id:
+                per_sheet.append({"sheet_id": s.id, "brier": round(brier, 4),
+                                  "ci95": [round(lo, 4), round(hi, 4)],
+                                  "posterior": round(p.posterior_mean, 4),
+                                  "observations": len(obs), "in_ci": in_ci})
+        avg_brier = float(np.mean(briers)) if briers else 0.0
+        coverage = (covered / total_obs) if total_obs else 0.0
+        return {"ok": True, "sheets_checked": len(sheets),
+                "avg_brier": round(avg_brier, 4),
+                "calibration_quality": round(1.0 / (1.0 + 4 * avg_brier), 4),
+                "ci95_coverage": round(coverage, 4), "observations": total_obs,
+                "per_sheet": per_sheet}
+
+    def top_efe(self, k: int = 8, domain_filter: Optional[str] = None) -> List[Dict]:
+        """Top-k sheets by Expected Free Energy — 'what Jeeves knows best'."""
+        self._load()
+        rows = [s for s in self.sheets.values()
+                if not domain_filter or s.path.startswith(domain_filter + "/")]
+        rows.sort(key=lambda s: s.prob.expected_free_energy, reverse=True)
+        return [{**s.brief(), "efe": round(s.prob.expected_free_energy, 4),
+                 "posterior": round(s.prob.posterior_mean, 4)} for s in rows[:k]]
+
     def queue_for_jury(self, sheet_id: str, reason: str = "high_entropy") -> Dict:
         self._load()
         s = self.sheets.get(sheet_id)

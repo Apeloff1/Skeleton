@@ -90,15 +90,43 @@ Each stage is independently shippable and testable; nothing rips out working cod
   (`idempotent_insert` unique-key no-op, `optimistic_update` `_ver` CAS). Applied to Ship
   (`idempotency_key` → duplicate ship suppressed). Broad rollout is incremental per-path.
 
-### Stage C — Cognition depth
-- **C1** LAFS auto-`reinforce(deep=True)` on Jury acceptance; nightly online-learning sweeps.
-- **C2** Graph belief-propagation multi-hop + posterior-predictive checks surfaced in API.
-- **C3** Jeeves retrieval-augmented replies: recall top-EFE LAFS sheets before generating.
+### Stage C — Cognition depth  ✅ COMPLETE (2026-06)
+- **C1** ✅ LAFS auto-`reinforce(deep=True)` on Jury acceptance (`routes/gameforge_jury.py` →
+  adds+deep-reinforces a `Meta/Verdict` sheet, publishes `jury.accepted`). Online-learning
+  sweep `POST /api/lafs/sweep/online` (rotating free-knowledge topics, deep-reinforced).
+- **C2** ✅ Multi-hop belief propagation (`lafs.belief_propagate`, `POST /api/lafs/belief-propagate/{id}`)
+  + posterior-predictive calibration (`GET /api/lafs/posterior-check`) + `GET /api/lafs/top-efe`.
+- **C3** ✅ Jeeves RAG replies `POST /api/lafs/jeeves/ask` — recalls top-EFE canon (hybrid-deep
+  acquisition) → grounded Claude answer with [n] citations (extractive fallback). **MULTIMODAL**:
+  accepts `image_base64`/`audio_base64` → vision model (gpt-4o) captions + folds media into Δ-memory.
 
-### Stage D — Frontend elaboration
-- **D1** "What Jeeves Knows" Studio panel (top-EFE ledger sheets + online-learn button).
-- **D2** Live fabric/IQ + saga trace stream in Mission Control (websocket or poll).
-- **D3** Per-section readiness breakdown (Core Patterns / Key Systems / Frontend / Quality).
+### Stage D — Frontend elaboration  ✅ COMPLETE (2026-06)
+- **D1** ✅ "What Jeeves Knows" panel (top-EFE canon sheets) + inline RAG ask box (Mission Control).
+- **D2** ✅ Live "Distributed Activity" feed (`/api/prood/logs`) + System-IQ growth sparkline +
+  Δ-Delta-Memory KDA heatmap card (react-native-svg). Live-poll toggle.
+
+---
+
+## 3c. NEW ADVANCED SUBSYSTEMS (2026-06 — folded in from SOTA references)
+
+### Δ Delta-Attention Memory (KDA) — `gameforge/omega/delta_memory.py`
+"Attention is a lookup, folded into ONE fixed matrix." A single `dim×dim` associative-memory
+matrix updated by the **delta rule** (`Δ = v − r`, `M = γ·M + β·(Δ⊗k)`) — corrects the existing
+association instead of appending, rows fade via decay γ, so the footprint is **fixed at 1K or 1M
+writes**. Fully **MULTIMODAL**: text/image/audio/video all content-address into the same matrix
+(per-modality salt keeps sub-spaces separable). Persisted with the fabric (survives restart).
+API: `/api/omega/delta/{stats,heatmap,write,read}`. Wired into every fabric emission + Jeeves media.
+
+### Graph-Engineering swarm DAG — `routes/agent_swarm.py`
+The "Karpathy loop → AgentHub → Dynamic Workflows" progression: `POST /api/swarm-dag/run` fans a
+directive into N **parallel** fresh-context sub-agents on a dependency DAG; each recalls shared
+memory (LAFS canon + Δ-KDA), emits a typed node, and writes it back into the durable
+**knowledge-graph shared-memory** (`swarm_graph` collection) — the graph, not an orchestrator
+transcript, is the shared state. Orchestrator node merges leaves; all steps stream on the event bus.
+
+> **Doctrine (maximal tech stack, this day):** every new capability must be (1) durable in Mongo,
+> (2) observable on the PROOD event bus, (3) multimodal-ready, and (4) bounded in footprint
+> (delta-memory over growing lists where possible).
 
 ### Stage E — Ops & scale
 - **E1** Background task runner (APScheduler) for sweeps, cleanup, snapshots.

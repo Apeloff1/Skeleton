@@ -164,3 +164,153 @@ async def learn_batch(topics: List[str], domain: str = "Meta", log_type: str = "
             out.append({"topic": t, "learned": False, "reason": f"{type(e).__name__}"})
     learned = sum(1 for o in out if o.get("learned"))
     return {"ok": True, "learned_count": learned, "total": len(out), "results": out}
+
+
+# ══════════════════════════════════════════════════════════════
+# STAGE C2 — multi-hop belief propagation + posterior-predictive
+# ══════════════════════════════════════════════════════════════
+@router.post("/belief-propagate/{sheet_id}")
+async def belief_propagate(sheet_id: str, hops: int = 2, strength: float = 0.08):
+    """Propagate a sheet's belief across the canon graph (multi-hop) and
+    return the full update trace."""
+    res = lafs.belief_propagate(sheet_id, hops=max(1, min(hops, 5)), strength=strength)
+    if not res.get("ok"):
+        raise HTTPException(status_code=404, detail=res.get("error", "sheet_not_found"))
+    return res
+
+
+@router.get("/posterior-check")
+async def posterior_check(sheet_id: Optional[str] = None):
+    """Posterior-predictive calibration check across the ledger (or one sheet)."""
+    res = lafs.posterior_predictive_check(sheet_id)
+    if not res.get("ok"):
+        raise HTTPException(status_code=404, detail=res.get("error", "no_sheets"))
+    return res
+
+
+@router.get("/top-efe")
+async def top_efe(k: int = 8, domain_filter: Optional[str] = None):
+    """Top-k sheets by Expected Free Energy — 'what Jeeves knows best'."""
+    return {"ok": True, "top": lafs.top_efe(k=max(1, min(k, 50)), domain_filter=domain_filter)}
+
+
+# ══════════════════════════════════════════════════════════════
+# STAGE C3 — Jeeves RAG replies (recall top-EFE canon → grounded answer)
+# ══════════════════════════════════════════════════════════════
+class JeevesAskReq(BaseModel):
+    query: str = Field(..., min_length=2)
+    top_k: int = 6
+    domain_filter: Optional[str] = None
+    image_base64: Optional[str] = None   # optional image → multimodal grounding
+    audio_base64: Optional[str] = None   # folded into Delta memory as audio modality
+
+
+@router.post("/jeeves/ask")
+async def jeeves_ask(req: JeevesAskReq):
+    """Retrieval-augmented, MULTIMODAL Jeeves reply: recall the most relevant
+    high-EFE LAFS sheets, optionally caption an attached image via a vision
+    model, then generate a grounded answer. Any attached media is also folded
+    into the fixed-size Delta (KDA) memory so Jeeves 'remembers' it."""
+    recalled = lafs.probability_search(
+        req.query, domain_filter=req.domain_filter,
+        acquisition="hybrid-deep", top_k=max(1, min(req.top_k, 12)))
+
+    grounded = [{"sheet_id": r.get("id"), "path": r.get("path"),
+                 "score": r.get("score"), "efe": r.get("acq"),
+                 "payload": r.get("payload")} for r in recalled]
+
+    ctx_lines = []
+    for i, r in enumerate(recalled, 1):
+        payload = r.get("payload") or {}
+        snippet = (payload.get("extract") or payload.get("content")
+                   or payload.get("description") or str(payload))[:400]
+        ctx_lines.append(f"[{i}] ({r.get('path')}) {snippet}")
+    context_block = "\n".join(ctx_lines) if ctx_lines else "(no canon recalled)"
+
+    # ── fold any attached media into the Delta (KDA) multimodal memory ──
+    modalities_seen = ["text"]
+    try:
+        from gameforge.omega import delta_memory as _dm
+        if req.image_base64:
+            _dm.write(f"query:{req.query[:60]}", req.image_base64, modality="image")
+            modalities_seen.append("image")
+        if req.audio_base64:
+            _dm.write(f"query:{req.query[:60]}", req.audio_base64, modality="audio")
+            modalities_seen.append("audio")
+    except Exception:  # noqa: BLE001
+        pass
+
+    import os as _os
+    api_key = _os.getenv("EMERGENT_LLM_KEY", "")
+    reply, model = None, "extractive"
+    if api_key and (recalled or req.image_base64):
+        try:
+            from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+            import uuid as _uuid
+            system = ("You are Jeeves, the GameForge master orchestrator. Answer the user "
+                      "GROUNDED in the provided canon knowledge AND any attached image. "
+                      "Cite sheet numbers [n]. If canon is insufficient, say so briefly.")
+            # vision-capable model when an image is attached, else sonnet
+            provider, mdl = ("openai", "gpt-4o") if req.image_base64 else ("anthropic", "claude-sonnet-4-6")
+            chat = LlmChat(api_key=api_key, session_id=_uuid.uuid4().hex,
+                           system_message=system).with_model(provider, mdl)
+            prompt = f"CANON KNOWLEDGE:\n{context_block}\n\nUSER QUESTION: {req.query}"
+            files = None
+            if req.image_base64:
+                b64 = req.image_base64.split(",", 1)[-1] if req.image_base64.startswith("data:") else req.image_base64
+                files = [ImageContent(image_base64=b64)]
+            reply = await chat.send_message(UserMessage(text=prompt, file_contents=files))
+            model = f"{provider}:{mdl}"
+        except Exception:  # noqa: BLE001
+            reply = None
+    if not reply:
+        if recalled:
+            top = recalled[0].get("payload") or {}
+            head = (top.get("extract") or top.get("content")
+                    or top.get("description") or "").strip()
+            reply = (f"Based on {len(recalled)} recalled canon sheet(s): {head[:600]}"
+                     if head else f"Recalled {len(recalled)} related canon sheet(s) but no text payload.")
+        else:
+            reply = "Jeeves has no canon on this yet — try /api/lafs/learn/online to teach him."
+
+    return {"ok": True, "query": req.query, "reply": reply, "model": model,
+            "modalities": modalities_seen, "grounded_in": grounded,
+            "recalled_count": len(recalled)}
+
+
+# ══════════════════════════════════════════════════════════════
+# STAGE C1 — online-learning sweep (rotating free-knowledge topics)
+# ══════════════════════════════════════════════════════════════
+_SWEEP_TOPICS = [
+    "Game design", "Procedural generation", "Finite-state machine", "Pathfinding",
+    "Game physics", "Level design", "Narrative design", "Roguelike",
+    "Entity component system", "Shader", "Quaternion", "Perlin noise",
+    "Behavior tree", "Game balance", "Difficulty level", "Sprite (computer graphics)",
+]
+_sweep_cursor = {"i": 0}
+
+
+@router.post("/sweep/online")
+async def sweep_online(count: int = 4, domain: str = "Meta", log_type: str = "Discovery"):
+    """Run one online-learning sweep over the next ``count`` rotating topics.
+    Designed to be called on a nightly schedule (or on demand)."""
+    picked, results, learned = [], [], 0
+    n = len(_SWEEP_TOPICS)
+    for _ in range(max(1, min(count, n))):
+        t = _SWEEP_TOPICS[_sweep_cursor["i"] % n]
+        _sweep_cursor["i"] += 1
+        picked.append(t)
+    for t in picked:
+        try:
+            s = await _wiki_summary(t)
+            if not s:
+                results.append({"topic": t, "learned": False}); continue
+            sheet = lafs.add_sheet(domain, log_type, {**s, "topic": t, "provenance": "wikipedia_rest_v1"},
+                                   author="Jeeves-Sweep", tags=["online", "sweep", t.lower()])
+            lafs.reinforce(sheet.id, success=True, weight=1.5, tag="online_sweep", deep=True)
+            results.append({"topic": t, "learned": True, "sheet_id": sheet.id})
+            learned += 1
+        except Exception as e:  # noqa: BLE001
+            results.append({"topic": t, "learned": False, "reason": type(e).__name__})
+    return {"ok": True, "swept": picked, "learned_count": learned, "results": results,
+            "cursor": _sweep_cursor["i"]}

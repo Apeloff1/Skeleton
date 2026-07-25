@@ -226,3 +226,55 @@ async def fabric_agent_emit(agent_id: str, req: EmitReq):
 async def fabric_jeeves_emit(req: EmitReq):
     """Route Jeeves output through the mastermap conductor."""
     return {"ok": True, "result": await omega_fabric.jeeves_emit(req.content, req.topic)}
+
+
+# ══════════════════════════════════════════════════════════════
+# DELTA MEMORY (KDA) — fixed-size multimodal associative memory.
+# "Attention is a lookup, folded into ONE matrix." Corrects, never appends.
+# ══════════════════════════════════════════════════════════════
+class DeltaWriteReq(BaseModel):
+    key: str = Field(..., min_length=1)
+    value: str = Field(..., min_length=1)
+    modality: str = "text"        # text | image | audio | video | vector
+    key_modality: str = "text"
+
+
+class DeltaReadReq(BaseModel):
+    key: str = Field(..., min_length=1)
+    key_modality: str = "text"
+
+
+@router.get("/delta/stats")
+async def delta_stats():
+    from gameforge.omega import delta_memory
+    return {"ok": True, **delta_memory.stats()}
+
+
+@router.get("/delta/heatmap")
+async def delta_heatmap(cells: int = 8):
+    from gameforge.omega import delta_memory
+    return {"ok": True, "cells": cells, "heatmap": delta_memory.snapshot_heatmap(max(2, min(cells, 16)))}
+
+
+@router.post("/delta/write")
+async def delta_write(req: DeltaWriteReq):
+    """Fold a (key → value) association of ANY modality into the fixed matrix.
+    image/audio/video values may be raw base64 or data-URIs — the memory is
+    content-addressed so binaries never grow the footprint."""
+    from gameforge.omega import delta_memory
+    res = delta_memory.write(req.key, req.value, modality=req.modality,
+                             key_modality=req.key_modality)
+    try:
+        import asyncio
+        asyncio.get_running_loop().create_task(omega_fabric._persist_state())
+    except Exception:  # noqa: BLE001
+        pass
+    return {"ok": True, **res}
+
+
+@router.post("/delta/read")
+async def delta_read(req: DeltaReadReq):
+    """Associative recall — read the current value vector for a key + nearest
+    stored concept (works cross-modally)."""
+    from gameforge.omega import delta_memory
+    return {"ok": True, **delta_memory.read(req.key, key_modality=req.key_modality)}
