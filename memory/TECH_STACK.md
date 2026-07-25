@@ -61,11 +61,19 @@ destroying the running 99.6%-complete system._
 
 Each stage is independently shippable and testable; nothing rips out working code.
 
-### Stage A — Foundation hardening (low risk)
-- **A1** Persist Ω-conductor sessions + fabric System-IQ to Mongo (survive fork/restart).
-- **A2** Typed settings via `pydantic-settings`; centralize env access (no scattered `os.environ`).
-- **A3** Structured logging (JSON) + correlation-id middleware across all routes.
-- **A4** Route module tree cleanup: group `routes/` into packages (`routes/gameforge/`, `routes/prood/`, `routes/agents/`) — imports updated, behavior identical.
+### Stage A — Foundation hardening (low risk)  ✅ COMPLETE (2026-06)
+- **A1** ✅ Persist Ω-conductor fabric System-IQ + emissions/growth to Mongo
+  (`omega_persistence` `_id="fabric"`). Leading-edge + TRAILING-edge flush (burst-safe);
+  restored on `ensure_started`. Verified survives `supervisorctl restart backend`.
+- **A2** ✅ Typed settings `core/settings.py` (`pydantic-settings`, cached singleton
+  `get_settings()`); Ω-fabric persistence toggle/interval read from it.
+- **A3** ✅ Pre-existing: `RequestIdMiddleware` (X-Request-Id correlation) + `AccessLogMiddleware`
+  + `core/structured_log.install_json_adapter()` (JSON sink when `LOG_FORMAT=json`). Verified.
+- **A4** ✅ Logical route-tree grouping in `core/routes_registry.py` (`ROUTE_GROUPS`,
+  `group_of()`, `route_group_summary()` surfaced in the registry report). Physical file
+  moves deliberately DEFERRED — 68 route modules cross-import, so grouping is a safe
+  classifier rather than a fragile package reshuffle.
+- Tests: `backend/tests/test_stage_a_hardening.py` (14) — 14/14 after the burst-flush fix.
 
 ### Stage B — Distributed rigor ("Byzantine" done right)
 - **B1** Promote the PBFT-sim consensus to a real quorum over N in-process replicas with vote logs.

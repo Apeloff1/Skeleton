@@ -51,6 +51,7 @@ class OmegaFabric:
 
         self._loaded = False
         self._last_persist = 0.0
+        self._flush_scheduled = False
 
     # ── durable state helpers (A1) ────────────────────────────
     def _persist_enabled(self) -> bool:
@@ -87,11 +88,17 @@ class OmegaFabric:
             pass
 
     async def _persist_state(self, force: bool = False):
-        """Throttled best-effort write of the fabric's durable state."""
+        """Throttled best-effort write of the fabric's durable state.
+
+        Leading-edge writes happen immediately; if a write arrives inside the
+        throttle window it is coalesced and a single TRAILING-edge flush is
+        scheduled so the LAST state in a burst is never lost (fixes the
+        bursty-emission data-loss found in Stage-A testing)."""
         if not self._persist_enabled():
             return
         now = time.time()
         if not force and (now - self._last_persist) < self._persist_interval():
+            self._schedule_trailing_flush()
             return
         self._last_persist = now
         try:
@@ -109,6 +116,27 @@ class OmegaFabric:
             )
         except Exception:  # noqa: BLE001 — persistence must never break emissions
             pass
+
+    def _schedule_trailing_flush(self):
+        """Schedule ONE delayed force-persist after the throttle window so the
+        latest state in a burst is durably written. Coalesces concurrent
+        requests via ``_flush_scheduled``."""
+        if self._flush_scheduled:
+            return
+        try:
+            import asyncio
+
+            async def _trailing():
+                try:
+                    await asyncio.sleep(self._persist_interval())
+                finally:
+                    self._flush_scheduled = False
+                await self._persist_state(force=True)
+
+            asyncio.get_running_loop().create_task(_trailing())
+            self._flush_scheduled = True
+        except Exception:  # noqa: BLE001
+            self._flush_scheduled = False
 
     # ── lifecycle ─────────────────────────────────────────────
     async def ensure_started(self):
