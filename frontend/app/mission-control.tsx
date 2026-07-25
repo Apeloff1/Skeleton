@@ -467,7 +467,14 @@ export default function MissionControl() {
 
             {/* What Jeeves Knows — top-EFE canon + RAG ask */}
             <View style={[s.card, { marginBottom: 12 }]}>
-              <Text style={s.planObj}>🧠 What Jeeves Knows</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={s.planObj}>🧠 What Jeeves Knows</Text>
+                <TouchableOpacity testID="open-jeeves-chat" onPress={() => router.push('/jeeves-chat')}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: PURPLE, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                  <Ionicons name="chatbubbles-outline" size={14} color="#fff" />
+                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Chat</Text>
+                </TouchableOpacity>
+              </View>
               {topEfe.length === 0 ? (
                 <Text style={[s.roomMeta, { marginTop: 6 }]}>No canon yet — teach Jeeves via online learning.</Text>
               ) : topEfe.map((sheet: any, i: number) => (

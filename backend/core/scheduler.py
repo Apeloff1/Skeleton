@@ -58,6 +58,37 @@ async def fabric_snapshot():
     return await _safe("fabric_snapshot", _snap())
 
 
+async def idle_augment():
+    """If Jeeves has been idle > 4h, SPEND the whole free-tier budget augmenting
+    his knowledge — run online-learning sweeps whose accepted sheets queue for
+    jury review (compounding the wiki while nobody is watching)."""
+    async def _aug():
+        from gameforge.jeeves.free_tier import free_tier
+        if not free_tier.should_augment_idle():
+            return {"augmented": False, "idle_seconds": round(free_tier.idle_seconds(), 1)}
+        from routes.lafs import sweep_online
+        learned = 0
+        # spend free units in batches until the window budget is exhausted
+        while free_tier.free_remaining() > 0:
+            free_tier.free_used += 4
+            res = await sweep_online(count=4)
+            learned += res.get("learned_count", 0)
+            # queue newly learned sheets for jury review
+            try:
+                from gameforge.lafs import lafs
+                for r in res.get("results", []):
+                    if r.get("sheet_id"):
+                        lafs.queue_for_jury(r["sheet_id"], reason="idle_augment")
+            except Exception:  # noqa: BLE001
+                pass
+            if learned > 40:
+                break
+        free_tier.idle_augmentations += 1
+        free_tier.touch()  # reset idle after augmenting
+        return {"augmented": True, "sheets_learned": learned}
+    return await _safe("idle_augment", _aug())
+
+
 # ── lifecycle ──────────────────────────────────────────────────
 def start_scheduler() -> bool:
     global _scheduler
@@ -74,6 +105,8 @@ def start_scheduler() -> bool:
     sch.add_job(legion_drill, "interval", minutes=10, id="legion_drill",
                 max_instances=1, coalesce=True)
     sch.add_job(fabric_snapshot, "interval", minutes=5, id="fabric_snapshot",
+                max_instances=1, coalesce=True)
+    sch.add_job(idle_augment, "interval", minutes=15, id="idle_augment",
                 max_instances=1, coalesce=True)
     try:
         sch.start()
@@ -94,7 +127,8 @@ async def run_job_now(job_id: str) -> Dict:
     """Manually trigger a scheduled job (for demos / ops)."""
     mapping = {"lafs_online_sweep": lafs_online_sweep,
                "legion_drill": legion_drill,
-               "fabric_snapshot": fabric_snapshot}
+               "fabric_snapshot": fabric_snapshot,
+               "idle_augment": idle_augment}
     fn = mapping.get(job_id)
     if not fn:
         return {"ok": False, "error": "unknown_job"}

@@ -128,6 +128,31 @@ transcript, is the shared state. Orchestrator node merges leaves; all steps stre
 > (2) observable on the PROOD event bus, (3) multimodal-ready, and (4) bounded in footprint
 > (delta-memory over growing lists where possible).
 
+---
+
+## 3e. FREE-TIER CASCADE + Jeeves multi-format creation + SOTA chat (2026-06)
+
+### Free-tier cascade — `gameforge/jeeves/free_tier.py`
+Layered cost control fronting the paid LLM: **Tier 0 LOCAL** (deterministic extractive +
+local artifact generation, unlimited/free) → **Tier 1 FREE** (free knowledge APIs, generous
+rolling-window quota) → **Tier 2 PAID** (Emergent LLM, only when free budget spent AND
+reasoning is required). `decide(needs_reasoning)` picks the tier; stats at `GET /api/jeeves/free-tier`.
+Tracks last-activity; scheduler `idle_augment` job (every 15m) spends the WHOLE free budget on
+online-learning sweeps that queue for jury review once Jeeves is **idle > 4h**.
+
+### Jeeves creation engine — `gameforge/jeeves/artifacts.py`
+FREE local generators (no LLM cost): **PDF** (reportlab), **spreadsheet** (openpyxl/XLSX),
+**chart variations** (matplotlib bar/line/pie/scatter), **graph** (networkx), **visual**
+(matplotlib infographic). All return base64 + mime.
+
+### Compose + SOTA chat — `routes/jeeves_compose.py`
+- `POST /api/jeeves/compose` — Jeeves replies in ALL requested forms in a SINGLE parse.
+- `POST /api/jeeves/chat` — SOTA 2026 session chat; auto-detects requested forms from the
+  message (or `force_all_forms`), returns text + inline artifacts, free-tier routed, multimodal
+  attach (image/pdf). History persisted (`jeeves_chat`).
+- Frontend `app/jeeves-chat.tsx` — bubble UI, tier badges, inline chart/graph/visual images +
+  downloadable PDF/XLSX chips, image + document attach. Linked from Mission Control.
+
 ### Stage E — Ops & scale  ✅ COMPLETE (2026-06)
 - **E1** ✅ APScheduler `AsyncIOScheduler` (`core/scheduler.py`) — autonomic jobs:
   `lafs_online_sweep` (30m), `legion_drill` (10m), `fabric_snapshot` (5m). Started on boot,
