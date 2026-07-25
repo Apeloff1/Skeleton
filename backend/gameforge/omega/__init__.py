@@ -20,10 +20,12 @@ from gameforge.omega.conductor import (
     IntegrityError, RecoverableError, RepetitionError,
     ConsensusError, MarathonStateError, QueueOverflowError,
 )
+from gameforge.omega.integration import OmegaFabric, omega_fabric
 
 __all__ = [
     "OmegaUltraConductor", "AgentToAgentConductor", "OrchestratorConductor",
     "UserToJeevesConductor", "ConductorRegistry", "conductor_registry",
+    "OmegaFabric", "omega_fabric",
     "IntegrityError", "RecoverableError", "RepetitionError",
     "ConsensusError", "MarathonStateError", "QueueOverflowError",
 ]

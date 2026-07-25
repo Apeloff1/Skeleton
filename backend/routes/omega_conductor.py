@@ -15,7 +15,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from gameforge.omega import (
-    conductor_registry,
+    conductor_registry, omega_fabric,
     AgentToAgentConductor, OrchestratorConductor, UserToJeevesConductor,
     RepetitionError, MarathonStateError, ConsensusError,
 )
@@ -186,3 +186,43 @@ async def subs(sid: str):
     if not isinstance(sess.conductor, OrchestratorConductor):
         raise HTTPException(status_code=400, detail="session_role_must_be_orchestrator_or_mastermap")
     return {"ok": True, "subs": sess.conductor.sub_summary()}
+
+
+# ══════════════════════════════════════════════════════════════
+# OmegaFabric — Ω conductor wired INTO Jeeves + ALL agents
+# (jeeves ≙ mastermap, each agent ≙ map). Rising System-IQ.
+# ══════════════════════════════════════════════════════════════
+class EmitReq(BaseModel):
+    content: str = Field(..., min_length=1)
+    topic: str = "general"
+
+
+@router.get("/fabric")
+async def fabric_overview():
+    await omega_fabric.ensure_started()
+    return {"ok": True, **omega_fabric.overview()}
+
+
+@router.get("/fabric/agents")
+async def fabric_agents():
+    return {"ok": True, "agents": omega_fabric.list_agents()}
+
+
+@router.get("/fabric/agent/{agent_id}")
+async def fabric_agent_status(agent_id: str):
+    snap = omega_fabric.agent_status(agent_id)
+    if snap is None:
+        raise HTTPException(status_code=404, detail="agent_not_registered")
+    return {"ok": True, "snapshot": snap}
+
+
+@router.post("/fabric/agent/{agent_id}/emit")
+async def fabric_agent_emit(agent_id: str, req: EmitReq):
+    """Route an agent's output through its conductor (never-repeat + progress)."""
+    return {"ok": True, "result": await omega_fabric.agent_emit(agent_id, req.content, req.topic)}
+
+
+@router.post("/fabric/jeeves/emit")
+async def fabric_jeeves_emit(req: EmitReq):
+    """Route Jeeves output through the mastermap conductor."""
+    return {"ok": True, "result": await omega_fabric.jeeves_emit(req.content, req.topic)}

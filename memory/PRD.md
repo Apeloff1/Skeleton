@@ -1084,3 +1084,22 @@
 ##   /sessions) → live 100%. Overall readiness now 99.6% (14/15 live, SOTA engines 94%),
 ##   15 capabilities. Mission Control panel is data-driven → renders automatically.
 ##   PROJECT COMPLETE %: 99.6% (/api/prood/readiness).
+
+## [Ω Fabric] Wired conductor INTO Jeeves + ALL agents (Jun 2026)
+##   gameforge/omega/integration.py — OmegaFabric. Topology: JEEVES=OrchestratorConductor
+##   (mastermap) → AGENT-MAP=OrchestratorConductor (map, attached to jeeves) → each agent
+##   = OmegaUltraConductor (attached to agent-map). "agents ≙ map, jeeves ≙ mastermap".
+##   System-IQ rises +1 per validated (non-repeat) emission (cap 200), growth log,
+##   soft cap 250 agents (evict oldest). Fail-safe: agent_emit/jeeves_emit never raise
+##   into the runtime (return accepted/blocked dict).
+##   WIRED into real runtime routes/gameforge_runtime.py: /message + /groupchat now call
+##   _omega_emit() → jeeves→mastermap, others→agent conductors (fire-safe try/except).
+##   ENDPOINTS added to /api/omega: GET /fabric, /fabric/agents, /fabric/agent/{id},
+##   POST /fabric/agent/{id}/emit, POST /fabric/jeeves/emit.
+##   VERIFIED (curl): groupchat emit → IQ 100→101 w/ merkle+seq; jeeves message → IQ 102;
+##   duplicate agent content → blocked=True; fabric overview shows IQ/agents/emissions/
+##   blocked + topology. FRONTEND: Mission Control "Ω-Ultra Fabric" card (System IQ,
+##   agents, emissions, blocked, topology) — data-driven, no cyan.
+##   NOTE: uploaded Decade-Tracker HTML (Jeeves→Jury auto-submit + rising IQ) uses CYAN
+##   heavily — NOT copied; adapted the IQ-growth concept into the fabric instead.
+##   PROJECT COMPLETE %: 99.6% (/api/prood/readiness, 15 capabilities, 14/15 live).

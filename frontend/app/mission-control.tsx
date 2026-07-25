@@ -38,6 +38,7 @@ export default function MissionControl() {
   const [prood, setProod] = React.useState<any>(null);
   const [saga, setSaga] = React.useState<any>(null);
   const [sagaBusy, setSagaBusy] = React.useState(false);
+  const [fabric, setFabric] = React.useState<any>(null);
   const [activateMsg, setActivateMsg] = React.useState('');
   const [selftest, setSelftest] = React.useState<any>(null);
   const [testing, setTesting] = React.useState(false);
@@ -46,11 +47,12 @@ export default function MissionControl() {
   const [live, setLive] = React.useState(false);
 
   const load = React.useCallback(async () => {
-    const [st, h, pos, pl, lg, cov, prd] = await Promise.all([
+    const [st, h, pos, pl, lg, cov, prd, fab] = await Promise.all([
       api.get<any>(`${RT}/status`), api.get<any>(`${RT}/health`), api.get<any>(`${RT}/positions`),
       api.get<any>(`${PLAN}/plans?limit=6`), api.get<any>(`${S}/logs?limit=18`),
       api.get<any>('/api/gameforge/coverage', { timeoutMs: 20000 }),
       api.get<any>('/api/prood/readiness', { timeoutMs: 25000 }),
+      api.get<any>('/api/omega/fabric', { timeoutMs: 20000 }),
     ]);
     if (st.ok) setStatus(st.data);
     if (h.ok) setHealth(h.data);
@@ -59,6 +61,7 @@ export default function MissionControl() {
     if (lg.ok) setLogs(lg.data?.logs || []);
     if (cov.ok) setCoverage(cov.data);
     if (prd.ok) setProod(prd.data);
+    if (fab.ok) setFabric(fab.data);
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -228,6 +231,23 @@ export default function MissionControl() {
             </View>
 
             <Text style={s.h2}>🏛️ PROOD Architecture</Text>
+            {fabric && (
+              <View style={[s.card, { marginBottom: 12 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={s.planObj}>Ω-Ultra Fabric · Jeeves + Agents</Text>
+                  <View style={[s.readyBanner, { backgroundColor: PURPLE + '22', marginTop: 0 }]}>
+                    <Ionicons name="pulse" size={14} color={PURPLE} />
+                    <Text style={[s.readyTxt, { color: PURPLE }]}>System IQ {Math.round(fabric.system_iq)}</Text>
+                  </View>
+                </View>
+                <View style={[s.statRow, { marginTop: 10 }]}>
+                  <Stat label="Agents" value={`${fabric.agents_tracked}`} color={GREEN} />
+                  <Stat label="Emissions" value={`${fabric.total_emissions}`} color={BLUE} />
+                  <Stat label="Blocked" value={`${fabric.blocked_repeats}`} color={AMBER} />
+                </View>
+                <Text style={[s.roomMeta, { marginTop: 8 }]}>{fabric.topology}</Text>
+              </View>
+            )}
             <ChurnPanel projectName="MissionChurn" />
             <View style={[s.card, { marginTop: 12 }]}>
               <Text style={s.planObj}>Saga Orchestration (compensation & recovery)</Text>

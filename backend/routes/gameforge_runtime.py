@@ -34,6 +34,19 @@ def _tasks():
     return _db()["gameforge_agent_tasks"]
 
 
+async def _omega_emit(agent_id: str, content: str, topic: str = "general"):
+    """Route agent/jeeves output through the Ω-Ultra fabric. Fail-safe: never
+    raises into the runtime — returns the conductor result or an error dict."""
+    try:
+        from gameforge.omega import omega_fabric
+        if agent_id == "jeeves":
+            return await omega_fabric.jeeves_emit(content, topic)
+        return await omega_fabric.agent_emit(agent_id, content, topic)
+    except Exception as e:  # noqa: BLE001
+        return {"accepted": False, "error": f"{type(e).__name__}: {e}"}
+
+
+
 def _role_for(category: str) -> dict:
     try:
         from routes.gameforge_map import _load_roles
@@ -98,7 +111,8 @@ async def message(b: MessageBody):
     doc = {"id": uuid.uuid4().hex[:12], "from": b.from_agent, "to": b.to_agent,
            "topic": b.topic, "content": b.content, "ts": time.time(), "read": False}
     _messages().insert_one(dict(doc))
-    return {"ok": True, "message_id": doc["id"]}
+    conductor = await _omega_emit(b.from_agent, b.content, b.topic)
+    return {"ok": True, "message_id": doc["id"], "omega": conductor}
 
 
 @router.get("/inbox/{agent_id}")
@@ -208,7 +222,8 @@ async def groupchat_post(b: GroupPost):
     _groupchat().insert_one(dict(doc))
     # auto-emit heartbeat: an agent that talks is alive.
     _agents().update_one({"agent_id": b.agent_id}, {"$set": {"last_heartbeat": time.time()}})
-    return {"ok": True, "message_id": doc["id"]}
+    omega = await _omega_emit(b.agent_id, b.content, b.channel)
+    return {"ok": True, "message_id": doc["id"], "omega": omega}
 
 
 @router.get("/groupchat")
