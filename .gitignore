@@ -1,5 +1,5 @@
 # ============================================================================
-# Git Ignore for CodeDock
+# Git Ignore for Tutolage
 # ============================================================================
 
 # ==========================================================================
@@ -46,7 +46,6 @@ yarn-error.log*
 # ==========================================================================
 .expo/
 .expo-shared/
-dist/
 web-build/
 *.jks
 *.p8
@@ -66,11 +65,17 @@ web-build/
 .DS_Store
 
 # ==========================================================================
-# Environment
+# Environment & Secrets (NEVER commit real env files — keep only .env.example)
 # ==========================================================================
-.env.local
-.env.*.local
+.env
+.env.*
+*.env
 !.env.example
+secrets/
+*.pem
+credentials.json
+service-account.json
+.credentials
 
 # ==========================================================================
 # Testing & Coverage
@@ -83,6 +88,8 @@ coverage.xml
 .pytest_cache/
 .tox/
 .nox/
+test_reports/
+test_result.md
 
 # ==========================================================================
 # Build & Artifacts
@@ -93,6 +100,10 @@ coverage.xml
 .cache/
 .ruff_cache/
 .mypy_cache/
+
+# Stray editor/agent backup files
+*.bak
+*.bak_*
 
 # ==========================================================================
 # Docker
@@ -106,22 +117,6 @@ coverage.xml
 *.sqlite
 *.sqlite3
 chroma_data/
-
-# ==========================================================================
-# Secrets (NEVER commit these)
-# ==========================================================================
-secrets/
-*.pem
-*.key
-credentials.json
-service-account.json
--e 
-# Environment files (keep .env for deployment — backend/.env & frontend/.env
-# are deployment-critical and MUST be in the build context). Local-only
-# overrides are still ignored via .env.local / .env.*.local above.
-.credentials
-# (.env / .env.* / *.env intentionally NOT ignored — backend/.env & frontend/.env
-#  are deployment-critical and must ship in the build context.)
 
 # testing-agent scratch workspaces
 .git_workspaces/
@@ -138,8 +133,6 @@ backend/data/build_artifacts/
 *.aab
 *.ipa
 
-# testing-agent reports (scratch)
-test_reports/
-.env
-.env.*
-*.env
+# Game engine binaries (install locally, never commit)
+backend/godot
+backend/godot.*

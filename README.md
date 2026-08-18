@@ -63,8 +63,8 @@
 
 ```bash
 # Clone and start
-git clone https://github.com/tutolage/tutolage.git
-cd tutolage
+git clone https://github.com/Apeloff1/Skeleton.git
+cd Skeleton
 
 # Copy environment files
 cp .env.example .env
