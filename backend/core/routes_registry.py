@@ -279,6 +279,8 @@ KNOWN_ROUTES: List[RouteEntry] = [
     ("routes.studio_api",                       "router"),
     ("routes.overheat_system",                  "router"),
     ("routes.performance_armor",                "router"),
+    # ── Godot engine (in-repo binary, headless scaffolding + export) ────
+    ("routes.godot_engine",                     "router"),
 ]
 
 
@@ -343,7 +345,8 @@ ROUTE_GROUPS: List[Tuple[str, Tuple[str, ...]]] = [
     ("playable",  ("routes.playable", "routes.game_kb", "routes.game_modes", "routes.snowball", "routes.canon")),
     ("worldforge", ("routes.worldforge", "routes.asset_genesis", "routes.faction")),
     ("engines",   ("routes.world_engine", "routes.narrative_engine", "routes.logic_engine",
-                   "routes.physics_engine", "routes.math_engine", "routes.cs_engine")),
+                   "routes.physics_engine", "routes.math_engine", "routes.cs_engine",
+                   "routes.godot_engine")),
     ("pipelines", ("routes.",)),  # any *_pipeline caught below via suffix
     ("academy",   ("routes.academy", "routes.curriculum", "routes.reading", "routes.language",
                    "routes.math_academy", "routes.class_")),
