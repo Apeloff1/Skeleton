@@ -1,29 +1,42 @@
 # ============================================================================
 # Tutolage Docker Compose
 # ============================================================================
+# One-command local development and production setup.
+# Merged from the Tutolage + Skeleton compose files (consolidation pass).
+#
 # Usage:
-#   docker compose up -d              # Start all services
-#   docker compose up -d backend      # Start backend only
-#   docker compose logs -f            # View logs
-#   docker compose down               # Stop all
+#   docker compose up -d                 # Start all services
+#   docker compose up -d backend         # Start backend only
+#   docker compose --profile full up -d  # Also start standalone ChromaDB
+#   docker compose logs -f               # View logs
+#   docker compose down                  # Stop all
 # ============================================================================
 
 services:
-  # Backend API
+  # ==========================================================================
+  # Backend API Service
+  # ==========================================================================
   backend:
     build:
       context: ./backend
-      target: ${TARGET:-production}
+      target: ${BUILD_TARGET:-development}
     container_name: tutolage-backend
     restart: unless-stopped
     ports:
-      - "8001:8001"
+      - "${BACKEND_PORT:-8001}:8001"
     environment:
       - MONGO_URL=mongodb://mongo:27017/tutolage
-      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DEBUG=${DEBUG:-true}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - EMERGENT_LLM_KEY=${EMERGENT_LLM_KEY:-}
+      - JWT_SECRET=${JWT_SECRET:-change-me}
+      - STRIPE_API_KEY=${STRIPE_API_KEY:-}
       - CHROMA_PERSIST_DIR=/app/data/chroma
     volumes:
+      - ./backend:/app
       - backend_data:/app/data
+      - /app/__pycache__
     depends_on:
       mongo:
         condition: service_healthy
@@ -32,10 +45,13 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
     networks:
       - tutolage
 
-  # Frontend (Expo Web)
+  # ==========================================================================
+  # Frontend Service (Expo)
+  # ==========================================================================
   frontend:
     build:
       context: ./frontend
@@ -43,35 +59,83 @@ services:
     container_name: tutolage-frontend
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
+      - "8081:8081"      # Metro bundler
+      - "19000:19000"    # Expo
+      - "19001:19001"    # Expo
+      - "19002:19002"    # Expo DevTools
     environment:
       - EXPO_PUBLIC_BACKEND_URL=http://backend:8001
+      - NODE_ENV=${NODE_ENV:-development}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     depends_on:
       - backend
     networks:
       - tutolage
 
-  # MongoDB
+  # ==========================================================================
+  # MongoDB Database
+  # ==========================================================================
   mongo:
     image: mongo:7.0
     container_name: tutolage-mongo
     restart: unless-stopped
     ports:
       - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:-changeme}
+      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-tutolage}
     volumes:
       - mongo_data:/data/db
+      - mongo_config:/data/configdb
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
     networks:
       - tutolage
 
+  # ==========================================================================
+  # ChromaDB Vector Database (Optional, for RAG)
+  # ==========================================================================
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: tutolage-chroma
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=FALSE
+    networks:
+      - tutolage
+    profiles:
+      - full  # Only start with: docker compose --profile full up
+
+# ============================================================================
+# Networks
+# ============================================================================
 networks:
   tutolage:
     driver: bridge
 
+# ============================================================================
+# Volumes
+# ============================================================================
 volumes:
   mongo_data:
+    driver: local
+  mongo_config:
+    driver: local
   backend_data:
+    driver: local
+  chroma_data:
+    driver: local
