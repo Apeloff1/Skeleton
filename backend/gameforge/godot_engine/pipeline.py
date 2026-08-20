@@ -9,10 +9,22 @@ Job kinds:
 
 Each job runs in a subprocess with a timeout; stdout/stderr and the exit
 code are captured into a :class:`GodotJob` record retrievable by id.
+
+Reliability guardrails
+----------------------
+* ``GODOT_MAX_CONCURRENT_JOBS`` (default 2) — a semaphore keeps headless
+  Godot processes from stampeding the box; extra submissions queue behind it.
+* Job history is bounded: finished jobs are evicted oldest-first past
+  ``MAX_JOB_HISTORY``, so a long-running server can't grow it forever.
+* Captured stdout/stderr are each capped at ``MAX_CAPTURE_BYTES``; the job
+  keeps the *tail*, which is what you actually read when something fails.
+* Argument values are sanitized — anything that would be parsed as a Godot
+  flag (leading ``-``) is rejected before the subprocess is built.
 """
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -22,6 +34,8 @@ from pathlib import Path
 from gameforge.godot_engine.binary import get_binary
 
 DEFAULT_TIMEOUT = 600  # seconds
+MAX_JOB_HISTORY = 200          # finished jobs retained, oldest evicted first
+MAX_CAPTURE_BYTES = 256 * 1024  # per stream; keep the tail
 
 
 class JobStatus(str, Enum):
@@ -30,6 +44,18 @@ class JobStatus(str, Enum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     TIMED_OUT = "timed_out"
+
+
+_FINISHED = (JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.TIMED_OUT)
+
+
+def _clean_arg(value: str, what: str) -> str:
+    """Reject values that would smuggle a flag into the Godot argv."""
+    if value.startswith("-"):
+        raise ValueError(f"{what} must not start with '-': {value!r}")
+    if "\x00" in value:
+        raise ValueError(f"{what} contains a NUL byte")
+    return value
 
 
 @dataclass
@@ -66,8 +92,12 @@ class GodotJob:
 class GodotPipeline:
     """Submits and tracks headless Godot jobs."""
 
-    def __init__(self) -> None:
+    def __init__(self, max_concurrent: int | None = None) -> None:
         self.jobs: dict[str, GodotJob] = {}
+        if max_concurrent is None:
+            max_concurrent = int(os.environ.get("GODOT_MAX_CONCURRENT_JOBS", "2"))
+        self._slots = asyncio.Semaphore(max(1, max_concurrent))
+        self._evict_lock = asyncio.Lock()
 
     @staticmethod
     def _base(project_dir: Path | None) -> list[str]:
@@ -91,11 +121,15 @@ class GodotPipeline:
         elif kind == "check":
             if script is None:
                 raise ValueError("check jobs require script=")
-            argv += ["--check-only", "--script", str(script)]
+            argv += ["--check-only", "--script", _clean_arg(str(script), "script")]
         elif kind == "export":
             if not preset or output is None:
                 raise ValueError("export jobs require preset= and output=")
-            argv += ["--export-release", preset, str(output)]
+            argv += [
+                "--export-release",
+                _clean_arg(preset, "preset"),
+                _clean_arg(str(output), "output"),
+            ]
         elif kind == "dump_gdextension":
             argv.append("--dump-gdextension-interface")
         else:
@@ -117,40 +151,58 @@ class GodotPipeline:
             project_dir=str(project_dir) if project_dir else None,
         )
         self.jobs[job.id] = job
+        await self._evict_finished()
         asyncio.create_task(self._run(job, timeout))
         return job
 
-    async def _run(self, job: GodotJob, timeout: int) -> None:
-        job.status = JobStatus.RUNNING
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                *job.argv,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            try:
-                out, err = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-            except asyncio.TimeoutError:
-                proc.kill()
-                await proc.wait()
-                job.status = JobStatus.TIMED_OUT
-                job.stderr = f"killed after {timeout}s"
+    async def _evict_finished(self) -> None:
+        """Bound the history: drop oldest *finished* jobs past the cap."""
+        async with self._evict_lock:
+            finished = [j for j in self.jobs.values() if j.status in _FINISHED]
+            if len(finished) <= MAX_JOB_HISTORY:
                 return
-            job.returncode = proc.returncode
-            job.stdout = out.decode(errors="replace")
-            job.stderr = err.decode(errors="replace")
-            job.status = JobStatus.SUCCEEDED if proc.returncode == 0 else JobStatus.FAILED
-        except Exception as e:  # binary missing, spawn failure, ...
-            job.status = JobStatus.FAILED
-            job.stderr = f"{type(e).__name__}: {e}"
-        finally:
-            job.finished_at = time.time()
+            finished.sort(key=lambda j: j.created_at)
+            for j in finished[: len(finished) - MAX_JOB_HISTORY]:
+                self.jobs.pop(j.id, None)
+
+    async def _run(self, job: GodotJob, timeout: int) -> None:
+        async with self._slots:
+            job.status = JobStatus.RUNNING
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    *job.argv,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                try:
+                    out, err = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+                except asyncio.TimeoutError:
+                    proc.kill()
+                    await proc.wait()
+                    job.status = JobStatus.TIMED_OUT
+                    job.stderr = f"killed after {timeout}s"
+                    return
+                job.returncode = proc.returncode
+                job.stdout = out[-MAX_CAPTURE_BYTES:].decode(errors="replace")
+                job.stderr = err[-MAX_CAPTURE_BYTES:].decode(errors="replace")
+                job.status = JobStatus.SUCCEEDED if proc.returncode == 0 else JobStatus.FAILED
+            except Exception as e:  # binary missing, spawn failure, ...
+                job.status = JobStatus.FAILED
+                job.stderr = f"{type(e).__name__}: {e}"
+            finally:
+                job.finished_at = time.time()
 
     def get(self, job_id: str) -> GodotJob | None:
         return self.jobs.get(job_id)
 
     def list(self, limit: int = 50) -> list[GodotJob]:
         return sorted(self.jobs.values(), key=lambda j: j.created_at, reverse=True)[:limit]
+
+    def stats(self) -> dict:
+        counts: dict[str, int] = {}
+        for j in self.jobs.values():
+            counts[j.status.value] = counts.get(j.status.value, 0) + 1
+        return {"total_jobs": len(self.jobs), "by_status": counts}
 
 
 _pipeline: GodotPipeline | None = None
