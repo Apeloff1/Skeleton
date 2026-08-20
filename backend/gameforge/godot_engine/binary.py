@@ -1,11 +1,22 @@
 """
-godot_engine.binary — async capability layer over the in-repo Godot binary.
+godot_engine.binary — the engine crate: locate, verify, and profile the
+in-repo Godot binary.
 
-Resolution order: GODOT_BINARY env → <backend>/godot → PATH.
+The crate
+---------
+The Godot editor binary is a first-class tracked asset shipped at
+``<backend>/godot`` (Linux x86_64, ~103 MB). This module is the only code
+allowed to touch it: everything else (project scaffolding, headless
+pipeline, the ``/api/godot-engine`` routes) goes through :func:`get_binary`.
 
-Beyond mere location, this module *profiles* the engine once at first use:
-version, headless sanity, and a SHA-256 fingerprint (cheap: size + first/last
-MiB — hashing all 103MB on every call would be wasteful).
+Resolution order: ``GODOT_BINARY`` env → ``<backend>/godot`` → ``PATH``.
+
+Integrity
+---------
+Set ``GODOT_FINGERPRINT`` to the expected cheap SHA-256 (size + first/last
+MiB — hashing all 103 MB on every call would be wasteful). After probing,
+the profile reports ``integrity`` as ``"verified"`` / ``"mismatch"`` /
+``"unchecked"`` and the /api/godot-engine/status endpoint surfaces it.
 """
 from __future__ import annotations
 
@@ -14,6 +25,7 @@ import hashlib
 import os
 import shutil
 import stat
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -34,6 +46,7 @@ class EngineProfile:
     headless_ok: bool
     fingerprint: str
     size_bytes: int
+    integrity: str = "unchecked"          # "verified" | "mismatch" | "unchecked"
     probed_at: float = field(default_factory=time.time)
 
     @property
@@ -51,6 +64,7 @@ class EngineProfile:
             "minor": self.minor,
             "headless_ok": self.headless_ok,
             "fingerprint": self.fingerprint,
+            "integrity": self.integrity,
             "size_bytes": self.size_bytes,
             "size_mb": round(self.size_bytes / (1 << 20), 1),
             "supports_check_only": self.supports_check_only,
@@ -98,6 +112,23 @@ class GodotBinary:
                 h.update(f.read(_HASH_CHUNK))
         return h.hexdigest()[:16]
 
+    def verify_integrity(self, fingerprint: str) -> str:
+        """Compare against the expected fingerprint from GODOT_FINGERPRINT.
+
+        Returns "verified" / "mismatch" / "unchecked". A mismatch never
+        blocks the engine — it is surfaced in the profile and notes so the
+        status endpoint can report a tampered or corrupted binary.
+        """
+        expected = os.environ.get("GODOT_FINGERPRINT", "").strip().lower()
+        if not expected:
+            return "unchecked"
+        if fingerprint == expected:
+            return "verified"
+        self.notes.append(
+            f"integrity mismatch: expected {expected}, got {fingerprint}"
+        )
+        return "mismatch"
+
     async def probe(self, force: bool = False) -> EngineProfile:
         """Profile the engine; cached after first success."""
         if self.profile and not force:
@@ -106,17 +137,20 @@ class GodotBinary:
         if rc != 0:
             raise RuntimeError(f"godot --version failed ({rc}): {err.strip()[:300]}")
         version = out.strip()
+        # Tolerate suffixes like "4.2.1.stable.official" — only major/minor matter.
         parts = version.split(".")
         major = int(parts[0]) if parts and parts[0].isdigit() else 0
         minor = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
         rc2, _, _ = await self._run("--headless", "--quit", timeout=45)
+        fp = self.fingerprint()
         self.profile = EngineProfile(
             version=version,
             major=major,
             minor=minor,
             headless_ok=(rc2 == 0),
-            fingerprint=self.fingerprint(),
+            fingerprint=fp,
             size_bytes=self.path.stat().st_size,
+            integrity=self.verify_integrity(fp),
         )
         return self.profile
 
@@ -133,10 +167,12 @@ class GodotBinary:
         return d
 
 
-def _candidate() -> tuple[Path, str] | None:
+def _candidate(notes: list[str]) -> tuple[Path, str] | None:
     env = os.environ.get("GODOT_BINARY")
-    if env and Path(env).is_file():
-        return Path(env), "env"
+    if env:
+        if Path(env).is_file():
+            return Path(env), "env"
+        notes.append(f"GODOT_BINARY set but not a file: {env!r} — falling through")
     if _REPO_BINARY.is_file():
         return _REPO_BINARY, "repo"
     on_path = shutil.which("godot")
@@ -146,19 +182,25 @@ def _candidate() -> tuple[Path, str] | None:
 
 
 _binary: GodotBinary | None = None
+_binary_lock = threading.Lock()
 
 
 def get_binary() -> GodotBinary:
+    """Return the singleton engine handle. Thread-safe first-touch."""
     global _binary
     if _binary is not None:
         return _binary
-    cand = _candidate()
-    if cand is None:
-        raise FileNotFoundError(
-            f"No Godot binary: expected {_REPO_BINARY}, GODOT_BINARY, or godot on PATH."
-        )
-    _binary = GodotBinary(path=cand[0], source=cand[1])
-    return _binary
+    with _binary_lock:
+        if _binary is not None:
+            return _binary
+        notes: list[str] = []
+        cand = _candidate(notes)
+        if cand is None:
+            raise FileNotFoundError(
+                f"No Godot binary: expected {_REPO_BINARY}, GODOT_BINARY, or godot on PATH."
+            )
+        _binary = GodotBinary(path=cand[0], source=cand[1], notes=notes)
+        return _binary
 
 
 def binary_status() -> dict:
