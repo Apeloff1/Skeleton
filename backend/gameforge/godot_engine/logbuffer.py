@@ -1,47 +1,90 @@
-"""logbuffer.py — bounded ring buffer for job output with cursor streaming.
-
-Subscribers read from a monotonically increasing offset, so SSE clients can
-poll/tail without re-receiving old lines. Memory is capped per buffer.
-"""
+"""logbuffer.py — per-job ring buffers for streamed stdout/stderr."""
 from __future__ import annotations
 
 import time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from threading import Lock
 
 
 @dataclass
 class LogLine:
-    seq: int
     ts: float
-    stream: str  # "stdout" | "stderr" | "system"
+    stream: str      # "stdout" | "stderr" | "system"
     text: str
 
 
 class LogBuffer:
-    def __init__(self, maxlen: int = 2000) -> None:
-        self._lines: deque[LogLine] = deque(maxlen=maxlen)
-        self._seq = 0
+    """Fixed-size ring buffer; oldest lines drop when full (backpressure-safe)."""
 
-    def append(self, text: str, stream: str = "stdout") -> LogLine:
-        self._seq += 1
-        line = LogLine(seq=self._seq, ts=time.time(), stream=stream, text=text)
-        self._lines.append(line)
-        return line
+    def __init__(self, capacity: int = 2000) -> None:
+        self._lines: deque[LogLine] = deque(maxlen=capacity)
+        self._lock = Lock()
+        self.dropped = 0
 
-    def since(self, offset: int = 0, limit: int = 500) -> tuple[list[dict], int]:
-        """Return (lines with seq > offset, next_offset)."""
-        out = [
-            {"seq": l.seq, "ts": l.ts, "stream": l.stream, "text": l.text}
-            for l in self._lines if l.seq > offset
-        ][-limit:]
-        return out, self._seq
+    def append(self, stream: str, text: str) -> None:
+        with self._lock:
+            if len(self._lines) == self._lines.maxlen:
+                self.dropped += 1
+            self._lines.append(LogLine(time.time(), stream, text))
 
-    def tail(self, n: int = 50) -> list[dict]:
+    def tail(self, stream: str | None = None, limit: int = 200) -> list[dict]:
+        with self._lock:
+            lines = list(self._lines)
+        if stream:
+            lines = [l for l in lines if l.stream == stream]
         return [
-            {"seq": l.seq, "ts": l.ts, "stream": l.stream, "text": l.text}
-            for l in list(self._lines)[-n:]
+            {"ts": l.ts, "stream": l.stream, "text": l.text}
+            for l in lines[-limit:]
         ]
+
+    def drain_since(self, index: int) -> tuple[int, list[dict]]:
+        """Incremental read for streaming clients: returns (next_index, lines)."""
+        with self._lock:
+            lines = list(self._lines)
+        if index >= len(lines):
+            return index, []
+        out = [
+            {"ts": l.ts, "stream": l.stream, "text": l.text}
+            for l in lines[index:]
+        ]
+        return len(lines), out
 
     def __len__(self) -> int:
         return len(self._lines)
+
+
+class LogBufferPool:
+    """Owns one LogBuffer per job id; bounded total memory."""
+
+    def __init__(self, max_buffers: int = 64, capacity: int = 2000) -> None:
+        self._buffers: dict[str, LogBuffer] = {}
+        self._max = max_buffers
+        self._capacity = capacity
+        self._lock = Lock()
+
+    def get(self, job_id: str) -> LogBuffer:
+        with self._lock:
+            buf = self._buffers.get(job_id)
+            if buf is None:
+                if len(self._buffers) >= self._max:
+                    oldest = next(iter(self._buffers))
+                    self._buffers.pop(oldest, None)
+                buf = LogBuffer(self._capacity)
+                self._buffers[job_id] = buf
+            return buf
+
+    def remove(self, job_id: str) -> None:
+        with self._lock:
+            self._buffers.pop(job_id, None)
+
+    def stats(self) -> dict:
+        with self._lock:
+            return {
+                "buffers": len(self._buffers),
+                "lines": sum(len(b) for b in self._buffers.values()),
+                "dropped": sum(b.dropped for b in self._buffers.values()),
+            }
+
+
+log_pool = LogBufferPool()
