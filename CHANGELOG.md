@@ -1,7 +1,63 @@
 # CHANGELOG
 
-All notable changes to the CodeDock / Galaxy Studio backend across the
-**8-volume Phase-1 → Phase-9 monolith de-decomposition campaign** (Feb 2026).
+All notable changes to the CodeDock / Galaxy Studio backend.
+
+---
+
+## Aug 2026 — Godot engine crate + backend packaging hardening
+
+Post-Phase-9 pass. No public API changes; one security fix.
+
+### Godot engine crate (`gameforge/godot_engine/`)
+
+The in-repo 103MB Godot binary (`backend/godot`, first-class tracked asset)
+got a full management-layer hardening across its three modules plus the
+HTTP surface:
+
+- **`binary.py`** — the crate. Optional `GODOT_FINGERPRINT` env var now
+  verifies the engine's cheap SHA-256 (size + first/last MiB) after probing;
+  the profile reports `integrity: verified | mismatch | unchecked` through
+  `GET /api/godot-engine/status`. Thread-safe singleton (double-checked
+  lock). Broken `GODOT_BINARY` overrides are logged as notes instead of
+  silently ignored. Version parsing tolerates suffixed releases
+  (`4.2.1.stable.official`).
+- **`project.py`** — `scaffold_project` refuses to clobber an existing
+  project unless `overwrite=True` (raises `ProjectExistsError`; routes map
+  it to **409**). Slug derivation strips separators/dots and caps length;
+  the resolved path must stay inside the projects root. `config/features`
+  now honors `spec.features` instead of hardcoding `"4.2"`.
+- **`pipeline.py`** — `GODOT_MAX_CONCURRENT_JOBS` (default 2) semaphore;
+  extra submissions queue instead of stampeding the box. Finished-job
+  history bounded at 200 (oldest evicted). stdout/stderr captured as tails
+  capped at 256KB per stream. Flag-smuggling argv values (leading `-`)
+  rejected before spawn. New `stats()`.
+- **`routes/godot_engine.py`** — `POST /projects` accepts `overwrite` and
+  returns 409 on slug conflict; `template` validated at the model layer;
+  `GET /status` includes live pipeline stats; `GET /templates` exposes the
+  scaffold templates. **Security**: `output` / `script` values on
+  `POST /jobs` are resolved against the project sandbox — absolute paths
+  and `..` escapes get a 422 before they reach Godot's argv.
+
+### Backend packaging
+
+- `backend/middleware/__init__.py` added — the last unpackaged backend
+  directory (relied on namespace-package fallback).
+- `backend/models/__init__.py` now re-exports all 15 platform enum types
+  from `models/enums.py` (the canonical Phase-10 module), so both
+  `from models.enums import X` and `from models import X` work. This is
+  the enum-relocation step the Phase-9 rollback note required before
+  `models/code_runtime.py` / `models/compiler_pipeline.py` can be
+  re-extracted.
+
+### Housekeeping verified
+
+All 214 routers declared in `core/routes_registry.py` resolve to files on
+disk; zero dangling references. `server.py`'s import surface fully
+resolves against the modular tree.
+
+---
+
+## Feb 2026 — Phase-1 → Phase-9 monolith de-decomposition campaign
 
 The campaign systematically broke up two large monolith files
 (`backend/server.py` and `backend/routes/galaxy_studio.py`) into a clean
@@ -11,7 +67,7 @@ surface and **zero** required frontend changes.
 
 ---
 
-## Headline numbers
+## Headline numbers (Phase-1 → Phase-9)
 
 | Metric                                              | Start (fork) | End (Phase-9) | Δ              |
 |-----------------------------------------------------|--------------|---------------|----------------|
@@ -100,10 +156,22 @@ surface and **zero** required frontend changes.
 
 ---
 
-## New module tree (post Phase-9)
+## New module tree (post Phase-9, updated Aug 2026)
 
 ```
 /app/backend/
+├── middleware/                   ← Aug 2026: packaged (__init__ added)
+│   ├── security.py
+│   └── hardening.py
+├── models/                       ← Aug 2026: package-level enum re-exports
+│   ├── __init__.py
+│   ├── enums.py                  ← canonical (Phase-10; 15 types)
+│   ├── code_runtime.py           ← Phase-9 (178 LOC, REVERTED in server.py)
+│   └── compiler_pipeline.py      ← Phase-9 (86 LOC, REVERTED in server.py)
+├── gameforge/godot_engine/       ← Aug 2026: hardened crate
+│   ├── binary.py                 ← locate · verify (GODOT_FINGERPRINT) · profile
+│   ├── project.py                ← scaffold, overwrite-guarded, traversal-proof
+│   └── pipeline.py               ← semaphore-capped, bounded, tail-capped
 ├── services/
 │   ├── ai_assistant_svc.py      ← Phase-9 (191 LOC)
 │   ├── ai_hub_svc.py            ← Phase-7 (177 LOC)
@@ -115,10 +183,6 @@ surface and **zero** required frontend changes.
 │       ├── algorithms.py         ← Phase-8 (64 LOC, 23 families)
 │       ├── expansion_packs.py    ← Phase-8 (126 LOC, 10 packs)
 │       └── language_packs.py     ← Phase-8 (856 LOC, 40 packs)
-├── models/                       ← Phase-9 (kept on disk for future re-extraction)
-│   ├── __init__.py
-│   ├── code_runtime.py           ← Phase-9 (178 LOC, REVERTED in server.py)
-│   └── compiler_pipeline.py      ← Phase-9 (86 LOC, REVERTED in server.py)
 └── routes/
     ├── galaxy_studio.py          ← 11 418 LOC (was 13 003)
     ├── galaxy_studio_state.py    ← SSOT for parent state (Phase-3+; 22 lazy proxies)
@@ -133,6 +197,7 @@ surface and **zero** required frontend changes.
     ├── galaxy_studio_pipeline.py ← Phase-6 (229 LOC)
     ├── galaxy_studio_vault.py    ← Phase-3
     ├── galaxy_studio_watchdog.py ← Phase-3
+    ├── godot_engine.py           ← Aug 2026: 409 conflicts, sandboxed paths
     ├── compiler_tools.py         ← Phase-6 (234 LOC, 2 live endpoints)
     ├── hub_tools.py              ← Phase-6 (258 LOC, 10 live endpoints)
     └── intelligence_collab.py    ← Phase-5 (243 LOC, 11 endpoints)
@@ -141,6 +206,13 @@ surface and **zero** required frontend changes.
 ---
 
 ## Bugs fixed
+
+### `/api/godot-engine/jobs` path traversal (Aug 2026)
+**Symptom**: `POST /jobs` with `output=../../../etc/x` joined the value
+onto the project dir unsanitized, escaping the projects sandbox into the
+Godot subprocess argv.
+**Fix**: `_resolve_within()` helper rejects absolute paths and `..`
+escapes with 422 before the pipeline is built.
 
 ### `/api/healing/organize` string-vs-dict input (Phase-7)
 **Symptom**: `AttributeError: 'str' object has no attribute 'get'` when called with `{"files": ["a.py", "b.js"]}`.
@@ -173,6 +245,9 @@ surface and **zero** required frontend changes.
 | Balanced-brace `{`/`}` parser      | Phase-8       | Safer block-end detection for dict literals |
 | 2-3 line shim (99%+ shrink)        | Phase-8       | E.g. 844-LOC `LANGUAGE_PACK_REGISTRY` → 2-line `from services.registries... import …` |
 | Safe-rollback discipline           | Phase-9       | Preserve extracted files on disk even when rolling back the shim, for future re-attempt |
+| Package-level re-export            | Aug 2026      | `models/__init__.py` re-exports the canonical enums so both import styles work |
+| Engine-crate integrity             | Aug 2026      | Env-pinned cheap fingerprint verifies the shipped binary at probe time |
+| Sandbox-path resolution            | Aug 2026      | User-supplied relative paths resolved + bounded before reaching subprocess argv |
 
 ---
 
@@ -201,12 +276,13 @@ prior volume; items N+1-2N are net-new for the current volume.
 
 | Item                                                                | Why deferred |
 |---------------------------------------------------------------------|--------------|
-| `models/code_runtime.py` shim re-enable                             | Pydantic v1 + enum-default coupling causes too many circular imports. Needs enum-relocation plan first. |
+| `models/code_runtime.py` shim re-enable                             | Unblocked by the Aug-2026 package-level enum re-exports; needs a local import test run before pushing the server.py rewrite. |
 | `models/compiler_pipeline.py` shim re-enable                        | Same reason. |
 | Galaxy Studio `/start-build` + `/status` + `/create` + `/advance` extraction | Heavily stateful, depends on `_run_background_build`, `_run_phase`, dozens of helpers. Requires lazy-state-proxy expansion. |
-| `LLMProvider` + `ExpansionCategory` + `ExpansionStatus` enum relocation | Would unblock `models/` re-extraction. |
 | Real Authentication wiring (replace `default_user` mock)            | **BLOCKED** — needs user provider choice (Emergent Auth / Firebase / Supabase / Auth0). |
 | `executor_factory` + `ExecutorFactory` relocation                   | Still inline in server.py — small (1 line) so low priority. |
+| ~75 unregistered route modules (`academy.py` vs `academy_v3.py`, version-suffixed duplicates) | Consolidation needs a per-file usage check first. |
+| ~80 root-level `*_test.py` files → `tests/`                          | Pure move, but pytest discovery config must land with it. |
 
 ---
 
@@ -221,16 +297,18 @@ curl -X POST "$EXPO_PUBLIC_BACKEND_URL/api/healing/organize" \
      -H "Content-Type: application/json" \
      -d '{"files":["a.py","b.js","c.ts"]}' | jq '.by_language | keys'
 # → ["javascript","python","typescript"]  (Phase-7 bugfix verified)
+curl -s "$EXPO_PUBLIC_BACKEND_URL/api/godot-engine/status" | jq '.available, .pipeline'
+# → true, {total_jobs:…, by_status:…}  (Aug-2026 crate verified)
 ```
 
 ---
 
 ## Acknowledgements
 
-This 8-volume campaign was executed across a single fork (Feb 2026) without
-any production downtime or frontend changes. The Emergent Labs platform's
-hot-reload via uvicorn WatchFiles made the iterative extraction-and-verify
-loop trivial. Every extraction was followed by a `deep_testing_backend_v2`
-regression sweep before proceeding to the next phase.
+This campaign ran across a single fork without any production downtime or
+frontend changes. The Emergent Labs platform's hot-reload via uvicorn
+WatchFiles made the iterative extraction-and-verify loop trivial. Every
+extraction was followed by a `deep_testing_backend_v2` regression sweep
+before proceeding to the next phase.
 
-— Phase-1 → Phase-9 main agent, Feb 2026.
+— Phase-1 → Phase-9 main agent, Feb 2026; hardening pass Aug 2026.
