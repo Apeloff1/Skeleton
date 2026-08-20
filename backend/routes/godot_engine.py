@@ -58,6 +58,21 @@ def _project_dir_for(slug: str) -> Path:
     return project_dir
 
 
+def _resolve_within(base: Path, relative: str, what: str) -> Path:
+    """Join a user-supplied relative path onto ``base``, rejecting escapes.
+
+    Absolute paths, ``..`` segments, and anything else that resolves outside
+    ``base`` get a 422 — the pipeline never sees a path outside the sandbox.
+    """
+    if not relative or relative.startswith(("/", "\\", "~")):
+        raise HTTPException(422, f"{what} must be a relative path inside the project")
+    resolved = (base / relative).resolve()
+    root = base.resolve()
+    if resolved != root and root not in resolved.parents:
+        raise HTTPException(422, f"{what} escapes the project sandbox: {relative!r}")
+    return resolved
+
+
 # ── Models ────────────────────────────────────────────────────────────────
 
 class ProjectCreateRequest(BaseModel):
@@ -140,11 +155,11 @@ async def submit_job(req: JobSubmitRequest) -> dict:
         if not req.preset or not req.output:
             raise HTTPException(422, "export jobs need preset and output")
         kwargs["preset"] = req.preset
-        kwargs["output"] = (project_dir or _PROJECTS_ROOT) / req.output
+        kwargs["output"] = _resolve_within(project_dir or _PROJECTS_ROOT, req.output, "output")
     if req.kind == "check":
         if not req.script:
             raise HTTPException(422, "check jobs need script")
-        kwargs["script"] = (project_dir or _PROJECTS_ROOT) / req.script
+        kwargs["script"] = _resolve_within(project_dir or _PROJECTS_ROOT, req.script, "script")
     try:
         job = await get_pipeline().submit(
             req.kind, project_dir, timeout=req.timeout, **kwargs
