@@ -162,9 +162,15 @@ class MAGWarmer:
         self.store = store
         self.interval_s = interval_s
         self._task: asyncio.Task | None = None
-        self._stop = asyncio.Event()
+        self._stop: asyncio.Event | None = None
         self.cycles = 0
         self.refreshes = 0
+
+    def _stop_event(self) -> asyncio.Event:
+        # Created lazily: asyncio.Event() must be made inside a running loop.
+        if self._stop is None:
+            self._stop = asyncio.Event()
+        return self._stop
 
     async def refresh_one(self, key: str) -> Filler | None:
         builder = self.store._builders.get(key)
@@ -205,24 +211,30 @@ class MAGWarmer:
         return warmed
 
     async def _loop(self) -> None:
-        while not self._stop.is_set():
+        stop = self._stop_event()
+        while not stop.is_set():
             try:
                 await self.warm_all()
                 self.cycles += 1
             except Exception:
                 pass
             try:
-                await asyncio.wait_for(self._stop.wait(), timeout=self.interval_s)
+                await asyncio.wait_for(stop.wait(), timeout=self.interval_s)
             except asyncio.TimeoutError:
                 pass
 
     def start(self) -> None:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return  # no loop yet (e.g. imported outside app runtime); skip
         if self._task is None or self._task.done():
-            self._stop.clear()
+            self._stop_event().clear()
             self._task = asyncio.create_task(self._loop())
 
     def stop(self) -> None:
-        self._stop.set()
+        if self._stop is not None:
+            self._stop.set()
 
     def stats(self) -> dict:
         return {"cycles": self.cycles, "refreshes": self.refreshes, "running": bool(self._task and not self._task.done())}
@@ -275,3 +287,21 @@ def prime() -> None:
                 built_at=filler.built_at,
             ))
     get_warmer().start()
+
+
+# ── Module-level API used by routes/memory_engine.py ─────────────────────────
+
+def stats() -> dict:
+    """Combined MAG stats (store + warmer) for status endpoints."""
+    return {
+        "store": get_store().stats(),
+        "warmer": get_warmer().stats(),
+        "fillers": [f.to_dict() for f in get_store().all()],
+    }
+
+
+async def warm_now(force: bool = True) -> dict:
+    """Force one preemptive refresh cycle now; returns what was warmed."""
+    register_default_fillers()
+    warmed = await get_warmer().warm_all(force=force)
+    return {"warmed": warmed, "count": len(warmed), "store": get_store().stats()}
