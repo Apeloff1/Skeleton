@@ -1,42 +1,89 @@
 # Repository Consolidation — August 2026
 
-**Skeleton is now the single canonical repo for the Tutolage platform.**
+**Skeleton is the single canonical repo for the Tutolage platform.**
 
-## What was surveyed
+## Repo survey & verdicts
 
-| Repo | State | Action |
-|------|-------|--------|
-| **Skeleton** (this repo) | Most developed — full backend, frontend, tests, docs | **Canonical repo** |
-| Prood | Byte-for-byte duplicate of Skeleton (same 79 root files) | Redundant — safe to delete or archive |
-| Tutolage | Older iteration of the same app | Salvaged: fuller `docker-compose.yml` (healthchecks, Mongo auth, ChromaDB profile, Expo ports) merged in |
-| 2dv0.4, 2dv0.3, 2dv0.2, 2dv1, 2d | Old 2D game prototypes (JavaScript) | Superseded — no salvageable app code |
-| Openworld*, Newmove*, Hotday*, Summer, lage, tolage, etc. | Early experiments | Superseded |
-| Prod, gameforge-rs, Ai-gamestudio, Piper, Restorepoint, resting-22, Ieresting-22 | Empty repositories | Nothing to salvage |
+| Repo | Contents | Verdict |
+|------|----------|---------|
+| **Skeleton** (canonical) | 287 backend routes, full frontend, 200+ modules, tests | **Survives** |
+| Tutolage | 46 backend routes, older frontend, config files | Merged (see below), then archive |
+| Prood | Byte-identical duplicate of Skeleton's 79 root files | Redundant — safe to delete |
+| Prod, gameforge-rs, Ai-gamestudio, Piper, Restorepoint, resting-22, Ieresting-22 | Empty | Nothing to merge — delete |
+| 2dv0.1–0.4, 2d, Openworld*, Newmove*, Hotday*, Summer, lage, tolage | Old JS game prototypes | Superseded — archive |
 
-## Fixes applied in the consolidation pass
+## Tutolage merge (file-level diff)
 
-- Added `LICENSE` (MIT) — the README referenced it but it didn't exist.
-- Added `.env.example`, `backend/.env.example`, `frontend/.env.example` — the README's setup steps referenced files that weren't in the repo.
-- Fixed `.gitignore` self-contradiction: it both required and ignored `.env` files. Real env files are now ignored; only `.env.example` is tracked.
-- Slimmed `backend/requirements.txt` from a full machine freeze (~190 packages incl. CUDA toolkits, PyInstaller, kubernetes client) to actual production dependencies; fixed the `bcrypt 5.0.0` / `passlib 1.7.4` incompatibility by pinning `bcrypt==4.0.1`.
-- Corrected README clone URL (pointed at a nonexistent `tutolage/tutolage` repo).
-- Merged the stronger `docker-compose.yml` from the Tutolage repo.
-- Gitignored `test_result.md` (2MB committed test-output dump), `*.bak*` editor backups, and the 103MB `backend/godot` binary.
+A full diff of both repos was run. Results:
+
+- **Routes: 0 to merge.** All 46 Tutolage routes already exist in Skeleton's 287.
+- **Frontend: 0 to merge.** Skeleton's is strictly newer (has `src/`, `state/`,
+  `theme/`, `app.config.js`, `babel.config.js`, `eas.json`); Tutolage only adds
+  a `package-lock.json` (Skeleton uses yarn) and a `.metro-cache/` build dir.
+- **docker-compose.yml — merged.** Tutolage's had Mongo auth, healthchecks, a
+  ChromaDB profile, and the full Expo port range; combined with Skeleton's
+  data-volume layout.
+- **`.pre-commit-config.yaml` — merged.** Tutolage's was a strict superset:
+  mypy, ESLint, Prettier, bandit, hadolint, commitizen on top of ruff. Adopted
+  wholesale, with the large-file limit raised to 110 MB so the Godot binary
+  stays committable.
+- **`backend/pyproject.toml` — merged.** Tutolage's richer tooling config
+  (stricter ruff rules, per-file ignores, mypy block, coverage branch mode,
+  pytest markers) ported onto Skeleton's naming; dependencies kept aligned with
+  the rebuilt `requirements.txt`.
+- **README — kept Skeleton's.** Tutolage's longer README is an older
+  "CodeDock"-branded draft; Skeleton's is current.
+
+## Consolidation fixes (earlier pass)
+
+- Added `LICENSE` (MIT) and `.env.example` files (root / backend / frontend).
+- Fixed `.gitignore` env contradiction — real env files ignored, examples tracked.
+- Rebuilt `backend/requirements.txt` (was a 190-package machine freeze with CUDA
+  toolkits and PyInstaller); fixed the `bcrypt 5.x` / `passlib 1.7.4` break by
+  pinning `bcrypt==4.0.1`.
+- Corrected README clone URL (pointed at a nonexistent `tutolage/tutolage`).
+
+## Godot engine (in-repo binary → first-class subsystem)
+
+The 103 MB `backend/godot` binary is the app's game engine, wired in as
+`backend/gameforge/godot_engine/` — one focused module per concern:
+
+- `binary.py` — locate/verify/profile the binary (async probe, version, headless self-test)
+- `cache.py` — TTL cache with stale-while-revalidate
+- `logbuffer.py` — per-job ring log capture
+- `scheduler.py` — staggered queue, bounded concurrency, cancellation
+- `pipeline.py` — headless jobs (import / GDScript check / export) as tracked tasks
+- `project.py` — scaffold runnable Godot 4 projects from specs
+- `scenes.py` — .tscn generators (platformer / topdown / empty)
+- `controllers.py` — playable GDScript player controllers
+- `presets.py` — export presets (desktop / web / mobile)
+- `health.py` — deep health snapshot (probe + disk headroom + dir writability)
+
+HTTP surface: `backend/routes/godot_engine.py` at `/api/godot-engine`, mounted
+through the declarative registry in `backend/core/routes_registry.py`
+(engines group). Generated projects/builds live under `backend/data/godot_projects/`
+and `backend/data/godot_builds/` (volume-backed, gitignored).
+
+Try it:
+
+```bash
+curl http://localhost:8001/api/godot-engine/status
+curl -X POST http://localhost:8001/api/godot-engine/projects \
+  -H 'Content-Type: application/json' \
+  -d '{"title": "My First Game", "description": "Scaffolded by Tutolage"}'
+```
 
 ## Known remaining issue
 
-Two files should be deleted from git history but the GitHub API currently returns
-`GitRPC::BadObjectState` on tree creation for this repo (likely related to the
-103MB `backend/godot` blob). To remove them locally:
+`test_result.md` and `backend_test.py.bak_1779283310` are gitignored but still
+tracked in history. The GitHub API returns `GitRPC::BadObjectState` on tree
+creation touching this repo's older objects (likely the 103 MB godot blob).
+Untrack them locally:
 
 ```bash
 git clone https://github.com/Apeloff1/Skeleton.git
 cd Skeleton
-git rm --cached test_result.md backend_test.py.bak_1779283310 backend/godot
-git commit -m "chore: untrack test dump, backup file, and godot binary"
+git rm --cached test_result.md backend_test.py.bak_1779283310
+git commit -m "chore: untrack test dump and backup file"
 git push
 ```
-
-If the push also fails with a bad-object error, the repo's object store needs
-repair: contact GitHub support, or migrate by pushing a fresh local clone to a
-new repo and archiving this one.
