@@ -5,7 +5,6 @@ Interconnected with exocortex memory, game_building_knowledge_db, MCP connectors
 Agents can browse, summarize, extract for game dev tasks (mechanics, assets, AI techniques).
 """
 
-from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 import hashlib

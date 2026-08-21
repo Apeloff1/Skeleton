@@ -5,7 +5,6 @@ For hardest intelligence problems requiring serial work without tokenizing every
 Integrated into Jeeves/agents for CNS game building reasoning.
 """
 
-from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 import torch  # Assume torch for latent; fallback to list sim if no torch

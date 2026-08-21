@@ -7,7 +7,6 @@ Shared memory matrix M training fails due to gradient cancellation under per-sam
 Integrated into CNS for reconstructive memory in Jeeves/twin_memory/masterlog. Enables revisualization/verification in multimodal (SceneBind) game building. Addresses gradient issues with controlled ablations.
 """
 
-from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 import numpy as np

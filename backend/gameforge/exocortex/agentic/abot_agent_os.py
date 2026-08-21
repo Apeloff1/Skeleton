@@ -9,7 +9,6 @@ EmbodiedWorldBench for evaluation.
 Integrated into CNS as core runtime for all 1000 agent teams; ties to ABot-AgentOS for lifelong memory, loops for planning/verification, boardroom for orchestration, DoYouRemember/StoryTeller memory.
 """
 
-from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 import numpy as np

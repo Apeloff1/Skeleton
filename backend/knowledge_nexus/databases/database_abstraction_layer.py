@@ -21,13 +21,17 @@ class BaseDatabase(ABC):
         self.name = name
         self.records: Dict[str, DBRecord] = {}
 
-    @abstractmethod
     def store(self, record_id: str, content: Any, metadata: Dict = None):
-        pass
+        self.records[record_id] = DBRecord(
+            id=record_id,
+            content=content,
+            metadata=metadata or {},
+            timestamp=time.time(),
+        )
+        return record_id
 
-    @abstractmethod
     def retrieve(self, record_id: str) -> Optional[DBRecord]:
-        pass
+        return self.records.get(record_id)
 
     def search(self, query: str, top_k: int = 10) -> List[DBRecord]:
         # Default simple search - real implementations would use AAAHRAG/Hybrid RAG

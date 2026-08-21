@@ -8,7 +8,6 @@ Training-free; preserves narrative (characters, events, relationships, story con
 Integrated into CNS for game story/narrative rooms; ties to DoYouRemember memory, EROS affective, loops for narrative reasoning, boardroom for story consensus.
 """
 
-from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 

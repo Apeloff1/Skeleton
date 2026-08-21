@@ -7,7 +7,6 @@ Uncertainty estimation via MoE-NO encoder + Mahalanobis distance for out-of-dist
 Integrated into CNS for game asset/vehicle/shape design in asset/engineering rooms; ties to SceneBind (multimodal design), Spatula (attribute control), EquiFusion (motion), REGRIND (retargeting).
 """
 
-from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 import numpy as np

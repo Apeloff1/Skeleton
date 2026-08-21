@@ -8,7 +8,6 @@ Latent diffusion with equivariant design for stochastic motion prediction.
 Integrated into CNS for game character animation/motion in asset/animation rooms; ties to REGRIND (retargeting RL), SceneBind (multimodal motion), loops for prediction reasoning.
 """
 
-from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 import numpy as np

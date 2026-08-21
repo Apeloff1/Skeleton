@@ -5,7 +5,7 @@ Binds spawned agents to specific roles with full context, prompts, and coherence
 """
 
 import json
-from typing import Dict
+from typing import Dict, List
 
 class AgentRoleBinding:
     def __init__(self, enhanced_role_path: str, coherence_path: str):

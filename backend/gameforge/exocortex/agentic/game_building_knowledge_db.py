@@ -5,9 +5,10 @@ Linked to exocortex memory (journals, logs, twins), web_browser_agent, MCP conne
 Enables agents to query, store, retrieve relevant game building knowledge with provenance and evolution.
 """
 
-from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+import hashlib
+import time
 import numpy as np
 
 @dataclass
@@ -68,8 +69,25 @@ class GameBuildingKnowledgeDB:
 
     def interconnect_exocortex(self, exocortex_memory: Dict, item_id: str):
         """Link DB item to exocortex memory/journals/twins for contextual game building."""
-        # In real: Vector sync, RAG, graph merge with exocortex (ABot graph, DoYouRemember, etc.)
-        pass  # Placeholder for full interconnect (e.g., store in memory logs, journals)
+        item = self.knowledge_items.get(item_id)
+        if not item:
+            return {"ok": False, "error": "unknown_item", "item_id": item_id}
+        mem = exocortex_memory if isinstance(exocortex_memory, dict) else {}
+        journal = mem.setdefault("journals", [])
+        twins = mem.setdefault("twins", {})
+        entry = {
+            "item_id": item.item_id,
+            "type": item.type,
+            "source": item.source,
+            "provenance": item.provenance,
+            "relations": list(item.graph_relations),
+            "linked_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "summary": (item.content or "")[:280],
+        }
+        journal.append(entry)
+        twins.setdefault(item.type, []).append(item.item_id)
+        mem.setdefault("graph_merge", {}).setdefault(item.item_id, list(item.graph_relations))
+        return {"ok": True, "item_id": item_id, "journal_len": len(journal)}
 
     def status(self) -> Dict[str, Any]:
         return {

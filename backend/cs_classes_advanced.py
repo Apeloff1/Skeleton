@@ -1259,7 +1259,8 @@ class AStar:
 # Behavior Tree Implementation
 class BTNode:
     def tick(self) -> str:
-        raise NotImplementedError
+        """Leaf default: SUCCESS. Composite nodes override."""
+        return "SUCCESS"
 
 class BTSelector(BTNode):
     """Returns SUCCESS if any child succeeds"""

@@ -10,7 +10,6 @@ Native hypergraph isomorphism via canonical string equality (no Levi graph reduc
 Integrated into CNS for game logic/quests/hyperedges (multi-agent interactions, complex dependencies) in logic/quest/narrative rooms; ties to ISALHG for hypergraph-based game structures, loops for traversal, boardroom for consensus on hypergraph ops.
 """
 
-from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 import hashlib

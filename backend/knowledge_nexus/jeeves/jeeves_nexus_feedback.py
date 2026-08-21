@@ -1,3 +1,4 @@
+from typing import Dict, List, Any, Dict, List, Optional
 #!/usr/bin/env python3
 """
 Jeeves Nexus Feedback Integration

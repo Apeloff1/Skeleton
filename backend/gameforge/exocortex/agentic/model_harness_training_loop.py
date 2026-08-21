@@ -6,7 +6,6 @@ Absorbs harness primitives into model training for smarter agents.
 Integrated into Jeeves/self_systems for CNS game building.
 """
 
-from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 

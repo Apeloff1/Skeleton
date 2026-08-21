@@ -6,7 +6,6 @@ GCA-Bench for evaluating foundation models on challenging real-world grasping wi
 Integrated into CNS grasping/asset/manipulation rooms for agent teams. Multi-stage: semantic understanding + scene understanding.
 """
 
-from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 import random

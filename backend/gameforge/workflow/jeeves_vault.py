@@ -16,6 +16,73 @@ import secrets
 import time
 from typing import Any, Dict, List, Optional
 
+
+class _FallbackCol:
+    """In-memory collection when Mongo is unavailable."""
+
+    def __init__(self, store: Dict[str, Dict[str, Any]]):
+        self.store = store
+
+    def update_one(self, q, update, upsert=False):
+        pid = q.get("package_id")
+        doc = dict(self.store.get(pid) or {})
+        if "$set" in update:
+            doc.update(update["$set"])
+        if "$inc" in update:
+            for k, v in update["$inc"].items():
+                doc[k] = doc.get(k, 0) + v
+        if pid:
+            self.store[pid] = doc
+        class R:
+            modified_count = 1
+        return R()
+
+    def find_one(self, q):
+        return self.store.get(q.get("package_id"))
+
+    def find(self, q=None, *a, **k):
+        q = q or {}
+        rows = list(self.store.values())
+        if q:
+            rows = [d for d in rows if all(d.get(k) == v for k, v in q.items() if k != "$lt" and not isinstance(v, dict))]
+        class Cur:
+            def __init__(self, rows):
+                self.rows = rows
+            def sort(self, *a, **k):
+                key = a[0] if a else "created_at"
+                self.rows = sorted(self.rows, key=lambda d: d.get(key) or 0, reverse=True)
+                return self
+            def limit(self, n):
+                self.rows = self.rows[:n]
+                return self
+            def __iter__(self):
+                return iter(self.rows)
+        return Cur(rows)
+
+    def delete_one(self, q):
+        pid = q.get("package_id")
+        class R:
+            deleted_count = 1 if pid in self.store else 0
+        if pid in self.store:
+            del self.store[pid]
+        return R()
+
+    def delete_many(self, q):
+        n = 0
+        if "expires_at" in q and isinstance(q["expires_at"], dict) and "$lt" in q["expires_at"]:
+            cutoff = q["expires_at"]["$lt"]
+            dead = [k for k, d in self.store.items() if d.get("expires_at", 0) < cutoff]
+            for k in dead:
+                del self.store[k]
+                n += 1
+        class R:
+            deleted_count = n
+        return R()
+
+    def count_documents(self, q):
+        return len(list(self.find(q)))
+
+
 from gameforge.boardroom.persistent_vault import boardroom_vault
 
 _DEFAULT_TTL = 30 * 24 * 3600          # 30 days
@@ -24,14 +91,24 @@ _DEFAULT_MAX_DOWNLOADS = 1000
 
 class JeevesVault:
     def __init__(self):
-        pass
+        self._fallback: Dict[str, Dict[str, Any]] = {}
+        self._use_fallback = False
 
     def _db(self):
-        from core.databases import get_sync_db
-        return get_sync_db()
+        if self._use_fallback:
+            return None
+        try:
+            from core.databases import get_sync_db
+            return get_sync_db()
+        except Exception:
+            self._use_fallback = True
+            return None
 
     def _col(self):
-        return self._db()["jeeves_vault"]
+        db = self._db()
+        if db is None:
+            return _FallbackCol(self._fallback)
+        return db["jeeves_vault"]
 
     # ── registration ──────────────────────────────────────────────────
     def register(

@@ -7,7 +7,6 @@ Tracks accuracy progression, error impact on scene description, and human-like g
 Integrated into CNS for perception rooms (SynCLIP/SceneBind/SeeSE3); upgrades robustness for game asset/scene understanding.
 """
 
-from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 import numpy as np

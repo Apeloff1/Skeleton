@@ -7,7 +7,6 @@ Latent-Space Navigation: visual odometry and localization purely in latent space
 Integrated into CNS for game scene/asset understanding, multimodal binding (SceneBind), and agentic world building.
 """
 
-from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 import numpy as np  # For latent vectors; torch fallback in real

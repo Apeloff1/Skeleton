@@ -132,7 +132,7 @@ def _code_for(category: str, week_title: str, topic: str, rnd: random.Random) ->
         return {
             "title": f"OOP pattern: {title_clean}",
             "language": "python",
-            "code": f"# {topic}\nfrom __future__ import annotations\nfrom abc import ABC, abstractmethod\n\nclass Notification(ABC):\n    @abstractmethod\n    def send(self, recipient: str, body: str) -> bool: ...\n\nclass EmailNotification(Notification):\n    def send(self, recipient, body):\n        # imagine SMTP here\n        return True\n\nclass SmsNotification(Notification):\n    def send(self, recipient, body):\n        # imagine Twilio here\n        return True\n\ndef notify(channel: Notification, recipient: str, body: str) -> None:\n    if channel.send(recipient, body):\n        print(f'sent to {{recipient}}')\n    else:\n        print('failed to send')",
+            "code": f"# {topic}\n\nfrom abc import ABC, abstractmethod\n\nclass Notification(ABC):\n    @abstractmethod\n    def send(self, recipient: str, body: str) -> bool: ...\n\nclass EmailNotification(Notification):\n    def send(self, recipient, body):\n        # imagine SMTP here\n        return True\n\nclass SmsNotification(Notification):\n    def send(self, recipient, body):\n        # imagine Twilio here\n        return True\n\ndef notify(channel: Notification, recipient: str, body: str) -> None:\n    if channel.send(recipient, body):\n        print(f'sent to {{recipient}}')\n    else:\n        print('failed to send')",
         }
     # default — Python
     return {

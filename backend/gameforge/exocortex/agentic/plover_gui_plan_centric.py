@@ -9,7 +9,6 @@ Addresses autonomy drift in dynamic GUIs (game dev tools, in-game UI, etc.).
 Integrated into CNS for game UI/automation rooms, agent runtime (ABot-AgentOS), loops for planning/replanning, boardroom for supervision.
 """
 
-from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 

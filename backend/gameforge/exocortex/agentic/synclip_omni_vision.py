@@ -9,7 +9,6 @@ SOTA among CLIP-based OVDP methods; robust grounding under linguistic variants; 
 Integrated into CNS for game asset/scene understanding, open-vocabulary perception in world_gen/asset rooms, tied to SceneBind (multimodal), SeeSE3 (3D latent), SynCLIP for synonym-robust visual grounding.
 """
 
-from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 import numpy as np

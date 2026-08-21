@@ -10,7 +10,6 @@ Integrated into CNS for game building studio: game metrics/analytics, player dat
 All 1000 rooms/agent teams use for data-driven game dev (e.g., balance_room, economy_design, observability_room).
 """
 
-from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 import numpy as np
