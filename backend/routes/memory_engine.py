@@ -14,6 +14,9 @@ Cost effect: for a 4K-token system prefix, a KV hit saves ~90% of those
 tokens on every request. At Jeeves request volume this is the dominant
 cost lever in the platform.
 
+Boot: importing this module primes MAG fillers and starts the preemptive
+warmer, so the KV-cache is warm before the first request lands.
+
 Endpoints
 ---------
 GET  /api/memory-engine/status        — stack health + cache stats
@@ -30,6 +33,15 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from services import cag, mag
+
+# ── Boot: prime fillers + start the preemptive warmer ────────────────────────
+# This runs when the route registry imports this module at app startup.
+# Idempotent: re-imports are no-ops. Failure is non-fatal — memory is an
+# optimization, never a boot blocker.
+try:
+    mag.prime()
+except Exception:
+    pass
 
 router = APIRouter(prefix="/api/memory-engine", tags=["memory-engine"])
 
