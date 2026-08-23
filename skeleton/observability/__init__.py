@@ -1,0 +1,1 @@
+"""Observability subsystem — metrics, tracing, health."""
