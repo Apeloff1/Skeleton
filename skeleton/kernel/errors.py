@@ -66,12 +66,29 @@ class RegistryError(KernelError):
     http_status = 409
 
 
+class CapabilityNotFoundError(RegistryError):
+    code = "KRN.CAPABILITY_NOT_FOUND"
+    severity = Severity.WARNING
+    http_status = 404
+
+
+class DuplicateCapabilityError(RegistryError):
+    code = "KRN.DUPLICATE_CAPABILITY"
+    http_status = 409
+
+
 class EventBusError(KernelError):
     code = "KRN.EVENT_BUS"
 
 
 class IdentityError(KernelError):
     code = "KRN.IDENTITY"
+    http_status = 400
+
+
+class InvalidIdentifierError(IdentityError):
+    code = "KRN.INVALID_IDENTIFIER"
+    severity = Severity.WARNING
     http_status = 400
 
 
