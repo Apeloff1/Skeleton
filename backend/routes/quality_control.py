@@ -18,6 +18,8 @@ from core.databases import client as _MONGO
 from routes.quality import MIN_QUALITY
 from routes.quality_polish import polish_pass, MAX_POLISH_PASSES
 import routes.game_kb_polish  # noqa: F401 — boot-time polish wiring into game_kb._llm_json
+import routes.game_kb_ext_a  # noqa: F401 — boot-time extended forge stages (part A)
+import routes.game_kb_ext_b  # noqa: F401 — boot-time extended forge stages (part B)
 
 router = APIRouter(prefix="/api/quality-control", tags=["quality-control"])
 _db = _MONGO[os.environ.get("DB_NAME", "test_database")]
