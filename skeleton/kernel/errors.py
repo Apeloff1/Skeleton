@@ -1,94 +1,46 @@
-"""The typed error lattice for Skeleton.
+"""Typed error lattice for Skeleton — extended v16.1.
 
-Every failure raised inside the platform derives from :class:`SkeletonError`.
-Each error carries three machine-readable facets:
-
-- ``code`` — stable, namespaced string (``AGENT.CONSENSUS.FAILED``) safe for
-  clients, alerts, and log aggregation to key on. Codes never change without
-  a major version bump.
-- ``severity`` — drives alerting and log level mapping.
-- ``context`` — structured payload, guaranteed JSON-serialisable, carrying
-  whatever the raise site knew (ids, ballot records, validation failures).
-
-The lattice mirrors the subsystem tree so a caller can catch at any altitude:
-catch ``PipelineError`` to handle any pipeline failure, or
-``BalanceSimulationError`` for one specific stage.
+Every error raised inside Skeleton derives from :class:`SkeletonError` and
+carries a stable machine-readable ``code``, a ``severity``, and a structured
+``context`` dict safe to serialise into logs and API responses. Subsystems
+extend the lattice with their own families; the API boundary maps each family
+onto HTTP statuses deterministically via :func:`http_status_for`.
 """
 
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
+from typing import Any, Dict, Optional
 
 
 class Severity(str, Enum):
-    """Error severity, ordered. Used for alert routing and log levels."""
-
-    INFO = "info"
-    WARNING = "warning"
-    ERROR = "error"
-    CRITICAL = "critical"
-
-    @property
-    def rank(self) -> int:
-        return {"info": 0, "warning": 1, "error": 2, "critical": 3}[self.value]
-
-    def at_least(self, other: "Severity") -> bool:
-        return self.rank >= other.rank
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
 
 
 class SkeletonError(Exception):
-    """Root of every error Skeleton raises.
+    """Root of the lattice."""
 
-    Parameters
-    ----------
-    message:
-        Human-readable description. Rendered into logs and (for 4xx-class
-        errors) into API responses.
-    code:
-        Machine-readable, namespaced, stable. Defaults to the class's
-        ``default_code``.
-    severity:
-        Alert routing severity; defaults to ``Severity.ERROR``.
-    context:
-        Structured payload. Must be JSON-serialisable; the constructor
-        coerces non-serialisable values to ``repr`` rather than failing.
-    """
-
-    default_code: str = "SKELETON.ERROR"
-    default_severity: Severity = Severity.ERROR
+    code: str = "SKL.UNKNOWN"
+    severity: Severity = Severity.ERROR
     http_status: int = 500
 
-    def __init__(
-        self,
-        message: str,
-        *,
-        code: str | None = None,
-        severity: Severity | None = None,
-        context: dict[str, Any] | None = None,
-    ) -> None:
+    def __init__(self, message: str, *, code: Optional[str] = None,
+                 severity: Optional[Severity] = None,
+                 context: Optional[Dict[str, Any]] = None,
+                 cause: Optional[BaseException] = None) -> None:
         super().__init__(message)
         self.message = message
-        self.code = code or self.default_code
-        self.severity = severity or self.default_severity
-        self.context = self._sanitise_context(context or {})
+        if code is not None:
+            self.code = code
+        if severity is not None:
+            self.severity = severity
+        self.context: Dict[str, Any] = dict(context or {})
+        self.cause = cause
 
-    @staticmethod
-    def _sanitise_context(context: dict[str, Any]) -> dict[str, Any]:
-        """Guarantee the context payload is JSON-serialisable."""
-        import json
-
-        safe: dict[str, Any] = {}
-        for key, value in context.items():
-            try:
-                json.dumps(value)
-                safe[str(key)] = value
-            except (TypeError, ValueError):
-                safe[str(key)] = repr(value)
-        return safe
-
-    def to_dict(self) -> dict[str, Any]:
-        """Serialise for API responses and structured logs."""
+    def to_dict(self) -> Dict[str, Any]:
         return {
             "error": type(self).__name__,
             "code": self.code,
@@ -97,152 +49,159 @@ class SkeletonError(Exception):
             "context": self.context,
         }
 
-    def __repr__(self) -> str:
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"{type(self).__name__}(code={self.code!r}, message={self.message!r})"
 
 
 # ---------------------------------------------------------------------------
-# Kernel
+# Kernel family
 # ---------------------------------------------------------------------------
 
 class KernelError(SkeletonError):
-    default_code = "KERNEL.ERROR"
+    code = "KRN.UNKNOWN"
 
 
 class RegistryError(KernelError):
-    default_code = "KERNEL.REGISTRY.ERROR"
+    code = "KRN.REGISTRY"
     http_status = 409
 
 
-class DuplicateCapabilityError(RegistryError):
-    default_code = "KERNEL.REGISTRY.DUPLICATE"
-
-
-class CapabilityNotFoundError(RegistryError):
-    default_code = "KERNEL.REGISTRY.NOT_FOUND"
-    http_status = 404
-
-
 class EventBusError(KernelError):
-    default_code = "KERNEL.EVENTS.ERROR"
+    code = "KRN.EVENT_BUS"
 
 
-class InvalidIdentifierError(KernelError):
-    default_code = "KERNEL.ID.INVALID"
+class IdentityError(KernelError):
+    code = "KRN.IDENTITY"
     http_status = 400
 
 
+class ConfigurationError(KernelError):
+    code = "KRN.CONFIG"
+    severity = Severity.CRITICAL
+
+
 # ---------------------------------------------------------------------------
-# Agents
+# Agent family
 # ---------------------------------------------------------------------------
 
 class AgentError(SkeletonError):
-    default_code = "AGENT.ERROR"
-
-
-class AgentNotFoundError(AgentError):
-    default_code = "AGENT.NOT_FOUND"
-    http_status = 404
-
-
-class NoCapableAgentError(AgentError):
-    default_code = "AGENT.ROUTE.NO_CAPABLE"
-    http_status = 503
+    code = "AGT.UNKNOWN"
 
 
 class ConsensusError(AgentError):
-    default_code = "AGENT.CONSENSUS.FAILED"
-    severity = Severity.WARNING
+    code = "AGT.CONSENSUS"
     http_status = 409
 
 
 class SchedulingError(AgentError):
-    default_code = "AGENT.SCHEDULE.ERROR"
-
-
-class TaskDeadLetteredError(SchedulingError):
-    default_code = "AGENT.SCHEDULE.DEAD_LETTER"
-    severity = Severity.WARNING
-
-
-# ---------------------------------------------------------------------------
-# Pipelines
-# ---------------------------------------------------------------------------
-
-class PipelineError(SkeletonError):
-    default_code = "PIPELINE.ERROR"
-
-
-class PipelineValidationError(PipelineError):
-    default_code = "PIPELINE.VALIDATION"
-    severity = Severity.WARNING
-    http_status = 422
-
-
-class GenerationError(PipelineError):
-    default_code = "PIPELINE.GENERATION"
-
-
-class BalanceSimulationError(PipelineError):
-    default_code = "PIPELINE.BALANCE_SIM"
-
-
-class PipelineTimeoutError(PipelineError):
-    default_code = "PIPELINE.TIMEOUT"
-    http_status = 504
-
-
-# ---------------------------------------------------------------------------
-# Jeeves
-# ---------------------------------------------------------------------------
-
-class JeevesError(SkeletonError):
-    default_code = "JEE.ERROR"
-
-
-class SessionNotFoundError(JeevesError):
-    default_code = "JEE.SESSION.NOT_FOUND"
-    http_status = 404
-
-
-class RagUnavailableError(JeevesError):
-    default_code = "JEE.RAG.UNAVAILABLE"
-    severity = Severity.WARNING
+    code = "AGT.SCHEDULING"
     http_status = 503
 
 
-class MatrixError(JeevesError):
-    default_code = "JEE.MATRIX.ERROR"
+class AgentUnavailable(AgentError):
+    code = "AGT.UNAVAILABLE"
+    http_status = 503
 
 
 # ---------------------------------------------------------------------------
-# Forge
+# Pipeline family
 # ---------------------------------------------------------------------------
 
-class ForgeError(SkeletonError):
-    default_code = "FORGE.ERROR"
+class PipelineError(SkeletonError):
+    code = "PPL.UNKNOWN"
 
 
-class BlueprintValidationError(ForgeError):
-    default_code = "FORGE.BLUEPRINT.VALIDATION"
+class GenerationError(PipelineError):
+    code = "PPL.GENERATION"
+    http_status = 502
+
+
+class ValidationError(PipelineError):
+    code = "PPL.VALIDATION"
     severity = Severity.WARNING
     http_status = 422
 
 
-class DependencyCycleError(ForgeError):
-    default_code = "FORGE.BLUEPRINT.CYCLE"
-    severity = Severity.WARNING
+class StageError(PipelineError):
+    code = "PPL.STAGE"
+
+
+# ---------------------------------------------------------------------------
+# Jeeves family
+# ---------------------------------------------------------------------------
+
+class JeevesError(SkeletonError):
+    code = "JEE.UNKNOWN"
+
+
+class SessionError(JeevesError):
+    code = "JEE.SESSION"
+    http_status = 409
+
+
+# ---------------------------------------------------------------------------
+# Retrieval family (quad lattice)
+# ---------------------------------------------------------------------------
+
+class RetrievalError(SkeletonError):
+    code = "RET.UNKNOWN"
+
+
+class FusionError(RetrievalError):
+    code = "RET.FUSION"
+
+
+# ---------------------------------------------------------------------------
+# Forge family
+# ---------------------------------------------------------------------------
+
+class ForgeError(SkeletonError):
+    code = "FRG.UNKNOWN"
+
+
+class BlueprintError(ForgeError):
+    code = "FRG.BLUEPRINT"
     http_status = 422
 
 
 class MaterialisationError(ForgeError):
-    default_code = "FORGE.MATERIALISATION"
+    code = "FRG.MATERIALISE"
+
+
+# ---------------------------------------------------------------------------
+# Vault family (secrets)
+# ---------------------------------------------------------------------------
+
+class VaultError(SkeletonError):
+    code = "VLT.UNKNOWN"
+    severity = Severity.CRITICAL
+
+
+class SecretNotFound(VaultError):
+    code = "VLT.NOT_FOUND"
+    severity = Severity.WARNING
+    http_status = 404
+
+
+class AccessDenied(VaultError):
+    code = "VLT.ACCESS_DENIED"
+    severity = Severity.WARNING
+    http_status = 403
+
+
+class RotationError(VaultError):
+    code = "VLT.ROTATION"
+
+
+class SealedVaultError(VaultError):
+    code = "VLT.SEALED"
+    http_status = 423
 
 
 # ---------------------------------------------------------------------------
 # HTTP mapping
 # ---------------------------------------------------------------------------
 
-def http_status_for(error: SkeletonError) -> int:
-    """Deterministically map any SkeletonError onto an HTTP status code."""
-    return error.http_status
+def http_status_for(exc: SkeletonError) -> int:
+    """Deterministic error→HTTP mapping used by the API boundary."""
+    return getattr(exc, "http_status", 500)
