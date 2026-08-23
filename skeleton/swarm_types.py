@@ -1,6 +1,6 @@
 """
 ================================================================================
-skeleton.swarm — Swarm Intelligence Mesh (Part 1: Types, Consensus, Auction)
+skeleton.swarm — Swarm Intelligence Mesh (Part 1: Types + Consensus + Auction)
 ================================================================================
 Quad-system swarm substrate with:
   1. Consensus protocols: Raft-like leader election + Byzantine fault tolerance
@@ -255,11 +255,8 @@ class ByzantineFaultTolerantConsensus(ConsensusProtocol):
         if len(pre_prepare_votes["accept"]) < 2 * self.f + 1:
             raise ConsensusError(
                 "PRE-PREPARE phase failed: insufficient accepts",
-                ballot={
-                    "phase": "pre_prepare",
-                    "accepts": len(pre_prepare_votes["accept"]),
-                    "required": 2 * self.f + 1,
-                },
+                ballot={"phase": "pre_prepare", "accepts": len(pre_prepare_votes["accept"]),
+                        "required": 2 * self.f + 1},
             )
 
         prepare_votes: Dict[str, List[str]] = {"accept": [], "reject": []}
@@ -274,11 +271,8 @@ class ByzantineFaultTolerantConsensus(ConsensusProtocol):
         if len(prepare_votes["accept"]) < 2 * self.f + 1:
             raise ConsensusError(
                 "PREPARE phase failed: insufficient prepares",
-                ballot={
-                    "phase": "prepare",
-                    "accepts": len(prepare_votes["accept"]),
-                    "required": 2 * self.f + 1,
-                },
+                ballot={"phase": "prepare", "accepts": len(prepare_votes["accept"]),
+                        "required": 2 * self.f + 1},
             )
 
         commit_votes: Dict[str, List[str]] = {"accept": [], "reject": []}
@@ -321,9 +315,9 @@ class ByzantineFaultTolerantConsensus(ConsensusProtocol):
 class AuctionBid:
     """A sealed bid in a Vickrey auction."""
     agent_id: AgentId
-    value: float
-    cost: float
-    capability_match: float = 0.0
+    value: float           # Bid value (willingness to pay / capacity)
+    cost: float            # True cost (private information)
+    capability_match: float = 0.0  # How well capabilities match the task
 
 
 class VickreyAuction:
@@ -340,6 +334,7 @@ class VickreyAuction:
         task_requirements: CapabilityVector,
         bidders: List[AgentState],
     ) -> Tuple[Optional[AgentState], float, List[Dict[str, Any]]]:
+        """Run auction. Returns (winner, price_paid, auction_record)."""
         if not bidders:
             return None, 0.0, []
 
@@ -375,12 +370,7 @@ class VickreyAuction:
             "capability_match": winner_bid.capability_match,
             "total_bidders": len(bids),
             "all_bids": [
-                {
-                    "agent_id": str(b.agent_id),
-                    "value": b.value,
-                    "cost": b.cost,
-                    "match": b.capability_match,
-                }
+                {"agent_id": str(b.agent_id), "value": b.value, "cost": b.cost, "match": b.capability_match}
                 for b in bids
             ],
         }
