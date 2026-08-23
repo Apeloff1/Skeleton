@@ -1,8 +1,6 @@
 """
 ================================================================================
-skeleton.resilience — Adversarial Resilience Fortress (Part 2: Exfiltration + Shadow)
-================================================================================
-Knowledge exfiltration detection, shadow mode A/B testing, and unified fortress.
+skeleton.resilience — Adversarial Resilience Fortress (Part 2: Exfiltration + Shadow + Unified Fortress)
 ================================================================================
 """
 from __future__ import annotations
@@ -15,11 +13,19 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from skeleton.kernel.errors import SkeletonError
 from skeleton.kernel.events import DomainEvent, EventBus
-from skeleton.resilience import ThreatLevel, ThreatCategory, ThreatReport
+from skeleton.resilience import ThreatLevel, ThreatCategory, ThreatReport, InputSanitiser, OutputGuardrail
 
+
+# =============================================================================
+# KNOWLEDGE EXFILTRATION DETECTION
+# =============================================================================
 
 class ExfiltrationDetector:
-    """Monitor I/O for data leakage patterns."""
+    """
+    Monitor I/O for data leakage patterns.
+    Detects: model extraction attempts, training data reconstruction,
+    membership inference, attribute inference.
+    """
 
     def __init__(self, bus: Optional[EventBus] = None) -> None:
         self._query_history: List[Dict[str, Any]] = []
@@ -31,6 +37,7 @@ class ExfiltrationDetector:
         evidence: List[str] = []
         score = 0.0
 
+        # Pattern 1: Repetitive similar queries (membership inference)
         similar_count = sum(
             1 for q in self._query_history[-20:]
             if self._similarity(query, q["query"]) > 0.8
@@ -39,6 +46,7 @@ class ExfiltrationDetector:
             evidence.append(f"Repetitive similar queries: {similar_count} in last 20")
             score += 0.3
 
+        # Pattern 2: Probing for specific training data
         probing_terms = ["training data", "your training", "what data", "dataset",
                         "examples you saw", "what you know about"]
         for term in probing_terms:
@@ -46,10 +54,12 @@ class ExfiltrationDetector:
                 evidence.append(f"Training data probe: '{term}'")
                 score += 0.2
 
+        # Pattern 3: Response contains memorised content
         if len(response) > 1000 and response.count(".") > 50:
             evidence.append("Long, structured response — possible extraction")
             score += 0.2
 
+        # Pattern 4: Systematic attribute probing
         user_patterns = self._suspicious_patterns.get(user_id, 0)
         if any(term in query.lower() for term in probing_terms):
             user_patterns += 1
@@ -80,7 +90,12 @@ class ExfiltrationDetector:
                 self._bus.publish(
                     DomainEvent(
                         topic="resilience.exfiltration.detected",
-                        payload={"user_id": user_id, "score": score, "evidence": evidence, "level": report.level.name},
+                        payload={
+                            "user_id": user_id,
+                            "score": score,
+                            "evidence": evidence,
+                            "level": report.level.name,
+                        },
                         correlation_id=f"exfil_{user_id}_{int(time.time())}",
                     )
                 )
@@ -95,9 +110,12 @@ class ExfiltrationDetector:
         return intersection / union if union > 0 else 0.0
 
 
+# =============================================================================
+# SHADOW MODE — SILENT A/B TESTING
+# =============================================================================
+
 @dataclass
 class ShadowExperiment:
-    """Definition of a shadow-mode A/B experiment."""
     experiment_id: str
     variant_a: str
     variant_b: str
@@ -109,18 +127,31 @@ class ShadowExperiment:
 
 
 class ShadowMode:
-    """Silent A/B testing infrastructure."""
+    """
+    Silent A/B testing infrastructure.
+    Runs variant B in shadow (non-user-visible) while serving variant A.
+    Collects metrics without impacting user experience.
+    """
 
     def __init__(self, bus: Optional[EventBus] = None) -> None:
         self._experiments: Dict[str, ShadowExperiment] = {}
         self._results: Dict[str, List[Dict[str, Any]]] = {}
         self._bus = bus
 
-    def create_experiment(self, experiment_id: str, variant_a: str, variant_b: str,
-                         traffic_split: float = 0.1, metrics: Optional[List[str]] = None) -> ShadowExperiment:
+    def create_experiment(
+        self,
+        experiment_id: str,
+        variant_a: str,
+        variant_b: str,
+        traffic_split: float = 0.1,
+        metrics: Optional[List[str]] = None,
+    ) -> ShadowExperiment:
         exp = ShadowExperiment(
-            experiment_id=experiment_id, variant_a=variant_a, variant_b=variant_b,
-            traffic_split=traffic_split, metrics=metrics or ["latency", "quality_score", "token_count"],
+            experiment_id=experiment_id,
+            variant_a=variant_a,
+            variant_b=variant_b,
+            traffic_split=traffic_split,
+            metrics=metrics or ["latency", "quality_score", "token_count"],
         )
         self._experiments[experiment_id] = exp
         self._results[experiment_id] = []
@@ -128,7 +159,12 @@ class ShadowMode:
             self._bus.publish(
                 DomainEvent(
                     topic="shadow.experiment.created",
-                    payload={"experiment_id": experiment_id, "variant_a": variant_a, "variant_b": variant_b, "traffic_split": traffic_split},
+                    payload={
+                        "experiment_id": experiment_id,
+                        "variant_a": variant_a,
+                        "variant_b": variant_b,
+                        "traffic_split": traffic_split,
+                    },
                     correlation_id=f"shadow_{experiment_id}",
                 )
             )
@@ -144,13 +180,20 @@ class ShadowMode:
         hash_value = int(hashlib.sha256(hash_input.encode()).hexdigest(), 16)
         return (hash_value % 10000) / 10000 < exp.traffic_split
 
-    def record_shadow_result(self, experiment_id: str, user_id: str,
-                            variant_a_result: Dict[str, Any], variant_b_result: Dict[str, Any]) -> None:
+    def record_shadow_result(
+        self,
+        experiment_id: str,
+        user_id: str,
+        variant_a_result: Dict[str, Any],
+        variant_b_result: Dict[str, Any],
+    ) -> None:
         if experiment_id not in self._experiments:
             return
         record = {
-            "timestamp": time.time(), "user_id": user_id,
-            "variant_a": variant_a_result, "variant_b": variant_b_result,
+            "timestamp": time.time(),
+            "user_id": user_id,
+            "variant_a": variant_a_result,
+            "variant_b": variant_b_result,
             "differences": {
                 k: variant_b_result.get(k, 0) - variant_a_result.get(k, 0)
                 for k in self._experiments[experiment_id].metrics
@@ -165,16 +208,21 @@ class ShadowMode:
         results = self._results[experiment_id]
         if not results:
             return {"experiment_id": experiment_id, "samples": 0}
+
         stats: Dict[str, Dict[str, float]] = {}
         for metric in self._experiments[experiment_id].metrics:
             diffs = [r["differences"].get(metric, 0) for r in results if metric in r["differences"]]
             if diffs:
                 stats[metric] = {
                     "mean_diff": sum(diffs) / len(diffs),
-                    "min_diff": min(diffs), "max_diff": max(diffs), "samples": len(diffs),
+                    "min_diff": min(diffs),
+                    "max_diff": max(diffs),
+                    "samples": len(diffs),
                 }
+
         return {
-            "experiment_id": experiment_id, "samples": len(results),
+            "experiment_id": experiment_id,
+            "samples": len(results),
             "duration_hours": (time.time() - self._experiments[experiment_id].start_time) / 3600,
             "statistics": stats,
         }
@@ -200,11 +248,17 @@ class ShadowMode:
         return exp
 
 
+# =============================================================================
+# RESILIENCE FORTRESS — MAIN INTERFACE
+# =============================================================================
+
 class ResilienceFortress:
-    """Unified adversarial resilience interface."""
+    """
+    Unified adversarial resilience interface.
+    Composes sanitiser, guardrails, exfiltration detector, and shadow mode.
+    """
 
     def __init__(self, bus: Optional[EventBus] = None) -> None:
-        from skeleton.resilience import InputSanitiser, OutputGuardrail
         self.sanitiser = InputSanitiser()
         self.guardrail = OutputGuardrail()
         self.exfiltration = ExfiltrationDetector(bus)
@@ -221,9 +275,15 @@ class ResilienceFortress:
             self._sanitize_count += 1
         return sanitized, report
 
-    def process_output(self, output: str, user_id: str, query: str) -> Dict[str, Any]:
+    def process_output(
+        self,
+        output: str,
+        user_id: str,
+        query: str,
+    ) -> Dict[str, Any]:
         guardrail_result = self.guardrail.evaluate(output)
         exfil_report = self.exfiltration.monitor_query(query, output, user_id)
+
         result = {
             "safe": guardrail_result["safe"] and exfil_report is None,
             "guardrail": guardrail_result,
@@ -234,16 +294,21 @@ class ResilienceFortress:
                 else "[OUTPUT BLOCKED: SAFETY VIOLATION]"
             ),
         }
+
         if self._bus:
             self._bus.publish(
                 DomainEvent(
                     topic="resilience.output.processed",
-                    payload={"user_id": user_id, "safe": result["safe"],
-                            "guardrail_score": guardrail_result["score"],
-                            "exfiltration_detected": exfil_report is not None},
+                    payload={
+                        "user_id": user_id,
+                        "safe": result["safe"],
+                        "guardrail_score": guardrail_result["score"],
+                        "exfiltration_detected": exfil_report is not None,
+                    },
                     correlation_id=f"res_{user_id}_{int(time.time())}",
                 )
             )
+
         return result
 
     def stats(self) -> Dict[str, Any]:
