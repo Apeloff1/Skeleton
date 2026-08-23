@@ -1,4 +1,4 @@
-"""Resilience Fortress — unified interface — split from the resilience_extended monolith (v16.2)."""
+"""Resilience Fortress — unified interface — split from resilience_extended (v16.2)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ import time
 from typing import Any, Dict, Optional, Tuple
 
 from skeleton.kernel.events import DomainEvent, EventBus
-
 from .types import ThreatLevel, ThreatReport
 from .sanitiser import InputSanitiser
 from .guardrails import OutputGuardrail
