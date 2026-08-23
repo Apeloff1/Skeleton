@@ -1,4 +1,4 @@
-"""Shadow mode — silent A/B testing — split from the resilience_extended monolith (v16.2)."""
+"""Shadow mode — silent A/B testing — split from resilience_extended (v16.2)."""
 
 from __future__ import annotations
 

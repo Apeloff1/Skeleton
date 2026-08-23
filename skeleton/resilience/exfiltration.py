@@ -1,4 +1,4 @@
-"""Knowledge exfiltration detection — split from the resilience_extended monolith (v16.2)."""
+"""Knowledge exfiltration detection — split from resilience_extended (v16.2)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ import time
 from typing import Any, Dict, List, Optional
 
 from skeleton.kernel.events import DomainEvent, EventBus
-
 from .types import ThreatLevel, ThreatCategory, ThreatReport
 
 # =============================================================================
