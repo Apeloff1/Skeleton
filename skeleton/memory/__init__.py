@@ -1,30 +1,10 @@
-"""skeleton.memory — RAG / CAG / MAG Memory Trinity"""
-from skeleton.memory.trinity import (
-    MemoryChunk,
-    MemoryQueryResult,
-    UnifiedContext,
-    MemoryStore,
-    InMemoryTFIDFStore,
-    ChromaDBStore,
-    CAGStore,
-    MAGStore,
-    MemoryTrinity,
-    PersonaContext,
-    EpisodicMemory,
-    PreferenceEmbedding,
-)
+"""Memory package — the RAG/CAG/MAG trinity (split from the v16 monolith)."""
 
-__all__ = [
-    "MemoryChunk",
-    "MemoryQueryResult",
-    "UnifiedContext",
-    "MemoryStore",
-    "InMemoryTFIDFStore",
-    "ChromaDBStore",
-    "CAGStore",
-    "MAGStore",
-    "MemoryTrinity",
-    "PersonaContext",
-    "EpisodicMemory",
-    "PreferenceEmbedding",
-]
+from .types import MemoryChunk, MemoryQueryResult, UnifiedContext
+from .store import MemoryStore
+from .rag import InMemoryTFIDFStore, ChromaDBStore
+from .cag import PersonaContext, CAGStore
+from .mag import EpisodicMemory, PreferenceEmbedding, MAGStore
+from .trinity import MemoryTrinity
+
+__all__ = ['MemoryChunk', 'MemoryQueryResult', 'UnifiedContext', 'MemoryStore', 'InMemoryTFIDFStore', 'ChromaDBStore', 'PersonaContext', 'CAGStore', 'EpisodicMemory', 'PreferenceEmbedding', 'MAGStore', 'MemoryTrinity']
