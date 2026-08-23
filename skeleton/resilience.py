@@ -1,6 +1,6 @@
 """
 ================================================================================
-skeleton.resilience — Adversarial Resilience Fortress (Part 1: Threats + Sanitiser)
+skeleton.resilience — Adversarial Resilience Fortress (Part 1: Input Sanitisation + Output Guardrails)
 ================================================================================
 Multi-layer defence against prompt injection, data exfiltration, and
 adversarial manipulation.
@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from skeleton.kernel.errors import SkeletonError
 from skeleton.kernel.events import DomainEvent, EventBus
 
 
@@ -119,6 +120,7 @@ class InputSanitiser:
             evidence.append(f"Semantic anomaly score: {semantic_score:.3f}")
             max_level = ThreatLevel(max_level.value + 1)
 
+        # Determine final level
         if max_level.value >= ThreatLevel.CRITICAL.value:
             level = ThreatLevel.CRITICAL
         elif max_level.value >= ThreatLevel.MALICIOUS.value:
@@ -195,7 +197,7 @@ class InputSanitiser:
         elif level == ThreatLevel.MALICIOUS:
             sanitized = re.sub(r"[^\w\s\.\,\!\?\-]", "", text)
             return sanitized[:1000]
-        else:
+        else:  # CRITICAL
             return "[INPUT BLOCKED: SECURITY VIOLATION]"
 
     def _determine_action(self, level: ThreatLevel) -> str:
@@ -219,10 +221,10 @@ class OutputGuardrail:
     """
 
     PII_PATTERNS = [
-        r"\b\d{3}-\d{2}-\d{4}\b",
-        r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b",
-        r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
-        r"\b\d{3}-\d{3}-\d{4}\b",
+        r"\b\d{3}-\d{2}-\d{4}\b",  # SSN
+        r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b",  # Credit card
+        r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",  # Email
+        r"\b\d{3}-\d{3}-\d{4}\b",  # Phone
     ]
 
     HARM_INDICATORS = [
@@ -239,6 +241,7 @@ class OutputGuardrail:
         score = 0.0
         redacted = output
 
+        # PII detection
         pii_found = False
         for pattern in self._pii_regex:
             if pattern.search(output):
@@ -248,6 +251,7 @@ class OutputGuardrail:
         if pii_found:
             score += 0.4
 
+        # Harmful content
         for indicator in self.HARM_INDICATORS:
             if indicator.lower() in output.lower():
                 dangerous = ["weapon", "bomb", "drug", "poison", "hack", "exploit"]
@@ -256,6 +260,7 @@ class OutputGuardrail:
                         violations.append(f"Potentially harmful: {indicator} + {term}")
                         score += 0.3
 
+        # Hallucination detection
         hallucination_score = self._detect_hallucinations(output)
         if hallucination_score > 0.5:
             violations.append(f"Possible hallucination: score {hallucination_score:.3f}")
