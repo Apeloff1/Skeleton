@@ -17,6 +17,7 @@ from typing import Dict, List, Any
 from core.databases import client as _MONGO
 from routes.quality import MIN_QUALITY
 from routes.quality_polish import polish_pass, MAX_POLISH_PASSES
+import routes.game_kb_polish  # noqa: F401 — boot-time polish wiring into game_kb._llm_json
 
 router = APIRouter(prefix="/api/quality-control", tags=["quality-control"])
 _db = _MONGO[os.environ.get("DB_NAME", "test_database")]
@@ -30,7 +31,7 @@ QA_STANDARDS: Dict[str, Any] = {
     "veto_power": True,
     "minimum_quality": "AAA",
     "rejected_tiers": ["indie", "prototype", "placeholder", "stub", "MVP"],
-    
+
     "technical_standards": {
         "code_quality": {
             "min_test_coverage": 80,
@@ -72,7 +73,7 @@ QA_STANDARDS: Dict[str, Any] = {
             "anticheat_required": True,
         }
     },
-    
+
     "design_standards": {
         "ui_ux": {
             "accessibility": "WCAG 2.1 AA",
@@ -96,7 +97,7 @@ QA_STANDARDS: Dict[str, Any] = {
             "localization_ready": True,
         }
     },
-    
+
     "delivery_checklist": [
         "All features complete and tested",
         "Performance within budget on target platforms",
@@ -145,9 +146,9 @@ async def review_submission(content: str = "", category: str = "code"):
         issues.append({"severity": "minor", "issue": "Contains debug logging", "fix": "Remove or replace with proper logging"})
     if "placeholder" in content.lower():
         issues.append({"severity": "critical", "issue": "Contains placeholder content", "fix": "Replace with production-quality content"})
-    
+
     passed = len([i for i in issues if i["severity"] == "critical"]) == 0
-    
+
     return {
         "verdict": "APPROVED" if passed else "REJECTED",
         "quality_tier": "AAA" if passed and len(issues) == 0 else "AA" if passed else "REJECTED",
