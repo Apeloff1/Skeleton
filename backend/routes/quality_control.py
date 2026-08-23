@@ -2,13 +2,24 @@
 Quality Control Agent v16.5 — Sentinel
 AAA Game Studio Standards Enforcement
 Standards set at year of creation. No indie quality accepted.
+
+Also hosts the /polish endpoints (forge quality-gate churn): the polish loop
+lives in routes/quality_polish.py; the endpoints are mounted here because
+core/routes_registry.py is append-managed and this module is already registered
+and quality-owned.
 """
 
-from fastapi import APIRouter
-from datetime import datetime
+import os
+from fastapi import APIRouter, Body, Query
+from datetime import datetime, timezone
 from typing import Dict, List, Any
 
+from core.databases import client as _MONGO
+from routes.quality import MIN_QUALITY
+from routes.quality_polish import polish_pass, MAX_POLISH_PASSES
+
 router = APIRouter(prefix="/api/quality-control", tags=["quality-control"])
+_db = _MONGO[os.environ.get("DB_NAME", "test_database")]
 
 CURRENT_YEAR = datetime.now().year
 
@@ -145,3 +156,68 @@ async def review_submission(content: str = "", category: str = "code"):
         "standards_year": CURRENT_YEAR,
         "message": "Meets AAA standards." if passed and len(issues) == 0 else "Approved with minor notes." if passed else "Does not meet AAA standards. Revisions required."
     }
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# ✨ POLISH endpoints — iterate a forge artifact until it clears the 95 gate.
+# stage key → game_kb artifact key (mirrors snowball_improve._STAGE_ART)
+_STAGE_ART = {"spec": "core_specs", "world": "lore_graph", "narrative": "quest_db",
+              "mechanics": "mechanics_config", "procedural": "procedural_config",
+              "assets": "asset_manifest", "qa": "qa_report", "build": "build_manifest",
+              "launch": "launch_manifest"}
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+@router.post("/polish/artifact")
+async def polish_inline(
+    kind: str = Body(..., embed=True),
+    content=Body(..., embed=True),
+    simulate: bool = Query(False),
+    max_passes: int = Query(MAX_POLISH_PASSES, ge=1, le=10),
+):
+    """✨ Polish one inline artifact against the 95 gate. Non-destructive."""
+    if not kind or content in (None, ""):
+        return {"error": "'kind' and 'content' are required."}
+    result = await polish_pass(kind, content, simulate=simulate, max_passes=max_passes)
+    return {"kind": kind, "gate": MIN_QUALITY, **result}
+
+
+@router.post("/polish/{pid}/stage/{stage}")
+async def polish_game_stage(
+    pid: str, stage: str,
+    simulate: bool = Query(False),
+    max_passes: int = Query(MAX_POLISH_PASSES, ge=1, le=10),
+):
+    """✨ Polish one stage of a game in place: load the KB artifact, iterate it
+    against the gate, persist the best version back, and record the pass trail."""
+    art_key = _STAGE_ART.get(stage)
+    if not art_key:
+        return {"error": f"unknown stage '{stage}'", "valid": list(_STAGE_ART.keys())}
+    kb = await _db.game_kb.find_one({"game_id": pid}, {"_id": 0, "artifacts": 1})
+    artifact = ((kb or {}).get("artifacts") or {}).get(art_key)
+    if not artifact:
+        return {"error": f"no artifact for stage '{stage}' (artifact '{art_key}') on game {pid}"}
+
+    result = await polish_pass(stage, artifact, simulate=simulate, artifact=artifact,
+                               max_passes=max_passes)
+
+    # persist the best version + trail
+    await _db.game_kb.update_one(
+        {"game_id": pid},
+        {"$set": {
+            "game_id": pid,
+            f"artifacts.{art_key}": result["content"],
+            f"stale.{art_key}": False,
+            f"polish.{art_key}": {
+                "at": _now(), "score": result["score"], "passed": result["passed"],
+                "improved_by": result["improved_by"], "passes": result["passes"],
+            },
+        }},
+        upsert=True,
+    )
+    return {"game_id": pid, "stage": stage, "artifact": art_key, "gate": MIN_QUALITY,
+            **{k: v for k, v in result.items() if k != "content"},
+            "persisted": True}
