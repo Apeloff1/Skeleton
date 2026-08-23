@@ -1,6 +1,6 @@
 """
 ================================================================================
-skeleton.swarm — Swarm Intelligence Mesh (Part 2: SwarmMesh, Health, Topology)
+skeleton.swarm — Swarm Intelligence Mesh (Part 2: SwarmMesh Topology)
 ================================================================================
 Self-healing mesh topology: heartbeat, quarantine, routing, circuit breakers,
 chaos engineering, partition detection/healing.
