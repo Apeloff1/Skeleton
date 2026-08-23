@@ -7,6 +7,7 @@ from .metalearning import TaskEmbedding, MetaLearner
 from .neurosymbolic import SymbolicRule, NeuralSymbolicEngine
 from .economic import ModelOption, BudgetConstraint, EconomicOptimiser
 from .orchestrator import IntelligenceOrchestrator
+from .dream import DreamReport, DreamEngine
 
 __all__ = [
     'Tensor',
@@ -22,5 +23,7 @@ __all__ = [
     'ModelOption',
     'BudgetConstraint',
     'EconomicOptimiser',
-    'IntelligenceOrchestrator'
+    'IntelligenceOrchestrator',
+    'DreamReport',
+    'DreamEngine',
 ]

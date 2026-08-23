@@ -4,6 +4,7 @@ from .types import AgentRole, CapabilityVector, AgentStatus, AgentState
 from .consensus import ConsensusProtocol, SimpleMajorityConsensus, ByzantineFaultTolerantConsensus
 from .auction import AuctionBid, VickreyAuction
 from .mesh import SwarmMesh
+from .stigmergy import Trail, PheromoneField, StigmergicRouter
 
 __all__ = [
     "AgentRole",
@@ -16,4 +17,7 @@ __all__ = [
     "AuctionBid",
     "VickreyAuction",
     "SwarmMesh",
+    "Trail",
+    "PheromoneField",
+    "StigmergicRouter",
 ]
