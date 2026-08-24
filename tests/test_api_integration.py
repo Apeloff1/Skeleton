@@ -29,7 +29,8 @@ def test_health_all_subsystems(client: TestClient) -> None:
     body = res.json()
     assert body["status"] == "healthy"
     for subsystem in ("kernel", "memory", "agents", "resilience",
-                      "intelligence", "jeeves", "forge", "pipelines"):
+                      "intelligence", "jeeves", "forge", "pipelines",
+                      "swarm", "vault", "observability"):
         assert body["checks"][subsystem] is True
 
 
@@ -177,3 +178,52 @@ def test_resilience_sanitise(client: TestClient) -> None:
     })
     assert res.status_code == 200
     assert "threat_level" in res.json()
+
+
+def test_vault_seal_unseal(client: TestClient) -> None:
+    res = client.get("/api/v1/vault/stats")
+    assert res.status_code == 200
+    assert res.json()["sealed"] is True
+
+    res = client.post("/api/v1/vault/unseal", json={"key": "a" * 32})
+    assert res.status_code == 200
+    assert res.json()["sealed"] is False
+
+    res = client.post("/api/v1/vault/seal")
+    assert res.status_code == 200
+    assert res.json()["sealed"] is True
+
+
+def test_vault_secret_roundtrip(client: TestClient) -> None:
+    client.post("/api/v1/vault/unseal", json={"key": "b" * 32})
+    res = client.post("/api/v1/vault/secret", json={
+        "path": "test/api_key",
+        "value": "sk-12345",
+        "principal": "root",
+    })
+    assert res.status_code == 200
+    assert res.json()["version"] == 1
+
+    res = client.get("/api/v1/vault/secret?path=test/api_key")
+    assert res.status_code == 200
+    assert res.json()["value"] == "sk-12345"
+
+
+def test_vault_sealed_read_fails(client: TestClient) -> None:
+    client.post("/api/v1/vault/seal")
+    res = client.get("/api/v1/vault/secret?path=anything")
+    assert res.status_code == 423
+
+
+def test_metrics_snapshot(client: TestClient) -> None:
+    res = client.get("/api/v1/metrics")
+    assert res.status_code == 200
+    body = res.json()
+    assert "counters" in body
+    assert "gauges" in body
+
+
+def test_metrics_prometheus_format(client: TestClient) -> None:
+    res = client.get("/api/v1/metrics/prometheus")
+    assert res.status_code == 200
+    assert res.text.startswith("# HELP") or res.text == "\n"
