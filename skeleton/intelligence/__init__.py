@@ -3,11 +3,11 @@
 from ._tensor import Tensor
 from .temporal import TemporalEvent, TemporalReasoner
 from .causal import CausalVariable, CausalGraph, CausalInference
+from .counterfactual import CounterfactualEngine, CounterfactualError, StructuralModel
 from .metalearning import TaskEmbedding, MetaLearner
 from .neurosymbolic import SymbolicRule, NeuralSymbolicEngine
 from .economic import ModelOption, BudgetConstraint, EconomicOptimiser
 from .orchestrator import IntelligenceOrchestrator
-from .dream import DreamReport, DreamEngine
 
 __all__ = [
     'Tensor',
@@ -16,6 +16,9 @@ __all__ = [
     'CausalVariable',
     'CausalGraph',
     'CausalInference',
+    'CounterfactualEngine',
+    'CounterfactualError',
+    'StructuralModel',
     'TaskEmbedding',
     'MetaLearner',
     'SymbolicRule',
@@ -23,7 +26,5 @@ __all__ = [
     'ModelOption',
     'BudgetConstraint',
     'EconomicOptimiser',
-    'IntelligenceOrchestrator',
-    'DreamReport',
-    'DreamEngine',
+    'IntelligenceOrchestrator'
 ]
