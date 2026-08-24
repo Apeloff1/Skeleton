@@ -1,11 +1,10 @@
-"""Jeeves — the AI tutor brain."""
+"""Jeeves package — the AI tutor brain."""
 
-from skeleton.jeeves.core import Jeeves, Session, SessionMode
-from skeleton.jeeves.matrices import SamMatrix, ClomMatrix, KremMatrix
-from skeleton.jeeves.rag import RagMemory
+from .cocoding import CoCodingOrchestrator, CoCodingSession, SkillLevel, Stage
 
 __all__ = [
-    "Jeeves", "Session", "SessionMode",
-    "SamMatrix", "ClomMatrix", "KremMatrix",
-    "RagMemory",
+    "CoCodingOrchestrator",
+    "CoCodingSession",
+    "SkillLevel",
+    "Stage",
 ]

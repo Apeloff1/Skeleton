@@ -1,5 +1,10 @@
-"""The Universal Forge: composable system blueprint synthesis."""
+"""Forge package — universal system synthesis."""
 
-from skeleton.forge.universal import Blueprint, Component, Forge, Port, Wire
+from .validators import BlueprintValidator, ConstraintViolation, FieldRule, ValidationVerdict
 
-__all__ = ["Blueprint", "Component", "Forge", "Port", "Wire"]
+__all__ = [
+    "BlueprintValidator",
+    "ConstraintViolation",
+    "FieldRule",
+    "ValidationVerdict",
+]
