@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="SKL_", extra="ignore")
 
     environment: str = "development"
-    version: str = "16.0.0"
+    version: str = "16.2.0"
     server: ServerSettings = Field(default_factory=ServerSettings)
     mongo: MongoSettings = Field(default_factory=MongoSettings)
     chroma: ChromaSettings = Field(default_factory=ChromaSettings)
