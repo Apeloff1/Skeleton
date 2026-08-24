@@ -5,7 +5,7 @@ A rigorously layered, hexagonal codebase: kernel (pure domain), agents
 (system synthesis), api (HTTP interface).
 """
 
-__version__ = "16.0.0"
+__version__ = "16.2.0"
 __codename__ = "Skeleton"
 
 from skeleton.kernel.errors import SkeletonError
