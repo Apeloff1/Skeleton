@@ -105,6 +105,17 @@ class AgentError(SkeletonError):
     code = "AGT.UNKNOWN"
 
 
+class AgentNotFoundError(AgentError):
+    code = "AGT.NOT_FOUND"
+    severity = Severity.WARNING
+    http_status = 404
+
+
+class NoCapableAgentError(AgentError):
+    code = "AGT.NO_CAPABLE_AGENT"
+    http_status = 503
+
+
 class ConsensusError(AgentError):
     code = "AGT.CONSENSUS"
     http_status = 409

@@ -1,11 +1,8 @@
-"""
-================================================================================
-skeleton.api.server — Unified Application Factory
-================================================================================
-FastAPI application factory wiring every subsystem into a cohesive surface:
+"""FastAPI application factory wiring every subsystem into a cohesive surface.
+
   - Kernel: errors, events, ids, registry
   - Memory: RAG/CAG/MAG trinity
-  - Agents: swarm mesh with consensus, auction, chaos
+  - Agents: mesh with liveness, routing, consensus
   - Resilience: adversarial fortress with shadow mode
   - Intelligence: temporal, causal, meta-learning, neuro-symbolic, economic
   - Jeeves: tutor core, matrices, RAG
@@ -13,13 +10,13 @@ FastAPI application factory wiring every subsystem into a cohesive surface:
   - Pipelines: NPC, game-logic, animation
 
 Design invariants:
-  1. create_app() returns a fully configured FastAPI instance with lifespan management.
+  1. create_app() returns a fully configured FastAPI instance with lifespan.
   2. All subsystems are instantiated in lifespan startup and disposed in shutdown.
   3. Error → HTTP mapping is deterministic and exhaustive.
-  4. Request-id middleware traces every call through the event bus.
+  4. Request-id middleware traces every call.
   5. Health endpoint reports per-subsystem status.
-================================================================================
 """
+
 from __future__ import annotations
 
 import time
@@ -27,36 +24,35 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator, Dict, Optional
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from skeleton.config.settings import Settings, get_settings
 from skeleton.kernel.errors import SkeletonError, http_status_for
-from skeleton.kernel.events import EventBus
-from skeleton.kernel.ids import AgentId, UserId
-from skeleton.kernel.registry import CapabilityRegistry
+from skeleton.kernel.events import DomainEvent, EventBus
+from skeleton.kernel.registry import bootstrap_registry
 
 from skeleton.agents.ledger import ActivityLedger
-from skeleton.agents.mesh import SwarmMesh
+from skeleton.agents.mesh import AgentMesh
 from skeleton.agents.scheduler import SwarmScheduler
 
 from skeleton.memory import (
-    CAGStore, ChromaDBStore, MAGStore, MemoryTrinity,
+    CAGStore,
+    InMemoryTFIDFStore,
+    MAGStore,
+    MemoryTrinity,
 )
 
 from skeleton.resilience import ResilienceFortress
 
-from skeleton.intelligence_part1 import TemporalReasoner, CausalInference
-from skeleton.intelligence_part2 import (
-    IntelligenceOrchestrator, MetaLearner, NeuralSymbolicEngine, EconomicOptimiser,
-)
+from skeleton.intelligence import IntelligenceOrchestrator
 
-from skeleton.jeeves.core import JeevesCore
-from skeleton.jeeves.matrices import SAM, CLOM, KREM
-from skeleton.jeeves.rag import JeevesRAG
+from skeleton.jeeves.core import Jeeves
+from skeleton.jeeves.matrices import ClomMatrix, KremMatrix, SamMatrix
+from skeleton.jeeves.rag import RagMemory
 
-from skeleton.forge.universal import UniversalForge
+from skeleton.forge.universal import Forge
 
 from skeleton.pipelines.npc import NpcPipeline
 from skeleton.pipelines.game_logic import GameLogicPipeline
@@ -73,15 +69,19 @@ class AppState:
     def __init__(self) -> None:
         self.settings: Optional[Settings] = None
         self.bus: Optional[EventBus] = None
-        self.registry: Optional[CapabilityRegistry] = None
+        self.registry = None
         self.ledger: Optional[ActivityLedger] = None
-        self.mesh: Optional[SwarmMesh] = None
+        self.mesh: Optional[AgentMesh] = None
         self.scheduler: Optional[SwarmScheduler] = None
         self.memory_trinity: Optional[MemoryTrinity] = None
         self.resilience: Optional[ResilienceFortress] = None
         self.intelligence: Optional[IntelligenceOrchestrator] = None
-        self.jeeves: Optional[JeevesCore] = None
-        self.forge: Optional[UniversalForge] = None
+        self.jeeves: Optional[Jeeves] = None
+        self.jeeves_sam: Optional[SamMatrix] = None
+        self.jeeves_clom: Optional[ClomMatrix] = None
+        self.jeeves_krem: Optional[KremMatrix] = None
+        self.jeeves_memory: Optional[RagMemory] = None
+        self.forge: Optional[Forge] = None
         self.npc_pipeline: Optional[NpcPipeline] = None
         self.game_logic_pipeline: Optional[GameLogicPipeline] = None
         self.animation_pipeline: Optional[AnimationPipeline] = None
@@ -106,7 +106,6 @@ class AppState:
         return checks
 
 
-# Global state container (managed by lifespan)
 _app_state = AppState()
 
 
@@ -123,16 +122,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Startup and shutdown lifecycle."""
     state = get_state()
     state.settings = get_settings()
-    state.bus = EventBus(history_size=10000)
-    state.registry = CapabilityRegistry(bus=state.bus)
+    state.bus = EventBus(replay_capacity=10000)
+    state.registry = bootstrap_registry(state.bus)
     state.ledger = ActivityLedger()
-    state.mesh = SwarmMesh(bus=state.bus)
+    state.mesh = AgentMesh(bus=state.bus)
     state.scheduler = SwarmScheduler(bus=state.bus)
 
     # Memory trinity
-    rag = ChromaDBStore(collection_name="skeleton_rag")
+    rag = InMemoryTFIDFStore()
     cag = CAGStore()
-    mag = MAGStore(user_id=UserId.generate())
+    mag = MAGStore()
     state.memory_trinity = MemoryTrinity(rag=rag, cag=cag, mag=mag, bus=state.bus)
 
     # Resilience fortress
@@ -142,38 +141,36 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     state.intelligence = IntelligenceOrchestrator(bus=state.bus)
 
     # Jeeves brain
-    state.jeeves = JeevesCore(
+    state.jeeves_sam = SamMatrix()
+    state.jeeves_clom = ClomMatrix()
+    state.jeeves_krem = KremMatrix()
+    state.jeeves_memory = RagMemory(bus=state.bus)
+    state.jeeves = Jeeves(
         bus=state.bus,
-        memory=state.memory_trinity,
-        sam=SAM(),
-        clom=CLOM(),
-        krem=KREM(),
+        max_turns=state.settings.jeeves.max_session_turns,
     )
 
     # Forge
-    state.forge = UniversalForge(bus=state.bus, registry=state.registry)
+    state.forge = Forge(bus=state.bus)
 
     # Pipelines
-    state.npc_pipeline = NpcPipeline(bus=state.bus, mesh=state.mesh)
-    state.game_logic_pipeline = GameLogicPipeline(bus=state.bus, mesh=state.mesh)
-    state.animation_pipeline = AnimationPipeline(bus=state.bus, mesh=state.mesh)
+    state.npc_pipeline = NpcPipeline(bus=state.bus)
+    state.game_logic_pipeline = GameLogicPipeline(bus=state.bus)
+    state.animation_pipeline = AnimationPipeline(bus=state.bus)
 
     state.started_at = time.time()
 
-    # Emit startup event
-    state.bus.publish(
-        EventBus.DomainEvent(
-            topic="system.startup",
-            payload={"version": "16.1.0", "subsystems": list(state.is_healthy().keys())},
-            correlation_id=str(uuid.uuid4()),
-        )
-    )
+    state.bus.publish(DomainEvent(
+        topic="system.startup",
+        payload={"version": state.settings.version,
+                 "environment": state.settings.environment,
+                 "subsystems": list(state.is_healthy().keys())},
+        correlation_id=uuid.uuid4().hex,
+    ))
 
     yield
 
-    # Shutdown
-    if state.bus:
-        state.bus.close()
+    state.bus.clear_history()
 
 
 # =============================================================================
@@ -192,7 +189,7 @@ async def skeleton_error_handler(request: Request, exc: SkeletonError) -> JSONRe
 # =============================================================================
 
 async def request_id_middleware(request: Request, call_next: Any) -> Any:
-    request_id = str(uuid.uuid4())
+    request_id = uuid.uuid4().hex
     request.state.request_id = request_id
     start = time.time()
     response = await call_next(request)
@@ -209,12 +206,11 @@ async def request_id_middleware(request: Request, call_next: Any) -> Any:
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Skeleton",
-        description="Tutolage AI Platform — v16.1 Frontier",
-        version="16.1.0",
+        description="Tutolage AI Platform — v16",
+        version="16.0.0",
         lifespan=lifespan,
     )
 
-    # CORS
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -223,13 +219,9 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Custom middleware
     app.middleware("http")(request_id_middleware)
-
-    # Exception handlers
     app.add_exception_handler(SkeletonError, skeleton_error_handler)
 
-    # Include routers
     from skeleton.api.routes import router
     app.include_router(router, prefix="/api/v1")
 
@@ -245,6 +237,6 @@ def create_app() -> FastAPI:
 
     @app.get("/")
     async def root() -> Dict[str, str]:
-        return {"name": "Skeleton", "version": "16.1.0", "status": "operational"}
+        return {"name": "Skeleton", "version": "16.0.0", "status": "operational"}
 
     return app
