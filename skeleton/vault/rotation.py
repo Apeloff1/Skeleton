@@ -1,157 +1,185 @@
-"""Credential rotation scheduler for the vault.
+"""Rotation policy — secrets that expire, overlap, and revoke cleanly.
 
-Secrets age: tokens expire, keys leak, employees leave. The rotation
-scheduler ensures every credential in the vault is refreshed before
-it becomes a liability.
+A vault that stores secrets forever is a liability with a delay fuse. The
+rotation policy gives every secret a lifecycle: a maximum age, an
+automatic successor generation, a grace window during which both the old
+and new secret validate (so in-flight callers don't break), and a final
+revocation that is recorded in an append-only audit log.
 
-- RotationPolicy: age-based, usage-count-based, or manual trigger
-- RotationScheduler: tracks versions, schedules rotations, coordinates
-  handoff with consumers via the optional notify hook
-- Audit trail: every rotation is logged with actor, reason, and outcome
+Design laws
+-----------
+- Rotation is proactive: ``rotate_due()`` is driven by the scheduler, not
+  by a failed authentication attempt.
+- Overlap is bounded and explicit: both secrets validate during the grace
+  window, the old one is revoked exactly at window end, and every
+  transition lands in the audit log with a reason.
+- The generator is injected — the policy decides *when*, never *what*.
+  Callers supply their own secret material, keeping the policy free of
+  any particular secret scheme.
 """
 
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from enum import Enum, auto
+from typing import Any, Callable, Dict, List, Optional
 
-from skeleton.kernel.errors import VaultError
-
-
-class RotationError(VaultError):
-    code = "VLT.ROTATION"
+from skeleton.kernel.errors import RotationError
+from skeleton.kernel.events import DomainEvent, EventBus
 
 
-class RotationTrigger(str, Enum):
-    AGE = "AGE"
-    USAGE = "USAGE"
-    MANUAL = "MANUAL"
-
-
-@dataclass
-class RotationPolicy:
-    max_age_s: float = 86400.0 * 90  # 90 days
-    max_uses: Optional[int] = None
-    trigger: RotationTrigger = RotationTrigger.AGE
+class SecretState(Enum):
+    ACTIVE = auto()
+    GRACE = auto()          # superseded but still validating
+    REVOKED = auto()
 
 
 @dataclass
 class SecretVersion:
-    secret_id: str
     version: int
+    material: str
     created_at: float
-    expires_at: float
-    uses: int = 0
-    rotated: bool = False
+    state: SecretState = SecretState.ACTIVE
+    grace_until: Optional[float] = None
 
 
-class RotationScheduler:
-    """Tracks secret lifetimes and performs rotations."""
+@dataclass(frozen=True)
+class AuditRecord:
+    secret_id: str
+    from_version: Optional[int]
+    to_version: int
+    reason: str
+    occurred_at: float = field(default_factory=time.time)
 
-    def __init__(
-        self,
-        *,
-        notify: Optional[Callable[[str, Dict[str, Any]], None]] = None,
-        clock: Optional[Callable[[], float]] = None,
-    ) -> None:
-        self._notify = notify
-        self._now = clock or time.monotonic
-        self._secrets: Dict[str, SecretVersion] = {}
-        self._policies: Dict[str, RotationPolicy] = {}
-        self._log: List[Dict[str, Any]] = []
 
-    def register(self, secret_id: str, policy: RotationPolicy) -> None:
-        self._policies[secret_id] = policy
-        self._touch(secret_id)
+@dataclass
+class ManagedSecret:
+    secret_id: str
+    max_age_s: float
+    grace_s: float
+    versions: List[SecretVersion] = field(default_factory=list)
 
-    def use(self, secret_id: str) -> None:
-        version = self._require(secret_id)
-        version.uses += 1
-        policy = self._policies.get(secret_id, RotationPolicy())
-        if policy.max_uses is not None and version.uses >= policy.max_uses:
-            self._rotate(secret_id, RotationTrigger.USAGE)
+    @property
+    def active(self) -> Optional[SecretVersion]:
+        for v in reversed(self.versions):
+            if v.state == SecretState.ACTIVE:
+                return v
+        return None
 
-    def sweep(self) -> Tuple[str, ...]:
-        """Expire old secrets; call on a timer. Returns IDs that rotated."""
-        now = self._now()
-        due = [
-            sid
-            for sid, policy in self._policies.items()
-            if sid in self._secrets and self._secrets[sid].expires_at <= now
-        ]
-        for sid in due:
-            self._rotate(sid, RotationTrigger.AGE)
-        return tuple(due)
 
-    def rotate_now(
-        self, secret_id: str, *, actor: str = "manual", reason: str = ""
-    ) -> SecretVersion:
-        return self._rotate(secret_id, RotationTrigger.MANUAL, actor=actor, reason=reason)
+class RotationPolicy:
+    """Lifecycle manager for versioned secrets."""
 
-    def _rotate(
-        self,
-        secret_id: str,
-        trigger: RotationTrigger,
-        *,
-        actor: str = "scheduler",
-        reason: str = "",
-    ) -> SecretVersion:
-        old = self._secrets.pop(secret_id, None)
-        new = self._touch(secret_id)
-        entry = {
-            "secret_id": secret_id,
-            "trigger": trigger.value,
-            "actor": actor,
-            "reason": reason,
-            "old_version": old.version if old else None,
-            "new_version": new.version,
-            "at": self._now(),
-        }
-        self._log.append(entry)
-        if self._notify is not None:
-            self._notify(secret_id, entry)
-        return new
+    def __init__(self, *, bus: Optional[EventBus] = None,
+                 clock: Optional[Callable[[], float]] = None) -> None:
+        self._secrets: Dict[str, ManagedSecret] = {}
+        self._audit: List[AuditRecord] = []
+        self._bus = bus
+        self._now = clock or time.time
 
-    def _touch(self, secret_id: str) -> SecretVersion:
-        policy = self._policies.get(secret_id, RotationPolicy())
-        now = self._now()
-        version = SecretVersion(
-            secret_id=secret_id,
-            version=(
-                self._secrets[secret_id].version + 1
-                if secret_id in self._secrets
-                else 1
-            ),
-            created_at=now,
-            expires_at=now + policy.max_age_s,
-        )
-        self._secrets[secret_id] = version
+    def register(self, secret_id: str, material: str, *,
+                 max_age_s: float = 86400.0, grace_s: float = 3600.0) -> SecretVersion:
+        if max_age_s <= 0 or grace_s < 0 or grace_s >= max_age_s:
+            raise RotationError(
+                "invalid rotation windows",
+                context={"max_age_s": max_age_s, "grace_s": grace_s},
+            )
+        secret = ManagedSecret(secret_id=secret_id, max_age_s=max_age_s, grace_s=grace_s)
+        version = SecretVersion(version=1, material=material, created_at=self._now())
+        secret.versions.append(version)
+        self._secrets[secret_id] = secret
+        self._audit.append(AuditRecord(secret_id, None, 1, "registered"))
         return version
 
-    def _require(self, secret_id: str) -> SecretVersion:
-        if secret_id not in self._secrets:
-            raise RotationError(
-                "secret not registered", context={"secret": secret_id}
+    def rotate_due(self) -> List[str]:
+        """Secret ids whose active version is older than max_age."""
+        now = self._now()
+        due: List[str] = []
+        for sid, secret in self._secrets.items():
+            active = secret.active
+            if active and now - active.created_at >= secret.max_age_s:
+                due.append(sid)
+        return due
+
+    def rotate(self, secret_id: str, new_material: str, *,
+               reason: str = "scheduled") -> SecretVersion:
+        secret = self._require(secret_id)
+        old = secret.active
+        if old is not None:
+            old.state = SecretState.GRACE
+            old.grace_until = self._now() + secret.grace_s
+        version = SecretVersion(
+            version=(old.version + 1) if old else 1,
+            material=new_material,
+            created_at=self._now(),
+        )
+        secret.versions.append(version)
+        self._audit.append(AuditRecord(secret_id,
+                                       old.version if old else None,
+                                       version.version, reason))
+        if self._bus:
+            self._bus.publish(
+                DomainEvent(
+                    topic="vault.secret.rotated",
+                    payload={"secret_id": secret_id, "to_version": version.version,
+                             "reason": reason, "grace_until": version.created_at + secret.grace_s},
+                    correlation_id=f"rot_{secret_id}_{version.version}",
+                )
             )
-        return self._secrets[secret_id]
+        return version
 
-    def status(self, secret_id: str) -> Dict[str, Any]:
-        version = self._require(secret_id)
-        policy = self._policies.get(secret_id, RotationPolicy())
+    def validate(self, secret_id: str, material: str) -> bool:
+        """True if material matches the active version or one in grace."""
+        secret = self._secrets.get(secret_id)
+        if secret is None:
+            return False
+        now = self._now()
+        for version in secret.versions:
+            if version.state == SecretState.ACTIVE and version.material == material:
+                return True
+            if (version.state == SecretState.GRACE
+                    and version.material == material
+                    and version.grace_until is not None
+                    and now <= version.grace_until):
+                return True
+        return False
+
+    def sweep_expired_grace(self) -> List[str]:
+        """Revoke grace versions past their window. Returns revoked ids."""
+        now = self._now()
+        revoked: List[str] = []
+        for sid, secret in self._secrets.items():
+            for version in secret.versions:
+                if (version.state == SecretState.GRACE
+                        and version.grace_until is not None
+                        and now > version.grace_until):
+                    version.state = SecretState.REVOKED
+                    revoked.append(sid)
+                    self._audit.append(AuditRecord(sid, version.version,
+                                                   version.version, "grace expired"))
+                    if self._bus:
+                        self._bus.publish(
+                            DomainEvent(
+                                topic="vault.secret.revoked",
+                                payload={"secret_id": sid, "version": version.version},
+                                correlation_id=f"rev_{sid}_{version.version}",
+                            )
+                        )
+        return revoked
+
+    def audit_log(self, secret_id: Optional[str] = None) -> List[AuditRecord]:
+        return [a for a in self._audit if secret_id is None or a.secret_id == secret_id]
+
+    def _require(self, secret_id: str) -> ManagedSecret:
+        secret = self._secrets.get(secret_id)
+        if secret is None:
+            raise RotationError("unknown secret", context={"secret_id": secret_id})
+        return secret
+
+    def stats(self) -> Dict[str, Any]:
         return {
-            "secret": secret_id,
-            "version": version.version,
-            "age_s": round(self._now() - version.created_at, 1),
-            "uses": version.uses,
-            "expires_in_s": round(version.expires_at - self._now(), 1),
-            "policy": {
-                "max_age_s": policy.max_age_s,
-                "max_uses": policy.max_uses,
-                "trigger": policy.trigger.value,
-            },
+            "secrets_managed": len(self._secrets),
+            "due_for_rotation": len(self.rotate_due()),
+            "audit_records": len(self._audit),
         }
-
-    def audit_log(self) -> Tuple[Dict[str, Any], ...]:
-        return tuple(self._log)
