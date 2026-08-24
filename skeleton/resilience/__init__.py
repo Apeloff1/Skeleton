@@ -6,15 +6,11 @@ from .guardrails import OutputGuardrail
 from .exfiltration import ExfiltrationDetector
 from .shadow import ShadowExperiment, ShadowMode
 from .fortress import ResilienceFortress
+from .canary import CanaryRegistry, CanaryToken, TripEvent
 
 __all__ = [
-    "ThreatLevel",
-    "ThreatCategory",
-    "ThreatReport",
-    "InputSanitiser",
-    "OutputGuardrail",
-    "ExfiltrationDetector",
-    "ShadowExperiment",
-    "ShadowMode",
-    "ResilienceFortress",
+    "ThreatLevel", "ThreatCategory", "ThreatReport",
+    "InputSanitiser", "OutputGuardrail", "ExfiltrationDetector",
+    "ShadowExperiment", "ShadowMode", "ResilienceFortress",
+    "CanaryRegistry", "CanaryToken", "TripEvent",
 ]

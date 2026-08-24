@@ -8,23 +8,15 @@ from .metalearning import TaskEmbedding, MetaLearner
 from .neurosymbolic import SymbolicRule, NeuralSymbolicEngine
 from .economic import ModelOption, BudgetConstraint, EconomicOptimiser
 from .orchestrator import IntelligenceOrchestrator
+from .adaptive import AdaptiveLearner, Arm, RunRecord, default_meta_grid
+from .dream import DreamEngine, DreamReport
 
 __all__ = [
-    'Tensor',
-    'TemporalEvent',
-    'TemporalReasoner',
-    'CausalVariable',
-    'CausalGraph',
-    'CausalInference',
-    'CounterfactualEngine',
-    'CounterfactualError',
-    'StructuralModel',
-    'TaskEmbedding',
-    'MetaLearner',
-    'SymbolicRule',
-    'NeuralSymbolicEngine',
-    'ModelOption',
-    'BudgetConstraint',
-    'EconomicOptimiser',
-    'IntelligenceOrchestrator'
+    'Tensor', 'TemporalEvent', 'TemporalReasoner',
+    'CausalVariable', 'CausalGraph', 'CausalInference',
+    'CounterfactualEngine', 'CounterfactualError', 'StructuralModel',
+    'TaskEmbedding', 'MetaLearner', 'SymbolicRule', 'NeuralSymbolicEngine',
+    'ModelOption', 'BudgetConstraint', 'EconomicOptimiser',
+    'IntelligenceOrchestrator', 'AdaptiveLearner', 'Arm', 'RunRecord',
+    'default_meta_grid', 'DreamEngine', 'DreamReport',
 ]
