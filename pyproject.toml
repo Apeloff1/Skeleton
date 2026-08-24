@@ -1,0 +1,164 @@
+# ============================================================================
+# Tutolage Skeleton — root project configuration (v16.2)
+# ============================================================================
+# This is the installable package the README describes: `pip install -e ".[dev]"`
+# from the repo root packages the `skeleton/` tree. The backend/ directory
+# keeps its own pyproject.toml for the legacy v15 service during the rewrite.
+# ============================================================================
+
+[project]
+name = "tutolage-skeleton"
+version = "16.2.0"
+description = "Tutolage Skeleton — the layered v16 rewrite of the Tutolage AI Learning & Game-Development Platform"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [
+    { name = "Tutolage Team", email = "team@tutolage.dev" },
+]
+keywords = [
+    "education", "ai", "learning", "game-development",
+    "fastapi", "llm", "tutor", "npc", "animation", "godot",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Education",
+    "Topic :: Games/Entertainment",
+    "Topic :: Software Development :: Code Generators",
+]
+
+dependencies = [
+    # Web framework (API layer only; the kernel is dependency-free)
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.25.0",
+    # Validation / config
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    # Utilities
+    "python-dotenv>=1.0.0",
+    "loguru>=0.7.0",
+]
+
+[project.optional-dependencies]
+# Vector memory backend — optional; every store falls back to a fully
+# implemented in-memory backend when ChromaDB is absent.
+chroma = [
+    "chromadb>=0.4.22",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "pytest-xdist>=3.5.0",
+    "httpx>=0.26.0",
+    "ruff>=0.2.0",
+    "mypy>=1.8.0",
+    "pre-commit>=3.6.0",
+]
+test = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "httpx>=0.26.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Apeloff1/Skeleton"
+Repository = "https://github.com/Apeloff1/Skeleton"
+Issues = "https://github.com/Apeloff1/Skeleton/issues"
+
+# ============================================================================
+# Build System
+# ============================================================================
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["skeleton"]
+
+# ============================================================================
+# Ruff
+# ============================================================================
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+indent-width = 4
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "B", "C4", "UP", "SIM", "RUF",
+]
+ignore = [
+    "E501",   # line too long (formatter owns this)
+    "B008",   # function calls in argument defaults (FastAPI Depends pattern)
+    "B904",   # raise-without-from inside except
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["skeleton"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ARG"]
+"__init__.py" = ["F401"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ============================================================================
+# Pytest
+# ============================================================================
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+addopts = ["-v", "--tb=short", "-ra"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "unit: unit tests",
+    "integration: integration tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["skeleton"]
+omit = ["tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+check_untyped_defs = true
+ignore_missing_imports = true
+strict_optional = true
