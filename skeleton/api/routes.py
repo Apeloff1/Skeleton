@@ -1,24 +1,42 @@
 """
 ================================================================================
-skeleton.api.routes — REST API Surface
+skeleton.api.routes — REST API Surface (v16.2 wiring)
 ================================================================================
-Thin FastAPI routers for every subsystem. No domain logic — validation,
-call service, serialise.
+Thin FastAPI routers for every subsystem. No domain logic — validate, call
+the service, serialise. Written against the actual v16.2 package APIs:
+
+  - Jeeves:    open_session / ask / set_mode / review_code / close_session
+  - Memory:    MemoryTrinity.query_unified
+  - Agents:    AgentMesh.join / route / stats, SwarmScheduler.submit / stats
+  - Pipelines: NpcPipeline.run / GameLogicPipeline.run / AnimationPipeline.run
+  - Forge:     Forge.new_blueprint / instantiate / materialise
+  - Registry:  CapabilityRegistry.list
 ================================================================================
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 
 from skeleton.api.server import get_state
+from skeleton.kernel.errors import SkeletonError
 
 router = APIRouter()
+
+# Blueprints are in-flight domain objects; keep them addressable by id
+# between the create and materialise calls.
+_blueprints: Dict[str, Any] = {}
 
 
 def _state():
     return get_state()
+
+
+def _require(obj: Any, name: str) -> Any:
+    if obj is None:
+        raise HTTPException(status_code=503, detail=f"{name} not available")
+    return obj
 
 
 # =============================================================================
@@ -36,12 +54,8 @@ async def health(state=Depends(_state)) -> Dict[str, Any]:
 
 @router.get("/capabilities")
 async def capabilities(state=Depends(_state)) -> List[Dict[str, Any]]:
-    if not state.registry:
-        return []
-    return [
-        {"name": name, "version": info.version, "healthy": info.healthy}
-        for name, info in state.registry._capabilities.items()
-    ]
+    registry = _require(state.registry, "Registry")
+    return [cap.to_dict() for cap in registry.list()]
 
 
 # =============================================================================
@@ -50,31 +64,45 @@ async def capabilities(state=Depends(_state)) -> List[Dict[str, Any]]:
 
 @router.post("/jeeves/session")
 async def jeeves_session(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    if not state.jeeves:
-        raise HTTPException(status_code=503, detail="Jeeves not available")
-    session_id = state.jeeves.create_session(
-        user_id=request.get("user_id"),
-        skill_level=request.get("skill_level", "intermediate"),
-    )
-    return {"session_id": session_id, "status": "created"}
+    jeeves = _require(state.jeeves, "Jeeves")
+    from skeleton.jeeves.core import SessionMode
+    mode = SessionMode.CO_CODING if request.get("mode") == "co_coding" else SessionMode.TUTORING
+    session = jeeves.open_session(request.get("user_id", "anonymous"), mode=mode)
+    return {"session_id": session.session_id, "mode": session.mode.value, "status": "created"}
 
 
 @router.post("/jeeves/interact")
 async def jeeves_interact(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    if not state.jeeves:
-        raise HTTPException(status_code=503, detail="Jeeves not available")
-    response = state.jeeves.interact(
-        session_id=request.get("session_id"),
-        user_input=request.get("input", ""),
+    jeeves = _require(state.jeeves, "Jeeves")
+    reply = jeeves.ask(
+        request.get("session_id", ""),
+        request.get("input", ""),
+        context=request.get("context"),
     )
-    return {"response": response, "session_id": request.get("session_id")}
+    return {"response": reply, "session_id": request.get("session_id")}
 
 
-@router.get("/jeeves/matrices/{session_id}")
-async def jeeves_matrices(session_id: str, state=Depends(_state)) -> Dict[str, Any]:
-    if not state.jeeves:
-        raise HTTPException(status_code=503, detail="Jeeves not available")
-    return state.jeeves.get_matrices(session_id)
+@router.post("/jeeves/review")
+async def jeeves_review(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    jeeves = _require(state.jeeves, "Jeeves")
+    return jeeves.review_code(request.get("session_id", ""), request.get("code", ""))
+
+
+@router.post("/jeeves/session/{session_id}/close")
+async def jeeves_close(session_id: str, state=Depends(_state)) -> Dict[str, Any]:
+    jeeves = _require(state.jeeves, "Jeeves")
+    session = jeeves.close_session(session_id)
+    return {"session_id": session.session_id, "turns": len(session.turns), "status": "closed"}
+
+
+@router.get("/jeeves/matrices")
+async def jeeves_matrices(state=Depends(_state)) -> Dict[str, Any]:
+    """Snapshots of the three self-learning matrices (SAM / CLOM / KREM)."""
+    return {
+        "sam": state.sam.snapshot() if state.sam else {},
+        "clom": state.clom.snapshot() if state.clom else {},
+        "krem": state.krem.snapshot() if state.krem else {},
+    }
 
 
 # =============================================================================
@@ -83,11 +111,11 @@ async def jeeves_matrices(session_id: str, state=Depends(_state)) -> Dict[str, A
 
 @router.post("/memory/query")
 async def memory_query(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    if not state.memory_trinity:
-        raise HTTPException(status_code=503, detail="Memory not available")
-    result = state.memory_trinity.query_unified(
-        query_text=request.get("query", ""),
+    trinity = _require(state.memory_trinity, "Memory")
+    result = trinity.query_unified(
+        request.get("query", ""),
         top_k_per_tier=request.get("top_k", 3),
+        metadata_filter=request.get("metadata_filter"),
     )
     return {
         "facts": [r.chunk.text for r in result.facts],
@@ -95,7 +123,14 @@ async def memory_query(request: Dict[str, Any], state=Depends(_state)) -> Dict[s
         "personal_history": [r.chunk.text for r in result.personal_history],
         "combined_score": result.combined_score,
         "token_estimate": result.token_estimate,
+        "provenance": result.provenance_chain,
     }
+
+
+@router.get("/memory/health")
+async def memory_health(state=Depends(_state)) -> Dict[str, Any]:
+    trinity = _require(state.memory_trinity, "Memory")
+    return trinity.health()
 
 
 # =============================================================================
@@ -104,23 +139,32 @@ async def memory_query(request: Dict[str, Any], state=Depends(_state)) -> Dict[s
 
 @router.get("/swarm/stats")
 async def swarm_stats(state=Depends(_state)) -> Dict[str, Any]:
-    if not state.mesh:
-        raise HTTPException(status_code=503, detail="Swarm not available")
-    return state.mesh.stats()
+    mesh = _require(state.mesh, "Swarm")
+    return mesh.stats()
 
 
 @router.post("/swarm/agent")
-async def swarm_register_agent(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    if not state.mesh:
-        raise HTTPException(status_code=503, detail="Swarm not available")
-    from skeleton.agents.mesh import AgentState, AgentRole, CapabilityVector
-    agent = AgentState(
-        agent_id=request.get("agent_id"),
-        role=AgentRole[request.get("role", "WORKER")],
-        capabilities=CapabilityVector(**request.get("capabilities", {})),
+async def swarm_join_agent(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    mesh = _require(state.mesh, "Swarm")
+    agent = mesh.join(
+        set(request.get("specialisations", [])),
+        weight=float(request.get("weight", 1.0)),
+        metadata=request.get("metadata"),
     )
-    state.mesh.register(agent)
-    return {"agent_id": str(agent.agent_id), "status": "registered"}
+    return {"agent_id": str(agent.agent_id), "status": "joined"}
+
+
+@router.post("/swarm/route/{capability}")
+async def swarm_route(capability: str, state=Depends(_state)) -> Dict[str, Any]:
+    mesh = _require(state.mesh, "Swarm")
+    agent = mesh.route(capability)
+    return {"agent_id": str(agent.agent_id), "load": agent.load}
+
+
+@router.get("/scheduler/stats")
+async def scheduler_stats(state=Depends(_state)) -> Dict[str, Any]:
+    scheduler = _require(state.scheduler, "Scheduler")
+    return scheduler.stats()
 
 
 # =============================================================================
@@ -129,35 +173,38 @@ async def swarm_register_agent(request: Dict[str, Any], state=Depends(_state)) -
 
 @router.post("/pipeline/npc")
 async def pipeline_npc(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    if not state.npc_pipeline:
-        raise HTTPException(status_code=503, detail="NPC pipeline not available")
-    result = state.npc_pipeline.generate(
-        description=request.get("description", ""),
-        include_dialogue=request.get("include_dialogue", True),
+    pipeline = _require(state.npc_pipeline, "NPC pipeline")
+    spec = pipeline.run(
+        request.get("description", ""),
+        name=request.get("name"),
+        dialogue_beats=int(request.get("dialogue_beats", 3)),
+        params=request.get("params"),
     )
-    return {"npc": result, "status": "generated"}
+    return {"npc": spec.to_dict(), "status": "generated"}
 
 
 @router.post("/pipeline/game-logic")
 async def pipeline_game_logic(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    if not state.game_logic_pipeline:
-        raise HTTPException(status_code=503, detail="Game logic pipeline not available")
-    result = state.game_logic_pipeline.generate(
-        style=request.get("style", "turn_based"),
-        include_magic=request.get("include_magic", True),
+    pipeline = _require(state.game_logic_pipeline, "Game logic pipeline")
+    spec = pipeline.run(
+        request.get("description", ""),
+        title=request.get("title", "untitled"),
+        max_level=int(request.get("max_level", 50)),
+        curve=request.get("curve", "quadratic"),
+        currency=request.get("currency", "gold"),
     )
-    return {"game_logic": result, "status": "generated"}
+    return {"game_logic": spec.to_dict(), "status": "generated"}
 
 
 @router.post("/pipeline/animation")
 async def pipeline_animation(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    if not state.animation_pipeline:
-        raise HTTPException(status_code=503, detail="Animation pipeline not available")
-    result = state.animation_pipeline.generate(
-        description=request.get("description", "humanoid"),
-        include_fingers=request.get("include_fingers", True),
+    pipeline = _require(state.animation_pipeline, "Animation pipeline")
+    actions = request.get("actions")
+    spec = pipeline.run(
+        request.get("description", ""),
+        actions=tuple(actions) if actions else ("idle", "walk", "run", "attack"),
     )
-    return {"animation": result, "status": "generated"}
+    return {"animation": spec.to_dict(), "status": "generated"}
 
 
 # =============================================================================
@@ -166,23 +213,40 @@ async def pipeline_animation(request: Dict[str, Any], state=Depends(_state)) -> 
 
 @router.post("/forge/blueprint")
 async def forge_blueprint(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    if not state.forge:
-        raise HTTPException(status_code=503, detail="Forge not available")
-    blueprint = state.forge.create_blueprint(
-        kind=request.get("kind", "system"),
-        spec=request.get("spec", {}),
-    )
-    return {"blueprint_id": blueprint.id, "status": "created"}
+    forge = _require(state.forge, "Forge")
+    blueprint = forge.new_blueprint(request.get("name", "untitled"))
+    for comp in request.get("components", []):
+        forge.instantiate(
+            blueprint,
+            comp["kind"],
+            comp["instance_id"],
+            config=comp.get("config"),
+        )
+    for wire in request.get("wires", []):
+        blueprint.connect(tuple(wire["src"]), tuple(wire["dst"]))
+    _blueprints[blueprint.blueprint_id] = blueprint
+    return {
+        "blueprint_id": blueprint.blueprint_id,
+        "components": len(blueprint.components),
+        "wires": len(blueprint.wires),
+        "status": "created",
+    }
+
+
+@router.get("/forge/kinds")
+async def forge_kinds(state=Depends(_state)) -> Dict[str, Any]:
+    forge = _require(state.forge, "Forge")
+    return {"kinds": forge.available_kinds()}
 
 
 @router.post("/forge/materialise")
 async def forge_materialise(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    if not state.forge:
-        raise HTTPException(status_code=503, detail="Forge not available")
-    result = state.forge.materialise(
-        blueprint_id=request.get("blueprint_id"),
-        seed=request.get("seed"),
-    )
+    forge = _require(state.forge, "Forge")
+    blueprint_id = request.get("blueprint_id", "")
+    blueprint = _blueprints.get(blueprint_id)
+    if blueprint is None:
+        raise HTTPException(status_code=404, detail=f"unknown blueprint {blueprint_id!r}")
+    result = forge.materialise(blueprint)
     return {"artefact": result, "status": "materialised"}
 
 
@@ -192,13 +256,11 @@ async def forge_materialise(request: Dict[str, Any], state=Depends(_state)) -> D
 
 @router.post("/intelligence/reason")
 async def intelligence_reason(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    if not state.intelligence:
-        raise HTTPException(status_code=503, detail="Intelligence not available")
-    result = state.intelligence.reason(
+    intelligence = _require(state.intelligence, "Intelligence")
+    return intelligence.reason(
         query=request.get("query", ""),
         context=request.get("context"),
     )
-    return result
 
 
 # =============================================================================
@@ -207,9 +269,8 @@ async def intelligence_reason(request: Dict[str, Any], state=Depends(_state)) ->
 
 @router.post("/resilience/sanitise")
 async def resilience_sanitise(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    if not state.resilience:
-        raise HTTPException(status_code=503, detail="Resilience not available")
-    sanitized, report = state.resilience.process_input(
+    fortress = _require(state.resilience, "Resilience")
+    sanitized, report = fortress.process_input(
         raw_input=request.get("input", ""),
         user_id=request.get("user_id", "anonymous"),
     )
@@ -223,6 +284,5 @@ async def resilience_sanitise(request: Dict[str, Any], state=Depends(_state)) ->
 
 @router.get("/resilience/stats")
 async def resilience_stats(state=Depends(_state)) -> Dict[str, Any]:
-    if not state.resilience:
-        raise HTTPException(status_code=503, detail="Resilience not available")
-    return state.resilience.stats()
+    fortress = _require(state.resilience, "Resilience")
+    return fortress.stats()
