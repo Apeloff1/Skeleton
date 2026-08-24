@@ -25,6 +25,7 @@ from .budget import Budget, BudgetExceeded, BudgetLedger
 from .clocks import ClockRegistry, VectorClock, order_events
 from .config_snapshots import AuditEntry, ConfigSnapshot, ConfigStore
 from .election import Election, Role, StaleTermError, VoteRequest
+from .entropy import EntropyError, EntropyPool, EntropySource
 from .errors import (
     ConfigurationError,
     EventBusError,
@@ -33,22 +34,25 @@ from .errors import (
     SkeletonError,
     http_status_for,
 )
+from .fair_queue import DequeueResult, FairWorkQueue, QueueFullError, WorkItem
 from .health import HealthRegistry, ProbeResult, ProbeStatus, Rollup
 from .leases import Lease, LeaseRegistry
 from .shutdown import ShutdownCoordinator, ShutdownPhase
 from .supervisor import Health, HeartbeatMonitor, Lifecycle, RestartPolicy, Supervisor
 from .trace import Span, SpanRecorder, SpanStatus, TraceContext
-from .workqueue import FairWorkQueue, QueueFullError, WorkItem
+from .vclock import ClockError, Ordering
+from .work_queue import Lane, LaneFullError, WorkQueue
 
 __all__ = [
     # errors
     "SkeletonError", "Severity", "KernelError", "EventBusError",
     "ConfigurationError", "http_status_for",
     # causality
-    "VectorClock", "ClockRegistry", "order_events",
+    "VectorClock", "ClockRegistry", "order_events", "ClockError", "Ordering",
     # admission / flow control
     "BackpressureGovernor", "TokenBucket", "LoadShedder", "Priority",
     "ShedDecision", "FairWorkQueue", "WorkItem", "QueueFullError",
+    "DequeueResult", "WorkQueue", "Lane", "LaneFullError",
     # failure handling
     "CircuitBreaker", "CircuitState", "CircuitOpenError", "RetryPolicy",
     "RetriesExhausted", "call_with_protection",
@@ -58,9 +62,10 @@ __all__ = [
     # coordination
     "Lease", "LeaseRegistry", "Election", "Role", "VoteRequest",
     "StaleTermError",
-    # resources / config
+    # resources / config / entropy
     "Budget", "BudgetLedger", "BudgetExceeded",
     "ConfigStore", "ConfigSnapshot", "AuditEntry",
+    "EntropyPool", "EntropySource", "EntropyError",
     # observability
     "TraceContext", "Span", "SpanRecorder", "SpanStatus",
     "HealthRegistry", "ProbeResult", "ProbeStatus", "Rollup",
