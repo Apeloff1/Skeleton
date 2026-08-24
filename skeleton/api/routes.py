@@ -11,6 +11,9 @@ the service, serialise. Written against the actual v16.2 package APIs:
   - Pipelines: NpcPipeline.run / GameLogicPipeline.run / AnimationPipeline.run
   - Forge:     Forge.new_blueprint / instantiate / materialise
   - Registry:  CapabilityRegistry.list
+  - Swarm:     SwarmMesh, SimpleMajorityConsensus, VickreyAuction
+  - Vault:     SecretsVault (seal/unseal/put/get/rotate/stats)
+  - Observability: MetricsRegistry (snapshot/prometheus)
 ================================================================================
 """
 from __future__ import annotations
@@ -168,6 +171,42 @@ async def scheduler_stats(state=Depends(_state)) -> Dict[str, Any]:
 
 
 # =============================================================================
+# SWARM INTELLIGENCE (consensus + auction)
+# =============================================================================
+
+@router.post("/swarm/consensus")
+async def swarm_consensus(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    """Run a consensus proposal against the swarm mesh."""
+    mesh = _require(state.swarm_mesh, "Swarm intelligence")
+    consensus = _require(state.consensus, "Consensus")
+    proposal = request.get("proposal", "")
+    voters = list(mesh.roster(include_quarantined=False))
+    if not voters:
+        raise HTTPException(status_code=503, detail="no voters in swarm")
+    try:
+        accepted, ballot = consensus.propose(proposal, voters)
+        return {"accepted": accepted, "ballot": ballot}
+    except SkeletonError as exc:
+        raise HTTPException(status_code=http_status_for(exc), detail=exc.to_dict())
+
+
+@router.post("/swarm/auction")
+async def swarm_auction(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    """Run a Vickrey auction for task allocation."""
+    mesh = _require(state.swarm_mesh, "Swarm intelligence")
+    auction = _require(state.auction, "Auction")
+    from skeleton.swarm.types import CapabilityVector
+    requirements = CapabilityVector(**request.get("requirements", {}))
+    bidders = list(mesh.roster(include_quarantined=False))
+    winner, price, record = auction.run(requirements, bidders)
+    return {
+        "winner": str(winner.agent_id) if winner else None,
+        "price_paid": price,
+        "record": record,
+    }
+
+
+# =============================================================================
 # PIPELINES
 # =============================================================================
 
@@ -286,3 +325,63 @@ async def resilience_sanitise(request: Dict[str, Any], state=Depends(_state)) ->
 async def resilience_stats(state=Depends(_state)) -> Dict[str, Any]:
     fortress = _require(state.resilience, "Resilience")
     return fortress.stats()
+
+
+# =============================================================================
+# VAULT
+# =============================================================================
+
+@router.post("/vault/unseal")
+async def vault_unseal(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    vault = _require(state.vault, "Vault")
+    key = request.get("key", "")
+    vault.unseal(key.encode() if isinstance(key, str) else key)
+    return {"sealed": vault.sealed, "fingerprint": vault._master_fingerprint}
+
+
+@router.post("/vault/seal")
+async def vault_seal(state=Depends(_state)) -> Dict[str, Any]:
+    vault = _require(state.vault, "Vault")
+    vault.seal()
+    return {"sealed": vault.sealed}
+
+
+@router.post("/vault/secret")
+async def vault_put(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    vault = _require(state.vault, "Vault")
+    version = vault.put(
+        request.get("path", ""),
+        request.get("value", ""),
+        principal=request.get("principal", "root"),
+        metadata=request.get("metadata"),
+    )
+    return {"path": request.get("path"), "version": version}
+
+
+@router.get("/vault/secret")
+async def vault_get(path: str, principal: str = "root", state=Depends(_state)) -> Dict[str, Any]:
+    vault = _require(state.vault, "Vault")
+    value = vault.get(path, principal=principal)
+    return {"path": path, "value": value}
+
+
+@router.get("/vault/stats")
+async def vault_stats(state=Depends(_state)) -> Dict[str, Any]:
+    vault = _require(state.vault, "Vault")
+    return vault.stats()
+
+
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
+
+@router.get("/metrics")
+async def metrics_snapshot(state=Depends(_state)) -> Dict[str, Any]:
+    metrics = _require(state.metrics, "Metrics")
+    return metrics.snapshot()
+
+
+@router.get("/metrics/prometheus")
+async def metrics_prometheus(state=Depends(_state)) -> str:
+    metrics = _require(state.metrics, "Metrics")
+    return metrics.prometheus()
