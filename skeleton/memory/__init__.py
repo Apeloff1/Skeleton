@@ -6,5 +6,6 @@ from .rag import InMemoryTFIDFStore, ChromaDBStore
 from .cag import PersonaContext, CAGStore
 from .mag import EpisodicMemory, PreferenceEmbedding, MAGStore
 from .trinity import MemoryTrinity
+from .repetition import Outcome, RepetitionScheduler, ReviewCard
 
-__all__ = ['MemoryChunk', 'MemoryQueryResult', 'UnifiedContext', 'MemoryStore', 'InMemoryTFIDFStore', 'ChromaDBStore', 'PersonaContext', 'CAGStore', 'EpisodicMemory', 'PreferenceEmbedding', 'MAGStore', 'MemoryTrinity']
+__all__ = ['MemoryChunk', 'MemoryQueryResult', 'UnifiedContext', 'MemoryStore', 'InMemoryTFIDFStore', 'ChromaDBStore', 'PersonaContext', 'CAGStore', 'EpisodicMemory', 'PreferenceEmbedding', 'MAGStore', 'MemoryTrinity', 'RepetitionScheduler', 'ReviewCard', 'Outcome']
