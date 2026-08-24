@@ -13,6 +13,9 @@ written against the actual v16.2 package APIs:
   - Jeeves:        Jeeves tutor core + SamMatrix/ClomMatrix/KremMatrix + RagMemory
   - Forge:         Forge (composable blueprints)
   - Pipelines:     NpcPipeline, GameLogicPipeline, AnimationPipeline
+  - Swarm:         SwarmMesh, ConsensusProtocol, VickreyAuction
+  - Vault:         SecretsVault
+  - Observability: MetricsRegistry
 
 Design invariants:
   1. create_app() returns a fully configured FastAPI instance with lifespan management.
@@ -59,6 +62,10 @@ from skeleton.pipelines.npc import NpcPipeline
 from skeleton.pipelines.game_logic import GameLogicPipeline
 from skeleton.pipelines.animation import AnimationPipeline
 
+from skeleton.swarm import SwarmMesh as SwarmIntelligenceMesh, SimpleMajorityConsensus, VickreyAuction
+from skeleton.vault import SecretsVault
+from skeleton.observability.metrics import MetricsRegistry
+
 VERSION = "16.2.0"
 
 
@@ -88,6 +95,12 @@ class AppState:
         self.npc_pipeline: Optional[NpcPipeline] = None
         self.game_logic_pipeline: Optional[GameLogicPipeline] = None
         self.animation_pipeline: Optional[AnimationPipeline] = None
+        # New in v16.2 extended wiring
+        self.swarm_mesh: Optional[SwarmIntelligenceMesh] = None
+        self.consensus: Optional[SimpleMajorityConsensus] = None
+        self.auction: Optional[VickreyAuction] = None
+        self.vault: Optional[SecretsVault] = None
+        self.metrics: Optional[MetricsRegistry] = None
         self.started_at: Optional[float] = None
 
     def is_healthy(self) -> Dict[str, Any]:
@@ -104,6 +117,9 @@ class AppState:
                 self.game_logic_pipeline is not None,
                 self.animation_pipeline is not None,
             ]),
+            "swarm": self.swarm_mesh is not None,
+            "vault": self.vault is not None,
+            "observability": self.metrics is not None,
         }
         checks["overall"] = all(checks.values())
         return checks
@@ -161,6 +177,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     state.npc_pipeline = NpcPipeline(bus=state.bus)
     state.game_logic_pipeline = GameLogicPipeline(bus=state.bus)
     state.animation_pipeline = AnimationPipeline(bus=state.bus)
+
+    # Swarm intelligence (consensus + auction substrate)
+    state.swarm_mesh = SwarmIntelligenceMesh()
+    state.consensus = SimpleMajorityConsensus()
+    state.auction = VickreyAuction()
+
+    # Vault (sealed by default — needs unseal call)
+    state.vault = SecretsVault(bus=state.bus)
+
+    # Observability
+    state.metrics = MetricsRegistry()
 
     state.started_at = time.time()
 
