@@ -1,21 +1,4 @@
-"""FastAPI application factory wiring every subsystem into a cohesive surface.
-
-  - Kernel: errors, events, ids, registry
-  - Memory: RAG/CAG/MAG trinity
-  - Agents: mesh with liveness, routing, consensus
-  - Resilience: adversarial fortress with shadow mode
-  - Intelligence: temporal, causal, meta-learning, neuro-symbolic, economic
-  - Jeeves: tutor core, matrices, RAG
-  - Forge: universal blueprint synthesis
-  - Pipelines: NPC, game-logic, animation
-
-Design invariants:
-  1. create_app() returns a fully configured FastAPI instance with lifespan.
-  2. All subsystems are instantiated in lifespan startup and disposed in shutdown.
-  3. Error → HTTP mapping is deterministic and exhaustive.
-  4. Request-id middleware traces every call.
-  5. Health endpoint reports per-subsystem status.
-"""
+"""FastAPI application factory wiring every subsystem into a cohesive surface."""
 
 from __future__ import annotations
 
@@ -31,37 +14,24 @@ from fastapi.responses import JSONResponse
 from skeleton.config.settings import Settings, get_settings
 from skeleton.kernel.errors import SkeletonError, http_status_for
 from skeleton.kernel.events import DomainEvent, EventBus
+from skeleton.kernel.ids import UserId
 from skeleton.kernel.registry import bootstrap_registry
 
 from skeleton.agents.ledger import ActivityLedger
 from skeleton.agents.mesh import AgentMesh
 from skeleton.agents.scheduler import SwarmScheduler
 
-from skeleton.memory import (
-    CAGStore,
-    InMemoryTFIDFStore,
-    MAGStore,
-    MemoryTrinity,
-)
-
+from skeleton.memory import CAGStore, InMemoryTFIDFStore, MAGStore, MemoryTrinity
 from skeleton.resilience import ResilienceFortress
-
 from skeleton.intelligence import IntelligenceOrchestrator
-
 from skeleton.jeeves.core import Jeeves
 from skeleton.jeeves.matrices import ClomMatrix, KremMatrix, SamMatrix
 from skeleton.jeeves.rag import RagMemory
-
 from skeleton.forge.universal import Forge
-
 from skeleton.pipelines.npc import NpcPipeline
 from skeleton.pipelines.game_logic import GameLogicPipeline
 from skeleton.pipelines.animation import AnimationPipeline
 
-
-# =============================================================================
-# APPLICATION STATE
-# =============================================================================
 
 class AppState:
     """Holds all subsystem instances for dependency injection."""
@@ -113,34 +83,24 @@ def get_state() -> AppState:
     return _app_state
 
 
-# =============================================================================
-# LIFESPAN
-# =============================================================================
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Startup and shutdown lifecycle."""
     state = get_state()
     state.settings = get_settings()
     state.bus = EventBus(replay_capacity=10000)
     state.registry = bootstrap_registry(state.bus)
     state.ledger = ActivityLedger()
     state.mesh = AgentMesh(bus=state.bus)
-    state.scheduler = SwarmScheduler(bus=state.bus)
+    state.scheduler = SwarmScheduler(bus=state.bus, ledger=state.ledger)
 
-    # Memory trinity
     rag = InMemoryTFIDFStore()
     cag = CAGStore()
-    mag = MAGStore()
+    mag = MAGStore(user_id=UserId.new())
     state.memory_trinity = MemoryTrinity(rag=rag, cag=cag, mag=mag, bus=state.bus)
 
-    # Resilience fortress
     state.resilience = ResilienceFortress(bus=state.bus)
-
-    # Intelligence orchestrator
     state.intelligence = IntelligenceOrchestrator(bus=state.bus)
 
-    # Jeeves brain
     state.jeeves_sam = SamMatrix()
     state.jeeves_clom = ClomMatrix()
     state.jeeves_krem = KremMatrix()
@@ -150,43 +110,28 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         max_turns=state.settings.jeeves.max_session_turns,
     )
 
-    # Forge
     state.forge = Forge(bus=state.bus)
-
-    # Pipelines
     state.npc_pipeline = NpcPipeline(bus=state.bus)
     state.game_logic_pipeline = GameLogicPipeline(bus=state.bus)
     state.animation_pipeline = AnimationPipeline(bus=state.bus)
-
     state.started_at = time.time()
 
     state.bus.publish(DomainEvent(
         topic="system.startup",
-        payload={"version": state.settings.version,
-                 "environment": state.settings.environment,
-                 "subsystems": list(state.is_healthy().keys())},
+        payload={
+            "version": state.settings.version,
+            "environment": state.settings.environment,
+            "subsystems": list(state.is_healthy().keys()),
+        },
         correlation_id=uuid.uuid4().hex,
     ))
-
     yield
-
     state.bus.clear_history()
 
 
-# =============================================================================
-# ERROR HANDLERS
-# =============================================================================
-
 async def skeleton_error_handler(request: Request, exc: SkeletonError) -> JSONResponse:
-    return JSONResponse(
-        status_code=http_status_for(exc),
-        content=exc.to_dict(),
-    )
+    return JSONResponse(status_code=http_status_for(exc), content=exc.to_dict())
 
-
-# =============================================================================
-# MIDDLEWARE
-# =============================================================================
 
 async def request_id_middleware(request: Request, call_next: Any) -> Any:
     request_id = uuid.uuid4().hex
@@ -199,10 +144,6 @@ async def request_id_middleware(request: Request, call_next: Any) -> Any:
     return response
 
 
-# =============================================================================
-# APP FACTORY
-# =============================================================================
-
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Skeleton",
@@ -210,7 +151,6 @@ def create_app() -> FastAPI:
         version="16.0.0",
         lifespan=lifespan,
     )
-
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -218,7 +158,6 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
     app.middleware("http")(request_id_middleware)
     app.add_exception_handler(SkeletonError, skeleton_error_handler)
 

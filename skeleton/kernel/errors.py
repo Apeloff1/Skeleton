@@ -126,6 +126,11 @@ class SchedulingError(AgentError):
     http_status = 503
 
 
+class TaskDeadLetteredError(SchedulingError):
+    code = "AGT.DEAD_LETTER"
+    http_status = 409
+
+
 class AgentUnavailable(AgentError):
     code = "AGT.UNAVAILABLE"
     http_status = 503
@@ -168,7 +173,7 @@ class SessionError(JeevesError):
 
 
 # ---------------------------------------------------------------------------
-# Retrieval family (quad lattice)
+# Retrieval / memory family
 # ---------------------------------------------------------------------------
 
 class RetrievalError(SkeletonError):
@@ -177,6 +182,11 @@ class RetrievalError(SkeletonError):
 
 class FusionError(RetrievalError):
     code = "RET.FUSION"
+
+
+class RagQueryError(RetrievalError):
+    code = "RET.RAG_QUERY"
+    http_status = 400
 
 
 # ---------------------------------------------------------------------------

@@ -1,8 +1,4 @@
-"""REST API surface — thin FastAPI routers for every subsystem.
-
-No domain logic: validate, call the service, serialise. All subsystem access
-goes through :func:`skeleton.api.server.get_state`.
-"""
+"""REST API surface — thin FastAPI routers for every subsystem."""
 
 from __future__ import annotations
 
@@ -11,7 +7,6 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, HTTPException
 
 from skeleton.api.server import get_state
-from skeleton.kernel.errors import SkeletonError
 from skeleton.jeeves.core import SessionMode
 
 router = APIRouter()
@@ -27,17 +22,10 @@ def _require(obj: Any, name: str) -> Any:
     return obj
 
 
-# =============================================================================
-# HEALTH & CAPABILITIES
-# =============================================================================
-
 @router.get("/health")
 async def health(state=Depends(_state)) -> Dict[str, Any]:
     checks = state.is_healthy()
-    return {
-        "status": "healthy" if checks["overall"] else "degraded",
-        "checks": checks,
-    }
+    return {"status": "healthy" if checks["overall"] else "degraded", "checks": checks}
 
 
 @router.get("/capabilities")
@@ -45,10 +33,6 @@ async def capabilities(state=Depends(_state)) -> List[Dict[str, Any]]:
     registry = _require(state.registry, "Registry")
     return [cap.to_dict() for cap in registry.list()]
 
-
-# =============================================================================
-# JEEVES TUTOR
-# =============================================================================
 
 @router.post("/jeeves/session")
 async def jeeves_session(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
@@ -86,10 +70,6 @@ async def jeeves_matrices(session_id: str, state=Depends(_state)) -> Dict[str, A
     }
 
 
-# =============================================================================
-# MEMORY TRINITY
-# =============================================================================
-
 @router.post("/memory/query")
 async def memory_query(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     trinity = _require(state.memory_trinity, "Memory")
@@ -108,14 +88,9 @@ async def memory_query(request: Dict[str, Any], state=Depends(_state)) -> Dict[s
     }
 
 
-# =============================================================================
-# SWARM
-# =============================================================================
-
 @router.get("/swarm/stats")
 async def swarm_stats(state=Depends(_state)) -> Dict[str, Any]:
-    mesh = _require(state.mesh, "Swarm")
-    return mesh.stats()
+    return _require(state.mesh, "Swarm").stats()
 
 
 @router.post("/swarm/agent")
@@ -136,9 +111,20 @@ async def swarm_route(request: Dict[str, Any], state=Depends(_state)) -> Dict[st
     return {"agent_id": str(agent.agent_id), "load": agent.load}
 
 
-# =============================================================================
-# PIPELINES
-# =============================================================================
+@router.get("/ledger/stats")
+async def ledger_stats(state=Depends(_state)) -> Dict[str, Any]:
+    return _require(state.ledger, "Ledger").stats()
+
+
+@router.get("/ledger/tail")
+async def ledger_tail(n: int = 50, state=Depends(_state)) -> List[Dict[str, Any]]:
+    return [e.to_dict() for e in _require(state.ledger, "Ledger").tail(n)]
+
+
+@router.get("/scheduler/stats")
+async def scheduler_stats(state=Depends(_state)) -> Dict[str, Any]:
+    return _require(state.scheduler, "Scheduler").stats()
+
 
 @router.post("/pipeline/npc")
 async def pipeline_npc(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
@@ -176,10 +162,6 @@ async def pipeline_animation(request: Dict[str, Any], state=Depends(_state)) -> 
     return {"animation": spec.to_dict(), "status": "generated"}
 
 
-# =============================================================================
-# FORGE
-# =============================================================================
-
 @router.post("/forge/blueprint")
 async def forge_blueprint(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     forge = _require(state.forge, "Forge")
@@ -189,12 +171,7 @@ async def forge_blueprint(request: Dict[str, Any], state=Depends(_state)) -> Dic
     for wire in request.get("wires", []):
         bp.connect(tuple(wire["from"]), tuple(wire["to"]))
     problems = bp.validate()
-    return {
-        "blueprint_id": bp.blueprint_id,
-        "valid": not problems,
-        "problems": problems,
-        "status": "created",
-    }
+    return {"blueprint_id": bp.blueprint_id, "valid": not problems, "problems": problems, "status": "created"}
 
 
 @router.post("/forge/materialise")
@@ -211,26 +188,16 @@ async def forge_materialise(request: Dict[str, Any], state=Depends(_state)) -> D
 
 @router.get("/forge/kinds")
 async def forge_kinds(state=Depends(_state)) -> List[str]:
-    forge = _require(state.forge, "Forge")
-    return forge.available_kinds()
+    return _require(state.forge, "Forge").available_kinds()
 
-
-# =============================================================================
-# INTELLIGENCE
-# =============================================================================
 
 @router.post("/intelligence/reason")
 async def intelligence_reason(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    orchestrator = _require(state.intelligence, "Intelligence")
-    return orchestrator.reason(
+    return _require(state.intelligence, "Intelligence").reason(
         query=request.get("query", ""),
         context=request.get("context"),
     )
 
-
-# =============================================================================
-# RESILIENCE
-# =============================================================================
 
 @router.post("/resilience/sanitise")
 async def resilience_sanitise(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
@@ -239,15 +206,15 @@ async def resilience_sanitise(request: Dict[str, Any], state=Depends(_state)) ->
         raw_input=request.get("input", ""),
         user_id=request.get("user_id", "anonymous"),
     )
+    level = getattr(report.level, "name", None) or getattr(report.level, "value", str(report.level))
     return {
         "sanitized": sanitized,
-        "threat_level": report.level.name,
-        "confidence": report.confidence,
-        "action": report.action_taken,
+        "threat_level": level,
+        "confidence": getattr(report, "confidence", None),
+        "action": getattr(report, "action_taken", None),
     }
 
 
 @router.get("/resilience/stats")
 async def resilience_stats(state=Depends(_state)) -> Dict[str, Any]:
-    fortress = _require(state.resilience, "Resilience")
-    return fortress.stats()
+    return _require(state.resilience, "Resilience").stats()
