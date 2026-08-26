@@ -7,12 +7,42 @@
 # Usage:
 #   docker compose up -d                 # Start all services
 #   docker compose up -d backend         # Start backend only
+#   docker compose up -d skeleton        # Start the v16 Skeleton API
 #   docker compose --profile full up -d  # Also start standalone ChromaDB
 #   docker compose logs -f               # View logs
 #   docker compose down                  # Stop all
 # ============================================================================
 
 services:
+  # ==========================================================================
+  # Skeleton API (hexagonal v16 rewrite)
+  # ==========================================================================
+  skeleton:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tutolage-skeleton
+    restart: unless-stopped
+    ports:
+      - "${SKELETON_PORT:-8010}:8001"
+    environment:
+      - SKL_ENVIRONMENT=${ENVIRONMENT:-development}
+      - SKL_MONGO_URI=mongodb://mongo:27017
+      - SKL_MONGO_DATABASE=skeleton
+      - SKL_CHROMA_HOST=chroma
+      - SKL_CHROMA_PORT=8000
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - tutolage
+
   # ==========================================================================
   # Backend API Service
   # ==========================================================================
@@ -66,12 +96,14 @@ services:
       - "19002:19002"    # Expo DevTools
     environment:
       - EXPO_PUBLIC_BACKEND_URL=http://backend:8001
+      - EXPO_PUBLIC_SKELETON_URL=http://skeleton:8001
       - NODE_ENV=${NODE_ENV:-development}
     volumes:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
       - backend
+      - skeleton
     networks:
       - tutolage
 
