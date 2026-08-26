@@ -53,10 +53,6 @@ class SkeletonError(Exception):
         return f"{type(self).__name__}(code={self.code!r}, message={self.message!r})"
 
 
-# ---------------------------------------------------------------------------
-# Kernel family
-# ---------------------------------------------------------------------------
-
 class KernelError(SkeletonError):
     code = "KRN.UNKNOWN"
 
@@ -97,10 +93,6 @@ class ConfigurationError(KernelError):
     severity = Severity.CRITICAL
 
 
-# ---------------------------------------------------------------------------
-# Agent family
-# ---------------------------------------------------------------------------
-
 class AgentError(SkeletonError):
     code = "AGT.UNKNOWN"
 
@@ -136,10 +128,6 @@ class AgentUnavailable(AgentError):
     http_status = 503
 
 
-# ---------------------------------------------------------------------------
-# Pipeline family
-# ---------------------------------------------------------------------------
-
 class PipelineError(SkeletonError):
     code = "PPL.UNKNOWN"
 
@@ -159,10 +147,6 @@ class StageError(PipelineError):
     code = "PPL.STAGE"
 
 
-# ---------------------------------------------------------------------------
-# Jeeves family
-# ---------------------------------------------------------------------------
-
 class JeevesError(SkeletonError):
     code = "JEE.UNKNOWN"
 
@@ -171,10 +155,6 @@ class SessionError(JeevesError):
     code = "JEE.SESSION"
     http_status = 409
 
-
-# ---------------------------------------------------------------------------
-# Retrieval / memory family
-# ---------------------------------------------------------------------------
 
 class RetrievalError(SkeletonError):
     code = "RET.UNKNOWN"
@@ -189,9 +169,10 @@ class RagQueryError(RetrievalError):
     http_status = 400
 
 
-# ---------------------------------------------------------------------------
-# Forge family
-# ---------------------------------------------------------------------------
+class RagUnavailableError(RetrievalError):
+    code = "RET.RAG_UNAVAILABLE"
+    http_status = 503
+
 
 class ForgeError(SkeletonError):
     code = "FRG.UNKNOWN"
@@ -205,10 +186,6 @@ class BlueprintError(ForgeError):
 class MaterialisationError(ForgeError):
     code = "FRG.MATERIALISE"
 
-
-# ---------------------------------------------------------------------------
-# Vault family (secrets)
-# ---------------------------------------------------------------------------
 
 class VaultError(SkeletonError):
     code = "VLT.UNKNOWN"
@@ -235,10 +212,6 @@ class SealedVaultError(VaultError):
     code = "VLT.SEALED"
     http_status = 423
 
-
-# ---------------------------------------------------------------------------
-# HTTP mapping
-# ---------------------------------------------------------------------------
 
 def http_status_for(exc: SkeletonError) -> int:
     """Deterministic error→HTTP mapping used by the API boundary."""
