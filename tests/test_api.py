@@ -22,10 +22,22 @@ class TestSurface:
         body = client.get("/health").json()
         assert body["status"] == "healthy"
         assert body["checks"]["overall"] is True
+        assert body["checks"]["genesis"] is True
+
+    def test_live_ready(self, client):
+        assert client.get("/health/live").json()["status"] in {"up", "down"}
+        assert client.get("/health/ready").json()["status"] in {"up", "down"}
+
+    def test_metrics(self, client):
+        assert "counters" in client.get("/metrics").json()
+
+    def test_genesis(self, client):
+        body = client.get("/api/v1/genesis").json()
+        assert "kernel" in body["report"]["phases"]
+        assert body["health"]["subsystems"] >= 20
 
     def test_capabilities(self, client):
-        caps = client.get("/api/v1/capabilities").json()
-        names = {c["name"] for c in caps}
+        names = {c["name"] for c in client.get("/api/v1/capabilities").json()}
         assert {"npc", "game_logic", "animation"} <= names
 
     def test_npc_pipeline_e2e(self, client):
@@ -35,8 +47,10 @@ class TestSurface:
 
     def test_jeeves_e2e(self, client):
         sess = client.post("/api/v1/jeeves/session", json={"user_id": "u1"}).json()
-        res = client.post("/api/v1/jeeves/interact",
-                          json={"session_id": sess["session_id"], "input": "What is a hash map?"})
+        res = client.post(
+            "/api/v1/jeeves/interact",
+            json={"session_id": sess["session_id"], "input": "What is a hash map?"},
+        )
         assert res.status_code == 200
         assert res.json()["response"]
 
@@ -56,3 +70,8 @@ class TestSurface:
         })
         assert res.status_code == 200
         assert res.json()["artefact"]["execution_order"] == ["a", "b"]
+
+    def test_swarm_join(self, client):
+        res = client.post("/api/v1/swarm/agent", json={"specialisations": ["npc"]})
+        assert res.status_code == 200
+        assert client.get("/api/v1/swarm/stats").json()["agents"] >= 1

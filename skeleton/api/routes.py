@@ -28,10 +28,30 @@ async def health(state=Depends(_state)) -> Dict[str, Any]:
     return {"status": "healthy" if checks["overall"] else "degraded", "checks": checks}
 
 
+@router.get("/health/live")
+async def live(state=Depends(_state)) -> Dict[str, Any]:
+    return _require(state.health, "Health").liveness()
+
+
+@router.get("/health/ready")
+async def ready(state=Depends(_state)) -> Dict[str, Any]:
+    return _require(state.health, "Health").readiness()
+
+
+@router.get("/metrics")
+async def metrics(state=Depends(_state)) -> Dict[str, Any]:
+    return _require(state.metrics, "Metrics").snapshot()
+
+
+@router.get("/genesis")
+async def genesis_report(state=Depends(_state)) -> Dict[str, Any]:
+    genesis = _require(state.genesis, "Genesis")
+    return {"report": genesis.report.to_dict(), "health": genesis.health()}
+
+
 @router.get("/capabilities")
 async def capabilities(state=Depends(_state)) -> List[Dict[str, Any]]:
-    registry = _require(state.registry, "Registry")
-    return [cap.to_dict() for cap in registry.list()]
+    return [cap.to_dict() for cap in _require(state.registry, "Registry").list()]
 
 
 @router.post("/jeeves/session")
@@ -45,18 +65,13 @@ async def jeeves_session(request: Dict[str, Any], state=Depends(_state)) -> Dict
 @router.post("/jeeves/interact")
 async def jeeves_interact(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     jeeves = _require(state.jeeves, "Jeeves")
-    reply = jeeves.ask(
-        request.get("session_id", ""),
-        request.get("input", ""),
-        context=request.get("context"),
-    )
+    reply = jeeves.ask(request.get("session_id", ""), request.get("input", ""), context=request.get("context"))
     return {"response": reply, "session_id": request.get("session_id")}
 
 
 @router.post("/jeeves/review")
 async def jeeves_review(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    jeeves = _require(state.jeeves, "Jeeves")
-    return jeeves.review_code(request.get("session_id", ""), request.get("code", ""))
+    return _require(state.jeeves, "Jeeves").review_code(request.get("session_id", ""), request.get("code", ""))
 
 
 @router.get("/jeeves/matrices/{session_id}")
@@ -72,8 +87,7 @@ async def jeeves_matrices(session_id: str, state=Depends(_state)) -> Dict[str, A
 
 @router.post("/memory/query")
 async def memory_query(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    trinity = _require(state.memory_trinity, "Memory")
-    result = trinity.query_unified(
+    result = _require(state.memory_trinity, "Memory").query_unified(
         request.get("query", ""),
         top_k_per_tier=request.get("top_k", 3),
         metadata_filter=request.get("metadata_filter"),
@@ -95,8 +109,7 @@ async def swarm_stats(state=Depends(_state)) -> Dict[str, Any]:
 
 @router.post("/swarm/agent")
 async def swarm_register_agent(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    mesh = _require(state.mesh, "Swarm")
-    agent = mesh.join(
+    agent = _require(state.mesh, "Swarm").join(
         set(request.get("specialisations", [])),
         weight=request.get("weight", 1.0),
         metadata=request.get("metadata"),
@@ -106,8 +119,7 @@ async def swarm_register_agent(request: Dict[str, Any], state=Depends(_state)) -
 
 @router.post("/swarm/route")
 async def swarm_route(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    mesh = _require(state.mesh, "Swarm")
-    agent = mesh.route(request.get("capability", ""))
+    agent = _require(state.mesh, "Swarm").route(request.get("capability", ""))
     return {"agent_id": str(agent.agent_id), "load": agent.load}
 
 
@@ -128,8 +140,7 @@ async def scheduler_stats(state=Depends(_state)) -> Dict[str, Any]:
 
 @router.post("/pipeline/npc")
 async def pipeline_npc(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    pipeline = _require(state.npc_pipeline, "NPC pipeline")
-    spec = pipeline.run(
+    spec = _require(state.npc_pipeline, "NPC pipeline").run(
         request.get("description", ""),
         name=request.get("name"),
         dialogue_beats=request.get("dialogue_beats", 3),
@@ -140,8 +151,7 @@ async def pipeline_npc(request: Dict[str, Any], state=Depends(_state)) -> Dict[s
 
 @router.post("/pipeline/game-logic")
 async def pipeline_game_logic(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    pipeline = _require(state.game_logic_pipeline, "Game logic pipeline")
-    spec = pipeline.run(
+    spec = _require(state.game_logic_pipeline, "Game logic pipeline").run(
         request.get("description", ""),
         title=request.get("title", "untitled"),
         max_level=request.get("max_level", 50),
@@ -153,9 +163,8 @@ async def pipeline_game_logic(request: Dict[str, Any], state=Depends(_state)) ->
 
 @router.post("/pipeline/animation")
 async def pipeline_animation(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    pipeline = _require(state.animation_pipeline, "Animation pipeline")
     actions = request.get("actions")
-    spec = pipeline.run(
+    spec = _require(state.animation_pipeline, "Animation pipeline").run(
         request.get("description", "humanoid"),
         actions=tuple(actions) if actions else ("idle", "walk", "run", "attack"),
     )
@@ -182,8 +191,7 @@ async def forge_materialise(request: Dict[str, Any], state=Depends(_state)) -> D
         forge.instantiate(bp, comp["kind"], comp["instance_id"], config=comp.get("config"))
     for wire in request.get("wires", []):
         bp.connect(tuple(wire["from"]), tuple(wire["to"]))
-    result = forge.materialise(bp)
-    return {"artefact": result, "status": "materialised"}
+    return {"artefact": forge.materialise(bp), "status": "materialised"}
 
 
 @router.get("/forge/kinds")
@@ -194,8 +202,7 @@ async def forge_kinds(state=Depends(_state)) -> List[str]:
 @router.post("/intelligence/reason")
 async def intelligence_reason(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     return _require(state.intelligence, "Intelligence").reason(
-        query=request.get("query", ""),
-        context=request.get("context"),
+        query=request.get("query", ""), context=request.get("context")
     )
 
 
