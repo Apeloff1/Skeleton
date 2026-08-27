@@ -1,4 +1,4 @@
-"""Observability subsystem — metrics, tracing, health, alerts, incidents, logging, dashboards, SLOs, sampling, exporters, ticks."""
+"""Observability subsystem — metrics, tracing, health, alerts, incidents, logging, dashboards, SLOs, sampling, exporters, ticks, probe coverage."""
 
 from .entanglement import Entanglement, EntanglementDetector
 from .health import HealthRegistry, ProbeResult, probe
@@ -13,6 +13,7 @@ from .sampling import Sampler, SamplerStats, SamplingError, default_sampler
 from .slo import ErrorBudget, SLOError, SLOTracker, ServiceLevelObjective
 from .exporters import MetricsExporter, TraceExporter
 from .ticks import TickAggregator, TickStats
+from .coverage import CoverageRegistry, CoverageAudit
 
 __all__ = [
     "Counter",
@@ -58,4 +59,6 @@ __all__ = [
     "TraceExporter",
     "TickAggregator",
     "TickStats",
+    "CoverageRegistry",
+    "CoverageAudit",
 ]

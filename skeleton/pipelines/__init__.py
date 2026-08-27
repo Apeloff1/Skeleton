@@ -21,6 +21,7 @@ from skeleton.pipelines.registry import PipelineRegistry, RegistryError
 from skeleton.pipelines.hooks import Hook, HookError, HookPoint, HookRegistry
 from skeleton.pipelines.cache import PipelineCache
 from skeleton.pipelines.seeds import SeedRegistry, StageSeed
+from skeleton.pipelines.retry import RetryError, RetryStage
 
 __all__ = [
     "NpcPipeline",
@@ -48,4 +49,6 @@ __all__ = [
     "PipelineCache",
     "SeedRegistry",
     "StageSeed",
+    "RetryError",
+    "RetryStage",
 ]

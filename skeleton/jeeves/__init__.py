@@ -22,6 +22,7 @@ from .review import (
 from .templates import PromptRegistry, PromptTemplate, TemplateError
 from .reflection import ReflectionBuilder, ReflectionPoint, ReflectionReport
 from .feedback import FeedbackCollector, FeedbackError, FeedbackKind, FeedbackRecord
+from .troubleshooting import Troubleshooter, TroubleshootingStep
 
 __all__ = [
     "CoCodingOrchestrator",
@@ -58,4 +59,6 @@ __all__ = [
     "FeedbackError",
     "FeedbackKind",
     "FeedbackRecord",
+    "Troubleshooter",
+    "TroubleshootingStep",
 ]
