@@ -1,10 +1,8 @@
-"""Testing helpers package."""
+"""Testing helpers package — fixtures + accessors."""
 
-from .scaffold import TestCase, TestOutcome, TestScaffold, TestScaffoldError
+from .fixtures import Fixture, FixtureRegistry
 
 __all__ = [
-    "TestCase",
-    "TestOutcome",
-    "TestScaffold",
-    "TestScaffoldError",
+    "Fixture",
+    "FixtureRegistry",
 ]
