@@ -1,4 +1,4 @@
-"""Resilience package — adversarial resilience fortress (split from the v16 monoliths)."""
+"""Resilience package — adversarial resilience fortress."""
 
 from .types import ThreatLevel, ThreatCategory, ThreatReport
 from .sanitiser import InputSanitiser
@@ -7,10 +7,12 @@ from .exfiltration import ExfiltrationDetector
 from .shadow import ShadowExperiment, ShadowMode
 from .fortress import ResilienceFortress
 from .canary import CanaryRegistry, CanaryToken, TripEvent
+from .metrics import ThreatMetrics
 
 __all__ = [
     "ThreatLevel", "ThreatCategory", "ThreatReport",
     "InputSanitiser", "OutputGuardrail", "ExfiltrationDetector",
     "ShadowExperiment", "ShadowMode", "ResilienceFortress",
     "CanaryRegistry", "CanaryToken", "TripEvent",
+    "ThreatMetrics",
 ]

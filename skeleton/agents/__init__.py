@@ -1,4 +1,4 @@
-"""Multi-agent substrate: ledger, mesh, scheduler, policy, messaging, negotiation."""
+"""Multi-agent substrate: ledger, mesh, scheduler, policy, messaging, coordination, negotiation."""
 
 from skeleton.agents.ledger import ActivityLedger, LedgerEntry
 from skeleton.agents.mesh import Agent, AgentMesh
@@ -18,6 +18,7 @@ from skeleton.agents.negotiation import (
     Response,
 )
 from skeleton.agents.messaging import Envelope, Mailbox, MessagingError
+from skeleton.agents.coordination import ClaimError, Coordinator
 
 __all__ = [
     "ActivityLedger",
@@ -39,4 +40,6 @@ __all__ = [
     "Envelope",
     "Mailbox",
     "MessagingError",
+    "ClaimError",
+    "Coordinator",
 ]

@@ -1,4 +1,4 @@
-"""Observability subsystem — metrics, tracing, health, alerts, emergent-coupling."""
+"""Observability subsystem — metrics, tracing, health, alerts, logging, emergent-coupling."""
 
 from .entanglement import Entanglement, EntanglementDetector
 from .health import HealthRegistry, ProbeResult, probe
@@ -6,6 +6,7 @@ from .metrics import Counter, Gauge, Histogram, MetricsRegistry
 from .tracing import InMemoryExporter, Span, SpanContext, Tracer
 from .alerting import AlertRule, AlertingEngine, NotificationRouter, Severity, Operator
 from .profiling import Profiler, SpanStats
+from .logging import LogEvent, LogError, StructuredLogger
 
 __all__ = [
     "Counter",
@@ -28,4 +29,7 @@ __all__ = [
     "Operator",
     "Profiler",
     "SpanStats",
+    "LogEvent",
+    "LogError",
+    "StructuredLogger",
 ]
