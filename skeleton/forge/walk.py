@@ -38,11 +38,14 @@ class WalkReport:
     cores: int
     path: List[str]
     required_cores: int
+    bound: float = 0.0
     steps: List[WalkStep] = field(default_factory=list)
     notes: List[str] = field(default_factory=list)
 
     @property
     def passed(self) -> bool:
+        if self.extracted and self.t + 1e-6 < self.bound:
+            return False
         return self.extracted and not self.collapsed
 
     def to_dict(self) -> Dict[str, Any]:
@@ -51,6 +54,7 @@ class WalkReport:
             "collapsed": self.collapsed,
             "passed": self.passed,
             "t": round(self.t, 4),
+            "bound": round(self.bound, 4),
             "hops": self.hops,
             "fights": self.fights,
             "cores": self.cores,
@@ -282,6 +286,14 @@ def walk_graph(
     elif not notes:
         notes.append("walk exhausted without extract")
 
+    bound = 0.0
+    shortest = _shortest(adj, spawn, extract)
+    if shortest and len(shortest) > 1:
+        for a, b in zip(shortest, shortest[1:]):
+            bound += next((w for v, w in adj[a] if v == b), 0.0)
+    if extracted and t + 1e-6 < bound:
+        notes.append(f"teleport: t={t:.4f} < bound={bound:.4f}")
+
     return WalkReport(
         extracted=extracted,
         collapsed=collapsed,
@@ -291,6 +303,7 @@ def walk_graph(
         cores=cores,
         path=path,
         required_cores=required,
+        bound=bound,
         steps=steps,
         notes=notes,
     )

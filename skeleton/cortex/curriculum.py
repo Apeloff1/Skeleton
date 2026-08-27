@@ -48,6 +48,10 @@ CORE_PAIRS: List[Pair] = [
      "THINK compile BIND SLOT left echo"),
     ("heat vent collapse extract late",
      "extract collapse vent heat late"),
+    ("forge run soulslike extract hops cores bias heat",
+     "soulslike extract hops cores heat bias forge run"),
+    ("walk collapse extract late lock core bound",
+     "extract lock core walk collapse late bound"),
 ]
 
 

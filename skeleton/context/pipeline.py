@@ -214,7 +214,15 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
             pack = attach(pack, ctx.get("generation"))
             ctx["pack"] = pack
     from skeleton.jeeves.builder import BuilderBrain
-    build_plan = BuilderBrain().plan(pack, tensor=cockpit.tensor, reading=cockpit.last_oracle)
+    jeeves = ctx.get("jeeves")
+    last_walk = getattr(jeeves, "last_walk", None) if jeeves is not None else None
+    cortex = None
+    if jeeves is not None and getattr(jeeves, "_cortex", None) is not None:
+        cortex = jeeves.cortex
+    build_plan = BuilderBrain().plan(
+        pack, tensor=cockpit.tensor, reading=cockpit.last_oracle,
+        cortex=cortex, last_walk=last_walk,
+    )
     ctx["build_plan"] = build_plan
     art = forge.materialise(
         bp, era=ctx["era"], target=ctx.get("target") or "godot",

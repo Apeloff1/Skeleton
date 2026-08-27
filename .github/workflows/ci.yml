@@ -66,6 +66,7 @@ jobs:
           python -m skeleton eras
           python -m skeleton plan "soulslike extraction with bonfire rest"
           python -m skeleton cockpit "BLEND ERA arcade_golden_age soulslike 0.5"
+          python -m skeleton walk --era soulslike
 
   # ========================================
   # Backend: Test

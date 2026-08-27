@@ -222,6 +222,7 @@ class TestSim:
         wr = walk_graph(pack, graph, plan=plan)
         assert wr.extracted, wr.notes
         assert wr.hops >= 1
+        assert wr.t + 1e-6 >= wr.bound
         assert wr.path[0] == graph["rooms"][0]["id"]
         assert wr.path[-1] == graph["rooms"][-1]["id"]
         if wr.required_cores:
@@ -240,6 +241,54 @@ class TestSim:
         g["edges"] = []
         wr = walk_graph(pack, g, plan={})
         assert not wr.extracted
+
+
+class TestClosedLoop:
+    def test_adapt_ease_on_collapse(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.jeeves.builder import BuilderBrain
+        from skeleton.context.tensor import ContextTensor
+        pack = compile_era("soulslike")
+        t = ContextTensor.from_era("soulslike")
+        p1 = BuilderBrain().plan(pack, tensor=t)
+        p2 = BuilderBrain().plan(pack, tensor=t, last_walk={
+            "extracted": False, "collapsed": True, "t": 900.0, "fights": 4, "hops": 20,
+        })
+        assert p1.adapt == "none"
+        assert p2.adapt == "ease"
+        assert p2.extract_late is False
+        assert p2.spawn_weapon is True
+        assert p1.seed != p2.seed
+        p1b = BuilderBrain().plan(pack, tensor=t)
+        assert p1.seed == p1b.seed
+
+    def test_adapt_harden_on_easy_extract(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.jeeves.builder import BuilderBrain
+        from skeleton.context.tensor import ContextTensor
+        pack = compile_era("soulslike")
+        t = ContextTensor.from_era("soulslike")
+        p1 = BuilderBrain().plan(pack, tensor=t)
+        p2 = BuilderBrain().plan(pack, tensor=t, last_walk={
+            "extracted": True, "collapsed": False, "t": 12.0, "fights": 1, "hops": 3,
+        })
+        assert p2.adapt == "harden"
+        assert p2.enemy_mix["elite"] >= p1.enemy_mix["elite"]
+        assert p2.enemy_mix["trash"] >= p1.enemy_mix["trash"]
+        assert p1.seed != p2.seed
+
+    def test_pipeline_second_run_mutates_plan(self):
+        from skeleton.context.pipeline import GameForgeRun
+        gf = GameForgeRun()
+        a = gf.execute("soulslike extraction with bonfire rest and estus")
+        b = gf.execute("soulslike extraction with bonfire rest and estus")
+        assert a["succeeded"] and b["succeeded"]
+        assert a["build_plan"]["adapt"] == "none"
+        assert b["build_plan"]["adapt"] in {"harden", "tighten", "hold", "ease"}
+        if a["sim"]["walk"]["t"] < 0.20 * a["sim"]["collapse_max"] and a["sim"]["walk"]["fights"] <= 1:
+            assert b["build_plan"]["adapt"] == "harden"
+            assert a["build_plan"]["seed"] != b["build_plan"]["seed"]
+        assert gf.jeeves.last_walk and gf.jeeves.last_walk.get("extracted")
 
 
 class TestProjectorAndIntake:

@@ -93,6 +93,7 @@ class Jeeves:
         self._cortex = None  # lazy JeevesCortex — the model in training
         self.era = "extraction_now"
         self.last_plan = None
+        self.last_walk = None
 
     @property
     def laws(self) -> tuple[str, ...]:
@@ -237,6 +238,9 @@ class Jeeves:
         hops = (walk or {}).get("hops")
         cores = (walk or {}).get("cores")
         bias = (plan or {}).get("room_bias") or "balanced"
+        self.last_walk = dict(walk or {})
+        self.last_walk["era"] = era
+        self.last_walk["bias"] = bias
         stim = (
             f"forge run {era} {vision} extract {extracted} "
             f"hops {hops} cores {cores} bias {bias}"

@@ -4,13 +4,16 @@ Tactical Jeeves coaches a live operator. This brain is the other half:
 it reads the context cube, the dodeca oracle, and the compiled era pack,
 then writes a BuildPlan the world generator and Godot emitter obey.
 
-Deterministic given (era, tensor fingerprint, oracle index). No LLM.
+Closed loop: a prior walk (or a recalled forge-run tract) mutates mix,
+bias, and extract-lateness, and is mixed into the seed so the next graph
+is a different building. Deterministic given (era, tensor, oracle, walk).
+No LLM. No weights.
 """
 from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from skeleton.context.oracle import OracleReading
 from skeleton.context.tensor import ContextTensor
@@ -34,6 +37,8 @@ class BuildPlan:
     enemy_mix: Dict[str, int]
     recipes: List[str]
     notes: List[str] = field(default_factory=list)
+    adapt: str = "none"
+    slack: float = 1.0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -49,11 +54,89 @@ class BuildPlan:
             "enemy_mix": dict(self.enemy_mix),
             "recipes": list(self.recipes),
             "notes": list(self.notes),
+            "adapt": self.adapt,
+            "slack": round(self.slack, 4),
         }
 
 
+def _walk_from_cortex(cortex: Any, era: str) -> Optional[Dict[str, Any]]:
+    if cortex is None or not hasattr(cortex, "recall"):
+        return None
+    rec = cortex.recall(f"forge run {era} extract hops cores bias")
+    composed = (rec or {}).get("composed") or {}
+    thought = composed.get("thought") or {}
+    text = str(thought.get("text") or "").lower()
+    if "forge run" not in text and "extract" not in text:
+        return None
+    extracted = "extract true" in text or "extracted" in text
+    collapsed = "collapse" in text and "extract true" not in text
+    hops = 0
+    if "hops" in text:
+        for tok in text.split():
+            if tok.isdigit():
+                hops = int(tok)
+                break
+    return {
+        "extracted": extracted and not collapsed,
+        "collapsed": collapsed,
+        "t": 0.0,
+        "fights": 0,
+        "hops": hops,
+        "from_recall": True,
+    }
+
+
+def adapt_from_walk(
+    pack: Dict[str, Any],
+    *,
+    bias: str,
+    spawn_weapon: bool,
+    extract_late: bool,
+    trash: int,
+    elite: int,
+    boss: int,
+    walk: Optional[Dict[str, Any]],
+) -> Tuple[str, bool, bool, int, int, int, str, float, List[str]]:
+    """Mutate a plan from a prior walk. Falsifiable: same walk → same tag."""
+    notes: List[str] = []
+    collapse = float((pack.get("session") or {}).get("collapse_max") or 9999.0)
+    if not walk:
+        return bias, spawn_weapon, extract_late, trash, elite, boss, "none", 1.0, notes
+    extracted = bool(walk.get("extracted"))
+    collapsed = bool(walk.get("collapsed"))
+    t = float(walk.get("t") or 0.0)
+    fights = int(walk.get("fights") or 0)
+    hops = int(walk.get("hops") or 0)
+    slack = ((collapse - t) / collapse) if (extracted and collapse > 0 and t > 0) else (
+        0.0 if (collapsed or not extracted) else 1.0
+    )
+    if collapsed or not extracted:
+        extract_late = False
+        spawn_weapon = True
+        trash = max(1, trash - 1)
+        boss = 0
+        elite = max(0, elite - 1)
+        bias = "loot"
+        tag = "ease"
+        notes.append("cortex: last walk failed — ease extract, arm the spawn")
+    elif slack < 0.25:
+        extract_late = False
+        trash = max(1, trash - 1)
+        tag = "tighten"
+        notes.append(f"cortex: slack={slack:.2f} hops={hops} — drop late extract")
+    elif slack > 0.80 and fights <= 1:
+        elite = max(elite, 1)
+        trash = min(6, trash + 1)
+        tag = "harden"
+        notes.append(f"cortex: slack={slack:.2f} fights={fights} — harden mix")
+    else:
+        tag = "hold"
+        notes.append(f"cortex: slack={slack:.2f} — hold the last plan grain")
+    return bias, spawn_weapon, extract_late, trash, elite, boss, tag, slack, notes
+
+
 class BuilderBrain:
-    """Forge collaborator. Bind a pack, then plan(tensor, reading)."""
+    """Forge collaborator. Bind a pack, then plan(tensor, reading, walk)."""
 
     def plan(
         self,
@@ -61,14 +144,14 @@ class BuilderBrain:
         *,
         tensor: Optional[ContextTensor] = None,
         reading: Optional[OracleReading] = None,
+        cortex: Any = None,
+        last_walk: Optional[Dict[str, Any]] = None,
     ) -> BuildPlan:
         era = str(pack.get("era") or "extraction_now")
         cube = tensor or ContextTensor.from_era(era.split("~")[0])
         fp = cube.fingerprint()
         oracle_index = int(reading.index) if reading is not None else -1
         oracle_text = reading.text if reading is not None else "Signs point to a standard drop."
-        seed_src = f"{era}|{fp}|{oracle_index}"
-        seed = hashlib.sha256(seed_src.encode()).hexdigest()[:16]
 
         lethality = cube["lethality"]
         tempo = cube["tempo"]
@@ -95,6 +178,17 @@ class BuilderBrain:
         if spectacle >= 0.80 and boss == 0:
             elite = max(elite, 1)
 
+        walk = last_walk or _walk_from_cortex(cortex, era)
+        bias, spawn_weapon, extract_late, trash, elite, boss, tag, slack, adapt_notes = adapt_from_walk(
+            pack, bias=bias, spawn_weapon=spawn_weapon, extract_late=extract_late,
+            trash=trash, elite=elite, boss=boss, walk=walk,
+        )
+
+        seed_src = f"{era}|{fp}|{oracle_index}"
+        if tag != "none":
+            seed_src += f"|{tag}|{int(extract_late)}|{trash}|{elite}|{boss}"
+        seed = hashlib.sha256(seed_src.encode()).hexdigest()[:16]
+
         recipes = [r.get("id") for r in (pack.get("recipes") or []) if r.get("id")]
         if spawn_weapon:
             first = recipes[:1] or ["kinetic_basic"]
@@ -107,12 +201,14 @@ class BuilderBrain:
             f"mix trash={trash} elite={elite} boss={boss}",
             f"armed={int(spawn_weapon)} late_extract={int(extract_late)}",
             f"philosophy={philosophy}",
-        ]
+            f"adapt={tag} slack={slack:.2f}",
+        ] + adapt_notes
         briefing = (
             f"Jeeves / {era}: {oracle_text} "
             f"Drop {bias}-weighted. "
             + ("You spawn with a kit." if spawn_weapon else "Scavenge a barrel before the first fight.")
             + (" Extract is late — value the cores." if extract_late else " Extract is honest; don't greed.")
+            + (f" Cortex {tag}." if tag != "none" else "")
         )
         return BuildPlan(
             era=era,
@@ -127,4 +223,6 @@ class BuilderBrain:
             enemy_mix={"trash": trash, "elite": elite, "boss": boss},
             recipes=first,
             notes=notes,
+            adapt=tag,
+            slack=slack,
         )
