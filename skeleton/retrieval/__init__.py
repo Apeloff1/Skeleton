@@ -13,6 +13,7 @@ from .rerank import Reranker, RerankRule
 from .highlight import Highlighter
 from .dedup import Deduper
 from .embeddings import LocalEmbedder, rerank_by_embedding
+from .lexicon import Lexicon, default_lexicon
 
 __all__ = [
     "Fuser",
@@ -38,4 +39,6 @@ __all__ = [
     "Deduper",
     "LocalEmbedder",
     "rerank_by_embedding",
+    "Lexicon",
+    "default_lexicon",
 ]
