@@ -1,8 +1,9 @@
-"""Swarm role registry — named defaults over AgentRole + CapabilityVector.
+"""Swarm role registry — preset capabilities per AgentRole.
 
-Swarm.types has the taxonomy classes; nothing ships a preset. The
-registry maps a role name (\"coder\", \"reviewer\", \"executor\") to its
-capabilities so discovery/rouiting asks for them, not opaque strings.
+Swarm.types defines SCOUT / WORKER / GUARDIAN / ORACLE but nothing
+says which capabilities each role claims by default. The registry maps
+role name to a capability tuple; discovery/routing string ask, not
+opaque strings.
 
 - :class:`RoleRegistry` — role → capability tuple
 """
@@ -12,7 +13,7 @@ from __future__ import annotations
 from typing import Dict, Tuple
 
 from skeleton.kernel.errors import AgentError
-from skeleton.swarm.types import AgentRole, CapabilityVector
+from skeleton.swarm.types import AgentRole
 
 
 class RoleError(AgentError):
@@ -26,7 +27,7 @@ class RoleRegistry:
         self._roles: Dict[str, Tuple[str, ...]] = {}
 
     def register(self, role: AgentRole, capabilities: Tuple[str, ...]) -> None:
-        self._roles[role.value] = tuple(capabilities)
+        self._roles[role.name] = tuple(capabilities)
 
     def capabilities_of(self, role: str) -> Tuple[str, ...]:
         caps = self._roles.get(role)
@@ -40,7 +41,8 @@ class RoleRegistry:
 
 def default_roles() -> RoleRegistry:
     registry = RoleRegistry()
-    registry.register(AgentRole.CODER, ("code", "generation"))
-    registry.register(AgentRole.REVIEWER, ("critique", "review"))
-    registry.register(AgentRole.EXECUTOR, ("execution", "test"))
+    registry.register(AgentRole.SCOUT, ("discovery", "information"))
+    registry.register(AgentRole.WORKER, ("execution", "computation"))
+    registry.register(AgentRole.GUARDIAN, ("validation", "fault-detection"))
+    registry.register(AgentRole.ORACLE, ("prediction", "advisory"))
     return registry

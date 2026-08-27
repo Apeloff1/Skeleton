@@ -1,18 +1,18 @@
 """Pipeline retries — wrap stage callables with bounded retry predicates.
 
-Not all jitter on failures should be a fail; a transient scrape or model
-timeout can succeed on attempt 2. A RuleStage wraps a Stage and retries
-per the configured predicate/limit.
+Not every failure should fail-fast: transient scrapes or model timeouts
+can succeed on attempt 2. RetryStage wraps a Stage and retries per the
+configured predicate/limit.
 
-- :class:`RetryStage` — bounded retry wrapper honoring RetryPolicy
+- :class:`RetryStage` — bounded retry wrapper honoring predicates
 """
 
 from __future__ import annotations
 
-from typing import Any, Callable, Tuple
+from typing import Any, Tuple
 
 from skeleton.kernel.errors import PipelineError
-from skeleton.pipelines.core import PipelineContext, Stage, StageConfigError
+from skeleton.pipelines.core import PipelineContext, Stage
 
 
 class RetryError(PipelineError):
@@ -30,14 +30,14 @@ class RetryStage:
         retryable: Tuple[type, ...] = (Exception,),
     ) -> None:
         if max_attempts <= 0:
-            raise StageRetryConfigError("max_attempts must be positive")
+            raise PipelineError("max_attempts must be positive")
         self._stage = stage
         self._attempts = max_attempts
         self._retryable = retryable
 
     def run(self, context: PipelineContext) -> Any:
         last_exc: Exception = RuntimeError("no attempts")
-        for attempt in range(1, self._attempts + 1):
+        for _ in range(1, self._attempts + 1):
             try:
                 return self._stage.run(context)
             except Exception as exc:
@@ -54,7 +54,3 @@ class RetryStage:
 
     def depends_on(self) -> Tuple[str, ...]:
         return self._stage.depends_on
-
-
-class StageRetryConfigError(StageRetryError):
-    pass
