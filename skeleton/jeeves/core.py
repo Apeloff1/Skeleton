@@ -270,6 +270,24 @@ class Jeeves:
             numbers=(trash, elite, boss, slack),
         )
         self.cortex.own.ingest(ability_from(observed, stim), stim)
+        spawn = bool((plan or {}).get("spawn_weapon"))
+        late = bool((plan or {}).get("extract_late"))
+        bias_thought = Thought(
+            slot="right", kind="walk",
+            text=f"bias={bias} slack={slack:.2f}",
+            confidence=min(1.0, 0.55 + 0.45 * max(0.0, slack)),
+            tags=("gestalt", "spatial", "right", "observed", "bias", str(bias), str(era)),
+            numbers=(slack,),
+        )
+        self.cortex.own.ingest(ability_from(bias_thought, stim), stim)
+        policy_thought = Thought(
+            slot="pfc", kind="plan",
+            text=f"armed={int(spawn)} late={int(late)} slack={slack:.2f}",
+            confidence=min(1.0, 0.55 + 0.45 * max(0.0, slack)),
+            tags=("plan", "boilerplate", "observed", "policy", "pfc", str(era)),
+            numbers=(float(spawn), float(late), slack),
+        )
+        self.cortex.own.ingest(ability_from(policy_thought, stim), stim)
         self._bus.emit("jeeves.observe_run", {
             "era": era, "extracted": extracted, "own": self.cortex.own.size,
         })

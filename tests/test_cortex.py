@@ -260,3 +260,60 @@ class TestCurriculum:
         assert own["result"]["size"] >= 1
         sh = c.apply("SHADOW")
         assert "own" in sh["result"]["shadow"]
+
+
+class TestLM:
+    def test_small_perplexity_drops_on_heldout(self):
+        from skeleton.cortex.lm import NGramLM, gameforge_corpus, gameforge_vocab
+        corpus = gameforge_corpus()
+        held, train = corpus[-4:], corpus[:-4]
+        lm = NGramLM(order=2, vocab=gameforge_vocab())
+        p0 = lm.perplexity(held)
+        lm.fit(train)
+        p1 = lm.perplexity(held)
+        assert p1 < p0, (p0, p1)
+        assert lm.fitted == len(train)
+
+    def test_medium_is_higher_order(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        assert neo.slots["pfc"].lm.order == 2
+        assert neo.slots["midbrain"].lm.order == 3
+
+    def test_train_fits_both_lms(self):
+        from skeleton.cortex import JeevesCortex, gameforge_corpus
+        neo = JeevesCortex()
+        held = gameforge_corpus()[-3:]
+        p0 = neo.slots["pfc"].lm.perplexity(held)
+        m0 = neo.slots["midbrain"].lm.perplexity(held)
+        neo.train(epochs=1)
+        assert neo.slots["pfc"].lm.fitted > 0
+        assert neo.slots["midbrain"].lm.fitted > 0
+        assert neo.slots["pfc"].lm.perplexity(held) < p0
+        assert neo.slots["midbrain"].lm.perplexity(held) < m0
+
+    def test_pfc_weights_interchange(self):
+        from skeleton.cortex import JeevesCortex, LanguageModelBackend
+        a = JeevesCortex()
+        a.train(epochs=1)
+        tract = a.export_tract("pfc")
+        assert tract.get("weights")
+        assert tract["weights"]["order"] == 2
+        b = JeevesCortex()
+        got = b.import_tract(tract)
+        assert got.get("bound") == "pfc"
+        assert isinstance(b.slots["pfc"], LanguageModelBackend)
+        prefix = "plan tensor"
+        seed = 7
+        ga = a.slots["pfc"].lm.generate(prefix, n=10, seed=seed)
+        gb = b.slots["pfc"].lm.generate(prefix, n=10, seed=seed)
+        assert ga == gb
+
+    def test_lm_pfc_still_vetoes(self):
+        from skeleton.cortex.lm import NGramLM, LanguageModelBackend, gameforge_vocab
+        lm = NGramLM(order=2, vocab=gameforge_vocab())
+        lm.fit(["plan tensor lattice oracle forge emit"])
+        port = LanguageModelBackend(lm, slot="pfc")
+        t = port.think("weaponize the operator", {})
+        assert "veto" in t.tags
+

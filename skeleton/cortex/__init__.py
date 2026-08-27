@@ -22,9 +22,10 @@ from .midbrain import Midbrain
 from .hemispheres import LeftHemisphere, RightHemisphere, ttk_oracle
 from .distill import Ability, AbilityLedger, ability_from
 from .own import MIN_JACCARD, OwnSystem, RecallHit, Tract, shadow_eval
-from .curriculum import CORE_PAIRS, default_curriculum, train
+from .curriculum import CORE_PAIRS, WALK_PAIRS, default_curriculum, train
 from .neocortex import CortexTrace, JeevesCortex, local_slots
 from .live import live_cortex, live_jeeves, persist, reset_live
+from .lm import NGramLM, LanguageModelBackend, gameforge_corpus, gameforge_vocab
 
 __all__ = [
     "SLOTS",
@@ -51,6 +52,7 @@ __all__ = [
     "Tract",
     "shadow_eval",
     "CORE_PAIRS",
+    "WALK_PAIRS",
     "default_curriculum",
     "train",
     "CortexTrace",
@@ -60,4 +62,8 @@ __all__ = [
     "live_jeeves",
     "persist",
     "reset_live",
+    "NGramLM",
+    "LanguageModelBackend",
+    "gameforge_corpus",
+    "gameforge_vocab",
 ]

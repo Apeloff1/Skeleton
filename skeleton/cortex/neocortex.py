@@ -245,14 +245,25 @@ class JeevesCortex:
         backend = self.backends().get(slot, "own")
         scale = getattr(self.slots.get(slot), "scale", "neo")
         tract = self.own.export_tract(slot, backend=backend, scale=str(scale))
-        return tract.to_dict()
+        payload = tract.to_dict()
+        port = self.slots.get(slot)
+        if port is not None and hasattr(port, "snapshot"):
+            payload["weights"] = port.snapshot()
+        return payload
 
     def import_tract(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         tract = Tract.from_dict(payload)
         n = self.own.import_tract(tract)
+        weights = (payload or {}).get("weights")
+        bound = None
+        if weights and tract.slot in {"pfc", "midbrain"}:
+            from skeleton.cortex.lm import LanguageModelBackend
+            self.bind(tract.slot, LanguageModelBackend.from_snapshot(weights, slot=tract.slot))
+            bound = tract.slot
         self._bus.emit("cortex.imported", {"slot": tract.slot, "copied": n})
         return {"slot": tract.slot, "copied": n, "own": self.own.size,
-                "capabilities": list(tract.capabilities)[:16]}
+                "capabilities": list(tract.capabilities)[:16],
+                "bound": bound}
 
     def train(self, *, epochs: int = 1, auto_surpass: bool = True) -> Dict[str, Any]:
         return run_curriculum(self, epochs=epochs, auto_surpass=auto_surpass)

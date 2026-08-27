@@ -870,3 +870,118 @@ class TestImprove:
         assert plan_b.enemy_mix == plan_a.enemy_mix
         assert not any(n.startswith("invented mix") for n in plan_b.notes), plan_b.notes
 
+
+class TestOmni:
+    def test_beam_reaches_depth_two(self):
+        from skeleton.cortex.own import OwnSystem
+        own = OwnSystem()
+        from skeleton.cortex.distill import ability_from
+        from skeleton.cortex.port import Thought
+        hard = Thought(
+            slot="left", kind="walk",
+            text="HP = DPS × TTK ; observed mix trash=6 elite=2 boss=0 slack=0.70",
+            confidence=0.8,
+            tags=("analytic", "mix", "walk", "observed", "left", "soulslike"),
+            numbers=(6.0, 2.0, 0.0, 0.70),
+        )
+        own.ingest(ability_from(hard, "plan soulslike forge mix bias ttk extract"),
+                   "plan soulslike forge mix bias ttk extract")
+
+        def cost(t, e, b):
+            return -(t * 1.5 + e * 6.0 + b * 120.0)
+
+        prop = own.beam_mix("plan soulslike forge mix bias ttk extract", cost, beam=3, depth=2)
+        assert prop is not None
+        t, e, b, s, invented = prop
+        assert invented
+        assert (t, e, b) != (6, 2, 0)
+        one = own.mix_neighbors(6, 2, 0)
+        best_one = max(cost(*n) for n in one)
+        assert (t, e, b) not in one, (t, e, b, one)
+        assert cost(t, e, b) >= best_one - 1e-9
+
+    def test_right_invents_bias(self):
+        from dataclasses import replace
+        from skeleton.forge.eras import compile_era
+        from skeleton.forge.walk import walk_from_pack
+        from skeleton.jeeves.builder import BuilderBrain
+        from skeleton.jeeves.core import Jeeves
+        from skeleton.context.tensor import ContextTensor
+        from skeleton.cortex import JeevesCortex
+
+        pack = compile_era("soulslike")
+        tensor = ContextTensor.from_era("soulslike")
+        collapse = float(pack["session"]["collapse_max"])
+        combat = replace(
+            BuilderBrain().plan(pack, tensor=tensor),
+            room_bias="combat",
+            enemy_mix={"trash": 6, "elite": 2, "boss": 0},
+        )
+        wr = walk_from_pack(pack, plan=combat.to_dict(), mode="thermal")
+        w = wr.to_dict()
+        w["collapse_max"] = collapse
+        neo = JeevesCortex()
+        neo.auto_surpass = False
+        j = Jeeves()
+        j.cortex = neo
+        j.observe_run(era="soulslike", walk=w, plan=combat.to_dict())
+        neo.surpass("left")
+        neo.surpass("right")
+        own = BuilderBrain().plan(pack, tensor=tensor, cortex=neo)
+        assert own.authored == "own"
+        assert any("invented bias=" in n or "improved bias=" in n for n in own.notes), own.notes
+
+    def test_pfc_invents_policy(self):
+        from dataclasses import replace
+        from skeleton.forge.eras import compile_era
+        from skeleton.forge.walk import walk_from_pack
+        from skeleton.jeeves.builder import BuilderBrain
+        from skeleton.jeeves.core import Jeeves
+        from skeleton.context.tensor import ContextTensor
+        from skeleton.cortex import JeevesCortex
+
+        pack = compile_era("soulslike")
+        tensor = ContextTensor.from_era("soulslike")
+        collapse = float(pack["session"]["collapse_max"])
+        late = replace(
+            BuilderBrain().plan(pack, tensor=tensor),
+            extract_late=True,
+            spawn_weapon=False,
+            enemy_mix={"trash": 6, "elite": 2, "boss": 0},
+        )
+        wr = walk_from_pack(pack, plan=late.to_dict(), mode="thermal")
+        w = wr.to_dict()
+        w["collapse_max"] = collapse
+        neo = JeevesCortex()
+        neo.auto_surpass = False
+        j = Jeeves()
+        j.cortex = neo
+        j.observe_run(era="soulslike", walk=w, plan=late.to_dict())
+        neo.surpass("left")
+        neo.surpass("pfc")
+        own = BuilderBrain().plan(pack, tensor=tensor, cortex=neo)
+        assert own.authored == "own"
+        assert any("invented policy" in n or "improved policy" in n for n in own.notes), own.notes
+
+    def test_train_then_plan_invents_from_curriculum(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.jeeves.builder import BuilderBrain
+        from skeleton.context.tensor import ContextTensor
+        from skeleton.cortex import JeevesCortex
+
+        neo = JeevesCortex()
+        out = neo.train(epochs=1)
+        assert out["held_rate"] >= 0.7
+        rec = neo.own.best_observed_record("plan soulslike forge mix bias ttk extract")
+        assert rec is not None
+        assert rec["mix"] == (6.0, 2.0, 0.0)
+        pack = compile_era("soulslike")
+        plan = BuilderBrain().plan(
+            pack, tensor=ContextTensor.from_era("soulslike"), cortex=neo,
+        )
+        assert plan.authored == "own"
+        got = (plan.enemy_mix["trash"], plan.enemy_mix["elite"], plan.enemy_mix["boss"])
+        assert got != (6, 2, 0), got
+        assert any("invented mix" in n for n in plan.notes), plan.notes
+
+

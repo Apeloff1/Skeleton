@@ -240,6 +240,19 @@ def _author(pack: Dict[str, Any], cube: ContextTensor, era: str, cortex: Any):
     return left, right, pfc, "local"
 
 
+def _ingest_observed(own, stim: str, era: str, *, slot: str, kind: str,
+                     text: str, tags: Tuple[str, ...], numbers: Tuple[float, ...]) -> None:
+    from skeleton.cortex.distill import ability_from
+    from skeleton.cortex.port import Thought
+    slack = float(numbers[-1]) if numbers else 0.0
+    thought = Thought(
+        slot=slot, kind=kind, text=text,
+        confidence=min(1.0, 0.55 + 0.45 * max(0.0, slack)),
+        tags=tags, numbers=numbers,
+    )
+    own.ingest(ability_from(thought, stim), stim)
+
+
 class BuilderBrain:
     """Forge collaborator. Bind a pack, then plan(tensor, reading, walk)."""
 
@@ -297,50 +310,115 @@ class BuilderBrain:
                 veto_notes = list(veto_notes) + [
                     f"improved mix trash={trash} elite={elite} boss={boss}"
                 ] + extra
+                ob = own.best_observed_bias(stim) if hasattr(own, "best_observed_bias") else None
+                if ob:
+                    bias = ob
+                    veto_notes.append(f"improved bias={bias}")
+                op = own.best_observed_policy(stim) if hasattr(own, "best_observed_policy") else None
+                if op:
+                    spawn_weapon, extract_late = bool(op[0]), bool(op[1])
+                    veto_notes.append(
+                        f"improved policy armed={int(spawn_weapon)} late={int(extract_late)}"
+                    )
                 skip_search = bool(rec and (rec.get("imported") or rec.get("invented")))
                 if rec and rec.get("imported"):
                     veto_notes.append("imported mix — no search")
+                collapse = float((pack.get("session") or {}).get("collapse_max") or 1.0)
+                search_seed = hashlib.sha256(f"{era}|{fp}|search".encode()).hexdigest()[:16]
                 if hasattr(own, "propose_mix") and not skip_search:
-                    from skeleton.forge.walk import walk_from_pack
-                    collapse = float((pack.get("session") or {}).get("collapse_max") or 1.0)
-                    search_seed = hashlib.sha256(f"{era}|{fp}|search".encode()).hexdigest()[:16]
+                    def _mix_score(tr: int, el: int, bo: int) -> float:
+                        cost = own.mix_cost(pack, tr, el, bo)
+                        return (collapse - cost) / collapse
 
-                    def _score(tr: int, el: int, bo: int) -> float:
+                    prop = own.propose_mix(stim, _mix_score, beam=3, depth=2)
+                    if prop is not None:
+                        nt, ne, nb, ns, invented = prop
+                        if invented:
+                            from skeleton.forge.walk import walk_from_pack
+                            proto = {
+                                "seed": search_seed,
+                                "extract_late": extract_late,
+                                "enemy_mix": {"trash": nt, "elite": ne, "boss": nb},
+                            }
+                            wr = walk_from_pack(pack, plan=proto, mode="thermal")
+                            if wr.extracted and not wr.collapsed:
+                                trash, elite, boss = nt, ne, nb
+                                trash, elite, boss, thermal_span, extra2 = _prune_mix(
+                                    pack, trash, elite, boss
+                                )
+                                veto_notes = list(veto_notes) + extra2 + [
+                                    f"invented mix trash={trash} elite={elite} boss={boss} slack={ns:.2f}"
+                                ]
+                                _ingest_observed(
+                                    own, stim, era,
+                                    slot="left", kind="walk",
+                                    text=(
+                                        f"HP = DPS × TTK ; invented mix trash={trash} "
+                                        f"elite={elite} boss={boss} slack={ns:.2f}"
+                                    ),
+                                    tags=("analytic", "mix", "walk", "observed", "invented", "left", era),
+                                    numbers=(float(trash), float(elite), float(boss), float(ns)),
+                                )
+
+                if hasattr(own, "propose_bias") and not skip_search:
+                    start_b = own.best_observed_bias(stim) or bias
+
+                    def _bias_score(b: str) -> float:
+                        from skeleton.forge.world import generate_rooms
+                        g = generate_rooms(
+                            pack, seed=search_seed,
+                            plan={"seed": search_seed, "room_bias": b,
+                                  "enemy_mix": {"trash": trash, "elite": elite, "boss": boss}},
+                        )
+                        combat = sum(1 for r in g["rooms"] if r["kind"] == "combat")
+                        return (collapse - combat * 8.0) / collapse
+
+                    bprop = own.propose_bias(stim, _bias_score, start=start_b)
+                    if bprop is not None:
+                        nbias, ns, invented_b = bprop
+                        if invented_b:
+                            bias = nbias
+                            veto_notes.append(f"invented bias={bias} slack={ns:.2f}")
+                            _ingest_observed(
+                                own, stim, era,
+                                slot="right", kind="gestalt",
+                                text=f"bias={bias} slack={ns:.2f}",
+                                tags=("gestalt", "spatial", "right", "observed", "invented", "bias", bias, era),
+                                numbers=(float(ns),),
+                            )
+
+                if hasattr(own, "propose_policy") and not skip_search:
+                    def _pol_score(sp: int, lt: int) -> float:
+                        from skeleton.forge.walk import walk_from_pack
                         proto = {
                             "seed": search_seed,
-                            "extract_late": extract_late,
-                            "enemy_mix": {"trash": tr, "elite": el, "boss": bo},
+                            "spawn_weapon": bool(sp),
+                            "extract_late": bool(lt),
+                            "enemy_mix": {"trash": trash, "elite": elite, "boss": boss},
+                            "room_bias": bias,
                         }
                         wr = walk_from_pack(pack, plan=proto, mode="thermal")
                         if not wr.extracted or wr.collapsed:
                             return -1.0
-                        cost = own.mix_cost(pack, tr, el, bo)
-                        return (collapse - wr.bound - cost) / collapse
+                        return (collapse - wr.t) / collapse + (0.01 if sp else 0.0)
 
-                    prop = own.propose_mix(stim, _score)
-                    if prop is not None:
-                        nt, ne, nb, ns, invented = prop
-                        if invented:
-                            trash, elite, boss = nt, ne, nb
-                            trash, elite, boss, thermal_span, extra2 = _prune_mix(
-                                pack, trash, elite, boss
-                            )
-                            veto_notes = list(veto_notes) + extra2 + [
-                                f"invented mix trash={trash} elite={elite} boss={boss} slack={ns:.2f}"
-                            ]
-                            from skeleton.cortex.distill import ability_from
-                            from skeleton.cortex.port import Thought
-                            observed = Thought(
-                                slot="left", kind="walk",
-                                text=(
-                                    f"HP = DPS × TTK ; invented mix trash={trash} "
-                                    f"elite={elite} boss={boss} slack={ns:.2f}"
-                                ),
-                                confidence=min(1.0, 0.55 + 0.45 * max(0.0, ns)),
-                                tags=("analytic", "mix", "walk", "observed", "invented", "left", era),
-                                numbers=(float(trash), float(elite), float(boss), float(ns)),
-                            )
-                            own.ingest(ability_from(observed, stim), stim)
+                    psp, plt, ns, invented_p = own.propose_policy(
+                        _pol_score, int(spawn_weapon), int(extract_late),
+                    )
+                    if invented_p:
+                        spawn_weapon, extract_late = bool(psp), bool(plt)
+                        veto_notes.append(
+                            f"invented policy armed={int(spawn_weapon)} late={int(extract_late)} slack={ns:.2f}"
+                        )
+                        _ingest_observed(
+                            own, stim, era,
+                            slot="pfc", kind="plan",
+                            text=(
+                                f"armed={int(spawn_weapon)} late={int(extract_late)} slack={ns:.2f}"
+                            ),
+                            tags=("plan", "boilerplate", "observed", "invented", "policy", "pfc", era),
+                            numbers=(float(psp), float(plt), float(ns)),
+                        )
 
         seed_src = f"{era}|{fp}|{oracle_index}"
         if tag != "none":

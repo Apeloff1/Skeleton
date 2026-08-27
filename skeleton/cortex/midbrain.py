@@ -40,6 +40,16 @@ class Midbrain:
     scale = "medium"
     slot = "midbrain"
 
+    def __init__(self) -> None:
+        from skeleton.cortex.lm import NGramLM, gameforge_vocab
+        self.lm = NGramLM(order=3, vocab=gameforge_vocab())
+
+    def fit(self, text: str) -> int:
+        return self.lm.fit([text])
+
+    def snapshot(self) -> dict:
+        return self.lm.snapshot()
+
     def think(self, stimulus: str, context: Dict[str, Any]) -> Thought:
         arousal, lw, rw = _weights(stimulus or "")
         to_left = lw >= 0.25

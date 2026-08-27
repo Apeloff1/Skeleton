@@ -15,10 +15,27 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from skeleton.cortex.distill import Ability
 from skeleton.cortex.port import Thought, jaccard, tokens
+from skeleton.forge.eras import ERA_IDS
+
+def _era_hit(tags: Iterable[str], stim_toks: set) -> bool:
+    tagset = set(tags or ())
+    stim_eras = set()
+    tag_eras = set()
+    for e in ERA_IDS:
+        parts = tuple(e.split("_"))
+        if e in stim_toks or (parts and all(p in stim_toks for p in parts)):
+            stim_eras.add(e)
+        if e in tagset:
+            tag_eras.add(e)
+    if stim_eras:
+        return bool(tag_eras & stim_eras)
+    return bool(tagset & stim_toks)
+
 
 MIN_JACCARD = 0.40
 K_RECALL = 5
 _NEIGHBORS = ((-1, 0, 0), (1, 0, 0), (0, -1, 0), (0, 1, 0), (0, 0, -1), (0, 0, 1))
+BIASES = ("loot", "combat", "heat", "balanced")
 
 
 @dataclass(frozen=True)
@@ -197,7 +214,7 @@ class OwnSystem:
                 continue
             if len(a.numbers) < 4:
                 continue
-            if not (set(a.tags) & stim_toks):
+            if not _era_hit(a.tags, stim_toks):
                 continue
             slack = float(a.numbers[-1])
             if slack > best_slack:
@@ -236,20 +253,100 @@ class OwnSystem:
             + boss * float(ttk.get("boss") or 60.0)
         )
 
-    def propose_mix(self, stimulus: str, score_fn) -> Optional[Tuple[int, int, int, float, bool]]:
-        """Hill-climb one step from the best observed mix. Invented iff a neighbor wins."""
-        base = self.best_observed_mix(stimulus)
-        if base is None:
+    def propose_mix(self, stimulus: str, score_fn, *, beam: int = 3, depth: int = 2) -> Optional[Tuple[int, int, int, float, bool]]:
+        """Beam-search mix neighbors. Invented iff the winner was never observed."""
+        return self.beam_mix(stimulus, score_fn, beam=beam, depth=depth)
+
+    def beam_mix(self, stimulus: str, score_fn, *, beam: int = 3, depth: int = 2) -> Optional[Tuple[int, int, int, float, bool]]:
+        rec = self.best_observed_record(stimulus)
+        if rec is None:
             return None
-        t, e, b = int(base[0]), int(base[1]), int(base[2])
-        best = (t, e, b)
-        best_s = float(score_fn(t, e, b))
+        t, e, b = int(rec["mix"][0]), int(rec["mix"][1]), int(rec["mix"][2])
+        start = (t, e, b)
+        observed = {start}
+        for a in self._items:
+            if "observed" not in a.tags or len(a.numbers) < 4:
+                continue
+            observed.add((int(a.numbers[-4]), int(a.numbers[-3]), int(a.numbers[-2])))
+        best = (float(score_fn(t, e, b)), start)
+        frontier: List[Tuple[float, Tuple[int, int, int]]] = [best]
+        beam = max(1, int(beam))
+        depth = max(1, int(depth))
+        for _ in range(depth):
+            cand: List[Tuple[float, Tuple[int, int, int]]] = []
+            seen = {m for _, m in frontier}
+            for _, mix in frontier:
+                for n in self.mix_neighbors(*mix):
+                    if n in seen:
+                        continue
+                    seen.add(n)
+                    cand.append((float(score_fn(*n)), n))
+            cand.sort(key=lambda kv: kv[0], reverse=True)
+            frontier = cand[:beam]
+            if frontier and frontier[0][0] > best[0] + 1e-6:
+                best = frontier[0]
+        winner = best[1]
+        return winner[0], winner[1], winner[2], best[0], winner not in observed
+
+    def best_observed_bias(self, stimulus: str) -> Optional[str]:
+        stim_toks = set(tokens(stimulus))
+        best_s = -1.0
+        best: Optional[str] = None
+        for a in self._items:
+            if "observed" not in a.tags or "bias" not in a.tags:
+                continue
+            if not _era_hit(a.tags, stim_toks):
+                continue
+            slack = float(a.numbers[-1]) if a.numbers else 0.0
+            for b in BIASES:
+                if b in a.tags and slack > best_s:
+                    best_s = slack
+                    best = b
+        return best
+
+    def propose_bias(self, stimulus: str, score_fn, start: Optional[str] = None) -> Optional[Tuple[str, float, bool]]:
+        base = start or self.best_observed_bias(stimulus) or "balanced"
+        best, best_s = base, float(score_fn(base))
         invented = False
-        for n in self.mix_neighbors(t, e, b):
-            s = float(score_fn(*n))
+        for b in BIASES:
+            if b == base:
+                continue
+            s = float(score_fn(b))
             if s > best_s + 1e-6:
-                best, best_s, invented = n, s, True
-        return best[0], best[1], best[2], best_s, invented
+                best, best_s, invented = b, s, True
+        return best, best_s, invented
+
+    def best_observed_policy(self, stimulus: str) -> Optional[Tuple[int, int]]:
+        stim_toks = set(tokens(stimulus))
+        best_s = -1.0
+        best: Optional[Tuple[int, int]] = None
+        for a in self._items:
+            if "observed" not in a.tags or a.slot not in {"pfc", "neo"}:
+                continue
+            if "policy" not in a.tags and "pfc" not in a.tags:
+                continue
+            if len(a.numbers) < 3:
+                continue
+            if not _era_hit(a.tags, stim_toks):
+                continue
+            slack = float(a.numbers[-1])
+            if slack > best_s:
+                best_s = slack
+                best = (int(a.numbers[-3]), int(a.numbers[-2]))
+        return best
+
+    def propose_policy(self, score_fn, start_spawn: int, start_late: int) -> Tuple[int, int, float, bool]:
+        base = (int(bool(start_spawn)), int(bool(start_late)))
+        best, best_s = base, float(score_fn(*base))
+        invented = False
+        for sp in (0, 1):
+            for lt in (0, 1):
+                if (sp, lt) == base:
+                    continue
+                s = float(score_fn(sp, lt))
+                if s > best_s + 1e-6:
+                    best, best_s, invented = (sp, lt), s, True
+        return best[0], best[1], best_s, invented
 
     def export_tract(self, slot: str, *, backend: str = "own",
                      scale: str = "neo") -> Tract:
