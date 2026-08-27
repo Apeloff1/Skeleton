@@ -10,7 +10,7 @@
 name = "tutolage"
 version = "15.0.0"
 description = "Tutolage - Ultimate AI-Powered Learning & Game Development Platform"
-readme = "../README.md"
+readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
 authors = [
