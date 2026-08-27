@@ -1,8 +1,4 @@
-"""Text-to-X generation pipelines plus the generic stage runner.
-
-Each domain pipeline (npc, game_logic, animation) is an application service;
-`core` provides the generic DAG runner any new pipeline can build on.
-"""
+"""Text-to-X generation pipelines plus the generic stage runner."""
 
 from skeleton.pipelines.npc import NpcPipeline, NpcSpec
 from skeleton.pipelines.game_logic import GameLogicPipeline, GameLogicSpec
@@ -12,6 +8,13 @@ from skeleton.pipelines.core import (
     PipelineRunner,
     Stage,
     StageResult,
+)
+from skeleton.pipelines.validation import (
+    StageValidatorRegistry,
+    ValidationIssue,
+    ValidationIssueLevel,
+    ValidationReport,
+    Validator,
 )
 
 __all__ = [
@@ -25,4 +28,9 @@ __all__ = [
     "PipelineRunner",
     "Stage",
     "StageResult",
+    "StageValidatorRegistry",
+    "ValidationIssue",
+    "ValidationIssueLevel",
+    "ValidationReport",
+    "Validator",
 ]

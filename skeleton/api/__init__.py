@@ -1,4 +1,4 @@
-"""REST API surface — FastAPI routers, server bootstrap, middleware."""
+"""REST API surface — FastAPI routers, server bootstrap, middleware, auth."""
 
 from .routes import router
 from .server import AppState, bootstrap, get_state, lifespan
@@ -10,6 +10,7 @@ from .middleware import (
     RateLimitError,
     get_request_id,
 )
+from .auth import AuthContext, role_dependency, scope_dependency
 
 __all__ = [
     "router",
@@ -23,4 +24,7 @@ __all__ = [
     "RateLimiter",
     "RateLimitError",
     "get_request_id",
+    "AuthContext",
+    "role_dependency",
+    "scope_dependency",
 ]
