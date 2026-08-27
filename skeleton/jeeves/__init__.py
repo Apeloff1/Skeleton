@@ -11,6 +11,14 @@ from .assessment import (
 )
 from .curriculum import Curriculum, CurriculumError, Lesson
 from .pedagogy import Hint, HintLevel, PedagogyEngine, PedagogyError, Scaffold
+from .review import (
+    CodeReviewer,
+    Finding,
+    FindingSeverity,
+    ReviewError,
+    ReviewRule,
+    default_reviewer,
+)
 
 __all__ = [
     "CoCodingOrchestrator",
@@ -31,4 +39,10 @@ __all__ = [
     "PedagogyEngine",
     "PedagogyError",
     "Scaffold",
+    "CodeReviewer",
+    "Finding",
+    "FindingSeverity",
+    "ReviewError",
+    "ReviewRule",
+    "default_reviewer",
 ]

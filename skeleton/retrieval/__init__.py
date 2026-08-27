@@ -7,6 +7,7 @@ from .index import InvertedIndex
 from .query_language import QueryParser, QueryTerm
 from .cache import CacheEntry, ResultCache
 from .chunking import Chunk, Chunker
+from .sources import SourceRegistry
 
 __all__ = [
     "Fuser",
@@ -23,4 +24,5 @@ __all__ = [
     "ResultCache",
     "Chunk",
     "Chunker",
+    "SourceRegistry",
 ]

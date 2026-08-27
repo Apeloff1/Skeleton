@@ -1,4 +1,4 @@
-"""Observability subsystem — metrics, tracing, health, alerts, logging, dashboards, sampling."""
+"""Observability subsystem — metrics, tracing, health, alerts, logging, dashboards, SLOs, sampling."""
 
 from .entanglement import Entanglement, EntanglementDetector
 from .health import HealthRegistry, ProbeResult, probe
@@ -9,6 +9,7 @@ from .profiling import Profiler, SpanStats
 from .logging import LogEvent, LogError, StructuredLogger
 from .dashboards import Dashboard, DashboardError, Widget, aggregate
 from .sampling import Sampler, SamplerStats, SamplingError, default_sampler
+from .slo import ErrorBudget, SLOError, SLOTracker, ServiceLevelObjective
 
 __all__ = [
     "Counter",
@@ -42,4 +43,8 @@ __all__ = [
     "SamplerStats",
     "SamplingError",
     "default_sampler",
+    "ErrorBudget",
+    "SLOError",
+    "SLOTracker",
+    "ServiceLevelObjective",
 ]

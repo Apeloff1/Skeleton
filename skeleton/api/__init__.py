@@ -1,4 +1,4 @@
-"""REST API surface — FastAPI routers, server bootstrap, middleware, auth."""
+"""REST API surface — routers, server, middleware, auth, versioning, webhooks, idempotency."""
 
 from .routes import router
 from .server import AppState, bootstrap, get_state, lifespan
@@ -13,6 +13,7 @@ from .middleware import (
 from .auth import AuthContext, role_dependency, scope_dependency
 from .versioning import SUPPORTED, Version, VersionError, extract, negotiate
 from .webhooks import Subscription, WebhookDispatcher, WebhookError
+from .idempotency import IdempotencyError, IdempotencyKey, IdempotencyStore, parse_key
 
 __all__ = [
     "router",
@@ -37,4 +38,8 @@ __all__ = [
     "Subscription",
     "WebhookDispatcher",
     "WebhookError",
+    "IdempotencyError",
+    "IdempotencyKey",
+    "IdempotencyStore",
+    "parse_key",
 ]
