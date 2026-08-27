@@ -8,6 +8,7 @@ from .query_language import QueryParser, QueryTerm
 from .cache import CacheEntry, ResultCache
 from .chunking import Chunk, Chunker
 from .sources import SourceRegistry
+from .ingest import CorpusIngestor, Document
 
 __all__ = [
     "Fuser",
@@ -25,4 +26,6 @@ __all__ = [
     "Chunk",
     "Chunker",
     "SourceRegistry",
+    "CorpusIngestor",
+    "Document",
 ]

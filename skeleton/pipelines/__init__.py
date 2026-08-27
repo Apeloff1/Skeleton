@@ -18,6 +18,7 @@ from skeleton.pipelines.validation import (
 )
 from skeleton.pipelines.registry import PipelineRegistry, RegistryError
 from skeleton.pipelines.hooks import Hook, HookError, HookPoint, HookRegistry
+from skeleton.pipelines.cache import PipelineCache
 
 __all__ = [
     "NpcPipeline",
@@ -41,4 +42,5 @@ __all__ = [
     "HookError",
     "HookPoint",
     "HookRegistry",
+    "PipelineCache",
 ]

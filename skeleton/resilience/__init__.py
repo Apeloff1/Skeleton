@@ -1,4 +1,4 @@
-"""Resilience package — adversarial resilience fortress."""
+"""Resilience package — adversarial resilience fortress plus bulkheads."""
 
 from .types import ThreatLevel, ThreatCategory, ThreatReport
 from .sanitiser import InputSanitiser
@@ -8,6 +8,7 @@ from .shadow import ShadowExperiment, ShadowMode
 from .fortress import ResilienceFortress
 from .canary import CanaryRegistry, CanaryToken, TripEvent
 from .metrics import ThreatMetrics
+from .bulkhead import Bulkhead, BulkheadError, BulkheadStats, Rejected
 
 __all__ = [
     "ThreatLevel", "ThreatCategory", "ThreatReport",
@@ -15,4 +16,5 @@ __all__ = [
     "ShadowExperiment", "ShadowMode", "ResilienceFortress",
     "CanaryRegistry", "CanaryToken", "TripEvent",
     "ThreatMetrics",
+    "Bulkhead", "BulkheadError", "BulkheadStats", "Rejected",
 ]

@@ -19,6 +19,7 @@ from .review import (
     ReviewRule,
     default_reviewer,
 )
+from .templates import PromptRegistry, PromptTemplate, TemplateError
 
 __all__ = [
     "CoCodingOrchestrator",
@@ -45,4 +46,7 @@ __all__ = [
     "ReviewError",
     "ReviewRule",
     "default_reviewer",
+    "PromptRegistry",
+    "PromptTemplate",
+    "TemplateError",
 ]
