@@ -111,10 +111,9 @@ class Genesis:
         )
         self._wire("intelligence", "orchestrator", IntelligenceOrchestrator(bus=self.bus))
         self._wire("intelligence", "adaptive", AdaptiveLearner(default_meta_grid(), bus=self.bus))
-        from skeleton.cortex import JeevesCortex
-        from skeleton.jeeves.core import Jeeves
-        cortex = JeevesCortex(bus=self.bus)
-        jeeves = Jeeves(bus=self.bus)
+        from skeleton.cortex.live import live_cortex, live_jeeves
+        cortex = live_cortex()
+        jeeves = live_jeeves()
         jeeves.cortex = cortex
         self._wire("intelligence", "cortex", cortex)
         self._wire("intelligence", "jeeves", jeeves)
@@ -159,9 +158,12 @@ class Genesis:
     def _phase_context(self) -> None:
         self.report.phases.append("context")
         from skeleton.context import Cockpit, GameForgeRun
+        from skeleton.cortex.live import live_jeeves
         cockpit = Cockpit()
         self._wire("context", "cockpit", cockpit)
-        self._wire("context", "gameforge", GameForgeRun(bus=self.bus, cockpit=cockpit))
+        self._wire("context", "gameforge", GameForgeRun(
+            bus=self.bus, cockpit=cockpit, jeeves=live_jeeves(), live=True,
+        ))
 
     def _phase_interface(self) -> None:
         self.report.phases.append("interface")

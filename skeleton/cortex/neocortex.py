@@ -257,6 +257,39 @@ class JeevesCortex:
     def train(self, *, epochs: int = 1, auto_surpass: bool = True) -> Dict[str, Any]:
         return run_curriculum(self, epochs=epochs, auto_surpass=auto_surpass)
 
+    def save(self, path) -> Dict[str, Any]:
+        from pathlib import Path
+        import json
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        blob = {
+            "own": self.own.snapshot(),
+            "acquired": dict(self.acquired),
+            "surpass": sorted(self._surpass),
+            "shadow": dict(self.shadow),
+        }
+        p.write_text(json.dumps(blob), encoding="utf-8")
+        return {"path": str(p), "own": self.own.size, "acquired": dict(self.acquired)}
+
+    def load(self, path) -> Dict[str, Any]:
+        from pathlib import Path
+        import json
+        p = Path(path)
+        if not p.exists():
+            return {"loaded": 0, "own": self.own.size}
+        blob = json.loads(p.read_text(encoding="utf-8"))
+        n = self.own.restore(blob.get("own") or {})
+        for k, v in (blob.get("acquired") or {}).items():
+            self.acquired[str(k)] = int(v)
+        self._surpass.update(blob.get("surpass") or [])
+        for k, v in (blob.get("shadow") or {}).items():
+            if isinstance(v, dict):
+                self.shadow[str(k)] = {
+                    "wins": int(v.get("wins") or 0),
+                    "trials": int(v.get("trials") or 0),
+                }
+        return {"loaded": n, "own": self.own.size, "surpass": sorted(self._surpass)}
+
     def status(self) -> Dict[str, Any]:
         return {
             "backends": self.backends(),

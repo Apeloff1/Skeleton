@@ -208,6 +208,16 @@ class OwnSystem:
             "capabilities": list(self.capabilities())[:24],
         }
 
+    def snapshot(self) -> Dict[str, Any]:
+        return {"items": [a.to_dict() for a in self._items]}
+
+    def restore(self, data: Dict[str, Any]) -> int:
+        n = 0
+        for d in data.get("items") or []:
+            self.ingest(Ability.from_dict(d))
+            n += 1
+        return n
+
 
 def shadow_eval(own: Thought, teacher: Thought) -> bool:
     """Own wins if it is at least as sure and shares any structural tag."""

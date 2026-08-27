@@ -24,6 +24,7 @@ from .distill import Ability, AbilityLedger, ability_from
 from .own import MIN_JACCARD, OwnSystem, RecallHit, Tract, shadow_eval
 from .curriculum import CORE_PAIRS, default_curriculum, train
 from .neocortex import CortexTrace, JeevesCortex, local_slots
+from .live import live_cortex, live_jeeves, persist, reset_live
 
 __all__ = [
     "SLOTS",
@@ -55,4 +56,8 @@ __all__ = [
     "CortexTrace",
     "JeevesCortex",
     "local_slots",
+    "live_cortex",
+    "live_jeeves",
+    "persist",
+    "reset_live",
 ]

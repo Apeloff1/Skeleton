@@ -56,7 +56,7 @@ def generations() -> Dict[str, Any]:
 def run(req: RunRequest) -> Dict[str, Any]:
     from skeleton.context.pipeline import GameForgeRun
     try:
-        payload = GameForgeRun().execute(
+        payload = GameForgeRun.live().execute(
             req.vision,
             era=req.era,
             archetype=req.archetype,
@@ -118,7 +118,9 @@ def plan(req: PlanRequest) -> Dict[str, Any]:
             pack = compile_era(era)
             tensor = ContextTensor.from_era(era)
         reading = Magic8Ball(Dodecahedron.from_tensor(tensor)).roll(tensor)
-        built = BuilderBrain().plan(pack, tensor=tensor, reading=reading)
+        from skeleton.cortex.live import live_cortex, persist
+        built = BuilderBrain().plan(pack, tensor=tensor, reading=reading, cortex=live_cortex())
+        persist()
     except Exception as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return built.to_dict()
@@ -146,8 +148,10 @@ def walk(req: PlanRequest) -> Dict[str, Any]:
             pack = compile_era(era)
             tensor = ContextTensor.from_era(era)
         reading = Magic8Ball(Dodecahedron.from_tensor(tensor)).roll(tensor)
-        built = BuilderBrain().plan(pack, tensor=tensor, reading=reading)
+        from skeleton.cortex.live import live_cortex, persist
+        built = BuilderBrain().plan(pack, tensor=tensor, reading=reading, cortex=live_cortex())
         wr = walk_from_pack(pack, plan=built.to_dict())
+        persist()
     except Exception as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {"walk": wr.to_dict(), "plan": built.to_dict()}
@@ -185,9 +189,9 @@ class TractPayload(BaseModel):
 
 @router.post("/think")
 def think(req: ThinkRequest) -> Dict[str, Any]:
-    from skeleton.cortex import JeevesCortex
+    from skeleton.cortex.live import live_cortex, persist
     from skeleton.context.tensor import ContextTensor
-    neo = JeevesCortex()
+    neo = live_cortex()
     if req.bind and len(req.bind) >= 2:
         slot, how = str(req.bind[0]), str(req.bind[1]).lower()
         if how == "echo":
@@ -204,6 +208,7 @@ def think(req: ThinkRequest) -> Dict[str, Any]:
     if req.surpass:
         surpassed = neo.surpass(req.surpass)
         trace = neo.think(req.stimulus, ctx)
+    persist()
     return {
         "trace": trace.to_dict(),
         "status": neo.status(),
@@ -214,32 +219,38 @@ def think(req: ThinkRequest) -> Dict[str, Any]:
 
 @router.get("/cortex")
 def cortex_status() -> Dict[str, Any]:
-    from skeleton.cortex import SLOTS, SCALES, TEMPLATES, JeevesCortex, default_curriculum
+    from skeleton.cortex import SLOTS, SCALES, TEMPLATES, default_curriculum
+    from skeleton.cortex.live import live_cortex
     return {
         "slots": list(SLOTS),
         "scales": list(SCALES),
         "pfc_templates": list(TEMPLATES),
-        "fresh": JeevesCortex().status(),
+        "live": live_cortex().status(),
         "curriculum_items": len(default_curriculum()),
     }
 
 
 @router.post("/train")
 def train(req: TrainRequest) -> Dict[str, Any]:
-    from skeleton.cortex import JeevesCortex
-    return JeevesCortex().train(epochs=max(1, int(req.epochs)))
+    from skeleton.cortex.live import live_cortex, persist
+    out = live_cortex().train(epochs=max(1, int(req.epochs)))
+    saved = persist()
+    out["saved"] = saved
+    return out
 
 
 @router.post("/cortex/import")
 def cortex_import(body: TractPayload) -> Dict[str, Any]:
-    from skeleton.cortex import JeevesCortex
-    neo = JeevesCortex()
+    from skeleton.cortex.live import live_cortex, persist
+    neo = live_cortex()
     payload = body.model_dump() if hasattr(body, "model_dump") else body.dict()
-    return neo.import_tract(payload)
+    out = neo.import_tract(payload)
+    persist()
+    return out
 
 
 @router.post("/recall")
 def recall(body: Dict[str, str]) -> Dict[str, Any]:
-    from skeleton.cortex import JeevesCortex
+    from skeleton.cortex.live import live_cortex
     stim = (body or {}).get("stimulus") or (body or {}).get("text") or ""
-    return JeevesCortex().recall(stim)
+    return live_cortex().recall(stim)

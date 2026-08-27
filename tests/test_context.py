@@ -589,3 +589,70 @@ class TestHardware:
         from skeleton.__main__ import main
         assert main(["generations"]) == 0
         assert main(["cockpit", "BIND GENERATION snes"]) == 0
+
+
+class TestLive:
+    def test_two_live_runs_share_own(self):
+        import os
+        import tempfile
+        from pathlib import Path
+        from skeleton.cortex.live import reset_live, live_cortex
+        from skeleton.context.pipeline import GameForgeRun
+        os.environ["SKELETON_OWN"] = str(Path(tempfile.mkdtemp()) / "own.json")
+        reset_live(wipe_disk=True)
+        a = GameForgeRun.live()
+        out = a.execute("cozy wholesome farm")
+        assert out["succeeded"]
+        size1 = live_cortex().own.size
+        assert size1 > 0
+        b = GameForgeRun.live()
+        assert b.jeeves.cortex is a.jeeves.cortex
+        b.execute("soulslike extraction bonfire estus")
+        assert live_cortex().own.size > size1
+
+    def test_disk_survives_process_reset(self):
+        import os
+        import tempfile
+        from pathlib import Path
+        from skeleton.cortex.live import reset_live, live_cortex, persist, own_path
+        from skeleton.context.pipeline import GameForgeRun
+        os.environ["SKELETON_OWN"] = str(Path(tempfile.mkdtemp()) / "own.json")
+        reset_live(wipe_disk=True)
+        GameForgeRun.live().execute("cozy wholesome farm")
+        persist()
+        size = live_cortex().own.size
+        assert own_path().exists()
+        reset_live()
+        assert live_cortex().own.size == size
+
+    def test_isolated_run_does_not_touch_live(self):
+        import os
+        import tempfile
+        from pathlib import Path
+        from skeleton.cortex.live import reset_live, live_cortex
+        from skeleton.context.pipeline import GameForgeRun
+        os.environ["SKELETON_OWN"] = str(Path(tempfile.mkdtemp()) / "own.json")
+        reset_live(wipe_disk=True)
+        live_cortex()
+        size = live_cortex().own.size
+        GameForgeRun().execute("cozy wholesome farm")
+        assert live_cortex().own.size == size
+
+    def test_train_then_run_is_same_jeeves(self):
+        import os
+        import tempfile
+        from pathlib import Path
+        from skeleton.cortex.live import reset_live, live_cortex, persist
+        from skeleton.context.pipeline import GameForgeRun
+        os.environ["SKELETON_OWN"] = str(Path(tempfile.mkdtemp()) / "own.json")
+        reset_live(wipe_disk=True)
+        live_cortex().train(epochs=1)
+        persist()
+        size = live_cortex().own.size
+        assert size > 0
+        out = GameForgeRun.live().execute("soulslike extraction bonfire estus")
+        assert out["succeeded"]
+        assert live_cortex().own.size >= size
+        assert out["build_plan"]["authored"] in {"cortex", "own"}
+        assert out.get("own", {}).get("own") == live_cortex().own.size
+

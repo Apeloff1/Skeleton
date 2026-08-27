@@ -136,3 +136,6 @@ backend/data/build_artifacts/
 # Godot runtime projects scaffolded at runtime (the engine binary itself,
 # backend/godot, is a first-class tracked asset — do NOT ignore it)
 backend/data/godot_projects/
+
+# Live Jeeves own-system persist
+.skeleton/

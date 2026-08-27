@@ -92,8 +92,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "train":
-        from skeleton.cortex import JeevesCortex
-        out = JeevesCortex().train(epochs=args.epochs)
+        from skeleton.cortex.live import live_cortex, persist
+        out = live_cortex().train(epochs=args.epochs)
+        out["saved"] = persist()
         print(json.dumps(out, indent=2, default=str))
         return 0 if out.get("held_rate", 0) >= 0.5 else 1
 
@@ -113,7 +114,9 @@ def main(argv: list[str] | None = None) -> int:
             pack = compile_era(args.era)
             tensor = ContextTensor.from_era(args.era)
         reading = Magic8Ball(Dodecahedron.from_tensor(tensor)).roll(tensor)
-        plan = BuilderBrain().plan(pack, tensor=tensor, reading=reading)
+        from skeleton.cortex.live import live_cortex, persist
+        plan = BuilderBrain().plan(pack, tensor=tensor, reading=reading, cortex=live_cortex())
+        persist()
         wr_i = walk_from_pack(pack, plan=plan.to_dict(), mode="ideal")
         wr = walk_from_pack(pack, plan=plan.to_dict(), mode="thermal")
         payload = wr.to_dict()
@@ -129,8 +132,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if wr.passed and wr.t + 0.2 >= wr_i.t else 1
 
     if args.cmd == "think":
-        from skeleton.cortex import JeevesCortex
-        neo = JeevesCortex()
+        from skeleton.cortex.live import live_cortex, persist
+        neo = live_cortex()
         if args.bind:
             slot, how = args.bind
             if how == "echo":
@@ -144,6 +147,7 @@ def main(argv: list[str] | None = None) -> int:
             neo.surpass(args.surpass)
             if args.stimulus:
                 trace = neo.think(args.stimulus)
+        persist()
         payload = trace.to_dict()
         if args.recall:
             payload["recall"] = neo.recall(args.stimulus)
@@ -170,7 +174,9 @@ def main(argv: list[str] | None = None) -> int:
             pack = compile_era(era)
             tensor = ContextTensor.from_era(era)
         reading = Magic8Ball(Dodecahedron.from_tensor(tensor)).roll(tensor)
-        plan = BuilderBrain().plan(pack, tensor=tensor, reading=reading)
+        from skeleton.cortex.live import live_cortex, persist
+        plan = BuilderBrain().plan(pack, tensor=tensor, reading=reading, cortex=live_cortex())
+        persist()
         print(json.dumps(plan.to_dict(), indent=2))
         return 0
 
@@ -203,7 +209,7 @@ def main(argv: list[str] | None = None) -> int:
         blend = None
         generation = None
 
-    payload = GameForgeRun().execute(
+    payload = GameForgeRun.live().execute(
         vision, era=era, answers=answers, project_root=out, overwrite=overwrite, target="godot",
         blend=blend, generation=generation,
     )

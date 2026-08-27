@@ -26,12 +26,23 @@ from skeleton.pipelines.composer import PipelineComposer, Stage
 
 
 class GameForgeRun:
-    def __init__(self, *, bus: Optional[EventBus] = None, cockpit: Optional[Cockpit] = None) -> None:
+    def __init__(self, *, bus: Optional[EventBus] = None, cockpit: Optional[Cockpit] = None,
+                 jeeves: Optional[Jeeves] = None, live: bool = False) -> None:
         self.bus = bus or EventBus()
         self.cockpit = cockpit or Cockpit()
         self.composer = PipelineComposer(bus=self.bus)
         self.forge = Forge(bus=self.bus)
-        self.jeeves = Jeeves(bus=self.bus)
+        if live:
+            from skeleton.cortex.live import live_jeeves
+            self.jeeves = live_jeeves()
+            self._persist = True
+        else:
+            self.jeeves = jeeves or Jeeves(bus=self.bus)
+            self._persist = False
+
+    @classmethod
+    def live(cls, *, cockpit: Optional[Cockpit] = None) -> "GameForgeRun":
+        return cls(cockpit=cockpit, live=True)
 
     def execute(self, vision: str, *, era: Optional[str] = None,
                 archetype: str = "extraction",
@@ -113,6 +124,10 @@ class GameForgeRun:
             "era": payload["era"],
             "mass": payload["mass"],
         })
+        if self._persist:
+            from skeleton.cortex.live import persist
+            saved = persist()
+            payload["own"] = saved
         return payload
 
 
