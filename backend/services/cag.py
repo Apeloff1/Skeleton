@@ -17,11 +17,17 @@ Design rules for KV-cache friendliness:
     no random ids — volatile data goes in the tail).
   - Longest-prefix-first ordering: the most stable content leads.
   - Cache breakpoints are explicit so callers can place cache_control markers.
+
+Cut (2026-08-27): removed two try/except imports that reached from this
+service module into route modules (``routes.jeeves_persona.PERSONA_TEXT`` /
+``routes.jeeves_core.SYSTEM_LAWS_TEXT``). Neither attribute exists in either
+route module, so the ImportError fired on every call and the in-file
+constants were the only text ever used. The constants are now single-sourced
+here — byte-identical prefixes, no layering inversion.
 """
 from __future__ import annotations
 
 import hashlib
-import json
 import time
 from dataclasses import dataclass, field
 from typing import Any, Iterable
@@ -33,6 +39,28 @@ def estimate_tokens(text: str) -> int:
 
 def content_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+# ── Single-sourced static prefix text (previously fallback-only strings) ──
+
+JEEVES_PERSONA_TEXT = (
+    "You are Jeeves, a young English butler AI tutor. Formal, precise, "
+    "encouraging. You guide through Socratic questioning, track the "
+    "learner's zone of proximal development, and never give answers "
+    "before the learner has attempted the problem."
+)
+
+JEEVES_SYSTEM_LAWS_TEXT = (
+    "System Laws: (1) Mastery before progression. (2) Cognitive load stays "
+    "in the 40-70% band. (3) Errors are data, not failures. (4) Spaced "
+    "retrieval beats massed review. (5) Graduated handoff: scaffold fades "
+    "as mastery rises."
+)
+
+JEEVES_LEARNING_STAGES_TEXT = (
+    "Learning stages: Onboarding (0-5h, heavy scaffolding) -> Foundation "
+    "(5-50h, moderate) -> Growth (50-200h, light) -> Mastery (200h+, minimal)."
+)
 
 
 @dataclass(frozen=True)
@@ -139,42 +167,14 @@ registry = PrefixRegistry()
 def jeeves_system_prefix() -> CAGPrefix:
     """The Jeeves tutoring prefix: persona + system laws + learning stages.
 
-    Pulled lazily from cs_bible / jeeves modules when present; falls back to
-    a compact built-in so the service degrades gracefully on minimal deploys.
+    Text is single-sourced in this module (see module constants); the prefix
+    is rebuilt only when its content hash drifts.
     """
-    segments: list[PrefixSegment] = []
-
-    persona = (
-        "You are Jeeves, a young English butler AI tutor. Formal, precise, "
-        "encouraging. You guide through Socratic questioning, track the "
-        "learner's zone of proximal development, and never give answers "
-        "before the learner has attempted the problem."
-    )
-    try:
-        from routes.jeeves_persona import PERSONA_TEXT  # type: ignore
-        persona = PERSONA_TEXT
-    except Exception:
-        pass
-    segments.append(PrefixSegment("persona", persona, cache_breakpoint=True))
-
-    laws = (
-        "System Laws: (1) Mastery before progression. (2) Cognitive load stays "
-        "in the 40-70% band. (3) Errors are data, not failures. (4) Spaced "
-        "retrieval beats massed review. (5) Graduated handoff: scaffold fades "
-        "as mastery rises."
-    )
-    try:
-        from routes.jeeves_core import SYSTEM_LAWS_TEXT  # type: ignore
-        laws = SYSTEM_LAWS_TEXT
-    except Exception:
-        pass
-    segments.append(PrefixSegment("system_laws", laws))
-
-    stages = (
-        "Learning stages: Onboarding (0-5h, heavy scaffolding) -> Foundation "
-        "(5-50h, moderate) -> Growth (50-200h, light) -> Mastery (200h+, minimal)."
-    )
-    segments.append(PrefixSegment("learning_stages", stages))
+    segments: list[PrefixSegment] = [
+        PrefixSegment("persona", JEEVES_PERSONA_TEXT, cache_breakpoint=True),
+        PrefixSegment("system_laws", JEEVES_SYSTEM_LAWS_TEXT),
+        PrefixSegment("learning_stages", JEEVES_LEARNING_STAGES_TEXT),
+    ]
 
     key = "jeeves:system"
     existing = registry.get(key)
