@@ -39,7 +39,8 @@ class GameForgeRun:
                 project_root: Optional[str] = None,
                 answers: Optional[Dict[str, str]] = None,
                 overwrite: bool = False,
-                blend: Optional[tuple] = None) -> Dict[str, Any]:
+                blend: Optional[tuple] = None,
+                generation: Optional[str] = None) -> Dict[str, Any]:
         cockpit = self.cockpit
         if answers:
             from skeleton.context.questionnaire import intake
@@ -47,6 +48,8 @@ class GameForgeRun:
             vision = vision or taken.vision
             era = era or taken.era
             cockpit.tensor = taken.tensor
+        if generation is None:
+            generation = getattr(cockpit, "generation", None)
         ctx: Dict[str, Any] = {
             "vision": vision or "",
             "era_hint": era,
@@ -58,6 +61,7 @@ class GameForgeRun:
             "forge": self.forge,
             "jeeves": self.jeeves,
             "blend": blend,
+            "generation": generation,
         }
         stages = [
             Stage("ingest", _stage_ingest),
@@ -76,6 +80,7 @@ class GameForgeRun:
             "run": run.to_dict(),
             "succeeded": run.succeeded,
             "era": run.context.get("era"),
+            "generation": run.context.get("generation"),
             "mass": cockpit.snowball.mass,
             "complete": cockpit.snowball.complete,
             "tensor": cockpit.tensor.to_dict(),
@@ -132,18 +137,28 @@ def _stage_detect(ctx: Dict[str, Any]) -> Dict[str, Any]:
     if not blend and getattr(cockpit, "blend", None):
         blend = cockpit.blend
         ctx["blend"] = blend
+    from skeleton.forge.hardware import detect_generation, attach
+    if not ctx.get("generation"):
+        gen, gscores = detect_generation(ctx.get("vision") or "")
+        if getattr(cockpit, "generation", None):
+            gen = cockpit.generation
+        ctx["generation"] = gen
+    else:
+        gscores = {"hint": 1}
     if blend and len(blend) >= 2:
         from skeleton.forge.eras import blend_eras
         t = float(blend[2]) if len(blend) > 2 else 0.5
-        pack = blend_eras(str(blend[0]), str(blend[1]), t)
+        pack = blend_eras(str(blend[0]), str(blend[1]), t, generation=ctx.get("generation"))
         era, scores = pack["era"], {"blend": 1}
         ctx["pack"] = pack
     elif ctx.get("era_hint"):
         era, scores = ctx["era_hint"], {"hint": 1}
     else:
         era, scores = detect_era(ctx.get("vision") or "")
-    _commit(ctx, "detect", ctx.get("vision") or "", era, {"era": era, "scores": scores})
-    return {"era": era, "detect_scores": scores}
+    _commit(ctx, "detect", ctx.get("vision") or "", era, {
+        "era": era, "scores": scores, "generation": ctx.get("generation"), "gen_scores": gscores,
+    })
+    return {"era": era, "detect_scores": scores, "generation": ctx.get("generation")}
 
 
 def _stage_tensor(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -189,8 +204,13 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
     pack = ctx.get("pack")
     if not pack:
         from skeleton.forge.eras import compile_era
-        pack = compile_era(ctx["era"])
+        pack = compile_era(ctx["era"], generation=ctx.get("generation"))
         ctx["pack"] = pack
+    else:
+        from skeleton.forge.hardware import attach
+        if "hardware" not in pack:
+            pack = attach(pack, ctx.get("generation"))
+            ctx["pack"] = pack
     from skeleton.jeeves.builder import BuilderBrain
     build_plan = BuilderBrain().plan(pack, tensor=cockpit.tensor, reading=cockpit.last_oracle)
     ctx["build_plan"] = build_plan

@@ -2,6 +2,7 @@
 
 from skeleton.forge.accessors import Accessor
 from skeleton.forge.eras import blend_eras, compile_era, compile_pack, era_pack, list_eras
+from skeleton.forge.hardware import catalog as hardware_catalog, detect_generation, get_generation, list_generations
 from skeleton.forge.godot_emit import emit_godot
 from skeleton.forge.sim import simulate_session, simulate_encounter
 from skeleton.forge.projector import write_project, ProjectExistsError
@@ -28,6 +29,10 @@ __all__ = [
     "compile_pack",
     "era_pack",
     "list_eras",
+    "hardware_catalog",
+    "detect_generation",
+    "get_generation",
+    "list_generations",
     "emit_godot",
     "simulate_session",
     "simulate_encounter",

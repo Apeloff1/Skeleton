@@ -26,6 +26,7 @@ class RunRequest(BaseModel):
     answers: Dict[str, str] = Field(default_factory=dict)
     blend: Optional[list] = None
     t: float = 0.5
+    generation: Optional[str] = None
 
 
 @router.get("/eras")
@@ -44,6 +45,13 @@ def eras() -> Dict[str, Any]:
     return {"eras": out, "count": len(out)}
 
 
+@router.get("/generations")
+def generations() -> Dict[str, Any]:
+    from skeleton.forge.hardware import catalog
+    rows = catalog()
+    return {"generations": rows, "count": len(rows)}
+
+
 @router.post("/run")
 def run(req: RunRequest) -> Dict[str, Any]:
     from skeleton.context.pipeline import GameForgeRun
@@ -57,6 +65,7 @@ def run(req: RunRequest) -> Dict[str, Any]:
             overwrite=req.overwrite,
             answers=req.answers or None,
             blend=(tuple(req.blend) + (req.t,)) if req.blend and len(req.blend) >= 2 else None,
+            generation=req.generation,
         )
     except Exception as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

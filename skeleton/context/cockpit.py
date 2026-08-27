@@ -2,6 +2,7 @@
 
 Command language (one statement per apply):
   BIND ERA <id>
+  BIND GENERATION <id>
   SET AXIS <name> <0..1>
   LERP ERA <id> <t>
   BLEND ERA <a> <b> [t]
@@ -43,6 +44,7 @@ class Cockpit:
     last_oracle: Optional[OracleReading] = None
     history: List[str] = field(default_factory=list)
     blend: Optional[Tuple[str, str, float]] = None
+    generation: Optional[str] = None
 
     @property
     def lattice(self) -> Dodecahedron:
@@ -58,6 +60,7 @@ class Cockpit:
             "snowball": self.snowball.to_dict(),
             "oracle": self.last_oracle.to_dict() if self.last_oracle else None,
             "blend": list(self.blend) if self.blend else None,
+            "generation": self.generation,
             "history": list(self.history[-20:]),
         }
 
@@ -78,6 +81,12 @@ class Cockpit:
             self.tensor = ContextTensor.from_era(era)
             self.blend = None
             result = {"era": self.tensor.era, "tensor": self.tensor.as_dict()}
+        elif verb == "BIND" and args and args[0].upper() in {"GENERATION", "GEN"}:
+            from skeleton.forge.hardware import get_generation
+            key = args[1] if len(args) > 1 else "modern"
+            spec = get_generation(key)
+            self.generation = spec["key"]
+            result = {"generation": spec["key"], "label": spec["label"], "viewport": spec["viewport"]}
         elif verb == "SET" and args and args[0].upper() == "AXIS":
             if len(args) < 3:
                 raise CockpitError("SET AXIS <name> <value>")

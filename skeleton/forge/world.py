@@ -75,6 +75,7 @@ def generate_rooms(
         if (u, v) not in edges:
             edges.append((u, v))
     _populate(rooms, pack, plan, rng)
+    doors = _doors(rooms, edges)
     return {
         "era": pack.get("era"),
         "seed": seed,
@@ -82,8 +83,10 @@ def generate_rooms(
         "count": n,
         "rooms": rooms,
         "edges": [{"from": a, "to": b} for a, b in edges],
+        "doors": doors,
         "reachable": True,
         "spawn_weapon": bool(plan.get("spawn_weapon")),
+        "occupancy": occupant_counts({"rooms": rooms}),
     }
 
 
@@ -121,6 +124,30 @@ def _populate(
     _ = rng  # seed consumed by caller; keep signature stable for later jitter
 
 
+def _sign(v: float) -> int:
+    return 0 if v == 0 else (1 if v > 0 else -1)
+
+
+def _doors(rooms: List[Dict[str, Any]], edges: List[Tuple[str, str]]) -> List[Dict[str, Any]]:
+    by = {r["id"]: r for r in rooms}
+    out: List[Dict[str, Any]] = []
+    for a, b in edges:
+        ra, rb = by[a], by[b]
+        sx = _sign(rb["x"] - ra["x"])
+        sy = _sign(rb["y"] - ra["y"])
+        out.append({
+            "from": a, "to": b,
+            "x": sx * (ROOM_W // 2 - 24), "y": sy * (ROOM_H // 2 - 24),
+            "dest_x": -sx * 80, "dest_y": -sy * 80,
+        })
+        out.append({
+            "from": b, "to": a,
+            "x": -sx * (ROOM_W // 2 - 24), "y": -sy * (ROOM_H // 2 - 24),
+            "dest_x": sx * 80, "dest_y": sy * 80,
+        })
+    return out
+
+
 def assert_connected(graph: Dict[str, Any]) -> None:
     rooms = [r["id"] for r in graph["rooms"]]
     adj = {r: [] for r in rooms}
@@ -137,6 +164,17 @@ def assert_connected(graph: Dict[str, Any]) -> None:
                 stack.append(v)
     if seen != set(rooms):
         raise ValueError("room graph is not connected")
+
+
+def assert_occupancy(graph: Dict[str, Any]) -> None:
+    counts = occupant_counts(graph)
+    if counts.get("player", 0) != 1:
+        raise ValueError("spawn occupancy: expected exactly one player")
+    if counts.get("extract", 0) != 1:
+        raise ValueError("extract occupancy: expected exactly one extract")
+    doors = graph.get("doors") or []
+    if len(doors) != 2 * len(graph.get("edges") or []):
+        raise ValueError("doors are not bidirectional")
 
 
 def occupant_counts(graph: Dict[str, Any]) -> Dict[str, int]:

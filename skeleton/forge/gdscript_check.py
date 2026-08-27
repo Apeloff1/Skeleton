@@ -62,8 +62,12 @@ def check_files(files: Mapping[str, str]) -> List[str]:
         "scripts/player/player_controller.gd",
         "scripts/combat/enemy.gd",
         "scripts/world/world_map.gd",
+        "scripts/world/door.gd",
+        "scripts/autoloads/input_bind.gd",
         "scenes/levels/run_level.tscn",
+        "scenes/door.tscn",
         "data/rooms.json",
+        "data/hardware.json",
     )
     for rel in required:
         if rel not in keys:
@@ -78,6 +82,14 @@ def check_files(files: Mapping[str, str]) -> List[str]:
         problems.append("run_level.tscn does not instance Room_r00")
     if 'instance=ExtResource("3")' not in level and "instance=ExtResource(\"3\")" not in level:
         problems.append("run_level.tscn never instances the player PackedScene")
+    if 'instance=ExtResource("7")' not in level:
+        problems.append("run_level.tscn never instances Door packed scenes")
+    if "enter_room" not in files.get("scripts/autoloads/game_state.gd", ""):
+        problems.append("GameState has no enter_room")
+    if "KEY_A" not in files.get("scripts/autoloads/input_bind.gd", ""):
+        problems.append("InputBind never binds KEY_A")
+    if "Camera2D" not in files.get("scenes/player.tscn", ""):
+        problems.append("player.tscn has no Camera2D")
     return problems
 
 

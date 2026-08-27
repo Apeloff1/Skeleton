@@ -233,7 +233,7 @@ def primary_dps(pack: Dict[str, Any]) -> float:
     return round(18.0 * (360.0 / 60.0) * (speed / 195.0), 1)
 
 
-def compile_pack(pack: Dict[str, Any]) -> Dict[str, Any]:
+def compile_pack(pack: Dict[str, Any], *, generation: str | None = None) -> Dict[str, Any]:
     pack = deepcopy(pack)
     dps = primary_dps(pack)
     ttk = pack["ttk"]
@@ -251,11 +251,12 @@ def compile_pack(pack: Dict[str, Any]) -> Dict[str, Any]:
         {"id": "energy_pulse", "family": "energy", "damage": 28, "heat": pack["heat"]["energy_heat"], "rpm": 180,
          "parts": ["emitter_pulse", "frame_std", "cell_basic"]},
     ]
-    return pack
+    from skeleton.forge.hardware import attach
+    return attach(pack, generation)
 
 
-def compile_era(era: str) -> Dict[str, Any]:
-    return compile_pack(era_pack(era))
+def compile_era(era: str, *, generation: str | None = None) -> Dict[str, Any]:
+    return compile_pack(era_pack(era), generation=generation)
 
 
 def _lerp(a: Any, b: Any, t: float) -> Any:
@@ -269,14 +270,14 @@ def _lerp(a: Any, b: Any, t: float) -> Any:
     return b if t >= 0.5 else a
 
 
-def blend_eras(era_a: str, era_b: str, t: float) -> Dict[str, Any]:
+def blend_eras(era_a: str, era_b: str, t: float, *, generation: str | None = None) -> Dict[str, Any]:
     """Linear interpolation of two compiled dialects, then re-derive HP."""
     t = 0.0 if t < 0.0 else 1.0 if t > 1.0 else float(t)
     a, b = era_pack(era_a), era_pack(era_b)
     mixed = _lerp(a, b, t)
     mixed["era"] = f"{a['era']}~{b['era']}@{t:.2f}"
     mixed["blend"] = {"a": a["era"], "b": b["era"], "t": t}
-    return compile_pack(mixed)
+    return compile_pack(mixed, generation=generation)
 
 
 def list_eras() -> List[str]:

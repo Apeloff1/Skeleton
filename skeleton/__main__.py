@@ -18,6 +18,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--json", action="store_true")
     r.add_argument("--blend", nargs=2, metavar=("ERA_A", "ERA_B"))
     r.add_argument("--t", dest="t", type=float, default=0.5)
+    r.add_argument("--generation")
 
     i = sub.add_parser("intake", help="12-beat answers → project")
     i.add_argument("pairs", nargs="*", help="id=option")
@@ -25,6 +26,7 @@ def main(argv: list[str] | None = None) -> int:
     i.add_argument("--overwrite", action="store_true")
 
     sub.add_parser("eras", help="list era dialects")
+    sub.add_parser("generations", help="list hardware generations")
     c = sub.add_parser("check", help="static-check a files dict or a project dir")
     c.add_argument("path")
 
@@ -44,6 +46,12 @@ def main(argv: list[str] | None = None) -> int:
         for era in list_eras():
             pack = compile_era(era)
             print(f"{era:22} dps={pack['primary_dps']:<7} speed={pack['player']['speed']}")
+        return 0
+
+    if args.cmd == "generations":
+        from skeleton.forge.hardware import catalog
+        for g in catalog():
+            print(f"{g['key']:10} {g['label']:16} {g['viewport'][0]}x{g['viewport'][1]}  {g['tagline']}")
         return 0
 
     if args.cmd == "check":
@@ -105,6 +113,7 @@ def main(argv: list[str] | None = None) -> int:
         overwrite = args.overwrite
         as_json = args.json
         blend = tuple(args.blend) + (args.t,) if args.blend else None
+        generation = args.generation
     else:
         answers = {}
         for pair in args.pairs:
@@ -117,10 +126,11 @@ def main(argv: list[str] | None = None) -> int:
         overwrite = args.overwrite
         as_json = False
         blend = None
+        generation = None
 
     payload = GameForgeRun().execute(
         vision, era=era, answers=answers, project_root=out, overwrite=overwrite, target="godot",
-        blend=blend,
+        blend=blend, generation=generation,
     )
     if args.cmd == "run" and as_json:
         slim = {k: payload[k] for k in ("succeeded", "era", "mass", "complete", "sim", "project", "forge") if k in payload}

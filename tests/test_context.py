@@ -142,6 +142,8 @@ class TestCockpit:
         assert r["result"]["era"] == "soulslike"
         c.apply("SET AXIS grind 0.99")
         assert c.tensor["grind"] == 0.99
+        g = c.apply("BIND GENERATION nes")
+        assert g["result"]["generation"] == "8bit"
         roll = c.apply("ROLL ORACLE")
         assert "text" in roll["result"]
         with pytest.raises(CockpitError):
@@ -343,3 +345,59 @@ class TestWorld:
         assert "Extract" in tscn
         assert graph["rooms"][0]["occupants"][0]["kind"] == "player"
         assert any(o["kind"] == "extract" for o in graph["rooms"][-1]["occupants"])
+        from skeleton.forge.world import assert_occupancy
+        assert_occupancy(graph)
+        assert len(graph["doors"]) == 2 * len(graph["edges"])
+        assert 'instance=ExtResource("7")' in tscn
+        assert "dest_room" in tscn
+        assert "data/hardware.json" in files
+        assert "KEY_A" in files["scripts/autoloads/input_bind.gd"]
+        assert "Camera2D" in files["scenes/player.tscn"]
+        assert "enter_room" in files["scripts/autoloads/game_state.gd"]
+
+
+class TestHardware:
+    def test_catalog_and_aliases(self):
+        from skeleton.forge.hardware import catalog, get_generation, list_generations, detect_generation
+        rows = catalog()
+        keys = [e["key"] for e in rows]
+        assert keys == ["8bit", "16bit", "early3d", "64bit", "earlyhd", "modern", "nextgen"]
+        assert [e["order"] for e in rows] == sorted(e["order"] for e in rows)
+        assert get_generation("NES")["key"] == "8bit"
+        assert get_generation("PS5")["key"] == "modern"
+        assert get_generation("garbage")["key"] == "modern"
+        ng = get_generation("nextgen")
+        assert ng["storage_bytes"][0] >= 250 * 1024**3
+        assert ng["asset_capacity"] == round(4_000_000 * 1.4)
+        assert get_generation("8bit")["max_poly"] == 0
+        assert list_generations() == keys
+        era, scores = detect_generation("a nes chiptune metroidvania on famicom")
+        assert era == "8bit"
+        assert scores["8bit"] >= 2
+
+    def test_pack_stamps_and_emit_viewport(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.forge.godot_emit import emit_godot
+        pack = compile_era("soulslike", generation="8bit")
+        assert pack["hardware"]["key"] == "8bit"
+        assert pack["hardware"]["sfx_format"] == "nsf"
+        assert pack["hardware"]["pixel_snap"] is True
+        files = emit_godot(pack)
+        godot = files["project.godot"]
+        assert "viewport_width=256" in godot
+        assert "viewport_height=240" in godot
+        assert "InputBind=" in godot
+        assert "#f83800" in files["data/hardware.json"] or "f83800" in files["data/hardware.json"]
+
+    def test_pipeline_generation(self):
+        from skeleton.context.pipeline import GameForgeRun
+        out = GameForgeRun().execute("nes soulslike bonfire estus", generation="8bit")
+        assert out["succeeded"]
+        assert out["generation"] == "8bit"
+        assert "viewport_width=256" in out["files"]["project.godot"]
+        assert out["files"]["scripts/autoloads/game_state.gd"].count("8bit") >= 1
+
+    def test_cli_generations(self):
+        from skeleton.__main__ import main
+        assert main(["generations"]) == 0
+        assert main(["cockpit", "BIND GENERATION snes"]) == 0
