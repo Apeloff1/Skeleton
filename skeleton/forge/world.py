@@ -86,6 +86,7 @@ def generate_rooms(
         "doors": doors,
         "reachable": True,
         "spawn_weapon": bool(plan.get("spawn_weapon")),
+        "extract_late": bool(plan.get("extract_late")),
         "occupancy": occupant_counts({"rooms": rooms}),
     }
 

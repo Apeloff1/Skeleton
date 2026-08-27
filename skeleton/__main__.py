@@ -49,6 +49,12 @@ def main(argv: list[str] | None = None) -> int:
     trn = sub.add_parser("train", help="run GameForge curriculum epochs on the own-system")
     trn.add_argument("--epochs", type=int, default=1)
 
+    wk = sub.add_parser("walk", help="prove spawn→extract on the emitted door graph")
+    wk.add_argument("--era", default="extraction_now")
+    wk.add_argument("--blend", nargs=2, metavar=("ERA_A", "ERA_B"))
+    wk.add_argument("--t", dest="t", type=float, default=0.5)
+    wk.add_argument("--json", action="store_true")
+
     args = p.parse_args(argv)
 
     if args.cmd == "eras":
@@ -90,6 +96,32 @@ def main(argv: list[str] | None = None) -> int:
         out = JeevesCortex().train(epochs=args.epochs)
         print(json.dumps(out, indent=2, default=str))
         return 0 if out.get("held_rate", 0) >= 0.5 else 1
+
+    if args.cmd == "walk":
+        from skeleton.forge.eras import blend_eras, compile_era
+        from skeleton.forge.walk import walk_from_pack
+        from skeleton.jeeves.builder import BuilderBrain
+        from skeleton.context.tensor import ContextTensor
+        from skeleton.context.dodeca import Dodecahedron
+        from skeleton.context.oracle import Magic8Ball
+        if args.blend:
+            pack = blend_eras(args.blend[0], args.blend[1], args.t)
+            tensor = ContextTensor.from_era(args.blend[0]).lerp(
+                ContextTensor.from_era(args.blend[1]), args.t
+            )
+        else:
+            pack = compile_era(args.era)
+            tensor = ContextTensor.from_era(args.era)
+        reading = Magic8Ball(Dodecahedron.from_tensor(tensor)).roll(tensor)
+        plan = BuilderBrain().plan(pack, tensor=tensor, reading=reading)
+        wr = walk_from_pack(pack, plan=plan.to_dict())
+        payload = wr.to_dict()
+        payload["plan"] = {"bias": plan.room_bias, "extract_late": plan.extract_late, "era": plan.era}
+        if args.json:
+            print(json.dumps(payload, indent=2, default=str))
+        else:
+            print(f"extracted={wr.extracted} t={wr.t:.2f} hops={wr.hops} cores={wr.cores}/{wr.required_cores}")
+        return 0 if wr.passed else 1
 
     if args.cmd == "think":
         from skeleton.cortex import JeevesCortex

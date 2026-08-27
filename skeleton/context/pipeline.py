@@ -103,6 +103,7 @@ class GameForgeRun:
             "files": run.context.get("files") or {},
             "sim": run.context.get("sim"),
             "project": run.context.get("project"),
+            "cortex_observe": run.context.get("cortex_observe"),
             "build_plan": (run.context.get("build_plan").to_dict()
                            if hasattr(run.context.get("build_plan"), "to_dict")
                            else run.context.get("build_plan")),
@@ -315,9 +316,25 @@ def _stage_seal(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
 def _stage_sim(ctx: Dict[str, Any]) -> Dict[str, Any]:
     from skeleton.forge.sim import simulate_session
+    import json
     art = ctx.get("artefact") or {}
-    pack = art.get("pack") or {}
-    report = simulate_session(pack)
+    pack = art.get("pack") or ctx.get("pack") or {}
+    files = ctx.get("files") or art.get("files") or {}
+    graph = None
+    raw = files.get("data/rooms.json")
+    if raw:
+        graph = json.loads(raw)
+    plan = ctx.get("build_plan")
+    plan_d = plan.to_dict() if hasattr(plan, "to_dict") else (plan or None)
+    report = simulate_session(pack, graph=graph, plan=plan_d)
+    jeeves = ctx.get("jeeves")
+    if jeeves is not None and hasattr(jeeves, "observe_run"):
+        ctx["cortex_observe"] = jeeves.observe_run(
+            era=str(ctx.get("era") or pack.get("era") or ""),
+            walk=report.walk or {},
+            plan=plan_d or {},
+            vision=str(ctx.get("vision") or ""),
+        )
     _commit(ctx, "sim", ctx.get("era") or "", "pass" if report.passed else "fail", report.to_dict())
     if not report.passed:
         raise RuntimeError("session sim failed: " + "; ".join(report.notes))

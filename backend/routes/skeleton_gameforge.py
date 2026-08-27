@@ -124,6 +124,35 @@ def plan(req: PlanRequest) -> Dict[str, Any]:
     return built.to_dict()
 
 
+@router.post("/walk")
+def walk(req: PlanRequest) -> Dict[str, Any]:
+    from skeleton.context.dodeca import Dodecahedron
+    from skeleton.context.oracle import Magic8Ball
+    from skeleton.context.tensor import ContextTensor, detect_era
+    from skeleton.forge.eras import blend_eras, compile_era
+    from skeleton.forge.walk import walk_from_pack
+    from skeleton.jeeves.builder import BuilderBrain
+    try:
+        if req.blend and len(req.blend) >= 2:
+            pack = blend_eras(str(req.blend[0]), str(req.blend[1]), float(req.t))
+            tensor = ContextTensor.from_era(str(req.blend[0])).lerp(
+                ContextTensor.from_era(str(req.blend[1])), float(req.t)
+            )
+        elif req.era:
+            pack = compile_era(req.era)
+            tensor = ContextTensor.from_era(req.era)
+        else:
+            era, _ = detect_era(req.vision or "")
+            pack = compile_era(era)
+            tensor = ContextTensor.from_era(era)
+        reading = Magic8Ball(Dodecahedron.from_tensor(tensor)).roll(tensor)
+        built = BuilderBrain().plan(pack, tensor=tensor, reading=reading)
+        wr = walk_from_pack(pack, plan=built.to_dict())
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"walk": wr.to_dict(), "plan": built.to_dict()}
+
+
 @router.post("/cockpit")
 def cockpit(body: Dict[str, str]) -> Dict[str, Any]:
     from skeleton.context.cockpit import Cockpit, CockpitError

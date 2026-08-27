@@ -5,6 +5,7 @@ from skeleton.forge.eras import blend_eras, compile_era, compile_pack, era_pack,
 from skeleton.forge.hardware import catalog as hardware_catalog, detect_generation, get_generation, list_generations
 from skeleton.forge.godot_emit import emit_godot
 from skeleton.forge.sim import simulate_session, simulate_encounter
+from skeleton.forge.walk import walk_graph, walk_from_pack
 from skeleton.forge.projector import write_project, ProjectExistsError
 from skeleton.forge.gdscript_check import check_files, check_ok
 from skeleton.forge.world import generate_rooms, assert_connected
@@ -36,6 +37,8 @@ __all__ = [
     "emit_godot",
     "simulate_session",
     "simulate_encounter",
+    "walk_graph",
+    "walk_from_pack",
     "write_project",
     "ProjectExistsError",
     "check_files",

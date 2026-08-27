@@ -60,6 +60,7 @@ class SessionReport:
     collapse_max: float
     passed: bool
     notes: List[str] = field(default_factory=list)
+    walk: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -69,6 +70,7 @@ class SessionReport:
             "collapse_max": self.collapse_max,
             "encounters": [e.to_dict() for e in self.encounters],
             "notes": list(self.notes),
+            "walk": self.walk,
         }
 
 
@@ -157,7 +159,13 @@ def simulate_encounter(pack: Dict[str, Any], enemy: Dict[str, Any], *,
     )
 
 
-def simulate_session(pack: Dict[str, Any], *, modes: tuple = ("ideal", "thermal")) -> SessionReport:
+def simulate_session(
+    pack: Dict[str, Any],
+    *,
+    modes: tuple = ("ideal", "thermal"),
+    graph: Optional[Dict[str, Any]] = None,
+    plan: Optional[Dict[str, Any]] = None,
+) -> SessionReport:
     notes: List[str] = []
     encounters: List[EncounterResult] = []
     passed = True
@@ -183,8 +191,17 @@ def simulate_session(pack: Dict[str, Any], *, modes: tuple = ("ideal", "thermal"
         if by_key[("trash", "thermal")].measured_ttk + interval < by_key[("trash", "ideal")].measured_ttk:
             passed = False
             notes.append("thermal TTK shorter than ideal — heat model inverted")
+    walk_payload: Optional[Dict[str, Any]] = None
+    from skeleton.forge.walk import walk_from_pack, walk_graph
+    wr = walk_graph(pack, graph, plan=plan) if graph else walk_from_pack(pack, plan=plan)
+    walk_payload = wr.to_dict()
+    if not wr.passed:
+        passed = False
+        notes.append("walk failed: " + "; ".join(wr.notes[:4]))
     if not notes:
         notes.append("compiler identity holds; thermal ≥ ideal")
+    if wr.passed:
+        notes.append(f"walk extracted in {wr.t:.2f}s over {wr.hops} hops")
     return SessionReport(
         era=str(pack.get("era")),
         primary_dps=float(pack.get("primary_dps") or 0.0),
@@ -192,4 +209,5 @@ def simulate_session(pack: Dict[str, Any], *, modes: tuple = ("ideal", "thermal"
         collapse_max=float((pack.get("session") or {}).get("collapse_max") or 0.0),
         passed=passed,
         notes=notes,
+        walk=walk_payload,
     )

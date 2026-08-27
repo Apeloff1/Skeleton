@@ -230,6 +230,23 @@ class Jeeves:
         })
         return out
 
+    def observe_run(self, *, era: str, walk: dict[str, Any], plan: dict[str, Any],
+                    vision: str = "") -> dict[str, Any]:
+        """Ingest a finished forge-run so own-system can recall extract outcomes."""
+        extracted = bool((walk or {}).get("extracted"))
+        hops = (walk or {}).get("hops")
+        cores = (walk or {}).get("cores")
+        bias = (plan or {}).get("room_bias") or "balanced"
+        stim = (
+            f"forge run {era} {vision} extract {extracted} "
+            f"hops {hops} cores {cores} bias {bias}"
+        )
+        trace = self.think(stim, context={"walk": walk, "plan": plan, "era": era})
+        self._bus.emit("jeeves.observe_run", {
+            "era": era, "extracted": extracted, "own": self.cortex.own.size,
+        })
+        return trace.to_dict()
+
     def bind_pack(self, pack: dict[str, Any]) -> dict[str, Any]:
         self.era = str(pack.get("era") or self.era)
         pack = self._brain_get().bind_pack(pack)

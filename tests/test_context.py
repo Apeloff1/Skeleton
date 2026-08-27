@@ -208,6 +208,38 @@ class TestSim:
         ideal = next(e for e in report.encounters if e.enemy_id == "trash" and e.mode == "ideal")
         therm = next(e for e in report.encounters if e.enemy_id == "trash" and e.mode == "thermal")
         assert therm.measured_ttk + 0.2 >= ideal.measured_ttk
+        assert report.walk and report.walk["extracted"]
+
+    def test_walk_extracts_and_locks(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.forge.world import generate_rooms
+        from skeleton.forge.walk import walk_graph
+        from skeleton.jeeves.builder import BuilderBrain
+        from skeleton.context.tensor import ContextTensor
+        pack = compile_era("soulslike")
+        plan = BuilderBrain().plan(pack, tensor=ContextTensor.from_era("soulslike")).to_dict()
+        graph = generate_rooms(pack, seed=plan["seed"], plan=plan)
+        wr = walk_graph(pack, graph, plan=plan)
+        assert wr.extracted, wr.notes
+        assert wr.hops >= 1
+        assert wr.path[0] == graph["rooms"][0]["id"]
+        assert wr.path[-1] == graph["rooms"][-1]["id"]
+        if wr.required_cores:
+            assert wr.cores >= wr.required_cores
+            # a core source is visited before the extract hop
+            kinds = {r["id"]: r["kind"] for r in graph["rooms"]}
+            assert any(kinds[r] in {"loot", "combat"} for r in wr.path[:-1])
+
+    def test_walk_disconnected_fails(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.forge.world import generate_rooms
+        from skeleton.forge.walk import walk_graph
+        pack = compile_era("extraction_now")
+        g = generate_rooms(pack)
+        g["doors"] = []
+        g["edges"] = []
+        wr = walk_graph(pack, g, plan={})
+        assert not wr.extracted
 
 
 class TestProjectorAndIntake:
@@ -240,6 +272,8 @@ class TestProjectorAndIntake:
         assert out["complete"]
         assert out["era"] == "soulslike"
         assert out["sim"]["passed"] is True
+        assert out["sim"]["walk"]["extracted"] is True
+        assert out["cortex_observe"]["own_size"] >= 1
         godot = P(root) / "project.godot"
         assert godot.is_file()
         text = godot.read_text()
@@ -287,6 +321,7 @@ class TestCLI:
         from skeleton.__main__ import main
         assert main(["plan", "quake rocket jump gib"]) == 0
         assert main(["cockpit", "BLEND ERA cozy_wholesome horror_survival 0.25"]) == 0
+        assert main(["walk", "--era", "extraction_now"]) == 0
 
 
 class TestBlend:
@@ -354,6 +389,8 @@ class TestWorld:
         assert "KEY_A" in files["scripts/autoloads/input_bind.gd"]
         assert "Camera2D" in files["scenes/player.tscn"]
         assert "enter_room" in files["scripts/autoloads/game_state.gd"]
+        assert "can_enter" in files["scripts/autoloads/game_state.gd"]
+        assert "can_enter(dest_room)" in files["scripts/world/door.gd"]
 
 
 class TestHardware:
