@@ -788,3 +788,85 @@ class TestImprove:
         s_own = ((collapse - wr.t) / collapse) if wr.extracted and wr.t > 0 else 0.0
         assert s_own > s_hard, (s_own, s_hard, got)
 
+    def test_hive_b_emits_invented_mix_without_search(self):
+        from dataclasses import replace
+        from skeleton.forge.eras import compile_era
+        from skeleton.forge.walk import walk_from_pack
+        from skeleton.jeeves.builder import BuilderBrain
+        from skeleton.jeeves.core import Jeeves
+        from skeleton.context.tensor import ContextTensor
+        from skeleton.cortex import JeevesCortex
+
+        pack = compile_era("soulslike")
+        tensor = ContextTensor.from_era("soulslike")
+        collapse = float(pack["session"]["collapse_max"])
+        hard = replace(
+            BuilderBrain().plan(pack, tensor=tensor),
+            enemy_mix={"trash": 6, "elite": 2, "boss": 0},
+        )
+        wr_h = walk_from_pack(pack, plan=hard.to_dict(), mode="thermal")
+        w_hard = wr_h.to_dict()
+        w_hard["collapse_max"] = collapse
+        a = JeevesCortex()
+        a.auto_surpass = False
+        j = Jeeves()
+        j.cortex = a
+        j.observe_run(era="soulslike", walk=w_hard, plan=hard.to_dict())
+        a.surpass("left")
+        plan_a = BuilderBrain().plan(pack, tensor=tensor, cortex=a)
+        assert any("invented" in n for n in plan_a.notes), plan_a.notes
+        tract = a.export_tract("left")
+        assert any("invented" in (e.get("tags") or []) for e in tract["exemplars"])
+        b = JeevesCortex()
+        b.auto_surpass = False
+        b.import_tract(tract)
+        b.surpass("left")
+        plan_b = BuilderBrain().plan(pack, tensor=tensor, cortex=b)
+        assert plan_b.authored == "own"
+        assert plan_b.enemy_mix == plan_a.enemy_mix
+        assert plan_b.enemy_mix != {"trash": 6, "elite": 2, "boss": 0}
+        assert any("imported mix" in n for n in plan_b.notes), plan_b.notes
+        assert not any(n.startswith("invented mix") for n in plan_b.notes), plan_b.notes
+
+    def test_invented_mix_survives_disk(self, tmp_path=None):
+        import tempfile
+        from pathlib import Path
+        from dataclasses import replace
+        from skeleton.forge.eras import compile_era
+        from skeleton.forge.walk import walk_from_pack
+        from skeleton.jeeves.builder import BuilderBrain
+        from skeleton.jeeves.core import Jeeves
+        from skeleton.context.tensor import ContextTensor
+        from skeleton.cortex import JeevesCortex
+
+        pack = compile_era("soulslike")
+        tensor = ContextTensor.from_era("soulslike")
+        collapse = float(pack["session"]["collapse_max"])
+        hard = replace(
+            BuilderBrain().plan(pack, tensor=tensor),
+            enemy_mix={"trash": 6, "elite": 2, "boss": 0},
+        )
+        wr_h = walk_from_pack(pack, plan=hard.to_dict(), mode="thermal")
+        w_hard = wr_h.to_dict()
+        w_hard["collapse_max"] = collapse
+        a = JeevesCortex()
+        a.auto_surpass = False
+        j = Jeeves()
+        j.cortex = a
+        j.observe_run(era="soulslike", walk=w_hard, plan=hard.to_dict())
+        a.surpass("left")
+        plan_a = BuilderBrain().plan(pack, tensor=tensor, cortex=a)
+        path = Path(tempfile.mkdtemp()) / "own.json"
+        a.save(path)
+        b = JeevesCortex()
+        b.auto_surpass = False
+        loaded = b.load(path)
+        assert loaded["loaded"] >= 1
+        rec = b.own.best_observed_record("plan soulslike forge mix bias ttk extract")
+        assert rec is not None
+        assert rec["invented"] is True
+        b.surpass("left")
+        plan_b = BuilderBrain().plan(pack, tensor=tensor, cortex=b)
+        assert plan_b.enemy_mix == plan_a.enemy_mix
+        assert not any(n.startswith("invented mix") for n in plan_b.notes), plan_b.notes
+

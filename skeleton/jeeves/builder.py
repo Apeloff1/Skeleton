@@ -288,15 +288,19 @@ class BuilderBrain:
         trash, elite, boss, thermal_span, veto_notes = _prune_mix(pack, trash, elite, boss)
         own = getattr(cortex, "own", None) if cortex is not None else None
         if authored == "own" and own is not None and hasattr(own, "best_observed_mix"):
-            improved = own.best_observed_mix(f"plan {era} forge mix bias ttk extract")
+            stim = f"plan {era} forge mix bias ttk extract"
+            rec = own.best_observed_record(stim) if hasattr(own, "best_observed_record") else None
+            improved = rec["mix"] if rec else own.best_observed_mix(stim)
             if improved is not None:
                 trash, elite, boss = int(improved[0]), int(improved[1]), int(improved[2])
                 trash, elite, boss, thermal_span, extra = _prune_mix(pack, trash, elite, boss)
                 veto_notes = list(veto_notes) + [
                     f"improved mix trash={trash} elite={elite} boss={boss}"
                 ] + extra
-                stim = f"plan {era} forge mix bias ttk extract"
-                if hasattr(own, "propose_mix"):
+                skip_search = bool(rec and (rec.get("imported") or rec.get("invented")))
+                if rec and rec.get("imported"):
+                    veto_notes.append("imported mix — no search")
+                if hasattr(own, "propose_mix") and not skip_search:
                     from skeleton.forge.walk import walk_from_pack
                     collapse = float((pack.get("session") or {}).get("collapse_max") or 1.0)
                     search_seed = hashlib.sha256(f"{era}|{fp}|search".encode()).hexdigest()[:16]

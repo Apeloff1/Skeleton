@@ -182,12 +182,16 @@ class OwnSystem:
         return thought, best_j, used
 
     def best_observed_mix(self, stimulus: str) -> Optional[Tuple[float, float, float]]:
+        rec = self.best_observed_record(stimulus)
+        return rec["mix"] if rec else None
+
+    def best_observed_record(self, stimulus: str) -> Optional[Dict[str, Any]]:
         """Highest-slack observed mix whose era tag appears in the stimulus."""
         stim_toks = set(tokens(stimulus))
         if not stim_toks:
             return None
         best_slack = -1.0
-        best: Optional[Tuple[float, float, float]] = None
+        best: Optional[Dict[str, Any]] = None
         for a in self._items:
             if "observed" not in a.tags:
                 continue
@@ -198,11 +202,18 @@ class OwnSystem:
             slack = float(a.numbers[-1])
             if slack > best_slack:
                 best_slack = slack
-                best = (
+                mix = (
                     float(a.numbers[-4]),
                     float(a.numbers[-3]),
                     float(a.numbers[-2]),
                 )
+                best = {
+                    "mix": mix,
+                    "slack": slack,
+                    "invented": "invented" in a.tags,
+                    "imported": "imported" in a.tags,
+                    "tags": a.tags,
+                }
         return best
 
     def mix_neighbors(self, trash: int, elite: int, boss: int) -> List[Tuple[int, int, int]]:
