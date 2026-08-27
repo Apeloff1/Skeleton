@@ -14,6 +14,12 @@ Command language (one statement per apply):
   THINK <text>
   ACQUIRE <slot>
   SURPASS <slot>
+  TRAIN [epochs]
+  RECALL <text>
+  EXPORT TRACT <slot>
+  IMPORT TRACT <slot>   (copies from this cockpit's own-system; interchange is in-process)
+  OWN
+  SHADOW
 Unknown verbs raise CockpitError. apply() is the only mutation path;
 the pipeline reads the cockpit, never the other way around.
 """
@@ -155,6 +161,28 @@ class Cockpit:
             if not args:
                 raise CockpitError("SURPASS <slot>")
             result = self._brain().surpass(args[0])
+        elif verb == "TRAIN":
+            epochs = int(args[0]) if args else 1
+            result = self._brain().train(epochs=epochs)
+        elif verb == "RECALL":
+            result = self._brain().recall(" ".join(args))
+        elif verb == "EXPORT":
+            if not args or args[0].upper() != "TRACT" or len(args) < 2:
+                raise CockpitError("EXPORT TRACT <slot>")
+            result = self._brain().export_tract(args[1])
+        elif verb == "IMPORT":
+            if not args or args[0].upper() != "TRACT" or len(args) < 2:
+                raise CockpitError("IMPORT TRACT <slot>")
+            # In-process interchange: re-import a tract this cortex already holds
+            # (two Cockpits share nothing; HTTP /cortex/import takes a payload).
+            payload = self._brain().export_tract(args[1])
+            result = self._brain().import_tract(payload)
+        elif verb == "OWN":
+            result = self._brain().own.to_dict()
+        elif verb == "SHADOW":
+            result = {"shadow": dict(self._brain().shadow),
+                      "surpass": sorted(self._brain()._surpass),
+                      "own": self._brain().own.size}
         elif verb == "DETECT":
             text = " ".join(args)
             era, scores = detect_era(text)

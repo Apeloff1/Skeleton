@@ -44,6 +44,10 @@ def main(argv: list[str] | None = None) -> int:
     th.add_argument("--bind", nargs=2, metavar=("SLOT", "BACKEND"))
     th.add_argument("--acquire")
     th.add_argument("--surpass")
+    th.add_argument("--recall", action="store_true")
+
+    trn = sub.add_parser("train", help="run GameForge curriculum epochs on the own-system")
+    trn.add_argument("--epochs", type=int, default=1)
 
     args = p.parse_args(argv)
 
@@ -81,6 +85,12 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(out, indent=2, default=str))
         return 0
 
+    if args.cmd == "train":
+        from skeleton.cortex import JeevesCortex
+        out = JeevesCortex().train(epochs=args.epochs)
+        print(json.dumps(out, indent=2, default=str))
+        return 0 if out.get("held_rate", 0) >= 0.5 else 1
+
     if args.cmd == "think":
         from skeleton.cortex import JeevesCortex
         neo = JeevesCortex()
@@ -97,7 +107,10 @@ def main(argv: list[str] | None = None) -> int:
             neo.surpass(args.surpass)
             if args.stimulus:
                 trace = neo.think(args.stimulus)
-        print(json.dumps(trace.to_dict(), indent=2, default=str))
+        payload = trace.to_dict()
+        if args.recall:
+            payload["recall"] = neo.recall(args.stimulus)
+        print(json.dumps(payload, indent=2, default=str))
         return 0
 
     if args.cmd == "plan":

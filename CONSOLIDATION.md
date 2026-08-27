@@ -87,3 +87,23 @@ git rm --cached test_result.md backend_test.py.bak_1779283310
 git commit -m "chore: untrack test dump and backup file"
 git push
 ```
+
+
+## Workspace census (2026-08-27)
+
+Canonical product is **Apeloff1/Skeleton** (public, Python, GameForge + Jeeves cortex).
+Grok App Builder `/workspace` is a TanStack Start scaffold — not the product. `/workspace/artifacts` is empty. Live clone: `/tmp/skel/Skeleton`.
+
+| Repo | Visibility | Size | Verdict |
+|---|---|---|---|
+| **Skeleton** | public | ~107 MB | Canonical. Hexagonal Tutolage rewrite + GameForge + cortex. |
+| Tutolage | public | ~45 MB | Merged (see above). Archive. |
+| hyperforge-cockpit-sota | public | 493 kb | 3D ECS cockpit prototype. Superseded by Skeleton cockpit. |
+| gameforge-middleware | private | 14 kb | C# Zaibatsu gate. Keep as sibling; not in Python spine. |
+| gameforge-rs | private | 106 kb | Rust axum port. Sibling; do not merge into Python. |
+| Prood | private | ~58 MB | v15 monolith. Byte-overlap with Skeleton root. Do not merge. |
+| Prod, Ai-gamestudio, Piper, Restorepoint, resting-22, Ieresting-22, Hotday, Hotdayz, lage, Summer, Nextstep, Nextstepz, tolage, utolage | private | 0 kb | Empty. Nothing to merge. |
+| 2d, 2dv0.2–0.4, 2dv1, Openworld*, Newmove*, Newsay*, Newstuff*, Lorebuff*, Saymore*, Expa, Newfix | public/private | JS prototypes | Superseded. Archive. |
+| Asds, Ggg, New-tey, Interesting-22 | private | large dumps | Not GameForge. Leave. |
+
+52 owner repos surveyed via GitHub API. One git clone on this host: `/tmp/skel/Skeleton`.

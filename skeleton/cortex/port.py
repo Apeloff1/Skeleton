@@ -18,7 +18,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Protocol, Tuple
+from typing import Any, Callable, Dict, Iterable, Optional, Protocol, Tuple
 
 SLOTS: Tuple[str, ...] = ("pfc", "midbrain", "left", "right")
 SCALES: Tuple[str, ...] = ("small", "medium", "hemisphere", "neo", "injected")
@@ -33,6 +33,15 @@ def fingerprint(text: str) -> str:
 
 def tokens(text: str) -> Tuple[str, ...]:
     return tuple(_TOKEN.findall((text or "").lower()))
+
+
+def jaccard(a: Iterable[str], b: Iterable[str]) -> float:
+    sa, sb = set(a or ()), set(b or ())
+    if not sa and not sb:
+        return 1.0
+    if not sa or not sb:
+        return 0.0
+    return len(sa & sb) / len(sa | sb)
 
 
 def _signature(slot: str, kind: str, tags: Tuple[str, ...],

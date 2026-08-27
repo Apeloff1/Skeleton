@@ -87,9 +87,13 @@ python -m skeleton eras
 python -m skeleton run "soulslike extraction with bonfire rest" --out ./proj --overwrite --json
 python -m skeleton run --blend arcade_golden_age soulslike --t 0.5 --out ./blend --overwrite
 python -m skeleton check ./proj
+python -m skeleton think "soulslike extraction ttk elite dread"
+python -m skeleton train --epochs 1
 ```
 
-HTTP: `GET /api/skeleton/eras` · `POST /api/skeleton/run` · `GET /api/skeleton/beats`
+HTTP: `GET /api/skeleton/eras` · `POST /api/skeleton/run` · `GET /api/skeleton/beats` · `POST /api/skeleton/think` · `POST /api/skeleton/train` · `GET /api/skeleton/cortex`
+
+Cortex (the model we are building, not implementing): PFC small/boilerplate · midbrain medium/coordinator · left analytic · right gestalt · Jeeves neo hivemind+trainer. Slots are `ModelPort`s; `bind` hot-swaps a backend; `acquire` copies a tract into own-system; `surpass` answers from Jaccard-nearest acquired tracts. Two cortices interchange by exporting a `Tract`.
 
 ---
 
@@ -100,7 +104,8 @@ HTTP: `GET /api/skeleton/eras` · `POST /api/skeleton/run` · `GET /api/skeleton
 | **Kernel** | Events, errors, identity, capability registry | `kernel/*` |
 | **Agents** | Swarm discovery, routing, consensus, audit | `agents/mesh.py`, `agents/scheduler.py` |
 | **Pipelines** | NPC, game-logic, animation generation | `pipelines/*` |
-| **Jeeves** | Tutor persona, system laws, RAG memory | `jeeves/*` |
+| **Jeeves** | Tutor persona, system laws, RAG memory, neocortex | `jeeves/*`, `cortex/*` |
+| **Cortex** | Interchangeable model: PFC/midbrain/hemispheres/own-system | `cortex/{port,pfc,midbrain,hemispheres,own,curriculum,neocortex}.py` |
 | **Forge** | Universal system blueprint synthesis | `forge/universal.py` |
 | **API** | HTTP surface, validation, lifespan | `api/*` |
 

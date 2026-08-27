@@ -1,16 +1,16 @@
 """Distillation — Jeeves acquires a slot's abilities into its own system.
 
-Every thought is a training pair (stimulus fingerprint → ability).
-acquire(slot) copies that tract into the neocortex ledger. surpass(slot)
-arms own-system answers for that tract. Nearest-neighbour on the
-fingerprint is the few-shot recall; no gradient, no weights.
+Every thought is a training pair (stimulus tokens → ability).
+acquire(slot) copies that tract into the neocortex. surpass(slot)
+arms own-system answers for that tract. Nearest-neighbour is
+token-Jaccard; SHA fingerprints are exact-match only. No gradient.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from skeleton.cortex.port import Thought, fingerprint
+from skeleton.cortex.port import Thought, fingerprint, jaccard, tokens
 
 
 @dataclass
@@ -24,6 +24,7 @@ class Ability:
     numbers: Tuple[float, ...]
     confidence: float
     seen: int = 1
+    tokens: Tuple[str, ...] = ()
 
     def to_dict(self) -> dict:
         return {
@@ -36,7 +37,23 @@ class Ability:
             "numbers": list(self.numbers),
             "confidence": round(self.confidence, 4),
             "seen": self.seen,
+            "tokens": list(self.tokens),
         }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "Ability":
+        return cls(
+            slot=str(d.get("slot") or "neo"),
+            stimulus_fp=str(d.get("stimulus_fp") or ""),
+            signature=str(d.get("signature") or ""),
+            kind=str(d.get("kind") or "own"),
+            text=str(d.get("text") or ""),
+            tags=tuple(d.get("tags") or ()),
+            numbers=tuple(float(n) for n in (d.get("numbers") or ())),
+            confidence=float(d.get("confidence") or 0.0),
+            seen=int(d.get("seen") or 1),
+            tokens=tuple(d.get("tokens") or ()),
+        )
 
     def as_thought(self) -> Thought:
         return Thought(
@@ -47,6 +64,7 @@ class Ability:
 
 
 def ability_from(thought: Thought, stimulus: str) -> Ability:
+    toks = tokens(stimulus)
     return Ability(
         slot=thought.slot,
         stimulus_fp=fingerprint(stimulus),
@@ -56,6 +74,7 @@ def ability_from(thought: Thought, stimulus: str) -> Ability:
         tags=thought.tags,
         numbers=thought.numbers,
         confidence=thought.confidence,
+        tokens=toks,
     )
 
 
@@ -72,6 +91,8 @@ class AbilityLedger:
         prev = self._by.get(key)
         if prev is not None:
             ab.seen = prev.seen + 1
+            if not ab.tokens:
+                ab.tokens = prev.tokens
         self._by[key] = ab
         self._items.append(ab)
         return ab
@@ -82,11 +103,13 @@ class AbilityLedger:
     def get(self, slot: str, stim_fp: str) -> Optional[Ability]:
         return self._by.get((slot, stim_fp))
 
-    def nearest(self, stim_fp: str, *, slot: Optional[str] = None) -> Optional[Ability]:
+    def nearest(self, stim_fp: str, *, slot: Optional[str] = None,
+                query_tokens: Tuple[str, ...] = ()) -> Optional[Ability]:
         pool = [a for a in self._by.values() if slot is None or a.slot == slot]
         if not pool:
             return None
-        # hex hamming on the 16-char fingerprint
+        if query_tokens:
+            return max(pool, key=lambda a: (jaccard(query_tokens, a.tokens), a.confidence))
         def dist(a: Ability) -> int:
             return sum(x != y for x, y in zip(a.stimulus_fp, stim_fp))
         return min(pool, key=dist)

@@ -210,6 +210,26 @@ class Jeeves:
         self._bus.emit("jeeves.cortex.surpass", out)
         return out
 
+    def recall(self, stimulus: str) -> dict[str, Any]:
+        return self.cortex.recall(stimulus)
+
+    def export_tract(self, slot: str) -> dict[str, Any]:
+        out = self.cortex.export_tract(slot)
+        self._bus.emit("jeeves.cortex.export", {"slot": slot, "size": out.get("size")})
+        return out
+
+    def import_tract(self, payload: dict[str, Any]) -> dict[str, Any]:
+        out = self.cortex.import_tract(payload)
+        self._bus.emit("jeeves.cortex.import", out)
+        return out
+
+    def train(self, *, epochs: int = 1) -> dict[str, Any]:
+        out = self.cortex.train(epochs=epochs)
+        self._bus.emit("jeeves.cortex.trained", {
+            "epochs": out.get("epochs"), "held_rate": out.get("held_rate"),
+        })
+        return out
+
     def bind_pack(self, pack: dict[str, Any]) -> dict[str, Any]:
         self.era = str(pack.get("era") or self.era)
         pack = self._brain_get().bind_pack(pack)

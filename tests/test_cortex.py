@@ -149,3 +149,102 @@ class TestPipelineAndCockpit:
         assert "jeeves" in g.handles
         tr = g.get("jeeves").think("cozy farm intimacy")
         assert tr.right is not None
+
+
+
+class TestOwnSystem:
+    def test_jaccard_not_hash_hamming(self):
+        from skeleton.cortex import jaccard, tokens, fingerprint
+        a = "compile ttk hp dps recipe sim"
+        b = "recipe sim compile dps hp ttk"
+        assert fingerprint(a) == fingerprint(b)  # same token set
+        c = "recipe sim compile dps hp ttk numbers"
+        assert fingerprint(a) != fingerprint(c)
+        assert jaccard(tokens(a), tokens(c)) >= 0.8
+
+    def test_paraphrase_recall_after_acquire(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        train = "compile ttk hp dps recipe sim"
+        held = "recipe sim compile dps hp ttk numbers"
+        neo.think(train)
+        neo.acquire("left")
+        neo.surpass("left")
+        tr = neo.think(held)
+        assert tr.used_own
+        assert tr.recalled_jaccard >= 0.8
+        assert tr.amalgam.kind.startswith("own")
+
+    def test_callable_survives_rebind(self):
+        from skeleton.cortex import CallableBackend, JeevesCortex
+        neo = JeevesCortex()
+        neo.bind("left", CallableBackend(
+            lambda s, c: "LEFT-TRACT-SIGIL ttk", slot="left", name="sigil",
+        ))
+        stim = "compile ttk hp dps recipe sim"
+        neo.think(stim)
+        got = neo.acquire("left")
+        assert got["copied"] >= 1
+        neo.bind_local("left")
+        neo.surpass("left")
+        tr = neo.think(stim)
+        assert tr.used_own
+        assert "LEFT-TRACT-SIGIL" in tr.amalgam.text
+        held = neo.think("recipe sim compile dps hp ttk")
+        assert held.used_own
+        assert "LEFT-TRACT-SIGIL" in held.amalgam.text
+
+    def test_tract_interchange_between_cortices(self):
+        from skeleton.cortex import JeevesCortex
+        a = JeevesCortex()
+        a.think("era feel spatial gestalt dread cozy")
+        a.acquire("right")
+        payload = a.export_tract("right")
+        assert payload["size"] >= 1
+        b = JeevesCortex()
+        imported = b.import_tract(payload)
+        assert imported["copied"] >= 1
+        b.surpass("right")
+        tr = b.think("gestalt spatial era feel cozy dread layout")
+        assert tr.used_own
+        assert tr.recalled_jaccard >= 0.5
+
+    def test_shadow_is_real_comparison(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        neo.auto_surpass = False
+        first = neo.think("soulslike extraction ttk elite dread")
+        assert first.shadow_win is None
+        neo.acquire("pfc")
+        neo.acquire("left")
+        neo.acquire("right")
+        second = neo.think("soulslike extraction ttk elite dread")
+        assert second.shadow_win is True
+        assert not second.used_own  # surpass not armed
+
+
+class TestCurriculum:
+    def test_epoch_heldout_hits(self):
+        from skeleton.cortex import JeevesCortex, CORE_PAIRS
+        neo = JeevesCortex()
+        out = neo.train(epochs=1)
+        assert out["items"] >= len(CORE_PAIRS)
+        assert out["held_rate"] >= 0.7
+        assert out["held_hits"] >= 1
+        assert set(out["surpass"]) >= {"pfc", "left"}
+
+    def test_jeeves_train_surface(self):
+        from skeleton.jeeves.core import Jeeves
+        out = Jeeves().train(epochs=1)
+        assert out["held_rate"] >= 0.7
+
+    def test_cockpit_train_and_own(self):
+        from skeleton.context.cockpit import Cockpit
+        c = Cockpit()
+        r = c.apply("TRAIN 1")
+        assert r["ok"]
+        assert r["result"]["held_rate"] >= 0.7
+        own = c.apply("OWN")
+        assert own["result"]["size"] >= 1
+        sh = c.apply("SHADOW")
+        assert "own" in sh["result"]["shadow"]

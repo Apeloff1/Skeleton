@@ -3,7 +3,8 @@
 PFC (small / boilerplate) · midbrain (medium / coordinator) · left/right
 hemispheres · Jeeves neocortex (hivemind + trainer). Slots are ModelPorts;
 backends swap; acquire copies a tract into Jeeves' own system; surpass
-answers from that system.
+answers from that system. Own-system recall is token-Jaccard; tracts
+interchange between cortices.
 """
 from .port import (
     SLOTS,
@@ -13,22 +14,27 @@ from .port import (
     ModelPort,
     Thought,
     fingerprint,
+    jaccard,
     tokens,
 )
 from .pfc import TEMPLATES, PrefrontalCortex
 from .midbrain import Midbrain
 from .hemispheres import LeftHemisphere, RightHemisphere
 from .distill import Ability, AbilityLedger, ability_from
+from .own import MIN_JACCARD, OwnSystem, RecallHit, Tract, shadow_eval
+from .curriculum import CORE_PAIRS, default_curriculum, train
 from .neocortex import CortexTrace, JeevesCortex, local_slots
 
 __all__ = [
     "SLOTS",
     "SCALES",
+    "MIN_JACCARD",
     "CallableBackend",
     "EchoBackend",
     "ModelPort",
     "Thought",
     "fingerprint",
+    "jaccard",
     "tokens",
     "TEMPLATES",
     "PrefrontalCortex",
@@ -38,6 +44,13 @@ __all__ = [
     "Ability",
     "AbilityLedger",
     "ability_from",
+    "OwnSystem",
+    "RecallHit",
+    "Tract",
+    "shadow_eval",
+    "CORE_PAIRS",
+    "default_curriculum",
+    "train",
     "CortexTrace",
     "JeevesCortex",
     "local_slots",

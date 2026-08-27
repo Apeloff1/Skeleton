@@ -142,6 +142,18 @@ class ThinkRequest(BaseModel):
     surpass: Optional[str] = None
 
 
+class TrainRequest(BaseModel):
+    epochs: int = 1
+
+
+class TractPayload(BaseModel):
+    slot: str = "left"
+    backend: str = "own"
+    scale: str = "neo"
+    capabilities: list = Field(default_factory=list)
+    exemplars: list = Field(default_factory=list)
+
+
 @router.post("/think")
 def think(req: ThinkRequest) -> Dict[str, Any]:
     from skeleton.cortex import JeevesCortex
@@ -173,10 +185,32 @@ def think(req: ThinkRequest) -> Dict[str, Any]:
 
 @router.get("/cortex")
 def cortex_status() -> Dict[str, Any]:
-    from skeleton.cortex import SLOTS, SCALES, TEMPLATES, JeevesCortex
+    from skeleton.cortex import SLOTS, SCALES, TEMPLATES, JeevesCortex, default_curriculum
     return {
         "slots": list(SLOTS),
         "scales": list(SCALES),
         "pfc_templates": list(TEMPLATES),
         "fresh": JeevesCortex().status(),
+        "curriculum_items": len(default_curriculum()),
     }
+
+
+@router.post("/train")
+def train(req: TrainRequest) -> Dict[str, Any]:
+    from skeleton.cortex import JeevesCortex
+    return JeevesCortex().train(epochs=max(1, int(req.epochs)))
+
+
+@router.post("/cortex/import")
+def cortex_import(body: TractPayload) -> Dict[str, Any]:
+    from skeleton.cortex import JeevesCortex
+    neo = JeevesCortex()
+    payload = body.model_dump() if hasattr(body, "model_dump") else body.dict()
+    return neo.import_tract(payload)
+
+
+@router.post("/recall")
+def recall(body: Dict[str, str]) -> Dict[str, Any]:
+    from skeleton.cortex import JeevesCortex
+    stim = (body or {}).get("stimulus") or (body or {}).get("text") or ""
+    return JeevesCortex().recall(stim)
