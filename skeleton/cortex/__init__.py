@@ -19,7 +19,7 @@ from .port import (
 )
 from .pfc import TEMPLATES, PrefrontalCortex
 from .midbrain import Midbrain
-from .hemispheres import LeftHemisphere, RightHemisphere
+from .hemispheres import LeftHemisphere, RightHemisphere, ttk_oracle
 from .distill import Ability, AbilityLedger, ability_from
 from .own import MIN_JACCARD, OwnSystem, RecallHit, Tract, shadow_eval
 from .curriculum import CORE_PAIRS, default_curriculum, train
@@ -41,6 +41,7 @@ __all__ = [
     "Midbrain",
     "LeftHemisphere",
     "RightHemisphere",
+    "ttk_oracle",
     "Ability",
     "AbilityLedger",
     "ability_from",

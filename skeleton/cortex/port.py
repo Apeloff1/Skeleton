@@ -105,9 +105,15 @@ class EchoBackend:
 
 
 class CallableBackend:
-    """Wrap an injected callable (LLM, hive agent, another model)."""
+    """Wrap an injected callable (LLM, hive agent, another model).
 
-    def __init__(self, fn: Callable[[str, Dict[str, Any]], str], *,
+    The callable may return a Thought (full authorship) or a string.
+    Strings that contain ``mix trash=N elite=M boss=K`` become numbers
+    the builder can compile. That is how an injected left tract authors
+    a mix the local hemisphere never would.
+    """
+
+    def __init__(self, fn: Callable[[str, Dict[str, Any]], Any], *,
                  slot: str, name: str = "injected", scale: str = "injected") -> None:
         self.fn = fn
         self.slot = slot
@@ -115,9 +121,18 @@ class CallableBackend:
         self.scale = scale
 
     def think(self, stimulus: str, context: Dict[str, Any]) -> Thought:
-        text = self.fn(stimulus or "", context or {})
+        out = self.fn(stimulus or "", context or {})
+        if isinstance(out, Thought):
+            return out
+        text = str(out)[:400]
+        m = re.search(r"mix trash=(\d+) elite=(\d+) boss=(\d+)", text.lower())
+        tags = ["injected", self.name, self.slot]
+        numbers: Tuple[float, ...] = ()
+        if m:
+            numbers = (float(m.group(1)), float(m.group(2)), float(m.group(3)))
+            tags.append("mix")
         return Thought(
             slot=self.slot, kind="injected",
-            text=str(text)[:400], confidence=0.7,
-            tags=("injected", self.name, self.slot),
+            text=text, confidence=0.7,
+            tags=tuple(tags), numbers=numbers,
         )

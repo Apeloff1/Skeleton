@@ -356,6 +356,42 @@ class TestAuthoredPlan:
         assert out["succeeded"]
         assert out["build_plan"]["authored"] == "cortex"
 
+    def test_injected_left_changes_mix_keeps_right_bias(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.jeeves.builder import BuilderBrain
+        from skeleton.context.tensor import ContextTensor
+        from skeleton.cortex import CallableBackend, JeevesCortex, ttk_oracle
+        pack = compile_era("soulslike")
+        tensor = ContextTensor.from_era("soulslike")
+        local = BuilderBrain().plan(pack, tensor=tensor)
+        neo = JeevesCortex()
+        neo.bind("left", CallableBackend(ttk_oracle, slot="left", name="ttk-oracle"))
+        inj = BuilderBrain().plan(pack, tensor=tensor, cortex=neo)
+        assert inj.authored == "cortex"
+        assert inj.room_bias == local.room_bias
+        assert inj.enemy_mix != local.enemy_mix
+        assert inj.enemy_mix["boss"] == 0
+        assert inj.enemy_mix["trash"] >= local.enemy_mix["trash"]
+
+    def test_surpass_keeps_oracle_mix_after_rebind(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.jeeves.builder import BuilderBrain
+        from skeleton.context.tensor import ContextTensor
+        from skeleton.cortex import CallableBackend, JeevesCortex, ttk_oracle
+        pack = compile_era("soulslike")
+        tensor = ContextTensor.from_era("soulslike")
+        neo = JeevesCortex()
+        neo.bind("left", CallableBackend(ttk_oracle, slot="left", name="ttk-oracle"))
+        first = BuilderBrain().plan(pack, tensor=tensor, cortex=neo)
+        neo.acquire("left")
+        neo.surpass("left")
+        neo.bind_local("left")
+        second = BuilderBrain().plan(pack, tensor=tensor, cortex=neo)
+        assert second.authored == "own"
+        assert second.enemy_mix["trash"] == first.enemy_mix["trash"]
+        assert second.enemy_mix["elite"] == first.enemy_mix["elite"]
+        assert second.room_bias == first.room_bias
+
 
 class TestProjectorAndIntake:
     def test_write_and_intake_run(self, tmp_path=None):

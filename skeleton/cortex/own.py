@@ -150,11 +150,15 @@ class OwnSystem:
         kind = "own-compose" if len(used) > 1 else "own"
         extra = "compose" if kind == "own-compose" else "recall"
         tag_t = tuple(dict.fromkeys(list(tags) + [extra]))
+        mix: Tuple[float, ...] = ()
+        left_hit = by_src.get("left")
+        if left_hit is not None and len(left_hit.ability.numbers) >= 3:
+            mix = tuple(float(x) for x in left_hit.ability.numbers[-3:])
         thought = Thought(
             slot="neo", kind=kind, text=" || ".join(parts),
             confidence=conf,
             tags=tag_t,
-            numbers=(best_j, float(len(used))),
+            numbers=mix if mix else (best_j, float(len(used))),
         )
         return thought, best_j, used
 

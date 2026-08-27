@@ -218,7 +218,20 @@ def _author(pack: Dict[str, Any], cube: ContextTensor, era: str, cortex: Any):
     stim = f"plan {era} forge mix bias ttk extract"
     if cortex is not None:
         trace = cortex.think(stim, ctx)
-        return trace.left, trace.right, trace.pfc, "cortex"
+        left, right, pfc = trace.left, trace.right, trace.pfc
+        slots = getattr(cortex, "slots", None) or {}
+        if left is None and "left" in slots:
+            left = slots["left"].think(stim, ctx)
+        if right is None and "right" in slots:
+            right = slots["right"].think(stim, ctx)
+        authored = "own" if getattr(trace, "used_own", False) else "cortex"
+        amalgam = getattr(trace, "amalgam", None)
+        if authored == "own" and amalgam is not None:
+            if _mix_of(amalgam) is not None:
+                left = amalgam
+            if _bias_of(amalgam) != "balanced":
+                right = amalgam
+        return left, right, pfc, authored
     from skeleton.cortex.hemispheres import LeftHemisphere, RightHemisphere
     from skeleton.cortex.pfc import PrefrontalCortex
     left = LeftHemisphere().think(stim, ctx)

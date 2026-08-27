@@ -108,3 +108,29 @@ class RightHemisphere:
             tags=("gestalt", "spatial", "right", bias),
             numbers=tuple(v for _, v in top),
         )
+
+
+def ttk_oracle(stimulus: str, context: Dict[str, Any]) -> Thought:
+    """Injected left tract: mix from TTK × collapse, never a boss.
+
+    Thermal tax is 4× on a soulslike. Fits 40% of collapse in trash,
+    one elite if 4× elite TTK is under half the timer. Boss is always
+    dropped — that is the oracle's entire personality.
+    """
+    ttk = context.get("pack_ttk") or {}
+    collapse = float(context.get("collapse_max") or 480.0)
+    trash_t = float(ttk.get("trash") or 1.0)
+    elite_t = float(ttk.get("elite") or 6.0)
+    tax = 4.0
+    budget = collapse * 0.40
+    trash = max(1, min(6, int(budget / max(trash_t * tax, 0.5))))
+    elite = 1 if elite_t * tax < collapse * 0.50 else 0
+    boss = 0
+    dps = context.get("pack_dps")
+    return Thought(
+        slot="left", kind="analytic",
+        text=f"HP = DPS × TTK ; oracle mix trash={trash} elite={elite} boss={boss}",
+        confidence=0.91,
+        tags=("analytic", "symbolic", "left", "mix", "oracle", "injected"),
+        numbers=(float(dps or 0.0), float(trash), float(elite), float(boss)),
+    )
