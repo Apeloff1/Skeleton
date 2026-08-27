@@ -46,6 +46,7 @@ from .lora import LoRA, LoRABank
 from .beam import beam_search, greedy_beam
 from .accum import Accumulator, accumulate_fit
 from .gossip import gossip, gossip_cortices
+from .attn import swiglu, swiglu_bwd, cosine_lr, silu, rms_norm
 
 __all__ = [
     "SLOTS",
@@ -123,4 +124,9 @@ __all__ = [
     "accumulate_fit",
     "gossip",
     "gossip_cortices",
+    "swiglu",
+    "swiglu_bwd",
+    "cosine_lr",
+    "silu",
+    "rms_norm",
 ]

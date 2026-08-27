@@ -528,6 +528,14 @@ class JeevesCortex:
                      if getattr(self.transformer, "lora", None) is not None else None),
         }
 
+    def speak(self, stimulus: str, *, n: int = 12, seed: int = 0) -> str:
+        xf = self.transformer
+        if xf is None:
+            return ""
+        if hasattr(xf, "decode"):
+            return str(xf.decode(stimulus or "", n=n, seed=seed))
+        return " ".join(xf.generate(stimulus or "", n=n, seed=seed))
+
     def beam(self, stimulus: str, *, n: int = 8, width: int = 4) -> Dict[str, Any]:
         xf = self.transformer
         if xf is None:

@@ -292,6 +292,43 @@ def cortex_zaibatsu() -> Dict[str, Any]:
     return tournament(live_cortex())
 
 
+@router.post("/cortex/speak")
+def cortex_speak(body: Dict[str, Any]) -> Dict[str, Any]:
+    from skeleton.cortex.live import live_cortex, persist
+    stim = (body or {}).get("stimulus") or (body or {}).get("prefix") or "plan tensor ttk"
+    n = int((body or {}).get("n") or 12)
+    text = live_cortex().speak(stim, n=n, seed=int((body or {}).get("seed") or 0))
+    persist()
+    return {"text": text, "n": n}
+
+
+@router.post("/cortex/beam")
+def cortex_beam(body: Dict[str, Any]) -> Dict[str, Any]:
+    from skeleton.cortex.live import live_cortex, persist
+    stim = (body or {}).get("stimulus") or (body or {}).get("prefix") or "plan tensor ttk"
+    out = live_cortex().beam(stim, n=int((body or {}).get("n") or 8), width=int((body or {}).get("width") or 4))
+    persist()
+    return out
+
+
+@router.post("/cortex/lora")
+def cortex_lora(body: Dict[str, Any]) -> Dict[str, Any]:
+    from skeleton.cortex.live import live_cortex, persist
+    neo = live_cortex()
+    out = neo.merge_lora() if (body or {}).get("merge") else neo.attach_lora(rank=int((body or {}).get("rank") or 2))
+    persist()
+    return out
+
+
+@router.post("/cortex/gossip")
+def cortex_gossip(body: Dict[str, Any]) -> Dict[str, Any]:
+    from skeleton.cortex import JeevesCortex
+    from skeleton.cortex.live import live_cortex, persist
+    out = live_cortex().gossip_with(JeevesCortex(), alpha=float((body or {}).get("alpha") or 0.25))
+    persist()
+    return out
+
+
 @router.post("/cortex/speculate")
 def cortex_speculate(body: Dict[str, Any]) -> Dict[str, Any]:
     from skeleton.cortex.live import live_cortex

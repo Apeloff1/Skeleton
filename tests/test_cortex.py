@@ -1192,4 +1192,58 @@ class TestQueue12:
         assert "merged" in neo.merge_lora()
 
 
+class TestQueue13:
+    def test_tie_shares_pointer(self):
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.lm import gameforge_vocab
+        lm = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=2, n_heads=2, n_layers=2, d_ff=16)
+        assert lm.tied is False
+        lm.tie()
+        assert lm.tied is True
+        assert lm.Wout is lm.E
+        a = lm._unembed([0.1] * lm.dim)
+        lm.E[0][0] += 0.5
+        b = lm._unembed([0.1] * lm.dim)
+        assert a != b
+        snap = lm.snapshot()
+        assert snap["tied"] is True
+        restored = TinyTransformer.from_snapshot(snap)
+        assert restored.tied is True
+        assert restored.Wout is restored.E
+
+    def test_cosine_lr_endpoints(self):
+        from skeleton.cortex.attn import cosine_lr
+        assert abs(cosine_lr(0, 10, base=0.04, floor=0.0) - 0.04) < 1e-12
+        assert abs(cosine_lr(10, 10, base=0.04, floor=0.0) - 0.0) < 1e-12
+        mid = cosine_lr(5, 10, base=0.04, floor=0.0)
+        assert 0.0 < mid < 0.04
+
+    def test_swiglu_zero_gate_is_zero(self):
+        from skeleton.cortex.attn import swiglu, zeros
+        D = 4
+        Wg = [zeros(D) for _ in range(D)]
+        Wu = [[0.2 if i == j else 0.0 for j in range(D)] for i in range(D)]
+        y, gate, up = swiglu([1.0, -0.5, 0.25, 0.0], Wg, Wu, zeros(D), zeros(D))
+        assert all(abs(g) < 1e-12 for g in gate)
+        assert all(abs(v) < 1e-12 for v in y)
+
+    def test_merkle_lists_lora_and_tie(self):
+        from skeleton.cortex import JeevesCortex
+        from skeleton.cortex.hive import merkle_card, bundle
+        neo = JeevesCortex()
+        neo.transformer.tie()
+        neo.attach_lora(rank=2)
+        card = merkle_card(neo)
+        assert card["tied"] is True
+        assert card["lora"] is not None
+        guts = bundle(neo)
+        assert guts["lora"] is not None
+        assert guts["transformer"]["tied"] is True
+
+    def test_speak_is_nonempty(self):
+        from skeleton.cortex import JeevesCortex
+        text = JeevesCortex().speak("plan tensor ttk", n=4, seed=1)
+        assert isinstance(text, str) and text
+
+
 

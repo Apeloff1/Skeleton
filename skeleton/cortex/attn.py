@@ -116,6 +116,27 @@ def silu_bwd(dy: Vec, x: Vec) -> Vec:
     return out
 
 
+def swiglu(x: Vec, Wg: List[List[float]], Wu: List[List[float]], bg: Vec, bu: Vec) -> Tuple[Vec, Vec, Vec]:
+    """SiLU(Wg x + bg) ⊙ (Wu x + bu). Returns (y, gate, up)."""
+    gate = add(matvec(Wg, x), bg)
+    up = add(matvec(Wu, x), bu)
+    s = silu(gate)
+    return [s[i] * up[i] for i in range(len(s))], gate, up
+
+
+def swiglu_bwd(dy: Vec, gate: Vec, up: Vec) -> Tuple[Vec, Vec]:
+    s = silu(gate)
+    d_up = [dy[i] * s[i] for i in range(len(dy))]
+    d_gate = silu_bwd([dy[i] * up[i] for i in range(len(dy))], gate)
+    return d_gate, d_up
+
+
+def cosine_lr(step: int, total: int, *, base: float = 0.04, floor: float = 0.0) -> float:
+    t = max(1, int(total))
+    k = max(0, min(int(step), t))
+    return float(floor) + 0.5 * (float(base) - float(floor)) * (1.0 + math.cos(math.pi * k / t))
+
+
 def rms_norm(x: Vec, g: Vec, eps: float = 1e-5) -> Tuple[Vec, Vec, float]:
     n = max(1, len(x))
     ms = sum(xi * xi for xi in x) / n

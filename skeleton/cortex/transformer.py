@@ -298,6 +298,7 @@ class TinyTransformer:
         ]
         self.Wout = _rand_mat(V, D, s, rng)
         self.bout = zeros(V)
+        self.tied = False
         self.dim = D
         self.ctx = C
         self.n_heads = heads
@@ -454,7 +455,7 @@ class TinyTransformer:
                 self.resident = False
         H, _ = self._forward(ids)
         y = H[-1] if H else zeros(self.dim)
-        return add(matvec(self.Wout, y), self.bout)
+        return self._unembed(y)
 
     def _step(self, idx: int, cache: KVCache) -> List[float]:
         """Extend the cache by one id. RoPE position is window-relative."""
@@ -464,7 +465,7 @@ class TinyTransformer:
         for li, layer in enumerate(self.layers):
             x = layer.step(x, cache.K[li], cache.V[li], self.n_heads, t)
         cache.tokens.append(ei)
-        return add(matvec(self.Wout, x), self.bout)
+        return self._unembed(x)
 
     def _logits_window(self, ids: Sequence[int], cache: Optional[KVCache] = None) -> List[float]:
         window = list(ids[-self.ctx:] or [self.unk])
@@ -523,7 +524,7 @@ class TinyTransformer:
         D = self.dim
         H, caches = self._forward(ids)
         y = H[-1] if H else zeros(D)
-        logits = add(matvec(self.Wout, y), self.bout)
+        logits = self._unembed(y)
         p = softmax(logits)
         loss = -math.log(max(p[target], 1e-12))
         dlog = [p[v] - (1.0 if v == target else 0.0) for v in range(self.V)]
@@ -532,8 +533,9 @@ class TinyTransformer:
             s = 5.0 / g2
             dlog = [x * s for x in dlog]
 
-        dy = matvec_T(self.Wout, dlog)
-        add_outer(self.Wout, dlog, y, -lr)
+        W = self.E if self.tied else self.Wout
+        dy = matvec_T(W, dlog)
+        add_outer(W, dlog, y, -lr)
         for v in range(self.V):
             self.bout[v] -= lr * dlog[v]
 
@@ -602,6 +604,22 @@ class TinyTransformer:
                 self._accel = None
                 self.resident = False
         return " ".join(self.generate(prefix, n=n, seed=seed))
+
+    def _unembed(self, y: Sequence[float]) -> List[float]:
+        W = self.E if self.tied else self.Wout
+        return add(matvec(W, list(y)), self.bout)
+
+    def tie(self) -> "TinyTransformer":
+        """Wout is E. Birth of the token mouth as its own unembed."""
+        self.Wout = self.E
+        self.tied = True
+        return self
+
+    def untie(self) -> "TinyTransformer":
+        if self.tied:
+            self.Wout = [list(row) for row in self.E]
+            self.tied = False
+        return self
 
     def from_bpe(self, text: str, bpe=None) -> List[int]:
         """Token ids from the BPE mouth. Unknown pieces fall to word _id / UNK."""
@@ -678,6 +696,7 @@ class TinyTransformer:
             "resident": bool(self.resident),
             "fitted": self.fitted,
             "steps": self.steps,
+            "tied": bool(self.tied),
             "itos": list(self.itos),
             "E": _copy_mat(self.E),
             "P": _copy_mat(self.P),
@@ -715,6 +734,8 @@ class TinyTransformer:
         lm.E = _m("E", lm.E)
         lm.P = _m("P", lm.P)
         lm.Wout = _m("Wout", lm.Wout)
+        if (data or {}).get("tied"):
+            lm.tie()
         b = (data or {}).get("bout")
         if b:
             lm.bout = [float(x) for x in b]

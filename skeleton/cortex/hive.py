@@ -32,6 +32,8 @@ def merkle_card(neo) -> Dict[str, Any]:
         "device": str(getattr(xf, "device", "cpu") or "cpu"),
         "resident": bool(getattr(xf, "resident", False)),
         "devil": bool(getattr(neo, "_surpass", None)),
+        "tied": bool(getattr(xf, "tied", False)),
+        "lora": (xf.lora.to_dict() if getattr(xf, "lora", None) is not None else None),
     }
 
 
@@ -48,6 +50,7 @@ def bundle(neo) -> Dict[str, Any]:
         "callosum": cc.snapshot() if cc is not None else None,
         "bpe": bpe.snapshot() if bpe is not None and hasattr(bpe, "snapshot") else None,
         "transformer": xf.snapshot() if xf is not None and hasattr(xf, "snapshot") else None,
+        "lora": (xf.lora.snapshot() if xf is not None and getattr(xf, "lora", None) is not None else None),
     }
 
 
@@ -77,6 +80,9 @@ def pull(dst, payload: Optional[Dict[str, Any]]) -> Dict[str, Any]:
             from skeleton.cortex.transformer import TinyTransformer
             dst.transformer = TinyTransformer.from_snapshot(payload["transformer"])
             pulled_xf = 1
+            if payload.get("lora") is not None:
+                from skeleton.cortex.lora import LoRABank
+                dst.transformer.lora = LoRABank.from_snapshot(payload["lora"])
         except Exception:
             pulled_xf = 0
     return {
