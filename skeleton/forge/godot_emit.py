@@ -5,6 +5,7 @@ godot_engine pipeline can later import/check these files.
 """
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, List
 
 
@@ -269,4 +270,7 @@ def emit_godot(pack: Dict[str, Any], *, title: str = "FORGE-RUN") -> Dict[str, s
         "sprint={\"deadzone\": 0.5, \"events\": []}\n"
         "fire={\"deadzone\": 0.5, \"events\": []}\n"
     )
+    from skeleton.forge.world import generate_rooms
+    graph = generate_rooms(pack, seed=str(pack.get("era")))
+    files["data/rooms.json"] = json.dumps(graph, indent=2)
     return files

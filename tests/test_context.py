@@ -284,3 +284,17 @@ class TestBlend:
         chunk = out["files"]["scripts/player/player_controller.gd"].split("speed: float = ", 1)[1]
         speed = float(chunk.splitlines()[0])
         assert 155.0 < speed < 160.0  # 160 vs 155 midpoint 157.5
+
+
+class TestWorld:
+    def test_connected_and_emitted(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.forge.world import generate_rooms, assert_connected
+        from skeleton.forge.godot_emit import emit_godot
+        pack = compile_era("metroidvania")
+        g = generate_rooms(pack)
+        assert_connected(g)
+        assert g["rooms"][0]["kind"] == "spawn"
+        assert g["rooms"][-1]["kind"] == "extract"
+        files = emit_godot(pack)
+        assert "data/rooms.json" in files

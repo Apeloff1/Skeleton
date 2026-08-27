@@ -6,6 +6,7 @@ from skeleton.forge.godot_emit import emit_godot
 from skeleton.forge.sim import simulate_session, simulate_encounter
 from skeleton.forge.projector import write_project, ProjectExistsError
 from skeleton.forge.gdscript_check import check_files, check_ok
+from skeleton.forge.world import generate_rooms, assert_connected
 from skeleton.forge.planner import MaterialisationPlanner, BuildPlan
 from skeleton.forge.archetypes import Archetype, ArchetypeError, ArchetypeLibrary, default_library
 from skeleton.forge.diagram import to_dot
@@ -34,6 +35,8 @@ __all__ = [
     "ProjectExistsError",
     "check_files",
     "check_ok",
+    "generate_rooms",
+    "assert_connected",
     "MaterialisationPlanner",
     "BuildPlan",
     "Archetype",
