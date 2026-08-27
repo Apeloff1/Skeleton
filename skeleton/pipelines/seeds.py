@@ -11,7 +11,8 @@ from __future__ import annotations
 
 import hashlib
 import random
-from typing import Any, Callable, Dict, Optional, Sequence
+from dataclasses import dataclass
+from typing import Dict
 
 from skeleton.kernel.errors import PipelineError
 

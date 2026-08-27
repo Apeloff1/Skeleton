@@ -8,9 +8,9 @@ simplification, cross-check examples), and proposes the next hint.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Optional, Tuple
 
-from skeleton.jeeves.pedagogy import HintLevel, Scaffold
+from skeleton.jeeves.pedagogy import Scaffold
 
 
 @dataclass(frozen=True)
@@ -36,5 +36,8 @@ class Troubleshooter:
                 return (name, text)
         return None
 
-    def diagnose(self, scaffold: Scaffold) -> str:
-        return self.next_step(scaffold) or ("attempts-complete", "review the trajectory")
+    def diagnose(self, scaffold: Scaffold) -> Tuple[str, str]:
+        step = self.next_step(scaffold)
+        if step is None:
+            return ("attempts-complete", "review the trajectory")
+        return step

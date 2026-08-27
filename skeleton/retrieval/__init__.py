@@ -1,48 +1,45 @@
-"""Retrieval subsystem — query, fuse, rank, ingest, suggest, lexicon, UI."""
+"""Quad retrieval subsystem for Skeleton."""
 
+from .fusion import Fuser, FusionStrategy, ScoredResult
+from .ranking import Ranker
+from .query import QueryPlan, QueryPlanner, RetrievalError
+from .index import InvertedIndex
+from .query_language import QueryParser, QueryTerm
 from .cache import CacheEntry, ResultCache
 from .chunking import Chunk, Chunker
+from .sources import SourceRegistry
+from .ingest import CorpusIngestor, Document
+from .rerank import Reranker, RerankRule
+from .reranker import Reranker as FeatureReranker, RankedItem, RerankWeights
+from .highlight import Highlighter
 from .dedup import Deduper
 from .embeddings import LocalEmbedder, rerank_by_embedding
-from .fusion import Fuser, FusionStrategy, ScoredResult
-from .highlight import Highlighter
-from .index import InvertedIndex
-from .ingest import CorpusIngestor, Document
-from .lexicon import Lexicon, default_lexicon
-from .query import QueryPlan, QueryPlanner, RetrievalError
-from .query_language import QueryParser, QueryTerm
-from .ranking import Ranker
-from .rerank import Reranker, RerankRule
-from .suggest import Suggester
-from .sources import SourceRegistry
-from .ui import ResultRenderer
 
 __all__ = [
+    "Fuser",
+    "FusionStrategy",
+    "ScoredResult",
+    "Ranker",
+    "QueryPlan",
+    "QueryPlanner",
+    "RetrievalError",
+    "InvertedIndex",
+    "QueryParser",
+    "QueryTerm",
     "CacheEntry",
     "ResultCache",
     "Chunk",
     "Chunker",
+    "SourceRegistry",
+    "CorpusIngestor",
+    "Document",
+    "Reranker",
+    "RerankRule",
+    "FeatureReranker",
+    "RerankWeights",
+    "RankedItem",
+    "Highlighter",
     "Deduper",
     "LocalEmbedder",
     "rerank_by_embedding",
-    "Fuser",
-    "FusionStrategy",
-    "ScoredResult",
-    "Highlighter",
-    "InvertedIndex",
-    "CorpusIngestor",
-    "Document",
-    "Lexicon",
-    "default_lexicon",
-    "QueryPlan",
-    "QueryPlanner",
-    "RetrievalError",
-    "QueryParser",
-    "QueryTerm",
-    "Ranker",
-    "Reranker",
-    "RerankRule",
-    "Suggester",
-    "SourceRegistry",
-    "ResultRenderer",
 ]
