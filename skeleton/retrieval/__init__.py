@@ -5,6 +5,7 @@ from .ranking import Ranker
 from .query import QueryPlan, QueryPlanner, RetrievalError
 from .index import InvertedIndex
 from .query_language import QueryParser, QueryTerm
+from .cache import CacheEntry, ResultCache
 
 __all__ = [
     "Fuser",
@@ -17,4 +18,6 @@ __all__ = [
     "InvertedIndex",
     "QueryParser",
     "QueryTerm",
+    "CacheEntry",
+    "ResultCache",
 ]

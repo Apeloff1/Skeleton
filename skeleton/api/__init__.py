@@ -12,6 +12,7 @@ from .middleware import (
 )
 from .auth import AuthContext, role_dependency, scope_dependency
 from .versioning import SUPPORTED, Version, VersionError, extract, negotiate
+from .webhooks import Subscription, WebhookDispatcher, WebhookError
 
 __all__ = [
     "router",
@@ -33,4 +34,7 @@ __all__ = [
     "VersionError",
     "extract",
     "negotiate",
+    "Subscription",
+    "WebhookDispatcher",
+    "WebhookError",
 ]
