@@ -121,6 +121,8 @@ class JeevesCortex:
         self.moe = ExpertBank(dim=dim, seed=19)
         self.sleep = SleepCycle(seed=23)
         self.rl = ReinforceState()
+        from skeleton.cortex.bpe import gameforge_bpe
+        self.bpe = gameforge_bpe(merges=64)
 
     def backends(self) -> Dict[str, str]:
         return {s: getattr(p, "name", type(p).__name__) for s, p in self.slots.items()}
@@ -145,12 +147,20 @@ class JeevesCortex:
         return self.bind(slot, local_slots()[slot])
 
     def _hidden(self, stim: str) -> List[float]:
+        seq = self._hidden_seq(stim)
+        return list(seq[-1]) if seq else [0.0] * int(getattr(self.transformer, "dim", 8) or 8)
+
+    def _hidden_seq(self, stim: str) -> List[List[float]]:
         xf = self.transformer
+        if xf is not None and hasattr(xf, "hidden_seq"):
+            H = xf.hidden_seq(stim or "")
+            if H:
+                return H
         if xf is not None and hasattr(xf, "hidden"):
             h = list(xf.hidden(stim or ""))
             if h:
-                return h
-        return [0.0] * int(getattr(xf, "dim", 8) or 8)
+                return [h]
+        return [[0.0] * int(getattr(xf, "dim", 8) or 8)]
 
     def think(self, stimulus: str, context: Optional[Dict[str, Any]] = None) -> CortexTrace:
         stim = stimulus or ""
@@ -249,12 +259,16 @@ class JeevesCortex:
         route: Optional[Thought],
     ) -> List[float]:
         """Online distill: heads eat teacher numbers, callosum fuses, sleep records."""
-        h = self._hidden(stim)
+        H = self._hidden_seq(stim)
+        h = H[-1] if H else [0.0] * int(getattr(self.transformer, "dim", 8) or 8)
         left_on = left is not None
         right_on = right is not None
-        fused, _fl, _fr = self.callosum.fuse(h, left_on=left_on, right_on=right_on)
+        if len(H) >= 2:
+            fused, _fl, _fr = self.callosum.fuse_seq(H, left_on=left_on, right_on=right_on)
+        else:
+            fused, _fl, _fr = self.callosum.fuse(h, left_on=left_on, right_on=right_on)
         if left_on and right_on:
-            self.callosum.hebb(h)
+            self.callosum.hebb(H[-1] if H else h)
         mixed, gates = self.moe.forward(fused)
         if left is not None:
             nums = tuple(left.numbers or ())
@@ -336,7 +350,11 @@ class JeevesCortex:
         return self.moe.predict_policy(self._stream(stimulus))
 
     def _stream(self, stim: str) -> List[float]:
-        h = self._hidden(stim)
+        H = self._hidden_seq(stim)
+        if len(H) >= 2:
+            fused, _fl, _fr = self.callosum.fuse_seq(H, left_on=True, right_on=True)
+            return fused
+        h = H[0] if H else self._hidden(stim)
         fused, _fl, _fr = self.callosum.fuse(h, left_on=True, right_on=True)
         return fused
 
@@ -421,6 +439,7 @@ class JeevesCortex:
             "moe": self.moe.snapshot(),
             "sleep": self.sleep.snapshot(),
             "rl": self.rl.snapshot(),
+            "bpe": self.bpe.snapshot(),
         }
         p.write_text(json.dumps(blob), encoding="utf-8")
         return {"path": str(p), "own": self.own.size, "acquired": dict(self.acquired)}
@@ -467,6 +486,9 @@ class JeevesCortex:
             self.sleep.restore(blob["sleep"])
         if blob.get("rl"):
             self.rl = ReinforceState.from_snapshot(blob["rl"])
+        if blob.get("bpe"):
+            from skeleton.cortex.bpe import BytePairEncoder
+            self.bpe = BytePairEncoder.from_snapshot(blob["bpe"])
         return {"loaded": n, "own": self.own.size, "surpass": sorted(self._surpass)}
 
     def status(self) -> Dict[str, Any]:
@@ -498,6 +520,10 @@ class JeevesCortex:
             "moe": self.moe.to_dict(),
             "sleep": self.sleep.to_dict(),
             "rl": self.rl.to_dict(),
+            "bpe": self.bpe.to_dict(),
+            "hive": {
+                "moe_fp": self.moe.fingerprint(),
+            },
         }
 
     def to(self, device: str = "auto") -> Dict[str, Any]:

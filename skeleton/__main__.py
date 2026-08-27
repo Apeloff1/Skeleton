@@ -49,6 +49,10 @@ def main(argv: list[str] | None = None) -> int:
     trn = sub.add_parser("train", help="run GameForge curriculum epochs on the own-system")
     trn.add_argument("--epochs", type=int, default=1)
 
+    sub.add_parser("metrics", help="score the live neocortex against untrained baselines")
+    sub.add_parser("merkle", help="print the live cortex merkle card")
+    sub.add_parser("zaibatsu", help="tournament the three mouths; print the family seal")
+
     wk = sub.add_parser("walk", help="prove spawn→extract on the emitted door graph")
     wk.add_argument("--era", default="extraction_now")
     wk.add_argument("--blend", nargs=2, metavar=("ERA_A", "ERA_B"))
@@ -97,6 +101,24 @@ def main(argv: list[str] | None = None) -> int:
         out["saved"] = persist()
         print(json.dumps(out, indent=2, default=str))
         return 0 if out.get("held_rate", 0) >= 0.5 else 1
+
+    if args.cmd == "metrics":
+        from skeleton.cortex.live import live_cortex
+        from skeleton.cortex.metrics import evaluate
+        print(json.dumps(evaluate(live_cortex()), indent=2, default=str))
+        return 0
+
+    if args.cmd == "merkle":
+        from skeleton.cortex.hive import merkle_card
+        from skeleton.cortex.live import live_cortex
+        print(json.dumps(merkle_card(live_cortex()), indent=2, default=str))
+        return 0
+
+    if args.cmd == "zaibatsu":
+        from skeleton.cortex.live import live_cortex
+        from skeleton.cortex.zaibatsu import tournament
+        print(json.dumps(tournament(live_cortex()), indent=2, default=str))
+        return 0
 
     if args.cmd == "walk":
         from skeleton.forge.eras import blend_eras, compile_era

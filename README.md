@@ -89,11 +89,14 @@ python -m skeleton run --blend arcade_golden_age soulslike --t 0.5 --out ./blend
 python -m skeleton check ./proj
 python -m skeleton think "soulslike extraction ttk elite dread"
 python -m skeleton train --epochs 1
+python -m skeleton metrics
+python -m skeleton merkle
+python -m skeleton zaibatsu
 ```
 
-HTTP: `GET /api/skeleton/eras` · `POST /api/skeleton/run` · `GET /api/skeleton/beats` · `POST /api/skeleton/think` · `POST /api/skeleton/train` · `GET /api/skeleton/cortex`
+HTTP: `GET /api/skeleton/eras` · `POST /api/skeleton/run` · `GET /api/skeleton/beats` · `POST /api/skeleton/think` · `POST /api/skeleton/train` · `GET /api/skeleton/cortex` · `GET /api/skeleton/cortex/zaibatsu` · `GET /api/skeleton/cortex/metrics` · `GET /api/skeleton/cortex/merkle`
 
-Cortex (the model we are building, not implementing): PFC small/boilerplate · midbrain medium/coordinator · left analytic · right gestalt · Jeeves neo hivemind+trainer+LM. Slots are `ModelPort`s; `bind` hot-swaps a backend; `acquire` copies a tract into own-system **and stamps the MoE expert**; `surpass` answers from the neo transformer (own-lm decode). Stacked Pre-LN (n_layers=2, n_heads=2, FFN) on CPU; `to("cuda")` pins the same weights on GPU when torch can see one, else degrades. Specialist heads (numeric mix / bias / route / veto / policy) sit on the residual. Corpus callosum splits left/right streams and Hebbs when both fire. Sleep consolidates the replay buffer. REINFORCE eats walk slack. The speaking LM authors the BuildPlan briefing.
+Cortex (the model we are building, not implementing): PFC small/boilerplate · midbrain medium/coordinator · left analytic · right gestalt · Jeeves neo hivemind+trainer+LM. Slots are `ModelPort`s; `bind` hot-swaps a backend; `acquire` copies a tract into own-system **and stamps the MoE expert**; `surpass` answers from the neo transformer (own-lm decode). Stacked Pre-LN (n_layers=2, n_heads=2, FFN-GELU, RoPE on Q/K) on CPU; KV-cache decode ≡ full forward; greedy is argmax. `to("cuda")` pins the same weights on GPU when torch can see one, else degrades. Specialist heads (numeric mix / bias / route / veto / policy) sit on the residual. Corpus callosum splits left/right streams and Hebbs when both fire. Sleep consolidates the replay buffer. REINFORCE eats walk slack. The speaking LM authors the BuildPlan briefing. BPE is the other mouth. `evaluate()` must beat untrained. Hive merkle-sync pulls experts iff the fingerprint differs. `tournament()` names a winner among the three mouths. PFC drafts, neo verifies.
 
 ---
 

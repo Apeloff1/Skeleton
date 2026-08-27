@@ -2,7 +2,9 @@
 
 Pure Python. Causal mask. Multi-head is split/concat over this.
 LayerNorm + full-sequence MHA backward live here so transformer.py
-can stack blocks without copying the guts. No ModelPort.
+can stack blocks without copying the guts. GELU and RoPE are extra
+identities: GELU leaks negative mass ReLU zeros; RoPE makes order
+not a bag. No ModelPort.
 """
 from __future__ import annotations
 
@@ -78,6 +80,140 @@ def softmax(xs: Vec) -> Vec:
 
 def relu(xs: Vec) -> Vec:
     return [x if x > 0.0 else 0.0 for x in xs]
+
+
+def gelu(xs: Vec) -> Vec:
+    """Tanh approximation. Identity: gelu(x) ≠ relu(x) for x < 0."""
+    out: Vec = []
+    for x in xs:
+        t = math.tanh(math.sqrt(2.0 / math.pi) * (x + 0.044715 * x * x * x))
+        out.append(0.5 * x * (1.0 + t))
+    return out
+
+
+def apply_rope(x: Vec, pos: int, *, base: float = 10000.0) -> Vec:
+    """Rotary position. Even/odd pairs rotated by θ = pos / base^(i/d)."""
+    n = len(x)
+    out = list(x)
+    d = max(2, n - (n % 2))
+    for i in range(0, d, 2):
+        theta = float(pos) / (base ** (i / float(d)))
+        c, s = math.cos(theta), math.sin(theta)
+        a, b = out[i], out[i + 1]
+        out[i] = a * c - b * s
+        out[i + 1] = a * s + b * c
+    return out
+
+
+def apply_rope_bwd(dy: Vec, pos: int, *, base: float = 10000.0) -> Vec:
+    """Adjoint of apply_rope. Rotation is orthogonal: R(θ)ᵀ = R(−θ)."""
+    return apply_rope(dy, -int(pos), base=base)
+
+
+def gelu_bwd(dy: Vec, x: Vec) -> Vec:
+    """dL/dx given dL/dgelu and the pre-activation x. Tanh approximation."""
+    k = math.sqrt(2.0 / math.pi)
+    out: Vec = []
+    for i, xi in enumerate(x):
+        u = k * (xi + 0.044715 * xi * xi * xi)
+        # clamp for tanh stability
+        if u > 20.0:
+            th = 1.0
+        elif u < -20.0:
+            th = -1.0
+        else:
+            th = math.tanh(u)
+        sech2 = 1.0 - th * th
+        du = k * (1.0 + 3.0 * 0.044715 * xi * xi)
+        dgelu = 0.5 * (1.0 + th) + 0.5 * xi * sech2 * du
+        out.append(dy[i] * dgelu)
+    return out
+
+
+def cached_attend(q: Vec, K: Mat, V: Mat) -> Tuple[Vec, Vec]:
+    """One query against a growing key bank. Causal by construction (bank is past)."""
+    if not K or not V:
+        return zeros(len(q)), []
+    d = max(1, len(q))
+    inv = 1.0 / math.sqrt(d)
+    scores = [dot(q, k) * inv for k in K]
+    w = softmax(scores)
+    ctx = zeros(len(V[0]))
+    for aij, vj in zip(w, V):
+        for i, val in enumerate(vj):
+            ctx[i] += aij * val
+    return ctx, w
+
+
+def cached_mha(q: Vec, K: Mat, V: Mat, n_heads: int = 1) -> Tuple[Vec, List[Vec]]:
+    """Multi-head cached attend. Concat on the feature axis."""
+    n_heads = max(1, int(n_heads))
+    if n_heads == 1:
+        c, a = cached_attend(q, K, V)
+        return c, [a]
+    Cs: List[Vec] = []
+    As: List[Vec] = []
+    for h in range(n_heads):
+        qh = slice_head([q], h, n_heads)[0] if q else []
+        Kh = slice_head(K, h, n_heads)
+        Vh = slice_head(V, h, n_heads)
+        c, a = cached_attend(qh, Kh, Vh)
+        Cs.append(c)
+        As.append(a)
+    row: Vec = []
+    for c in Cs:
+        row.extend(c)
+    return row, As
+
+
+def sample_logits(
+    logits: Vec,
+    rng,
+    *,
+    temperature: float = 1.0,
+    top_k: int = 0,
+    top_p: float = 1.0,
+) -> int:
+    """Greedy if temperature→0 or top_k=1. Else temperature + top-k + nucleus."""
+    n = len(logits)
+    if n == 0:
+        return 0
+    if temperature is None or float(temperature) <= 1e-8 or int(top_k) == 1:
+        return max(range(n), key=lambda i: logits[i])
+    t = max(1e-6, float(temperature))
+    scaled = [x / t for x in logits]
+    p = softmax(scaled)
+    k = int(top_k or 0)
+    if 0 < k < n:
+        keep = set(sorted(range(n), key=lambda i: -p[i])[:k])
+        p = [p[i] if i in keep else 0.0 for i in range(n)]
+        s = sum(p) or 1.0
+        p = [x / s for x in p]
+    tp = float(top_p)
+    if 0.0 < tp < 1.0:
+        order = sorted(range(n), key=lambda i: -p[i])
+        acc = 0.0
+        keep_n = set()
+        for i in order:
+            keep_n.add(i)
+            acc += p[i]
+            if acc >= tp:
+                break
+        p = [p[i] if i in keep_n else 0.0 for i in range(n)]
+        s = sum(p) or 1.0
+        p = [x / s for x in p]
+    if rng is None:
+        return max(range(n), key=lambda i: p[i])
+    r = rng.random()
+    acc = 0.0
+    nxt = n - 1
+    for i, pv in enumerate(p):
+        acc += pv
+        if acc >= r:
+            nxt = i
+            break
+    return nxt
+
 
 
 def layer_norm(x: Vec, g: Vec, b: Vec, eps: float = 1e-5) -> Tuple[Vec, Vec, float]:

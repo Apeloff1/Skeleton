@@ -255,6 +255,53 @@ def cortex_export(slot: str = "left") -> Dict[str, Any]:
     return live_cortex().export_tract(slot)
 
 
+@router.get("/cortex/merkle")
+def cortex_merkle() -> Dict[str, Any]:
+    from skeleton.cortex.hive import merkle_card
+    from skeleton.cortex.live import live_cortex
+    return merkle_card(live_cortex())
+
+
+@router.get("/cortex/metrics")
+def cortex_metrics() -> Dict[str, Any]:
+    from skeleton.cortex.live import live_cortex
+    from skeleton.cortex.metrics import evaluate
+    return evaluate(live_cortex())
+
+
+@router.post("/cortex/sync")
+def cortex_sync(body: Dict[str, Any]) -> Dict[str, Any]:
+    from skeleton.cortex.hive import pull
+    from skeleton.cortex.live import live_cortex, persist
+    out = pull(live_cortex(), body or {})
+    persist()
+    return out
+
+
+@router.get("/cortex/bundle")
+def cortex_bundle() -> Dict[str, Any]:
+    from skeleton.cortex.hive import bundle
+    from skeleton.cortex.live import live_cortex
+    return bundle(live_cortex())
+
+
+@router.get("/cortex/zaibatsu")
+def cortex_zaibatsu() -> Dict[str, Any]:
+    from skeleton.cortex.live import live_cortex
+    from skeleton.cortex.zaibatsu import tournament
+    return tournament(live_cortex())
+
+
+@router.post("/cortex/speculate")
+def cortex_speculate(body: Dict[str, Any]) -> Dict[str, Any]:
+    from skeleton.cortex.live import live_cortex
+    from skeleton.cortex.speculate import speculate
+    stim = (body or {}).get("stimulus") or (body or {}).get("prefix") or "plan tensor ttk"
+    n = int((body or {}).get("n") or 8)
+    k = int((body or {}).get("k") or 4)
+    return speculate(live_cortex(), stim, n=n, k=k)
+
+
 @router.post("/cortex/export")
 def cortex_export_post(body: Dict[str, str]) -> Dict[str, Any]:
     from skeleton.cortex.live import live_cortex

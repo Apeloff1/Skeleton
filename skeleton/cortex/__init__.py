@@ -37,6 +37,11 @@ from .callosum import CorpusCallosum
 from .moe import ExpertBank
 from .sleep import SleepCycle
 from .rl import ReinforceState, reinforce_mix
+from .bpe import BytePairEncoder, gameforge_bpe
+from .metrics import evaluate, beats
+from .hive import merkle_card, bundle, pull
+from .speculate import speculate, greedy_decode
+from .zaibatsu import tournament, devil_gene
 
 __all__ = [
     "SLOTS",
@@ -95,4 +100,15 @@ __all__ = [
     "SleepCycle",
     "ReinforceState",
     "reinforce_mix",
+    "BytePairEncoder",
+    "gameforge_bpe",
+    "evaluate",
+    "beats",
+    "merkle_card",
+    "bundle",
+    "pull",
+    "speculate",
+    "greedy_decode",
+    "tournament",
+    "devil_gene",
 ]

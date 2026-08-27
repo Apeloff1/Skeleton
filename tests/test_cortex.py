@@ -920,7 +920,185 @@ class TestOrganism:
         assert tr.amalgam.kind != "own-lm"
 
 
+class TestBPE:
+    def test_compresses_closed_world(self):
+        from skeleton.cortex.bpe import gameforge_bpe
+        from skeleton.cortex.lm import gameforge_corpus
+        enc = gameforge_bpe(merges=64)
+        blob = " ".join(gameforge_corpus()[:8])
+        assert enc.compression(blob) < 1.0
+        assert enc.fitted > 0
+        pieces = enc.encode_pieces("HP DPS TTK mix trash=2")
+        assert enc.decode(pieces).replace("·", "").startswith("hp")
+        snap = enc.snapshot()
+        from skeleton.cortex.bpe import BytePairEncoder
+        b = BytePairEncoder.from_snapshot(snap)
+        assert b.encode_pieces("ttk dps") == enc.encode_pieces("ttk dps")
 
+    def test_oov_still_encodes(self):
+        from skeleton.cortex.bpe import gameforge_bpe
+        enc = gameforge_bpe(merges=48)
+        ids = enc.encode_ids("zzzx unseen concatenation ttk")
+        assert ids
+        assert all(isinstance(i, int) for i in ids)
+
+
+class TestSequenceCallosum:
+    def test_seq_is_not_last_hidden(self):
+        from skeleton.cortex.callosum import CorpusCallosum
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.lm import gameforge_vocab
+        lm = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=3, n_heads=2, n_layers=2, d_ff=16)
+        H = lm.hidden_seq("loot bias heat ttk")
+        assert len(H) >= 2
+        cc = CorpusCallosum(dim=8, seed=11)
+        fused_seq, _, _ = cc.fuse_seq(H)
+        fused_last, _, _ = CorpusCallosum(dim=8, seed=11).fuse(H[-1])
+        assert fused_seq != fused_last
+
+    def test_rope_order_matters(self):
+        from skeleton.cortex.attn import apply_rope, gelu, relu
+        x = [0.4, -0.2, 0.1, 0.3, 0.0, 0.5, -0.1, 0.2]
+        assert apply_rope(x, 0) == x
+        assert apply_rope(x, 1) != apply_rope(x, 4)
+        assert gelu([-1.0])[0] < 0.0
+        assert relu([-1.0])[0] == 0.0
+        assert gelu([-1.0]) != relu([-1.0])
+
+
+class TestHiveMerkle:
+    def test_same_merkle_is_noop(self):
+        from skeleton.cortex import JeevesCortex
+        from skeleton.cortex.hive import merkle_card, pull
+        a = JeevesCortex()
+        a.think("soulslike extraction ttk elite dread")
+        from skeleton.cortex.hive import bundle
+        out = pull(a, bundle(a))
+        assert out["pulled"] == 0
+        assert out["reason"] == "same"
+
+    def test_diff_merkle_pulls_experts(self):
+        from skeleton.cortex import JeevesCortex
+        from skeleton.cortex.hive import bundle, pull
+        a = JeevesCortex()
+        a.think("compile ttk hp dps recipe sim")
+        a.think("soulslike extraction ttk elite dread")
+        payload = bundle(a)
+        b = JeevesCortex()
+        assert b.moe.fingerprint() != payload["moe_fp"]
+        out = pull(b, payload)
+        assert out["pulled"] == 1
+        assert b.moe.fingerprint() == a.moe.fingerprint()
+        assert b.moe.experts["left"].head.fitted == a.moe.experts["left"].head.fitted
+
+
+class TestBeatMetrics:
+    def test_trained_beats_untrained(self):
+        from skeleton.cortex import JeevesCortex
+        from skeleton.cortex.metrics import beats, evaluate
+        neo = JeevesCortex()
+        m0 = evaluate(neo)
+        assert m0["beats"]["bpe_compresses"] is True
+        out = neo.train(epochs=1)
+        m1 = out["metrics"]
+        won = beats(m1, m0)
+        assert won["ppl"] is True, (m0["ppl"], m1["ppl"])
+        assert won["mix_ready"] is True
+        assert won["gates_alive"] is True
+        assert won["bpe_compresses"] is True
+        assert m1["mix_mae"] <= m0["mix_mae"]
+        assert neo.callosum.seq_fires >= 1
+
+
+class TestZaibatsuLM:
+    def test_rope_is_in_the_stream(self):
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.lm import gameforge_vocab
+        lm = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=3, n_heads=2, n_layers=2, d_ff=16)
+        assert lm.hidden("ttk dps hp") != lm.hidden("hp dps ttk")
+        assert lm.hidden("ttk dps hp") != lm.hidden("ttk hp dps")
+
+    def test_rope_adjoint(self):
+        from skeleton.cortex.attn import apply_rope, apply_rope_bwd, dot
+        x = [0.4, -0.2, 0.1, 0.3, 0.0, 0.5, -0.1, 0.2]
+        y = [0.1, 0.2, -0.3, 0.4, 0.5, -0.1, 0.0, 0.2]
+        rx = apply_rope(x, 3)
+        assert abs(dot(rx, y) - dot(x, apply_rope_bwd(y, 3))) < 1e-9
+        restored = apply_rope(apply_rope_bwd(x, 5), 5)
+        assert all(abs(a - b) < 1e-9 for a, b in zip(restored, x))
+
+    def test_gelu_bwd_finite(self):
+        from skeleton.cortex.attn import gelu, gelu_bwd
+        x = [-2.0, -0.5, 0.0, 0.5, 2.0]
+        y = gelu(x)
+        assert y[0] < 0.0
+        dy = [1.0] * 5
+        dx = gelu_bwd(dy, x)
+        assert all(abs(v) < 10.0 for v in dx)
+        assert dx[0] != 0.0  # leak, not a relu gate
+
+    def test_kv_cache_matches_full(self):
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.lm import gameforge_vocab
+        lm = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=4, n_heads=2, n_layers=2, d_ff=16)
+        a = lm.generate("plan tensor", n=8, seed=3, use_cache=True)
+        b = lm.generate("plan tensor", n=8, seed=3, use_cache=False)
+        assert a == b
+        assert len(a) == 8
+
+    def test_greedy_is_argmax(self):
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.lm import gameforge_vocab
+        from skeleton.cortex.attn import sample_logits
+        lm = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=1, n_heads=2, n_layers=2, d_ff=16)
+        ids = [lm._id(t) for t in ("plan", "tensor")]
+        logits = lm._logits(ids)
+        g = sample_logits(logits, None, temperature=0.0)
+        assert g == max(range(len(logits)), key=lambda i: logits[i])
+        k1 = sample_logits(logits, None, temperature=1.0, top_k=1)
+        assert k1 == g
+        a = lm.generate("plan tensor", n=6, seed=0, temperature=0.0, use_cache=True)
+        b = lm.generate("plan tensor", n=6, seed=99, temperature=0.0, use_cache=False)
+        assert a == b
+
+    def test_cached_mha_matches_last_causal(self):
+        from skeleton.cortex.attn import cached_mha, multi_head_attend, apply_rope
+        Q = [[0.2, 0.1, -0.1, 0.3], [0.0, 0.4, 0.2, -0.2], [0.3, -0.1, 0.1, 0.2]]
+        K = [apply_rope(q, t) for t, q in enumerate(Q)]
+        V = list(Q)
+        C, _ = multi_head_attend(K, K, V, 2)
+        c_last, _ = cached_mha(K[-1], K, V, 2)
+        assert all(abs(a - b) < 1e-9 for a, b in zip(C[-1], c_last))
+
+    def test_speculate_reports_ratio(self):
+        from skeleton.cortex import JeevesCortex
+        from skeleton.cortex.speculate import speculate
+        neo = JeevesCortex()
+        out = speculate(neo, "plan tensor ttk hp", n=6, seed=2, k=8)
+        assert out["drafted"] >= 0
+        assert 0.0 <= out["ratio"] <= 1.0
+        assert out["verifier"] == "neo-transformer"
+        assert out["drafter"] == "pfc"
+        assert "accepted_tokens" in out
+
+    def test_tournament_names_a_winner(self):
+        from skeleton.cortex import JeevesCortex
+        from skeleton.cortex.zaibatsu import devil_gene, tournament
+        neo = JeevesCortex()
+        card = tournament(neo)
+        assert card["house"] == "mishima-zaibatsu"
+        assert card["winner"] in {"pfc", "midbrain", "neo"}
+        assert card["mouths"]["neo"]["n_layers"] >= 2
+        assert card["mouths"]["midbrain"]["n_layers"] <= 2
+        assert card["seal"]["n_layers"] >= 2
+        d = devil_gene(neo)
+        assert d["n_layers"] >= 2
+        assert d["armed"] is False
+        neo.train(epochs=1)
+        card2 = tournament(neo)
+        assert card2["mouths"]["neo"]["ppl"] < card["mouths"]["neo"]["ppl"]
+        assert card2["metrics"]["beats"]["bpe_compresses"] is True
+        assert card2["metrics"]["ppl"] < card["metrics"]["ppl"]
 
 
 

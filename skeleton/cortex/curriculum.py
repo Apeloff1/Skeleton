@@ -65,6 +65,7 @@ WALK_PAIRS: List[Pair] = [
 ]
 
 _MIX_RE = re.compile(r"mix trash=(\d+) elite=(\d+) boss=(\d+) slack=([0-9.]+)")
+_NEO_FIT = {a for a, _ in CORE_PAIRS} | {a for a, _ in WALK_PAIRS}
 
 
 def _ingest_observed_mix(neo, train_s: str) -> None:
@@ -125,7 +126,11 @@ def train(neo, *, epochs: int = 1, pairs: Sequence[Pair] | None = None,
                     port.fit(train_s)
             xf = getattr(neo, "transformer", None)
             if xf is not None and hasattr(xf, "fit"):
-                xf.fit([train_s])
+                # Neo LM trains on the builder dialect, not every era id.
+                # Era pairs still think() and port.fit; UNK-heavy era names
+                # blow a 2-layer residual if they take the same SGD as TTK.
+                if train_s in _NEO_FIT:
+                    xf.fit([train_s], lr=0.03)
         for slot in SLOTS:
             neo.acquire(slot)
         if auto_surpass:
@@ -160,6 +165,8 @@ def train(neo, *, epochs: int = 1, pairs: Sequence[Pair] | None = None,
         "device": str(getattr(xf, "device", "cpu") or "cpu"),
         "resident": bool(getattr(xf, "resident", False)),
     }
+    from skeleton.cortex.metrics import evaluate as _eval
+    scored = _eval(neo) if neo is not None else {}
     return {
         "epochs": epochs,
         "items": len(curriculum),
@@ -176,4 +183,6 @@ def train(neo, *, epochs: int = 1, pairs: Sequence[Pair] | None = None,
         "callosum": last_status.get("callosum"),
         "sleep": last_status.get("sleep"),
         "rl": last_status.get("rl"),
+        "bpe": last_status.get("bpe"),
+        "metrics": scored,
     }

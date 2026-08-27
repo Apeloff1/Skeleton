@@ -128,9 +128,11 @@ class TorchAccel:
         D = int(lm.dim)
         heads = max(1, int(lm.n_heads))
         dh = max(1, D // heads)
+        T = X.size(0)
         for blob in self._layers:
             Xn = torch.nn.functional.layer_norm(X, (D,), blob["ln1_g"], blob["ln1_b"])
             Q, K, V = Xn @ blob["Wq"].T, Xn @ blob["Wk"].T, Xn @ blob["Wv"].T
+            Q, K = self._rope(Q), self._rope(K)
             chunks = []
             for h in range(heads):
                 Qh = Q[:, h * dh:(h + 1) * dh]
@@ -138,7 +140,6 @@ class TorchAccel:
                 Vh = V[:, h * dh:(h + 1) * dh]
                 scale = dh ** -0.5
                 scores = Qh @ Kh.T * scale
-                T = scores.size(0)
                 mask = torch.triu(torch.ones(T, T, device=self.device), diagonal=1).bool()
                 scores = scores.masked_fill(mask, float("-inf"))
                 A = torch.softmax(scores, dim=-1)
@@ -147,9 +148,35 @@ class TorchAccel:
             X = X + C @ blob["Wo"].T
             if blob.get("W1") is not None:
                 Un = torch.nn.functional.layer_norm(X, (D,), blob["ln2_g"], blob["ln2_b"])
-                z = torch.relu(Un @ blob["W1"].T + blob["b1"])
+                hid = Un @ blob["W1"].T + blob["b1"]
+                z = self._gelu(hid)
                 X = X + z @ blob["W2"].T + blob["b2"]
         return X[-1] @ self._Wout.T + self._bout, X[-1]
+
+    def _rope(self, X):
+        """Match attn.apply_rope: even/odd pairs, θ = pos / 10000^(i/d)."""
+        torch = self.torch
+        T, D = X.shape
+        d = D - (D % 2)
+        if d < 2:
+            return X
+        out = X.clone()
+        pos = torch.arange(T, device=X.device, dtype=X.dtype).unsqueeze(1)
+        i = torch.arange(0, d, 2, device=X.device, dtype=X.dtype)
+        theta = pos / (10000.0 ** (i / float(d)))
+        c, s = torch.cos(theta), torch.sin(theta)
+        even = X[:, 0:d:2]
+        odd = X[:, 1:d:2]
+        out = out.clone()
+        out[:, 0:d:2] = even * c - odd * s
+        out[:, 1:d:2] = even * s + odd * c
+        return out
+
+    def _gelu(self, x):
+        """Tanh approximation matching attn.gelu — not erf."""
+        torch = self.torch
+        k = 0.7978845608028654  # sqrt(2/pi)
+        return 0.5 * x * (1.0 + torch.tanh(k * (x + 0.044715 * x * x * x)))
 
     def logits(self, ids: Sequence[int]) -> List[float]:
         with self.torch.no_grad():

@@ -440,17 +440,60 @@ class BuilderBrain:
                     if wr.extracted and not wr.collapsed:
                         collapse = float((pack.get("session") or {}).get("collapse_max") or 1.0)
                         moe_slack = (collapse - wr.t) / collapse if collapse else 0.0
-                        trash, elite, boss = nt, ne, nb
-                        trash, elite, boss, thermal_span, extra_m = _prune_mix(pack, trash, elite, boss)
-                        veto_notes = list(veto_notes) + extra_m + [
-                            f"moe mix trash={trash} elite={elite} boss={boss} slack={moe_slack:.2f}"
-                        ]
-                        if hasattr(cortex, "reinforce"):
-                            cortex.reinforce(
-                                f"plan {era} forge mix bias ttk extract",
-                                (float(trash), float(elite), float(boss)),
-                                float(moe_slack),
-                            )
+                        cur = walk_from_pack(
+                            pack,
+                            plan={"seed": proto["seed"], "extract_late": extract_late,
+                                  "enemy_mix": {"trash": trash, "elite": elite, "boss": boss}},
+                            mode="thermal",
+                        )
+                        cur_slack = ((collapse - cur.t) / collapse) if (collapse and cur.extracted) else -1.0
+                        if moe_slack > cur_slack + 1e-6:
+                            trash, elite, boss = nt, ne, nb
+                            trash, elite, boss, thermal_span, extra_m = _prune_mix(pack, trash, elite, boss)
+                            veto_notes = list(veto_notes) + extra_m + [
+                                f"moe mix trash={trash} elite={elite} boss={boss} slack={moe_slack:.2f}"
+                            ]
+                            if hasattr(cortex, "reinforce"):
+                                cortex.reinforce(
+                                    f"plan {era} forge mix bias ttk extract",
+                                    (float(trash), float(elite), float(boss)),
+                                    float(moe_slack),
+                                )
+
+        if cortex is not None and not skip_search and hasattr(cortex, "predict_bias"):
+            pb = cortex.predict_bias(f"plan {era} forge mix bias ttk extract")
+            if pb and pb != bias:
+                from skeleton.forge.walk import walk_from_pack
+                proto_b = {
+                    "seed": hashlib.sha256(f"{era}|{fp}|moe-bias".encode()).hexdigest()[:16],
+                    "room_bias": pb,
+                    "extract_late": extract_late,
+                    "enemy_mix": {"trash": trash, "elite": elite, "boss": boss},
+                }
+                wrb = walk_from_pack(pack, plan=proto_b, mode="thermal")
+                if wrb.extracted and not wrb.collapsed:
+                    bias = pb
+                    veto_notes.append(f"moe bias={bias}")
+
+        if cortex is not None and not skip_search and hasattr(cortex, "predict_policy"):
+            pol = cortex.predict_policy(f"plan {era} forge mix bias ttk extract")
+            if pol is not None:
+                sp, lt = bool(pol[0]), bool(pol[1])
+                if (sp, lt) != (spawn_weapon, extract_late):
+                    from skeleton.forge.walk import walk_from_pack
+                    proto_p = {
+                        "seed": hashlib.sha256(f"{era}|{fp}|moe-pol".encode()).hexdigest()[:16],
+                        "spawn_weapon": sp,
+                        "extract_late": lt,
+                        "room_bias": bias,
+                        "enemy_mix": {"trash": trash, "elite": elite, "boss": boss},
+                    }
+                    wrp = walk_from_pack(pack, plan=proto_p, mode="thermal")
+                    if wrp.extracted and not wrp.collapsed:
+                        spawn_weapon, extract_late = sp, lt
+                        veto_notes.append(
+                            f"moe policy armed={int(spawn_weapon)} late={int(extract_late)}"
+                        )
 
         seed_src = f"{era}|{fp}|{oracle_index}"
         if tag != "none":

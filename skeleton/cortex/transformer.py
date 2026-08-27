@@ -9,11 +9,16 @@ from __future__ import annotations
 
 import math
 import random
-from typing import Any, Dict, Iterable, List, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from skeleton.cortex.attn import (
     add,
     add_outer,
+    apply_rope,
+    apply_rope_bwd,
+    cached_mha,
+    gelu,
+    gelu_bwd,
     layer_norm,
     layer_norm_bwd,
     matvec,
@@ -21,7 +26,7 @@ from skeleton.cortex.attn import (
     mha_backward,
     multi_head_attend,
     ones,
-    relu,
+    sample_logits,
     softmax,
     zeros,
 )
@@ -103,8 +108,8 @@ class TransformerBlock:
             Xn.append(y)
             hats1.append(hat)
             invs1.append(inv)
-        Q = [matvec(self.Wq, x) for x in Xn]
-        K = [matvec(self.Wk, x) for x in Xn]
+        Q = [apply_rope(matvec(self.Wq, x), t) for t, x in enumerate(Xn)]
+        K = [apply_rope(matvec(self.Wk, x), t) for t, x in enumerate(Xn)]
         V = [matvec(self.Wv, x) for x in Xn]
         C, As = multi_head_attend(Q, K, V, n_heads)
         attn = [matvec(self.Wo, c) for c in C]
@@ -122,7 +127,7 @@ class TransformerBlock:
                 hats2.append(hat)
                 invs2.append(inv)
             pre = [add(matvec(self.W1, u), self.b1) for u in Un]
-            z = [relu(p) for p in pre]
+            z = [gelu(p) for p in pre]
             ff = [add(matvec(self.W2, zi), self.b2) for zi in z]
             Y = [add(U[t], ff[t]) for t in range(n)]
         cache = {
@@ -136,6 +141,11 @@ class TransformerBlock:
     def backward(self, dY: List[List[float]], cache: Dict[str, Any], lr: float) -> List[List[float]]:
         n = len(dY)
         D = self.dim
+        for t in range(n):
+            g = math.sqrt(sum(x * x for x in dY[t]))
+            if g > 2.0:
+                s = 2.0 / g
+                dY[t] = [x * s for x in dY[t]]
         dU = [list(dY[t]) for t in range(n)]
         if self.d_ff and cache.get("z"):
             Un = cache["Un"]
@@ -148,7 +158,7 @@ class TransformerBlock:
                 for i in range(D):
                     acc_b2[i] += dY[t][i]
                 d_z = matvec_T(self.W2, dY[t])
-                d_pre = [d_z[i] if z[t][i] > 0.0 else 0.0 for i in range(len(d_z))]
+                d_pre = gelu_bwd(d_z, cache["pre"][t])
                 add_outer(self.W1, d_pre, Un[t], -lr)
                 for i in range(len(self.b1)):
                     acc_b1[i] += d_pre[i]
@@ -178,6 +188,8 @@ class TransformerBlock:
         dQ, dK, dV = mha_backward(
             dC, cache["Q"], cache["K"], cache["V"], cache["As"], int(cache["n_heads"]),
         )
+        dQ = [apply_rope_bwd(dq, t) for t, dq in enumerate(dQ)]
+        dK = [apply_rope_bwd(dk, t) for t, dk in enumerate(dK)]
         dXn = [zeros(D) for _ in range(n)]
         for t in range(n):
             add_outer(self.Wq, dQ[t], Xn[t], -lr)
@@ -200,6 +212,55 @@ class TransformerBlock:
             self.ln1_b[i] -= lr * acc_db[i]
         X = cache["X"]
         return [add(dU[t], dX_ln[t]) for t in range(n)] if X else dX_ln
+
+    def step(
+        self,
+        x: List[float],
+        Ks: List[List[float]],
+        Vs: List[List[float]],
+        n_heads: int,
+        pos: int,
+    ) -> List[float]:
+        """One-token decode step. Ks/Vs grow with unroped keys; RoPE at attend time."""
+        y, _, _ = layer_norm(x, self.ln1_g, self.ln1_b)
+        q = matvec(self.Wq, y)
+        k = matvec(self.Wk, y)
+        v = matvec(self.Wv, y)
+        Ks.append(k)
+        Vs.append(v)
+        K_rope = [apply_rope(kk, t) for t, kk in enumerate(Ks)]
+        q_rope = apply_rope(q, pos)
+        c, _ = cached_mha(q_rope, K_rope, Vs, n_heads)
+        attn = matvec(self.Wo, c)
+        u = add(x, attn)
+        if self.d_ff:
+            un, _, _ = layer_norm(u, self.ln2_g, self.ln2_b)
+            z = gelu(add(matvec(self.W1, un), self.b1))
+            ff = add(matvec(self.W2, z), self.b2)
+            return add(u, ff)
+        return u
+
+
+class KVCache:
+    """Window-relative key/value bank. Reset when the window origin moves."""
+
+    def __init__(self, n_layers: int, ctx: int) -> None:
+        self.n_layers = max(1, int(n_layers))
+        self.ctx = max(2, int(ctx))
+        self.K: List[List[List[float]]] = [[] for _ in range(self.n_layers)]
+        self.V: List[List[List[float]]] = [[] for _ in range(self.n_layers)]
+        self.tokens: List[int] = []
+
+    def reset(self) -> None:
+        self.K = [[] for _ in range(self.n_layers)]
+        self.V = [[] for _ in range(self.n_layers)]
+        self.tokens = []
+
+    def primed_for(self, window: Sequence[int]) -> bool:
+        """True iff cache holds window[:-1] and can extend by window[-1]."""
+        if not window:
+            return False
+        return self.tokens == list(window[:-1])
 
 
 class TinyTransformer:
@@ -395,18 +456,46 @@ class TinyTransformer:
         y = H[-1] if H else zeros(self.dim)
         return add(matvec(self.Wout, y), self.bout)
 
+    def _step(self, idx: int, cache: KVCache) -> List[float]:
+        """Extend the cache by one id. RoPE position is window-relative."""
+        t = len(cache.tokens)
+        ei = int(idx) if 0 <= int(idx) < self.V else self.unk
+        x = add(self.E[ei], self.P[min(t, self.ctx - 1)])
+        for li, layer in enumerate(self.layers):
+            x = layer.step(x, cache.K[li], cache.V[li], self.n_heads, t)
+        cache.tokens.append(ei)
+        return add(matvec(self.Wout, x), self.bout)
+
+    def _logits_window(self, ids: Sequence[int], cache: Optional[KVCache] = None) -> List[float]:
+        window = list(ids[-self.ctx:] or [self.unk])
+        if cache is None:
+            return self._logits(window)
+        if cache.primed_for(window):
+            return self._step(window[-1], cache)
+        cache.reset()
+        for idx in window[:-1]:
+            self._step(idx, cache)
+        return self._step(window[-1], cache)
+
     def hidden(self, prefix: str) -> List[float]:
         """Last-position context after the stacked residual stream."""
+        seq = self.hidden_seq(prefix)
+        return list(seq[-1]) if seq else zeros(self.dim)
+
+    def hidden_seq(self, prefix: str) -> List[List[float]]:
+        """Full residual stream. Callosum reads this, not just the last token."""
         ids = [self._id(t) for t in tokens(prefix)] or [self.unk]
         ids = ids[-self.ctx:]
         if self._accel is not None:
             try:
-                return list(self._accel.hidden(ids))
+                h = list(self._accel.hidden(ids))
+                H, _ = self._forward(ids)
+                return [list(row) for row in H] if H else [h]
             except Exception:
                 self._accel = None
                 self.resident = False
         H, _ = self._forward(ids)
-        return list(H[-1]) if H else zeros(self.dim)
+        return [list(row) for row in H] if H else [zeros(self.dim)]
 
     def weights_last(self, prefix: str) -> List[float]:
         ids = [self._id(t) for t in tokens(prefix)] or [self.unk]
@@ -438,6 +527,10 @@ class TinyTransformer:
         p = softmax(logits)
         loss = -math.log(max(p[target], 1e-12))
         dlog = [p[v] - (1.0 if v == target else 0.0) for v in range(self.V)]
+        g2 = math.sqrt(sum(x * x for x in dlog))
+        if g2 > 5.0:
+            s = 5.0 / g2
+            dlog = [x * s for x in dlog]
 
         dy = matvec_T(self.Wout, dlog)
         add_outer(self.Wout, dlog, y, -lr)
@@ -449,6 +542,11 @@ class TinyTransformer:
         for layer, cache in zip(reversed(self.layers), reversed(caches)):
             dH = layer.backward(dH, cache, lr)
 
+        for t in range(n):
+            g = math.sqrt(sum(x * x for x in dH[t]))
+            if g > 2.0:
+                s = 2.0 / g
+                dH[t] = [x * s for x in dH[t]]
         for t, idx in enumerate(ids):
             dx = dH[t]
             for d in range(D):
@@ -457,7 +555,7 @@ class TinyTransformer:
         self.steps += 1
         return loss
 
-    def fit(self, texts: Iterable[str], *, lr: float = 0.06) -> int:
+    def fit(self, texts: Iterable[str], *, lr: float = 0.04) -> int:
         n = 0
         for raw in texts:
             body = tokens(raw)
@@ -505,7 +603,17 @@ class TinyTransformer:
                 self.resident = False
         return " ".join(self.generate(prefix, n=n, seed=seed))
 
-    def generate(self, prefix: str | Sequence[str], n: int = 12, *, seed: int = 0) -> Tuple[str, ...]:
+    def generate(
+        self,
+        prefix: str | Sequence[str],
+        n: int = 12,
+        *,
+        seed: int = 0,
+        temperature: float = 1.0,
+        top_k: int = 0,
+        top_p: float = 1.0,
+        use_cache: bool = True,
+    ) -> Tuple[str, ...]:
         rng = random.Random(int(seed) & 0xFFFFFFFF)
         if isinstance(prefix, str):
             body = list(tokens(prefix))
@@ -513,18 +621,14 @@ class TinyTransformer:
             body = [str(t) for t in prefix]
         ids = [self._id(t) for t in body] or [self.unk]
         out = list(ids)
+        cache = KVCache(self.n_layers, self.ctx) if use_cache else None
         for _ in range(max(1, n)):
             window = out[-self.ctx:]
-            p = softmax(self._logits(window))
-            r = rng.random()
-            acc = 0.0
-            nxt = self.V - 1
-            for v, pv in enumerate(p):
-                acc += pv
-                if acc >= r:
-                    nxt = v
-                    break
-            out.append(nxt)
+            logits = self._logits_window(window, cache)
+            nxt = sample_logits(
+                logits, rng, temperature=temperature, top_k=top_k, top_p=top_p,
+            )
+            out.append(int(nxt))
         return tuple(self.itos[i] if 0 <= i < len(self.itos) else UNK for i in out[:n])
 
     def snapshot(self) -> Dict[str, Any]:

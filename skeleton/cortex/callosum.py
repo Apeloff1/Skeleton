@@ -13,7 +13,7 @@ import math
 from collections import deque
 from typing import Any, Deque, Dict, List, Optional, Sequence, Tuple
 
-from skeleton.cortex.attn import add, dot, matvec, scale, softmax, zeros
+from skeleton.cortex.attn import add, apply_rope, dot, matvec, scale, softmax, zeros
 
 Vec = List[float]
 Mat = List[List[float]]
@@ -114,6 +114,7 @@ class CorpusCallosum:
         self.hebbs = 0
         self.last_attn_lr: List[float] = []
         self.last_attn_rl: List[float] = []
+        self.seq_fires = 0
 
     def split(self, h: Sequence[float]) -> Tuple[Vec, Vec]:
         v = list(h)[: self.dim] + [0.0] * max(0, self.dim - len(h))
@@ -145,6 +146,62 @@ class CorpusCallosum:
         self.fires += 1
         return fused, fused_l, fused_r
 
+    def fuse_seq(
+        self,
+        seq: Sequence[Sequence[float]],
+        *,
+        left_on: bool = True,
+        right_on: bool = True,
+    ) -> Tuple[Vec, List[Vec], List[Vec]]:
+        """Sequence-level commissure. Every left token attends over all right tokens.
+
+        RoPE on Q/K so order is not a bag. Pooled fused ≠ fuse(last) whenever
+        the window is longer than one. That is the identity last-hidden cannot
+        fake. Memory still records the last projected token of each stream.
+        """
+        if not seq:
+            z = zeros(self.dim)
+            return z, [], []
+        if len(seq) == 1:
+            return self.fuse(seq[0], left_on=left_on, right_on=right_on)
+
+        Ls: List[Vec] = []
+        Rs: List[Vec] = []
+        for t, h in enumerate(seq):
+            hl, hr = self.split(h)
+            Ls.append(apply_rope(hl, t))
+            Rs.append(apply_rope(hr, t))
+        if left_on:
+            self.mem.left.append(list(Ls[-1]))
+        if right_on:
+            self.mem.right.append(list(Rs[-1]))
+
+        fused_L: List[Vec] = []
+        fused_R: List[Vec] = []
+        last_w: List[float] = []
+        for i, q in enumerate(Ls):
+            ctx, w = _cross_attend(q, Rs, Rs, self.Wq_l, self.Wk_l, self.Wv_l)
+            fused_L.append(add(q, scale(ctx, self.gate_l)) if ctx else list(q))
+            last_w = w
+        for i, q in enumerate(Rs):
+            ctx, w = _cross_attend(q, Ls, Ls, self.Wq_r, self.Wk_r, self.Wv_r)
+            fused_R.append(add(q, scale(ctx, self.gate_r)) if ctx else list(q))
+        self.last_attn_lr = last_w
+        n = max(1, len(fused_L[-1]) if fused_L else self.dim)
+        pooled_l = zeros(n)
+        pooled_r = zeros(n)
+        for v in fused_L:
+            for i in range(min(n, len(v))):
+                pooled_l[i] += v[i]
+        for v in fused_R:
+            for i in range(min(n, len(v))):
+                pooled_r[i] += v[i]
+        inv = 1.0 / max(1, len(fused_L))
+        fused = [0.5 * (pooled_l[i] * inv + pooled_r[i] * inv) for i in range(n)]
+        self.fires += 1
+        self.seq_fires += 1
+        return fused, fused_L, fused_R
+
     def hebb(self, h: Sequence[float], *, lr: float = 0.04) -> float:
         """When both streams fire, C += lr · outer(h_l, h_r). Returns Δenergy."""
         h_l, h_r = self.split(h)
@@ -172,6 +229,7 @@ class CorpusCallosum:
             "gate_l": self.gate_l, "gate_r": self.gate_r,
             "mem": self.mem.snapshot(),
             "fires": self.fires, "hebbs": self.hebbs,
+            "seq_fires": self.seq_fires,
         }
 
     @classmethod
@@ -188,6 +246,7 @@ class CorpusCallosum:
         cc.gate_r = float((data or {}).get("gate_r") if (data or {}).get("gate_r") is not None else cc.gate_r)
         cc.fires = int((data or {}).get("fires") or 0)
         cc.hebbs = int((data or {}).get("hebbs") or 0)
+        cc.seq_fires = int((data or {}).get("seq_fires") or 0)
         if (data or {}).get("mem"):
             cc.mem.restore(data["mem"])
         return cc
@@ -197,6 +256,7 @@ class CorpusCallosum:
             "dim": self.dim,
             "fires": self.fires,
             "hebbs": self.hebbs,
+            "seq_fires": self.seq_fires,
             "mem_left": len(self.mem.left),
             "mem_right": len(self.mem.right),
             "gate_l": round(self.gate_l, 4),
