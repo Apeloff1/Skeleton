@@ -11,6 +11,7 @@ from .sources import SourceRegistry
 from .ingest import CorpusIngestor, Document
 from .rerank import Reranker, RerankRule
 from .highlight import Highlighter
+from .dedup import Deduper
 
 __all__ = [
     "Fuser",
@@ -33,4 +34,5 @@ __all__ = [
     "Reranker",
     "RerankRule",
     "Highlighter",
+    "Deduper",
 ]

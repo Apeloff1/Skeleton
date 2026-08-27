@@ -1,4 +1,4 @@
-"""Secrets vault subsystem — sealing, threshold, rotation, audit, access, KMS, sealed store."""
+"""Secrets vault subsystem — sealing, rotation, audit, access, KMS, sealed store, key registry."""
 
 from .shamir import SealingError, ShamirSeal, Share
 from .rotation import RotationPolicy, RotationScheduler, RotationTrigger
@@ -6,6 +6,7 @@ from .audit import AuditEntry, AuditLog
 from .access import AccessDenied, AccessPolicy, Role
 from .kms import DataKey, EnvelopeError, EnvelopeKMS
 from .store import IntegrityError, SealedStore
+from .keys import KeyRegistry, KeyVersion, KeyVersionError
 
 __all__ = [
     "Share",
@@ -24,4 +25,7 @@ __all__ = [
     "EnvelopeKMS",
     "IntegrityError",
     "SealedStore",
+    "KeyRegistry",
+    "KeyVersion",
+    "KeyVersionError",
 ]
