@@ -261,3 +261,31 @@ async def resilience_sanitise(request: Dict[str, Any], state=Depends(_state)) ->
 @router.get("/resilience/stats")
 async def resilience_stats(state=Depends(_state)) -> Dict[str, Any]:
     return _require(state.resilience, "Resilience").stats()
+
+
+@router.get("/context/snapshot")
+async def context_snapshot(state=Depends(_state)) -> Dict[str, Any]:
+    return _require(state.cockpit, "Cockpit").snapshot()
+
+
+@router.post("/context/command")
+async def context_command(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    return _require(state.cockpit, "Cockpit").apply(request.get("command", ""))
+
+
+@router.post("/gameforge/run")
+async def gameforge_run(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    runner = _require(state.gameforge, "GameForge")
+    out = runner.execute(
+        request.get("vision", ""),
+        era=request.get("era"),
+        archetype=request.get("archetype", "extraction"),
+        target=request.get("target", "godot"),
+    )
+    # files can be large; keep names in the HTTP body
+    files = out.get("files") or {}
+    out = dict(out)
+    out["file_names"] = sorted(files)
+    if not request.get("include_files"):
+        out.pop("files", None)
+    return out

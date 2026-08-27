@@ -52,6 +52,8 @@ class AppState:
         self.jeeves_krem: Optional[KremMatrix] = None
         self.jeeves_memory: Optional[RagMemory] = None
         self.forge: Optional[Forge] = None
+        self.cockpit = None
+        self.gameforge = None
         self.npc_pipeline: Optional[NpcPipeline] = None
         self.game_logic_pipeline: Optional[GameLogicPipeline] = None
         self.animation_pipeline: Optional[AnimationPipeline] = None
@@ -72,6 +74,7 @@ class AppState:
             "intelligence": self.intelligence is not None,
             "jeeves": self.jeeves is not None,
             "forge": self.forge is not None,
+            "context": self.cockpit is not None,
             "observability": self.health is not None and self.metrics is not None,
             "vault": self.audit is not None,
             "pipelines": all([
@@ -118,6 +121,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     state.jeeves_memory = RagMemory(bus=state.bus)
     state.jeeves = Jeeves(bus=state.bus, max_turns=state.settings.jeeves.max_session_turns)
     state.forge = Forge(bus=state.bus)
+    from skeleton.context import Cockpit, GameForgeRun
+    state.cockpit = genesis.handles.get("cockpit") or Cockpit()
+    state.gameforge = genesis.handles.get("gameforge") or GameForgeRun(bus=state.bus, cockpit=state.cockpit)
     state.npc_pipeline = NpcPipeline(bus=state.bus)
     state.game_logic_pipeline = GameLogicPipeline(bus=state.bus)
     state.animation_pipeline = AnimationPipeline(bus=state.bus)

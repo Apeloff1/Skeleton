@@ -42,6 +42,7 @@ class Genesis:
         self._phase_intelligence()
         self._phase_swarm()
         self._phase_resilience()
+        self._phase_context()
         self._phase_interface()
         self.bus.publish(
             DomainEvent(
@@ -147,6 +148,13 @@ class Genesis:
         canaries.plant("memory.rag")
         canaries.plant("vault")
         self._wire("resilience", "canaries", canaries)
+
+    def _phase_context(self) -> None:
+        self.report.phases.append("context")
+        from skeleton.context import Cockpit, GameForgeRun
+        cockpit = Cockpit()
+        self._wire("context", "cockpit", cockpit)
+        self._wire("context", "gameforge", GameForgeRun(bus=self.bus, cockpit=cockpit))
 
     def _phase_interface(self) -> None:
         self.report.phases.append("interface")

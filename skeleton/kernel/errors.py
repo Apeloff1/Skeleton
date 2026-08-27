@@ -128,6 +128,11 @@ class AgentUnavailable(AgentError):
     http_status = 503
 
 
+class AgentQuarantinedError(AgentError):
+    code = "AGT.QUARANTINED"
+    http_status = 423
+
+
 class PipelineError(SkeletonError):
     code = "PPL.UNKNOWN"
 

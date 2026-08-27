@@ -6,6 +6,7 @@ from .auction import AuctionBid, VickreyAuction
 from .mesh import SwarmMesh
 from .stigmergy import Trail, PheromoneField, StigmergicRouter
 from .roles import RoleRegistry, RoleError, default_roles
+from .hive import HiveMind, HiveResult, AggregationError
 
 __all__ = [
     "AgentRole",
@@ -24,4 +25,7 @@ __all__ = [
     "RoleRegistry",
     "RoleError",
     "default_roles",
+    "HiveMind",
+    "HiveResult",
+    "AggregationError",
 ]
