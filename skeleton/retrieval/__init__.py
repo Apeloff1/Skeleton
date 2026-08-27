@@ -6,6 +6,7 @@ from .query import QueryPlan, QueryPlanner, RetrievalError
 from .index import InvertedIndex
 from .query_language import QueryParser, QueryTerm
 from .cache import CacheEntry, ResultCache
+from .chunking import Chunk, Chunker
 
 __all__ = [
     "Fuser",
@@ -20,4 +21,6 @@ __all__ = [
     "QueryTerm",
     "CacheEntry",
     "ResultCache",
+    "Chunk",
+    "Chunker",
 ]
