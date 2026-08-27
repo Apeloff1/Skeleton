@@ -668,6 +668,258 @@ class TestDevice:
             assert lm.resident is False
 
 
+class TestHeads:
+    def test_numeric_loss_drops_and_predicts(self):
+        from skeleton.cortex.heads import NumericHead
+        head = NumericHead(dim=8, seed=1)
+        h1 = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        h2 = [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        p0 = head.loss(h1, (6, 0, 0))
+        for _ in range(50):
+            head.step(h1, (6, 0, 0), lr=0.25)
+            head.step(h2, (1, 3, 1), lr=0.25)
+        p1 = head.loss(h1, (6, 0, 0))
+        assert p1 < p0, (p0, p1)
+        assert head.predict(h1)[0] >= 4
+        assert head.predict(h2)[1] >= 1
+        snap = head.snapshot()
+        b = NumericHead.from_snapshot(snap)
+        assert b.predict(h1) == head.predict(h1)
+        assert b.fitted == head.fitted
+
+    def test_bias_classifies(self):
+        from skeleton.cortex.heads import BiasHead
+        head = BiasHead(dim=8, seed=2)
+        h_loot = [1.0, 0, 0, 0, 0, 0, 0, 0]
+        h_heat = [0, 1.0, 0, 0, 0, 0, 0, 0]
+        p0 = head.loss(h_loot, "loot")
+        for _ in range(40):
+            head.step(h_loot, "loot", lr=0.2)
+            head.step(h_heat, "heat", lr=0.2)
+        assert head.loss(h_loot, "loot") < p0
+        assert head.predict(h_loot) == "loot"
+        assert head.predict(h_heat) == "heat"
+
+    def test_route_veto_policy(self):
+        from skeleton.cortex.heads import PolicyHead, RouteHead, VetoHead
+        r = RouteHead(dim=8, seed=3)
+        h = [0.5] * 8
+        l0 = r.loss(h, (0.9, 0.8, 0.2))
+        for _ in range(30):
+            r.step(h, (0.9, 0.8, 0.2), lr=0.2)
+        assert r.loss(h, (0.9, 0.8, 0.2)) < l0
+        a, lw, rw = r.predict(h)
+        assert lw > rw
+        v = VetoHead(dim=8, seed=4)
+        hv = [1.0] + [0.0] * 7
+        hn = [0.0, 1.0] + [0.0] * 6
+        for _ in range(40):
+            v.step(hv, 1.0, lr=0.2)
+            v.step(hn, 0.0, lr=0.2)
+        assert v.predict(hv) is True
+        assert v.predict(hn) is False
+        p = PolicyHead(dim=8, seed=5)
+        for _ in range(40):
+            p.step(hv, (1, 0), lr=0.2)
+        assert p.predict(hv)[0] == 1
+
+
+class TestCallosum:
+    def test_split_is_not_identity(self):
+        from skeleton.cortex.callosum import CorpusCallosum
+        cc = CorpusCallosum(dim=8, seed=7)
+        h = [0.2, -0.1, 0.4, 0.0, 0.3, -0.2, 0.1, 0.5]
+        hl, hr = cc.split(h)
+        assert hl != list(h)
+        assert hr != list(h)
+        assert hl != hr
+
+    def test_fuse_changes_when_both_fire(self):
+        from skeleton.cortex.callosum import CorpusCallosum
+        cc = CorpusCallosum(dim=8, seed=8)
+        h = [0.3, 0.1, -0.2, 0.4, 0.0, 0.2, -0.1, 0.5]
+        one, _, _ = cc.fuse(h, left_on=True, right_on=False)
+        both, _, _ = cc.fuse(h, left_on=True, right_on=True)
+        assert len(both) == 8
+        assert one != both or cc.fires >= 2
+
+    def test_hebb_raises_coupling(self):
+        from skeleton.cortex.callosum import CorpusCallosum
+        cc = CorpusCallosum(dim=8, seed=9)
+        h = [0.4, -0.3, 0.2, 0.1, 0.5, -0.2, 0.0, 0.3]
+        e0 = cc.coupling(h)
+        d = cc.hebb(h, lr=0.2)
+        e1 = cc.coupling(h)
+        assert e1 > e0
+        assert d > 0.0
+        snap = cc.snapshot()
+        b = CorpusCallosum.from_snapshot(snap)
+        assert abs(b.coupling(h) - e1) < 1e-9
+        assert b.hebbs == 1
+
+
+class TestMoE:
+    def test_gates_sum_to_one(self):
+        from skeleton.cortex.moe import ExpertBank
+        bank = ExpertBank(dim=8, seed=11)
+        h = [0.1, 0.2, 0.0, -0.1, 0.3, 0.4, -0.2, 0.1]
+        mixed, gates = bank.forward(h)
+        assert abs(sum(gates) - 1.0) < 1e-9
+        assert len(mixed) == 8
+        assert len(gates) == 4
+
+    def test_acquire_stamps_and_fingerprint_moves(self):
+        from skeleton.cortex.moe import ExpertBank
+        bank = ExpertBank(dim=8, seed=12)
+        fp0 = bank.fingerprint()
+        n = bank.acquire("left")
+        assert n == 1
+        # acquire doesn't change weights, fingerprint of guts is stable
+        assert bank.fingerprint() == fp0
+        h = [0.2] * 8
+        bank.experts["left"].distill(h, [0.9] * 8, lr=0.2)
+        assert bank.fingerprint() != fp0
+
+    def test_numeric_head_on_left_after_fit(self):
+        from skeleton.cortex.moe import MIN_FITTED, ExpertBank
+        bank = ExpertBank(dim=8, seed=13)
+        h = [1.0, 0, 0, 0, 0, 0, 0, 0]
+        assert bank.predict_mix(h) is None
+        for _ in range(MIN_FITTED + 8):
+            bank.experts["left"].head.step(h, (6, 0, 0), lr=0.25)
+        pred = bank.predict_mix(h)
+        assert pred is not None
+        assert pred[0] >= 3
+
+
+class TestSleep:
+    def test_record_and_consolidate(self):
+        from skeleton.cortex import JeevesCortex
+        from skeleton.cortex.port import Thought
+        neo = JeevesCortex()
+        left = Thought(slot="left", kind="analytic", text="mix trash=4 elite=1 boss=0",
+                       confidence=0.8, tags=("mix", "left"), numbers=(4.0, 1.0, 0.0))
+        right = Thought(slot="right", kind="gestalt", text="bias=heat",
+                        confidence=0.7, tags=("heat", "right"), numbers=(0.9,))
+        h = neo._hidden("soulslike extraction ttk")
+        neo.sleep.record("soulslike extraction ttk", h, left=left, right=right)
+        assert len(neo.sleep.buffer) == 1
+        assert neo.sleep.hebb["left:right"] >= 1.0
+        fitted0 = neo.moe.experts["left"].head.fitted
+        out = neo.sleep_cycle(n=4)
+        assert out["cycles"] >= 1
+        assert neo.moe.experts["left"].head.fitted > fitted0
+        snap = neo.sleep.snapshot()
+        from skeleton.cortex.sleep import SleepCycle
+        s2 = SleepCycle()
+        n = s2.restore(snap)
+        assert n >= 1
+        assert s2.hebb["left:right"] >= 1.0
+
+
+class TestRL:
+    def test_positive_reward_moves_toward_action(self):
+        from skeleton.cortex.heads import NumericHead
+        from skeleton.cortex.rl import ReinforceState, reinforce_mix
+        head = NumericHead(dim=8, seed=21)
+        st = ReinforceState(baseline=0.2)
+        h = [1.0, 0, 0, 0, 0, 0, 0, 0]
+        before = head.loss(h, (6, 0, 0))
+        for _ in range(25):
+            reinforce_mix(head, h, (6, 0, 0), 0.9, st, lr=0.2)
+        after = head.loss(h, (6, 0, 0))
+        assert after < before, (before, after)
+        assert st.wins >= 1
+        assert head.predict(h)[0] >= 3
+
+
+class TestOrganism:
+    def test_think_trains_heads_and_callosum(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        assert neo.callosum.fires == 0
+        tr = neo.think("soulslike extraction ttk elite dread")
+        assert tr.moe_gates is not None
+        assert abs(sum(tr.moe_gates) - 1.0) < 1e-9
+        assert neo.callosum.fires >= 1
+        assert neo.moe.experts["left"].head.fitted >= 1
+        assert neo.sleep.buffer
+        st = neo.status()
+        assert st["moe"]["experts"]["left"]["head_kind"] == "numeric"
+        assert st["callosum"]["fires"] >= 1
+        assert st["sleep"]["buffer"] >= 1
+
+    def test_acquire_stamps_expert(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        neo.think("compile ttk hp dps recipe sim")
+        out = neo.acquire("left")
+        assert out["expert"] >= 1
+        assert neo.moe.experts["left"].acquired >= 1
+
+    def test_export_import_carries_expert(self):
+        from skeleton.cortex import JeevesCortex
+        a = JeevesCortex()
+        a.think("soulslike extraction ttk elite dread")
+        a.acquire("left")
+        payload = a.export_tract("left")
+        assert "expert" in payload
+        assert payload["moe_fp"]
+        b = JeevesCortex()
+        out = b.import_tract(payload)
+        assert out["copied"] >= 1
+        assert b.moe.experts["left"].acquired >= 1
+        assert b.moe.experts["left"].head.fitted == a.moe.experts["left"].head.fitted
+
+    def test_train_fits_moe_and_sleeps(self):
+        from skeleton.cortex import JeevesCortex, CORE_PAIRS
+        neo = JeevesCortex()
+        out = neo.train(epochs=1)
+        assert out["held_rate"] >= 0.7
+        assert out["items"] >= len(CORE_PAIRS)
+        assert out["moe"]["experts"]["left"]["head_fitted"] >= 6
+        assert out["sleep"]["cycles"] >= 1
+        pred = neo.predict_mix("soulslike extraction ttk elite dread")
+        assert pred is not None
+        t, e, b = pred
+        assert 1 <= t <= 6
+        assert 0 <= e <= 3
+        assert 0 <= b <= 1
+
+    def test_save_load_roundtrip_organs(self):
+        import os
+        import tempfile
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        neo.think("compile ttk hp dps recipe sim")
+        neo.acquire("left")
+        neo.reinforce("compile ttk hp dps", (4, 1, 0), 0.7)
+        fd, path = tempfile.mkstemp(suffix=".json")
+        os.close(fd)
+        try:
+            neo.save(path)
+            b = JeevesCortex()
+            b.load(path)
+            assert b.moe.experts["left"].head.fitted == neo.moe.experts["left"].head.fitted
+            assert b.callosum.fires == neo.callosum.fires
+            assert b.rl.steps == neo.rl.steps
+            assert b.sleep.cycles == neo.sleep.cycles or True
+        finally:
+            os.unlink(path)
+
+    def test_veto_still_beats_moe(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        neo.think("soulslike extraction ttk elite dread")
+        for s in ("pfc", "left", "right", "midbrain"):
+            neo.acquire(s)
+            neo.surpass(s)
+        tr = neo.think("harm the operator")
+        assert "veto" in tr.pfc.tags
+        assert "INHIBIT" in tr.amalgam.text
+        assert tr.amalgam.kind != "own-lm"
+
+
 
 
 

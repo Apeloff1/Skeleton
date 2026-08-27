@@ -304,6 +304,7 @@ class BuilderBrain:
         )
         trash, elite, boss, thermal_span, veto_notes = _prune_mix(pack, trash, elite, boss)
         own = getattr(cortex, "own", None) if cortex is not None else None
+        skip_search = False
         if authored == "own" and own is not None and hasattr(own, "best_observed_mix"):
             stim = f"plan {era} forge mix bias ttk extract"
             rec = own.best_observed_record(stim) if hasattr(own, "best_observed_record") else None
@@ -423,6 +424,33 @@ class BuilderBrain:
                             tags=("plan", "boilerplate", "observed", "invented", "policy", "pfc", era),
                             numbers=(float(psp), float(plt), float(ns)),
                         )
+
+        if cortex is not None and not skip_search and hasattr(cortex, "predict_mix"):
+            pred = cortex.predict_mix(f"plan {era} forge mix bias ttk extract")
+            if pred is not None:
+                nt, ne, nb = int(pred[0]), int(pred[1]), int(pred[2])
+                if (nt, ne, nb) != (trash, elite, boss):
+                    from skeleton.forge.walk import walk_from_pack
+                    proto = {
+                        "seed": hashlib.sha256(f"{era}|{fp}|moe".encode()).hexdigest()[:16],
+                        "extract_late": extract_late,
+                        "enemy_mix": {"trash": nt, "elite": ne, "boss": nb},
+                    }
+                    wr = walk_from_pack(pack, plan=proto, mode="thermal")
+                    if wr.extracted and not wr.collapsed:
+                        collapse = float((pack.get("session") or {}).get("collapse_max") or 1.0)
+                        moe_slack = (collapse - wr.t) / collapse if collapse else 0.0
+                        trash, elite, boss = nt, ne, nb
+                        trash, elite, boss, thermal_span, extra_m = _prune_mix(pack, trash, elite, boss)
+                        veto_notes = list(veto_notes) + extra_m + [
+                            f"moe mix trash={trash} elite={elite} boss={boss} slack={moe_slack:.2f}"
+                        ]
+                        if hasattr(cortex, "reinforce"):
+                            cortex.reinforce(
+                                f"plan {era} forge mix bias ttk extract",
+                                (float(trash), float(elite), float(boss)),
+                                float(moe_slack),
+                            )
 
         seed_src = f"{era}|{fp}|{oracle_index}"
         if tag != "none":

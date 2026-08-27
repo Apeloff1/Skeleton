@@ -3,7 +3,11 @@
 Every thought is a training pair (stimulus tokens → ability).
 acquire(slot) copies that tract into the neocortex. surpass(slot)
 arms own-system answers for that tract. Nearest-neighbour is
-token-Jaccard; SHA fingerprints are exact-match only. No gradient.
+token-Jaccard; SHA fingerprints are exact-match only.
+
+Gradient lives on the specialist heads (heads.py) and MoE adapters
+(moe.py): teacher numbers are labels, neo residual is the feature.
+This ledger is the tape those heads train from.
 """
 from __future__ import annotations
 

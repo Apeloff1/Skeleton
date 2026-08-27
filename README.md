@@ -93,7 +93,7 @@ python -m skeleton train --epochs 1
 
 HTTP: `GET /api/skeleton/eras` · `POST /api/skeleton/run` · `GET /api/skeleton/beats` · `POST /api/skeleton/think` · `POST /api/skeleton/train` · `GET /api/skeleton/cortex`
 
-Cortex (the model we are building, not implementing): PFC small/boilerplate · midbrain medium/coordinator · left analytic · right gestalt · Jeeves neo hivemind+trainer+LM. Slots are `ModelPort`s; `bind` hot-swaps a backend; `acquire` copies a tract into own-system; `surpass` answers from the neo transformer (own-lm decode). Stacked Pre-LN (n_layers=2, n_heads=2, FFN) on CPU; `to("cuda")` pins the same weights on GPU when torch can see one, else degrades. The speaking LM authors the BuildPlan briefing.
+Cortex (the model we are building, not implementing): PFC small/boilerplate · midbrain medium/coordinator · left analytic · right gestalt · Jeeves neo hivemind+trainer+LM. Slots are `ModelPort`s; `bind` hot-swaps a backend; `acquire` copies a tract into own-system **and stamps the MoE expert**; `surpass` answers from the neo transformer (own-lm decode). Stacked Pre-LN (n_layers=2, n_heads=2, FFN) on CPU; `to("cuda")` pins the same weights on GPU when torch can see one, else degrades. Specialist heads (numeric mix / bias / route / veto / policy) sit on the residual. Corpus callosum splits left/right streams and Hebbs when both fire. Sleep consolidates the replay buffer. REINFORCE eats walk slack. The speaking LM authors the BuildPlan briefing.
 
 ---
 
@@ -105,7 +105,7 @@ Cortex (the model we are building, not implementing): PFC small/boilerplate · m
 | **Agents** | Swarm discovery, routing, consensus, audit | `agents/mesh.py`, `agents/scheduler.py` |
 | **Pipelines** | NPC, game-logic, animation generation | `pipelines/*` |
 | **Jeeves** | Tutor persona, system laws, RAG memory, neocortex | `jeeves/*`, `cortex/*` |
-| **Cortex** | Interchangeable model: PFC/midbrain/hemispheres/own-system + stacked neo LM (CPU/CUDA harness) | `cortex/{port,pfc,midbrain,hemispheres,own,curriculum,neocortex,transformer,device,torch_lm}.py` |
+| **Cortex** | Interchangeable model: PFC/midbrain/hemispheres/own-system + stacked neo LM + MoE experts + corpus callosum + sleep + REINFORCE (CPU/CUDA harness) | `cortex/{port,pfc,midbrain,hemispheres,own,curriculum,neocortex,transformer,device,torch_lm,heads,callosum,moe,sleep,rl}.py` |
 | **Forge** | Universal system blueprint synthesis | `forge/universal.py` |
 | **API** | HTTP surface, validation, lifespan | `api/*` |
 

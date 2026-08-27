@@ -4,7 +4,9 @@ PFC (small / boilerplate) · midbrain (medium / coordinator) · left/right
 hemispheres · Jeeves neocortex (hivemind + trainer). Slots are ModelPorts;
 backends swap; acquire copies a tract into Jeeves' own system; surpass
 answers from that system. Own-system recall is token-Jaccard; tracts
-interchange between cortices.
+interchange between cortices. Specialist heads, corpus callosum, MoE
+experts, sleep consolidation and REINFORCE are how neo acquires the
+MODELS themselves and builds a system that surpasses them.
 """
 from .port import (
     SLOTS,
@@ -30,6 +32,11 @@ from .neural import NeuralLM, NeuralBackend
 from .transformer import TinyTransformer, TransformerBackend
 from .learned import LearnedWeights
 from .device import probe, resolve, attach_lm
+from .heads import BiasHead, NumericHead, PolicyHead, RouteHead, VetoHead
+from .callosum import CorpusCallosum
+from .moe import ExpertBank
+from .sleep import SleepCycle
+from .rl import ReinforceState, reinforce_mix
 
 __all__ = [
     "SLOTS",
@@ -78,4 +85,14 @@ __all__ = [
     "probe",
     "resolve",
     "attach_lm",
+    "NumericHead",
+    "BiasHead",
+    "RouteHead",
+    "VetoHead",
+    "PolicyHead",
+    "CorpusCallosum",
+    "ExpertBank",
+    "SleepCycle",
+    "ReinforceState",
+    "reinforce_mix",
 ]

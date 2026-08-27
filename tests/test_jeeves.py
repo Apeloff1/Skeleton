@@ -193,3 +193,11 @@ class TestBuilder:
         assert any("lm=own" in n for n in p1.notes)
         assert len(p1.briefing) > len(p0.briefing)
         assert "LM:" not in p0.briefing
+
+    def test_status_exposes_organs(self):
+        from skeleton.cortex import JeevesCortex
+        st = JeevesCortex().status()
+        assert "moe" in st and "callosum" in st and "sleep" in st and "rl" in st
+        assert st["moe"]["experts"]["left"]["head_kind"] == "numeric"
+        assert st["moe"]["experts"]["right"]["head_kind"] == "bias"
+

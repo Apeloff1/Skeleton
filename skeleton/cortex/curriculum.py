@@ -136,6 +136,8 @@ def train(neo, *, epochs: int = 1, pairs: Sequence[Pair] | None = None,
             held_total += 1
             if tr.used_own or (tr.recalled_jaccard and tr.recalled_jaccard >= 0.4):
                 held_hits += 1
+        if hasattr(neo, "sleep_cycle"):
+            neo.sleep_cycle()
         last_status = neo.status()
     rate = (held_hits / held_total) if held_total else 0.0
     lms = {}
@@ -170,4 +172,8 @@ def train(neo, *, epochs: int = 1, pairs: Sequence[Pair] | None = None,
         "shadow": last_status.get("shadow"),
         "backends": last_status.get("backends"),
         "lms": lms,
+        "moe": last_status.get("moe"),
+        "callosum": last_status.get("callosum"),
+        "sleep": last_status.get("sleep"),
+        "rl": last_status.get("rl"),
     }

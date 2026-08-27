@@ -8,26 +8,34 @@ The four slots (PFC / midbrain / left / right) are agents. Jeeves:
   5. amalgamates a teacher thought
   6. composes an own-system thought from Jaccard-nearest acquired tracts
   7. shadows own vs teacher; auto-surpass when own wins
-  8. acquire(slot) copies a model's abilities into own-system
+  8. acquire(slot) copies a model's abilities AND stamps the MoE expert
   9. surpass(slot) answers from own-system — the neo transformer SPEAKS
      (CPU default, CUDA if harnessed). Compose keeps the numbers. Veto still wins.
+ 10. specialist heads train on teacher numbers every think (online distill)
+ 11. corpus callosum fuses left/right streams; Hebb when both fire
+ 12. sleep consolidates the buffer; REINFORCE eats walk slack
 
 Backends are interchangeable: bind(slot, port) hot-swaps the model in
 that tract. The neo TinyTransformer is Jeeves' own language model.
 GPU is a harness on that same net, not a second architecture.
+Heads + MoE + callosum are how neo acquires the MODELS, not the prompts.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Sequence, Set
 
+from skeleton.cortex.callosum import CorpusCallosum
 from skeleton.cortex.curriculum import train as run_curriculum
 from skeleton.cortex.distill import Ability, AbilityLedger, ability_from
 from skeleton.cortex.hemispheres import LeftHemisphere, RightHemisphere
 from skeleton.cortex.midbrain import Midbrain
+from skeleton.cortex.moe import ExpertBank
 from skeleton.cortex.own import OwnSystem, Tract, shadow_eval
 from skeleton.cortex.pfc import PrefrontalCortex
 from skeleton.cortex.port import SLOTS, EchoBackend, ModelPort, Thought, fingerprint
+from skeleton.cortex.rl import ReinforceState, reinforce_mix
+from skeleton.cortex.sleep import SleepCycle
 from skeleton.kernel.errors import CortexError
 from skeleton.kernel.events import EventBus
 from skeleton.swarm.hive import Estimate, HiveMind
@@ -52,6 +60,7 @@ class CortexTrace:
     recalled_jaccard: float = 0.0
     shadow_win: Optional[bool] = None
     own_size: int = 0
+    moe_gates: Optional[List[float]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -69,6 +78,7 @@ class CortexTrace:
             "recalled_jaccard": round(self.recalled_jaccard, 4),
             "shadow_win": self.shadow_win,
             "own_size": self.own_size,
+            "moe_gates": None if self.moe_gates is None else [round(g, 4) for g in self.moe_gates],
         }
 
 
@@ -106,6 +116,11 @@ class JeevesCortex:
             n_heads=2, n_layers=2, d_ff=32, device="auto",
         )
         self._device_info = probe()
+        dim = int(getattr(self.transformer, "dim", 8) or 8)
+        self.callosum = CorpusCallosum(dim=dim, seed=17)
+        self.moe = ExpertBank(dim=dim, seed=19)
+        self.sleep = SleepCycle(seed=23)
+        self.rl = ReinforceState()
 
     def backends(self) -> Dict[str, str]:
         return {s: getattr(p, "name", type(p).__name__) for s, p in self.slots.items()}
@@ -128,6 +143,14 @@ class JeevesCortex:
 
     def bind_local(self, slot: str) -> Dict[str, str]:
         return self.bind(slot, local_slots()[slot])
+
+    def _hidden(self, stim: str) -> List[float]:
+        xf = self.transformer
+        if xf is not None and hasattr(xf, "hidden"):
+            h = list(xf.hidden(stim or ""))
+            if h:
+                return h
+        return [0.0] * int(getattr(xf, "dim", 8) or 8)
 
     def think(self, stimulus: str, context: Optional[Dict[str, Any]] = None) -> CortexTrace:
         stim = stimulus or ""
@@ -200,6 +223,8 @@ class JeevesCortex:
             if thought is not None:
                 self.own.ingest(ability_from(thought, stim), stim)
 
+        gates = self._distill_step(stim, left=left, right=right, pfc=pfc, route=route)
+
         self._bus.emit("cortex.thought", {
             "fp": fp, "used_own": used_own, "hive": hive.value,
             "backends": self.backends(), "jaccard": recalled_j,
@@ -211,8 +236,48 @@ class JeevesCortex:
             hive_value=hive.value, used_own=used_own,
             acquired=dict(self.acquired), backends=self.backends(),
             recalled_jaccard=recalled_j, shadow_win=shadow_win,
-            own_size=self.own.size,
+            own_size=self.own.size, moe_gates=gates,
         )
+
+    def _distill_step(
+        self,
+        stim: str,
+        *,
+        left: Optional[Thought],
+        right: Optional[Thought],
+        pfc: Optional[Thought],
+        route: Optional[Thought],
+    ) -> List[float]:
+        """Online distill: heads eat teacher numbers, callosum fuses, sleep records."""
+        h = self._hidden(stim)
+        left_on = left is not None
+        right_on = right is not None
+        fused, _fl, _fr = self.callosum.fuse(h, left_on=left_on, right_on=right_on)
+        if left_on and right_on:
+            self.callosum.hebb(h)
+        mixed, gates = self.moe.forward(fused)
+        if left is not None:
+            nums = tuple(left.numbers or ())
+            if len(nums) >= 3 and 0 <= nums[-3] <= 8:
+                self.moe.experts["left"].head.step(fused, nums[-3:])
+            self.moe.credit("left")
+        if right is not None:
+            text = (right.text or "").lower()
+            from skeleton.cortex.own import BIASES
+            for b in BIASES:
+                if b in (right.tags or ()) or f"bias={b}" in text:
+                    self.moe.experts["right"].head.step(fused, b)
+                    break
+            self.moe.credit("right")
+        if route is not None and len(route.numbers) >= 3:
+            self.moe.experts["midbrain"].head.step(fused, route.numbers[:3])
+            self.moe.credit("midbrain")
+        if pfc is not None:
+            veto_t = float(pfc.numbers[-1]) if pfc.numbers else 0.0
+            self.moe.experts["pfc"].head.step(fused, veto_t)
+            self.moe.credit("pfc")
+        self.sleep.record(stim, fused, left=left, right=right, pfc=pfc, route=route)
+        return list(gates)
 
     def acquire(self, slot: str) -> Dict[str, Any]:
         slot = (slot or "").lower()
@@ -228,8 +293,12 @@ class JeevesCortex:
             ))
             copied += 1
         self.acquired[slot] = self.acquired.get(slot, 0) + copied
-        self._bus.emit("cortex.acquired", {"slot": slot, "copied": copied})
-        return {"slot": slot, "copied": copied, "acquired": dict(self.acquired), "own": self.own.size}
+        stamped = self.moe.acquire(slot)
+        self._bus.emit("cortex.acquired", {"slot": slot, "copied": copied, "expert": stamped})
+        return {
+            "slot": slot, "copied": copied, "acquired": dict(self.acquired),
+            "own": self.own.size, "expert": stamped,
+        }
 
     def surpass(self, slot: str) -> Dict[str, Any]:
         slot = (slot or "").lower()
@@ -251,6 +320,41 @@ class JeevesCortex:
             },
         }
 
+    def predict_mix(self, stimulus: str):
+        return self.moe.predict_mix(self._stream(stimulus))
+
+    def predict_bias(self, stimulus: str):
+        return self.moe.predict_bias(self._stream(stimulus))
+
+    def predict_route(self, stimulus: str):
+        return self.moe.predict_route(self._stream(stimulus))
+
+    def predict_veto(self, stimulus: str):
+        return self.moe.predict_veto(self._stream(stimulus))
+
+    def predict_policy(self, stimulus: str):
+        return self.moe.predict_policy(self._stream(stimulus))
+
+    def _stream(self, stim: str) -> List[float]:
+        h = self._hidden(stim)
+        fused, _fl, _fr = self.callosum.fuse(h, left_on=True, right_on=True)
+        return fused
+
+    def sleep_cycle(self, *, n: int = 8) -> Dict[str, Any]:
+        out = self.sleep.consolidate(self, n=n)
+        self.sleep.prune()
+        self._bus.emit("cortex.sleep", out)
+        return out
+
+    def reinforce(self, stimulus: str, action: Sequence[float], reward: float) -> Dict[str, Any]:
+        h = self._stream(stimulus)
+        head = self.moe.experts["left"].head
+        info = reinforce_mix(head, h, action, reward, self.rl)
+        if float(reward) >= self.rl.baseline:
+            self.moe.credit("left", lr=0.03)
+        self._bus.emit("cortex.reinforce", info)
+        return info
+
     def export_tract(self, slot: str) -> Dict[str, Any]:
         slot = (slot or "").lower()
         backend = self.backends().get(slot, "own")
@@ -260,6 +364,11 @@ class JeevesCortex:
         port = self.slots.get(slot)
         if port is not None and hasattr(port, "snapshot"):
             payload["weights"] = port.snapshot()
+        ex = self.moe.experts.get(slot)
+        if ex is not None:
+            payload["expert"] = ex.snapshot()
+        payload["callosum"] = self.callosum.snapshot()
+        payload["moe_fp"] = self.moe.fingerprint()
         return payload
 
     def import_tract(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -278,10 +387,16 @@ class JeevesCortex:
             elif w is not None:
                 w.restore(weights)
                 bound = tract.slot
+        expert = (payload or {}).get("expert")
+        if expert and tract.slot in self.moe.experts:
+            from skeleton.cortex.moe import Expert
+            self.moe.experts[tract.slot] = Expert.from_snapshot(expert)
+        if (payload or {}).get("callosum"):
+            self.callosum = CorpusCallosum.from_snapshot(payload["callosum"])
         self._bus.emit("cortex.imported", {"slot": tract.slot, "copied": n})
         return {"slot": tract.slot, "copied": n, "own": self.own.size,
                 "capabilities": list(tract.capabilities)[:16],
-                "bound": bound}
+                "bound": bound, "moe_fp": self.moe.fingerprint()}
 
     def train(self, *, epochs: int = 1, auto_surpass: bool = True) -> Dict[str, Any]:
         return run_curriculum(self, epochs=epochs, auto_surpass=auto_surpass)
@@ -302,6 +417,10 @@ class JeevesCortex:
             "shadow": dict(self.shadow),
             "lms": lms,
             "transformer": self.transformer.snapshot(),
+            "callosum": self.callosum.snapshot(),
+            "moe": self.moe.snapshot(),
+            "sleep": self.sleep.snapshot(),
+            "rl": self.rl.snapshot(),
         }
         p.write_text(json.dumps(blob), encoding="utf-8")
         return {"path": str(p), "own": self.own.size, "acquired": dict(self.acquired)}
@@ -340,6 +459,14 @@ class JeevesCortex:
             else:
                 from skeleton.cortex.transformer import TinyTransformer
                 self.transformer = TinyTransformer.from_snapshot(snap)
+        if blob.get("callosum"):
+            self.callosum = CorpusCallosum.from_snapshot(blob["callosum"])
+        if blob.get("moe"):
+            self.moe = ExpertBank.from_snapshot(blob["moe"])
+        if blob.get("sleep"):
+            self.sleep.restore(blob["sleep"])
+        if blob.get("rl"):
+            self.rl = ReinforceState.from_snapshot(blob["rl"])
         return {"loaded": n, "own": self.own.size, "surpass": sorted(self._surpass)}
 
     def status(self) -> Dict[str, Any]:
@@ -367,6 +494,10 @@ class JeevesCortex:
                 "resident": bool(getattr(xf, "resident", False)),
                 "capability": str(info.get("capability") or "python"),
             },
+            "callosum": self.callosum.to_dict(),
+            "moe": self.moe.to_dict(),
+            "sleep": self.sleep.to_dict(),
+            "rl": self.rl.to_dict(),
         }
 
     def to(self, device: str = "auto") -> Dict[str, Any]:
@@ -404,6 +535,8 @@ class JeevesCortex:
 
         Unfitted net falls back to compose (tape). Fitted net is the LM.
         Decode on the bound device (CPU default, CUDA if harnessed).
+        MoE mix stitches in when the left expert is fitted and compose
+        has no mix numbers of its own.
         """
         xf = self.transformer
         if xf is None or int(getattr(xf, "fitted", 0) or 0) <= 0:
@@ -411,13 +544,18 @@ class JeevesCortex:
         seed = int(fingerprint(stim)[:8], 16) if stim else 0
         gen = xf.decode(stim, n=14, seed=seed)
         tags = tuple(dict.fromkeys(list(composed.tags) + ["lm", "neo", "own"]))
+        numbers = composed.numbers
+        moe_mix = self.moe.predict_mix(self._hidden(stim))
+        if moe_mix is not None and (not numbers or len(numbers) < 3):
+            numbers = tuple(float(x) for x in moe_mix)
+            tags = tuple(dict.fromkeys(list(tags) + ["moe", "mix"]))
         return Thought(
             slot="neo",
             kind="own-lm",
             text=f"{gen} || {composed.text}",
             confidence=min(1.0, 0.58 + 0.35 * float(jaccard or 0.0)),
             tags=tags,
-            numbers=composed.numbers,
+            numbers=numbers,
         )
 
     def _maybe_auto_surpass(self) -> None:
