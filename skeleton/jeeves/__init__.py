@@ -9,6 +9,7 @@ from .assessment import (
     InteractionEvidence,
     SkillModel,
 )
+from .curriculum import Curriculum, CurriculumError, Lesson
 
 __all__ = [
     "CoCodingOrchestrator",
@@ -21,4 +22,7 @@ __all__ = [
     "BloomLevel",
     "InteractionEvidence",
     "SkillModel",
+    "Curriculum",
+    "CurriculumError",
+    "Lesson",
 ]

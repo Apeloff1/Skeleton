@@ -1,9 +1,25 @@
-"""Forge package — universal system synthesis."""
+"""The Universal Forge: composable system blueprint synthesis."""
 
-from .validators import BlueprintValidator, ConstraintViolation, FieldRule, ValidationVerdict
-from .planner import BuildPlan, BuildWave, MaterialisationPlanner, PlannedSystem
+from skeleton.forge.universal import Blueprint, Component, Forge, Port, Wire
+from skeleton.forge.validator import (
+    CompositeValidator,
+    Severity,
+    ValidationProblem,
+    ValidationReport,
+    ValidationRule,
+    default_validator,
+)
 
 __all__ = [
-    "BlueprintValidator", "ConstraintViolation", "FieldRule", "ValidationVerdict",
-    "MaterialisationPlanner", "BuildPlan", "BuildWave", "PlannedSystem",
+    "Blueprint",
+    "Component",
+    "Forge",
+    "Port",
+    "Wire",
+    "CompositeValidator",
+    "Severity",
+    "ValidationProblem",
+    "ValidationReport",
+    "ValidationRule",
+    "default_validator",
 ]
