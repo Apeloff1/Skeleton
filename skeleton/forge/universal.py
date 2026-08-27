@@ -155,6 +155,14 @@ class Forge:
         self.register_kind("sink", (Port("in", "event", "in"),))
         self.register_kind("state_store",
                            (Port("write", "state", "in"), Port("read", "state", "out")))
+        # Game-loop kinds (extraction / heat / Jeeves / combat)
+        self.register_kind("player", (Port("intent", "event", "out"), Port("state", "state", "out")))
+        self.register_kind("heat", (Port("in", "event", "in"), Port("critical", "signal", "out")))
+        self.register_kind("weapon_forge", (Port("parts", "resource", "in"), Port("weapon", "event", "out")))
+        self.register_kind("enemy_spawner", (Port("tick", "event", "in"), Port("spawn", "event", "out")))
+        self.register_kind("collapse", (Port("tick", "event", "in"), Port("fail", "signal", "out")))
+        self.register_kind("extract", (Port("cores", "resource", "in"), Port("success", "signal", "out")))
+        self.register_kind("jeeves", (Port("telemetry", "state", "in"), Port("advice", "event", "out")))
 
     def register_kind(self, kind: str, ports: tuple[Port, ...]) -> None:
         if not kind.strip():
@@ -184,23 +192,40 @@ class Forge:
         blueprint.add_component(component)
         return component
 
-    def materialise(self, blueprint: Blueprint) -> dict[str, Any]:
-        """Validate, then produce the runnable system description."""
+    def materialise(self, blueprint: Blueprint, *, era: str = "extraction_now",
+                    target: str = "json") -> dict[str, Any]:
+        """Validate, compile era numbers, optionally emit Godot files."""
+        from skeleton.forge.eras import compile_era
+        from skeleton.forge.godot_emit import emit_godot
+        from skeleton.forge.planner import MaterialisationPlanner
+
         problems = blueprint.validate()
         if problems:
             raise MaterialisationError("blueprint failed validation",
                                        context={"blueprint_id": blueprint.blueprint_id,
                                                 "problems": problems})
-        result = {
+        pack = compile_era(era)
+        order = self._topological_order(blueprint)
+        plan = MaterialisationPlanner(bus=self._bus).plan_blueprint(blueprint)
+        result: dict[str, Any] = {
             "blueprint_id": blueprint.blueprint_id,
             "name": blueprint.name,
+            "era": pack["era"],
+            "primary_dps": pack["primary_dps"],
+            "pack": pack,
             "topology": blueprint.to_dict(),
-            "execution_order": self._topological_order(blueprint),
+            "execution_order": order,
+            "plan": plan.to_dict(),
         }
+        if target == "godot":
+            result["files"] = emit_godot(pack, title=blueprint.name)
+            result["file_count"] = len(result["files"])
         self._bus.emit("forge.blueprint.materialised",
                        {"blueprint_id": blueprint.blueprint_id,
                         "components": len(blueprint.components),
-                        "wires": len(blueprint.wires)})
+                        "wires": len(blueprint.wires),
+                        "era": pack["era"],
+                        "target": target})
         return result
 
     @staticmethod

@@ -191,12 +191,30 @@ async def forge_materialise(request: Dict[str, Any], state=Depends(_state)) -> D
         forge.instantiate(bp, comp["kind"], comp["instance_id"], config=comp.get("config"))
     for wire in request.get("wires", []):
         bp.connect(tuple(wire["from"]), tuple(wire["to"]))
-    return {"artefact": forge.materialise(bp), "status": "materialised"}
+    return {"artefact": forge.materialise(bp, era=request.get("era", "extraction_now"), target=request.get("target", "json")), "status": "materialised"}
 
 
 @router.get("/forge/kinds")
 async def forge_kinds(state=Depends(_state)) -> List[str]:
     return _require(state.forge, "Forge").available_kinds()
+
+
+@router.get("/forge/eras")
+async def forge_eras() -> Dict[str, Any]:
+    from skeleton.forge.eras import list_eras, compile_era
+    return {"eras": list_eras(), "default": "extraction_now", "sample": compile_era("extraction_now")["primary_dps"]}
+
+
+@router.post("/forge/archetype")
+async def forge_archetype(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    from skeleton.forge.archetypes import default_library
+    forge = _require(state.forge, "Forge")
+    name = request.get("name", "extraction")
+    era = request.get("era", "extraction_now")
+    target = request.get("target", "godot")
+    bp = default_library().build(forge, name)
+    artefact = forge.materialise(bp, era=era, target=target)
+    return {"blueprint_id": bp.blueprint_id, "artefact": artefact, "status": "materialised"}
 
 
 @router.post("/intelligence/reason")

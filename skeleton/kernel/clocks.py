@@ -34,12 +34,12 @@ class VectorClock:
             if not isinstance(node, str) or not node:
                 raise ClockError(
                     "vector-clock node ids must be non-empty strings",
-                    context={"node": node!r},
+                    context={"node": repr(node)},
                 )
             if not isinstance(counter, int) or counter < 0:
                 raise ClockError(
                     "vector-clock counters must be non-negative integers",
-                    context={"node": node, "counter": counter!r},
+                    context={"node": node, "counter": repr(counter)},
                 )
             if counter:
                 clean[node] = counter

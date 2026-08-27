@@ -13,6 +13,16 @@ from typing import Any, Callable, Dict, Tuple
 
 from skeleton.kernel.errors import MaterialisationError
 
+def _encode_godot(d):
+    files = d.get("files") or {}
+    if not files:
+        from skeleton.forge.godot_emit import emit_godot
+        files = emit_godot(d.get("pack") or {}, title=str(d.get("name") or "FORGE"))
+    manifest = {path: ("gd" if path.endswith(".gd") else "other") for path in files}
+    payload = {"manifest": manifest, "files": files, "count": len(files)}
+    return json.dumps(payload, indent=2).encode()
+
+
 
 try:
     import yaml as _yaml  # PyYAML
@@ -42,6 +52,10 @@ class MaterialisationRegistry:
                 name="yaml",
                 encode=lambda d: _yaml.safe_dump(d, sort_keys=False).encode(),
             )
+        self._materialisers["godot"] = Materialiser(
+            name="godot",
+            encode=_encode_godot,
+        )
 
     def get(self, name: str) -> Materialiser:
         materialiser = self._materialisers.get(name)

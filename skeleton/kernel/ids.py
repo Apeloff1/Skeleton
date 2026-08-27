@@ -53,7 +53,13 @@ class EntityId:
     __slots__ = ("_token",)
 
     def __init__(self, token: str | None = None) -> None:
-        token = token if token is not None else generate_token()
+        if token is None:
+            token = f"{self.prefix}_{generate_token()}"
+        elif token.startswith(self.prefix + "_"):
+            pass
+        else:
+            # allow bare tokens from generate_token()
+            token = f"{self.prefix}_{token}"
         pattern = self._compiled_pattern()
         if not pattern.fullmatch(token):
             raise InvalidIdentifierError(

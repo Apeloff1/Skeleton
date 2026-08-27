@@ -183,3 +183,31 @@ class RotationPolicy:
             "due_for_rotation": len(self.rotate_due()),
             "audit_records": len(self._audit),
         }
+
+
+class RotationTrigger(str, Enum):
+    SCHEDULED = "scheduled"
+    COMPROMISE = "compromise"
+    MANUAL = "manual"
+
+
+class RotationScheduler:
+    """Drives RotationPolicy.rotate_due() with an injected generator."""
+
+    def __init__(self, policy: RotationPolicy, *,
+                 generator: Optional[Callable[[str], str]] = None) -> None:
+        self.policy = policy
+        self._generator = generator or (lambda sid: f"{sid}-{int(time.time())}")
+        self._runs = 0
+
+    def tick(self, *, reason: str = RotationTrigger.SCHEDULED.value) -> List[str]:
+        rotated: List[str] = []
+        for sid in self.policy.rotate_due():
+            self.policy.rotate(sid, self._generator(sid), reason=reason)
+            rotated.append(sid)
+        expired = self.policy.sweep_expired_grace()
+        self._runs += 1
+        return rotated + [f"revoked:{s}" for s in expired]
+
+    def stats(self) -> Dict[str, int]:
+        return {"runs": self._runs, "secrets": len(self.policy._secrets)}

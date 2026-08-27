@@ -103,7 +103,7 @@ class SurpriseScorer:
     def observe(self, channel: str, value: float, *,
                 learn: bool = True, now: Optional[float] = None) -> SurpriseReading:
         if not math.isfinite(value):
-            raise SurpriseError("value must be finite", context={"channel": channel, "value": value!r})
+            raise SurpriseError("value must be finite", context={"channel": channel, "value": repr(value)})
         now = time.time() if now is None else now
         stats = self._channels.setdefault(channel, OnlineGaussian())
 

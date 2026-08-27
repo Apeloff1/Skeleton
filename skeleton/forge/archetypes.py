@@ -60,4 +60,29 @@ def default_library() -> ArchetypeLibrary:
         return bp
 
     library.register(Archetype(name="pipeline", build=pipeline))
+
+    def extraction(forge: Forge) -> Blueprint:
+        bp = forge.new_blueprint("extraction")
+        forge.instantiate(bp, "player", "operator")
+        forge.instantiate(bp, "heat", "heat")
+        forge.instantiate(bp, "weapon_forge", "forge")
+        forge.instantiate(bp, "enemy_spawner", "spawner")
+        forge.instantiate(bp, "collapse", "collapse")
+        forge.instantiate(bp, "extract", "extract")
+        forge.instantiate(bp, "jeeves", "jeeves")
+        bp.connect(("operator", "intent"), ("heat", "in"))
+        bp.connect(("operator", "state"), ("jeeves", "telemetry"))
+        return bp
+
+    def combat_loop(forge: Forge) -> Blueprint:
+        bp = forge.new_blueprint("combat_loop")
+        forge.instantiate(bp, "player", "operator")
+        forge.instantiate(bp, "enemy_spawner", "spawner")
+        forge.instantiate(bp, "weapon_forge", "forge")
+        forge.instantiate(bp, "sink", "hud")
+        bp.connect(("operator", "intent"), ("hud", "in"))
+        return bp
+
+    library.register(Archetype(name="extraction", build=extraction))
+    library.register(Archetype(name="combat_loop", build=combat_loop))
     return library

@@ -151,3 +151,29 @@ class MaterialisationPlanner:
             path.append(current)
         path.reverse()
         return path
+
+
+    def plan_blueprint(self, blueprint) -> BuildPlan:
+        """Adapt a Forge Blueprint into the systems-dict the planner consumes."""
+        comps = getattr(blueprint, "components", {}) or {}
+        wires = getattr(blueprint, "wires", []) or []
+        depends: dict = {cid: [] for cid in comps}
+        for w in wires:
+            src = w.src[0] if hasattr(w, "src") else w["from"][0]
+            dst = w.dst[0] if hasattr(w, "dst") else w["to"][0]
+            if dst in depends and src not in depends[dst]:
+                depends[dst].append(src)
+        systems = []
+        for cid, comp in comps.items():
+            cost = None
+            cfg = getattr(comp, "config", {}) or {}
+            if "cost" in cfg:
+                try:
+                    cost = float(cfg["cost"])
+                except (TypeError, ValueError):
+                    cost = None
+            systems.append({"id": cid, "depends_on": depends[cid], "declared_cost": cost})
+        name = getattr(blueprint, "name", "unnamed")
+        if not systems:
+            raise BlueprintError("cannot plan an empty blueprint")
+        return self.plan({"name": name, "systems": systems})

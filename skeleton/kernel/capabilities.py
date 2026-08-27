@@ -156,7 +156,7 @@ class TokenIssuer:
         if not subject or not caps:
             raise CapabilityError(
                 "token needs a subject and at least one capability",
-                context={"subject": subject!r},
+                context={"subject": repr(subject)},
             )
         token = CapabilityToken(
             subject=subject,
