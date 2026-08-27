@@ -190,20 +190,34 @@ def _stage_jeeves(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    from skeleton.forge.gdscript_check import check_ok
     files = ctx.get("files") or {}
+    ok, problems = check_ok(files)
+    if not ok:
+        raise RuntimeError("gdscript check failed: " + "; ".join(problems[:8]))
     project = None
     root = ctx.get("project_root")
     if root:
         from skeleton.forge.projector import write_project
+        import json
+        from pathlib import Path
         project = write_project(
             root, files, overwrite=bool(ctx.get("overwrite")),
             meta={"era": ctx.get("era"), "dps": ctx.get("primary_dps")},
         )
+        cockpit = ctx["cockpit"]
+        Path(root, "CONTEXT_LEDGER.json").write_text(
+            json.dumps(cockpit.ledger.to_dict(), indent=2, default=str), encoding="utf-8"
+        )
+        Path(root, "CONTEXT_TENSOR.json").write_text(
+            json.dumps(cockpit.tensor.to_dict(), indent=2), encoding="utf-8"
+        )
     _commit(ctx, "emit", ctx["era"], f"{len(files)} files", {
         "file_count": len(files),
         "root": None if not project else project["root"],
+        "check": "ok",
     })
-    return {"emitted": True, "project": project}
+    return {"emitted": True, "project": project, "check_ok": True}
 
 
 def _stage_seal(ctx: Dict[str, Any]) -> Dict[str, Any]:

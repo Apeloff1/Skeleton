@@ -229,3 +229,35 @@ class TestProjectorAndIntake:
         enemy = (P(root) / "scripts/combat/enemy.gd").read_text()
         assert "hp_table" in enemy
         assert (P(root) / "FORGE_MANIFEST.json").is_file()
+
+
+class TestGdScriptCheck:
+    def test_closed_graph(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.forge.godot_emit import emit_godot
+        from skeleton.forge.gdscript_check import check_ok
+        files = emit_godot(compile_era("horror_survival"), title="HORROR")
+        ok, problems = check_ok(files)
+        assert ok, problems
+        assert "scenes/player.tscn" in files
+        assert "scenes/extract.tscn" in files
+        assert "instance=ExtResource(\"2\")" in files["scenes/levels/run_level.tscn"] or 'instance=ExtResource("2")' in files["scenes/levels/run_level.tscn"]
+
+    def test_broken_autoload_detected(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.forge.godot_emit import emit_godot
+        from skeleton.forge.gdscript_check import check_files
+        files = emit_godot(compile_era("extraction_now"))
+        del files["scripts/autoloads/heat_system.gd"]
+        problems = check_files(files)
+        assert any("heat_system" in p for p in problems)
+
+
+class TestCLI:
+    def test_eras_and_run(self):
+        from skeleton.__main__ import main
+        assert main(["eras"]) == 0
+        import tempfile
+        root = tempfile.mkdtemp(prefix="cli-")
+        rc = main(["run", "silent hill ammo scarce dread", "--out", root, "--overwrite", "--json"])
+        assert rc == 0
