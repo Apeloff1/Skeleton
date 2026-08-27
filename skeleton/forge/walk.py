@@ -39,6 +39,9 @@ class WalkReport:
     path: List[str]
     required_cores: int
     bound: float = 0.0
+    mode: str = "ideal"
+    heat_peak: float = 0.0
+    vents: int = 0
     steps: List[WalkStep] = field(default_factory=list)
     notes: List[str] = field(default_factory=list)
 
@@ -55,6 +58,9 @@ class WalkReport:
             "passed": self.passed,
             "t": round(self.t, 4),
             "bound": round(self.bound, 4),
+            "mode": self.mode,
+            "heat_peak": round(self.heat_peak, 3),
+            "vents": self.vents,
             "hops": self.hops,
             "fights": self.fights,
             "cores": self.cores,
@@ -76,6 +82,29 @@ def _ttk(pack: Dict[str, Any], tier: str) -> float:
             return float(e.get("ttk_target") or 0.0)
     ttk = pack.get("ttk") or {}
     return float(ttk.get(tier) or 1.0)
+
+
+def _enemy(pack: Dict[str, Any], tier: str) -> Optional[Dict[str, Any]]:
+    for e in pack.get("enemies") or []:
+        if e.get("id") == tier:
+            return e
+    return None
+
+
+def _heat_cfg(pack: Dict[str, Any]) -> Dict[str, float]:
+    h = pack.get("heat") or {}
+    return {
+        "max": float(h.get("max_heat") or 100.0),
+        "cool": float(h.get("passive_cool") or 7.5),
+        "sprint": float(h.get("sprint_heat_per_sec") or 11.0),
+    }
+
+
+def _tick_heat(heat: float, dt: float, pack: Dict[str, Any], *, sprint: bool = False) -> float:
+    cfg = _heat_cfg(pack)
+    delta = cfg["sprint"] * dt if sprint else 0.0
+    heat = heat + delta - cfg["cool"] * dt
+    return max(0.0, min(cfg["max"] * 1.15, heat))
 
 
 def _adj(graph: Dict[str, Any], pack: Dict[str, Any]) -> Dict[str, List[Tuple[str, float]]]:
@@ -143,41 +172,63 @@ def _resolve_room(
     fights: int,
     steps: List[WalkStep],
     collapse: float,
-) -> Tuple[float, int, int, bool]:
-    """Apply occupants. Returns (t, cores, fights, collapsed)."""
+    heat: float,
+    vents: int,
+    mode: str,
+) -> Tuple[float, int, int, bool, float, int]:
+    """Apply occupants. Returns (t, cores, fights, collapsed, heat, vents)."""
     rid = room["id"]
     kind = room.get("kind")
     steps.append(WalkStep(t, rid, "enter", kind or ""))
     if kind == "loot":
         cores += 1
         steps.append(WalkStep(t, rid, "loot", f"cores={cores}"))
-        return t, cores, fights, t >= collapse
+        return t, cores, fights, t >= collapse, heat, vents
     if kind == "heat":
         speed = _speed(pack)
-        dwell = 180.0 / speed  # half a room height
+        dwell = 180.0 / speed
         t += dwell
-        steps.append(WalkStep(t, rid, "heat", f"dwell={dwell:.3f}"))
-        return t, cores, fights, t >= collapse
+        if mode == "thermal":
+            heat = _tick_heat(heat, dwell, pack, sprint=True)
+        steps.append(WalkStep(t, rid, "heat", f"dwell={dwell:.3f} heat={heat:.1f}"))
+        return t, cores, fights, t >= collapse, heat, vents
     if kind == "combat":
+        from skeleton.forge.sim import simulate_encounter
         for occ in room.get("occupants") or []:
             if occ.get("kind") != "enemy":
                 continue
             tier = str(occ.get("tier") or "trash")
-            cost = _ttk(pack, tier)
-            t += cost
-            fights += 1
-            if tier in {"elite", "boss"}:
-                cores += 1
-            steps.append(WalkStep(t, rid, "fight", f"{tier} ttk={cost:.3f}"))
-            if t >= collapse:
-                return t, cores, fights, True
-        # a combat visit is itself a core source when extract is late
-        if not any(o.get("kind") == "enemy" for o in room.get("occupants") or []):
-            cores += 1
-        else:
-            cores += 1  # trash also yields a data-core chip
-        return t, cores, fights, t >= collapse
-    return t, cores, fights, t >= collapse
+            enemy = _enemy(pack, tier)
+            if mode == "thermal" and enemy is not None:
+                remaining = max(0.05, collapse - t)
+                result = simulate_encounter(
+                    pack, enemy, mode="thermal", heat0=heat, max_t=remaining,
+                )
+                cost = float(result.measured_ttk)
+                heat = float(result.heat_end)
+                vents += int(result.vents)
+                t += cost
+                fights += 1
+                if tier in {"elite", "boss"}:
+                    cores += 1
+                steps.append(WalkStep(
+                    t, rid, "fight",
+                    f"{tier} thermal={cost:.3f} heat={heat:.1f} vents={result.vents}",
+                ))
+                if result.collapsed or not result.killed or t >= collapse:
+                    return t, cores, fights, True, heat, vents
+            else:
+                cost = _ttk(pack, tier)
+                t += cost
+                fights += 1
+                if tier in {"elite", "boss"}:
+                    cores += 1
+                steps.append(WalkStep(t, rid, "fight", f"{tier} ttk={cost:.3f}"))
+                if t >= collapse:
+                    return t, cores, fights, True, heat, vents
+        cores += 1
+        return t, cores, fights, t >= collapse, heat, vents
+    return t, cores, fights, t >= collapse, heat, vents
 
 
 def walk_graph(
@@ -185,6 +236,7 @@ def walk_graph(
     graph: Dict[str, Any],
     *,
     plan: Optional[Dict[str, Any]] = None,
+    mode: str = "ideal",
 ) -> WalkReport:
     plan = plan or {}
     rooms = {r["id"]: r for r in graph["rooms"]}
@@ -203,13 +255,18 @@ def walk_graph(
     hops = 0
     fights = 0
     cores = 0
+    vents = 0
+    heat = 0.0
+    heat_peak = 0.0
     current = spawn
     collapsed = False
     extracted = False
 
-    t, cores, fights, collapsed = _resolve_room(
-        pack, rooms[spawn], t=t, cores=cores, fights=fights, steps=steps, collapse=collapse
+    t, cores, fights, collapsed, heat, vents = _resolve_room(
+        pack, rooms[spawn], t=t, cores=cores, fights=fights, steps=steps,
+        collapse=collapse, heat=heat, vents=vents, mode=mode,
     )
+    heat_peak = max(heat_peak, heat)
 
     def target() -> Optional[str]:
         if cores < required:
@@ -266,12 +323,16 @@ def walk_graph(
             nxt = alt[0]
             travel = next((w for v, w in adj[current] if v == nxt), 0.5)
         t += travel
+        if mode == "thermal":
+            heat = _tick_heat(heat, travel, pack, sprint=False)
         hops += 1
         current = nxt
         path.append(current)
-        t, cores, fights, collapsed = _resolve_room(
-            pack, rooms[current], t=t, cores=cores, fights=fights, steps=steps, collapse=collapse
+        t, cores, fights, collapsed, heat, vents = _resolve_room(
+            pack, rooms[current], t=t, cores=cores, fights=fights, steps=steps,
+            collapse=collapse, heat=heat, vents=vents, mode=mode,
         )
+        heat_peak = max(heat_peak, heat)
         if collapsed:
             notes.append(f"collapse at t={t:.2f}s in {current}")
             break
@@ -304,12 +365,20 @@ def walk_graph(
         path=path,
         required_cores=required,
         bound=bound,
+        mode=mode,
+        heat_peak=heat_peak,
+        vents=vents,
         steps=steps,
         notes=notes,
     )
 
 
-def walk_from_pack(pack: Dict[str, Any], *, plan: Optional[Dict[str, Any]] = None) -> WalkReport:
+def walk_from_pack(
+    pack: Dict[str, Any],
+    *,
+    plan: Optional[Dict[str, Any]] = None,
+    mode: str = "ideal",
+) -> WalkReport:
     from skeleton.forge.world import generate_rooms
     graph = generate_rooms(pack, seed=str((plan or {}).get("seed") or pack.get("era")), plan=plan)
-    return walk_graph(pack, graph, plan=plan)
+    return walk_graph(pack, graph, plan=plan, mode=mode)

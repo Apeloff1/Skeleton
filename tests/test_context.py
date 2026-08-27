@@ -242,6 +242,34 @@ class TestSim:
         wr = walk_graph(pack, g, plan={})
         assert not wr.extracted
 
+    def test_thermal_walk_not_faster_than_ideal(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.forge.world import generate_rooms
+        from skeleton.forge.walk import walk_graph
+        from skeleton.jeeves.builder import BuilderBrain
+        from skeleton.context.tensor import ContextTensor
+        pack = compile_era("soulslike")
+        plan = BuilderBrain().plan(pack, tensor=ContextTensor.from_era("soulslike")).to_dict()
+        graph = generate_rooms(pack, seed=plan["seed"], plan=plan)
+        ideal = walk_graph(pack, graph, plan=plan, mode="ideal")
+        therm = walk_graph(pack, graph, plan=plan, mode="thermal")
+        assert ideal.extracted and therm.extracted, (ideal.notes, therm.notes)
+        rec = (pack.get("recipes") or [{}])[0]
+        interval = 60.0 / max(float(rec.get("rpm") or 360), 1.0)
+        assert therm.t + interval * max(1, therm.fights) >= ideal.t
+        assert therm.mode == "thermal"
+        assert therm.path == ideal.path
+
+    def test_hot_start_slows_fight(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.forge.sim import simulate_encounter
+        pack = compile_era("extraction_now")
+        trash = next(e for e in pack["enemies"] if e["id"] == "trash")
+        cold = simulate_encounter(pack, trash, mode="thermal", heat0=0.0)
+        hot = simulate_encounter(pack, trash, mode="thermal", heat0=pack["heat"]["max_heat"] * 0.95)
+        assert hot.measured_ttk + 1e-6 >= cold.measured_ttk
+        assert hot.heat_end > 0
+
 
 class TestClosedLoop:
     def test_adapt_ease_on_collapse(self):

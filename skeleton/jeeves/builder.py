@@ -135,6 +135,57 @@ def adapt_from_walk(
     return bias, spawn_weapon, extract_late, trash, elite, boss, tag, slack, notes
 
 
+def _prune_mix(
+    pack: Dict[str, Any], trash: int, elite: int, boss: int,
+) -> Tuple[int, int, int, float, List[str]]:
+    """Left-brain veto: sequential thermal kills must fit inside 70% of collapse."""
+    from skeleton.forge.sim import simulate_encounter
+    notes: List[str] = []
+    collapse = float((pack.get("session") or {}).get("collapse_max") or 9999.0)
+    budget = collapse * 0.70
+    enemies = {str(e.get("id")): e for e in (pack.get("enemies") or [])}
+
+    def span(tsh: int, elt: int, bs: int) -> Tuple[float, bool]:
+        heat = 0.0
+        tot = 0.0
+        for tier, n in (("trash", tsh), ("elite", elt), ("boss", bs)):
+            enemy = enemies.get(tier)
+            if enemy is None or n <= 0:
+                continue
+            for _ in range(n):
+                remaining = max(0.05, budget - tot)
+                r = simulate_encounter(pack, enemy, mode="thermal", heat0=heat, max_t=remaining)
+                tot += float(r.measured_ttk)
+                heat = float(r.heat_end)
+                if (not r.killed) or tot > budget:
+                    return tot, False
+        return tot, True
+
+    dropped: List[str] = []
+    while True:
+        tot, ok = span(trash, elite, boss)
+        if ok:
+            if dropped:
+                notes.append("left-veto dropped " + ",".join(dropped) + f" thermal_span={tot:.1f}s")
+            else:
+                notes.append(f"left-veto thermal_span={tot:.1f}s/{budget:.1f}s")
+            return trash, elite, boss, tot, notes
+        if boss:
+            boss = 0
+            dropped.append("boss")
+            continue
+        if elite:
+            elite -= 1
+            dropped.append("elite")
+            continue
+        if trash > 1:
+            trash -= 1
+            dropped.append("trash")
+            continue
+        notes.append(f"left-veto mix irreducible thermal_span={tot:.1f}s")
+        return trash, elite, boss, tot, notes
+
+
 class BuilderBrain:
     """Forge collaborator. Bind a pack, then plan(tensor, reading, walk)."""
 
@@ -183,6 +234,7 @@ class BuilderBrain:
             pack, bias=bias, spawn_weapon=spawn_weapon, extract_late=extract_late,
             trash=trash, elite=elite, boss=boss, walk=walk,
         )
+        trash, elite, boss, thermal_span, veto_notes = _prune_mix(pack, trash, elite, boss)
 
         seed_src = f"{era}|{fp}|{oracle_index}"
         if tag != "none":
@@ -202,7 +254,8 @@ class BuilderBrain:
             f"armed={int(spawn_weapon)} late_extract={int(extract_late)}",
             f"philosophy={philosophy}",
             f"adapt={tag} slack={slack:.2f}",
-        ] + adapt_notes
+            f"thermal_span={thermal_span:.1f}s",
+        ] + adapt_notes + veto_notes
         briefing = (
             f"Jeeves / {era}: {oracle_text} "
             f"Drop {bias}-weighted. "

@@ -30,6 +30,7 @@ class EncounterResult:
     collapsed: bool
     killed: bool
     events: List[SimEvent] = field(default_factory=list)
+    heat_end: float = 0.0
 
     @property
     def error(self) -> float:
@@ -49,6 +50,7 @@ class EncounterResult:
             "overheat": self.overheat,
             "collapsed": self.collapsed,
             "killed": self.killed,
+            "heat_end": round(self.heat_end, 3),
         }
 
 
@@ -81,7 +83,8 @@ def _recipe(pack: Dict[str, Any]) -> Dict[str, Any]:
 
 def simulate_encounter(pack: Dict[str, Any], enemy: Dict[str, Any], *,
                        mode: str = "ideal", dt: float = 1.0 / 60.0,
-                       max_t: Optional[float] = None) -> EncounterResult:
+                       max_t: Optional[float] = None,
+                       heat0: float = 0.0) -> EncounterResult:
     rec = _recipe(pack)
     dmg = float(rec.get("damage") or 18)
     rpm = float(rec.get("rpm") or 360)
@@ -108,18 +111,20 @@ def simulate_encounter(pack: Dict[str, Any], enemy: Dict[str, Any], *,
         return EncounterResult(
             enemy_id=str(enemy.get("id")), mode=mode, target_ttk=target,
             measured_ttk=measured, shots=int(shots), vents=0, overheat=False,
-            collapsed=False, killed=True, events=[SimEvent(measured, "ideal", "closed-form HP/DPS")],
+            collapsed=False, killed=True,
+            events=[SimEvent(measured, "ideal", "closed-form HP/DPS")],
+            heat_end=float(heat0 or 0.0),
         )
 
     hp_left = hp
-    heat = 0.0
+    heat = float(heat0 or 0.0)
     t = 0.0
     cooldown = 0.0
     shots = 0
     vents = 0
-    venting = False
+    venting = heat / max(max_heat, 0.001) >= crit
     events: List[SimEvent] = []
-    overheat = False
+    overheat = venting
 
     while t < ceiling and hp_left > 0:
         t += dt
@@ -148,7 +153,7 @@ def simulate_encounter(pack: Dict[str, Any], enemy: Dict[str, Any], *,
             return EncounterResult(
                 enemy_id=str(enemy.get("id")), mode=mode, target_ttk=target,
                 measured_ttk=t, shots=shots, vents=vents, overheat=overheat,
-                collapsed=True, killed=False, events=events,
+                collapsed=True, killed=False, events=events, heat_end=heat,
             )
 
     killed = hp_left <= 0
@@ -156,6 +161,7 @@ def simulate_encounter(pack: Dict[str, Any], enemy: Dict[str, Any], *,
         enemy_id=str(enemy.get("id")), mode=mode, target_ttk=target,
         measured_ttk=t if killed else ceiling, shots=shots, vents=vents,
         overheat=overheat, collapsed=False, killed=killed, events=events,
+        heat_end=heat,
     )
 
 
@@ -192,16 +198,40 @@ def simulate_session(
             passed = False
             notes.append("thermal TTK shorter than ideal — heat model inverted")
     walk_payload: Optional[Dict[str, Any]] = None
-    from skeleton.forge.walk import walk_from_pack, walk_graph
-    wr = walk_graph(pack, graph, plan=plan) if graph else walk_from_pack(pack, plan=plan)
-    walk_payload = wr.to_dict()
-    if not wr.passed:
+    from skeleton.forge.walk import walk_graph
+    from skeleton.forge.world import generate_rooms
+    if graph is None:
+        graph = generate_rooms(
+            pack, seed=str((plan or {}).get("seed") or pack.get("era")), plan=plan,
+        )
+    wr_ideal = walk_graph(pack, graph, plan=plan, mode="ideal")
+    wr_therm = walk_graph(pack, graph, plan=plan, mode="thermal")
+    if wr_therm.t + interval * max(1, wr_therm.fights) < wr_ideal.t:
         passed = False
-        notes.append("walk failed: " + "; ".join(wr.notes[:4]))
+        notes.append(
+            f"thermal walk {wr_therm.t:.3f}s shorter than ideal {wr_ideal.t:.3f}s — heat clock inverted"
+        )
+    if not wr_therm.passed:
+        passed = False
+        notes.append("thermal walk failed: " + "; ".join(wr_therm.notes[:4]))
+    elif not wr_ideal.passed:
+        passed = False
+        notes.append("ideal walk failed: " + "; ".join(wr_ideal.notes[:4]))
+    walk_payload = wr_therm.to_dict()
+    walk_payload["ideal"] = {
+        "t": round(wr_ideal.t, 4),
+        "extracted": wr_ideal.extracted,
+        "passed": wr_ideal.passed,
+        "hops": wr_ideal.hops,
+        "fights": wr_ideal.fights,
+    }
     if not notes:
         notes.append("compiler identity holds; thermal ≥ ideal")
-    if wr.passed:
-        notes.append(f"walk extracted in {wr.t:.2f}s over {wr.hops} hops")
+    if wr_therm.passed:
+        notes.append(
+            f"walk extracted thermal={wr_therm.t:.2f}s ideal={wr_ideal.t:.2f}s "
+            f"hops={wr_therm.hops} heat_peak={wr_therm.heat_peak:.1f}"
+        )
     return SessionReport(
         era=str(pack.get("era")),
         primary_dps=float(pack.get("primary_dps") or 0.0),

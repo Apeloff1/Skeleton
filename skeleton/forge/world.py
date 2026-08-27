@@ -113,8 +113,8 @@ def _populate(
             r["occupants"].append({"kind": "loot", "tier": None})
     if not combat:
         return
-    # spread trash across combat rooms, elites toward the extract, boss last
-    for i in range(max(trash_n, len(combat))):
+    # spread the planned mix; do not invent a trash per combat room
+    for i in range(trash_n):
         room = combat[i % len(combat)]
         room["occupants"].append({"kind": "enemy", "tier": "trash"})
     for i in range(elite_n):

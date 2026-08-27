@@ -114,14 +114,19 @@ def main(argv: list[str] | None = None) -> int:
             tensor = ContextTensor.from_era(args.era)
         reading = Magic8Ball(Dodecahedron.from_tensor(tensor)).roll(tensor)
         plan = BuilderBrain().plan(pack, tensor=tensor, reading=reading)
-        wr = walk_from_pack(pack, plan=plan.to_dict())
+        wr_i = walk_from_pack(pack, plan=plan.to_dict(), mode="ideal")
+        wr = walk_from_pack(pack, plan=plan.to_dict(), mode="thermal")
         payload = wr.to_dict()
+        payload["ideal"] = {"t": round(wr_i.t, 4), "extracted": wr_i.extracted}
         payload["plan"] = {"bias": plan.room_bias, "extract_late": plan.extract_late, "era": plan.era}
         if args.json:
             print(json.dumps(payload, indent=2, default=str))
         else:
-            print(f"extracted={wr.extracted} t={wr.t:.2f} hops={wr.hops} cores={wr.cores}/{wr.required_cores}")
-        return 0 if wr.passed else 1
+            print(
+                f"extracted={wr.extracted} thermal={wr.t:.2f}s ideal={wr_i.t:.2f}s "
+                f"hops={wr.hops} heat_peak={wr.heat_peak:.1f} cores={wr.cores}/{wr.required_cores}"
+            )
+        return 0 if wr.passed and wr.t + 0.2 >= wr_i.t else 1
 
     if args.cmd == "think":
         from skeleton.cortex import JeevesCortex
