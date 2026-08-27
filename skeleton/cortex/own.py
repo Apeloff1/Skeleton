@@ -115,8 +115,21 @@ class OwnSystem:
     def compose(self, stimulus: str, *,
                 min_jaccard: float = MIN_JACCARD) -> Optional[Tuple[Thought, float, List[RecallHit]]]:
         hits = self.recall(stimulus, k=K_RECALL, min_jaccard=min_jaccard)
+        improved = self.best_observed_mix(stimulus)
         if not hits:
-            return None
+            if improved is None:
+                return None
+            thought = Thought(
+                slot="neo", kind="own",
+                text=(
+                    f"improved mix trash={int(improved[0])} "
+                    f"elite={int(improved[1])} boss={int(improved[2])}"
+                ),
+                confidence=0.88,
+                tags=("neo", "own", "improved", "mix"),
+                numbers=improved,
+            )
+            return thought, 1.0, []
         by_src: Dict[str, RecallHit] = {}
         for h in hits:
             src = _source_slot(h.ability)
@@ -149,11 +162,16 @@ class OwnSystem:
         conf = min(1.0, sum(confs) / max(1, len(confs)))
         kind = "own-compose" if len(used) > 1 else "own"
         extra = "compose" if kind == "own-compose" else "recall"
-        tag_t = tuple(dict.fromkeys(list(tags) + [extra]))
         mix: Tuple[float, ...] = ()
-        left_hit = by_src.get("left")
-        if left_hit is not None and len(left_hit.ability.numbers) >= 3:
-            mix = tuple(float(x) for x in left_hit.ability.numbers[-3:])
+        improved = self.best_observed_mix(stimulus)
+        if improved is not None:
+            mix = improved
+            tags.append("improved")
+        else:
+            left_hit = by_src.get("left")
+            if left_hit is not None and len(left_hit.ability.numbers) >= 3:
+                mix = tuple(float(x) for x in left_hit.ability.numbers[-3:])
+        tag_t = tuple(dict.fromkeys(list(tags) + [extra]))
         thought = Thought(
             slot="neo", kind=kind, text=" || ".join(parts),
             confidence=conf,
@@ -161,6 +179,30 @@ class OwnSystem:
             numbers=mix if mix else (best_j, float(len(used))),
         )
         return thought, best_j, used
+
+    def best_observed_mix(self, stimulus: str) -> Optional[Tuple[float, float, float]]:
+        """Highest-slack observed mix whose era tag appears in the stimulus."""
+        stim_toks = set(tokens(stimulus))
+        if not stim_toks:
+            return None
+        best_slack = -1.0
+        best: Optional[Tuple[float, float, float]] = None
+        for a in self._items:
+            if "observed" not in a.tags:
+                continue
+            if len(a.numbers) < 4:
+                continue
+            if not (set(a.tags) & stim_toks):
+                continue
+            slack = float(a.numbers[-1])
+            if slack > best_slack:
+                best_slack = slack
+                best = (
+                    float(a.numbers[-4]),
+                    float(a.numbers[-3]),
+                    float(a.numbers[-2]),
+                )
+        return best
 
     def export_tract(self, slot: str, *, backend: str = "own",
                      scale: str = "neo") -> Tract:

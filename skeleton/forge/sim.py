@@ -218,6 +218,7 @@ def simulate_session(
         passed = False
         notes.append("ideal walk failed: " + "; ".join(wr_ideal.notes[:4]))
     walk_payload = wr_therm.to_dict()
+    walk_payload["collapse_max"] = float((pack.get("session") or {}).get("collapse_max") or 0)
     walk_payload["ideal"] = {
         "t": round(wr_ideal.t, 4),
         "extracted": wr_ideal.extracted,

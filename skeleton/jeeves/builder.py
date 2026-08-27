@@ -286,6 +286,15 @@ class BuilderBrain:
             trash=trash, elite=elite, boss=boss, walk=walk,
         )
         trash, elite, boss, thermal_span, veto_notes = _prune_mix(pack, trash, elite, boss)
+        own = getattr(cortex, "own", None) if cortex is not None else None
+        if authored == "own" and own is not None and hasattr(own, "best_observed_mix"):
+            improved = own.best_observed_mix(f"plan {era} forge mix bias ttk extract")
+            if improved is not None:
+                trash, elite, boss = int(improved[0]), int(improved[1]), int(improved[2])
+                trash, elite, boss, thermal_span, extra = _prune_mix(pack, trash, elite, boss)
+                veto_notes = list(veto_notes) + [
+                    f"improved mix trash={trash} elite={elite} boss={boss}"
+                ] + extra
 
         seed_src = f"{era}|{fp}|{oracle_index}"
         if tag != "none":

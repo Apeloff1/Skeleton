@@ -235,17 +235,41 @@ class Jeeves:
                     vision: str = "") -> dict[str, Any]:
         """Ingest a finished forge-run so own-system can recall extract outcomes."""
         extracted = bool((walk or {}).get("extracted"))
+        collapsed = bool((walk or {}).get("collapsed"))
         hops = (walk or {}).get("hops")
         cores = (walk or {}).get("cores")
         bias = (plan or {}).get("room_bias") or "balanced"
+        mix = (plan or {}).get("enemy_mix") or {}
+        trash = float(mix.get("trash") or 0)
+        elite = float(mix.get("elite") or 0)
+        boss = float(mix.get("boss") or 0)
+        t = float((walk or {}).get("t") or 0)
+        collapse = float((walk or {}).get("collapse_max") or 0)
+        slack = ((collapse - t) / collapse) if (extracted and collapse > 0 and t > 0) else (
+            0.0 if (collapsed or not extracted) else 1.0
+        )
         self.last_walk = dict(walk or {})
         self.last_walk["era"] = era
         self.last_walk["bias"] = bias
+        self.last_walk["slack"] = slack
         stim = (
             f"forge run {era} {vision} extract {extracted} "
             f"hops {hops} cores {cores} bias {bias}"
         )
         trace = self.think(stim, context={"walk": walk, "plan": plan, "era": era})
+        from skeleton.cortex.distill import ability_from
+        from skeleton.cortex.port import Thought
+        observed = Thought(
+            slot="left", kind="walk",
+            text=(
+                f"HP = DPS × TTK ; observed mix trash={int(trash)} "
+                f"elite={int(elite)} boss={int(boss)} slack={slack:.2f}"
+            ),
+            confidence=min(1.0, 0.55 + 0.45 * max(0.0, slack)),
+            tags=("analytic", "mix", "walk", "observed", "left", str(era)),
+            numbers=(trash, elite, boss, slack),
+        )
+        self.cortex.own.ingest(ability_from(observed, stim), stim)
         self._bus.emit("jeeves.observe_run", {
             "era": era, "extracted": extracted, "own": self.cortex.own.size,
         })

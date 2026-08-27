@@ -712,3 +712,46 @@ class TestHive:
         local = BuilderBrain().plan(pack, tensor=tensor)
         assert plan_b.enemy_mix != local.enemy_mix
 
+
+class TestImprove:
+    def test_own_mix_beats_teacher_slack(self):
+        from dataclasses import replace
+        from skeleton.forge.eras import compile_era
+        from skeleton.forge.walk import walk_from_pack
+        from skeleton.jeeves.builder import BuilderBrain
+        from skeleton.jeeves.core import Jeeves
+        from skeleton.context.tensor import ContextTensor
+        from skeleton.cortex import JeevesCortex
+
+        pack = compile_era("soulslike")
+        tensor = ContextTensor.from_era("soulslike")
+        collapse = float(pack["session"]["collapse_max"])
+        base = BuilderBrain().plan(pack, tensor=tensor)
+        easy = replace(base, enemy_mix={"trash": 1, "elite": 0, "boss": 0})
+        hard = replace(base, enemy_mix={"trash": 6, "elite": 2, "boss": 0})
+
+        def slack(plan):
+            wr = walk_from_pack(pack, plan=plan.to_dict(), mode="thermal")
+            d = wr.to_dict()
+            d["collapse_max"] = collapse
+            s = ((collapse - wr.t) / collapse) if wr.extracted and wr.t > 0 else 0.0
+            return s, d
+
+        s_easy, w_easy = slack(easy)
+        s_hard, w_hard = slack(hard)
+        assert s_easy > s_hard, (s_easy, s_hard)
+
+        neo = JeevesCortex()
+        neo.auto_surpass = False
+        j = Jeeves()
+        j.cortex = neo
+        j.observe_run(era="soulslike", walk=w_hard, plan=hard.to_dict())
+        j.observe_run(era="soulslike", walk=w_easy, plan=easy.to_dict())
+        neo.surpass("left")
+        own = BuilderBrain().plan(pack, tensor=tensor, cortex=neo)
+        wr_own = walk_from_pack(pack, plan=own.to_dict(), mode="thermal")
+        s_own = ((collapse - wr_own.t) / collapse) if wr_own.extracted and wr_own.t > 0 else 0.0
+        assert own.authored == "own", own.authored
+        assert own.enemy_mix == {"trash": 1, "elite": 0, "boss": 0}, own.enemy_mix
+        assert s_own > s_hard, (s_own, s_hard, wr_own.t, wr_own.extracted)
+
