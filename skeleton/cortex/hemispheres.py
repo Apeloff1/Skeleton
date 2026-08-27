@@ -36,14 +36,27 @@ class LeftHemisphere:
             props.append("eras " + ",".join(found_eras[:3]))
         if nums:
             props.append("literals " + ",".join(f"{n:g}" for n in nums[:4]))
+        tensor = context.get("tensor") or {}
+        def _ax(name: str) -> float:
+            v = tensor.get(name) if isinstance(tensor, dict) else None
+            return float(v) if isinstance(v, (int, float)) else 0.0
+        tempo, lethality, risk, spectacle = _ax("tempo"), _ax("lethality"), _ax("risk"), _ax("spectacle")
+        trash = 1 + int(round(max(0.0, min(1.0, tempo)) * 3))
+        elite = (1 if lethality >= 0.50 else 0) + (1 if lethality >= 0.80 else 0)
+        boss = 1 if (risk >= 0.75 and lethality >= 0.60) else 0
+        if spectacle >= 0.80 and boss == 0:
+            elite = max(elite, 1)
+        props.append(f"mix trash={trash} elite={elite} boss={boss}")
         ntok = len(tokens(text))
         conf = 0.62 + min(0.3, (len(props) + ntok / 40.0) / 8.0)
+        mix = (float(trash), float(elite), float(boss))
+        dps_n = (float(dps),) if isinstance(dps, (int, float)) else ()
         return Thought(
             slot="left", kind="analytic",
             text=" ; ".join(props),
             confidence=conf,
-            tags=("analytic", "symbolic", "left") + found_eras[:2],
-            numbers=nums + ((float(dps),) if isinstance(dps, (int, float)) else ()),
+            tags=("analytic", "symbolic", "left", "mix") + found_eras[:2],
+            numbers=nums + dps_n + mix,
         )
 
 

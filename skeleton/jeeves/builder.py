@@ -39,6 +39,7 @@ class BuildPlan:
     notes: List[str] = field(default_factory=list)
     adapt: str = "none"
     slack: float = 1.0
+    authored: str = "local"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -56,6 +57,7 @@ class BuildPlan:
             "notes": list(self.notes),
             "adapt": self.adapt,
             "slack": round(self.slack, 4),
+            "authored": self.authored,
         }
 
 
@@ -66,9 +68,9 @@ def _walk_from_cortex(cortex: Any, era: str) -> Optional[Dict[str, Any]]:
     composed = (rec or {}).get("composed") or {}
     thought = composed.get("thought") or {}
     text = str(thought.get("text") or "").lower()
-    if "forge run" not in text and "extract" not in text:
+    if "forge run" not in text:
         return None
-    extracted = "extract true" in text or "extracted" in text
+    extracted = "extract true" in text or " extracted" in text
     collapsed = "collapse" in text and "extract true" not in text
     hops = 0
     if "hops" in text:
@@ -186,6 +188,45 @@ def _prune_mix(
         return trash, elite, boss, tot, notes
 
 
+def _bias_of(right: Any) -> str:
+    tags = tuple(getattr(right, "tags", ()) or ())
+    text = str(getattr(right, "text", "") or "").lower()
+    for b in ("loot", "heat", "combat", "balanced"):
+        if b in tags or f"bias={b}" in text:
+            return b
+    return "balanced"
+
+
+def _mix_of(left: Any) -> Optional[Tuple[int, int, int]]:
+    nums = tuple(getattr(left, "numbers", ()) or ())
+    if len(nums) < 3:
+        return None
+    trash, elite, boss = int(nums[-3]), int(nums[-2]), int(nums[-1])
+    if 0 <= trash <= 8 and 0 <= elite <= 4 and 0 <= boss <= 2:
+        return trash, elite, boss
+    return None
+
+
+def _author(pack: Dict[str, Any], cube: ContextTensor, era: str, cortex: Any):
+    ctx = {
+        "era": era,
+        "tensor": cube.as_dict() if hasattr(cube, "as_dict") else {},
+        "pack_dps": pack.get("primary_dps"),
+        "pack_ttk": pack.get("ttk"),
+        "collapse_max": (pack.get("session") or {}).get("collapse_max"),
+    }
+    stim = f"plan {era} forge mix bias ttk extract"
+    if cortex is not None:
+        trace = cortex.think(stim, ctx)
+        return trace.left, trace.right, trace.pfc, "cortex"
+    from skeleton.cortex.hemispheres import LeftHemisphere, RightHemisphere
+    from skeleton.cortex.pfc import PrefrontalCortex
+    left = LeftHemisphere().think(stim, ctx)
+    right = RightHemisphere().think(stim, {**ctx, "left": left.to_dict()})
+    pfc = PrefrontalCortex().think(stim, {**ctx, "left": left.to_dict(), "right": right.to_dict()})
+    return left, right, pfc, "local"
+
+
 class BuilderBrain:
     """Forge collaborator. Bind a pack, then plan(tensor, reading, walk)."""
 
@@ -204,30 +245,27 @@ class BuilderBrain:
         oracle_index = int(reading.index) if reading is not None else -1
         oracle_text = reading.text if reading is not None else "Signs point to a standard drop."
 
+        left, right, pfc, authored = _author(pack, cube, era, cortex)
+        bias = _bias_of(right)
+        mix = _mix_of(left)
         lethality = cube["lethality"]
         tempo = cube["tempo"]
         risk = cube["risk"]
-        grind = cube["grind"]
         scarcity = cube["scarcity"]
-        spectacle = cube["spectacle"]
-
-        if grind >= 0.62 and grind >= lethality:
-            bias = "loot"
-        elif scarcity >= 0.75 and lethality >= 0.55:
-            bias = "heat"
-        elif tempo >= 0.72 or lethality >= 0.80:
-            bias = "combat"
+        if mix is not None:
+            trash, elite, boss = mix
         else:
-            bias = "balanced"
+            trash = 1 + int(round(_clamp(tempo) * 3))
+            elite = (1 if lethality >= 0.50 else 0) + (1 if lethality >= 0.80 else 0)
+            boss = 1 if (risk >= 0.75 and lethality >= 0.60) else 0
 
         spawn_weapon = tempo >= 0.75 or lethality < 0.20 or scarcity < 0.35
         extract_late = risk >= 0.70
-
-        trash = 1 + int(round(_clamp(tempo) * 3))
-        elite = (1 if lethality >= 0.50 else 0) + (1 if lethality >= 0.80 else 0)
-        boss = 1 if (risk >= 0.75 and lethality >= 0.60) else 0
-        if spectacle >= 0.80 and boss == 0:
-            elite = max(elite, 1)
+        if pfc is not None and (
+            "veto" in (pfc.tags or ()) or (pfc.numbers and pfc.numbers[-1] >= 1.0)
+        ):
+            spawn_weapon = True
+            extract_late = False
 
         walk = last_walk or _walk_from_cortex(cortex, era)
         bias, spawn_weapon, extract_late, trash, elite, boss, tag, slack, adapt_notes = adapt_from_walk(
@@ -255,6 +293,7 @@ class BuilderBrain:
             f"philosophy={philosophy}",
             f"adapt={tag} slack={slack:.2f}",
             f"thermal_span={thermal_span:.1f}s",
+            f"authored={authored}",
         ] + adapt_notes + veto_notes
         briefing = (
             f"Jeeves / {era}: {oracle_text} "
@@ -262,6 +301,7 @@ class BuilderBrain:
             + ("You spawn with a kit." if spawn_weapon else "Scavenge a barrel before the first fight.")
             + (" Extract is late — value the cores." if extract_late else " Extract is honest; don't greed.")
             + (f" Cortex {tag}." if tag != "none" else "")
+            + f" Authored {authored}/{bias}."
         )
         return BuildPlan(
             era=era,
@@ -278,4 +318,5 @@ class BuilderBrain:
             notes=notes,
             adapt=tag,
             slack=slack,
+            authored=authored,
         )

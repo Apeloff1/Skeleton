@@ -64,6 +64,18 @@ class TestHemispheres:
         assert t.kind == "gestalt"
         assert "heat" in t.tags or "bias=heat" in t.text
 
+    def test_left_authors_mix_from_tensor(self):
+        tensor = dict(tempo=0.9, lethality=0.9, risk=0.8, spectacle=0.2,
+                      grind=0.1, scarcity=0.4, agency=0.5, opacity=0.5, intimacy=0.2, authorial=0.4)
+        t = LeftHemisphere().think("plan extraction_now forge mix", {
+            "era": "extraction_now", "tensor": tensor, "pack_dps": 100.0,
+            "pack_ttk": {"trash": 0.8},
+        })
+        assert "mix trash=" in t.text
+        assert t.numbers[-3] >= 3  # tempo 0.9 → trash 1+3
+        assert t.numbers[-2] >= 1  # lethality 0.9 → elite
+        assert t.numbers[-1] >= 1  # risk+lethality → boss
+
 
 class TestNeocortex:
     def test_think_fires_both_tracts(self):

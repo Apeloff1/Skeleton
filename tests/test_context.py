@@ -319,6 +319,44 @@ class TestClosedLoop:
         assert gf.jeeves.last_walk and gf.jeeves.last_walk.get("extracted")
 
 
+class TestAuthoredPlan:
+    def test_right_bias_is_the_plan_bias(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.jeeves.builder import BuilderBrain
+        from skeleton.context.tensor import ContextTensor
+        from skeleton.cortex.hemispheres import RightHemisphere, LeftHemisphere
+        pack = compile_era("soulslike")
+        tensor = ContextTensor.from_era("soulslike")
+        ctx = {"era": "soulslike", "tensor": tensor.as_dict(), "pack_dps": pack["primary_dps"], "pack_ttk": pack.get("ttk")}
+        right = RightHemisphere().think("plan soulslike forge mix bias ttk extract", ctx)
+        left = LeftHemisphere().think("plan soulslike forge mix bias ttk extract", ctx)
+        plan = BuilderBrain().plan(pack, tensor=tensor)
+        assert plan.authored == "local"
+        assert plan.room_bias in right.tags
+        assert plan.enemy_mix["trash"] == int(left.numbers[-3])
+        assert plan.enemy_mix["elite"] == int(left.numbers[-2])
+        # boss may be pruned by left-veto if thermal span blows collapse
+        assert plan.enemy_mix["boss"] <= int(left.numbers[-1])
+
+    def test_echo_right_falls_back_balanced(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.jeeves.builder import BuilderBrain
+        from skeleton.context.tensor import ContextTensor
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        neo.bind_echo("right")
+        pack = compile_era("soulslike")
+        plan = BuilderBrain().plan(pack, tensor=ContextTensor.from_era("soulslike"), cortex=neo)
+        assert plan.authored == "cortex"
+        assert plan.room_bias == "balanced"
+
+    def test_pipeline_forge_is_cortex_authored(self):
+        from skeleton.context.pipeline import GameForgeRun
+        out = GameForgeRun().execute("cozy wholesome farm")
+        assert out["succeeded"]
+        assert out["build_plan"]["authored"] == "cortex"
+
+
 class TestProjectorAndIntake:
     def test_write_and_intake_run(self, tmp_path=None):
         import tempfile, os
