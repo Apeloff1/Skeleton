@@ -20,6 +20,7 @@ from .review import (
     default_reviewer,
 )
 from .templates import PromptRegistry, PromptTemplate, TemplateError
+from .reflection import ReflectionBuilder, ReflectionPoint, ReflectionReport
 
 __all__ = [
     "CoCodingOrchestrator",
@@ -49,4 +50,7 @@ __all__ = [
     "PromptRegistry",
     "PromptTemplate",
     "TemplateError",
+    "ReflectionBuilder",
+    "ReflectionPoint",
+    "ReflectionReport",
 ]

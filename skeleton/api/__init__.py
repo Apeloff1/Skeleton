@@ -1,4 +1,4 @@
-"""REST API surface — routers, server, middleware, auth, versioning, webhooks, idempotency."""
+"""REST API surface — routers, server, middleware, auth, versioning, webhooks, idempotency, validation."""
 
 from .routes import router
 from .server import AppState, bootstrap, get_state, lifespan
@@ -14,6 +14,7 @@ from .auth import AuthContext, role_dependency, scope_dependency
 from .versioning import SUPPORTED, Version, VersionError, extract, negotiate
 from .webhooks import Subscription, WebhookDispatcher, WebhookError
 from .idempotency import IdempotencyError, IdempotencyKey, IdempotencyStore, parse_key
+from .validation import FieldRule, RequestValidator, ValidationIssue, ValidationError
 
 __all__ = [
     "router",
@@ -42,4 +43,8 @@ __all__ = [
     "IdempotencyKey",
     "IdempotencyStore",
     "parse_key",
+    "FieldRule",
+    "RequestValidator",
+    "ValidationIssue",
+    "ValidationError",
 ]

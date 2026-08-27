@@ -9,6 +9,7 @@ from .cache import CacheEntry, ResultCache
 from .chunking import Chunk, Chunker
 from .sources import SourceRegistry
 from .ingest import CorpusIngestor, Document
+from .rerank import Reranker, RerankRule
 
 __all__ = [
     "Fuser",
@@ -28,4 +29,6 @@ __all__ = [
     "SourceRegistry",
     "CorpusIngestor",
     "Document",
+    "Reranker",
+    "RerankRule",
 ]
