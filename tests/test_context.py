@@ -261,3 +261,26 @@ class TestCLI:
         root = tempfile.mkdtemp(prefix="cli-")
         rc = main(["run", "silent hill ammo scarce dread", "--out", root, "--overwrite", "--json"])
         assert rc == 0
+
+
+class TestBlend:
+    def test_midpoint_speed(self):
+        from skeleton.forge.eras import blend_eras, compile_era
+        a = compile_era("arcade_golden_age")
+        b = compile_era("soulslike")
+        m = blend_eras("arcade_golden_age", "soulslike", 0.5)
+        assert m["blend"]["t"] == 0.5
+        mid = (a["player"]["speed"] + b["player"]["speed"]) / 2
+        assert abs(m["player"]["speed"] - mid) < 1e-6
+        trash = next(e for e in m["enemies"] if e["id"] == "trash")
+        assert trash["hp"] == round(m["primary_dps"] * trash["ttk_target"], 1)
+
+    def test_pipeline_blend_run(self):
+        from skeleton.context.pipeline import GameForgeRun
+        out = GameForgeRun().execute("", blend=("arcade_golden_age", "soulslike", 0.5))
+        assert out["succeeded"]
+        assert "~" in out["era"]
+        assert out["sim"]["passed"] is True
+        chunk = out["files"]["scripts/player/player_controller.gd"].split("speed: float = ", 1)[1]
+        speed = float(chunk.splitlines()[0])
+        assert 155.0 < speed < 160.0  # 160 vs 155 midpoint 157.5

@@ -1,7 +1,7 @@
 """The Universal Forge — blueprints, validation, materialisers, accessors."""
 
 from skeleton.forge.accessors import Accessor
-from skeleton.forge.eras import compile_era, era_pack, list_eras
+from skeleton.forge.eras import blend_eras, compile_era, compile_pack, era_pack, list_eras
 from skeleton.forge.godot_emit import emit_godot
 from skeleton.forge.sim import simulate_session, simulate_encounter
 from skeleton.forge.projector import write_project, ProjectExistsError
@@ -22,7 +22,9 @@ from skeleton.forge.validator import (
 
 __all__ = [
     "Accessor",
+    "blend_eras",
     "compile_era",
+    "compile_pack",
     "era_pack",
     "list_eras",
     "emit_godot",

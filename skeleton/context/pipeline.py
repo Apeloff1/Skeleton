@@ -38,7 +38,8 @@ class GameForgeRun:
                 target: str = "godot",
                 project_root: Optional[str] = None,
                 answers: Optional[Dict[str, str]] = None,
-                overwrite: bool = False) -> Dict[str, Any]:
+                overwrite: bool = False,
+                blend: Optional[tuple] = None) -> Dict[str, Any]:
         cockpit = self.cockpit
         if answers:
             from skeleton.context.questionnaire import intake
@@ -56,6 +57,7 @@ class GameForgeRun:
             "cockpit": cockpit,
             "forge": self.forge,
             "jeeves": self.jeeves,
+            "blend": blend,
         }
         stages = [
             Stage("ingest", _stage_ingest),
@@ -122,7 +124,14 @@ def _stage_ingest(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _stage_detect(ctx: Dict[str, Any]) -> Dict[str, Any]:
-    if ctx.get("era_hint"):
+    blend = ctx.get("blend")
+    if blend and len(blend) >= 2:
+        from skeleton.forge.eras import blend_eras
+        t = float(blend[2]) if len(blend) > 2 else 0.5
+        pack = blend_eras(str(blend[0]), str(blend[1]), t)
+        era, scores = pack["era"], {"blend": 1}
+        ctx["pack"] = pack
+    elif ctx.get("era_hint"):
         era, scores = ctx["era_hint"], {"hint": 1}
     else:
         era, scores = detect_era(ctx.get("vision") or "")
@@ -132,7 +141,16 @@ def _stage_detect(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
 def _stage_tensor(ctx: Dict[str, Any]) -> Dict[str, Any]:
     cockpit: Cockpit = ctx["cockpit"]
-    cockpit.tensor = ContextTensor.from_era(ctx["era"])
+    blend = ctx.get("blend")
+    if blend and len(blend) >= 2:
+        t = float(blend[2]) if len(blend) > 2 else 0.5
+        cockpit.tensor = ContextTensor.from_era(str(blend[0])).lerp(
+            ContextTensor.from_era(str(blend[1])), t
+        )
+        # keep the blended era label on the cube
+        object.__setattr__(cockpit.tensor, "era", ctx["era"])
+    else:
+        cockpit.tensor = ContextTensor.from_era(ctx["era"])
     _commit(ctx, "tensor", ctx["era"], cockpit.tensor.fingerprint(), cockpit.tensor.as_dict())
     return {"tensor_fp": cockpit.tensor.fingerprint()}
 
@@ -160,7 +178,7 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
         bp = default_library().build(forge, name)
     except Exception:
         bp = default_library().build(forge, "extraction")
-    art = forge.materialise(bp, era=ctx["era"], target=ctx.get("target") or "godot")
+    art = forge.materialise(bp, era=ctx["era"], target=ctx.get("target") or "godot", pack=ctx.get("pack"))
     _commit(ctx, "forge", name, art.get("blueprint_id", ""), {
         "blueprint_id": art.get("blueprint_id"),
         "era": art.get("era"),
@@ -179,7 +197,8 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
 def _stage_jeeves(ctx: Dict[str, Any]) -> Dict[str, Any]:
     jeeves: Jeeves = ctx["jeeves"]
     session = jeeves.open_session("pipeline", mode=SessionMode.TACTICAL)
-    pack = jeeves.bind_era(ctx["era"])
+    pack = ctx.get("pack") or ctx.get("artefact", {}).get("pack")
+    pack = jeeves.bind_pack(pack) if pack else jeeves.bind_era(ctx["era"])
     advice = jeeves.advise(session.session_id, {
         "heat": pack["heat"]["max_heat"] * pack["jeeves"]["heat_critical"],
         "has_weapon": False,

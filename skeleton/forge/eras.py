@@ -233,8 +233,8 @@ def primary_dps(pack: Dict[str, Any]) -> float:
     return round(18.0 * (360.0 / 60.0) * (speed / 195.0), 1)
 
 
-def compile_era(era: str) -> Dict[str, Any]:
-    pack = era_pack(era)
+def compile_pack(pack: Dict[str, Any]) -> Dict[str, Any]:
+    pack = deepcopy(pack)
     dps = primary_dps(pack)
     ttk = pack["ttk"]
     pack["primary_dps"] = dps
@@ -252,6 +252,31 @@ def compile_era(era: str) -> Dict[str, Any]:
          "parts": ["emitter_pulse", "frame_std", "cell_basic"]},
     ]
     return pack
+
+
+def compile_era(era: str) -> Dict[str, Any]:
+    return compile_pack(era_pack(era))
+
+
+def _lerp(a: Any, b: Any, t: float) -> Any:
+    if isinstance(a, bool) or isinstance(b, bool):
+        return b if t >= 0.5 else a
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        return type(a)(a + (b - a) * t) if not isinstance(a, bool) else a
+    if isinstance(a, dict) and isinstance(b, dict):
+        keys = set(a) | set(b)
+        return {k: _lerp(a.get(k, b.get(k)), b.get(k, a.get(k)), t) for k in keys}
+    return b if t >= 0.5 else a
+
+
+def blend_eras(era_a: str, era_b: str, t: float) -> Dict[str, Any]:
+    """Linear interpolation of two compiled dialects, then re-derive HP."""
+    t = 0.0 if t < 0.0 else 1.0 if t > 1.0 else float(t)
+    a, b = era_pack(era_a), era_pack(era_b)
+    mixed = _lerp(a, b, t)
+    mixed["era"] = f"{a['era']}~{b['era']}@{t:.2f}"
+    mixed["blend"] = {"a": a["era"], "b": b["era"], "t": t}
+    return compile_pack(mixed)
 
 
 def list_eras() -> List[str]:

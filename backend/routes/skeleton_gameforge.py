@@ -24,6 +24,8 @@ class RunRequest(BaseModel):
     overwrite: bool = False
     include_files: bool = False
     answers: Dict[str, str] = Field(default_factory=dict)
+    blend: Optional[list] = None
+    t: float = 0.5
 
 
 @router.get("/eras")
@@ -54,6 +56,7 @@ def run(req: RunRequest) -> Dict[str, Any]:
             project_root=req.project_root,
             overwrite=req.overwrite,
             answers=req.answers or None,
+            blend=(tuple(req.blend) + (req.t,)) if req.blend and len(req.blend) >= 2 else None,
         )
     except Exception as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

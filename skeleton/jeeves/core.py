@@ -168,11 +168,15 @@ class Jeeves:
             self._brain = TacticalBrain(self.era)
         return self._brain
 
-    def bind_era(self, era: str) -> dict[str, Any]:
-        self.era = era
-        pack = self._brain_get().bind_era(era)
+    def bind_pack(self, pack: dict[str, Any]) -> dict[str, Any]:
+        self.era = str(pack.get("era") or self.era)
+        pack = self._brain_get().bind_pack(pack)
         self._bus.emit("jeeves.era.bound", {"era": pack["era"], "dps": pack["primary_dps"]})
         return pack
+
+    def bind_era(self, era: str) -> dict[str, Any]:
+        from skeleton.forge.eras import compile_era
+        return self.bind_pack(compile_era(era))
 
     def advise(self, session_id: str, telemetry: dict[str, Any] | None = None) -> dict[str, Any]:
         """Tactical cascade. Opens nothing; uses bound era + live telemetry."""

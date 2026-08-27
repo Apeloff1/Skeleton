@@ -77,7 +77,19 @@ uvicorn skeleton.api.server:create_app --factory --reload --port 8001
 ```bash
 pytest -q            # full suite
 ruff check .         # lint
+python tests/run_unit.py
 ```
+
+## GameForge CLI
+
+```bash
+python -m skeleton eras
+python -m skeleton run "soulslike extraction with bonfire rest" --out ./proj --overwrite --json
+python -m skeleton run --blend arcade_golden_age soulslike --t 0.5 --out ./blend --overwrite
+python -m skeleton check ./proj
+```
+
+HTTP: `GET /api/skeleton/eras` · `POST /api/skeleton/run` · `GET /api/skeleton/beats`
 
 ---
 

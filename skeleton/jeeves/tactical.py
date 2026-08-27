@@ -56,15 +56,18 @@ class TacticalBrain:
         self.bind_era(era)
         self.log: List[Advice] = []
 
-    def bind_era(self, era: str) -> Dict[str, Any]:
-        self.pack = compile_era(era)
-        self.era = self.pack["era"]
-        j = self.pack["jeeves"]
+    def bind_pack(self, pack: Dict[str, Any]) -> Dict[str, Any]:
+        self.pack = pack
+        self.era = str(pack.get("era") or "extraction_now")
+        j = pack.get("jeeves") or {}
         self.heat_rising = float(j.get("heat_rising", 0.65))
         self.heat_critical = float(j.get("heat_critical", 0.92))
         self.collapse_extract = 0.40
         self.collapse_late = 0.75
         return self.pack
+
+    def bind_era(self, era: str) -> Dict[str, Any]:
+        return self.bind_pack(compile_era(era))
 
     def observe(self, telemetry: Dict[str, Any]) -> WorldModel:
         heat = float(telemetry.get("heat", 0.0) or 0.0)

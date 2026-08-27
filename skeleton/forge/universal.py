@@ -193,7 +193,7 @@ class Forge:
         return component
 
     def materialise(self, blueprint: Blueprint, *, era: str = "extraction_now",
-                    target: str = "json") -> dict[str, Any]:
+                    target: str = "json", pack: dict[str, Any] | None = None) -> dict[str, Any]:
         """Validate, compile era numbers, optionally emit Godot files."""
         from skeleton.forge.eras import compile_era
         from skeleton.forge.godot_emit import emit_godot
@@ -204,7 +204,7 @@ class Forge:
             raise MaterialisationError("blueprint failed validation",
                                        context={"blueprint_id": blueprint.blueprint_id,
                                                 "problems": problems})
-        pack = compile_era(era)
+        pack = pack or compile_era(era)
         order = self._topological_order(blueprint)
         plan = MaterialisationPlanner(bus=self._bus).plan_blueprint(blueprint)
         result: dict[str, Any] = {

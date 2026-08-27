@@ -16,6 +16,8 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--out", dest="out")
     r.add_argument("--overwrite", action="store_true")
     r.add_argument("--json", action="store_true")
+    r.add_argument("--blend", nargs=2, metavar=("ERA_A", "ERA_B"))
+    r.add_argument("--t", dest="t", type=float, default=0.5)
 
     i = sub.add_parser("intake", help="12-beat answers → project")
     i.add_argument("pairs", nargs="*", help="id=option")
@@ -62,6 +64,7 @@ def main(argv: list[str] | None = None) -> int:
         out = args.out
         overwrite = args.overwrite
         as_json = args.json
+        blend = tuple(args.blend) + (args.t,) if args.blend else None
     else:
         answers = {}
         for pair in args.pairs:
@@ -73,9 +76,11 @@ def main(argv: list[str] | None = None) -> int:
         out = args.out
         overwrite = args.overwrite
         as_json = False
+        blend = None
 
     payload = GameForgeRun().execute(
         vision, era=era, answers=answers, project_root=out, overwrite=overwrite, target="godot",
+        blend=blend,
     )
     if args.cmd == "run" and as_json:
         slim = {k: payload[k] for k in ("succeeded", "era", "mass", "complete", "sim", "project", "forge") if k in payload}
