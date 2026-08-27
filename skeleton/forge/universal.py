@@ -193,7 +193,8 @@ class Forge:
         return component
 
     def materialise(self, blueprint: Blueprint, *, era: str = "extraction_now",
-                    target: str = "json", pack: dict[str, Any] | None = None) -> dict[str, Any]:
+                    target: str = "json", pack: dict[str, Any] | None = None,
+                    build_plan: dict[str, Any] | None = None) -> dict[str, Any]:
         """Validate, compile era numbers, optionally emit Godot files."""
         from skeleton.forge.eras import compile_era
         from skeleton.forge.godot_emit import emit_godot
@@ -216,9 +217,10 @@ class Forge:
             "topology": blueprint.to_dict(),
             "execution_order": order,
             "plan": plan.to_dict(),
+            "build_plan": build_plan or {},
         }
         if target == "godot":
-            result["files"] = emit_godot(pack, title=blueprint.name)
+            result["files"] = emit_godot(pack, title=blueprint.name, build_plan=build_plan)
             result["file_count"] = len(result["files"])
         self._bus.emit("forge.blueprint.materialised",
                        {"blueprint_id": blueprint.blueprint_id,

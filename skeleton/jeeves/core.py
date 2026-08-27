@@ -90,6 +90,7 @@ class Jeeves:
         self._sessions: dict[str, Session] = {}
         self._brain = None  # lazy TacticalBrain
         self.era = "extraction_now"
+        self.last_plan = None
 
     @property
     def laws(self) -> tuple[str, ...]:
@@ -177,6 +178,20 @@ class Jeeves:
     def bind_era(self, era: str) -> dict[str, Any]:
         from skeleton.forge.eras import compile_era
         return self.bind_pack(compile_era(era))
+
+    def plan_build(self, pack: dict[str, Any] | None = None, *,
+                   tensor=None, reading=None) -> dict[str, Any]:
+        """Jeeves-as-builder: design the run the forge will emit."""
+        from skeleton.jeeves.builder import BuilderBrain
+        if pack is None:
+            from skeleton.forge.eras import compile_era
+            pack = compile_era(self.era)
+        plan = BuilderBrain().plan(pack, tensor=tensor, reading=reading)
+        self.last_plan = plan
+        self._bus.emit("jeeves.build.planned", {
+            "era": plan.era, "seed": plan.seed, "bias": plan.room_bias,
+        })
+        return plan.to_dict()
 
     def advise(self, session_id: str, telemetry: dict[str, Any] | None = None) -> dict[str, Any]:
         """Tactical cascade. Opens nothing; uses bound era + live telemetry."""

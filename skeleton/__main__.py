@@ -28,6 +28,15 @@ def main(argv: list[str] | None = None) -> int:
     c = sub.add_parser("check", help="static-check a files dict or a project dir")
     c.add_argument("path")
 
+    pl = sub.add_parser("plan", help="Jeeves BuildPlan for a vision / era")
+    pl.add_argument("vision", nargs="?", default="")
+    pl.add_argument("--era")
+    pl.add_argument("--blend", nargs=2, metavar=("ERA_A", "ERA_B"))
+    pl.add_argument("--t", dest="t", type=float, default=0.5)
+
+    ck = sub.add_parser("cockpit", help="apply one cockpit command")
+    ck.add_argument("command")
+
     args = p.parse_args(argv)
 
     if args.cmd == "eras":
@@ -49,6 +58,37 @@ def main(argv: list[str] | None = None) -> int:
                 print(" -", x)
             return 2
         print(f"OK {len(files)} files")
+        return 0
+
+    if args.cmd == "cockpit":
+        from skeleton.context.cockpit import Cockpit
+        cpit = Cockpit()
+        out = cpit.apply(args.command)
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "plan":
+        from skeleton.context.tensor import ContextTensor, detect_era
+        from skeleton.forge.eras import blend_eras, compile_era
+        from skeleton.jeeves.builder import BuilderBrain
+        from skeleton.context.dodeca import Dodecahedron
+        from skeleton.context.oracle import Magic8Ball
+        if args.blend:
+            pack = blend_eras(args.blend[0], args.blend[1], args.t)
+            tensor = ContextTensor.from_era(args.blend[0]).lerp(
+                ContextTensor.from_era(args.blend[1]), args.t
+            )
+            object.__setattr__(tensor, "era", pack["era"])
+        elif args.era:
+            pack = compile_era(args.era)
+            tensor = ContextTensor.from_era(args.era)
+        else:
+            era, _ = detect_era(args.vision or "")
+            pack = compile_era(era)
+            tensor = ContextTensor.from_era(era)
+        reading = Magic8Ball(Dodecahedron.from_tensor(tensor)).roll(tensor)
+        plan = BuilderBrain().plan(pack, tensor=tensor, reading=reading)
+        print(json.dumps(plan.to_dict(), indent=2))
         return 0
 
     from skeleton.context.pipeline import GameForgeRun

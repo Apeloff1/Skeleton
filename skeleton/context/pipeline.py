@@ -97,6 +97,9 @@ class GameForgeRun:
             "files": run.context.get("files") or {},
             "sim": run.context.get("sim"),
             "project": run.context.get("project"),
+            "build_plan": (run.context.get("build_plan").to_dict()
+                           if hasattr(run.context.get("build_plan"), "to_dict")
+                           else run.context.get("build_plan")),
         }
         self.bus.emit("gameforge.run.finished", {
             "succeeded": run.succeeded,
@@ -125,6 +128,10 @@ def _stage_ingest(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
 def _stage_detect(ctx: Dict[str, Any]) -> Dict[str, Any]:
     blend = ctx.get("blend")
+    cockpit: Cockpit = ctx["cockpit"]
+    if not blend and getattr(cockpit, "blend", None):
+        blend = cockpit.blend
+        ctx["blend"] = blend
     if blend and len(blend) >= 2:
         from skeleton.forge.eras import blend_eras
         t = float(blend[2]) if len(blend) > 2 else 0.5
@@ -173,17 +180,31 @@ def _stage_oracle(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
 def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
     forge: Forge = ctx["forge"]
+    cockpit: Cockpit = ctx["cockpit"]
     name = ctx.get("archetype") or "extraction"
     try:
         bp = default_library().build(forge, name)
     except Exception:
         bp = default_library().build(forge, "extraction")
-    art = forge.materialise(bp, era=ctx["era"], target=ctx.get("target") or "godot", pack=ctx.get("pack"))
+    pack = ctx.get("pack")
+    if not pack:
+        from skeleton.forge.eras import compile_era
+        pack = compile_era(ctx["era"])
+        ctx["pack"] = pack
+    from skeleton.jeeves.builder import BuilderBrain
+    build_plan = BuilderBrain().plan(pack, tensor=cockpit.tensor, reading=cockpit.last_oracle)
+    ctx["build_plan"] = build_plan
+    art = forge.materialise(
+        bp, era=ctx["era"], target=ctx.get("target") or "godot",
+        pack=pack, build_plan=build_plan.to_dict(),
+    )
     _commit(ctx, "forge", name, art.get("blueprint_id", ""), {
         "blueprint_id": art.get("blueprint_id"),
         "era": art.get("era"),
         "primary_dps": art.get("primary_dps"),
         "file_count": art.get("file_count"),
+        "build_seed": build_plan.seed,
+        "room_bias": build_plan.room_bias,
     })
     return {
         "blueprint_id": art.get("blueprint_id"),
@@ -191,6 +212,7 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "artefact": art,
         "files": art.get("files") or {},
         "file_count": art.get("file_count") or len(art.get("files") or {}),
+        "build_plan": build_plan.to_dict(),
     }
 
 
@@ -199,11 +221,22 @@ def _stage_jeeves(ctx: Dict[str, Any]) -> Dict[str, Any]:
     session = jeeves.open_session("pipeline", mode=SessionMode.TACTICAL)
     pack = ctx.get("pack") or ctx.get("artefact", {}).get("pack")
     pack = jeeves.bind_pack(pack) if pack else jeeves.bind_era(ctx["era"])
+    raw = ctx.get("build_plan")
+    if raw is not None and hasattr(raw, "to_dict"):
+        plan = raw.to_dict()
+        jeeves.last_plan = raw
+    else:
+        plan = dict(raw or {})
+    spawn_weapon = bool(plan.get("spawn_weapon"))
     advice = jeeves.advise(session.session_id, {
         "heat": pack["heat"]["max_heat"] * pack["jeeves"]["heat_critical"],
-        "has_weapon": False,
+        "has_weapon": spawn_weapon,
         "alive": True,
     })
+    if plan:
+        advice = dict(advice)
+        advice["briefing"] = plan.get("briefing")
+        advice["build_plan"] = plan
     _commit(ctx, "jeeves", ctx["era"], advice["next"]["text"], advice["next"])
     return {"jeeves_advice": advice, "session_id": session.session_id}
 

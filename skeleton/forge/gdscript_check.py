@@ -61,6 +61,9 @@ def check_files(files: Mapping[str, str]) -> List[str]:
         "scripts/autoloads/jeeves.gd",
         "scripts/player/player_controller.gd",
         "scripts/combat/enemy.gd",
+        "scripts/world/world_map.gd",
+        "scenes/levels/run_level.tscn",
+        "data/rooms.json",
     )
     for rel in required:
         if rel not in keys:
@@ -70,6 +73,11 @@ def check_files(files: Mapping[str, str]) -> List[str]:
         problems.append("player never calls move_and_slide")
     if "HeatSystem" not in player:
         problems.append("player never talks to HeatSystem")
+    level = files.get("scenes/levels/run_level.tscn", "")
+    if "Room_r00" not in level:
+        problems.append("run_level.tscn does not instance Room_r00")
+    if 'instance=ExtResource("3")' not in level and "instance=ExtResource(\"3\")" not in level:
+        problems.append("run_level.tscn never instances the player PackedScene")
     return problems
 
 

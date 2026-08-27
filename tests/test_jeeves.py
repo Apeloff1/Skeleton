@@ -144,3 +144,32 @@ class TestTactical:
         j.bind_era("extraction_now")
         reply = j.ask(s.session_id, "status", context={"telemetry": {"heat": 99, "alive": True, "has_weapon": True}})
         assert "Heat critical" in reply or "critical" in reply.lower()
+
+
+class TestBuilder:
+    def test_deterministic_and_armed_boomer(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.jeeves.builder import BuilderBrain
+        pack = compile_era("boomer_shooter")
+        a = BuilderBrain().plan(pack)
+        b = BuilderBrain().plan(pack)
+        assert a.seed == b.seed
+        assert a.spawn_weapon is True  # tempo 0.95
+        assert a.room_bias == "combat"
+        assert a.enemy_mix["trash"] >= 2
+
+    def test_horror_scavenges(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.jeeves.builder import BuilderBrain
+        pack = compile_era("horror_survival")
+        p = BuilderBrain().plan(pack)
+        assert p.spawn_weapon is False
+        assert p.extract_late is True
+        assert p.room_bias in {"heat", "combat", "loot", "balanced"}
+
+    def test_jeeves_plan_build(self):
+        j = Jeeves()
+        d = j.plan_build()
+        assert d["seed"]
+        assert d["briefing"]
+        assert j.last_plan is not None

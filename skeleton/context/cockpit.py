@@ -4,9 +4,11 @@ Command language (one statement per apply):
   BIND ERA <id>
   SET AXIS <name> <0..1>
   LERP ERA <id> <t>
+  BLEND ERA <a> <b> [t]
   ROLL ORACLE
   NICK HELIX
   LIGATE HELIX
+  DETECT <text>
   SNAPSHOT
   STATUS
 Unknown verbs raise CockpitError. apply() is the only mutation path;
@@ -16,7 +18,7 @@ from __future__ import annotations
 
 import shlex
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from skeleton.context.dodeca import Dodecahedron
 from skeleton.context.helix import DNAHelix
@@ -40,6 +42,7 @@ class Cockpit:
     snowball: Snowball = field(default_factory=Snowball)
     last_oracle: Optional[OracleReading] = None
     history: List[str] = field(default_factory=list)
+    blend: Optional[Tuple[str, str, float]] = None
 
     @property
     def lattice(self) -> Dodecahedron:
@@ -54,6 +57,7 @@ class Cockpit:
                        "valid": not self.ledger.verify()},
             "snowball": self.snowball.to_dict(),
             "oracle": self.last_oracle.to_dict() if self.last_oracle else None,
+            "blend": list(self.blend) if self.blend else None,
             "history": list(self.history[-20:]),
         }
 
@@ -72,6 +76,7 @@ class Cockpit:
         elif verb == "BIND" and args and args[0].upper() == "ERA":
             era = args[1] if len(args) > 1 else "extraction_now"
             self.tensor = ContextTensor.from_era(era)
+            self.blend = None
             result = {"era": self.tensor.era, "tensor": self.tensor.as_dict()}
         elif verb == "SET" and args and args[0].upper() == "AXIS":
             if len(args) < 3:
@@ -87,6 +92,18 @@ class Cockpit:
             other = ContextTensor.from_era(args[1])
             self.tensor = self.tensor.lerp(other, float(args[2]))
             result = {"era": self.tensor.era, "tensor": self.tensor.as_dict()}
+        elif verb == "BLEND":
+            if args and args[0].upper() == "ERA":
+                args = args[1:]
+            if len(args) < 2:
+                raise CockpitError("BLEND ERA <a> <b> [t]")
+            a, b = args[0], args[1]
+            t = float(args[2]) if len(args) > 2 else 0.5
+            t = 0.0 if t < 0.0 else 1.0 if t > 1.0 else t
+            self.blend = (a, b, t)
+            self.tensor = ContextTensor.from_era(a).lerp(ContextTensor.from_era(b), t)
+            object.__setattr__(self.tensor, "era", f"{a}~{b}@{t:.2f}")
+            result = {"era": self.tensor.era, "blend": [a, b, t], "tensor": self.tensor.as_dict()}
         elif verb == "ROLL":
             ball = Magic8Ball(self.lattice)
             self.last_oracle = ball.roll(self.tensor, nonce=len(self.history))
@@ -101,6 +118,7 @@ class Cockpit:
             text = " ".join(args)
             era, scores = detect_era(text)
             self.tensor = ContextTensor.from_era(era)
+            self.blend = None
             result = {"era": era, "scores": scores}
         else:
             raise CockpitError("unknown command", context={"verb": verb, "line": line})

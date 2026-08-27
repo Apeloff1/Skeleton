@@ -6,7 +6,7 @@ godot_engine pipeline can later import/check these files.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 def _gd_recipes(recipes: List[dict]) -> str:
@@ -20,7 +20,12 @@ def _gd_recipes(recipes: List[dict]) -> str:
     return "var known_recipes: Array = [\n" + ",\n".join(lines) + "\n]\n"
 
 
-def emit_godot(pack: Dict[str, Any], *, title: str = "FORGE-RUN") -> Dict[str, str]:
+def emit_godot(
+    pack: Dict[str, Any],
+    *,
+    title: str = "FORGE-RUN",
+    build_plan: Optional[Dict[str, Any]] = None,
+) -> Dict[str, str]:
     heat = pack.get("heat") or {}
     player = pack.get("player") or {}
     jeeves = pack.get("jeeves") or {}
@@ -35,6 +40,7 @@ def emit_godot(pack: Dict[str, Any], *, title: str = "FORGE-RUN") -> Dict[str, s
     speed = float(player.get("speed") or 180)
     sprint_m = float(player.get("sprint_multiplier") or 1.4)
     collapse = float(session.get("collapse_max") or 300)
+    plan = build_plan or {}
     files: Dict[str, str] = {}
     files["project.godot"] = (
         '; Engine configuration file.\n'
@@ -58,6 +64,7 @@ def emit_godot(pack: Dict[str, Any], *, title: str = "FORGE-RUN") -> Dict[str, s
         "signal advice_issued(text: String, priority: int)\n"
         "signal run_ended(success: bool)\n"
         "signal data_core_picked(core: Dictionary)\n"
+        "signal room_entered(room_id: String)\n"
     )
     files["scripts/autoloads/heat_system.gd"] = (
         "extends Node\n"
@@ -95,6 +102,7 @@ def emit_godot(pack: Dict[str, Any], *, title: str = "FORGE-RUN") -> Dict[str, s
         "			return true\n"
         "	return false\n"
     )
+    armed = bool(plan.get("spawn_weapon"))
     files["scripts/autoloads/game_state.gd"] = (
         "extends Node\n"
         "enum RunPhase { IDLE, RUNNING, EXTRACTING, FAILED, SUCCESS }\n"
@@ -102,7 +110,9 @@ def emit_godot(pack: Dict[str, Any], *, title: str = "FORGE-RUN") -> Dict[str, s
         "var player_alive: bool = true\n"
         f"var collapse_max: float = {collapse}\n"
         "var collapse_timer: float = collapse_max\n"
-        "var data_cores_held: Array = []\n\n"
+        "var data_cores_held: Array = []\n"
+        f"var spawn_weapon: bool = {str(armed).lower()}\n"
+        f"var current_room: String = \"r00\"\n\n"
         "func start_run() -> void:\n"
         "	phase = RunPhase.RUNNING\n"
         "	player_alive = true\n"
@@ -117,14 +127,22 @@ def emit_godot(pack: Dict[str, Any], *, title: str = "FORGE-RUN") -> Dict[str, s
         "		player_alive = false\n"
         "		EventBus.run_ended.emit(false)\n"
     )
+    briefing = (plan.get("briefing") or "Jeeves online.").replace('"', "'")
     files["scripts/autoloads/jeeves.gd"] = (
         "extends Node\n"
-        "## Jeeves — tactical AI (era-weighted)\n"
+        "## Jeeves — tactical AI (era-weighted) + builder briefing\n"
         f"const W_HEAT_RISING := {float(jeeves.get('heat_rising', 0.65))}\n"
         f"const W_HEAT_CRITICAL := {float(jeeves.get('heat_critical', 0.92))}\n"
         f"const W_CD_NORMAL := {float(jeeves.get('advice_cooldown_normal', 4.5))}\n"
-        "var _cd: float = 0.0\n\n"
+        f'const BRIEFING := "{briefing}"\n'
+        "var _cd: float = 0.0\n"
+        "var _briefed: bool = false\n\n"
         "func _process(delta: float) -> void:\n"
+        "	if not _briefed:\n"
+        "		EventBus.advice_issued.emit(BRIEFING, 1)\n"
+        "		_briefed = true\n"
+        "		_cd = W_CD_NORMAL\n"
+        "		return\n"
         "	_cd = max(0.0, _cd - delta)\n"
         "	if _cd > 0.0:\n"
         "		return\n"
@@ -189,6 +207,7 @@ def emit_godot(pack: Dict[str, Any], *, title: str = "FORGE-RUN") -> Dict[str, s
         "func _process(_delta: float) -> void:\n"
         "	$Heat.text = \"HEAT %.0f / %.0f\" % [HeatSystem.current_heat, HeatSystem.max_heat]\n"
         "	$Collapse.text = \"COLLAPSE %.0f\" % GameState.collapse_timer\n"
+        "	$Room.text = \"ROOM %s\" % GameState.current_room\n"
     )
     files["export_presets.cfg"] = (
         "[preset.0]\nname=\"Linux/X11\"\nplatform=\"Linux/X11\"\nrunnable=true\n"
@@ -206,6 +225,15 @@ def emit_godot(pack: Dict[str, Any], *, title: str = "FORGE-RUN") -> Dict[str, s
         "	if body.is_in_group(\"player\"):\n"
         "		GameState.phase = GameState.RunPhase.SUCCESS\n"
         "		EventBus.run_ended.emit(true)\n"
+    )
+    files["scripts/world/heat_zone.gd"] = (
+        "extends Area2D\n"
+        "func _ready() -> void:\n"
+        "	add_to_group(\"heat_zone\")\n\n"
+        "func _process(delta: float) -> void:\n"
+        "	for b in get_overlapping_bodies():\n"
+        "		if b.is_in_group(\"player\"):\n"
+        "			HeatSystem.add_sprint_heat(delta)\n"
     )
     files["scenes/player.tscn"] = (
         "[gd_scene load_steps=3 format=3]\n"
@@ -237,30 +265,16 @@ def emit_godot(pack: Dict[str, Any], *, title: str = "FORGE-RUN") -> Dict[str, s
         "[node name=\"Body\" type=\"CollisionShape2D\" parent=\".\"]\n"
         "shape = SubResource(\"zone\")\n"
     )
-    files["scenes/levels/run_level.tscn"] = (
-        "[gd_scene load_steps=5 format=3]\n"
-        "[ext_resource type=\"Script\" path=\"res://scripts/ui/hud.gd\" id=\"1\"]\n"
-        "[ext_resource type=\"PackedScene\" path=\"res://scenes/player.tscn\" id=\"2\"]\n"
-        "[ext_resource type=\"PackedScene\" path=\"res://scenes/enemy.tscn\" id=\"3\"]\n"
-        "[ext_resource type=\"PackedScene\" path=\"res://scenes/extract.tscn\" id=\"4\"]\n"
-        "[node name=\"RunLevel\" type=\"Node2D\"]\n"
-        "[node name=\"Player\" parent=\".\" instance=ExtResource(\"2\")]\n"
-        "position = Vector2(640, 360)\n"
-        "[node name=\"Enemy\" parent=\".\" instance=ExtResource(\"3\")]\n"
-        "position = Vector2(800, 360)\n"
-        "[node name=\"Extract\" parent=\".\" instance=ExtResource(\"4\")]\n"
-        "position = Vector2(1100, 360)\n"
-        "[node name=\"HUD\" type=\"CanvasLayer\" parent=\".\"]\n"
+    files["scenes/heat_zone.tscn"] = (
+        "[gd_scene load_steps=3 format=3]\n"
+        "[ext_resource type=\"Script\" path=\"res://scripts/world/heat_zone.gd\" id=\"1\"]\n"
+        "[sub_resource type=\"RectangleShape2D\" id=\"zone\"]\n"
+        "size = Vector2(200, 200)\n"
+        "[node name=\"HeatZone\" type=\"Area2D\"]\n"
         "script = ExtResource(\"1\")\n"
-        "[node name=\"Heat\" type=\"Label\" parent=\"HUD\"]\n"
-        "offset_right = 400.0\n"
-        "offset_bottom = 24.0\n"
-        "[node name=\"Collapse\" type=\"Label\" parent=\"HUD\"]\n"
-        "offset_top = 28.0\n"
-        "offset_right = 400.0\n"
-        "offset_bottom = 52.0\n"
+        "[node name=\"Body\" type=\"CollisionShape2D\" parent=\".\"]\n"
+        "shape = SubResource(\"zone\")\n"
     )
-    # input map — keep move/sprint off ui_* so the export is a real project
     files["project.godot"] += (
         "\n[input]\n"
         "move_left={\"deadzone\": 0.5, \"events\": []}\n"
@@ -270,7 +284,104 @@ def emit_godot(pack: Dict[str, Any], *, title: str = "FORGE-RUN") -> Dict[str, s
         "sprint={\"deadzone\": 0.5, \"events\": []}\n"
         "fire={\"deadzone\": 0.5, \"events\": []}\n"
     )
-    from skeleton.forge.world import generate_rooms
-    graph = generate_rooms(pack, seed=str(pack.get("era")))
+    from skeleton.forge.world import generate_rooms, assert_connected
+    graph = generate_rooms(pack, seed=str(plan.get("seed") or pack.get("era")), plan=plan)
+    assert_connected(graph)
     files["data/rooms.json"] = json.dumps(graph, indent=2)
+    files["data/build_plan.json"] = json.dumps(plan, indent=2)
+    files["scenes/levels/run_level.tscn"] = _level_tscn(graph)
+    files["scripts/world/world_map.gd"] = _world_map_gd(plan, graph)
     return files
+
+
+def _world_map_gd(plan: Dict[str, Any], graph: Optional[Dict[str, Any]] = None) -> str:
+    era = (plan.get("era") or (graph or {}).get("era") or "extraction_now")
+    seed = plan.get("seed") or (graph or {}).get("seed") or era
+    n = int((graph or {}).get("count") or 0)
+    rooms = (graph or {}).get("rooms") or []
+    edges = (graph or {}).get("edges") or []
+    room_lits = []
+    for r in rooms:
+        room_lits.append(
+            '{"id": "%s", "kind": "%s", "x": %s, "y": %s}'
+            % (r["id"], r["kind"], r.get("x", 0), r.get("y", 0))
+        )
+    edge_lits = ['{"from": "%s", "to": "%s"}' % (e["from"], e["to"]) for e in edges]
+    rooms_s = ", ".join(room_lits) or ""
+    edges_s = ", ".join(edge_lits) or ""
+    return (
+        "extends Node2D\n"
+        "## WorldMap — instanced room graph (Jeeves BuildPlan)\n"
+        f'const ERA := "{era}"\n'
+        f'const SEED := "{seed}"\n'
+        f"const ROOM_COUNT := {n}\n"
+        f"var rooms: Array = [{rooms_s}]\n"
+        f"var edges: Array = [{edges_s}]\n\n"
+        "func _ready() -> void:\n"
+        "	if rooms.size() > 0:\n"
+        "		GameState.current_room = rooms[0].id\n"
+        "		EventBus.room_entered.emit(rooms[0].id)\n"
+    )
+
+
+def _level_tscn(graph: Dict[str, Any]) -> str:
+    """Instance every room + occupant. Player lives in spawn; extract in extract."""
+    lines = [
+        "[gd_scene load_steps=7 format=3]",
+        '[ext_resource type="Script" path="res://scripts/world/world_map.gd" id="1"]',
+        '[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="2"]',
+        '[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="3"]',
+        '[ext_resource type="PackedScene" path="res://scenes/enemy.tscn" id="4"]',
+        '[ext_resource type="PackedScene" path="res://scenes/extract.tscn" id="5"]',
+        '[ext_resource type="PackedScene" path="res://scenes/heat_zone.tscn" id="6"]',
+        '[node name="RunLevel" type="Node2D"]',
+        'script = ExtResource("1")',
+    ]
+    enemy_i = 0
+    for room in graph["rooms"]:
+        rid = room["id"]
+        lines.append(f'[node name="Room_{rid}" type="Node2D" parent="."]')
+        lines.append(f'position = Vector2({int(room.get("x", 0))}, {int(room.get("y", 0))})')
+        ox = 0
+        for occ in room.get("occupants") or []:
+            kind = occ.get("kind")
+            if kind == "player":
+                lines.append(f'[node name="Player" parent="Room_{rid}" instance=ExtResource("3")]')
+                lines.append("position = Vector2(0, 0)")
+            elif kind == "enemy":
+                enemy_i += 1
+                tier = occ.get("tier") or "trash"
+                name = f"Enemy_{rid}_{enemy_i}"
+                lines.append(f'[node name="{name}" parent="Room_{rid}" instance=ExtResource("4")]')
+                lines.append(f"position = Vector2({ox}, 0)")
+                lines.append(f'tier = "{tier}"')
+                ox += 36
+            elif kind == "extract":
+                lines.append(f'[node name="Extract" parent="Room_{rid}" instance=ExtResource("5")]')
+                lines.append("position = Vector2(0, 0)")
+            elif kind == "heat":
+                lines.append(f'[node name="HeatZone" parent="Room_{rid}" instance=ExtResource("6")]')
+                lines.append("position = Vector2(0, 0)")
+            elif kind == "loot":
+                lines.append(f'[node name="Loot" type="Marker2D" parent="Room_{rid}"]')
+                lines.append("position = Vector2(0, 0)")
+    for e in graph.get("edges") or []:
+        a, b = e["from"], e["to"]
+        lines.append(f'[node name="Door_{a}_{b}" type="Marker2D" parent="Room_{a}"]')
+        lines.append("position = Vector2(320, 0)")
+    lines.extend([
+        '[node name="HUD" type="CanvasLayer" parent="."]',
+        'script = ExtResource("2")',
+        '[node name="Heat" type="Label" parent="HUD"]',
+        "offset_right = 400.0",
+        "offset_bottom = 24.0",
+        '[node name="Collapse" type="Label" parent="HUD"]',
+        "offset_top = 28.0",
+        "offset_right = 400.0",
+        "offset_bottom = 52.0",
+        '[node name="Room" type="Label" parent="HUD"]',
+        "offset_top = 56.0",
+        "offset_right = 400.0",
+        "offset_bottom = 80.0",
+    ])
+    return "\n".join(lines) + "\n"

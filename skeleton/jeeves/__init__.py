@@ -4,6 +4,7 @@ from .core import Jeeves, Session, SessionMode, SYSTEM_LAWS, Turn
 from .matrices import ClomMatrix, KremMatrix, SamMatrix
 from .rag import RagMemory
 from .tactical import Advice, TacticalBrain, WorldModel
+from .builder import BuildPlan, BuilderBrain
 from .assessment import (
     AdaptiveTest,
     AssessmentEngine,
@@ -48,6 +49,8 @@ __all__ = [
     "Advice",
     "TacticalBrain",
     "WorldModel",
+    "BuildPlan",
+    "BuilderBrain",
     "AdaptiveTest",
     "AssessmentEngine",
     "AssessmentError",

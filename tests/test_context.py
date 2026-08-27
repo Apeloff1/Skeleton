@@ -147,6 +147,17 @@ class TestCockpit:
         with pytest.raises(CockpitError):
             c.apply("SUMMON DEMON")
 
+    def test_blend_command(self):
+        c = Cockpit()
+        r = c.apply("BLEND ERA arcade_golden_age soulslike 0.5")
+        assert r["ok"]
+        assert "~" in r["result"]["era"]
+        assert c.blend == ("arcade_golden_age", "soulslike", 0.5)
+        mid = ContextTensor.from_era("arcade_golden_age").lerp(
+            ContextTensor.from_era("soulslike"), 0.5
+        )
+        assert abs(c.tensor["tempo"] - mid["tempo"]) < 1e-9
+
     def test_detect_command(self):
         c = Cockpit()
         r = c.apply("DETECT tarkov raid extract loot heat")
@@ -168,6 +179,11 @@ class TestGameForgeRun:
         assert out["forge"]["file_count"] >= 7
         assert "Heat" in (out["jeeves"]["next"]["text"] + out["jeeves"]["advice"][0]["text"])
         assert "project.godot" in out["files"]
+        assert out["build_plan"]["room_bias"] in {"combat", "loot", "heat", "balanced"}
+        tscn = out["files"]["scenes/levels/run_level.tscn"]
+        assert "Room_r00" in tscn
+        assert "instance=ExtResource" in tscn
+        assert '"kind": "player"' in out["files"]["data/rooms.json"] or '"kind": "spawn"' in out["files"]["data/rooms.json"]
 
 
 class TestSim:
@@ -241,7 +257,10 @@ class TestGdScriptCheck:
         assert ok, problems
         assert "scenes/player.tscn" in files
         assert "scenes/extract.tscn" in files
-        assert "instance=ExtResource(\"2\")" in files["scenes/levels/run_level.tscn"] or 'instance=ExtResource("2")' in files["scenes/levels/run_level.tscn"]
+        tscn = files["scenes/levels/run_level.tscn"]
+        assert "Room_r00" in tscn
+        assert "instance=ExtResource" in tscn
+        assert "scripts/world/world_map.gd" in files
 
     def test_broken_autoload_detected(self):
         from skeleton.forge.eras import compile_era
@@ -261,6 +280,11 @@ class TestCLI:
         root = tempfile.mkdtemp(prefix="cli-")
         rc = main(["run", "silent hill ammo scarce dread", "--out", root, "--overwrite", "--json"])
         assert rc == 0
+
+    def test_plan_and_cockpit(self):
+        from skeleton.__main__ import main
+        assert main(["plan", "quake rocket jump gib"]) == 0
+        assert main(["cockpit", "BLEND ERA cozy_wholesome horror_survival 0.25"]) == 0
 
 
 class TestBlend:
@@ -285,6 +309,17 @@ class TestBlend:
         speed = float(chunk.splitlines()[0])
         assert 155.0 < speed < 160.0  # 160 vs 155 midpoint 157.5
 
+    def test_cockpit_blend_drives_detect(self):
+        from skeleton.context.cockpit import Cockpit
+        from skeleton.context.pipeline import GameForgeRun
+        c = Cockpit()
+        c.apply("BLEND ERA arcade_golden_age soulslike 0.5")
+        c.apply("ROLL ORACLE")
+        out = GameForgeRun(cockpit=c).execute("")
+        assert out["succeeded"]
+        assert "~" in out["era"]
+        assert out["build_plan"]["seed"]
+
 
 class TestWorld:
     def test_connected_and_emitted(self):
@@ -298,3 +333,13 @@ class TestWorld:
         assert g["rooms"][-1]["kind"] == "extract"
         files = emit_godot(pack)
         assert "data/rooms.json" in files
+        import json
+        graph = json.loads(files["data/rooms.json"])
+        assert_connected(graph)
+        tscn = files["scenes/levels/run_level.tscn"]
+        for room in graph["rooms"]:
+            assert f'name="Room_{room["id"]}"' in tscn
+        assert "Player" in tscn
+        assert "Extract" in tscn
+        assert graph["rooms"][0]["occupants"][0]["kind"] == "player"
+        assert any(o["kind"] == "extract" for o in graph["rooms"][-1]["occupants"])
