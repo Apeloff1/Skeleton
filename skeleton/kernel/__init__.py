@@ -26,7 +26,61 @@ from skeleton.kernel.events import DomainEvent, EventBus
 from skeleton.kernel.ids import AgentId, BlueprintId, MemoryId, PipelineRunId, SessionId, UserId
 from skeleton.kernel.registry import CapabilityKind, CapabilityRegistry, bootstrap_registry
 
+# --- v16.2 kernel hardening modules -------------------------------------
+from skeleton.kernel.clocks import ClockError, ClockRegistry, VectorClock
+from skeleton.kernel.backpressure import BackpressureGovernor, GovernorStats, Priority
+from skeleton.kernel.supervisor import Health, Lifecycle, SupervisorError
+from skeleton.kernel.leases import (
+    FencingGate,
+    Lease,
+    LeaseError,
+    LeaseHeldError,
+    LeaseManager,
+)
+from skeleton.kernel.election import (
+    Election,
+    ElectionError,
+    NodeState,
+    Role,
+    StaleTermError,
+    VoteRequest,
+)
+from skeleton.kernel.breaker import (
+    CircuitBreaker,
+    CircuitOpenError,
+    CircuitState,
+    RetriesExhausted,
+    RetryError,
+    RetryPolicy,
+)
+from skeleton.kernel.trace import Span, SpanRecorder, SpanStatus, TraceContext, TraceError
+from skeleton.kernel.budget import (
+    Budget,
+    BudgetError,
+    BudgetExceeded,
+    BudgetLedger,
+    UnknownCurrency,
+)
+from skeleton.kernel.shutdown import ShutdownError, ShutdownPhase
+from skeleton.kernel.config_snapshots import AuditEntry, ConfigSnapshot, ConfigStore
+from skeleton.kernel.health import (
+    HealthError,
+    HealthRegistry,
+    ProbeReport,
+    ProbeResult,
+    ProbeStatus,
+    Rollup,
+)
+from skeleton.kernel.work_queue import (
+    Lane,
+    LaneFullError,
+    WorkItem,
+    WorkQueue,
+    WorkQueueError,
+)
+
 __all__ = [
+    # errors + primitives
     "SkeletonError",
     "RegistryError",
     "CapabilityNotFoundError",
@@ -58,4 +112,57 @@ __all__ = [
     "CapabilityKind",
     "CapabilityRegistry",
     "bootstrap_registry",
+    # v16.2 hardening
+    "ClockError",
+    "ClockRegistry",
+    "VectorClock",
+    "BackpressureGovernor",
+    "GovernorStats",
+    "Priority",
+    "Health",
+    "Lifecycle",
+    "SupervisorError",
+    "FencingGate",
+    "Lease",
+    "LeaseError",
+    "LeaseHeldError",
+    "LeaseManager",
+    "Election",
+    "ElectionError",
+    "NodeState",
+    "Role",
+    "StaleTermError",
+    "VoteRequest",
+    "CircuitBreaker",
+    "CircuitOpenError",
+    "CircuitState",
+    "RetriesExhausted",
+    "RetryError",
+    "RetryPolicy",
+    "Span",
+    "SpanRecorder",
+    "SpanStatus",
+    "TraceContext",
+    "TraceError",
+    "Budget",
+    "BudgetError",
+    "BudgetExceeded",
+    "BudgetLedger",
+    "UnknownCurrency",
+    "ShutdownError",
+    "ShutdownPhase",
+    "AuditEntry",
+    "ConfigSnapshot",
+    "ConfigStore",
+    "HealthError",
+    "HealthRegistry",
+    "ProbeReport",
+    "ProbeResult",
+    "ProbeStatus",
+    "Rollup",
+    "Lane",
+    "LaneFullError",
+    "WorkItem",
+    "WorkQueue",
+    "WorkQueueError",
 ]
