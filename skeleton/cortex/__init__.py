@@ -42,6 +42,10 @@ from .metrics import evaluate, beats
 from .hive import merkle_card, bundle, pull
 from .speculate import speculate, greedy_decode
 from .zaibatsu import tournament, devil_gene
+from .lora import LoRA, LoRABank
+from .beam import beam_search, greedy_beam
+from .accum import Accumulator, accumulate_fit
+from .gossip import gossip, gossip_cortices
 
 __all__ = [
     "SLOTS",
@@ -111,4 +115,12 @@ __all__ = [
     "greedy_decode",
     "tournament",
     "devil_gene",
+    "LoRA",
+    "LoRABank",
+    "beam_search",
+    "greedy_beam",
+    "Accumulator",
+    "accumulate_fit",
+    "gossip",
+    "gossip_cortices",
 ]

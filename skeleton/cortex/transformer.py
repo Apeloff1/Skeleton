@@ -603,6 +603,36 @@ class TinyTransformer:
                 self.resident = False
         return " ".join(self.generate(prefix, n=n, seed=seed))
 
+    def from_bpe(self, text: str, bpe=None) -> List[int]:
+        """Token ids from the BPE mouth. Unknown pieces fall to word _id / UNK."""
+        if bpe is None:
+            bpe = getattr(self, "bpe", None)
+        if bpe is None or not hasattr(bpe, "encode_pieces"):
+            return [self._id(t) for t in tokens(text)] or [self.unk]
+        ids: List[int] = []
+        for piece in bpe.encode_pieces(text or ""):
+            if piece in self.stoi:
+                ids.append(self._id(piece))
+            else:
+                ids.append(self.unk)
+        return ids or [self.unk]
+
+    def beam(self, prefix: str, *, n: int = 8, width: int = 4) -> Dict[str, Any]:
+        from skeleton.cortex.beam import beam_search
+        return beam_search(self, prefix, n=n, width=width)
+
+    def accumulate(self, texts: Iterable[str], *, k: int = 4, lr: float = 0.04) -> Dict[str, Any]:
+        from skeleton.cortex.accum import accumulate_fit
+        return accumulate_fit(self, texts, k=k, lr=lr)
+
+    def attach_lora(self, *, rank: int = 2, alpha: float = 4.0, seed: int = 0) -> Dict[str, Any]:
+        from skeleton.cortex.lora import LoRABank
+        return LoRABank(rank=rank, alpha=alpha, seed=seed).attach(self)
+
+    def merge_lora(self) -> Dict[str, Any]:
+        bank = getattr(self, "lora", None)
+        return {"merged": []} if bank is None else bank.merge(self)
+
     def generate(
         self,
         prefix: str | Sequence[str],

@@ -91,6 +91,49 @@ def gelu(xs: Vec) -> Vec:
     return out
 
 
+def silu(xs: Vec) -> Vec:
+    out: Vec = []
+    for x in xs:
+        if x >= 20.0:
+            out.append(x)
+        elif x <= -20.0:
+            out.append(0.0)
+        else:
+            out.append(x / (1.0 + math.exp(-x)))
+    return out
+
+
+def silu_bwd(dy: Vec, x: Vec) -> Vec:
+    out: Vec = []
+    for i, xi in enumerate(x):
+        if xi >= 20.0:
+            sig = 1.0
+        elif xi <= -20.0:
+            sig = 0.0
+        else:
+            sig = 1.0 / (1.0 + math.exp(-xi))
+        out.append(dy[i] * (sig + xi * sig * (1.0 - sig)))
+    return out
+
+
+def rms_norm(x: Vec, g: Vec, eps: float = 1e-5) -> Tuple[Vec, Vec, float]:
+    n = max(1, len(x))
+    ms = sum(xi * xi for xi in x) / n
+    inv = 1.0 / math.sqrt(ms + eps)
+    hat = [xi * inv for xi in x]
+    y = [g[i] * hat[i] for i in range(len(x))]
+    return y, hat, inv
+
+
+def rms_norm_bwd(dy: Vec, x: Vec, hat: Vec, inv: float, g: Vec) -> Tuple[Vec, Vec]:
+    n = max(1, len(dy))
+    dg = [dy[i] * hat[i] for i in range(n)]
+    dhat = [dy[i] * g[i] for i in range(n)]
+    dot_dhat_x = sum(dhat[i] * x[i] for i in range(n))
+    dx = [dhat[i] * inv - (inv ** 3) * x[i] * (dot_dhat_x / n) for i in range(n)]
+    return dx, dg
+
+
 def apply_rope(x: Vec, pos: int, *, base: float = 10000.0) -> Vec:
     """Rotary position. Even/odd pairs rotated by θ = pos / base^(i/d)."""
     n = len(x)

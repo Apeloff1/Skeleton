@@ -524,7 +524,53 @@ class JeevesCortex:
             "hive": {
                 "moe_fp": self.moe.fingerprint(),
             },
+            "lora": (self.transformer.lora.to_dict()
+                     if getattr(self.transformer, "lora", None) is not None else None),
         }
+
+    def beam(self, stimulus: str, *, n: int = 8, width: int = 4) -> Dict[str, Any]:
+        xf = self.transformer
+        if xf is None:
+            return {"winner": "", "beams": []}
+        if hasattr(xf, "beam"):
+            return xf.beam(stimulus or "", n=n, width=width)
+        from skeleton.cortex.beam import beam_search
+        return beam_search(xf, stimulus or "", n=n, width=width)
+
+    def attach_lora(self, *, rank: int = 2, alpha: float = 4.0) -> Dict[str, Any]:
+        xf = self.transformer
+        if xf is None or not hasattr(xf, "attach_lora"):
+            return {"attached": []}
+        return xf.attach_lora(rank=rank, alpha=alpha)
+
+    def merge_lora(self) -> Dict[str, Any]:
+        xf = self.transformer
+        if xf is None or not hasattr(xf, "merge_lora"):
+            return {"merged": []}
+        return xf.merge_lora()
+
+    def accumulate(self, texts=None, *, k: int = 4, lr: float = 0.04) -> Dict[str, Any]:
+        from skeleton.cortex.lm import gameforge_corpus
+        xf = self.transformer
+        if xf is None:
+            return {"tokens": 0}
+        corp = texts or gameforge_corpus()[:8]
+        if hasattr(xf, "accumulate"):
+            return xf.accumulate(corp, k=k, lr=lr)
+        from skeleton.cortex.accum import accumulate_fit
+        return accumulate_fit(xf, corp, k=k, lr=lr)
+
+    def gossip_with(self, other, *, alpha: float = 0.5) -> Dict[str, Any]:
+        from skeleton.cortex.gossip import gossip_cortices
+        return gossip_cortices(self, other, alpha=alpha)
+
+    def tokens_of(self, text: str) -> List[int]:
+        """BPE mouth first. Word ids if the encoder is missing."""
+        xf = self.transformer
+        if xf is not None and hasattr(xf, "from_bpe"):
+            return list(xf.from_bpe(text or "", getattr(self, "bpe", None)))
+        from skeleton.cortex.port import tokens as _tok
+        return list(_tok(text or ""))
 
     def to(self, device: str = "auto") -> Dict[str, Any]:
         """Harness GPU if present. Degrades to CPU without throwing."""

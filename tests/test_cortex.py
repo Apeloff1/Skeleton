@@ -1101,4 +1101,95 @@ class TestZaibatsuLM:
         assert card2["metrics"]["ppl"] < card["metrics"]["ppl"]
 
 
+class TestQueue12:
+    def test_silu_leaks_negative(self):
+        from skeleton.cortex.attn import silu, silu_bwd
+        y = silu([-2.0, -0.5, 0.0, 0.5, 2.0])
+        assert y[0] < 0.0
+        assert y[2] == 0.0
+        dx = silu_bwd([1.0] * 5, [-2.0, -0.5, 0.0, 0.5, 2.0])
+        assert dx[0] != 0.0
+
+    def test_rmsnorm_unit_rms(self):
+        from skeleton.cortex.attn import rms_norm, rms_norm_bwd, ones
+        x = [1.0, -2.0, 0.5, 0.0, 3.0, -1.0, 0.25, -0.75]
+        g = ones(len(x))
+        y, hat, inv = rms_norm(x, g)
+        raw = sum(xi * xi for xi in x) / len(x)
+        ms = sum(h * h for h in hat) / len(hat)
+        assert abs(ms - raw / (raw + 1e-5)) < 1e-9
+        dx, dg = rms_norm_bwd([1.0] * len(x), x, hat, inv, g)
+        assert len(dx) == len(x)
+
+    def test_lora_birth_is_identity(self):
+        from skeleton.cortex.lora import LoRA
+        from skeleton.cortex.attn import matvec
+        W = [[0.2, -0.1, 0.0, 0.3], [0.1, 0.4, -0.2, 0.0],
+             [0.0, 0.2, 0.1, -0.1], [-0.3, 0.0, 0.2, 0.1]]
+        ad = LoRA(4, 4, rank=2, alpha=4.0, seed=3)
+        x = [0.5, -0.25, 0.1, 0.2]
+        Wx = matvec(W, x)
+        assert all(abs(a - b) < 1e-12 for a, b in zip(ad.apply(Wx, x), Wx))
+        ad.B[0][0] = 0.4
+        assert any(abs(a - b) > 1e-9 for a, b in zip(ad.apply(Wx, x), Wx))
+        ad.merge_into(W)
+        assert ad.energy() == 0.0
+
+    def test_beam_width1_matches_greedy(self):
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.lm import gameforge_vocab
+        from skeleton.cortex.beam import greedy_beam
+        lm = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=2, n_heads=2, n_layers=2, d_ff=16)
+        b = greedy_beam(lm, "plan tensor", n=6)
+        assert len(b) == 6
+        wide = lm.beam("plan tensor", n=6, width=3)
+        assert wide["width"] == 3 and wide["winner"]
+
+    def test_from_bpe_emits_ids(self):
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.lm import gameforge_vocab
+        from skeleton.cortex.bpe import gameforge_bpe
+        lm = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=2, n_heads=2, n_layers=2, d_ff=16)
+        bpe = gameforge_bpe(merges=32)
+        ids = lm.from_bpe("plan tensor ttk", bpe)
+        assert ids
+        assert all(isinstance(i, int) and 0 <= i < lm.V for i in ids)
+
+    def test_accum_fewer_flushes_than_tokens(self):
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.lm import gameforge_vocab
+        from skeleton.cortex.accum import Accumulator
+        texts = ["plan tensor lattice oracle", "mix trash elite boss slack"]
+        a = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=5, n_heads=2, n_layers=2, d_ff=16)
+        b = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=5, n_heads=2, n_layers=2, d_ff=16)
+        a.fit(texts)
+        info = Accumulator(k=4).fit(b, texts)
+        assert info["flushes"] >= 1
+        assert info["flushes"] < a.steps
+        assert info["tokens"] == a.steps
+
+    def test_gossip_alpha0_noop(self):
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.lm import gameforge_vocab
+        from skeleton.cortex.gossip import gossip
+        src = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=1, n_heads=2, n_layers=2, d_ff=16)
+        dst = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=9, n_heads=2, n_layers=2, d_ff=16)
+        src.fit(["plan tensor lattice"])
+        before = [row[:] for row in dst.Wout]
+        assert gossip(dst, src, alpha=0.0)["gossiped"] == 1
+        assert all(abs(a - b) < 1e-12 for ra, rb in zip(before, dst.Wout) for a, b in zip(ra, rb))
+        gossip(dst, src, alpha=0.5)
+        assert any(abs(a - b) > 1e-9 for ra, rb in zip(before, dst.Wout) for a, b in zip(ra, rb))
+
+    def test_neo_wires_queue12(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        assert "Wq" in neo.attach_lora(rank=2)["attached"]
+        assert neo.beam("plan tensor ttk", n=4, width=2)["winner"] is not None
+        assert neo.accumulate(["plan tensor lattice oracle"], k=2)["tokens"] >= 1
+        assert neo.gossip_with(JeevesCortex(), alpha=0.25)["gossiped"] in (0, 1)
+        assert neo.tokens_of("plan tensor ttk")
+        assert "merged" in neo.merge_lora()
+
+
 

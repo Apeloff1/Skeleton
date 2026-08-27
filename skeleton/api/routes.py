@@ -312,3 +312,30 @@ async def gameforge_intake(request: Dict[str, Any], state=Depends(_state)) -> Di
     if not request.get("include_files"):
         out.pop("files", None)
     return out
+
+
+@router.get("/auth/github")
+async def github_oauth_card() -> Dict[str, Any]:
+    """The exact strings to paste into GitHub → New OAuth App."""
+    from skeleton.api.oauth import oauth_card
+    return oauth_card()
+
+
+@router.get("/auth/github/start")
+async def github_oauth_start() -> Dict[str, Any]:
+    from skeleton.api.oauth import authorize_url, client_id
+    if not client_id():
+        raise HTTPException(status_code=503, detail="SKELETON_GITHUB_CLIENT_ID unset")
+    return authorize_url()
+
+
+@router.get("/auth/github/callback")
+async def github_oauth_callback(code: str = "", state: str = "") -> Dict[str, Any]:
+    from skeleton.api.oauth import exchange_code
+    if not code:
+        raise HTTPException(status_code=400, detail="missing code")
+    out = exchange_code(code)
+    safe = {k: v for k, v in out.items() if k != "access_token"}
+    safe["state"] = state
+    return safe
+
