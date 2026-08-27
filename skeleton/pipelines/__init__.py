@@ -9,6 +9,7 @@ from skeleton.pipelines.core import (
     Stage,
     StageResult,
 )
+from skeleton.pipelines.parallel import ParallelRunner
 from skeleton.pipelines.validation import (
     StageValidatorRegistry,
     ValidationIssue,
@@ -31,6 +32,7 @@ __all__ = [
     "PipelineRunner",
     "Stage",
     "StageResult",
+    "ParallelRunner",
     "StageValidatorRegistry",
     "ValidationIssue",
     "ValidationIssueLevel",

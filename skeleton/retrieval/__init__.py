@@ -10,6 +10,7 @@ from .chunking import Chunk, Chunker
 from .sources import SourceRegistry
 from .ingest import CorpusIngestor, Document
 from .rerank import Reranker, RerankRule
+from .highlight import Highlighter
 
 __all__ = [
     "Fuser",
@@ -31,4 +32,5 @@ __all__ = [
     "Document",
     "Reranker",
     "RerankRule",
+    "Highlighter",
 ]
