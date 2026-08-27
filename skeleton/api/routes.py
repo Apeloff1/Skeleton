@@ -57,7 +57,12 @@ async def capabilities(state=Depends(_state)) -> List[Dict[str, Any]]:
 @router.post("/jeeves/session")
 async def jeeves_session(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     jeeves = _require(state.jeeves, "Jeeves")
-    mode = SessionMode.CO_CODING if request.get("mode") == "co_coding" else SessionMode.TUTORING
+    raw_mode = request.get("mode", "tutoring")
+    mode = SessionMode.TUTORING
+    for m in SessionMode:
+        if m.value == raw_mode:
+            mode = m
+            break
     session = jeeves.open_session(request.get("user_id", "anonymous"), mode=mode)
     return {"session_id": session.session_id, "mode": session.mode.value, "status": "created"}
 
@@ -72,6 +77,19 @@ async def jeeves_interact(request: Dict[str, Any], state=Depends(_state)) -> Dic
 @router.post("/jeeves/review")
 async def jeeves_review(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     return _require(state.jeeves, "Jeeves").review_code(request.get("session_id", ""), request.get("code", ""))
+
+
+@router.post("/jeeves/bind-era")
+async def jeeves_bind_era(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    pack = _require(state.jeeves, "Jeeves").bind_era(request.get("era", "extraction_now"))
+    return {"era": pack["era"], "primary_dps": pack["primary_dps"], "status": "bound"}
+
+
+@router.post("/jeeves/advise")
+async def jeeves_advise(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    return _require(state.jeeves, "Jeeves").advise(
+        request.get("session_id", ""), request.get("telemetry") or {},
+    )
 
 
 @router.get("/jeeves/matrices/{session_id}")

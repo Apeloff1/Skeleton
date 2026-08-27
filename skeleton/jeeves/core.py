@@ -30,6 +30,8 @@ SYSTEM_LAWS: tuple[str, ...] = (
 class SessionMode(str, Enum):
     TUTORING = "tutoring"
     CO_CODING = "co_coding"
+    TACTICAL = "tactical"
+    BUILDER = "builder"
 
 
 @dataclass
@@ -86,6 +88,8 @@ class Jeeves:
         self._responder = responder or _local_responder
         self._max_turns = max_turns
         self._sessions: dict[str, Session] = {}
+        self._brain = None  # lazy TacticalBrain
+        self.era = "extraction_now"
 
     @property
     def laws(self) -> tuple[str, ...]:
@@ -126,7 +130,11 @@ class Jeeves:
         session.add_turn("learner", message)
         ctx = dict(context or {})
         ctx["mode"] = session.mode.value
-        reply = self._responder(message, session.turns, ctx)
+        if session.mode in (SessionMode.TACTICAL, SessionMode.BUILDER):
+            tel = ctx.get("telemetry") or {}
+            reply = self._brain_get().recommend_next(tel).text
+        else:
+            reply = self._responder(message, session.turns, ctx)
         session.add_turn("jeeves", reply)
         self._bus.emit("jeeves.turn.completed",
                        {"session_id": session_id, "turns": len(session.turns)})
@@ -150,6 +158,37 @@ class Jeeves:
         self._bus.emit("jeeves.review.completed",
                        {"session_id": session_id, "findings": len(findings)})
         return {"findings": findings, "summary": summary}
+
+    def get_session(self, session_id: str) -> Session:
+        return self._get(session_id)
+
+    def _brain_get(self):
+        if self._brain is None:
+            from skeleton.jeeves.tactical import TacticalBrain
+            self._brain = TacticalBrain(self.era)
+        return self._brain
+
+    def bind_era(self, era: str) -> dict[str, Any]:
+        self.era = era
+        pack = self._brain_get().bind_era(era)
+        self._bus.emit("jeeves.era.bound", {"era": pack["era"], "dps": pack["primary_dps"]})
+        return pack
+
+    def advise(self, session_id: str, telemetry: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Tactical cascade. Opens nothing; uses bound era + live telemetry."""
+        session = self._get(session_id)
+        brain = self._brain_get()
+        advice = brain.advise(telemetry or {})
+        top = advice[0]
+        session.add_turn("jeeves", top.text)
+        self._bus.emit("jeeves.advice.issued",
+                       {"session_id": session_id, "priority": top.priority, "axis": top.axis})
+        return {
+            "era": brain.era,
+            "world": brain.observe(telemetry or {}).to_dict(),
+            "advice": [a.to_dict() for a in advice],
+            "next": top.to_dict(),
+        }
 
     def _get(self, session_id: str) -> Session:
         session = self._sessions.get(session_id)

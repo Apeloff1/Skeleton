@@ -1,5 +1,9 @@
 """Jeeves package — AI tutor brain with session tracking surface."""
 
+from .core import Jeeves, Session, SessionMode, SYSTEM_LAWS, Turn
+from .matrices import ClomMatrix, KremMatrix, SamMatrix
+from .rag import RagMemory
+from .tactical import Advice, TacticalBrain, WorldModel
 from .assessment import (
     AdaptiveTest,
     AssessmentEngine,
@@ -32,6 +36,18 @@ from .tracking import SessionTracker, SessionTracking
 from .troubleshooting import Troubleshooter, TroubleshootingStep
 
 __all__ = [
+    "Jeeves",
+    "Session",
+    "SessionMode",
+    "SYSTEM_LAWS",
+    "Turn",
+    "ClomMatrix",
+    "KremMatrix",
+    "SamMatrix",
+    "RagMemory",
+    "Advice",
+    "TacticalBrain",
+    "WorldModel",
     "AdaptiveTest",
     "AssessmentEngine",
     "AssessmentError",

@@ -1,6 +1,19 @@
 """Tests for Jeeves: core sessions, matrices, RAG memory."""
 
-import pytest
+try:
+    import pytest
+except ImportError:  # pragma: no cover
+    class pytest:  # type: ignore
+        class raises:
+            def __init__(self, exc):
+                self.exc = exc
+            def __enter__(self):
+                return self
+            def __exit__(self, t, v, tb):
+                if t is None:
+                    raise AssertionError("did not raise")
+                return issubclass(t, self.exc)
+
 
 from skeleton.jeeves import (
     ClomMatrix,
@@ -106,3 +119,28 @@ class TestRagMemory:
         mem = RagMemory()
         mem.remember("a")
         assert len(mem) == 1
+
+
+class TestTactical:
+    def test_heat_critical(self):
+        from skeleton.jeeves.tactical import TacticalBrain
+        b = TacticalBrain("soulslike")
+        top = b.recommend_next({"heat": 90, "max_heat": 100, "alive": True, "has_weapon": True})
+        assert top.priority == 3
+        assert top.axis == "heat"
+
+    def test_bind_via_jeeves(self):
+        j = Jeeves()
+        s = j.open_session("op", mode=SessionMode.TACTICAL)
+        pack = j.bind_era("boomer_shooter")
+        assert pack["era"] == "boomer_shooter"
+        out = j.advise(s.session_id, {"heat": 10, "has_weapon": False, "alive": True})
+        assert out["next"]["axis"] == "forge"
+        assert j.get_session(s.session_id).is_open
+
+    def test_ask_tactical_uses_brain(self):
+        j = Jeeves()
+        s = j.open_session("op", mode=SessionMode.TACTICAL)
+        j.bind_era("extraction_now")
+        reply = j.ask(s.session_id, "status", context={"telemetry": {"heat": 99, "alive": True, "has_weapon": True}})
+        assert "Heat critical" in reply or "critical" in reply.lower()
