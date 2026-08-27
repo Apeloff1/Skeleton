@@ -1,4 +1,4 @@
-"""Reranker — the second pass that fusion retrieval is missing.
+"""FeatureReranker — the second pass that fusion retrieval is missing.
 
 Fusion (the quad lattice) is a *first* pass: fast, broad, approximate.
 Its scores come from per-tier heuristics that never look at the query and
@@ -17,6 +17,11 @@ Features (all computed locally, no external model):
 Weights are explicit and tunable; the default ordering is principled
 (coverage dominates) rather than tuned to a benchmark. Deterministic
 given the same inputs; pure domain, no I/O.
+
+Naming: this module previously exported a class named ``Reranker``, which
+collided with the rule-based ``Reranker`` in ``rerank.py``. Renamed to
+:class:`FeatureReranker`; a ``Reranker`` alias remains at module bottom
+so legacy direct importers (``genesis.py`` pre-migration) keep resolving.
 """
 
 from __future__ import annotations
@@ -48,7 +53,7 @@ class RankedItem:
     original_rank: int
 
 
-class Reranker:
+class FeatureReranker:
     """Feature-based second-pass reranker."""
 
     def __init__(self, *, weights: RerankWeights = RerankWeights(),
@@ -150,3 +155,12 @@ class Reranker:
     def stats(self) -> Dict[str, Any]:
         return {"queries_reranked": self._queries,
                 "weights": self.weights.__dict__}
+
+
+# ----------------------------------------------------------------------
+# Legacy alias — direct importers (``from skeleton.retrieval.reranker
+# import Reranker``) keep resolving while callers migrate to the clear
+# :class:`FeatureReranker` name. ``rerank.py`` owns the ``Reranker`` name
+# (rule-based boosting) and is the root-package export.
+# ----------------------------------------------------------------------
+Reranker = FeatureReranker

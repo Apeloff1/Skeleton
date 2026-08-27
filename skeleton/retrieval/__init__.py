@@ -14,6 +14,7 @@ from .query import QueryPlan, QueryPlanner, RetrievalError
 from .query_language import QueryParser, QueryTerm
 from .ranking import Ranker
 from .rerank import Reranker, RerankRule
+from .reranker import FeatureReranker
 from .suggest import Suggester
 from .sources import SourceRegistry
 from .ui import ResultRenderer
@@ -45,6 +46,7 @@ __all__ = [
     "Ranker",
     "Reranker",
     "RerankRule",
+    "FeatureReranker",
     "Suggester",
     "SourceRegistry",
     "ResultRenderer",

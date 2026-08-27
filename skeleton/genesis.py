@@ -9,7 +9,7 @@ from skeleton.kernel.entropy import EntropyPool
 from skeleton.kernel.events import DomainEvent, EventBus
 from skeleton.kernel.ids import UserId
 from skeleton.kernel.invariants import Invariant, InvariantLattice
-from skeleton.kernel.vclock import VectorClock
+from skeleton.kernel.clocks import VectorClock
 
 
 @dataclass
@@ -152,11 +152,11 @@ class Genesis:
         self.report.phases.append("interface")
         from skeleton.observability.anomaly import AnomalyDetector
         from skeleton.retrieval.provenance import ProvenanceLedger
-        from skeleton.retrieval.reranker import Reranker
+        from skeleton.retrieval.reranker import FeatureReranker
 
         self._wire("interface", "anomaly", AnomalyDetector(bus=self.bus))
         self._wire("interface", "provenance", ProvenanceLedger(bus=self.bus))
-        self._wire("interface", "reranker", Reranker())
+        self._wire("interface", "reranker", FeatureReranker())
 
     def health(self) -> Dict[str, Any]:
         assert self.lattice is not None
