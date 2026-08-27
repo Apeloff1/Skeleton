@@ -1,15 +1,14 @@
-"""Multi-agent substrate: ledger, mesh, scheduler, policy, routing, memory, deadlines."""
+"""Multi-agent substrate + aggregation."""
 
+from skeleton.agents.aggregation import Aggregator, AggregationError, Estimate
+from skeleton.agents.coordination import ClaimError, Coordinator
+from skeleton.agents.deadlines import DeadlineError, DeadlineRecord, DeadlineTracker
+from skeleton.agents.discovery import Advert, AgentDiscovery, DiscoveryError, Match
+from skeleton.agents.heartbeat import HeartbeatError, HeartbeatRecord, HeartbeatRegistry
 from skeleton.agents.ledger import ActivityLedger, LedgerEntry
+from skeleton.agents.load import LoadBalanceError, LoadBalancer, LoadView
+from skeleton.agents.memory import MemoryEntry, MemoryError, WorkingMemory
 from skeleton.agents.mesh import Agent, AgentMesh
-from skeleton.agents.scheduler import SwarmScheduler, Task
-from skeleton.agents.policy import (
-    Action,
-    BeliefState,
-    PolicyEngine,
-    PolicyError,
-    RulePolicy,
-)
 from skeleton.agents.negotiation import (
     Decision,
     Negotiation,
@@ -17,38 +16,26 @@ from skeleton.agents.negotiation import (
     Proposal,
     Response,
 )
-from skeleton.agents.messaging import Envelope, Mailbox, MessagingError
-from skeleton.agents.coordination import ClaimError, Coordinator
-from skeleton.agents.discovery import Advert, AgentDiscovery, DiscoveryError, Match
-from skeleton.agents.heartbeat import HeartbeatError, HeartbeatRecord, HeartbeatRegistry
+from skeleton.agents.policy import (
+    Action,
+    BeliefState,
+    PolicyEngine,
+    PolicyError,
+    RulePolicy,
+)
 from skeleton.agents.reputation import ReputationError, ReputationScore, ReputationTable
 from skeleton.agents.routing import RouteCandidate, RouteRequest, RoutingError, TaskRouter
-from skeleton.agents.load import LoadBalanceError, LoadBalancer, LoadView
-from skeleton.agents.memory import MemoryEntry, MemoryError, WorkingMemory
-from skeleton.agents.deadlines import DeadlineError, DeadlineRecord, DeadlineTracker
+from skeleton.agents.scheduler import SwarmScheduler, Task
 
 __all__ = [
-    "ActivityLedger",
-    "LedgerEntry",
-    "Agent",
-    "AgentMesh",
-    "SwarmScheduler",
-    "Task",
-    "Action",
-    "BeliefState",
-    "PolicyEngine",
-    "PolicyError",
-    "RulePolicy",
-    "Decision",
-    "Negotiation",
-    "NegotiationError",
-    "Proposal",
-    "Response",
-    "Envelope",
-    "Mailbox",
-    "MessagingError",
+    "Aggregator",
+    "AggregationError",
+    "Estimate",
     "ClaimError",
     "Coordinator",
+    "DeadlineError",
+    "DeadlineRecord",
+    "DeadlineTracker",
     "Advert",
     "AgentDiscovery",
     "DiscoveryError",
@@ -56,6 +43,26 @@ __all__ = [
     "HeartbeatError",
     "HeartbeatRecord",
     "HeartbeatRegistry",
+    "ActivityLedger",
+    "LedgerEntry",
+    "LoadBalanceError",
+    "LoadBalancer",
+    "LoadView",
+    "MemoryEntry",
+    "MemoryError",
+    "WorkingMemory",
+    "Agent",
+    "AgentMesh",
+    "Decision",
+    "Negotiation",
+    "NegotiationError",
+    "Proposal",
+    "Response",
+    "Action",
+    "BeliefState",
+    "PolicyEngine",
+    "PolicyError",
+    "RulePolicy",
     "ReputationError",
     "ReputationScore",
     "ReputationTable",
@@ -63,13 +70,6 @@ __all__ = [
     "RouteRequest",
     "RoutingError",
     "TaskRouter",
-    "LoadBalanceError",
-    "LoadBalancer",
-    "LoadView",
-    "MemoryEntry",
-    "MemoryError",
-    "WorkingMemory",
-    "DeadlineError",
-    "DeadlineRecord",
-    "DeadlineTracker",
+    "SwarmScheduler",
+    "Task",
 ]

@@ -1,52 +1,53 @@
-"""Observability subsystem — metrics, tracing, health, alerts, incidents, logging, dashboards, SLOs, sampling, exporters, ticks, probe coverage."""
+"""Observability subsystem — full surface with uptime tracking."""
 
-from .entanglement import Entanglement, EntanglementDetector
-from .health import HealthRegistry, ProbeResult, probe
-from .metrics import Counter, Gauge, Histogram, MetricsRegistry
-from .tracing import InMemoryExporter, Span, SpanContext, Tracer
 from .alerting import AlertRule, AlertingEngine, NotificationRouter, Operator, Severity
-from .incidents import Incident, IncidentError, IncidentStatus, IncidentTracker
-from .profiling import Profiler, SpanStats
-from .logging import LogEvent, LogError, StructuredLogger
+from .coverage import CoverageRegistry, CoverageAudit
 from .dashboards import Dashboard, DashboardError, Widget, aggregate
+from .entanglement import Entanglement, EntanglementDetector
+from .exporters import MetricsExporter, TraceExporter
+from .health import HealthRegistry, ProbeResult, probe
+from .incidents import Incident, IncidentError, IncidentStatus, IncidentTracker
+from .logging import LogEvent, LogError, StructuredLogger
+from .metrics import Counter, Gauge, Histogram, MetricsRegistry
+from .profiling import Profiler, SpanStats
 from .sampling import Sampler, SamplerStats, SamplingError, default_sampler
 from .slo import ErrorBudget, SLOError, SLOTracker, ServiceLevelObjective
-from .exporters import MetricsExporter, TraceExporter
 from .ticks import TickAggregator, TickStats
-from .coverage import CoverageRegistry, CoverageAudit
+from .tracing import InMemoryExporter, Span, SpanContext, Tracer
+from .uptime import AvailabilityWindow, UptimeTracker
 
 __all__ = [
-    "Counter",
-    "Gauge",
-    "Histogram",
-    "MetricsRegistry",
-    "ProbeResult",
-    "HealthRegistry",
-    "probe",
-    "Span",
-    "Tracer",
-    "InMemoryExporter",
-    "SpanContext",
-    "Entanglement",
-    "EntanglementDetector",
     "AlertRule",
     "AlertingEngine",
     "NotificationRouter",
     "Operator",
     "Severity",
-    "Incident",
-    "IncidentError",
-    "IncidentStatus",
-    "IncidentTracker",
-    "Profiler",
-    "SpanStats",
-    "LogEvent",
-    "LogError",
-    "StructuredLogger",
+    "CoverageRegistry",
+    "CoverageAudit",
     "Dashboard",
     "DashboardError",
     "Widget",
     "aggregate",
+    "Entanglement",
+    "EntanglementDetector",
+    "MetricsExporter",
+    "TraceExporter",
+    "HealthRegistry",
+    "ProbeResult",
+    "probe",
+    "Incident",
+    "IncidentError",
+    "IncidentStatus",
+    "IncidentTracker",
+    "LogEvent",
+    "LogError",
+    "StructuredLogger",
+    "Counter",
+    "Gauge",
+    "Histogram",
+    "MetricsRegistry",
+    "Profiler",
+    "SpanStats",
     "Sampler",
     "SamplerStats",
     "SamplingError",
@@ -55,10 +56,12 @@ __all__ = [
     "SLOError",
     "SLOTracker",
     "ServiceLevelObjective",
-    "MetricsExporter",
-    "TraceExporter",
     "TickAggregator",
     "TickStats",
-    "CoverageRegistry",
-    "CoverageAudit",
+    "InMemoryExporter",
+    "Span",
+    "SpanContext",
+    "Tracer",
+    "AvailabilityWindow",
+    "UptimeTracker",
 ]

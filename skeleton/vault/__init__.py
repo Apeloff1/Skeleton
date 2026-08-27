@@ -1,39 +1,45 @@
-"""Secrets vault subsystem — sealing, rotation, audit, access, KMS, store, keys, quorum, recovery."""
+"""Secrets vault subsystem — sealed store, policies, recovery, KMS, quorum."""
 
-from .shamir import SealingError, ShamirSeal, Share
-from .rotation import RotationPolicy, RotationScheduler, RotationTrigger
-from .audit import AuditEntry, AuditLog
 from .access import AccessDenied, AccessPolicy, Role
+from .audit import AuditEntry, AuditLog
 from .kms import DataKey, EnvelopeError, EnvelopeKMS
-from .store import IntegrityError, SealedStore
 from .keys import KeyRegistry, KeyVersion, KeyVersionError
+from .policies import PolicyRegistry, PolicyViolation, VaultPolicy, enforce_plaintext_minimum, require_prefix
 from .quorum import QuorumError, QuorumGate, QuorumRequest
 from .recovery import RecoveryError, RecoveryManager, RecoverySnapshot
+from .rotation import RotationPolicy, RotationScheduler, RotationTrigger
+from .shamir import SealingError, ShamirSeal, Share
+from .store import IntegrityError, SealedStore
 
 __all__ = [
-    "Share",
-    "ShamirSeal",
-    "SealingError",
-    "RotationPolicy",
-    "RotationScheduler",
-    "RotationTrigger",
-    "AuditEntry",
-    "AuditLog",
     "AccessDenied",
     "AccessPolicy",
     "Role",
+    "AuditEntry",
+    "AuditLog",
     "DataKey",
     "EnvelopeError",
     "EnvelopeKMS",
-    "IntegrityError",
-    "SealedStore",
     "KeyRegistry",
     "KeyVersion",
     "KeyVersionError",
+    "PolicyRegistry",
+    "PolicyViolation",
+    "VaultPolicy",
+    "enforce_plaintext_minimum",
+    "require_prefix",
     "QuorumError",
     "QuorumGate",
     "QuorumRequest",
     "RecoveryError",
     "RecoveryManager",
     "RecoverySnapshot",
+    "RotationPolicy",
+    "RotationScheduler",
+    "RotationTrigger",
+    "SealingError",
+    "ShamirSeal",
+    "Share",
+    "IntegrityError",
+    "SealedStore",
 ]
