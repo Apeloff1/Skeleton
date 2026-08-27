@@ -27,6 +27,8 @@ from .neocortex import CortexTrace, JeevesCortex, local_slots
 from .live import live_cortex, live_jeeves, persist, reset_live
 from .lm import NGramLM, LanguageModelBackend, gameforge_corpus, gameforge_vocab
 from .neural import NeuralLM, NeuralBackend
+from .transformer import TinyTransformer, TransformerBackend
+from .learned import LearnedWeights
 
 __all__ = [
     "SLOTS",
@@ -69,4 +71,7 @@ __all__ = [
     "gameforge_vocab",
     "NeuralLM",
     "NeuralBackend",
+    "TinyTransformer",
+    "TransformerBackend",
+    "LearnedWeights",
 ]

@@ -697,10 +697,12 @@ class TestLive:
         reset_live(wipe_disk=True)
         live_cortex().train(epochs=1)
         steps = live_cortex().slots["pfc"].neural.steps
-        assert steps > 0
+        xf = live_cortex().transformer.steps
+        assert steps > 0 and xf > 0
         persist()
         reset_live()
         assert live_cortex().slots["pfc"].neural.steps == steps
+        assert live_cortex().transformer.steps == xf
 
 
 class TestHive:

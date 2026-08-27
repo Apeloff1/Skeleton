@@ -350,6 +350,9 @@ class TestNeural:
         for slot in ("pfc", "midbrain", "left", "right"):
             assert lms[slot]["neural_steps"] > 0, slot
             assert lms[slot]["ngram_fitted"] > 0, slot
+        assert lms["midbrain"]["transformer_steps"] > 0
+        assert lms["pfc"]["transformer_steps"] == 0
+        assert lms["neo"]["transformer_steps"] > 0
 
     def test_left_neural_backend_keeps_mix_numbers(self):
         from skeleton.cortex.neural import NeuralLM, NeuralBackend
@@ -373,5 +376,76 @@ class TestNeural:
         got = b.import_tract(tract)
         assert got.get("bound") == "left"
         assert b.slots["left"].neural.steps == a.slots["left"].neural.steps
+
+
+class TestAttention:
+    def test_causal_mask(self):
+        from skeleton.cortex.attn import causal_attend
+        q = k = v = [[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]
+        _, a = causal_attend(q, k, v)
+        assert [len(row) for row in a] == [1, 2, 3]
+
+    def test_perplexity_drops(self):
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.lm import gameforge_corpus, gameforge_vocab
+        corpus = gameforge_corpus()
+        held, train = corpus[-4:], corpus[:-4]
+        lm = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=1)
+        p0 = lm.perplexity(held)
+        lm.fit(train)
+        p1 = lm.perplexity(held)
+        assert p1 < p0, (p0, p1)
+        assert lm.steps > 0
+
+    def test_reads_prefix_skipgram_cannot(self):
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.neural import NeuralLM
+        from skeleton.cortex.lm import gameforge_vocab
+        from skeleton.cortex.port import tokens
+        vocab = gameforge_vocab()
+        att = TinyTransformer(vocab=vocab, dim=8, ctx=6, seed=3)
+        sg = NeuralLM(vocab=vocab, dim=8, seed=3)
+
+        def sg_state(prefix: str):
+            last = tokens(prefix)[-1]
+            return list(sg.E[sg._id(last)])
+
+        assert sg_state("loot bias") == sg_state("heat bias")
+        assert att.hidden("loot bias") != att.hidden("heat bias")
+        w = att.weights_last("loot bias")
+        assert len(w) == 2 and min(w) > 0.0
+
+    def test_snapshot_roundtrip(self):
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.lm import gameforge_vocab
+        a = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=4)
+        a.fit(["HP DPS TTK compile recipe sim"])
+        b = TinyTransformer.from_snapshot(a.snapshot())
+        assert b.steps == a.steps
+        assert abs(a.token_prob("HP DPS", "TTK") - b.token_prob("HP DPS", "TTK")) < 1e-9
+
+    def test_midbrain_interchange_keeps_attention(self):
+        from skeleton.cortex import JeevesCortex
+        a = JeevesCortex()
+        a.train(epochs=1)
+        steps = a.slots["midbrain"].transformer.steps
+        assert steps > 0
+        tract = a.export_tract("midbrain")
+        assert tract["weights"].get("transformer")
+        b = JeevesCortex()
+        got = b.import_tract(tract)
+        assert got.get("bound") == "midbrain"
+        assert b.slots["midbrain"].transformer.steps == steps
+
+    def test_scale_assignment(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        assert neo.slots["pfc"].scale == "small"
+        assert neo.slots["midbrain"].scale == "medium"
+        assert neo.slots["midbrain"].transformer is not None
+        assert getattr(neo.slots["pfc"], "transformer", None) is None
+        assert neo.transformer is not None
+        assert neo.scale == "neo"
+
 
 

@@ -41,21 +41,26 @@ class Midbrain:
     slot = "midbrain"
 
     def __init__(self) -> None:
-        from skeleton.cortex.lm import NGramLM, gameforge_vocab
-        from skeleton.cortex.neural import NeuralLM
-        vocab = gameforge_vocab()
-        self.lm = NGramLM(order=3, vocab=vocab)
-        self.neural = NeuralLM(vocab=vocab, dim=16, seed=3)
+        from skeleton.cortex.learned import LearnedWeights
+        self.weights = LearnedWeights(order=3, dim=8, seed=3, attn=True, ctx=6)
+
+    @property
+    def lm(self):
+        return self.weights.lm
+
+    @property
+    def neural(self):
+        return self.weights.neural
+
+    @property
+    def transformer(self):
+        return self.weights.transformer
 
     def fit(self, text: str) -> int:
-        n = self.lm.fit([text])
-        self.neural.fit([text])
-        return n
+        return self.weights.fit(text)
 
     def snapshot(self) -> dict:
-        snap = self.lm.snapshot()
-        snap["neural"] = self.neural.snapshot()
-        return snap
+        return self.weights.snapshot()
 
     def think(self, stimulus: str, context: Dict[str, Any]) -> Thought:
         arousal, lw, rw = _weights(stimulus or "")

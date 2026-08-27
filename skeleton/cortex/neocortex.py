@@ -98,6 +98,11 @@ class JeevesCortex:
         self.shadow["own"] = {"wins": 0, "trials": 0}
         self.hive = HiveMind(bus=self._bus)
         self.auto_surpass = True
+        from skeleton.cortex.lm import gameforge_vocab
+        from skeleton.cortex.transformer import TinyTransformer
+        self.transformer = TinyTransformer(
+            vocab=gameforge_vocab(), dim=8, ctx=6, seed=19,
+        )
 
     def backends(self) -> Dict[str, str]:
         return {s: getattr(p, "name", type(p).__name__) for s, p in self.slots.items()}
@@ -257,22 +262,16 @@ class JeevesCortex:
         weights = (payload or {}).get("weights")
         bound = None
         if weights:
-            neural = weights.get("neural")
-            ngram = {k: v for k, v in weights.items() if k != "neural"}
-            if tract.slot in {"pfc", "midbrain"}:
+            port = self.slots.get(tract.slot)
+            w = getattr(port, "weights", None)
+            if tract.slot == "pfc":
                 from skeleton.cortex.lm import LanguageModelBackend
+                ngram = {k: v for k, v in weights.items() if k not in {"neural", "transformer"}}
                 self.bind(tract.slot, LanguageModelBackend.from_snapshot(ngram, slot=tract.slot))
                 bound = tract.slot
-            elif tract.slot in {"left", "right"}:
-                port = self.slots.get(tract.slot)
-                if port is not None and hasattr(port, "lm"):
-                    from skeleton.cortex.lm import NGramLM
-                    port.lm = NGramLM.from_snapshot(ngram)
-                    bound = tract.slot
-                if neural and port is not None and hasattr(port, "neural"):
-                    from skeleton.cortex.neural import NeuralLM
-                    port.neural = NeuralLM.from_snapshot(neural)
-                    bound = tract.slot
+            elif w is not None:
+                w.restore(weights)
+                bound = tract.slot
         self._bus.emit("cortex.imported", {"slot": tract.slot, "copied": n})
         return {"slot": tract.slot, "copied": n, "own": self.own.size,
                 "capabilities": list(tract.capabilities)[:16],
@@ -296,6 +295,7 @@ class JeevesCortex:
             "surpass": sorted(self._surpass),
             "shadow": dict(self.shadow),
             "lms": lms,
+            "transformer": self.transformer.snapshot(),
         }
         p.write_text(json.dumps(blob), encoding="utf-8")
         return {"path": str(p), "own": self.own.size, "acquired": dict(self.acquired)}
@@ -319,16 +319,12 @@ class JeevesCortex:
                 }
         for slot, snap in (blob.get("lms") or {}).items():
             port = self.slots.get(str(slot))
-            if port is None or not isinstance(snap, dict):
-                continue
-            neural = snap.get("neural")
-            ngram = {k: v for k, v in snap.items() if k != "neural"}
-            if hasattr(port, "lm") and ngram.get("unigrams") is not None:
-                from skeleton.cortex.lm import NGramLM
-                port.lm = NGramLM.from_snapshot(ngram)
-            if neural and hasattr(port, "neural"):
-                from skeleton.cortex.neural import NeuralLM
-                port.neural = NeuralLM.from_snapshot(neural)
+            w = getattr(port, "weights", None) if port is not None else None
+            if w is not None and isinstance(snap, dict):
+                w.restore(snap)
+        if blob.get("transformer"):
+            from skeleton.cortex.transformer import TinyTransformer
+            self.transformer = TinyTransformer.from_snapshot(blob["transformer"])
         return {"loaded": n, "own": self.own.size, "surpass": sorted(self._surpass)}
 
     def status(self) -> Dict[str, Any]:

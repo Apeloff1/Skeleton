@@ -123,6 +123,9 @@ def train(neo, *, epochs: int = 1, pairs: Sequence[Pair] | None = None,
                 port = getattr(neo, "slots", {}).get(slot)
                 if port is not None and hasattr(port, "fit"):
                     port.fit(train_s)
+            xf = getattr(neo, "transformer", None)
+            if xf is not None and hasattr(xf, "fit"):
+                xf.fit([train_s])
         for slot in SLOTS:
             neo.acquire(slot)
         if auto_surpass:
@@ -144,7 +147,13 @@ def train(neo, *, epochs: int = 1, pairs: Sequence[Pair] | None = None,
             "ngram_fitted": int(getattr(lm, "fitted", 0) or 0),
             "neural_steps": int(getattr(neural, "steps", 0) or 0),
             "neural_fitted": int(getattr(neural, "fitted", 0) or 0),
+            "transformer_steps": int(getattr(getattr(port, "transformer", None), "steps", 0) or 0),
         }
+    xf = getattr(neo, "transformer", None)
+    lms["neo"] = {
+        "transformer_steps": int(getattr(xf, "steps", 0) or 0),
+        "transformer_fitted": int(getattr(xf, "fitted", 0) or 0),
+    }
     return {
         "epochs": epochs,
         "items": len(curriculum),
