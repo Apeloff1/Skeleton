@@ -1,6 +1,6 @@
-"""GameForge context pipeline — one run, nine conserved-mass stages.
+"""GameForge context pipeline — one run, ten conserved-mass stages.
 
-ingest → detect → tensor → lattice → oracle → forge → jeeves → emit → seal
+ingest → detect → tensor → lattice → oracle → forge → jeeves → sim → emit → seal
 
 Every stage pairs a Watson/Crick turn onto the helix and commits a
 ledger block. Snowball mass hits 1.0 iff every stage succeeded. The
@@ -35,13 +35,24 @@ class GameForgeRun:
 
     def execute(self, vision: str, *, era: Optional[str] = None,
                 archetype: str = "extraction",
-                target: str = "godot") -> Dict[str, Any]:
+                target: str = "godot",
+                project_root: Optional[str] = None,
+                answers: Optional[Dict[str, str]] = None,
+                overwrite: bool = False) -> Dict[str, Any]:
         cockpit = self.cockpit
+        if answers:
+            from skeleton.context.questionnaire import intake
+            taken = intake(answers)
+            vision = vision or taken.vision
+            era = era or taken.era
+            cockpit.tensor = taken.tensor
         ctx: Dict[str, Any] = {
             "vision": vision or "",
             "era_hint": era,
             "archetype": archetype,
             "target": target,
+            "project_root": project_root,
+            "overwrite": overwrite,
             "cockpit": cockpit,
             "forge": self.forge,
             "jeeves": self.jeeves,
@@ -54,6 +65,7 @@ class GameForgeRun:
             Stage("oracle", _stage_oracle),
             Stage("forge", _stage_forge),
             Stage("jeeves", _stage_jeeves),
+            Stage("sim", _stage_sim),
             Stage("emit", _stage_emit),
             Stage("seal", _stage_seal),
         ]
@@ -81,6 +93,8 @@ class GameForgeRun:
             },
             "jeeves": run.context.get("jeeves_advice"),
             "files": run.context.get("files") or {},
+            "sim": run.context.get("sim"),
+            "project": run.context.get("project"),
         }
         self.bus.emit("gameforge.run.finished", {
             "succeeded": run.succeeded,
@@ -177,8 +191,19 @@ def _stage_jeeves(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
 def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
     files = ctx.get("files") or {}
-    _commit(ctx, "emit", ctx["era"], f"{len(files)} files", {"file_count": len(files)})
-    return {"emitted": True}
+    project = None
+    root = ctx.get("project_root")
+    if root:
+        from skeleton.forge.projector import write_project
+        project = write_project(
+            root, files, overwrite=bool(ctx.get("overwrite")),
+            meta={"era": ctx.get("era"), "dps": ctx.get("primary_dps")},
+        )
+    _commit(ctx, "emit", ctx["era"], f"{len(files)} files", {
+        "file_count": len(files),
+        "root": None if not project else project["root"],
+    })
+    return {"emitted": True, "project": project}
 
 
 def _stage_seal(ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -187,3 +212,14 @@ def _stage_seal(ctx: Dict[str, Any]) -> Dict[str, Any]:
     _commit(ctx, "seal", "operator", "sealed" if not problems else "invalid",
             {"valid": not problems, "problems": problems, "mass": cockpit.snowball.mass})
     return {"sealed": not problems, "ledger_problems": problems}
+
+
+def _stage_sim(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    from skeleton.forge.sim import simulate_session
+    art = ctx.get("artefact") or {}
+    pack = art.get("pack") or {}
+    report = simulate_session(pack)
+    _commit(ctx, "sim", ctx.get("era") or "", "pass" if report.passed else "fail", report.to_dict())
+    if not report.passed:
+        raise RuntimeError("session sim failed: " + "; ".join(report.notes))
+    return {"sim": report.to_dict()}

@@ -17,19 +17,21 @@ STAGES: Tuple[str, ...] = (
     "oracle",
     "forge",
     "jeeves",
+    "sim",
     "emit",
     "seal",
 )
 
 WEIGHTS: Dict[str, float] = {
-    "ingest": 0.06,
-    "detect": 0.08,
-    "tensor": 0.10,
-    "lattice": 0.08,
-    "oracle": 0.08,
-    "forge": 0.22,
-    "jeeves": 0.14,
-    "emit": 0.16,
+    "ingest": 0.05,
+    "detect": 0.06,
+    "tensor": 0.08,
+    "lattice": 0.06,
+    "oracle": 0.06,
+    "forge": 0.18,
+    "jeeves": 0.10,
+    "sim": 0.16,
+    "emit": 0.17,
     "seal": 0.08,
 }
 

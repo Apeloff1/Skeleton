@@ -168,3 +168,64 @@ class TestGameForgeRun:
         assert out["forge"]["file_count"] >= 7
         assert "Heat" in (out["jeeves"]["next"]["text"] + out["jeeves"]["advice"][0]["text"])
         assert "project.godot" in out["files"]
+
+
+class TestSim:
+    def test_ideal_trash_matches_compiler(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.forge.sim import simulate_session
+        for era in ("extraction_now", "soulslike", "boomer_shooter"):
+            pack = compile_era(era)
+            report = simulate_session(pack)
+            trash = next(e for e in report.encounters if e.enemy_id == "trash" and e.mode == "ideal")
+            assert trash.killed, era
+            assert trash.error <= 0.20, (era, trash.error, trash.measured_ttk, trash.target_ttk)
+            assert report.passed, report.notes
+
+    def test_thermal_not_faster_than_ideal(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.forge.sim import simulate_session
+        pack = compile_era("extraction_now")
+        report = simulate_session(pack)
+        ideal = next(e for e in report.encounters if e.enemy_id == "trash" and e.mode == "ideal")
+        therm = next(e for e in report.encounters if e.enemy_id == "trash" and e.mode == "thermal")
+        assert therm.measured_ttk + 1e-6 >= ideal.measured_ttk
+
+
+class TestProjectorAndIntake:
+    def test_write_and_intake_run(self, tmp_path=None):
+        import tempfile, os
+        from pathlib import Path as P
+        from skeleton.context.questionnaire import intake
+        from skeleton.context.pipeline import GameForgeRun
+        taken = intake({
+            "pace": "processional", "death": "everything", "combat": "earned",
+            "info": "nothing", "loot": "build", "heat": "stamina",
+            "author": "mine", "social": "solo", "space": "dungeon",
+            "fail_state": "bonfire", "ai": "silent", "era_explicit": "soulslike",
+        })
+        assert taken.era == "soulslike"
+        root = tempfile.mkdtemp(prefix="forge-")
+        out = GameForgeRun().execute(
+            "",
+            answers={
+                "pace": "processional", "death": "everything", "combat": "earned",
+                "info": "nothing", "loot": "build", "heat": "stamina",
+                "author": "mine", "social": "solo", "space": "dungeon",
+                "fail_state": "bonfire", "ai": "silent", "era_explicit": "soulslike",
+            },
+            project_root=root,
+            overwrite=True,
+            target="godot",
+        )
+        assert out["succeeded"]
+        assert out["complete"]
+        assert out["era"] == "soulslike"
+        assert out["sim"]["passed"] is True
+        godot = P(root) / "project.godot"
+        assert godot.is_file()
+        text = godot.read_text()
+        assert "HeatSystem=" in text
+        enemy = (P(root) / "scripts/combat/enemy.gd").read_text()
+        assert "hp_table" in enemy
+        assert (P(root) / "FORGE_MANIFEST.json").is_file()

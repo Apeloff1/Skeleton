@@ -289,3 +289,26 @@ async def gameforge_run(request: Dict[str, Any], state=Depends(_state)) -> Dict[
     if not request.get("include_files"):
         out.pop("files", None)
     return out
+
+
+@router.post("/gameforge/intake")
+async def gameforge_intake(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    from skeleton.context.questionnaire import intake
+    taken = intake(request.get("answers") or {})
+    runner = _require(state.gameforge, "GameForge")
+    out = runner.execute(
+        taken.vision,
+        era=taken.era,
+        answers=request.get("answers") or {},
+        project_root=request.get("project_root"),
+        overwrite=bool(request.get("overwrite")),
+        target=request.get("target", "godot"),
+        archetype=request.get("archetype", "extraction"),
+    )
+    files = out.get("files") or {}
+    out = dict(out)
+    out["intake"] = taken.to_dict()
+    out["file_names"] = sorted(files)
+    if not request.get("include_files"):
+        out.pop("files", None)
+    return out

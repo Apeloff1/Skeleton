@@ -150,10 +150,64 @@ def emit_godot(pack: Dict[str, Any], *, title: str = "FORGE-RUN") -> Dict[str, s
         "		HeatSystem.add_sprint_heat(delta)\n"
         "	move_and_slide()\n"
     )
+    enemies = pack.get("enemies") or []
+    def _hp(eid, default):
+        for e in enemies:
+            if e.get("id") == eid:
+                return float(e.get("hp") or default)
+        return float(default)
+    trash_hp, elite_hp, boss_hp = _hp("trash", 100), _hp("elite", 400), _hp("boss", 5000)
+    files["scripts/combat/enemy.gd"] = (
+        "extends CharacterBody2D\n"
+        "class_name ForgeEnemy\n"
+        "@export_enum(\"trash\", \"elite\", \"boss\") var tier: String = \"trash\"\n"
+        f"var hp_table := {{\"trash\": {trash_hp}, \"elite\": {elite_hp}, \"boss\": {boss_hp}}}\n"
+        "var hp: float = 0.0\n\n"
+        "func _ready() -> void:\n"
+        "	hp = hp_table.get(tier, hp_table[\"trash\"])\n\n"
+        "func take_damage(amount: float) -> void:\n"
+        "	hp -= amount\n"
+        "	if hp <= 0.0:\n"
+        "		queue_free()\n"
+    )
+    files["scripts/ui/hud.gd"] = (
+        "extends CanvasLayer\n"
+        "func _process(_delta: float) -> void:\n"
+        "	$Heat.text = \"HEAT %.0f / %.0f\" % [HeatSystem.current_heat, HeatSystem.max_heat]\n"
+        "	$Collapse.text = \"COLLAPSE %.0f\" % GameState.collapse_timer\n"
+    )
+    files["export_presets.cfg"] = (
+        "[preset.0]\nname=\"Linux/X11\"\nplatform=\"Linux/X11\"\nrunnable=true\n"
+        "export_path=\"builds/linux/game.x86_64\"\n\n"
+        "[preset.1]\nname=\"Windows Desktop\"\nplatform=\"Windows Desktop\"\nrunnable=true\n"
+        "export_path=\"builds/windows/game.exe\"\n\n"
+        "[preset.2]\nname=\"Web\"\nplatform=\"Web\"\nrunnable=false\n"
+        "export_path=\"builds/web/index.html\"\n"
+    )
     files["scenes/levels/run_level.tscn"] = (
-        "[gd_scene format=3]\n"
+        "[gd_scene load_steps=2 format=3]\n"
+        "[ext_resource type=\"Script\" path=\"res://scripts/ui/hud.gd\" id=\"1\"]\n"
         "[node name=\"RunLevel\" type=\"Node2D\"]\n"
         "[node name=\"PlayerSpawn\" type=\"Marker2D\" parent=\".\"]\n"
         "position = Vector2(640, 360)\n"
+        "[node name=\"HUD\" type=\"CanvasLayer\" parent=\".\"]\n"
+        "script = ExtResource(\"1\")\n"
+        "[node name=\"Heat\" type=\"Label\" parent=\"HUD\"]\n"
+        "offset_right = 400.0\n"
+        "offset_bottom = 24.0\n"
+        "[node name=\"Collapse\" type=\"Label\" parent=\"HUD\"]\n"
+        "offset_top = 28.0\n"
+        "offset_right = 400.0\n"
+        "offset_bottom = 52.0\n"
+    )
+    # input map — keep move/sprint off ui_* so the export is a real project
+    files["project.godot"] += (
+        "\n[input]\n"
+        "move_left={\"deadzone\": 0.5, \"events\": []}\n"
+        "move_right={\"deadzone\": 0.5, \"events\": []}\n"
+        "move_up={\"deadzone\": 0.5, \"events\": []}\n"
+        "move_down={\"deadzone\": 0.5, \"events\": []}\n"
+        "sprint={\"deadzone\": 0.5, \"events\": []}\n"
+        "fire={\"deadzone\": 0.5, \"events\": []}\n"
     )
     return files
