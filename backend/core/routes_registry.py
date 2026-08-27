@@ -283,6 +283,7 @@ KNOWN_ROUTES: List[RouteEntry] = [
     ("routes.godot_engine",                     "router"),
     # ── Memory engine (RAG + CAG + MAG context stack) ──────────────────
     ("routes.memory_engine",                    "router"),
+    ("routes.skeleton_gameforge",               "router"),
 ]
 
 

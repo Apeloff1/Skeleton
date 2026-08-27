@@ -38,6 +38,22 @@ _ERA_KEYWORDS: Dict[str, Tuple[str, ...]] = {
     "modern_aaa": ("aaa", "cover shooter", "ubisoft", "cinematic"),
     "indie_experimental": ("indie", "experimental", "authorial", "twine", "zachlike"),
     "extraction_now": ("extract", "tarkov", "dmz", "raid", "loot", "heat", "collapse"),
+    "metroidvania": ("metroid", "vania", "ability gate", "backtrack", "map unlock"),
+    "roguelike": ("roguelike", "permadeath", "procgen", "dcss", "nethack"),
+    "jrpg": ("jrpg", "turn-based", "materia", "atb", "final fantasy"),
+    "crpg": ("crpg", "baldur", "infinity engine", "isometric party"),
+    "immersive_sim": ("immersive sim", "deus ex", "dishonored", "systemic"),
+    "stealth": ("stealth", "metal gear", "mark and execute", "undetected"),
+    "tactics_grid": ("tactics", "grid", "xcom", "fire emblem", "cover chance"),
+    "fighting_game": ("fighting game", "footsies", "frame data", "combo"),
+    "bullet_heaven": ("bullet heaven", "survivor-like", "vampire survivors", "horde"),
+    "deckbuilder": ("deckbuilder", "slay the spire", "card pile", "energy cost"),
+    "battle_royale": ("battle royale", "zone close", "drop ship", "last standing"),
+    "mmorpg": ("mmorpg", "raid night", "subscription", "auction house"),
+    "visual_novel": ("visual novel", "renpy", "dialogue tree", "cg route"),
+    "walking_sim": ("walking sim", "gone home", "what remains", "environmental story"),
+    "grand_strategy": ("grand strategy", "europa universalis", "ck3", "pdx"),
+    "city_builder": ("city builder", "simcity", "zoning", "traffic sim"),
 }
 
 
@@ -63,8 +79,29 @@ class ContextTensor:
 
     @classmethod
     def from_era(cls, era: str) -> "ContextTensor":
-        profile = ERA_PROFILES.get(era) or ERA_PROFILES["extraction_now"]
-        return cls.from_mapping(profile, era=era if era in ERA_PROFILES else "extraction_now")
+        if era in ERA_PROFILES:
+            return cls.from_mapping(ERA_PROFILES[era], era=era)
+        from skeleton.forge.eras import ERA_IDS, compile_era
+        if era in ERA_IDS:
+            pack = compile_era(era)
+            speed = float(pack["player"]["speed"])
+            glass = float(pack["ttk"]["player_glass"])
+            trash = float(pack["ttk"]["trash"])
+            perm = float(pack["meta"].get("permadeath") or 0.5)
+            mapping = {
+                "risk": perm,
+                "tempo": min(1.0, speed / 240.0),
+                "lethality": min(1.0, 2.0 / max(glass, 0.2)),
+                "opacity": min(1.0, trash / 8.0),
+                "scarcity": perm * 0.8 + 0.1,
+                "agency": min(1.0, speed / 200.0),
+                "spectacle": min(1.0, 1.2 - trash / 10.0),
+                "intimacy": max(0.0, 1.0 - perm),
+                "grind": min(1.0, float(pack["ttk"]["boss"]) / 200.0),
+                "authorial": 0.55,
+            }
+            return cls.from_mapping(mapping, era=era)
+        return cls.from_mapping(ERA_PROFILES["extraction_now"], era="extraction_now")
 
     def as_dict(self) -> Dict[str, float]:
         return {a: round(v, 4) for a, v in zip(AXES, self.values)}
