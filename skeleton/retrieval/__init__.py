@@ -4,6 +4,7 @@ from .fusion import Fuser, FusionStrategy, ScoredResult
 from .ranking import Ranker
 from .query import QueryPlan, QueryPlanner, RetrievalError
 from .index import InvertedIndex
+from .query_language import QueryParser, QueryTerm
 
 __all__ = [
     "Fuser",
@@ -14,4 +15,6 @@ __all__ = [
     "QueryPlanner",
     "RetrievalError",
     "InvertedIndex",
+    "QueryParser",
+    "QueryTerm",
 ]

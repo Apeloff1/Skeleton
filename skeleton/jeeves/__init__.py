@@ -10,6 +10,7 @@ from .assessment import (
     SkillModel,
 )
 from .curriculum import Curriculum, CurriculumError, Lesson
+from .pedagogy import Hint, HintLevel, PedagogyEngine, PedagogyError, Scaffold
 
 __all__ = [
     "CoCodingOrchestrator",
@@ -25,4 +26,9 @@ __all__ = [
     "Curriculum",
     "CurriculumError",
     "Lesson",
+    "Hint",
+    "HintLevel",
+    "PedagogyEngine",
+    "PedagogyError",
+    "Scaffold",
 ]

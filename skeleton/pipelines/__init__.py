@@ -16,6 +16,7 @@ from skeleton.pipelines.validation import (
     ValidationReport,
     Validator,
 )
+from skeleton.pipelines.registry import PipelineRegistry, RegistryError
 
 __all__ = [
     "NpcPipeline",
@@ -33,4 +34,6 @@ __all__ = [
     "ValidationIssueLevel",
     "ValidationReport",
     "Validator",
+    "PipelineRegistry",
+    "RegistryError",
 ]
