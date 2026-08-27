@@ -1,4 +1,4 @@
-"""Retrieval subsystem — query, fuse, rank, ingest, suggest, uptime-aware lexicon."""
+"""Retrieval subsystem — query, fuse, rank, ingest, suggest, lexicon, UI."""
 
 from .cache import CacheEntry, ResultCache
 from .chunking import Chunk, Chunker
@@ -15,6 +15,7 @@ from .ranking import Ranker
 from .rerank import Reranker, RerankRule
 from .suggest import Suggester
 from .sources import SourceRegistry
+from .ui import ResultRenderer
 
 __all__ = [
     "CacheEntry",
@@ -43,4 +44,5 @@ __all__ = [
     "RerankRule",
     "Suggester",
     "SourceRegistry",
+    "ResultRenderer",
 ]

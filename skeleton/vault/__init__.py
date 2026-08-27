@@ -1,7 +1,8 @@
-"""Secrets vault subsystem — sealed store, policies, recovery, KMS, quorum."""
+"""Secrets vault subsystem — sealed store, policies, recovery, entropy, KMS, quorum."""
 
 from .access import AccessDenied, AccessPolicy, Role
 from .audit import AuditEntry, AuditLog
+from .entropy import EntropyError, EntropyQuality, EntropyRegistry, EntropySource
 from .kms import DataKey, EnvelopeError, EnvelopeKMS
 from .keys import KeyRegistry, KeyVersion, KeyVersionError
 from .policies import PolicyRegistry, PolicyViolation, VaultPolicy, enforce_plaintext_minimum, require_prefix
@@ -17,6 +18,10 @@ __all__ = [
     "Role",
     "AuditEntry",
     "AuditLog",
+    "EntropyError",
+    "EntropyQuality",
+    "EntropyRegistry",
+    "EntropySource",
     "DataKey",
     "EnvelopeError",
     "EnvelopeKMS",

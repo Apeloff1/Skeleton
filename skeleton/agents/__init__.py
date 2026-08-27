@@ -1,4 +1,4 @@
-"""Multi-agent substrate + aggregation."""
+"""Multi-agent substrate + aggregation + voting."""
 
 from skeleton.agents.aggregation import Aggregator, AggregationError, Estimate
 from skeleton.agents.coordination import ClaimError, Coordinator
@@ -26,6 +26,7 @@ from skeleton.agents.policy import (
 from skeleton.agents.reputation import ReputationError, ReputationScore, ReputationTable
 from skeleton.agents.routing import RouteCandidate, RouteRequest, RoutingError, TaskRouter
 from skeleton.agents.scheduler import SwarmScheduler, Task
+from skeleton.agents.voting import Ballot, VoteMethod, Voting, VotingError
 
 __all__ = [
     "Aggregator",
@@ -72,4 +73,8 @@ __all__ = [
     "TaskRouter",
     "SwarmScheduler",
     "Task",
+    "Ballot",
+    "VoteMethod",
+    "Voting",
+    "VotingError",
 ]
