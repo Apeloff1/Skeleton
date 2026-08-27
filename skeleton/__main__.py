@@ -39,6 +39,12 @@ def main(argv: list[str] | None = None) -> int:
     ck = sub.add_parser("cockpit", help="apply one cockpit command")
     ck.add_argument("command")
 
+    th = sub.add_parser("think", help="Jeeves neocortex think (the model in training)")
+    th.add_argument("stimulus", nargs="?", default="")
+    th.add_argument("--bind", nargs=2, metavar=("SLOT", "BACKEND"))
+    th.add_argument("--acquire")
+    th.add_argument("--surpass")
+
     args = p.parse_args(argv)
 
     if args.cmd == "eras":
@@ -73,6 +79,25 @@ def main(argv: list[str] | None = None) -> int:
         cpit = Cockpit()
         out = cpit.apply(args.command)
         print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "think":
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        if args.bind:
+            slot, how = args.bind
+            if how == "echo":
+                neo.bind_echo(slot)
+            else:
+                neo.bind_local(slot)
+        trace = neo.think(args.stimulus)
+        if args.acquire:
+            neo.acquire(args.acquire)
+        if args.surpass:
+            neo.surpass(args.surpass)
+            if args.stimulus:
+                trace = neo.think(args.stimulus)
+        print(json.dumps(trace.to_dict(), indent=2, default=str))
         return 0
 
     if args.cmd == "plan":

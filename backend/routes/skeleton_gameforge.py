@@ -132,3 +132,51 @@ def cockpit(body: Dict[str, str]) -> Dict[str, Any]:
         return Cockpit().apply(cmd)
     except CockpitError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class ThinkRequest(BaseModel):
+    stimulus: str = ""
+    era: Optional[str] = None
+    bind: Optional[list] = None  # [slot, echo|local]
+    acquire: Optional[str] = None
+    surpass: Optional[str] = None
+
+
+@router.post("/think")
+def think(req: ThinkRequest) -> Dict[str, Any]:
+    from skeleton.cortex import JeevesCortex
+    from skeleton.context.tensor import ContextTensor
+    neo = JeevesCortex()
+    if req.bind and len(req.bind) >= 2:
+        slot, how = str(req.bind[0]), str(req.bind[1]).lower()
+        if how == "echo":
+            neo.bind_echo(slot)
+        else:
+            neo.bind_local(slot)
+    ctx = {}
+    if req.era:
+        t = ContextTensor.from_era(req.era)
+        ctx = {"era": t.era, "tensor": t.as_dict()}
+    trace = neo.think(req.stimulus, ctx)
+    acquired = neo.acquire(req.acquire) if req.acquire else None
+    surpassed = None
+    if req.surpass:
+        surpassed = neo.surpass(req.surpass)
+        trace = neo.think(req.stimulus, ctx)
+    return {
+        "trace": trace.to_dict(),
+        "status": neo.status(),
+        "acquired": acquired,
+        "surpassed": surpassed,
+    }
+
+
+@router.get("/cortex")
+def cortex_status() -> Dict[str, Any]:
+    from skeleton.cortex import SLOTS, SCALES, TEMPLATES, JeevesCortex
+    return {
+        "slots": list(SLOTS),
+        "scales": list(SCALES),
+        "pfc_templates": list(TEMPLATES),
+        "fresh": JeevesCortex().status(),
+    }

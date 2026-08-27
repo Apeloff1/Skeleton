@@ -161,6 +161,11 @@ class SessionError(JeevesError):
     http_status = 409
 
 
+class CortexError(JeevesError):
+    code = "JEE.CORTEX"
+    http_status = 400
+
+
 class RetrievalError(SkeletonError):
     code = "RET.UNKNOWN"
 

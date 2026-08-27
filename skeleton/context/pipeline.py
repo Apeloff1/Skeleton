@@ -99,6 +99,7 @@ class GameForgeRun:
                 "primary_dps": run.context.get("primary_dps"),
             },
             "jeeves": run.context.get("jeeves_advice"),
+            "cortex": run.context.get("cortex"),
             "files": run.context.get("files") or {},
             "sim": run.context.get("sim"),
             "project": run.context.get("project"),
@@ -257,8 +258,20 @@ def _stage_jeeves(ctx: Dict[str, Any]) -> Dict[str, Any]:
         advice = dict(advice)
         advice["briefing"] = plan.get("briefing")
         advice["build_plan"] = plan
+    cockpit: Cockpit = ctx["cockpit"]
+    trace = jeeves.think(ctx.get("vision") or ctx.get("era") or "", context={
+        "era": ctx.get("era"),
+        "tensor": cockpit.tensor.as_dict(),
+        "pack_dps": pack.get("primary_dps"),
+        "pack_ttk": pack.get("ttk"),
+        "hottest": cockpit.lattice.hottest(1)[0][0],
+    })
     _commit(ctx, "jeeves", ctx["era"], advice["next"]["text"], advice["next"])
-    return {"jeeves_advice": advice, "session_id": session.session_id}
+    return {
+        "jeeves_advice": advice,
+        "session_id": session.session_id,
+        "cortex": trace.to_dict(),
+    }
 
 
 def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:

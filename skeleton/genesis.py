@@ -111,6 +111,13 @@ class Genesis:
         )
         self._wire("intelligence", "orchestrator", IntelligenceOrchestrator(bus=self.bus))
         self._wire("intelligence", "adaptive", AdaptiveLearner(default_meta_grid(), bus=self.bus))
+        from skeleton.cortex import JeevesCortex
+        from skeleton.jeeves.core import Jeeves
+        cortex = JeevesCortex(bus=self.bus)
+        jeeves = Jeeves(bus=self.bus)
+        jeeves.cortex = cortex
+        self._wire("intelligence", "cortex", cortex)
+        self._wire("intelligence", "jeeves", jeeves)
 
     def _phase_swarm(self) -> None:
         self.report.phases.append("swarm")

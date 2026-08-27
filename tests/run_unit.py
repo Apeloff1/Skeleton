@@ -11,6 +11,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import tests.test_context as c  # noqa: E402
+import tests.test_cortex as x  # noqa: E402
 import tests.test_forge as f  # noqa: E402
 import tests.test_jeeves as j  # noqa: E402
 
@@ -18,7 +19,7 @@ import tests.test_jeeves as j  # noqa: E402
 def main() -> int:
     fails = 0
     passes = 0
-    for mod in (f, j, c):
+    for mod in (f, j, c, x):
         for name, cls in inspect.getmembers(mod, inspect.isclass):
             if not name.startswith("Test"):
                 continue

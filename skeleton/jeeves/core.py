@@ -32,6 +32,7 @@ class SessionMode(str, Enum):
     CO_CODING = "co_coding"
     TACTICAL = "tactical"
     BUILDER = "builder"
+    CORTEX = "cortex"
 
 
 @dataclass
@@ -89,6 +90,7 @@ class Jeeves:
         self._max_turns = max_turns
         self._sessions: dict[str, Session] = {}
         self._brain = None  # lazy TacticalBrain
+        self._cortex = None  # lazy JeevesCortex — the model in training
         self.era = "extraction_now"
         self.last_plan = None
 
@@ -134,6 +136,8 @@ class Jeeves:
         if session.mode in (SessionMode.TACTICAL, SessionMode.BUILDER):
             tel = ctx.get("telemetry") or {}
             reply = self._brain_get().recommend_next(tel).text
+        elif session.mode is SessionMode.CORTEX:
+            reply = self.think(message, context=ctx).amalgam.text
         else:
             reply = self._responder(message, session.turns, ctx)
         session.add_turn("jeeves", reply)
@@ -168,6 +172,43 @@ class Jeeves:
             from skeleton.jeeves.tactical import TacticalBrain
             self._brain = TacticalBrain(self.era)
         return self._brain
+
+    @property
+    def cortex(self):
+        if self._cortex is None:
+            from skeleton.cortex import JeevesCortex
+            self._cortex = JeevesCortex(bus=self._bus)
+        return self._cortex
+
+    @cortex.setter
+    def cortex(self, value) -> None:
+        self._cortex = value
+
+    def think(self, stimulus: str, *, context: dict[str, Any] | None = None):
+        """Neocortex think — the model in training, not a chat wrapper."""
+        trace = self.cortex.think(stimulus, context)
+        self._bus.emit("jeeves.cortex.thought", {
+            "fp": trace.fingerprint, "used_own": trace.used_own,
+            "hive": trace.hive_value,
+        })
+        return trace
+
+    def bind_model(self, slot: str, backend=None, *, echo: bool = False, local: bool = False):
+        if echo:
+            return self.cortex.bind_echo(slot)
+        if local or backend is None:
+            return self.cortex.bind_local(slot)
+        return self.cortex.bind(slot, backend)
+
+    def acquire(self, slot: str) -> dict[str, Any]:
+        out = self.cortex.acquire(slot)
+        self._bus.emit("jeeves.cortex.acquired", out)
+        return out
+
+    def surpass(self, slot: str) -> dict[str, Any]:
+        out = self.cortex.surpass(slot)
+        self._bus.emit("jeeves.cortex.surpass", out)
+        return out
 
     def bind_pack(self, pack: dict[str, Any]) -> dict[str, Any]:
         self.era = str(pack.get("era") or self.era)

@@ -10,8 +10,10 @@ Command language (one statement per apply):
   NICK HELIX
   LIGATE HELIX
   DETECT <text>
-  SNAPSHOT
-  STATUS
+  BIND SLOT <pfc|midbrain|left|right> <local|echo>
+  THINK <text>
+  ACQUIRE <slot>
+  SURPASS <slot>
 Unknown verbs raise CockpitError. apply() is the only mutation path;
 the pipeline reads the cockpit, never the other way around.
 """
@@ -45,10 +47,17 @@ class Cockpit:
     history: List[str] = field(default_factory=list)
     blend: Optional[Tuple[str, str, float]] = None
     generation: Optional[str] = None
+    _cortex: Any = field(default=None, repr=False)
 
     @property
     def lattice(self) -> Dodecahedron:
         return Dodecahedron.from_tensor(self.tensor)
+
+    def _brain(self):
+        if self._cortex is None:
+            from skeleton.cortex import JeevesCortex
+            self._cortex = JeevesCortex()
+        return self._cortex
 
     def snapshot(self) -> Dict[str, Any]:
         return {
@@ -81,6 +90,15 @@ class Cockpit:
             self.tensor = ContextTensor.from_era(era)
             self.blend = None
             result = {"era": self.tensor.era, "tensor": self.tensor.as_dict()}
+        elif verb == "BIND" and args and args[0].upper() in {"SLOT", "MODEL"}:
+            if len(args) < 2:
+                raise CockpitError("BIND SLOT <pfc|midbrain|left|right> [local|echo]")
+            slot = args[1]
+            how = (args[2] if len(args) > 2 else "local").lower()
+            if how == "echo":
+                result = {"backends": self._brain().bind_echo(slot), "slot": slot, "backend": "echo"}
+            else:
+                result = {"backends": self._brain().bind_local(slot), "slot": slot, "backend": "local"}
         elif verb == "BIND" and args and args[0].upper() in {"GENERATION", "GEN"}:
             from skeleton.forge.hardware import get_generation
             key = args[1] if len(args) > 1 else "modern"
@@ -123,6 +141,20 @@ class Cockpit:
         elif verb == "LIGATE":
             self.helix.ligate()
             result = {"nicked": self.helix.nicked, "sigma": self.helix.supercoiling}
+        elif verb == "THINK":
+            stim = " ".join(args)
+            ctx = {"era": self.tensor.era, "tensor": self.tensor.as_dict()}
+            if self.last_oracle:
+                ctx["hottest"] = (self.lattice.hottest(1) or [("combat", 0)])[0][0]
+            result = self._brain().think(stim, ctx).to_dict()
+        elif verb == "ACQUIRE":
+            if not args:
+                raise CockpitError("ACQUIRE <slot>")
+            result = self._brain().acquire(args[0])
+        elif verb == "SURPASS":
+            if not args:
+                raise CockpitError("SURPASS <slot>")
+            result = self._brain().surpass(args[0])
         elif verb == "DETECT":
             text = " ".join(args)
             era, scores = detect_era(text)
