@@ -228,11 +228,11 @@ def shadow_eval(own: Thought, teacher: Thought) -> bool:
 
 
 def _source_slot(ab: Ability) -> str:
-    if "acquired" in ab.tags:
+    if "acquired" in ab.tags or "imported" in ab.tags:
         for s in ("pfc", "left", "right", "midbrain"):
             if s in ab.tags:
                 return s
-    if ab.slot in {"pfc", "left", "right", "midbrain", "neo"}:
+    if ab.slot in {"pfc", "left", "right", "midbrain"}:
         return ab.slot
     for s in ("pfc", "left", "right", "midbrain"):
         if s in ab.tags:

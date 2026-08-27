@@ -249,6 +249,19 @@ def cortex_import(body: TractPayload) -> Dict[str, Any]:
     return out
 
 
+@router.get("/cortex/export")
+def cortex_export(slot: str = "left") -> Dict[str, Any]:
+    from skeleton.cortex.live import live_cortex
+    return live_cortex().export_tract(slot)
+
+
+@router.post("/cortex/export")
+def cortex_export_post(body: Dict[str, str]) -> Dict[str, Any]:
+    from skeleton.cortex.live import live_cortex
+    slot = (body or {}).get("slot") or "left"
+    return live_cortex().export_tract(slot)
+
+
 @router.post("/recall")
 def recall(body: Dict[str, str]) -> Dict[str, Any]:
     from skeleton.cortex.live import live_cortex

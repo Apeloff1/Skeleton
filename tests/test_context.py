@@ -656,3 +656,30 @@ class TestLive:
         assert out["build_plan"]["authored"] in {"cortex", "own"}
         assert out.get("own", {}).get("own") == live_cortex().own.size
 
+
+class TestHive:
+    def test_tract_from_a_authors_mix_on_b(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.jeeves.builder import BuilderBrain
+        from skeleton.context.tensor import ContextTensor
+        from skeleton.cortex import CallableBackend, JeevesCortex, ttk_oracle
+        pack = compile_era("soulslike")
+        tensor = ContextTensor.from_era("soulslike")
+        a = JeevesCortex()
+        a.bind("left", CallableBackend(ttk_oracle, slot="left", name="ttk-oracle"))
+        plan_a = BuilderBrain().plan(pack, tensor=tensor, cortex=a)
+        a.acquire("left")
+        tract = a.export_tract("left")
+        assert tract["size"] >= 1
+        assert any(len(e.get("numbers") or []) >= 3 for e in tract["exemplars"])
+        b = JeevesCortex()
+        got = b.import_tract(tract)
+        assert got["copied"] >= 1
+        b.surpass("left")
+        plan_b = BuilderBrain().plan(pack, tensor=tensor, cortex=b)
+        assert plan_b.authored == "own"
+        assert plan_b.enemy_mix == plan_a.enemy_mix
+        assert plan_b.room_bias == plan_a.room_bias
+        local = BuilderBrain().plan(pack, tensor=tensor)
+        assert plan_b.enemy_mix != local.enemy_mix
+
