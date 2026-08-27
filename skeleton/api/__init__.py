@@ -1,6 +1,7 @@
-"""REST API surface — full surface re-export."""
+"""REST API surface — routes, bootstrap, middleware, auth, caching, filters."""
 
 from .auth import AuthContext, role_dependency, scope_dependency
+from .cache_control import CachePolicy, CacheProfile, etag_for, headers_for
 from .deprecations import Deprecation, DeprecationRegistry
 from .errors import ApiErrorResponse, map_error
 from .filters import Filter, FilterOperation, FilterParser
@@ -24,6 +25,10 @@ __all__ = [
     "AuthContext",
     "role_dependency",
     "scope_dependency",
+    "CachePolicy",
+    "CacheProfile",
+    "etag_for",
+    "headers_for",
     "Deprecation",
     "DeprecationRegistry",
     "ApiErrorResponse",

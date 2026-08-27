@@ -1,6 +1,5 @@
-"""Jeeves package — the AI tutor brain."""
+"""Jeeves package — AI tutor brain with session tracking surface."""
 
-from .cocoding import CoCodingOrchestrator, CoCodingSession, SkillLevel, Stage
 from .assessment import (
     AdaptiveTest,
     AssessmentEngine,
@@ -9,8 +8,16 @@ from .assessment import (
     InteractionEvidence,
     SkillModel,
 )
+from .cocoding import CoCodingOrchestrator, CoCodingSession, SkillLevel, Stage
 from .curriculum import Curriculum, CurriculumError, Lesson
+from .feedback import (
+    FeedbackCollector,
+    FeedbackError,
+    FeedbackKind,
+    FeedbackRecord,
+)
 from .pedagogy import Hint, HintLevel, PedagogyEngine, PedagogyError, Scaffold
+from .reflection import ReflectionBuilder, ReflectionPoint, ReflectionReport
 from .review import (
     CodeReviewer,
     Finding,
@@ -19,46 +26,52 @@ from .review import (
     ReviewRule,
     default_reviewer,
 )
+from .safety import SafetyError, SafetyFlag, SafetyGuard, SafetyLevel
 from .templates import PromptRegistry, PromptTemplate, TemplateError
-from .reflection import ReflectionBuilder, ReflectionPoint, ReflectionReport
-from .feedback import FeedbackCollector, FeedbackError, FeedbackKind, FeedbackRecord
+from .tracking import SessionTracker, SessionTracking
 from .troubleshooting import Troubleshooter, TroubleshootingStep
 
 __all__ = [
-    "CoCodingOrchestrator",
-    "CoCodingSession",
-    "SkillLevel",
-    "Stage",
     "AdaptiveTest",
     "AssessmentEngine",
     "AssessmentError",
     "BloomLevel",
     "InteractionEvidence",
     "SkillModel",
+    "CoCodingOrchestrator",
+    "CoCodingSession",
+    "SkillLevel",
+    "Stage",
     "Curriculum",
     "CurriculumError",
     "Lesson",
+    "FeedbackCollector",
+    "FeedbackError",
+    "FeedbackKind",
+    "FeedbackRecord",
     "Hint",
     "HintLevel",
     "PedagogyEngine",
     "PedagogyError",
     "Scaffold",
+    "ReflectionBuilder",
+    "ReflectionPoint",
+    "ReflectionReport",
     "CodeReviewer",
     "Finding",
     "FindingSeverity",
     "ReviewError",
     "ReviewRule",
     "default_reviewer",
+    "SafetyError",
+    "SafetyFlag",
+    "SafetyGuard",
+    "SafetyLevel",
     "PromptRegistry",
     "PromptTemplate",
     "TemplateError",
-    "ReflectionBuilder",
-    "ReflectionPoint",
-    "ReflectionReport",
-    "FeedbackCollector",
-    "FeedbackError",
-    "FeedbackKind",
-    "FeedbackRecord",
+    "SessionTracker",
+    "SessionTracking",
     "Troubleshooter",
     "TroubleshootingStep",
 ]
