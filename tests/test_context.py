@@ -393,6 +393,35 @@ class TestAuthoredPlan:
         assert second.room_bias == first.room_bias
 
 
+    def test_auto_surpass_authors_mix_without_bind(self):
+        from skeleton.forge.eras import compile_era
+        from skeleton.jeeves.builder import BuilderBrain
+        from skeleton.context.tensor import ContextTensor
+        from skeleton.cortex import CallableBackend, JeevesCortex, ttk_oracle
+        pack = compile_era("soulslike")
+        tensor = ContextTensor.from_era("soulslike")
+        local = BuilderBrain().plan(pack, tensor=tensor)
+        neo = JeevesCortex()
+        neo.bind("left", CallableBackend(ttk_oracle, slot="left", name="ttk-oracle"))
+        oracle_mix = None
+        saw_own = False
+        for _ in range(8):
+            p = BuilderBrain().plan(pack, tensor=tensor, cortex=neo)
+            if oracle_mix is None:
+                oracle_mix = dict(p.enemy_mix)
+            if p.authored == "own":
+                saw_own = True
+                break
+        assert saw_own, neo.shadow
+        neo.bind_local("left")
+        assert neo.backends()["left"] != "ttk-oracle"
+        after = BuilderBrain().plan(pack, tensor=tensor, cortex=neo)
+        assert after.authored == "own"
+        assert after.enemy_mix == oracle_mix
+        assert after.enemy_mix != local.enemy_mix
+        assert after.room_bias == local.room_bias
+
+
 class TestProjectorAndIntake:
     def test_write_and_intake_run(self, tmp_path=None):
         import tempfile, os

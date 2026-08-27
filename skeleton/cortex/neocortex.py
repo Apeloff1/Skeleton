@@ -172,6 +172,8 @@ class JeevesCortex:
             self.shadow["own"]["trials"] += 1
             if shadow_win:
                 self.shadow["own"]["wins"] += 1
+            if self.auto_surpass:
+                self._maybe_auto_surpass()
             armed = bool(self._surpass)
             if armed:
                 amalgam = own_thought
@@ -180,8 +182,6 @@ class JeevesCortex:
                     self.shadow[s]["trials"] += 1
                     if shadow_win:
                         self.shadow[s]["wins"] += 1
-            if self.auto_surpass:
-                self._maybe_auto_surpass()
 
         # Ingest AFTER the decision so this turn cannot recall itself.
         self.own.ingest(ability_from(teacher, stim), stim)
