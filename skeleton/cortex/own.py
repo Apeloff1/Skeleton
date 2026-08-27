@@ -18,6 +18,7 @@ from skeleton.cortex.port import Thought, jaccard, tokens
 
 MIN_JACCARD = 0.40
 K_RECALL = 5
+_NEIGHBORS = ((-1, 0, 0), (1, 0, 0), (0, -1, 0), (0, 1, 0), (0, 0, -1), (0, 0, 1))
 
 
 @dataclass(frozen=True)
@@ -203,6 +204,41 @@ class OwnSystem:
                     float(a.numbers[-2]),
                 )
         return best
+
+    def mix_neighbors(self, trash: int, elite: int, boss: int) -> List[Tuple[int, int, int]]:
+        out: List[Tuple[int, int, int]] = []
+        seen = {(trash, elite, boss)}
+        for dt, de, db in _NEIGHBORS:
+            t, e, b = trash + dt, elite + de, boss + db
+            if 1 <= t <= 6 and 0 <= e <= 3 and 0 <= b <= 1:
+                key = (t, e, b)
+                if key not in seen:
+                    seen.add(key)
+                    out.append(key)
+        return out
+
+    def mix_cost(self, pack: Dict[str, Any], trash: int, elite: int, boss: int) -> float:
+        ttk = pack.get("ttk") or {}
+        return (
+            trash * float(ttk.get("trash") or 1.0)
+            + elite * float(ttk.get("elite") or 6.0)
+            + boss * float(ttk.get("boss") or 60.0)
+        )
+
+    def propose_mix(self, stimulus: str, score_fn) -> Optional[Tuple[int, int, int, float, bool]]:
+        """Hill-climb one step from the best observed mix. Invented iff a neighbor wins."""
+        base = self.best_observed_mix(stimulus)
+        if base is None:
+            return None
+        t, e, b = int(base[0]), int(base[1]), int(base[2])
+        best = (t, e, b)
+        best_s = float(score_fn(t, e, b))
+        invented = False
+        for n in self.mix_neighbors(t, e, b):
+            s = float(score_fn(*n))
+            if s > best_s + 1e-6:
+                best, best_s, invented = n, s, True
+        return best[0], best[1], best[2], best_s, invented
 
     def export_tract(self, slot: str, *, backend: str = "own",
                      scale: str = "neo") -> Tract:

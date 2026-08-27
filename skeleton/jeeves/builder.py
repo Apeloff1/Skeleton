@@ -295,6 +295,48 @@ class BuilderBrain:
                 veto_notes = list(veto_notes) + [
                     f"improved mix trash={trash} elite={elite} boss={boss}"
                 ] + extra
+                stim = f"plan {era} forge mix bias ttk extract"
+                if hasattr(own, "propose_mix"):
+                    from skeleton.forge.walk import walk_from_pack
+                    collapse = float((pack.get("session") or {}).get("collapse_max") or 1.0)
+                    search_seed = hashlib.sha256(f"{era}|{fp}|search".encode()).hexdigest()[:16]
+
+                    def _score(tr: int, el: int, bo: int) -> float:
+                        proto = {
+                            "seed": search_seed,
+                            "extract_late": extract_late,
+                            "enemy_mix": {"trash": tr, "elite": el, "boss": bo},
+                        }
+                        wr = walk_from_pack(pack, plan=proto, mode="thermal")
+                        if not wr.extracted or wr.collapsed:
+                            return -1.0
+                        cost = own.mix_cost(pack, tr, el, bo)
+                        return (collapse - wr.bound - cost) / collapse
+
+                    prop = own.propose_mix(stim, _score)
+                    if prop is not None:
+                        nt, ne, nb, ns, invented = prop
+                        if invented:
+                            trash, elite, boss = nt, ne, nb
+                            trash, elite, boss, thermal_span, extra2 = _prune_mix(
+                                pack, trash, elite, boss
+                            )
+                            veto_notes = list(veto_notes) + extra2 + [
+                                f"invented mix trash={trash} elite={elite} boss={boss} slack={ns:.2f}"
+                            ]
+                            from skeleton.cortex.distill import ability_from
+                            from skeleton.cortex.port import Thought
+                            observed = Thought(
+                                slot="left", kind="walk",
+                                text=(
+                                    f"HP = DPS × TTK ; invented mix trash={trash} "
+                                    f"elite={elite} boss={boss} slack={ns:.2f}"
+                                ),
+                                confidence=min(1.0, 0.55 + 0.45 * max(0.0, ns)),
+                                tags=("analytic", "mix", "walk", "observed", "invented", "left", era),
+                                numbers=(float(trash), float(elite), float(boss), float(ns)),
+                            )
+                            own.ingest(ability_from(observed, stim), stim)
 
         seed_src = f"{era}|{fp}|{oracle_index}"
         if tag != "none":

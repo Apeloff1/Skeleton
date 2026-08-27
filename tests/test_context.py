@@ -755,3 +755,36 @@ class TestImprove:
         assert own.enemy_mix == {"trash": 1, "elite": 0, "boss": 0}, own.enemy_mix
         assert s_own > s_hard, (s_own, s_hard, wr_own.t, wr_own.extracted)
 
+    def test_invents_unobserved_neighbor(self):
+        from dataclasses import replace
+        from skeleton.forge.eras import compile_era
+        from skeleton.forge.walk import walk_from_pack
+        from skeleton.jeeves.builder import BuilderBrain
+        from skeleton.jeeves.core import Jeeves
+        from skeleton.context.tensor import ContextTensor
+        from skeleton.cortex import JeevesCortex
+
+        pack = compile_era("soulslike")
+        tensor = ContextTensor.from_era("soulslike")
+        collapse = float(pack["session"]["collapse_max"])
+        base = BuilderBrain().plan(pack, tensor=tensor)
+        hard = replace(base, enemy_mix={"trash": 6, "elite": 2, "boss": 0})
+        wr_h = walk_from_pack(pack, plan=hard.to_dict(), mode="thermal")
+        w_hard = wr_h.to_dict()
+        w_hard["collapse_max"] = collapse
+        s_hard = ((collapse - wr_h.t) / collapse) if wr_h.extracted and wr_h.t > 0 else 0.0
+        neo = JeevesCortex()
+        neo.auto_surpass = False
+        j = Jeeves()
+        j.cortex = neo
+        j.observe_run(era="soulslike", walk=w_hard, plan=hard.to_dict())
+        neo.surpass("left")
+        own = BuilderBrain().plan(pack, tensor=tensor, cortex=neo)
+        got = (own.enemy_mix["trash"], own.enemy_mix["elite"], own.enemy_mix["boss"])
+        assert own.authored == "own", own.authored
+        assert got != (6, 2, 0), got
+        assert any("invented" in n for n in own.notes), own.notes
+        wr = walk_from_pack(pack, plan=own.to_dict(), mode="thermal")
+        s_own = ((collapse - wr.t) / collapse) if wr.extracted and wr.t > 0 else 0.0
+        assert s_own > s_hard, (s_own, s_hard, got)
+
