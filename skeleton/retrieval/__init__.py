@@ -12,6 +12,7 @@ from .ingest import CorpusIngestor, Document
 from .rerank import Reranker, RerankRule
 from .highlight import Highlighter
 from .dedup import Deduper
+from .embeddings import LocalEmbedder, rerank_by_embedding
 
 __all__ = [
     "Fuser",
@@ -35,4 +36,6 @@ __all__ = [
     "RerankRule",
     "Highlighter",
     "Deduper",
+    "LocalEmbedder",
+    "rerank_by_embedding",
 ]

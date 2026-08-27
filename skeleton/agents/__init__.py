@@ -1,4 +1,4 @@
-"""Multi-agent substrate: ledger, mesh, scheduler, policy, routing, messaging, coordination, negotiation, discovery, heartbeat, reputation, load."""
+"""Multi-agent substrate: ledger, mesh, scheduler, policy, routing, memory."""
 
 from skeleton.agents.ledger import ActivityLedger, LedgerEntry
 from skeleton.agents.mesh import Agent, AgentMesh
@@ -24,6 +24,7 @@ from skeleton.agents.heartbeat import HeartbeatError, HeartbeatRecord, Heartbeat
 from skeleton.agents.reputation import ReputationError, ReputationScore, ReputationTable
 from skeleton.agents.routing import RouteCandidate, RouteRequest, RoutingError, TaskRouter
 from skeleton.agents.load import LoadBalanceError, LoadBalancer, LoadView
+from skeleton.agents.memory import MemoryEntry, MemoryError, WorkingMemory
 
 __all__ = [
     "ActivityLedger",
@@ -64,4 +65,7 @@ __all__ = [
     "LoadBalanceError",
     "LoadBalancer",
     "LoadView",
+    "MemoryEntry",
+    "MemoryError",
+    "WorkingMemory",
 ]
