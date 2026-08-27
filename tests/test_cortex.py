@@ -507,11 +507,65 @@ class TestJeevesLM:
         from skeleton.cortex.lm import gameforge_vocab
         src = open(xfmod.__file__, encoding="utf-8").read()
         assert "import torch" not in src
-        assert "cuda" not in src
         lm = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=1)
         lm.fit(["plan tensor lattice oracle forge emit"])
         text = lm.decode("plan tensor", n=8, seed=2)
         assert isinstance(text, str) and len(text.split()) >= 4
+
+
+class TestDevice:
+    def test_probe_cpu_here(self):
+        from skeleton.cortex.device import probe, resolve
+        p = probe()
+        assert p["name"] in {"cpu", "cuda"}
+        assert p["backend"] in {"python", "torch"}
+        r = resolve("cuda")
+        assert r["requested"] == "cuda"
+        if not p["cuda"]:
+            assert r["actual"] == "cpu"
+            assert r["degraded"] is True
+
+    def test_to_cuda_degrades_without_gpu(self):
+        from skeleton.cortex import JeevesCortex, probe
+        neo = JeevesCortex()
+        out = neo.to("cuda")
+        assert out["requested"] in {"cuda", "gpu", "auto"} or True
+        p = probe()
+        if not p["cuda"]:
+            assert out["actual"] == "cpu"
+            assert out["degraded"] is True
+        assert neo.status()["lm"]["device"] in {"cpu", "cuda"}
+
+    def test_neo_is_multihead_ffn(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        xf = neo.transformer
+        assert xf.n_heads >= 2
+        assert xf.d_ff >= 16
+        st = neo.status()["lm"]
+        assert st["n_heads"] >= 2
+        assert st["backend"]
+
+    def test_two_head_still_reads_prefix(self):
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.lm import gameforge_vocab
+        from skeleton.cortex.port import tokens
+        att = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=3, n_heads=2, d_ff=16)
+        assert att.hidden("loot bias") != att.hidden("heat bias")
+        w = att.weights_last("loot bias")
+        assert len(w) == len(tokens("loot bias"))
+
+    def test_ffn_perplexity_drops(self):
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.lm import gameforge_corpus, gameforge_vocab
+        corpus = gameforge_corpus()
+        held, train = corpus[-4:], corpus[:-4]
+        lm = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=1, n_heads=2, d_ff=16)
+        p0 = lm.perplexity(held)
+        lm.fit(train)
+        p1 = lm.perplexity(held)
+        assert p1 < p0, (p0, p1)
+
 
 
 

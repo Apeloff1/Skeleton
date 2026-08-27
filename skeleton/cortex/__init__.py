@@ -29,6 +29,7 @@ from .lm import NGramLM, LanguageModelBackend, gameforge_corpus, gameforge_vocab
 from .neural import NeuralLM, NeuralBackend
 from .transformer import TinyTransformer, TransformerBackend
 from .learned import LearnedWeights
+from .device import probe, resolve, attach_lm
 
 __all__ = [
     "SLOTS",
@@ -74,4 +75,7 @@ __all__ = [
     "TinyTransformer",
     "TransformerBackend",
     "LearnedWeights",
+    "probe",
+    "resolve",
+    "attach_lm",
 ]

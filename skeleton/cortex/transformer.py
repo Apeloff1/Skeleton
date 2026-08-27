@@ -16,7 +16,10 @@ from skeleton.cortex.attn import (
     causal_attend,
     matvec,
     matvec_T,
+    multi_head_attend,
+    relu,
     scale,
+    slice_head,
     softmax,
     zeros,
     zeros2,
@@ -40,6 +43,9 @@ class TinyTransformer:
         dim: int = 8,
         ctx: int = 6,
         seed: int = 0,
+        n_heads: int = 1,
+        n_layers: int = 1,
+        d_ff: int = 0,
     ) -> None:
         itos = [UNK] + sorted({str(t) for t in (vocab or ()) if t and t != UNK})
         self.itos: List[str] = itos
@@ -48,6 +54,9 @@ class TinyTransformer:
         V = max(2, len(itos))
         D = max(4, int(dim))
         C = max(2, int(ctx))
+        heads = max(1, int(n_heads))
+        if D % heads:
+            heads = 1
         rng = random.Random(int(seed) & 0xFFFFFFFF)
         s = 0.08
         self.E = _rand_mat(V, D, s, rng)
@@ -58,10 +67,21 @@ class TinyTransformer:
         self.Wo = _rand_mat(D, D, s, rng)
         self.Wout = _rand_mat(V, D, s, rng)
         self.bout = zeros(V)
+        ff = max(0, int(d_ff))
+        self.W1 = _rand_mat(ff, D, s, rng) if ff else []
+        self.b1 = zeros(ff) if ff else []
+        self.W2 = _rand_mat(D, ff, s, rng) if ff else []
+        self.b2 = zeros(D) if ff else []
         self.dim = D
         self.ctx = C
+        self.n_heads = heads
+        self.n_layers = max(1, int(n_layers))
+        self.d_ff = ff
         self.fitted = 0
         self.steps = 0
+        self.device = "cpu"
+        self.requested = "cpu"
+        self._accel = None
 
     @property
     def V(self) -> int:
@@ -76,35 +96,55 @@ class TinyTransformer:
             X.append(add(self.E[idx], self.P[t]))
         return X
 
-    def _logits(self, ids: Sequence[int]) -> List[float]:
+    def to(self, device: str = "cpu") -> "TinyTransformer":
+        """Bind a device. CUDA if torch can see a GPU; else CPU. Never throws."""
+        from skeleton.cortex.device import resolve
+        info = resolve(device)
+        self.requested = str(info.get("requested") or device)
+        self.device = str(info.get("actual") or "cpu")
+        self._accel = None
+        if self.device == "cuda" or (info.get("torch") and self.requested in {"cuda", "gpu", "torch"}):
+            try:
+                from skeleton.cortex.torch_lm import TorchAccel
+                self._accel = TorchAccel(self, device=self.device)
+                self.device = self._accel.device_name
+            except Exception:
+                self._accel = None
+                self.device = "cpu"
+        return self
+
+    def _block(self, ids: Sequence[int]):
         X = self._encode(ids)
         Q = [matvec(self.Wq, x) for x in X]
         K = [matvec(self.Wk, x) for x in X]
         V = [matvec(self.Wv, x) for x in X]
-        C, _ = causal_attend(Q, K, V)
-        H = matvec(self.Wo, C[-1])
-        return add(matvec(self.Wout, H), self.bout)
+        C, As = multi_head_attend(Q, K, V, self.n_heads)
+        attn = matvec(self.Wo, C[-1])
+        U = add(X[-1], attn)
+        z: List[float] = []
+        y = U
+        if self.d_ff:
+            z = relu(add(matvec(self.W1, U), self.b1))
+            y = add(U, add(matvec(self.W2, z), self.b2))
+        return X, Q, K, V, C, As, U, z, y
+
+    def _logits(self, ids: Sequence[int]) -> List[float]:
+        *_, y = self._block(ids)
+        return add(matvec(self.Wout, y), self.bout)
 
     def hidden(self, prefix: str) -> List[float]:
-        """Last-position context vector. Mixes the whole prefix."""
+        """Last-position context after residual (+ FFN if armed)."""
         ids = [self._id(t) for t in tokens(prefix)] or [self.unk]
         ids = ids[-self.ctx:]
-        X = self._encode(ids)
-        Q = [matvec(self.Wq, x) for x in X]
-        K = [matvec(self.Wk, x) for x in X]
-        V = [matvec(self.Wv, x) for x in X]
-        C, _ = causal_attend(Q, K, V)
-        return list(C[-1])
+        *_, y = self._block(ids)
+        return list(y)
 
     def weights_last(self, prefix: str) -> List[float]:
         ids = [self._id(t) for t in tokens(prefix)] or [self.unk]
         ids = ids[-self.ctx:]
-        X = self._encode(ids)
-        Q = [matvec(self.Wq, x) for x in X]
-        K = [matvec(self.Wk, x) for x in X]
-        V = [matvec(self.Wv, x) for x in X]
-        _, A = causal_attend(Q, K, V)
-        return list(A[-1])
+        *rest, As, _U, _z, _y = self._block(ids)
+        A0 = As[0] if As else []
+        return list(A0[-1]) if A0 else []
 
     def token_prob(self, prefix: str, tok: str) -> float:
         ids = [self._id(t) for t in tokens(prefix)] or [self.unk]
@@ -113,52 +153,71 @@ class TinyTransformer:
         return float(p[self._id(tok)])
 
     def _sgd(self, ids: List[int], target: int, lr: float) -> float:
-        """Last-token CE through one causal head."""
+        """Last-token CE through residual multi-head + FFN. CPU or bound accel."""
+        if self._accel is not None:
+            try:
+                return float(self._accel.sgd(ids, target, lr))
+            except Exception:
+                self._accel = None
         n = len(ids)
         D = self.dim
-        X = self._encode(ids)
-        Q = [matvec(self.Wq, x) for x in X]
-        K = [matvec(self.Wk, x) for x in X]
-        V = [matvec(self.Wv, x) for x in X]
-        C, A = causal_attend(Q, K, V)
-        H = matvec(self.Wo, C[-1])
-        logits = add(matvec(self.Wout, H), self.bout)
+        X, Q, K, V, C, As, U, z, y = self._block(ids)
+        logits = add(matvec(self.Wout, y), self.bout)
         p = softmax(logits)
         loss = -math.log(max(p[target], 1e-12))
         dlog = [p[v] - (1.0 if v == target else 0.0) for v in range(self.V)]
 
-        dH = matvec_T(self.Wout, dlog)
-        add_outer(self.Wout, dlog, H, -lr)
+        dy = matvec_T(self.Wout, dlog)
+        add_outer(self.Wout, dlog, y, -lr)
         for v in range(self.V):
             self.bout[v] -= lr * dlog[v]
 
-        dC_last = matvec_T(self.Wo, dH)
-        add_outer(self.Wo, dH, C[-1], -lr)
+        dU = dy
+        if self.d_ff and z:
+            d_z = matvec_T(self.W2, dy)
+            d_pre = [d_z[i] if z[i] > 0.0 else 0.0 for i in range(len(z))]
+            add_outer(self.W2, dy, z, -lr)
+            add_outer(self.W1, d_pre, U, -lr)
+            for i in range(len(self.b2)):
+                self.b2[i] -= lr * dy[i]
+            for i in range(len(self.b1)):
+                self.b1[i] -= lr * d_pre[i]
+            dU = add(dy, matvec_T(self.W1, d_pre))
 
+        dC_last = matvec_T(self.Wo, dU)
+        add_outer(self.Wo, dU, C[-1], -lr)
+        dX = [zeros(D) for _ in range(n)]
+        dX[-1] = add(dX[-1], dU)
+
+        heads = self.n_heads
+        dh = max(1, D // heads)
         i = n - 1
-        w = A[i]
-        dV = [zeros(D) for _ in range(n)]
-        dA = zeros(n)
-        for j, aij in enumerate(w):
-            for d in range(D):
-                dV[j][d] += dC_last[d] * aij
-            dA[j] = sum(dC_last[d] * V[j][d] for d in range(D))
-        # softmax backward on last row
-        dot_da = sum(dA[j] * w[j] for j in range(len(w)))
-        ds = [(dA[j] - dot_da) * w[j] for j in range(len(w))]
-        inv = 1.0 / math.sqrt(D)
         dQ_i = zeros(D)
         dK = [zeros(D) for _ in range(n)]
-        for j, dsj in enumerate(ds):
-            g = dsj * inv
-            for d in range(D):
-                dQ_i[d] += K[j][d] * g
-                dK[j][d] += Q[i][d] * g
+        dV = [zeros(D) for _ in range(n)]
+        for h in range(heads):
+            lo, hi = h * dh, (h + 1) * dh
+            dCh = dC_last[lo:hi]
+            Qh = slice_head(Q, h, heads)
+            Kh = slice_head(K, h, heads)
+            Vh = slice_head(V, h, heads)
+            w = As[h][i] if h < len(As) else []
+            dAh = zeros(len(w))
+            for j, aij in enumerate(w):
+                for d in range(len(dCh)):
+                    dV[j][lo + d] += dCh[d] * aij
+                dAh[j] = sum(dCh[d] * Vh[j][d] for d in range(len(dCh)))
+            dot_da = sum(dAh[j] * w[j] for j in range(len(w)))
+            ds = [(dAh[j] - dot_da) * w[j] for j in range(len(w))]
+            inv = 1.0 / math.sqrt(max(1, dh))
+            for j, dsj in enumerate(ds):
+                g = dsj * inv
+                for d in range(dh):
+                    dQ_i[lo + d] += Kh[j][d] * g
+                    dK[j][lo + d] += Qh[i][d] * g
 
-        dX = [zeros(D) for _ in range(n)]
         add_outer(self.Wq, dQ_i, X[i], -lr)
-        dx = matvec_T(self.Wq, dQ_i)
-        dX[i] = add(dX[i], dx)
+        dX[i] = add(dX[i], matvec_T(self.Wq, dQ_i))
         for j in range(n):
             add_outer(self.Wk, dK[j], X[j], -lr)
             dX[j] = add(dX[j], matvec_T(self.Wk, dK[j]))
@@ -211,7 +270,12 @@ class TinyTransformer:
         return math.exp(-mean)
 
     def decode(self, prefix: str, *, n: int = 14, seed: int = 0) -> str:
-        """CPU next-token decode. No GPU. No torch."""
+        """Next-token decode on the bound device (CPU default, CUDA if harnessed)."""
+        if self._accel is not None:
+            try:
+                return str(self._accel.decode(prefix, n=n, seed=seed))
+            except Exception:
+                self._accel = None
         return " ".join(self.generate(prefix, n=n, seed=seed))
 
     def generate(self, prefix: str | Sequence[str], n: int = 12, *, seed: int = 0) -> Tuple[str, ...]:
@@ -240,6 +304,10 @@ class TinyTransformer:
         return {
             "dim": self.dim,
             "ctx": self.ctx,
+            "n_heads": self.n_heads,
+            "n_layers": self.n_layers,
+            "d_ff": self.d_ff,
+            "device": self.device,
             "fitted": self.fitted,
             "steps": self.steps,
             "itos": list(self.itos),
@@ -251,6 +319,10 @@ class TinyTransformer:
             "Wo": [list(r) for r in self.Wo],
             "Wout": [list(r) for r in self.Wout],
             "bout": list(self.bout),
+            "W1": [list(r) for r in self.W1] if self.W1 else [],
+            "b1": list(self.b1) if self.b1 else [],
+            "W2": [list(r) for r in self.W2] if self.W2 else [],
+            "b2": list(self.b2) if self.b2 else [],
         }
 
     @classmethod
@@ -261,6 +333,9 @@ class TinyTransformer:
             dim=int((data or {}).get("dim") or 8),
             ctx=int((data or {}).get("ctx") or 6),
             seed=0,
+            n_heads=int((data or {}).get("n_heads") or 1),
+            n_layers=int((data or {}).get("n_layers") or 1),
+            d_ff=int((data or {}).get("d_ff") or 0),
         )
         lm.itos = itos
         lm.stoi = {t: i for i, t in enumerate(itos)}
@@ -274,11 +349,18 @@ class TinyTransformer:
         lm.Wv = _m("Wv", lm.Wv)
         lm.Wo = _m("Wo", lm.Wo)
         lm.Wout = _m("Wout", lm.Wout)
+        lm.W1 = _m("W1", lm.W1)
+        lm.W2 = _m("W2", lm.W2)
         b = (data or {}).get("bout")
         if b:
             lm.bout = [float(x) for x in b]
+        if (data or {}).get("b1"):
+            lm.b1 = [float(x) for x in data["b1"]]
+        if (data or {}).get("b2"):
+            lm.b2 = [float(x) for x in data["b2"]]
         lm.fitted = int((data or {}).get("fitted") or 0)
         lm.steps = int((data or {}).get("steps") or 0)
+        lm.device = str((data or {}).get("device") or "cpu")
         return lm
 
 

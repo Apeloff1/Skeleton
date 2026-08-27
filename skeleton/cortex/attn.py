@@ -1,12 +1,12 @@
 """Scaled-dot-product attention — the primitive, not a model.
 
-Pure Python. One head. Causal mask. This file has no ModelPort and
-no next-token head; transformer.py sits on top of it.
+Pure Python. Causal mask. Multi-head is split/concat over this.
+No ModelPort, no next-token head; transformer.py sits on top.
 """
 from __future__ import annotations
 
 import math
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 Vec = List[float]
 Mat = List[List[float]]
@@ -71,6 +71,10 @@ def softmax(xs: Vec) -> Vec:
     return [x / s for x in e]
 
 
+def relu(xs: Vec) -> Vec:
+    return [x if x > 0.0 else 0.0 for x in xs]
+
+
 def causal_attend(Q: Mat, K: Mat, V: Mat) -> Tuple[Mat, Mat]:
     """One head. C[i] = Σ_{j≤i} A[i,j] V[j]. Returns (C, A)."""
     n = len(Q)
@@ -91,3 +95,45 @@ def causal_attend(Q: Mat, K: Mat, V: Mat) -> Tuple[Mat, Mat]:
         C.append(ctx)
         A.append(w)
     return C, A
+
+
+def slice_head(X: Mat, h: int, n_heads: int) -> Mat:
+    if not X:
+        return []
+    d = len(X[0])
+    n_heads = max(1, n_heads)
+    dh = max(1, d // n_heads)
+    lo, hi = h * dh, (h + 1) * dh
+    return [row[lo:hi] for row in X]
+
+
+def concat_heads(heads: List[Mat]) -> Mat:
+    if not heads:
+        return []
+    n = len(heads[0])
+    out: Mat = []
+    for i in range(n):
+        row: Vec = []
+        for H in heads:
+            row.extend(H[i])
+        out.append(row)
+    return out
+
+
+def multi_head_attend(Q: Mat, K: Mat, V: Mat, n_heads: int = 1) -> Tuple[Mat, List[Mat]]:
+    """n_heads independent causal attends, concat on the feature axis."""
+    n_heads = max(1, int(n_heads))
+    if n_heads == 1:
+        C, A = causal_attend(Q, K, V)
+        return C, [A]
+    Cs: List[Mat] = []
+    As: List[Mat] = []
+    for h in range(n_heads):
+        C, A = causal_attend(
+            slice_head(Q, h, n_heads),
+            slice_head(K, h, n_heads),
+            slice_head(V, h, n_heads),
+        )
+        Cs.append(C)
+        As.append(A)
+    return concat_heads(Cs), As

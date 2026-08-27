@@ -98,11 +98,13 @@ class JeevesCortex:
         self.shadow["own"] = {"wins": 0, "trials": 0}
         self.hive = HiveMind(bus=self._bus)
         self.auto_surpass = True
+        from skeleton.cortex.device import attach_lm, probe
         from skeleton.cortex.lm import gameforge_vocab
-        from skeleton.cortex.transformer import TinyTransformer
-        self.transformer = TinyTransformer(
-            vocab=gameforge_vocab(), dim=8, ctx=6, seed=19,
+        self.transformer = attach_lm(
+            vocab=gameforge_vocab(), dim=8, ctx=8, seed=19,
+            n_heads=2, n_layers=2, d_ff=32, device="auto",
         )
+        self._device_info = probe()
 
     def backends(self) -> Dict[str, str]:
         return {s: getattr(p, "name", type(p).__name__) for s, p in self.slots.items()}
@@ -326,8 +328,17 @@ class JeevesCortex:
             if w is not None and isinstance(snap, dict):
                 w.restore(snap)
         if blob.get("transformer"):
-            from skeleton.cortex.transformer import TinyTransformer
-            self.transformer = TinyTransformer.from_snapshot(blob["transformer"])
+            snap = blob["transformer"]
+            if (snap or {}).get("kind") == "torch-stack":
+                try:
+                    from skeleton.cortex.torch_lm import TorchTransformer
+                    self.transformer = TorchTransformer.from_snapshot(snap)
+                except Exception:
+                    from skeleton.cortex.transformer import TinyTransformer
+                    self.transformer = TinyTransformer.from_snapshot(snap)
+            else:
+                from skeleton.cortex.transformer import TinyTransformer
+                self.transformer = TinyTransformer.from_snapshot(snap)
         return {"loaded": n, "own": self.own.size, "surpass": sorted(self._surpass)}
 
     def status(self) -> Dict[str, Any]:
@@ -344,8 +355,39 @@ class JeevesCortex:
                 "steps": int(getattr(xf, "steps", 0) or 0),
                 "dim": int(getattr(xf, "dim", 0) or 0),
                 "ctx": int(getattr(xf, "ctx", 0) or 0),
-                "device": "cpu",
+                "n_heads": int(getattr(xf, "n_heads", 1) or 1),
+                "n_layers": int(getattr(xf, "n_layers", 1) or 1),
+                "d_ff": int(getattr(xf, "d_ff", 0) or 0),
+                "device": str(getattr(xf, "device", "cpu") or "cpu"),
+                "requested": str(getattr(xf, "requested", getattr(xf, "device", "cpu")) or "cpu"),
+                "backend": type(xf).__name__,
+                "cuda": bool((self._device_info or {}).get("cuda")),
             },
+        }
+
+    def to(self, device: str = "auto") -> Dict[str, Any]:
+        """Harness GPU if present. Degrades to CPU without throwing."""
+        from skeleton.cortex.device import attach_lm, probe, resolve
+        from skeleton.cortex.lm import gameforge_vocab
+        info = resolve(device)
+        self._device_info = probe()
+        xf = self.transformer
+        if hasattr(xf, "to"):
+            xf.to(info["actual"])
+        else:
+            snap = xf.snapshot() if hasattr(xf, "snapshot") else {}
+            self.transformer = attach_lm(
+                vocab=gameforge_vocab(), dim=8, ctx=8, seed=19,
+                n_heads=2, n_layers=2, d_ff=32, device=info["actual"],
+            )
+            if snap and hasattr(self.transformer, "from_snapshot"):
+                pass
+        return {
+            "requested": info["requested"],
+            "actual": getattr(self.transformer, "device", info["actual"]),
+            "degraded": bool(info.get("degraded")),
+            "cuda": bool(info.get("cuda")),
+            "backend": type(self.transformer).__name__,
         }
 
     def _lm_amalgam(self, stim: str, composed: Thought, jaccard: float) -> Thought:
