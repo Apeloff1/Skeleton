@@ -1,11 +1,24 @@
 """Jeeves package — the AI tutor brain."""
 
 from .cocoding import CoCodingOrchestrator, CoCodingSession, SkillLevel, Stage
-from .knowledge import Concept, ConceptEdge, ConceptError, EdgeType, KnowledgeGraph
-from .socratic import Belief, Dialogue, SocraticEngine, SocraticMove, Turn
+from .assessment import (
+    AdaptiveTest,
+    AssessmentEngine,
+    AssessmentError,
+    BloomLevel,
+    InteractionEvidence,
+    SkillModel,
+)
 
 __all__ = [
-    "CoCodingOrchestrator", "CoCodingSession", "SkillLevel", "Stage",
-    "KnowledgeGraph", "Concept", "ConceptEdge", "ConceptError", "EdgeType",
-    "SocraticEngine", "SocraticMove", "Belief", "Dialogue", "Turn",
+    "CoCodingOrchestrator",
+    "CoCodingSession",
+    "SkillLevel",
+    "Stage",
+    "AdaptiveTest",
+    "AssessmentEngine",
+    "AssessmentError",
+    "BloomLevel",
+    "InteractionEvidence",
+    "SkillModel",
 ]

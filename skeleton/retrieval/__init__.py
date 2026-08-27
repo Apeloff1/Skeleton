@@ -1,9 +1,11 @@
-"""Retrieval package — quad lattice, reranking, provenance."""
+"""Quad retrieval subsystem for Skeleton."""
 
-from .provenance import Attribution, LedgerEntry, ProvenanceLedger
-from .reranker import RankedItem, Reranker, RerankWeights
+from .fusion import Fuser, FusionStrategy, ScoredResult
+from .ranking import Ranker
 
 __all__ = [
-    "ProvenanceLedger", "LedgerEntry", "Attribution",
-    "Reranker", "RerankWeights", "RankedItem",
+    "Fuser",
+    "FusionStrategy",
+    "ScoredResult",
+    "Ranker",
 ]

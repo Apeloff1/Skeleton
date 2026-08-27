@@ -1,25 +1,28 @@
-"""Pipelines package — Text-to-X generation services."""
+"""Text-to-X generation pipelines plus the generic stage runner.
 
-from .dialogue import (
-    DialogueEdge,
-    DialogueError,
-    DialogueNode,
-    DialogueTree,
-    DialogueWalker,
-)
-from .composer import (
-    Context,
-    GateFn,
-    PipelineComposer,
-    PipelineRun,
+Each domain pipeline (npc, game_logic, animation) is an application service;
+`core` provides the generic DAG runner any new pipeline can build on.
+"""
+
+from skeleton.pipelines.npc import NpcPipeline, NpcSpec
+from skeleton.pipelines.game_logic import GameLogicPipeline, GameLogicSpec
+from skeleton.pipelines.animation import AnimationPipeline, AnimationSpec
+from skeleton.pipelines.core import (
+    PipelineContext,
+    PipelineRunner,
     Stage,
-    StageFn,
-    StageRecord,
-    StageStatus,
+    StageResult,
 )
 
 __all__ = [
-    "DialogueEdge", "DialogueError", "DialogueNode", "DialogueTree", "DialogueWalker",
-    "PipelineComposer", "PipelineRun", "Stage", "StageRecord", "StageStatus",
-    "Context", "StageFn", "GateFn",
+    "NpcPipeline",
+    "NpcSpec",
+    "GameLogicPipeline",
+    "GameLogicSpec",
+    "AnimationPipeline",
+    "AnimationSpec",
+    "PipelineContext",
+    "PipelineRunner",
+    "Stage",
+    "StageResult",
 ]
