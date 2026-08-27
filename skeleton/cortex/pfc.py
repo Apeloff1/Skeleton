@@ -31,13 +31,20 @@ class PrefrontalCortex:
     def __init__(self, *, span: int = 7) -> None:
         self.memory: deque[str] = deque(maxlen=max(3, span))
         from skeleton.cortex.lm import NGramLM, gameforge_vocab
-        self.lm = NGramLM(order=2, vocab=gameforge_vocab())
+        from skeleton.cortex.neural import NeuralLM
+        vocab = gameforge_vocab()
+        self.lm = NGramLM(order=2, vocab=vocab)
+        self.neural = NeuralLM(vocab=vocab, dim=12, seed=2)
 
     def fit(self, text: str) -> int:
-        return self.lm.fit([text])
+        n = self.lm.fit([text])
+        self.neural.fit([text])
+        return n
 
     def snapshot(self) -> dict:
-        return self.lm.snapshot()
+        snap = self.lm.snapshot()
+        snap["neural"] = self.neural.snapshot()
+        return snap
 
     def think(self, stimulus: str, context: Dict[str, Any]) -> Thought:
         text = (stimulus or "").strip()

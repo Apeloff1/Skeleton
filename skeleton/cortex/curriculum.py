@@ -135,6 +135,16 @@ def train(neo, *, epochs: int = 1, pairs: Sequence[Pair] | None = None,
                 held_hits += 1
         last_status = neo.status()
     rate = (held_hits / held_total) if held_total else 0.0
+    lms = {}
+    slots = getattr(neo, "slots", {}) or {}
+    for slot, port in slots.items():
+        lm = getattr(port, "lm", None)
+        neural = getattr(port, "neural", None)
+        lms[slot] = {
+            "ngram_fitted": int(getattr(lm, "fitted", 0) or 0),
+            "neural_steps": int(getattr(neural, "steps", 0) or 0),
+            "neural_fitted": int(getattr(neural, "fitted", 0) or 0),
+        }
     return {
         "epochs": epochs,
         "items": len(curriculum),
@@ -146,4 +156,5 @@ def train(neo, *, epochs: int = 1, pairs: Sequence[Pair] | None = None,
         "surpass": last_status.get("surpass"),
         "shadow": last_status.get("shadow"),
         "backends": last_status.get("backends"),
+        "lms": lms,
     }

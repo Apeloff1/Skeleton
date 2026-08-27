@@ -317,3 +317,61 @@ class TestLM:
         t = port.think("weaponize the operator", {})
         assert "veto" in t.tags
 
+
+class TestNeural:
+    def test_perplexity_drops(self):
+        from skeleton.cortex.neural import NeuralLM
+        from skeleton.cortex.lm import gameforge_corpus, gameforge_vocab
+        corpus = gameforge_corpus()
+        held, train = corpus[-4:], corpus[:-4]
+        lm = NeuralLM(vocab=gameforge_vocab(), dim=12, seed=1)
+        p0 = lm.perplexity(held)
+        lm.fit(train)
+        p1 = lm.perplexity(held)
+        assert p1 < p0, (p0, p1)
+        assert lm.steps > 0
+
+    def test_snapshot_roundtrip(self):
+        from skeleton.cortex.neural import NeuralLM
+        from skeleton.cortex.lm import gameforge_vocab
+        a = NeuralLM(vocab=gameforge_vocab(), dim=12, seed=4)
+        a.fit(["HP DPS TTK compile recipe sim extract"])
+        b = NeuralLM.from_snapshot(a.snapshot())
+        assert b.steps == a.steps
+        x = "HP DPS TTK compile"
+        assert abs(a.logprob(x) - b.logprob(x)) < 1e-9
+        assert a.generate(x, n=8, seed=3) == b.generate(x, n=8, seed=3)
+
+    def test_train_fits_all_four_neurals(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        out = neo.train(epochs=1)
+        lms = out.get("lms") or {}
+        for slot in ("pfc", "midbrain", "left", "right"):
+            assert lms[slot]["neural_steps"] > 0, slot
+            assert lms[slot]["ngram_fitted"] > 0, slot
+
+    def test_left_neural_backend_keeps_mix_numbers(self):
+        from skeleton.cortex.neural import NeuralLM, NeuralBackend
+        from skeleton.cortex.lm import gameforge_vocab
+        lm = NeuralLM(vocab=gameforge_vocab(), dim=12, seed=5)
+        lm.fit(["HP DPS TTK mix trash elite boss"])
+        port = NeuralBackend(lm, slot="left")
+        t = port.think("plan soulslike forge mix", {"pack_dps": 10.0, "pack_ttk": {"trash": 1}})
+        assert t.slot == "left"
+        assert "neural" in t.tags
+        assert len(t.numbers) >= 3
+
+    def test_hemisphere_lms_interchange(self):
+        from skeleton.cortex import JeevesCortex
+        a = JeevesCortex()
+        a.train(epochs=1)
+        tract = a.export_tract("left")
+        assert tract.get("weights", {}).get("unigrams")
+        assert tract["weights"].get("neural")
+        b = JeevesCortex()
+        got = b.import_tract(tract)
+        assert got.get("bound") == "left"
+        assert b.slots["left"].neural.steps == a.slots["left"].neural.steps
+
+

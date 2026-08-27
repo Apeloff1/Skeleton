@@ -682,8 +682,25 @@ class TestLive:
         out = GameForgeRun.live().execute("soulslike extraction bonfire estus")
         assert out["succeeded"]
         assert live_cortex().own.size >= size
-        assert out["build_plan"]["authored"] in {"cortex", "own"}
+        assert out["build_plan"]["authored"] == "own"
+        mix = out["build_plan"]["enemy_mix"]
+        assert (mix["trash"], mix["elite"], mix["boss"]) != (6, 2, 0), mix
+        assert any("invented mix" in n for n in out["build_plan"]["notes"]), out["build_plan"]["notes"]
         assert out.get("own", {}).get("own") == live_cortex().own.size
+
+    def test_disk_restores_neural_weights(self):
+        import os
+        import tempfile
+        from pathlib import Path
+        from skeleton.cortex.live import reset_live, live_cortex, persist
+        os.environ["SKELETON_OWN"] = str(Path(tempfile.mkdtemp()) / "own.json")
+        reset_live(wipe_disk=True)
+        live_cortex().train(epochs=1)
+        steps = live_cortex().slots["pfc"].neural.steps
+        assert steps > 0
+        persist()
+        reset_live()
+        assert live_cortex().slots["pfc"].neural.steps == steps
 
 
 class TestHive:

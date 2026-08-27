@@ -26,6 +26,7 @@ from .curriculum import CORE_PAIRS, WALK_PAIRS, default_curriculum, train
 from .neocortex import CortexTrace, JeevesCortex, local_slots
 from .live import live_cortex, live_jeeves, persist, reset_live
 from .lm import NGramLM, LanguageModelBackend, gameforge_corpus, gameforge_vocab
+from .neural import NeuralLM, NeuralBackend
 
 __all__ = [
     "SLOTS",
@@ -66,4 +67,6 @@ __all__ = [
     "LanguageModelBackend",
     "gameforge_corpus",
     "gameforge_vocab",
+    "NeuralLM",
+    "NeuralBackend",
 ]

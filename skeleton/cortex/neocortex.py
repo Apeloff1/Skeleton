@@ -256,10 +256,23 @@ class JeevesCortex:
         n = self.own.import_tract(tract)
         weights = (payload or {}).get("weights")
         bound = None
-        if weights and tract.slot in {"pfc", "midbrain"}:
-            from skeleton.cortex.lm import LanguageModelBackend
-            self.bind(tract.slot, LanguageModelBackend.from_snapshot(weights, slot=tract.slot))
-            bound = tract.slot
+        if weights:
+            neural = weights.get("neural")
+            ngram = {k: v for k, v in weights.items() if k != "neural"}
+            if tract.slot in {"pfc", "midbrain"}:
+                from skeleton.cortex.lm import LanguageModelBackend
+                self.bind(tract.slot, LanguageModelBackend.from_snapshot(ngram, slot=tract.slot))
+                bound = tract.slot
+            elif tract.slot in {"left", "right"}:
+                port = self.slots.get(tract.slot)
+                if port is not None and hasattr(port, "lm"):
+                    from skeleton.cortex.lm import NGramLM
+                    port.lm = NGramLM.from_snapshot(ngram)
+                    bound = tract.slot
+                if neural and port is not None and hasattr(port, "neural"):
+                    from skeleton.cortex.neural import NeuralLM
+                    port.neural = NeuralLM.from_snapshot(neural)
+                    bound = tract.slot
         self._bus.emit("cortex.imported", {"slot": tract.slot, "copied": n})
         return {"slot": tract.slot, "copied": n, "own": self.own.size,
                 "capabilities": list(tract.capabilities)[:16],
@@ -273,11 +286,16 @@ class JeevesCortex:
         import json
         p = Path(path)
         p.parent.mkdir(parents=True, exist_ok=True)
+        lms = {}
+        for slot, port in self.slots.items():
+            if hasattr(port, "snapshot"):
+                lms[slot] = port.snapshot()
         blob = {
             "own": self.own.snapshot(),
             "acquired": dict(self.acquired),
             "surpass": sorted(self._surpass),
             "shadow": dict(self.shadow),
+            "lms": lms,
         }
         p.write_text(json.dumps(blob), encoding="utf-8")
         return {"path": str(p), "own": self.own.size, "acquired": dict(self.acquired)}
@@ -299,6 +317,18 @@ class JeevesCortex:
                     "wins": int(v.get("wins") or 0),
                     "trials": int(v.get("trials") or 0),
                 }
+        for slot, snap in (blob.get("lms") or {}).items():
+            port = self.slots.get(str(slot))
+            if port is None or not isinstance(snap, dict):
+                continue
+            neural = snap.get("neural")
+            ngram = {k: v for k, v in snap.items() if k != "neural"}
+            if hasattr(port, "lm") and ngram.get("unigrams") is not None:
+                from skeleton.cortex.lm import NGramLM
+                port.lm = NGramLM.from_snapshot(ngram)
+            if neural and hasattr(port, "neural"):
+                from skeleton.cortex.neural import NeuralLM
+                port.neural = NeuralLM.from_snapshot(neural)
         return {"loaded": n, "own": self.own.size, "surpass": sorted(self._surpass)}
 
     def status(self) -> Dict[str, Any]:
