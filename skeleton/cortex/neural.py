@@ -5,26 +5,33 @@ are the model. SGD on GameForge tokens. Perplexity on held-out
 in-domain text must drop. Snapshot/restore is interchange: acquire
 copies a net, not a prompt.
 
-No torch. NumPy. Dim 12. This is the small/medium net the ports
-were waiting for.
+Pure Python. No numpy, no torch. Dim 12. This is the small/medium
+net the ports were waiting for — CI GameForge has no extra deps.
 """
 from __future__ import annotations
 
 import math
+import random
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
-
-import numpy as np
 
 from skeleton.cortex.port import Thought, fingerprint, tokens
 
 UNK = "__unk__"
 
 
-def _softmax(logits: np.ndarray) -> np.ndarray:
-    z = logits - float(np.max(logits))
-    e = np.exp(z)
-    s = float(e.sum()) or 1.0
-    return e / s
+def _zeros(n: int) -> List[float]:
+    return [0.0] * n
+
+
+def _rand_mat(rows: int, cols: int, scale: float, rng: random.Random) -> List[List[float]]:
+    return [[rng.gauss(0.0, scale) for _ in range(cols)] for _ in range(rows)]
+
+
+def _softmax(logits: List[float]) -> List[float]:
+    m = max(logits) if logits else 0.0
+    e = [math.exp(x - m) for x in logits]
+    s = sum(e) or 1.0
+    return [x / s for x in e]
 
 
 class NeuralLM:
@@ -43,35 +50,56 @@ class NeuralLM:
         self.unk = 0
         V = max(2, len(itos))
         D = max(4, int(dim))
-        rng = np.random.default_rng(int(seed) & 0xFFFFFFFF)
+        rng = random.Random(int(seed) & 0xFFFFFFFF)
         scale = 0.08
-        self.E = rng.normal(0.0, scale, (V, D)).astype(np.float64)
-        self.W = rng.normal(0.0, scale, (D, V)).astype(np.float64)
-        self.b = np.zeros(V, dtype=np.float64)
+        self.E = _rand_mat(V, D, scale, rng)
+        self.W = _rand_mat(D, V, scale, rng)
+        self.b = _zeros(V)
         self.dim = D
         self.fitted = 0
         self.steps = 0
 
     @property
     def V(self) -> int:
-        return int(self.E.shape[0])
+        return len(self.E)
 
     def _id(self, tok: str) -> int:
         return int(self.stoi.get(tok, self.unk))
 
-    def _sgd(self, i: int, j: int, lr: float) -> float:
+    def _logits(self, i: int) -> List[float]:
         h = self.E[i]
-        logits = h @ self.W + self.b
+        D = self.dim
+        V = self.V
+        out = list(self.b)
+        for d in range(D):
+            hd = h[d]
+            row = self.W[d]
+            for v in range(V):
+                out[v] += hd * row[v]
+        return out
+
+    def _sgd(self, i: int, j: int, lr: float) -> float:
+        logits = self._logits(i)
         p = _softmax(logits)
-        loss = -math.log(max(float(p[j]), 1e-12))
-        dlog = p.copy()
-        dlog[j] -= 1.0
-        dW = np.outer(h, dlog)
-        db = dlog
-        dE = self.W @ dlog
-        self.W -= lr * dW
-        self.b -= lr * db
-        self.E[i] -= lr * dE
+        loss = -math.log(max(p[j], 1e-12))
+        dlog = [p[v] - (1.0 if v == j else 0.0) for v in range(self.V)]
+        h = self.E[i]
+        D = self.dim
+        V = self.V
+        dE = _zeros(D)
+        for d in range(D):
+            acc = 0.0
+            row = self.W[d]
+            hd = h[d]
+            for v in range(V):
+                g = dlog[v]
+                acc += row[v] * g
+                row[v] -= lr * hd * g
+            dE[d] = acc
+        for v in range(V):
+            self.b[v] -= lr * dlog[v]
+        for d in range(D):
+            h[d] -= lr * dE[d]
         self.steps += 1
         return loss
 
@@ -91,13 +119,13 @@ class NeuralLM:
     def logprob(self, text: str) -> float:
         body = tokens(text)
         if len(body) < 2:
-            return math.log(1.0 / self.V)
+            return math.log(1.0 / max(1, self.V))
         ids = [self._id(t) for t in body]
         lp = 0.0
         n = 0
         for a, b in zip(ids, ids[1:]):
-            p = _softmax(self.E[a] @ self.W + self.b)
-            lp += math.log(max(float(p[b]), 1e-12))
+            p = _softmax(self._logits(a))
+            lp += math.log(max(p[b], 1e-12))
             n += 1
         return lp / max(1, n)
 
@@ -112,7 +140,7 @@ class NeuralLM:
         return math.exp(-mean)
 
     def generate(self, prefix: str | Sequence[str], n: int = 12, *, seed: int = 0) -> Tuple[str, ...]:
-        rng = np.random.default_rng(int(seed) & 0xFFFFFFFF)
+        rng = random.Random(int(seed) & 0xFFFFFFFF)
         if isinstance(prefix, str):
             body = list(tokens(prefix))
         else:
@@ -120,8 +148,15 @@ class NeuralLM:
         ids = [self._id(t) for t in body] or [self.unk]
         out = list(ids)
         for _ in range(max(1, n)):
-            p = _softmax(self.E[out[-1]] @ self.W + self.b)
-            nxt = int(rng.choice(self.V, p=p))
+            p = _softmax(self._logits(out[-1]))
+            r = rng.random()
+            acc = 0.0
+            nxt = self.V - 1
+            for v, pv in enumerate(p):
+                acc += pv
+                if acc >= r:
+                    nxt = v
+                    break
             out.append(nxt)
         return tuple(self.itos[i] if 0 <= i < len(self.itos) else UNK for i in out[:n])
 
@@ -131,9 +166,9 @@ class NeuralLM:
             "fitted": self.fitted,
             "steps": self.steps,
             "itos": list(self.itos),
-            "E": self.E.tolist(),
-            "W": self.W.tolist(),
-            "b": self.b.tolist(),
+            "E": [list(row) for row in self.E],
+            "W": [list(row) for row in self.W],
+            "b": list(self.b),
         }
 
     @classmethod
@@ -142,10 +177,15 @@ class NeuralLM:
         lm = cls(vocab=[t for t in itos if t != UNK], dim=int((data or {}).get("dim") or 12), seed=0)
         lm.itos = itos
         lm.stoi = {t: i for i, t in enumerate(itos)}
-        E = np.array((data or {}).get("E") or lm.E, dtype=np.float64)
-        W = np.array((data or {}).get("W") or lm.W, dtype=np.float64)
-        b = np.array((data or {}).get("b") or lm.b, dtype=np.float64)
-        lm.E, lm.W, lm.b = E, W, b
+        E = (data or {}).get("E")
+        W = (data or {}).get("W")
+        b = (data or {}).get("b")
+        if E:
+            lm.E = [list(map(float, row)) for row in E]
+        if W:
+            lm.W = [list(map(float, row)) for row in W]
+        if b:
+            lm.b = [float(x) for x in b]
         lm.fitted = int((data or {}).get("fitted") or 0)
         lm.steps = int((data or {}).get("steps") or 0)
         return lm
