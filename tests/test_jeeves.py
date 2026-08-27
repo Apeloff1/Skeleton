@@ -173,3 +173,23 @@ class TestBuilder:
         assert d["seed"]
         assert d["briefing"]
         assert j.last_plan is not None
+
+    def test_trained_cortex_authors_briefing(self):
+        from skeleton.cortex import JeevesCortex
+        from skeleton.cortex.port import SLOTS
+        from skeleton.forge.eras import compile_era
+        from skeleton.jeeves.builder import BuilderBrain
+        neo = JeevesCortex()
+        stim = "plan soulslike forge mix bias ttk extract"
+        neo.transformer.fit([stim] * 4)
+        neo.think(stim)
+        for s in SLOTS:
+            neo.acquire(s)
+            neo.surpass(s)
+        pack = compile_era("soulslike")
+        p0 = BuilderBrain().plan(pack)
+        p1 = BuilderBrain().plan(pack, cortex=neo)
+        assert "LM:" in p1.briefing
+        assert any("lm=own" in n for n in p1.notes)
+        assert len(p1.briefing) > len(p0.briefing)
+        assert "LM:" not in p0.briefing

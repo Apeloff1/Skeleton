@@ -107,3 +107,7 @@ Grok App Builder `/workspace` is a TanStack Start scaffold — not the product. 
 | Asds, Ggg, New-tey, Interesting-22 | private | large dumps | Not GameForge. Leave. |
 
 52 owner repos surveyed via GitHub API. One git clone on this host: `/tmp/skel/Skeleton`.
+
+## Cortex LM (2026-08-27)
+
+Jeeves neo is a stacked Pre-LN transformer (n_layers=2, n_heads=2, d_ff=32) that actually runs those layers in pure Python. GPU is a harness: `probe()` / `to("cuda")` pins `TorchAccel` when torch sees a GPU; weights stay resident; decode/SGD run on-device; snapshot syncs lists back. No torch in CI. After `train()`, `BuilderBrain.plan(..., cortex=neo)` briefing is authored by the own-lm decode (`LM:` prefix). Veto still beats the LM.

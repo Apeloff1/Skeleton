@@ -1,8 +1,9 @@
-"""Tiny causal transformer — the medium language model.
+"""Tiny causal transformer — stacked Pre-LN blocks.
 
-One attention head over a prefix, then a next-token softmax. Skip-gram
-only sees the last token; this net mixes the whole window. That is the
-identity. Pure Python. No numpy. Snapshot/restore is interchange.
+Skip-gram sees the last token. One layer mixes the window. Two layers
+mix the mix — that is the identity. Pure Python. No numpy. No torch.
+CUDA is a harness (torch_lm.TorchAccel) bound by to(), never imported
+here. Snapshot/restore is interchange, including stacked layers.
 """
 from __future__ import annotations
 
@@ -13,16 +14,16 @@ from typing import Any, Dict, Iterable, List, Sequence, Tuple
 from skeleton.cortex.attn import (
     add,
     add_outer,
-    causal_attend,
+    layer_norm,
+    layer_norm_bwd,
     matvec,
     matvec_T,
+    mha_backward,
     multi_head_attend,
+    ones,
     relu,
-    scale,
-    slice_head,
     softmax,
     zeros,
-    zeros2,
 )
 from skeleton.cortex.port import Thought, fingerprint, tokens
 
@@ -33,8 +34,176 @@ def _rand_mat(rows: int, cols: int, scale_: float, rng: random.Random) -> List[L
     return [[rng.gauss(0.0, scale_) for _ in range(cols)] for _ in range(rows)]
 
 
+def _copy_mat(m: List[List[float]]) -> List[List[float]]:
+    return [list(row) for row in m]
+
+
+class TransformerBlock:
+    """One Pre-LN residual block: X + Attn(LN(X)) then X + FFN(LN(X))."""
+
+    def __init__(self, dim: int, d_ff: int, rng: random.Random, scale_: float) -> None:
+        D = dim
+        ff = max(0, int(d_ff))
+        self.Wq = _rand_mat(D, D, scale_, rng)
+        self.Wk = _rand_mat(D, D, scale_, rng)
+        self.Wv = _rand_mat(D, D, scale_, rng)
+        self.Wo = _rand_mat(D, D, scale_, rng)
+        self.ln1_g = ones(D)
+        self.ln1_b = zeros(D)
+        self.W1 = _rand_mat(ff, D, scale_, rng) if ff else []
+        self.b1 = zeros(ff) if ff else []
+        self.W2 = _rand_mat(D, ff, scale_, rng) if ff else []
+        self.b2 = zeros(D) if ff else []
+        self.ln2_g = ones(D)
+        self.ln2_b = zeros(D)
+        self.d_ff = ff
+        self.dim = D
+
+    def snapshot(self) -> Dict[str, Any]:
+        return {
+            "Wq": _copy_mat(self.Wq), "Wk": _copy_mat(self.Wk),
+            "Wv": _copy_mat(self.Wv), "Wo": _copy_mat(self.Wo),
+            "ln1_g": list(self.ln1_g), "ln1_b": list(self.ln1_b),
+            "W1": _copy_mat(self.W1) if self.W1 else [],
+            "b1": list(self.b1) if self.b1 else [],
+            "W2": _copy_mat(self.W2) if self.W2 else [],
+            "b2": list(self.b2) if self.b2 else [],
+            "ln2_g": list(self.ln2_g), "ln2_b": list(self.ln2_b),
+            "d_ff": self.d_ff, "dim": self.dim,
+        }
+
+    @classmethod
+    def from_snapshot(cls, data: Dict[str, Any], *, dim: int, d_ff: int) -> "TransformerBlock":
+        blk = cls(dim, d_ff, random.Random(0), 0.0)
+        def _m(key: str, cur: List[List[float]]) -> List[List[float]]:
+            raw = (data or {}).get(key)
+            return [list(map(float, row)) for row in raw] if raw else cur
+        def _v(key: str, cur: List[float]) -> List[float]:
+            raw = (data or {}).get(key)
+            return [float(x) for x in raw] if raw else cur
+        blk.Wq, blk.Wk = _m("Wq", blk.Wq), _m("Wk", blk.Wk)
+        blk.Wv, blk.Wo = _m("Wv", blk.Wv), _m("Wo", blk.Wo)
+        blk.W1, blk.W2 = _m("W1", blk.W1), _m("W2", blk.W2)
+        blk.b1, blk.b2 = _v("b1", blk.b1), _v("b2", blk.b2)
+        blk.ln1_g, blk.ln1_b = _v("ln1_g", blk.ln1_g), _v("ln1_b", blk.ln1_b)
+        blk.ln2_g, blk.ln2_b = _v("ln2_g", blk.ln2_g), _v("ln2_b", blk.ln2_b)
+        if not blk.ln1_g:
+            blk.ln1_g = ones(dim)
+        if not blk.ln2_g:
+            blk.ln2_g = ones(dim)
+        return blk
+
+    def forward(self, X: List[List[float]], n_heads: int):
+        n = len(X)
+        Xn: List[List[float]] = []
+        hats1: List[List[float]] = []
+        invs1: List[float] = []
+        for x in X:
+            y, hat, inv = layer_norm(x, self.ln1_g, self.ln1_b)
+            Xn.append(y)
+            hats1.append(hat)
+            invs1.append(inv)
+        Q = [matvec(self.Wq, x) for x in Xn]
+        K = [matvec(self.Wk, x) for x in Xn]
+        V = [matvec(self.Wv, x) for x in Xn]
+        C, As = multi_head_attend(Q, K, V, n_heads)
+        attn = [matvec(self.Wo, c) for c in C]
+        U = [add(X[t], attn[t]) for t in range(n)]
+        z: List[List[float]] = []
+        pre: List[List[float]] = []
+        Un: List[List[float]] = []
+        hats2: List[List[float]] = []
+        invs2: List[float] = []
+        Y = U
+        if self.d_ff:
+            for u in U:
+                y, hat, inv = layer_norm(u, self.ln2_g, self.ln2_b)
+                Un.append(y)
+                hats2.append(hat)
+                invs2.append(inv)
+            pre = [add(matvec(self.W1, u), self.b1) for u in Un]
+            z = [relu(p) for p in pre]
+            ff = [add(matvec(self.W2, zi), self.b2) for zi in z]
+            Y = [add(U[t], ff[t]) for t in range(n)]
+        cache = {
+            "X": X, "Xn": Xn, "hats1": hats1, "invs1": invs1,
+            "Q": Q, "K": K, "V": V, "C": C, "As": As, "attn": attn, "U": U,
+            "Un": Un, "hats2": hats2, "invs2": invs2, "z": z, "pre": pre,
+            "n_heads": n_heads,
+        }
+        return Y, cache
+
+    def backward(self, dY: List[List[float]], cache: Dict[str, Any], lr: float) -> List[List[float]]:
+        n = len(dY)
+        D = self.dim
+        dU = [list(dY[t]) for t in range(n)]
+        if self.d_ff and cache.get("z"):
+            Un = cache["Un"]
+            z = cache["z"]
+            acc_b2 = zeros(D)
+            acc_b1 = zeros(len(self.b1))
+            d_Un = [zeros(D) for _ in range(n)]
+            for t in range(n):
+                add_outer(self.W2, dY[t], z[t], -lr)
+                for i in range(D):
+                    acc_b2[i] += dY[t][i]
+                d_z = matvec_T(self.W2, dY[t])
+                d_pre = [d_z[i] if z[t][i] > 0.0 else 0.0 for i in range(len(d_z))]
+                add_outer(self.W1, d_pre, Un[t], -lr)
+                for i in range(len(self.b1)):
+                    acc_b1[i] += d_pre[i]
+                d_Un[t] = matvec_T(self.W1, d_pre)
+            for i in range(D):
+                self.b2[i] -= lr * acc_b2[i]
+            for i in range(len(self.b1)):
+                self.b1[i] -= lr * acc_b1[i]
+            acc_dg = zeros(D)
+            acc_db = zeros(D)
+            hats2 = cache["hats2"]
+            invs2 = cache["invs2"]
+            for t in range(n):
+                dx, dg, db = layer_norm_bwd(d_Un[t], hats2[t], invs2[t], self.ln2_g)
+                dU[t] = add(dU[t], dx)
+                acc_dg = add(acc_dg, dg)
+                acc_db = add(acc_db, db)
+            for i in range(D):
+                self.ln2_g[i] -= lr * acc_dg[i]
+                self.ln2_b[i] -= lr * acc_db[i]
+
+        C = cache["C"]
+        Xn = cache["Xn"]
+        dC = [matvec_T(self.Wo, dU[t]) for t in range(n)]
+        for t in range(n):
+            add_outer(self.Wo, dU[t], C[t], -lr)
+        dQ, dK, dV = mha_backward(
+            dC, cache["Q"], cache["K"], cache["V"], cache["As"], int(cache["n_heads"]),
+        )
+        dXn = [zeros(D) for _ in range(n)]
+        for t in range(n):
+            add_outer(self.Wq, dQ[t], Xn[t], -lr)
+            add_outer(self.Wk, dK[t], Xn[t], -lr)
+            add_outer(self.Wv, dV[t], Xn[t], -lr)
+            dXn[t] = add(add(matvec_T(self.Wq, dQ[t]), matvec_T(self.Wk, dK[t])),
+                         matvec_T(self.Wv, dV[t]))
+        acc_dg = zeros(D)
+        acc_db = zeros(D)
+        dX_ln = [zeros(D) for _ in range(n)]
+        hats1 = cache["hats1"]
+        invs1 = cache["invs1"]
+        for t in range(n):
+            dx, dg, db = layer_norm_bwd(dXn[t], hats1[t], invs1[t], self.ln1_g)
+            dX_ln[t] = dx
+            acc_dg = add(acc_dg, dg)
+            acc_db = add(acc_db, db)
+        for i in range(D):
+            self.ln1_g[i] -= lr * acc_dg[i]
+            self.ln1_b[i] -= lr * acc_db[i]
+        X = cache["X"]
+        return [add(dU[t], dX_ln[t]) for t in range(n)] if X else dX_ln
+
+
 class TinyTransformer:
-    """Causal attention LM. P(next | prefix), not P(next | last)."""
+    """Causal attention LM. P(next | prefix), not P(next | last). Stackable."""
 
     def __init__(
         self,
@@ -61,31 +230,92 @@ class TinyTransformer:
         s = 0.08
         self.E = _rand_mat(V, D, s, rng)
         self.P = _rand_mat(C, D, s, rng)
-        self.Wq = _rand_mat(D, D, s, rng)
-        self.Wk = _rand_mat(D, D, s, rng)
-        self.Wv = _rand_mat(D, D, s, rng)
-        self.Wo = _rand_mat(D, D, s, rng)
+        nL = max(1, int(n_layers))
+        ff = max(0, int(d_ff))
+        self.layers: List[TransformerBlock] = [
+            TransformerBlock(D, ff, rng, s) for _ in range(nL)
+        ]
         self.Wout = _rand_mat(V, D, s, rng)
         self.bout = zeros(V)
-        ff = max(0, int(d_ff))
-        self.W1 = _rand_mat(ff, D, s, rng) if ff else []
-        self.b1 = zeros(ff) if ff else []
-        self.W2 = _rand_mat(D, ff, s, rng) if ff else []
-        self.b2 = zeros(D) if ff else []
         self.dim = D
         self.ctx = C
         self.n_heads = heads
-        self.n_layers = max(1, int(n_layers))
+        self.n_layers = nL
         self.d_ff = ff
         self.fitted = 0
         self.steps = 0
         self.device = "cpu"
         self.requested = "cpu"
+        self.resident = False
         self._accel = None
 
     @property
     def V(self) -> int:
         return len(self.E)
+
+    @property
+    def Wq(self) -> List[List[float]]:
+        return self.layers[0].Wq
+
+    @Wq.setter
+    def Wq(self, v: List[List[float]]) -> None:
+        self.layers[0].Wq = v
+
+    @property
+    def Wk(self) -> List[List[float]]:
+        return self.layers[0].Wk
+
+    @Wk.setter
+    def Wk(self, v: List[List[float]]) -> None:
+        self.layers[0].Wk = v
+
+    @property
+    def Wv(self) -> List[List[float]]:
+        return self.layers[0].Wv
+
+    @Wv.setter
+    def Wv(self, v: List[List[float]]) -> None:
+        self.layers[0].Wv = v
+
+    @property
+    def Wo(self) -> List[List[float]]:
+        return self.layers[0].Wo
+
+    @Wo.setter
+    def Wo(self, v: List[List[float]]) -> None:
+        self.layers[0].Wo = v
+
+    @property
+    def W1(self) -> List[List[float]]:
+        return self.layers[0].W1
+
+    @W1.setter
+    def W1(self, v: List[List[float]]) -> None:
+        self.layers[0].W1 = v
+
+    @property
+    def W2(self) -> List[List[float]]:
+        return self.layers[0].W2
+
+    @W2.setter
+    def W2(self, v: List[List[float]]) -> None:
+        self.layers[0].W2 = v
+
+    @property
+    def b1(self) -> List[float]:
+        return self.layers[0].b1
+
+    @b1.setter
+    def b1(self, v: List[float]) -> None:
+        self.layers[0].b1 = v
+
+    @property
+    def b2(self) -> List[float]:
+        return self.layers[0].b2
+
+    @b2.setter
+    def b2(self, v: List[float]) -> None:
+        self.layers[0].b2 = v
 
     def _id(self, tok: str) -> int:
         return int(self.stoi.get(tok, self.unk))
@@ -97,52 +327,92 @@ class TinyTransformer:
         return X
 
     def to(self, device: str = "cpu") -> "TinyTransformer":
-        """Bind a device. CUDA if torch can see a GPU; else CPU. Never throws."""
+        """Bind a device. CUDA if torch can see a GPU; else CPU. Never throws.
+
+        When torch exists the weights pin on the bound device (GPU-resident
+        if cuda, otherwise torch-cpu). Python lists catch up on snapshot().
+        """
         from skeleton.cortex.device import resolve
         info = resolve(device)
         self.requested = str(info.get("requested") or device)
         self.device = str(info.get("actual") or "cpu")
+        if self._accel is not None:
+            try:
+                self._accel.sync()
+            except Exception:
+                pass
         self._accel = None
-        if self.device == "cuda" or (info.get("torch") and self.requested in {"cuda", "gpu", "torch"}):
+        self.resident = False
+        pin = bool(info.get("torch")) and self.requested != "cpu"
+        if pin:
             try:
                 from skeleton.cortex.torch_lm import TorchAccel
                 self._accel = TorchAccel(self, device=self.device)
+                self._accel.pin()
                 self.device = self._accel.device_name
+                self.resident = True
             except Exception:
                 self._accel = None
                 self.device = "cpu"
+                self.resident = False
         return self
 
+    def _forward(self, ids: Sequence[int]):
+        H = self._encode(ids)
+        caches = []
+        for layer in self.layers:
+            H, cache = layer.forward(H, self.n_heads)
+            caches.append(cache)
+        return H, caches
+
     def _block(self, ids: Sequence[int]):
-        X = self._encode(ids)
-        Q = [matvec(self.Wq, x) for x in X]
-        K = [matvec(self.Wk, x) for x in X]
-        V = [matvec(self.Wv, x) for x in X]
-        C, As = multi_head_attend(Q, K, V, self.n_heads)
-        attn = matvec(self.Wo, C[-1])
-        U = add(X[-1], attn)
-        z: List[float] = []
-        y = U
-        if self.d_ff:
-            z = relu(add(matvec(self.W1, U), self.b1))
-            y = add(U, add(matvec(self.W2, z), self.b2))
-        return X, Q, K, V, C, As, U, z, y
+        """Compat: last-layer cache shaped like the old 1-layer tuple."""
+        H, caches = self._forward(ids)
+        c = caches[-1] if caches else {}
+        U = c.get("U") or H
+        z_seq = c.get("z") or []
+        z = z_seq[-1] if z_seq else []
+        return (
+            c.get("X") or [],
+            c.get("Q") or [],
+            c.get("K") or [],
+            c.get("V") or [],
+            c.get("C") or [],
+            c.get("As") or [],
+            U[-1] if U else [],
+            z,
+            H[-1] if H else [],
+        )
 
     def _logits(self, ids: Sequence[int]) -> List[float]:
-        *_, y = self._block(ids)
+        if self._accel is not None:
+            try:
+                return list(self._accel.logits(ids))
+            except Exception:
+                self._accel = None
+                self.resident = False
+        H, _ = self._forward(ids)
+        y = H[-1] if H else zeros(self.dim)
         return add(matvec(self.Wout, y), self.bout)
 
     def hidden(self, prefix: str) -> List[float]:
-        """Last-position context after residual (+ FFN if armed)."""
+        """Last-position context after the stacked residual stream."""
         ids = [self._id(t) for t in tokens(prefix)] or [self.unk]
         ids = ids[-self.ctx:]
-        *_, y = self._block(ids)
-        return list(y)
+        if self._accel is not None:
+            try:
+                return list(self._accel.hidden(ids))
+            except Exception:
+                self._accel = None
+                self.resident = False
+        H, _ = self._forward(ids)
+        return list(H[-1]) if H else zeros(self.dim)
 
     def weights_last(self, prefix: str) -> List[float]:
         ids = [self._id(t) for t in tokens(prefix)] or [self.unk]
         ids = ids[-self.ctx:]
-        *rest, As, _U, _z, _y = self._block(ids)
+        _H, caches = self._forward(ids)
+        As = (caches[-1].get("As") if caches else None) or []
         A0 = As[0] if As else []
         return list(A0[-1]) if A0 else []
 
@@ -153,15 +423,17 @@ class TinyTransformer:
         return float(p[self._id(tok)])
 
     def _sgd(self, ids: List[int], target: int, lr: float) -> float:
-        """Last-token CE through residual multi-head + FFN. CPU or bound accel."""
+        """Last-token CE through stacked Pre-LN blocks. CPU or bound accel."""
         if self._accel is not None:
             try:
                 return float(self._accel.sgd(ids, target, lr))
             except Exception:
                 self._accel = None
+                self.resident = False
         n = len(ids)
         D = self.dim
-        X, Q, K, V, C, As, U, z, y = self._block(ids)
+        H, caches = self._forward(ids)
+        y = H[-1] if H else zeros(D)
         logits = add(matvec(self.Wout, y), self.bout)
         p = softmax(logits)
         loss = -math.log(max(p[target], 1e-12))
@@ -172,62 +444,16 @@ class TinyTransformer:
         for v in range(self.V):
             self.bout[v] -= lr * dlog[v]
 
-        dU = dy
-        if self.d_ff and z:
-            d_z = matvec_T(self.W2, dy)
-            d_pre = [d_z[i] if z[i] > 0.0 else 0.0 for i in range(len(z))]
-            add_outer(self.W2, dy, z, -lr)
-            add_outer(self.W1, d_pre, U, -lr)
-            for i in range(len(self.b2)):
-                self.b2[i] -= lr * dy[i]
-            for i in range(len(self.b1)):
-                self.b1[i] -= lr * d_pre[i]
-            dU = add(dy, matvec_T(self.W1, d_pre))
+        dH = [zeros(D) for _ in range(n)]
+        dH[-1] = dy
+        for layer, cache in zip(reversed(self.layers), reversed(caches)):
+            dH = layer.backward(dH, cache, lr)
 
-        dC_last = matvec_T(self.Wo, dU)
-        add_outer(self.Wo, dU, C[-1], -lr)
-        dX = [zeros(D) for _ in range(n)]
-        dX[-1] = add(dX[-1], dU)
-
-        heads = self.n_heads
-        dh = max(1, D // heads)
-        i = n - 1
-        dQ_i = zeros(D)
-        dK = [zeros(D) for _ in range(n)]
-        dV = [zeros(D) for _ in range(n)]
-        for h in range(heads):
-            lo, hi = h * dh, (h + 1) * dh
-            dCh = dC_last[lo:hi]
-            Qh = slice_head(Q, h, heads)
-            Kh = slice_head(K, h, heads)
-            Vh = slice_head(V, h, heads)
-            w = As[h][i] if h < len(As) else []
-            dAh = zeros(len(w))
-            for j, aij in enumerate(w):
-                for d in range(len(dCh)):
-                    dV[j][lo + d] += dCh[d] * aij
-                dAh[j] = sum(dCh[d] * Vh[j][d] for d in range(len(dCh)))
-            dot_da = sum(dAh[j] * w[j] for j in range(len(w)))
-            ds = [(dAh[j] - dot_da) * w[j] for j in range(len(w))]
-            inv = 1.0 / math.sqrt(max(1, dh))
-            for j, dsj in enumerate(ds):
-                g = dsj * inv
-                for d in range(dh):
-                    dQ_i[lo + d] += Kh[j][d] * g
-                    dK[j][lo + d] += Qh[i][d] * g
-
-        add_outer(self.Wq, dQ_i, X[i], -lr)
-        dX[i] = add(dX[i], matvec_T(self.Wq, dQ_i))
-        for j in range(n):
-            add_outer(self.Wk, dK[j], X[j], -lr)
-            dX[j] = add(dX[j], matvec_T(self.Wk, dK[j]))
-            add_outer(self.Wv, dV[j], X[j], -lr)
-            dX[j] = add(dX[j], matvec_T(self.Wv, dV[j]))
         for t, idx in enumerate(ids):
-            dx = scale(dX[t], lr)
+            dx = dH[t]
             for d in range(D):
-                self.E[idx][d] -= dx[d]
-                self.P[t][d] -= dx[d]
+                self.E[idx][d] -= lr * dx[d]
+                self.P[t][d] -= lr * dx[d]
         self.steps += 1
         return loss
 
@@ -276,6 +502,7 @@ class TinyTransformer:
                 return str(self._accel.decode(prefix, n=n, seed=seed))
             except Exception:
                 self._accel = None
+                self.resident = False
         return " ".join(self.generate(prefix, n=n, seed=seed))
 
     def generate(self, prefix: str | Sequence[str], n: int = 12, *, seed: int = 0) -> Tuple[str, ...]:
@@ -301,6 +528,12 @@ class TinyTransformer:
         return tuple(self.itos[i] if 0 <= i < len(self.itos) else UNK for i in out[:n])
 
     def snapshot(self) -> Dict[str, Any]:
+        if self._accel is not None:
+            try:
+                self._accel.sync()
+            except Exception:
+                pass
+        L0 = self.layers[0]
         return {
             "dim": self.dim,
             "ctx": self.ctx,
@@ -308,33 +541,36 @@ class TinyTransformer:
             "n_layers": self.n_layers,
             "d_ff": self.d_ff,
             "device": self.device,
+            "resident": bool(self.resident),
             "fitted": self.fitted,
             "steps": self.steps,
             "itos": list(self.itos),
-            "E": [list(r) for r in self.E],
-            "P": [list(r) for r in self.P],
-            "Wq": [list(r) for r in self.Wq],
-            "Wk": [list(r) for r in self.Wk],
-            "Wv": [list(r) for r in self.Wv],
-            "Wo": [list(r) for r in self.Wo],
-            "Wout": [list(r) for r in self.Wout],
+            "E": _copy_mat(self.E),
+            "P": _copy_mat(self.P),
+            "Wq": _copy_mat(L0.Wq),
+            "Wk": _copy_mat(L0.Wk),
+            "Wv": _copy_mat(L0.Wv),
+            "Wo": _copy_mat(L0.Wo),
+            "Wout": _copy_mat(self.Wout),
             "bout": list(self.bout),
-            "W1": [list(r) for r in self.W1] if self.W1 else [],
-            "b1": list(self.b1) if self.b1 else [],
-            "W2": [list(r) for r in self.W2] if self.W2 else [],
-            "b2": list(self.b2) if self.b2 else [],
+            "W1": _copy_mat(L0.W1) if L0.W1 else [],
+            "b1": list(L0.b1) if L0.b1 else [],
+            "W2": _copy_mat(L0.W2) if L0.W2 else [],
+            "b2": list(L0.b2) if L0.b2 else [],
+            "layers": [L.snapshot() for L in self.layers],
         }
 
     @classmethod
     def from_snapshot(cls, data: Dict[str, Any]) -> "TinyTransformer":
         itos = list((data or {}).get("itos") or [UNK])
+        n_layers = int((data or {}).get("n_layers") or 1)
         lm = cls(
             vocab=[t for t in itos if t != UNK],
             dim=int((data or {}).get("dim") or 8),
             ctx=int((data or {}).get("ctx") or 6),
             seed=0,
             n_heads=int((data or {}).get("n_heads") or 1),
-            n_layers=int((data or {}).get("n_layers") or 1),
+            n_layers=n_layers,
             d_ff=int((data or {}).get("d_ff") or 0),
         )
         lm.itos = itos
@@ -344,23 +580,35 @@ class TinyTransformer:
             return [list(map(float, row)) for row in raw] if raw else cur
         lm.E = _m("E", lm.E)
         lm.P = _m("P", lm.P)
-        lm.Wq = _m("Wq", lm.Wq)
-        lm.Wk = _m("Wk", lm.Wk)
-        lm.Wv = _m("Wv", lm.Wv)
-        lm.Wo = _m("Wo", lm.Wo)
         lm.Wout = _m("Wout", lm.Wout)
-        lm.W1 = _m("W1", lm.W1)
-        lm.W2 = _m("W2", lm.W2)
         b = (data or {}).get("bout")
         if b:
             lm.bout = [float(x) for x in b]
-        if (data or {}).get("b1"):
-            lm.b1 = [float(x) for x in data["b1"]]
-        if (data or {}).get("b2"):
-            lm.b2 = [float(x) for x in data["b2"]]
+        raw_layers = (data or {}).get("layers")
+        if raw_layers:
+            lm.layers = [
+                TransformerBlock.from_snapshot(blob, dim=lm.dim, d_ff=lm.d_ff)
+                for blob in raw_layers
+            ]
+            lm.n_layers = max(1, len(lm.layers))
+        else:
+            L0 = lm.layers[0]
+            L0.Wq = _m("Wq", L0.Wq)
+            L0.Wk = _m("Wk", L0.Wk)
+            L0.Wv = _m("Wv", L0.Wv)
+            L0.Wo = _m("Wo", L0.Wo)
+            L0.W1 = _m("W1", L0.W1)
+            L0.W2 = _m("W2", L0.W2)
+            if (data or {}).get("b1"):
+                L0.b1 = [float(x) for x in data["b1"]]
+            if (data or {}).get("b2"):
+                L0.b2 = [float(x) for x in data["b2"]]
         lm.fitted = int((data or {}).get("fitted") or 0)
         lm.steps = int((data or {}).get("steps") or 0)
         lm.device = str((data or {}).get("device") or "cpu")
+        if lm.device == "cuda":
+            lm.device = "cpu"
+            lm.requested = "cuda"
         return lm
 
 

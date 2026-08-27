@@ -10,10 +10,11 @@ The four slots (PFC / midbrain / left / right) are agents. Jeeves:
   7. shadows own vs teacher; auto-surpass when own wins
   8. acquire(slot) copies a model's abilities into own-system
   9. surpass(slot) answers from own-system — the neo transformer SPEAKS
-     (CPU decode). Compose keeps the numbers. Veto still wins.
+     (CPU default, CUDA if harnessed). Compose keeps the numbers. Veto still wins.
 
 Backends are interchangeable: bind(slot, port) hot-swaps the model in
 that tract. The neo TinyTransformer is Jeeves' own language model.
+GPU is a harness on that same net, not a second architecture.
 """
 from __future__ import annotations
 
@@ -343,6 +344,7 @@ class JeevesCortex:
 
     def status(self) -> Dict[str, Any]:
         xf = self.transformer
+        info = self._device_info or {}
         return {
             "backends": self.backends(),
             "ledger": self.ledger.to_dict(),
@@ -361,7 +363,9 @@ class JeevesCortex:
                 "device": str(getattr(xf, "device", "cpu") or "cpu"),
                 "requested": str(getattr(xf, "requested", getattr(xf, "device", "cpu")) or "cpu"),
                 "backend": type(xf).__name__,
-                "cuda": bool((self._device_info or {}).get("cuda")),
+                "cuda": bool(info.get("cuda")),
+                "resident": bool(getattr(xf, "resident", False)),
+                "capability": str(info.get("capability") or "python"),
             },
         }
 
@@ -373,7 +377,10 @@ class JeevesCortex:
         self._device_info = probe()
         xf = self.transformer
         if hasattr(xf, "to"):
-            xf.to(info["actual"])
+            want = info["actual"]
+            if want == "cpu" and info.get("torch") and info.get("requested") in {"cuda", "gpu", "torch", "auto"}:
+                want = "torch"
+            xf.to(want if info.get("cuda") or want != "cuda" else "cpu")
         else:
             snap = xf.snapshot() if hasattr(xf, "snapshot") else {}
             self.transformer = attach_lm(
@@ -388,13 +395,15 @@ class JeevesCortex:
             "degraded": bool(info.get("degraded")),
             "cuda": bool(info.get("cuda")),
             "backend": type(self.transformer).__name__,
+            "resident": bool(getattr(self.transformer, "resident", False)),
+            "capability": str(info.get("capability") or "python"),
         }
 
     def _lm_amalgam(self, stim: str, composed: Thought, jaccard: float) -> Thought:
         """Neo transformer speaks. Compose keeps numbers and acquired text.
 
         Unfitted net falls back to compose (tape). Fitted net is the LM.
-        CPU decode only.
+        Decode on the bound device (CPU default, CUDA if harnessed).
         """
         xf = self.transformer
         if xf is None or int(getattr(xf, "fitted", 0) or 0) <= 0:

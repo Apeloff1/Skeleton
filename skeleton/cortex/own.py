@@ -1,6 +1,7 @@
 """Own-system — the memory the neo LM speaks from.
 
-The transformer in JeevesCortex is the voice (CPU decode). This
+The transformer in JeevesCortex is the voice (CPU default, CUDA if
+the device harness can see a GPU). This
 module is the few-shot memory: Jaccard recall, mix/bias exemplars,
 tract interchange. Compose stitches numbers; the LM utters text.
 Two cortices interchange by exporting a Tract plus weights.

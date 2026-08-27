@@ -310,7 +310,10 @@ class Jeeves:
         if pack is None:
             from skeleton.forge.eras import compile_era
             pack = compile_era(self.era)
-        plan = BuilderBrain().plan(pack, tensor=tensor, reading=reading)
+        plan = BuilderBrain().plan(
+            pack, tensor=tensor, reading=reading,
+            cortex=self.cortex, last_walk=self.last_walk,
+        )
         self.last_plan = plan
         self._bus.emit("jeeves.build.planned", {
             "era": plan.era, "seed": plan.seed, "bias": plan.room_bias,

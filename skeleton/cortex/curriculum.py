@@ -153,6 +153,10 @@ def train(neo, *, epochs: int = 1, pairs: Sequence[Pair] | None = None,
     lms["neo"] = {
         "transformer_steps": int(getattr(xf, "steps", 0) or 0),
         "transformer_fitted": int(getattr(xf, "fitted", 0) or 0),
+        "n_layers": int(getattr(xf, "n_layers", 1) or 1),
+        "n_heads": int(getattr(xf, "n_heads", 1) or 1),
+        "device": str(getattr(xf, "device", "cpu") or "cpu"),
+        "resident": bool(getattr(xf, "resident", False)),
     }
     return {
         "epochs": epochs,

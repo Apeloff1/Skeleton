@@ -1,11 +1,14 @@
 """Torch / CUDA accel for the neo LM.
 
 Lazy import. GameForge CI never loads this file unless someone
-calls TinyTransformer.to('cuda') and torch is installed.
+calls TinyTransformer.to() and torch is installed.
 
-TorchAccel: same TinyTransformer weights, autograd SGD on cpu|cuda.
-TorchTransformer: stacked TransformerEncoder (n_layers, n_heads, FFN)
-on the bound device. Snapshot is a state_dict of lists.
+TorchAccel: same TinyTransformer weights, pinned on cpu|cuda,
+autograd SGD through stacked Pre-LN blocks. Python lists catch
+up on sync() / snapshot(). GPU is a harness, not a rewrite.
+
+TorchTransformer: optional nn.TransformerEncoder stack, restored
+only when a snapshot kind is torch-stack.
 """
 from __future__ import annotations
 
@@ -22,7 +25,7 @@ def _torch():
 
 
 class TorchAccel:
-    """Run one TinyTransformer step with autograd on cpu or cuda."""
+    """Run TinyTransformer steps with autograd. Weights live on the device."""
 
     def __init__(self, lm: Any, device: str = "cpu") -> None:
         torch = _torch()
@@ -32,74 +35,171 @@ class TorchAccel:
         self.lm = lm
         self.device = torch.device(device)
         self.device_name = "cuda" if self.device.type == "cuda" else "cpu"
+        self.resident = False
+        self._E = self._P = self._Wout = self._bout = None
+        self._layers: List[Dict[str, Any]] = []
 
-    def _t(self, rows: List[List[float]], grad: bool = True):
+    def _t2(self, rows: List[List[float]], grad: bool = True):
         return self.torch.tensor(rows, dtype=self.torch.float32, device=self.device, requires_grad=grad)
 
-    def _v(self, row: List[float], grad: bool = True):
+    def _t1(self, row: List[float], grad: bool = True):
         return self.torch.tensor(row, dtype=self.torch.float32, device=self.device, requires_grad=grad)
+
+    def pin(self) -> "TorchAccel":
+        """Upload python weights once. Subsequent SGD stays on-device."""
+        lm = self.lm
+        self._E = self._t2(lm.E)
+        self._P = self._t2(lm.P)
+        self._Wout = self._t2(lm.Wout)
+        self._bout = self._t1(lm.bout)
+        self._layers = []
+        blocks = getattr(lm, "layers", None) or []
+        if not blocks:
+            blocks = [lm]
+        for L in blocks:
+            blob: Dict[str, Any] = {
+                "Wq": self._t2(L.Wq), "Wk": self._t2(L.Wk),
+                "Wv": self._t2(L.Wv), "Wo": self._t2(L.Wo),
+                "ln1_g": self._t1(getattr(L, "ln1_g", [1.0] * lm.dim)),
+                "ln1_b": self._t1(getattr(L, "ln1_b", [0.0] * lm.dim)),
+                "W1": None, "b1": None, "W2": None, "b2": None,
+                "ln2_g": None, "ln2_b": None,
+            }
+            W1 = getattr(L, "W1", None)
+            if W1:
+                blob["W1"] = self._t2(W1)
+                blob["b1"] = self._t1(getattr(L, "b1", [0.0] * len(W1)))
+                blob["W2"] = self._t2(L.W2)
+                blob["b2"] = self._t1(getattr(L, "b2", [0.0] * lm.dim))
+                blob["ln2_g"] = self._t1(getattr(L, "ln2_g", [1.0] * lm.dim))
+                blob["ln2_b"] = self._t1(getattr(L, "ln2_b", [0.0] * lm.dim))
+            self._layers.append(blob)
+        self.resident = True
+        lm.resident = True
+        lm.device = self.device_name
+        return self
+
+    def _params(self):
+        yield self._E
+        yield self._P
+        yield self._Wout
+        yield self._bout
+        for L in self._layers:
+            for v in L.values():
+                if v is not None:
+                    yield v
+
+    def sync(self) -> None:
+        """Python lists catch up. Snapshot / to() / fallback call this."""
+        if not self.resident or self._E is None:
+            return
+        lm = self.lm
+        lm.E = self._E.detach().cpu().tolist()
+        lm.P = self._P.detach().cpu().tolist()
+        lm.Wout = self._Wout.detach().cpu().tolist()
+        lm.bout = self._bout.detach().cpu().tolist()
+        blocks = getattr(lm, "layers", None) or []
+        for i, blob in enumerate(self._layers):
+            target = blocks[i] if i < len(blocks) else lm
+            target.Wq = blob["Wq"].detach().cpu().tolist()
+            target.Wk = blob["Wk"].detach().cpu().tolist()
+            target.Wv = blob["Wv"].detach().cpu().tolist()
+            target.Wo = blob["Wo"].detach().cpu().tolist()
+            if hasattr(target, "ln1_g"):
+                target.ln1_g = blob["ln1_g"].detach().cpu().tolist()
+                target.ln1_b = blob["ln1_b"].detach().cpu().tolist()
+            if blob.get("W1") is not None:
+                target.W1 = blob["W1"].detach().cpu().tolist()
+                target.b1 = blob["b1"].detach().cpu().tolist()
+                target.W2 = blob["W2"].detach().cpu().tolist()
+                target.b2 = blob["b2"].detach().cpu().tolist()
+                if hasattr(target, "ln2_g") and blob.get("ln2_g") is not None:
+                    target.ln2_g = blob["ln2_g"].detach().cpu().tolist()
+                    target.ln2_b = blob["ln2_b"].detach().cpu().tolist()
+
+    def _forward_ids(self, ids: Sequence[int]):
+        torch = self.torch
+        lm = self.lm
+        if not self.resident:
+            self.pin()
+        idx = torch.tensor(list(ids), dtype=torch.long, device=self.device)
+        pos = torch.arange(len(ids), device=self.device).clamp(max=lm.ctx - 1)
+        X = self._E[idx] + self._P[pos]
+        D = int(lm.dim)
+        heads = max(1, int(lm.n_heads))
+        dh = max(1, D // heads)
+        for blob in self._layers:
+            Xn = torch.nn.functional.layer_norm(X, (D,), blob["ln1_g"], blob["ln1_b"])
+            Q, K, V = Xn @ blob["Wq"].T, Xn @ blob["Wk"].T, Xn @ blob["Wv"].T
+            chunks = []
+            for h in range(heads):
+                Qh = Q[:, h * dh:(h + 1) * dh]
+                Kh = K[:, h * dh:(h + 1) * dh]
+                Vh = V[:, h * dh:(h + 1) * dh]
+                scale = dh ** -0.5
+                scores = Qh @ Kh.T * scale
+                T = scores.size(0)
+                mask = torch.triu(torch.ones(T, T, device=self.device), diagonal=1).bool()
+                scores = scores.masked_fill(mask, float("-inf"))
+                A = torch.softmax(scores, dim=-1)
+                chunks.append(A @ Vh)
+            C = torch.cat(chunks, dim=-1) if chunks else V
+            X = X + C @ blob["Wo"].T
+            if blob.get("W1") is not None:
+                Un = torch.nn.functional.layer_norm(X, (D,), blob["ln2_g"], blob["ln2_b"])
+                z = torch.relu(Un @ blob["W1"].T + blob["b1"])
+                X = X + z @ blob["W2"].T + blob["b2"]
+        return X[-1] @ self._Wout.T + self._bout, X[-1]
+
+    def logits(self, ids: Sequence[int]) -> List[float]:
+        with self.torch.no_grad():
+            y, _ = self._forward_ids(ids)
+            return y.detach().cpu().tolist()
+
+    def hidden(self, ids: Sequence[int]) -> List[float]:
+        with self.torch.no_grad():
+            _, h = self._forward_ids(ids)
+            return h.detach().cpu().tolist()
 
     def sgd(self, ids: Sequence[int], target: int, lr: float) -> float:
         torch = self.torch
-        lm = self.lm
-        E = self._t(lm.E)
-        P = self._t(lm.P)
-        Wq, Wk, Wv, Wo = self._t(lm.Wq), self._t(lm.Wk), self._t(lm.Wv), self._t(lm.Wo)
-        Wout = self._t(lm.Wout)
-        bout = self._v(lm.bout)
-        idx = torch.tensor(list(ids), dtype=torch.long, device=self.device)
-        pos = torch.arange(len(ids), device=self.device)
-        X = E[idx] + P[pos]
-        Q, K, V = X @ Wq.T, X @ Wk.T, X @ Wv.T
-        heads = max(1, int(lm.n_heads))
-        D = int(lm.dim)
-        dh = max(1, D // heads)
-        chunks = []
-        for h in range(heads):
-            Qh, Kh, Vh = Q[:, h * dh:(h + 1) * dh], K[:, h * dh:(h + 1) * dh], V[:, h * dh:(h + 1) * dh]
-            scale = dh ** -0.5
-            scores = Qh @ Kh.T * scale
-            T = scores.size(0)
-            mask = torch.triu(torch.ones(T, T, device=self.device), diagonal=1).bool()
-            scores = scores.masked_fill(mask, float("-inf"))
-            A = torch.softmax(scores, dim=-1)
-            chunks.append(A @ Vh)
-        C = torch.cat(chunks, dim=-1) if chunks else V
-        attn = C[-1] @ Wo.T
-        U = X[-1] + attn
-        y = U
-        extras = []
-        if lm.d_ff and lm.W1:
-            W1, W2 = self._t(lm.W1), self._t(lm.W2)
-            b1, b2 = self._v(lm.b1), self._v(lm.b2)
-            z = torch.relu(U @ W1.T + b1)
-            y = U + z @ W2.T + b2
-            extras = [W1, b1, W2, b2]
-        logits = y @ Wout.T + bout
+        if not self.resident:
+            self.pin()
+        for p in self._params():
+            if p.grad is not None:
+                p.grad.zero_()
+        logits, _ = self._forward_ids(ids)
         tgt = torch.tensor([int(target)], dtype=torch.long, device=self.device)
         loss = torch.nn.functional.cross_entropy(logits.unsqueeze(0), tgt)
         loss.backward()
-        params = [E, P, Wq, Wk, Wv, Wo, Wout, bout] + extras
         with torch.no_grad():
-            for p in params:
+            for p in self._params():
                 if p.grad is not None:
                     p.add_(p.grad, alpha=-float(lr))
-        lm.E, lm.P = E.detach().cpu().tolist(), P.detach().cpu().tolist()
-        lm.Wq, lm.Wk = Wq.detach().cpu().tolist(), Wk.detach().cpu().tolist()
-        lm.Wv, lm.Wo = Wv.detach().cpu().tolist(), Wo.detach().cpu().tolist()
-        lm.Wout, lm.bout = Wout.detach().cpu().tolist(), bout.detach().cpu().tolist()
-        if extras:
-            lm.W1, lm.b1 = extras[0].detach().cpu().tolist(), extras[1].detach().cpu().tolist()
-            lm.W2, lm.b2 = extras[2].detach().cpu().tolist(), extras[3].detach().cpu().tolist()
-        lm.steps += 1
+        self.lm.steps += 1
         return float(loss.detach().cpu())
 
     def decode(self, prefix: str, n: int = 14, seed: int = 0) -> str:
-        return " ".join(self.lm.generate(prefix, n=n, seed=seed))
+        """Sample next tokens on the bound device."""
+        torch = self.torch
+        lm = self.lm
+        if not self.resident:
+            self.pin()
+        g = torch.Generator(device="cpu")
+        g.manual_seed(int(seed) & 0xFFFFFFFF)
+        ids = [lm._id(t) for t in tokens(prefix)] or [lm.unk]
+        with torch.no_grad():
+            for _ in range(max(1, n)):
+                window = ids[-lm.ctx:]
+                logits, _ = self._forward_ids(window)
+                p = torch.softmax(logits.float().cpu(), dim=-1)
+                nxt = int(torch.multinomial(p, 1, generator=g).item())
+                ids.append(nxt)
+        return " ".join(lm.itos[i] if 0 <= i < len(lm.itos) else UNK for i in ids[:n])
 
 
 class TorchTransformer:
-    """Stacked TransformerEncoder on cpu|cuda. The high-standard neo LM."""
+    """Stacked TransformerEncoder on cpu|cuda. Optional high-standard neo LM."""
 
     name = "torch-lm"
     scale = "neo"
@@ -124,6 +224,7 @@ class TorchTransformer:
         self.device_obj = torch.device(device)
         self.device = "cuda" if self.device_obj.type == "cuda" else "cpu"
         self.requested = device
+        self.resident = True
         itos = [UNK] + sorted({str(t) for t in (vocab or ()) if t and t != UNK})
         self.itos = itos
         self.stoi = {t: i for i, t in enumerate(itos)}
@@ -242,11 +343,12 @@ class TorchTransformer:
             "dim": self.dim, "ctx": self.ctx,
             "n_heads": self.n_heads, "n_layers": self.n_layers, "d_ff": self.d_ff,
             "device": self.device, "fitted": self.fitted, "steps": self.steps,
-            "itos": list(self.itos), "state": blob,
+            "itos": list(self.itos), "state": blob, "resident": True,
         }
 
     @classmethod
     def from_snapshot(cls, data: Dict[str, Any]) -> "TorchTransformer":
+        want = str(data.get("device") or "cpu")
         lm = cls(
             vocab=[t for t in (data.get("itos") or []) if t != UNK],
             dim=int(data.get("dim") or 8),
@@ -254,7 +356,7 @@ class TorchTransformer:
             n_heads=int(data.get("n_heads") or 2),
             n_layers=int(data.get("n_layers") or 2),
             d_ff=int(data.get("d_ff") or 32),
-            device=str(data.get("device") or "cpu"),
+            device=want,
         )
         state = data.get("state") or {}
         if state:

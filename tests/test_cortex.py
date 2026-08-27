@@ -542,9 +542,12 @@ class TestDevice:
         xf = neo.transformer
         assert xf.n_heads >= 2
         assert xf.d_ff >= 16
+        assert xf.n_layers >= 2
         st = neo.status()["lm"]
         assert st["n_heads"] >= 2
+        assert st["n_layers"] >= 2
         assert st["backend"]
+        assert st["capability"] in {"python", "torch-cpu", "cuda"}
 
     def test_two_head_still_reads_prefix(self):
         from skeleton.cortex.transformer import TinyTransformer
@@ -565,6 +568,105 @@ class TestDevice:
         lm.fit(train)
         p1 = lm.perplexity(held)
         assert p1 < p0, (p0, p1)
+
+    def test_stack_is_not_one_layer(self):
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.lm import gameforge_vocab
+        vocab = gameforge_vocab()
+        a = TinyTransformer(vocab=vocab, dim=8, ctx=6, seed=7, n_heads=2, n_layers=1, d_ff=16)
+        b = TinyTransformer(vocab=vocab, dim=8, ctx=6, seed=7, n_heads=2, n_layers=2, d_ff=16)
+        assert a.n_layers == 1 and b.n_layers == 2
+        assert len(b.layers) == 2
+        assert a.hidden("loot bias") != b.hidden("loot bias")
+
+    def test_both_layers_train(self):
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.lm import gameforge_vocab
+        lm = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=9,
+                             n_heads=2, n_layers=2, d_ff=16)
+        w0 = [row[:] for row in lm.layers[0].Wq]
+        w1 = [row[:] for row in lm.layers[1].Wq]
+        g0 = list(lm.layers[0].ln1_g)
+        lm.fit(["HP DPS TTK compile recipe sim lattice oracle forge"])
+        assert lm.layers[0].Wq != w0
+        assert lm.layers[1].Wq != w1
+        assert lm.layers[0].ln1_g != g0
+        assert lm.steps > 0
+
+    def test_layernorm_mean_zero(self):
+        from skeleton.cortex.attn import layer_norm, layer_norm_bwd
+        x = [1.0, 2.0, 3.0, 4.0]
+        g = [1.0, 1.0, 1.0, 1.0]
+        b = [0.0, 0.0, 0.0, 0.0]
+        y, hat, inv = layer_norm(x, g, b)
+        assert abs(sum(hat)) < 1e-9
+        assert inv > 0.0
+        dy = [0.1, -0.2, 0.3, -0.2]
+        dx, dg, db = layer_norm_bwd(dy, hat, inv, g)
+        assert len(dx) == 4 and abs(sum(dx)) < 1e-6
+
+    def test_stacked_perplexity_drops(self):
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.lm import gameforge_corpus, gameforge_vocab
+        corpus = gameforge_corpus()
+        held, train = corpus[-4:], corpus[:-4]
+        lm = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=1,
+                             n_heads=2, n_layers=2, d_ff=16)
+        p0 = lm.perplexity(held)
+        lm.fit(train)
+        p1 = lm.perplexity(held)
+        assert p1 < p0, (p0, p1)
+        snap = lm.snapshot()
+        assert len(snap["layers"]) == 2
+        b = TinyTransformer.from_snapshot(snap)
+        assert b.n_layers == 2
+        assert abs(b.token_prob("HP DPS", "TTK") - lm.token_prob("HP DPS", "TTK")) < 1e-9
+
+    def test_gpu_harness_pins_or_degrades(self):
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.lm import gameforge_vocab
+        from skeleton.cortex.device import probe
+        lm = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=1, n_heads=2, n_layers=2, d_ff=16)
+        lm.to("cuda")
+        p = probe()
+        if p["cuda"]:
+            assert lm.device == "cuda"
+            assert lm.resident is True
+            assert lm._accel is not None
+        else:
+            assert lm.device == "cpu"
+            assert lm.resident is False
+        text = lm.decode("plan tensor", n=6, seed=2)
+        assert isinstance(text, str) and len(text.split()) >= 3
+
+    def test_torch_lm_is_lazy(self):
+        import skeleton.cortex.torch_lm as tmod
+        src = open(tmod.__file__, encoding="utf-8").read()
+        assert "def pin(" in src
+        assert "def sync(" in src
+        assert "cuda.is_available" in src
+        top = [ln.strip() for ln in src.splitlines() if ln.startswith("import ") or ln.startswith("from ")]
+        assert not any("torch" in ln for ln in top)
+        from skeleton.cortex.lm import gameforge_vocab
+        from skeleton.cortex.transformer import TinyTransformer
+        lm = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=4, seed=1)
+        try:
+            tmod.TorchAccel(lm, "cpu")
+        except ImportError:
+            pass
+
+    def test_attach_lm_is_stacked_python_here(self):
+        from skeleton.cortex.device import attach_lm, probe
+        from skeleton.cortex.lm import gameforge_vocab
+        from skeleton.cortex.transformer import TinyTransformer
+        lm = attach_lm(vocab=gameforge_vocab(), n_layers=2, n_heads=2, d_ff=32)
+        assert isinstance(lm, TinyTransformer)
+        assert lm.n_layers == 2
+        p = probe()
+        if not p["torch"]:
+            assert lm.device == "cpu"
+            assert lm.resident is False
+
 
 
 

@@ -1,13 +1,14 @@
 """Jeeves-as-builder — designs the run before the forge emits it.
 
 Tactical Jeeves coaches a live operator. This brain is the other half:
-it reads the context cube, the dodeca oracle, and the compiled era pack,
-then writes a BuildPlan the world generator and Godot emitter obey.
+it reads the context cube, the dodeca oracle, the compiled era pack,
+and — when the neo LM is fitted — the own-lm decode, then writes a
+BuildPlan the world generator and Godot emitter obey.
 
 Closed loop: a prior walk (or a recalled forge-run tract) mutates mix,
 bias, and extract-lateness, and is mixed into the seed so the next graph
 is a different building. Deterministic given (era, tensor, oracle, walk).
-No LLM. No weights.
+No external LLM. The neo transformer authors the briefing when fitted.
 """
 from __future__ import annotations
 
@@ -226,18 +227,21 @@ def _author(pack: Dict[str, Any], cube: ContextTensor, era: str, cortex: Any):
             right = slots["right"].think(stim, ctx)
         authored = "own" if getattr(trace, "used_own", False) else "cortex"
         amalgam = getattr(trace, "amalgam", None)
+        spoken = ""
+        if amalgam is not None and getattr(amalgam, "kind", "") == "own-lm":
+            spoken = str(amalgam.text or "").split("||")[0].strip()
         if authored == "own" and amalgam is not None:
             if _mix_of(amalgam) is not None:
                 left = amalgam
             if _bias_of(amalgam) != "balanced":
                 right = amalgam
-        return left, right, pfc, authored
+        return left, right, pfc, authored, spoken
     from skeleton.cortex.hemispheres import LeftHemisphere, RightHemisphere
     from skeleton.cortex.pfc import PrefrontalCortex
     left = LeftHemisphere().think(stim, ctx)
     right = RightHemisphere().think(stim, {**ctx, "left": left.to_dict()})
     pfc = PrefrontalCortex().think(stim, {**ctx, "left": left.to_dict(), "right": right.to_dict()})
-    return left, right, pfc, "local"
+    return left, right, pfc, "local", ""
 
 
 def _ingest_observed(own, stim: str, era: str, *, slot: str, kind: str,
@@ -271,7 +275,7 @@ class BuilderBrain:
         oracle_index = int(reading.index) if reading is not None else -1
         oracle_text = reading.text if reading is not None else "Signs point to a standard drop."
 
-        left, right, pfc, authored = _author(pack, cube, era, cortex)
+        left, right, pfc, authored, spoken = _author(pack, cube, era, cortex)
         bias = _bias_of(right)
         mix = _mix_of(left)
         lethality = cube["lethality"]
@@ -449,6 +453,9 @@ class BuilderBrain:
             + (f" Cortex {tag}." if tag != "none" else "")
             + f" Authored {authored}/{bias}."
         )
+        if spoken:
+            briefing += f" LM: {spoken}"
+            notes.append("lm=own")
         return BuildPlan(
             era=era,
             seed=seed,
