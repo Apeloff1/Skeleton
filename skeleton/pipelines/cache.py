@@ -1,15 +1,13 @@
 """Pipeline caching — TTL memoisation of stage outputs.
 
-Certain stages recompute identical inputs; the cache wraps pipelines
-at the boundary, not stage-by-stage resource calls.
+Certain stages recompute identical inputs; the cache wraps the pipeline
+boundary keyed by an input signature string the caller computes.
 """
 
 from __future__ import annotations
 
 import time
 from typing import Any, Dict, Optional, Tuple
-
-from skeleton.pipelines.validation import StageResult
 
 
 class PipelineCache:
