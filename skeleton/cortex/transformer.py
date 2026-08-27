@@ -210,6 +210,10 @@ class TinyTransformer:
         mean = sum(self.logprob(t) for t in seq) / len(seq)
         return math.exp(-mean)
 
+    def decode(self, prefix: str, *, n: int = 14, seed: int = 0) -> str:
+        """CPU next-token decode. No GPU. No torch."""
+        return " ".join(self.generate(prefix, n=n, seed=seed))
+
     def generate(self, prefix: str | Sequence[str], n: int = 12, *, seed: int = 0) -> Tuple[str, ...]:
         rng = random.Random(int(seed) & 0xFFFFFFFF)
         if isinstance(prefix, str):

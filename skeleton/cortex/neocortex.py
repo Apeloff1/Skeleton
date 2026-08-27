@@ -1,4 +1,4 @@
-"""Jeeves neocortex — hivemind that organizes the tracts and trains itself.
+"""Jeeves neocortex — hivemind that organizes the tracts and is itself an LM.
 
 The four slots (PFC / midbrain / left / right) are agents. Jeeves:
   1. lets midbrain route
@@ -8,12 +8,12 @@ The four slots (PFC / midbrain / left / right) are agents. Jeeves:
   5. amalgamates a teacher thought
   6. composes an own-system thought from Jaccard-nearest acquired tracts
   7. shadows own vs teacher; auto-surpass when own wins
-  8. acquire(slot) copies that model's abilities into own-system
-  9. surpass(slot) answers from own-system instead of the teacher
+  8. acquire(slot) copies a model's abilities into own-system
+  9. surpass(slot) answers from own-system — the neo transformer SPEAKS
+     (CPU decode). Compose keeps the numbers. Veto still wins.
 
 Backends are interchangeable: bind(slot, port) hot-swaps the model in
-that tract. Jeeves keeps the abilities it already acquired. Two cortices
-interchange by exporting a Tract.
+that tract. The neo TinyTransformer is Jeeves' own language model.
 """
 from __future__ import annotations
 
@@ -171,6 +171,9 @@ class JeevesCortex:
         used_own = False
         shadow_win: Optional[bool] = None
         amalgam = teacher
+        veto = bool(pfc.tags and "veto" in pfc.tags) or (
+            bool(pfc.numbers) and pfc.numbers[-1] >= 1.0
+        )
         if composed is not None:
             own_thought, recalled_j, _hits = composed
             shadow_win = shadow_eval(own_thought, teacher)
@@ -180,8 +183,8 @@ class JeevesCortex:
             if self.auto_surpass:
                 self._maybe_auto_surpass()
             armed = bool(self._surpass)
-            if armed:
-                amalgam = own_thought
+            if armed and not veto:
+                amalgam = self._lm_amalgam(stim, own_thought, recalled_j)
                 used_own = True
                 for s in self._surpass:
                     self.shadow[s]["trials"] += 1
@@ -328,6 +331,7 @@ class JeevesCortex:
         return {"loaded": n, "own": self.own.size, "surpass": sorted(self._surpass)}
 
     def status(self) -> Dict[str, Any]:
+        xf = self.transformer
         return {
             "backends": self.backends(),
             "ledger": self.ledger.to_dict(),
@@ -335,7 +339,35 @@ class JeevesCortex:
             "acquired": dict(self.acquired),
             "surpass": sorted(self._surpass),
             "shadow": dict(self.shadow),
+            "lm": {
+                "fitted": int(getattr(xf, "fitted", 0) or 0),
+                "steps": int(getattr(xf, "steps", 0) or 0),
+                "dim": int(getattr(xf, "dim", 0) or 0),
+                "ctx": int(getattr(xf, "ctx", 0) or 0),
+                "device": "cpu",
+            },
         }
+
+    def _lm_amalgam(self, stim: str, composed: Thought, jaccard: float) -> Thought:
+        """Neo transformer speaks. Compose keeps numbers and acquired text.
+
+        Unfitted net falls back to compose (tape). Fitted net is the LM.
+        CPU decode only.
+        """
+        xf = self.transformer
+        if xf is None or int(getattr(xf, "fitted", 0) or 0) <= 0:
+            return composed
+        seed = int(fingerprint(stim)[:8], 16) if stim else 0
+        gen = xf.decode(stim, n=14, seed=seed)
+        tags = tuple(dict.fromkeys(list(composed.tags) + ["lm", "neo", "own"]))
+        return Thought(
+            slot="neo",
+            kind="own-lm",
+            text=f"{gen} || {composed.text}",
+            confidence=min(1.0, 0.58 + 0.35 * float(jaccard or 0.0)),
+            tags=tags,
+            numbers=composed.numbers,
+        )
 
     def _maybe_auto_surpass(self) -> None:
         own = self.shadow.get("own") or {}

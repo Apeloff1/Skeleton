@@ -1,12 +1,9 @@
-"""Own-system — the model Jeeves builds to surpass its parts.
+"""Own-system — the memory the neo LM speaks from.
 
-No weights. No tokenizer. No transformer. The own-system is a
-compositional few-shot memory: every acquired tract is an exemplar
-bundle. Recall is token-Jaccard (SHA fingerprints are exact-match
-only; Hamming on a hash is noise). Compose stitches the nearest
-left / right / pfc exemplars into one neo thought. Two cortices
-interchange by exporting a Tract — Jeeves acquires the ability of
-any bound backend, then answers from its own system.
+The transformer in JeevesCortex is the voice (CPU decode). This
+module is the few-shot memory: Jaccard recall, mix/bias exemplars,
+tract interchange. Compose stitches numbers; the LM utters text.
+Two cortices interchange by exporting a Tract plus weights.
 """
 from __future__ import annotations
 

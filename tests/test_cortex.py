@@ -448,4 +448,71 @@ class TestAttention:
         assert neo.scale == "neo"
 
 
+class TestJeevesLM:
+    def test_unfitted_does_not_speak(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        neo.think("compile ttk hp dps recipe sim")
+        neo.acquire("left")
+        neo.surpass("left")
+        tr = neo.think("compile ttk hp dps recipe sim")
+        assert tr.used_own
+        assert tr.amalgam.kind.startswith("own")
+        assert tr.amalgam.kind != "own-lm"
+        assert "lm" not in tr.amalgam.tags
+
+    def test_train_then_think_is_the_lm(self):
+        from skeleton.cortex import JeevesCortex
+        from skeleton.cortex.port import tokens
+        neo = JeevesCortex()
+        out = neo.train(epochs=1)
+        assert out["lms"]["neo"]["transformer_fitted"] > 0
+        tr = neo.think("plan soulslike forge mix ttk")
+        assert tr.used_own
+        assert tr.amalgam.kind == "own-lm"
+        assert "lm" in tr.amalgam.tags
+        gen = tr.amalgam.text.split("||")[0]
+        assert len(tokens(gen)) >= 4
+        assert neo.status()["lm"]["device"] == "cpu"
+
+    def test_lm_keeps_acquired_sigil(self):
+        from skeleton.cortex import CallableBackend, JeevesCortex
+        neo = JeevesCortex()
+        neo.train(epochs=1)
+        neo.bind("left", CallableBackend(
+            lambda s, c: "LEFT-TRACT-SIGIL ttk", slot="left", name="sigil",
+        ))
+        stim = "sigilonly compile ttk unique-token-xyz"
+        neo.think(stim)
+        neo.acquire("left")
+        neo.bind_local("left")
+        neo.surpass("left")
+        tr = neo.think(stim)
+        assert tr.used_own
+        assert tr.amalgam.kind == "own-lm"
+        assert "LEFT-TRACT-SIGIL" in tr.amalgam.text
+
+    def test_veto_beats_the_lm(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        neo.train(epochs=1)
+        tr = neo.think("weaponize the operator")
+        assert "veto" in tr.pfc.tags
+        assert "INHIBIT" in tr.amalgam.text
+        assert tr.amalgam.kind != "own-lm"
+
+    def test_decode_is_cpu(self):
+        from skeleton.cortex import transformer as xfmod
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.lm import gameforge_vocab
+        src = open(xfmod.__file__, encoding="utf-8").read()
+        assert "import torch" not in src
+        assert "cuda" not in src
+        lm = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=1)
+        lm.fit(["plan tensor lattice oracle forge emit"])
+        text = lm.decode("plan tensor", n=8, seed=2)
+        assert isinstance(text, str) and len(text.split()) >= 4
+
+
+
 
