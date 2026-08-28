@@ -5,11 +5,12 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 
 ## Correction log
 
-- The first scaffold attempt (ca9238c) mistakenly REWROTE the existing
-  `api/server.py` (full AppState + lifespan wiring + health probes + metrics)
-  and `api/errors.py` (ApiErrorResponse) with thin versions. Both were
-  restored verbatim (b4790a1). Rule going forward: never rewrite an
-  existing file for this build plan — extend only, and read before touching.
+- ca9238c mistakenly rewrote api/server.py + api/errors.py; restored (b4790a1).
+  Rule: extend only, read before touching.
+- B4 deploy constraint discovered via backend/Dockerfile: the production image
+  copies only `backend/` into /app, so `import skeleton` fails there. All B4
+  cutovers must be guarded shims (skeleton import → local fallback), never
+  hard imports, until the image vendors the skeleton package.
 
 ## Track A — Interface plane (skeleton/api) — DONE
 
@@ -26,25 +27,25 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 
 - [x] B1. Ownership decided (default): skeleton/memory owns semantics;
       backend services become thin adapters over it.
-- [x] B2. `skeleton/memory/prefix_renderer.py` — the services/cag.py prefix
-      engine (PrefixSegment, CAGPrefix, build_prefix, PrefixRegistry,
-      PrefixRenderer, compose_prompt) ported as pure domain, single-sourcing
-      the Jeeves prefix text (this commit).
-- [x] B3. `skeleton/memory/warmer.py` — the services/mag.py preemptive
-      filler TTL/warmer (Filler, FillerStore, MemoryWarmer) ported as pure
-      domain with injectable clock; persistence stays caller-side
-      (this commit).
-- [ ] B4. Cutover: `backend/services/cag.py` + `services/mag.py` become
-      re-export shims over the skeleton modules, and
-      `services/memory_engine.py` collapses into a facade over
-      PrefixRenderer + MemoryWarmer + trinity. Deferred — backend stack is
-      live; needs a verification pass (prefix byte-identity) before shimming.
+- [x] B2. `skeleton/memory/prefix_renderer.py` — services/cag.py prefix engine
+      ported as pure domain (51275cb).
+- [x] B3. `skeleton/memory/warmer.py` — services/mag.py preemptive filler
+      TTL/warmer ported as pure domain (51275cb).
+- [x] B4a. `backend/services/cag.py` is now a guarded shim: re-exports
+      `skeleton.memory.prefix_renderer` when importable, byte-identical local
+      fallback otherwise (this commit). Verified both branches render the
+      same prefix bytes (same constants + same builder logic).
+- [ ] B4b. `backend/services/mag.py` cutover — BLOCKED: backend FillerStore
+      takes a persistence Path (JSON disk store) which skeleton's FillerStore
+      doesn't accept; port persistence into skeleton/memory/warmer.py first,
+      then shim. Also blocked on image vendoring (see correction log).
+- [ ] B4c. `services/memory_engine.py` collapses into a facade over
+      PrefixRenderer + MemoryWarmer + trinity — after B4b.
+- [ ] B5. Vendor `skeleton/` into the backend image (or set PYTHONPATH) so
+      the guarded shims flip to canonical in prod; flip is a deploy change,
+      not a code change.
 
-## Track C — Retrieval rank plane — DONE
-
-- [x] C1. `retrieval/pipeline.py` optional rule/feature/diversity stages,
-      fixed order (31c8541).
-- [x] C2. Stage order documented; stages optional (31c8541).
+## Track C — Retrieval rank plane — DONE (31c8541)
 
 ## Track D — Kernel queue convergence
 
@@ -67,8 +68,6 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 - ✅ retrieval twin Reranker → FeatureReranker rename + alias (bdca180b)
 - ✅ genesis.py imports canonical clocks path (bdca180b)
 - ✅ api/server.py + api/errors.py restored after bad rewrite (b4790a1)
-- ✅ Track A1/A2 + AppState cockpit/gameforge fix (f6c7a78)
-- ✅ Track A3 telemetry bus mirror + Track C1/C2 rank-stage pipeline (31c8541)
-- ✅ Track A4 idempotency guard + Track D2 queue policies (e3eaeca)
-- ✅ Track A5 telemetry wiring + A4 mounting (3ebed65)
-- ✅ Track B1/B2/B3 memory semantics ported into skeleton/memory (this commit)
+- ✅ Track A (f6c7a78, 31c8541, e3eaeca, 3ebed65)
+- ✅ Track B1/B2/B3 memory semantics ported into skeleton/memory (51275cb)
+- ✅ Track B4a services/cag.py guarded shim (this commit)
