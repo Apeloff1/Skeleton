@@ -1853,6 +1853,10 @@ class TestGenosGatesAcquire:
         assert out["G"] >= out["G0"]
         miss = neo.improve("like something that does not exist")
         assert miss["improved"] == 0
+        up = neo.ascend("like hollow knight", rounds=4)
+        assert up["kind"] == "ascend" and up["law"] == "ok"
+        tr = neo.think("like hades")
+        assert tr.G >= 1.0 and tr.law == "ok"
 
 
 

@@ -62,6 +62,9 @@ class CortexTrace:
     own_size: int = 0
     moe_gates: Optional[List[float]] = None
     mouth: str = "neo"
+    G: float = 1.0
+    law: str = "ok"
+    improve: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -81,6 +84,9 @@ class CortexTrace:
             "own_size": self.own_size,
             "moe_gates": None if self.moe_gates is None else [round(g, 4) for g in self.moe_gates],
             "mouth": self.mouth,
+            "G": round(float(self.G), 6),
+            "law": self.law,
+            "improve": self.improve,
         }
 
 
@@ -210,6 +216,27 @@ class JeevesCortex:
         from skeleton.cortex.improve import improve
         return improve(self, stimulus, rounds=rounds)
 
+    def ascend(self, stimulus: str, *, rounds: int = 8) -> Dict[str, Any]:
+        from skeleton.cortex.laws import check
+        from skeleton.cortex.metrics import evaluate
+        card = self.improve(stimulus, rounds=rounds)
+        if not card.get("improved"):
+            return card
+        if hasattr(self, "elect_mouth"):
+            card["mouth"] = (self.elect_mouth() or {}).get("winner")
+        if hasattr(self, "sleep_cycle"):
+            card["sleep"] = self.sleep_cycle(n=4)
+        card["eval"] = evaluate(self)
+        card["kind"] = "ascend"
+        slim = {k: v for k, v in card.items() if k not in {"eval", "sleep", "mouth"}}
+        slim["kind"] = "ascend"
+        slim["eval_ppl"] = (card.get("eval") or {}).get("ppl")
+        out = check(slim)
+        out["eval"] = card.get("eval")
+        out["sleep"] = card.get("sleep")
+        out["mouth"] = card.get("mouth")
+        return out
+
     def bind_ref(self, slot: str = "right") -> Dict[str, str]:
         from skeleton.cortex.refs import GameRefPort
         return self.bind(slot, GameRefPort(slot=slot))
@@ -261,7 +288,7 @@ class JeevesCortex:
             ctx["reference"] = ref["ref"]
             stim = f"{stim} {ref['ref'].get('dialect') or ''}".strip()
         if "like " in (stimulus or "").lower() and ref.get("hit"):
-            ctx["improve"] = self.improve(stimulus or "")
+            ctx["improve"] = self.ascend(stimulus or "")
 
         route = self.slots["midbrain"].think(stim, ctx)
         self.ledger.record(route, stim)
@@ -347,6 +374,9 @@ class JeevesCortex:
             recalled_jaccard=recalled_j, shadow_win=shadow_win,
             own_size=self.own.size, moe_gates=gates,
             mouth=self.speaking_name(),
+            G=float(getattr(self.genos_engine, "G", 1.0) or 1.0),
+            law="ok",
+            improve=ctx.get("improve") if isinstance(ctx.get("improve"), dict) else None,
         )
 
     def _distill_step(
@@ -681,6 +711,8 @@ class JeevesCortex:
             },
             "lora": (self.transformer.lora.to_dict()
                      if getattr(self.transformer, "lora", None) is not None else None),
+            "genos": self.genos_engine.snapshot() if getattr(self, "genos_engine", None) else None,
+            "law": "ok",
         }
 
     def mouth(self, name: str = "gelu"):

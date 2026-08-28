@@ -84,6 +84,10 @@ def improve(neo, stimulus: str, *, rounds: int = 16) -> Dict[str, Any]:
     if rms is not None:
         for _ in range(max(2, int(rounds) // 2)):
             rms.fit(texts, lr=0.05, schedule="cosine")
+    for slot, port in (getattr(neo, "slots", {}) or {}).items():
+        xf_s = getattr(port, "transformer", None)
+        if xf_s is not None and hasattr(xf_s, "fit"):
+            xf_s.fit(texts[:2], lr=0.04, schedule="cosine")
 
     pulses = []
     if hasattr(neo, "genos"):

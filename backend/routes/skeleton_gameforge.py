@@ -347,6 +347,30 @@ def cortex_contact(body: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+@router.post("/cortex/refer")
+def cortex_refer(body: Dict[str, Any]) -> Dict[str, Any]:
+    from skeleton.cortex.live import live_cortex, persist
+    out = live_cortex().refer(str((body or {}).get("stimulus") or "elden ring"), live=bool((body or {}).get("live")))
+    persist()
+    return out
+
+
+@router.post("/cortex/improve")
+def cortex_improve(body: Dict[str, Any]) -> Dict[str, Any]:
+    from skeleton.cortex.live import live_cortex, persist
+    out = live_cortex().improve(str((body or {}).get("stimulus") or "like elden ring"), rounds=int((body or {}).get("rounds") or 8))
+    persist()
+    return out
+
+
+@router.post("/cortex/ascend")
+def cortex_ascend(body: Dict[str, Any]) -> Dict[str, Any]:
+    from skeleton.cortex.live import live_cortex, persist
+    out = live_cortex().ascend(str((body or {}).get("stimulus") or "like elden ring"), rounds=int((body or {}).get("rounds") or 8))
+    persist()
+    return out
+
+
 @router.post("/cortex/distill")
 def cortex_distill(body: Dict[str, Any]) -> Dict[str, Any]:
     from skeleton.cortex.live import live_cortex, persist
