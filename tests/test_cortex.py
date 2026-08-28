@@ -1531,4 +1531,26 @@ class TestQueue24:
         assert any(abs(a - b) > 1e-12 for ra, rb in zip(e0, neo.transformer.E[:2]) for a, b in zip(ra, rb))
 
 
+class TestQueue25:
+    def test_surpass_is_neo_decode(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        stim = "compile ttk hp dps recipe sim"
+        neo.think(stim)
+        neo.acquire("left")
+        neo.surpass("left")
+        assert "left" in neo._surpass
+        a = neo.think(stim)
+        assert a.used_own
+        assert a.amalgam.slot == "neo"
+        assert "surpass" in a.amalgam.tags
+        assert "ECHO" not in a.amalgam.text
+        neo.bind_echo("left")
+        b = neo.think(stim)
+        assert b.used_own
+        assert "ECHO" not in b.amalgam.text
+        assert b.left is not None and b.left.text.startswith("ECHO")
+        assert a.amalgam.kind == "own-lm" and b.amalgam.kind == "own-lm"
+
+
 

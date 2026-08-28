@@ -226,6 +226,7 @@ class JeevesCortex:
         veto = bool(pfc.tags and "veto" in pfc.tags) or (
             bool(pfc.numbers) and pfc.numbers[-1] >= 1.0
         )
+        own_thought = None
         if composed is not None:
             own_thought, recalled_j, _hits = composed
             shadow_win = shadow_eval(own_thought, teacher)
@@ -234,14 +235,16 @@ class JeevesCortex:
                 self.shadow["own"]["wins"] += 1
             if self.auto_surpass:
                 self._maybe_auto_surpass()
-            armed = bool(self._surpass)
-            if armed and not veto:
-                amalgam = self._lm_amalgam(stim, own_thought, recalled_j)
-                used_own = True
-                for s in self._surpass:
-                    self.shadow[s]["trials"] += 1
-                    if shadow_win:
-                        self.shadow[s]["wins"] += 1
+        armed = bool(self._surpass)
+        if armed and not veto:
+            if own_thought is None:
+                own_thought = Thought(slot="neo", kind="own", text="", confidence=0.5, tags=("own", "surpass"))
+            amalgam = self._lm_amalgam(stim, own_thought, recalled_j)
+            used_own = True
+            for s in self._surpass:
+                self.shadow[s]["trials"] += 1
+                if shadow_win:
+                    self.shadow[s]["wins"] += 1
 
         # Ingest AFTER the decision so this turn cannot recall itself.
         self.own.ingest(ability_from(teacher, stim), stim)
@@ -700,20 +703,26 @@ class JeevesCortex:
         has no mix numbers of its own.
         """
         xf = self.transformer
-        if xf is None or int(getattr(xf, "fitted", 0) or 0) <= 0:
-            return composed
+        mouth_name = "gelu"
+        winner = getattr(self, "_winner_mouth", None)
+        if winner == "neo_rms" and getattr(self, "neo_rms", None) is not None:
+            xf = self.neo_rms
+            mouth_name = "rms"
         seed = int(fingerprint(stim)[:8], 16) if stim else 0
-        gen = xf.decode(stim, n=14, seed=seed)
-        tags = tuple(dict.fromkeys(list(composed.tags) + ["lm", "neo", "own"]))
+        gen = ""
+        if xf is not None and hasattr(xf, "decode"):
+            gen = str(xf.decode(stim or "", n=14, seed=seed) or "")
+        tags = tuple(dict.fromkeys(list(composed.tags) + ["lm", "neo", "own", "surpass", mouth_name]))
         numbers = composed.numbers
         moe_mix = self.moe.predict_mix(self._hidden(stim))
         if moe_mix is not None and (not numbers or len(numbers) < 3):
             numbers = tuple(float(x) for x in moe_mix)
             tags = tuple(dict.fromkeys(list(tags) + ["moe", "mix"]))
+        body = gen.strip() or (composed.text or "")
         return Thought(
             slot="neo",
             kind="own-lm",
-            text=f"{gen} || {composed.text}",
+            text=body,
             confidence=min(1.0, 0.58 + 0.35 * float(jaccard or 0.0)),
             tags=tags,
             numbers=numbers,
