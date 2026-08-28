@@ -61,6 +61,7 @@ class CortexTrace:
     shadow_win: Optional[bool] = None
     own_size: int = 0
     moe_gates: Optional[List[float]] = None
+    mouth: str = "neo"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -79,6 +80,7 @@ class CortexTrace:
             "shadow_win": self.shadow_win,
             "own_size": self.own_size,
             "moe_gates": None if self.moe_gates is None else [round(g, 4) for g in self.moe_gates],
+            "mouth": self.mouth,
         }
 
 
@@ -128,6 +130,9 @@ class JeevesCortex:
         self.rl = ReinforceState()
         from skeleton.cortex.bpe import gameforge_bpe
         self.bpe = gameforge_bpe(merges=64)
+        self._winner_mouth = "neo"
+        self._mouth_override = None
+        self._seal: Dict[str, Any] = {}
 
     def backends(self) -> Dict[str, str]:
         return {s: getattr(p, "name", type(p).__name__) for s, p in self.slots.items()}
@@ -266,6 +271,7 @@ class JeevesCortex:
             acquired=dict(self.acquired), backends=self.backends(),
             recalled_jaccard=recalled_j, shadow_win=shadow_win,
             own_size=self.own.size, moe_gates=gates,
+            mouth=self.speaking_name(),
         )
 
     def _distill_step(
@@ -456,7 +462,11 @@ class JeevesCortex:
                 "bound": bound, "moe_fp": self.moe.fingerprint()}
 
     def train(self, *, epochs: int = 1, auto_surpass: bool = True) -> Dict[str, Any]:
-        return run_curriculum(self, epochs=epochs, auto_surpass=auto_surpass)
+        out = run_curriculum(self, epochs=epochs, auto_surpass=auto_surpass)
+        seal = self.elect_mouth()
+        out["mouth"] = seal.get("winner")
+        out["seal"] = seal
+        return out
 
     def save(self, path) -> Dict[str, Any]:
         from pathlib import Path
@@ -580,9 +590,33 @@ class JeevesCortex:
 
     def mouth(self, name: str = "gelu"):
         key = str(name or "gelu").lower()
-        if key in {"rms", "swiglu", "neo_rms", "right"}:
+        if key in {"rms", "swiglu", "neo_rms"}:
             return getattr(self, "neo_rms", None) or self.transformer
+        if key in {"pfc", "midbrain", "left", "right"}:
+            port = (getattr(self, "slots", {}) or {}).get(key)
+            xf = getattr(port, "transformer", None) if port is not None else None
+            return xf or self.transformer
         return self.transformer
+
+    def speaking_name(self) -> str:
+        if self._mouth_override:
+            return str(self._mouth_override)
+        return str(self._winner_mouth or "neo")
+
+    def speaking_lm(self):
+        return self.mouth(self.speaking_name())
+
+    def set_mouth(self, name: Optional[str] = None) -> str:
+        self._mouth_override = None if not name else str(name).lower()
+        return self.speaking_name()
+
+    def elect_mouth(self, *, texts=None) -> Dict[str, Any]:
+        from skeleton.cortex.zaibatsu import tournament
+        seal = tournament(self, texts=texts)
+        winner = str(seal.get("winner") or "neo")
+        self._winner_mouth = winner
+        self._seal = seal
+        return seal
 
     def speak(self, stimulus: str, *, n: int = 12, seed: int = 0, mouth: str = "gelu") -> str:
         xf = self.mouth(mouth)
@@ -702,12 +736,8 @@ class JeevesCortex:
         MoE mix stitches in when the left expert is fitted and compose
         has no mix numbers of its own.
         """
-        xf = self.transformer
-        mouth_name = "gelu"
-        winner = getattr(self, "_winner_mouth", None)
-        if winner == "neo_rms" and getattr(self, "neo_rms", None) is not None:
-            xf = self.neo_rms
-            mouth_name = "rms"
+        xf = self.speaking_lm()
+        mouth_name = self.speaking_name()
         seed = int(fingerprint(stim)[:8], 16) if stim else 0
         gen = ""
         if xf is not None and hasattr(xf, "decode"):

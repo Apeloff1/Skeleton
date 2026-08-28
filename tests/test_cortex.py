@@ -1553,4 +1553,20 @@ class TestQueue25:
         assert a.amalgam.kind == "own-lm" and b.amalgam.kind == "own-lm"
 
 
+class TestQueue26:
+    def test_think_reports_elected_mouth(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        out = neo.train(epochs=1)
+        seal = out["seal"]
+        tr = neo.think("plan tensor ttk")
+        assert tr.mouth == seal["winner"]
+        assert tr.to_dict()["mouth"] == seal["winner"]
+        neo.set_mouth("neo_rms")
+        tr2 = neo.think("plan tensor ttk")
+        assert tr2.mouth == "neo_rms"
+        neo.set_mouth(None)
+        assert neo.speaking_name() == seal["winner"]
+
+
 
