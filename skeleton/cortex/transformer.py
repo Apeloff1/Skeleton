@@ -544,7 +544,7 @@ class TinyTransformer:
 
     def hidden_seq(self, prefix: str) -> List[List[float]]:
         """Full residual stream. Callosum reads this, not just the last token."""
-        ids = [self._id(t) for t in tokens(prefix)] or [self.unk]
+        ids = self._ids(prefix)
         ids = ids[-self.ctx:]
         if self._accel is not None:
             try:
@@ -558,7 +558,7 @@ class TinyTransformer:
         return [list(row) for row in H] if H else [zeros(self.dim)]
 
     def weights_last(self, prefix: str) -> List[float]:
-        ids = [self._id(t) for t in tokens(prefix)] or [self.unk]
+        ids = self._ids(prefix)
         ids = ids[-self.ctx:]
         _H, caches = self._forward(ids)
         As = (caches[-1].get("As") if caches else None) or []
@@ -620,10 +620,9 @@ class TinyTransformer:
         corpus = [t for t in texts if t]
         windows: List[Tuple[List[int], int]] = []
         for raw in corpus:
-            body = tokens(raw)
-            if len(body) < 2:
+            ids = self._ids(raw)
+            if len(ids) < 2:
                 continue
-            ids = [self._id(t) for t in body]
             for i in range(1, len(ids)):
                 windows.append((ids[max(0, i - self.ctx):i], ids[i]))
         total = max(1, len(windows))
@@ -636,10 +635,9 @@ class TinyTransformer:
         return n
 
     def logprob(self, text: str) -> float:
-        body = tokens(text)
-        if len(body) < 2:
+        ids = self._ids(text)
+        if len(ids) < 2:
             return math.log(1.0 / max(1, self.V))
-        ids = [self._id(t) for t in body]
         lp = 0.0
         n = 0
         for i in range(1, len(ids)):
@@ -689,15 +687,22 @@ class TinyTransformer:
         """Token ids from the BPE mouth. Unknown pieces fall to word _id / UNK."""
         if bpe is None:
             bpe = getattr(self, "bpe", None)
+        word_ids = [self._id(t) for t in tokens(text)] or [self.unk]
         if bpe is None or not hasattr(bpe, "encode_pieces"):
-            return [self._id(t) for t in tokens(text)] or [self.unk]
+            return word_ids
         ids: List[int] = []
         for piece in bpe.encode_pieces(text or ""):
             if piece in self.stoi:
                 ids.append(self._id(piece))
             else:
                 ids.append(self.unk)
-        return ids or [self.unk]
+        if not ids or ids.count(self.unk) >= len(ids):
+            return word_ids
+        return ids
+
+    def _ids(self, text: str) -> List[int]:
+        """Single id path. BPE mouth first; word ids if the pieces miss the vocab."""
+        return list(self.from_bpe(text or "", getattr(self, "bpe", None)))
 
     def beam(self, prefix: str, *, n: int = 8, width: int = 4) -> Dict[str, Any]:
         from skeleton.cortex.beam import beam_search
@@ -728,10 +733,9 @@ class TinyTransformer:
     ) -> Tuple[str, ...]:
         rng = random.Random(int(seed) & 0xFFFFFFFF)
         if isinstance(prefix, str):
-            body = list(tokens(prefix))
+            ids = self._ids(prefix)
         else:
-            body = [str(t) for t in prefix]
-        ids = [self._id(t) for t in body] or [self.unk]
+            ids = [self._id(str(t)) for t in prefix] or [self.unk]
         out = list(ids)
         cache = KVCache(self.n_layers, self.ctx) if use_cache else None
         for _ in range(max(1, n)):

@@ -46,7 +46,7 @@ class LearnedWeights:
         n = self.lm.fit([text])
         self.neural.fit([text])
         if self.transformer is not None:
-            self.transformer.fit([text])
+            self.transformer.fit([text], schedule="cosine")
         return n
 
     def snapshot(self) -> Dict[str, Any]:

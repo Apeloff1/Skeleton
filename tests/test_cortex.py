@@ -1593,4 +1593,28 @@ class TestQueue27:
         assert b.neo_rms.lora is not None
 
 
+class TestQueue28Queue29:
+    def test_bpe_is_the_id_path(self):
+        from skeleton.cortex import JeevesCortex
+        from skeleton.cortex.lm import gameforge_corpus
+        neo = JeevesCortex()
+        text = "plan tensor ttk lattice"
+        assert neo.tokens_of(text) == neo.transformer.from_bpe(text, neo.bpe)
+        assert neo.tokens_of(text) == neo.transformer._ids(text)
+        ratio = neo.bpe.compression(" ".join(gameforge_corpus()[:8]))
+        assert ratio < 1.0
+
+    def test_tied_cosine_all_slot_lms(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        assert neo.transformer.tied is True
+        assert neo.transformer.Wout is neo.transformer.E
+        before = {s: int(getattr(neo.slots[s].transformer, "steps", 0) or 0) for s in ("pfc", "midbrain", "left", "right")}
+        neo.train(epochs=1)
+        for s, n0 in before.items():
+            assert neo.slots[s].transformer.steps > n0
+        assert neo.transformer.tied is True
+        assert neo.transformer.steps >= 1
+
+
 

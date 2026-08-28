@@ -130,6 +130,14 @@ class JeevesCortex:
         self.rl = ReinforceState()
         from skeleton.cortex.bpe import gameforge_bpe
         self.bpe = gameforge_bpe(merges=64)
+        self.transformer.bpe = self.bpe
+        self.neo_rms.bpe = self.bpe
+        if hasattr(self.transformer, "tie"):
+            self.transformer.tie()
+        for port in self.slots.values():
+            xf = getattr(port, "transformer", None)
+            if xf is not None:
+                xf.bpe = self.bpe
         self._winner_mouth = "neo"
         self._mouth_override = None
         self._seal: Dict[str, Any] = {}
