@@ -74,6 +74,7 @@ from skeleton.kernel.health import (
 from skeleton.kernel.work_queue import (
     Lane,
     LaneFullError,
+    SubmitterCapError,
     WorkItem,
     WorkQueue,
     WorkQueueError,
@@ -162,6 +163,7 @@ __all__ = [
     "Rollup",
     "Lane",
     "LaneFullError",
+    "SubmitterCapError",
     "WorkItem",
     "WorkQueue",
     "WorkQueueError",

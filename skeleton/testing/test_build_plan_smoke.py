@@ -60,6 +60,13 @@ def test_work_queue_submitter_cap():
     q.enqueue("lane", "d", submitter="quiet")  # other submitters unaffected
 
 
+def test_submitter_cap_error_exported_from_kernel_package():
+    from skeleton.kernel import SubmitterCapError
+    from skeleton.kernel.work_queue import SubmitterCapError as Direct
+
+    assert SubmitterCapError is Direct
+
+
 def test_queue_shims_resolve_to_canonical():
     from skeleton.kernel import workqueue as wq_shim
     from skeleton.kernel import fair_queue as fq_shim
@@ -196,7 +203,6 @@ def test_quad_retriever_emits_valid_events_and_serves_cache():
     assert "retrieval.completed" in seen
 
     # second identical retrieve should come from the CAG answer cache
-    before = bus.stats()["published_total"]
     cached = quad.retrieve("vector clocks")
     assert cached
     topics = [e.topic for e in bus.replay("retrieval.*")]
