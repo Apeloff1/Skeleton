@@ -20,9 +20,21 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 
 - [x] D1. Audited: `genesis.py` imports canonical clocks; the three shims
       (`workqueue.py`, `fair_queue.py`, `vclock.py`) are pure re-exports with
-      zero internal consumers — they ARE the deprecation layer. Nothing left
-      to cut without deletion; shim removal queued under E4.
+      zero internal consumers — they ARE the deprecation layer. Removal
+      queued under E4.
 - [x] D2. `WorkQueue` optional per-submitter caps + deadline expiry (e3eaeca).
+
+## Track F — Quad retriever wiring — DONE (this commit)
+
+- [x] F1. Fixed bus contract violation: `quad.py` called
+      `EventBus.publish(str, dict)`; the bus requires a DomainEvent, so every
+      ingest/retrieve raised EventBusError. Now emits via `bus.emit(...)`
+      through a best-effort `_emit` helper — telemetry can never break
+      retrieval.
+- [x] F2. `QuadRetriever` wired into Genesis `_phase_interface` as the
+      `quad` handle alongside anomaly/provenance/reranker.
+- [x] F3. Smoke tests: event emission shape, cache-hit on repeated query,
+      and the genesis `quad` handle boot check.
 
 ## Track E — Cleanup pass (deferred, requires local git ops)
 
@@ -34,11 +46,11 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 
 ## Verification
 
-- [x] `skeleton/testing/test_build_plan_smoke.py` — executable smoke tests
-      for every surface landed this session: DRR fairness, deadline expiry,
-      submitter caps, shim identity, FeatureReranker, pipeline stages,
-      prefix byte-determinism, filler persistence, warmer refresh,
-      idempotency replay (this commit).
+- [x] `skeleton/testing/test_build_plan_smoke.py` — 14 tests covering DRR
+      fairness, deadline expiry, submitter caps, shim identity,
+      FeatureReranker, pipeline stages, prefix byte-determinism, filler
+      persistence, warmer refresh, idempotency replay, quad event shape /
+      cache hit / genesis wiring.
 - [ ] Run `pytest skeleton/testing/test_build_plan_smoke.py` in CI/local and
       confirm green; then `docker compose build backend` and confirm the
       `jeeves:system` prefix SHA is unchanged after the B5 flip.
@@ -53,4 +65,5 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 - ✅ api/server.py + api/errors.py restored after bad rewrite (b4790a1)
 - ✅ Track A (f6c7a78, 31c8541, e3eaeca, 3ebed65)
 - ✅ Track B (51275cb, 324db3d, 7790918, 656406a, 48963bd)
-- ✅ Track D1 audit closed (this commit)
+- ✅ Track D1 audit closed (9622493)
+- ✅ Track F quad bus-contract fix + genesis wiring (this commit)

@@ -8,6 +8,7 @@ never been executed when written:
   - retrieval: FeatureReranker disambiguation + rank-stage pipeline (C1)
   - memory: prefix renderer byte-determinism + warmer persistence (B2/B3)
   - api: idempotency guard replay semantics (A4)
+  - quad: bus event shape fix + genesis wiring (this round)
 
 Run: pytest skeleton/testing/test_build_plan_smoke.py -v
 """
@@ -171,3 +172,43 @@ def test_idempotency_guard_replays_recorded_response():
     assert guard.replay(headers) == payload
     assert guard.replay({}) is None     # no header → never replays
     assert guard.replay({IDEMPOTENCY_HEADER: "other"}) is None
+
+
+# ── quad retriever (bus event shape fix + genesis wiring) ────────────────
+
+def test_quad_retriever_emits_valid_events_and_serves_cache():
+    """Regression: ingest/retrieve previously raised EventBusError because
+    quad.py called bus.publish(str, dict) instead of passing a DomainEvent."""
+    from skeleton.kernel.events import EventBus
+    from skeleton.retrieval.quad import QuadRetriever
+
+    bus = EventBus()
+    seen = []
+    bus.subscribe("retrieval.*", lambda e: seen.append(e.topic))
+
+    quad = QuadRetriever(bus=bus)
+    quad.ingest_document("doc1", "vector clocks merge on message receipt")
+    quad.ingest_fact("vector clock", "orders", "causality")
+
+    results = quad.retrieve("vector clocks")
+    assert results                      # RRF fusion produced hits
+    assert "retrieval.ingested" in seen
+    assert "retrieval.completed" in seen
+
+    # second identical retrieve should come from the CAG answer cache
+    before = bus.stats()["published_total"]
+    cached = quad.retrieve("vector clocks")
+    assert cached
+    topics = [e.topic for e in bus.replay("retrieval.*")]
+    assert "retrieval.cache_hit" in topics
+
+
+def test_genesis_wires_quad_handle():
+    from skeleton.genesis import Genesis
+
+    g = Genesis(seed=42).boot()
+    quad = g.get("quad")
+    assert quad is not None
+    assert "interface" in g.report.phases
+    assert "quad" in g.report.wired["interface"]
+    assert g.health()["healthy"]

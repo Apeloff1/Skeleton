@@ -16,6 +16,12 @@ normalises each plane's scores into [0,1], and merges with *reciprocal rank
 fusion* (RRF) weighted per plane. Every plane is fully implemented — no external
 service is required; ChromaDB can back the RAG plane when present, but the
 embedded TF-IDF vector store is the default and is complete.
+
+Fix (2026-08-28): bus notifications previously called
+``EventBus.publish(topic_str, payload_dict)`` — the kernel bus requires a
+:class:`DomainEvent`, so every ingest/retrieve raised ``EventBusError``.
+Switched to ``bus.emit(...)``, which builds the event. ``bus.emit`` failures
+are swallowed: retrieval must never fail on telemetry.
 """
 
 from __future__ import annotations
@@ -54,6 +60,14 @@ class Fragment:
 
 def _tokens(text: str) -> List[str]:
     return [t for t in "".join(c.lower() if c.isalnum() else " " for c in text).split() if t]
+
+
+def _emit(bus: EventBus, topic: str, payload: Dict[str, Any]) -> None:
+    """Best-effort event emit — telemetry must never break retrieval."""
+    try:
+        bus.emit(topic, payload, correlation_id="quad-retriever")
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -380,8 +394,8 @@ class QuadRetriever:
             self.mag.encode(chunk, kind="semantic",
                             salience=min(1.0, salience + 0.1 * (i == 0)),
                             metadata={"doc_id": doc_id, "chunk": i})
-        self._bus.publish("retrieval.ingested",
-                          {"doc_id": doc_id, "chunks": len(chunks)})
+        _emit(self._bus, "retrieval.ingested",
+              {"doc_id": doc_id, "chunks": len(chunks)})
         return len(chunks)
 
     def ingest_fact(self, subject: str, predicate: str, obj: str,
@@ -397,7 +411,8 @@ class QuadRetriever:
         if use_cache:
             cached = self.cag.search(query, k=k)
             if cached:
-                self._bus.publish("retrieval.cache_hit", {"query": query, "hits": len(cached)})
+                _emit(self._bus, "retrieval.cache_hit",
+                      {"query": query, "hits": len(cached)})
                 return cached
 
         plane_hits: Dict[str, List[Fragment]] = {
@@ -422,10 +437,10 @@ class QuadRetriever:
         if use_cache:
             self.cag.put(query, results, negative=not results)
         elapsed_ms = (time.perf_counter() - t0) * 1000
-        self._bus.publish("retrieval.completed",
-                          {"query": query, "results": len(results),
-                           "elapsed_ms": round(elapsed_ms, 3),
-                           "planes": {p: len(h) for p, h in plane_hits.items()}})
+        _emit(self._bus, "retrieval.completed",
+              {"query": query, "results": len(results),
+               "elapsed_ms": round(elapsed_ms, 3),
+               "planes": {p: len(h) for p, h in plane_hits.items()}})
         return results
 
     def stats(self) -> Dict[str, Any]:

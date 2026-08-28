@@ -42,7 +42,6 @@ class Genesis:
         self._phase_intelligence()
         self._phase_swarm()
         self._phase_resilience()
-        self._phase_context()
         self._phase_interface()
         self.bus.publish(
             DomainEvent(
@@ -111,12 +110,6 @@ class Genesis:
         )
         self._wire("intelligence", "orchestrator", IntelligenceOrchestrator(bus=self.bus))
         self._wire("intelligence", "adaptive", AdaptiveLearner(default_meta_grid(), bus=self.bus))
-        from skeleton.cortex.live import live_cortex, live_jeeves
-        cortex = live_cortex()
-        jeeves = live_jeeves()
-        jeeves.cortex = cortex
-        self._wire("intelligence", "cortex", cortex)
-        self._wire("intelligence", "jeeves", jeeves)
 
     def _phase_swarm(self) -> None:
         self.report.phases.append("swarm")
@@ -155,25 +148,17 @@ class Genesis:
         canaries.plant("vault")
         self._wire("resilience", "canaries", canaries)
 
-    def _phase_context(self) -> None:
-        self.report.phases.append("context")
-        from skeleton.context import Cockpit, GameForgeRun
-        from skeleton.cortex.live import live_jeeves
-        cockpit = Cockpit()
-        self._wire("context", "cockpit", cockpit)
-        self._wire("context", "gameforge", GameForgeRun(
-            bus=self.bus, cockpit=cockpit, jeeves=live_jeeves(), live=True,
-        ))
-
     def _phase_interface(self) -> None:
         self.report.phases.append("interface")
         from skeleton.observability.anomaly import AnomalyDetector
         from skeleton.retrieval.provenance import ProvenanceLedger
+        from skeleton.retrieval.quad import QuadRetriever
         from skeleton.retrieval.reranker import FeatureReranker
 
         self._wire("interface", "anomaly", AnomalyDetector(bus=self.bus))
         self._wire("interface", "provenance", ProvenanceLedger(bus=self.bus))
         self._wire("interface", "reranker", FeatureReranker())
+        self._wire("interface", "quad", QuadRetriever(bus=self.bus))
 
     def health(self) -> Dict[str, Any]:
         assert self.lattice is not None
