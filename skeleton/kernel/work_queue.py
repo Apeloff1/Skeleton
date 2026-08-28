@@ -14,10 +14,22 @@ forever. Weighted fair queueing gives each lane a guaranteed share:
 
 Bounds are explicit: per-lane capacity, global in-flight cap, and
 deterministic tie-breaking so replay produces the same schedule.
+
+Optional policies ported from the retired ``fair_queue`` plane:
+
+- **Deadlines** — items may carry an absolute ``deadline``; ``dequeue``
+  silently retires expired work (counted under ``stats.expired``) instead
+  of running zombie tasks.
+- **Per-submitter caps** — when constructed with ``per_submitter_cap``,
+  enqueue rejects work from a submitter already holding that many queued
+  items, so one chatty producer can't flood every lane.
+
+Both policies are opt-in: default construction behaves exactly as before.
 """
 
 from __future__ import annotations
 
+import time
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Deque, Dict, Optional, Tuple
@@ -34,11 +46,23 @@ class LaneFullError(WorkQueueError):
     http_status = 503
 
 
+class SubmitterCapError(WorkQueueError):
+    code = "KRN.WQ_SUBMITTER_CAP"
+    http_status = 503
+
+
 @dataclass(frozen=True)
 class WorkItem:
     item_id: str
     payload: Any
     enqueued_seq: int = 0
+    submitter: Optional[str] = None
+    deadline: Optional[float] = None  # absolute epoch seconds; None = never
+
+    def is_expired(self, now: Optional[float] = None) -> bool:
+        if self.deadline is None:
+            return False
+        return (now if now is not None else time.time()) >= self.deadline
 
 
 @dataclass
@@ -67,13 +91,25 @@ class WorkQueue:
 
     QUANTUM = 100.0  # one dequeue unit per weight-1 lane per round
 
-    def __init__(self, *, max_in_flight: int = 64) -> None:
+    def __init__(
+        self,
+        *,
+        max_in_flight: int = 64,
+        per_submitter_cap: Optional[int] = None,
+        clock: Optional[Any] = None,
+    ) -> None:
         if max_in_flight < 1:
             raise WorkQueueError("max_in_flight must be >= 1")
+        if per_submitter_cap is not None and per_submitter_cap < 1:
+            raise WorkQueueError("per_submitter_cap must be >= 1 when set")
         self.max_in_flight = max_in_flight
+        self.per_submitter_cap = per_submitter_cap
+        self._now = clock or time.time
         self._lanes: Dict[str, Lane] = {}
         self._seq = 0
         self._in_flight = 0
+        self._submitter_counts: Dict[str, int] = {}
+        self._expired = 0
 
     # ------------------------------------------------------------------
     # Lanes
@@ -92,23 +128,51 @@ class WorkQueue:
     # Enqueue / dequeue
     # ------------------------------------------------------------------
 
-    def enqueue(self, lane: str, item_id: str, payload: Any = None) -> WorkItem:
+    def enqueue(
+        self,
+        lane: str,
+        item_id: str,
+        payload: Any = None,
+        *,
+        submitter: Optional[str] = None,
+        deadline: Optional[float] = None,
+    ) -> WorkItem:
         target = self._require(lane)
         if len(target.queue) >= target.capacity:
             raise LaneFullError(
                 "lane at capacity",
                 context={"lane": lane, "capacity": target.capacity},
             )
+        if submitter is not None and self.per_submitter_cap is not None:
+            held = self._submitter_counts.get(submitter, 0)
+            if held >= self.per_submitter_cap:
+                raise SubmitterCapError(
+                    "submitter at fair-share cap",
+                    context={"submitter": submitter, "cap": self.per_submitter_cap},
+                )
         self._seq += 1
-        item = WorkItem(item_id=item_id, payload=payload, enqueued_seq=self._seq)
+        item = WorkItem(
+            item_id=item_id,
+            payload=payload,
+            enqueued_seq=self._seq,
+            submitter=submitter,
+            deadline=deadline,
+        )
         target.queue.append(item)
+        if submitter is not None:
+            self._submitter_counts[submitter] = self._submitter_counts.get(submitter, 0) + 1
         return item
 
     def dequeue(self) -> Optional[Tuple[str, WorkItem]]:
         """Pick the next item fairly. Returns (lane, item) or None when
-        every lane is empty or the in-flight cap is reached."""
+        every lane is empty or the in-flight cap is reached.
+
+        Expired items (deadline passed) are retired silently and counted
+        under ``stats().expired`` — zombie work never runs.
+        """
         if self._in_flight >= self.max_in_flight:
             return None
+        now = self._now()
         live = [ln for ln in self._lanes.values() if ln.queue]
         if not live:
             return None
@@ -122,6 +186,13 @@ class WorkQueue:
             return None  # nobody has earned a turn yet
         chosen.deficit -= self.QUANTUM
         item = chosen.queue.popleft()
+        if item.submitter is not None:
+            self._submitter_counts[item.submitter] = max(
+                0, self._submitter_counts.get(item.submitter, 0) - 1
+            )
+        if item.is_expired(now):
+            self._expired += 1
+            return self.dequeue()  # retire and try the next item
         self._in_flight += 1
         return chosen.name, item
 
@@ -139,6 +210,14 @@ class WorkQueue:
             return len(self._require(lane).queue)
         return sum(len(ln.queue) for ln in self._lanes.values())
 
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "lanes": self.report(),
+            "in_flight": self._in_flight,
+            "expired": self._expired,
+            "submitters": dict(self._submitter_counts),
+        }
+
     def report(self) -> Dict[str, Dict[str, float]]:
         return {
             name: {
@@ -155,6 +234,11 @@ class WorkQueue:
         items = tuple(target.queue)
         target.queue.clear()
         target.deficit = 0.0
+        for item in items:
+            if item.submitter is not None:
+                self._submitter_counts[item.submitter] = max(
+                    0, self._submitter_counts.get(item.submitter, 0) - 1
+                )
         return items
 
     def _require(self, lane: str) -> Lane:

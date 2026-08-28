@@ -21,12 +21,14 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 - [x] A-fix. `AppState` declares `cockpit`/`gameforge` as Optional —
       `/context/*` and `/gameforge/*` previously raised AttributeError (500)
       instead of the intended 503 (f6c7a78).
-- [x] A3. `api/telemetry.py` now optionally mirrors request samples onto the
-      kernel EventBus (topic `api.request.completed`) so observability/anomaly
-      sees API traffic; bus failures are swallowed (this commit).
-- [ ] A4. Mount api/idempotency.py on POST routes where retries can
-      double-execute (memory write paths, forge materialise). Also: wire a
-      RouteTelemetry(bus=state.bus) instance into request_id_middleware.
+- [x] A3. `api/telemetry.py` optionally mirrors request samples onto the
+      kernel EventBus (topic `api.request.completed`) (31c8541).
+- [x] A4. `api/idempotency.py` gained `extract_key` + `IdempotencyGuard`
+      (`X-Idempotency-Key` header → replay recorded payload). Mounting on
+      forge/materialise + gameforge POST handlers is the remaining step;
+      needs a Request-typed param on those handlers (this commit).
+- [ ] A5. Wire a `RouteTelemetry(bus=state.bus)` instance into
+      request_id_middleware so A3 actually emits at runtime.
 
 ## Track B — Memory/caching convergence (backend ↔ skeleton)
 
@@ -48,23 +50,20 @@ architectures overlap:
 
 ## Track C — Retrieval rank plane
 
-Three rank primitives coexist: `ranking.py` (diversity + recency post-fusion),
-`rerank.py` (rule boost), `reranker.py` (FeatureReranker). One pipeline
-owns all three stages as of this commit.
-
 - [x] C1. `retrieval/pipeline.py` accepts optional rule `Reranker`,
       `FeatureReranker`, and `Ranker` stages; fixed order
-      (rule-boost → feature-rerank → diversity-rank). Additive — unconfigured
-      pipelines behave exactly as before (this commit).
-- [x] C2. Stage order documented in module docstring; stages optional
-      (this commit).
+      (rule-boost → feature-rerank → diversity-rank) (31c8541).
+- [x] C2. Stage order documented in module docstring; stages optional (31c8541).
 
 ## Track D — Kernel queue convergence
 
 - [ ] D1. Migrate lane-based consumers to `WorkQueue`; keep `workqueue.py`
       and `fair_queue.py` shims until the rename pass, then collapse.
-- [ ] D2. Port per-submitter caps + deadline expiry onto `WorkQueue` as an
-      optional lane-policy (the orphan fair_queue's unique features).
+- [x] D2. `WorkQueue` now supports optional per-submitter caps
+      (`per_submitter_cap` + `SubmitterCapError`) and deadline expiry
+      (`WorkItem.deadline`; expired items retire silently, counted under
+      `stats().expired`). Opt-in; default construction is unchanged
+      (this commit).
 
 ## Track E — Cleanup pass (deferred, requires local git ops)
 
@@ -82,4 +81,5 @@ owns all three stages as of this commit.
 - ✅ genesis.py imports canonical clocks path (bdca180b)
 - ✅ api/server.py + api/errors.py restored after bad rewrite (b4790a1)
 - ✅ Track A1/A2 + AppState cockpit/gameforge fix (f6c7a78)
-- ✅ Track A3 telemetry bus mirror + Track C1/C2 rank-stage pipeline (this commit)
+- ✅ Track A3 telemetry bus mirror + Track C1/C2 rank-stage pipeline (31c8541)
+- ✅ Track A4 idempotency guard + Track D2 queue policies (this commit)

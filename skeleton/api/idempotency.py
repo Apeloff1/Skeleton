@@ -6,6 +6,9 @@ payload instead of rerunning the handler.
 
 - :class:`IdempotencyKey` — parsed header (with length/format checks)
 - :class:`IdempotencyStore` — TTL-keyed response cache
+- :func:`extract_key` / :class:`IdempotencyGuard` — FastAPI integration:
+  parse the ``X-Idempotency-Key`` header and short-circuit replays with
+  the recorded payload (see ``skeleton/api/routes.py`` forge endpoints).
 """
 
 from __future__ import annotations
@@ -15,6 +18,8 @@ from dataclasses import dataclass
 from typing import Callable, Dict, Optional, Tuple
 
 from skeleton.api.middleware import MiddlewareError
+
+IDEMPOTENCY_HEADER = "X-Idempotency-Key"
 
 
 class IdempotencyError(MiddlewareError):
@@ -34,6 +39,14 @@ def parse_key(header: Optional[str]) -> Optional[IdempotencyKey]:
     if header is None:
         return None
     return IdempotencyKey(value=header.strip())
+
+
+def extract_key(headers: Dict[str, str]) -> Optional[IdempotencyKey]:
+    """Pull the idempotency key from a request header mapping (any casing)."""
+    for name, value in headers.items():
+        if name.lower() == IDEMPOTENCY_HEADER.lower():
+            return parse_key(value)
+    return None
 
 
 class IdempotencyStore:
@@ -61,3 +74,32 @@ class IdempotencyStore:
 
     def size(self) -> int:
         return len(self._entries)
+
+
+class IdempotencyGuard:
+    """Per-route guard: first execution runs, replays return the recording.
+
+    Usage inside a route handler::
+
+        guard = IdempotencyGuard(_IDEMPOTENCY_STORE)
+        replay = guard.replay(headers)
+        if replay is not None:
+            return replay
+        response = {...}  # real work
+        guard.remember(headers, response)
+        return response
+    """
+
+    def __init__(self, store: Optional[IdempotencyStore] = None) -> None:
+        self.store = store or IdempotencyStore()
+
+    def replay(self, headers: Dict[str, str]) -> Optional[object]:
+        key = extract_key(headers)
+        if key is None:
+            return None
+        return self.store.seen(key)
+
+    def remember(self, headers: Dict[str, str], response: object) -> None:
+        key = extract_key(headers)
+        if key is not None:
+            self.store.record(key, response)
