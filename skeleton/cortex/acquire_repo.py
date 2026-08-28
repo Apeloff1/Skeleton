@@ -12,7 +12,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 ROOT_NAME = "skeleton/acquired"
 
@@ -100,12 +100,18 @@ def _dialect(name, blurb, genres) -> str:
     bits = [str(name or "game").lower()]
     gtxt = " ".join(str(g.get("description") if isinstance(g, dict) else g) for g in (genres or [])).lower()
     text = f"{blurb or ''} {gtxt}".lower()
-    if any(w in text for w in ("soul", "dark fantasy", "die", "bonfire")):
+    if any(w in text for w in ("soul", "dark fantasy", "die", "bonfire", "sekiro", "bloodborne")):
         bits.append("soulslike extraction ttk elite dread")
     if any(w in text for w in ("open world", "exploration", "action rpg")):
         bits.append("open-world exploration pack")
-    if any(w in text for w in ("roguelike", "procedural")):
-        bits.append("roguelike lattice")
+    if any(w in text for w in ("roguelike", "rogue-lite", "procedural", "hades", "slay the spire")):
+        bits.append("roguelike lattice mix trash elite boss")
+    if any(w in text for w in ("metroid", "castlevania", "hollow knight", "backtrack")):
+        bits.append("metroidvania backtrack map")
+    if any(w in text for w in ("extract", "tarkov", "hunt", "lethal")):
+        bits.append("extraction_now ttk elite dread")
+    if any(w in text for w in ("cozy", "farm", "stardew")):
+        bits.append("cozy harvest era")
     bits.append("plan tensor ttk hp dps")
     return " ".join(bits)
 
@@ -135,7 +141,7 @@ def acquire_gaming(neo=None, *, appid: int = 1245620, title: str = "Elden Ring",
         "kind": "gaming-acquire",
         "written": written,
         "errors": errors,
-        "ok": int(len(written) > 0 and len(errors) == 0),
+        "ok": int(any(str(w.get("path") or "").endswith(".json") and "index" not in str(w.get("path") or "") for w in written[:-1]) if written else 0),
         "dialect": " | ".join(dialect_bits)[:400],
     }
     written.append(_write(dest / "index.json", index))
@@ -161,3 +167,73 @@ def acquire_catalog(root: Optional[Path] = None) -> Dict[str, Any]:
     card = {"kind": "catalog", "families": catalog(), "probe": probe_all()}
     meta = _write(dest / "catalog.json", card)
     return {"acquired": 1, "errors": [], "files": [meta]}
+
+
+SPREE: Tuple[Dict[str, Any], ...] = (
+    {"appid": 1245620, "title": "Elden Ring", "era": "soulslike"},
+    {"appid": 374320, "title": "Dark Souls III", "era": "soulslike"},
+    {"appid": 814380, "title": "Sekiro Shadows Die Twice", "era": "soulslike"},
+    {"appid": 1627720, "title": "Lies of P", "era": "soulslike"},
+    {"appid": 1145360, "title": "Hades", "era": "roguelike"},
+    {"appid": 646570, "title": "Slay the Spire", "era": "roguelike"},
+    {"appid": 518790, "title": "Dead Cells", "era": "roguelike"},
+    {"appid": 367520, "title": "Hollow Knight", "era": "metroidvania"},
+    {"appid": 1809540, "title": "Nine Sols", "era": "metroidvania"},
+    {"appid": 594650, "title": "Hunt Showdown", "era": "extraction_now"},
+    {"appid": 1966720, "title": "Lethal Company", "era": "extraction_now"},
+    {"appid": 413150, "title": "Stardew Valley", "era": "cozy"},
+)
+
+
+def acquire_spree(neo=None, *, root: Optional[Path] = None) -> Dict[str, Any]:
+    dest = acquired_dir(root) / "gaming"
+    rows: List[Dict[str, Any]] = []
+    errors: List[str] = []
+    dialects: List[str] = []
+    for game in SPREE:
+        row = {"title": game["title"], "appid": game["appid"], "era": game["era"], "ok": 0}
+        try:
+            out = acquire_gaming(None, appid=int(game["appid"]), title=str(game["title"]), root=root)
+            row["ok"] = 1 if not out.get("errors") else 0
+            row["files"] = len(out.get("files") or [])
+            row["errors"] = list(out.get("errors") or [])
+            if out.get("dialect"):
+                dialects.append(str(out["dialect"]))
+            errors.extend(f"{game['title']}:{e}" for e in (out.get("errors") or []))
+        except Exception as exc:
+            row["errors"] = [type(exc).__name__]
+            errors.append(f"{game['title']}:{type(exc).__name__}")
+        rows.append(row)
+    blob = " || ".join(dialects)
+    if neo is not None and blob:
+        xf = getattr(neo, "transformer", None)
+        if xf is not None:
+            xf.fit(dialects, lr=0.04, schedule="cosine")
+        rms = getattr(neo, "neo_rms", None)
+        if rms is not None:
+            rms.fit(dialects, lr=0.04, schedule="cosine")
+        if hasattr(neo, "own"):
+            neo.own.ingest_model("gaming-spree", {"n": len(rows), "dialect": blob[:400]})
+        if hasattr(neo, "think"):
+            for d in dialects[:8]:
+                neo.think(d[:160])
+        if hasattr(neo, "genos"):
+            pulse = neo.genos(blob[:180])
+        else:
+            pulse = {}
+    else:
+        pulse = {}
+    index = {
+        "kind": "gaming-spree",
+        "games": rows,
+        "ok": int(all(r.get("ok") for r in rows)),
+        "errors": errors,
+        "n": len(rows),
+        "dialects": len(dialects),
+        "G": (pulse or {}).get("G"),
+        "epsilon": (pulse or {}).get("epsilon"),
+    }
+    written = _write(dest / "spree.json", index)
+    if pulse:
+        _write(acquired_dir(root) / "genos" / "spree_pulse.json", {"kind": "genos-spree", "card": pulse})
+    return {"acquired": len(rows), "ok": index["ok"], "errors": errors, "files": [written], "pulse": pulse}

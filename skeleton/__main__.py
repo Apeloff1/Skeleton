@@ -97,6 +97,8 @@ def main(argv: list[str] | None = None) -> int:
     ac.add_argument("--appid", type=int, default=1245620)
     ac.add_argument("--title", default="Elden Ring")
 
+    sub.add_parser("spree", help="full gaming acquire across the house era pack")
+
     wk = sub.add_parser("walk", help="prove spawn→extract on the emitted door graph")
     wk.add_argument("--era", default="extraction_now")
     wk.add_argument("--blend", nargs=2, metavar=("ERA_A", "ERA_B"))
@@ -210,6 +212,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "acquire-game":
         from skeleton.cortex.live import live_cortex, persist
         out = live_cortex().acquire_gaming(appid=args.appid, title=args.title)
+        persist()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "spree":
+        from skeleton.cortex.live import live_cortex, persist
+        out = live_cortex().acquire_spree()
         persist()
         print(json.dumps(out, indent=2, default=str))
         return 0

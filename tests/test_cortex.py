@@ -1781,5 +1781,12 @@ class TestGenosGatesAcquire:
         hf = neo.gate("huggingface.hub", slot="left")
         assert hf.get("family") == "huggingface.hub" or "huggingface" in neo.backends()["left"]
 
+    def test_spree_pack_is_twelve_and_landed(self):
+        from skeleton.cortex.acquire_repo import SPREE, acquired_dir
+        assert len(SPREE) == 12
+        dest = acquired_dir() / "gaming"
+        assert len(list(dest.glob("steam_*.json"))) >= 12
+        assert (dest / "spree.json").exists()
+
 
 

@@ -198,6 +198,10 @@ class JeevesCortex:
         from skeleton.cortex.acquire_repo import acquire_gaming
         return acquire_gaming(self, appid=appid, title=title)
 
+    def acquire_spree(self) -> Dict[str, Any]:
+        from skeleton.cortex.acquire_repo import acquire_spree
+        return acquire_spree(self)
+
     def _contact_if_teacher(self, slot: str, stimulus: str) -> None:
         from skeleton.cortex.contact import is_teacher
         port = self.slots.get(slot)

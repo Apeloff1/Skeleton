@@ -1,19 +1,19 @@
 {
-  "dialect": "elden ring open-world exploration pack plan tensor ttk hp dps | elden ring plan tensor ttk hp dps",
+  "dialect": "stardew valley soulslike extraction ttk elite dread cozy harvest era plan tensor ttk hp dps | stardew valley cozy harvest era plan tensor ttk hp dps",
   "errors": [],
   "kind": "gaming-acquire",
   "ok": 1,
-  "sha256": "148721e6ce986ff6c086fab4ae262529c92098a52ee07cf662a5203362244173",
+  "sha256": "edc1bb7e75991a5c014fd911bc9b06e396a5200b8b68e23f48b0d25e9a9d228e",
   "written": [
     {
-      "bytes": 1041,
-      "path": "/tmp/skel/skeleton/acquired/gaming/steam_1245620.json",
-      "sha256": "ab4a9a20d4b0d893b18743070660b06055233a05502ab58cd6f20ba7d8c8cc15"
+      "bytes": 1119,
+      "path": "/tmp/skel/skeleton/acquired/gaming/steam_413150.json",
+      "sha256": "163c145f7fa95e86feb4c4a60b45f2c515d825ae2233dd018ca2345fc0b56582"
     },
     {
-      "bytes": 771,
-      "path": "/tmp/skel/skeleton/acquired/gaming/wiki_elden_ring.json",
-      "sha256": "73d93ebe6d4f719050e6c0d550346accf2838b9c2098a207a5e44477d2c19b7d"
+      "bytes": 885,
+      "path": "/tmp/skel/skeleton/acquired/gaming/wiki_stardew_valley.json",
+      "sha256": "1994b234ba47ce52b3d414feaa1408e5e6c77d82e3fa013e27247722bd99898f"
     }
   ]
 }

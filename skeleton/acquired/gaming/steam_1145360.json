@@ -1,0 +1,34 @@
+{
+  "appid": 1145360,
+  "categories": [
+    "Single-player",
+    "Steam Achievements",
+    "Full controller support",
+    "Steam Trading Cards",
+    "Captions available",
+    "Steam Cloud",
+    "Remote Play on Phone",
+    "Remote Play on Tablet",
+    "Remote Play on TV",
+    "Family Sharing"
+  ],
+  "developers": [
+    "Supergiant Games"
+  ],
+  "dialect": "hades soulslike extraction ttk elite dread plan tensor ttk hp dps",
+  "genres": [
+    "Action",
+    "Indie",
+    "RPG"
+  ],
+  "is_free": false,
+  "name": "Hades",
+  "publishers": [
+    "Supergiant Games"
+  ],
+  "release": "Sep 17, 2020",
+  "sha256": "3e95db6aa63606f1b5907ffc1fea7292346fa3f77c79360d0bc15e3f1969fdda",
+  "short_description": "Defy the god of the dead as you hack and slash out of the Underworld in this rogue-like dungeon crawler from the creators of Bastion, Transistor, and Pyre.",
+  "source": "steam",
+  "type": "game"
+}

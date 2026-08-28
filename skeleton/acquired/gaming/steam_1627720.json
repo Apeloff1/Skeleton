@@ -1,0 +1,40 @@
+{
+  "appid": 1627720,
+  "categories": [
+    "Single-player",
+    "Steam Achievements",
+    "Full controller support",
+    "Camera Comfort",
+    "Color Alternatives",
+    "Custom Volume Controls",
+    "Adjustable Difficulty",
+    "Gamepad Recommended",
+    "DualShock Controller Support",
+    "DualShock Controller Support",
+    "DualSense Controller Support",
+    "DualSense Controller Support",
+    "Save Anytime",
+    "Stereo Sound",
+    "Surround Sound",
+    "Steam Cloud"
+  ],
+  "developers": [
+    "NEOWIZ"
+  ],
+  "dialect": "lies of p soulslike extraction ttk elite dread plan tensor ttk hp dps",
+  "genres": [
+    "Action",
+    "Adventure",
+    "RPG"
+  ],
+  "is_free": false,
+  "name": "Lies of P",
+  "publishers": [
+    "NEOWIZ"
+  ],
+  "release": "Sep 18, 2023",
+  "sha256": "5b02e4c8279297ce4a91b50d8efad679abbad7607f1f17513ad34210412f628f",
+  "short_description": "Lies of P is a thrilling soulslike that takes the story of Pinocchio, turns it on its head, and sets it against the darkly elegant backdrop of the Belle Epoque era.",
+  "source": "steam",
+  "type": "game"
+}

@@ -1,0 +1,33 @@
+{
+  "appid": 367520,
+  "categories": [
+    "Single-player",
+    "Steam Achievements",
+    "Full controller support",
+    "Steam Trading Cards",
+    "Steam Cloud",
+    "Remote Play on Phone",
+    "Remote Play on Tablet",
+    "Remote Play on TV",
+    "Family Sharing"
+  ],
+  "developers": [
+    "Team Cherry"
+  ],
+  "dialect": "hollow knight soulslike extraction ttk elite dread metroidvania backtrack map plan tensor ttk hp dps",
+  "genres": [
+    "Action",
+    "Adventure",
+    "Indie"
+  ],
+  "is_free": false,
+  "name": "Hollow Knight",
+  "publishers": [
+    "Team Cherry"
+  ],
+  "release": "Feb 24, 2017",
+  "sha256": "7735644b6b5645455d75e84ea2e4c9163858b07b95ca357c258415f5047dbe2e",
+  "short_description": "Forge your own path in Hollow Knight! An epic action adventure through a vast ruined kingdom of insects and heroes. Explore twisting caverns, battle tainted creatures and befriend bizarre bugs, all in a classic, hand-drawn 2D style.",
+  "source": "steam",
+  "type": "game"
+}

@@ -1,0 +1,33 @@
+{
+  "appid": 518790,
+  "categories": [
+    "Single-player",
+    "Multi-player",
+    "Co-op",
+    "Online Co-op",
+    "Steam Achievements",
+    "Full controller support",
+    "In-App Purchases",
+    "Steam Cloud",
+    "Family Sharing"
+  ],
+  "developers": [
+    "Expansive Worlds"
+  ],
+  "dialect": "thehunter: call of the wild\u2122 open-world exploration pack extraction_now ttk elite dread plan tensor ttk hp dps",
+  "genres": [
+    "Adventure",
+    "Simulation",
+    "Sports"
+  ],
+  "is_free": true,
+  "name": "theHunter: Call of the Wild\u2122",
+  "publishers": [
+    "Avalanche Studios"
+  ],
+  "release": "Feb 16, 2017",
+  "sha256": "600e13dded32610a62220124e2a30d4be1fa5ce8ed89f52fe33813dda93143fe",
+  "short_description": "Discover an atmospheric hunting game like no other in this realistic, stunning open world \u2013 regularly updated in collaboration with the community. Immerse yourself in the single player campaign, or share the ultimate hunting experience with friends.",
+  "source": "steam",
+  "type": "game"
+}

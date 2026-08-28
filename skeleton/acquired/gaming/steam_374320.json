@@ -1,0 +1,39 @@
+{
+  "appid": 374320,
+  "categories": [
+    "Single-player",
+    "Multi-player",
+    "Co-op",
+    "Steam Achievements",
+    "Full controller support",
+    "Steam Trading Cards",
+    "Camera Comfort",
+    "Custom Volume Controls",
+    "Playable without Timed Input",
+    "Save Anytime",
+    "Stereo Sound",
+    "Surround Sound",
+    "Remote Play on Phone",
+    "Remote Play on Tablet",
+    "Remote Play on TV",
+    "Family Sharing"
+  ],
+  "developers": [
+    "FromSoftware, Inc."
+  ],
+  "dialect": "dark souls\u2122 iii soulslike extraction ttk elite dread plan tensor ttk hp dps",
+  "genres": [
+    "Action"
+  ],
+  "is_free": false,
+  "name": "DARK SOULS\u2122 III",
+  "publishers": [
+    "FromSoftware, Inc.",
+    "Bandai Namco Entertainment"
+  ],
+  "release": "Apr 11, 2016",
+  "sha256": "137fe7b1ef6d5cecb967404cc8911142e5377df4e67d5f2e4e39bf99392defc1",
+  "short_description": "Dark Souls continues to push the boundaries with the latest, ambitious chapter in the critically-acclaimed and genre-defining series. Prepare yourself and Embrace The Darkness!",
+  "source": "steam",
+  "type": "game"
+}

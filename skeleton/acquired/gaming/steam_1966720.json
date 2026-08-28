@@ -1,0 +1,33 @@
+{
+  "appid": 1966720,
+  "categories": [
+    "Single-player",
+    "Multi-player",
+    "Co-op",
+    "Online Co-op",
+    "Custom Volume Controls",
+    "Stereo Sound",
+    "Partial Controller Support",
+    "Family Sharing"
+  ],
+  "developers": [
+    "Zeekerss"
+  ],
+  "dialect": "lethal company soulslike extraction ttk elite dread plan tensor ttk hp dps",
+  "genres": [
+    "Action",
+    "Adventure",
+    "Indie",
+    "Early Access"
+  ],
+  "is_free": false,
+  "name": "Lethal Company",
+  "publishers": [
+    "Zeekerss"
+  ],
+  "release": "Oct 23, 2023",
+  "sha256": "8bdd95767f2b56ccb2f6a312b3b265e11b684dac3dd5a40258d8c467dbbe8317",
+  "short_description": "A co-op horror about scavenging at abandoned moons to sell scrap to the Company.",
+  "source": "steam",
+  "type": "game"
+}

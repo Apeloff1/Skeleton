@@ -1,0 +1,123 @@
+{
+  "dialects": 12,
+  "errors": [
+    "Hunt Showdown:wiki-missing"
+  ],
+  "games": [
+    {
+      "appid": 1245620,
+      "era": "soulslike",
+      "errors": [],
+      "ok": 1,
+      "steam": true,
+      "title": "Elden Ring",
+      "wiki": true
+    },
+    {
+      "appid": 374320,
+      "era": "soulslike",
+      "errors": [],
+      "ok": 1,
+      "steam": true,
+      "title": "Dark Souls III",
+      "wiki": true
+    },
+    {
+      "appid": 814380,
+      "era": "soulslike",
+      "errors": [],
+      "ok": 1,
+      "steam": true,
+      "title": "Sekiro Shadows Die Twice",
+      "wiki": true
+    },
+    {
+      "appid": 1627720,
+      "era": "soulslike",
+      "errors": [],
+      "ok": 1,
+      "steam": true,
+      "title": "Lies of P",
+      "wiki": true
+    },
+    {
+      "appid": 1145360,
+      "era": "roguelike",
+      "errors": [],
+      "ok": 1,
+      "steam": true,
+      "title": "Hades",
+      "wiki": true
+    },
+    {
+      "appid": 646570,
+      "era": "roguelike",
+      "errors": [],
+      "ok": 1,
+      "steam": true,
+      "title": "Slay the Spire",
+      "wiki": true
+    },
+    {
+      "appid": 518790,
+      "era": "roguelike",
+      "errors": [],
+      "ok": 1,
+      "steam": true,
+      "title": "Dead Cells",
+      "wiki": true
+    },
+    {
+      "appid": 367520,
+      "era": "metroidvania",
+      "errors": [],
+      "ok": 1,
+      "steam": true,
+      "title": "Hollow Knight",
+      "wiki": true
+    },
+    {
+      "appid": 1809540,
+      "era": "metroidvania",
+      "errors": [],
+      "ok": 1,
+      "steam": true,
+      "title": "Nine Sols",
+      "wiki": true
+    },
+    {
+      "appid": 594650,
+      "era": "extraction_now",
+      "errors": [
+        "wiki-missing"
+      ],
+      "ok": 1,
+      "steam": true,
+      "title": "Hunt Showdown",
+      "wiki": false
+    },
+    {
+      "appid": 1966720,
+      "era": "extraction_now",
+      "errors": [],
+      "ok": 1,
+      "steam": true,
+      "title": "Lethal Company",
+      "wiki": true
+    },
+    {
+      "appid": 413150,
+      "era": "cozy",
+      "errors": [],
+      "ok": 1,
+      "steam": true,
+      "title": "Stardew Valley",
+      "wiki": true
+    }
+  ],
+  "kind": "gaming-spree",
+  "n": 12,
+  "note": "Hunt wiki 429; steam copy present",
+  "ok": 1,
+  "sha256": "ff7dcabd8f9500a1f364c9ed8c0e16a51d5f8fc06943f51c8cf5277e8e9ac522"
+}
