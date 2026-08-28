@@ -142,7 +142,9 @@ class JeevesCortex:
         self._mouth_override = None
         self._seal: Dict[str, Any] = {}
         from skeleton.cortex.contact import ContactEngine
+        from skeleton.cortex.genos import Genos
         self.contact_engine = ContactEngine()
+        self.genos_engine = Genos()
 
     def backends(self) -> Dict[str, str]:
         return {s: getattr(p, "name", type(p).__name__) for s, p in self.slots.items()}
@@ -184,6 +186,17 @@ class JeevesCortex:
 
     def contact(self, slot: str, stimulus: str = "") -> Dict[str, Any]:
         return self.contact_engine.touch(self, slot, stimulus)
+
+    def genos(self, stimulus: str = "plan tensor ttk lattice soulslike") -> Dict[str, Any]:
+        return self.genos_engine.pulse(self, stimulus=stimulus)
+
+    def gate(self, fid: str, *, slot: str = "left", model: str | None = None, modality: str = "text") -> Dict[str, Any]:
+        from skeleton.cortex.gates import bind_gate
+        return bind_gate(self, fid, slot=slot, model=model, modality=modality)
+
+    def acquire_gaming(self, *, appid: int = 1245620, title: str = "Elden Ring") -> Dict[str, Any]:
+        from skeleton.cortex.acquire_repo import acquire_gaming
+        return acquire_gaming(self, appid=appid, title=title)
 
     def _contact_if_teacher(self, slot: str, stimulus: str) -> None:
         from skeleton.cortex.contact import is_teacher
@@ -536,6 +549,7 @@ class JeevesCortex:
             "winner": self._winner_mouth,
             "mouth_override": self._mouth_override,
             "contact": self.contact_engine.snapshot(),
+            "genos": self.genos_engine.snapshot(),
         }
         p.write_text(json.dumps(blob), encoding="utf-8")
         return {"path": str(p), "own": self.own.size, "acquired": dict(self.acquired)}
@@ -587,6 +601,8 @@ class JeevesCortex:
                 self.neo_rms.bpe = self.bpe
         if blob.get("contact"):
             self.contact_engine.restore(blob.get("contact"))
+        if blob.get("genos"):
+            self.genos_engine.restore(blob.get("genos"))
         if blob.get("callosum"):
             self.callosum = CorpusCallosum.from_snapshot(blob["callosum"])
         if blob.get("moe"):

@@ -1,0 +1,40 @@
+{
+  "appid": 1245620,
+  "categories": [
+    "Single-player",
+    "Multi-player",
+    "PvP",
+    "Online PvP",
+    "Co-op",
+    "Online Co-op",
+    "Steam Achievements",
+    "Full controller support",
+    "Steam Trading Cards",
+    "Camera Comfort",
+    "Custom Volume Controls",
+    "Playable without Timed Input",
+    "Save Anytime",
+    "Stereo Sound",
+    "Surround Sound",
+    "Steam Cloud"
+  ],
+  "developers": [
+    "FromSoftware, Inc."
+  ],
+  "dialect": "elden ring open-world exploration pack plan tensor ttk hp dps",
+  "genres": [
+    "Action",
+    "RPG"
+  ],
+  "is_free": false,
+  "name": "ELDEN RING",
+  "publishers": [
+    "FromSoftware, Inc.",
+    "Bandai Namco Entertainment"
+  ],
+  "release": "Feb 24, 2022",
+  "sha256": "ab4a9a20d4b0d893b18743070660b06055233a05502ab58cd6f20ba7d8c8cc15",
+  "short_description": "THE CRITICALLY ACCLAIMED FANTASY ACTION RPG. Rise, Tarnished, and be guided by grace to brandish the power of the Elden Ring and become an Elden Lord in the Lands Between.",
+  "source": "steam",
+  "type": "game"
+}

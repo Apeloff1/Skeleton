@@ -90,6 +90,13 @@ def main(argv: list[str] | None = None) -> int:
     ct.add_argument("slot", choices=["pfc", "midbrain", "left", "right"])
     ct.add_argument("prefix", nargs="?", default="plan tensor ttk")
 
+    gn = sub.add_parser("genos", help="pulse the genos trajectory engine")
+    gn.add_argument("prefix", nargs="?", default="plan tensor ttk lattice soulslike")
+
+    ac = sub.add_parser("acquire-game", help="pull Steam+Wikipedia into skeleton/acquired/gaming")
+    ac.add_argument("--appid", type=int, default=1245620)
+    ac.add_argument("--title", default="Elden Ring")
+
     wk = sub.add_parser("walk", help="prove spawn→extract on the emitted door graph")
     wk.add_argument("--era", default="extraction_now")
     wk.add_argument("--blend", nargs=2, metavar=("ERA_A", "ERA_B"))
@@ -189,6 +196,20 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "bind-kimi":
         from skeleton.cortex.live import live_cortex, persist
         out = live_cortex().bind_kimi(args.slot, args.model)
+        persist()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "genos":
+        from skeleton.cortex.live import live_cortex, persist
+        out = live_cortex().genos(args.prefix)
+        persist()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "acquire-game":
+        from skeleton.cortex.live import live_cortex, persist
+        out = live_cortex().acquire_gaming(appid=args.appid, title=args.title)
         persist()
         print(json.dumps(out, indent=2, default=str))
         return 0

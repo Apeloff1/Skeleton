@@ -1742,4 +1742,44 @@ class TestContactLaw:
         assert neo.contact_engine.contacts >= 2
 
 
+class TestGenosGatesAcquire:
+    def test_catalog_covers_houses(self):
+        from skeleton.cortex import all_model_ids, catalog, ping, probe_all
+        cats = catalog()
+        assert len(cats) >= 10
+        ids = all_model_ids()
+        assert "grok-4" in ids and "kimi-k2-0711-preview" in ids
+        assert "gpt-4o" in ids and "claude-sonnet-4" in ids
+        probes = probe_all()
+        assert len(probes) == len(cats)
+        assert ping("house.skeleton")["ok"] == 1
+
+    def test_modal_ports_never_throw(self):
+        from skeleton.cortex import ImagePort, VideoPort, open_modality
+        img = ImagePort(slot="right")
+        t = img.think("soul layout", {"image_bytes": b"\x00\x01"})
+        assert t.kind == "modal-image" and t.numbers
+        vid = open_modality("video", slot="right")
+        v = vid.think("cutscene", {"frames": 3})
+        assert "VIDEO" in v.text
+
+    def test_genos_pulse_grows(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        a = neo.genos("plan tensor ttk")
+        b = neo.genos("soulslike extraction ttk elite dread")
+        assert a["ok"] == 1 and b["ok"] == 1
+        assert b["G"] >= a["G"]
+        assert neo.genos_engine.errors == 0
+        assert neo.genos_engine.epsilon == 0.0
+
+    def test_gate_bind_local_and_hf(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        loc = neo.gate("house.skeleton", slot="pfc")
+        assert loc["kind"] == "local"
+        hf = neo.gate("huggingface.hub", slot="left")
+        assert hf.get("family") == "huggingface.hub" or "huggingface" in neo.backends()["left"]
+
+
 

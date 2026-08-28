@@ -1,0 +1,19 @@
+{
+  "dialect": "elden ring open-world exploration pack plan tensor ttk hp dps | elden ring plan tensor ttk hp dps",
+  "errors": [],
+  "kind": "gaming-acquire",
+  "ok": 1,
+  "sha256": "148721e6ce986ff6c086fab4ae262529c92098a52ee07cf662a5203362244173",
+  "written": [
+    {
+      "bytes": 1041,
+      "path": "/tmp/skel/skeleton/acquired/gaming/steam_1245620.json",
+      "sha256": "ab4a9a20d4b0d893b18743070660b06055233a05502ab58cd6f20ba7d8c8cc15"
+    },
+    {
+      "bytes": 771,
+      "path": "/tmp/skel/skeleton/acquired/gaming/wiki_elden_ring.json",
+      "sha256": "73d93ebe6d4f719050e6c0d550346accf2838b9c2098a207a5e44477d2c19b7d"
+    }
+  ]
+}

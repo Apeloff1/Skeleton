@@ -49,6 +49,11 @@ from .gossip import absorb_mouth, gossip, gossip_cortices, gossip_mouths
 from .dodeca import FACES, face_card
 from .interchange import HuggingFaceBackend, KimiBackend, distill_teacher, probe_interchange
 from .contact import ContactEngine, is_teacher
+from .catalog import FAMILIES, catalog, all_model_ids
+from .gates import bind_gate, probe_all, ping
+from .multimodal import AudioPort, ImagePort, TextPort, VideoPort, open_modality
+from .genos import Genos
+from .acquire_repo import acquire_catalog, acquire_gaming
 from .attn import swiglu, swiglu_bwd, cosine_lr, silu, rms_norm
 
 __all__ = [
@@ -141,4 +146,18 @@ __all__ = [
     "cosine_lr",
     "silu",
     "rms_norm",
+    "FAMILIES",
+    "catalog",
+    "all_model_ids",
+    "bind_gate",
+    "probe_all",
+    "ping",
+    "TextPort",
+    "ImagePort",
+    "AudioPort",
+    "VideoPort",
+    "open_modality",
+    "Genos",
+    "acquire_gaming",
+    "acquire_catalog",
 ]

@@ -1,0 +1,9 @@
+{
+  "description": "2022 video game",
+  "dialect": "elden ring plan tensor ttk hp dps",
+  "extract": "Elden Ring is a 2022 action role-playing game directed by Hidetaka Miyazaki with worldbuilding provided by the American fantasy writer George R. R. Martin. Developed by FromSoftware and published by Bandai Namco Entertainment, it was first released on February 25, 2022 for PlayStation 4, PlayStation 5, Windows, Xbox One and Xbox Series X/S. Set in the Lands Between, players control a customizable player character on a quest to repair the Elden Ring and become the new Elden Lord.",
+  "sha256": "73d93ebe6d4f719050e6c0d550346accf2838b9c2098a207a5e44477d2c19b7d",
+  "source": "wikipedia",
+  "title": "Elden Ring",
+  "url": "https://en.wikipedia.org/wiki/Elden_Ring"
+}
