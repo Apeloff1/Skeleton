@@ -1087,7 +1087,7 @@ class TestZaibatsuLM:
         neo = JeevesCortex()
         card = tournament(neo)
         assert card["house"] == "mishima-zaibatsu"
-        assert card["winner"] in {"pfc", "midbrain", "neo"}
+        assert card["winner"] in {"pfc", "midbrain", "neo", "neo_rms"}
         assert card["mouths"]["neo"]["n_layers"] >= 2
         assert card["mouths"]["midbrain"]["n_layers"] <= 2
         assert card["seal"]["n_layers"] >= 2
@@ -1338,6 +1338,22 @@ class TestQueue16:
         assert all(abs(a - b) < 1e-12 for ra, rb in zip(before, neo.transformer.Wout) for a, b in zip(ra, rb))
         neo.gossip_mouths(alpha=0.4)
         assert any(abs(a - b) > 1e-9 for ra, rb in zip(before, neo.transformer.Wout) for a, b in zip(ra, rb))
+
+
+class TestQueue17:
+    def test_tournament_has_fourth_mouth(self):
+        from skeleton.cortex import JeevesCortex
+        from skeleton.cortex.zaibatsu import devil_gene, tournament
+        neo = JeevesCortex()
+        card = tournament(neo)
+        assert "neo_rms" in card["mouths"]
+        assert card["mouths"]["neo_rms"]["norm"] == "rms"
+        assert card["mouths"]["neo_rms"]["ffn_kind"] == "swiglu"
+        assert card["mouths"]["neo"]["ffn_kind"] == "gelu"
+        assert card["winner"] in card["mouths"]
+        d = devil_gene(neo)
+        assert d["neo_rms"]["norm"] == "rms"
+        assert "neo_rms" in card["succession"]
 
 
 
