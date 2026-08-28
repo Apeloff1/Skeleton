@@ -17,14 +17,16 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
       capabilities, jeeves, memory, swarm, ledger, scheduler, pipelines,
       forge, intelligence, resilience, context, gameforge, auth.
 - [x] A2. Added missing handle-introspection endpoints: `GET /genesis/handles`
-      and `GET /interface/reranker/stats` (this commit).
-- [x] A-fix. `AppState` now declares `cockpit`/`gameforge` as Optional —
+      and `GET /interface/reranker/stats` (f6c7a78).
+- [x] A-fix. `AppState` declares `cockpit`/`gameforge` as Optional —
       `/context/*` and `/gameforge/*` previously raised AttributeError (500)
-      instead of the intended 503 (this commit).
-- [ ] A3. Verify api/telemetry.py feeds the kernel EventBus so
-      observability/anomaly sees API traffic; currently standalone counters.
+      instead of the intended 503 (f6c7a78).
+- [x] A3. `api/telemetry.py` now optionally mirrors request samples onto the
+      kernel EventBus (topic `api.request.completed`) so observability/anomaly
+      sees API traffic; bus failures are swallowed (this commit).
 - [ ] A4. Mount api/idempotency.py on POST routes where retries can
-      double-execute (memory write paths, forge materialise).
+      double-execute (memory write paths, forge materialise). Also: wire a
+      RouteTelemetry(bus=state.bus) instance into request_id_middleware.
 
 ## Track B — Memory/caching convergence (backend ↔ skeleton)
 
@@ -48,13 +50,14 @@ architectures overlap:
 
 Three rank primitives coexist: `ranking.py` (diversity + recency post-fusion),
 `rerank.py` (rule boost), `reranker.py` (FeatureReranker). One pipeline
-should own all three stages.
+owns all three stages as of this commit.
 
-- [ ] C1. `retrieval/pipeline.py` — accept optional `Ranker`, rule `Reranker`,
-      and `FeatureReranker` stages; fixed order
-      (fuse → rule-boost → feature-rerank → diversity-rank). Additive only.
-- [ ] C2. Document stage order in module docstring; stages optional so the
-      pipeline degrades to today's behavior when absent.
+- [x] C1. `retrieval/pipeline.py` accepts optional rule `Reranker`,
+      `FeatureReranker`, and `Ranker` stages; fixed order
+      (rule-boost → feature-rerank → diversity-rank). Additive — unconfigured
+      pipelines behave exactly as before (this commit).
+- [x] C2. Stage order documented in module docstring; stages optional
+      (this commit).
 
 ## Track D — Kernel queue convergence
 
@@ -78,4 +81,5 @@ should own all three stages.
 - ✅ retrieval twin Reranker → FeatureReranker rename + alias (bdca180b)
 - ✅ genesis.py imports canonical clocks path (bdca180b)
 - ✅ api/server.py + api/errors.py restored after bad rewrite (b4790a1)
-- ✅ Track A1/A2 + AppState cockpit/gameforge fix (this commit)
+- ✅ Track A1/A2 + AppState cockpit/gameforge fix (f6c7a78)
+- ✅ Track A3 telemetry bus mirror + Track C1/C2 rank-stage pipeline (this commit)
