@@ -1,49 +1,42 @@
-"""API errors — unify SkeletonError code to HTTP responses.
+"""Consolidated endpoint error envelope.
 
-kernel http_status_for(exc) maps the lattice; routes still embed that
-map ad hoc. These helpers produce the JSON envelope the router returns.
-
-- :class:`ApiErrorResponse` — to_{dict,response}
-- :func:`map_error` — SkeletonError → ApiErrorResponse with safe context
+Every SkeletonError subclass carries a ``code`` (e.g. ``KRN.WORK_QUEUE``)
+and many carry an ``http_status``. This module renders them all through one
+shape so API consumers get a stable error contract regardless of which
+subsystem raised.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Dict, Optional
-
-from fastapi.responses import JSONResponse
 
 from skeleton.kernel.errors import SkeletonError, http_status_for
 
 
-@dataclass
-class ApiErrorResponse:
-    error: str
-    code: str
-    message: str
-    context: Dict[str, Any]
-    status: int
-
-    def to_dict(self) -> Dict[str, Any]:
+def error_envelope(exc: Exception) -> Dict[str, Any]:
+    """Render any exception as a stable error envelope dict."""
+    if isinstance(exc, SkeletonError):
         return {
             "error": {
-                "type": self.error,
-                "code": self.code,
-                "message": self.message,
-                "context": self.context,
+                "code": getattr(exc, "code", "SKELETON"),
+                "message": str(exc),
+                "context": getattr(exc, "context", {}),
+                "status": http_status_for(exc),
             }
         }
+    return {
+        "error": {
+            "code": "INTERNAL",
+            "message": str(exc)[:200],
+            "context": {},
+            "status": 500,
+        }
+    }
 
-    def response(self) -> JSONResponse:
-        return JSONResponse(status_code=self.status, content=self.to_dict())
 
-
-def map_error(exc: SkeletonError, *, include_context: bool = True) -> ApiErrorResponse:
-    return ApiErrorResponse(
-        error=type(exc).__name__,
-        code=exc.code,
-        message=exc.message,
-        context=dict(exc.context) if include_context else {},
-        status=http_status_for(exc),
-    )
+def status_for(exc: Exception, default: int = 500) -> int:
+    """HTTP status for an exception, falling back to ``default``."""
+    try:
+        return http_status_for(exc)
+    except Exception:
+        return default
