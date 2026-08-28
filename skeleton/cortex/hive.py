@@ -11,6 +11,13 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 
+def _e_fp(xf) -> str:
+    if xf is None:
+        return ""
+    row = (getattr(xf, "E", None) or [[0.0]])[0][:4]
+    return ",".join(f"{float(x):.5f}" for x in row)
+
+
 def merkle_card(neo) -> Dict[str, Any]:
     moe = getattr(neo, "moe", None)
     xf = getattr(neo, "transformer", None)
@@ -39,10 +46,12 @@ def merkle_card(neo) -> Dict[str, Any]:
             "norm": str(getattr(getattr(neo, "neo_rms", None), "norm", "") or ""),
             "ffn_kind": str(getattr(getattr(neo, "neo_rms", None), "ffn_kind", "") or ""),
             "steps": int(getattr(getattr(neo, "neo_rms", None), "steps", 0) or 0),
+            "e_fp": _e_fp(getattr(neo, "neo_rms", None)),
+            "lora": bool(getattr(getattr(neo, "neo_rms", None), "lora", None) is not None),
         },
         "lora": (xf.lora.to_dict() if xf is not None and getattr(xf, "lora", None) is not None else None),
         "models": sorted(getattr(getattr(neo, "own", None), "models", {}) or {}),
-        "e_fp": ",".join(f"{x:.5f}" for x in ((getattr(xf, "E", None) or [[0.0]])[0][:4])),
+        "e_fp": _e_fp(xf),
     }
 
 
@@ -60,6 +69,10 @@ def bundle(neo) -> Dict[str, Any]:
         "bpe": bpe.snapshot() if bpe is not None and hasattr(bpe, "snapshot") else None,
         "transformer": xf.snapshot() if xf is not None and hasattr(xf, "snapshot") else None,
         "lora": (xf.lora.snapshot() if xf is not None and getattr(xf, "lora", None) is not None else None),
+        "neo_rms_weights": (getattr(neo, "neo_rms", None).snapshot()
+                           if getattr(neo, "neo_rms", None) is not None else None),
+        "lora_rms": (getattr(getattr(neo, "neo_rms", None), "lora", None).snapshot()
+                     if getattr(getattr(neo, "neo_rms", None), "lora", None) is not None else None),
     }
 
 
@@ -67,14 +80,20 @@ def pull(dst, payload: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     """Replace dst experts iff merkle differs. Returns whether pulled."""
     payload = payload or {}
     src_fp = str(payload.get("moe_fp") or "")
-    dst_fp = dst.moe.fingerprint() if getattr(dst, "moe", None) is not None else ""
-    if not src_fp or src_fp == dst_fp or not payload.get("moe"):
+    dst_card = merkle_card(dst)
+    dst_fp = dst_card.get("moe_fp") or ""
+    same_moe = bool(src_fp) and src_fp == dst_fp
+    same_e = str(payload.get("e_fp") or "") == str(dst_card.get("e_fp") or "")
+    same_rms = str((payload.get("neo_rms") or {}).get("e_fp") or "") == str((dst_card.get("neo_rms") or {}).get("e_fp") or "")
+    if same_moe and same_e and same_rms:
         return {
             "pulled": 0,
             "reason": "same" if src_fp == dst_fp else "empty",
             "moe_fp": dst_fp,
             "src_fp": src_fp,
         }
+    if not payload.get("moe") and not payload.get("transformer") and not payload.get("neo_rms_weights"):
+        return {"pulled": 0, "reason": "empty", "moe_fp": dst_fp, "src_fp": src_fp}
     from skeleton.cortex.moe import ExpertBank
     dst.moe = ExpertBank.from_snapshot(payload["moe"])
     if payload.get("callosum") is not None:
@@ -94,11 +113,23 @@ def pull(dst, payload: Optional[Dict[str, Any]]) -> Dict[str, Any]:
                 dst.transformer.lora = LoRABank.from_snapshot(payload["lora"])
         except Exception:
             pulled_xf = 0
+    pulled_rms = 0
+    if payload.get("neo_rms_weights") is not None:
+        try:
+            from skeleton.cortex.transformer import TinyTransformer
+            dst.neo_rms = TinyTransformer.from_snapshot(payload["neo_rms_weights"])
+            pulled_rms = 1
+            if payload.get("lora_rms") is not None:
+                from skeleton.cortex.lora import LoRABank
+                dst.neo_rms.lora = LoRABank.from_snapshot(payload["lora_rms"])
+        except Exception:
+            pulled_rms = 0
     return {
         "pulled": 1,
         "reason": "merkle-diff",
         "moe_fp": dst.moe.fingerprint(),
         "src_fp": src_fp,
         "transformer": pulled_xf,
+        "neo_rms": pulled_rms,
         "card": merkle_card(dst),
     }

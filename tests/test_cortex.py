@@ -1569,4 +1569,28 @@ class TestQueue26:
         assert neo.speaking_name() == seal["winner"]
 
 
+class TestQueue27:
+    def test_pull_restores_both_neos_and_lora(self):
+        from skeleton.cortex import JeevesCortex
+        from skeleton.cortex.hive import bundle, merkle_card, pull
+        a = JeevesCortex()
+        a.think("compile ttk hp dps recipe sim")
+        a.attach_lora(rank=2)
+        payload = bundle(a)
+        assert payload.get("transformer")
+        assert payload.get("neo_rms_weights")
+        assert payload.get("lora")
+        assert payload.get("lora_rms")
+        b = JeevesCortex()
+        out = pull(b, payload)
+        assert out["pulled"] == 1
+        assert out["transformer"] == 1
+        assert out["neo_rms"] == 1
+        ca, cb = merkle_card(a), merkle_card(b)
+        assert ca["e_fp"] == cb["e_fp"]
+        assert ca["neo_rms"]["e_fp"] == cb["neo_rms"]["e_fp"]
+        assert b.transformer.lora is not None
+        assert b.neo_rms.lora is not None
+
+
 
