@@ -1,87 +1,246 @@
-"""API server — the serving face of Genesis.
-
-Boots the Genesis orchestrator lazily on first request (never at import,
-so tests and tooling can import this module without paying boot cost), and
-exposes the substrate through a small set of canonical endpoints.
-
-The server is deliberately thin: every endpoint delegates to a Genesis
-handle. Subsystem logic never lives here.
-"""
+"""FastAPI application factory — Genesis-backed wiring of every subsystem."""
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+import time
+import uuid
+from contextlib import asynccontextmanager
+from typing import Any, AsyncGenerator, Dict, Optional
 
-try:
-    from fastapi import FastAPI, HTTPException
-except ImportError:  # skeleton core stays framework-free
-    FastAPI = None  # type: ignore[assignment,misc]
-    HTTPException = None  # type: ignore[assignment,misc]
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
+from skeleton.config.settings import Settings, get_settings
 from skeleton.genesis import Genesis
+from skeleton.kernel.errors import SkeletonError, http_status_for
+from skeleton.kernel.events import DomainEvent, EventBus
+from skeleton.kernel.ids import UserId
+from skeleton.kernel.registry import bootstrap_registry
+from skeleton.agents.ledger import ActivityLedger
+from skeleton.agents.mesh import AgentMesh
+from skeleton.agents.scheduler import SwarmScheduler
+from skeleton.memory import CAGStore, InMemoryTFIDFStore, MAGStore, MemoryTrinity
+from skeleton.resilience import ResilienceFortress
+from skeleton.intelligence import IntelligenceOrchestrator
+from skeleton.jeeves.core import Jeeves
+from skeleton.jeeves.matrices import ClomMatrix, KremMatrix, SamMatrix
+from skeleton.jeeves.rag import RagMemory
+from skeleton.forge.universal import Forge
+from skeleton.pipelines.npc import NpcPipeline
+from skeleton.pipelines.game_logic import GameLogicPipeline
+from skeleton.pipelines.animation import AnimationPipeline
+from skeleton.observability import HealthRegistry, MetricsRegistry, Tracer, probe
+from skeleton.vault import AuditLog, ShamirSeal
 
-_genesis: Optional[Genesis] = None
+
+class AppState:
+    def __init__(self) -> None:
+        self.settings: Optional[Settings] = None
+        self.genesis: Optional[Genesis] = None
+        self.bus: Optional[EventBus] = None
+        self.registry = None
+        self.ledger: Optional[ActivityLedger] = None
+        self.mesh: Optional[AgentMesh] = None
+        self.scheduler: Optional[SwarmScheduler] = None
+        self.memory_trinity: Optional[MemoryTrinity] = None
+        self.resilience: Optional[ResilienceFortress] = None
+        self.intelligence: Optional[IntelligenceOrchestrator] = None
+        self.jeeves: Optional[Jeeves] = None
+        self.jeeves_sam: Optional[SamMatrix] = None
+        self.jeeves_clom: Optional[ClomMatrix] = None
+        self.jeeves_krem: Optional[KremMatrix] = None
+        self.jeeves_memory: Optional[RagMemory] = None
+        self.forge: Optional[Forge] = None
+        self.npc_pipeline: Optional[NpcPipeline] = None
+        self.game_logic_pipeline: Optional[GameLogicPipeline] = None
+        self.animation_pipeline: Optional[AnimationPipeline] = None
+        self.health: Optional[HealthRegistry] = None
+        self.metrics: Optional[MetricsRegistry] = None
+        self.tracer: Optional[Tracer] = None
+        self.audit: Optional[AuditLog] = None
+        self.seal: Optional[ShamirSeal] = None
+        self.started_at: Optional[float] = None
+
+    def is_healthy(self) -> Dict[str, Any]:
+        checks = {
+            "kernel": self.bus is not None and self.registry is not None,
+            "genesis": self.genesis is not None,
+            "memory": self.memory_trinity is not None,
+            "agents": self.mesh is not None and self.scheduler is not None,
+            "resilience": self.resilience is not None,
+            "intelligence": self.intelligence is not None,
+            "jeeves": self.jeeves is not None,
+            "forge": self.forge is not None,
+            "observability": self.health is not None and self.metrics is not None,
+            "vault": self.audit is not None,
+            "pipelines": all([
+                self.npc_pipeline is not None,
+                self.game_logic_pipeline is not None,
+                self.animation_pipeline is not None,
+            ]),
+        }
+        checks["overall"] = all(checks.values())
+        return checks
 
 
-def get_genesis() -> Genesis:
-    """Boot-or-return the single Genesis instance."""
-    global _genesis
-    if _genesis is None:
-        _genesis = Genesis().boot()
-    return _genesis
+_app_state = AppState()
 
 
-def reset_genesis() -> None:
-    """Test hook: drop the cached instance so the next request re-boots."""
-    global _genesis
-    _genesis = None
+def get_state() -> AppState:
+    return _app_state
 
 
-def create_app(seed: Optional[int] = None) -> "FastAPI":
-    if FastAPI is None:
-        raise RuntimeError(
-            "fastapi is required for skeleton.api.server; "
-            "install it or use the kernel directly"
-        )
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    state = get_state()
+    state.settings = get_settings()
+    genesis = Genesis(seed=1337).boot()
+    state.genesis = genesis
+    state.bus = genesis.bus
+    state.registry = bootstrap_registry(state.bus)
+    state.ledger = ActivityLedger()
+    state.mesh = AgentMesh(bus=state.bus)
+    state.scheduler = SwarmScheduler(bus=state.bus, ledger=state.ledger)
 
-    if seed is not None:
-        global _genesis
-        _genesis = Genesis(seed=seed).boot()
+    rag = genesis.handles.get("rag") or InMemoryTFIDFStore()
+    cag = genesis.handles.get("cag") or CAGStore()
+    mag = genesis.handles.get("mag") or MAGStore(user_id=UserId.new())
+    state.memory_trinity = genesis.handles.get("trinity") or MemoryTrinity(
+        rag=rag, cag=cag, mag=mag, bus=state.bus
+    )
+    state.resilience = genesis.handles.get("fortress") or ResilienceFortress(bus=state.bus)
+    state.intelligence = genesis.handles.get("orchestrator") or IntelligenceOrchestrator(bus=state.bus)
 
-    app = FastAPI(title="Skeleton API", version="16.0.0")
+    state.jeeves_sam = SamMatrix()
+    state.jeeves_clom = ClomMatrix()
+    state.jeeves_krem = KremMatrix()
+    state.jeeves_memory = RagMemory(bus=state.bus)
+    state.jeeves = Jeeves(bus=state.bus, max_turns=state.settings.jeeves.max_session_turns)
+    state.forge = Forge(bus=state.bus)
+    state.npc_pipeline = NpcPipeline(bus=state.bus)
+    state.game_logic_pipeline = GameLogicPipeline(bus=state.bus)
+    state.animation_pipeline = AnimationPipeline(bus=state.bus)
+
+    state.metrics = MetricsRegistry()
+    state.tracer = Tracer()
+    state.audit = AuditLog()
+    state.seal = ShamirSeal()
+    state.health = HealthRegistry()
+
+    @probe("bus")
+    def _bus_probe():
+        return {"ok": state.bus is not None, "detail": "event bus"}
+
+    @probe("genesis")
+    def _genesis_probe():
+        return {"ok": state.genesis is not None, "detail": "genesis"}
+
+    @probe("registry")
+    def _registry_probe():
+        return {"ok": state.registry is not None, "detail": "capabilities"}
+
+    @probe("memory")
+    def _memory_probe():
+        return {"ok": state.memory_trinity is not None, "detail": "trinity"}
+
+    state.health.add_liveness(_bus_probe)
+    state.health.add_liveness(_genesis_probe)
+    state.health.add_readiness(_bus_probe)
+    state.health.add_readiness(_registry_probe)
+    state.health.add_readiness(_memory_probe)
+    state.health.add_readiness(_genesis_probe)
+
+    state.started_at = time.time()
+    state.bus.publish(DomainEvent(
+        topic="system.startup",
+        payload={
+            "version": state.settings.version,
+            "environment": state.settings.environment,
+            "subsystems": list(state.is_healthy().keys()),
+            "genesis": state.genesis.report.to_dict(),
+        },
+        correlation_id=uuid.uuid4().hex,
+    ))
+    yield
+    state.bus.clear_history()
+
+
+async def skeleton_error_handler(request: Request, exc: SkeletonError) -> JSONResponse:
+    return JSONResponse(status_code=http_status_for(exc), content=exc.to_dict())
+
+
+async def request_id_middleware(request: Request, call_next: Any) -> Any:
+    request_id = uuid.uuid4().hex
+    request.state.request_id = request_id
+    start = time.time()
+    response = await call_next(request)
+    duration = time.time() - start
+    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Response-Time"] = f"{duration:.3f}s"
+    metrics = get_state().metrics
+    if metrics is not None:
+        try:
+            metrics.counter("http.requests", "HTTP requests").inc()
+            metrics.histogram("http.duration_seconds", "request duration").observe(duration)
+        except Exception:
+            pass
+    return response
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title="Skeleton",
+        description="Tutolage AI Platform — v16 Genesis",
+        version="16.0.0",
+        lifespan=lifespan,
+    )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    app.middleware("http")(request_id_middleware)
+    app.add_exception_handler(SkeletonError, skeleton_error_handler)
+
+    from skeleton.api.routes import router
+    app.include_router(router, prefix="/api/v1")
 
     @app.get("/health")
-    def health() -> Dict[str, Any]:
-        g = get_genesis()
-        report = g.health()
-        if not report["healthy"]:
-            raise HTTPException(status_code=503, detail=report)
-        return report
-
-    @app.get("/subsystems")
-    def subsystems() -> Dict[str, Any]:
-        g = get_genesis()
-        return g.report.to_dict()
-
-    @app.post("/memory/query")
-    def memory_query(body: Dict[str, Any]) -> Dict[str, Any]:
-        g = get_genesis()
-        trinity = g.get("trinity")
-        query = str(body.get("query", ""))
-        top_k = int(body.get("top_k", 5))
-        results = trinity.query(query, top_k=top_k)
+    async def health() -> Dict[str, Any]:
+        state = get_state()
+        checks = state.is_healthy()
         return {
-            "query": query,
-            "results": [
-                {
-                    "id": r.chunk.id,
-                    "text": r.chunk.text,
-                    "score": r.score,
-                    "rank": r.rank,
-                    "tier": r.chunk.source_tier,
-                }
-                for r in results
-            ],
+            "status": "healthy" if checks["overall"] else "degraded",
+            "checks": checks,
+            "uptime_seconds": time.time() - state.started_at if state.started_at else 0,
         }
+
+    @app.get("/health/live")
+    async def live() -> Dict[str, Any]:
+        state = get_state()
+        if state.health is None:
+            return {"status": "down", "probes": []}
+        return state.health.liveness()
+
+    @app.get("/health/ready")
+    async def ready() -> Dict[str, Any]:
+        state = get_state()
+        if state.health is None:
+            return {"status": "down", "probes": []}
+        return state.health.readiness()
+
+    @app.get("/metrics")
+    async def metrics() -> Dict[str, Any]:
+        state = get_state()
+        if state.metrics is None:
+            return {"counters": {}, "gauges": {}, "histograms": {}}
+        return state.metrics.snapshot()
+
+    @app.get("/")
+    async def root() -> Dict[str, str]:
+        return {"name": "Skeleton", "version": "16.0.0", "status": "operational"}
 
     return app
