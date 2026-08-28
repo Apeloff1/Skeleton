@@ -76,6 +76,53 @@ async def reranker_stats(state=Depends(_state)) -> Dict[str, Any]:
     return {"reranker": stats}
 
 
+@router.post("/retrieval/query")
+async def retrieval_query(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    """Fan a query over the four-plane quad retriever (RAG+CAG+MAG+KAG, RRF)."""
+    genesis = _require(state.genesis, "Genesis")
+    quad = genesis.handles.get("quad")
+    if quad is None:
+        raise HTTPException(status_code=503, detail="quad retriever not wired")
+    query = str(request.get("query", ""))
+    if not query.strip():
+        raise HTTPException(status_code=422, detail="query is required")
+    k = int(request.get("k", 8))
+    results = quad.retrieve(query, k=k, use_cache=bool(request.get("use_cache", True)))
+    return {
+        "query": query,
+        "results": [
+            {
+                "id": f.fragment_id,
+                "plane": f.plane,
+                "content": f.content,
+                "score": round(f.score, 6),
+                "provenance": f.provenance,
+            }
+            for f in results
+        ],
+        "stats": quad.stats(),
+    }
+
+
+@router.post("/retrieval/ingest")
+async def retrieval_ingest(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    """Ingest a document into the quad retriever's RAG+MAG planes."""
+    genesis = _require(state.genesis, "Genesis")
+    quad = genesis.handles.get("quad")
+    if quad is None:
+        raise HTTPException(status_code=503, detail="quad retriever not wired")
+    doc_id = str(request.get("doc_id", "")).strip()
+    text = str(request.get("text", "")).strip()
+    if not doc_id or not text:
+        raise HTTPException(status_code=422, detail="doc_id and text are required")
+    chunks = quad.ingest_document(
+        doc_id, text,
+        metadata=request.get("metadata"),
+        salience=float(request.get("salience", 0.5)),
+    )
+    return {"doc_id": doc_id, "chunks": chunks, "status": "ingested"}
+
+
 @router.get("/capabilities")
 async def capabilities(state=Depends(_state)) -> List[Dict[str, Any]]:
     return [cap.to_dict() for cap in _require(state.registry, "Registry").list()]
