@@ -58,6 +58,7 @@ from .laws import LAWS, LawError, check
 from .antiplag import distill_dialect, guard
 from .cite import steam_cite, wiki_cite, SPDX_STEAM, SPDX_WIKI
 from .refs import GameRefPort, lookup, match, refer
+from .improve import improve
 from .attn import swiglu, swiglu_bwd, cosine_lr, silu, rms_norm
 
 __all__ = [

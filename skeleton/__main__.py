@@ -103,6 +103,10 @@ def main(argv: list[str] | None = None) -> int:
     rf.add_argument("prefix", nargs="?", default="elden ring")
     rf.add_argument("--live", action="store_true")
 
+    im = sub.add_parser("improve", help="like <game>: raise house quality under law")
+    im.add_argument("prefix", nargs="?", default="like elden ring")
+    im.add_argument("--rounds", type=int, default=16)
+
     wk = sub.add_parser("walk", help="prove spawn→extract on the emitted door graph")
     wk.add_argument("--era", default="extraction_now")
     wk.add_argument("--blend", nargs=2, metavar=("ERA_A", "ERA_B"))
@@ -216,6 +220,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "acquire-game":
         from skeleton.cortex.live import live_cortex, persist
         out = live_cortex().acquire_gaming(appid=args.appid, title=args.title)
+        persist()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "improve":
+        from skeleton.cortex.live import live_cortex, persist
+        out = live_cortex().improve(args.prefix, rounds=args.rounds)
         persist()
         print(json.dumps(out, indent=2, default=str))
         return 0

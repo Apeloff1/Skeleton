@@ -206,6 +206,10 @@ class JeevesCortex:
         from skeleton.cortex.refs import refer
         return refer(stimulus, live=live)
 
+    def improve(self, stimulus: str, *, rounds: int = 16) -> Dict[str, Any]:
+        from skeleton.cortex.improve import improve
+        return improve(self, stimulus, rounds=rounds)
+
     def bind_ref(self, slot: str = "right") -> Dict[str, str]:
         from skeleton.cortex.refs import GameRefPort
         return self.bind(slot, GameRefPort(slot=slot))
@@ -256,6 +260,8 @@ class JeevesCortex:
         if ref.get("hit"):
             ctx["reference"] = ref["ref"]
             stim = f"{stim} {ref['ref'].get('dialect') or ''}".strip()
+        if "like " in (stimulus or "").lower() and ref.get("hit"):
+            ctx["improve"] = self.improve(stimulus or "")
 
         route = self.slots["midbrain"].think(stim, ctx)
         self.ledger.record(route, stim)

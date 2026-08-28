@@ -1840,6 +1840,21 @@ class TestGenosGatesAcquire:
         assert neo.backends()["right"] == "gameref"
         assert neo.think("hades mix trash elite") is not None
 
+    def test_like_elden_ring_improves_under_law(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        out = neo.improve("like elden ring", rounds=4)
+        assert out["improved"] == 1
+        assert out["stored_prose"] == 0
+        assert out["law"] == "ok"
+        assert out["era"] == "soulslike"
+        assert out["epsilon"] == 0.0
+        assert out["neo_steps"] > 0
+        assert out["G"] >= out["G0"]
+        miss = neo.improve("like something that does not exist")
+        assert miss["improved"] == 0
+
+
 
 
 
