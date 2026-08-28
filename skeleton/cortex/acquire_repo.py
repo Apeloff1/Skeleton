@@ -97,12 +97,8 @@ def write_references(root: Optional[Path] = None) -> Dict[str, Any]:
 
 
 def _get_json(url: str, *, timeout: float = 8.0, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
-    from skeleton.cortex.cite import AGENT
-    req = urllib.request.Request(url, headers=headers or {"User-Agent": AGENT})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        raw = resp.read().decode("utf-8")
-    data = json.loads(raw)
-    return data if isinstance(data, dict) else {"payload": data}
+    from skeleton.cortex.polite import fetch_json
+    return fetch_json(url, timeout=timeout, headers=headers)
 
 
 def parse_ref(appid: int, *, title: str = "", era: str = "") -> Dict[str, Any]:

@@ -58,3 +58,24 @@ def distill_dialect(title: str, era: str = "", genres=None) -> str:
         bits.append(str(g).lower())
     bits.append("plan tensor ttk hp dps")
     return " ".join(bits)
+
+
+def _h(s: str, seed: int) -> int:
+    return hash((seed, s)) & 0xFFFFFFFF
+
+
+def minhash(text: str, *, k: int = 64, w: int = 4) -> tuple:
+    """k-wide MinHash of w-shingles. Compare with estimated Jaccard."""
+    sh = shingles(text, w)
+    if not sh:
+        return tuple(0 for _ in range(k))
+    sig = []
+    for i in range(k):
+        sig.append(min(_h(" ".join(g), i) for g in sh))
+    return tuple(sig)
+
+
+def minhash_jaccard(a: tuple, b: tuple) -> float:
+    if not a or not b or len(a) != len(b):
+        return 0.0
+    return sum(1 for x, y in zip(a, b) if x == y) / len(a)

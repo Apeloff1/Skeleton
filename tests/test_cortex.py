@@ -1811,6 +1811,18 @@ class TestGenosGatesAcquire:
         assert ref["stored_prose"] == 0
         assert "http" in ref["url"]
         assert "Steam" in ref["citation"]
+        from skeleton.cortex.antiplag import minhash, minhash_jaccard
+        a = minhash("elden ring soulslike plan tensor ttk hp dps")
+        b = minhash("elden ring soulslike plan tensor ttk hp dps")
+        c = minhash("unrelated cooking recipe salt pepper oven")
+        assert minhash_jaccard(a, b) == 1.0
+        assert minhash_jaccard(a, c) < 0.5
+        from skeleton.cortex.polite import throttle
+        import time
+        t0 = time.monotonic()
+        throttle("https://example.com/a")
+        throttle("https://example.com/b")
+        assert time.monotonic() - t0 >= 0.9
 
 
 
