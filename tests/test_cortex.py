@@ -145,6 +145,9 @@ class TestPipelineAndCockpit:
         like = GameForgeRun().execute("like elden ring forge a pack")
         assert like["succeeded"]
         assert like.get("reference") == "Elden Ring" or like.get("era") == "soulslike"
+        assert like.get("law") in {None, "ok"}
+        if like.get("G") is not None:
+            assert float(like["G"]) >= 1.0
 
     def test_cockpit_think_and_bind_slot(self):
         from skeleton.context.cockpit import Cockpit

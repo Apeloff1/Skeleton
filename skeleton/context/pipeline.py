@@ -123,6 +123,8 @@ class GameForgeRun:
             },
             "jeeves": run.context.get("jeeves_advice"),
             "cortex": run.context.get("cortex"),
+            "G": ((run.context.get("cortex") or {}) or {}).get("G"),
+            "law": ((run.context.get("cortex") or {}) or {}).get("law"),
             "files": run.context.get("files") or {},
             "sim": run.context.get("sim"),
             "project": run.context.get("project"),
@@ -299,6 +301,7 @@ def _stage_jeeves(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "pack_dps": pack.get("primary_dps"),
         "pack_ttk": pack.get("ttk"),
         "hottest": cockpit.lattice.hottest(1)[0][0],
+        "reference": ctx.get("reference"),
     })
     _commit(ctx, "jeeves", ctx["era"], advice["next"]["text"], advice["next"])
     return {
