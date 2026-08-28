@@ -141,6 +141,8 @@ class JeevesCortex:
         self._winner_mouth = "neo"
         self._mouth_override = None
         self._seal: Dict[str, Any] = {}
+        from skeleton.cortex.contact import ContactEngine
+        self.contact_engine = ContactEngine()
 
     def backends(self) -> Dict[str, str]:
         return {s: getattr(p, "name", type(p).__name__) for s, p in self.slots.items()}
@@ -176,7 +178,18 @@ class JeevesCortex:
 
     def distill(self, slot: str, stimulus: str) -> Dict[str, Any]:
         from skeleton.cortex.interchange import distill_teacher
-        return distill_teacher(self, slot, stimulus)
+        out = distill_teacher(self, slot, stimulus)
+        out["contact"] = self.contact(slot, stimulus)
+        return out
+
+    def contact(self, slot: str, stimulus: str = "") -> Dict[str, Any]:
+        return self.contact_engine.touch(self, slot, stimulus)
+
+    def _contact_if_teacher(self, slot: str, stimulus: str) -> None:
+        from skeleton.cortex.contact import is_teacher
+        port = self.slots.get(slot)
+        if port is not None and is_teacher(port):
+            self.contact_engine.touch(self, slot, stimulus)
 
     def _hidden(self, stim: str) -> List[float]:
         seq = self._hidden_seq(stim)
@@ -223,9 +236,11 @@ class JeevesCortex:
         if lw >= 0.25:
             left = self.slots["left"].think(stim, {**ctx, "route": route.to_dict()})
             self.ledger.record(left, stim)
+            self._contact_if_teacher("left", stim)
         if rw >= 0.25:
             right = self.slots["right"].think(stim, {**ctx, "route": route.to_dict()})
             self.ledger.record(right, stim)
+            self._contact_if_teacher("right", stim)
 
         pfc_ctx = {**ctx}
         if left:
@@ -234,6 +249,8 @@ class JeevesCortex:
             pfc_ctx["right"] = right.to_dict()
         pfc = self.slots["pfc"].think(stim, pfc_ctx)
         self.ledger.record(pfc, stim)
+        self._contact_if_teacher("pfc", stim)
+        self._contact_if_teacher("midbrain", stim)
 
         estimates: List[Estimate] = [
             Estimate("midbrain", route.confidence),
@@ -518,6 +535,7 @@ class JeevesCortex:
             "bpe": self.bpe.snapshot(),
             "winner": self._winner_mouth,
             "mouth_override": self._mouth_override,
+            "contact": self.contact_engine.snapshot(),
         }
         p.write_text(json.dumps(blob), encoding="utf-8")
         return {"path": str(p), "own": self.own.size, "acquired": dict(self.acquired)}
@@ -567,6 +585,8 @@ class JeevesCortex:
             self.transformer.bpe = self.bpe
             if getattr(self, "neo_rms", None) is not None:
                 self.neo_rms.bpe = self.bpe
+        if blob.get("contact"):
+            self.contact_engine.restore(blob.get("contact"))
         if blob.get("callosum"):
             self.callosum = CorpusCallosum.from_snapshot(blob["callosum"])
         if blob.get("moe"):

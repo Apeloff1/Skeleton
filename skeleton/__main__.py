@@ -86,6 +86,10 @@ def main(argv: list[str] | None = None) -> int:
     ds.add_argument("slot", choices=["pfc", "midbrain", "left", "right"])
     ds.add_argument("prefix", nargs="?", default="plan tensor ttk")
 
+    ct = sub.add_parser("contact", help="write Jeeves adapters onto a teacher copy")
+    ct.add_argument("slot", choices=["pfc", "midbrain", "left", "right"])
+    ct.add_argument("prefix", nargs="?", default="plan tensor ttk")
+
     wk = sub.add_parser("walk", help="prove spawn→extract on the emitted door graph")
     wk.add_argument("--era", default="extraction_now")
     wk.add_argument("--blend", nargs=2, metavar=("ERA_A", "ERA_B"))
@@ -185,6 +189,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "bind-kimi":
         from skeleton.cortex.live import live_cortex, persist
         out = live_cortex().bind_kimi(args.slot, args.model)
+        persist()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "contact":
+        from skeleton.cortex.live import live_cortex, persist
+        out = live_cortex().contact(args.slot, args.prefix)
         persist()
         print(json.dumps(out, indent=2, default=str))
         return 0

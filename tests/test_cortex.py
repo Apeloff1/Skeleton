@@ -1722,4 +1722,24 @@ class TestInterchangeTeachers:
         assert neo.slots["right"].slot == "right"
 
 
+class TestContactLaw:
+    def test_contact_writes_adapters_on_teacher_copy(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        neo.bind_hf("left")
+        birth = neo.contact("left", "plan tensor ttk")
+        assert birth["contacted"] == 1
+        assert birth["lora"] is True
+        assert birth["steps"] >= 1
+        lm = neo.slots["left"].standin
+        assert lm.lora is not None
+        e0 = lm.lora.energy() if hasattr(lm.lora, "energy") else 0.0
+        second = neo.contact("left", "plan tensor lattice oracle")
+        assert second["contacts"] >= 2
+        assert second["magnitude"] >= 1.0 or second["contact_ppl"] is not None
+        assert "left:teacher" in neo.own.models
+        neo.think("plan tensor ttk lattice")
+        assert neo.contact_engine.contacts >= 2
+
+
 

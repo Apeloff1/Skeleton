@@ -48,6 +48,7 @@ from .accum import Accumulator, accumulate_fit
 from .gossip import absorb_mouth, gossip, gossip_cortices, gossip_mouths
 from .dodeca import FACES, face_card
 from .interchange import HuggingFaceBackend, KimiBackend, distill_teacher, probe_interchange
+from .contact import ContactEngine, is_teacher
 from .attn import swiglu, swiglu_bwd, cosine_lr, silu, rms_norm
 
 __all__ = [
