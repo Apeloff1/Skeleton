@@ -112,6 +112,19 @@ class ConsensusError(AgentError):
     code = "AGT.CONSENSUS"
     http_status = 409
 
+    def __init__(self, message: str, *, ballot: Optional[Dict[str, Any]] = None,
+                 **kwargs: Any) -> None:
+        # The swarm consensus/mesh layers attach the full ballot so callers
+        # can inspect exactly who voted how. Fold it into context so the
+        # standard error envelope carries it (fix 2026-08-28: previously the
+        # ballot kwarg hit SkeletonError.__init__ and raised TypeError on
+        # every failed quorum).
+        context = dict(kwargs.pop("context", {}) or {})
+        if ballot is not None:
+            context.setdefault("ballot", ballot)
+        super().__init__(message, context=context, **kwargs)
+        self.ballot: Dict[str, Any] = dict(ballot or {})
+
 
 class SchedulingError(AgentError):
     code = "AGT.SCHEDULING"

@@ -1,4 +1,9 @@
-"""Consensus protocols — majority + BFT (split from swarm_types.py, v16.2)."""
+"""Consensus protocols — majority + BFT (split from swarm_types.py, v16.2).
+
+Fix (2026-08-28): ``AgentId.generate()`` did not exist on the kernel id
+lattice (the constructor is ``AgentId.new()``), so the BFT pre-commit
+crashed with AttributeError on every invocation. Uses ``AgentId.new()``.
+"""
 
 from __future__ import annotations
 
@@ -119,7 +124,7 @@ class ByzantineFaultTolerantConsensus(ConsensusProtocol):
                 ballot={"required": self.required_nodes, "actual": n},
             )
 
-        proposal_hash = self._commit(proposal, AgentId.generate())
+        proposal_hash = self._commit(proposal, AgentId.new())
 
         pre_prepare_votes: Dict[str, List[str]] = {"accept": [], "reject": []}
         for voter in voters:
