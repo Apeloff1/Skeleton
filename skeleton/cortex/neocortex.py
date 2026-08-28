@@ -440,6 +440,7 @@ class JeevesCortex:
             "shadow": dict(self.shadow),
             "lms": lms,
             "transformer": self.transformer.snapshot(),
+            "neo_rms": self.neo_rms.snapshot() if getattr(self, "neo_rms", None) is not None else None,
             "callosum": self.callosum.snapshot(),
             "moe": self.moe.snapshot(),
             "sleep": self.sleep.snapshot(),
@@ -483,6 +484,9 @@ class JeevesCortex:
             else:
                 from skeleton.cortex.transformer import TinyTransformer
                 self.transformer = TinyTransformer.from_snapshot(snap)
+        if blob.get("neo_rms"):
+            from skeleton.cortex.transformer import TinyTransformer
+            self.neo_rms = TinyTransformer.from_snapshot(blob["neo_rms"])
         if blob.get("callosum"):
             self.callosum = CorpusCallosum.from_snapshot(blob["callosum"])
         if blob.get("moe"):
@@ -559,15 +563,25 @@ class JeevesCortex:
 
     def attach_lora(self, *, rank: int = 2, alpha: float = 4.0) -> Dict[str, Any]:
         xf = self.transformer
-        if xf is None or not hasattr(xf, "attach_lora"):
-            return {"attached": []}
-        return xf.attach_lora(rank=rank, alpha=alpha)
+        out: Dict[str, Any] = {"attached": []}
+        if xf is not None and hasattr(xf, "attach_lora"):
+            out = dict(xf.attach_lora(rank=rank, alpha=alpha))
+        rms = getattr(self, "neo_rms", None)
+        rms_out = {"attached": []}
+        if rms is not None and hasattr(rms, "attach_lora"):
+            rms_out = rms.attach_lora(rank=rank, alpha=alpha)
+        out["neo_rms"] = rms_out
+        return out
 
     def merge_lora(self) -> Dict[str, Any]:
         xf = self.transformer
-        if xf is None or not hasattr(xf, "merge_lora"):
-            return {"merged": []}
-        return xf.merge_lora()
+        out: Dict[str, Any] = {"merged": []}
+        if xf is not None and hasattr(xf, "merge_lora"):
+            out = dict(xf.merge_lora())
+        rms = getattr(self, "neo_rms", None)
+        if rms is not None and hasattr(rms, "merge_lora"):
+            out["neo_rms"] = rms.merge_lora()
+        return out
 
     def accumulate(self, texts=None, *, k: int = 4, lr: float = 0.04) -> Dict[str, Any]:
         from skeleton.cortex.lm import gameforge_corpus
@@ -612,9 +626,20 @@ class JeevesCortex:
             )
             if snap and hasattr(self.transformer, "from_snapshot"):
                 pass
+        rms = getattr(self, "neo_rms", None)
+        if rms is not None and hasattr(rms, "to"):
+            try:
+                want_rms = info["actual"]
+                if want_rms == "cpu" and info.get("torch") and info.get("requested") in {"cuda", "gpu", "torch", "auto"}:
+                    want_rms = "torch"
+                rms.to(want_rms if info.get("cuda") or want_rms != "cuda" else "cpu")
+            except Exception:
+                pass
         return {
             "requested": info["requested"],
             "actual": getattr(self.transformer, "device", info["actual"]),
+            "neo_rms_device": str(getattr(getattr(self, "neo_rms", None), "device", "cpu") or "cpu"),
+            "neo_rms_resident": bool(getattr(getattr(self, "neo_rms", None), "resident", False)),
             "degraded": bool(info.get("degraded")),
             "cuda": bool(info.get("cuda")),
             "backend": type(self.transformer).__name__,

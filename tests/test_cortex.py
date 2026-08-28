@@ -1287,4 +1287,34 @@ class TestQueue14:
         assert neo.status()["lm"]["neo_rms"]["norm"] == "rms"
 
 
+class TestQueue15:
+    def test_lora_lands_on_both_mouths(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        out = neo.attach_lora(rank=2)
+        assert "Wq" in (out.get("attached") or [])
+        assert "Wq" in (out.get("neo_rms") or {}).get("attached", [])
+        assert getattr(neo.transformer, "lora", None) is not None
+        assert getattr(neo.neo_rms, "lora", None) is not None
+        merged = neo.merge_lora()
+        assert "merged" in merged and "neo_rms" in merged
+
+    def test_to_pins_both_devices(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        info = neo.to("cpu")
+        assert info["actual"]
+        assert info["neo_rms_device"]
+        assert neo.transformer.device
+        assert neo.neo_rms.device
+
+    def test_train_advances_neo_rms(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        before = neo.neo_rms.steps
+        neo.train(epochs=1)
+        assert neo.neo_rms.steps >= before
+        assert neo.transformer.steps >= 1
+
+
 

@@ -130,7 +130,10 @@ def train(neo, *, epochs: int = 1, pairs: Sequence[Pair] | None = None,
                 # Era pairs still think() and port.fit; UNK-heavy era names
                 # blow a 2-layer residual if they take the same SGD as TTK.
                 if train_s in _NEO_FIT:
-                    xf.fit([train_s], lr=0.03)
+                    xf.fit([train_s], lr=0.03, schedule="cosine")
+            rms = getattr(neo, "neo_rms", None)
+            if rms is not None and hasattr(rms, "fit") and train_s in _NEO_FIT:
+                rms.fit([train_s], lr=0.03, schedule="cosine")
         for slot in SLOTS:
             neo.acquire(slot)
         if auto_surpass:
