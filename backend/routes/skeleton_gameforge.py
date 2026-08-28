@@ -297,16 +297,22 @@ def cortex_speak(body: Dict[str, Any]) -> Dict[str, Any]:
     from skeleton.cortex.live import live_cortex, persist
     stim = (body or {}).get("stimulus") or (body or {}).get("prefix") or "plan tensor ttk"
     n = int((body or {}).get("n") or 12)
-    text = live_cortex().speak(stim, n=n, seed=int((body or {}).get("seed") or 0))
+    mouth = str((body or {}).get("mouth") or "gelu")
+    text = live_cortex().speak(stim, n=n, seed=int((body or {}).get("seed") or 0), mouth=mouth)
     persist()
-    return {"text": text, "n": n}
+    return {"text": text, "n": n, "mouth": mouth}
 
 
 @router.post("/cortex/beam")
 def cortex_beam(body: Dict[str, Any]) -> Dict[str, Any]:
     from skeleton.cortex.live import live_cortex, persist
     stim = (body or {}).get("stimulus") or (body or {}).get("prefix") or "plan tensor ttk"
-    out = live_cortex().beam(stim, n=int((body or {}).get("n") or 8), width=int((body or {}).get("width") or 4))
+    out = live_cortex().beam(
+        stim,
+        n=int((body or {}).get("n") or 8),
+        width=int((body or {}).get("width") or 4),
+        mouth=str((body or {}).get("mouth") or "gelu"),
+    )
     persist()
     return out
 
@@ -324,7 +330,12 @@ def cortex_lora(body: Dict[str, Any]) -> Dict[str, Any]:
 def cortex_gossip(body: Dict[str, Any]) -> Dict[str, Any]:
     from skeleton.cortex import JeevesCortex
     from skeleton.cortex.live import live_cortex, persist
-    out = live_cortex().gossip_with(JeevesCortex(), alpha=float((body or {}).get("alpha") or 0.25))
+    neo = live_cortex()
+    alpha = float((body or {}).get("alpha") or 0.25)
+    if (body or {}).get("mouths"):
+        out = neo.gossip_mouths(alpha=alpha, direction=str((body or {}).get("direction") or "rms-into-gelu"))
+    else:
+        out = neo.gossip_with(JeevesCortex(), alpha=alpha)
     persist()
     return out
 

@@ -1317,4 +1317,27 @@ class TestQueue15:
         assert neo.transformer.steps >= 1
 
 
+class TestQueue16:
+    def test_mouth_switch(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        assert neo.mouth("gelu") is neo.transformer
+        assert neo.mouth("rms") is neo.neo_rms
+        g = neo.speak("plan tensor ttk", n=3, seed=1, mouth="gelu")
+        r = neo.speak("plan tensor ttk", n=3, seed=1, mouth="rms")
+        assert g and r
+        b = neo.beam("plan tensor ttk", n=3, width=2, mouth="rms")
+        assert b["mouth"] == "rms" and b.get("winner") is not None
+
+    def test_gossip_mouths_alpha0_noop(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        before = [row[:] for row in neo.transformer.Wout]
+        out = neo.gossip_mouths(alpha=0.0)
+        assert out["gossiped"] == 1
+        assert all(abs(a - b) < 1e-12 for ra, rb in zip(before, neo.transformer.Wout) for a, b in zip(ra, rb))
+        neo.gossip_mouths(alpha=0.4)
+        assert any(abs(a - b) > 1e-9 for ra, rb in zip(before, neo.transformer.Wout) for a, b in zip(ra, rb))
+
+
 

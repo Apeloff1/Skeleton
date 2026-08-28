@@ -21,7 +21,7 @@ def _mix_mat(A: List[List[float]], B: List[List[float]], alpha: float) -> List[L
 
 def mix_blocks(dst_blk: Dict[str, Any], src_blk: Dict[str, Any], alpha: float) -> Dict[str, Any]:
     out = dict(dst_blk)
-    for key in ("Wq", "Wk", "Wv", "Wo", "W1", "W2", "b1", "b2", "ln1_g", "ln1_b", "ln2_g", "ln2_b"):
+    for key in ("Wq", "Wk", "Wv", "Wo", "W1", "Wu", "W2", "b1", "bu", "b2", "ln1_g", "ln1_b", "ln2_g", "ln2_b"):
         dv, sv = dst_blk.get(key), src_blk.get(key)
         if isinstance(dv, list) and dv and isinstance(dv[0], list):
             out[key] = _mix_mat(dv, sv or dv, alpha)
@@ -52,6 +52,9 @@ def gossip(dst_lm, src_lm, *, alpha: float = 0.5, keys: Optional[Iterable[str]] 
     if int(getattr(dst_lm, "n_layers", 0) or 0) != int(getattr(src_lm, "n_layers", 0) or 0):
         return {"gossiped": 0, "reason": "depth-mismatch"}
     a = max(0.0, min(1.0, float(alpha)))
+    if a == 0.0:
+        return {"gossiped": 1, "alpha": 0.0, "n_layers": int(dst_lm.n_layers), "dim": int(dst_lm.dim),
+                "keys": list(keys or ("E", "P", "Wout", "layers")), "reason": "alpha0"}
     restored = type(dst_lm).from_snapshot(mix_snapshots(dst_lm.snapshot(), src_lm.snapshot(), a))
     dst_lm.E, dst_lm.P, dst_lm.Wout, dst_lm.bout = restored.E, restored.P, restored.Wout, restored.bout
     dst_lm.layers, dst_lm.n_layers = restored.layers, restored.n_layers
@@ -62,8 +65,23 @@ def gossip(dst_lm, src_lm, *, alpha: float = 0.5, keys: Optional[Iterable[str]] 
 def gossip_cortices(dst, src, *, alpha: float = 0.5) -> Dict[str, Any]:
     before = merkle_card(dst)
     info = gossip(getattr(dst, "transformer", None), getattr(src, "transformer", None), alpha=alpha)
+    rms = gossip(getattr(dst, "neo_rms", None), getattr(src, "neo_rms", None), alpha=alpha)
     after = merkle_card(dst)
     info["before_steps"] = before.get("transformer_steps")
     info["after_steps"] = after.get("transformer_steps")
+    info["neo_rms"] = rms
     info["card"] = after
+    return info
+
+
+def gossip_mouths(neo, *, alpha: float = 0.25, direction: str = "rms-into-gelu") -> Dict[str, Any]:
+    """Mix the two local mouths. Default: RMS/SwiGLU bleeds into the GELU primary."""
+    xf = getattr(neo, "transformer", None)
+    rms = getattr(neo, "neo_rms", None)
+    if direction == "gelu-into-rms":
+        info = gossip(rms, xf, alpha=alpha)
+        info["direction"] = direction
+        return info
+    info = gossip(xf, rms, alpha=alpha)
+    info["direction"] = "rms-into-gelu"
     return info

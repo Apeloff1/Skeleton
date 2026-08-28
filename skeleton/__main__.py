@@ -57,11 +57,13 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("prefix", nargs="?", default="plan tensor ttk")
     sp.add_argument("-n", type=int, default=12)
     sp.add_argument("--seed", type=int, default=0)
+    sp.add_argument("--mouth", default="gelu", help="gelu | rms")
 
     bm = sub.add_parser("beam", help="beam-search the neo mouth")
     bm.add_argument("prefix", nargs="?", default="plan tensor ttk")
     bm.add_argument("-n", type=int, default=8)
     bm.add_argument("--width", type=int, default=4)
+    bm.add_argument("--mouth", default="gelu", help="gelu | rms")
 
     lr = sub.add_parser("lora", help="attach or merge LoRA on the live neo")
     lr.add_argument("--rank", type=int, default=2)
@@ -69,6 +71,8 @@ def main(argv: list[str] | None = None) -> int:
 
     gs = sub.add_parser("gossip", help="α-mix live neo with a fresh peer")
     gs.add_argument("--alpha", type=float, default=0.25)
+    gs.add_argument("--mouths", action="store_true", help="mix neo_rms into primary")
+    gs.add_argument("--direction", default="rms-into-gelu")
 
     wk = sub.add_parser("walk", help="prove spawn→extract on the emitted door graph")
     wk.add_argument("--era", default="extraction_now")
@@ -139,14 +143,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "speak":
         from skeleton.cortex.live import live_cortex, persist
-        text = live_cortex().speak(args.prefix, n=args.n, seed=args.seed)
+        text = live_cortex().speak(args.prefix, n=args.n, seed=args.seed, mouth=args.mouth)
         persist()
         print(text)
         return 0
 
     if args.cmd == "beam":
         from skeleton.cortex.live import live_cortex, persist
-        out = live_cortex().beam(args.prefix, n=args.n, width=args.width)
+        out = live_cortex().beam(args.prefix, n=args.n, width=args.width, mouth=args.mouth)
         persist()
         print(json.dumps(out, indent=2, default=str))
         return 0
@@ -162,7 +166,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "gossip":
         from skeleton.cortex import JeevesCortex
         from skeleton.cortex.live import live_cortex, persist
-        out = live_cortex().gossip_with(JeevesCortex(), alpha=args.alpha)
+        neo = live_cortex()
+        if args.mouths:
+            out = neo.gossip_mouths(alpha=args.alpha, direction=args.direction)
+        else:
+            out = neo.gossip_with(JeevesCortex(), alpha=args.alpha)
         persist()
         print(json.dumps(out, indent=2, default=str))
         return 0

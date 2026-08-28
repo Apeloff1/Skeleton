@@ -544,22 +544,31 @@ class JeevesCortex:
                      if getattr(self.transformer, "lora", None) is not None else None),
         }
 
-    def speak(self, stimulus: str, *, n: int = 12, seed: int = 0) -> str:
-        xf = self.transformer
+    def mouth(self, name: str = "gelu"):
+        key = str(name or "gelu").lower()
+        if key in {"rms", "swiglu", "neo_rms", "right"}:
+            return getattr(self, "neo_rms", None) or self.transformer
+        return self.transformer
+
+    def speak(self, stimulus: str, *, n: int = 12, seed: int = 0, mouth: str = "gelu") -> str:
+        xf = self.mouth(mouth)
         if xf is None:
             return ""
         if hasattr(xf, "decode"):
             return str(xf.decode(stimulus or "", n=n, seed=seed))
         return " ".join(xf.generate(stimulus or "", n=n, seed=seed))
 
-    def beam(self, stimulus: str, *, n: int = 8, width: int = 4) -> Dict[str, Any]:
-        xf = self.transformer
+    def beam(self, stimulus: str, *, n: int = 8, width: int = 4, mouth: str = "gelu") -> Dict[str, Any]:
+        xf = self.mouth(mouth)
         if xf is None:
             return {"winner": "", "beams": []}
         if hasattr(xf, "beam"):
-            return xf.beam(stimulus or "", n=n, width=width)
-        from skeleton.cortex.beam import beam_search
-        return beam_search(xf, stimulus or "", n=n, width=width)
+            out = xf.beam(stimulus or "", n=n, width=width)
+        else:
+            from skeleton.cortex.beam import beam_search
+            out = beam_search(xf, stimulus or "", n=n, width=width)
+        out["mouth"] = "rms" if xf is getattr(self, "neo_rms", None) else "gelu"
+        return out
 
     def attach_lora(self, *, rank: int = 2, alpha: float = 4.0) -> Dict[str, Any]:
         xf = self.transformer
@@ -597,6 +606,10 @@ class JeevesCortex:
     def gossip_with(self, other, *, alpha: float = 0.5) -> Dict[str, Any]:
         from skeleton.cortex.gossip import gossip_cortices
         return gossip_cortices(self, other, alpha=alpha)
+
+    def gossip_mouths(self, *, alpha: float = 0.25, direction: str = "rms-into-gelu") -> Dict[str, Any]:
+        from skeleton.cortex.gossip import gossip_mouths
+        return gossip_mouths(self, alpha=alpha, direction=direction)
 
     def tokens_of(self, text: str) -> List[int]:
         """BPE mouth first. Word ids if the encoder is missing."""
