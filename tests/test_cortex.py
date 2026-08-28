@@ -1803,6 +1803,14 @@ class TestGenosGatesAcquire:
             raise AssertionError("plag")
         except LawError as e:
             assert e.law == "cite-do-not-copy"
+        from skeleton.cortex.antiplag import score
+        s = score("plan tensor ttk", "unrelated source page about cooking")
+        assert s["method"] == "broder-w4" and s["copy"] is False
+        from skeleton.cortex.acquire_repo import reference_of
+        ref = reference_of({"appid": 1245620, "title": "Elden Ring", "era": "soulslike"})
+        assert ref["stored_prose"] == 0
+        assert "http" in ref["url"]
+        assert "Steam" in ref["citation"]
 
 
 

@@ -2,138 +2,186 @@
   "games": [
     {
       "appid": 1245620,
+      "citation": "Elden Ring. Steam Store. https://store.steampowered.com/app/1245620/",
       "dialect": "elden ring soulslike plan tensor ttk hp dps",
       "era": "soulslike",
       "kind": "reference",
-      "license": "cite-url-only",
+      "license": "LicenseRef-Steam-Store-Terms",
       "source": "steam",
+      "stored_prose": 0,
       "title": "Elden Ring",
       "url": "https://store.steampowered.com/app/1245620/",
-      "wiki": "https://en.wikipedia.org/wiki/Elden_Ring"
+      "wiki": "https://en.wikipedia.org/wiki/Elden_Ring",
+      "wiki_citation": "\"Elden Ring,\" Wikipedia, https://en.wikipedia.org/wiki/Elden_Ring (CC BY-SA 4.0)",
+      "wiki_license": "CC-BY-SA-4.0"
     },
     {
       "appid": 374320,
+      "citation": "Dark Souls III. Steam Store. https://store.steampowered.com/app/374320/",
       "dialect": "dark souls iii soulslike plan tensor ttk hp dps",
       "era": "soulslike",
       "kind": "reference",
-      "license": "cite-url-only",
+      "license": "LicenseRef-Steam-Store-Terms",
       "source": "steam",
+      "stored_prose": 0,
       "title": "Dark Souls III",
       "url": "https://store.steampowered.com/app/374320/",
-      "wiki": "https://en.wikipedia.org/wiki/Dark_Souls_III"
+      "wiki": "https://en.wikipedia.org/wiki/Dark_Souls_III",
+      "wiki_citation": "\"Dark Souls III,\" Wikipedia, https://en.wikipedia.org/wiki/Dark_Souls_III (CC BY-SA 4.0)",
+      "wiki_license": "CC-BY-SA-4.0"
     },
     {
       "appid": 814380,
+      "citation": "Sekiro Shadows Die Twice. Steam Store. https://store.steampowered.com/app/814380/",
       "dialect": "sekiro shadows die twice soulslike plan tensor ttk hp dps",
       "era": "soulslike",
       "kind": "reference",
-      "license": "cite-url-only",
+      "license": "LicenseRef-Steam-Store-Terms",
       "source": "steam",
+      "stored_prose": 0,
       "title": "Sekiro Shadows Die Twice",
       "url": "https://store.steampowered.com/app/814380/",
-      "wiki": "https://en.wikipedia.org/wiki/Sekiro_Shadows_Die_Twice"
+      "wiki": "https://en.wikipedia.org/wiki/Sekiro_Shadows_Die_Twice",
+      "wiki_citation": "\"Sekiro Shadows Die Twice,\" Wikipedia, https://en.wikipedia.org/wiki/Sekiro_Shadows_Die_Twice (CC BY-SA 4.0)",
+      "wiki_license": "CC-BY-SA-4.0"
     },
     {
       "appid": 1627720,
+      "citation": "Lies of P. Steam Store. https://store.steampowered.com/app/1627720/",
       "dialect": "lies of p soulslike plan tensor ttk hp dps",
       "era": "soulslike",
       "kind": "reference",
-      "license": "cite-url-only",
+      "license": "LicenseRef-Steam-Store-Terms",
       "source": "steam",
+      "stored_prose": 0,
       "title": "Lies of P",
       "url": "https://store.steampowered.com/app/1627720/",
-      "wiki": "https://en.wikipedia.org/wiki/Lies_of_P"
+      "wiki": "https://en.wikipedia.org/wiki/Lies_of_P",
+      "wiki_citation": "\"Lies of P,\" Wikipedia, https://en.wikipedia.org/wiki/Lies_of_P (CC BY-SA 4.0)",
+      "wiki_license": "CC-BY-SA-4.0"
     },
     {
       "appid": 1145360,
+      "citation": "Hades. Steam Store. https://store.steampowered.com/app/1145360/",
       "dialect": "hades roguelike plan tensor ttk hp dps",
       "era": "roguelike",
       "kind": "reference",
-      "license": "cite-url-only",
+      "license": "LicenseRef-Steam-Store-Terms",
       "source": "steam",
+      "stored_prose": 0,
       "title": "Hades",
       "url": "https://store.steampowered.com/app/1145360/",
-      "wiki": "https://en.wikipedia.org/wiki/Hades"
+      "wiki": "https://en.wikipedia.org/wiki/Hades",
+      "wiki_citation": "\"Hades,\" Wikipedia, https://en.wikipedia.org/wiki/Hades (CC BY-SA 4.0)",
+      "wiki_license": "CC-BY-SA-4.0"
     },
     {
       "appid": 646570,
+      "citation": "Slay the Spire. Steam Store. https://store.steampowered.com/app/646570/",
       "dialect": "slay the spire roguelike plan tensor ttk hp dps",
       "era": "roguelike",
       "kind": "reference",
-      "license": "cite-url-only",
+      "license": "LicenseRef-Steam-Store-Terms",
       "source": "steam",
+      "stored_prose": 0,
       "title": "Slay the Spire",
       "url": "https://store.steampowered.com/app/646570/",
-      "wiki": "https://en.wikipedia.org/wiki/Slay_the_Spire"
+      "wiki": "https://en.wikipedia.org/wiki/Slay_the_Spire",
+      "wiki_citation": "\"Slay the Spire,\" Wikipedia, https://en.wikipedia.org/wiki/Slay_the_Spire (CC BY-SA 4.0)",
+      "wiki_license": "CC-BY-SA-4.0"
     },
     {
       "appid": 518790,
+      "citation": "Dead Cells. Steam Store. https://store.steampowered.com/app/518790/",
       "dialect": "dead cells roguelike plan tensor ttk hp dps",
       "era": "roguelike",
       "kind": "reference",
-      "license": "cite-url-only",
+      "license": "LicenseRef-Steam-Store-Terms",
       "source": "steam",
+      "stored_prose": 0,
       "title": "Dead Cells",
       "url": "https://store.steampowered.com/app/518790/",
-      "wiki": "https://en.wikipedia.org/wiki/Dead_Cells"
+      "wiki": "https://en.wikipedia.org/wiki/Dead_Cells",
+      "wiki_citation": "\"Dead Cells,\" Wikipedia, https://en.wikipedia.org/wiki/Dead_Cells (CC BY-SA 4.0)",
+      "wiki_license": "CC-BY-SA-4.0"
     },
     {
       "appid": 367520,
+      "citation": "Hollow Knight. Steam Store. https://store.steampowered.com/app/367520/",
       "dialect": "hollow knight metroidvania plan tensor ttk hp dps",
       "era": "metroidvania",
       "kind": "reference",
-      "license": "cite-url-only",
+      "license": "LicenseRef-Steam-Store-Terms",
       "source": "steam",
+      "stored_prose": 0,
       "title": "Hollow Knight",
       "url": "https://store.steampowered.com/app/367520/",
-      "wiki": "https://en.wikipedia.org/wiki/Hollow_Knight"
+      "wiki": "https://en.wikipedia.org/wiki/Hollow_Knight",
+      "wiki_citation": "\"Hollow Knight,\" Wikipedia, https://en.wikipedia.org/wiki/Hollow_Knight (CC BY-SA 4.0)",
+      "wiki_license": "CC-BY-SA-4.0"
     },
     {
       "appid": 1809540,
+      "citation": "Nine Sols. Steam Store. https://store.steampowered.com/app/1809540/",
       "dialect": "nine sols metroidvania plan tensor ttk hp dps",
       "era": "metroidvania",
       "kind": "reference",
-      "license": "cite-url-only",
+      "license": "LicenseRef-Steam-Store-Terms",
       "source": "steam",
+      "stored_prose": 0,
       "title": "Nine Sols",
       "url": "https://store.steampowered.com/app/1809540/",
-      "wiki": "https://en.wikipedia.org/wiki/Nine_Sols"
+      "wiki": "https://en.wikipedia.org/wiki/Nine_Sols",
+      "wiki_citation": "\"Nine Sols,\" Wikipedia, https://en.wikipedia.org/wiki/Nine_Sols (CC BY-SA 4.0)",
+      "wiki_license": "CC-BY-SA-4.0"
     },
     {
       "appid": 594650,
+      "citation": "Hunt Showdown. Steam Store. https://store.steampowered.com/app/594650/",
       "dialect": "hunt showdown extraction_now plan tensor ttk hp dps",
       "era": "extraction_now",
       "kind": "reference",
-      "license": "cite-url-only",
+      "license": "LicenseRef-Steam-Store-Terms",
       "source": "steam",
+      "stored_prose": 0,
       "title": "Hunt Showdown",
       "url": "https://store.steampowered.com/app/594650/",
-      "wiki": "https://en.wikipedia.org/wiki/Hunt_Showdown"
+      "wiki": "https://en.wikipedia.org/wiki/Hunt_Showdown",
+      "wiki_citation": "\"Hunt Showdown,\" Wikipedia, https://en.wikipedia.org/wiki/Hunt_Showdown (CC BY-SA 4.0)",
+      "wiki_license": "CC-BY-SA-4.0"
     },
     {
       "appid": 1966720,
+      "citation": "Lethal Company. Steam Store. https://store.steampowered.com/app/1966720/",
       "dialect": "lethal company extraction_now plan tensor ttk hp dps",
       "era": "extraction_now",
       "kind": "reference",
-      "license": "cite-url-only",
+      "license": "LicenseRef-Steam-Store-Terms",
       "source": "steam",
+      "stored_prose": 0,
       "title": "Lethal Company",
       "url": "https://store.steampowered.com/app/1966720/",
-      "wiki": "https://en.wikipedia.org/wiki/Lethal_Company"
+      "wiki": "https://en.wikipedia.org/wiki/Lethal_Company",
+      "wiki_citation": "\"Lethal Company,\" Wikipedia, https://en.wikipedia.org/wiki/Lethal_Company (CC BY-SA 4.0)",
+      "wiki_license": "CC-BY-SA-4.0"
     },
     {
       "appid": 413150,
+      "citation": "Stardew Valley. Steam Store. https://store.steampowered.com/app/413150/",
       "dialect": "stardew valley cozy plan tensor ttk hp dps",
       "era": "cozy",
       "kind": "reference",
-      "license": "cite-url-only",
+      "license": "LicenseRef-Steam-Store-Terms",
       "source": "steam",
+      "stored_prose": 0,
       "title": "Stardew Valley",
       "url": "https://store.steampowered.com/app/413150/",
-      "wiki": "https://en.wikipedia.org/wiki/Stardew_Valley"
+      "wiki": "https://en.wikipedia.org/wiki/Stardew_Valley",
+      "wiki_citation": "\"Stardew Valley,\" Wikipedia, https://en.wikipedia.org/wiki/Stardew_Valley (CC BY-SA 4.0)",
+      "wiki_license": "CC-BY-SA-4.0"
     }
   ],
   "kind": "reference-index",
   "n": 12,
-  "sha256": "4e56d7516c77e9c3977ac69127b5e1a4f3d24997226f5bd8859b8d1a969d2d4e"
+  "sha256": "2b37f35d484ce2be0ad1da7a4ae865ea2d36bc67c3f2202c232e00ca6b24c966"
 }

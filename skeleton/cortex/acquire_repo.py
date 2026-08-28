@@ -62,19 +62,27 @@ def _write(path: Path, payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def reference_of(game: Dict[str, Any]) -> Dict[str, Any]:
+    from skeleton.cortex.cite import SPDX_STEAM, SPDX_WIKI, steam_cite, wiki_cite
     appid = int(game["appid"])
     title = str(game["title"])
     era = str(game.get("era") or "")
+    dialect = distill_dialect(title, era)
+    steam = steam_cite(appid, title, era=era, dialect=dialect)
+    wiki = wiki_cite(title)
     return check({
         "kind": "reference",
         "appid": appid,
         "title": title,
         "era": era,
         "source": "steam",
-        "url": f"https://store.steampowered.com/app/{appid}/",
-        "wiki": f"https://en.wikipedia.org/wiki/{urllib.parse.quote(title.replace(' ', '_'))}",
-        "license": "cite-url-only",
-        "dialect": distill_dialect(title, era),
+        "url": steam["url"],
+        "wiki": wiki["url"],
+        "license": SPDX_STEAM,
+        "wiki_license": SPDX_WIKI,
+        "citation": steam["citation"],
+        "wiki_citation": wiki["citation"],
+        "dialect": dialect,
+        "stored_prose": 0,
     })
 
 
@@ -89,7 +97,8 @@ def write_references(root: Optional[Path] = None) -> Dict[str, Any]:
 
 
 def _get_json(url: str, *, timeout: float = 8.0, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
-    req = urllib.request.Request(url, headers=headers or {"User-Agent": "SkeletonGenos/1.0"})
+    from skeleton.cortex.cite import AGENT
+    req = urllib.request.Request(url, headers=headers or {"User-Agent": AGENT})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         raw = resp.read().decode("utf-8")
     data = json.loads(raw)

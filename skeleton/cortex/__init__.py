@@ -56,6 +56,7 @@ from .genos import Genos
 from .acquire_repo import acquire_catalog, acquire_gaming, acquire_spree, parse_ref, references
 from .laws import LAWS, LawError, check
 from .antiplag import distill_dialect, guard
+from .cite import steam_cite, wiki_cite, SPDX_STEAM, SPDX_WIKI
 from .attn import swiglu, swiglu_bwd, cosine_lr, silu, rms_norm
 
 __all__ = [
