@@ -337,6 +337,16 @@ def cortex_bind_kimi(body: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+@router.post("/cortex/contact")
+def cortex_contact(body: Dict[str, Any]) -> Dict[str, Any]:
+    from skeleton.cortex.live import live_cortex, persist
+    slot = str((body or {}).get("slot") or "left")
+    stim = str((body or {}).get("stimulus") or (body or {}).get("prefix") or "plan tensor ttk")
+    out = live_cortex().contact(slot, stim)
+    persist()
+    return out
+
+
 @router.post("/cortex/distill")
 def cortex_distill(body: Dict[str, Any]) -> Dict[str, Any]:
     from skeleton.cortex.live import live_cortex, persist
