@@ -160,6 +160,8 @@ class TestPipelineAndCockpit:
         )
         assert out.get("law") == "ok"
         assert j.last_walk.get("reference") == "Elden Ring"
+        pack = j.bind_era("like elden ring")
+        assert pack["era"] == "soulslike"
 
     def test_cockpit_think_and_bind_slot(self):
         from skeleton.context.cockpit import Cockpit

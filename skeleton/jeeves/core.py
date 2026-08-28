@@ -318,7 +318,14 @@ class Jeeves:
 
     def bind_era(self, era: str) -> dict[str, Any]:
         from skeleton.forge.eras import compile_era
-        return self.bind_pack(compile_era(era))
+        raw = era or self.era
+        try:
+            hit = self.refer(raw)
+        except Exception:
+            hit = None
+        if hit and hit.get("hit"):
+            raw = str((hit.get("ref") or {}).get("era") or raw)
+        return self.bind_pack(compile_era(raw))
 
     def plan_build(self, pack: dict[str, Any] | None = None, *,
                    tensor=None, reading=None) -> dict[str, Any]:
