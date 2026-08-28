@@ -47,6 +47,7 @@ from .beam import beam_search, greedy_beam
 from .accum import Accumulator, accumulate_fit
 from .gossip import absorb_mouth, gossip, gossip_cortices, gossip_mouths
 from .dodeca import FACES, face_card
+from .interchange import HuggingFaceBackend, KimiBackend, distill_teacher, probe_interchange
 from .attn import swiglu, swiglu_bwd, cosine_lr, silu, rms_norm
 
 __all__ = [
@@ -128,6 +129,10 @@ __all__ = [
     "gossip_mouths",
     "absorb_mouth",
     "face_card",
+    "HuggingFaceBackend",
+    "KimiBackend",
+    "distill_teacher",
+    "probe_interchange",
     "FACES",
     "consensus",
     "swiglu",

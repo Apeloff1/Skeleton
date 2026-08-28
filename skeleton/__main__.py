@@ -74,6 +74,18 @@ def main(argv: list[str] | None = None) -> int:
     gs.add_argument("--mouths", action="store_true", help="mix neo_rms into primary")
     gs.add_argument("--direction", default="rms-into-gelu")
 
+    hf = sub.add_parser("bind-hf", help="bind a HuggingFace teacher into a slot")
+    hf.add_argument("slot", choices=["pfc", "midbrain", "left", "right"])
+    hf.add_argument("--model", default="sshleifer/tiny-gpt2")
+
+    km = sub.add_parser("bind-kimi", help="bind a Kimi/Moonshot teacher into a slot")
+    km.add_argument("slot", choices=["pfc", "midbrain", "left", "right"])
+    km.add_argument("--model", default="kimi-k2-0711-preview")
+
+    ds = sub.add_parser("distill", help="teacher speaks; neo SGD on that text")
+    ds.add_argument("slot", choices=["pfc", "midbrain", "left", "right"])
+    ds.add_argument("prefix", nargs="?", default="plan tensor ttk")
+
     wk = sub.add_parser("walk", help="prove spawn→extract on the emitted door graph")
     wk.add_argument("--era", default="extraction_now")
     wk.add_argument("--blend", nargs=2, metavar=("ERA_A", "ERA_B"))
@@ -159,6 +171,27 @@ def main(argv: list[str] | None = None) -> int:
         from skeleton.cortex.live import live_cortex, persist
         neo = live_cortex()
         out = neo.merge_lora() if args.merge else neo.attach_lora(rank=args.rank)
+        persist()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "bind-hf":
+        from skeleton.cortex.live import live_cortex, persist
+        out = live_cortex().bind_hf(args.slot, args.model)
+        persist()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "bind-kimi":
+        from skeleton.cortex.live import live_cortex, persist
+        out = live_cortex().bind_kimi(args.slot, args.model)
+        persist()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "distill":
+        from skeleton.cortex.live import live_cortex, persist
+        out = live_cortex().distill(args.slot, args.prefix)
         persist()
         print(json.dumps(out, indent=2, default=str))
         return 0

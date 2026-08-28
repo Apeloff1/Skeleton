@@ -197,4 +197,5 @@ Jeeves neocortex is the model in training. Slots are ModelPorts:
 Callosum `fuse_tracts` binds hemisphere hiddens. Zaibatsu elects the speaking mouth.
 Hive `bundle`/`pull`/`consensus` interchange both neos and both LoRA banks.
 Sleep replay SGD both neos. Dodecahedron seal has twelve faces; `number == 12` is complete.
-No `from_pretrained`. Closed world.
+Birth is closed-world. HuggingFace and Kimi bind as teachers (`bind_hf`, `bind_kimi`);
+neo distills their text. No import-time download.

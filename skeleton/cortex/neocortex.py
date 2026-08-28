@@ -164,6 +164,20 @@ class JeevesCortex:
     def bind_local(self, slot: str) -> Dict[str, str]:
         return self.bind(slot, local_slots()[slot])
 
+    def bind_hf(self, slot: str, model_id: str = "sshleifer/tiny-gpt2") -> Dict[str, Any]:
+        from skeleton.cortex.interchange import HuggingFaceBackend, probe_interchange
+        backends = self.bind(slot, HuggingFaceBackend(model_id, slot=slot))
+        return {"backends": backends, "probe": probe_interchange(), "model_id": model_id}
+
+    def bind_kimi(self, slot: str, model: str = "kimi-k2-0711-preview") -> Dict[str, Any]:
+        from skeleton.cortex.interchange import KimiBackend, probe_interchange
+        backends = self.bind(slot, KimiBackend(model, slot=slot))
+        return {"backends": backends, "probe": probe_interchange(), "model": model}
+
+    def distill(self, slot: str, stimulus: str) -> Dict[str, Any]:
+        from skeleton.cortex.interchange import distill_teacher
+        return distill_teacher(self, slot, stimulus)
+
     def _hidden(self, stim: str) -> List[float]:
         seq = self._hidden_seq(stim)
         return list(seq[-1]) if seq else [0.0] * int(getattr(self.transformer, "dim", 8) or 8)

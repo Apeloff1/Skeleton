@@ -1492,6 +1492,10 @@ class TestQueue23:
             p0 = port.perplexity(texts)
             snap = port.snapshot()
             restored = type(port).from_snapshot(snap)
+            xf = getattr(port, "transformer", None)
+            rx = getattr(restored, "transformer", None)
+            if xf is not None and rx is not None and getattr(xf, "bpe", None) is not None:
+                rx.bpe = xf.bpe
             p1 = restored.perplexity(texts)
             assert p0 < 1e8 and abs(p0 - p1) < 1e-6
             assert port.decode("plan tensor ttk", n=4)
@@ -1682,6 +1686,40 @@ class TestDodeca12:
         neo = JeevesCortex()
         out = neo.dispatch("forge era pack")
         assert out["dispatched"] == 1
+
+
+class TestInterchangeTeachers:
+    def test_hf_standin_is_a_port(self):
+        from skeleton.cortex import HuggingFaceBackend, JeevesCortex, probe_interchange
+        probe = probe_interchange()
+        assert probe["standin"] is True
+        hf = HuggingFaceBackend("sshleifer/tiny-gpt2", slot="left")
+        t = hf.think("plan tensor ttk", {})
+        assert t.kind == "teacher" and "huggingface" in t.tags
+        assert hf.decode("plan tensor ttk", n=4)
+        assert hf.perplexity(["plan tensor ttk"]) < 1e8
+        snap = hf.snapshot()
+        restored = HuggingFaceBackend.from_snapshot(snap)
+        assert restored.model_id == hf.model_id
+        neo = JeevesCortex()
+        neo.bind_hf("left")
+        assert "huggingface" in neo.backends()["left"]
+        neo.bind_local("left")
+        assert "ECHO" not in neo.slots["left"].think("ttk", {}).text
+
+    def test_kimi_standin_and_distill(self):
+        from skeleton.cortex import JeevesCortex, KimiBackend
+        k = KimiBackend(slot="right")
+        assert k.think("era soul dread", {}).kind == "teacher"
+        neo = JeevesCortex()
+        neo.bind_kimi("right")
+        before = neo.transformer.steps
+        out = neo.distill("right", "era soul dread cozy")
+        assert out["distilled"] == 1
+        assert neo.transformer.steps >= before
+        assert "right" in neo.own.models
+        neo.bind_local("right")
+        assert neo.slots["right"].slot == "right"
 
 
 

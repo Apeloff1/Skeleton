@@ -317,6 +317,36 @@ def cortex_beam(body: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+@router.post("/cortex/bind-hf")
+def cortex_bind_hf(body: Dict[str, Any]) -> Dict[str, Any]:
+    from skeleton.cortex.live import live_cortex, persist
+    slot = str((body or {}).get("slot") or "left")
+    model = str((body or {}).get("model") or "sshleifer/tiny-gpt2")
+    out = live_cortex().bind_hf(slot, model)
+    persist()
+    return out
+
+
+@router.post("/cortex/bind-kimi")
+def cortex_bind_kimi(body: Dict[str, Any]) -> Dict[str, Any]:
+    from skeleton.cortex.live import live_cortex, persist
+    slot = str((body or {}).get("slot") or "right")
+    model = str((body or {}).get("model") or "kimi-k2-0711-preview")
+    out = live_cortex().bind_kimi(slot, model)
+    persist()
+    return out
+
+
+@router.post("/cortex/distill")
+def cortex_distill(body: Dict[str, Any]) -> Dict[str, Any]:
+    from skeleton.cortex.live import live_cortex, persist
+    slot = str((body or {}).get("slot") or "left")
+    stim = str((body or {}).get("stimulus") or (body or {}).get("prefix") or "plan tensor ttk")
+    out = live_cortex().distill(slot, stim)
+    persist()
+    return out
+
+
 @router.post("/cortex/lora")
 def cortex_lora(body: Dict[str, Any]) -> Dict[str, Any]:
     from skeleton.cortex.live import live_cortex, persist
