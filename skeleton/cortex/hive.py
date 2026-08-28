@@ -55,6 +55,32 @@ def merkle_card(neo) -> Dict[str, Any]:
     }
 
 
+def consensus(a, b, *, texts=None) -> Dict[str, Any]:
+    """Lower finite ppl inherits the house. Loser pulls the winner bundle."""
+    from skeleton.cortex.curriculum import CORE_PAIRS
+    corpus = list(texts or [s for s, _ in list(CORE_PAIRS)[:6]])
+
+    def _p(neo) -> float:
+        xf = getattr(neo, "transformer", None)
+        if xf is None or not hasattr(xf, "perplexity"):
+            return float("inf")
+        try:
+            return float(xf.perplexity(corpus))
+        except Exception:
+            return float("inf")
+
+    pa, pb = _p(a), _p(b)
+    if pa <= pb:
+        winner, loser, wp = a, b, pa
+    else:
+        winner, loser, wp = b, a, pb
+    info = pull(loser, bundle(winner))
+    info["winner_ppl"] = wp
+    info["ppl"] = {"a": pa, "b": pb}
+    info["consensus"] = 1
+    return info
+
+
 def bundle(neo) -> Dict[str, Any]:
     """Guts a hive peer can pull. Merkle first, then the nets."""
     card = merkle_card(neo)

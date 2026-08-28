@@ -39,13 +39,14 @@ from .sleep import SleepCycle
 from .rl import ReinforceState, reinforce_mix
 from .bpe import BytePairEncoder, gameforge_bpe
 from .metrics import evaluate, beats
-from .hive import merkle_card, bundle, pull
+from .hive import merkle_card, bundle, pull, consensus
 from .speculate import speculate, greedy_decode
 from .zaibatsu import tournament, devil_gene
 from .lora import LoRA, LoRABank
 from .beam import beam_search, greedy_beam
 from .accum import Accumulator, accumulate_fit
 from .gossip import absorb_mouth, gossip, gossip_cortices, gossip_mouths
+from .dodeca import FACES, face_card
 from .attn import swiglu, swiglu_bwd, cosine_lr, silu, rms_norm
 
 __all__ = [
@@ -126,6 +127,9 @@ __all__ = [
     "gossip_cortices",
     "gossip_mouths",
     "absorb_mouth",
+    "face_card",
+    "FACES",
+    "consensus",
     "swiglu",
     "swiglu_bwd",
     "cosine_lr",

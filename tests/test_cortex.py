@@ -1617,4 +1617,71 @@ class TestQueue28Queue29:
         assert neo.transformer.steps >= 1
 
 
+class TestDodeca12:
+    def test_twelve_faces_live(self):
+        from skeleton.cortex import FACES, JeevesCortex
+        neo = JeevesCortex()
+        neo.think("compile ttk hp dps recipe sim")
+        card = neo.dodeca()
+        assert card["of"] == 12 and len(FACES) == 12
+        assert card["live"] == 12 and card["complete"] is True
+        assert card["number"] == 12
+
+    def test_sleep_trains_both_neos(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        neo.think("plan tensor ttk lattice")
+        s0, r0 = neo.transformer.steps, neo.neo_rms.steps
+        out = neo.sleep_cycle(n=4)
+        assert out["replays"] >= 1
+        assert neo.transformer.steps >= s0
+        assert neo.neo_rms.steps >= r0
+
+    def test_consensus_and_closed_world(self):
+        from skeleton.cortex import JeevesCortex, consensus
+        import pathlib
+        a, b = JeevesCortex(), JeevesCortex()
+        a.think("plan tensor ttk")
+        info = consensus(a, b)
+        assert info["consensus"] == 1
+        banned = 0
+        for p in pathlib.Path("skeleton/cortex").rglob("*.py"):
+            txt = p.read_text(encoding="utf-8")
+            if "from_pretrained" in txt or "AutoModel" in txt:
+                banned += 1
+        assert banned == 0
+
+    def test_evaluate_four_mouths(self):
+        from skeleton.cortex import JeevesCortex
+        from skeleton.cortex.metrics import evaluate
+        m = evaluate(JeevesCortex())
+        assert m["beats"]["pfc_finite"] and m["beats"]["mid_finite"]
+        assert m["beats"]["neo_finite"] and m["beats"]["rms_finite"]
+
+    def test_persist_keeps_winner(self):
+        from skeleton.cortex import JeevesCortex
+        import tempfile, pathlib
+        neo = JeevesCortex()
+        neo.set_mouth("neo_rms")
+        neo._winner_mouth = "neo_rms"
+        p = pathlib.Path(tempfile.mkdtemp()) / "own.json"
+        neo.save(p)
+        b = JeevesCortex()
+        b.load(p)
+        assert b._winner_mouth == "neo_rms"
+
+    def test_rms_hidden_is_stable(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        a = neo.neo_rms.hidden_seq("plan tensor ttk")
+        b = neo.neo_rms.hidden_seq("plan tensor ttk")
+        assert a and a == b
+
+    def test_dispatch_ledgers(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        out = neo.dispatch("forge era pack")
+        assert out["dispatched"] == 1
+
+
 

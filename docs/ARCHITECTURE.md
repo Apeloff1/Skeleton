@@ -179,3 +179,22 @@ agent activity, forge operations — each endpoint thin: validate → call servi
 The `tests/` tree mirrors the package. Tests are hermetic: no network, no real database — the
 in-memory RAG backend and the in-process event bus make every subsystem testable in isolation.
 Integration tests compose subsystems through the real wiring used by `create_app()`.
+
+---
+
+## 9. Cortex organism
+
+Jeeves neocortex is the model in training. Slots are ModelPorts:
+
+- **pfc** — small 1-layer LM (boilerplate + DRAFT)
+- **midbrain** — medium 1-layer coordinator LM
+- **left** — analytic LM (TTK / mix / oracle)
+- **right** — gestalt LM (era / soul / bias)
+- **neo** — stacked Pre-LN GELU, tied unembed, BPE ids
+- **neo_rms** — stacked RMSNorm + SwiGLU
+
+`acquire` copies weights via `absorb_mouth`. `surpass` answers from neo decode.
+Callosum `fuse_tracts` binds hemisphere hiddens. Zaibatsu elects the speaking mouth.
+Hive `bundle`/`pull`/`consensus` interchange both neos and both LoRA banks.
+Sleep replay SGD both neos. Dodecahedron seal has twelve faces; `number == 12` is complete.
+No `from_pretrained`. Closed world.

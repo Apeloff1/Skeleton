@@ -53,6 +53,19 @@ def evaluate(neo) -> Dict[str, Any]:
     ppl_texts = [a for a, _ in list(CORE_PAIRS)] + [a for a, _ in list(WALK_PAIRS)]
     ppl = float(xf.perplexity(ppl_texts)) if xf is not None and hasattr(xf, "perplexity") else float("inf")
 
+    def _mouth_ppl(lm) -> float:
+        if lm is None or not hasattr(lm, "perplexity"):
+            return float("inf")
+        try:
+            return float(lm.perplexity(ppl_texts[:6]))
+        except Exception:
+            return float("inf")
+
+    slots = getattr(neo, "slots", {}) or {}
+    ppl_pfc = _mouth_ppl(getattr(slots.get("pfc"), "transformer", None))
+    ppl_mid = _mouth_ppl(getattr(slots.get("midbrain"), "transformer", None))
+    ppl_rms = _mouth_ppl(getattr(neo, "neo_rms", None))
+
     mix_err: List[float] = []
     mix_hits = 0
     mix_n = 0
@@ -117,6 +130,10 @@ def evaluate(neo) -> Dict[str, Any]:
     fitted_left = int(getattr(getattr(getattr(moe, "experts", {}).get("left"), "head", None), "fitted", 0) or 0)
     return {
         "ppl": round(ppl, 4),
+        "ppl_pfc": None if ppl_pfc >= 1e8 else round(ppl_pfc, 4),
+        "ppl_mid": None if ppl_mid >= 1e8 else round(ppl_mid, 4),
+        "ppl_neo": None if ppl >= 1e8 else round(ppl, 4),
+        "ppl_rms": None if ppl_rms >= 1e8 else round(ppl_rms, 4),
         "mix_mae": round(mix_mae, 4),
         "mix_hits": mix_hits,
         "mix_n": mix_n,
@@ -131,6 +148,10 @@ def evaluate(neo) -> Dict[str, Any]:
             "mix_ready": fitted_left >= 6,
             "gates_alive": gate_entropy > 0.5,
             "bpe_compresses": bpe_comp < 1.0,
+            "pfc_finite": ppl_pfc < 1e8,
+            "mid_finite": ppl_mid < 1e8,
+            "neo_finite": ppl < 1e8,
+            "rms_finite": ppl_rms < 1e8,
         },
     }
 

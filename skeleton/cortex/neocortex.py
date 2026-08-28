@@ -355,8 +355,11 @@ class JeevesCortex:
         if port is not None and hasattr(port, "snapshot"):
             model = self.own.ingest_model(slot, port.snapshot())
         src = getattr(port, "transformer", None) if port is not None else None
+        lora_info: Dict[str, Any] = {"attached": []}
         if src is not None:
             from skeleton.cortex.gossip import absorb_mouth
+            if getattr(self.transformer, "lora", None) is None and hasattr(self, "attach_lora"):
+                lora_info = self.attach_lora(rank=2)
             absorb = absorb_mouth(self.transformer, src, alpha=0.2)
             if getattr(self, "neo_rms", None) is not None:
                 absorb["neo_rms"] = absorb_mouth(self.neo_rms, src, alpha=0.1)
@@ -365,6 +368,7 @@ class JeevesCortex:
             "slot": slot, "copied": copied, "acquired": dict(self.acquired),
             "own": self.own.size, "expert": stamped,
             "model": model, "absorb": absorb, "models": sorted(self.own.models),
+            "lora": lora_info,
         }
 
     def surpass(self, slot: str) -> Dict[str, Any]:
@@ -498,6 +502,8 @@ class JeevesCortex:
             "sleep": self.sleep.snapshot(),
             "rl": self.rl.snapshot(),
             "bpe": self.bpe.snapshot(),
+            "winner": self._winner_mouth,
+            "mouth_override": self._mouth_override,
         }
         p.write_text(json.dumps(blob), encoding="utf-8")
         return {"path": str(p), "own": self.own.size, "acquired": dict(self.acquired)}
@@ -539,6 +545,14 @@ class JeevesCortex:
         if blob.get("neo_rms"):
             from skeleton.cortex.transformer import TinyTransformer
             self.neo_rms = TinyTransformer.from_snapshot(blob["neo_rms"])
+        if blob.get("winner"):
+            self._winner_mouth = str(blob.get("winner") or "neo")
+        if "mouth_override" in blob:
+            self._mouth_override = blob.get("mouth_override")
+        if getattr(self, "bpe", None) is not None:
+            self.transformer.bpe = self.bpe
+            if getattr(self, "neo_rms", None) is not None:
+                self.neo_rms.bpe = self.bpe
         if blob.get("callosum"):
             self.callosum = CorpusCallosum.from_snapshot(blob["callosum"])
         if blob.get("moe"):
@@ -617,6 +631,21 @@ class JeevesCortex:
     def set_mouth(self, name: Optional[str] = None) -> str:
         self._mouth_override = None if not name else str(name).lower()
         return self.speaking_name()
+
+    def dodeca(self) -> Dict[str, Any]:
+        from skeleton.cortex.dodeca import face_card
+        return face_card(self)
+
+    def dispatch(self, stimulus: str) -> Dict[str, Any]:
+        """Hivemind job: ledger the stimulus as a swarm act. No network."""
+        thought = Thought(
+            slot="neo", kind="dispatch",
+            text=f"DISPATCH {(stimulus or '')[:160]}",
+            confidence=0.8, tags=("dispatch", "hive", "mesh"),
+        )
+        self.ledger.record(thought, stimulus or "")
+        self._bus.emit("cortex.dispatch", {"stim": (stimulus or "")[:160]})
+        return {"dispatched": 1, "ledger": self.ledger.to_dict()}
 
     def elect_mouth(self, *, texts=None) -> Dict[str, Any]:
         from skeleton.cortex.zaibatsu import tournament

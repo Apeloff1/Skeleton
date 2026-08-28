@@ -179,6 +179,13 @@ class SleepCycle:
             if callosum is not None and "left" in tr.fired and "right" in tr.fired:
                 callosum.hebb(h, lr=0.02)
                 hebbs += 1
+            if tr.stim:
+                xf = getattr(neo, "transformer", None)
+                if xf is not None and hasattr(xf, "fit"):
+                    xf.fit([tr.stim], lr=min(lr, 0.03), schedule="cosine")
+                rms = getattr(neo, "neo_rms", None)
+                if rms is not None and hasattr(rms, "fit"):
+                    rms.fit([tr.stim], lr=min(lr, 0.03), schedule="cosine")
             self.replays += 1
         self._ema_update(neo)
         self.cycles += 1
