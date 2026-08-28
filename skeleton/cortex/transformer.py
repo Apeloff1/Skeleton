@@ -17,6 +17,7 @@ from skeleton.cortex.attn import (
     apply_rope,
     apply_rope_bwd,
     cached_mha,
+    cosine_lr,
     gelu,
     gelu_bwd,
     layer_norm,
@@ -26,8 +27,13 @@ from skeleton.cortex.attn import (
     mha_backward,
     multi_head_attend,
     ones,
+    rms_norm,
+    rms_norm_bwd,
     sample_logits,
+    silu,
     softmax,
+    swiglu,
+    swiglu_bwd,
     zeros,
 )
 from skeleton.cortex.port import Thought, fingerprint, tokens
@@ -46,7 +52,8 @@ def _copy_mat(m: List[List[float]]) -> List[List[float]]:
 class TransformerBlock:
     """One Pre-LN residual block: X + Attn(LN(X)) then X + FFN(LN(X))."""
 
-    def __init__(self, dim: int, d_ff: int, rng: random.Random, scale_: float) -> None:
+    def __init__(self, dim: int, d_ff: int, rng: random.Random, scale_: float, *,
+                 norm: str = "ln", ffn_kind: str = "gelu") -> None:
         D = dim
         ff = max(0, int(d_ff))
         self.Wq = _rand_mat(D, D, scale_, rng)
@@ -57,12 +64,29 @@ class TransformerBlock:
         self.ln1_b = zeros(D)
         self.W1 = _rand_mat(ff, D, scale_, rng) if ff else []
         self.b1 = zeros(ff) if ff else []
+        self.Wu = _rand_mat(ff, D, scale_, rng) if ff else []
+        self.bu = zeros(ff) if ff else []
         self.W2 = _rand_mat(D, ff, scale_, rng) if ff else []
         self.b2 = zeros(D) if ff else []
         self.ln2_g = ones(D)
         self.ln2_b = zeros(D)
         self.d_ff = ff
         self.dim = D
+        self.norm = "rms" if str(norm).lower() == "rms" else "ln"
+        self.ffn_kind = "swiglu" if str(ffn_kind).lower() == "swiglu" else "gelu"
+
+    def _norm(self, x: List[float], g: List[float], b: List[float]):
+        if self.norm == "rms":
+            y, hat, inv = rms_norm(x, g)
+            return y, hat, inv
+        return layer_norm(x, g, b)
+
+    def _norm_bwd(self, dy: List[float], hat: List[float], inv: float, g: List[float], x: Optional[List[float]] = None):
+        if self.norm == "rms":
+            src = x if x is not None else [hat[i] / inv if inv else hat[i] for i in range(len(hat))]
+            dx, dg = rms_norm_bwd(dy, src, hat, inv, g)
+            return dx, dg, zeros(len(dg))
+        return layer_norm_bwd(dy, hat, inv, g)
 
     def snapshot(self) -> Dict[str, Any]:
         return {
@@ -71,15 +95,20 @@ class TransformerBlock:
             "ln1_g": list(self.ln1_g), "ln1_b": list(self.ln1_b),
             "W1": _copy_mat(self.W1) if self.W1 else [],
             "b1": list(self.b1) if self.b1 else [],
+            "Wu": _copy_mat(self.Wu) if self.Wu else [],
+            "bu": list(self.bu) if self.bu else [],
             "W2": _copy_mat(self.W2) if self.W2 else [],
             "b2": list(self.b2) if self.b2 else [],
             "ln2_g": list(self.ln2_g), "ln2_b": list(self.ln2_b),
             "d_ff": self.d_ff, "dim": self.dim,
+            "norm": self.norm, "ffn_kind": self.ffn_kind,
         }
 
     @classmethod
     def from_snapshot(cls, data: Dict[str, Any], *, dim: int, d_ff: int) -> "TransformerBlock":
-        blk = cls(dim, d_ff, random.Random(0), 0.0)
+        blk = cls(dim, d_ff, random.Random(0), 0.0,
+                  norm=str((data or {}).get("norm") or "ln"),
+                  ffn_kind=str((data or {}).get("ffn_kind") or "gelu"))
         def _m(key: str, cur: List[List[float]]) -> List[List[float]]:
             raw = (data or {}).get(key)
             return [list(map(float, row)) for row in raw] if raw else cur
@@ -90,6 +119,7 @@ class TransformerBlock:
         blk.Wv, blk.Wo = _m("Wv", blk.Wv), _m("Wo", blk.Wo)
         blk.W1, blk.W2 = _m("W1", blk.W1), _m("W2", blk.W2)
         blk.b1, blk.b2 = _v("b1", blk.b1), _v("b2", blk.b2)
+        blk.Wu, blk.bu = _m("Wu", blk.Wu), _v("bu", blk.bu)
         blk.ln1_g, blk.ln1_b = _v("ln1_g", blk.ln1_g), _v("ln1_b", blk.ln1_b)
         blk.ln2_g, blk.ln2_b = _v("ln2_g", blk.ln2_g), _v("ln2_b", blk.ln2_b)
         if not blk.ln1_g:
@@ -104,7 +134,7 @@ class TransformerBlock:
         hats1: List[List[float]] = []
         invs1: List[float] = []
         for x in X:
-            y, hat, inv = layer_norm(x, self.ln1_g, self.ln1_b)
+            y, hat, inv = self._norm(x, self.ln1_g, self.ln1_b)
             Xn.append(y)
             hats1.append(hat)
             invs1.append(inv)
@@ -116,25 +146,33 @@ class TransformerBlock:
         U = [add(X[t], attn[t]) for t in range(n)]
         z: List[List[float]] = []
         pre: List[List[float]] = []
+        gate: List[List[float]] = []
+        up: List[List[float]] = []
         Un: List[List[float]] = []
         hats2: List[List[float]] = []
         invs2: List[float] = []
         Y = U
         if self.d_ff:
             for u in U:
-                y, hat, inv = layer_norm(u, self.ln2_g, self.ln2_b)
+                y, hat, inv = self._norm(u, self.ln2_g, self.ln2_b)
                 Un.append(y)
                 hats2.append(hat)
                 invs2.append(inv)
-            pre = [add(matvec(self.W1, u), self.b1) for u in Un]
-            z = [gelu(p) for p in pre]
+            if self.ffn_kind == "swiglu":
+                for u in Un:
+                    yi, g, p = swiglu(u, self.W1, self.Wu, self.b1, self.bu)
+                    z.append(yi); gate.append(g); up.append(p)
+                pre = gate
+            else:
+                pre = [add(matvec(self.W1, u), self.b1) for u in Un]
+                z = [gelu(p) for p in pre]
             ff = [add(matvec(self.W2, zi), self.b2) for zi in z]
             Y = [add(U[t], ff[t]) for t in range(n)]
         cache = {
             "X": X, "Xn": Xn, "hats1": hats1, "invs1": invs1,
             "Q": Q, "K": K, "V": V, "C": C, "As": As, "attn": attn, "U": U,
             "Un": Un, "hats2": hats2, "invs2": invs2, "z": z, "pre": pre,
-            "n_heads": n_heads,
+            "gate": gate, "up": up, "n_heads": n_heads,
         }
         return Y, cache
 
@@ -158,11 +196,20 @@ class TransformerBlock:
                 for i in range(D):
                     acc_b2[i] += dY[t][i]
                 d_z = matvec_T(self.W2, dY[t])
-                d_pre = gelu_bwd(d_z, cache["pre"][t])
-                add_outer(self.W1, d_pre, Un[t], -lr)
-                for i in range(len(self.b1)):
-                    acc_b1[i] += d_pre[i]
-                d_Un[t] = matvec_T(self.W1, d_pre)
+                if self.ffn_kind == "swiglu" and cache.get("gate"):
+                    d_gate, d_up = swiglu_bwd(d_z, cache["gate"][t], cache["up"][t])
+                    add_outer(self.W1, d_gate, Un[t], -lr)
+                    add_outer(self.Wu, d_up, Un[t], -lr)
+                    for i in range(len(self.b1)):
+                        acc_b1[i] += d_gate[i]
+                        self.bu[i] -= lr * d_up[i]
+                    d_Un[t] = add(matvec_T(self.W1, d_gate), matvec_T(self.Wu, d_up))
+                else:
+                    d_pre = gelu_bwd(d_z, cache["pre"][t])
+                    add_outer(self.W1, d_pre, Un[t], -lr)
+                    for i in range(len(self.b1)):
+                        acc_b1[i] += d_pre[i]
+                    d_Un[t] = matvec_T(self.W1, d_pre)
             for i in range(D):
                 self.b2[i] -= lr * acc_b2[i]
             for i in range(len(self.b1)):
@@ -171,14 +218,16 @@ class TransformerBlock:
             acc_db = zeros(D)
             hats2 = cache["hats2"]
             invs2 = cache["invs2"]
+            Usrc = cache.get("U") or []
             for t in range(n):
-                dx, dg, db = layer_norm_bwd(d_Un[t], hats2[t], invs2[t], self.ln2_g)
+                dx, dg, db = self._norm_bwd(d_Un[t], hats2[t], invs2[t], self.ln2_g, Usrc[t] if t < len(Usrc) else None)
                 dU[t] = add(dU[t], dx)
                 acc_dg = add(acc_dg, dg)
                 acc_db = add(acc_db, db)
             for i in range(D):
                 self.ln2_g[i] -= lr * acc_dg[i]
-                self.ln2_b[i] -= lr * acc_db[i]
+                if self.norm != "rms":
+                    self.ln2_b[i] -= lr * acc_db[i]
 
         C = cache["C"]
         Xn = cache["Xn"]
@@ -202,14 +251,16 @@ class TransformerBlock:
         dX_ln = [zeros(D) for _ in range(n)]
         hats1 = cache["hats1"]
         invs1 = cache["invs1"]
+        Xsrc = cache.get("X") or []
         for t in range(n):
-            dx, dg, db = layer_norm_bwd(dXn[t], hats1[t], invs1[t], self.ln1_g)
+            dx, dg, db = self._norm_bwd(dXn[t], hats1[t], invs1[t], self.ln1_g, Xsrc[t] if t < len(Xsrc) else None)
             dX_ln[t] = dx
             acc_dg = add(acc_dg, dg)
             acc_db = add(acc_db, db)
         for i in range(D):
             self.ln1_g[i] -= lr * acc_dg[i]
-            self.ln1_b[i] -= lr * acc_db[i]
+            if self.norm != "rms":
+                self.ln1_b[i] -= lr * acc_db[i]
         X = cache["X"]
         return [add(dU[t], dX_ln[t]) for t in range(n)] if X else dX_ln
 
@@ -222,7 +273,7 @@ class TransformerBlock:
         pos: int,
     ) -> List[float]:
         """One-token decode step. Ks/Vs grow with unroped keys; RoPE at attend time."""
-        y, _, _ = layer_norm(x, self.ln1_g, self.ln1_b)
+        y, _, _ = self._norm(x, self.ln1_g, self.ln1_b)
         q = matvec(self.Wq, y)
         k = matvec(self.Wk, y)
         v = matvec(self.Wv, y)
@@ -234,8 +285,11 @@ class TransformerBlock:
         attn = matvec(self.Wo, c)
         u = add(x, attn)
         if self.d_ff:
-            un, _, _ = layer_norm(u, self.ln2_g, self.ln2_b)
-            z = gelu(add(matvec(self.W1, un), self.b1))
+            un, _, _ = self._norm(u, self.ln2_g, self.ln2_b)
+            if self.ffn_kind == "swiglu":
+                z, _, _ = swiglu(un, self.W1, self.Wu, self.b1, self.bu)
+            else:
+                z = gelu(add(matvec(self.W1, un), self.b1))
             ff = add(matvec(self.W2, z), self.b2)
             return add(u, ff)
         return u
@@ -276,6 +330,8 @@ class TinyTransformer:
         n_heads: int = 1,
         n_layers: int = 1,
         d_ff: int = 0,
+        norm: str = "ln",
+        ffn_kind: str = "gelu",
     ) -> None:
         itos = [UNK] + sorted({str(t) for t in (vocab or ()) if t and t != UNK})
         self.itos: List[str] = itos
@@ -293,8 +349,11 @@ class TinyTransformer:
         self.P = _rand_mat(C, D, s, rng)
         nL = max(1, int(n_layers))
         ff = max(0, int(d_ff))
+        self.norm = "rms" if str(norm).lower() == "rms" else "ln"
+        self.ffn_kind = "swiglu" if str(ffn_kind).lower() == "swiglu" else "gelu"
         self.layers: List[TransformerBlock] = [
-            TransformerBlock(D, ff, rng, s) for _ in range(nL)
+            TransformerBlock(D, ff, rng, s, norm=self.norm, ffn_kind=self.ffn_kind)
+            for _ in range(nL)
         ]
         self.Wout = _rand_mat(V, D, s, rng)
         self.bout = zeros(V)
@@ -557,18 +616,23 @@ class TinyTransformer:
         self.steps += 1
         return loss
 
-    def fit(self, texts: Iterable[str], *, lr: float = 0.04) -> int:
-        n = 0
-        for raw in texts:
+    def fit(self, texts: Iterable[str], *, lr: float = 0.04, schedule: str = "const") -> int:
+        corpus = [t for t in texts if t]
+        windows: List[Tuple[List[int], int]] = []
+        for raw in corpus:
             body = tokens(raw)
             if len(body) < 2:
                 continue
             ids = [self._id(t) for t in body]
             for i in range(1, len(ids)):
-                window = ids[max(0, i - self.ctx):i]
-                self._sgd(window, ids[i], lr)
-                n += 1
-            self.fitted += 1
+                windows.append((ids[max(0, i - self.ctx):i], ids[i]))
+        total = max(1, len(windows))
+        n = 0
+        for step, (window, target) in enumerate(windows):
+            eta = cosine_lr(step, total, base=lr) if schedule == "cosine" else lr
+            self._sgd(window, target, eta)
+            n += 1
+        self.fitted += len(corpus)
         return n
 
     def logprob(self, text: str) -> float:
@@ -697,6 +761,8 @@ class TinyTransformer:
             "fitted": self.fitted,
             "steps": self.steps,
             "tied": bool(self.tied),
+            "norm": self.norm,
+            "ffn_kind": self.ffn_kind,
             "itos": list(self.itos),
             "E": _copy_mat(self.E),
             "P": _copy_mat(self.P),
@@ -725,6 +791,8 @@ class TinyTransformer:
             n_heads=int((data or {}).get("n_heads") or 1),
             n_layers=n_layers,
             d_ff=int((data or {}).get("d_ff") or 0),
+            norm=str((data or {}).get("norm") or "ln"),
+            ffn_kind=str((data or {}).get("ffn_kind") or "gelu"),
         )
         lm.itos = itos
         lm.stoi = {t: i for i, t in enumerate(itos)}

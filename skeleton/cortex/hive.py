@@ -33,7 +33,14 @@ def merkle_card(neo) -> Dict[str, Any]:
         "resident": bool(getattr(xf, "resident", False)),
         "devil": bool(getattr(neo, "_surpass", None)),
         "tied": bool(getattr(xf, "tied", False)),
-        "lora": (xf.lora.to_dict() if getattr(xf, "lora", None) is not None else None),
+        "norm": str(getattr(xf, "norm", "ln") or "ln"),
+        "ffn_kind": str(getattr(xf, "ffn_kind", "gelu") or "gelu"),
+        "neo_rms": {
+            "norm": str(getattr(getattr(neo, "neo_rms", None), "norm", "") or ""),
+            "ffn_kind": str(getattr(getattr(neo, "neo_rms", None), "ffn_kind", "") or ""),
+            "steps": int(getattr(getattr(neo, "neo_rms", None), "steps", 0) or 0),
+        },
+        "lora": (xf.lora.to_dict() if xf is not None and getattr(xf, "lora", None) is not None else None),
     }
 
 

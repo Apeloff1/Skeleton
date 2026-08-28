@@ -1246,4 +1246,45 @@ class TestQueue13:
         assert isinstance(text, str) and text
 
 
+class TestQueue14:
+    def test_rms_swiglu_block_forwards(self):
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.lm import gameforge_vocab
+        lm = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=3,
+                             n_heads=2, n_layers=2, d_ff=16, norm="rms", ffn_kind="swiglu")
+        assert lm.norm == "rms" and lm.ffn_kind == "swiglu"
+        assert lm.layers[0].norm == "rms" and lm.layers[0].ffn_kind == "swiglu"
+        ids = [lm._id("plan"), lm._id("tensor"), lm._id("ttk")]
+        a = lm._logits(ids)
+        cache = type("C", (), {})()
+        from skeleton.cortex.transformer import KVCache
+        kv = KVCache(lm.n_layers, lm.ctx)
+        b = None
+        for i, tok in enumerate(ids):
+            b = lm._step(tok, kv)
+        assert len(a) == len(b) == lm.V
+        n = lm.fit(["plan tensor ttk lattice oracle"], lr=0.02)
+        assert n >= 1 and lm.steps >= 1
+        snap = TinyTransformer.from_snapshot(lm.snapshot())
+        assert snap.norm == "rms" and snap.ffn_kind == "swiglu"
+
+    def test_cosine_fit_runs(self):
+        from skeleton.cortex.transformer import TinyTransformer
+        from skeleton.cortex.lm import gameforge_vocab
+        lm = TinyTransformer(vocab=gameforge_vocab(), dim=8, ctx=6, seed=4, n_heads=2, n_layers=2, d_ff=16)
+        n = lm.fit(["plan tensor lattice", "mix trash elite"], lr=0.04, schedule="cosine")
+        assert n >= 1
+
+    def test_second_neo_is_rms_swiglu(self):
+        from skeleton.cortex import JeevesCortex
+        from skeleton.cortex.hive import merkle_card
+        neo = JeevesCortex()
+        assert neo.neo_rms.norm == "rms"
+        assert neo.neo_rms.ffn_kind == "swiglu"
+        card = merkle_card(neo)
+        assert card["neo_rms"]["norm"] == "rms"
+        assert card["neo_rms"]["ffn_kind"] == "swiglu"
+        assert neo.status()["lm"]["neo_rms"]["norm"] == "rms"
+
+
 

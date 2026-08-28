@@ -115,6 +115,11 @@ class JeevesCortex:
             vocab=gameforge_vocab(), dim=8, ctx=8, seed=19,
             n_heads=2, n_layers=2, d_ff=32, device="auto",
         )
+        from skeleton.cortex.transformer import TinyTransformer
+        self.neo_rms = TinyTransformer(
+            vocab=gameforge_vocab(), dim=8, ctx=8, seed=23,
+            n_heads=2, n_layers=2, d_ff=32, norm="rms", ffn_kind="swiglu",
+        )
         self._device_info = probe()
         dim = int(getattr(self.transformer, "dim", 8) or 8)
         self.callosum = CorpusCallosum(dim=dim, seed=17)
@@ -509,6 +514,13 @@ class JeevesCortex:
                 "n_heads": int(getattr(xf, "n_heads", 1) or 1),
                 "n_layers": int(getattr(xf, "n_layers", 1) or 1),
                 "d_ff": int(getattr(xf, "d_ff", 0) or 0),
+                "norm": str(getattr(xf, "norm", "ln") or "ln"),
+                "ffn_kind": str(getattr(xf, "ffn_kind", "gelu") or "gelu"),
+                "neo_rms": {
+                    "norm": str(getattr(self.neo_rms, "norm", "rms")),
+                    "ffn_kind": str(getattr(self.neo_rms, "ffn_kind", "swiglu")),
+                    "steps": int(getattr(self.neo_rms, "steps", 0) or 0),
+                },
                 "device": str(getattr(xf, "device", "cpu") or "cpu"),
                 "requested": str(getattr(xf, "requested", getattr(xf, "device", "cpu")) or "cpu"),
                 "backend": type(xf).__name__,
