@@ -41,6 +41,8 @@ def merkle_card(neo) -> Dict[str, Any]:
             "steps": int(getattr(getattr(neo, "neo_rms", None), "steps", 0) or 0),
         },
         "lora": (xf.lora.to_dict() if xf is not None and getattr(xf, "lora", None) is not None else None),
+        "models": sorted(getattr(getattr(neo, "own", None), "models", {}) or {}),
+        "e_fp": ",".join(f"{x:.5f}" for x in ((getattr(xf, "E", None) or [[0.0]])[0][:4])),
     }
 
 

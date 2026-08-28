@@ -45,7 +45,7 @@ from .zaibatsu import tournament, devil_gene
 from .lora import LoRA, LoRABank
 from .beam import beam_search, greedy_beam
 from .accum import Accumulator, accumulate_fit
-from .gossip import gossip, gossip_cortices, gossip_mouths
+from .gossip import absorb_mouth, gossip, gossip_cortices, gossip_mouths
 from .attn import swiglu, swiglu_bwd, cosine_lr, silu, rms_norm
 
 __all__ = [
@@ -125,6 +125,7 @@ __all__ = [
     "gossip",
     "gossip_cortices",
     "gossip_mouths",
+    "absorb_mouth",
     "swiglu",
     "swiglu_bwd",
     "cosine_lr",

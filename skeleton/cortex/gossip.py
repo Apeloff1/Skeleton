@@ -74,6 +74,30 @@ def gossip_cortices(dst, src, *, alpha: float = 0.5) -> Dict[str, Any]:
     return info
 
 
+def absorb_mouth(dst_lm, src_lm, *, alpha: float = 0.2) -> Dict[str, Any]:
+    """Copy a (possibly shallower) mouth into dst. Mixes E/P/Wout + min(layers)."""
+    if dst_lm is None or src_lm is None:
+        return {"absorbed": 0, "reason": "missing"}
+    if int(getattr(dst_lm, "dim", 0) or 0) != int(getattr(src_lm, "dim", 0) or 0):
+        return {"absorbed": 0, "reason": "dim-mismatch"}
+    a = max(0.0, min(1.0, float(alpha)))
+    if a == 0.0:
+        return {"absorbed": 1, "alpha": 0.0, "reason": "alpha0", "layers": 0}
+    ds = dst_lm.snapshot()
+    ss = src_lm.snapshot()
+    mixed = mix_snapshots(ds, ss, a)
+    d_layers, s_layers = list(ds.get("layers") or []), list(ss.get("layers") or [])
+    n = min(len(d_layers), len(s_layers))
+    if n and len(d_layers) != len(s_layers):
+        layers = [mix_blocks(d_layers[i], s_layers[i], a) for i in range(n)] + d_layers[n:]
+        mixed["layers"] = layers
+    restored = type(dst_lm).from_snapshot(mixed)
+    dst_lm.E, dst_lm.P, dst_lm.Wout, dst_lm.bout = restored.E, restored.P, restored.Wout, restored.bout
+    dst_lm.layers, dst_lm.n_layers = restored.layers, restored.n_layers
+    return {"absorbed": 1, "alpha": a, "layers": n,
+            "dst_layers": int(dst_lm.n_layers), "src_layers": int(getattr(src_lm, "n_layers", 0) or 0)}
+
+
 def gossip_mouths(neo, *, alpha: float = 0.25, direction: str = "rms-into-gelu") -> Dict[str, Any]:
     """Mix the two local mouths. Default: RMS/SwiGLU bleeds into the GELU primary."""
     xf = getattr(neo, "transformer", None)

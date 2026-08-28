@@ -90,6 +90,13 @@ class OwnSystem:
     def __init__(self) -> None:
         self._items: List[Ability] = []
         self._by_fp: Dict[str, List[Ability]] = {}
+        self.models: Dict[str, Dict[str, Any]] = {}
+
+    def ingest_model(self, slot: str, snap: Optional[Dict[str, Any]]) -> int:
+        if not snap:
+            return 0
+        self.models[str(slot)] = dict(snap)
+        return 1
 
     def ingest(self, ability: Ability, stimulus: str = "") -> Ability:
         if not ability.tokens and stimulus:
@@ -390,16 +397,19 @@ class OwnSystem:
             "size": self.size,
             "fingerprints": len(self._by_fp),
             "capabilities": list(self.capabilities())[:24],
+            "models": sorted(self.models),
         }
 
     def snapshot(self) -> Dict[str, Any]:
-        return {"items": [a.to_dict() for a in self._items]}
+        return {"items": [a.to_dict() for a in self._items], "models": dict(self.models)}
 
     def restore(self, data: Dict[str, Any]) -> int:
         n = 0
         for d in data.get("items") or []:
             self.ingest(Ability.from_dict(d))
             n += 1
+        for slot, snap in (data.get("models") or {}).items():
+            self.ingest_model(str(slot), snap)
         return n
 
 

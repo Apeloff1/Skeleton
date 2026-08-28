@@ -332,10 +332,22 @@ class JeevesCortex:
             copied += 1
         self.acquired[slot] = self.acquired.get(slot, 0) + copied
         stamped = self.moe.acquire(slot)
-        self._bus.emit("cortex.acquired", {"slot": slot, "copied": copied, "expert": stamped})
+        port = self.slots.get(slot)
+        model = 0
+        absorb: Dict[str, Any] = {"absorbed": 0}
+        if port is not None and hasattr(port, "snapshot"):
+            model = self.own.ingest_model(slot, port.snapshot())
+        src = getattr(port, "transformer", None) if port is not None else None
+        if src is not None:
+            from skeleton.cortex.gossip import absorb_mouth
+            absorb = absorb_mouth(self.transformer, src, alpha=0.2)
+            if getattr(self, "neo_rms", None) is not None:
+                absorb["neo_rms"] = absorb_mouth(self.neo_rms, src, alpha=0.1)
+        self._bus.emit("cortex.acquired", {"slot": slot, "copied": copied, "expert": stamped, "model": model})
         return {
             "slot": slot, "copied": copied, "acquired": dict(self.acquired),
             "own": self.own.size, "expert": stamped,
+            "model": model, "absorb": absorb, "models": sorted(self.own.models),
         }
 
     def surpass(self, slot: str) -> Dict[str, Any]:

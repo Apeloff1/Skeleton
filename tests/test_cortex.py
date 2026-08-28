@@ -1512,4 +1512,23 @@ class TestQueue23:
         assert again == local_decode
 
 
+class TestQueue24:
+    def test_acquire_copies_the_model(self):
+        from skeleton.cortex import JeevesCortex
+        from skeleton.cortex.hive import merkle_card
+        neo = JeevesCortex()
+        neo.think("compile ttk hp dps recipe sim")
+        before = merkle_card(neo)
+        e0 = [row[:] for row in neo.transformer.E[:2]]
+        got = neo.acquire("left")
+        assert got["model"] == 1
+        assert "left" in got["models"]
+        assert got["absorb"]["absorbed"] == 1
+        assert neo.own.models["left"]
+        after = merkle_card(neo)
+        assert after["models"] == ["left"]
+        assert after["e_fp"] != before["e_fp"]
+        assert any(abs(a - b) > 1e-12 for ra, rb in zip(e0, neo.transformer.E[:2]) for a, b in zip(ra, rb))
+
+
 
