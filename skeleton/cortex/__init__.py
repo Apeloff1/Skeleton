@@ -53,7 +53,9 @@ from .catalog import FAMILIES, catalog, all_model_ids
 from .gates import bind_gate, probe_all, ping
 from .multimodal import AudioPort, ImagePort, TextPort, VideoPort, open_modality
 from .genos import Genos
-from .acquire_repo import acquire_catalog, acquire_gaming
+from .acquire_repo import acquire_catalog, acquire_gaming, acquire_spree, parse_ref, references
+from .laws import LAWS, LawError, check
+from .antiplag import distill_dialect, guard
 from .attn import swiglu, swiglu_bwd, cosine_lr, silu, rms_norm
 
 __all__ = [

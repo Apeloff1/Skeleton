@@ -1785,8 +1785,25 @@ class TestGenosGatesAcquire:
         from skeleton.cortex.acquire_repo import SPREE, acquired_dir
         assert len(SPREE) == 12
         dest = acquired_dir() / "gaming"
-        assert len(list(dest.glob("steam_*.json"))) >= 12
-        assert (dest / "spree.json").exists()
+        assert (dest / "references.json").exists()
+        assert not list(dest.glob("steam_*.json"))
+        assert not list(dest.glob("wiki_*.json"))
+
+    def test_laws_and_antiplag_block_copies(self):
+        from skeleton.cortex.antiplag import guard
+        from skeleton.cortex.laws import LawError, check
+        try:
+            check({"extract": "long article text"})
+            raise AssertionError("law")
+        except LawError as e:
+            assert e.law == "no-third-party-prose"
+        try:
+            guard("critically acclaimed fantasy action rpg rise tarnished guided by grace",
+                  "THE CRITICALLY ACCLAIMED FANTASY ACTION RPG. Rise, Tarnished, and be guided by grace")
+            raise AssertionError("plag")
+        except LawError as e:
+            assert e.law == "cite-do-not-copy"
+
 
 
 

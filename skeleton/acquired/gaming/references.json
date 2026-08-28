@@ -1,0 +1,139 @@
+{
+  "games": [
+    {
+      "appid": 1245620,
+      "dialect": "elden ring soulslike plan tensor ttk hp dps",
+      "era": "soulslike",
+      "kind": "reference",
+      "license": "cite-url-only",
+      "source": "steam",
+      "title": "Elden Ring",
+      "url": "https://store.steampowered.com/app/1245620/",
+      "wiki": "https://en.wikipedia.org/wiki/Elden_Ring"
+    },
+    {
+      "appid": 374320,
+      "dialect": "dark souls iii soulslike plan tensor ttk hp dps",
+      "era": "soulslike",
+      "kind": "reference",
+      "license": "cite-url-only",
+      "source": "steam",
+      "title": "Dark Souls III",
+      "url": "https://store.steampowered.com/app/374320/",
+      "wiki": "https://en.wikipedia.org/wiki/Dark_Souls_III"
+    },
+    {
+      "appid": 814380,
+      "dialect": "sekiro shadows die twice soulslike plan tensor ttk hp dps",
+      "era": "soulslike",
+      "kind": "reference",
+      "license": "cite-url-only",
+      "source": "steam",
+      "title": "Sekiro Shadows Die Twice",
+      "url": "https://store.steampowered.com/app/814380/",
+      "wiki": "https://en.wikipedia.org/wiki/Sekiro_Shadows_Die_Twice"
+    },
+    {
+      "appid": 1627720,
+      "dialect": "lies of p soulslike plan tensor ttk hp dps",
+      "era": "soulslike",
+      "kind": "reference",
+      "license": "cite-url-only",
+      "source": "steam",
+      "title": "Lies of P",
+      "url": "https://store.steampowered.com/app/1627720/",
+      "wiki": "https://en.wikipedia.org/wiki/Lies_of_P"
+    },
+    {
+      "appid": 1145360,
+      "dialect": "hades roguelike plan tensor ttk hp dps",
+      "era": "roguelike",
+      "kind": "reference",
+      "license": "cite-url-only",
+      "source": "steam",
+      "title": "Hades",
+      "url": "https://store.steampowered.com/app/1145360/",
+      "wiki": "https://en.wikipedia.org/wiki/Hades"
+    },
+    {
+      "appid": 646570,
+      "dialect": "slay the spire roguelike plan tensor ttk hp dps",
+      "era": "roguelike",
+      "kind": "reference",
+      "license": "cite-url-only",
+      "source": "steam",
+      "title": "Slay the Spire",
+      "url": "https://store.steampowered.com/app/646570/",
+      "wiki": "https://en.wikipedia.org/wiki/Slay_the_Spire"
+    },
+    {
+      "appid": 518790,
+      "dialect": "dead cells roguelike plan tensor ttk hp dps",
+      "era": "roguelike",
+      "kind": "reference",
+      "license": "cite-url-only",
+      "source": "steam",
+      "title": "Dead Cells",
+      "url": "https://store.steampowered.com/app/518790/",
+      "wiki": "https://en.wikipedia.org/wiki/Dead_Cells"
+    },
+    {
+      "appid": 367520,
+      "dialect": "hollow knight metroidvania plan tensor ttk hp dps",
+      "era": "metroidvania",
+      "kind": "reference",
+      "license": "cite-url-only",
+      "source": "steam",
+      "title": "Hollow Knight",
+      "url": "https://store.steampowered.com/app/367520/",
+      "wiki": "https://en.wikipedia.org/wiki/Hollow_Knight"
+    },
+    {
+      "appid": 1809540,
+      "dialect": "nine sols metroidvania plan tensor ttk hp dps",
+      "era": "metroidvania",
+      "kind": "reference",
+      "license": "cite-url-only",
+      "source": "steam",
+      "title": "Nine Sols",
+      "url": "https://store.steampowered.com/app/1809540/",
+      "wiki": "https://en.wikipedia.org/wiki/Nine_Sols"
+    },
+    {
+      "appid": 594650,
+      "dialect": "hunt showdown extraction_now plan tensor ttk hp dps",
+      "era": "extraction_now",
+      "kind": "reference",
+      "license": "cite-url-only",
+      "source": "steam",
+      "title": "Hunt Showdown",
+      "url": "https://store.steampowered.com/app/594650/",
+      "wiki": "https://en.wikipedia.org/wiki/Hunt_Showdown"
+    },
+    {
+      "appid": 1966720,
+      "dialect": "lethal company extraction_now plan tensor ttk hp dps",
+      "era": "extraction_now",
+      "kind": "reference",
+      "license": "cite-url-only",
+      "source": "steam",
+      "title": "Lethal Company",
+      "url": "https://store.steampowered.com/app/1966720/",
+      "wiki": "https://en.wikipedia.org/wiki/Lethal_Company"
+    },
+    {
+      "appid": 413150,
+      "dialect": "stardew valley cozy plan tensor ttk hp dps",
+      "era": "cozy",
+      "kind": "reference",
+      "license": "cite-url-only",
+      "source": "steam",
+      "title": "Stardew Valley",
+      "url": "https://store.steampowered.com/app/413150/",
+      "wiki": "https://en.wikipedia.org/wiki/Stardew_Valley"
+    }
+  ],
+  "kind": "reference-index",
+  "n": 12,
+  "sha256": "4e56d7516c77e9c3977ac69127b5e1a4f3d24997226f5bd8859b8d1a969d2d4e"
+}
