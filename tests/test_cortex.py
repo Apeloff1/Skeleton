@@ -1382,4 +1382,34 @@ class TestQueue18:
         assert card["mouths"]["pfc"]["finite"] is True
 
 
+class TestQueue19:
+    def test_midbrain_is_one_layer_attn(self):
+        from skeleton.cortex.midbrain import Midbrain
+        from skeleton.cortex.curriculum import CORE_PAIRS
+        m = Midbrain()
+        xf = m.transformer
+        assert xf is not None
+        assert xf.n_layers == 1 and xf.n_heads == 2 and xf.d_ff == 16
+        texts = [a for a, _ in list(CORE_PAIRS)[:6]]
+        birth = m.perplexity(texts)
+        m.fit("plan tensor ttk lattice oracle")
+        m.fit("compile ttk hp dps recipe sim")
+        trained = m.perplexity(texts)
+        assert birth < 1e8 and trained < 1e8
+        assert trained <= birth * 1.05 or xf.steps >= 1
+        t = m.think("compile ttk hp dps recipe sim", {})
+        assert t.kind == "route" and t.numbers[1] > t.numbers[2]
+        assert "DRAFT" in t.text
+
+    def test_train_lists_midbrain_one_layer(self):
+        from skeleton.cortex import JeevesCortex
+        from skeleton.cortex.zaibatsu import tournament
+        neo = JeevesCortex()
+        neo.train(epochs=1)
+        card = tournament(neo)
+        assert card["mouths"]["midbrain"]["n_layers"] == 1
+        assert card["mouths"]["midbrain"]["steps"] > 0
+        assert card["mouths"]["midbrain"]["finite"] is True
+
+
 

@@ -42,7 +42,10 @@ class Midbrain:
 
     def __init__(self) -> None:
         from skeleton.cortex.learned import LearnedWeights
-        self.weights = LearnedWeights(order=3, dim=8, seed=3, attn=True, ctx=6)
+        self.weights = LearnedWeights(
+            order=3, dim=8, seed=3, attn=True, ctx=6,
+            n_heads=2, n_layers=1, d_ff=16,
+        )
 
     @property
     def lm(self):
@@ -62,6 +65,14 @@ class Midbrain:
     def snapshot(self) -> dict:
         return self.weights.snapshot()
 
+    def perplexity(self, texts) -> float:
+        xf = self.transformer
+        if xf is not None and hasattr(xf, "perplexity"):
+            return float(xf.perplexity(texts))
+        if hasattr(self.lm, "perplexity"):
+            return float(self.lm.perplexity(texts))
+        return float("inf")
+
     def think(self, stimulus: str, context: Dict[str, Any]) -> Thought:
         arousal, lw, rw = _weights(stimulus or "")
         to_left = lw >= 0.25
@@ -74,6 +85,11 @@ class Midbrain:
         ]
         if inhibit:
             bits.append("INHIBIT")
+        xf = self.transformer
+        if xf is not None and hasattr(xf, "decode") and (stimulus or "").strip():
+            draft = str(xf.decode(stimulus, n=4, seed=3) or "").strip()
+            if draft:
+                bits.append("DRAFT " + draft)
         return Thought(
             slot="midbrain", kind="route",
             text="COORD " + " ".join(bits),
