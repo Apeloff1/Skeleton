@@ -202,6 +202,14 @@ class JeevesCortex:
         from skeleton.cortex.acquire_repo import acquire_spree
         return acquire_spree(self)
 
+    def refer(self, stimulus: str, *, live: bool = False) -> Dict[str, Any]:
+        from skeleton.cortex.refs import refer
+        return refer(stimulus, live=live)
+
+    def bind_ref(self, slot: str = "right") -> Dict[str, str]:
+        from skeleton.cortex.refs import GameRefPort
+        return self.bind(slot, GameRefPort(slot=slot))
+
     def _contact_if_teacher(self, slot: str, stimulus: str) -> None:
         from skeleton.cortex.contact import is_teacher
         port = self.slots.get(slot)
@@ -243,6 +251,11 @@ class JeevesCortex:
         # Compose against own-system as of BEFORE this turn (no teacher leak).
         composed = self.own.compose(stim)
         recalled_j = composed[1] if composed else 0.0
+
+        ref = self.refer(stim)
+        if ref.get("hit"):
+            ctx["reference"] = ref["ref"]
+            stim = f"{stim} {ref['ref'].get('dialect') or ''}".strip()
 
         route = self.slots["midbrain"].think(stim, ctx)
         self.ledger.record(route, stim)

@@ -93,11 +93,15 @@ def main(argv: list[str] | None = None) -> int:
     gn = sub.add_parser("genos", help="pulse the genos trajectory engine")
     gn.add_argument("prefix", nargs="?", default="plan tensor ttk lattice soulslike")
 
-    ac = sub.add_parser("acquire-game", help="pull Steam+Wikipedia into skeleton/acquired/gaming")
+    ac = sub.add_parser("acquire-game", help="parse a Steam app on demand; store pointer only")
     ac.add_argument("--appid", type=int, default=1245620)
     ac.add_argument("--title", default="Elden Ring")
 
-    sub.add_parser("spree", help="full gaming acquire across the house era pack")
+    sub.add_parser("spree", help="write the 12-title reference index")
+
+    rf = sub.add_parser("refer", help="lookup a game reference from a stimulus")
+    rf.add_argument("prefix", nargs="?", default="elden ring")
+    rf.add_argument("--live", action="store_true")
 
     wk = sub.add_parser("walk", help="prove spawn→extract on the emitted door graph")
     wk.add_argument("--era", default="extraction_now")
@@ -212,6 +216,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "acquire-game":
         from skeleton.cortex.live import live_cortex, persist
         out = live_cortex().acquire_gaming(appid=args.appid, title=args.title)
+        persist()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "refer":
+        from skeleton.cortex.live import live_cortex, persist
+        out = live_cortex().refer(args.prefix, live=args.live)
         persist()
         print(json.dumps(out, indent=2, default=str))
         return 0

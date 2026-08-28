@@ -1824,6 +1824,22 @@ class TestGenosGatesAcquire:
         throttle("https://example.com/b")
         assert time.monotonic() - t0 >= 0.9
 
+    def test_refer_is_a_tool_not_a_copy(self):
+        from skeleton.cortex import GameRefPort, JeevesCortex, refer
+        out = refer("plan an elden ring soulslike")
+        assert out["hit"] == 1
+        assert out["ref"]["stored_prose"] == 0
+        assert "elden ring" in out["ref"]["dialect"]
+        port = GameRefPort(slot="right")
+        t = port.think("hollow knight backtrack", {})
+        assert t.kind == "ref" and "metroidvania" in t.tags
+        neo = JeevesCortex()
+        assert neo.refer("totally unknown title xyz")["hit"] == 0
+        assert neo.refer("hades roguelike")["hit"] == 1
+        neo.bind_ref("right")
+        assert neo.backends()["right"] == "gameref"
+        assert neo.think("hades mix trash elite") is not None
+
 
 
 
