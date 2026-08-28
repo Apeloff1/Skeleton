@@ -61,6 +61,11 @@ class AppState:
         self.audit: Optional[AuditLog] = None
         self.seal: Optional[ShamirSeal] = None
         self.started_at: Optional[float] = None
+        # Optional planes referenced by routes but not wired in lifespan yet —
+        # declared here so the route-layer ``_require`` 503s cleanly instead
+        # of raising AttributeError (previously a 500 on /context/*, /gameforge/*).
+        self.cockpit: Optional[Any] = None
+        self.gameforge: Optional[Any] = None
 
     def is_healthy(self) -> Dict[str, Any]:
         checks = {

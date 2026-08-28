@@ -49,6 +49,28 @@ async def genesis_report(state=Depends(_state)) -> Dict[str, Any]:
     return {"report": genesis.report.to_dict(), "health": genesis.health()}
 
 
+@router.get("/genesis/handles")
+async def genesis_handles(state=Depends(_state)) -> Dict[str, Any]:
+    """Names of every subsystem handle wired by the Genesis boot, per phase."""
+    genesis = _require(state.genesis, "Genesis")
+    return {
+        "phases": genesis.report.phases,
+        "wired": genesis.report.wired,
+        "handle_names": sorted(genesis.handles.keys()),
+    }
+
+
+@router.get("/interface/reranker/stats")
+async def reranker_stats(state=Depends(_state)) -> Dict[str, Any]:
+    """FeatureReranker counters (queries reranked, active weights)."""
+    genesis = _require(state.genesis, "Genesis")
+    reranker = genesis.handles.get("reranker")
+    if reranker is None:
+        raise HTTPException(status_code=503, detail="reranker not wired")
+    stats = reranker.stats() if hasattr(reranker, "stats") else {}
+    return {"reranker": stats}
+
+
 @router.get("/capabilities")
 async def capabilities(state=Depends(_state)) -> List[Dict[str, Any]]:
     return [cap.to_dict() for cap in _require(state.registry, "Registry").list()]
@@ -338,4 +360,3 @@ async def github_oauth_callback(code: str = "", state: str = "") -> Dict[str, An
     safe = {k: v for k, v in out.items() if k != "access_token"}
     safe["state"] = state
     return safe
-
