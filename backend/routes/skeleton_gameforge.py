@@ -371,6 +371,14 @@ def cortex_ascend(body: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+@router.post("/jeeves/plan")
+def jeeves_plan(body: Dict[str, Any]) -> Dict[str, Any]:
+    from skeleton.cortex.live import live_jeeves, persist
+    out = live_jeeves().plan_build(vision=str((body or {}).get("vision") or "like elden ring"))
+    persist()
+    return out
+
+
 @router.post("/cortex/distill")
 def cortex_distill(body: Dict[str, Any]) -> Dict[str, Any]:
     from skeleton.cortex.live import live_cortex, persist

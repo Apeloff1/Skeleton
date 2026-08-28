@@ -111,6 +111,9 @@ def main(argv: list[str] | None = None) -> int:
     asd.add_argument("prefix", nargs="?", default="like elden ring")
     asd.add_argument("--rounds", type=int, default=8)
 
+    pb = sub.add_parser("plan", help="Jeeves builder plan; like <game> resolves era")
+    pb.add_argument("vision", nargs="?", default="like elden ring")
+
     wk = sub.add_parser("walk", help="prove spawn→extract on the emitted door graph")
     wk.add_argument("--era", default="extraction_now")
     wk.add_argument("--blend", nargs=2, metavar=("ERA_A", "ERA_B"))
@@ -278,6 +281,13 @@ def main(argv: list[str] | None = None) -> int:
             out = neo.gossip_mouths(alpha=args.alpha, direction=args.direction)
         else:
             out = neo.gossip_with(JeevesCortex(), alpha=args.alpha)
+        persist()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "plan":
+        from skeleton.cortex.live import live_jeeves, persist
+        out = live_jeeves().plan_build(vision=args.vision)
         persist()
         print(json.dumps(out, indent=2, default=str))
         return 0

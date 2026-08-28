@@ -328,9 +328,11 @@ class Jeeves:
         return self.bind_pack(compile_era(raw))
 
     def plan_build(self, pack: dict[str, Any] | None = None, *,
-                   tensor=None, reading=None) -> dict[str, Any]:
+                   tensor=None, reading=None, vision: str = "") -> dict[str, Any]:
         """Jeeves-as-builder: design the run the forge will emit."""
         from skeleton.jeeves.builder import BuilderBrain
+        if vision:
+            pack = self.bind_era(vision)
         if pack is None:
             from skeleton.forge.eras import compile_era
             pack = compile_era(self.era)
@@ -342,7 +344,13 @@ class Jeeves:
         self._bus.emit("jeeves.build.planned", {
             "era": plan.era, "seed": plan.seed, "bias": plan.room_bias,
         })
-        return plan.to_dict()
+        out = plan.to_dict()
+        if vision:
+            hit = self.refer(vision)
+            if hit.get("hit"):
+                out["reference"] = (hit.get("ref") or {}).get("title")
+                out["citation"] = (hit.get("ref") or {}).get("citation")
+        return out
 
     def advise(self, session_id: str, telemetry: dict[str, Any] | None = None) -> dict[str, Any]:
         """Tactical cascade. Opens nothing; uses bound era + live telemetry."""

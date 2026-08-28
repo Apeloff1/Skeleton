@@ -162,6 +162,9 @@ class TestPipelineAndCockpit:
         assert j.last_walk.get("reference") == "Elden Ring"
         pack = j.bind_era("like elden ring")
         assert pack["era"] == "soulslike"
+        planned = j.plan_build(vision="like hollow knight")
+        assert planned["era"] == "metroidvania"
+        assert planned.get("reference") == "Hollow Knight"
 
     def test_cockpit_think_and_bind_slot(self):
         from skeleton.context.cockpit import Cockpit
