@@ -1,8 +1,7 @@
 {
-  "description": "2023 video game",
   "dialect": "lies of p soulslike extraction ttk elite dread plan tensor ttk hp dps",
-  "extract": "Lies of P is a 2023 action role-playing game developed by Neowiz and Nough and published by Neowiz. The story is loosely based on the 1883 Italian novel The Adventures of Pinocchio by Carlo Collodi, to whom it is dedicated. The game is a Soulslike set in the fictional city of Krat, inspired by the Belle \u00c9poque. The titular \"P\" refers to protagonist Pinocchio, whom the player controls from a third-person perspective, and is one of the automaton-like \"Puppets\" central to the life and industry of Krat.",
-  "sha256": "013946459bda29932aec077ddc63d425fa9e1fd69c137654e0fc5e0ce2f064eb",
+  "license": "CC BY-SA \u2014 cite the URL, do not copy the article",
+  "sha256": "d57d80fb0a6c238a907949a01aae05d24bec56715b8b6eb0bdc16161903c8280",
   "source": "wikipedia",
   "title": "Lies of P",
   "url": "https://en.wikipedia.org/wiki/Lies_of_P"

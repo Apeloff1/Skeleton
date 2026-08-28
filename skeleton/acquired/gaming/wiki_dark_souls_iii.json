@@ -1,8 +1,7 @@
 {
-  "description": "2016 video game",
   "dialect": "dark souls iii soulslike extraction ttk elite dread plan tensor ttk hp dps",
-  "extract": "Dark Souls III is a 2016 action role-playing game developed by FromSoftware and published by Bandai Namco Entertainment. Released for the PlayStation 4, Xbox One, and Windows, it is the third and final entry in the Dark Souls trilogy. The game follows the Ashen One, an unkindled warrior, on a quest involving the Lords of Cinder and the fading First Flame. It is played from a third-person perspective, and players use weapons, armour, magic, shields, and consumables to fight enemies. Series creator Hidetaka Miyazaki returned as a director after having a supervisory role on Dark Souls II.",
-  "sha256": "6df757ee57348bc16ec40686227692f02d6120332a19bd53c4a2b73abcdf4cae",
+  "license": "CC BY-SA \u2014 cite the URL, do not copy the article",
+  "sha256": "74b1b6f244c444fb095d9967e19c897dfc04fec66488bb1ccefc493fbc211047",
   "source": "wikipedia",
   "title": "Dark Souls III",
   "url": "https://en.wikipedia.org/wiki/Dark_Souls_III"

@@ -1,8 +1,7 @@
 {
-  "description": "2017 video game",
   "dialect": "hollow knight metroidvania backtrack map plan tensor ttk hp dps",
-  "extract": "Hollow Knight is a 2017 Metroidvania video game developed and published by Australian independent development studio Team Cherry. The player controls a nameless insectoid warrior in exploring Hallownest, a fallen kingdom plagued by a supernatural disease. The game is set in diverse subterranean locations, featuring friendly and hostile insectoid characters and numerous bosses. Players have the opportunity to unlock abilities as they explore, along with pieces of lore and flavour text that are spread throughout the kingdom.",
-  "sha256": "2d56ee9fec2160c4e2406333a461f789100e91a897df6a1aae8e36349ba1c9b4",
+  "license": "CC BY-SA \u2014 cite the URL, do not copy the article",
+  "sha256": "7ce658d5fcf4de13ba109c3abcbc2633b57ccf184f0cbc540b466cb654444b87",
   "source": "wikipedia",
   "title": "Hollow Knight",
   "url": "https://en.wikipedia.org/wiki/Hollow_Knight"

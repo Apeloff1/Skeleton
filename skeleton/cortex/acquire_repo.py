@@ -1,8 +1,7 @@
-"""Repo acquisition — foreign payloads become files Jeeves owns.
+"""Repo acquisition — pointers and house dialect only.
 
-Gaming APIs first: Steam storefront (public), Wikipedia REST, RAWG if
-keyed. Every write is schema-checked, hashed, and stored under
-`skeleton/acquired/`. Failures record ε and write nothing partial.
+Law: do not store third-party prose, assets, binaries, or keys.
+Steam and Wikipedia are cited by URL. Files keep id, title, house dialect.
 """
 from __future__ import annotations
 
@@ -63,19 +62,16 @@ def steam_app(appid: int = 1245620) -> Dict[str, Any]:
     inner = node.get("data") if isinstance(node, dict) else None
     if not isinstance(inner, dict):
         raise ValueError("steam-empty")
+    genres = [g.get("description") for g in (inner.get("genres") or []) if isinstance(g, dict)][:8]
+    name = inner.get("name")
     return {
         "source": "steam",
         "appid": int(appid),
-        "name": inner.get("name"),
+        "name": name,
         "type": inner.get("type"),
-        "is_free": inner.get("is_free"),
-        "short_description": (inner.get("short_description") or "")[:800],
-        "developers": list(inner.get("developers") or [])[:8],
-        "publishers": list(inner.get("publishers") or [])[:8],
-        "genres": [g.get("description") for g in (inner.get("genres") or []) if isinstance(g, dict)][:12],
-        "categories": [c.get("description") for c in (inner.get("categories") or []) if isinstance(c, dict)][:16],
-        "release": (inner.get("release_date") or {}).get("date") if isinstance(inner.get("release_date"), dict) else None,
-        "dialect": _dialect(inner.get("name"), inner.get("short_description"), inner.get("genres")),
+        "url": f"https://store.steampowered.com/app/{int(appid)}/",
+        "genres": genres,
+        "dialect": _dialect(name, "", genres),
     }
 
 
@@ -83,16 +79,16 @@ def wikipedia_game(title: str = "Elden Ring") -> Dict[str, Any]:
     q = urllib.parse.quote(title)
     url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{q}"
     data = _get_json(url, headers={"User-Agent": "SkeletonGenos/1.0 (gameforge; acquire)"})
-    extract = str(data.get("extract") or "")
-    if not extract:
+    title_out = data.get("title") or title
+    url = ((data.get("content_urls") or {}).get("desktop") or {}).get("page")
+    if not title_out:
         raise ValueError("wiki-empty")
     return {
         "source": "wikipedia",
-        "title": data.get("title") or title,
-        "description": data.get("description"),
-        "extract": extract[:1200],
-        "url": ((data.get("content_urls") or {}).get("desktop") or {}).get("page"),
-        "dialect": _dialect(data.get("title"), extract, []),
+        "title": title_out,
+        "url": url or f"https://en.wikipedia.org/wiki/{urllib.parse.quote(str(title_out))}",
+        "license": "CC BY-SA — cite the URL, do not copy the article",
+        "dialect": _dialect(title_out, "", []),
     }
 
 

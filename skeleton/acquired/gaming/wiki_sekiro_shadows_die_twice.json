@@ -1,8 +1,7 @@
 {
-  "description": "2019 video game",
   "dialect": "sekiro: shadows die twice soulslike extraction ttk elite dread plan tensor ttk hp dps",
-  "extract": "Sekiro: Shadows Die Twice is a 2019 action-adventure game developed by FromSoftware. It was released in Japan by FromSoftware and internationally by Activision for the PlayStation 4, Windows and Xbox One in March 2019 and for Stadia in October 2020.",
-  "sha256": "cb1ebe796727fee8f9c3f1d1cbd7495557ef32717bbc1ad242c3c40736a5a2ef",
+  "license": "CC BY-SA \u2014 cite the URL, do not copy the article",
+  "sha256": "3d341ab50cc592237def01e26676b6952dd2b008dc7332e2a99f6b1d85148b34",
   "source": "wikipedia",
   "title": "Sekiro: Shadows Die Twice",
   "url": "https://en.wikipedia.org/wiki/Sekiro%3A_Shadows_Die_Twice"

@@ -1,8 +1,7 @@
 {
-  "description": "2018 video game",
   "dialect": "dead cells open-world exploration pack roguelike lattice mix trash elite boss metroidvania backtrack map plan tensor ttk hp dps",
-  "extract": "Dead Cells is a 2018 roguelike-Metroidvania game developed by French independent developer Motion Twin. The player takes the role of an amorphous creature called the Prisoner. As the Prisoner, the player must fight their way out of a diseased island in order to slay the island's King. The player gains weapons, treasure and other tools through exploration of the procedurally generated levels. Dead Cells features a permadeath system, causing the player to lose all items and other abilities upon dying. A currency called Cells can be collected from defeated enemies, allowing the player to purchase permanent upgrades.",
-  "sha256": "2058e91d09fb3167d52558597b4cb9596437c22558caecec0ddd4069d219af8f",
+  "license": "CC BY-SA \u2014 cite the URL, do not copy the article",
+  "sha256": "bdc3caecd22fb14de18fdf221d14fc6f2ef5260e214742a780e52554e089192c",
   "source": "wikipedia",
   "title": "Dead Cells",
   "url": "https://en.wikipedia.org/wiki/Dead_Cells"

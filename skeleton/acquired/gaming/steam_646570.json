@@ -1,39 +1,13 @@
 {
   "appid": 646570,
-  "categories": [
-    "Single-player",
-    "Steam Achievements",
-    "Full controller support",
-    "Steam Trading Cards",
-    "Steam Workshop",
-    "Adjustable Text Size",
-    "Custom Volume Controls",
-    "Mouse Only Option",
-    "Playable without Timed Input",
-    "Save Anytime",
-    "Touch Only Option",
-    "Steam Cloud",
-    "Stats",
-    "Steam Leaderboards",
-    "Remote Play on Phone",
-    "Remote Play on Tablet"
-  ],
-  "developers": [
-    "Mega Crit"
-  ],
   "dialect": "slay the spire soulslike extraction ttk elite dread roguelike lattice mix trash elite boss plan tensor ttk hp dps",
   "genres": [
     "Indie",
     "Strategy"
   ],
-  "is_free": false,
   "name": "Slay the Spire",
-  "publishers": [
-    "Mega Crit"
-  ],
-  "release": "Jan 23, 2019",
-  "sha256": "ca2f22fbd01a3e79d76588c1782141f70636620ec2b8423d707644914f95771d",
-  "short_description": "We fused card games and roguelikes together to make the best single player deckbuilder we could. Craft a unique deck, encounter bizarre creatures, discover relics of immense power, and Slay the Spire!",
+  "sha256": "1ab5f2f53b9f39d4d9cf0f72a2fc6724f9d1c5cfea48677a4098864a378fb8df",
   "source": "steam",
-  "type": "game"
+  "type": "game",
+  "url": "https://store.steampowered.com/app/646570/"
 }

@@ -1,8 +1,7 @@
 {
-  "description": "2016 video game",
   "dialect": "stardew valley cozy harvest era plan tensor ttk hp dps",
-  "extract": "Stardew Valley is a 2016 farm life simulation video game developed by Eric \"ConcernedApe\" Barone. Players take the role of a character who inherits their deceased grandfather's dilapidated farm. The game is open-ended, with players managing the farm by clearing land, growing seasonal crops, and raising animals. Players can acquire skills in farming, foraging, fishing, mining, and combat. Social features include building relationships with townspeople, with the option to marry and have a child. A later update added multiplayer, allowing online play with others.",
-  "sha256": "1994b234ba47ce52b3d414feaa1408e5e6c77d82e3fa013e27247722bd99898f",
+  "license": "CC BY-SA \u2014 cite the URL, do not copy the article",
+  "sha256": "f7f200b015be6989476c9f3560be3da56b74051923039ba19b7cf3e81084ec0a",
   "source": "wikipedia",
   "title": "Stardew Valley",
   "url": "https://en.wikipedia.org/wiki/Stardew_Valley"

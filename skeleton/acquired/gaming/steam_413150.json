@@ -1,39 +1,14 @@
 {
   "appid": 413150,
-  "categories": [
-    "Single-player",
-    "Multi-player",
-    "Co-op",
-    "Online Co-op",
-    "LAN Co-op",
-    "Shared/Split Screen Co-op",
-    "Shared/Split Screen",
-    "Steam Achievements",
-    "Full controller support",
-    "Steam Trading Cards",
-    "Steam Cloud",
-    "Remote Play on Phone",
-    "Remote Play on Tablet",
-    "Remote Play Together",
-    "Family Sharing"
-  ],
-  "developers": [
-    "ConcernedApe"
-  ],
   "dialect": "stardew valley soulslike extraction ttk elite dread cozy harvest era plan tensor ttk hp dps",
   "genres": [
     "Indie",
     "RPG",
     "Simulation"
   ],
-  "is_free": false,
   "name": "Stardew Valley",
-  "publishers": [
-    "ConcernedApe"
-  ],
-  "release": "Feb 26, 2016",
-  "sha256": "163c145f7fa95e86feb4c4a60b45f2c515d825ae2233dd018ca2345fc0b56582",
-  "short_description": "You've inherited your grandfather's old farm plot in Stardew Valley. Armed with hand-me-down tools and a few coins, you set out to begin your new life. Can you learn to live off the land and turn these overgrown fields into a thriving home?",
+  "sha256": "d70e5538a0d174a012a3a328317a0fab8ab326a945ce193de12e26b0fc7e40a1",
   "source": "steam",
-  "type": "game"
+  "type": "game",
+  "url": "https://store.steampowered.com/app/413150/"
 }

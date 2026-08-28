@@ -1,33 +1,13 @@
 {
   "appid": 814380,
-  "categories": [
-    "Single-player",
-    "Steam Achievements",
-    "Full controller support",
-    "Steam Trading Cards",
-    "Steam Cloud",
-    "Remote Play on Tablet",
-    "Remote Play on TV",
-    "Family Sharing"
-  ],
-  "developers": [
-    "FromSoftware, Inc."
-  ],
   "dialect": "sekiro\u2122: shadows die twice - goty edition soulslike extraction ttk elite dread plan tensor ttk hp dps",
   "genres": [
     "Action",
     "Adventure"
   ],
-  "is_free": false,
   "name": "Sekiro\u2122: Shadows Die Twice - GOTY Edition",
-  "publishers": [
-    "Activision (Excluding Japan and Asia)",
-    "FromSoftware, Inc. (Japan)",
-    "\u65b9\u5757\u6e38\u620f (Asia)"
-  ],
-  "release": "Mar 21, 2019",
-  "sha256": "2e54c54150909bd74c2b173014573ca83a22ef81007269c55659d6aa91ce89ca",
-  "short_description": "Game of the Year - The Game Awards 2019 Best Action Game of 2019 - IGN Carve your own clever path to vengeance in the award winning adventure from developer FromSoftware, creators of Bloodborne and the Dark Souls series. Take Revenge. Restore Your Honor. Kill Ingeniously.",
+  "sha256": "84474308c9eb3169d9985a6cfe3bcf7ca1c5d8ee9389995c927abe1f7b174e6b",
   "source": "steam",
-  "type": "game"
+  "type": "game",
+  "url": "https://store.steampowered.com/app/814380/"
 }

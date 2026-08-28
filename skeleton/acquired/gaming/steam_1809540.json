@@ -1,40 +1,14 @@
 {
   "appid": 1809540,
-  "categories": [
-    "Single-player",
-    "Steam Achievements",
-    "Full controller support",
-    "Color Alternatives",
-    "Custom Volume Controls",
-    "Adjustable Difficulty",
-    "Gamepad Recommended",
-    "Keyboard Only Option",
-    "DualShock Controller Support",
-    "DualShock Controller Support",
-    "DualSense Controller Support",
-    "DualSense Controller Support",
-    "Stereo Sound",
-    "Steam Cloud",
-    "Steam Leaderboards",
-    "Family Sharing"
-  ],
-  "developers": [
-    "RedCandleGames"
-  ],
   "dialect": "nine sols soulslike extraction ttk elite dread plan tensor ttk hp dps",
   "genres": [
     "Action",
     "Adventure",
     "Indie"
   ],
-  "is_free": false,
   "name": "Nine Sols",
-  "publishers": [
-    "RedCandleGames"
-  ],
-  "release": "May 28, 2024",
-  "sha256": "8b3cb12c61fcf830a77282adf66c2e1937d8a3a7db527bbf920b378508dcbb1a",
-  "short_description": "Nine Sols is a lore rich, hand-drawn 2D action-platformer featuring Sekiro-inspired deflection focused combat. Embark on a journey of eastern fantasy, explore the land once home to an ancient alien race, and follow a vengeful hero\u2019s quest to slay the 9 Sols, formidable rulers of this forsaken realm.",
+  "sha256": "56c1e4a4e34c2e523bd508bb168cc68102a8db9fe1b3c22278f97a458c9cf34d",
   "source": "steam",
-  "type": "game"
+  "type": "game",
+  "url": "https://store.steampowered.com/app/1809540/"
 }

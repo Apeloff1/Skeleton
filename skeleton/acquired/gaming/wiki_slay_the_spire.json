@@ -1,8 +1,7 @@
 {
-  "description": "2019 roguelike deck-building game",
   "dialect": "slay the spire soulslike extraction ttk elite dread roguelike lattice mix trash elite boss plan tensor ttk hp dps",
-  "extract": "Slay the Spire is a 2019 roguelike deck-building game developed by the American indie studio Mega Crit. It was published by Mega Crit for its initial PC release and by Humble Bundle for home consoles and mobile platforms. The game was released in early access for Microsoft Windows, macOS, and Linux in late 2017, with an official release in January 2019. It was released for PlayStation 4 in May 2019, for Nintendo Switch in June 2019 and for Xbox One in August 2019. An iOS version was released in June 2020, with an Android version released in February 2021.",
-  "sha256": "782ccb516e43e8281ca02022e61aeb443b99ac5056db9a69f4c7b3ff1165007b",
+  "license": "CC BY-SA \u2014 cite the URL, do not copy the article",
+  "sha256": "217d6963d05ef3e43140dbe45ead18b374f4eb9021ced1b95e57360335a07a58",
   "source": "wikipedia",
   "title": "Slay the Spire",
   "url": "https://en.wikipedia.org/wiki/Slay_the_Spire"
