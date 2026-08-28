@@ -8,13 +8,13 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 - ca9238c mistakenly rewrote api/server.py + api/errors.py; restored (b4790a1).
   Rule: extend only, read before touching.
 - B4 deploy constraint discovered via backend/Dockerfile: the production image
-  copies only `backend/` into /app, so `import skeleton` fails there. All B4
-  cutovers are guarded shims (skeleton import → local fallback), never hard
-  imports, until the image vendors the skeleton package.
+  originally copied only `backend/` into /app, so `import skeleton` failed
+  there. All B4 cutovers are guarded shims (skeleton import → local fallback);
+  B5 (this commit) vendors skeleton/ into the image so the shims flip.
 
 ## Track A — Interface plane (skeleton/api) — DONE (f6c7a78 → 3ebed65)
 
-## Track B — Memory/caching convergence (backend ↔ skeleton)
+## Track B — Memory/caching convergence (backend ↔ skeleton) — DONE
 
 - [x] B1. Ownership decided (default): skeleton/memory owns semantics;
       backend services become thin adapters over it.
@@ -25,13 +25,15 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 - [x] B4a. `backend/services/cag.py` guarded shim (324db3d).
 - [x] B4b. Warmer JSON persistence in skeleton + `services/mag.py` guarded
       shim (7790918).
-- [x] B4c. `services/memory_engine.py` is now an explicit facade: everything
-      it touches (compose_prompt / jeeves_system_prefix / get_store /
-      get_warmer) resolves through the B4a/B4b shims to the skeleton
-      canonicals when importable. No logic beyond prompt assembly + cost
-      ledger; documented in the module docstring (this commit).
-- [ ] B5. Vendor `skeleton/` into the backend image (or set PYTHONPATH) so
-      the guarded shims flip to canonical in prod; deploy change, not code.
+- [x] B4c. `services/memory_engine.py` explicit facade over the shimmed stack
+      (656406a).
+- [x] B5. Backend image vendors `skeleton/`: compose build context moved to
+      the repo root (`dockerfile: backend/Dockerfile`), Dockerfile COPY paths
+      adjusted, `skeleton/` copied to /app/skeleton, and the dev volume
+      mounts ./skeleton too. After the next image build, the guarded shims
+      resolve to the canonical skeleton modules in prod (this commit).
+      NOTE: building with context ./backend no longer works — root context
+      is required (documented in the Dockerfile header).
 
 ## Track C — Retrieval rank plane — DONE (31c8541)
 
@@ -57,7 +59,4 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 - ✅ genesis.py imports canonical clocks path (bdca180b)
 - ✅ api/server.py + api/errors.py restored after bad rewrite (b4790a1)
 - ✅ Track A (f6c7a78, 31c8541, e3eaeca, 3ebed65)
-- ✅ Track B2/B3 memory semantics ported into skeleton/memory (51275cb)
-- ✅ Track B4a services/cag.py guarded shim (324db3d)
-- ✅ Track B4b warmer persistence + services/mag.py guarded shim (7790918)
-- ✅ Track B4c memory_engine facade (this commit)
+- ✅ Track B (51275cb, 324db3d, 7790918, 656406a, this commit)

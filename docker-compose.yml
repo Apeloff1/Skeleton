@@ -46,9 +46,13 @@ services:
   # ==========================================================================
   # Backend API Service
   # ==========================================================================
+  # NOTE (B5): build context is the repo root so backend/Dockerfile can COPY
+  # both backend/ and skeleton/ into the image — the guarded shims in
+  # services/{cag,mag}.py then resolve to the canonical skeleton modules.
   backend:
     build:
-      context: ./backend
+      context: .
+      dockerfile: backend/Dockerfile
       target: ${BUILD_TARGET:-development}
     container_name: tutolage-backend
     restart: unless-stopped
@@ -65,6 +69,7 @@ services:
       - CHROMA_PERSIST_DIR=/app/data/chroma
     volumes:
       - ./backend:/app
+      - ./skeleton:/app/skeleton
       - backend_data:/app/data
       - /app/__pycache__
     depends_on:
@@ -92,7 +97,7 @@ services:
       - "${FRONTEND_PORT:-3000}:3000"
       - "8081:8081"      # Metro bundler
       - "19000:19000"    # Expo
-      - "19001:19001"    # Expo
+      - "19001:19001"    # Expo DevTools
       - "19002:19002"    # Expo DevTools
     environment:
       - EXPO_PUBLIC_BACKEND_URL=http://backend:8001
