@@ -149,6 +149,18 @@ class TestPipelineAndCockpit:
         if like.get("G") is not None:
             assert float(like["G"]) >= 1.0
 
+    def test_observe_run_cites_reference(self):
+        from skeleton.jeeves.core import Jeeves
+        j = Jeeves()
+        out = j.observe_run(
+            era="soulslike",
+            walk={"extracted": True, "hops": 3, "cores": 1, "t": 10, "collapse_max": 20},
+            plan={"room_bias": "balanced", "enemy_mix": {"trash": 4, "elite": 2, "boss": 1}},
+            vision="like elden ring",
+        )
+        assert out.get("law") == "ok"
+        assert j.last_walk.get("reference") == "Elden Ring"
+
     def test_cockpit_think_and_bind_slot(self):
         from skeleton.context.cockpit import Cockpit
         c = Cockpit()

@@ -261,11 +261,19 @@ class Jeeves:
         self.last_walk["era"] = era
         self.last_walk["bias"] = bias
         self.last_walk["slack"] = slack
+        ref = None
+        try:
+            ref = self.refer(vision or era or "")
+        except Exception:
+            ref = None
+        if ref and ref.get("hit"):
+            self.last_walk["reference"] = (ref.get("ref") or {}).get("title")
+            era = era or str((ref.get("ref") or {}).get("era") or era)
         stim = (
             f"forge run {era} {vision} extract {extracted} "
             f"hops {hops} cores {cores} bias {bias}"
         )
-        trace = self.think(stim, context={"walk": walk, "plan": plan, "era": era})
+        trace = self.think(stim, context={"walk": walk, "plan": plan, "era": era, "reference": (ref or {}).get("ref")})
         from skeleton.cortex.distill import ability_from
         from skeleton.cortex.port import Thought
         observed = Thought(
