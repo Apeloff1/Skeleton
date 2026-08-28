@@ -9,15 +9,21 @@ cold-cache rebuild.
 
 Pure domain with injectable clock; the async loop is opt-in
 (:meth:`MemoryWarmer.start`) and only runs when an event loop exists.
-Persistence is the caller's concern — the backend service's JSON store
-stays backend-side until the adapter cutover (B4).
+
+Persistence is opt-in via ``FillerStore(path=...)``: a JSON snapshot
+(``{"fillers": {key: record}}``) written atomically (tmp + replace) on
+every ``put`` and reloaded on construction. No path → pure in-memory,
+same as before. Format matches the legacy backend store byte-for-byte so
+existing ``mag_fillers.json`` files load unchanged.
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Union
 
 from .prefix_renderer import CAGPrefix
@@ -72,16 +78,47 @@ class Filler:
 
 
 class FillerStore:
-    """In-memory filler registry with builder wiring.
+    """Filler registry with builder wiring and optional JSON persistence.
 
-    Persistence is deliberately out of scope here (pure domain); callers
-    that need restart-survival snapshot ``all()``/``put()`` themselves.
+    ``path`` is optional: with it, the store reloads a prior snapshot on
+    construction and writes atomically on every ``put``; without it the
+    store is purely in-memory. Persistence failures are best-effort — the
+    in-memory copy always continues (a warm cache is an optimization, never
+    a boot blocker).
     """
 
-    def __init__(self, *, clock: Optional[Callable[[], float]] = None) -> None:
+    def __init__(
+        self,
+        path: Optional[Path] = None,
+        *,
+        clock: Optional[Callable[[], float]] = None,
+    ) -> None:
+        self.path = Path(path) if path is not None else None
         self._now = clock or time.time
         self._fillers: Dict[str, Filler] = {}
         self._builders: Dict[str, FillerBuilder] = {}
+        if self.path is not None:
+            self._load()
+
+    def _load(self) -> None:
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8"))  # type: ignore[union-attr]
+            for key, rec in raw.get("fillers", {}).items():
+                self._fillers[key] = Filler(**rec)
+        except Exception:
+            self._fillers = {}
+
+    def _save(self) -> None:
+        if self.path is None:
+            return
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self.path.with_suffix(".tmp")
+            payload = {"fillers": {k: asdict(v) for k, v in self._fillers.items()}}
+            tmp.write_text(json.dumps(payload), encoding="utf-8")
+            tmp.replace(self.path)
+        except Exception:
+            pass  # persistence is best-effort; in-memory copy continues
 
     def register_builder(self, key: str, builder: FillerBuilder,
                          ttl_s: int = DEFAULT_TTL_S) -> None:
@@ -91,6 +128,7 @@ class FillerStore:
 
     def put(self, filler: Filler) -> None:
         self._fillers[filler.key] = filler
+        self._save()
 
     def get(self, key: str) -> Optional[Filler]:
         return self._fillers.get(key)
@@ -110,13 +148,16 @@ class FillerStore:
     def stats(self) -> dict:
         now = self._now()
         fresh = sum(1 for f in self._fillers.values() if f.is_fresh(now))
-        return {
+        stats = {
             "fillers": len(self._fillers),
             "fresh": fresh,
             "stale": len(self._fillers) - fresh,
             "cached_tokens": sum(f.tokens for f in self._fillers.values()),
             "refresh_total": sum(f.refresh_count for f in self._fillers.values()),
         }
+        if self.path is not None:
+            stats["store_path"] = str(self.path)
+        return stats
 
 
 class MemoryWarmer:

@@ -9,19 +9,10 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
   Rule: extend only, read before touching.
 - B4 deploy constraint discovered via backend/Dockerfile: the production image
   copies only `backend/` into /app, so `import skeleton` fails there. All B4
-  cutovers must be guarded shims (skeleton import → local fallback), never
-  hard imports, until the image vendors the skeleton package.
+  cutovers are guarded shims (skeleton import → local fallback), never hard
+  imports, until the image vendors the skeleton package.
 
-## Track A — Interface plane (skeleton/api) — DONE
-
-- [x] A1. routes.py surveyed (f6c7a78).
-- [x] A2. `GET /genesis/handles` + `GET /interface/reranker/stats` (f6c7a78).
-- [x] A-fix. `AppState` declares `cockpit`/`gameforge` as Optional — 500 → 503 (f6c7a78).
-- [x] A3. `api/telemetry.py` optionally mirrors samples onto the kernel bus (31c8541).
-- [x] A4. `IdempotencyGuard` + `X-Idempotency-Key`, mounted on /forge/materialise,
-      /forge/archetype, /gameforge/run, /gameforge/intake (e3eaeca, 3ebed65).
-- [x] A5. `RouteTelemetry` wired into request_id_middleware with the kernel bus;
-      `GET /telemetry/routes` exposes the snapshot (3ebed65).
+## Track A — Interface plane (skeleton/api) — DONE (f6c7a78 → 3ebed65)
 
 ## Track B — Memory/caching convergence (backend ↔ skeleton)
 
@@ -31,19 +22,17 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
       ported as pure domain (51275cb).
 - [x] B3. `skeleton/memory/warmer.py` — services/mag.py preemptive filler
       TTL/warmer ported as pure domain (51275cb).
-- [x] B4a. `backend/services/cag.py` is now a guarded shim: re-exports
-      `skeleton.memory.prefix_renderer` when importable, byte-identical local
-      fallback otherwise (this commit). Verified both branches render the
-      same prefix bytes (same constants + same builder logic).
-- [ ] B4b. `backend/services/mag.py` cutover — BLOCKED: backend FillerStore
-      takes a persistence Path (JSON disk store) which skeleton's FillerStore
-      doesn't accept; port persistence into skeleton/memory/warmer.py first,
-      then shim. Also blocked on image vendoring (see correction log).
+- [x] B4a. `backend/services/cag.py` guarded shim over
+      `skeleton.memory.prefix_renderer` (324db3d).
+- [x] B4b. `skeleton/memory/warmer.py` FillerStore gained opt-in JSON
+      persistence (`path=...`, atomic tmp+replace, byte-compatible with the
+      legacy mag_fillers.json), and `backend/services/mag.py` is now a
+      guarded shim over it (this commit). Module-level API (prime, stats,
+      warm_now, register_default_fillers) preserved on both branches.
 - [ ] B4c. `services/memory_engine.py` collapses into a facade over
-      PrefixRenderer + MemoryWarmer + trinity — after B4b.
+      PrefixRenderer + MemoryWarmer + trinity — small; next session.
 - [ ] B5. Vendor `skeleton/` into the backend image (or set PYTHONPATH) so
-      the guarded shims flip to canonical in prod; flip is a deploy change,
-      not a code change.
+      the guarded shims flip to canonical in prod; deploy change, not code.
 
 ## Track C — Retrieval rank plane — DONE (31c8541)
 
@@ -70,4 +59,5 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 - ✅ api/server.py + api/errors.py restored after bad rewrite (b4790a1)
 - ✅ Track A (f6c7a78, 31c8541, e3eaeca, 3ebed65)
 - ✅ Track B1/B2/B3 memory semantics ported into skeleton/memory (51275cb)
-- ✅ Track B4a services/cag.py guarded shim (this commit)
+- ✅ Track B4a services/cag.py guarded shim (324db3d)
+- ✅ Track B4b warmer persistence + services/mag.py guarded shim (this commit)
