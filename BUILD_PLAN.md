@@ -11,59 +11,46 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
   restored verbatim (b4790a1). Rule going forward: never rewrite an
   existing file for this build plan — extend only, and read before touching.
 
-## Track A — Interface plane (skeleton/api)
+## Track A — Interface plane (skeleton/api) — DONE
 
-- [x] A1. routes.py surveyed — endpoints exist for health, metrics, genesis,
-      capabilities, jeeves, memory, swarm, ledger, scheduler, pipelines,
-      forge, intelligence, resilience, context, gameforge, auth.
-- [x] A2. Added missing handle-introspection endpoints: `GET /genesis/handles`
-      and `GET /interface/reranker/stats` (f6c7a78).
-- [x] A-fix. `AppState` declares `cockpit`/`gameforge` as Optional —
-      `/context/*` and `/gameforge/*` previously raised AttributeError (500)
-      instead of the intended 503 (f6c7a78).
-- [x] A3. `api/telemetry.py` optionally mirrors request samples onto the
-      kernel EventBus (topic `api.request.completed`) (31c8541).
-- [x] A4. `api/idempotency.py` gained `extract_key` + `IdempotencyGuard`
-      (`X-Idempotency-Key` header → replay recorded payload). Mounting on
-      forge/materialise + gameforge POST handlers is the remaining step;
-      needs a Request-typed param on those handlers (this commit).
-- [ ] A5. Wire a `RouteTelemetry(bus=state.bus)` instance into
-      request_id_middleware so A3 actually emits at runtime.
+- [x] A1. routes.py surveyed (f6c7a78).
+- [x] A2. `GET /genesis/handles` + `GET /interface/reranker/stats` (f6c7a78).
+- [x] A-fix. `AppState` declares `cockpit`/`gameforge` as Optional — 500 → 503 (f6c7a78).
+- [x] A3. `api/telemetry.py` optionally mirrors samples onto the kernel bus (31c8541).
+- [x] A4. `IdempotencyGuard` + `X-Idempotency-Key`, mounted on /forge/materialise,
+      /forge/archetype, /gameforge/run, /gameforge/intake (e3eaeca, 3ebed65).
+- [x] A5. `RouteTelemetry` wired into request_id_middleware with the kernel bus;
+      `GET /telemetry/routes` exposes the snapshot (3ebed65).
 
 ## Track B — Memory/caching convergence (backend ↔ skeleton)
 
-Decision required before surgery: backend `services/memory_engine.py` stack
-is LIVE (routes.memory_engine → services {cag, mag, rag_service}). Two
-architectures overlap:
+- [x] B1. Ownership decided (default): skeleton/memory owns semantics;
+      backend services become thin adapters over it.
+- [x] B2. `skeleton/memory/prefix_renderer.py` — the services/cag.py prefix
+      engine (PrefixSegment, CAGPrefix, build_prefix, PrefixRegistry,
+      PrefixRenderer, compose_prompt) ported as pure domain, single-sourcing
+      the Jeeves prefix text (this commit).
+- [x] B3. `skeleton/memory/warmer.py` — the services/mag.py preemptive
+      filler TTL/warmer (Filler, FillerStore, MemoryWarmer) ported as pure
+      domain with injectable clock; persistence stays caller-side
+      (this commit).
+- [ ] B4. Cutover: `backend/services/cag.py` + `services/mag.py` become
+      re-export shims over the skeleton modules, and
+      `services/memory_engine.py` collapses into a facade over
+      PrefixRenderer + MemoryWarmer + trinity. Deferred — backend stack is
+      live; needs a verification pass (prefix byte-identity) before shimming.
 
-- skeleton/memory: RAG TF-IDF store, CAG persona store, MAG episodic store
-- backend/services: CAG prefix renderer, MAG KV-cache fillers, RAG ChromaDB
+## Track C — Retrieval rank plane — DONE
 
-- [ ] B1. Decide ownership: skeleton/memory becomes canonical for semantics;
-      backend services become thin HTTP-era adapters.
-- [ ] B2. Port `services/cag.py` prefix rendering INTO
-      `skeleton/memory/cag.py` as a sibling concern (PrefixRenderer class).
-- [ ] B3. Port `services/mag.py` filler TTL/warmer INTO a new
-      `skeleton/memory/warmer.py`.
-- [ ] B4. `services/memory_engine.py` collapses into
-      `skeleton/memory/trinity.py`; MemoryEngine becomes a facade re-export.
-
-## Track C — Retrieval rank plane
-
-- [x] C1. `retrieval/pipeline.py` accepts optional rule `Reranker`,
-      `FeatureReranker`, and `Ranker` stages; fixed order
-      (rule-boost → feature-rerank → diversity-rank) (31c8541).
-- [x] C2. Stage order documented in module docstring; stages optional (31c8541).
+- [x] C1. `retrieval/pipeline.py` optional rule/feature/diversity stages,
+      fixed order (31c8541).
+- [x] C2. Stage order documented; stages optional (31c8541).
 
 ## Track D — Kernel queue convergence
 
-- [ ] D1. Migrate lane-based consumers to `WorkQueue`; keep `workqueue.py`
-      and `fair_queue.py` shims until the rename pass, then collapse.
-- [x] D2. `WorkQueue` now supports optional per-submitter caps
-      (`per_submitter_cap` + `SubmitterCapError`) and deadline expiry
-      (`WorkItem.deadline`; expired items retire silently, counted under
-      `stats().expired`). Opt-in; default construction is unchanged
-      (this commit).
+- [ ] D1. Migrate lane-based consumers to `WorkQueue`; collapse shims at the
+      rename pass.
+- [x] D2. `WorkQueue` optional per-submitter caps + deadline expiry (e3eaeca).
 
 ## Track E — Cleanup pass (deferred, requires local git ops)
 
@@ -82,4 +69,6 @@ architectures overlap:
 - ✅ api/server.py + api/errors.py restored after bad rewrite (b4790a1)
 - ✅ Track A1/A2 + AppState cockpit/gameforge fix (f6c7a78)
 - ✅ Track A3 telemetry bus mirror + Track C1/C2 rank-stage pipeline (31c8541)
-- ✅ Track A4 idempotency guard + Track D2 queue policies (this commit)
+- ✅ Track A4 idempotency guard + Track D2 queue policies (e3eaeca)
+- ✅ Track A5 telemetry wiring + A4 mounting (3ebed65)
+- ✅ Track B1/B2/B3 memory semantics ported into skeleton/memory (this commit)
