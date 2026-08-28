@@ -31,7 +31,10 @@ class PrefrontalCortex:
     def __init__(self, *, span: int = 7) -> None:
         self.memory: deque[str] = deque(maxlen=max(3, span))
         from skeleton.cortex.learned import LearnedWeights
-        self.weights = LearnedWeights(order=2, dim=12, seed=2, attn=False)
+        # Small LM: n-gram + 1-layer transformer (no FFN). Boilerplate stays the think() spine.
+        self.weights = LearnedWeights(
+            order=2, dim=8, seed=2, attn=True, ctx=4, n_heads=1, n_layers=1, d_ff=0,
+        )
 
     @property
     def lm(self):
@@ -41,11 +44,23 @@ class PrefrontalCortex:
     def neural(self):
         return self.weights.neural
 
+    @property
+    def transformer(self):
+        return self.weights.transformer
+
     def fit(self, text: str) -> int:
         return self.weights.fit(text)
 
     def snapshot(self) -> dict:
         return self.weights.snapshot()
+
+    def perplexity(self, texts) -> float:
+        xf = self.transformer
+        if xf is not None and hasattr(xf, "perplexity"):
+            return float(xf.perplexity(texts))
+        if hasattr(self.lm, "perplexity"):
+            return float(self.lm.perplexity(texts))
+        return float("inf")
 
     def think(self, stimulus: str, context: Dict[str, Any]) -> Thought:
         text = (stimulus or "").strip()
@@ -68,6 +83,11 @@ class PrefrontalCortex:
             conf = 0.95
         else:
             body = " | ".join(steps)
+            xf = self.transformer
+            if xf is not None and hasattr(xf, "decode"):
+                draft = str(xf.decode(text, n=6, seed=2) or "").strip()
+                if draft:
+                    body = body + " | DRAFT " + draft
             tags = ("plan", "boilerplate", "small")
             conf = 0.72 + min(0.2, len(tokens(text)) / 80.0)
         return Thought(

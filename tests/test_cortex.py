@@ -1356,4 +1356,30 @@ class TestQueue17:
         assert "neo_rms" in card["succession"]
 
 
+class TestQueue18:
+    def test_pfc_owns_small_transformer(self):
+        from skeleton.cortex.pfc import PrefrontalCortex
+        from skeleton.cortex.curriculum import CORE_PAIRS
+        pfc = PrefrontalCortex()
+        xf = pfc.transformer
+        assert xf is not None
+        assert xf.n_layers == 1 and xf.n_heads == 1 and xf.d_ff == 0 and xf.ctx == 4
+        texts = [a for a, _ in list(CORE_PAIRS)[:6]]
+        ppl = pfc.perplexity(texts)
+        assert ppl < 1e8
+        pfc.fit("plan tensor ttk lattice")
+        assert xf.steps >= 1
+        t = pfc.think("plan tensor ttk", {"era": "extraction_now"})
+        assert "PLAN" in t.text and "DRAFT" in t.text
+
+    def test_train_advances_pfc_zaibatsu_mouth(self):
+        from skeleton.cortex import JeevesCortex
+        from skeleton.cortex.zaibatsu import tournament
+        neo = JeevesCortex()
+        neo.train(epochs=1)
+        card = tournament(neo)
+        assert card["mouths"]["pfc"]["steps"] > 0
+        assert card["mouths"]["pfc"]["finite"] is True
+
+
 

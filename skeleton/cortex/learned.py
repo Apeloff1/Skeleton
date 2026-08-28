@@ -27,6 +27,9 @@ class LearnedWeights:
         seed: int = 0,
         attn: bool = False,
         ctx: int = 6,
+        n_heads: int = 1,
+        n_layers: int = 1,
+        d_ff: int = 0,
     ) -> None:
         vocab = gameforge_vocab()
         self.lm = NGramLM(order=order, vocab=vocab)
@@ -36,6 +39,7 @@ class LearnedWeights:
             from skeleton.cortex.transformer import TinyTransformer
             self.transformer = TinyTransformer(
                 vocab=vocab, dim=min(8, dim), ctx=ctx, seed=seed + 17,
+                n_heads=n_heads, n_layers=n_layers, d_ff=d_ff,
             )
 
     def fit(self, text: str) -> int:
