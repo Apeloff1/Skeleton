@@ -9,7 +9,7 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 - B4/B5 deploy constraint discovered via backend/Dockerfile + compose: image
   originally vendored only backend/. Shims guarded; B5 vendored skeleton/.
 
-## Track A — Interface plane (skeleton/api) — DONE (f6c7a78 → 3ebed65)
+## Track A — Interface plane — DONE (f6c7a78 → 3ebed65)
 
 ## Track B — Memory/caching convergence — DONE (51275cb → 48963bd)
 
@@ -21,24 +21,15 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 
 ## Track G — Swarm/mesh audit — DONE (972b802, e6e765b)
 
-## Track H — Context/gameforge wiring — DONE (df7fbcd)
+## Track H — Context/gameforge wiring + import audit — DONE (df7fbcd, a5abbdc)
 
-- [x] H1. Discovered `skeleton/context/` (cockpit, tensor, helix, ledger,
-      oracle, snowball, questionnaire, ten-stage pipeline) and
-      `skeleton/cortex/` (44-module ML substrate) — packages absent from the
-      original tree map.
-- [x] H2. `state.cockpit`/`state.gameforge` were Optional-but-never-wired,
-      so `/context/*` and `/gameforge/*` 503'd permanently. Lifespan now
-      constructs one shared Cockpit and a GameForgeRun over it (df7fbcd).
-- [x] H3. Lazy-import contract verified: `api/oauth.py`,
-      `context/questionnaire.py`, `observability.probe`, `vault.ShamirSeal`,
-      `MemoryTrinity.query_unified` all resolve; `fusion_contribution` field
-      confirmed on MemoryQueryResult.
-- [ ] H4. Wire the quad retriever endpoint (`POST /api/v1/retrieval/query`
-      over genesis `quad` handle) — small additive route; next pass.
-- [ ] H5. Cortex (44 modules) is unwired: neocortex/lm/heads/moe have no
-      genesis phase and no API surface. Needs its own design pass — big
-      enough to be its own track.
+- [x] H1–H3. context/cortex mapped, Cockpit+GameForgeRun wired into lifespan,
+      lazy-import contract verified (df7fbcd).
+- [x] H4. Quad retriever endpoints live: `POST /retrieval/query` (RRF over
+      RAG/CAG/MAG/KAG, plane stats included) and `POST /retrieval/ingest`
+      (chunk + index documents) over the genesis `quad` handle (a5abbdc).
+- [ ] H5. Cortex (44 modules) unwired: neocortex/lm/heads/moe have no genesis
+      phase and no API surface. Needs its own design pass — own track.
 
 ## Track E — Cleanup pass (deferred, requires local git ops)
 
@@ -56,9 +47,9 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
       three raise paths, majority pass, BFT happy path).
 - [ ] Run both suites in CI/local; then `docker compose build backend` and
       confirm the `jeeves:system` prefix SHA is unchanged after the B5 flip;
-      then a live smoke: `GET /api/v1/context/snapshot` (was 503, should now
-      return the cockpit snapshot) and a `POST /api/v1/gameforge/run` with a
-      small vision.
+      then live smokes: `GET /api/v1/context/snapshot` (was 503), a small
+      `POST /api/v1/gameforge/run`, and `POST /api/v1/retrieval/query` after
+      an ingest.
 
 ## Completed cuts (ledger)
 
@@ -73,4 +64,5 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 - ✅ Track D1 audit closed (9622493)
 - ✅ Track F quad bus-contract fix + genesis wiring (5a4d78a)
 - ✅ Track G swarm consensus ballot/AgentId fixes + mesh boundary (972b802, e6e765b)
-- ✅ Track H context/gameforge wiring + import contract audit (df7fbcd, this commit)
+- ✅ Track H context/gameforge wiring + import audit (df7fbcd)
+- ✅ H4 quad retrieval endpoints (a5abbdc)
