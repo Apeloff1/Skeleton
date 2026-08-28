@@ -81,11 +81,17 @@ class Thought:
 
 
 class ModelPort(Protocol):
+    """The only seam. Bind anything that speaks this surface."""
+
     name: str
     scale: str
     slot: str
 
     def think(self, stimulus: str, context: Dict[str, Any]) -> Thought: ...
+    def fit(self, text: str) -> int: ...
+    def decode(self, stimulus: str, *, n: int = 8, seed: int = 0) -> str: ...
+    def snapshot(self) -> Dict[str, Any]: ...
+    def perplexity(self, texts: Iterable[str]) -> float: ...
 
 
 class EchoBackend:
@@ -102,6 +108,23 @@ class EchoBackend:
             text=f"ECHO[{self.slot}] {(stimulus or '')[:160]}",
             confidence=1.0, tags=("echo", self.slot),
         )
+
+    def fit(self, text: str) -> int:
+        return 0
+
+    def decode(self, stimulus: str, *, n: int = 8, seed: int = 0) -> str:
+        return f"ECHO[{self.slot}] {(stimulus or '')[: max(1, int(n) * 8)]}"
+
+    def snapshot(self) -> Dict[str, Any]:
+        return {"kind": "echo", "slot": self.slot, "name": self.name}
+
+    @classmethod
+    def from_snapshot(cls, data: Dict[str, Any], *, slot: str | None = None) -> "EchoBackend":
+        sl = slot or str((data or {}).get("slot") or "left")
+        return cls(slot=sl, name=str((data or {}).get("name") or "echo"))
+
+    def perplexity(self, texts: Iterable[str]) -> float:
+        return 1.0
 
 
 class CallableBackend:
@@ -136,3 +159,21 @@ class CallableBackend:
             text=text, confidence=0.7,
             tags=tuple(tags), numbers=numbers,
         )
+
+    def fit(self, text: str) -> int:
+        return 0
+
+    def decode(self, stimulus: str, *, n: int = 8, seed: int = 0) -> str:
+        thought = self.think(stimulus or "", {})
+        return (thought.text or "")[: max(1, int(n) * 12)]
+
+    def snapshot(self) -> Dict[str, Any]:
+        return {"kind": "callable", "slot": self.slot, "name": self.name, "scale": self.scale}
+
+    @classmethod
+    def from_snapshot(cls, data: Dict[str, Any], *, slot: str | None = None) -> "CallableBackend":
+        sl = slot or str((data or {}).get("slot") or "left")
+        return cls(lambda s, c: f"ECHO[{sl}] {s}", slot=sl, name=str((data or {}).get("name") or "injected"))
+
+    def perplexity(self, texts: Iterable[str]) -> float:
+        return 1.0

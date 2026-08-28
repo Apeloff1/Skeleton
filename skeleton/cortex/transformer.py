@@ -854,6 +854,12 @@ class TransformerBackend:
         snap["kind"] = "transformer"
         return snap
 
+    def decode(self, stimulus: str, *, n: int = 8, seed: int = 0) -> str:
+        return str(self.lm.decode(stimulus or "", n=n, seed=seed))
+
+    def perplexity(self, texts) -> float:
+        return float(self.lm.perplexity(texts))
+
     @classmethod
     def from_snapshot(cls, data: Dict[str, Any], *, slot: str | None = None) -> "TransformerBackend":
         lm = TinyTransformer.from_snapshot(data or {})

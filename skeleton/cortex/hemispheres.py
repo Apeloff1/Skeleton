@@ -52,6 +52,19 @@ class LeftHemisphere:
             return float(xf.perplexity(texts))
         return float("inf")
 
+    def decode(self, stimulus: str, *, n: int = 8, seed: int = 0) -> str:
+        xf = self.transformer
+        if xf is not None and hasattr(xf, "decode"):
+            return str(xf.decode(stimulus or "", n=n, seed=seed))
+        return (stimulus or "")[:160]
+
+    @classmethod
+    def from_snapshot(cls, data, *, slot: str | None = None) -> "LeftHemisphere":
+        obj = cls()
+        if data:
+            obj.weights.restore(data)
+        return obj
+
     def think(self, stimulus: str, context: Dict[str, Any]) -> Thought:
         text = stimulus or ""
         nums = tuple(float(x) for x in _NUM.findall(text)[:8])
@@ -133,6 +146,19 @@ class RightHemisphere:
         if xf is not None and hasattr(xf, "perplexity"):
             return float(xf.perplexity(texts))
         return float("inf")
+
+    def decode(self, stimulus: str, *, n: int = 8, seed: int = 0) -> str:
+        xf = self.transformer
+        if xf is not None and hasattr(xf, "decode"):
+            return str(xf.decode(stimulus or "", n=n, seed=seed))
+        return (stimulus or "")[:160]
+
+    @classmethod
+    def from_snapshot(cls, data, *, slot: str | None = None) -> "RightHemisphere":
+        obj = cls()
+        if data:
+            obj.weights.restore(data)
+        return obj
 
     def think(self, stimulus: str, context: Dict[str, Any]) -> Thought:
         text = (stimulus or "").lower()

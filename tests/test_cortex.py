@@ -1480,4 +1480,36 @@ class TestQueue22:
         assert len(neo._tract_hidden("left", "ttk")) == neo.callosum.dim
 
 
+class TestQueue23:
+    def test_every_local_mouth_speaks_the_seam(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        texts = ["plan tensor ttk", "ttk hp dps"]
+        for slot in ("pfc", "midbrain", "left", "right"):
+            port = neo.slots[slot]
+            assert callable(port.fit) and callable(port.decode)
+            assert callable(port.snapshot) and callable(port.perplexity)
+            p0 = port.perplexity(texts)
+            snap = port.snapshot()
+            restored = type(port).from_snapshot(snap)
+            p1 = restored.perplexity(texts)
+            assert p0 < 1e8 and abs(p0 - p1) < 1e-6
+            assert port.decode("plan tensor ttk", n=4)
+
+    def test_bind_echo_then_local_changes_the_mouth(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        local_decode = neo.slots["left"].decode("ttk hp dps", n=4, seed=1)
+        neo.bind_echo("left")
+        echo_t = neo.slots["left"].think("ttk hp dps", {})
+        echo_d = neo.slots["left"].decode("ttk hp dps", n=4)
+        assert "ECHO" in echo_t.text and echo_d.startswith("ECHO")
+        neo.bind_local("left")
+        local_t = neo.slots["left"].think("ttk hp dps", {"pack_dps": 108.0})
+        again = neo.slots["left"].decode("ttk hp dps", n=4, seed=1)
+        assert "ECHO" not in local_t.text
+        assert "HP = DPS × TTK" in local_t.text
+        assert again == local_decode
+
+
 

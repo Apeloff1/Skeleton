@@ -196,6 +196,16 @@ class LanguageModelBackend:
         snap["scale"] = self.scale
         return snap
 
+    def decode(self, stimulus: str, *, n: int = 8, seed: int = 0) -> str:
+        if hasattr(self.lm, "generate"):
+            return " ".join(self.lm.generate(stimulus or "", n=n))
+        return (stimulus or "")[:160]
+
+    def perplexity(self, texts) -> float:
+        if hasattr(self.lm, "perplexity"):
+            return float(self.lm.perplexity(texts))
+        return float("inf")
+
     @classmethod
     def from_snapshot(cls, data: Dict[str, Any], *, slot: str | None = None) -> "LanguageModelBackend":
         lm = NGramLM.from_snapshot(data or {})

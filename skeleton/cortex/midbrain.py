@@ -73,6 +73,19 @@ class Midbrain:
             return float(self.lm.perplexity(texts))
         return float("inf")
 
+    def decode(self, stimulus: str, *, n: int = 8, seed: int = 0) -> str:
+        xf = self.transformer
+        if xf is not None and hasattr(xf, "decode"):
+            return str(xf.decode(stimulus or "", n=n, seed=seed))
+        return (stimulus or "")[:160]
+
+    @classmethod
+    def from_snapshot(cls, data, *, slot: str | None = None) -> "Midbrain":
+        obj = cls()
+        if data:
+            obj.weights.restore(data)
+        return obj
+
     def think(self, stimulus: str, context: Dict[str, Any]) -> Thought:
         arousal, lw, rw = _weights(stimulus or "")
         to_left = lw >= 0.25
