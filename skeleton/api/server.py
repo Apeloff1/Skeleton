@@ -32,6 +32,7 @@ from skeleton.pipelines.game_logic import GameLogicPipeline
 from skeleton.pipelines.animation import AnimationPipeline
 from skeleton.observability import HealthRegistry, MetricsRegistry, Tracer, probe
 from skeleton.vault import AuditLog, ShamirSeal
+from skeleton.api.telemetry import RouteTelemetry
 
 
 class AppState:
@@ -61,6 +62,9 @@ class AppState:
         self.audit: Optional[AuditLog] = None
         self.seal: Optional[ShamirSeal] = None
         self.started_at: Optional[float] = None
+        # Per-route request telemetry; mirrors onto the kernel bus once the
+        # bus exists so observability/anomaly sees API traffic (A5).
+        self.route_telemetry = RouteTelemetry()
         # Optional planes referenced by routes but not wired in lifespan yet —
         # declared here so the route-layer ``_require`` 503s cleanly instead
         # of raising AttributeError (previously a 500 on /context/*, /gameforge/*).
@@ -103,6 +107,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     genesis = Genesis(seed=1337).boot()
     state.genesis = genesis
     state.bus = genesis.bus
+    state.route_telemetry = RouteTelemetry(bus=state.bus)
     state.registry = bootstrap_registry(state.bus)
     state.ledger = ActivityLedger()
     state.mesh = AgentMesh(bus=state.bus)
@@ -183,7 +188,15 @@ async def request_id_middleware(request: Request, call_next: Any) -> Any:
     duration = time.time() - start
     response.headers["X-Request-ID"] = request_id
     response.headers["X-Response-Time"] = f"{duration:.3f}s"
-    metrics = get_state().metrics
+    state = get_state()
+    if state.route_telemetry is not None:
+        try:
+            state.route_telemetry.record(
+                request.url.path, duration * 1000, error=response.status_code >= 500
+            )
+        except Exception:
+            pass
+    metrics = state.metrics
     if metrics is not None:
         try:
             metrics.counter("http.requests", "HTTP requests").inc()
@@ -243,6 +256,10 @@ def create_app() -> FastAPI:
         if state.metrics is None:
             return {"counters": {}, "gauges": {}, "histograms": {}}
         return state.metrics.snapshot()
+
+    @app.get("/telemetry/routes")
+    async def route_telemetry() -> Dict[str, Any]:
+        return get_state().route_telemetry.snapshot()
 
     @app.get("/")
     async def root() -> Dict[str, str]:

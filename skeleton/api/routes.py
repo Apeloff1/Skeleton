@@ -4,12 +4,17 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
+from skeleton.api.idempotency import IdempotencyGuard
 from skeleton.api.server import get_state
 from skeleton.jeeves.core import SessionMode
 
 router = APIRouter()
+
+# Idempotency for retry-sensitive POSTs (forge materialise, gameforge runs):
+# a client retry replays the first recorded response instead of re-executing.
+_idempotency = IdempotencyGuard()
 
 
 def _state():
@@ -224,14 +229,19 @@ async def forge_blueprint(request: Dict[str, Any], state=Depends(_state)) -> Dic
 
 
 @router.post("/forge/materialise")
-async def forge_materialise(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+async def forge_materialise(http_request: Request, request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    replay = _idempotency.replay(dict(http_request.headers))
+    if replay is not None:
+        return replay  # type: ignore[return-value]
     forge = _require(state.forge, "Forge")
     bp = forge.new_blueprint(request.get("name", "unnamed"))
     for comp in request.get("components", []):
         forge.instantiate(bp, comp["kind"], comp["instance_id"], config=comp.get("config"))
     for wire in request.get("wires", []):
         bp.connect(tuple(wire["from"]), tuple(wire["to"]))
-    return {"artefact": forge.materialise(bp, era=request.get("era", "extraction_now"), target=request.get("target", "json")), "status": "materialised"}
+    response = {"artefact": forge.materialise(bp, era=request.get("era", "extraction_now"), target=request.get("target", "json")), "status": "materialised"}
+    _idempotency.remember(dict(http_request.headers), response)
+    return response
 
 
 @router.get("/forge/kinds")
@@ -246,7 +256,10 @@ async def forge_eras() -> Dict[str, Any]:
 
 
 @router.post("/forge/archetype")
-async def forge_archetype(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+async def forge_archetype(http_request: Request, request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    replay = _idempotency.replay(dict(http_request.headers))
+    if replay is not None:
+        return replay  # type: ignore[return-value]
     from skeleton.forge.archetypes import default_library
     forge = _require(state.forge, "Forge")
     name = request.get("name", "extraction")
@@ -254,7 +267,9 @@ async def forge_archetype(request: Dict[str, Any], state=Depends(_state)) -> Dic
     target = request.get("target", "godot")
     bp = default_library().build(forge, name)
     artefact = forge.materialise(bp, era=era, target=target)
-    return {"blueprint_id": bp.blueprint_id, "artefact": artefact, "status": "materialised"}
+    response = {"blueprint_id": bp.blueprint_id, "artefact": artefact, "status": "materialised"}
+    _idempotency.remember(dict(http_request.headers), response)
+    return response
 
 
 @router.post("/intelligence/reason")
@@ -296,7 +311,10 @@ async def context_command(request: Dict[str, Any], state=Depends(_state)) -> Dic
 
 
 @router.post("/gameforge/run")
-async def gameforge_run(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+async def gameforge_run(http_request: Request, request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    replay = _idempotency.replay(dict(http_request.headers))
+    if replay is not None:
+        return replay  # type: ignore[return-value]
     runner = _require(state.gameforge, "GameForge")
     out = runner.execute(
         request.get("vision", ""),
@@ -310,11 +328,15 @@ async def gameforge_run(request: Dict[str, Any], state=Depends(_state)) -> Dict[
     out["file_names"] = sorted(files)
     if not request.get("include_files"):
         out.pop("files", None)
+    _idempotency.remember(dict(http_request.headers), out)
     return out
 
 
 @router.post("/gameforge/intake")
-async def gameforge_intake(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+async def gameforge_intake(http_request: Request, request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    replay = _idempotency.replay(dict(http_request.headers))
+    if replay is not None:
+        return replay  # type: ignore[return-value]
     from skeleton.context.questionnaire import intake
     taken = intake(request.get("answers") or {})
     runner = _require(state.gameforge, "GameForge")
@@ -333,6 +355,7 @@ async def gameforge_intake(request: Dict[str, Any], state=Depends(_state)) -> Di
     out["file_names"] = sorted(files)
     if not request.get("include_files"):
         out.pop("files", None)
+    _idempotency.remember(dict(http_request.headers), out)
     return out
 
 
