@@ -142,6 +142,9 @@ class TestPipelineAndCockpit:
         assert out["succeeded"]
         assert out["cortex"]["amalgam"]["kind"] == "amalgam"
         assert out["cortex"]["fingerprint"]
+        like = GameForgeRun().execute("like elden ring forge a pack")
+        assert like["succeeded"]
+        assert like.get("reference") == "Elden Ring" or like.get("era") == "soulslike"
 
     def test_cockpit_think_and_bind_slot(self):
         from skeleton.context.cockpit import Cockpit

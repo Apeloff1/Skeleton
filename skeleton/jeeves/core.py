@@ -185,6 +185,15 @@ class Jeeves:
     def cortex(self, value) -> None:
         self._cortex = value
 
+    def refer(self, stimulus: str, *, live: bool = False):
+        return self.cortex.refer(stimulus, live=live)
+
+    def improve(self, stimulus: str, *, rounds: int = 16):
+        return self.cortex.improve(stimulus, rounds=rounds)
+
+    def ascend(self, stimulus: str, *, rounds: int = 8):
+        return self.cortex.ascend(stimulus, rounds=rounds)
+
     def think(self, stimulus: str, *, context: dict[str, Any] | None = None):
         """Neocortex think — the model in training, not a chat wrapper."""
         trace = self.cortex.think(stimulus, context)

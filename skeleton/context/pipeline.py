@@ -61,6 +61,16 @@ class GameForgeRun:
             cockpit.tensor = taken.tensor
         if generation is None:
             generation = getattr(cockpit, "generation", None)
+        try:
+            from skeleton.cortex.refs import lookup
+            hit = lookup(vision or "")
+        except Exception:
+            hit = None
+        if hit:
+            era = era or str(hit.get("era") or era)
+            extra = str(hit.get("dialect") or "")
+            if extra and extra not in (vision or ""):
+                vision = f"{vision} {extra}".strip()
         ctx: Dict[str, Any] = {
             "vision": vision or "",
             "era_hint": era,
@@ -73,6 +83,7 @@ class GameForgeRun:
             "jeeves": self.jeeves,
             "blend": blend,
             "generation": generation,
+            "reference": hit,
         }
         stages = [
             Stage("ingest", _stage_ingest),
@@ -92,6 +103,7 @@ class GameForgeRun:
             "succeeded": run.succeeded,
             "era": run.context.get("era"),
             "generation": run.context.get("generation"),
+            "reference": (run.context.get("reference") or {}).get("title") if isinstance(run.context.get("reference"), dict) else None,
             "mass": cockpit.snowball.mass,
             "complete": cockpit.snowball.complete,
             "tensor": cockpit.tensor.to_dict(),
