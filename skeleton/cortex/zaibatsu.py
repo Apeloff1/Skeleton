@@ -72,6 +72,8 @@ def tournament(neo, *, texts=None) -> Dict[str, Any]:
 
     mouths["pfc"] = _entry("pfc", pfc_lm, "small", 0)
     mouths["midbrain"] = _entry("midbrain", mid_lm, "medium", 1)
+    mouths["left"] = _entry("left", _mouth(neo, "left"), "hemisphere", 1)
+    mouths["right"] = _entry("right", _mouth(neo, "right"), "hemisphere", 1)
     mouths["neo"] = _entry("neo", neo_lm, "neo", 2)
     mouths["neo_rms"] = _entry("neo_rms", getattr(neo, "neo_rms", None), "neo-rms", 2)
 
@@ -92,8 +94,10 @@ def tournament(neo, *, texts=None) -> Dict[str, Any]:
         "seal": card,
         "metrics": scored,
         "succession": {
-            "pfc": "draft / boilerplate n-gram",
-            "midbrain": "coordinator causal attn n_layers=1",
+            "pfc": "draft / boilerplate 1-layer small LM",
+            "midbrain": "coordinator causal attn n_layers=1 n_heads=2",
+            "left": "analytic LM — TTK / mix / oracle",
+            "right": "gestalt LM — era / soul / bias",
             "neo": "hivemind stacked Pre-LN GELU n_layers=2",
             "neo_rms": "second neo RMSNorm+SwiGLU n_layers=2",
             "rule": "acquire copies the MODEL; surpass answers from neo; hive pull inherits the house; --mouth rms speaks the second neo",

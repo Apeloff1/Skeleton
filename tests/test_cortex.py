@@ -1087,7 +1087,7 @@ class TestZaibatsuLM:
         neo = JeevesCortex()
         card = tournament(neo)
         assert card["house"] == "mishima-zaibatsu"
-        assert card["winner"] in {"pfc", "midbrain", "neo", "neo_rms"}
+        assert card["winner"] in {"pfc", "midbrain", "left", "right", "neo", "neo_rms"}
         assert card["mouths"]["neo"]["n_layers"] >= 2
         assert card["mouths"]["midbrain"]["n_layers"] <= 2
         assert card["seal"]["n_layers"] >= 2
@@ -1410,6 +1410,47 @@ class TestQueue19:
         assert card["mouths"]["midbrain"]["n_layers"] == 1
         assert card["mouths"]["midbrain"]["steps"] > 0
         assert card["mouths"]["midbrain"]["finite"] is True
+
+
+class TestQueue20Queue21:
+    def test_left_is_analytic_lm(self):
+        from skeleton.cortex.hemispheres import LeftHemisphere
+        left = LeftHemisphere()
+        xf = left.transformer
+        assert xf is not None and xf.n_layers == 1 and xf.n_heads == 2
+        left.fit("HP = DPS × TTK mix trash elite boss ttk oracle")
+        left.fit("compile ttk hp dps recipe 108")
+        t = left.think("ttk 1.5 elite", {"pack_dps": 108.0, "pack_ttk": {"trash": 1.1}})
+        assert "HP = DPS × TTK" in t.text
+        assert "108" in t.text
+        assert "DRAFT" in t.text
+        assert xf.steps >= 1
+        assert left.perplexity(["HP = DPS × TTK", "ttk hp dps mix"]) < 1e8
+
+    def test_right_is_gestalt_lm(self):
+        from skeleton.cortex.hemispheres import RightHemisphere
+        right = RightHemisphere()
+        xf = right.transformer
+        assert xf is not None and xf.n_layers == 1
+        right.fit("era soul dread cozy intimacy spatial gestalt")
+        right.fit("soulslike extraction walk heat bias")
+        t = right.think("era feel spatial gestalt dread cozy intimacy", {"era": "soulslike"})
+        assert "like soulslike" in t.text
+        assert "DRAFT" in t.text
+        assert xf.steps >= 1
+        assert right.perplexity(["era soul dread", "cozy intimacy spatial"]) < 1e8
+
+    def test_train_seats_both_hemispheres(self):
+        from skeleton.cortex import JeevesCortex
+        from skeleton.cortex.zaibatsu import tournament
+        neo = JeevesCortex()
+        neo.train(epochs=1)
+        card = tournament(neo)
+        assert card["mouths"]["left"]["steps"] > 0
+        assert card["mouths"]["right"]["steps"] > 0
+        assert card["mouths"]["left"]["n_layers"] == 1
+        assert card["mouths"]["right"]["n_layers"] == 1
+        assert "left" in card["succession"] and "right" in card["succession"]
 
 
 

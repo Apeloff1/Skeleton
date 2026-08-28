@@ -23,7 +23,10 @@ class LeftHemisphere:
 
     def __init__(self) -> None:
         from skeleton.cortex.learned import LearnedWeights
-        self.weights = LearnedWeights(order=2, dim=12, seed=11, attn=False)
+        self.weights = LearnedWeights(
+            order=2, dim=8, seed=11, attn=True, ctx=6,
+            n_heads=2, n_layers=1, d_ff=16,
+        )
 
     @property
     def lm(self):
@@ -33,11 +36,21 @@ class LeftHemisphere:
     def neural(self):
         return self.weights.neural
 
+    @property
+    def transformer(self):
+        return self.weights.transformer
+
     def fit(self, text: str) -> int:
         return self.weights.fit(text)
 
     def snapshot(self) -> dict:
         return self.weights.snapshot()
+
+    def perplexity(self, texts) -> float:
+        xf = self.transformer
+        if xf is not None and hasattr(xf, "perplexity"):
+            return float(xf.perplexity(texts))
+        return float("inf")
 
     def think(self, stimulus: str, context: Dict[str, Any]) -> Thought:
         text = stimulus or ""
@@ -69,6 +82,11 @@ class LeftHemisphere:
         conf = 0.62 + min(0.3, (len(props) + ntok / 40.0) / 8.0)
         mix = (float(trash), float(elite), float(boss))
         dps_n = (float(dps),) if isinstance(dps, (int, float)) else ()
+        xf = self.transformer
+        if xf is not None and hasattr(xf, "decode"):
+            draft = str(xf.decode(text or "ttk dps hp", n=5, seed=11) or "").strip()
+            if draft:
+                props.append("DRAFT " + draft)
         return Thought(
             slot="left", kind="analytic",
             text=" ; ".join(props),
@@ -87,7 +105,10 @@ class RightHemisphere:
 
     def __init__(self) -> None:
         from skeleton.cortex.learned import LearnedWeights
-        self.weights = LearnedWeights(order=2, dim=12, seed=13, attn=False)
+        self.weights = LearnedWeights(
+            order=2, dim=8, seed=13, attn=True, ctx=6,
+            n_heads=2, n_layers=1, d_ff=16,
+        )
 
     @property
     def lm(self):
@@ -97,11 +118,21 @@ class RightHemisphere:
     def neural(self):
         return self.weights.neural
 
+    @property
+    def transformer(self):
+        return self.weights.transformer
+
     def fit(self, text: str) -> int:
         return self.weights.fit(text)
 
     def snapshot(self) -> dict:
         return self.weights.snapshot()
+
+    def perplexity(self, texts) -> float:
+        xf = self.transformer
+        if xf is not None and hasattr(xf, "perplexity"):
+            return float(xf.perplexity(texts))
+        return float("inf")
 
     def think(self, stimulus: str, context: Dict[str, Any]) -> Thought:
         text = (stimulus or "").lower()
@@ -136,6 +167,11 @@ class RightHemisphere:
             bits.append(f"face={hottest}")
         if top:
             bits.append("axes " + ",".join(f"{k}:{v:.2f}" for k, v in top))
+        xf = self.transformer
+        if xf is not None and hasattr(xf, "decode"):
+            draft = str(xf.decode(text or "era soul dread", n=5, seed=13) or "").strip()
+            if draft:
+                bits.append("DRAFT " + draft)
         conf = 0.60 + min(0.3, (1 if era else 0) * 0.1 + len(top) * 0.06)
         return Thought(
             slot="right", kind="gestalt",
