@@ -1,5 +1,5 @@
 """
-services/memory_engine.py — unified memory stack orchestrator.
+services/memory_engine.py — unified memory stack orchestrator (facade).
 
 Layers, cheapest-first (the order a request should consult memory):
 
@@ -13,6 +13,14 @@ Layers, cheapest-first (the order a request should consult memory):
 The orchestrator composes the final prompt and reports a cost ledger so
 callers (and dashboards) can see exactly how many tokens were billed at
 cached vs full rate.
+
+Facade note (B4c, 2026-08-28): this module is now a thin facade. Everything
+it touches — compose_prompt / jeeves_system_prefix (services.cag) and
+get_store / get_warmer (services.mag) — resolves through guarded shims to
+the canonical ``skeleton.memory.prefix_renderer`` and
+``skeleton.memory.warmer`` implementations whenever the skeleton package is
+importable, with byte-identical local fallbacks otherwise. No logic lives
+here beyond prompt assembly and the cost ledger.
 """
 from __future__ import annotations
 

@@ -22,15 +22,14 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
       ported as pure domain (51275cb).
 - [x] B3. `skeleton/memory/warmer.py` — services/mag.py preemptive filler
       TTL/warmer ported as pure domain (51275cb).
-- [x] B4a. `backend/services/cag.py` guarded shim over
-      `skeleton.memory.prefix_renderer` (324db3d).
-- [x] B4b. `skeleton/memory/warmer.py` FillerStore gained opt-in JSON
-      persistence (`path=...`, atomic tmp+replace, byte-compatible with the
-      legacy mag_fillers.json), and `backend/services/mag.py` is now a
-      guarded shim over it (this commit). Module-level API (prime, stats,
-      warm_now, register_default_fillers) preserved on both branches.
-- [ ] B4c. `services/memory_engine.py` collapses into a facade over
-      PrefixRenderer + MemoryWarmer + trinity — small; next session.
+- [x] B4a. `backend/services/cag.py` guarded shim (324db3d).
+- [x] B4b. Warmer JSON persistence in skeleton + `services/mag.py` guarded
+      shim (7790918).
+- [x] B4c. `services/memory_engine.py` is now an explicit facade: everything
+      it touches (compose_prompt / jeeves_system_prefix / get_store /
+      get_warmer) resolves through the B4a/B4b shims to the skeleton
+      canonicals when importable. No logic beyond prompt assembly + cost
+      ledger; documented in the module docstring (this commit).
 - [ ] B5. Vendor `skeleton/` into the backend image (or set PYTHONPATH) so
       the guarded shims flip to canonical in prod; deploy change, not code.
 
@@ -58,6 +57,7 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 - ✅ genesis.py imports canonical clocks path (bdca180b)
 - ✅ api/server.py + api/errors.py restored after bad rewrite (b4790a1)
 - ✅ Track A (f6c7a78, 31c8541, e3eaeca, 3ebed65)
-- ✅ Track B1/B2/B3 memory semantics ported into skeleton/memory (51275cb)
+- ✅ Track B2/B3 memory semantics ported into skeleton/memory (51275cb)
 - ✅ Track B4a services/cag.py guarded shim (324db3d)
-- ✅ Track B4b warmer persistence + services/mag.py guarded shim (this commit)
+- ✅ Track B4b warmer persistence + services/mag.py guarded shim (7790918)
+- ✅ Track B4c memory_engine facade (this commit)
