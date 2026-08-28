@@ -115,6 +115,8 @@ class CorpusCallosum:
         self.last_attn_lr: List[float] = []
         self.last_attn_rl: List[float] = []
         self.seq_fires = 0
+        self.tract_fires = 0
+        self.last_source = "neo"
 
     def split(self, h: Sequence[float]) -> Tuple[Vec, Vec]:
         v = list(h)[: self.dim] + [0.0] * max(0, self.dim - len(h))
@@ -144,7 +146,55 @@ class CorpusCallosum:
         n = max(1, len(fused_l))
         fused = [(fused_l[i] + fused_r[i]) * 0.5 for i in range(n)]
         self.fires += 1
+        self.last_source = "neo"
         return fused, fused_l, fused_r
+
+    def _pad(self, v: Optional[Sequence[float]]) -> Vec:
+        raw = list(v or [])[: self.dim]
+        return raw + [0.0] * (self.dim - len(raw))
+
+    def fuse_tracts(
+        self,
+        h_left: Sequence[float],
+        h_right: Sequence[float],
+        *,
+        left_on: bool = True,
+        right_on: bool = True,
+    ) -> Tuple[Vec, Vec, Vec]:
+        """Fuse two hemisphere-LM hiddens. Length of fused is always self.dim."""
+        h_l = matvec(self.Wl, self._pad(h_left))
+        h_r = matvec(self.Wr, self._pad(h_right))
+        if left_on:
+            self.mem.left.append(list(h_l))
+        if right_on:
+            self.mem.right.append(list(h_r))
+        ctx_l, w_lr = _cross_attend(h_l, list(self.mem.right), list(self.mem.right),
+                                    self.Wq_l, self.Wk_l, self.Wv_l)
+        ctx_r, w_rl = _cross_attend(h_r, list(self.mem.left), list(self.mem.left),
+                                    self.Wq_r, self.Wk_r, self.Wv_r)
+        self.last_attn_lr = w_lr
+        self.last_attn_rl = w_rl
+        fused_l = add(h_l, scale(ctx_l, self.gate_l)) if ctx_l else list(h_l)
+        fused_r = add(h_r, scale(ctx_r, self.gate_r)) if ctx_r else list(h_r)
+        n = self.dim
+        fused = [(fused_l[i] + fused_r[i]) * 0.5 for i in range(n)]
+        self.fires += 1
+        self.tract_fires += 1
+        self.last_source = "tracts"
+        return fused, fused_l, fused_r
+
+    def hebb_tracts(self, h_left: Sequence[float], h_right: Sequence[float], *, lr: float = 0.04) -> float:
+        h_l = matvec(self.Wl, self._pad(h_left))
+        h_r = matvec(self.Wr, self._pad(h_right))
+        before = energy(self.C, h_l, h_r)
+        for i, ai in enumerate(h_l):
+            row = self.C[i]
+            k = lr * ai
+            for j, bj in enumerate(h_r):
+                row[j] += k * bj
+        after = energy(self.C, h_l, h_r)
+        self.hebbs += 1
+        return after - before
 
     def fuse_seq(
         self,
@@ -230,6 +280,8 @@ class CorpusCallosum:
             "mem": self.mem.snapshot(),
             "fires": self.fires, "hebbs": self.hebbs,
             "seq_fires": self.seq_fires,
+            "tract_fires": self.tract_fires,
+            "last_source": self.last_source,
         }
 
     @classmethod
@@ -247,6 +299,8 @@ class CorpusCallosum:
         cc.fires = int((data or {}).get("fires") or 0)
         cc.hebbs = int((data or {}).get("hebbs") or 0)
         cc.seq_fires = int((data or {}).get("seq_fires") or 0)
+        cc.tract_fires = int((data or {}).get("tract_fires") or 0)
+        cc.last_source = str((data or {}).get("last_source") or "neo")
         if (data or {}).get("mem"):
             cc.mem.restore(data["mem"])
         return cc
@@ -257,6 +311,8 @@ class CorpusCallosum:
             "fires": self.fires,
             "hebbs": self.hebbs,
             "seq_fires": self.seq_fires,
+            "tract_fires": self.tract_fires,
+            "last_source": self.last_source,
             "mem_left": len(self.mem.left),
             "mem_right": len(self.mem.right),
             "gate_l": round(self.gate_l, 4),

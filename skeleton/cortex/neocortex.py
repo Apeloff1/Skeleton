@@ -167,6 +167,17 @@ class JeevesCortex:
                 return [h]
         return [[0.0] * int(getattr(xf, "dim", 8) or 8)]
 
+    def _tract_hidden(self, slot: str, stim: str):
+        port = (getattr(self, "slots", {}) or {}).get(slot)
+        xf = getattr(port, "transformer", None) if port is not None else None
+        if xf is None or not hasattr(xf, "hidden"):
+            return None
+        try:
+            h = list(xf.hidden(stim or ""))
+        except Exception:
+            return None
+        return h if h else None
+
     def think(self, stimulus: str, context: Optional[Dict[str, Any]] = None) -> CortexTrace:
         stim = stimulus or ""
         ctx = dict(context or {})
@@ -268,12 +279,20 @@ class JeevesCortex:
         h = H[-1] if H else [0.0] * int(getattr(self.transformer, "dim", 8) or 8)
         left_on = left is not None
         right_on = right is not None
-        if len(H) >= 2:
+        h_left = self._tract_hidden("left", stim)
+        h_right = self._tract_hidden("right", stim)
+        if h_left is not None and h_right is not None:
+            fused, _fl, _fr = self.callosum.fuse_tracts(h_left, h_right, left_on=left_on, right_on=right_on)
+            if left_on and right_on:
+                self.callosum.hebb_tracts(h_left, h_right)
+        elif len(H) >= 2:
             fused, _fl, _fr = self.callosum.fuse_seq(H, left_on=left_on, right_on=right_on)
+            if left_on and right_on:
+                self.callosum.hebb(H[-1] if H else h)
         else:
             fused, _fl, _fr = self.callosum.fuse(h, left_on=left_on, right_on=right_on)
-        if left_on and right_on:
-            self.callosum.hebb(H[-1] if H else h)
+            if left_on and right_on:
+                self.callosum.hebb(H[-1] if H else h)
         mixed, gates = self.moe.forward(fused)
         if left is not None:
             nums = tuple(left.numbers or ())

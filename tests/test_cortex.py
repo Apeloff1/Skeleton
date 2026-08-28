@@ -1453,4 +1453,31 @@ class TestQueue20Queue21:
         assert "left" in card["succession"] and "right" in card["succession"]
 
 
+class TestQueue22:
+    def test_fuse_tracts_dim_and_hebb(self):
+        from skeleton.cortex.callosum import CorpusCallosum
+        cc = CorpusCallosum(dim=8, seed=3)
+        left = [0.1 * i for i in range(8)]
+        right = [0.05 * (8 - i) for i in range(8)]
+        fused, fl, fr = cc.fuse_tracts(left, right)
+        assert len(fused) == 8 and len(fl) == 8 and len(fr) == 8
+        assert cc.last_source == "tracts"
+        assert cc.tract_fires == 1 and cc.fires == 1
+        d = cc.hebb_tracts(left, right)
+        assert cc.hebbs == 1
+        assert isinstance(d, float)
+
+    def test_think_fuses_hemisphere_lms(self):
+        from skeleton.cortex import JeevesCortex
+        neo = JeevesCortex()
+        before = neo.callosum.fires
+        neo.think("ttk hp dps era soul dread")
+        assert neo.callosum.fires == before + 1
+        assert neo.callosum.last_source == "tracts"
+        assert neo.callosum.tract_fires >= 1
+        assert neo.callosum.hebbs >= 1
+        assert neo.status()["callosum"]["last_source"] == "tracts"
+        assert len(neo._tract_hidden("left", "ttk")) == neo.callosum.dim
+
+
 
