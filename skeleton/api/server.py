@@ -12,6 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from skeleton.config.settings import Settings, get_settings
+from skeleton.context.cockpit import Cockpit
+from skeleton.context.pipeline import GameForgeRun
 from skeleton.genesis import Genesis
 from skeleton.kernel.errors import SkeletonError, http_status_for
 from skeleton.kernel.events import DomainEvent, EventBus
@@ -65,11 +67,10 @@ class AppState:
         # Per-route request telemetry; mirrors onto the kernel bus once the
         # bus exists so observability/anomaly sees API traffic (A5).
         self.route_telemetry = RouteTelemetry()
-        # Optional planes referenced by routes but not wired in lifespan yet —
-        # declared here so the route-layer ``_require`` 503s cleanly instead
-        # of raising AttributeError (previously a 500 on /context/*, /gameforge/*).
-        self.cockpit: Optional[Any] = None
-        self.gameforge: Optional[Any] = None
+        # Context + gameforge planes — wired in lifespan since 2026-08-28
+        # (previously declared-but-None, so /context/* and /gameforge/* 503'd).
+        self.cockpit: Optional[Cockpit] = None
+        self.gameforge: Optional[GameForgeRun] = None
 
     def is_healthy(self) -> Dict[str, Any]:
         checks = {
@@ -131,6 +132,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     state.npc_pipeline = NpcPipeline(bus=state.bus)
     state.game_logic_pipeline = GameLogicPipeline(bus=state.bus)
     state.animation_pipeline = AnimationPipeline(bus=state.bus)
+
+    # Context plane + the ten-stage GameForge pipeline. One cockpit shared by
+    # both so operator commands (BIND/BLEND/etc.) shape the next run.
+    state.cockpit = Cockpit()
+    state.gameforge = GameForgeRun(
+        bus=state.bus, cockpit=state.cockpit, jeeves=state.jeeves,
+    )
 
     state.metrics = MetricsRegistry()
     state.tracer = Tracer()
