@@ -23,13 +23,22 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 
 ## Track H — Context/gameforge wiring + import audit — DONE (df7fbcd, a5abbdc)
 
-- [x] H1–H3. context/cortex mapped, Cockpit+GameForgeRun wired into lifespan,
-      lazy-import contract verified (df7fbcd).
-- [x] H4. Quad retriever endpoints live: `POST /retrieval/query` (RRF over
-      RAG/CAG/MAG/KAG, plane stats included) and `POST /retrieval/ingest`
-      (chunk + index documents) over the genesis `quad` handle (a5abbdc).
-- [ ] H5. Cortex (44 modules) unwired: neocortex/lm/heads/moe have no genesis
-      phase and no API surface. Needs its own design pass — own track.
+## Track H5 — Cortex wiring — DONE (3b22c74, 3892273)
+
+- [x] H5.1. `JeevesCortex(bus=...)` wired as genesis `_phase_cortex` handle
+      `cortex` — a fresh inspectable twin; the process-lived serving
+      organism (`skeleton.cortex.live`) stays the singleton and is
+      deliberately untouched. Local slots only, no network backends at boot.
+- [x] H5.2. `api/cortex_routes.py`: `GET /cortex/status` and
+      `POST /cortex/think` over the genesis handle; mounted in server.py.
+      Call shapes verified against neocortex.py (`think(stimulus, context)`,
+      `status()` dict).
+- [x] H5.3. Design decision recorded: mutation paths (train / acquire /
+      surpass / LoRA / gossip) stay on CLI + cockpit, NOT on HTTP. The
+      cortex is a model organism; the API inspects it.
+- [ ] H5.4 (future). Decide whether the genesis twin should BE the live
+      singleton (repoint `_phase_cortex` at `cortex.live.live_cortex()`)
+      once a persistence story (`$SKELETON_OWN`) exists in the container.
 
 ## Track E — Cleanup pass (deferred, requires local git ops)
 
@@ -41,15 +50,12 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 
 ## Verification
 
-- [x] `skeleton/testing/test_build_plan_smoke.py` — 15 tests (queue, shims,
-      reranker, pipeline, prefix renderer, warmer, idempotency, quad, genesis).
-- [x] `skeleton/testing/test_swarm_consensus.py` — 6 tests (ballot carrying,
-      three raise paths, majority pass, BFT happy path).
-- [ ] Run both suites in CI/local; then `docker compose build backend` and
-      confirm the `jeeves:system` prefix SHA is unchanged after the B5 flip;
-      then live smokes: `GET /api/v1/context/snapshot` (was 503), a small
-      `POST /api/v1/gameforge/run`, and `POST /api/v1/retrieval/query` after
-      an ingest.
+- [x] `skeleton/testing/test_build_plan_smoke.py` — 15 tests.
+- [x] `skeleton/testing/test_swarm_consensus.py` — 6 tests.
+- [ ] Run both suites in CI/local; `docker compose build backend` → prefix
+      SHA unchanged; live smokes: `/api/v1/context/snapshot`,
+      `/api/v1/gameforge/run`, `/api/v1/retrieval/query`, and now
+      `/api/v1/cortex/status`.
 
 ## Completed cuts (ledger)
 
@@ -66,3 +72,4 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 - ✅ Track G swarm consensus ballot/AgentId fixes + mesh boundary (972b802, e6e765b)
 - ✅ Track H context/gameforge wiring + import audit (df7fbcd)
 - ✅ H4 quad retrieval endpoints (a5abbdc)
+- ✅ H5 cortex genesis phase + API surface (3b22c74, 3892273)
