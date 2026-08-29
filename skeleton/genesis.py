@@ -43,6 +43,7 @@ class Genesis:
         self._phase_swarm()
         self._phase_resilience()
         self._phase_interface()
+        self._phase_cortex()
         self.bus.publish(
             DomainEvent(
                 topic="kernel.genesis.booted",
@@ -159,6 +160,20 @@ class Genesis:
         self._wire("interface", "provenance", ProvenanceLedger(bus=self.bus))
         self._wire("interface", "reranker", FeatureReranker())
         self._wire("interface", "quad", QuadRetriever(bus=self.bus))
+
+    def _phase_cortex(self) -> None:
+        """The Jeeves neocortex — wired last so it can observe the whole bus.
+
+        A fresh (non-live) cortex: the process-lived singleton in
+        ``skeleton.cortex.live`` stays the serving organism; the genesis
+        handle is the inspectable twin for tooling, tests and the
+        ``/cortex/status`` surface. Local slots only — no network backends
+        are bound at boot.
+        """
+        self.report.phases.append("cortex")
+        from skeleton.cortex.neocortex import JeevesCortex
+
+        self._wire("cortex", "cortex", JeevesCortex(bus=self.bus))
 
     def health(self) -> Dict[str, Any]:
         assert self.lattice is not None
