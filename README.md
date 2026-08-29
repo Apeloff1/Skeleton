@@ -8,9 +8,7 @@
 ![ChromaDB](https://img.shields.io/badge/ChromaDB-RAG-FF6F61?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-**The fully rebuilt, maximum-density rewrite of the Tutolage AI Learning & Game-Development Platform**
-
-*Every module complete. Every pipeline functional. No stubs. No placeholders. No shortcuts.*
+**The layered rewrite of the Tutolage AI Learning & Game-Development Platform**
 
 </div>
 
@@ -18,49 +16,57 @@
 
 ## What Skeleton Is
 
-**Skeleton** is the ground-up rewrite of the `Prood` monolith (v15) into a rigorously layered,
-hexagonal codebase. Where Prood grew organically into 300+ co-mingled route modules, Skeleton
-distils the same surface area — Jeeves AI tutoring, the Text-to-X game pipelines, the agent
-swarms, the learning sciences engine, the world/asset forges — into a strict architecture with
-total separation between **domain**, **application**, **infrastructure**, and **interface**
-concerns.
+**Skeleton** is the layered rewrite of the Tutolage platform into a strict
+hexagonal architecture: **kernel** (pure domain), **agents** (multi-agent
+substrate), **memory / retrieval / intelligence** planes, the **Universal**
+**Forge** blueprint engine, the **Jeeves** tutor brain with the trainable
+**cortex** organism, a serving **FastAPI** surface, a **CLI**, and a **legacy
+backend** in `backend/` being absorbed via guarded shims.
 
-Every file in this repository is complete, importable, and test-covered. There are no TODOs,
-no `pass` bodies standing in for logic, and no truncated modules.
+The 2026-08 deep-cut campaign folded every duplicate into a canonical
+implementation, fixed five runtime-landmine bugs found by reading (two of
+which disabled the entire CLI and the four-plane retrieval lattice), and
+wired every boot phase. See `docs/DEEP_CUTS.md` and `BUILD_PLAN.md` for the
+full ledger.
 
 ---
 
-## Layered Architecture
+## Repository Layout
 
 ```
-skeleton/
-├── config/                 # pydantic-settings configuration tree (env-driven, validated)
-│   └── settings.py
-├── kernel/                 # pure domain kernel — zero I/O, zero framework imports
-│   ├── errors.py           #   typed exception lattice with codes, context, severity
-│   ├── events.py           #   domain event bus: pub/sub, replay, correlation ids
-│   ├── ids.py              #   strongly-typed identifier value objects
-│   └── registry.py         #   plugin/capability registry with versioning + health
-├── agents/                 # multi-agent substrate
-│   ├── ledger.py           #   append-only agent activity ledger w/ audit queries
-│   ├── mesh.py             #   agent mesh: discovery, routing, quorum, consensus
-│   └── scheduler.py        #   swarm scheduler: priorities, backpressure, retries
-├── pipelines/              # Text-to-X generation pipelines (application services)
-│   ├── npc.py              #   Text-to-NPC: persona, dialogue trees, behaviour graphs
-│   ├── game_logic.py       #   combat / economy / progression system synthesis
-│   └── animation.py        #   rigs, keyframes, state machines, blend trees
-├── jeeves/                 # the Jeeves AI tutor brain
-│   ├── core.py             #   system laws, session orchestration, co-coding mode
-│   ├── matrices.py         #   SAM / CLOM / KREM self-learning matrices (full impl)
-│   └── rag.py              #   ChromaDB retrieval-augmented memory w/ fallback store
-├── forge/                  # the Universal Forge: systems synthesis engine
-│   └── universal.py        #   composable system blueprints, validation, materialisation
-├── api/                    # interface layer — FastAPI adapters, no domain logic
-│   ├── server.py           #   app factory, middleware, lifespan, OpenAPI surface
-│   └── routes.py           #   REST endpoints for every subsystem
-└── __init__.py             # package surface + version constants
-tests/                      # pytest suite mirroring the package tree
-docs/ARCHITECTURE.md        # the full architectural treatise
+skeleton/                    # the v16 package (pip install -e .)
+├── kernel/                  # pure domain: events, errors, ids, registry,
+│   │                        # clocks, work_queue (DRR lanes + deadlines),
+│   │                        # shims: workqueue / fair_queue / vclock → canonicals
+├── genesis.py               # boot orchestrator: kernel → memory → intelligence
+│   │                        # → swarm → resilience → interface → cortex
+├── config/                  # pydantic-settings tree
+├── agents/                  # mesh (operational roster), scheduler, ledger
+├── swarm/                   # SwarmMesh (partitions, chaos, auctions),
+│   │                        # hive, stigmergy, consensus + mesh_boundary note
+├── memory/                  # RAG / CAG / MAG trinity + prefix_renderer
+│   │                        # and warmer (KV-cache semantics, ported from
+│   │                        # backend/services)
+├── intelligence/            # dream, adaptive, metalearning, tensor base
+├── retrieval/               # quad lattice (RAG+CAG+MAG+KAG + RRF), fusion,
+│   │                        # ranking trio (rule boost → FeatureReranker →
+│   │                        # diversity Ranker), pipeline
+├── resilience/              # threat fortress, bulkheads, canaries
+├── observability/           # health, metrics, tracing, anomaly, SLO
+├── vault/                   # sealed secrets store, Shamir seal, KMS, audit
+├── agents|swarm as above    #
+├── jeeves/                  # tutor: core, matrices (SAM/CLOM/KREM), builder,
+│   │                        # tactical, templates, assessment
+├── cortex/                  # JeevesCortex — slots (pfc/midbrain/left/right),
+│   │                        # neo LM, MoE, callosum, sleep, REINFORCE
+├── context/                 # cockpit command language, tensor, quad pipeline
+├── forge/                   # blueprints, eras, hardware, walk, gdscript emit
+├── pipelines/               # text→NPC / game-logic / animation
+├── api/                     # server factory, routes, cortex routes, auth,
+│   │                        # idempotency, telemetry → kernel bus
+├── testing/                 # scaffold + fixtures + smoke suites
+backend/                     # legacy monolith being absorbed:
+└── services/cag|mag guarded → skeleton memory, other services route-local
 ```
 
 ---
@@ -72,45 +78,48 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 uvicorn skeleton.api.server:create_app --factory --reload --port 8001
 # → http://localhost:8001/docs
+
+pytest skeleton/testing/ -q    # smoke suites (15 + 6 tests)
+ruff check .                   # lint
 ```
 
-```bash
-pytest -q            # full suite
-ruff check .         # lint
-python tests/run_unit.py
-```
-
-## GameForge CLI
+## CLI
 
 ```bash
-python -m skeleton eras
-python -m skeleton run "soulslike extraction with bonfire rest" --out ./proj --overwrite --json
-python -m skeleton run --blend arcade_golden_age soulslike --t 0.5 --out ./blend --overwrite
+python -m skeleton eras          # era dialect list
+python -m skeleton run "vision" --out ./proj --overwrite --json
 python -m skeleton check ./proj
-python -m skeleton think "soulslike extraction ttk elite dread"
+python -m skeleton think "stimulus"
 python -m skeleton train --epochs 1
-python -m skeleton metrics
-python -m skeleton merkle
-python -m skeleton zaibatsu
+python -m skeleton metrics       # score the live neocortex
 ```
 
-HTTP: `GET /api/skeleton/eras` · `POST /api/skeleton/run` · `GET /api/skeleton/beats` · `POST /api/skeleton/think` · `POST /api/skeleton/train` · `GET /api/skeleton/cortex` · `GET /api/skeleton/cortex/zaibatsu` · `GET /api/skeleton/cortex/metrics` · `GET /api/skeleton/cortex/merkle`
+## HTTP surface (selected)
 
-Cortex (the model we are building, not implementing): PFC small/boilerplate · midbrain medium/coordinator · left analytic · right gestalt · Jeeves neo hivemind+trainer+LM. Slots are `ModelPort`s; `bind` hot-swaps a backend; `acquire` copies a tract into own-system **and stamps the MoE expert**; `surpass` answers from the neo transformer (own-lm decode). Stacked Pre-LN (n_layers=2, n_heads=2, FFN-GELU, RoPE on Q/K) on CPU; KV-cache decode ≡ full forward; greedy is argmax. `to("cuda")` pins the same weights on GPU when torch can see one, else degrades. Specialist heads (numeric mix / bias / route / veto / policy) sit on the residual. Corpus callosum splits left/right streams and Hebbs when both fire. Sleep consolidates the replay buffer. REINFORCE eats walk slack. The speaking LM authors the BuildPlan briefing. BPE is the other mouth. `evaluate()` must beat untrained. Hive merkle-sync pulls experts iff the fingerprint differs. `tournament()` names a winner among the three mouths. PFC drafts, neo verifies.
+| Endpoint | Purpose |
+|---|---|
+| `GET /health`, `/metrics`, `/api/v1/genesis` | Boot & health introspection |
+| `POST /api/v1/memory/query` | Trinity RAG/CAG/MAG fusion |
+| `POST /api/v1/retrieval/query`, `/retrieval/ingest` | Quad four-plane retrieval |
+| `POST /api/v1/jeeves/*` | Tutor sessions, review, advice |
+| `POST /api/v1/forge/*` | Blueprint build & materialise (idempotent) |
+| `POST /api/v1/gameforge/run` | Ten-stage context pipeline (live now) |
+| `GET /api/v1/context/snapshot` | Cockpit command-language state |
+| `GET /api/v1/cortex/status`, `POST /api/v1/cortex/think` | Neocortex inspect |
+| `GET /api/v1/telemetry/routes` | Per-route timing |
 
----
+## Principles
 
-## Subsystem Map
-
-| Subsystem | Responsibility | Key modules |
-|---|---|---|
-| **Kernel** | Events, errors, identity, capability registry | `kernel/*` |
-| **Agents** | Swarm discovery, routing, consensus, audit | `agents/mesh.py`, `agents/scheduler.py` |
-| **Pipelines** | NPC, game-logic, animation generation | `pipelines/*` |
-| **Jeeves** | Tutor persona, system laws, RAG memory, neocortex | `jeeves/*`, `cortex/*` |
-| **Cortex** | Interchangeable model: PFC/midbrain/hemispheres/own-system + stacked neo LM + MoE experts + corpus callosum + sleep + REINFORCE (CPU/CUDA harness) | `cortex/{port,pfc,midbrain,hemispheres,own,curriculum,neocortex,transformer,device,torch_lm,heads,callosum,moe,sleep,rl}.py` |
-| **Forge** | Universal system blueprint synthesis | `forge/universal.py` |
-| **API** | HTTP surface, validation, lifespan | `api/*` |
+1. **Kernel is pure.** No framework or I/O imports under `skeleton/kernel/`.
+2. **One implementation per concept.** Duplicates fold into the canonical
+   module; old import paths survive as shims until the rename pass.
+3. **Failures are typed.** Everything derives from `SkeletonError` with a
+   code, severity and context.
+4. **Boot is total.** Genesis phases wire kernel → memory → intelligence →
+   swarm → resilience → interface → cortex; `health()` evaluates the
+   invariant lattice on demand.
+5. **The cortex is a model, not a wrapper.** PFC / midbrain / left / right /
+   neo slots with acquire / surpass / distill heads and an own-system LM.
 
 ---
 
