@@ -1,7 +1,7 @@
 # Skeleton — Surrounding Systems Build Plan
 
 Status legend: ✅ done · 🔨 scaffolded · ⬜ pending
-Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180b).
+Generated 2026-08-29, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180b).
 
 ## Correction log
 
@@ -25,20 +25,19 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 
 ## Track H5 — Cortex wiring — DONE (3b22c74, 3892273)
 
-- [x] H5.1. `JeevesCortex(bus=...)` wired as genesis `_phase_cortex` handle
-      `cortex` — a fresh inspectable twin; the process-lived serving
-      organism (`skeleton.cortex.live`) stays the singleton and is
-      deliberately untouched. Local slots only, no network backends at boot.
-- [x] H5.2. `api/cortex_routes.py`: `GET /cortex/status` and
-      `POST /cortex/think` over the genesis handle; mounted in server.py.
-      Call shapes verified against neocortex.py (`think(stimulus, context)`,
-      `status()` dict).
-- [x] H5.3. Design decision recorded: mutation paths (train / acquire /
-      surpass / LoRA / gossip) stay on CLI + cockpit, NOT on HTTP. The
-      cortex is a model organism; the API inspects it.
-- [ ] H5.4 (future). Decide whether the genesis twin should BE the live
-      singleton (repoint `_phase_cortex` at `cortex.live.live_cortex()`)
-      once a persistence story (`$SKELETON_OWN`) exists in the container.
+## Track I — CLI + import-surface audit — DONE (3033821)
+
+- [x] I1. `__main__.py` registered two subparsers both named `plan` — argparse
+      raised `conflicting subparser` at parser construction, so EVERY CLI
+      command was dead. The builder-plan command is now `build-plan`; `plan`
+      keeps the live-Jeeves `plan_build(vision=...)` path. Verified
+      `plan_build` exists on Jeeves with the `vision` kwarg before rewiring.
+- [x] I2. Verified the CLI + Jeeves lazy-import surface resolves:
+      `jeeves/tactical.py`, `jeeves/builder.py`, and all of `forge/` that
+      __main__ + context/pipeline import (eras, hardware, walk,
+      gdscript_check, projector, sim, archetypes, universal).
+- [x] I3. CLI imports nothing from the folded twins (fair_queue / mutable
+      vclock / old Reranker) — renames from the deep cuts are compatible.
 
 ## Track E — Cleanup pass (deferred, requires local git ops)
 
@@ -54,8 +53,9 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 - [x] `skeleton/testing/test_swarm_consensus.py` — 6 tests.
 - [ ] Run both suites in CI/local; `docker compose build backend` → prefix
       SHA unchanged; live smokes: `/api/v1/context/snapshot`,
-      `/api/v1/gameforge/run`, `/api/v1/retrieval/query`, and now
-      `/api/v1/cortex/status`.
+      `/api/v1/gameforge/run`, `/api/v1/retrieval/query`,
+      `/api/v1/cortex/status`; and `python -m skeleton eras` (was dead at
+      startup before 3033821).
 
 ## Completed cuts (ledger)
 
@@ -73,3 +73,4 @@ Generated 2026-08-28, anchored to the deep-cut ledger (fe5ec07, c553ef8, bdca180
 - ✅ Track H context/gameforge wiring + import audit (df7fbcd)
 - ✅ H4 quad retrieval endpoints (a5abbdc)
 - ✅ H5 cortex genesis phase + API surface (3b22c74, 3892273)
+- ✅ Track I CLI duplicate-subparser fix + lazy-import audit (3033821)
