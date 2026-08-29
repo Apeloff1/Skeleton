@@ -234,6 +234,11 @@ def create_app() -> FastAPI:
     from skeleton.api.routes import router
     app.include_router(router, prefix="/api/v1")
 
+    # Cortex read-surface (H5) — /cortex/status + /cortex/think over the
+    # genesis cortex handle.
+    from skeleton.api.cortex_routes import router as cortex_router
+    app.include_router(cortex_router, prefix="/api/v1")
+
     @app.get("/health")
     async def health() -> Dict[str, Any]:
         state = get_state()
