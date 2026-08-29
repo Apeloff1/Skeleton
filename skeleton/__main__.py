@@ -1,4 +1,10 @@
-"""python -m skeleton — run, intake, eras, check."""
+"""python -m skeleton — run, intake, eras, check.
+
+Fix (2026-08-29): two subparsers were both registered under the name
+``plan`` (``pl`` and ``pb``), so argparse raised ``conflicting subparser``
+at startup — no CLI command could run at all. The builder-plan command is
+now ``build-plan``; ``plan`` keeps the live-Jeeves plan_build path.
+"""
 from __future__ import annotations
 
 import argparse
@@ -111,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
     asd.add_argument("prefix", nargs="?", default="like elden ring")
     asd.add_argument("--rounds", type=int, default=8)
 
-    pb = sub.add_parser("plan", help="Jeeves builder plan; like <game> resolves era")
+    pb = sub.add_parser("build-plan", help="Jeeves builder plan; like <game> resolves era")
     pb.add_argument("vision", nargs="?", default="like elden ring")
 
     wk = sub.add_parser("walk", help="prove spawn→extract on the emitted door graph")
@@ -285,13 +291,6 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(out, indent=2, default=str))
         return 0
 
-    if args.cmd == "plan":
-        from skeleton.cortex.live import live_jeeves, persist
-        out = live_jeeves().plan_build(vision=args.vision)
-        persist()
-        print(json.dumps(out, indent=2, default=str))
-        return 0
-
     if args.cmd == "walk":
         from skeleton.forge.eras import blend_eras, compile_era
         from skeleton.forge.walk import walk_from_pack
@@ -349,6 +348,13 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "plan":
+        from skeleton.cortex.live import live_jeeves, persist
+        out = live_jeeves().plan_build(vision=args.vision)
+        persist()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "build-plan":
         from skeleton.context.tensor import ContextTensor, detect_era
         from skeleton.forge.eras import blend_eras, compile_era
         from skeleton.jeeves.builder import BuilderBrain
