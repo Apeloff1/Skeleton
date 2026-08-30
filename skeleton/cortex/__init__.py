@@ -60,6 +60,9 @@ from .cite import steam_cite, wiki_cite, SPDX_STEAM, SPDX_WIKI
 from .refs import GameRefPort, lookup, match, refer
 from .improve import improve
 from .attn import swiglu, swiglu_bwd, cosine_lr, silu, rms_norm
+from .deck import CommandDeck, live_deck
+from .era_bind import HOUSE_ERA, house_era, resolve as resolve_era, bind_into
+from .perpendicular import AXES as PERP_AXES, cut as perpendicular_cut, live_cut
 
 __all__ = [
     "SLOTS",
@@ -165,4 +168,13 @@ __all__ = [
     "Genos",
     "acquire_gaming",
     "acquire_catalog",
+    "CommandDeck",
+    "live_deck",
+    "HOUSE_ERA",
+    "house_era",
+    "resolve_era",
+    "bind_into",
+    "PERP_AXES",
+    "perpendicular_cut",
+    "live_cut",
 ]

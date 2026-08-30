@@ -62,15 +62,21 @@ class GameForgeRun:
         if generation is None:
             generation = getattr(cockpit, "generation", None)
         try:
-            from skeleton.cortex.refs import lookup
-            hit = lookup(vision or "")
-        except Exception:
-            hit = None
-        if hit:
-            era = era or str(hit.get("era") or era)
-            extra = str(hit.get("dialect") or "")
+            from skeleton.cortex.era_bind import resolve
+            bound = resolve(vision or era or "")
+            hit = {
+                "title": bound.get("title"),
+                "era": bound.get("era"),
+                "citation": bound.get("citation"),
+                "url": bound.get("url"),
+                "dialect": bound.get("dialect"),
+            } if bound.get("hit") else None
+            era = era or str(bound.get("era") or era)
+            extra = str(bound.get("dialect") or "")
             if extra and extra not in (vision or ""):
                 vision = f"{vision} {extra}".strip()
+        except Exception:
+            hit = None
         ctx: Dict[str, Any] = {
             "vision": vision or "",
             "era_hint": era,
@@ -104,6 +110,8 @@ class GameForgeRun:
             "era": run.context.get("era"),
             "generation": run.context.get("generation"),
             "reference": (run.context.get("reference") or {}).get("title") if isinstance(run.context.get("reference"), dict) else None,
+            "citation": (run.context.get("reference") or {}).get("citation") if isinstance(run.context.get("reference"), dict) else None,
+            "stored_prose": 0,
             "mass": cockpit.snowball.mass,
             "complete": cockpit.snowball.complete,
             "tensor": cockpit.tensor.to_dict(),

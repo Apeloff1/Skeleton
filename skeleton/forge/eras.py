@@ -220,7 +220,16 @@ def _merge(base: Dict[str, Any], delta: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def era_pack(era: str) -> Dict[str, Any]:
-    name = era if era in ERA_IDS else "extraction_now"
+    raw = era or ""
+    name = raw if raw in ERA_IDS else ""
+    if not name:
+        try:
+            from skeleton.cortex.era_bind import house_era
+            name = house_era(raw)
+        except Exception:
+            name = "extraction_now"
+    if name not in ERA_IDS:
+        name = "extraction_now"
     pack = _merge(_BASE, _DELTA.get(name, {}))
     pack["era"] = name
     return pack

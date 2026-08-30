@@ -41,6 +41,11 @@ ASPECTS = {
         "plan tensor day cycle gift",
         "town route rest",
     ),
+    "cozy_wholesome": (
+        "cozy harvest era crop season",
+        "plan tensor day cycle gift",
+        "town route rest",
+    ),
 }
 
 

@@ -4,6 +4,35 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-30 — Perpendicular cut (era bind × seven axes)
+
+- `skeleton/cortex/era_bind.py` — title / slogan / ref-era collapse onto
+  forge `ERA_IDS`. `cozy` compiles `cozy_wholesome`. `like Elden Ring`
+  binds soulslike + Steam citation.
+- `skeleton/cortex/perpendicular.py` — REF·ERA·LAW·TEACH·ASCEND·GENOS·OBSERVE
+  as one card. `stored_prose=0`.
+- `forge/eras.py::era_pack` consults `HOUSE_ERA` before fallback.
+- `Jeeves.bind_era` / `plan_build` resolve like-titles to house era.
+- `GameForgeRun.execute` uses `resolve()` so vision era is the pack era.
+- CommandDeck.cut + CLI `python -m skeleton cut` + `POST /cortex/cut`.
+- Tests: `skeleton/testing/test_cortex_perpendicular.py`.
+
+---
+
+## 2026-08-30 — Command deck HTTP + observe citation
+
+- `skeleton/cortex/deck.py` — CommandDeck: speak/refer/improve/ascend/plan/genos/walk.
+  `like <title>` auto-ascends. stored_prose 0.
+- `skeleton/api/cortex_routes.py` — GET deck/laws/refs/dodeca; POST speak/refer/improve/ascend/plan/genos + dodeca walk/pick.
+  Genesis handle if wired; live_cortex otherwise.
+- CLI `python -m skeleton deck [stimulus] [--walk N]`
+- Perpendicular: `observe_run` returns G + law + citation + stored_prose.
+  `GameForgeRun.execute` payload carries citation + stored_prose.
+- Tests: `skeleton/testing/test_cortex_deck.py`
+
+---
+
+
 ## 2026-08-29 → 2026-08-28 — Deep-cut + build-plan campaign
 
 A single working session of structural cuts, runtime-landmine fixes, and

@@ -308,7 +308,22 @@ class Jeeves:
         self._bus.emit("jeeves.observe_run", {
             "era": era, "extracted": extracted, "own": self.cortex.own.size,
         })
-        return trace.to_dict()
+        card = trace.to_dict()
+        cite = url = None
+        if ref and ref.get("hit"):
+            r = ref.get("ref") or {}
+            cite = r.get("citation")
+            url = r.get("url")
+        return {
+            **card,
+            "G": round(float(card.get("G") or getattr(getattr(self.cortex, "genos_engine", None), "G", 1.0) or 1.0), 6),
+            "law": card.get("law") or "ok",
+            "citation": cite,
+            "url": url,
+            "stored_prose": 0,
+            "extracted": extracted,
+            "era": era,
+        }
 
     def bind_pack(self, pack: dict[str, Any]) -> dict[str, Any]:
         self.era = str(pack.get("era") or self.era)
@@ -317,15 +332,19 @@ class Jeeves:
         return pack
 
     def bind_era(self, era: str) -> dict[str, Any]:
-        from skeleton.forge.eras import compile_era
+        from skeleton.cortex.era_bind import resolve
         raw = era or self.era
-        try:
-            hit = self.refer(raw)
-        except Exception:
-            hit = None
-        if hit and hit.get("hit"):
-            raw = str((hit.get("ref") or {}).get("era") or raw)
-        return self.bind_pack(compile_era(raw))
+        card = resolve(raw)
+        pack = card.get("pack")
+        if pack is None:
+            from skeleton.forge.eras import compile_era
+            pack = compile_era(card.get("era") or raw)
+        bound = self.bind_pack(pack)
+        bound["citation"] = card.get("citation")
+        bound["title"] = card.get("title")
+        bound["stored_prose"] = 0
+        bound["ref_era"] = card.get("ref_era")
+        return bound
 
     def plan_build(self, pack: dict[str, Any] | None = None, *,
                    tensor=None, reading=None, vision: str = "") -> dict[str, Any]:
@@ -346,10 +365,15 @@ class Jeeves:
         })
         out = plan.to_dict()
         if vision:
-            hit = self.refer(vision)
-            if hit.get("hit"):
-                out["reference"] = (hit.get("ref") or {}).get("title")
-                out["citation"] = (hit.get("ref") or {}).get("citation")
+            from skeleton.cortex.era_bind import resolve
+            card = resolve(vision)
+            if card.get("hit"):
+                out["reference"] = card.get("title")
+                out["citation"] = card.get("citation")
+                out["url"] = card.get("url")
+            out["era"] = card.get("era") or out.get("era")
+            out["stored_prose"] = 0
+            out["law"] = "ok"
         return out
 
     def advise(self, session_id: str, telemetry: dict[str, Any] | None = None) -> dict[str, Any]:

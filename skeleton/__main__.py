@@ -57,6 +57,13 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("metrics", help="score the live neocortex against untrained baselines")
     sub.add_parser("merkle", help="print the live cortex merkle card")
+    dk = sub.add_parser("deck", help="command deck snapshot / speak / walk")
+    dk.add_argument("stimulus", nargs="?", default="")
+    dk.add_argument("--walk", type=int, default=0)
+    ct = sub.add_parser("cut", help="seven-axis perpendicular cut")
+    ct.add_argument("stimulus", nargs="?", default="like Elden Ring")
+    ct.add_argument("--rounds", type=int, default=3)
+    ct.add_argument("--live-parse", action="store_true")
     sub.add_parser("zaibatsu", help="tournament the three mouths; print the family seal")
 
     sp = sub.add_parser("speak", help="neo transformer decode")
@@ -173,6 +180,28 @@ def main(argv: list[str] | None = None) -> int:
         from skeleton.cortex.live import live_cortex
         from skeleton.cortex.metrics import evaluate
         print(json.dumps(evaluate(live_cortex()), indent=2, default=str))
+        return 0
+
+    if args.cmd == "deck":
+        from skeleton.cortex.deck import live_deck
+        from skeleton.cortex.live import persist
+        deck = live_deck()
+        if args.stimulus:
+            out = deck.speak(args.stimulus)
+        elif args.walk:
+            out = deck.walk(args.walk)
+        else:
+            out = deck.snapshot()
+        persist()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "cut":
+        from skeleton.cortex.deck import live_deck
+        from skeleton.cortex.live import persist
+        out = live_deck().cut(args.stimulus, rounds=args.rounds, live=args.live_parse)
+        persist()
+        print(json.dumps(out, indent=2, default=str))
         return 0
 
     if args.cmd == "merkle":
