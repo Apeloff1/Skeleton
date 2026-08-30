@@ -16,6 +16,11 @@ Design laws
 - Retries are per-stage, bounded, and recorded; a stage that exhausts
   retries fails the run with its attempt history attached.
 - The composer is deterministic given the same stage functions.
+
+Fix (2026-08-30): a stage returning a non-dict output previously crashed
+``context.update(output)`` with a TypeError that was itself recorded as
+the stage failure, hiding the real shape error. Non-dict outputs are now
+rejected with a clear StageError before the merge.
 """
 
 from __future__ import annotations
@@ -139,6 +144,14 @@ class PipelineComposer:
             record.attempts = attempt
             try:
                 output = stage.run(run.context)
+                if not isinstance(output, dict):
+                    raise StageError(
+                        "stage must return a dict of context updates",
+                        context={
+                            "stage": stage.name,
+                            "returned": type(output).__name__,
+                        },
+                    )
                 run.context.update(output)
                 last_error = None
                 break
