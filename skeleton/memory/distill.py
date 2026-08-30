@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import re
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from skeleton.memory.prefix_renderer import estimate_tokens
@@ -35,15 +35,55 @@ _SIGNAL_DECISION = re.compile(
     r"\b(decided|chose|will|must|never|always|agreed|because|therefore)\b", re.I
 )
 _SIGNAL_QUESTION = re.compile(r"\?")
-_FILLER = re.compile(
-    r"^(ok|okay|thanks|thank you|got it|sure|yes|no|yep|nope|cool|nice)[.!]?$", re.I
+
+# Non-lexical filler — entire-utterance matches that carry no signal.
+# Extended 2026-08-30 from the original 12-word list: acknowledgements,
+# affirmations, backchannels, and social openers/closers across English
+# plus the common chat-register variants (no caps, abbreviations, emoji-
+# adjacent forms). Matching is whole-utterance, case-insensitive, with
+# optional trailing punctuation — substrings inside real content never
+# match (e.g. "yes, the plan is…" still passes the gate).
+NON_LEXICAL_WORDS = frozenset({
+    # bare acknowledgements
+    "ok", "okay", "k", "kk", "okok", "okey", "okei",
+    "yes", "yeah", "yep", "yup", "ya", "aye", "yass", "yesss",
+    "no", "nope", "nah", "nuh",
+    "sure", "right", "correct", "true", "exactly", "indeed", "agreed",
+    "fine", "good", "great", "nice", "cool", "awesome", "amazing",
+    "perfect", "wonderful", "lovely", "brilliant", "fantastic",
+    # gratitudes
+    "thanks", "thank you", "thankyou", "thx", "ty", "tysm", "takk",
+    "much appreciated", "appreciated", "cheers",
+    # backchannels / continuers
+    "got it", "gotcha", "i see", "understood", "understand", "noted",
+    "makes sense", "fair enough", "fair", "mhm", "mm", "mmm", "uh huh",
+    "uh-huh", "hmm", "hm", "aight", "alright", "all good",
+    "sounds good", "looking good", "roger", "copy", "copy that", "ack",
+    # social openers / closers (whole-utterance only)
+    "hi", "hello", "hey", "yo", "sup", "hiya", "heyy",
+    "bye", "goodbye", "cya", "see ya", "later", "gtg", "g2g", "ttyl",
+    "good morning", "good evening", "good night", "gn",
+    # hesitation / softeners
+    "idk", "dunno", "maybe", "perhaps", "whatever", "meh",
+    "lol", "lmao", "haha", "hahaha", "hehe",
+    "oops", "whoops", "wow", "whoa", "oh", "ah", "huh", "eh",
+})
+
+_FILLER_PATTERN = re.compile(
+    r"^(?:" + "|".join(re.escape(w) for w in sorted(NON_LEXICAL_WORDS, key=len, reverse=True)) + r")[.!…]*$",
+    re.I,
 )
+
+
+def is_non_lexical(text: str) -> bool:
+    """True iff the whole utterance is non-lexical filler."""
+    return bool(_FILLER_PATTERN.match((text or "").strip()))
 
 
 def worth_remembering(text: str, *, min_signal: int = 1) -> bool:
     """An episode earns memory iff it carries at least ``min_signal`` cues."""
     text = (text or "").strip()
-    if not text or _FILLER.match(text):
+    if not text or is_non_lexical(text):
         return False
     signal = 0
     if _SIGNAL_NUMBER.search(text):
@@ -86,12 +126,7 @@ class DistilledFact:
 
 def distill(text: str, *, max_gist_words: int = 40,
             importance: float = 0.5) -> DistilledFact:
-    """Compress an episode to its lead sentence(s) + entity anchors.
-
-    Lead-sentence extraction, not summarization-by-model: the first
-    sentence(s) carry the assertion; the rest is usually elaboration.
-    Entity anchors keep the fact searchable in the KAG/MAG planes.
-    """
+    """Compress an episode to its lead sentence(s) + entity anchors."""
     import hashlib
     raw = (text or "").strip()
     sentences = re.split(r"(?<=[.!?])\s+", raw)
