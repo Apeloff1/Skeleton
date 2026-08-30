@@ -156,3 +156,15 @@ async def cortex_dodeca_walk(request: Dict[str, Any], state=Depends(_state)) -> 
 @router.post("/cortex/dodeca/pick")
 async def cortex_dodeca_pick(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).pick(int(request.get("index") or 0))
+
+
+@router.get("/cortex/galaxy")
+async def cortex_galaxy_get() -> Dict[str, Any]:
+    from skeleton.galaxy.system import live_galaxy
+    return live_galaxy().snapshot()
+
+
+@router.post("/cortex/galaxy")
+async def cortex_galaxy_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    stimulus = str(request.get("stimulus") or request.get("vision") or "").strip()
+    return _deck(state).galaxy(stimulus, sleep=bool(request.get("sleep")))

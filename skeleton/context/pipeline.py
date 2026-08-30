@@ -150,6 +150,12 @@ class GameForgeRun:
             from skeleton.cortex.live import persist
             saved = persist()
             payload["own"] = saved
+        try:
+            from skeleton.context.postprocess import postprocess_context
+            payload = postprocess_context(run.context, payload)
+        except Exception as exc:
+            payload["postprocessed"] = False
+            payload["postprocess_error"] = type(exc).__name__
         return payload
 
 

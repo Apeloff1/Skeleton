@@ -64,6 +64,9 @@ def main(argv: list[str] | None = None) -> int:
     ct.add_argument("stimulus", nargs="?", default="like Elden Ring")
     ct.add_argument("--rounds", type=int, default=3)
     ct.add_argument("--live-parse", action="store_true")
+    gx = sub.add_parser("galaxy", help="five-brain Hoag knowledge pulse")
+    gx.add_argument("stimulus", nargs="?", default="")
+    gx.add_argument("--sleep", action="store_true")
     sub.add_parser("zaibatsu", help="tournament the three mouths; print the family seal")
 
     sp = sub.add_parser("speak", help="neo transformer decode")
@@ -201,6 +204,12 @@ def main(argv: list[str] | None = None) -> int:
         from skeleton.cortex.live import persist
         out = live_deck().cut(args.stimulus, rounds=args.rounds, live=args.live_parse)
         persist()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "galaxy":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().galaxy(args.stimulus, sleep=args.sleep)
         print(json.dumps(out, indent=2, default=str))
         return 0
 

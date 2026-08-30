@@ -121,6 +121,17 @@ class CommandDeck:
         self.traces = [card, *self.traces][:24]
         return card
 
+    def galaxy(self, stimulus: str = "", *, sleep: bool = False) -> Dict[str, Any]:
+        from skeleton.galaxy.system import live_galaxy
+        gxy = live_galaxy()
+        if stimulus:
+            card = gxy.pulse(stimulus, sleep=sleep)
+        else:
+            card = gxy.snapshot()
+        card["G"] = round(_g(self.neo), 6)
+        card["stored_prose"] = 0
+        return card
+
     def plan(self, vision: str) -> Dict[str, Any]:
         from skeleton.cortex.era_bind import resolve
         card = resolve(vision)

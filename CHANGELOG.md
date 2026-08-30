@@ -4,6 +4,20 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-30 — Hoag galaxy five-brain knowledge + context postprocess
+
+- `skeleton/galaxy/` — memory, compiler, dream, distiller, editor.
+  Wiki librarian nucleus. Colored mouth mirrors in the gap (every
+  catalog family + house slots) via Jeeves.
+- Knowledge codec T0–T5 + SOTA house decoder (commitment recall).
+- Context post-process after seal; snowball mass unchanged.
+- CommandDeck.galaxy, CLI `galaxy`, GET/POST `/cortex/galaxy`.
+- Docs: `docs/HOAG_GALAXY.md`, `docs/BACKLOG.md`.
+- Tests: `skeleton/testing/test_galaxy_brains.py`.
+- stored_prose=0. Hoag cited, not copied.
+
+---
+
 ## 2026-08-30 — Perpendicular cut (era bind × seven axes)
 
 - `skeleton/cortex/era_bind.py` — title / slogan / ref-era collapse onto
