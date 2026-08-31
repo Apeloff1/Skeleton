@@ -15,7 +15,12 @@ def walk(org=None, *, neo=None, stimulus: str = "", n: int = 4,
     from skeleton.organism.pulse import pulse
 
     org = org or live_organismer()
-    limit = max(1, min(8, int(n or 4)))
+    try:
+        from skeleton.organism.budget import walk_limit
+        from skeleton.organism.caps import live as live_caps
+        limit = walk_limit(live_caps().tier, int(n or 4))
+    except Exception:
+        limit = max(1, min(8, int(n or 4)))
     cards: List[Dict[str, Any]] = []
     stopped = "cap"
     for _ in range(limit):

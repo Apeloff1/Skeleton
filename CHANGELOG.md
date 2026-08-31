@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Retain vs consolidate under live pressure
+
+- organism/budget.py. Tight → consolidate (dream/tighten). Slack → retain.
+- Walk N follows cap tier. Cite 2607.17545 as the split only.
+
+---
+
 ## 2026-08-31 — Perpendicular: MHC, nucleus bind, field depth
 
 - Pointers: EVAF 2606.26806, ProCL 2605.13162, retain/consolidate 2607.17545.

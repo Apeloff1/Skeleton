@@ -54,6 +54,17 @@ def test_sota_card_has_seeded_field_pointers():
     assert card["coverage"]["pointers"] >= 16
 
 
+def test_budget_choose_splits():
+    from skeleton.organism.budget import choose, walk_limit
+    tight = choose(0.80, stale_n=0, atoms=90, atom_cap=100)
+    slack = choose(0.10, stale_n=0, atoms=10, atom_cap=100)
+    assert tight["op"] == "consolidate"
+    assert slack["op"] == "retain"
+    assert walk_limit("tiny", 8) == 3
+    assert walk_limit("max", 8) == 8
+    assert tight["stored_prose"] == 0
+
+
 def test_nucleus_bind_and_mhc(tmp_path):
     from skeleton.galaxy.system import GalaxySystem
     from skeleton.organism.mhc import mhc_card

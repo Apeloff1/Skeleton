@@ -17,8 +17,14 @@ def hint(org, *, neo=None) -> Dict[str, Any]:
     cov = coverage_card("")
     fresh = org.galaxy.editor.freshness()
     pressure = float(caps.get("pressure") or 0)
-    if pressure >= 0.75:
+    atoms = sum(len(lib.shelf) for lib in org.galaxy.mesh.brains.values())
+    from skeleton.organism.budget import choose
+    budget = choose(pressure, int(fresh.get("stale_n") or 0),
+                    atoms=atoms, atom_cap=int(caps.get("atoms") or 1))
+    if budget["op"] == "consolidate" and pressure >= 0.75:
         code, why = "tighten", "pressure"
+    elif budget["op"] == "consolidate":
+        code, why = "dream", "consolidate"
     elif int(fresh.get("stale_n") or 0) >= 4:
         code, why = "dream", "stale-index"
     elif float(cov.get("score") or 0) < 0.20 and not cov.get("bound"):
@@ -37,5 +43,6 @@ def hint(org, *, neo=None) -> Dict[str, Any]:
         "coverage": cov.get("score"),
         "gap": path.get("gap"),
         "stale_n": fresh.get("stale_n"),
+        "budget": budget["op"],
         "stored_prose": 0,
     }
