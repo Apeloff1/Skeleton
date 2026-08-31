@@ -8,6 +8,7 @@ from skeleton.organism.organismer import live_organismer
 from skeleton.galaxy.vault import vault_path
 from skeleton.organism.caps import card as caps_card
 from skeleton.organism.doctor import doctor_card
+from skeleton.organism.laws import laws_card
 from skeleton.organism.health import health_card
 from skeleton.organism.next import hint as next_hint
 from skeleton.organism.mhc import mhc_card
@@ -40,12 +41,14 @@ ENDPOINTS = (
     "POST /cortex/walk",
     "GET /cortex/field",
     "GET /cortex/doctor",
+    "GET /cortex/laws",
 )
 
 
 def product_card() -> Dict[str, Any]:
     org = live_organismer()
     snap = org.snapshot()
+    laws = laws_card(org.galaxy.mesh)
     return {
         "kind": "product",
         "name": "Jeeves Cortex Organism",
@@ -72,6 +75,6 @@ def product_card() -> Dict[str, Any]:
         "endpoints": list(ENDPOINTS),
         "field": [dict(p) for p in SOTA_POINTERS],
         "sota": sota_card("", G=org.G),
-        "laws": ("cite-do-not-copy", "stored_prose=0", "clipped-G", "write-route skip|update|new"),
-        "stored_prose": 0,
+        "laws": laws,
+        "stored_prose": laws["stored_prose"],
     }

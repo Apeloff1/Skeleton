@@ -83,6 +83,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("lattice", help="Hoag lattice + gated KV handles")
     sub.add_parser("health", help="operator health card")
     sub.add_parser("doctor", help="laws + health + caps + field")
+    sub.add_parser("laws", help="live stored_prose scan")
     sub.add_parser("next", help="coded operator next hint")
     sub.add_parser("seed", help="file field pointers into the wiki")
     sub.add_parser("field", help="list SOTA field pointers")
@@ -297,6 +298,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "doctor":
         from skeleton.cortex.deck import live_deck
         out = live_deck().doctor()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "laws":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().laws()
         print(json.dumps(out, indent=2, default=str))
         return 0
 

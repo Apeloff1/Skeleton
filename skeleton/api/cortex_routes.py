@@ -231,6 +231,11 @@ async def cortex_doctor_get(state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).doctor()
 
 
+@router.get("/cortex/laws")
+async def cortex_laws_get(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).laws()
+
+
 @router.get("/cortex/next")
 async def cortex_next_get(state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).next()

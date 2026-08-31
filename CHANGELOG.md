@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Laws CLI + product scan
+
+- CLI laws, GET /cortex/laws. Product stored_prose from scan.
+
+---
+
 ## 2026-08-31 — Health uses live prose scan
 
 - health.ok requires scan_prose == 0. stored_prose is counted.

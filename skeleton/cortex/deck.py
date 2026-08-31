@@ -159,6 +159,11 @@ class CommandDeck:
         from skeleton.organism.doctor import doctor_card
         return doctor_card(neo=self.neo)
 
+    def laws(self) -> Dict[str, Any]:
+        from skeleton.organism.laws import laws_card
+        from skeleton.galaxy.system import live_galaxy
+        return laws_card(live_galaxy().mesh)
+
     def next(self) -> Dict[str, Any]:
         from skeleton.organism.next import hint
         from skeleton.organism.organismer import live_organismer
