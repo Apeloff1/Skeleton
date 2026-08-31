@@ -22,6 +22,9 @@ def health_card(org=None, *, neo=None) -> Dict[str, Any]:
     err_ratio = float(org.errors) / steps
     pressure = float(caps.get("pressure") or 0.0)
     ok = int(pressure < 0.90 and err_ratio < 0.35)
+    from skeleton.organism.journal import tail
+    from skeleton.organism.next import hint
+    nxt = hint(org, neo=neo)
     return {
         "kind": "health",
         "ok": ok,
@@ -38,5 +41,8 @@ def health_card(org=None, *, neo=None) -> Dict[str, Any]:
         "lattice": lat.get("ascii"),
         "kv_bound": kv.get("bound"),
         "kv_n": kv.get("n"),
+        "next": nxt.get("code"),
+        "next_why": nxt.get("why"),
+        "journal": tail(4, root=getattr(org, "root", None)),
         "stored_prose": 0,
     }

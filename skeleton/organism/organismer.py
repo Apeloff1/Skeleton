@@ -102,6 +102,9 @@ class Organismer:
             from skeleton.organism.caps import adapt as caps_adapt, trim_mesh
             adapt_card = caps_adapt()
             trim_card = trim_mesh(self.galaxy.mesh)
+            if self.persist_on and not (self.galaxy.mesh.wiki.topics or {}):
+                from skeleton.social.seed import seed_field
+                seed_field(self.galaxy)
             topics = (self.galaxy.mesh.wiki.catalog().get("topics") or {})
             decision, score, hit = write_route(stimulus, topics.keys())
             if decision == "new" and should_suppress(stimulus, wb_topics(self.galaxy.mesh)):

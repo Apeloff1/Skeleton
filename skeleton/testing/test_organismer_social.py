@@ -54,6 +54,18 @@ def test_sota_card_has_seeded_field_pointers():
     assert card["coverage"]["pointers"] >= 16
 
 
+def test_seed_field_is_idempotent():
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.social.seed import seed_field
+    gxy = GalaxySystem()
+    a = seed_field(gxy)
+    b = seed_field(gxy)
+    assert a["minted"] >= 1
+    assert b["minted"] == 0
+    assert b["skipped"] >= a["minted"]
+    assert a["stored_prose"] == 0
+
+
 def test_next_hint_and_journal(tmp_path):
     from skeleton.organism.journal import append, tail
     from skeleton.organism.next import hint

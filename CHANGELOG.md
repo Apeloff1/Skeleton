@@ -4,6 +4,15 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Field seed + health carries next/journal
+
+- social/seed.py files SOTA pointers as citation atoms. Idempotent.
+- Persist-on first pulse seeds an empty wiki.
+- Health includes next code and journal tail.
+- CLI seed, POST /cortex/seed.
+
+---
+
 ## 2026-08-31 — Next hint + pulse journal + S×coverage
 
 - _S gains 0.20 × coverage score.

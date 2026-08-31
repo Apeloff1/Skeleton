@@ -160,6 +160,11 @@ class CommandDeck:
         from skeleton.organism.organismer import live_organismer
         return hint(live_organismer(), neo=self.neo)
 
+    def seed(self) -> Dict[str, Any]:
+        from skeleton.galaxy.system import live_galaxy
+        from skeleton.social.seed import seed_field
+        return seed_field(live_galaxy())
+
     def wiki(self, q: str = "") -> Dict[str, Any]:
         from skeleton.galaxy.query import run
         from skeleton.galaxy.system import live_galaxy
