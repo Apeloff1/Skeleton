@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Pulse rotates field URLs
+
+- Empty pulse stimulus uses rotate_stimulus(steps).
+
+---
+
 ## 2026-08-31 — Dream/tighten persist clip
 
 - persist_clip on dream and tighten pulses.

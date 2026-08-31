@@ -41,8 +41,10 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
         acted["refresh"] = org.galaxy.editor.refresh()
         org.last_dream_step = org.steps
     else:
-        stim = stimulus or "plan tensor ttk house contact"
+        from skeleton.organism.runloop import rotate_stimulus
+        stim = rotate_stimulus(int(org.steps or 0), stimulus)
         acted["step"] = org.step(stim, neo=neo)
+        acted["stimulus"] = stim.split()[0]
     return {
         "kind": "pulse",
         "next": nxt,
