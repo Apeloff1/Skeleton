@@ -211,6 +211,11 @@ async def cortex_graph_get(cue: str = "", state=Depends(_state)) -> Dict[str, An
     return _deck(state).graph(cue)
 
 
+@router.get("/cortex/context")
+async def cortex_context_get(cue: str = "", state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).context(cue)
+
+
 @router.get("/cortex/banks")
 async def cortex_banks_get(state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).banks()

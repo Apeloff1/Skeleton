@@ -200,6 +200,11 @@ class CommandDeck:
         from skeleton.galaxy.system import live_galaxy
         return graph_card(live_galaxy().mesh, cue)
 
+    def context(self, cue: str = "") -> Dict[str, Any]:
+        from skeleton.organism.context_loop import assess
+        from skeleton.organism.organismer import live_organismer
+        return assess(live_organismer(), cue=cue, neo=self.neo)
+
     def banks(self) -> Dict[str, Any]:
         from skeleton.galaxy.banks import card
         from skeleton.galaxy.system import live_galaxy

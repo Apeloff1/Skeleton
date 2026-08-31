@@ -4,6 +4,15 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-01 — Context loop: rot guard × reconstruction
+
+- organism/context_loop.py scores journal Turns via RotGuardedCompactor
+  then reconstructs a cue-tag forest.
+- next why=rot when the guard says rot. Dream pulse records the loop.
+- CLI context, GET /cortex/context. Decoder prior_with_forest.
+
+---
+
 ## 2026-08-31 — Cue-tag reconstruction forest
 
 - galaxy/graph.py. Reconstruct 1-hop forest from query cues.

@@ -23,6 +23,7 @@ def append(row: Dict[str, Any], *, root: Optional[Path] = None) -> Dict[str, Any
         "step": row.get("step"),
         "G": row.get("G"),
         "decision": row.get("decision"),
+        "topic": row.get("topic"),
         "coverage": row.get("coverage"),
         "pressure": row.get("pressure"),
         "stored_prose": 0,

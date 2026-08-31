@@ -27,7 +27,20 @@ class KnowledgeDecoder:
             key=lambda p: p[0],
             reverse=True,
         )
-        return [a for s, a in scored[: max(1, k)] if s > 0]
+        hits = [a for s, a in scored[: max(1, k)] if s > 0]
+        return hits
+
+    def prior_with_forest(self, query: str, bank: Iterable[Atom], mesh, *, k: int = 5) -> List[Atom]:
+        hits = self.prior(query, bank, k=k)
+        try:
+            from skeleton.galaxy.graph import reconstruct
+            rec = reconstruct(mesh, query, k=k)
+            ids = {n["id"] for n in (rec.get("nodes") or [])}
+        except Exception:
+            return hits
+        have = {a.id for a in hits}
+        extra = [a for a in bank if a.id in ids and a.id not in have]
+        return (hits + extra)[: max(1, k + 3)]
 
     def decode(self, query: str, bank: Iterable[Atom], *, k: int = 5) -> Dict[str, Any]:
         hits = self.prior(query, bank, k=k)

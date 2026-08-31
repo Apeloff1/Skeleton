@@ -212,6 +212,22 @@ def test_next_hint_and_journal(tmp_path):
     assert rows and rows[-1]["decision"] == "new"
 
 
+def test_context_loop_fresh_on_empty(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.context_loop import assess, should_dream
+    from skeleton.organism.organismer import Organismer
+    from skeleton.social.seed import seed_field
+    gxy = GalaxySystem()
+    seed_field(gxy)
+    org = Organismer(root=tmp_path, persist=False, galaxy=gxy)
+    card = assess(org, cue="memory graph")
+    assert card["kind"] == "context-loop"
+    assert card["rot"] in {"fresh", "watch", "rot"}
+    assert card["stored_prose"] == 0
+    assert should_dream({"rot": "rot", "compacted": 0}) is True
+    assert should_dream({"rot": "fresh", "compacted": 0}) is False
+
+
 def test_reconstruct_forest_from_seeded_wiki():
     from skeleton.galaxy.graph import card, reconstruct
     from skeleton.galaxy.system import GalaxySystem

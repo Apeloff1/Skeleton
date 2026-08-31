@@ -43,6 +43,7 @@ ENDPOINTS = (
     "GET /cortex/doctor",
     "GET /cortex/laws",
     "GET /cortex/graph",
+    "GET /cortex/context",
 )
 
 

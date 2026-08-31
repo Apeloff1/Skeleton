@@ -21,8 +21,18 @@ def hint(org, *, neo=None) -> Dict[str, Any]:
     from skeleton.organism.budget import choose
     budget = choose(pressure, int(fresh.get("stale_n") or 0),
                     atoms=atoms, atom_cap=int(caps.get("atoms") or 1))
+    loop: Dict[str, Any] = {}
+    dream_rot = False
+    try:
+        from skeleton.organism.context_loop import assess, should_dream
+        loop = assess(org, cue="memory graph", neo=neo)
+        dream_rot = should_dream(loop)
+    except Exception:
+        loop = {}
     if budget["op"] == "consolidate" and pressure >= 0.75:
         code, why = "tighten", "pressure"
+    elif dream_rot:
+        code, why = "dream", "rot"
     elif budget["op"] == "consolidate":
         code, why = "dream", "consolidate"
     elif int(fresh.get("stale_n") or 0) >= 4:
@@ -44,5 +54,7 @@ def hint(org, *, neo=None) -> Dict[str, Any]:
         "gap": path.get("gap"),
         "stale_n": fresh.get("stale_n"),
         "budget": budget["op"],
+        "rot": loop.get("rot"),
+        "forest_n": loop.get("forest_n"),
         "stored_prose": 0,
     }

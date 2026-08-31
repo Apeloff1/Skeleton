@@ -39,6 +39,8 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
         acted["clip"] = clip_fat(org.galaxy.mesh)
         acted["clip"].update(persist_clip(org))
         acted["refresh"] = org.galaxy.editor.refresh()
+        from skeleton.organism.context_loop import assess as loop_assess
+        acted["loop"] = loop_assess(org, cue=stimulus or "memory graph", neo=neo)
         org.last_dream_step = org.steps
     else:
         from skeleton.organism.runloop import rotate_stimulus
