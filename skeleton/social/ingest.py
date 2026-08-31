@@ -9,6 +9,7 @@ import re
 from typing import Any, Dict, List
 
 from skeleton.social.archivex import parse_arxiv, parse_x_status, pointer
+from skeleton.social.cdx import probe
 from skeleton.social.sources import SOTA_POINTERS, classify
 
 _URL_RE = re.compile(r"https?://[^\s)>\]]+", re.I)
@@ -18,7 +19,7 @@ def extract_urls(text: str) -> List[str]:
     return _URL_RE.findall(text or "")
 
 
-def ingest(stimulus: str) -> Dict[str, Any]:
+def ingest(stimulus: str, *, live: bool = False) -> Dict[str, Any]:
     urls = extract_urls(stimulus)
     cards: List[Dict[str, Any]] = []
     houses: List[str] = []
@@ -38,6 +39,12 @@ def ingest(stimulus: str) -> Dict[str, Any]:
     if ax and not any(c.get("kind") == "arxiv" for c in cards):
         cards.append({**ax, "source_id": "arxiv", "house": "arXiv"})
         houses.append("arxiv")
+    probes: List[Dict[str, Any]] = []
+    if live:
+        for card in cards[:2]:
+            target = str(card.get("url") or "")
+            if target.startswith("http"):
+                probes.append(probe(target, live=True))
     return {
         "kind": "social-ingest",
         "urls": urls,
@@ -46,6 +53,7 @@ def ingest(stimulus: str) -> Dict[str, Any]:
         "x_posts": sum(1 for c in cards if c.get("kind") == "x-status"),
         "papers": sum(1 for c in cards if c.get("kind") == "arxiv"),
         "archives": sum(1 for c in cards if "xarchive" in c or c.get("kind") == "url"),
+        "cdx": probes,
         "stored_prose": 0,
     }
 

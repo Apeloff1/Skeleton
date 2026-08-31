@@ -70,6 +70,7 @@ def main(argv: list[str] | None = None) -> int:
     og = sub.add_parser("organismer", help="10x organism step over galaxy+social")
     og.add_argument("stimulus", nargs="?", default="")
     og.add_argument("--sleep", action="store_true")
+    og.add_argument("--cdx", action="store_true", help="opt-in Wayback CDX header probe")
     so = sub.add_parser("social", help="social SOTA card / ArchiveX pointers")
     so.add_argument("stimulus", nargs="?", default="")
     sub.add_parser("product", help="operator product card for the living organism")
@@ -221,7 +222,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "organismer":
         from skeleton.cortex.deck import live_deck
-        out = live_deck().organismer(args.stimulus, sleep=args.sleep)
+        out = live_deck().organismer(args.stimulus, sleep=args.sleep, live_cdx=bool(getattr(args, "cdx", False)))
         print(json.dumps(out, indent=2, default=str))
         return 0
 

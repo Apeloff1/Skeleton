@@ -114,6 +114,60 @@ def test_persist_and_ledger(tmp_path):
     assert len(g2.mesh.wiki.topics) >= 1
 
 
+def test_cdx_probe_parses_rows_without_body():
+    from skeleton.social.cdx import probe, reset_throttle
+    reset_throttle()
+    sample = '[["timestamp","original","statuscode","mimetype"],["20260830112233","https://x.com/a/status/1","200","text/html"]]'
+    card = probe("https://x.com/a/status/1", live=True, opener=lambda url: sample)
+    assert card["live"] == 1
+    assert card["timestamp"] == "20260830112233"
+    assert card["status"] == "200"
+    assert card["stored_prose"] == 0
+    again = probe("https://x.com/a/status/1", live=True, opener=lambda url: sample)
+    assert again.get("reason") == "throttled"
+
+
+def test_teacher_sync_fail_closed_and_glean():
+    from skeleton.cortex.contact import ContactEngine
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.teachers import glean_rule, sync
+
+    class _LM:
+        lora = None
+
+        def perplexity(self, texts):
+            return 3.5
+
+        def fit(self, texts, lr=0.05, schedule="cosine"):
+            return 1
+
+        def hidden(self, s):
+            return [0.1] * 8
+
+    class _Port:
+        name = "huggingface"
+        standin = _LM()
+
+        def snapshot(self):
+            return {"kind": "standin"}
+
+    class _Neo(_Dummy):
+        slots = {"hf": _Port()}
+
+        def contact(self, slot, stimulus=""):
+            self.contact_engine = getattr(self, "contact_engine", ContactEngine())
+            return self.contact_engine.touch(self, slot, stimulus)
+
+    card = sync(_Neo(), "plan tensor ttk")
+    assert card["contacted"] == 1
+    assert card["magnitude"] > 0
+    rule = glean_rule(GalaxySystem(), stimulus="plan tensor ttk", contact=card)
+    assert rule and rule["kind"] == "principle"
+    assert rule["stored_prose"] == 0
+    empty = sync(_Dummy(), "plan tensor ttk")
+    assert empty["contacted"] == 0
+
+
 def test_product_card_shape():
     reset_organismer()
     deck = CommandDeck(_Dummy())

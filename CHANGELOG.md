@@ -4,6 +4,15 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Teacher contact rule + opt-in CDX probe
+
+- Organismer step runs teacher sync then distiller gleans a
+  contact-rule atom. Weights stay on the mouth.
+- Opt-in CDX header probe (`--cdx` / SKELETON_CDX=1), 1s/host, 2KB cap.
+- CommandDeck.contact.
+
+---
+
 ## 2026-08-31 — Galaxy shelf persist + atom ids on the merkle chain
 
 - galaxy/shelf.py — atoms + wiki topics survive process (cap 400).

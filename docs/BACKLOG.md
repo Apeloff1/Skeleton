@@ -5,10 +5,9 @@ architecture.
 
 ## P0 — next pulse
 
-- Live teacher contact (HF / Kimi) inside an organismer step on a bound
-  mouth: house LoRA + SGD + Hebb + absorb, then distiller gleans the
-  *rule*, not the teacher weights.
-- Optional live CDX fetch (opt-in, header-only, 1s/host throttle).
+- Live teacher contact inside organismer — wired (fail-closed; real
+  HF/Kimi still needs a bound mouth with a stand-in copy).
+- Optional live CDX fetch — wired (`--cdx` / SKELETON_CDX=1).
 - Merkle line per social pointer + galaxy write. (ledger now carries
   atom ids; social URL already on the line)
 - Persistence of galaxy atom shelf — done this pass. Cap 400.

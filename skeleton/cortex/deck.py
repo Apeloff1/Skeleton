@@ -132,11 +132,11 @@ class CommandDeck:
         card["stored_prose"] = 0
         return card
 
-    def organismer(self, stimulus: str = "", *, sleep: bool = False) -> Dict[str, Any]:
+    def organismer(self, stimulus: str = "", *, sleep: bool = False, live_cdx: bool = False) -> Dict[str, Any]:
         from skeleton.organism.organismer import live_organismer
         org = live_organismer()
         if stimulus:
-            return org.step(stimulus, neo=self.neo, sleep=sleep)
+            return org.step(stimulus, neo=self.neo, sleep=sleep, live_cdx=live_cdx)
         snap = org.snapshot()
         snap["G"] = round(_g(self.neo), 6) if _g(self.neo) > snap["G"] else snap["G"]
         return snap
@@ -149,6 +149,14 @@ class CommandDeck:
         from skeleton.organism.product import product_card
         card = product_card()
         card["mouth_G"] = round(_g(self.neo), 6)
+        return card
+
+    def contact(self, stimulus: str = "") -> Dict[str, Any]:
+        from skeleton.organism.teachers import glean_rule, sync
+        from skeleton.galaxy.system import live_galaxy
+        card = sync(self.neo, stimulus)
+        card["rule"] = glean_rule(live_galaxy(), stimulus=stimulus, contact=card)
+        card["G"] = round(_g(self.neo), 6)
         return card
 
     def plan(self, vision: str) -> Dict[str, Any]:

@@ -27,6 +27,7 @@ from skeleton.galaxy.shelf import save as galaxy_save
 from skeleton.organism.ledger import append as ledger_append, count as ledger_count
 from skeleton.organism.router import card as route_card_of, route as write_route, should_pulse
 from skeleton.organism.shelf import load as shelf_load, save as shelf_save
+from skeleton.organism.teachers import glean_rule, sync as teacher_sync
 from skeleton.social.ingest import ingest
 from skeleton.social.sota import sota_card
 
@@ -79,10 +80,11 @@ class Organismer:
         sleep: bool = False,
         citation: str = "",
         url: str = "",
+        live_cdx: bool = False,
     ) -> Dict[str, Any]:
         self.steps += 1
         eta = cosine_lr(min(self.steps, 64), 64, base=0.28, floor=0.08)
-        social = ingest(stimulus)
+        social = ingest(stimulus, live=live_cdx)
         first = (social.get("cards") or [{}])[0] if social.get("cards") else {}
         cite = citation or str(first.get("url") or "")
         try:
@@ -114,6 +116,7 @@ class Organismer:
             bound = neo is not None and (
                 hasattr(neo, "elect_mouth") or hasattr(neo, "transformer") or bool(getattr(neo, "slots", None))
             )
+            contact = teacher_sync(neo, stimulus)
             if bound:
                 genos_card = self.genos.pulse(neo, stimulus=stimulus)
             else:
@@ -138,6 +141,7 @@ class Organismer:
                 self.genos.G = float(self.genos.G * residual)
                 genos_card = {**genos_card, "S": S, "S_residual": round(residual, 4),
                               "G": round(self.genos.G, 6)}
+            rule = glean_rule(self.galaxy, stimulus=stimulus, contact=contact, genos=genos_card)
             card = {
                 "kind": "organismer",
                 "step": self.steps,
@@ -157,6 +161,8 @@ class Organismer:
                 "genos": genos_card,
                 "sota": sota_card(stimulus, G=self.G),
                 "write": route_card,
+                "contact": contact,
+                "rule": rule,
                 "stored_prose": 0,
             }
             line: Dict[str, Any] = {}
