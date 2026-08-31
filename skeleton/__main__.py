@@ -85,7 +85,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("next", help="coded operator next hint")
     sub.add_parser("seed", help="file field pointers into the wiki")
     sub.add_parser("field", help="list SOTA field pointers")
-    sub.add_parser("ready", help="seed if empty, then health+next+caps")
+    rd = sub.add_parser("ready", help="seed if empty, then health+next+caps")
+    rd.add_argument("--walk", action="store_true")
+    rd.add_argument("-n", type=int, default=2)
     pu = sub.add_parser("pulse", help="obey the next code")
     pu.add_argument("stimulus", nargs="?", default="")
     wk = sub.add_parser("walk", help="bounded pulse walk (not gameforge run)")
@@ -311,7 +313,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "ready":
         from skeleton.cortex.deck import live_deck
-        out = live_deck().ready()
+        out = live_deck().ready(walk=bool(getattr(args, "walk", False)), n=int(getattr(args, "n", 2) or 2))
         print(json.dumps(out, indent=2, default=str))
         return 0
 

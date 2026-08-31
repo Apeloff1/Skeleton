@@ -136,6 +136,9 @@ def test_ready_card_seeds_then_reports(tmp_path):
     again = ready_card(org)
     assert again["seed"]["minted"] == 0
     assert card["stored_prose"] == 0
+    walked = ready_card(org, walk=True, n=2)
+    assert walked.get("walk")
+    assert walked["walk"]["n"] <= 2
 
 
 def test_seed_field_is_idempotent():

@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Ready --walk
+
+- ready_card(walk=True) runs a short field walk after seed.
+- CLI `ready --walk -n 2`, GET /cortex/ready?walk=1
+
+---
+
 ## 2026-08-31 — Walk rotates field URLs
 
 - Empty walk stimulus cycles SOTA_POINTERS topic+url.

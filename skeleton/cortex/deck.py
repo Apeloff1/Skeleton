@@ -169,9 +169,9 @@ class CommandDeck:
         from skeleton.social.field import field_card
         return field_card()
 
-    def ready(self) -> Dict[str, Any]:
+    def ready(self, walk: bool = False, n: int = 2) -> Dict[str, Any]:
         from skeleton.organism.ready import ready_card
-        return ready_card(neo=self.neo)
+        return ready_card(neo=self.neo, walk=walk, n=n)
 
     def pulse(self, stimulus: str = "") -> Dict[str, Any]:
         from skeleton.organism.pulse import pulse

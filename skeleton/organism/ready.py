@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any, Dict
 
 
-def ready_card(org=None, *, neo=None) -> Dict[str, Any]:
+def ready_card(org=None, *, neo=None, walk: bool = False, n: int = 2) -> Dict[str, Any]:
     from skeleton.organism.caps import card as caps_card
     from skeleton.organism.health import health_card
     from skeleton.organism.mhc import mhc_card
@@ -19,6 +19,10 @@ def ready_card(org=None, *, neo=None) -> Dict[str, Any]:
         seeded = seed_field(org.galaxy)
     health = health_card(org, neo=neo)
     nxt = hint(org, neo=neo)
+    walked = None
+    if walk:
+        from skeleton.organism.runloop import walk as do_walk
+        walked = do_walk(org, neo=neo, n=n)
     return {
         "kind": "ready",
         "ok": health.get("ok"),
@@ -28,5 +32,6 @@ def ready_card(org=None, *, neo=None) -> Dict[str, Any]:
         "caps": caps_card(),
         "path10": path_card(org),
         "mhc": mhc_card(org),
+        "walk": walked,
         "stored_prose": 0,
     }
