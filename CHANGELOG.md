@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Health uses live prose scan
+
+- health.ok requires scan_prose == 0. stored_prose is counted.
+
+---
+
 ## 2026-08-31 — Live stored_prose scan
 
 - organism/laws.py counts long dialect on every shelf.

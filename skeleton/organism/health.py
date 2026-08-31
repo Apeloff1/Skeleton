@@ -22,7 +22,9 @@ def health_card(org=None, *, neo=None) -> Dict[str, Any]:
     steps = max(1, int(org.steps or 0))
     err_ratio = float(org.errors) / steps
     pressure = float(caps.get("pressure") or 0.0)
-    ok = int(pressure < 0.90 and err_ratio < 0.35)
+    from skeleton.organism.laws import scan_prose
+    prose = scan_prose(org.galaxy.mesh)
+    ok = int(pressure < 0.90 and err_ratio < 0.35 and prose == 0)
     from skeleton.organism.journal import tail
     from skeleton.organism.next import hint
     nxt = hint(org, neo=neo)
@@ -46,5 +48,5 @@ def health_card(org=None, *, neo=None) -> Dict[str, Any]:
         "next": nxt.get("code"),
         "next_why": nxt.get("why"),
         "journal": tail(4, root=getattr(org, "root", None)),
-        "stored_prose": 0,
+        "stored_prose": prose,
     }
