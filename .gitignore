@@ -139,3 +139,6 @@ backend/data/godot_projects/
 
 # Live Jeeves own-system persist
 .skeleton/
+
+# Organism shelf + merkle ledger (runtime)
+skeleton/acquired/organism/

@@ -79,3 +79,40 @@ def test_deck_organismer_and_social():
     out = deck.organismer("plan tensor https://arxiv.org/abs/2509.24704")
     assert out["kind"] == "organismer"
     assert out["G"] >= 1.0
+    assert out.get("write", {}).get("decision") in {"new", "update", "skip"}
+
+
+def test_write_route_second_pulse_skips():
+    from skeleton.organism.router import NEW, SKIP, route
+    d1, _, _ = route("dual layer write routing CLS", [])
+    assert d1 == NEW
+    d2, score, _ = route("dual layer write routing CLS", ["dual layer write routing CLS"])
+    assert d2 == SKIP
+    assert score >= 0.72
+
+
+def test_persist_and_ledger(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem, reset_galaxy
+    from skeleton.organism.shelf import load
+    reset_galaxy()
+    org = Organismer(persist=True, root=tmp_path, galaxy=GalaxySystem())
+    a = org.step("like Elden Ring https://arxiv.org/abs/2608.22215")
+    assert a["write"]["decision"] == "new"
+    assert a["ledger"]["sha"]
+    b = org.step("like Elden Ring https://arxiv.org/abs/2608.22215")
+    assert b["write"]["decision"] in {"skip", "update"}
+    org2 = Organismer(persist=False, root=tmp_path)
+    loaded = load(org2, root=tmp_path)
+    assert loaded["loaded"] == 1
+    assert org2.G >= 1.0
+
+
+def test_product_card_shape():
+    reset_organismer()
+    deck = CommandDeck(_Dummy())
+    card = deck.product()
+    assert card["kind"] == "product"
+    assert card["target"] == 10.0
+    assert "GET /cortex/product" in card["endpoints"]
+    assert any(p["topic"] == "mem0" for p in card["field"])
+    assert card["stored_prose"] == 0

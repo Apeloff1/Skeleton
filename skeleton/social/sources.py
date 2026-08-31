@@ -67,6 +67,11 @@ SOTA_POINTERS: Tuple[Dict[str, str], ...] = (
     {"topic": "xf-archive-search", "url": "https://github.com/Dicklesworthstone/xf", "house": "GitHub"},
     {"topic": "xarchive", "url": "https://xarchive.net/about", "house": "Xarchive"},
     {"topic": "wayback-cdx", "url": "https://web.archive.org/cdx/search/cdx", "house": "Internet Archive"},
+    {"topic": "mem0", "url": "https://github.com/mem0ai/mem0", "house": "GitHub"},
+    {"topic": "graphiti", "url": "https://github.com/getzep/graphiti", "house": "GitHub"},
+    {"topic": "letta", "url": "https://github.com/letta-ai/letta", "house": "GitHub"},
+    {"topic": "cognee", "url": "https://github.com/topoteretes/cognee", "house": "GitHub"},
+    {"topic": "budgeted-memory", "url": "https://arxiv.org/abs/2607.16848", "house": "arXiv"},
 )
 
 

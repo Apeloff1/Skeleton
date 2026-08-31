@@ -1,0 +1,42 @@
+"""Product card — one operator-facing snapshot of the living system."""
+from __future__ import annotations
+
+from typing import Any, Dict
+
+from skeleton.organism.ledger import count, head
+from skeleton.organism.organismer import live_organismer
+from skeleton.organism.paths import ledger_path, state_path
+from skeleton.social.sota import sota_card
+from skeleton.social.sources import SOTA_POINTERS
+
+
+ENDPOINTS = (
+    "GET /cortex/product",
+    "GET|POST /cortex/organismer",
+    "GET|POST /cortex/social",
+    "GET|POST /cortex/galaxy",
+    "CLI: python -m skeleton product",
+    "CLI: python -m skeleton organismer <stimulus>",
+)
+
+
+def product_card() -> Dict[str, Any]:
+    org = live_organismer()
+    snap = org.snapshot()
+    return {
+        "kind": "product",
+        "name": "Jeeves Cortex Organism",
+        "G": snap["G"],
+        "target": snap["target"],
+        "toward_10x_pct": snap["toward_10x_pct"],
+        "steps": snap["steps"],
+        "errors": snap["errors"],
+        "galaxy_pulses": snap["galaxy_pulses"],
+        "ledger": {"head": head(org.root), "n": count(org.root), "path": str(ledger_path(org.root))},
+        "state_path": str(state_path(org.root)),
+        "endpoints": list(ENDPOINTS),
+        "field": [dict(p) for p in SOTA_POINTERS],
+        "sota": sota_card("", G=org.G),
+        "laws": ("cite-do-not-copy", "stored_prose=0", "clipped-G", "write-route skip|update|new"),
+        "stored_prose": 0,
+    }

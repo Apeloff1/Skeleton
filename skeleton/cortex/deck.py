@@ -145,6 +145,12 @@ class CommandDeck:
         from skeleton.social.sota import sota_card
         return sota_card(stimulus, G=_g(self.neo))
 
+    def product(self) -> Dict[str, Any]:
+        from skeleton.organism.product import product_card
+        card = product_card()
+        card["mouth_G"] = round(_g(self.neo), 6)
+        return card
+
     def plan(self, vision: str) -> Dict[str, Any]:
         from skeleton.cortex.era_bind import resolve
         card = resolve(vision)

@@ -4,6 +4,16 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Product persist + merkle ledger + write router
+
+- Dual-layer write route skip|update|new against wiki nucleus.
+- Append-only merkle ledger + state.json (acquired/organism, gitignored).
+- Operator product card: CLI `product`, GET /cortex/product.
+- Field pointers: Mem0, Graphiti, Letta, Cognee, arXiv:2607.16848.
+- Dual-layer cite arXiv:2608.22215. Docs: docs/PRODUCT.md.
+
+---
+
 ## 2026-08-31 — Organismer 10× + social SOTA (ArchiveX / arXiv / labs)
 
 - `skeleton/organism/organismer.py` — clipped G growth with source

@@ -17,11 +17,15 @@ advances G.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from skeleton.cortex.attn import cosine_lr
 from skeleton.cortex.genos import Genos
 from skeleton.galaxy.system import GalaxySystem, live_galaxy
+from skeleton.organism.ledger import append as ledger_append, count as ledger_count
+from skeleton.organism.router import card as route_card_of, route as write_route, should_pulse
+from skeleton.organism.shelf import load as shelf_load, save as shelf_save
 from skeleton.social.ingest import ingest
 from skeleton.social.sota import sota_card
 
@@ -33,12 +37,23 @@ def _clip(x: float, lo: float, hi: float) -> float:
 class Organismer:
     TARGET = 10.0
 
-    def __init__(self, *, genos: Optional[Genos] = None, galaxy: Optional[GalaxySystem] = None) -> None:
+    def __init__(
+        self,
+        *,
+        genos: Optional[Genos] = None,
+        galaxy: Optional[GalaxySystem] = None,
+        persist: bool = False,
+        root: Optional[Path] = None,
+    ) -> None:
         self.genos = genos or Genos()
         self.galaxy = galaxy or live_galaxy()
         self.steps = 0
         self.errors = 0
         self.log: List[Dict[str, Any]] = []
+        self.persist_on = persist
+        self.root = root
+        if persist:
+            shelf_load(self, root=root)
 
     @property
     def G(self) -> float:
@@ -70,7 +85,20 @@ class Organismer:
         first = (social.get("cards") or [{}])[0] if social.get("cards") else {}
         cite = citation or str(first.get("url") or "")
         try:
-            gxy = self.galaxy.pulse(stimulus, citation=cite, url=url or cite, sleep=sleep)
+            topics = (self.galaxy.mesh.wiki.catalog().get("topics") or {})
+            decision, score, hit = write_route(stimulus, topics.keys())
+            route_card = route_card_of(decision, score, hit)
+            gxy: Dict[str, Any]
+            if should_pulse(decision):
+                gxy = self.galaxy.pulse(stimulus, citation=cite, url=url or cite, sleep=sleep)
+            else:
+                gxy = {
+                    "route": "skip",
+                    "memory": {},
+                    "principle": None,
+                    "wiki": self.galaxy.mesh.wiki.catalog(),
+                    "stored_prose": 0,
+                }
             if social.get("cards"):
                 for card in social["cards"][:6]:
                     topic = str(card.get("kind") or "url") + " " + str(card.get("url") or "")[:80]
@@ -126,9 +154,25 @@ class Organismer:
                 },
                 "genos": genos_card,
                 "sota": sota_card(stimulus, G=self.G),
+                "write": route_card,
                 "stored_prose": 0,
             }
-            self.log.append({"step": self.steps, "G": card["G"], "S": S})
+            line: Dict[str, Any] = {}
+            if self.persist_on:
+                line = ledger_append({
+                    "kind": "organism-write",
+                    "decision": decision,
+                    "url": cite,
+                    "topic": hit or stimulus[:80],
+                    "G": self.G,
+                }, root=self.root)
+                card["saved"] = shelf_save(self, root=self.root)
+            card["ledger"] = {
+                "sha": line.get("sha"),
+                "prev": line.get("prev"),
+                "n": ledger_count(self.root) if self.persist_on else 0,
+            }
+            self.log.append({"step": self.steps, "G": card["G"], "S": S, "decision": decision})
             return card
         except Exception as exc:
             self.errors += 1
@@ -161,7 +205,7 @@ _LIVE: Optional[Organismer] = None
 def live_organismer() -> Organismer:
     global _LIVE
     if _LIVE is None:
-        _LIVE = Organismer()
+        _LIVE = Organismer(persist=True)
     return _LIVE
 
 
