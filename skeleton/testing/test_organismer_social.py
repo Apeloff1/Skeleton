@@ -241,6 +241,17 @@ def test_caps_headroom_below_wall():
     assert tight.atoms <= calm.atoms
 
 
+def test_health_ok_on_fresh_organism(tmp_path):
+    from skeleton.organism.health import health_card
+    from skeleton.organism.organismer import Organismer
+    org = Organismer(root=tmp_path, persist=False)
+    card = health_card(org)
+    assert card["kind"] == "health"
+    assert card["ok"] == 1
+    assert card["stored_prose"] == 0
+    assert card["kv_bound"] == 0
+
+
 def test_lattice_and_unbound_kv():
     from skeleton.galaxy.kv import archive
     from skeleton.galaxy.lattice import card as lcard

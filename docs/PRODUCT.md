@@ -4,7 +4,9 @@ Operator card for the living organism. One JSON. No dashboards required.
 
 ```
 python -m skeleton product
+python -m skeleton health
 GET /cortex/product
+GET /cortex/health
 ```
 
 Fields: G, toward_10x_pct, steps, errors, galaxy_pulses, ledger head,

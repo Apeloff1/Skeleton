@@ -188,6 +188,10 @@ class Organismer:
             card["banks"] = banks_card(self.galaxy.mesh, neo=neo)
             card["caps"] = adapt_card
             card["trim"] = trim_card
+            from skeleton.galaxy.kv import archive as kv_archive
+            from skeleton.galaxy.lattice import card as lattice_card
+            card["lattice"] = lattice_card(self.galaxy.mesh, neo=neo).get("ascii")
+            card["kv"] = kv_archive(self.galaxy.mesh, neo=neo)
             line: Dict[str, Any] = {}
             if self.persist_on:
                 ids = list(gxy.get("atom_ids") or [])

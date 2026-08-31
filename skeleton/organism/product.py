@@ -7,6 +7,7 @@ from skeleton.organism.ledger import count, head
 from skeleton.organism.organismer import live_organismer
 from skeleton.galaxy.vault import vault_path
 from skeleton.organism.caps import card as caps_card
+from skeleton.organism.health import health_card
 from skeleton.organism.paths import ledger_path, state_path
 from skeleton.social.sota import sota_card
 from skeleton.social.sources import SOTA_POINTERS
@@ -21,6 +22,9 @@ ENDPOINTS = (
     "CLI: python -m skeleton organismer <stimulus>",
     "GET /cortex/wiki?q=",
     "GET /cortex/banks",
+    "GET /cortex/caps",
+    "GET /cortex/lattice",
+    "GET /cortex/health",
 )
 
 
@@ -42,6 +46,7 @@ def product_card() -> Dict[str, Any]:
         "state_path": str(state_path(org.root)),
         "vault": vault_path(org.root).as_posix(),
         "caps": caps_card(),
+        "health": health_card(org),
         "endpoints": list(ENDPOINTS),
         "field": [dict(p) for p in SOTA_POINTERS],
         "sota": sota_card("", G=org.G),

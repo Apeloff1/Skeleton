@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Operator health card
+
+- organism/health.py — ok/pressure/G/lattice/kv in one JSON.
+- CLI health, GET /cortex/health. Product embeds it.
+
+---
+
 ## 2026-08-31 — Hoag lattice card + gated KV handles
 
 - galaxy/lattice.py — colored ring nodes + ASCII.

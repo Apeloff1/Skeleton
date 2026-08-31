@@ -219,3 +219,8 @@ async def cortex_caps_get(state=Depends(_state)) -> Dict[str, Any]:
 @router.get("/cortex/lattice")
 async def cortex_lattice_get(state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).lattice()
+
+
+@router.get("/cortex/health")
+async def cortex_health_get(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).health()

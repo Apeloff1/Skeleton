@@ -151,6 +151,10 @@ class CommandDeck:
         card["mouth_G"] = round(_g(self.neo), 6)
         return card
 
+    def health(self) -> Dict[str, Any]:
+        from skeleton.organism.health import health_card
+        return health_card(neo=self.neo)
+
     def wiki(self, q: str = "") -> Dict[str, Any]:
         from skeleton.galaxy.query import run
         from skeleton.galaxy.system import live_galaxy
