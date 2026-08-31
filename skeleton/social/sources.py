@@ -79,6 +79,8 @@ SOTA_POINTERS: Tuple[Dict[str, str], ...] = (
     {"topic": "memory-depth-evaf", "url": "https://arxiv.org/abs/2606.26806", "house": "arXiv"},
     {"topic": "procl-program-memory", "url": "https://arxiv.org/abs/2605.13162", "house": "arXiv"},
     {"topic": "retain-or-consolidate", "url": "https://arxiv.org/abs/2607.17545", "house": "arXiv"},
+    {"topic": "agent-native-memory", "url": "https://arxiv.org/abs/2606.24775", "house": "arXiv"},
+    {"topic": "routed-graph-handoff", "url": "https://arxiv.org/abs/2608.25277", "house": "arXiv"},
 )
 
 

@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Doctor + two field handles
+
+- organism/doctor.py. CLI doctor, GET /cortex/doctor.
+- Pointers: 2606.24775 agent-native memory, 2608.25277 routed graph handoff.
+
+---
+
 ## 2026-08-31 — Version 2026.08.31-walk
 
 - Product stamp. Ritual is ready --walk. Health carries field_n.

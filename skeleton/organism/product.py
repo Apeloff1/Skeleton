@@ -38,6 +38,7 @@ ENDPOINTS = (
     "POST /cortex/pulse",
     "POST /cortex/walk",
     "GET /cortex/field",
+    "GET /cortex/doctor",
 )
 
 

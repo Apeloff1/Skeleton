@@ -54,6 +54,18 @@ def test_sota_card_has_seeded_field_pointers():
     assert card["coverage"]["pointers"] >= 16
 
 
+def test_doctor_ok(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.doctor import doctor_card
+    from skeleton.organism.organismer import Organismer
+    org = Organismer(root=tmp_path, persist=False, galaxy=GalaxySystem())
+    card = doctor_card(org)
+    assert card["kind"] == "doctor"
+    assert card["ok"] == 1
+    assert card["field_n"] >= 16
+    assert card["stored_prose"] == 0
+
+
 def test_field_card_lists_pointers():
     from skeleton.social.field import field_card
     card = field_card()

@@ -155,6 +155,10 @@ class CommandDeck:
         from skeleton.organism.health import health_card
         return health_card(neo=self.neo)
 
+    def doctor(self) -> Dict[str, Any]:
+        from skeleton.organism.doctor import doctor_card
+        return doctor_card(neo=self.neo)
+
     def next(self) -> Dict[str, Any]:
         from skeleton.organism.next import hint
         from skeleton.organism.organismer import live_organismer
