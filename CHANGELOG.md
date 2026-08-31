@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Version 2026.08.31-walk
+
+- Product stamp. Ritual is ready --walk. Health carries field_n.
+
+---
+
 ## 2026-08-31 — Ready --walk
 
 - ready_card(walk=True) runs a short field walk after seed.

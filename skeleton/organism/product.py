@@ -17,7 +17,7 @@ from skeleton.social.sota import sota_card
 from skeleton.social.sources import SOTA_POINTERS
 
 
-VERSION = "2026.08.31-ready"
+VERSION = "2026.08.31-walk"
 
 
 ENDPOINTS = (

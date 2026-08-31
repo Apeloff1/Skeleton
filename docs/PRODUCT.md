@@ -3,7 +3,7 @@
 Operator JSON. No dashboard required.
 
 ```
-python -m skeleton ready
+python -m skeleton ready --walk -n 2
 python -m skeleton product
 python -m skeleton health
 python -m skeleton next

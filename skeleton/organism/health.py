@@ -13,6 +13,7 @@ def health_card(org=None, *, neo=None) -> Dict[str, Any]:
     from skeleton.galaxy.lattice import card as lattice_card
     from skeleton.organism.caps import card as caps_card
     from skeleton.organism.organismer import live_organismer
+    from skeleton.social.sources import SOTA_POINTERS
 
     org = org or live_organismer()
     caps = caps_card()
@@ -41,6 +42,7 @@ def health_card(org=None, *, neo=None) -> Dict[str, Any]:
         "lattice": lat.get("ascii"),
         "kv_bound": kv.get("bound"),
         "kv_n": kv.get("n"),
+        "field_n": len(SOTA_POINTERS),
         "next": nxt.get("code"),
         "next_why": nxt.get("why"),
         "journal": tail(4, root=getattr(org, "root", None)),

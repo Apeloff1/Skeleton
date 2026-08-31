@@ -1,4 +1,4 @@
-# Freeze — 2026-08-31 ready
+# Freeze — 2026.08.31-walk
 
 Repo: Apeloff1/Skeleton  
 Ritual: `python -m skeleton ready` then `python -m skeleton walk -n 3`
