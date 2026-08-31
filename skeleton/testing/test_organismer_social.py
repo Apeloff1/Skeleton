@@ -105,6 +105,13 @@ def test_persist_and_ledger(tmp_path):
     loaded = load(org2, root=tmp_path)
     assert loaded["loaded"] == 1
     assert org2.G >= 1.0
+    assert a["galaxy"]["atom_ids"]
+    from skeleton.galaxy.shelf import load as gload
+    g2 = GalaxySystem()
+    info = gload(g2, root=tmp_path)
+    assert info["loaded"] == 1
+    assert info["n"] >= 1
+    assert len(g2.mesh.wiki.topics) >= 1
 
 
 def test_product_card_shape():

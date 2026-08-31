@@ -43,6 +43,7 @@ def append(event: Dict[str, Any], *, root: Optional[Path] = None) -> Dict[str, A
         "url": (event.get("url") or "")[:240],
         "topic": (event.get("topic") or "")[:120],
         "G": event.get("G"),
+        "atoms": (event.get("atoms") or "")[:160],
         "prev": head(root),
         "stored_prose": 0,
     })

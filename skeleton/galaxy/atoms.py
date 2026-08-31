@@ -146,6 +146,31 @@ class Atom:
             confidence=confidence, risk=risk,
         )
 
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Atom":
+        tags = tuple(data.get("tags") or ())
+        links = tuple(data.get("links") or ())
+        atom = cls(
+            id=str(data.get("id") or atom_id("restore")),
+            kind=str(data.get("kind") or "capture"),
+            tier=str(data.get("tier") or "T0_FLASH"),
+            topic=str(data.get("topic") or "")[:160],
+            dialect=str(data.get("dialect") or "")[:160],
+            brain=str(data.get("brain") or "memory"),
+            color=str(data.get("color") or ""),
+            citation=str(data.get("citation") or "")[:240],
+            url=str(data.get("url") or "")[:240],
+            parent=str(data.get("parent") or ""),
+            links=links,
+            tags=tags,
+            confidence=float(data.get("confidence") or 0.7),
+            risk=float(data.get("risk") or 0.0),
+            stored_prose=0,
+            superseded_by=str(data.get("superseded_by") or ""),
+            ts=float(data.get("ts") or time.time()),
+        )
+        return atom
+
 
 def house_dialect(stimulus: str) -> str:
     """House paraphrase — pointers + structure, never source prose."""

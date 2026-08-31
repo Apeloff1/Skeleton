@@ -7,9 +7,11 @@ Wiki librarian hears every write. Mouths attach as colored gap rings.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 from skeleton.galaxy.atoms import Atom
+from skeleton.galaxy import shelf as galaxy_shelf
 from skeleton.galaxy.brains import CompilerBrain, DistillerBrain, DreamBrain, EditorBrain, MemoryBrain
 from skeleton.galaxy.codec import KnowledgeCodec
 from skeleton.galaxy.decoder import KnowledgeDecoder
@@ -19,7 +21,7 @@ from skeleton.galaxy.mirrors import bind_mouth, mouth_mirrors
 
 
 class GalaxySystem:
-    def __init__(self) -> None:
+    def __init__(self, *, persist: bool = False, root: Optional[Path] = None) -> None:
         self.mesh = LibrarianMesh()
         self.codec = KnowledgeCodec()
         self.decoder = KnowledgeDecoder()
@@ -29,6 +31,10 @@ class GalaxySystem:
         self.distiller = DistillerBrain(self.mesh, self.codec)
         self.editor = EditorBrain(self.mesh, self.codec)
         self.pulses = 0
+        self.persist_on = persist
+        self.root = root
+        if persist:
+            galaxy_shelf.load(self, root=root)
 
     def pulse(self, stimulus: str, *, citation: str = "", url: str = "", sleep: bool = False) -> Dict[str, Any]:
         dest = self.editor.route(stimulus)
@@ -41,6 +47,7 @@ class GalaxySystem:
         dream_card = self.dream.sleep() if sleep else None
         decoded = self.decoder.decode(stimulus, self.mesh.broadcast_search(stimulus, k=4), k=4)
         self.pulses += 1
+        saved = galaxy_shelf.save(self, root=self.root) if self.persist_on else None
         return {
             "kind": "galaxy-pulse",
             "pulses": self.pulses,
@@ -54,6 +61,8 @@ class GalaxySystem:
             "wiki": self.mesh.wiki.catalog(),
             "librarians": self.mesh.to_dict(),
             "hoag": galaxy_card(),
+            "saved": saved,
+            "atom_ids": [a.id for a in (mem, compiled, principle, indexed) if a is not None],
             "stored_prose": 0,
         }
 
@@ -96,7 +105,7 @@ _LIVE: Optional[GalaxySystem] = None
 def live_galaxy() -> GalaxySystem:
     global _LIVE
     if _LIVE is None:
-        _LIVE = GalaxySystem()
+        _LIVE = GalaxySystem(persist=True)
     return _LIVE
 
 

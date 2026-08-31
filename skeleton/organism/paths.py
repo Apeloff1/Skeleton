@@ -19,3 +19,7 @@ def state_path(root: Optional[Path] = None) -> Path:
 
 def ledger_path(root: Optional[Path] = None) -> Path:
     return organism_dir(root) / "ledger.jsonl"
+
+
+def galaxy_path(root: Optional[Path] = None) -> Path:
+    return organism_dir(root) / "galaxy.json"

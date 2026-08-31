@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Galaxy shelf persist + atom ids on the merkle chain
+
+- galaxy/shelf.py — atoms + wiki topics survive process (cap 400).
+- Atom.from_dict. Pulse returns atom_ids. Ledger line carries them.
+- Product card exposes galaxy_atoms / wiki_topics.
+
+---
+
 ## 2026-08-31 — Product persist + merkle ledger + write router
 
 - Dual-layer write route skip|update|new against wiki nucleus.

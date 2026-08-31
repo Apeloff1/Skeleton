@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional
 from skeleton.cortex.attn import cosine_lr
 from skeleton.cortex.genos import Genos
 from skeleton.galaxy.system import GalaxySystem, live_galaxy
+from skeleton.galaxy.shelf import save as galaxy_save
 from skeleton.organism.ledger import append as ledger_append, count as ledger_count
 from skeleton.organism.router import card as route_card_of, route as write_route, should_pulse
 from skeleton.organism.shelf import load as shelf_load, save as shelf_save
@@ -151,6 +152,7 @@ class Organismer:
                     "memory_id": (gxy.get("memory") or {}).get("id"),
                     "principle": (gxy.get("principle") or {}).get("id") if gxy.get("principle") else None,
                     "wiki_topics": len((gxy.get("wiki") or {}).get("topics") or {}),
+                    "atom_ids": list(gxy.get("atom_ids") or []),
                 },
                 "genos": genos_card,
                 "sota": sota_card(stimulus, G=self.G),
@@ -159,14 +161,17 @@ class Organismer:
             }
             line: Dict[str, Any] = {}
             if self.persist_on:
+                ids = list(gxy.get("atom_ids") or [])
                 line = ledger_append({
                     "kind": "organism-write",
                     "decision": decision,
                     "url": cite,
-                    "topic": hit or stimulus[:80],
+                    "topic": (hit or stimulus)[:80],
                     "G": self.G,
+                    "atoms": ",".join(ids)[:160],
                 }, root=self.root)
                 card["saved"] = shelf_save(self, root=self.root)
+                card["galaxy_saved"] = galaxy_save(self.galaxy, root=self.root)
             card["ledger"] = {
                 "sha": line.get("sha"),
                 "prev": line.get("prev"),

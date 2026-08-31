@@ -32,6 +32,8 @@ def product_card() -> Dict[str, Any]:
         "steps": snap["steps"],
         "errors": snap["errors"],
         "galaxy_pulses": snap["galaxy_pulses"],
+        "galaxy_atoms": sum(len(lib.shelf) for lib in org.galaxy.mesh.brains.values()),
+        "wiki_topics": len(org.galaxy.mesh.wiki.topics),
         "ledger": {"head": head(org.root), "n": count(org.root), "path": str(ledger_path(org.root))},
         "state_path": str(state_path(org.root)),
         "endpoints": list(ENDPOINTS),

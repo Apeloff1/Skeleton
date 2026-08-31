@@ -23,4 +23,5 @@ House implementation is Jaccard + DreamBrain, not their SFT cascade.
 
 ## Persistence
 
-Runtime only. `skeleton/acquired/organism/` is gitignored.
+Runtime only. `skeleton/acquired/organism/` is gitignored
+(`state.json`, `ledger.jsonl`, `galaxy.json`). Cap 400 atoms.

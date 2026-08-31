@@ -9,10 +9,9 @@ architecture.
   mouth: house LoRA + SGD + Hebb + absorb, then distiller gleans the
   *rule*, not the teacher weights.
 - Optional live CDX fetch (opt-in, header-only, 1s/host throttle).
-- Merkle line per social pointer + galaxy write. (organism ledger live;
-  galaxy atom ids not yet hashed into the same chain)
-- Persistence of galaxy *atom shelf* across process (organism G persists;
-  wiki topics still process-local).
+- Merkle line per social pointer + galaxy write. (ledger now carries
+  atom ids; social URL already on the line)
+- Persistence of galaxy atom shelf — done this pass. Cap 400.
 
 ## P1
 
