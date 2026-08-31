@@ -29,6 +29,7 @@ ENDPOINTS = (
     "GET /cortex/health",
     "GET /cortex/next",
     "POST /cortex/seed",
+    "GET /cortex/ready",
 )
 
 

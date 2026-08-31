@@ -54,6 +54,19 @@ def test_sota_card_has_seeded_field_pointers():
     assert card["coverage"]["pointers"] >= 16
 
 
+def test_ready_card_seeds_then_reports(tmp_path):
+    from skeleton.organism.organismer import Organismer
+    from skeleton.organism.ready import ready_card
+    org = Organismer(root=tmp_path, persist=False)
+    card = ready_card(org)
+    assert card["kind"] == "ready"
+    assert card["ok"] == 1
+    assert card["seed"]["minted"] >= 1
+    again = ready_card(org)
+    assert again["seed"]["minted"] == 0
+    assert card["stored_prose"] == 0
+
+
 def test_seed_field_is_idempotent():
     from skeleton.galaxy.system import GalaxySystem
     from skeleton.social.seed import seed_field

@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Ready ritual + wiki field in S
+
+- organism/ready.py seeds an empty wiki then returns health/next/caps.
+- CLI ready, GET /cortex/ready.
+- _S gains up to 0.18 from wiki topic count.
+
+---
+
 ## 2026-08-31 — Field seed + health carries next/journal
 
 - social/seed.py files SOTA pointers as citation atoms. Idempotent.

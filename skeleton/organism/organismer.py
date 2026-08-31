@@ -80,7 +80,12 @@ class Organismer:
                 cov = float(coverage_card("").get("score") or 0)
             except Exception:
                 cov = 0.0
-        raw = 1.0 + 0.14 * n + 0.10 * x + 0.12 * p + 0.20 * cov
+        field = 0.0
+        try:
+            field = min(0.18, 0.01 * len(self.galaxy.mesh.wiki.topics or {}))
+        except Exception:
+            field = 0.0
+        raw = 1.0 + 0.14 * n + 0.10 * x + 0.12 * p + 0.20 * cov + field
         return _clip(raw, 1.0, 2.2)
 
     def step(
