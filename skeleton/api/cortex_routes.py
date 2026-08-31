@@ -168,3 +168,24 @@ async def cortex_galaxy_get() -> Dict[str, Any]:
 async def cortex_galaxy_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     stimulus = str(request.get("stimulus") or request.get("vision") or "").strip()
     return _deck(state).galaxy(stimulus, sleep=bool(request.get("sleep")))
+
+
+@router.get("/cortex/social")
+async def cortex_social_get(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).social("")
+
+
+@router.post("/cortex/social")
+async def cortex_social_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).social(str(request.get("stimulus") or request.get("url") or ""))
+
+
+@router.get("/cortex/organismer")
+async def cortex_organismer_get(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).organismer("")
+
+
+@router.post("/cortex/organismer")
+async def cortex_organismer_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    stimulus = str(request.get("stimulus") or request.get("vision") or "").strip()
+    return _deck(state).organismer(stimulus, sleep=bool(request.get("sleep")))

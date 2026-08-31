@@ -1,0 +1,82 @@
+"""Reputable source registry — pointers only.
+
+House shelves never store article or post prose. Each row is a
+citation handle: id, house, url pattern, license note. Social SOTA
+is measured by how many of these handles a pulse can bind, not by
+scraping feeds.
+"""
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional, Tuple
+
+Source = Dict[str, Any]
+
+SOURCES: Tuple[Source, ...] = (
+    {"id": "arxiv", "house": "arXiv", "kind": "paper",
+     "base": "https://arxiv.org/abs/", "match": ("arxiv.org/abs/", "arxiv.org/html/", "arxiv.org/pdf/"),
+     "note": "open preprint"},
+    {"id": "xarchive", "house": "Xarchive", "kind": "archive",
+     "base": "https://xarchive.net/", "match": ("xarchive.net",),
+     "note": "wayback CDX index; stores no post copies"},
+    {"id": "wayback", "house": "Internet Archive", "kind": "archive",
+     "base": "https://web.archive.org/", "match": ("web.archive.org", "web.archive.org/cdx/search/cdx"),
+     "note": "CDX capture pointer"},
+    {"id": "x-status", "house": "X", "kind": "post",
+     "base": "https://x.com/", "match": ("x.com/", "twitter.com/"),
+     "note": "status URL pointer; no body stored"},
+    {"id": "xai", "house": "xAI", "kind": "lab",
+     "base": "https://x.ai/", "match": ("x.ai/", "docs.x.ai"),
+     "note": "lab primary"},
+    {"id": "anthropic", "house": "Anthropic", "kind": "lab",
+     "base": "https://www.anthropic.com/", "match": ("anthropic.com",),
+     "note": "lab primary"},
+    {"id": "openai", "house": "OpenAI", "kind": "lab",
+     "base": "https://openai.com/", "match": ("openai.com",),
+     "note": "lab primary"},
+    {"id": "deepmind", "house": "Google DeepMind", "kind": "lab",
+     "base": "https://deepmind.google/", "match": ("deepmind.google", "deepmind.com"),
+     "note": "lab primary"},
+    {"id": "meta-ai", "house": "Meta", "kind": "lab",
+     "base": "https://ai.meta.com/", "match": ("ai.meta.com", "arxiv.org"),
+     "note": "lab + papers"},
+    {"id": "stanford-crfm", "house": "Stanford CRFM", "kind": "lab",
+     "base": "https://crfm.stanford.edu/", "match": ("crfm.stanford.edu",),
+     "note": "academic"},
+    {"id": "openai-index", "house": "OpenAI", "kind": "article",
+     "base": "https://openai.com/index/", "match": ("openai.com/index/",),
+     "note": "lab article"},
+    {"id": "hf-papers", "house": "Hugging Face", "kind": "paper",
+     "base": "https://huggingface.co/papers/", "match": ("huggingface.co/papers",),
+     "note": "paper card"},
+    {"id": "github-oss", "house": "GitHub", "kind": "code",
+     "base": "https://github.com/", "match": ("github.com/",),
+     "note": "repo pointer"},
+)
+
+# Seed SOTA pointer set — house dialect topics, not abstracts.
+SOTA_POINTERS: Tuple[Dict[str, str], ...] = (
+    {"topic": "proactive-memory-agent", "url": "https://arxiv.org/abs/2607.08716", "house": "arXiv"},
+    {"topic": "mindmemos", "url": "https://arxiv.org/abs/2608.12428", "house": "arXiv"},
+    {"topic": "o-mem", "url": "https://arxiv.org/html/2511.13593", "house": "arXiv"},
+    {"topic": "graph-agent-memory", "url": "https://arxiv.org/abs/2602.05665", "house": "arXiv"},
+    {"topic": "recuris-rsi", "url": "https://arxiv.org/abs/2608.24876", "house": "arXiv"},
+    {"topic": "memgen", "url": "https://arxiv.org/abs/2509.24704", "house": "arXiv"},
+    {"topic": "context-codec", "url": "https://arxiv.org/abs/2605.17304", "house": "arXiv"},
+    {"topic": "dual-layer-memory", "url": "https://arxiv.org/abs/2608.22215", "house": "arXiv"},
+    {"topic": "x-archive-rag", "url": "https://github.com/mameshivaa/x-archive-rag", "house": "GitHub"},
+    {"topic": "xf-archive-search", "url": "https://github.com/Dicklesworthstone/xf", "house": "GitHub"},
+    {"topic": "xarchive", "url": "https://xarchive.net/about", "house": "Xarchive"},
+    {"topic": "wayback-cdx", "url": "https://web.archive.org/cdx/search/cdx", "house": "Internet Archive"},
+)
+
+
+def catalog() -> List[Dict[str, Any]]:
+    return [dict(s) for s in SOURCES]
+
+
+def classify(url: str) -> Optional[Source]:
+    u = (url or "").lower()
+    for src in SOURCES:
+        if any(m in u for m in src["match"]):
+            return dict(src)
+    return None

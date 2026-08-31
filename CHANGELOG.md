@@ -4,6 +4,20 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Organismer 10× + social SOTA (ArchiveX / arXiv / labs)
+
+- `skeleton/organism/organismer.py` — clipped G growth with source
+  density S. Target G=10.
+- `skeleton/social/` — source catalog, ArchiveX/Wayback pointers,
+  ingest, SOTA coverage card. stored_prose=0.
+- CommandDeck.organismer / social. CLI + HTTP.
+- Seeded field pointers: Recuris, MindMemOS, O-Mem, MemGen,
+  proactive-memory, context-codec, x-archive-rag, xf, xarchive.
+- Tests: `skeleton/testing/test_organismer_social.py`.
+- Docs: `docs/ORGANISMER.md`.
+
+---
+
 ## 2026-08-30 — Hoag galaxy five-brain knowledge + context postprocess
 
 - `skeleton/galaxy/` — memory, compiler, dream, distiller, editor.

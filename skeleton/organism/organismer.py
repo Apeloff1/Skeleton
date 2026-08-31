@@ -1,0 +1,170 @@
+"""Organismer — the process that multiplies the organism toward 10×.
+
+Organism  = cortex + galaxy + genos + social pointers.
+Organismer = one bounded step that compounds all four.
+
+Extended gene (house, not a paper copy):
+
+    G' = G * (1 + η * M * H * C * S * (1 - ε))
+
+S is source density from social ingest + seeded field pointers.
+Per-step growth is clipped to [1.00, 1.22] so a single speak cannot
+overshoot the 10× trajectory. Target remains G=10.
+
+Decentralized memory pattern (private brain shelves + shared wiki
+nucleus) is already the galaxy; organismer only scores it and
+advances G.
+"""
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional
+
+from skeleton.cortex.attn import cosine_lr
+from skeleton.cortex.genos import Genos
+from skeleton.galaxy.system import GalaxySystem, live_galaxy
+from skeleton.social.ingest import ingest
+from skeleton.social.sota import sota_card
+
+
+def _clip(x: float, lo: float, hi: float) -> float:
+    return lo if x < lo else hi if x > hi else x
+
+
+class Organismer:
+    TARGET = 10.0
+
+    def __init__(self, *, genos: Optional[Genos] = None, galaxy: Optional[GalaxySystem] = None) -> None:
+        self.genos = genos or Genos()
+        self.galaxy = galaxy or live_galaxy()
+        self.steps = 0
+        self.errors = 0
+        self.log: List[Dict[str, Any]] = []
+
+    @property
+    def G(self) -> float:
+        return float(self.genos.G)
+
+    @property
+    def toward(self) -> float:
+        return min(100.0, max(0.0, (self.G - 1.0) / (self.TARGET - 1.0) * 100.0))
+
+    def _S(self, social: Dict[str, Any]) -> float:
+        n = len(social.get("houses") or [])
+        x = int(social.get("x_posts") or 0)
+        p = int(social.get("papers") or 0)
+        raw = 1.0 + 0.14 * n + 0.10 * x + 0.12 * p
+        return _clip(raw, 1.0, 2.2)
+
+    def step(
+        self,
+        stimulus: str,
+        *,
+        neo: Any = None,
+        sleep: bool = False,
+        citation: str = "",
+        url: str = "",
+    ) -> Dict[str, Any]:
+        self.steps += 1
+        eta = cosine_lr(min(self.steps, 64), 64, base=0.28, floor=0.08)
+        social = ingest(stimulus)
+        first = (social.get("cards") or [{}])[0] if social.get("cards") else {}
+        cite = citation or str(first.get("url") or "")
+        try:
+            gxy = self.galaxy.pulse(stimulus, citation=cite, url=url or cite, sleep=sleep)
+            if social.get("cards"):
+                for card in social["cards"][:6]:
+                    topic = str(card.get("kind") or "url") + " " + str(card.get("url") or "")[:80]
+                    self.galaxy.editor.index_topic(
+                        self.galaxy.codec.encode(
+                            topic, kind="citation", brain="editor",
+                            citation=str(card.get("url") or ""), url=str(card.get("url") or ""),
+                            depth_hint=5, tags=("social", str(card.get("house") or "web")),
+                        )
+                    )
+            genos_card = None
+            bound = neo is not None and (
+                hasattr(neo, "elect_mouth") or hasattr(neo, "transformer") or bool(getattr(neo, "slots", None))
+            )
+            if bound:
+                genos_card = self.genos.pulse(neo, stimulus=stimulus)
+            else:
+                # organismer-local gene when no neo mouth is bound
+                S = self._S(social)
+                M, H, C, eps = 1.0, 0.7, 0.12, self.errors / max(1, self.steps)
+                growth = _clip(1.0 + eta * M * H * C * S * (1.0 - eps), 1.0, 1.22)
+                self.genos.G = float(self.genos.G * growth)
+                self.genos.pulses += 1
+                if self.genos.G > self.genos.peak:
+                    self.genos.peak = self.genos.G
+                genos_card = {
+                    "ok": 1, "M": M, "H": H, "C": C, "S": S,
+                    "G": round(self.genos.G, 6), "growth": round(growth, 6),
+                    "eta": round(eta, 4), "path": "organismer-local",
+                }
+            S = self._S(social)
+            if genos_card and "S" not in genos_card:
+                # fold S into an already-pulsed G without double-counting hard:
+                # apply a small residual S-boost, still clipped
+                residual = _clip(1.0 + 0.04 * (S - 1.0), 1.0, 1.08)
+                self.genos.G = float(self.genos.G * residual)
+                genos_card = {**genos_card, "S": S, "S_residual": round(residual, 4),
+                              "G": round(self.genos.G, 6)}
+            card = {
+                "kind": "organismer",
+                "step": self.steps,
+                "G": round(self.G, 6),
+                "target": self.TARGET,
+                "toward_10x_pct": round(self.toward, 2),
+                "eta": round(eta, 4),
+                "S": S,
+                "social": social,
+                "galaxy": {
+                    "route": gxy.get("route"),
+                    "memory_id": (gxy.get("memory") or {}).get("id"),
+                    "principle": (gxy.get("principle") or {}).get("id") if gxy.get("principle") else None,
+                    "wiki_topics": len((gxy.get("wiki") or {}).get("topics") or {}),
+                },
+                "genos": genos_card,
+                "sota": sota_card(stimulus, G=self.G),
+                "stored_prose": 0,
+            }
+            self.log.append({"step": self.steps, "G": card["G"], "S": S})
+            return card
+        except Exception as exc:
+            self.errors += 1
+            return {
+                "kind": "organismer",
+                "ok": 0,
+                "error": type(exc).__name__,
+                "G": round(self.G, 6),
+                "stored_prose": 0,
+            }
+
+    def snapshot(self) -> Dict[str, Any]:
+        return {
+            "kind": "organism",
+            "G": round(self.G, 6),
+            "target": self.TARGET,
+            "toward_10x_pct": round(self.toward, 2),
+            "steps": self.steps,
+            "errors": self.errors,
+            "galaxy_pulses": self.galaxy.pulses,
+            "sota": sota_card("", G=self.G),
+            "log": list(self.log[-24:]),
+            "stored_prose": 0,
+        }
+
+
+_LIVE: Optional[Organismer] = None
+
+
+def live_organismer() -> Organismer:
+    global _LIVE
+    if _LIVE is None:
+        _LIVE = Organismer()
+    return _LIVE
+
+
+def reset_organismer() -> None:
+    global _LIVE
+    _LIVE = None

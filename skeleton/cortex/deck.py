@@ -132,6 +132,19 @@ class CommandDeck:
         card["stored_prose"] = 0
         return card
 
+    def organismer(self, stimulus: str = "", *, sleep: bool = False) -> Dict[str, Any]:
+        from skeleton.organism.organismer import live_organismer
+        org = live_organismer()
+        if stimulus:
+            return org.step(stimulus, neo=self.neo, sleep=sleep)
+        snap = org.snapshot()
+        snap["G"] = round(_g(self.neo), 6) if _g(self.neo) > snap["G"] else snap["G"]
+        return snap
+
+    def social(self, stimulus: str = "") -> Dict[str, Any]:
+        from skeleton.social.sota import sota_card
+        return sota_card(stimulus, G=_g(self.neo))
+
     def plan(self, vision: str) -> Dict[str, Any]:
         from skeleton.cortex.era_bind import resolve
         card = resolve(vision)

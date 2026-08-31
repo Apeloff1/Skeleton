@@ -67,6 +67,11 @@ def main(argv: list[str] | None = None) -> int:
     gx = sub.add_parser("galaxy", help="five-brain Hoag knowledge pulse")
     gx.add_argument("stimulus", nargs="?", default="")
     gx.add_argument("--sleep", action="store_true")
+    og = sub.add_parser("organismer", help="10x organism step over galaxy+social")
+    og.add_argument("stimulus", nargs="?", default="")
+    og.add_argument("--sleep", action="store_true")
+    so = sub.add_parser("social", help="social SOTA card / ArchiveX pointers")
+    so.add_argument("stimulus", nargs="?", default="")
     sub.add_parser("zaibatsu", help="tournament the three mouths; print the family seal")
 
     sp = sub.add_parser("speak", help="neo transformer decode")
@@ -210,6 +215,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "galaxy":
         from skeleton.cortex.deck import live_deck
         out = live_deck().galaxy(args.stimulus, sleep=args.sleep)
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "organismer":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().organismer(args.stimulus, sleep=args.sleep)
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "social":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().social(args.stimulus)
         print(json.dumps(out, indent=2, default=str))
         return 0
 
