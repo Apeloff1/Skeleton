@@ -144,6 +144,7 @@ def test_ready_card_seeds_then_reports(tmp_path):
     card = ready_card(org)
     assert card["kind"] == "ready"
     assert card["ok"] == 1
+    assert card.get("doctor", {}).get("ok") == 1
     assert card["seed"]["minted"] >= 1
     again = ready_card(org)
     assert again["seed"]["minted"] == 0

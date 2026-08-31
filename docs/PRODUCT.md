@@ -6,6 +6,7 @@ Operator JSON. No dashboard required.
 python -m skeleton ready --walk -n 2
 python -m skeleton product
 python -m skeleton health
+python -m skeleton doctor
 python -m skeleton next
 python -m skeleton seed
 python -m skeleton caps

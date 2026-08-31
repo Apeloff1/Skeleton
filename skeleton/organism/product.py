@@ -7,6 +7,7 @@ from skeleton.organism.ledger import count, head
 from skeleton.organism.organismer import live_organismer
 from skeleton.galaxy.vault import vault_path
 from skeleton.organism.caps import card as caps_card
+from skeleton.organism.doctor import doctor_card
 from skeleton.organism.health import health_card
 from skeleton.organism.next import hint as next_hint
 from skeleton.organism.mhc import mhc_card
@@ -62,6 +63,7 @@ def product_card() -> Dict[str, Any]:
         "vault": vault_path(org.root).as_posix(),
         "caps": caps_card(),
         "health": health_card(org),
+        "doctor": doctor_card(org),
         "path10": path_card(org),
         "mhc": mhc_card(org),
         "budget": next_hint(org).get("budget"),

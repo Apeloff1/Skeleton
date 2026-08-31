@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Doctor on ready and product
+
+- ready and product embed the doctor card.
+
+---
+
 ## 2026-08-31 — Doctor + two field handles
 
 - organism/doctor.py. CLI doctor, GET /cortex/doctor.

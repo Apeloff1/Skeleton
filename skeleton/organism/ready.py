@@ -6,6 +6,7 @@ from typing import Any, Dict
 
 def ready_card(org=None, *, neo=None, walk: bool = False, n: int = 2) -> Dict[str, Any]:
     from skeleton.organism.caps import card as caps_card
+    from skeleton.organism.doctor import doctor_card
     from skeleton.organism.health import health_card
     from skeleton.organism.mhc import mhc_card
     from skeleton.organism.next import hint
@@ -32,6 +33,7 @@ def ready_card(org=None, *, neo=None, walk: bool = False, n: int = 2) -> Dict[st
         "caps": caps_card(),
         "path10": path_card(org),
         "mhc": mhc_card(org),
+        "doctor": doctor_card(org, neo=neo),
         "walk": walked,
         "stored_prose": 0,
     }
