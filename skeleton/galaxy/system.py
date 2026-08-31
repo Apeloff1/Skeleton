@@ -45,7 +45,8 @@ class GalaxySystem:
             principle = self.distiller.glean(stimulus, citation=citation)
         indexed = self.editor.index_topic(compiled)
         dream_card = self.dream.sleep() if sleep else None
-        decoded = self.decoder.decode(stimulus, self.mesh.broadcast_search(stimulus, k=4), k=4)
+        from skeleton.galaxy.prior import blend as prior_blend
+        decoded = prior_blend(stimulus, self.mesh.broadcast_search(stimulus, k=4), decoder=self.decoder)
         audited = self.editor.audit()
         self.pulses += 1
         saved = galaxy_shelf.save(self, root=self.root) if self.persist_on else None

@@ -5,6 +5,7 @@ from typing import Any, Dict
 
 from skeleton.organism.ledger import count, head
 from skeleton.organism.organismer import live_organismer
+from skeleton.galaxy.vault import vault_path
 from skeleton.organism.paths import ledger_path, state_path
 from skeleton.social.sota import sota_card
 from skeleton.social.sources import SOTA_POINTERS
@@ -36,6 +37,7 @@ def product_card() -> Dict[str, Any]:
         "wiki_topics": len(org.galaxy.mesh.wiki.topics),
         "ledger": {"head": head(org.root), "n": count(org.root), "path": str(ledger_path(org.root))},
         "state_path": str(state_path(org.root)),
+        "vault": vault_path(org.root).as_posix(),
         "endpoints": list(ENDPOINTS),
         "field": [dict(p) for p in SOTA_POINTERS],
         "sota": sota_card("", G=org.G),

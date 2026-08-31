@@ -200,3 +200,26 @@ def test_idle_due_cadence():
     assert due(4, 0) is True
     assert due(5, 4) is False
     assert due(8, 4) is True
+
+
+def test_ccl_vault_roundtrip(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.galaxy.vault import dump, load
+    gxy = GalaxySystem()
+    gxy.pulse("plan tensor ttk lattice")
+    card = dump(gxy.mesh, root=tmp_path)
+    assert card["n"] >= 1
+    rows = load(root=tmp_path)
+    assert rows and "kind" in rows[0]
+    assert card["stored_prose"] == 0
+
+
+def test_prior_stays_cpu_without_mouth():
+    from skeleton.galaxy.atoms import Atom
+    from skeleton.galaxy.prior import blend
+    atom = Atom.mint(kind="capture", tier="T0_FLASH", topic="plan tensor",
+                     dialect="house:plan tensor", brain="memory", color="cyan")
+    card = blend("plan tensor", [atom])
+    assert card["prior"] == "cpu-jaccard"
+    assert card["device"] == "cpu"
+    assert card["stored_prose"] == 0

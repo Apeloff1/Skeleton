@@ -50,7 +50,9 @@ def save(system, *, root: Optional[Path] = None) -> Dict[str, Any]:
     path = galaxy_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
-    return {"path": str(path), "n": payload["n"], "topics": len(payload["topics"])}
+    from skeleton.galaxy.vault import dump as dump_ccl
+    ccl = dump_ccl(system.mesh, root=root)
+    return {"path": str(path), "n": payload["n"], "topics": len(payload["topics"]), "ccl": ccl}
 
 
 def load(system, *, root: Optional[Path] = None) -> Dict[str, Any]:

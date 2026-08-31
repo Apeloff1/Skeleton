@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — CCL vault + decoder device prior
+
+- acquired/galaxy/vault.ccl compact codec lines.
+- Decoder prior CPU-canonical; GPU tilt only if mouth device is not cpu.
+- Vault written beside galaxy.json on persist.
+
+---
+
 ## 2026-08-31 — MAD editor audit + idle dream + contact surface
 
 - galaxy/mad.py — Jaccard collapse + robust-z outliers on principles.
