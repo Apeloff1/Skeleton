@@ -173,6 +173,10 @@ class CommandDeck:
         from skeleton.organism.pulse import pulse
         return pulse(neo=self.neo, stimulus=stimulus)
 
+    def walk(self, stimulus: str = "", n: int = 4) -> Dict[str, Any]:
+        from skeleton.organism.runloop import walk
+        return walk(neo=self.neo, stimulus=stimulus, n=n)
+
     def wiki(self, q: str = "") -> Dict[str, Any]:
         from skeleton.galaxy.query import run
         from skeleton.galaxy.system import live_galaxy

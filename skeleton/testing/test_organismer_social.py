@@ -54,6 +54,18 @@ def test_sota_card_has_seeded_field_pointers():
     assert card["coverage"]["pointers"] >= 16
 
 
+def test_walk_is_bounded(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.organismer import Organismer
+    from skeleton.organism.runloop import walk
+    org = Organismer(root=tmp_path, persist=False, galaxy=GalaxySystem())
+    card = walk(org, persist=False, n=3)
+    assert card["kind"] == "run"
+    assert card["n"] <= 3
+    assert card["limit"] == 3
+    assert card["stored_prose"] == 0
+
+
 def test_pulse_obeys_next(tmp_path):
     from skeleton.galaxy.system import GalaxySystem
     from skeleton.organism.organismer import Organismer

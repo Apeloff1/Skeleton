@@ -244,3 +244,9 @@ async def cortex_ready_get(state=Depends(_state)) -> Dict[str, Any]:
 @router.post("/cortex/pulse")
 async def cortex_pulse_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).pulse(str(request.get("stimulus") or ""))
+
+
+@router.post("/cortex/walk")
+async def cortex_walk_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    n = int(request.get("n") or 4)
+    return _deck(state).walk(str(request.get("stimulus") or ""), n=n)

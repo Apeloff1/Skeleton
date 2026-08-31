@@ -87,6 +87,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("ready", help="seed if empty, then health+next+caps")
     pu = sub.add_parser("pulse", help="obey the next code")
     pu.add_argument("stimulus", nargs="?", default="")
+    wk = sub.add_parser("walk", help="bounded pulse walk (not gameforge run)")
+    wk.add_argument("stimulus", nargs="?", default="")
+    wk.add_argument("-n", type=int, default=4)
     sub.add_parser("zaibatsu", help="tournament the three mouths; print the family seal")
 
     sp = sub.add_parser("speak", help="neo transformer decode")
@@ -308,6 +311,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "pulse":
         from skeleton.cortex.deck import live_deck
         out = live_deck().pulse(args.stimulus)
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "walk":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().walk(args.stimulus, n=args.n)
         print(json.dumps(out, indent=2, default=str))
         return 0
 

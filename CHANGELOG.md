@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Bounded walk (not gameforge run)
+
+- organism/runloop.py pulses until hold/tighten or N≤8.
+- CLI walk, POST /cortex/walk. Does not steal `run`.
+
+---
+
 ## 2026-08-31 — Pulse obeys next
 
 - organism/pulse.py dispatches seed/dream/step/tighten/hold.
