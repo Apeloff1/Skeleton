@@ -212,6 +212,19 @@ def test_next_hint_and_journal(tmp_path):
     assert rows and rows[-1]["decision"] == "new"
 
 
+def test_wiki_bound_coverage_after_seed():
+    from skeleton.galaxy.system import live_galaxy, reset_galaxy
+    from skeleton.social.coverage import coverage_card
+    from skeleton.social.seed import seed_field
+    reset_galaxy()
+    seed_field(live_galaxy())
+    cov = coverage_card("")
+    assert cov["mode"] == "wiki-bound"
+    assert cov["wiki_bound"]
+    assert cov["stored_prose"] == 0
+    reset_galaxy()
+
+
 def test_coverage_and_path10_and_freshness():
     from skeleton.galaxy.system import GalaxySystem
     from skeleton.organism.organismer import Organismer
@@ -221,6 +234,7 @@ def test_coverage_and_path10_and_freshness():
     assert cov["kind"] == "field-coverage"
     assert cov["score"] > 0
     assert "arXiv" in cov["bound"]
+    assert "wiki_bound" in cov
     org = Organismer()
     p = path_card(org)
     assert p["target"] == 10.0

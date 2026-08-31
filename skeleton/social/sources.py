@@ -81,6 +81,9 @@ SOTA_POINTERS: Tuple[Dict[str, str], ...] = (
     {"topic": "retain-or-consolidate", "url": "https://arxiv.org/abs/2607.17545", "house": "arXiv"},
     {"topic": "agent-native-memory", "url": "https://arxiv.org/abs/2606.24775", "house": "arXiv"},
     {"topic": "routed-graph-handoff", "url": "https://arxiv.org/abs/2608.25277", "house": "arXiv"},
+    {"topic": "mragent-reconstruct", "url": "https://arxiv.org/abs/2606.06036", "house": "arXiv"},
+    {"topic": "entity-memory-graph", "url": "https://arxiv.org/abs/2608.27925", "house": "arXiv"},
+    {"topic": "sage-graph-memory", "url": "https://arxiv.org/abs/2605.12061", "house": "arXiv"},
 )
 
 
