@@ -21,10 +21,11 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
     acted: Dict[str, Any] = {"code": code}
     if code == "tighten":
         from skeleton.organism.caps import adapt, trim_mesh
-        from skeleton.organism.laws import clip_fat
+        from skeleton.organism.laws import clip_fat, persist_clip
         acted["adapt"] = adapt()
         acted["trim"] = trim_mesh(org.galaxy.mesh)
         acted["clip"] = clip_fat(org.galaxy.mesh)
+        acted["clip"].update(persist_clip(org))
     elif code == "hold":
         acted["held"] = 1
     elif code == "bind-source":
@@ -32,10 +33,11 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
     elif code == "dream":
         from skeleton.organism.caps import trim_mesh
         from skeleton.organism.idle import run as idle_run
-        from skeleton.organism.laws import clip_fat
+        from skeleton.organism.laws import clip_fat, persist_clip
         acted["idle"] = idle_run(org.galaxy, neo)
         acted["trim"] = trim_mesh(org.galaxy.mesh)
         acted["clip"] = clip_fat(org.galaxy.mesh)
+        acted["clip"].update(persist_clip(org))
         acted["refresh"] = org.galaxy.editor.refresh()
         org.last_dream_step = org.steps
     else:

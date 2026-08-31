@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Dream/tighten persist clip
+
+- persist_clip on dream and tighten pulses.
+
+---
+
 ## 2026-08-31 — Version 2026.08.31-fix
 
 - persist_clip writes the shelf when persist_on.

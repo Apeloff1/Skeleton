@@ -72,6 +72,17 @@ def test_laws_scan_flags_long_dialect():
     assert scan_prose(gxy.mesh) == 0
 
 
+def test_persist_clip_writes_when_on(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.laws import persist_clip
+    from skeleton.organism.organismer import Organismer
+    from skeleton.organism.paths import galaxy_path
+    org = Organismer(root=tmp_path, persist=True, galaxy=GalaxySystem())
+    card = persist_clip(org)
+    assert card.get("persisted") == 1
+    assert galaxy_path(tmp_path).exists()
+
+
 def test_doctor_ok(tmp_path):
     from skeleton.galaxy.system import GalaxySystem
     from skeleton.organism.doctor import doctor_card
