@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Version 2026.08.31-fix
+
+- persist_clip writes the shelf when persist_on.
+- Ritual: ready --fix --walk.
+
+---
+
 ## 2026-08-31 — Ready --fix
 
 - ready --fix clips before health. GET /cortex/ready?fix=1

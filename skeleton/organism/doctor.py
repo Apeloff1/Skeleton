@@ -12,13 +12,16 @@ def _version() -> str:
 def doctor_card(org=None, *, neo=None, fix: bool = False) -> Dict[str, Any]:
     from skeleton.organism.caps import card as caps_card
     from skeleton.organism.health import health_card
-    from skeleton.organism.laws import clip_fat, laws_card
+    from skeleton.organism.laws import clip_fat, laws_card, persist_clip
     from skeleton.organism.next import hint
     from skeleton.organism.organismer import live_organismer
     from skeleton.social.field import field_card
 
     org = org or live_organismer()
-    clipped = clip_fat(org.galaxy.mesh) if fix else None
+    clipped = None
+    if fix:
+        clipped = clip_fat(org.galaxy.mesh)
+        clipped.update(persist_clip(org))
     health = health_card(org, neo=neo)
     caps = caps_card()
     field = field_card()

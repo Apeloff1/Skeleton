@@ -35,6 +35,15 @@ def clip_fat(mesh) -> Dict[str, Any]:
     return {"kind": "clip", "clipped": clipped, "stored_prose": scan_prose(mesh)}
 
 
+def persist_clip(org) -> Dict[str, Any]:
+    if not getattr(org, "persist_on", False):
+        return {"persisted": 0}
+    from skeleton.galaxy.shelf import save
+    card = save(org.galaxy, root=getattr(org, "root", None))
+    card["persisted"] = 1
+    return card
+
+
 def laws_card(mesh) -> Dict[str, Any]:
     prose = scan_prose(mesh)
     return {

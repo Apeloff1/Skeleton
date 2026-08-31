@@ -19,8 +19,9 @@ def ready_card(org=None, *, neo=None, walk: bool = False, n: int = 2, fix: bool 
     if not (org.galaxy.mesh.wiki.topics or {}):
         seeded = seed_field(org.galaxy)
     if fix:
-        from skeleton.organism.laws import clip_fat
+        from skeleton.organism.laws import clip_fat, persist_clip
         clip_fat(org.galaxy.mesh)
+        persist_clip(org)
     health = health_card(org, neo=neo)
     nxt = hint(org, neo=neo)
     walked = None
