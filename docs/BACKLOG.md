@@ -16,8 +16,9 @@ architecture.
 
 - GPU harness for decoder prior (tiny transformer mouth as blend
   partner). CPU path stays canonical.
-- Editor MAD filter on contradictory principles (math, not an LLM).
-- Dream scheduler hook on agent idle (SleepCycle × DreamBrain).
+- Editor MAD filter — done this pass (Jaccard + robust z).
+- Dream scheduler hook on idle — done (cadence 4 × DreamBrain;
+  SleepCycle if the mouth exposes it).
 - Context codec CCL as an on-disk vault under `acquired/galaxy/`.
 
 ## P2 — obscure / deep

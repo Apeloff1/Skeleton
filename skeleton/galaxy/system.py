@@ -46,6 +46,7 @@ class GalaxySystem:
         indexed = self.editor.index_topic(compiled)
         dream_card = self.dream.sleep() if sleep else None
         decoded = self.decoder.decode(stimulus, self.mesh.broadcast_search(stimulus, k=4), k=4)
+        audited = self.editor.audit()
         self.pulses += 1
         saved = galaxy_shelf.save(self, root=self.root) if self.persist_on else None
         return {
@@ -58,6 +59,7 @@ class GalaxySystem:
             "index": indexed.to_dict(),
             "dream": dream_card,
             "decoded": decoded,
+            "audit": audited,
             "wiki": self.mesh.wiki.catalog(),
             "librarians": self.mesh.to_dict(),
             "hoag": galaxy_card(),

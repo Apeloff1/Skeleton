@@ -258,6 +258,13 @@ class EditorBrain:
         self.index[key] = card.id
         return self.mesh.publish(card)
 
+    def audit(self, principles: Optional[List[Atom]] = None) -> Dict[str, Any]:
+        from skeleton.galaxy.mad import audit as mad_audit
+        pool = principles
+        if pool is None:
+            pool = [a for a in self.mesh.of("distiller").all() if a.kind == "principle"]
+        return mad_audit(pool)
+
     def refresh(self) -> Dict[str, Any]:
         stale = 0
         now = time.time()

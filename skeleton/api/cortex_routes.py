@@ -194,3 +194,8 @@ async def cortex_organismer_post(request: Dict[str, Any], state=Depends(_state))
 @router.get("/cortex/product")
 async def cortex_product_get(state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).product()
+
+
+@router.post("/cortex/contact")
+async def cortex_contact_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).contact(str(request.get("stimulus") or ""))

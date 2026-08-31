@@ -27,6 +27,7 @@ from skeleton.galaxy.shelf import save as galaxy_save
 from skeleton.organism.ledger import append as ledger_append, count as ledger_count
 from skeleton.organism.router import card as route_card_of, route as write_route, should_pulse
 from skeleton.organism.shelf import load as shelf_load, save as shelf_save
+from skeleton.organism.idle import due as idle_due, run as idle_run
 from skeleton.organism.teachers import glean_rule, sync as teacher_sync
 from skeleton.social.ingest import ingest
 from skeleton.social.sota import sota_card
@@ -52,6 +53,7 @@ class Organismer:
         self.steps = 0
         self.errors = 0
         self.log: List[Dict[str, Any]] = []
+        self.last_dream_step = 0
         self.persist_on = persist
         self.root = root
         if persist:
@@ -157,6 +159,7 @@ class Organismer:
                     "principle": (gxy.get("principle") or {}).get("id") if gxy.get("principle") else None,
                     "wiki_topics": len((gxy.get("wiki") or {}).get("topics") or {}),
                     "atom_ids": list(gxy.get("atom_ids") or []),
+                    "audit": gxy.get("audit"),
                 },
                 "genos": genos_card,
                 "sota": sota_card(stimulus, G=self.G),
@@ -165,6 +168,10 @@ class Organismer:
                 "rule": rule,
                 "stored_prose": 0,
             }
+            if sleep or idle_due(self.steps, self.last_dream_step):
+                card["idle"] = idle_run(self.galaxy, neo)
+                self.last_dream_step = self.steps
+            card["audit"] = self.galaxy.editor.audit()
             line: Dict[str, Any] = {}
             if self.persist_on:
                 ids = list(gxy.get("atom_ids") or [])

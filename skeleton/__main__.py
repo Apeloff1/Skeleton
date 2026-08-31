@@ -74,6 +74,8 @@ def main(argv: list[str] | None = None) -> int:
     so = sub.add_parser("social", help="social SOTA card / ArchiveX pointers")
     so.add_argument("stimulus", nargs="?", default="")
     sub.add_parser("product", help="operator product card for the living organism")
+    ctact = sub.add_parser("contact", help="teacher contact + distill the rule")
+    ctact.add_argument("stimulus", nargs="?", default="plan tensor ttk")
     sub.add_parser("zaibatsu", help="tournament the three mouths; print the family seal")
 
     sp = sub.add_parser("speak", help="neo transformer decode")
@@ -235,6 +237,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "product":
         from skeleton.cortex.deck import live_deck
         out = live_deck().product()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "contact":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().contact(args.stimulus)
         print(json.dumps(out, indent=2, default=str))
         return 0
 

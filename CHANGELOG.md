@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — MAD editor audit + idle dream + contact surface
+
+- galaxy/mad.py — Jaccard collapse + robust-z outliers on principles.
+- Editor.audit on every galaxy pulse. Organismer dreams every 4 steps.
+- CLI `contact`, POST /cortex/contact.
+
+---
+
 ## 2026-08-31 — Teacher contact rule + opt-in CDX probe
 
 - Organismer step runs teacher sync then distiller gleans a

@@ -177,3 +177,26 @@ def test_product_card_shape():
     assert "GET /cortex/product" in card["endpoints"]
     assert any(p["topic"] == "mem0" for p in card["field"])
     assert card["stored_prose"] == 0
+
+
+def test_mad_kills_near_duplicate_principle():
+    from skeleton.galaxy.atoms import Atom
+    from skeleton.galaxy.mad import audit
+    a = Atom.mint(kind="principle", tier="T4_PRINCIPLE", topic="contact rule mag house",
+                  dialect="house:contact rule mag", brain="distiller", color="gold")
+    b = Atom.mint(kind="principle", tier="T4_PRINCIPLE", topic="contact rule mag house",
+                  dialect="house:contact rule mag", brain="distiller", color="gold")
+    a.confidence = 0.9
+    b.confidence = 0.4
+    card = audit([a, b])
+    assert card["killed"] >= 1
+    assert a.superseded_by or b.superseded_by
+    assert card["stored_prose"] == 0
+
+
+def test_idle_due_cadence():
+    from skeleton.organism.idle import due
+    assert due(0, 0) is False
+    assert due(4, 0) is True
+    assert due(5, 4) is False
+    assert due(8, 4) is True
