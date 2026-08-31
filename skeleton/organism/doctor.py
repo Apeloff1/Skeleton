@@ -9,19 +9,20 @@ def _version() -> str:
     return VERSION
 
 
-def doctor_card(org=None, *, neo=None) -> Dict[str, Any]:
+def doctor_card(org=None, *, neo=None, fix: bool = False) -> Dict[str, Any]:
     from skeleton.organism.caps import card as caps_card
     from skeleton.organism.health import health_card
+    from skeleton.organism.laws import clip_fat, laws_card
     from skeleton.organism.next import hint
     from skeleton.organism.organismer import live_organismer
     from skeleton.social.field import field_card
 
     org = org or live_organismer()
+    clipped = clip_fat(org.galaxy.mesh) if fix else None
     health = health_card(org, neo=neo)
     caps = caps_card()
     field = field_card()
     nxt = hint(org, neo=neo)
-    from skeleton.organism.laws import laws_card
     laws = laws_card(org.galaxy.mesh)
     prose = int(laws.get("stored_prose") or 0)
     ok = int(bool(health.get("ok")) and prose == 0 and field["n"] >= 16)
@@ -40,4 +41,5 @@ def doctor_card(org=None, *, neo=None) -> Dict[str, Any]:
         "version": _version(),
         "laws": laws["names"],
         "laws_ok": laws["ok"],
+        "fix": clipped,
     }

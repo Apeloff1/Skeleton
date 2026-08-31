@@ -82,6 +82,9 @@ def test_doctor_ok(tmp_path):
     assert card["ok"] == 1
     assert card["field_n"] >= 16
     assert card["stored_prose"] == 0
+    fixed = doctor_card(org, fix=True)
+    assert fixed["ok"] == 1
+    assert fixed.get("fix") is not None
 
 
 def test_field_card_lists_pointers():

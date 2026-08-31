@@ -227,8 +227,8 @@ async def cortex_health_get(state=Depends(_state)) -> Dict[str, Any]:
 
 
 @router.get("/cortex/doctor")
-async def cortex_doctor_get(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).doctor()
+async def cortex_doctor_get(fix: bool = False, state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).doctor(fix=fix)
 
 
 @router.get("/cortex/laws")

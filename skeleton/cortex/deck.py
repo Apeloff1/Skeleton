@@ -155,9 +155,9 @@ class CommandDeck:
         from skeleton.organism.health import health_card
         return health_card(neo=self.neo)
 
-    def doctor(self) -> Dict[str, Any]:
+    def doctor(self, fix: bool = False) -> Dict[str, Any]:
         from skeleton.organism.doctor import doctor_card
-        return doctor_card(neo=self.neo)
+        return doctor_card(neo=self.neo, fix=fix)
 
     def laws(self) -> Dict[str, Any]:
         from skeleton.organism.laws import laws_card
