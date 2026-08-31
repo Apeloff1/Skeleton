@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Pulse obeys next
+
+- organism/pulse.py dispatches seed/dream/step/tighten/hold.
+- CLI pulse, POST /cortex/pulse.
+
+---
+
 ## 2026-08-31 — Product freeze 2026.08.31-ready
 
 - product.version stamp. PRODUCT.md and STATUS.md match the live surface.

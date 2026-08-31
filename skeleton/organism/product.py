@@ -33,6 +33,7 @@ ENDPOINTS = (
     "GET /cortex/next",
     "POST /cortex/seed",
     "GET /cortex/ready",
+    "POST /cortex/pulse",
 )
 
 

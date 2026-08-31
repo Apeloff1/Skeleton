@@ -239,3 +239,8 @@ async def cortex_seed_post(state=Depends(_state)) -> Dict[str, Any]:
 @router.get("/cortex/ready")
 async def cortex_ready_get(state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).ready()
+
+
+@router.post("/cortex/pulse")
+async def cortex_pulse_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).pulse(str(request.get("stimulus") or ""))

@@ -54,10 +54,24 @@ def test_sota_card_has_seeded_field_pointers():
     assert card["coverage"]["pointers"] >= 16
 
 
+def test_pulse_obeys_next(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.organismer import Organismer
+    from skeleton.organism.pulse import pulse
+    org = Organismer(root=tmp_path, persist=False, galaxy=GalaxySystem())
+    card = pulse(org, persist=False)
+    assert card["kind"] == "pulse"
+    assert card["acted"]["code"] in {"tighten", "dream", "bind-source", "contact", "hold", "pulse"}
+    assert card["stored_prose"] == 0
+    again = pulse(org, persist=False, stimulus="plan tensor")
+    assert again["kind"] == "pulse"
+
+
 def test_ready_card_seeds_then_reports(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
     from skeleton.organism.organismer import Organismer
     from skeleton.organism.ready import ready_card
-    org = Organismer(root=tmp_path, persist=False)
+    org = Organismer(root=tmp_path, persist=False, galaxy=GalaxySystem())
     card = ready_card(org)
     assert card["kind"] == "ready"
     assert card["ok"] == 1
