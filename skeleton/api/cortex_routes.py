@@ -252,8 +252,8 @@ async def cortex_field_get(state=Depends(_state)) -> Dict[str, Any]:
 
 
 @router.get("/cortex/ready")
-async def cortex_ready_get(walk: bool = False, n: int = 2, state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).ready(walk=walk, n=n)
+async def cortex_ready_get(walk: bool = False, n: int = 2, fix: bool = False, state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).ready(walk=walk, n=n, fix=fix)
 
 
 @router.post("/cortex/pulse")

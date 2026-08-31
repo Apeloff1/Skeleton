@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Ready --fix
+
+- ready --fix clips before health. GET /cortex/ready?fix=1
+
+---
+
 ## 2026-08-31 — Doctor --fix
 
 - doctor_card(fix=True) clips then rescans. CLI doctor --fix.

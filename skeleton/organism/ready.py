@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any, Dict
 
 
-def ready_card(org=None, *, neo=None, walk: bool = False, n: int = 2) -> Dict[str, Any]:
+def ready_card(org=None, *, neo=None, walk: bool = False, n: int = 2, fix: bool = False) -> Dict[str, Any]:
     from skeleton.organism.caps import card as caps_card
     from skeleton.organism.doctor import doctor_card
     from skeleton.organism.health import health_card
@@ -18,6 +18,9 @@ def ready_card(org=None, *, neo=None, walk: bool = False, n: int = 2) -> Dict[st
     seeded = {"minted": 0, "skipped": 0}
     if not (org.galaxy.mesh.wiki.topics or {}):
         seeded = seed_field(org.galaxy)
+    if fix:
+        from skeleton.organism.laws import clip_fat
+        clip_fat(org.galaxy.mesh)
     health = health_card(org, neo=neo)
     nxt = hint(org, neo=neo)
     walked = None
@@ -33,7 +36,7 @@ def ready_card(org=None, *, neo=None, walk: bool = False, n: int = 2) -> Dict[st
         "caps": caps_card(),
         "path10": path_card(org),
         "mhc": mhc_card(org),
-        "doctor": doctor_card(org, neo=neo),
+        "doctor": doctor_card(org, neo=neo, fix=False),
         "walk": walked,
-        "stored_prose": 0,
+        "stored_prose": health.get("stored_prose"),
     }
