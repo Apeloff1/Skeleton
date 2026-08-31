@@ -9,6 +9,14 @@ from typing import Any, Dict, List, Optional
 STOP = {"hold", "tighten"}
 
 
+def rotate_stimulus(i: int, explicit: str = "") -> str:
+    if explicit:
+        return explicit
+    from skeleton.social.sources import SOTA_POINTERS
+    row = SOTA_POINTERS[i % len(SOTA_POINTERS)]
+    return f"{row['topic']} {row['url']}"
+
+
 def walk(org=None, *, neo=None, stimulus: str = "", n: int = 4,
          persist: Optional[bool] = None) -> Dict[str, Any]:
     from skeleton.organism.organismer import live_organismer
@@ -21,10 +29,16 @@ def walk(org=None, *, neo=None, stimulus: str = "", n: int = 4,
         limit = walk_limit(live_caps().tier, int(n or 4))
     except Exception:
         limit = max(1, min(8, int(n or 4)))
+    if not (org.galaxy.mesh.wiki.topics or {}):
+        from skeleton.social.seed import seed_field
+        seed_field(org.galaxy)
     cards: List[Dict[str, Any]] = []
+    used: List[str] = []
     stopped = "cap"
-    for _ in range(limit):
-        card = pulse(org, neo=neo, stimulus=stimulus, persist=persist)
+    for i in range(limit):
+        stim = rotate_stimulus(i, stimulus)
+        used.append(stim.split()[0])
+        card = pulse(org, neo=neo, stimulus=stim, persist=persist)
         cards.append({
             "code": (card.get("acted") or {}).get("code"),
             "G": card.get("G"),
@@ -39,6 +53,7 @@ def walk(org=None, *, neo=None, stimulus: str = "", n: int = 4,
         "limit": limit,
         "stopped": stopped,
         "codes": [c["code"] for c in cards],
+        "topics": used,
         "G": cards[-1]["G"] if cards else round(org.G, 6),
         "stored_prose": 0,
     }

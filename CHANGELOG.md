@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Walk rotates field URLs
+
+- Empty walk stimulus cycles SOTA_POINTERS topic+url.
+- Walk seeds an empty wiki first.
+
+---
+
 ## 2026-08-31 — Field catalog + consolidate trims
 
 - social/field.py. CLI field, GET /cortex/field.

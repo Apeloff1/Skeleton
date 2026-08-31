@@ -99,7 +99,16 @@ def test_walk_is_bounded(tmp_path):
     assert card["kind"] == "run"
     assert card["n"] <= 3
     assert card["limit"] == 3
+    assert card.get("topics")
     assert card["stored_prose"] == 0
+
+
+def test_rotate_stimulus_uses_field():
+    from skeleton.organism.runloop import rotate_stimulus
+    a = rotate_stimulus(0)
+    b = rotate_stimulus(1)
+    assert "http" in a
+    assert a != b
 
 
 def test_pulse_obeys_next(tmp_path):
