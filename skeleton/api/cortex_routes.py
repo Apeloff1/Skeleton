@@ -199,3 +199,13 @@ async def cortex_product_get(state=Depends(_state)) -> Dict[str, Any]:
 @router.post("/cortex/contact")
 async def cortex_contact_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).contact(str(request.get("stimulus") or ""))
+
+
+@router.get("/cortex/wiki")
+async def cortex_wiki_get(q: str = "", state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).wiki(q)
+
+
+@router.get("/cortex/banks")
+async def cortex_banks_get(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).banks()

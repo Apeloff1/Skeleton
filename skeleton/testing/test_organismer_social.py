@@ -223,3 +223,29 @@ def test_prior_stays_cpu_without_mouth():
     assert card["prior"] == "cpu-jaccard"
     assert card["device"] == "cpu"
     assert card["stored_prose"] == 0
+
+
+def test_wiki_query_selects_principle():
+    from skeleton.galaxy.query import run
+    from skeleton.galaxy.system import GalaxySystem
+    gxy = GalaxySystem()
+    gxy.pulse("law like Elden Ring contact rule")
+    card = run(gxy.mesh, "SELECT * WHERE kind=principle")
+    assert card["kind"] == "wiki-query"
+    assert card["stored_prose"] == 0
+
+
+def test_banks_and_writeback_mark():
+    from skeleton.galaxy.banks import card as bcard
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.writeback import absorb, should_suppress, topics
+    gxy = GalaxySystem()
+    gxy.pulse("law principle house contact mag")
+    wb = absorb(gxy.mesh)
+    assert wb["marked"] >= 1
+    banks = bcard(gxy.mesh)
+    assert banks["kind"] == "memory-banks"
+    assert banks["stored_prose"] == 0
+    held = topics(gxy.mesh)
+    assert held
+    assert should_suppress(next(iter(held)), held)

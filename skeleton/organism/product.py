@@ -18,6 +18,8 @@ ENDPOINTS = (
     "GET|POST /cortex/galaxy",
     "CLI: python -m skeleton product",
     "CLI: python -m skeleton organismer <stimulus>",
+    "GET /cortex/wiki?q=",
+    "GET /cortex/banks",
 )
 
 

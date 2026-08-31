@@ -4,6 +4,15 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Wiki query, memory banks, write-back suppress
+
+- SPARQL-shaped SELECT over wiki atoms.
+- Common vs long-tail banks + residual hash block.
+- High-value atoms tagged internalized; later near-duplicates skip.
+- CLI wiki/banks, GET /cortex/wiki and /cortex/banks.
+
+---
+
 ## 2026-08-31 — CCL vault + decoder device prior
 
 - acquired/galaxy/vault.ccl compact codec lines.

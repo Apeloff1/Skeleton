@@ -23,13 +23,11 @@ architecture.
 
 ## P2 — obscure / deep
 
-- Hierarchical parametric memory banks (long-tail vs common) fetched
-  as a block into neo residual — house analog of hierarchical memories.
-- Fractal / octahedral KV archive only if a live transformer mouth is
-  bound; do not pretend we have a production KV cache yet.
-- Dual-layer write-back: consolidate high-value external atoms into
-  neo parameters on a cron, then suppress redundant writes.
-- Wiki librarian SPARQL-shaped query language over topics.
+- Hierarchical memory banks — done (common/long-tail + residual block;
+  ingest only if mouth exposes ingest_residual).
+- Fractal / octahedral KV archive — still not claimed. No fake cache.
+- Dual-layer write-back — done (internalized tag + skip).
+- Wiki SPARQL-shaped query — done (SELECT … WHERE).
 - Per-mouth colored lattice visualization in the command deck UI
   (App Builder was ephemeral; Skeleton remains source of truth).
 

@@ -151,6 +151,16 @@ class CommandDeck:
         card["mouth_G"] = round(_g(self.neo), 6)
         return card
 
+    def wiki(self, q: str = "") -> Dict[str, Any]:
+        from skeleton.galaxy.query import run
+        from skeleton.galaxy.system import live_galaxy
+        return run(live_galaxy().mesh, q)
+
+    def banks(self) -> Dict[str, Any]:
+        from skeleton.galaxy.banks import card
+        from skeleton.galaxy.system import live_galaxy
+        return card(live_galaxy().mesh, neo=self.neo)
+
     def contact(self, stimulus: str = "") -> Dict[str, Any]:
         from skeleton.organism.teachers import glean_rule, sync
         from skeleton.galaxy.system import live_galaxy

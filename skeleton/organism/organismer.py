@@ -27,8 +27,10 @@ from skeleton.galaxy.shelf import save as galaxy_save
 from skeleton.organism.ledger import append as ledger_append, count as ledger_count
 from skeleton.organism.router import card as route_card_of, route as write_route, should_pulse
 from skeleton.organism.shelf import load as shelf_load, save as shelf_save
+from skeleton.galaxy.banks import card as banks_card
 from skeleton.organism.idle import due as idle_due, run as idle_run
 from skeleton.organism.teachers import glean_rule, sync as teacher_sync
+from skeleton.organism.writeback import absorb as wb_absorb, should_suppress, topics as wb_topics
 from skeleton.social.ingest import ingest
 from skeleton.social.sota import sota_card
 
@@ -92,6 +94,8 @@ class Organismer:
         try:
             topics = (self.galaxy.mesh.wiki.catalog().get("topics") or {})
             decision, score, hit = write_route(stimulus, topics.keys())
+            if decision == "new" and should_suppress(stimulus, wb_topics(self.galaxy.mesh)):
+                decision, hit = "skip", (hit or "internalized")
             route_card = route_card_of(decision, score, hit)
             gxy: Dict[str, Any]
             if should_pulse(decision):
@@ -172,6 +176,8 @@ class Organismer:
                 card["idle"] = idle_run(self.galaxy, neo)
                 self.last_dream_step = self.steps
             card["audit"] = self.galaxy.editor.audit()
+            card["writeback"] = wb_absorb(self.galaxy.mesh)
+            card["banks"] = banks_card(self.galaxy.mesh, neo=neo)
             line: Dict[str, Any] = {}
             if self.persist_on:
                 ids = list(gxy.get("atom_ids") or [])

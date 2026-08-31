@@ -76,6 +76,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("product", help="operator product card for the living organism")
     ctact = sub.add_parser("contact", help="teacher contact + distill the rule")
     ctact.add_argument("stimulus", nargs="?", default="plan tensor ttk")
+    wq = sub.add_parser("wiki", help="SPARQL-shaped wiki query")
+    wq.add_argument("q", nargs="?", default="SELECT topic WHERE kind=principle")
+    sub.add_parser("banks", help="common vs long-tail memory banks")
     sub.add_parser("zaibatsu", help="tournament the three mouths; print the family seal")
 
     sp = sub.add_parser("speak", help="neo transformer decode")
@@ -243,6 +246,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "contact":
         from skeleton.cortex.deck import live_deck
         out = live_deck().contact(args.stimulus)
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "wiki":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().wiki(args.q)
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "banks":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().banks()
         print(json.dumps(out, indent=2, default=str))
         return 0
 
