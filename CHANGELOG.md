@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Journal records field topic
+
+- Each persist step journals the stimulus topic token.
+
+---
+
 ## 2026-08-31 — Pulse rotates field URLs
 
 - Empty pulse stimulus uses rotate_stimulus(steps).

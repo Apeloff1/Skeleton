@@ -245,10 +245,12 @@ class Organismer:
                     "step": self.steps,
                     "G": card["G"],
                     "decision": decision,
+                    "topic": stimulus.split()[0] if stimulus else "",
                     "coverage": card["coverage"]["score"],
                     "pressure": (adapt_card or {}).get("pressure"),
                 }, root=self.root)
-            self.log.append({"step": self.steps, "G": card["G"], "S": S, "decision": decision})
+            self.log.append({"step": self.steps, "G": card["G"], "S": S, "decision": decision,
+                             "topic": stimulus.split()[0] if stimulus else ""})
             return card
         except Exception as exc:
             self.errors += 1
