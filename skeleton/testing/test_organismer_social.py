@@ -196,10 +196,10 @@ def test_mad_kills_near_duplicate_principle():
 
 def test_idle_due_cadence():
     from skeleton.organism.idle import due
-    assert due(0, 0) is False
-    assert due(4, 0) is True
-    assert due(5, 4) is False
-    assert due(8, 4) is True
+    assert due(0, 0, cadence=4) is False
+    assert due(4, 0, cadence=4) is True
+    assert due(5, 4, cadence=4) is False
+    assert due(8, 4, cadence=4) is True
 
 
 def test_ccl_vault_roundtrip(tmp_path):
@@ -223,6 +223,18 @@ def test_prior_stays_cpu_without_mouth():
     assert card["prior"] == "cpu-jaccard"
     assert card["device"] == "cpu"
     assert card["stored_prose"] == 0
+
+
+def test_caps_headroom_below_wall():
+    from skeleton.organism.caps import compute
+    tiny = compute(avail_mb=900, ram_mb=1024, cpus=2, gpu=False, headroom=0.62, tier="tiny")
+    huge = compute(avail_mb=48000, ram_mb=65536, cpus=16, gpu=True, headroom=0.62, tier="max")
+    assert tiny.atoms < huge.atoms
+    assert tiny.rules < huge.rules
+    assert tiny.growth_clip <= huge.growth_clip
+    assert tiny.headroom <= 0.85
+    assert huge.atoms <= 1800
+    assert tiny.tier == "tiny"
 
 
 def test_wiki_query_selects_principle():

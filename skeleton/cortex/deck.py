@@ -161,6 +161,10 @@ class CommandDeck:
         from skeleton.galaxy.system import live_galaxy
         return card(live_galaxy().mesh, neo=self.neo)
 
+    def caps(self) -> Dict[str, Any]:
+        from skeleton.organism.caps import card
+        return card()
+
     def contact(self, stimulus: str = "") -> Dict[str, Any]:
         from skeleton.organism.teachers import glean_rule, sync
         from skeleton.galaxy.system import live_galaxy

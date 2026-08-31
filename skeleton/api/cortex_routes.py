@@ -209,3 +209,8 @@ async def cortex_wiki_get(q: str = "", state=Depends(_state)) -> Dict[str, Any]:
 @router.get("/cortex/banks")
 async def cortex_banks_get(state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).banks()
+
+
+@router.get("/cortex/caps")
+async def cortex_caps_get(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).caps()

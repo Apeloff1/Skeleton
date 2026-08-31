@@ -30,6 +30,7 @@ architecture.
 - Wiki SPARQL-shaped query — done (SELECT … WHERE).
 - Per-mouth colored lattice visualization in the command deck UI
   (App Builder was ephemeral; Skeleton remains source of truth).
+- Hardware multi-cap table — done (headroom 0.62).
 
 ## Explicitly not this pass
 

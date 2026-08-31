@@ -4,6 +4,15 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Hardware multi-cap table (headroom 0.62)
+
+- organism/caps.py probes RAM/CPU/GPU, tiers tiny→max, applies 0.62
+  headroom so shelves sit below the wall.
+- Atoms, vault, rules, query, residual, growth clip, CDX bytes read live().
+- CLI `caps`, GET /cortex/caps. Env SKELETON_HEADROOM / SKELETON_TIER.
+
+---
+
 ## 2026-08-31 — Wiki query, memory banks, write-back suppress
 
 - SPARQL-shaped SELECT over wiki atoms.

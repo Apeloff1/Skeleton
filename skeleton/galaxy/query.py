@@ -33,7 +33,13 @@ def parse(q: str) -> Dict[str, str]:
     return out
 
 
-def run(mesh, q: str, *, limit: int = 24) -> Dict[str, Any]:
+def run(mesh, q: str, *, limit: int = 0) -> Dict[str, Any]:
+    if limit <= 0:
+        try:
+            from skeleton.organism.caps import live as live_caps
+            limit = int(live_caps().query)
+        except Exception:
+            limit = 24
     spec = parse(q)
     rows: List[Dict[str, Any]] = []
     seen = set()

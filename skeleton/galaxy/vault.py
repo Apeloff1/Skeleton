@@ -13,6 +13,8 @@ from skeleton.cortex.acquire_repo import acquired_dir
 from skeleton.galaxy.codec import parse_ccl, render_ccl
 
 
+from skeleton.organism.caps import live as live_caps
+
 CAP = 400
 
 
@@ -32,7 +34,8 @@ def dump(mesh, *, root: Optional[Path] = None) -> Dict[str, Any]:
         for atom in lib.all():
             if not atom.superseded_by:
                 seen[atom.id] = atom
-    atoms = sorted(seen.values(), key=lambda a: a.ts)[-CAP:]
+    cap = int(getattr(live_caps(), "vault", CAP) or CAP)
+    atoms = sorted(seen.values(), key=lambda a: a.ts)[-cap:]
     lines = [render_ccl(a) for a in atoms]
     path = vault_path(root)
     path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")

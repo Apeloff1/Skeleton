@@ -13,7 +13,18 @@ from typing import Any, Dict, Optional
 CADENCE = 4
 
 
-def due(steps: int, last_dream_step: int, *, cadence: int = CADENCE) -> bool:
+def _cadence(explicit: int | None = None) -> int:
+    if explicit is not None:
+        return explicit
+    try:
+        from skeleton.organism.caps import live as live_caps
+        return int(live_caps().idle_cadence)
+    except Exception:
+        return CADENCE
+
+
+def due(steps: int, last_dream_step: int, *, cadence: int | None = None) -> bool:
+    cadence = _cadence(cadence)
     return steps > 0 and (steps - last_dream_step) >= cadence
 
 

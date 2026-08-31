@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 
 from skeleton.cortex.laws import check
 from skeleton.galaxy.atoms import Atom
+from skeleton.organism.caps import live as live_caps
 from skeleton.organism.paths import galaxy_path
 
 CAP = 400
@@ -17,7 +18,8 @@ def dump_mesh(mesh) -> Dict[str, Any]:
     for lib in (*mesh.brains.values(), mesh.wiki):
         for atom in lib.all():
             seen[atom.id] = atom
-    atoms = sorted(seen.values(), key=lambda a: a.ts)[-CAP:]
+    cap = int(getattr(live_caps(), "atoms", CAP) or CAP)
+    atoms = sorted(seen.values(), key=lambda a: a.ts)[-cap:]
     return check({
         "kind": "galaxy-shelf",
         "topics": dict(mesh.wiki.topics),

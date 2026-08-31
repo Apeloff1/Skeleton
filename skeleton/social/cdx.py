@@ -55,10 +55,18 @@ def probe(original: str, *, live: bool = False, opener=None) -> Dict[str, Any]:
     return card
 
 
+def _cap() -> int:
+    try:
+        from skeleton.organism.caps import live as live_caps
+        return int(live_caps().cdx_bytes)
+    except Exception:
+        return _CAP
+
+
 def _fetch(url: str) -> str:
     req = urllib.request.Request(url, method="GET", headers={"User-Agent": "SkeletonOrganism/1.0 (+research; header-only)"})
     with urllib.request.urlopen(req, timeout=2) as resp:
-        return resp.read(_CAP).decode("utf-8", "replace")
+        return resp.read(_cap()).decode("utf-8", "replace")
 
 
 def _parse_cdx(raw: str) -> Dict[str, Any]:

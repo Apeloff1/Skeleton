@@ -33,7 +33,13 @@ def split(mesh) -> Tuple[List[str], List[str]]:
     return common, tail
 
 
-def residual_block(common: List[str], *, n: int = 16) -> List[float]:
+def residual_block(common: List[str], *, n: int = 0) -> List[float]:
+    if n <= 0:
+        try:
+            from skeleton.organism.caps import live as live_caps
+            n = int(live_caps().residual)
+        except Exception:
+            n = 16
     return [_hash_unit(t) for t in common[:n]]
 
 

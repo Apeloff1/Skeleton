@@ -129,7 +129,12 @@ class Organismer:
                 # organismer-local gene when no neo mouth is bound
                 S = self._S(social)
                 M, H, C, eps = 1.0, 0.7, 0.12, self.errors / max(1, self.steps)
-                growth = _clip(1.0 + eta * M * H * C * S * (1.0 - eps), 1.0, 1.22)
+                try:
+                    from skeleton.organism.caps import live as live_caps
+                    gclip = float(live_caps().growth_clip)
+                except Exception:
+                    gclip = 1.22
+                growth = _clip(1.0 + eta * M * H * C * S * (1.0 - eps), 1.0, gclip)
                 self.genos.G = float(self.genos.G * growth)
                 self.genos.pulses += 1
                 if self.genos.G > self.genos.peak:

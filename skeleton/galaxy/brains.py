@@ -197,7 +197,12 @@ class DistillerBrain:
                 atom.tags = tuple(set(atom.tags) | {"overwrite"})
                 del self.rules[rid]
                 break
-        if len(self.rules) >= self.MAX_RULES:
+        try:
+            from skeleton.organism.caps import live as live_caps
+            limit = int(live_caps().rules)
+        except Exception:
+            limit = self.MAX_RULES
+        if len(self.rules) >= limit:
             oldest = min(self.rules.values(), key=lambda a: a.confidence)
             oldest.superseded_by = atom.id
             self.rules.pop(oldest.id, None)
