@@ -235,6 +235,21 @@ def test_caps_headroom_below_wall():
     assert tiny.headroom <= 0.85
     assert huge.atoms <= 1800
     assert tiny.tier == "tiny"
+    tight = compute(avail_mb=900, ram_mb=1024, cpus=2, gpu=False, headroom=0.62, tier="tiny", load=8.0)
+    calm = compute(avail_mb=900, ram_mb=1024, cpus=2, gpu=False, headroom=0.62, tier="tiny", load=0.1)
+    assert tight.pressure > calm.pressure
+    assert tight.atoms <= calm.atoms
+
+
+def test_caps_adapt_hysteresis():
+    from skeleton.organism.caps import adapt, compute, reset_caps
+    reset_caps()
+    wide = compute(avail_mb=20000, ram_mb=32000, cpus=8, gpu=False, headroom=0.62, tier="large", load=0.2)
+    adapt(probe=wide)
+    thin = compute(avail_mb=800, ram_mb=32000, cpus=8, gpu=False, headroom=0.62, tier="tiny", load=6.0)
+    card = adapt(probe=thin)
+    assert card["action"] == "tighten"
+    reset_caps()
 
 
 def test_wiki_query_selects_principle():

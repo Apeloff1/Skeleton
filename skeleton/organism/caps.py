@@ -39,6 +39,8 @@ class Caps:
     growth_clip: float
     cdx_bytes: int
     banks_list: int
+    load: float
+    pressure: float
 
 
 def _meminfo() -> tuple[int, int]:
@@ -87,18 +89,36 @@ def _tier(avail_mb: int, forced: str = "") -> str:
     return "max"
 
 
-def _scale(headroom: float, gpu: bool, cpus: int) -> float:
+def _loadavg() -> float:
+    path = Path("/proc/loadavg")
+    if not path.exists():
+        return 0.0
+    try:
+        return float(path.read_text(encoding="utf-8").split()[0])
+    except (OSError, ValueError, IndexError):
+        return 0.0
+
+
+def _pressure(avail_mb: int, ram_mb: int, load: float, cpus: int) -> float:
+    mem_p = 1.0 - (float(avail_mb) / max(1.0, float(ram_mb)))
+    cpu_p = min(1.0, float(load) / max(1.0, float(cpus)))
+    return max(0.0, min(1.0, 0.65 * mem_p + 0.35 * cpu_p))
+
+
+def _scale(headroom: float, gpu: bool, cpus: int, pressure: float) -> float:
     s = float(headroom)
     if gpu:
         s *= 1.08
     if cpus >= 8:
         s *= 1.04
-    return min(0.85, s)
+    s *= max(0.45, 1.0 - 0.40 * float(pressure))
+    return min(0.85, max(0.32, s))
 
 
 def compute(*, headroom: Optional[float] = None, tier: Optional[str] = None,
             ram_mb: Optional[int] = None, avail_mb: Optional[int] = None,
-            cpus: Optional[int] = None, gpu: Optional[bool] = None) -> Caps:
+            cpus: Optional[int] = None, gpu: Optional[bool] = None,
+            load: Optional[float] = None) -> Caps:
     env_h = os.environ.get("SKELETON_HEADROOM")
     h = float(headroom if headroom is not None else (env_h or HEADROOM))
     h = min(0.85, max(0.35, h))
@@ -107,8 +127,10 @@ def compute(*, headroom: Optional[float] = None, tier: Optional[str] = None,
     av = int(avail_mb if avail_mb is not None else av)
     ncpu = int(cpus if cpus is not None else _cpus())
     has_gpu = bool(_gpu() if gpu is None else gpu)
+    ld = float(load if load is not None else _loadavg())
+    press = _pressure(av, tot, ld, ncpu)
     name = _tier(av, str(tier or os.environ.get("SKELETON_TIER") or ""))
-    s = _scale(h, has_gpu, ncpu)
+    s = _scale(h, has_gpu, ncpu, press)
     usable_gb = max(0.4, (av / 1024.0) * s)
     atoms = int(min(1800, max(48, usable_gb * 70)))
     vault = atoms
@@ -126,10 +148,13 @@ def compute(*, headroom: Optional[float] = None, tier: Optional[str] = None,
         atoms=atoms, vault=vault, rules=rules, query=query, residual=residual,
         replay=replay, social_cards=social, idle_cadence=idle,
         growth_clip=growth, cdx_bytes=cdx, banks_list=banks,
+        load=round(ld, 3), pressure=round(press, 4),
     )
 
 
 _LIVE: Optional[Caps] = None
+_EASY = 0
+_LAST_ACTION = "hold"
 
 
 def live() -> Caps:
@@ -140,8 +165,65 @@ def live() -> Caps:
 
 
 def reset_caps() -> None:
-    global _LIVE
+    global _LIVE, _EASY, _LAST_ACTION
     _LIVE = None
+    _EASY = 0
+    _LAST_ACTION = "hold"
+
+
+def adapt(*, probe: Optional[Caps] = None) -> Dict[str, Any]:
+    """Shrink immediately under pressure. Ease only after two calm probes."""
+    global _LIVE, _EASY, _LAST_ACTION
+    fresh = probe or compute()
+    cur = live()
+    if fresh.atoms < cur.atoms or fresh.pressure > cur.pressure + 0.08:
+        _LIVE = fresh
+        _EASY = 0
+        _LAST_ACTION = "tighten"
+    elif fresh.atoms > cur.atoms and fresh.pressure + 0.05 < cur.pressure:
+        _EASY += 1
+        if _EASY >= 2:
+            _LIVE = fresh
+            _EASY = 0
+            _LAST_ACTION = "ease"
+        else:
+            _LAST_ACTION = "hold"
+    else:
+        _LAST_ACTION = "hold"
+    return {
+        "kind": "caps-adapt",
+        "action": _LAST_ACTION,
+        "pressure": live().pressure,
+        "atoms": live().atoms,
+        "tier": live().tier,
+        "stored_prose": 0,
+    }
+
+
+def trim_mesh(mesh, caps: Optional[Caps] = None) -> Dict[str, Any]:
+    """Drop oldest low-value captures when the shelf exceeds the live cap."""
+    cap = caps or live()
+    seen = {}
+    for lib in (*mesh.brains.values(), mesh.wiki):
+        for atom in lib.all():
+            if not atom.superseded_by:
+                seen[atom.id] = atom
+    evicted = 0
+    extra = len(seen) - int(cap.atoms)
+    if extra > 0:
+        victims = sorted(
+            (a for a in seen.values() if a.kind in {"capture", "zettel", "index"} and "internalized" not in (a.tags or ())),
+            key=lambda a: (a.confidence, a.ts),
+        )
+        for atom in victims[:extra]:
+            atom.superseded_by = "cap-trim"
+            evicted += 1
+    rules = [a for a in seen.values() if a.kind == "principle" and not a.superseded_by]
+    if len(rules) > int(cap.rules):
+        for atom in sorted(rules, key=lambda a: a.confidence)[: len(rules) - int(cap.rules)]:
+            atom.superseded_by = "cap-trim"
+            evicted += 1
+    return {"kind": "cap-trim", "evicted": evicted, "atoms_cap": cap.atoms, "stored_prose": 0}
 
 
 def card() -> Dict[str, Any]:
@@ -149,6 +231,7 @@ def card() -> Dict[str, Any]:
     d = asdict(c)
     d["kind"] = "caps"
     d["law"] = "headroom-below-wall"
+    d["action"] = _LAST_ACTION
     d["stored_prose"] = 0
     try:
         usage = shutil.disk_usage(Path.cwd())

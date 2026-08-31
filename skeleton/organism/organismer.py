@@ -92,6 +92,9 @@ class Organismer:
         first = (social.get("cards") or [{}])[0] if social.get("cards") else {}
         cite = citation or str(first.get("url") or "")
         try:
+            from skeleton.organism.caps import adapt as caps_adapt, trim_mesh
+            adapt_card = caps_adapt()
+            trim_card = trim_mesh(self.galaxy.mesh)
             topics = (self.galaxy.mesh.wiki.catalog().get("topics") or {})
             decision, score, hit = write_route(stimulus, topics.keys())
             if decision == "new" and should_suppress(stimulus, wb_topics(self.galaxy.mesh)):
@@ -183,6 +186,8 @@ class Organismer:
             card["audit"] = self.galaxy.editor.audit()
             card["writeback"] = wb_absorb(self.galaxy.mesh)
             card["banks"] = banks_card(self.galaxy.mesh, neo=neo)
+            card["caps"] = adapt_card
+            card["trim"] = trim_card
             line: Dict[str, Any] = {}
             if self.persist_on:
                 ids = list(gxy.get("atom_ids") or [])

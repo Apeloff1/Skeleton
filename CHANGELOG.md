@@ -4,6 +4,15 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Adaptive caps: tighten now, ease later
+
+- Pressure = 0.65 memory-fill + 0.35 load/cpu. Headroom shrinks with it.
+- adapt() tightens immediately; eases only after two calm probes.
+- trim_mesh evicts oldest low-value captures over the live cap.
+- Organismer step runs adapt + trim.
+
+---
+
 ## 2026-08-31 — Hardware multi-cap table (headroom 0.62)
 
 - organism/caps.py probes RAM/CPU/GPU, tiers tiny→max, applies 0.62
