@@ -4,6 +4,15 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Perpendicular: coverage, 10x path, freshness, field
+
+- Field pointers: GraphMemix 2608.26983, parametric KG 2608.25489,
+  graph selection integrity 2606.12290, DMAS LTM 2601.07978.
+- social/coverage.py. organism/path10.py. Editor.freshness.
+- State persists last_health. Product embeds coverage + path10 + fresh.
+
+---
+
 ## 2026-08-31 — Operator health card
 
 - organism/health.py — ok/pressure/G/lattice/kv in one JSON.

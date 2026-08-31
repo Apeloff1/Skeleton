@@ -50,6 +50,28 @@ def test_sota_card_has_seeded_field_pointers():
     assert any("xarchive" in p["url"] for p in card["field_pointers"])
     assert card["stored_prose"] == 0
     assert card["toward_10x_pct"] > 0
+    assert card["coverage_score"] >= 0
+    assert card["coverage"]["pointers"] >= 16
+
+
+def test_coverage_and_path10_and_freshness():
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.organismer import Organismer
+    from skeleton.organism.path10 import path_card
+    from skeleton.social.coverage import coverage_card
+    cov = coverage_card("https://arxiv.org/abs/2608.26983")
+    assert cov["kind"] == "field-coverage"
+    assert cov["score"] > 0
+    assert "arXiv" in cov["bound"]
+    org = Organismer()
+    p = path_card(org)
+    assert p["target"] == 10.0
+    assert p["gap"] >= 0
+    gxy = GalaxySystem()
+    gxy.pulse("index freshness topic")
+    fresh = gxy.editor.freshness(max_age=10**12)
+    assert fresh["kind"] == "editor-freshness"
+    assert fresh["stored_prose"] == 0
 
 
 def test_organismer_grows_but_does_not_overshoot():

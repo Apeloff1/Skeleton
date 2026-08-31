@@ -72,6 +72,10 @@ SOTA_POINTERS: Tuple[Dict[str, str], ...] = (
     {"topic": "letta", "url": "https://github.com/letta-ai/letta", "house": "GitHub"},
     {"topic": "cognee", "url": "https://github.com/topoteretes/cognee", "house": "GitHub"},
     {"topic": "budgeted-memory", "url": "https://arxiv.org/abs/2607.16848", "house": "arXiv"},
+    {"topic": "graphmemix", "url": "https://arxiv.org/abs/2608.26983", "house": "arXiv"},
+    {"topic": "parametric-kg-memory", "url": "https://arxiv.org/abs/2608.25489", "house": "arXiv"},
+    {"topic": "graph-selection-integrity", "url": "https://arxiv.org/abs/2606.12290", "house": "arXiv"},
+    {"topic": "dmas-ltm-cost", "url": "https://arxiv.org/abs/2601.07978", "house": "arXiv"},
 )
 
 

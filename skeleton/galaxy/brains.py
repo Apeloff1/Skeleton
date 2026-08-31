@@ -280,3 +280,21 @@ class EditorBrain:
                     atom.confidence = max(0.15, atom.confidence * 0.92)
                     stale += 1
         return {"index_size": len(self.index), "decayed": stale, "traffic": list(self.traffic[-16:]), "stored_prose": 0}
+
+    def freshness(self, *, max_age: float = 86_400) -> Dict[str, Any]:
+        now = time.time()
+        stale = []
+        for topic, aid in list(self.index.items()):
+            atom = self.mesh.of(self.name).get(aid)
+            if atom is None:
+                continue
+            if (now - float(atom.ts)) > float(max_age):
+                stale.append(topic)
+        return {
+            "kind": "editor-freshness",
+            "index": len(self.index),
+            "stale": stale[:24],
+            "stale_n": len(stale),
+            "max_age": max_age,
+            "stored_prose": 0,
+        }

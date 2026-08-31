@@ -192,6 +192,16 @@ class Organismer:
             from skeleton.galaxy.lattice import card as lattice_card
             card["lattice"] = lattice_card(self.galaxy.mesh, neo=neo).get("ascii")
             card["kv"] = kv_archive(self.galaxy.mesh, neo=neo)
+            from skeleton.organism.path10 import path_card
+            from skeleton.social.coverage import coverage_card
+            card["path10"] = path_card(self, last_growth=(genos_card or {}).get("growth"))
+            card["coverage"] = coverage_card(stimulus)
+            card["fresh"] = self.galaxy.editor.freshness()
+            self.last_health = {
+                "ok": int(float((adapt_card or {}).get("pressure") or 0) < 0.90),
+                "pressure": (adapt_card or {}).get("pressure"),
+                "coverage": card["coverage"]["score"],
+            }
             line: Dict[str, Any] = {}
             if self.persist_on:
                 ids = list(gxy.get("atom_ids") or [])

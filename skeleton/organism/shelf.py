@@ -18,6 +18,7 @@ def save(org, *, root: Optional[Path] = None) -> Dict[str, Any]:
         "galaxy_pulses": int(getattr(org.galaxy, "pulses", 0) or 0),
         "log": list(org.log[-32:]),
         "genos": org.genos.snapshot(),
+        "last_health": dict(getattr(org, "last_health", {}) or {}),
         "stored_prose": 0,
     })
     path = state_path(root)
