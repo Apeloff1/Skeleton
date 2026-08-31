@@ -195,6 +195,11 @@ class CommandDeck:
         from skeleton.galaxy.system import live_galaxy
         return run(live_galaxy().mesh, q)
 
+    def graph(self, cue: str = "") -> Dict[str, Any]:
+        from skeleton.galaxy.graph import card as graph_card
+        from skeleton.galaxy.system import live_galaxy
+        return graph_card(live_galaxy().mesh, cue)
+
     def banks(self) -> Dict[str, Any]:
         from skeleton.galaxy.banks import card
         from skeleton.galaxy.system import live_galaxy

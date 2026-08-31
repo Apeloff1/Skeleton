@@ -212,6 +212,19 @@ def test_next_hint_and_journal(tmp_path):
     assert rows and rows[-1]["decision"] == "new"
 
 
+def test_reconstruct_forest_from_seeded_wiki():
+    from skeleton.galaxy.graph import card, reconstruct
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.social.seed import seed_field
+    gxy = GalaxySystem()
+    seed_field(gxy)
+    rec = reconstruct(gxy.mesh, "memory graph")
+    assert rec["kind"] == "reconstruct"
+    assert rec["stored_prose"] == 0
+    gcard = card(gxy.mesh, "memory")
+    assert gcard["atoms"] >= 1
+
+
 def test_wiki_bound_coverage_after_seed():
     from skeleton.galaxy.system import live_galaxy, reset_galaxy
     from skeleton.social.coverage import coverage_card

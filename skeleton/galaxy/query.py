@@ -69,11 +69,20 @@ def run(mesh, q: str, *, limit: int = 0) -> Dict[str, Any]:
                 break
         if len(rows) >= limit:
             break
+    forest = None
+    needle_q = spec.get("contains") or q
+    if needle_q:
+        try:
+            from skeleton.galaxy.graph import reconstruct
+            forest = reconstruct(mesh, needle_q, k=min(8, limit))
+        except Exception:
+            forest = None
     return {
         "kind": "wiki-query",
         "q": q[:160],
         "spec": spec,
         "n": len(rows),
         "rows": rows,
+        "forest": forest,
         "stored_prose": 0,
     }

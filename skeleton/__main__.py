@@ -78,6 +78,8 @@ def main(argv: list[str] | None = None) -> int:
     ctact.add_argument("stimulus", nargs="?", default="plan tensor ttk")
     wq = sub.add_parser("wiki", help="SPARQL-shaped wiki query")
     wq.add_argument("q", nargs="?", default="SELECT topic WHERE kind=principle")
+    gr = sub.add_parser("graph", help="cue-tag reconstruction forest")
+    gr.add_argument("cue", nargs="?", default="memory graph")
     sub.add_parser("banks", help="common vs long-tail memory banks")
     sub.add_parser("caps", help="hardware-aware multi-cap table")
     sub.add_parser("lattice", help="Hoag lattice + gated KV handles")
@@ -270,6 +272,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "wiki":
         from skeleton.cortex.deck import live_deck
         out = live_deck().wiki(args.q)
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "graph":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().graph(args.cue)
         print(json.dumps(out, indent=2, default=str))
         return 0
 

@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Cue-tag reconstruction forest
+
+- galaxy/graph.py. Reconstruct 1-hop forest from query cues.
+- Wiki queries attach a forest. CLI graph, GET /cortex/graph.
+- Cite 2606.06036 as stance. Edges are token Jaccard.
+
+---
+
 ## 2026-08-31 — Wiki-bound coverage + three graph-memory handles
 
 - coverage mode wiki-bound when the nucleus holds field URLs.
