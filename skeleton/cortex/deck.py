@@ -165,6 +165,10 @@ class CommandDeck:
         from skeleton.social.seed import seed_field
         return seed_field(live_galaxy())
 
+    def field(self) -> Dict[str, Any]:
+        from skeleton.social.field import field_card
+        return field_card()
+
     def ready(self) -> Dict[str, Any]:
         from skeleton.organism.ready import ready_card
         return ready_card(neo=self.neo)

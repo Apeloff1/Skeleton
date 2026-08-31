@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Field catalog + consolidate trims
+
+- social/field.py. CLI field, GET /cortex/field.
+- Dream pulse also trims and refreshes the editor.
+- Product carries budget op.
+
+---
+
 ## 2026-08-31 — Retain vs consolidate under live pressure
 
 - organism/budget.py. Tight → consolidate (dream/tighten). Slack → retain.

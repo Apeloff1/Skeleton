@@ -28,8 +28,11 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
     elif code == "bind-source":
         acted["seed"] = seed_field(org.galaxy)
     elif code == "dream":
+        from skeleton.organism.caps import trim_mesh
         from skeleton.organism.idle import run as idle_run
         acted["idle"] = idle_run(org.galaxy, neo)
+        acted["trim"] = trim_mesh(org.galaxy.mesh)
+        acted["refresh"] = org.galaxy.editor.refresh()
         org.last_dream_step = org.steps
     else:
         stim = stimulus or "plan tensor ttk house contact"

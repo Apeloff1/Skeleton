@@ -1,7 +1,7 @@
 # Freeze — 2026-08-31 ready
 
 Repo: Apeloff1/Skeleton  
-Ritual: `python -m skeleton ready`
+Ritual: `python -m skeleton ready` then `python -m skeleton walk -n 3`
 
 Shipped this lineage: five-brain Hoag galaxy, codec T0–T5, decoder prior
 (CPU canonical), CCL vault, adaptive caps, wiki SELECT, banks,

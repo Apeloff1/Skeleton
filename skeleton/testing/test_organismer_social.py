@@ -54,6 +54,14 @@ def test_sota_card_has_seeded_field_pointers():
     assert card["coverage"]["pointers"] >= 16
 
 
+def test_field_card_lists_pointers():
+    from skeleton.social.field import field_card
+    card = field_card()
+    assert card["n"] >= 16
+    assert "arXiv" in card["houses"]
+    assert card["stored_prose"] == 0
+
+
 def test_budget_choose_splits():
     from skeleton.organism.budget import choose, walk_limit
     tight = choose(0.80, stale_n=0, atoms=90, atom_cap=100)

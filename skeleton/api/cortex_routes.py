@@ -236,6 +236,11 @@ async def cortex_seed_post(state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).seed()
 
 
+@router.get("/cortex/field")
+async def cortex_field_get(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).field()
+
+
 @router.get("/cortex/ready")
 async def cortex_ready_get(state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).ready()

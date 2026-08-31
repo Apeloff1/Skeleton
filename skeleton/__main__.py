@@ -84,6 +84,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("health", help="operator health card")
     sub.add_parser("next", help="coded operator next hint")
     sub.add_parser("seed", help="file field pointers into the wiki")
+    sub.add_parser("field", help="list SOTA field pointers")
     sub.add_parser("ready", help="seed if empty, then health+next+caps")
     pu = sub.add_parser("pulse", help="obey the next code")
     pu.add_argument("stimulus", nargs="?", default="")
@@ -299,6 +300,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "seed":
         from skeleton.cortex.deck import live_deck
         out = live_deck().seed()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "field":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().field()
         print(json.dumps(out, indent=2, default=str))
         return 0
 
