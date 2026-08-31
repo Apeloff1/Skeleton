@@ -54,6 +54,21 @@ def test_sota_card_has_seeded_field_pointers():
     assert card["coverage"]["pointers"] >= 16
 
 
+def test_laws_scan_flags_long_dialect():
+    from skeleton.galaxy.atoms import Atom
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.laws import laws_card, scan_prose
+    gxy = GalaxySystem()
+    assert scan_prose(gxy.mesh) == 0
+    fat = Atom.mint(
+        kind="capture", tier="T3_SEMANTIC", topic="x",
+        dialect="word " * 40, brain="memory", color="#00e5ff",
+    )
+    gxy.mesh.brains["memory"].shelf[fat.id] = fat
+    assert scan_prose(gxy.mesh) >= 1
+    assert laws_card(gxy.mesh)["ok"] == 0
+
+
 def test_doctor_ok(tmp_path):
     from skeleton.galaxy.system import GalaxySystem
     from skeleton.organism.doctor import doctor_card

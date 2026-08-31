@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Live stored_prose scan
+
+- organism/laws.py counts long dialect on every shelf.
+- Doctor ok requires scan == 0.
+
+---
+
 ## 2026-08-31 — Doctor on ready and product
 
 - ready and product embed the doctor card.

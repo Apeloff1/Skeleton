@@ -21,7 +21,9 @@ def doctor_card(org=None, *, neo=None) -> Dict[str, Any]:
     caps = caps_card()
     field = field_card()
     nxt = hint(org, neo=neo)
-    prose = int(health.get("stored_prose") or 0)
+    from skeleton.organism.laws import laws_card
+    laws = laws_card(org.galaxy.mesh)
+    prose = int(laws.get("stored_prose") or 0)
     ok = int(bool(health.get("ok")) and prose == 0 and field["n"] >= 16)
     return {
         "kind": "doctor",
@@ -36,5 +38,6 @@ def doctor_card(org=None, *, neo=None) -> Dict[str, Any]:
         "houses": field["houses"],
         "G": health.get("G"),
         "version": _version(),
-        "laws": ("cite-do-not-copy", "stored_prose=0", "clipped-G", "headroom-below-wall"),
+        "laws": laws["names"],
+        "laws_ok": laws["ok"],
     }
