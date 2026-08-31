@@ -236,6 +236,8 @@ def test_product_card_shape():
     assert card["kind"] == "product"
     assert card["target"] == 10.0
     assert "GET /cortex/product" in card["endpoints"]
+    assert "GET /cortex/ready" in card["endpoints"]
+    assert card.get("version")
     assert any(p["topic"] == "mem0" for p in card["field"])
     assert card["stored_prose"] == 0
 

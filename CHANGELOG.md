@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Product freeze 2026.08.31-ready
+
+- product.version stamp. PRODUCT.md and STATUS.md match the live surface.
+
+---
+
 ## 2026-08-31 — Ready ritual + wiki field in S
 
 - organism/ready.py seeds an empty wiki then returns health/next/caps.

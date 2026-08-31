@@ -15,6 +15,9 @@ from skeleton.social.sota import sota_card
 from skeleton.social.sources import SOTA_POINTERS
 
 
+VERSION = "2026.08.31-ready"
+
+
 ENDPOINTS = (
     "GET /cortex/product",
     "GET|POST /cortex/organismer",
@@ -39,6 +42,7 @@ def product_card() -> Dict[str, Any]:
     return {
         "kind": "product",
         "name": "Jeeves Cortex Organism",
+        "version": VERSION,
         "G": snap["G"],
         "target": snap["target"],
         "toward_10x_pct": snap["toward_10x_pct"],
