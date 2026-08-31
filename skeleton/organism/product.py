@@ -27,6 +27,7 @@ ENDPOINTS = (
     "GET /cortex/caps",
     "GET /cortex/lattice",
     "GET /cortex/health",
+    "GET /cortex/next",
 )
 
 

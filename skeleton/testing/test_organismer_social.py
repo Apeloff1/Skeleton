@@ -54,6 +54,20 @@ def test_sota_card_has_seeded_field_pointers():
     assert card["coverage"]["pointers"] >= 16
 
 
+def test_next_hint_and_journal(tmp_path):
+    from skeleton.organism.journal import append, tail
+    from skeleton.organism.next import hint
+    from skeleton.organism.organismer import Organismer
+    org = Organismer(root=tmp_path, persist=False)
+    card = hint(org)
+    assert card["kind"] == "next"
+    assert card["code"] in {"tighten", "dream", "bind-source", "contact", "hold", "pulse"}
+    assert card["stored_prose"] == 0
+    append({"step": 1, "G": 1.0, "decision": "new", "coverage": 0.2, "pressure": 0.1}, root=tmp_path)
+    rows = tail(2, root=tmp_path)
+    assert rows and rows[-1]["decision"] == "new"
+
+
 def test_coverage_and_path10_and_freshness():
     from skeleton.galaxy.system import GalaxySystem
     from skeleton.organism.organismer import Organismer

@@ -82,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("caps", help="hardware-aware multi-cap table")
     sub.add_parser("lattice", help="Hoag lattice + gated KV handles")
     sub.add_parser("health", help="operator health card")
+    sub.add_parser("next", help="coded operator next hint")
     sub.add_parser("zaibatsu", help="tournament the three mouths; print the family seal")
 
     sp = sub.add_parser("speak", help="neo transformer decode")
@@ -279,6 +280,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "health":
         from skeleton.cortex.deck import live_deck
         out = live_deck().health()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "next":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().next()
         print(json.dumps(out, indent=2, default=str))
         return 0
 

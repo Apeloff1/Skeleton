@@ -73,7 +73,14 @@ class Organismer:
         n = len(social.get("houses") or [])
         x = int(social.get("x_posts") or 0)
         p = int(social.get("papers") or 0)
-        raw = 1.0 + 0.14 * n + 0.10 * x + 0.12 * p
+        cov = float((social.get("coverage_score") or 0) or 0)
+        if cov <= 0:
+            try:
+                from skeleton.social.coverage import coverage_card
+                cov = float(coverage_card("").get("score") or 0)
+            except Exception:
+                cov = 0.0
+        raw = 1.0 + 0.14 * n + 0.10 * x + 0.12 * p + 0.20 * cov
         return _clip(raw, 1.0, 2.2)
 
     def step(
@@ -220,6 +227,17 @@ class Organismer:
                 "prev": line.get("prev"),
                 "n": ledger_count(self.root) if self.persist_on else 0,
             }
+            from skeleton.organism.next import hint as next_hint
+            card["next"] = next_hint(self, neo=neo)
+            if self.persist_on:
+                from skeleton.organism.journal import append as journal_append
+                journal_append({
+                    "step": self.steps,
+                    "G": card["G"],
+                    "decision": decision,
+                    "coverage": card["coverage"]["score"],
+                    "pressure": (adapt_card or {}).get("pressure"),
+                }, root=self.root)
             self.log.append({"step": self.steps, "G": card["G"], "S": S, "decision": decision})
             return card
         except Exception as exc:

@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Next hint + pulse journal + S×coverage
+
+- _S gains 0.20 × coverage score.
+- organism/next.py coded hint. CLI next, GET /cortex/next.
+- journal.jsonl capped by live atoms/8.
+
+---
+
 ## 2026-08-31 — Perpendicular: coverage, 10x path, freshness, field
 
 - Field pointers: GraphMemix 2608.26983, parametric KG 2608.25489,
