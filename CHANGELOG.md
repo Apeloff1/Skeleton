@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Perpendicular: MHC, nucleus bind, field depth
+
+- Pointers: EVAF 2606.26806, ProCL 2605.13162, retain/consolidate 2607.17545.
+- Empty-stimulus pulses bind wiki nucleus URLs.
+- MHC card on product/ready.
+
+---
+
 ## 2026-08-31 — Bounded walk (not gameforge run)
 
 - organism/runloop.py pulses until hold/tighten or N≤8.

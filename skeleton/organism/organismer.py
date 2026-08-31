@@ -101,6 +101,8 @@ class Organismer:
         self.steps += 1
         eta = cosine_lr(min(self.steps, 64), 64, base=0.28, floor=0.08)
         social = ingest(stimulus, live=live_cdx)
+        from skeleton.social.nucleus import bind_if_empty
+        social = bind_if_empty(social, self.galaxy.mesh, live=live_cdx)
         first = (social.get("cards") or [{}])[0] if social.get("cards") else {}
         cite = citation or str(first.get("url") or "")
         try:

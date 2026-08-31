@@ -11,10 +11,12 @@ python -m skeleton seed
 python -m skeleton caps
 python -m skeleton lattice
 python -m skeleton wiki 'SELECT * WHERE kind=principle'
+python -m skeleton pulse
+python -m skeleton walk -n 3
 ```
 
 HTTP: `GET /cortex/{product,health,next,ready,caps,lattice,banks,wiki}`  
-`POST /cortex/{organismer,galaxy,social,seed,contact}`
+`POST /cortex/{organismer,galaxy,social,seed,contact,pulse,walk}`
 
 Version stamp lives on the product card (`version`).
 

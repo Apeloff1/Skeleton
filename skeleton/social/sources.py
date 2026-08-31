@@ -76,6 +76,9 @@ SOTA_POINTERS: Tuple[Dict[str, str], ...] = (
     {"topic": "parametric-kg-memory", "url": "https://arxiv.org/abs/2608.25489", "house": "arXiv"},
     {"topic": "graph-selection-integrity", "url": "https://arxiv.org/abs/2606.12290", "house": "arXiv"},
     {"topic": "dmas-ltm-cost", "url": "https://arxiv.org/abs/2601.07978", "house": "arXiv"},
+    {"topic": "memory-depth-evaf", "url": "https://arxiv.org/abs/2606.26806", "house": "arXiv"},
+    {"topic": "procl-program-memory", "url": "https://arxiv.org/abs/2605.13162", "house": "arXiv"},
+    {"topic": "retain-or-consolidate", "url": "https://arxiv.org/abs/2607.17545", "house": "arXiv"},
 )
 
 

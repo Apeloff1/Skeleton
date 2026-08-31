@@ -54,6 +54,23 @@ def test_sota_card_has_seeded_field_pointers():
     assert card["coverage"]["pointers"] >= 16
 
 
+def test_nucleus_bind_and_mhc(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.mhc import mhc_card
+    from skeleton.organism.organismer import Organismer
+    from skeleton.social.nucleus import bind_if_empty, wiki_urls
+    from skeleton.social.seed import seed_field
+    gxy = GalaxySystem()
+    seed_field(gxy)
+    assert wiki_urls(gxy.mesh)
+    filled = bind_if_empty({"cards": []}, gxy.mesh)
+    assert filled.get("cards")
+    org = Organismer(root=tmp_path, persist=False, galaxy=gxy)
+    card = mhc_card(org)
+    assert card["kind"] == "mhc"
+    assert card["stored_prose"] == 0
+
+
 def test_walk_is_bounded(tmp_path):
     from skeleton.galaxy.system import GalaxySystem
     from skeleton.organism.organismer import Organismer

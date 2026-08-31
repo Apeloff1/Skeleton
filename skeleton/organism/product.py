@@ -8,6 +8,7 @@ from skeleton.organism.organismer import live_organismer
 from skeleton.galaxy.vault import vault_path
 from skeleton.organism.caps import card as caps_card
 from skeleton.organism.health import health_card
+from skeleton.organism.mhc import mhc_card
 from skeleton.organism.path10 import path_card
 from skeleton.social.coverage import coverage_card
 from skeleton.organism.paths import ledger_path, state_path
@@ -59,6 +60,7 @@ def product_card() -> Dict[str, Any]:
         "caps": caps_card(),
         "health": health_card(org),
         "path10": path_card(org),
+        "mhc": mhc_card(org),
         "coverage": coverage_card(""),
         "fresh": org.galaxy.editor.freshness(),
         "endpoints": list(ENDPOINTS),
