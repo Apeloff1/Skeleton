@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Clip fat dialects on consolidate
+
+- clip_fat runs house_dialect on long shelves.
+- Dream and tighten pulses clip.
+
+---
+
 ## 2026-08-31 — Laws CLI + product scan
 
 - CLI laws, GET /cortex/laws. Product stored_prose from scan.

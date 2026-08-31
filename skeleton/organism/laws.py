@@ -18,6 +18,23 @@ def scan_prose(mesh) -> int:
     return n
 
 
+def clip_fat(mesh) -> Dict[str, Any]:
+    from skeleton.galaxy.atoms import house_dialect
+    clipped = 0
+    for lib in (mesh.brains or {}).values():
+        shelf = getattr(lib, "shelf", {}) or {}
+        items = shelf.values() if isinstance(shelf, dict) else shelf
+        for atom in items:
+            dialect = str(getattr(atom, "dialect", "") or "")
+            topic = str(getattr(atom, "topic", "") or "")
+            if len(f"{dialect} {topic}".split()) > LIMIT:
+                atom.dialect = house_dialect(dialect or topic)
+                if len(topic.split()) > LIMIT:
+                    atom.topic = " ".join(topic.split()[:8])
+                clipped += 1
+    return {"kind": "clip", "clipped": clipped, "stored_prose": scan_prose(mesh)}
+
+
 def laws_card(mesh) -> Dict[str, Any]:
     prose = scan_prose(mesh)
     return {

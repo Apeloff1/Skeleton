@@ -67,6 +67,9 @@ def test_laws_scan_flags_long_dialect():
     gxy.mesh.brains["memory"].shelf[fat.id] = fat
     assert scan_prose(gxy.mesh) >= 1
     assert laws_card(gxy.mesh)["ok"] == 0
+    from skeleton.organism.laws import clip_fat
+    clip_fat(gxy.mesh)
+    assert scan_prose(gxy.mesh) == 0
 
 
 def test_doctor_ok(tmp_path):
