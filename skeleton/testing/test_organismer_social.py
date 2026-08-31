@@ -241,6 +241,21 @@ def test_caps_headroom_below_wall():
     assert tight.atoms <= calm.atoms
 
 
+def test_lattice_and_unbound_kv():
+    from skeleton.galaxy.kv import archive
+    from skeleton.galaxy.lattice import card as lcard
+    from skeleton.galaxy.system import GalaxySystem
+    gxy = GalaxySystem()
+    gxy.pulse("plan tensor ttk")
+    lat = lcard(gxy.mesh)
+    assert lat["kind"] == "lattice"
+    assert "nucleus" in lat["ascii"]
+    assert lat["stored_prose"] == 0
+    kv = archive(gxy.mesh, neo=None)
+    assert kv["bound"] == 0
+    assert kv["n"] == 0
+
+
 def test_caps_adapt_hysteresis():
     from skeleton.organism.caps import adapt, compute, reset_caps
     reset_caps()

@@ -25,11 +25,12 @@ architecture.
 
 - Hierarchical memory banks — done (common/long-tail + residual block;
   ingest only if mouth exposes ingest_residual).
-- Fractal / octahedral KV archive — still not claimed. No fake cache.
+- Fractal / octahedral KV archive — handle map when transformer bound.
+  Still not a production cache.
 - Dual-layer write-back — done (internalized tag + skip).
 - Wiki SPARQL-shaped query — done (SELECT … WHERE).
-- Per-mouth colored lattice visualization in the command deck UI
-  (App Builder was ephemeral; Skeleton remains source of truth).
+- Per-mouth colored lattice — data card + ASCII done (`lattice`).
+  Pixel UI still not claimed.
 - Hardware multi-cap table — done (headroom 0.62).
 
 ## Explicitly not this pass

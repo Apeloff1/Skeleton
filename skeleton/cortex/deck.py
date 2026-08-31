@@ -165,6 +165,15 @@ class CommandDeck:
         from skeleton.organism.caps import card
         return card()
 
+    def lattice(self) -> Dict[str, Any]:
+        from skeleton.galaxy.kv import archive
+        from skeleton.galaxy.lattice import card as lattice_card
+        from skeleton.galaxy.system import live_galaxy
+        gxy = live_galaxy()
+        out = lattice_card(gxy.mesh, neo=self.neo)
+        out["kv"] = archive(gxy.mesh, neo=self.neo)
+        return out
+
     def contact(self, stimulus: str = "") -> Dict[str, Any]:
         from skeleton.organism.teachers import glean_rule, sync
         from skeleton.galaxy.system import live_galaxy

@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-08-31 — Hoag lattice card + gated KV handles
+
+- galaxy/lattice.py — colored ring nodes + ASCII.
+- galaxy/kv.py — residual handles only if transformer bound.
+- CLI lattice, GET /cortex/lattice.
+
+---
+
 ## 2026-08-31 — Adaptive caps: tighten now, ease later
 
 - Pressure = 0.65 memory-fill + 0.35 load/cpu. Headroom shrinks with it.
