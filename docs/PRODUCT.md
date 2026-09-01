@@ -15,6 +15,7 @@ python -m skeleton wiki 'SELECT * WHERE kind=principle'
 python -m skeleton pulse
 python -m skeleton walk -n 3
 python -m skeleton sleep --force
+python -m skeleton forget "old trace"
 ```
 
 HTTP: `GET /cortex/{product,health,next,ready,caps,lattice,banks,wiki}`  

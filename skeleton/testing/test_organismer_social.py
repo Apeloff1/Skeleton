@@ -72,6 +72,26 @@ def test_laws_scan_flags_long_dialect():
     assert scan_prose(gxy.mesh) == 0
 
 
+def test_forget_decays_and_wakes():
+    from skeleton.galaxy.atoms import Atom
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.forget import reconsolidate, sweep
+    gxy = GalaxySystem()
+    cold = Atom.mint(
+        kind="capture", tier="T0_FLASH", topic="old trace",
+        dialect="old trace", brain="memory", color="#00e5ff",
+        confidence=0.20,
+    )
+    gxy.mesh.brains["memory"].shelf[cold.id] = cold
+    card = sweep(gxy.mesh, cue="")
+    assert card["kind"] == "forget"
+    assert cold.superseded_by == "forget-retire" or "retired" in (cold.tags or ())
+    woke = reconsolidate(gxy.mesh, "old trace")
+    assert woke["woke"] >= 1
+    assert cold.superseded_by == ""
+    assert card["stored_prose"] == 0
+
+
 def test_sleep_is_gated_then_forced(tmp_path):
     from skeleton.galaxy.system import GalaxySystem
     from skeleton.organism.organismer import Organismer

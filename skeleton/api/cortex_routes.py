@@ -251,6 +251,11 @@ async def cortex_sleep_get(force: bool = False, cue: str = "", state=Depends(_st
     return _deck(state).sleep(force=force, cue=cue)
 
 
+@router.post("/cortex/forget")
+async def cortex_forget_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).forget(str(request.get("cue") or ""))
+
+
 @router.get("/cortex/laws")
 async def cortex_laws_get(state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).laws()

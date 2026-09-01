@@ -90,6 +90,9 @@ SOTA_POINTERS: Tuple[Dict[str, str], ...] = (
     {"topic": "recuris-rsi-memory", "url": "https://arxiv.org/abs/2608.24876", "house": "arXiv"},
     {"topic": "human-inspired-memory", "url": "https://arxiv.org/abs/2605.08538", "house": "arXiv"},
     {"topic": "agent-memory-survey", "url": "https://arxiv.org/abs/2602.06052", "house": "arXiv"},
+    {"topic": "fsfm-selective-forget", "url": "https://arxiv.org/abs/2604.20300", "house": "arXiv"},
+    {"topic": "forget-control-plane", "url": "https://arxiv.org/abs/2606.15903", "house": "arXiv"},
+    {"topic": "reversible-forgetting", "url": "https://arxiv.org/abs/2608.18177", "house": "arXiv"},
 )
 
 

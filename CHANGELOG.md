@@ -4,6 +4,15 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-01 — Selective forget + reconsolidation
+
+- organism/forget.py: dormant / retired / wake-on-cue.
+- NREM sweeps. REM reconsolidates the cue.
+- CLI forget, POST /cortex/forget.
+- Pointers: 2604.20300, 2606.15903, 2608.18177.
+
+---
+
 ## 2026-09-01 — Gated NREM+REM sleep
 
 - organism/sleep.py. Consolidation gated (2605.12978).

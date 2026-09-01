@@ -31,14 +31,17 @@ def nrem(org) -> Dict[str, Any]:
     from skeleton.organism.laws import clip_fat, persist_clip
     from skeleton.organism.writeback import absorb
 
+    from skeleton.organism.forget import sweep
     clip = clip_fat(org.galaxy.mesh)
     clip.update(persist_clip(org))
+    forgotten = sweep(org.galaxy.mesh)
     return {
         "kind": "nrem",
         "adapt": adapt(),
         "trim": trim_mesh(org.galaxy.mesh),
         "clip": clip,
         "absorb": absorb(org.galaxy.mesh),
+        "forget": forgotten,
         "refresh": org.galaxy.editor.refresh(),
         "stored_prose": clip.get("stored_prose", 0),
     }
@@ -48,10 +51,13 @@ def rem(org, *, neo=None, cue: str = "") -> Dict[str, Any]:
     from skeleton.organism.context_loop import assess
     from skeleton.organism.idle import run as idle_run
 
+    from skeleton.organism.forget import reconsolidate
+    cue = cue or "memory graph"
     return {
         "kind": "rem",
         "idle": idle_run(org.galaxy, neo),
-        "loop": assess(org, cue=cue or "memory graph", neo=neo),
+        "loop": assess(org, cue=cue, neo=neo),
+        "reconsolidate": reconsolidate(org.galaxy.mesh, cue),
         "stored_prose": 0,
     }
 

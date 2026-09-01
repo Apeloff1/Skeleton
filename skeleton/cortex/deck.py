@@ -186,6 +186,11 @@ class CommandDeck:
         from skeleton.organism.sleep import cycle
         return cycle(neo=self.neo, force=force, cue=cue)
 
+    def forget(self, cue: str = "") -> Dict[str, Any]:
+        from skeleton.galaxy.system import live_galaxy
+        from skeleton.organism.forget import sweep
+        return sweep(live_galaxy().mesh, cue=cue)
+
     def pulse(self, stimulus: str = "") -> Dict[str, Any]:
         from skeleton.organism.pulse import pulse
         return pulse(neo=self.neo, stimulus=stimulus)

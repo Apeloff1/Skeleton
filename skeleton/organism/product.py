@@ -45,6 +45,7 @@ ENDPOINTS = (
     "GET /cortex/graph",
     "GET /cortex/context",
     "GET|POST /cortex/sleep",
+    "POST /cortex/forget",
 )
 
 
