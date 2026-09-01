@@ -256,6 +256,16 @@ async def cortex_forget_post(request: Dict[str, Any], state=Depends(_state)) -> 
     return _deck(state).forget(str(request.get("cue") or ""))
 
 
+@router.get("/cortex/helix")
+async def cortex_helix_get(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).helix()
+
+
+@router.get("/cortex/recall")
+async def cortex_recall_get(q: str = "", state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).recall(q)
+
+
 @router.get("/cortex/laws")
 async def cortex_laws_get(state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).laws()

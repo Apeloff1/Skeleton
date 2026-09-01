@@ -4,6 +4,15 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-01 — Dual-helix eidetic chain
+
+- organism/helix.py. Sense = events. Snap = mesh merkle + compact atoms.
+  Cross-pair hashes. Verify + recall. Persist and NREM stamp both.
+- CLI helix / recall. GET /cortex/helix, GET /cortex/recall?q=
+- Version 2026.09.01-helix.
+
+---
+
 ## 2026-09-01 — Selective forget + reconsolidation
 
 - organism/forget.py: dormant / retired / wake-on-cue.

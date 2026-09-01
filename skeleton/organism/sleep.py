@@ -35,6 +35,11 @@ def nrem(org) -> Dict[str, Any]:
     clip = clip_fat(org.galaxy.mesh)
     clip.update(persist_clip(org))
     forgotten = sweep(org.galaxy.mesh)
+    helix = None
+    if getattr(org, "persist_on", False):
+        from skeleton.organism.helix import stamp as helix_stamp
+        helix = helix_stamp(org, {"kind": "nrem", "topic": "sleep", "G": getattr(org, "G", None)},
+                            root=getattr(org, "root", None))
     return {
         "kind": "nrem",
         "adapt": adapt(),
@@ -42,6 +47,7 @@ def nrem(org) -> Dict[str, Any]:
         "clip": clip,
         "absorb": absorb(org.galaxy.mesh),
         "forget": forgotten,
+        "helix": helix,
         "refresh": org.galaxy.editor.refresh(),
         "stored_prose": clip.get("stored_prose", 0),
     }

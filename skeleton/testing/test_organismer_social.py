@@ -72,6 +72,23 @@ def test_laws_scan_flags_long_dialect():
     assert scan_prose(gxy.mesh) == 0
 
 
+def test_helix_stamps_and_recalls(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.helix import recall, stamp, verify
+    from skeleton.organism.organismer import Organismer
+    from skeleton.social.seed import seed_field
+    gxy = GalaxySystem()
+    seed_field(gxy)
+    org = Organismer(root=tmp_path, persist=True, galaxy=gxy)
+    card = stamp(org, {"kind": "test", "topic": "mem0 graph", "G": org.G}, root=tmp_path)
+    assert card["sense"]["sha"]
+    assert card["snap"]["merkle"]
+    assert verify(tmp_path)["ok"] == 1
+    hit = recall("mem0", root=tmp_path)
+    assert hit["n"] >= 1
+    assert card["stored_prose"] == 0
+
+
 def test_forget_decays_and_wakes():
     from skeleton.galaxy.atoms import Atom
     from skeleton.galaxy.system import GalaxySystem

@@ -23,3 +23,11 @@ def ledger_path(root: Optional[Path] = None) -> Path:
 
 def galaxy_path(root: Optional[Path] = None) -> Path:
     return organism_dir(root) / "galaxy.json"
+
+
+def helix_sense_path(root: Optional[Path] = None) -> Path:
+    return organism_dir(root) / "helix_sense.jsonl"
+
+
+def helix_snap_path(root: Optional[Path] = None) -> Path:
+    return organism_dir(root) / "helix_snap.jsonl"

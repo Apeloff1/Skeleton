@@ -230,6 +230,15 @@ class Organismer:
                     "G": self.G,
                     "atoms": ",".join(ids)[:160],
                 }, root=self.root)
+                from skeleton.organism.helix import stamp as helix_stamp
+                card["helix"] = helix_stamp(self, {
+                    "kind": "organism-write",
+                    "decision": decision,
+                    "url": cite,
+                    "topic": (hit or stimulus)[:80],
+                    "G": self.G,
+                    "atoms": ",".join(ids)[:160],
+                }, root=self.root)
                 card["saved"] = shelf_save(self, root=self.root)
                 card["galaxy_saved"] = galaxy_save(self.galaxy, root=self.root)
             card["ledger"] = {

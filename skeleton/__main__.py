@@ -94,6 +94,9 @@ def main(argv: list[str] | None = None) -> int:
     sl.add_argument("cue", nargs="?", default="")
     fg = sub.add_parser("forget", help="decay / retire / reconsolidate")
     fg.add_argument("cue", nargs="?", default="")
+    sub.add_parser("helix", help="dual-helix eidetic heads")
+    rc = sub.add_parser("recall", help="recall from helix snapshots")
+    rc.add_argument("cue", nargs="?", default="")
     sub.add_parser("next", help="coded operator next hint")
     sub.add_parser("seed", help="file field pointers into the wiki")
     sub.add_parser("field", help="list SOTA field pointers")
@@ -321,6 +324,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "forget":
         from skeleton.cortex.deck import live_deck
         out = live_deck().forget(str(getattr(args, "cue", "") or ""))
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "helix":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().helix()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "recall":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().recall(str(getattr(args, "cue", "") or ""))
         print(json.dumps(out, indent=2, default=str))
         return 0
 

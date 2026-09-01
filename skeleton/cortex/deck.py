@@ -191,6 +191,16 @@ class CommandDeck:
         from skeleton.organism.forget import sweep
         return sweep(live_galaxy().mesh, cue=cue)
 
+    def helix(self) -> Dict[str, Any]:
+        from skeleton.organism.helix import card
+        from skeleton.organism.organismer import live_organismer
+        return card(live_organismer().root)
+
+    def recall(self, cue: str = "") -> Dict[str, Any]:
+        from skeleton.organism.helix import recall
+        from skeleton.organism.organismer import live_organismer
+        return recall(cue, root=live_organismer().root)
+
     def pulse(self, stimulus: str = "") -> Dict[str, Any]:
         from skeleton.organism.pulse import pulse
         return pulse(neo=self.neo, stimulus=stimulus)
