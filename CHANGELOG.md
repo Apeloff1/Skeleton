@@ -4,6 +4,18 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-01 — Gated NREM+REM sleep
+
+- organism/sleep.py. Consolidation gated (2605.12978).
+  NREM clip/trim/absorb. REM DreamBrain + forest.
+- Pulse `dream` runs sleep.cycle(force).
+- CLI sleep --force, GET|POST /cortex/sleep.
+- Pointers: 2606.03979, 2604.20943, 2605.12978, 2608.24876,
+  2605.08538, 2602.06052.
+- Version 2026.09.01-sleep.
+
+---
+
 ## 2026-09-01 — Context loop: rot guard × reconstruction
 
 - organism/context_loop.py scores journal Turns via RotGuardedCompactor

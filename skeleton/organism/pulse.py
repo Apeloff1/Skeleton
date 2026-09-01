@@ -31,17 +31,8 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
     elif code == "bind-source":
         acted["seed"] = seed_field(org.galaxy)
     elif code == "dream":
-        from skeleton.organism.caps import trim_mesh
-        from skeleton.organism.idle import run as idle_run
-        from skeleton.organism.laws import clip_fat, persist_clip
-        acted["idle"] = idle_run(org.galaxy, neo)
-        acted["trim"] = trim_mesh(org.galaxy.mesh)
-        acted["clip"] = clip_fat(org.galaxy.mesh)
-        acted["clip"].update(persist_clip(org))
-        acted["refresh"] = org.galaxy.editor.refresh()
-        from skeleton.organism.context_loop import assess as loop_assess
-        acted["loop"] = loop_assess(org, cue=stimulus or "memory graph", neo=neo)
-        org.last_dream_step = org.steps
+        from skeleton.organism.sleep import cycle as sleep_cycle
+        acted["sleep"] = sleep_cycle(org, neo=neo, force=True, cue=stimulus)
     else:
         from skeleton.organism.runloop import rotate_stimulus
         stim = rotate_stimulus(int(org.steps or 0), stimulus)

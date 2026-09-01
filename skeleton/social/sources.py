@@ -84,6 +84,12 @@ SOTA_POINTERS: Tuple[Dict[str, str], ...] = (
     {"topic": "mragent-reconstruct", "url": "https://arxiv.org/abs/2606.06036", "house": "arXiv"},
     {"topic": "entity-memory-graph", "url": "https://arxiv.org/abs/2608.27925", "house": "arXiv"},
     {"topic": "sage-graph-memory", "url": "https://arxiv.org/abs/2605.12061", "house": "arXiv"},
+    {"topic": "lms-need-sleep", "url": "https://arxiv.org/abs/2606.03979", "house": "arXiv"},
+    {"topic": "scm-sleep-forget", "url": "https://arxiv.org/abs/2604.20943", "house": "arXiv"},
+    {"topic": "faulty-consolidation", "url": "https://arxiv.org/abs/2605.12978", "house": "arXiv"},
+    {"topic": "recuris-rsi-memory", "url": "https://arxiv.org/abs/2608.24876", "house": "arXiv"},
+    {"topic": "human-inspired-memory", "url": "https://arxiv.org/abs/2605.08538", "house": "arXiv"},
+    {"topic": "agent-memory-survey", "url": "https://arxiv.org/abs/2602.06052", "house": "arXiv"},
 )
 
 

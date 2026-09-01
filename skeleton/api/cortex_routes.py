@@ -241,6 +241,16 @@ async def cortex_doctor_get(fix: bool = False, state=Depends(_state)) -> Dict[st
     return _deck(state).doctor(fix=fix)
 
 
+@router.post("/cortex/sleep")
+async def cortex_sleep_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).sleep(force=bool(request.get("force")), cue=str(request.get("cue") or ""))
+
+
+@router.get("/cortex/sleep")
+async def cortex_sleep_get(force: bool = False, cue: str = "", state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).sleep(force=force, cue=cue)
+
+
 @router.get("/cortex/laws")
 async def cortex_laws_get(state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).laws()

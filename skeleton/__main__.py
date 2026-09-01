@@ -89,6 +89,9 @@ def main(argv: list[str] | None = None) -> int:
     dc = sub.add_parser("doctor", help="laws + health + caps + field")
     dc.add_argument("--fix", action="store_true")
     sub.add_parser("laws", help="live stored_prose scan")
+    sl = sub.add_parser("sleep", help="gated NREM+REM consolidation")
+    sl.add_argument("--force", action="store_true")
+    sl.add_argument("cue", nargs="?", default="")
     sub.add_parser("next", help="coded operator next hint")
     sub.add_parser("seed", help="file field pointers into the wiki")
     sub.add_parser("field", help="list SOTA field pointers")
@@ -304,6 +307,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "lattice":
         from skeleton.cortex.deck import live_deck
         out = live_deck().lattice()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "sleep":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().sleep(force=bool(getattr(args, "force", False)), cue=str(getattr(args, "cue", "") or ""))
         print(json.dumps(out, indent=2, default=str))
         return 0
 

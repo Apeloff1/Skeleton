@@ -182,6 +182,10 @@ class CommandDeck:
         from skeleton.organism.ready import ready_card
         return ready_card(neo=self.neo, walk=walk, n=n, fix=fix)
 
+    def sleep(self, force: bool = False, cue: str = "") -> Dict[str, Any]:
+        from skeleton.organism.sleep import cycle
+        return cycle(neo=self.neo, force=force, cue=cue)
+
     def pulse(self, stimulus: str = "") -> Dict[str, Any]:
         from skeleton.organism.pulse import pulse
         return pulse(neo=self.neo, stimulus=stimulus)

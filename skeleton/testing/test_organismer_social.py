@@ -72,6 +72,22 @@ def test_laws_scan_flags_long_dialect():
     assert scan_prose(gxy.mesh) == 0
 
 
+def test_sleep_is_gated_then_forced(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.organismer import Organismer
+    from skeleton.organism.sleep import cycle
+    org = Organismer(root=tmp_path, persist=False, galaxy=GalaxySystem())
+    gated = cycle(org, persist=False)
+    assert gated["kind"] == "sleep"
+    assert gated["ran"] == 0
+    forced = cycle(org, persist=False, force=True)
+    assert forced["ran"] == 1
+    assert forced["nrem"]["kind"] == "nrem"
+    assert forced["rem"]["kind"] == "rem"
+    assert forced["stored_prose"] == 0
+    assert cycle(org, persist=False)["ran"] == 0
+
+
 def test_persist_clip_writes_when_on(tmp_path):
     from skeleton.galaxy.system import GalaxySystem
     from skeleton.organism.laws import persist_clip

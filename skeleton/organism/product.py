@@ -19,7 +19,7 @@ from skeleton.social.sota import sota_card
 from skeleton.social.sources import SOTA_POINTERS
 
 
-VERSION = "2026.08.31-fix"
+VERSION = "2026.09.01-sleep"
 
 
 ENDPOINTS = (
@@ -44,6 +44,7 @@ ENDPOINTS = (
     "GET /cortex/laws",
     "GET /cortex/graph",
     "GET /cortex/context",
+    "GET|POST /cortex/sleep",
 )
 
 
