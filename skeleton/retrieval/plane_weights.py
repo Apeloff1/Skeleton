@@ -7,17 +7,13 @@ moves by exponential moving average toward reward (used) / penalty (unused).
 The quad retriever reads :meth:`effective_weights` instead of its static
 table whenever a learner is attached.
 
-Inspired by adaptive hybrid-fusion work circulating in 2026 retrieval
-discussions — the consistent finding is that fixed RRF weights drift as
-workload mix changes, and a cheap online learner beats periodic hand-tuning.
-
 Pure domain, deterministic under a seeded test clock (no randomness).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Dict, Iterable, Optional, Tuple
 
 PLANES: Tuple[str, ...] = ("rag", "cag", "mag", "kag")
 
@@ -37,13 +33,7 @@ class PlaneArm:
 
 
 class PlaneWeightLearner:
-    """EMA bandit over retrieval planes.
-
-    ``observe(used_planes, all_planes)`` after each retrieval nudges each
-    plane's weight toward its observed usefulness. Weights stay in a bounded
-    band so no plane ever fully drops out (a silent plane can't earn its way
-    back if its weight hits zero).
-    """
+    """EMA bandit over retrieval planes. See module docstring."""
 
     def __init__(
         self,
@@ -65,12 +55,7 @@ class PlaneWeightLearner:
         self.updates = 0
 
     def observe(self, used_planes: Iterable[str], *, all_planes: Optional[Iterable[str]] = None) -> None:
-        """Record one retrieval outcome.
-
-        ``used_planes``: planes whose fragments the consumer actually used.
-        ``all_planes``: planes that returned candidates this round (defaults
-        to every plane). Used planes move up, unused candidates move down.
-        """
+        """Record one retrieval outcome (used planes up, unused candidates down)."""
         used = set(used_planes)
         considered = set(all_planes) if all_planes is not None else set(PLANES)
         for plane in considered:
@@ -94,3 +79,19 @@ class PlaneWeightLearner:
             "weights": self.effective_weights(),
             "rates": {p: round(a.rate, 4) for p, a in self._arms.items()},
         }
+
+
+# ---------------------------------------------------------------------------
+# QuadRetriever integration (F-2: the feedback loop, closed)
+# ---------------------------------------------------------------------------
+
+def attach_learner(quad, learner: Optional[PlaneWeightLearner] = None) -> PlaneWeightLearner:
+    """Attach a weight learner to a QuadRetriever.
+
+    After attachment, ``quad.retrieve`` fuses with the learner's effective
+    weights instead of the static table, and ``quad.observe(...)`` feeds
+    outcomes back. Idempotent.
+    """
+    learner = learner or PlaneWeightLearner(getattr(quad, "weights", None))
+    quad._weight_learner = learner
+    return learner
