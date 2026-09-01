@@ -7,6 +7,9 @@ from .mesh import SwarmMesh
 from .stigmergy import Trail, PheromoneField, StigmergicRouter
 from .roles import RoleRegistry, RoleError, default_roles
 from .hive import HiveMind, HiveResult, AggregationError
+from .blackboard import Blackboard, BlackboardEntry
+from .handoff import HandoffError, HandoffRegistry, TaskEnvelope, TaskState
+from .mesh_boundary import mesh_boundary
 
 __all__ = [
     "AgentRole",
@@ -28,4 +31,11 @@ __all__ = [
     "HiveMind",
     "HiveResult",
     "AggregationError",
+    "Blackboard",
+    "BlackboardEntry",
+    "HandoffError",
+    "HandoffRegistry",
+    "TaskEnvelope",
+    "TaskState",
+    "mesh_boundary",
 ]

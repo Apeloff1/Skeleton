@@ -10,6 +10,8 @@ from .index import InvertedIndex
 from .ingest import CorpusIngestor, Document
 from .lexicon import Lexicon, default_lexicon
 from .pipeline import SearchOutcome, SearchPipeline
+from .plane_weights import PlaneArm, PlaneWeightLearner
+from .quad import Fragment, KnowledgeEdge, QuadRetriever
 from .query import QueryPlan, QueryPlanner, RetrievalError
 from .query_language import QueryParser, QueryTerm
 from .ranking import Ranker
@@ -38,6 +40,11 @@ __all__ = [
     "default_lexicon",
     "SearchOutcome",
     "SearchPipeline",
+    "PlaneArm",
+    "PlaneWeightLearner",
+    "Fragment",
+    "KnowledgeEdge",
+    "QuadRetriever",
     "QueryPlan",
     "QueryPlanner",
     "RetrievalError",

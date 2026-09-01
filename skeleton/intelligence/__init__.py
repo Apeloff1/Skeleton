@@ -10,6 +10,13 @@ from .economic import ModelOption, BudgetConstraint, EconomicOptimiser
 from .orchestrator import IntelligenceOrchestrator
 from .adaptive import AdaptiveLearner, Arm, RunRecord, default_meta_grid
 from .dream import DreamEngine, DreamReport
+from .cascade import CascadeRouter, ModelResponse, RouteDecision, difficulty_estimate
+from .uncertainty import Candidate, GateDecision, GateVerdict, UncertaintyGate
+from .verification import VerificationLoop, VerificationTrace, VerificationVerdict
+from .verifier import CodeVerifier, RubricScore, VerifierReport
+from .improve_loop import ImproveLoop, ImproveResult, Iteration
+from .routed_gate import RoutedAnswer, RoutedGate
+from .contract import Contract, ContractIssue, RepairResult
 
 __all__ = [
     'Tensor', 'TemporalEvent', 'TemporalReasoner',
@@ -19,4 +26,11 @@ __all__ = [
     'ModelOption', 'BudgetConstraint', 'EconomicOptimiser',
     'IntelligenceOrchestrator', 'AdaptiveLearner', 'Arm', 'RunRecord',
     'default_meta_grid', 'DreamEngine', 'DreamReport',
+    'CascadeRouter', 'ModelResponse', 'RouteDecision', 'difficulty_estimate',
+    'Candidate', 'GateDecision', 'GateVerdict', 'UncertaintyGate',
+    'VerificationLoop', 'VerificationTrace', 'VerificationVerdict',
+    'CodeVerifier', 'RubricScore', 'VerifierReport',
+    'ImproveLoop', 'ImproveResult', 'Iteration',
+    'RoutedAnswer', 'RoutedGate',
+    'Contract', 'ContractIssue', 'RepairResult',
 ]
