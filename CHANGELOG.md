@@ -4,6 +4,15 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-01 — Satellites on the ready ritual
+
+- organism/satellites.py: Jeeves laws, vault entropy (no secrets),
+  retrieval RRF over wiki+field+helix.
+- CLI satellites, GET /cortex/satellites. Ready and doctor embed the card.
+- Version 2026.09.01-sat.
+
+---
+
 ## 2026-09-01 — Close 10 unfinished pieces
 
 - deck.octwalk; CLI erawalk vs walk.

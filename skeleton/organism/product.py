@@ -19,7 +19,7 @@ from skeleton.social.sota import sota_card
 from skeleton.social.sources import SOTA_POINTERS
 
 
-VERSION = "2026.09.01-close10"
+VERSION = "2026.09.01-sat"
 
 
 ENDPOINTS = (
@@ -48,6 +48,7 @@ ENDPOINTS = (
     "POST /cortex/forget",
     "GET /cortex/helix",
     "GET /cortex/recall?q=",
+    "GET /cortex/satellites",
 )
 
 

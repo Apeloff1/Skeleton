@@ -16,8 +16,8 @@ ebbinghaus decay hook, query-language terms on wiki.
 7. Steam / wiki prose on shelves — forbidden.
 8. Hellas Reach / any repo other than Apeloff1/Skeleton — forbidden.
 9. On-chain helix consensus network (local jsonl only).
-10. Jeeves pedagogy + vault KMS + retrieval fusion as first-class
-    operator cards (modules exist, not on the ready ritual).
+10. Jeeves + vault + retrieve cards — closed this pass (satellites).
+    Pedagogy sessions and EnvelopeKMS master keys stay unclaimed.
 
 ## Laws that stay closed
 

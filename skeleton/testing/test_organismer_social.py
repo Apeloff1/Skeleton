@@ -72,6 +72,16 @@ def test_laws_scan_flags_long_dialect():
     assert scan_prose(gxy.mesh) == 0
 
 
+def test_satellites_cards_are_dry():
+    from skeleton.organism.satellites import satellites_card
+    card = satellites_card()
+    assert card["kind"] == "satellites"
+    assert card["jeeves"]["stored_prose"] == 0
+    assert card["vault"]["secrets"] == 0
+    assert card["retrieve"]["n"] >= 1
+    assert "urandom" in card["vault"]["entropy"]
+
+
 def test_modality_base_does_not_raise():
     from skeleton.cortex.multimodal import ModalityPort
     thought = ModalityPort("right").decode_thought("plan tensor", {})

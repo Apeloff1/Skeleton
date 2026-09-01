@@ -95,6 +95,8 @@ def main(argv: list[str] | None = None) -> int:
     fg = sub.add_parser("forget", help="decay / retire / reconsolidate")
     fg.add_argument("cue", nargs="?", default="")
     sub.add_parser("helix", help="dual-helix eidetic heads")
+    sat = sub.add_parser("satellites", help="jeeves + vault + retrieve")
+    sat.add_argument("cue", nargs="?", default="")
     rc = sub.add_parser("recall", help="recall from helix snapshots")
     rc.add_argument("cue", nargs="?", default="")
     sub.add_parser("next", help="coded operator next hint")
@@ -332,6 +334,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "helix":
         from skeleton.cortex.deck import live_deck
         out = live_deck().helix()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "satellites":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().satellites(str(getattr(args, "cue", "") or ""))
         print(json.dumps(out, indent=2, default=str))
         return 0
 

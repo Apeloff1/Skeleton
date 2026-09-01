@@ -18,6 +18,7 @@ python -m skeleton sleep --force
 python -m skeleton forget "old trace"
 python -m skeleton helix
 python -m skeleton recall mem0
+python -m skeleton satellites
 ```
 
 HTTP: `GET /cortex/{product,health,next,ready,caps,lattice,banks,wiki}`  
