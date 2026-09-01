@@ -29,8 +29,16 @@ def hint(org, *, neo=None) -> Dict[str, Any]:
         dream_rot = should_dream(loop)
     except Exception:
         loop = {}
+    sleep_due = False
+    try:
+        from skeleton.organism.sleep import due as sleep_due_fn
+        sleep_due = sleep_due_fn(org)
+    except Exception:
+        sleep_due = False
     if budget["op"] == "consolidate" and pressure >= 0.75:
         code, why = "tighten", "pressure"
+    elif sleep_due:
+        code, why = "dream", "sleep-due"
     elif dream_rot:
         code, why = "dream", "rot"
     elif budget["op"] == "consolidate":

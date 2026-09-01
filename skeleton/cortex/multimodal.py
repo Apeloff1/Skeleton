@@ -38,7 +38,11 @@ class ModalityPort:
         return self.decode_thought(stimulus or "", context or {})
 
     def decode_thought(self, stimulus: str, context: Dict[str, Any]) -> Thought:
-        raise NotImplementedError
+        return Thought(
+            slot=self.slot, kind=f"modal-{self.modality}",
+            text=(stimulus or self.modality)[:400],
+            confidence=0.55, tags=("modal", self.modality, self.slot),
+        )
 
     def fit(self, text: str) -> int:
         return 0

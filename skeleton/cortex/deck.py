@@ -305,7 +305,7 @@ class CommandDeck:
             return engine.pulse(self.neo, stimulus=stimulus)
         return {"ok": 0, "reason": "no-genos"}
 
-    def walk(self, steps: int = 1) -> Dict[str, Any]:
+    def octwalk(self, steps: int = 1) -> Dict[str, Any]:
         steps = max(1, min(12, int(steps)))
         walked = []
         for i in range(steps):

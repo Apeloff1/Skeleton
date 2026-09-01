@@ -53,6 +53,22 @@ def decay(mesh) -> Dict[str, Any]:
         elif atom.confidence < DORMANT_FLOOR:
             tags.add("dormant")
             dormant += 1
+        try:
+            from skeleton.memory.forgetting import MemoryTrace, retrievability
+            ts = float(getattr(atom, "ts", 0) or 0)
+            if ts > 1e12:
+                ts = ts / 1000.0
+            if ts > 0:
+                r = retrievability(MemoryTrace(
+                    memory_id=str(atom.id), created_at=ts, last_recalled_at=ts,
+                    recalls=0, importance=float(atom.confidence), salience=0.4,
+                ))
+                if r < 0.12 and atom.kind != "principle":
+                    tags.add("dormant")
+                    atom.confidence = min(float(atom.confidence), max(0.08, r))
+                    dormant += 1
+        except Exception:
+            pass
         atom.tags = tuple(tags)
         if "dormant" in tags and not atom.superseded_by:
             atom.confidence = max(0.05, float(atom.confidence) * 0.92)

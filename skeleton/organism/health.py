@@ -51,4 +51,5 @@ def health_card(org=None, *, neo=None) -> Dict[str, Any]:
         "forest_n": nxt.get("forest_n"),
         "journal": tail(4, root=getattr(org, "root", None)),
         "stored_prose": prose,
+        "helix": __import__("skeleton.organism.helix", fromlist=["card"]).card(getattr(org, "root", None)),
     }

@@ -172,11 +172,13 @@ def main(argv: list[str] | None = None) -> int:
     pb = sub.add_parser("build-plan", help="Jeeves builder plan; like <game> resolves era")
     pb.add_argument("vision", nargs="?", default="like elden ring")
 
-    wk = sub.add_parser("walk", help="prove spawn→extract on the emitted door graph")
-    wk.add_argument("--era", default="extraction_now")
-    wk.add_argument("--blend", nargs=2, metavar=("ERA_A", "ERA_B"))
-    wk.add_argument("--t", dest="t", type=float, default=0.5)
-    wk.add_argument("--json", action="store_true")
+    ew = sub.add_parser("erawalk", help="prove spawn→extract on the emitted door graph")
+    ew.add_argument("--era", default="extraction_now")
+    ew.add_argument("--blend", nargs=2, metavar=("ERA_A", "ERA_B"))
+    ew.add_argument("--t", dest="t", type=float, default=0.5)
+    ew.add_argument("--json", action="store_true")
+    ow = sub.add_parser("octwalk", help="octahedral face walk on the neo")
+    ow.add_argument("-n", type=int, default=1)
 
     args = p.parse_args(argv)
 
@@ -509,7 +511,13 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(out, indent=2, default=str))
         return 0
 
-    if args.cmd == "walk":
+    if args.cmd == "octwalk":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().octwalk(int(getattr(args, "n", 1) or 1))
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "erawalk":
         from skeleton.forge.eras import blend_eras, compile_era
         from skeleton.forge.walk import walk_from_pack
         from skeleton.jeeves.builder import BuilderBrain

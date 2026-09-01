@@ -72,6 +72,22 @@ def test_laws_scan_flags_long_dialect():
     assert scan_prose(gxy.mesh) == 0
 
 
+def test_modality_base_does_not_raise():
+    from skeleton.cortex.multimodal import ModalityPort
+    thought = ModalityPort("right").decode_thought("plan tensor", {})
+    assert thought.text
+
+
+def test_doctor_carries_helix(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.doctor import doctor_card
+    from skeleton.organism.organismer import Organismer
+    org = Organismer(root=tmp_path, persist=False, galaxy=GalaxySystem())
+    card = doctor_card(org)
+    assert "helix_ok" in card
+    assert card["ok"] == 1
+
+
 def test_helix_stamps_and_recalls(tmp_path):
     from skeleton.galaxy.system import GalaxySystem
     from skeleton.organism.helix import recall, stamp, verify

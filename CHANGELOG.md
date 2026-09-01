@@ -4,6 +4,15 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-01 — Close 10 unfinished pieces
+
+- deck.octwalk; CLI erawalk vs walk.
+- multimodal base decodes. doctor helix+verify. health helix.
+- next sleep-due. ebbinghaus decay. wiki QueryParser.
+- BACKLOG rewritten. Version 2026.09.01-close10.
+
+---
+
 ## 2026-09-01 — Dual-helix eidetic chain
 
 - organism/helix.py. Sense = events. Snap = mesh merkle + compact atoms.

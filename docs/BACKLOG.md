@@ -1,41 +1,26 @@
-# Backlog — not in this pass
+# Backlog — ranked, live
 
-Ranked. Next cuts should pick from here rather than re-litigating
-architecture.
+Closed this pass (2026.09.01-close10): dual-helix, forget/reconsolidate,
+gated NREM+REM, wiki-bound coverage, walk-name collision, multimodal
+base decode, doctor helix+verify, health helix, next sleep-due,
+ebbinghaus decay hook, query-language terms on wiki.
 
-## P0 — next pulse
+## Still open
 
-- Live teacher contact inside organismer — wired (fail-closed; real
-  HF/Kimi still needs a bound mouth with a stand-in copy).
-- Optional live CDX fetch — wired (`--cdx` / SKELETON_CDX=1).
-- Merkle line per social pointer + galaxy write. (ledger now carries
-  atom ids; social URL already on the line)
-- Persistence of galaxy atom shelf — done this pass. Cap 400.
+1. Pixel lattice UI (ASCII + data card only).
+2. Production octahedral KV cache (handle map only).
+3. Live teacher mouth with a stand-in copy bound (fail-closed contact exists).
+4. Parametric LoRA write-back on a live teacher (tag-only absorb now).
+5. GPU decoder prior as default (CPU canonical; GPU tilt optional).
+6. Import-time HuggingFace downloads — never this repo.
+7. Steam / wiki prose on shelves — forbidden.
+8. Hellas Reach / any repo other than Apeloff1/Skeleton — forbidden.
+9. On-chain helix consensus network (local jsonl only).
+10. Jeeves pedagogy + vault KMS + retrieval fusion as first-class
+    operator cards (modules exist, not on the ready ritual).
 
-## P1
+## Laws that stay closed
 
-- GPU harness for decoder prior — done (CPU default; GPU tilt only
-  if mouth.device is not cpu).
-- Editor MAD filter — done this pass (Jaccard + robust z).
-- Dream scheduler hook on idle — done (cadence 4 × DreamBrain;
-  SleepCycle if the mouth exposes it).
-- Context codec CCL vault — done (`acquired/galaxy/vault.ccl`).
-
-## P2 — obscure / deep
-
-- Hierarchical memory banks — done (common/long-tail + residual block;
-  ingest only if mouth exposes ingest_residual).
-- Fractal / octahedral KV archive — handle map when transformer bound.
-  Still not a production cache.
-- Dual-layer write-back — done (internalized tag + skip).
-- Wiki SPARQL-shaped query — done (SELECT … WHERE).
-- Per-mouth colored lattice — data card + ASCII done (`lattice`).
-  Pixel UI still not claimed.
-- Hardware multi-cap table — done (headroom 0.62).
-
-## Explicitly not this pass
-
-- Import-time HuggingFace downloads.
-- Steam / wiki prose in shelves.
-- Changing snowball stage weights (mass stays 1.0 on ten stages).
-- Hellas Reach / any repo other than Apeloff1/Skeleton.
+- cite-do-not-copy, stored_prose scanned not stamped
+- snowball mass 1.0 on ten stages
+- hardware caps below the wall

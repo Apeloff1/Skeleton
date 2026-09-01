@@ -19,7 +19,7 @@ from skeleton.social.sota import sota_card
 from skeleton.social.sources import SOTA_POINTERS
 
 
-VERSION = "2026.09.01-helix"
+VERSION = "2026.09.01-close10"
 
 
 ENDPOINTS = (

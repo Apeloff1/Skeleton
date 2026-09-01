@@ -41,6 +41,17 @@ def run(mesh, q: str, *, limit: int = 0) -> Dict[str, Any]:
         except Exception:
             limit = 24
     spec = parse(q)
+    try:
+        from skeleton.retrieval.query_language import QueryParser
+        extra = []
+        for term in QueryParser.parse(q or ""):
+            if term.negated:
+                continue
+            extra.append(term.raw)
+        if extra and not spec.get("contains"):
+            spec["contains"] = " ".join(extra)[:80]
+    except Exception:
+        pass
     rows: List[Dict[str, Any]] = []
     seen = set()
     libs = list(mesh.brains.values()) + [mesh.wiki]
