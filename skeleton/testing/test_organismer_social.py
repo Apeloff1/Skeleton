@@ -72,6 +72,25 @@ def test_laws_scan_flags_long_dialect():
     assert scan_prose(gxy.mesh) == 0
 
 
+def test_chronicle_records_and_indexes(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.chronicle import card, record, seed
+    from skeleton.organism.chronicle.dump import dump, inventory
+    from skeleton.organism.organismer import Organismer
+    org = Organismer(root=tmp_path, persist=True, galaxy=GalaxySystem())
+    seed(org)
+    out = record(org, {"topic": "mem0 graph", "decision": "pulse", "code": "pulse", "G": 1.0})
+    assert out["kind"] == "chronicle"
+    assert out["rolodex_n"] >= 1
+    view = card(org, cue="mem0")
+    assert view["horizon_years"] == 10
+    assert view["index"]["n"] >= 1
+    assert view["stored_prose"] == 0
+    forced = dump(tmp_path, force=True)
+    assert forced["kind"] == "decade-dump"
+    assert inventory(tmp_path)["horizon_years"] == 10
+
+
 def test_nervous_slos_ok(tmp_path):
     from skeleton.galaxy.system import GalaxySystem
     from skeleton.organism.nervous import nervous_card

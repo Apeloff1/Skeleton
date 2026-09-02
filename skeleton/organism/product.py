@@ -19,7 +19,7 @@ from skeleton.social.sota import sota_card
 from skeleton.social.sources import SOTA_POINTERS
 
 
-VERSION = "2026.09.02-nervous"
+VERSION = "2026.09.02-chronicle"
 
 
 ENDPOINTS = (
@@ -50,6 +50,8 @@ ENDPOINTS = (
     "GET /cortex/recall?q=",
     "GET /cortex/satellites",
     "GET /cortex/nervous",
+    "GET /cortex/chronicle",
+    "POST /cortex/dump",
 )
 
 

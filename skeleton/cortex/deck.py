@@ -169,6 +169,16 @@ class CommandDeck:
         from skeleton.organism.organismer import live_organismer
         return nervous_card(live_organismer(), neo=self.neo)
 
+    def chronicle(self, cue: str = "") -> Dict[str, Any]:
+        from skeleton.organism.chronicle import card
+        from skeleton.organism.organismer import live_organismer
+        return card(live_organismer(), cue=cue)
+
+    def dump(self, force: bool = False) -> Dict[str, Any]:
+        from skeleton.organism.chronicle.dump import dump
+        from skeleton.organism.organismer import live_organismer
+        return dump(live_organismer().root, force=force)
+
     def laws(self) -> Dict[str, Any]:
         from skeleton.organism.laws import laws_card
         from skeleton.galaxy.system import live_galaxy

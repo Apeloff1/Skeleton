@@ -4,6 +4,15 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-02 — Chronicle: decade eidetic books
+
+- journals, rolodex, itinerary, monthly annals, inverted index,
+  traffic record(), 10-year dump/rotate with sha256 manifest.
+- Persist steps seed and record. CLI chronicle / dump --force.
+- Version 2026.09.02-chronicle.
+
+---
+
 ## 2026-09-02 — Nervous card + KV persist path
 
 - organism/nervous.py: SLO prose/pressure/helix + intelligence roster.

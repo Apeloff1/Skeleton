@@ -97,6 +97,10 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("helix", help="dual-helix eidetic heads")
     sat = sub.add_parser("satellites", help="jeeves + vault + retrieve")
     sub.add_parser("nervous", help="SLO + intelligence roster")
+    ch = sub.add_parser("chronicle", help="journals, rolodex, itinerary, annals, index")
+    ch.add_argument("cue", nargs="?", default="memory graph")
+    dp = sub.add_parser("dump", help="rotate hot books into decade backup")
+    dp.add_argument("--force", action="store_true")
     sat.add_argument("cue", nargs="?", default="")
     rc = sub.add_parser("recall", help="recall from helix snapshots")
     rc.add_argument("cue", nargs="?", default="")
@@ -341,6 +345,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "nervous":
         from skeleton.cortex.deck import live_deck
         out = live_deck().nervous()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "chronicle":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().chronicle(str(getattr(args, "cue", "") or "memory graph"))
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "dump":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().dump(force=bool(getattr(args, "force", False)))
         print(json.dumps(out, indent=2, default=str))
         return 0
 

@@ -29,7 +29,7 @@ def seed_field(galaxy) -> Dict[str, Any]:
         galaxy.editor.index_topic(atom)
         galaxy.mesh.wiki.topics[topic] = str(row.get("url") or "")[:240]
         minted += 1
-    return {
+    card = {
         "kind": "field-seed",
         "minted": minted,
         "skipped": skipped,
@@ -37,3 +37,10 @@ def seed_field(galaxy) -> Dict[str, Any]:
         "wiki_topics": len(galaxy.mesh.wiki.topics),
         "stored_prose": 0,
     }
+    try:
+        from skeleton.organism.chronicle import seed as chronicle_seed
+        from skeleton.organism.organismer import live_organismer
+        card["rolodex"] = chronicle_seed(live_organismer())
+    except Exception:
+        pass
+    return card

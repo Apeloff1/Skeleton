@@ -40,6 +40,7 @@ def ready_card(org=None, *, neo=None, walk: bool = False, n: int = 2, fix: bool 
         "doctor": doctor_card(org, neo=neo, fix=False),
         "satellites": __import__("skeleton.organism.satellites", fromlist=["satellites_card"]).satellites_card(org, cue="memory graph"),
         "nervous": __import__("skeleton.organism.nervous", fromlist=["nervous_card"]).nervous_card(org, neo=neo),
+        "chronicle": __import__("skeleton.organism.chronicle", fromlist=["card"]).card(org, cue="memory graph"),
         "walk": walked,
         "stored_prose": health.get("stored_prose"),
     }

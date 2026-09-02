@@ -276,6 +276,16 @@ async def cortex_nervous_get(state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).nervous()
 
 
+@router.get("/cortex/chronicle")
+async def cortex_chronicle_get(cue: str = "", state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).chronicle(cue)
+
+
+@router.post("/cortex/dump")
+async def cortex_dump_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).dump(force=bool(request.get("force")))
+
+
 @router.get("/cortex/laws")
 async def cortex_laws_get(state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).laws()
