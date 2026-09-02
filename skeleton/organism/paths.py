@@ -31,3 +31,7 @@ def helix_sense_path(root: Optional[Path] = None) -> Path:
 
 def helix_snap_path(root: Optional[Path] = None) -> Path:
     return organism_dir(root) / "helix_snap.jsonl"
+
+
+def kv_path(root: Optional[Path] = None) -> Path:
+    return organism_dir(root) / "kv.json"

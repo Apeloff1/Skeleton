@@ -164,6 +164,11 @@ class CommandDeck:
         from skeleton.organism.satellites import satellites_card
         return satellites_card(live_organismer(), cue=cue)
 
+    def nervous(self) -> Dict[str, Any]:
+        from skeleton.organism.nervous import nervous_card
+        from skeleton.organism.organismer import live_organismer
+        return nervous_card(live_organismer(), neo=self.neo)
+
     def laws(self) -> Dict[str, Any]:
         from skeleton.organism.laws import laws_card
         from skeleton.galaxy.system import live_galaxy

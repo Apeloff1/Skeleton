@@ -271,6 +271,11 @@ async def cortex_satellites_get(cue: str = "", state=Depends(_state)) -> Dict[st
     return _deck(state).satellites(cue)
 
 
+@router.get("/cortex/nervous")
+async def cortex_nervous_get(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).nervous()
+
+
 @router.get("/cortex/laws")
 async def cortex_laws_get(state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).laws()

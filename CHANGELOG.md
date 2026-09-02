@@ -4,6 +4,15 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-02 — Nervous card + KV persist path
+
+- organism/nervous.py: SLO prose/pressure/helix + intelligence roster.
+- kv.persist writes handle map only when a mouth is bound.
+- CLI nervous, GET /cortex/nervous. Ready embeds nervous.
+- Version 2026.09.02-nervous.
+
+---
+
 ## 2026-09-01 — Satellites on the ready ritual
 
 - organism/satellites.py: Jeeves laws, vault entropy (no secrets),

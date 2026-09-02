@@ -41,6 +41,11 @@ def persist_clip(org) -> Dict[str, Any]:
     from skeleton.galaxy.shelf import save
     card = save(org.galaxy, root=getattr(org, "root", None))
     card["persisted"] = 1
+    try:
+        from skeleton.galaxy.kv import persist as kv_persist
+        card["kv"] = kv_persist(org.galaxy.mesh, neo=None, root=getattr(org, "root", None))
+    except Exception:
+        pass
     return card
 
 

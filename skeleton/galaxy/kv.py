@@ -42,5 +42,38 @@ def archive(mesh, *, neo=None) -> Dict[str, Any]:
         "n": len(store),
         "keys": keys[:32],
         "width": cap,
+        "store": store,
         "stored_prose": 0,
     }
+
+
+def persist(mesh, *, neo=None, root=None) -> Dict[str, Any]:
+    import json
+    from skeleton.organism.paths import kv_path
+    card = archive(mesh, neo=neo)
+    if not card.get("bound"):
+        return {**card, "persisted": 0}
+    path = kv_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {k: card[k] for k in ("kind", "bound", "n", "keys", "width", "stored_prose") if k in card}
+    payload["store"] = card.get("store") or {}
+    path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+    payload["persisted"] = 1
+    payload["path"] = str(path)
+    payload.pop("store", None)
+    return payload
+
+
+def load(*, root=None) -> Dict[str, Any]:
+    import json
+    from skeleton.organism.paths import kv_path
+    path = kv_path(root)
+    if not path.exists():
+        return {"kind": "kv-archive", "bound": 0, "n": 0, "persisted": 0, "stored_prose": 0}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {"kind": "kv-archive", "bound": 0, "n": 0, "persisted": 0, "stored_prose": 0}
+    data["persisted"] = 1
+    data.pop("store", None)
+    return data

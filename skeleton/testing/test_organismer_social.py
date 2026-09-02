@@ -72,6 +72,29 @@ def test_laws_scan_flags_long_dialect():
     assert scan_prose(gxy.mesh) == 0
 
 
+def test_nervous_slos_ok(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.nervous import nervous_card
+    from skeleton.organism.organismer import Organismer
+    org = Organismer(root=tmp_path, persist=False, galaxy=GalaxySystem())
+    card = nervous_card(org)
+    assert card["kind"] == "nervous"
+    assert card["ok"] == 1
+    assert "prose" in card["slos"]
+    assert "temporal" in card["intelligence"]
+    assert card["stored_prose"] == 0
+
+
+def test_kv_unbound_does_not_write(tmp_path):
+    from skeleton.galaxy.kv import persist
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.paths import kv_path
+    card = persist(GalaxySystem().mesh, neo=None, root=tmp_path)
+    assert card["bound"] == 0
+    assert card.get("persisted") == 0
+    assert not kv_path(tmp_path).exists()
+
+
 def test_satellites_cards_are_dry():
     from skeleton.organism.satellites import satellites_card
     card = satellites_card()
