@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Decade dump includes persist cards
+
+- observe/ctx/runtime/conductor/horizon/day/cage/rot/gov are hot targets.
+- Version 2026.09.03-dumphot.
+
+---
+
 ## 2026-09-03 — Observe fan-out across stacks
 
 - Row carries wiki, atoms, coverage. Ritual and ready stamp observe.

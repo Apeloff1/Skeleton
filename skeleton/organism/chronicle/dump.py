@@ -37,6 +37,15 @@ def _hot_targets(root: Optional[Path] = None) -> List[Path]:
         helix_sense_path(root),
         helix_snap_path(root),
         croot(root) / "itinerary.jsonl",
+        croot(root) / "observe.jsonl",
+        croot(root) / "ctx.json",
+        croot(root) / "runtime.json",
+        croot(root) / "conductor.json",
+        croot(root) / "horizon.json",
+        croot(root) / "day.json",
+        croot(root) / "cage.json",
+        croot(root) / "rot.json",
+        croot(root) / "gov.json",
     ]
 
 
