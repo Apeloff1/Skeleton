@@ -56,3 +56,9 @@ def fused_block(
 def naive_writes(seq: int, d: int) -> int:
     # x_norm + 3 projections + residual + QKV copies + S + P + O
     return (1 + 3 + 1 + 3 + 1 + 1 + 1) * seq * d
+
+
+def naive_block(d: int) -> int:
+    # 20 row-writes: embed, 2 rms, rope, 6 linears, 2 residual, swiglu,
+    # S, P, O, plus two copies that fusion skips.
+    return 20 * int(d)

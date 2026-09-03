@@ -86,6 +86,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("caps", help="hardware-aware multi-cap table")
     sub.add_parser("kernels", help="multi-kernel profile (mobile/tight/desktop)")
     sub.add_parser("bank", help="live kernel bank snapshot")
+    sub.add_parser("ritual", help="catalog + bank + block + stock in one card")
     sub.add_parser("kgov", help="tick the mid-run kernel governor")
     sub.add_parser("follow", help="operator token bag the organism grows")
     sub.add_parser("agree", help="local dual-helix consensus")
@@ -333,6 +334,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "kgov":
         from skeleton.kernel.governor import tick
         print(json.dumps(tick(), indent=2, default=str))
+        return 0
+
+    if args.cmd == "ritual":
+        from skeleton.kernel.ritual import card as ritual_card
+        print(json.dumps(ritual_card(), indent=2, default=str))
         return 0
 
     if args.cmd == "bank":

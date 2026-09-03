@@ -17,7 +17,7 @@ from skeleton.kernel.ops.kvcache import KVCache
 from skeleton.kernel.ops.residual import residual
 from skeleton.kernel.ops.swiglu import swiglu
 from skeleton.kernel.ops.sample import sample
-from skeleton.kernel.ops.fused import naive_writes
+from skeleton.kernel.ops.fused import naive_block
 
 
 def _eye(n: int) -> List[List[float]]:
@@ -67,8 +67,8 @@ class Block:
             "d": self.d,
             "runs": self.runs,
             "writes": self.last_writes,
-            "naive": naive_writes(1, self.d),
-            "saved": max(0, naive_writes(1, self.d) - self.last_writes),
+            "naive": naive_block(self.d),
+            "saved": max(0, naive_block(self.d) - self.last_writes),
             "tok": tok,
             "kv": self.cache.card(),
             "tokens": toks,

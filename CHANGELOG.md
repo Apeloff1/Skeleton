@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Kernel ritual card
+
+- One card: catalog + bank + block + stock.
+- naive_block is 20*d. Version 2026.09.03-ritual.
+
+---
+
 ## 2026-09-03 — Full house block + live stock
 
 - Block: embed RMS RoPE qkv attn residual SwiGLU sample.
