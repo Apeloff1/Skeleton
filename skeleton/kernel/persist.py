@@ -55,3 +55,34 @@ def load(*, root: Optional[Path] = None) -> Dict[str, Any]:
         return json.loads(p.read_text(encoding="utf-8"))
     except Exception:
         return {"kind": "orch-persist", "runs": 0, "stored_prose": 0}
+
+
+def gov_path(root: Optional[Path] = None) -> Path:
+    base = Path(root) if root else Path(".")
+    return base / "chronicle" / "gov.json"
+
+
+def save_gov(card: Dict[str, Any], *, root: Optional[Path] = None) -> Path:
+    p = gov_path(root)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    slim = {
+        "kind": "kernel-gov",
+        "action": card.get("action"),
+        "pressure": card.get("pressure"),
+        "profile": card.get("profile"),
+        "was": card.get("was"),
+        "rebuilt": card.get("rebuilt"),
+        "stored_prose": 0,
+    }
+    p.write_text(json.dumps(slim, indent=2), encoding="utf-8")
+    return p
+
+
+def load_gov(*, root: Optional[Path] = None) -> Dict[str, Any]:
+    p = gov_path(root)
+    if not p.is_file():
+        return {"kind": "kernel-gov", "action": "hold", "stored_prose": 0}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {"kind": "kernel-gov", "action": "hold", "stored_prose": 0}

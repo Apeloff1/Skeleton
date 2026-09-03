@@ -56,7 +56,7 @@ def tick(pressure: float | None = None) -> Dict[str, Any]:
             rebuilt = 1
         except Exception:
             rebuilt = 0
-    return {
+    out = {
         "kind": "kernel-gov",
         "action": action,
         "pressure": round(pressure, 4),
@@ -65,3 +65,9 @@ def tick(pressure: float | None = None) -> Dict[str, Any]:
         "rebuilt": rebuilt,
         "stored_prose": 0,
     }
+    try:
+        from skeleton.kernel.persist import save_gov
+        save_gov(out)
+    except Exception:
+        pass
+    return out

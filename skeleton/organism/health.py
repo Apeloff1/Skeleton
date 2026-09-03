@@ -54,6 +54,8 @@ def health_card(org=None, *, neo=None) -> Dict[str, Any]:
         "helix": __import__("skeleton.organism.helix", fromlist=["card"]).card(getattr(org, "root", None)),
         "orch": _orch_stamp(),
         "coverage": __import__("skeleton.kernel.coverage", fromlist=["card"]).card().get("pct_obl"),
+        "gov": __import__("skeleton.kernel.persist", fromlist=["load_gov"]).load_gov(),
+        "witness": __import__("skeleton.kernel.witness", fromlist=["card"]).card(),
     }
 
 

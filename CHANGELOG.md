@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Persist last governor action
+
+- chronicle/gov.json. health carries gov + witness.
+- Version 2026.09.03-govpersist.
+
+---
+
 ## 2026-09-03 — Tight roster keeps control plane
 
 - tight includes orch, hold, sfence, block, extras.
