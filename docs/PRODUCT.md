@@ -26,6 +26,7 @@ python -m skeleton gov
 python -m skeleton cage
 python -m skeleton rot
 python -m skeleton fieldcov
+python -m skeleton enact
 python -m skeleton walk -n 3
 python -m skeleton sleep --force
 python -m skeleton forget "old trace"

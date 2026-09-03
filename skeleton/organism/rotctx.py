@@ -29,3 +29,21 @@ def card() -> Dict[str, Any]:
     st["kind"] = "scope-rot-stats"
     st["stored_prose"] = 0
     return st
+
+
+def persist(rot: Dict[str, Any], *, root=None):
+    import json
+    from pathlib import Path
+    base = Path(root) if root else Path(".")
+    p = base / "chronicle" / "rot.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    slim = {
+        "kind": "scope-rot",
+        "verdict": rot.get("verdict"),
+        "risk": rot.get("risk"),
+        "checks": _GUARD.checks,
+        "rot_events": _GUARD.rot_events,
+        "stored_prose": 0,
+    }
+    p.write_text(json.dumps(slim, indent=2), encoding="utf-8")
+    return p

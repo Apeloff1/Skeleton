@@ -131,12 +131,28 @@ def enact(org=None, *, neo=None) -> Dict[str, Any]:
     if head == "dump":
         from skeleton.organism.chronicle.dump import dump
         acted = dump(getattr(org, "root", None), force=True)
+    elif head == "bind-source":
+        from skeleton.social.seed import seed_field
+        acted = seed_field(org.galaxy)
+    elif head == "dream":
+        from skeleton.organism.sleep import cycle
+        acted = cycle(org, neo=neo, force=True)
+    elif head == "doctor":
+        from skeleton.organism.doctor import doctor_card
+        acted = doctor_card(org, neo=neo, fix=True)
     else:
         acted = pulse(org, neo=neo, stimulus="")
+    try:
+        from skeleton.organism.rotctx import persist as rot_persist
+        rot_persist(composed.get("rot") or {})
+    except Exception:
+        pass
     return {
         "kind": "scope-enact",
         "head": head,
         "acted": acted,
         "queue": composed.get("queue"),
+        "rot": composed.get("rot"),
+        "coverage": composed.get("coverage"),
         "stored_prose": 0,
     }

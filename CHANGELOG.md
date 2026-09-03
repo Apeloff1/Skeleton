@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Scope enact binds sources and persists rot
+
+- enact handles dump, bind-source, dream, doctor, pulse.
+- rot.json written on enact. Version 2026.09.03-enact.
+
+---
+
 ## 2026-09-03 — Scope rot guard (F-3) + field coverage on health
 
 - compose assesses the queue. rot trims fill codes.
