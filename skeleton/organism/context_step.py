@@ -14,6 +14,13 @@ from typing import Any, Dict, List, Optional
 
 def run(org, stimulus: str = "", *, sleep: bool = False, neo=None) -> Dict[str, Any]:
     stim = (stimulus or "plan tensor ttk").strip()
+    stim_hash = hashlib.sha256(stim.encode("utf-8")).hexdigest()[:16]
+    prev = last(getattr(org, "root", None))
+    if prev.get("hash") == stim_hash and int(prev.get("mix") or 0) > 0:
+        out = dict(prev)
+        out["reused"] = 1
+        out["stored_prose"] = 0
+        return out
     gxy: Dict[str, Any] = {}
     try:
         gxy = org.galaxy.pulse(stim, sleep=sleep)
@@ -23,31 +30,24 @@ def run(org, stimulus: str = "", *, sleep: bool = False, neo=None) -> Dict[str, 
     mix_n = 0
     dens: Dict[str, Any] = {}
     reused = 0
-    stim_hash = hashlib.sha256(stim.encode("utf-8")).hexdigest()[:16]
     try:
-        prev = last(getattr(org, "root", None))
-        if prev.get("hash") == stim_hash and int(prev.get("mix") or 0) > 0:
-            mix_n = int(prev.get("mix") or 0)
-            dens = {"mean_depth": prev.get("density") or 0}
-            reused = 1
-        else:
+        profile = "mobile"
+        try:
+            from skeleton.kernel.profiles import card as profiles_card
+            profile = str(profiles_card().get("profile") or "mobile")
+        except Exception:
             profile = "mobile"
-            try:
-                from skeleton.kernel.profiles import card as profiles_card
-                profile = str(profiles_card().get("profile") or "mobile")
-            except Exception:
-                profile = "mobile"
-            mixed = org.galaxy.codec.mix(stim, profile=profile)
-            for atom in mixed:
-                org.galaxy.mesh.publish(atom)
-                if atom.kind in {"principle", "index", "zettel"}:
-                    try:
-                        org.galaxy.editor.index_topic(atom)
-                    except Exception:
-                        pass
-                ids.append(atom.id)
-                mix_n += 1
-            dens = org.galaxy.codec.density(mixed)
+        mixed = org.galaxy.codec.mix(stim, profile=profile)
+        for atom in mixed:
+            org.galaxy.mesh.publish(atom)
+            if atom.kind in {"principle", "index", "zettel"}:
+                try:
+                    org.galaxy.editor.index_topic(atom)
+                except Exception:
+                    pass
+            ids.append(atom.id)
+            mix_n += 1
+        dens = org.galaxy.codec.density(mixed)
     except Exception:
         mix_n = 0
         dens = {}

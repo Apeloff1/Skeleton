@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Repeat stimulus skips galaxy.pulse
+
+- Hash hit returns last ctx card. No pulse, mix, glean, helix.
+- Version 2026.09.03-ctxhit.
+
+---
+
 ## 2026-09-03 — Mix is idempotent on the same stimulus
 
 - Second ctx on the same hash reuses last mix. No extra atoms.
