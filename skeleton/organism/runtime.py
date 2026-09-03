@@ -107,6 +107,7 @@ def persist(card: Dict[str, Any], *, root=None):
         "skip": card.get("skip"),
         "ctx_n": card.get("ctx_n"),
         "kernel_n": card.get("kernel_n"),
+        "mix": card.get("mix"),
         "stored_prose": 0,
     }
     p.write_text(json.dumps(slim, indent=2), encoding="utf-8")

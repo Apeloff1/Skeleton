@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Conductor day if mix is shallow
+
+- mix=0 after a day → day again. runtime.json keeps mix.
+- Version 2026.09.03-shallow.
+
+---
+
 ## 2026-09-03 — Stacks memory plane carries mix density
 
 - Version 2026.09.03-mixstack.
