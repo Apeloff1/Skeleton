@@ -72,6 +72,21 @@ def test_laws_scan_flags_long_dialect():
     assert scan_prose(gxy.mesh) == 0
 
 
+def test_scope_composes_queue(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.organismer import Organismer
+    from skeleton.organism.scope import card as scope_card, compose
+    org = Organismer(root=tmp_path, persist=False, galaxy=GalaxySystem())
+    planned = compose(org)
+    assert planned["kind"] == "scope-compose"
+    assert 2 <= planned["n"] <= 12
+    assert planned["queue"]
+    view = scope_card(org)
+    assert view["horizons"] == ["step", "walk", "season", "decade"]
+    assert view["target"] == 10.0
+    assert view["stored_prose"] == 0
+
+
 def test_chronicle_records_and_indexes(tmp_path):
     from skeleton.galaxy.system import GalaxySystem
     from skeleton.organism.chronicle import card, record, seed

@@ -281,6 +281,16 @@ async def cortex_chronicle_get(cue: str = "", state=Depends(_state)) -> Dict[str
     return _deck(state).chronicle(cue)
 
 
+@router.get("/cortex/scope")
+async def cortex_scope_get(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).scope()
+
+
+@router.post("/cortex/enact")
+async def cortex_enact_post(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).enact()
+
+
 @router.post("/cortex/dump")
 async def cortex_dump_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).dump(force=bool(request.get("force")))

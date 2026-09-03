@@ -170,6 +170,14 @@ class CommandDeck:
         from skeleton.organism.organismer import live_organismer
         return nervous_card(live_organismer(), neo=self.neo)
 
+    def scope(self) -> Dict[str, Any]:
+        from skeleton.organism.scope import card as scope_card
+        return scope_card(neo=self.neo)
+
+    def enact(self) -> Dict[str, Any]:
+        from skeleton.organism.scope import enact
+        return enact(neo=self.neo)
+
     def chronicle(self, cue: str = "") -> Dict[str, Any]:
         from skeleton.organism.chronicle import card
         from skeleton.organism.organismer import live_organismer

@@ -101,6 +101,8 @@ def main(argv: list[str] | None = None) -> int:
     ch.add_argument("cue", nargs="?", default="memory graph")
     dp = sub.add_parser("dump", help="rotate hot books into decade backup")
     dp.add_argument("--force", action="store_true")
+    sub.add_parser("scope", help="multi-horizon queue beyond one next code")
+    sub.add_parser("enact", help="run the head of the scope queue")
     sat.add_argument("cue", nargs="?", default="")
     rc = sub.add_parser("recall", help="recall from helix snapshots")
     rc.add_argument("cue", nargs="?", default="")
@@ -345,6 +347,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "nervous":
         from skeleton.cortex.deck import live_deck
         out = live_deck().nervous()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "scope":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().scope()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "enact":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().enact()
         print(json.dumps(out, indent=2, default=str))
         return 0
 

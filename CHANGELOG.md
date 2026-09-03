@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Multi-horizon scope governor
+
+- organism/scope.py. Ambition 2–12 by pressure. Queue written to itinerary.
+- Horizons: step / walk / season / decade. enact runs the head.
+- CLI scope / enact. Version 2026.09.03-scope.
+
+---
+
 ## 2026-09-02 — Chronicle: decade eidetic books
 
 - journals, rolodex, itinerary, monthly annals, inverted index,
