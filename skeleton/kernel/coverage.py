@@ -32,5 +32,6 @@ def card() -> Dict[str, Any]:
         "live": sorted(live),
         "hot": sorted(hot),
         "pct_obl": round(100 * (1 - len(missing_obl) / max(1, len(obl))), 1),
+        "mix": __import__("skeleton.organism.context_step", fromlist=["mix_card"]).mix_card(),
         "stored_prose": 0,
     }
