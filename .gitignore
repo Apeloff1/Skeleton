@@ -144,3 +144,5 @@ backend/data/godot_projects/
 skeleton/acquired/organism/
 skeleton/acquired/galaxy/
 chronicle/orch.json
+chronicle/board.json
+chronicle/board.prev.json

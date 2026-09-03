@@ -91,6 +91,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("hot", help="stages that ran on the last orch walk")
     sn = sub.add_parser("season", help="N orch walks under profile walk_n")
     sub.add_parser("coverage", help="catalog vs live vs hot")
+    sub.add_parser("kdiff", help="diff last two scoreboards")
     dc = sub.add_parser("decade", help="seasons until cap")
     dc.add_argument("text", nargs="?", default="plan tensor ttk")
     dc.add_argument("--seasons", type=int, default=3)
@@ -350,6 +351,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "orch":
         from skeleton.cortex.deck import live_deck
         print(json.dumps(live_deck().orch(getattr(args, "text", "plan tensor ttk")), indent=2, default=str))
+        return 0
+
+    if args.cmd == "kdiff":
+        from skeleton.kernel.diff import card as diff_card
+        print(json.dumps(diff_card(), indent=2, default=str))
         return 0
 
     if args.cmd == "coverage":

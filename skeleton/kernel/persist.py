@@ -26,6 +26,27 @@ def save(card: Dict[str, Any], *, root: Optional[Path] = None) -> Path:
     return p
 
 
+def board_path(root: Optional[Path] = None) -> Path:
+    base = Path(root) if root else Path(".")
+    return base / "chronicle" / "board.json"
+
+
+def prev_board_path(root: Optional[Path] = None) -> Path:
+    base = Path(root) if root else Path(".")
+    return base / "chronicle" / "board.prev.json"
+
+
+def save_board(card: Dict[str, Any], *, root: Optional[Path] = None) -> Path:
+    cur = board_path(root)
+    prev = prev_board_path(root)
+    cur.parent.mkdir(parents=True, exist_ok=True)
+    if cur.is_file():
+        prev.write_text(cur.read_text(encoding="utf-8"), encoding="utf-8")
+    slim = {"kind": "board", "n": card.get("n"), "names": list((card.get("rows") or {}).keys()), "stored_prose": 0}
+    cur.write_text(json.dumps(slim, indent=2), encoding="utf-8")
+    return cur
+
+
 def load(*, root: Optional[Path] = None) -> Dict[str, Any]:
     p = path(root)
     if not p.is_file():

@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Scoreboard persist + kdiff
+
+- board.json / board.prev.json. kdiff added vs removed.
+- Version 2026.09.03-kdiff.
+
+---
+
 ## 2026-09-03 — Extras live on the bank
 
 - Named extra ops poke on the stock stage.

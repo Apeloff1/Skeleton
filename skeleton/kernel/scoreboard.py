@@ -18,10 +18,16 @@ def card() -> Dict[str, Any]:
                 rows[name] = {"kind": "err", "err": type(exc).__name__, "stored_prose": 0}
         else:
             rows[name] = {"kind": type(inst).__name__, "stored_prose": 0}
-    return {
+    out = {
         "kind": "kernel-scoreboard",
         "profile": snap.get("profile"),
         "n": len(rows),
         "rows": rows,
         "stored_prose": 0,
     }
+    try:
+        from skeleton.kernel.persist import save_board
+        save_board(out)
+    except Exception:
+        pass
+    return out
