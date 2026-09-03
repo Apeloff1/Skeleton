@@ -15,7 +15,27 @@ def high_value(atom) -> bool:
     return (atom.kind == "principle" or float(atom.confidence) >= 0.80) and not atom.superseded_by
 
 
-def absorb(mesh) -> Dict[str, Any]:
+def into_mouth(neo, topics_n: int) -> Dict[str, Any]:
+    """Parametric path. Fail-closed. No HF. No teacher prose."""
+    if neo is None or topics_n <= 0:
+        return {"mouth": 0, "lora": 0, "merged": 0, "residual": 0}
+    out = {"mouth": 1, "lora": 0, "merged": 0, "residual": 0}
+    try:
+        if hasattr(neo, "attach_lora"):
+            info = neo.attach_lora(rank=2)
+            out["lora"] = 1 if info else 0
+        if hasattr(neo, "ingest_residual"):
+            neo.ingest_residual("writeback internalized %s" % topics_n)
+            out["residual"] = 1
+        if hasattr(neo, "merge_lora"):
+            neo.merge_lora()
+            out["merged"] = 1
+    except Exception as exc:
+        out["error"] = type(exc).__name__
+    return out
+
+
+def absorb(mesh, *, neo=None) -> Dict[str, Any]:
     marked = []
     for lib in (*mesh.brains.values(), mesh.wiki):
         for atom in lib.all():
@@ -25,7 +45,8 @@ def absorb(mesh) -> Dict[str, Any]:
                 continue
             atom.tags = tuple(set(atom.tags or ()) | {"internalized"})
             marked.append(atom.id)
-    return {"kind": "write-back", "marked": len(marked), "stored_prose": 0}
+    mouth = into_mouth(neo, len(marked))
+    return {"kind": "write-back", "marked": len(marked), "stored_prose": 0, **mouth}
 
 
 def topics(mesh) -> Set[str]:

@@ -201,7 +201,7 @@ class Organismer:
                 card["idle"] = idle_run(self.galaxy, neo)
                 self.last_dream_step = self.steps
             card["audit"] = self.galaxy.editor.audit()
-            card["writeback"] = wb_absorb(self.galaxy.mesh)
+            card["writeback"] = wb_absorb(self.galaxy.mesh, neo=neo)
             card["banks"] = banks_card(self.galaxy.mesh, neo=neo)
             card["caps"] = adapt_card
             card["trim"] = trim_card

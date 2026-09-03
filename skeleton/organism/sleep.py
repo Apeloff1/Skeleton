@@ -26,7 +26,7 @@ def due(org, *, cadence: Optional[int] = None) -> bool:
     return idle_due(int(org.steps or 0), last, cadence=cadence)
 
 
-def nrem(org) -> Dict[str, Any]:
+def nrem(org, *, neo=None) -> Dict[str, Any]:
     from skeleton.organism.caps import adapt, trim_mesh
     from skeleton.organism.laws import clip_fat, persist_clip
     from skeleton.organism.writeback import absorb
@@ -45,7 +45,7 @@ def nrem(org) -> Dict[str, Any]:
         "adapt": adapt(),
         "trim": trim_mesh(org.galaxy.mesh),
         "clip": clip,
-        "absorb": absorb(org.galaxy.mesh),
+        "absorb": absorb(org.galaxy.mesh, neo=neo),
         "forget": forgotten,
         "helix": helix,
         "refresh": org.galaxy.editor.refresh(),
@@ -85,7 +85,7 @@ def cycle(org=None, *, neo=None, force: bool = False, cue: str = "",
             "cite": list(CITE),
             "stored_prose": 0,
         }
-    n = nrem(org)
+    n = nrem(org, neo=neo)
     r = rem(org, neo=neo, cue=cue)
     org.last_dream_step = int(org.steps or 0)
     return {

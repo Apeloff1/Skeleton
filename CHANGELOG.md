@@ -4,6 +4,15 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Parametric write-back + scoped walks
+
+- writeback.into_mouth: attach_lora / ingest_residual / merge_lora
+  when a mouth is bound. Fail-closed otherwise.
+- Walk follows the scope queue; dump intents rotate hot books.
+- Version 2026.09.03-lora.
+
+---
+
 ## 2026-09-03 — Multi-horizon scope governor
 
 - organism/scope.py. Ambition 2–12 by pressure. Queue written to itinerary.

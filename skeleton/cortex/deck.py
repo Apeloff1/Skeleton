@@ -178,6 +178,11 @@ class CommandDeck:
         from skeleton.organism.scope import enact
         return enact(neo=self.neo)
 
+    def writeback(self) -> Dict[str, Any]:
+        from skeleton.galaxy.system import live_galaxy
+        from skeleton.organism.writeback import absorb
+        return absorb(live_galaxy().mesh, neo=self.neo)
+
     def chronicle(self, cue: str = "") -> Dict[str, Any]:
         from skeleton.organism.chronicle import card
         from skeleton.organism.organismer import live_organismer

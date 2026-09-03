@@ -72,6 +72,15 @@ def test_laws_scan_flags_long_dialect():
     assert scan_prose(gxy.mesh) == 0
 
 
+def test_writeback_fail_closed_without_mouth():
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.writeback import absorb
+    card = absorb(GalaxySystem().mesh, neo=None)
+    assert card["kind"] == "write-back"
+    assert card["mouth"] == 0
+    assert card["stored_prose"] == 0
+
+
 def test_scope_composes_queue(tmp_path):
     from skeleton.galaxy.system import GalaxySystem
     from skeleton.organism.organismer import Organismer

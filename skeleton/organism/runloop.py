@@ -32,10 +32,23 @@ def walk(org=None, *, neo=None, stimulus: str = "", n: int = 4,
     if not (org.galaxy.mesh.wiki.topics or {}):
         from skeleton.social.seed import seed_field
         seed_field(org.galaxy)
+    queue: List[str] = []
+    try:
+        from skeleton.organism.scope import compose
+        queue = list((compose(org, neo=neo).get("queue") or []))
+    except Exception:
+        queue = []
     cards: List[Dict[str, Any]] = []
     used: List[str] = []
     stopped = "cap"
     for i in range(limit):
+        intent = queue[i] if i < len(queue) else "pulse"
+        if intent == "dump":
+            from skeleton.organism.chronicle.dump import dump
+            dump(getattr(org, "root", None), force=False)
+            cards.append({"code": "dump", "G": round(org.G, 6)})
+            used.append("dump")
+            continue
         stim = rotate_stimulus(i, stimulus)
         used.append(stim.split()[0])
         card = pulse(org, neo=neo, stimulus=stim, persist=persist)
@@ -54,6 +67,7 @@ def walk(org=None, *, neo=None, stimulus: str = "", n: int = 4,
         "stopped": stopped,
         "codes": [c["code"] for c in cards],
         "topics": used,
+        "queue": queue,
         "G": cards[-1]["G"] if cards else round(org.G, 6),
         "stored_prose": 0,
     }
