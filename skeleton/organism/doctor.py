@@ -87,4 +87,5 @@ def doctor_card(org=None, *, neo=None, fix: bool = False) -> Dict[str, Any]:
         "verified": verified,
         "satellites": __import__("skeleton.organism.satellites", fromlist=["satellites_card"]).satellites_card(org),
         "cage": __import__("skeleton.galaxy.quarantine", fromlist=["card"]).card(),
+        "observe": __import__("skeleton.organism.observe", fromlist=["card"]).card(getattr(org, "root", None)),
     }

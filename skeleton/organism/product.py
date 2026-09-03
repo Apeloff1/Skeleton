@@ -19,7 +19,7 @@ from skeleton.social.sota import sota_card
 from skeleton.social.sources import SOTA_POINTERS
 
 
-VERSION = "2026.09.03-fanout"
+VERSION = "2026.09.03-wide"
 
 
 ENDPOINTS = (
@@ -115,5 +115,6 @@ def product_card() -> Dict[str, Any]:
         "quality": quality,
         "latest_repair": latest_repair,
         "repair_view": repair_view,
+        "observe": __import__("skeleton.organism.observe", fromlist=["card"]).card(getattr(org, "root", None)),
         "stored_prose": laws["stored_prose"],
     }

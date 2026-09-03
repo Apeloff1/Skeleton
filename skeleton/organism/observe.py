@@ -44,6 +44,32 @@ def record(org, walked: Dict[str, Any], *, root: Optional[Path] = None) -> Dict[
         row["coverage"] = coverage_card("").get("score") or 0
     except Exception:
         pass
+    try:
+        from skeleton.social.field import field_card
+        row["field"] = field_card().get("n") or 0
+    except Exception:
+        row["field"] = 0
+    try:
+        from skeleton.organism.follow import card as follow_card
+        row["follow"] = follow_card(getattr(org, "root", None)).get("n") or 0
+    except Exception:
+        row["follow"] = 0
+    try:
+        from skeleton.kernel.hot import rank
+        hot = rank().get("hot") or []
+        row["hot"] = hot[0] if hot else ""
+    except Exception:
+        row["hot"] = ""
+    try:
+        from skeleton.organism.helix import verify as helix_verify
+        row["helix_ok"] = int(helix_verify(getattr(org, "root", None)).get("ok") or 0)
+    except Exception:
+        row["helix_ok"] = 1
+    try:
+        from skeleton.organism.chronicle.dump import inventory
+        row["dumps"] = inventory(getattr(org, "root", None)).get("n") or 0
+    except Exception:
+        row["dumps"] = 0
     p = path(root if root is not None else getattr(org, "root", None))
     p.parent.mkdir(parents=True, exist_ok=True)
     with p.open("a", encoding="utf-8") as fh:
@@ -79,5 +105,10 @@ def card(root: Optional[Path] = None) -> Dict[str, Any]:
         "wiki": (rows[-1].get("wiki") if rows else 0) or 0,
         "atoms": (rows[-1].get("atoms") if rows else 0) or 0,
         "coverage": (rows[-1].get("coverage") if rows else 0) or 0,
+        "field": (rows[-1].get("field") if rows else 0) or 0,
+        "follow": (rows[-1].get("follow") if rows else 0) or 0,
+        "hot": (rows[-1].get("hot") if rows else "") or "",
+        "helix_ok": (rows[-1].get("helix_ok") if rows else 1) or 0,
+        "dumps": (rows[-1].get("dumps") if rows else 0) or 0,
         "stored_prose": 0,
     }
