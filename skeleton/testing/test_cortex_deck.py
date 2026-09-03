@@ -96,7 +96,6 @@ def test_guard_rejects_title_copy():
     except LawError as exc:
         assert exc.law == "cite-do-not-copy"
     else:
-        # house dialect vs title must stay under Broder caps
         s = score("plan tensor ttk hp dps stagger posture", "Elden Ring")
         assert s["copy"] is False
 
@@ -127,6 +126,15 @@ def test_deck_speak_without_ref_stays_legal():
     assert card["hit"] == 0
     assert card["improve"] is None
     assert card["law"] == "ok"
+
+
+def test_deck_plan_attaches_quality_contract():
+    deck = CommandDeck(_Dummy())
+    card = deck.plan("like Elden Ring")
+    assert card["quality"]["accepted"] is True
+    assert card["quality"]["quality"]["metadata"]["kind"] == "plan"
+    assert card["quality_stats"]["runs"] == 1
+    assert card["era"] == "soulslike"
 
 
 def test_deck_walk_and_pick():

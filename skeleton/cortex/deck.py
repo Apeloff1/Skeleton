@@ -272,6 +272,8 @@ class CommandDeck:
 
     def plan(self, vision: str) -> Dict[str, Any]:
         from skeleton.cortex.era_bind import resolve
+        from skeleton.intelligence.plan_verifier import PlanVerifier
+
         card = resolve(vision)
         if card.get("hit"):
             self.last_ref = {
@@ -286,6 +288,9 @@ class CommandDeck:
                 out.setdefault("era", card.get("era"))
                 out.setdefault("citation", card.get("citation"))
                 out.setdefault("stored_prose", 0)
+                verifier = PlanVerifier()
+                out["quality"] = verifier.verify(out, vision=vision).to_dict()
+                out["quality_stats"] = verifier.stats()
                 self.last_plan = out
                 return out
         pack = card.get("pack") or {}
@@ -299,6 +304,9 @@ class CommandDeck:
             "stored_prose": 0,
             "law": "ok",
         }
+        verifier = PlanVerifier()
+        out["quality"] = verifier.verify(out, vision=vision).to_dict()
+        out["quality_stats"] = verifier.stats()
         self.last_plan = out
         return out
 
