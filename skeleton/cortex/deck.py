@@ -285,6 +285,10 @@ class CommandDeck:
         from skeleton.kernel.orchestrator import Orchestrator
         return Orchestrator().dispatch(text)
 
+    def season(self, text: str = "plan tensor ttk", n: int = 0) -> Dict[str, Any]:
+        from skeleton.kernel.season import run as season_run
+        return season_run(text, n=n)
+
     def follow(self) -> Dict[str, Any]:
         from skeleton.organism.follow import card as follow_card
         from skeleton.organism.organismer import live_organismer

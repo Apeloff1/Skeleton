@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Kernel season
+
+- N orch walks capped by profile walk_n. Stops on pressure or SLO trip.
+- Version 2026.09.03-season.
+
+---
+
 ## 2026-09-03 — Next hint carries hot kernel stages
 
 - hint() includes last orch walk. Pulse and orch share the queue.
