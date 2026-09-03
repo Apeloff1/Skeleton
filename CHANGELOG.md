@@ -4,6 +4,15 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Prefill/decode pipeline + mesh-in-RAM + breaker
+
+- Pipeline runs prefill then decode through fused ops.
+- Mesh atom ids land in the RAM arena.
+- Breaker and bulkhead join the bank.
+- Version 2026.09.03-pipe.
+
+---
+
 ## 2026-09-03 — GPU launch plan + RAM arena
 
 - GpuKernel: tile/smem/regs plan. Falls through to CPU fused. No PTX.

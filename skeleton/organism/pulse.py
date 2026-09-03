@@ -48,6 +48,14 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
             bank["ops_step"] = step
         if launch:
             bank["gpu_launch"] = launch
+        pipe = get("pipeline")
+        if pipe is not None and hasattr(pipe, "run"):
+            from skeleton.kernel.bank import live as bank_live
+            bank["pipeline"] = pipe.run("plan tensor ttk", bank=bank_live())
+        arena = get("ram")
+        if arena is not None:
+            from skeleton.kernel.meshmem import place
+            bank["meshmem"] = place(org.galaxy.mesh, arena)
     except Exception:
         bank = {}
     nxt = hint(org, neo=neo)

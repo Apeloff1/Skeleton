@@ -41,6 +41,8 @@ class GpuKernel:
             "regs": self.regs,
             "grid": (1, 1, 1),
             "block": (self.tile, 1, 1),
+            "stages": ("qkv", "attend", "pv", "residual"),
+            "pipeline": ("prefill", "decode"),
             "stored_prose": 0,
         }
 

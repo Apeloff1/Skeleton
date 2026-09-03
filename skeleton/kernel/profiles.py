@@ -62,6 +62,9 @@ ROSTER: Dict[str, Tuple[str, ...]] = {
     "ops": ("skeleton.kernel.ops",),
     "gpu": ("skeleton.kernel.ops.gpu",),
     "ram": ("skeleton.kernel.ram",),
+    "pipeline": ("skeleton.kernel.pipeline",),
+    "breaker": ("skeleton.kernel.breaker",),
+    "bulkhead": ("skeleton.kernel.bulkhead",),
 }
 
 PROFILES: Dict[str, Tuple[str, ...]] = {
