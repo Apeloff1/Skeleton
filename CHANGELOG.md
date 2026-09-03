@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Cage persist + doctor stamp
+
+- chronicle/cage.json stores ids only. doctor_card carries cage.
+- Version 2026.09.03-cagedoc.
+
+---
+
 ## 2026-09-03 — Galaxy quarantine cage (F-8)
 
 - Low-confidence bare atoms and high-risk atoms stay off the live shelf.

@@ -86,4 +86,5 @@ def doctor_card(org=None, *, neo=None, fix: bool = False) -> Dict[str, Any]:
         "helix_snap_n": (helix.get("snap") or {}).get("n"),
         "verified": verified,
         "satellites": __import__("skeleton.organism.satellites", fromlist=["satellites_card"]).satellites_card(org),
+        "cage": __import__("skeleton.galaxy.quarantine", fromlist=["card"]).card(),
     }
