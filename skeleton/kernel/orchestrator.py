@@ -12,6 +12,7 @@ class Orchestrator:
     def __init__(self) -> None:
         self.runs = 0
         self.last: Dict[str, Any] = {}
+        self._decode_n = 1
 
     def dispatch(self, text: str = "plan tensor ttk") -> Dict[str, Any]:
         from skeleton.kernel.bank import boot, get, live, snapshot
@@ -24,7 +25,13 @@ class Orchestrator:
         profile = str(gov.get("profile") or snapshot().get("profile") or "mobile")
         thr = get("throttle")
         blocked = bool(thr is not None and hasattr(thr, "allow") and not thr.allow())
-        route = plan(profile, pressure=pressure, blocked=blocked)
+        slo = get("slo")
+        slo_trip = bool(slo is not None and hasattr(slo, "trip") and slo.trip())
+        route = plan(profile, pressure=pressure, blocked=blocked, slo_trip=slo_trip)
+        self._decode_n = int(route.get("decode_n") or 1)
+        pf = get("prefetch")
+        if pf is not None and hasattr(pf, "load"):
+            pf.load(list(route.get("run") or []))
         trace: List[Dict[str, Any]] = []
         bank = live()
 
@@ -44,6 +51,18 @@ class Orchestrator:
             "n": len(trace),
             "stored_prose": 0,
         }
+        try:
+            from skeleton.organism.chronicle import record
+            record(None, {
+                "book": "journal",
+                "topic": "orch " + " ".join(route.get("run") or []),
+                "decision": (route.get("run") or ["hold"])[0],
+                "code": "orch",
+                "why": profile,
+                "phase": "orch",
+            })
+        except Exception:
+            pass
         return self.last
 
     def _stage(self, stage: str, text: str, bank: Dict[str, Any]) -> Dict[str, Any]:
@@ -72,13 +91,25 @@ class Orchestrator:
                 return gpu.launch()
             return {"kind": "prefill", "ok": 0}
         if stage == "decode":
+            n = max(1, int(self._decode_n or 1))
+            split = bank.get("split")
             blk = bank.get("block")
-            if blk is not None and hasattr(blk, "forward"):
-                return blk.forward(text.split()[:4])
-            ops = bank.get("ops")
-            if ops is not None and hasattr(ops, "step"):
-                return ops.step()
-            return {"kind": "decode", "ok": 0}
+            last: Dict[str, Any] = {"kind": "decode", "ok": 0, "steps": 0}
+            toks = text.split()[:4] or ["plan"]
+            steps = 0
+            for i in range(max(1, n)):
+                if split is not None and hasattr(split, "take") and not split.take("decode"):
+                    break
+                if blk is not None and hasattr(blk, "forward"):
+                    last = blk.forward(toks)
+                else:
+                    ops = bank.get("ops")
+                    last = ops.step() if ops is not None and hasattr(ops, "step") else last
+                steps += 1
+            last = dict(last)
+            last["steps"] = steps
+            last["kind"] = last.get("kind") or "decode"
+            return last
         if stage == "check":
             chk = bank.get("check")
             ram = bank.get("ram")

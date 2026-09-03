@@ -18,15 +18,31 @@ SKIP = {
 }
 
 
-def plan(profile: str, *, pressure: float = 0.0, blocked: bool = False) -> Dict[str, Any]:
+EDGES = {
+    "admit": ("quota",),
+    "quota": ("place",),
+    "place": ("prefill",),
+    "prefill": ("decode",),
+    "decode": ("check",),
+    "check": ("stock",),
+    "stock": ("reclaim",),
+    "reclaim": (),
+}
+
+
+def plan(profile: str, *, pressure: float = 0.0, blocked: bool = False,
+         slo_trip: bool = False) -> Dict[str, Any]:
     skip: Set[str] = set(SKIP.get(str(profile), ()))
-    if pressure >= 0.82:
+    if pressure >= 0.82 or slo_trip:
         skip.update({"gpu", "speculate", "prefetch"})
     stages = ["admit", "quota", "place", "prefill", "decode", "check", "stock", "reclaim"]
     if blocked:
         stages = ["admit"]
         skip.update({"prefill", "decode", "place"})
     run = [s for s in stages if s not in skip]
+    decode_n = 1 if profile in {"tight", "mobile"} or pressure >= 0.62 else 3
+    if slo_trip:
+        decode_n = 1
     return {
         "kind": "krouter",
         "profile": profile,
@@ -34,5 +50,8 @@ def plan(profile: str, *, pressure: float = 0.0, blocked: bool = False) -> Dict[
         "run": run,
         "skip": sorted(skip),
         "blocked": int(blocked),
+        "slo_trip": int(slo_trip),
+        "decode_n": decode_n,
+        "edges": {k: list(v) for k, v in EDGES.items() if k in run},
         "stored_prose": 0,
     }

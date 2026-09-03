@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Orchestrator DAG + multi-token decode
+
+- Router carries edges, decode_n, slo_trip.
+- Decode loops under split budget. Prefetch warms the plan.
+- Dispatch stamps the chronicle. Version 2026.09.03-odag.
+
+---
+
 ## 2026-09-03 — Kernel orchestrator + router
 
 - krouter picks stages from profile and pressure.
