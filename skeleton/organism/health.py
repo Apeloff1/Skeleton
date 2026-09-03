@@ -60,6 +60,7 @@ def health_card(org=None, *, neo=None) -> Dict[str, Any]:
         "field_score": __import__("skeleton.social.coverage", fromlist=["coverage_card"]).coverage_card().get("score"),
         "rot": __import__("skeleton.organism.rotctx", fromlist=["card"]).card(),
         "calendar": __import__("skeleton.organism.calendar", fromlist=["card"]).card(getattr(org, "root", None)),
+        "ctx_n": __import__("skeleton.organism.context_step", fromlist=["last"]).last(getattr(org, "root", None)).get("n") or 0,
     }
 
 

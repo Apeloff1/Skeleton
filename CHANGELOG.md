@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Context step longform + social + helix persist
+
+- Newlines encode as conversation atoms. URLs bind as pointers.
+- ctx.json ids only. calendar/health carry ctx_n.
+- Version 2026.09.03-ctxmax.
+
+---
+
 ## 2026-09-03 — Five-brain context step on every pulse
 
 - memory → compiler → dream → distiller → editor + cage + conductor.

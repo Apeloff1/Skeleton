@@ -36,5 +36,6 @@ def card(root: Optional[Path] = None) -> Dict[str, Any]:
         "profile": gov.get("profile"),
         "dumps": inv.get("n") or 0,
         "years": inv.get("years") or [],
+        "ctx_n": __import__("skeleton.organism.context_step", fromlist=["last"]).last(root).get("n") or 0,
         "stored_prose": 0,
     }
