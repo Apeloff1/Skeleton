@@ -110,6 +110,8 @@ def main(argv: list[str] | None = None) -> int:
     cx.add_argument("text", nargs="?", default="plan tensor ttk")
     cx.add_argument("--replay", action="store_true")
     cx.add_argument("--refine", action="store_true")
+    lv = sub.add_parser("live", help="organism runtime DAG walk")
+    lv.add_argument("text", nargs="?", default="plan tensor ttk")
     cdn = sub.add_parser("conductor", help="editor traffic control")
     cdn.add_argument("--run", action="store_true")
     cdn.add_argument("--commit", action="store_true")
@@ -388,6 +390,11 @@ def main(argv: list[str] | None = None) -> int:
         else:
             out = decide()
         print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "live":
+        from skeleton.organism.runtime import dispatch as live_dispatch
+        print(json.dumps(live_dispatch(stimulus=getattr(args, "text", "")), indent=2, default=str))
         return 0
 
     if args.cmd == "ctx":

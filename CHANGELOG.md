@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Organism runtime DAG
+
+- admit→quota→place→prefill→decode→check→stock→reclaim over the house.
+- Tight skips place/reclaim. python -m skeleton live
+- Version 2026.09.03-runtime.
+
+---
+
 ## 2026-09-03 — Pulse auto-polish recall
 
 - After ctx, replay. If recall < 0.55 and not tight, glean+compile once.
