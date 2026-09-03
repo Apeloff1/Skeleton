@@ -89,7 +89,8 @@ def main(argv: list[str] | None = None) -> int:
     bp.add_argument("--reset", action="store_true")
     sw = sub.add_parser("switch", help="force profile and rebuild bank")
     sw.add_argument("profile", nargs="?", default="mobile")
-    sub.add_parser("ritual", help="catalog + bank + block + stock in one card")
+    rp = sub.add_parser("ritual", help="catalog + bank + block + stock in one card")
+    rp.add_argument("--live", action="store_true")
     sub.add_parser("scoreboard", help="card every live kernel")
     sub.add_parser("hot", help="stages that ran on the last orch walk")
     sn = sub.add_parser("season", help="N orch walks under profile walk_n")
@@ -484,7 +485,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "ritual":
         from skeleton.kernel.ritual import card as ritual_card
-        print(json.dumps(ritual_card(), indent=2, default=str))
+        print(json.dumps(ritual_card(live=getattr(args, "live", False)), indent=2, default=str))
         return 0
 
     if args.cmd == "switch":

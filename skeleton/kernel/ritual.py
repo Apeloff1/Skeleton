@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any, Dict
 
 
-def card() -> Dict[str, Any]:
+def card(*, live: bool = False) -> Dict[str, Any]:
     from skeleton.kernel.bank import boot, snapshot
     from skeleton.kernel.ops.catalog import Catalog
     from skeleton.kernel.profiles import card as profiles_card
@@ -23,7 +23,7 @@ def card() -> Dict[str, Any]:
             live_stock = s.tick("ritual")
     except Exception:
         pass
-    return {
+    out = {
         "kind": "kernel-ritual",
         "profile": bank.get("profile"),
         "n": bank.get("n"),
@@ -34,5 +34,30 @@ def card() -> Dict[str, Any]:
         "profiles": profiles_card(),
         "scoreboard": __import__("skeleton.kernel.scoreboard", fromlist=["card"]).card(),
         "coverage": __import__("skeleton.kernel.coverage", fromlist=["card"]).card(),
+        "runtime": __import__("skeleton.organism.runtime", fromlist=["last"]).last(),
+        "conductor": {},
+        "live": int(live),
         "stored_prose": 0,
     }
+    try:
+        from skeleton.organism.conductor import decide
+        d = decide()
+        out["conductor"] = {"code": d.get("code"), "why": d.get("why"), "horizon": d.get("horizon")}
+    except Exception:
+        pass
+    if live:
+        try:
+            from skeleton.kernel.bank import get
+            from skeleton.kernel.orchestrator import Orchestrator
+            orch = get("orch") or Orchestrator()
+            walked = orch.dispatch("plan tensor ttk")
+            out["orch"] = {"n": walked.get("n"), "runs": walked.get("runs")}
+        except Exception:
+            out["orch"] = {}
+        try:
+            from skeleton.organism.runtime import dispatch as live_dispatch
+            rt = live_dispatch(stimulus="plan tensor ttk")
+            out["runtime"] = {"n": rt.get("n"), "ctx_n": rt.get("ctx_n"), "profile": rt.get("profile")}
+        except Exception:
+            pass
+    return out

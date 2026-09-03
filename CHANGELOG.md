@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Ritual carries conductor + optional dual DAG walk
+
+- ritual stamps last runtime and conductor horizon.
+- --live walks kernel orch and organism runtime.
+- Version 2026.09.03-ritualive.
+
+---
+
 ## 2026-09-03 — Persist last runtime walk
 
 - chronicle/runtime.json. health and calendar carry runtime_n.
