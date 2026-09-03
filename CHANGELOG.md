@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Conductor commit skips pulse on runtime hash hit
+
+- Version 2026.09.03-cmhit.
+
+---
+
 ## 2026-09-03 — Repeat runtime walk is a hash hit
 
 - Same stimulus: first n=9, second n=0 skip=9.

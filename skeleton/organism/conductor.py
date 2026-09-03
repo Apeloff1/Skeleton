@@ -192,7 +192,15 @@ def commit(org=None, *, neo=None) -> Dict[str, Any]:
         code = rest[0]
         rest = rest[1:]
         source = "horizon"
-    acted = _act(code, org, neo=neo)
+    reused = 0
+    try:
+        reused = int(__import__("skeleton.organism.runtime", fromlist=["last"]).last(root).get("reused") or 0)
+    except Exception:
+        reused = 0
+    if code == "pulse" and reused:
+        acted = {"kind": "skipped", "why": "rt-hit"}
+    else:
+        acted = _act(code, org, neo=neo)
     _save_rest(rest, root=root)
     return {
         "kind": "conductor-commit",
