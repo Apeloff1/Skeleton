@@ -34,6 +34,7 @@ python -m skeleton conductor
 python -m skeleton conductor --run
 python -m skeleton conductor --commit
 python -m skeleton ctx "plan tensor ttk"
+python -m skeleton ctx "plan tensor ttk" --replay
 python -m skeleton walk -n 3
 python -m skeleton sleep --force
 python -m skeleton forget "old trace"

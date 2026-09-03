@@ -103,6 +103,34 @@ def persist(card: Dict[str, Any], *, root: Optional[Path] = None) -> Path:
     return p
 
 
+def replay(org, query: str = "", *, root: Optional[Path] = None) -> Dict[str, Any]:
+    prev = last(root if root is not None else getattr(org, "root", None))
+    ids = list(prev.get("atom_ids") or [])
+    bank = []
+    try:
+        for lib in list(org.galaxy.mesh.brains.values()) + [org.galaxy.mesh.wiki]:
+            for atom in lib.all():
+                if atom.id in ids:
+                    bank.append(atom)
+    except Exception:
+        bank = []
+    q = query or "plan tensor ttk"
+    card: Dict[str, Any] = {}
+    try:
+        card = org.galaxy.decoder.decode(q, bank, k=5)
+    except Exception:
+        card = {}
+    return {
+        "kind": "ctx-replay",
+        "n": len(ids),
+        "bank": len(bank),
+        "recall": card.get("atom_recall") or 0,
+        "hits": len(card.get("hits") or []),
+        "critical": len(card.get("critical_passthrough") or []),
+        "stored_prose": 0,
+    }
+
+
 def last(root: Optional[Path] = None) -> Dict[str, Any]:
     p = path(root)
     if not p.is_file():

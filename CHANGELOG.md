@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Context replay through the decoder
+
+- Last ctx ids decoded. recall + hits, no prose dump.
+- Version 2026.09.03-replay.
+
+---
+
 ## 2026-09-03 — Context step longform + social + helix persist
 
 - Newlines encode as conversation atoms. URLs bind as pointers.

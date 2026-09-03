@@ -108,6 +108,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("calendar", help="day + dump inventory + last gov")
     cx = sub.add_parser("ctx", help="five-brain context post-process")
     cx.add_argument("text", nargs="?", default="plan tensor ttk")
+    cx.add_argument("--replay", action="store_true")
     cdn = sub.add_parser("conductor", help="editor traffic control")
     cdn.add_argument("--run", action="store_true")
     cdn.add_argument("--commit", action="store_true")
@@ -389,9 +390,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "ctx":
-        from skeleton.organism.context_step import run as ctx_run
+        from skeleton.organism.context_step import replay as ctx_replay, run as ctx_run
         from skeleton.organism.organismer import live_organismer
-        print(json.dumps(ctx_run(live_organismer(), getattr(args, "text", "")), indent=2, default=str))
+        org = live_organismer()
+        text = getattr(args, "text", "") or ""
+        if getattr(args, "replay", False):
+            ctx_run(org, text)
+            print(json.dumps(ctx_replay(org, text), indent=2, default=str))
+        else:
+            print(json.dumps(ctx_run(org, text), indent=2, default=str))
         return 0
 
     if args.cmd == "calendar":
