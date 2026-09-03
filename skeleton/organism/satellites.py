@@ -88,5 +88,6 @@ def satellites_card(org=None, *, cue: str = "") -> Dict[str, Any]:
         "quality": quality,
         "latest_repair": latest_repair,
         "repair_view": repair_view,
+        "mix": __import__("skeleton.organism.context_step", fromlist=["mix_card"]).mix_card(root),
         "stored_prose": 0,
     }

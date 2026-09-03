@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — mix on satellites
+
+- Version 2026.09.03-mixsat.
+
+---
+
 ## 2026-09-03 — mix on doctor
 
 - Version 2026.09.03-mixdoc.
