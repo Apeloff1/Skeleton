@@ -63,6 +63,7 @@ def append_quality(entry: Dict[str, Any], *, root: Optional[Path] = None) -> Dic
         "weakest_path": str(entry.get("weakest_path") or ""),
         "summary": dict(entry.get("summary") or {}),
         "metadata": dict(entry.get("metadata") or {}),
+        "evidence": dict(entry.get("evidence") or {}),
     }
     with path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(row, sort_keys=True, default=str) + "\n")
@@ -84,6 +85,11 @@ def append_repair(entry: Dict[str, Any], *, root: Optional[Path] = None) -> Dict
         "changed": int(bool(payload.get("changed"))),
         "before_reason": str((payload.get("before") or {}).get("reason") or ""),
         "after_reason": str((payload.get("after") or {}).get("reason") or ""),
+    })
+    payload.setdefault("evidence", {
+        "actions": list(payload.get("actions") or []),
+        "before": dict(payload.get("before") or {}),
+        "after": dict(payload.get("after") or {}),
     })
     return append_quality(payload, root=root)
 

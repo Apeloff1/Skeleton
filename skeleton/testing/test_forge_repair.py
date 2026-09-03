@@ -50,6 +50,16 @@ def test_attempt_repair_comments_eval_once(tmp_path):
     assert "# eval(" in out["files"]["scripts/world/world_map.gd"]
 
 
+def test_attempt_repair_restores_eventbus_autoload(tmp_path):
+    files = {
+        "project.godot": 'config_version=5\nrun/main_scene="res://scenes/levels/run_level.tscn"\n',
+        "scenes/levels/run_level.tscn": '[gd_scene load_steps=1 format=3]\n[node name="RunLevel" type="Node2D"]\n',
+    }
+    out = attempt_repair(files, request="repair project", root=tmp_path)
+    assert out["changed"] == 1
+    assert 'EventBus="*res://scripts/autoloads/event_bus.gd"' in out["files"]["project.godot"]
+
+
 def test_materialise_can_repair_once_and_return_result(tmp_path, monkeypatch):
     from skeleton.forge.universal import Forge
 

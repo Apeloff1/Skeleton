@@ -30,3 +30,16 @@ def test_repair_entries_are_separate_from_failures(tmp_path):
     append_repair({"surface": "forge", "ok": 1, "before": {"reason": "low_score"}, "after": {"reason": "accepted", "score": 0.9, "weakest_path": "a.gd"}, "actions": [{"path": "a.gd"}]}, root=tmp_path)
     assert latest_failure(root=tmp_path, surface="forge")["reason"] == "low_score"
     assert latest_repair(root=tmp_path, surface="forge")["kind"] == "repair"
+
+
+def test_quality_evidence_is_persisted(tmp_path):
+    append_quality({
+        "surface": "forge",
+        "accepted": False,
+        "reason": "unsafe_code",
+        "score": 0.1,
+        "weakest_path": "scripts/world/world_map.gd",
+        "evidence": {"top_file_reports": [{"path": "scripts/world/world_map.gd", "hard_issues": ["unsafe constructs detected"]}]},
+    }, root=tmp_path)
+    row = latest_failure(root=tmp_path, surface="forge")
+    assert row["evidence"]["top_file_reports"][0]["path"].endswith("world_map.gd")

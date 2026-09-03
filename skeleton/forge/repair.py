@@ -44,7 +44,6 @@ def candidate_failures(*, root=None, limit: int = 5) -> Dict[str, Any]:
 
 
 def attempt_repair(files: Mapping[str, str], *, request: str = "", root=None) -> Dict[str, Any]:
-    """One bounded repair pass over an emitted file map, then re-verify."""
     before = ForgeVerifier().verify(files, request=request)
     fixed = dict(files)
     actions: List[Dict[str, Any]] = []
@@ -69,6 +68,9 @@ def attempt_repair(files: Mapping[str, str], *, request: str = "", root=None) ->
             if project and 'run/main_scene=' not in project:
                 fixed["project.godot"] = project + 'run/main_scene="res://scenes/levels/run_level.tscn"\n'
                 actions.append({"path": "project.godot", "action": "restored main scene entry"})
+            if 'EventBus="*res://scripts/autoloads/event_bus.gd"' not in project and project:
+                fixed["project.godot"] = fixed["project.godot"] + 'EventBus="*res://scripts/autoloads/event_bus.gd"\n'
+                actions.append({"path": "project.godot", "action": "restored EventBus autoload"})
 
     after = ForgeVerifier().verify(fixed, request=request)
     result = {
@@ -92,7 +94,13 @@ def _targets(failure: Dict[str, Any]) -> List[Dict[str, Any]]:
     reason = str(failure.get("reason") or "unknown")
     weakest = str(failure.get("weakest_path") or "")
     summary = dict(failure.get("summary") or {})
-    targets: List[Dict[str, Any]] = []
+    evidence = dict(failure.get("evidence") or {})
+    top = list(evidence.get("top_file_reports") or [])
+    hard_first = []
+    for item in top:
+        if item.get("hard_issues"):
+            hard_first.append({"target": item.get("path") or weakest or "generated script", "action": "clear hard verification failures first"})
+    targets: List[Dict[str, Any]] = hard_first[:]
     if reason == "project_closure":
         targets.append({"target": "project graph", "action": "restore missing required files or references"})
     if reason in {"unsafe_code", "low_score"}:

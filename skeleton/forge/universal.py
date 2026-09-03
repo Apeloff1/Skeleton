@@ -205,6 +205,11 @@ class Forge:
             result["file_count"] = len(files)
             result["verification"] = verification.to_dict()
             result["verification_stats"] = verifier.stats()
+            evidence = {
+                "project_issues": list(verification.project_issues),
+                "blocking_issues": list(verification.blocking_issues),
+                "top_file_reports": [r.to_dict() for r in verification.file_reports[:3]],
+            }
             append_quality({
                 "kind": "quality",
                 "surface": "forge",
@@ -214,6 +219,7 @@ class Forge:
                 "weakest_path": verification.weakest_path,
                 "summary": verification.summary,
                 "metadata": verification.quality.metadata,
+                "evidence": evidence,
             }, root=self._root)
             event = DomainEvent(
                 topic="forge.verification.completed" if verification.accepted else "forge.verification.failed",
