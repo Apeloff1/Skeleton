@@ -199,6 +199,7 @@ class Forge:
         from skeleton.forge.eras import compile_era
         from skeleton.forge.godot_emit import emit_godot
         from skeleton.forge.planner import MaterialisationPlanner
+        from skeleton.intelligence.forge_verifier import ForgeVerifier
 
         problems = blueprint.validate()
         if problems:
@@ -220,8 +221,19 @@ class Forge:
             "build_plan": build_plan or {},
         }
         if target == "godot":
-            result["files"] = emit_godot(pack, title=blueprint.name, build_plan=build_plan)
-            result["file_count"] = len(result["files"])
+            files = emit_godot(pack, title=blueprint.name, build_plan=build_plan)
+            verification = ForgeVerifier().verify(files, request=blueprint.name)
+            result["files"] = files
+            result["file_count"] = len(files)
+            result["verification"] = verification.to_dict()
+            if not verification.accepted:
+                raise MaterialisationError(
+                    "emitted Godot project failed verification",
+                    context={
+                        "blueprint_id": blueprint.blueprint_id,
+                        "verification": verification.to_dict(),
+                    },
+                )
         self._bus.emit("forge.blueprint.materialised",
                        {"blueprint_id": blueprint.blueprint_id,
                         "components": len(blueprint.components),
