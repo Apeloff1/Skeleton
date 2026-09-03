@@ -75,6 +75,8 @@ def decide(org=None, *, neo=None) -> Dict[str, Any]:
         code, why = "bind-source", "coverage"
     elif int(cal.get("day_n") or 0) == 0:
         code, why = "day", "no-day"
+    elif float((__import__("skeleton.organism.runloop", fromlist=["bound_card"]).bound_card(getattr(org, "root", None)).get("field_pct") or 0)) < 25.0:
+        code, why = "day", "field"
     elif int(cal.get("dumps") or 0) == 0:
         code, why = "week", "no-dump"
     else:

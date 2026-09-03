@@ -27,5 +27,6 @@ def run(org=None, *, days: int = 2, neo=None) -> Dict[str, Any]:
         "rows": rows,
         "stopped": stopped,
         "dump": {"n": dumped.get("n"), "rotated": dumped.get("rotated")},
+        "field": __import__("skeleton.organism.runloop", fromlist=["bound_card"]).bound_card(getattr(org, "root", None)),
         "stored_prose": 0,
     }

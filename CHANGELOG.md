@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Conductor day when field_pct < 25
+
+- Coverage and week carry field_pct. Version 2026.09.03-fieldlaw.
+
+---
+
 ## 2026-09-03 — Field walker
 
 - Profile cap tight=1 mobile=2 desktop=4. Day and pulse claim unbound pointers.
