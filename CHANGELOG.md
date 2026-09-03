@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Pulse walks the organism runtime spine
+
+- ctx/polish tail removed. pulse.runtime is the DAG card.
+- pressure ≥ 0.82 skips prefill/decode/place.
+- Version 2026.09.03-spine.
+
+---
+
 ## 2026-09-03 — Ritual carries conductor + optional dual DAG walk
 
 - ritual stamps last runtime and conductor horizon.

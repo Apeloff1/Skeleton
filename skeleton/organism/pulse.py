@@ -62,21 +62,25 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
             acted["follow"] = grow(stim, root=getattr(org, "root", None))
         except Exception:
             pass
-    ctx: Dict[str, Any] = {}
+    rt: Dict[str, Any] = {}
     try:
-        from skeleton.organism.context_step import run as ctx_run
-        ctx = ctx_run(org, stimulus or acted.get("stimulus") or "", sleep=code == "dream", neo=neo)
-        from skeleton.organism.context_step import polish as ctx_polish
-        ctx["polish"] = ctx_polish(org, stimulus or acted.get("stimulus") or "")
+        from skeleton.organism.runtime import dispatch as live_dispatch
+        walked = live_dispatch(org, stimulus or acted.get("stimulus") or "", neo=neo)
+        rt = {
+            "n": walked.get("n"),
+            "ctx_n": walked.get("ctx_n"),
+            "profile": walked.get("profile"),
+            "skip": walked.get("skip"),
+        }
     except Exception:
-        ctx = {}
+        rt = {}
     return {
         "kind": "pulse",
         "next": nxt,
         "acted": acted,
         "gov": gov,
         "bank": bank,
-        "ctx": ctx,
+        "runtime": rt,
         "G": round(org.G, 6),
         "stored_prose": 0,
     }

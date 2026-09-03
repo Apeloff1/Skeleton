@@ -44,6 +44,14 @@ def dispatch(org=None, stimulus: str = "", *, neo=None) -> Dict[str, Any]:
     except Exception:
         profile = "mobile"
     skip = {"place", "reclaim"} if profile == "tight" else set()
+    pressure = 0.0
+    try:
+        from skeleton.organism.caps import card as caps_card
+        pressure = float(caps_card().get("pressure") or 0)
+    except Exception:
+        pressure = 0.0
+    if pressure >= 0.82:
+        skip.update({"prefill", "decode", "place"})
     trace: List[Dict[str, Any]] = []
     ctx: Dict[str, Any] = {}
     for stage in EDGES:
