@@ -11,6 +11,7 @@ OBLIGATORY: Tuple[str, ...] = (
 EXTRA: Tuple[str, ...] = (
     "softmax", "rope", "swiglu", "embed", "layernorm", "residual",
     "moe", "dma", "gather", "pipeline", "breaker", "bulkhead",
+    "gelu", "relu", "alibi", "window", "int4", "check", "stock",
 )
 
 

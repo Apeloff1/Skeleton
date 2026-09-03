@@ -31,6 +31,8 @@ from skeleton.kernel.wrap import BreakerCard, BulkheadCard
 from skeleton.kernel.ops.embed import Embed
 from skeleton.kernel.ops.dma import Dma
 from skeleton.kernel.ops.catalog import Catalog
+from skeleton.kernel.ram.check import Check
+from skeleton.kernel.stock import Stock
 
 _MAKERS = {
     "admission": lambda ov: Admission(window=16 if ov else 32),
@@ -62,6 +64,8 @@ _MAKERS = {
     "embed": lambda ov: Embed(d=8 if ov else 16),
     "dma": lambda ov: Dma(),
     "catalog": lambda ov: Catalog(),
+    "check": lambda ov: Check(),
+    "stock": lambda ov: Stock(),
 }
 
 _LIVE: Dict[str, Any] = {}
@@ -87,6 +91,7 @@ def boot(profile: str = "", overlay: Dict[str, Any] | None = None) -> Dict[str, 
             "throttle", "quota", "reclaim", "bloom", "isolate", "prefetch", "admission",
             "page", "prefix", "batch", "slo", "pack", "ops", "ram", "gpu",
             "pipeline", "breaker", "bulkhead", "embed", "dma", "catalog",
+            "check", "stock",
         ]
     _LIVE = {k: _MAKERS[k](tight) for k in chosen}
     _PROFILE = name

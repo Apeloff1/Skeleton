@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — More extras: act alibi window int4 check stock
+
+- GELU/ReLU/tanh, ALiBi, sliding window, INT4 pack.
+- RAM checksum. In-tree stock probe.
+- Version 2026.09.03-kmore.
+
+---
+
 ## 2026-09-03 — Obligatory + extra numeric kernels
 
 - Extra: softmax rope swiglu embed layernorm residual moe dma gather catalog
