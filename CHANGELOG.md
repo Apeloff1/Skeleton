@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — mix on ritual, ready, product
+
+- Version 2026.09.03-mixops.
+
+---
+
 ## 2026-09-03 — mix CLI
 
 - Profile layers + last mix/density. Version 2026.09.03-mixcli.

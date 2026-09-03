@@ -19,7 +19,7 @@ from skeleton.social.sota import sota_card
 from skeleton.social.sources import SOTA_POINTERS
 
 
-VERSION = "2026.09.03-mixcli"
+VERSION = "2026.09.03-mixops"
 
 
 ENDPOINTS = (
@@ -117,5 +117,6 @@ def product_card() -> Dict[str, Any]:
         "repair_view": repair_view,
         "observe": __import__("skeleton.organism.observe", fromlist=["card"]).card(getattr(org, "root", None)),
         "stacks": __import__("skeleton.organism.stacks", fromlist=["card"]).card(getattr(org, "root", None)),
+        "mix": __import__("skeleton.organism.context_step", fromlist=["mix_card"]).mix_card(getattr(org, "root", None)),
         "stored_prose": laws["stored_prose"],
     }

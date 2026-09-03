@@ -54,5 +54,6 @@ def ready_card(org=None, *, neo=None, walk: bool = False, n: int = 2, fix: bool 
         "observe": __import__("skeleton.organism.observe", fromlist=["card"]).card(getattr(org, "root", None)),
         "runtime_n": __import__("skeleton.organism.runtime", fromlist=["last"]).last(getattr(org, "root", None)).get("n") or 0,
         "stacks": __import__("skeleton.organism.stacks", fromlist=["card"]).card(getattr(org, "root", None)),
+        "mix": __import__("skeleton.organism.context_step", fromlist=["mix_card"]).mix_card(getattr(org, "root", None)),
         "stored_prose": health.get("stored_prose"),
     }
