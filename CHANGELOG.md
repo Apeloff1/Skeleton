@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — gov CLI + witness carries last governor
+
+- python -m skeleton gov
+- Version 2026.09.03-govcli.
+
+---
+
 ## 2026-09-03 — Restore tight profile from gov.json on boot
 
 - Empty-profile boot reads last tighten and force(tight).

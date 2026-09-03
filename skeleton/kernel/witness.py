@@ -22,5 +22,6 @@ def card() -> Dict[str, Any]:
         "coverage": cov().get("pct_obl"),
         "last_n": last.get("n") or 0,
         "last_runs": last.get("runs") or 0,
+        "gov": __import__("skeleton.kernel.persist", fromlist=["load_gov"]).load_gov(),
         "stored_prose": 0,
     }

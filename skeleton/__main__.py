@@ -96,6 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("coverage", help="catalog vs live vs hot")
     sub.add_parser("kdiff", help="diff last two scoreboards")
     sub.add_parser("witness", help="fence hold hot coverage last-orch")
+    sub.add_parser("gov", help="last governor action from gov.json")
     dc = sub.add_parser("decade", help="seasons until cap")
     dc.add_argument("text", nargs="?", default="plan tensor ttk")
     dc.add_argument("--seasons", type=int, default=3)
@@ -357,9 +358,9 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(live_deck().orch(getattr(args, "text", "plan tensor ttk")), indent=2, default=str))
         return 0
 
-    if args.cmd == "witness":
-        from skeleton.kernel.witness import card as witness_card
-        print(json.dumps(witness_card(), indent=2, default=str))
+    if args.cmd == "gov":
+        from skeleton.kernel.persist import load_gov
+        print(json.dumps(load_gov(), indent=2, default=str))
         return 0
 
     if args.cmd == "witness":
