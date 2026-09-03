@@ -116,6 +116,14 @@ class Organismer:
             decision, score, hit = write_route(stimulus, topics.keys())
             if decision == "new" and should_suppress(stimulus, wb_topics(self.galaxy.mesh)):
                 decision, hit = "skip", (hit or "internalized")
+            try:
+                import hashlib
+                from skeleton.organism.context_step import last as ctx_last
+                h = hashlib.sha256(stimulus.encode("utf-8")).hexdigest()[:16]
+                if ctx_last(self.root).get("hash") == h:
+                    decision, hit = "skip", "ctx-hit"
+            except Exception:
+                pass
             route_card = route_card_of(decision, score, hit)
             gxy: Dict[str, Any]
             if should_pulse(decision):

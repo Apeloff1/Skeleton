@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Step skips galaxy.pulse when ctx already wrote the hash
+
+- First pulse: G moves, galaxy pulses=1. Repeat: step skipped.
+- Version 2026.09.03-stepskip.
+
+---
+
 ## 2026-09-03 — Pulse skips org.step on ctx reuse
 
 - Runtime first. Repeat stimulus does not step or grow follow.
