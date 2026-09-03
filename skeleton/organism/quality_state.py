@@ -107,6 +107,13 @@ def latest_failure(*, root: Optional[Path] = None, surface: str = "") -> Dict[st
     return rows[-1] if rows else {}
 
 
+def repair_candidates(*, root: Optional[Path] = None, surface: str = "forge") -> List[Dict[str, Any]]:
+    rows = load_quality(root=root, limit=256)
+    rows = [r for r in rows if not r.get("accepted") and str(r.get("surface") or "") == surface]
+    rows.sort(key=lambda r: (float(r.get("score") or 0.0), int(r.get("at") or 0)), reverse=True)
+    return rows
+
+
 def quality_snapshot(*, root: Optional[Path] = None, limit: int = 32) -> Dict[str, Any]:
     rows = load_quality(root=root, limit=limit)
     return {

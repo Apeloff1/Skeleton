@@ -6,6 +6,7 @@ from skeleton.cortex.deck import CommandDeck
 from skeleton.cortex.dodeca import FACES, face_card
 from skeleton.cortex.laws import LAWS, LawError, check
 from skeleton.cortex.refs import lookup, refer
+from skeleton.organism.quality_state import load_quality
 
 
 class _Engine:
@@ -128,13 +129,15 @@ def test_deck_speak_without_ref_stays_legal():
     assert card["law"] == "ok"
 
 
-def test_deck_plan_attaches_quality_contract():
-    deck = CommandDeck(_Dummy())
+def test_deck_plan_attaches_quality_contract_and_persists(tmp_path):
+    deck = CommandDeck(_Dummy(), root=tmp_path)
     card = deck.plan("like Elden Ring")
     assert card["quality"]["accepted"] is True
     assert card["quality"]["quality"]["metadata"]["kind"] == "plan"
     assert card["quality_stats"]["runs"] == 1
     assert card["era"] == "soulslike"
+    rows = load_quality(root=tmp_path)
+    assert rows and rows[-1]["surface"] == "plan"
 
 
 def test_deck_walk_and_pick():

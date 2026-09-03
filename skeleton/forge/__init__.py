@@ -13,6 +13,7 @@ from skeleton.forge.planner import MaterialisationPlanner, BuildPlan
 from skeleton.forge.archetypes import Archetype, ArchetypeError, ArchetypeLibrary, default_library
 from skeleton.forge.diagram import to_dot
 from skeleton.forge.materialisers import Materialiser, MaterialisationRegistry
+from skeleton.forge.repair import latest_repair_plan, candidate_failures
 from skeleton.forge.universal import Blueprint, Component, Forge, Port, Wire
 from skeleton.forge.validator import (
     CompositeValidator,
@@ -54,6 +55,8 @@ __all__ = [
     "to_dot",
     "Materialiser",
     "MaterialisationRegistry",
+    "latest_repair_plan",
+    "candidate_failures",
     "Blueprint",
     "Component",
     "Forge",
