@@ -16,6 +16,7 @@ from .verification import VerificationLoop, VerificationTrace, VerificationVerdi
 from .verifier import CodeVerifier, RubricScore, VerifierReport
 from .quality import QualityIssue, QualityReport, QualitySignal
 from .plan_verifier import PlanVerifier, PlanVerificationReport
+from .plan_repair import attempt_plan_repair
 from .pipeline_verifier import PipelineVerifier, PipelineVerificationReport
 from .npc_verifier import NpcVerifier, NpcVerificationReport
 from .dialogue_verifier import DialogueVerifier, DialogueVerificationReport
@@ -37,7 +38,7 @@ __all__ = [
     'VerificationLoop', 'VerificationTrace', 'VerificationVerdict',
     'CodeVerifier', 'RubricScore', 'VerifierReport',
     'QualityIssue', 'QualityReport', 'QualitySignal',
-    'PlanVerifier', 'PlanVerificationReport',
+    'PlanVerifier', 'PlanVerificationReport', 'attempt_plan_repair',
     'PipelineVerifier', 'PipelineVerificationReport',
     'NpcVerifier', 'NpcVerificationReport',
     'DialogueVerifier', 'DialogueVerificationReport',

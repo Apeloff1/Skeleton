@@ -78,5 +78,6 @@ def satellites_card(org=None, *, cue: str = "") -> Dict[str, Any]:
         "vault": vault_card(),
         "retrieve": retrieve_card(cue, org=org),
         "quality": quality,
+        "latest_repair": quality.get("latest_repair") or {},
         "stored_prose": 0,
     }

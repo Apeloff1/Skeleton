@@ -31,6 +31,7 @@ def doctor_card(org=None, *, neo=None, fix: bool = False) -> Dict[str, Any]:
     prose = int(laws.get("stored_prose") or 0)
     quality = quality_snapshot(root=getattr(org, "root", None))
     q_pressure = quality_pressure(quality["rollup"])
+    latest_repair = quality.get("latest_repair") or {}
     helix = {}
     try:
         from skeleton.organism.helix import verify as helix_verify
@@ -70,6 +71,7 @@ def doctor_card(org=None, *, neo=None, fix: bool = False) -> Dict[str, Any]:
         "laws_ok": laws["ok"],
         "quality": quality,
         "quality_pressure": q_pressure,
+        "latest_repair": latest_repair,
         "fix": clipped,
         "helix_ok": helix_ok,
         "helix_sense_n": (helix.get("sense") or {}).get("n"),

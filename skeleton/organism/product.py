@@ -93,5 +93,6 @@ def product_card() -> Dict[str, Any]:
         "sota": sota_card("", G=org.G),
         "laws": laws,
         "quality": quality,
+        "latest_repair": quality.get("latest_repair") or {},
         "stored_prose": laws["stored_prose"],
     }
