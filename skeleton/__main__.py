@@ -106,6 +106,8 @@ def main(argv: list[str] | None = None) -> int:
     wk = sub.add_parser("week", help="days then dump")
     wk.add_argument("--days", type=int, default=2)
     sub.add_parser("calendar", help="day + dump inventory + last gov")
+    cx = sub.add_parser("ctx", help="five-brain context post-process")
+    cx.add_argument("text", nargs="?", default="plan tensor ttk")
     cdn = sub.add_parser("conductor", help="editor traffic control")
     cdn.add_argument("--run", action="store_true")
     cdn.add_argument("--commit", action="store_true")
@@ -384,6 +386,12 @@ def main(argv: list[str] | None = None) -> int:
         else:
             out = decide()
         print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "ctx":
+        from skeleton.organism.context_step import run as ctx_run
+        from skeleton.organism.organismer import live_organismer
+        print(json.dumps(ctx_run(live_organismer(), getattr(args, "text", "")), indent=2, default=str))
         return 0
 
     if args.cmd == "calendar":

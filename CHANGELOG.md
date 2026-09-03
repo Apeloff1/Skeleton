@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Five-brain context step on every pulse
+
+- memory → compiler → dream → distiller → editor + cage + conductor.
+- pulse.ctx carries atom ids only. Version 2026.09.03-ctx.
+
+---
+
 ## 2026-09-03 — Conductor commit walks one horizon step
 
 - --commit runs step 0, queues the rest, interrupts on prose/pressure.
