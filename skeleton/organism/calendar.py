@@ -37,6 +37,7 @@ def card(root: Optional[Path] = None) -> Dict[str, Any]:
         "dumps": inv.get("n") or 0,
         "years": inv.get("years") or [],
         "ctx_n": __import__("skeleton.organism.context_step", fromlist=["last"]).last(root).get("n") or 0,
+        "mix": __import__("skeleton.organism.context_step", fromlist=["last"]).last(root).get("mix") or 0,
         "runtime_n": __import__("skeleton.organism.runtime", fromlist=["last"]).last(root).get("n") or 0,
         "observe": __import__("skeleton.organism.observe", fromlist=["card"]).card(root),
         "stored_prose": 0,
