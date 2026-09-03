@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — mix CLI
+
+- Profile layers + last mix/density. Version 2026.09.03-mixcli.
+
+---
+
 ## 2026-09-03 — Calendar and health stamp last mix
 
 - Version 2026.09.03-mixcal.

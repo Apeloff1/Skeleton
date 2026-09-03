@@ -225,6 +225,30 @@ def refine(org, stimulus: str = "", *, rounds: int = 2, floor: float = 0.55, neo
     }
 
 
+def mix_card(root: Optional[Path] = None) -> Dict[str, Any]:
+    prev = last(root)
+    profile = "mobile"
+    try:
+        from skeleton.kernel.profiles import card as profiles_card
+        profile = str(profiles_card().get("profile") or "mobile")
+    except Exception:
+        profile = "mobile"
+    layers = {
+        "tight": ["T0", "T4"],
+        "mobile": ["T0", "T2", "T4"],
+        "desktop": ["T0", "T1", "T2", "T3", "T4", "T5"],
+    }
+    return {
+        "kind": "mix",
+        "profile": profile,
+        "layers": layers.get(profile, layers["mobile"]),
+        "last_mix": prev.get("mix") or 0,
+        "density": prev.get("density") or 0,
+        "n": prev.get("n") or 0,
+        "stored_prose": 0,
+    }
+
+
 def last(root: Optional[Path] = None) -> Dict[str, Any]:
     p = path(root)
     if not p.is_file():

@@ -19,7 +19,7 @@ from skeleton.social.sota import sota_card
 from skeleton.social.sources import SOTA_POINTERS
 
 
-VERSION = "2026.09.03-mixcal"
+VERSION = "2026.09.03-mixcli"
 
 
 ENDPOINTS = (
