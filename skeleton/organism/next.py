@@ -71,5 +71,6 @@ def hint(org, *, neo=None) -> Dict[str, Any]:
         "rot": loop.get("rot"),
         "forest_n": loop.get("forest_n"),
         "follow": follow_bias,
+        "hot": __import__("skeleton.kernel.hot", fromlist=["rank"]).rank().get("hot") or [],
         "stored_prose": 0,
     }

@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Next hint carries hot kernel stages
+
+- hint() includes last orch walk. Pulse and orch share the queue.
+- Version 2026.09.03-nexthot.
+
+---
+
 ## 2026-09-03 — Follow feed + hot stages on product
 
 - Orchestrator tokens come from the follow bag.
