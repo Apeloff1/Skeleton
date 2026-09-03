@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Pulse skips org.step on ctx reuse
+
+- Runtime first. Repeat stimulus does not step or grow follow.
+- First pulse still steps so G can move. Version 2026.09.03-stephit.
+
+---
+
 ## 2026-09-03 — Repeat stimulus skips galaxy.pulse
 
 - Hash hit returns last ctx card. No pulse, mix, glean, helix.

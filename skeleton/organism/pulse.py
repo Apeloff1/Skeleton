@@ -42,26 +42,51 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
     else:
         from skeleton.organism.runloop import rotate_stimulus
         stim = rotate_stimulus(int(org.steps or 0), stimulus)
-        acted["step"] = org.step(stim, neo=neo)
-        acted["stimulus"] = stim.split()[0]
+        acted["stimulus"] = stim.split()[0] if stim else ""
+        rt_early: Dict[str, Any] = {}
         try:
-            from skeleton.organism.follow import grow
-            acted["follow"] = grow(stim, root=getattr(org, "root", None))
+            from skeleton.organism.runtime import dispatch as live_dispatch
+            walked = live_dispatch(org, stim, neo=neo)
+            rt_early = {
+                "n": walked.get("n"),
+                "ctx_n": walked.get("ctx_n"),
+                "profile": walked.get("profile"),
+                "skip": walked.get("skip"),
+                "kernel_n": walked.get("kernel_n"),
+            }
         except Exception:
-            pass
-    rt: Dict[str, Any] = {}
-    try:
-        from skeleton.organism.runtime import dispatch as live_dispatch
-        walked = live_dispatch(org, stimulus or acted.get("stimulus") or "", neo=neo)
-        rt = {
-            "n": walked.get("n"),
-            "ctx_n": walked.get("ctx_n"),
-            "profile": walked.get("profile"),
-            "skip": walked.get("skip"),
-            "kernel_n": walked.get("kernel_n"),
-        }
-    except Exception:
+            rt_early = {}
+        hit = 0
+        try:
+            from skeleton.organism.context_step import last as ctx_last
+            hit = int(ctx_last(getattr(org, "root", None)).get("reused") or 0)
+        except Exception:
+            hit = 0
+        if hit:
+            acted["step"] = {"skipped": "ctx-hit"}
+        else:
+            acted["step"] = org.step(stim, neo=neo)
+            try:
+                from skeleton.organism.follow import grow
+                acted["follow"] = grow(stim, root=getattr(org, "root", None))
+            except Exception:
+                pass
+        rt = rt_early
+    if code in {"tighten", "hold", "bind-source", "dream"}:
         rt = {}
+    if not rt:
+        try:
+            from skeleton.organism.runtime import dispatch as live_dispatch
+            walked = live_dispatch(org, stimulus or acted.get("stimulus") or "", neo=neo)
+            rt = {
+                "n": walked.get("n"),
+                "ctx_n": walked.get("ctx_n"),
+                "profile": walked.get("profile"),
+                "skip": walked.get("skip"),
+                "kernel_n": walked.get("kernel_n"),
+            }
+        except Exception:
+            rt = {}
     return {
         "kind": "pulse",
         "next": nxt,

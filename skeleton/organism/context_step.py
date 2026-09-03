@@ -20,6 +20,10 @@ def run(org, stimulus: str = "", *, sleep: bool = False, neo=None) -> Dict[str, 
         out = dict(prev)
         out["reused"] = 1
         out["stored_prose"] = 0
+        try:
+            persist(out, root=getattr(org, "root", None))
+        except Exception:
+            pass
         return out
     gxy: Dict[str, Any] = {}
     try:
