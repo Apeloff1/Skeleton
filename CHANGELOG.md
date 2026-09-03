@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Scope rot guard (F-3) + field coverage on health
+
+- compose assesses the queue. rot trims fill codes.
+- health carries field_score and rot stats.
+- Version 2026.09.03-rotf3.
+
+---
+
 ## 2026-09-03 — Restore caged ids on live()
 
 - cage.json ids reload into the cage. ready_card carries cage.

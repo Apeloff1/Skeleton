@@ -57,6 +57,8 @@ def health_card(org=None, *, neo=None) -> Dict[str, Any]:
         "gov": __import__("skeleton.kernel.persist", fromlist=["load_gov"]).load_gov(),
         "witness": __import__("skeleton.kernel.witness", fromlist=["card"]).card(),
         "cage": __import__("skeleton.galaxy.quarantine", fromlist=["card"]).card(),
+        "field_score": __import__("skeleton.social.coverage", fromlist=["coverage_card"]).coverage_card().get("score"),
+        "rot": __import__("skeleton.organism.rotctx", fromlist=["card"]).card(),
     }
 
 

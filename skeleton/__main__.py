@@ -98,6 +98,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("witness", help="fence hold hot coverage last-orch")
     sub.add_parser("gov", help="last governor action from gov.json")
     sub.add_parser("cage", help="galaxy quarantine card")
+    sub.add_parser("rot", help="scope rot stats")
+    sub.add_parser("fieldcov", help="social field coverage")
     dc = sub.add_parser("decade", help="seasons until cap")
     dc.add_argument("text", nargs="?", default="plan tensor ttk")
     dc.add_argument("--seasons", type=int, default=3)
@@ -357,6 +359,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "orch":
         from skeleton.cortex.deck import live_deck
         print(json.dumps(live_deck().orch(getattr(args, "text", "plan tensor ttk")), indent=2, default=str))
+        return 0
+
+    if args.cmd == "rot":
+        from skeleton.organism.rotctx import card as rot_card
+        print(json.dumps(rot_card(), indent=2, default=str))
+        return 0
+
+    if args.cmd == "fieldcov":
+        from skeleton.social.coverage import coverage_card
+        print(json.dumps(coverage_card(), indent=2, default=str))
         return 0
 
     if args.cmd == "cage":

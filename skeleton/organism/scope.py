@@ -54,6 +54,9 @@ def compose(org, *, neo=None) -> Dict[str, Any]:
         code = FILL[i % len(FILL)]
         queue.append(code)
         i += 1
+    from skeleton.organism.rotctx import assess as rot_assess, trim as rot_trim
+    rot = rot_assess(queue)
+    queue = rot_trim(queue, rot)
     planned = plan(queue, root=getattr(org, "root", None), why="scope")
     try:
         from skeleton.organism.chronicle import record
@@ -76,6 +79,8 @@ def compose(org, *, neo=None) -> Dict[str, Any]:
         "planned": planned.get("n"),
         "pressure": pressure,
         "ambition": n,
+        "rot": rot,
+        "coverage": round(float(cov.get("score") or 0), 4),
         "stored_prose": 0,
     }
 
@@ -109,6 +114,8 @@ def card(org=None, *, neo=None) -> Dict[str, Any]:
             "horizon_years": inv.get("horizon_years"),
         },
         "itinerary": tail(8, root=getattr(org, "root", None)),
+        "rot": composed.get("rot"),
+        "coverage": composed.get("coverage"),
         "stored_prose": 0,
     }
 
