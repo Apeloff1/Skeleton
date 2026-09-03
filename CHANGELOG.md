@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Pulse auto-polish recall
+
+- After ctx, replay. If recall < 0.55 and not tight, glean+compile once.
+- Version 2026.09.03-polish.
+
+---
+
 ## 2026-09-03 — Context refine loop + recall law
 
 - Encode/decode until recall ≥ 0.55 or 2 rounds. Low recall → dream.

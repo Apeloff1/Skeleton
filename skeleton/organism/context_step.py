@@ -132,6 +132,36 @@ def replay(org, query: str = "", *, root: Optional[Path] = None) -> Dict[str, An
     }
 
 
+def polish(org, stimulus: str = "", *, floor: float = 0.55) -> Dict[str, Any]:
+    """One replay. One glean/compile if recall is thin. Tight profile skips."""
+    try:
+        from skeleton.kernel.profiles import card as profiles_card
+        if str(profiles_card().get("profile") or "") == "tight":
+            return {"kind": "ctx-polish", "skipped": "tight", "stored_prose": 0}
+    except Exception:
+        pass
+    rec = replay(org, stimulus or "plan tensor ttk")
+    extra = 0
+    if float(rec.get("recall") or 0) < floor:
+        try:
+            org.galaxy.distiller.glean(stimulus or "plan tensor ttk")
+            org.galaxy.compiler.compile(stimulus or "plan tensor ttk")
+            extra = 1
+            rec = replay(org, stimulus or "plan tensor ttk")
+        except Exception:
+            extra = 0
+    try:
+        prev = last(getattr(org, "root", None))
+        prev["recall"] = rec.get("recall")
+        persist(prev, root=getattr(org, "root", None))
+    except Exception:
+        pass
+    rec["kind"] = "ctx-polish"
+    rec["extra"] = extra
+    rec["stored_prose"] = 0
+    return rec
+
+
 def refine(org, stimulus: str = "", *, rounds: int = 2, floor: float = 0.55, neo=None) -> Dict[str, Any]:
     stim = stimulus or "plan tensor ttk"
     rounds = max(1, min(3, int(rounds)))

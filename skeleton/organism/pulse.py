@@ -66,6 +66,8 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
     try:
         from skeleton.organism.context_step import run as ctx_run
         ctx = ctx_run(org, stimulus or acted.get("stimulus") or "", sleep=code == "dream", neo=neo)
+        from skeleton.organism.context_step import polish as ctx_polish
+        ctx["polish"] = ctx_polish(org, stimulus or acted.get("stimulus") or "")
     except Exception:
         ctx = {}
     return {
