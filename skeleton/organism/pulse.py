@@ -16,6 +16,12 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
     org = org or live_organismer()
     if persist is not None:
         org.persist_on = bool(persist)
+    gov: Dict[str, Any] = {}
+    try:
+        from skeleton.kernel.governor import tick as gov_tick
+        gov = gov_tick()
+    except Exception:
+        gov = {}
     nxt = hint(org, neo=neo)
     code = str(nxt.get("code") or "pulse")
     acted: Dict[str, Any] = {"code": code}
@@ -42,6 +48,7 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
         "kind": "pulse",
         "next": nxt,
         "acted": acted,
+        "gov": gov,
         "G": round(org.G, 6),
         "stored_prose": 0,
     }

@@ -57,8 +57,20 @@ MOBILE_OVERLAY = {
 }
 
 
+_FORCE = ""
+
+
+def force(name: str) -> str:
+    global _FORCE
+    name = str(name or "").lower()
+    _FORCE = name if name in PROFILES else ""
+    return _FORCE
+
+
 def pick(*, tier: str = "", pressure: float = 0.0, cpus: int = 1,
          avail_mb: int = 4096, gpu: bool = False) -> str:
+    if _FORCE in PROFILES:
+        return _FORCE
     forced = str(os.environ.get("SKELETON_KERNEL") or "").lower()
     if forced in PROFILES:
         return forced

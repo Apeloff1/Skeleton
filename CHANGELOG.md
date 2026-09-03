@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Kernel governor mid-run
+
+- tight latches at pressure 0.82. Two calm probes ≤0.55 release it.
+- Pulse ticks the governor. Version 2026.09.03-kgov.
+
+---
+
 ## 2026-09-03 — Kernel overlay binds walk/scope/idle/dump
 
 - live_overlay() caps walk_n, ambition, idle cadence, dump heat.
