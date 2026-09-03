@@ -36,6 +36,7 @@ def card(*, live: bool = False) -> Dict[str, Any]:
         "coverage": __import__("skeleton.kernel.coverage", fromlist=["card"]).card(),
         "runtime": __import__("skeleton.organism.runtime", fromlist=["last"]).last(),
         "conductor": {},
+        "observe": __import__("skeleton.organism.observe", fromlist=["card"]).card(),
         "live": int(live),
         "stored_prose": 0,
     }

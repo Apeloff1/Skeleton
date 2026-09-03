@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Observe fan-out across stacks
+
+- Row carries wiki, atoms, coverage. Ritual and ready stamp observe.
+- Runtime stages append to itinerary. Version 2026.09.03-fanout.
+
+---
+
 ## 2026-09-03 — F-2 observe ledger
 
 - One jsonl row per runtime walk: G, recall, pressure, kernel_n.

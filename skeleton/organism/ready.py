@@ -51,5 +51,7 @@ def ready_card(org=None, *, neo=None, walk: bool = False, n: int = 2, fix: bool 
         "walk": walked,
         "season": season,
         "cage": __import__("skeleton.galaxy.quarantine", fromlist=["card"]).card(),
+        "observe": __import__("skeleton.organism.observe", fromlist=["card"]).card(getattr(org, "root", None)),
+        "runtime_n": __import__("skeleton.organism.runtime", fromlist=["last"]).last(getattr(org, "root", None)).get("n") or 0,
         "stored_prose": health.get("stored_prose"),
     }

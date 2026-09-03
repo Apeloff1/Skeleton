@@ -34,8 +34,16 @@ def record(org, walked: Dict[str, Any], *, root: Optional[Path] = None) -> Dict[
         "recall": recall,
         "pressure": round(pressure, 4),
         "profile": walked.get("profile"),
+        "wiki": len(getattr(getattr(org.galaxy.mesh, "wiki", None), "topics", {}) or {}),
+        "atoms": sum(len(getattr(lib, "shelf", {}) or {}) for lib in (org.galaxy.mesh.brains or {}).values()),
+        "coverage": 0.0,
         "stored_prose": 0,
     }
+    try:
+        from skeleton.social.coverage import coverage_card
+        row["coverage"] = coverage_card("").get("score") or 0
+    except Exception:
+        pass
     p = path(root if root is not None else getattr(org, "root", None))
     p.parent.mkdir(parents=True, exist_ok=True)
     with p.open("a", encoding="utf-8") as fh:
@@ -68,5 +76,8 @@ def card(root: Optional[Path] = None) -> Dict[str, Any]:
         "delta_G": round(delta, 6),
         "last_recall": (rows[-1].get("recall") if rows else 0) or 0,
         "last_kernel_n": (rows[-1].get("kernel_n") if rows else 0) or 0,
+        "wiki": (rows[-1].get("wiki") if rows else 0) or 0,
+        "atoms": (rows[-1].get("atoms") if rows else 0) or 0,
+        "coverage": (rows[-1].get("coverage") if rows else 0) or 0,
         "stored_prose": 0,
     }

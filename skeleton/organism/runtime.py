@@ -85,6 +85,11 @@ def dispatch(org=None, stimulus: str = "", *, neo=None) -> Dict[str, Any]:
         observe_record(org, out, root=getattr(org, "root", None))
     except Exception:
         pass
+    try:
+        from skeleton.organism.chronicle.itinerary import plan
+        plan([t.get("stage") for t in out.get("trace") or [] if t.get("stage")], root=getattr(org, "root", None), why="runtime")
+    except Exception:
+        pass
     return out
 
 
