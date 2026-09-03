@@ -73,6 +73,7 @@ _MAKERS = {
     "stock_live": lambda ov: StockLive(mobile=bool(ov)),
     "orch": lambda ov: __import__("skeleton.kernel.orchestrator", fromlist=["Orchestrator"]).Orchestrator(),
     "extras": lambda ov: Extras(),
+    "hold": lambda ov: __import__("skeleton.kernel.hold", fromlist=["Hold"]).Hold(),
 }
 
 _LIVE: Dict[str, Any] = {}
@@ -98,7 +99,7 @@ def boot(profile: str = "", overlay: Dict[str, Any] | None = None) -> Dict[str, 
             "throttle", "quota", "reclaim", "bloom", "isolate", "prefetch", "admission",
             "page", "prefix", "batch", "slo", "pack", "ops", "ram", "gpu",
             "pipeline", "breaker", "bulkhead", "embed", "dma", "catalog",
-            "check", "stock", "block", "stock_live", "orch", "extras",
+            "check", "stock", "block", "stock_live", "orch", "extras", "hold",
         ]
     _LIVE = {k: _MAKERS[k](tight) for k in chosen}
     _PROFILE = name

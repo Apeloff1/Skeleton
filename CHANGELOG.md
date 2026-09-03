@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Hold gate on season drift
+
+- Hold latches live names. Drift stops the season.
+- Version 2026.09.03-hold.
+
+---
+
 ## 2026-09-03 — Scoreboard persist + kdiff
 
 - board.json / board.prev.json. kdiff added vs removed.

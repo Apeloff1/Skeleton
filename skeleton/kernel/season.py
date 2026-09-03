@@ -28,6 +28,13 @@ def run(text: str = "plan tensor ttk", *, n: int = 0) -> Dict[str, Any]:
             break
         card = orch.dispatch(text)
         traces.append(int(card.get("n") or 0))
+        hold = get("hold")
+        if hold is not None and hasattr(hold, "check"):
+            from skeleton.kernel.bank import live
+            names = list(live().keys())
+            if not hold.check(names):
+                stopped = "drift"
+                break
     return {
         "kind": "kernel-season",
         "walks": len(traces),
@@ -35,5 +42,6 @@ def run(text: str = "plan tensor ttk", *, n: int = 0) -> Dict[str, Any]:
         "stages": traces,
         "stopped": stopped,
         "orch": orch.card(),
+        "hold": (get("hold").card() if get("hold") is not None else {}),
         "stored_prose": 0,
     }
