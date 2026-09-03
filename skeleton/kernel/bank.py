@@ -28,6 +28,9 @@ from skeleton.kernel.ops.gpu import GpuKernel
 from skeleton.kernel.ram.arena import Arena
 from skeleton.kernel.pipeline import Pipeline
 from skeleton.kernel.wrap import BreakerCard, BulkheadCard
+from skeleton.kernel.ops.embed import Embed
+from skeleton.kernel.ops.dma import Dma
+from skeleton.kernel.ops.catalog import Catalog
 
 _MAKERS = {
     "admission": lambda ov: Admission(window=16 if ov else 32),
@@ -56,6 +59,9 @@ _MAKERS = {
     "pipeline": lambda ov: Pipeline(mobile=bool(ov)),
     "breaker": lambda ov: BreakerCard(mobile=bool(ov)),
     "bulkhead": lambda ov: BulkheadCard(mobile=bool(ov)),
+    "embed": lambda ov: Embed(d=8 if ov else 16),
+    "dma": lambda ov: Dma(),
+    "catalog": lambda ov: Catalog(),
 }
 
 _LIVE: Dict[str, Any] = {}
@@ -80,7 +86,7 @@ def boot(profile: str = "", overlay: Dict[str, Any] | None = None) -> Dict[str, 
         chosen = [
             "throttle", "quota", "reclaim", "bloom", "isolate", "prefetch", "admission",
             "page", "prefix", "batch", "slo", "pack", "ops", "ram", "gpu",
-            "pipeline", "breaker", "bulkhead",
+            "pipeline", "breaker", "bulkhead", "embed", "dma", "catalog",
         ]
     _LIVE = {k: _MAKERS[k](tight) for k in chosen}
     _PROFILE = name

@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Obligatory + extra numeric kernels
+
+- Extra: softmax rope swiglu embed layernorm residual moe dma gather catalog
+- Obligatory stay: matmul attention rmsnorm kv qlinear sample fused gpu ram
+- Version 2026.09.03-kextra.
+
+---
+
 ## 2026-09-03 — Prefill/decode pipeline + mesh-in-RAM + breaker
 
 - Pipeline runs prefill then decode through fused ops.
