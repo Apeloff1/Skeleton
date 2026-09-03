@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Bound field ledger
+
+- chronicle/bound.jsonl. python -m skeleton bound.
+- Version 2026.09.03-bound.
+
+---
+
 ## 2026-09-03 — Rotate grows the follow bag from the bound topic
 
 - Version 2026.09.03-folrot.

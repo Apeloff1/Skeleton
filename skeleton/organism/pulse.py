@@ -63,6 +63,8 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
                     org.galaxy.mesh.publish(atom)
                     org.galaxy.editor.index_topic(atom)
                     acted["bound"] = row["topic"]
+                    from skeleton.organism.runloop import bind_row
+                    bind_row(row, root=getattr(org, "root", None))
                     from skeleton.organism.follow import grow
                     acted["follow"] = grow(row["topic"] + " " + row["url"], root=getattr(org, "root", None))
                 except Exception:

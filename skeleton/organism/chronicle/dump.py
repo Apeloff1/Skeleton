@@ -47,6 +47,7 @@ def _hot_targets(root: Optional[Path] = None) -> List[Path]:
         croot(root) / "rot.json",
         croot(root) / "gov.json",
         croot(root) / "rotate.json",
+        croot(root) / "bound.jsonl",
     ]
 
 

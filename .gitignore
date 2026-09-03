@@ -156,3 +156,4 @@ chronicle/ctx.json
 chronicle/runtime.json
 chronicle/observe.jsonl
 chronicle/rotate.json
+chronicle/bound.jsonl

@@ -117,6 +117,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("stacks", help="last card from every plane")
     sub.add_parser("mix", help="last F-6 depth mix")
     sub.add_parser("path", help="10x path card")
+    sub.add_parser("bound", help="bound SOTA field inventory")
     cdn = sub.add_parser("conductor", help="editor traffic control")
     cdn.add_argument("--run", action="store_true")
     cdn.add_argument("--commit", action="store_true")
@@ -396,6 +397,11 @@ def main(argv: list[str] | None = None) -> int:
         else:
             out = decide()
         print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "bound":
+        from skeleton.organism.runloop import bound_card
+        print(json.dumps(bound_card(), indent=2, default=str))
         return 0
 
     if args.cmd == "path":

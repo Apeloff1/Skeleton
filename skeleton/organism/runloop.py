@@ -43,6 +43,36 @@ def advance(root=None) -> int:
     return i
 
 
+def bound_path(root=None):
+    from pathlib import Path
+    base = Path(root) if root else Path(".")
+    return base / "chronicle" / "bound.jsonl"
+
+
+def bind_row(row: dict, *, root=None) -> dict:
+    import json
+    p = bound_path(root)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    rec = {"kind": "bound", "topic": row.get("topic"), "url": row.get("url"), "house": row.get("house"), "stored_prose": 0}
+    with p.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(rec) + "\n")
+    return rec
+
+
+def bound_card(root=None) -> dict:
+    import json
+    p = bound_path(root)
+    rows = []
+    if p.is_file():
+        for line in p.read_text(encoding="utf-8").splitlines()[-48:]:
+            try:
+                rows.append(json.loads(line))
+            except Exception:
+                continue
+    houses = sorted({str(r.get("house")) for r in rows if r.get("house")})
+    return {"kind": "bound", "n": len(rows), "houses": houses, "last": (rows[-1].get("topic") if rows else ""), "stored_prose": 0}
+
+
 def walk(org=None, *, neo=None, stimulus: str = "", n: int = 4,
          persist: Optional[bool] = None) -> Dict[str, Any]:
     from skeleton.organism.organismer import live_organismer
