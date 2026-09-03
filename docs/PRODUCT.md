@@ -32,6 +32,7 @@ python -m skeleton week --days 2
 python -m skeleton calendar
 python -m skeleton conductor
 python -m skeleton conductor --run
+python -m skeleton conductor --commit
 python -m skeleton walk -n 3
 python -m skeleton sleep --force
 python -m skeleton forget "old trace"

@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Conductor commit walks one horizon step
+
+- --commit runs step 0, queues the rest, interrupts on prose/pressure.
+- Version 2026.09.03-commit.
+
+---
+
 ## 2026-09-03 — Conductor horizon + hysteresis + helix
 
 - 3-step itinerary. doctor/tighten stick two ticks.

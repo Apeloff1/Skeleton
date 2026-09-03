@@ -108,6 +108,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("calendar", help="day + dump inventory + last gov")
     cdn = sub.add_parser("conductor", help="editor traffic control")
     cdn.add_argument("--run", action="store_true")
+    cdn.add_argument("--commit", action="store_true")
     dc = sub.add_parser("decade", help="seasons until cap")
     dc.add_argument("text", nargs="?", default="plan tensor ttk")
     dc.add_argument("--seasons", type=int, default=3)
@@ -375,9 +376,14 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "conductor":
-        from skeleton.organism.conductor import decide, run as cond_run
-        fn = cond_run if getattr(args, "run", False) else decide
-        print(json.dumps(fn(), indent=2, default=str))
+        from skeleton.organism.conductor import commit as cond_commit, decide, run as cond_run
+        if getattr(args, "commit", False):
+            out = cond_commit()
+        elif getattr(args, "run", False):
+            out = cond_run()
+        else:
+            out = decide()
+        print(json.dumps(out, indent=2, default=str))
         return 0
 
     if args.cmd == "calendar":

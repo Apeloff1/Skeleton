@@ -128,10 +128,7 @@ def _latch(code: str, why: str) -> Tuple[str, str, int]:
     return code, why, _HOLD
 
 
-def run(org=None, *, neo=None) -> Dict[str, Any]:
-    org = org or __import__("skeleton.organism.organismer", fromlist=["live_organismer"]).live_organismer()
-    plan = decide(org, neo=neo)
-    code = plan["code"]
+def _act(code: str, org, *, neo=None) -> Dict[str, Any]:
     acted: Dict[str, Any] = {}
     if code == "doctor":
         from skeleton.organism.doctor import doctor_card
@@ -154,13 +151,74 @@ def run(org=None, *, neo=None) -> Dict[str, Any]:
     else:
         from skeleton.organism.pulse import pulse
         acted = pulse(org, neo=neo, stimulus="")
+    return acted
+
+
+def run(org=None, *, neo=None) -> Dict[str, Any]:
+    org = org or __import__("skeleton.organism.organismer", fromlist=["live_organismer"]).live_organismer()
+    plan = decide(org, neo=neo)
+    acted = _act(plan["code"], org, neo=neo)
     return {
         "kind": "conductor-run",
-        "code": code,
+        "code": plan["code"],
         "why": plan.get("why"),
         "acted": {k: acted.get(k) for k in ("kind", "ok", "n", "head", "profile", "minted") if k in acted},
         "stored_prose": 0,
     }
+
+
+def commit(org=None, *, neo=None) -> Dict[str, Any]:
+    """Run horizon[0] only. Queue the rest. Interrupt on prose/pressure."""
+    org = org or __import__("skeleton.organism.organismer", fromlist=["live_organismer"]).live_organismer()
+    root = getattr(org, "root", None)
+    plan = decide(org, neo=neo)
+    rest = _load_rest(root)
+    interrupt = plan.get("why") in {"prose", "pressure"}
+    if interrupt or not rest:
+        code = plan["code"]
+        rest = list(plan.get("horizon") or [])[1:]
+        source = "law" if interrupt or not rest else "law"
+        if interrupt:
+            source = "interrupt"
+        else:
+            source = "fresh"
+    else:
+        code = rest[0]
+        rest = rest[1:]
+        source = "horizon"
+    acted = _act(code, org, neo=neo)
+    _save_rest(rest, root=root)
+    return {
+        "kind": "conductor-commit",
+        "code": code,
+        "why": plan.get("why"),
+        "source": source,
+        "rest": rest,
+        "acted": {k: acted.get(k) for k in ("kind", "ok", "n", "head", "profile", "minted") if k in acted},
+        "stored_prose": 0,
+    }
+
+
+def _rest_path(root: Optional[Path] = None) -> Path:
+    base = Path(root) if root else Path(".")
+    return base / "chronicle" / "horizon.json"
+
+
+def _load_rest(root: Optional[Path] = None) -> List[str]:
+    p = _rest_path(root)
+    if not p.is_file():
+        return []
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+        return [str(x) for x in (data.get("rest") or []) if x]
+    except Exception:
+        return []
+
+
+def _save_rest(rest: List[str], *, root: Optional[Path] = None) -> None:
+    p = _rest_path(root)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"kind": "horizon", "rest": rest, "stored_prose": 0}, indent=2), encoding="utf-8")
 
 
 def _save(card: Dict[str, Any], *, root: Optional[Path] = None) -> None:
