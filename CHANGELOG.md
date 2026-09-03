@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Conductor law leaves pulse when runtime reused
+
+- pulse + rt-hit → week. Version 2026.09.03-lawhit.
+
+---
+
 ## 2026-09-03 — Conductor commit skips pulse on runtime hash hit
 
 - Version 2026.09.03-cmhit.

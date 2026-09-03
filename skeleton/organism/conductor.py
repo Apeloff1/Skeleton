@@ -84,6 +84,11 @@ def decide(org=None, *, neo=None) -> Dict[str, Any]:
             code, why = str(nxt.get("code") or "pulse"), str(nxt.get("why") or "hint")
         except Exception:
             code, why = "pulse", "gap"
+    try:
+        if code == "pulse" and int(__import__("skeleton.organism.runtime", fromlist=["last"]).last(getattr(org, "root", None)).get("reused") or 0):
+            code, why = "week", "rt-hit"
+    except Exception:
+        pass
     code, why, latch = _latch(code, why)
     horizon: List[str] = [code, *FOLLOW.get(code, ("pulse", "day"))]
     out = {
