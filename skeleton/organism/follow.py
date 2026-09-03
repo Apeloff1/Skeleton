@@ -95,5 +95,6 @@ def card(root: Optional[Path] = None) -> Dict[str, Any]:
         "seen": data.get("seen"),
         "bag_n": len(data.get("bag") or {}),
         "top": top,
+        "mix": __import__("skeleton.organism.context_step", fromlist=["mix_card"]).mix_card(root),
         "stored_prose": 0,
     }
