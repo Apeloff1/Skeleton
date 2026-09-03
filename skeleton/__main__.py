@@ -101,6 +101,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("rot", help="scope rot stats")
     sub.add_parser("fieldcov", help="social field coverage")
     sub.add_parser("enact", help="run the head of the scope queue")
+    dy = sub.add_parser("day", help="seed compose enact under caps")
+    dy.add_argument("-n", type=int, default=0)
     dc = sub.add_parser("decade", help="seasons until cap")
     dc.add_argument("text", nargs="?", default="plan tensor ttk")
     dc.add_argument("--seasons", type=int, default=3)
@@ -365,6 +367,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "rot":
         from skeleton.organism.rotctx import card as rot_card
         print(json.dumps(rot_card(), indent=2, default=str))
+        return 0
+
+    if args.cmd == "day":
+        from skeleton.organism.day import run as day_run
+        print(json.dumps(day_run(n=getattr(args, "n", 0)), indent=2, default=str))
         return 0
 
     if args.cmd == "enact":

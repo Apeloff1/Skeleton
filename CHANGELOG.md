@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Day cycle
+
+- seed + compose + enact × ambition. Stops on rot or pressure.
+- chronicle/day.json. Version 2026.09.03-day.
+
+---
+
 ## 2026-09-03 — Scope enact binds sources and persists rot
 
 - enact handles dump, bind-source, dream, doctor, pulse.
