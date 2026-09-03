@@ -243,4 +243,8 @@ def card() -> Dict[str, Any]:
         d["kernels"] = kernels_card(caps=d)
     except Exception:
         pass
+    try:
+        d["mix"] = __import__("skeleton.organism.context_step", fromlist=["mix_card"]).mix_card()
+    except Exception:
+        pass
     return d
