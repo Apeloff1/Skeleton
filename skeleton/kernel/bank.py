@@ -24,6 +24,8 @@ from skeleton.kernel.slo import SLO
 from skeleton.kernel.pin import Pin
 from skeleton.kernel.pack import Pack
 from skeleton.kernel.ops.engine import Engine
+from skeleton.kernel.ops.gpu import GpuKernel
+from skeleton.kernel.ram.arena import Arena
 
 _MAKERS = {
     "admission": lambda ov: Admission(window=16 if ov else 32),
@@ -47,6 +49,8 @@ _MAKERS = {
     "pin": lambda ov: Pin(cap=4 if ov else 12),
     "pack": lambda ov: Pack(width=4 if ov else 8),
     "ops": lambda ov: Engine(d=8 if ov else 16),
+    "gpu": lambda ov: GpuKernel(d=8 if ov else 16),
+    "ram": lambda ov: Arena(mobile=bool(ov)),
 }
 
 _LIVE: Dict[str, Any] = {}
@@ -66,11 +70,11 @@ def boot(profile: str = "", overlay: Dict[str, Any] | None = None) -> Dict[str, 
     # profile kernels are old names; new ten always candidate
     chosen = list(_MAKERS.keys())
     if name == "tight":
-        chosen = ["throttle", "quota", "reclaim", "bloom", "page", "slo", "ops"]
+        chosen = ["throttle", "quota", "reclaim", "bloom", "page", "slo", "ops", "ram"]
     elif name == "mobile":
         chosen = [
             "throttle", "quota", "reclaim", "bloom", "isolate", "prefetch", "admission",
-            "page", "prefix", "batch", "slo", "pack", "ops",
+            "page", "prefix", "batch", "slo", "pack", "ops", "ram", "gpu",
         ]
     _LIVE = {k: _MAKERS[k](tight) for k in chosen}
     _PROFILE = name

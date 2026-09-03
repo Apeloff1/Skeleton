@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — GPU launch plan + RAM arena
+
+- GpuKernel: tile/smem/regs plan. Falls through to CPU fused. No PTX.
+- RAM: buddy + slab + clock + balloon. Tight inflates the balloon.
+- Version 2026.09.03-gpuram.
+
+---
+
 ## 2026-09-03 — Numeric ops matmul attention rmsnorm kv qlinear sample fused
 
 - CPU reference. Fusion writes O, not nine matrices.

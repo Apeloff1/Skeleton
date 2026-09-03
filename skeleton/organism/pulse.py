@@ -34,9 +34,20 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
             rec.run(org.galaxy.mesh)
         ops = get("ops")
         step = ops.step() if ops is not None and hasattr(ops, "step") else {}
+        gpu = get("gpu")
+        launch = gpu.launch() if gpu is not None and hasattr(gpu, "launch") else {}
+        ram = get("ram")
+        if ram is not None and hasattr(ram, "pressure"):
+            try:
+                from skeleton.organism.caps import live as live_caps
+                ram.pressure(float(live_caps().pressure))
+            except Exception:
+                pass
         bank = snapshot()
         if step:
             bank["ops_step"] = step
+        if launch:
+            bank["gpu_launch"] = launch
     except Exception:
         bank = {}
     nxt = hint(org, neo=neo)
