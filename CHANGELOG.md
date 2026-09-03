@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Storm gate (F-9)
+
+- Identical orch stimuli drop inside the TTL window.
+- Season passes once=False. Version 2026.09.03-storm.
+
+---
+
 ## 2026-09-03 — gov CLI + witness carries last governor
 
 - python -m skeleton gov

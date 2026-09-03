@@ -76,6 +76,7 @@ ROSTER: Dict[str, Tuple[str, ...]] = {
     "krouter": ("skeleton.kernel.krouter",),
     "hold": ("skeleton.kernel.hold",),
     "sfence": ("skeleton.kernel.fence",),
+    "storm": ("skeleton.kernel.storm",),
 }
 
 PROFILES: Dict[str, Tuple[str, ...]] = {

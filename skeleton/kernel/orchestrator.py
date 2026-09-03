@@ -14,7 +14,7 @@ class Orchestrator:
         self.last: Dict[str, Any] = {}
         self._decode_n = 1
 
-    def dispatch(self, text: str = "plan tensor ttk") -> Dict[str, Any]:
+    def dispatch(self, text: str = "plan tensor ttk", *, once: bool = True) -> Dict[str, Any]:
         from skeleton.kernel.bank import boot, get, live, snapshot
         from skeleton.kernel.krouter import plan
         from skeleton.kernel.governor import tick as gov_tick
@@ -22,6 +22,16 @@ class Orchestrator:
 
         boot()
         text = " ".join(feed_tokens(text))
+        storm = get("storm")
+        if once and storm is not None and hasattr(storm, "admit") and not storm.admit(text):
+            return {
+                "kind": "kernel-orch",
+                "runs": self.runs,
+                "dropped": 1,
+                "reason": "storm",
+                "n": 0,
+                "stored_prose": 0,
+            }
         gov = gov_tick()
         pressure = float(gov.get("pressure") or 0)
         profile = str(gov.get("profile") or snapshot().get("profile") or "mobile")

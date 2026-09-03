@@ -39,7 +39,7 @@ def _run(text: str = "plan tensor ttk", *, n: int = 0) -> Dict[str, Any]:
         if slo is not None and hasattr(slo, "trip") and slo.trip():
             stopped = "slo"
             break
-        card = orch.dispatch(text)
+        card = orch.dispatch(text, once=False)
         traces.append(int(card.get("n") or 0))
         hold = get("hold")
         if hold is not None and hasattr(hold, "check"):

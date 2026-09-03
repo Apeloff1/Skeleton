@@ -75,6 +75,7 @@ _MAKERS = {
     "extras": lambda ov: Extras(),
     "hold": lambda ov: __import__("skeleton.kernel.hold", fromlist=["Hold"]).Hold(),
     "sfence": lambda ov: __import__("skeleton.kernel.fence", fromlist=["Fence"]).Fence(),
+    "storm": lambda ov: __import__("skeleton.kernel.storm", fromlist=["Storm"]).Storm(ttl_s=4.0 if ov else 8.0),
 }
 
 _LIVE: Dict[str, Any] = {}
@@ -117,14 +118,14 @@ def boot(profile: str = "", overlay: Dict[str, Any] | None = None) -> Dict[str, 
     if name == "tight":
         chosen = [
             "throttle", "quota", "reclaim", "bloom", "page", "slo", "ops", "ram",
-            "pipeline", "breaker", "block", "orch", "hold", "sfence", "extras",
+            "pipeline", "breaker", "block", "orch", "hold", "sfence", "extras", "storm",
         ]
     elif name == "mobile":
         chosen = [
             "throttle", "quota", "reclaim", "bloom", "isolate", "prefetch", "admission",
             "page", "prefix", "batch", "slo", "pack", "ops", "ram", "gpu",
             "pipeline", "breaker", "bulkhead", "embed", "dma", "catalog",
-            "check", "stock", "block", "stock_live", "orch", "extras", "hold", "sfence",
+            "check", "stock", "block", "stock_live", "orch", "extras", "hold", "sfence", "storm",
         ]
     _LIVE = {k: _MAKERS[k](tight) for k in chosen}
     _PROFILE = name
