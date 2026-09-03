@@ -100,6 +100,8 @@ SOTA_POINTERS: Tuple[Dict[str, str], ...] = (
     {"topic": "hero-mobile-rag", "url": "https://arxiv.org/abs/2603.01661", "house": "arXiv"},
     {"topic": "persistentkv-page", "url": "https://arxiv.org/abs/2606.26666", "house": "arXiv"},
     {"topic": "paged-attention", "url": "https://arxiv.org/abs/2309.06180", "house": "arXiv"},
+    {"topic": "flashnorm", "url": "https://arxiv.org/abs/2407.09577", "house": "arXiv"},
+    {"topic": "fireq-int4-fp8", "url": "https://arxiv.org/abs/2505.20839", "house": "arXiv"},
 )
 
 

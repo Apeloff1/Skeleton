@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Numeric ops matmul attention rmsnorm kv qlinear sample fused
+
+- CPU reference. Fusion writes O, not nine matrices.
+- Engine d=8 mobile / 16 desktop. Pulse steps it.
+- Version 2026.09.03-ops.
+
+---
+
 ## 2026-09-03 — Serving kernels page..pack
 
 - page tile speculate prefix batch radix split slo pin pack

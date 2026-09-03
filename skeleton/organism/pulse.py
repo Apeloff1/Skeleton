@@ -32,7 +32,11 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
         rec = get("reclaim")
         if rec is not None and gov.get("profile") == "tight":
             rec.run(org.galaxy.mesh)
+        ops = get("ops")
+        step = ops.step() if ops is not None and hasattr(ops, "step") else {}
         bank = snapshot()
+        if step:
+            bank["ops_step"] = step
     except Exception:
         bank = {}
     nxt = hint(org, neo=neo)

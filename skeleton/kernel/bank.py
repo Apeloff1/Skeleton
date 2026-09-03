@@ -23,6 +23,7 @@ from skeleton.kernel.split import Split
 from skeleton.kernel.slo import SLO
 from skeleton.kernel.pin import Pin
 from skeleton.kernel.pack import Pack
+from skeleton.kernel.ops.engine import Engine
 
 _MAKERS = {
     "admission": lambda ov: Admission(window=16 if ov else 32),
@@ -45,6 +46,7 @@ _MAKERS = {
     "slo": lambda ov: SLO(miss_cap=2 if ov else 5),
     "pin": lambda ov: Pin(cap=4 if ov else 12),
     "pack": lambda ov: Pack(width=4 if ov else 8),
+    "ops": lambda ov: Engine(d=8 if ov else 16),
 }
 
 _LIVE: Dict[str, Any] = {}
@@ -64,11 +66,11 @@ def boot(profile: str = "", overlay: Dict[str, Any] | None = None) -> Dict[str, 
     # profile kernels are old names; new ten always candidate
     chosen = list(_MAKERS.keys())
     if name == "tight":
-        chosen = ["throttle", "quota", "reclaim", "bloom", "page", "slo"]
+        chosen = ["throttle", "quota", "reclaim", "bloom", "page", "slo", "ops"]
     elif name == "mobile":
         chosen = [
             "throttle", "quota", "reclaim", "bloom", "isolate", "prefetch", "admission",
-            "page", "prefix", "batch", "slo", "pack",
+            "page", "prefix", "batch", "slo", "pack", "ops",
         ]
     _LIVE = {k: _MAKERS[k](tight) for k in chosen}
     _PROFILE = name
