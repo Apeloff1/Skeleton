@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Season fence lease
+
+- One season walker at a time. Denied returns stopped=lease.
+- Version 2026.09.03-sfence.
+
+---
+
 ## 2026-09-03 — Hold gate on season drift
 
 - Hold latches live names. Drift stops the season.

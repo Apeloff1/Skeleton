@@ -74,6 +74,7 @@ _MAKERS = {
     "orch": lambda ov: __import__("skeleton.kernel.orchestrator", fromlist=["Orchestrator"]).Orchestrator(),
     "extras": lambda ov: Extras(),
     "hold": lambda ov: __import__("skeleton.kernel.hold", fromlist=["Hold"]).Hold(),
+    "sfence": lambda ov: __import__("skeleton.kernel.fence", fromlist=["Fence"]).Fence(),
 }
 
 _LIVE: Dict[str, Any] = {}
@@ -86,6 +87,8 @@ def boot(profile: str = "", overlay: Dict[str, Any] | None = None) -> Dict[str, 
 
     info = profiles_card()
     name = profile or str(info.get("profile") or "mobile")
+    if _LIVE and name == _PROFILE:
+        return {"kind": "kernel-bank", "profile": name, "n": len(_LIVE), "names": list(_LIVE), "stored_prose": 0, "reused": 1}
     ov = overlay if overlay is not None else (info.get("overlay") or {})
     tight = bool(ov) or name in {"mobile", "tight"}
     wanted = list(info.get("kernels") or [])
@@ -99,7 +102,7 @@ def boot(profile: str = "", overlay: Dict[str, Any] | None = None) -> Dict[str, 
             "throttle", "quota", "reclaim", "bloom", "isolate", "prefetch", "admission",
             "page", "prefix", "batch", "slo", "pack", "ops", "ram", "gpu",
             "pipeline", "breaker", "bulkhead", "embed", "dma", "catalog",
-            "check", "stock", "block", "stock_live", "orch", "extras", "hold",
+            "check", "stock", "block", "stock_live", "orch", "extras", "hold", "sfence",
         ]
     _LIVE = {k: _MAKERS[k](tight) for k in chosen}
     _PROFILE = name
