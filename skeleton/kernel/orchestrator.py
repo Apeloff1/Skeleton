@@ -66,6 +66,16 @@ class Orchestrator:
             })
         except Exception:
             pass
+        try:
+            from skeleton.kernel.persist import save
+            save(self.last)
+        except Exception:
+            pass
+        try:
+            from skeleton.organism.chronicle import itinerary
+            itinerary.append({"code": "orch", "why": profile, "n": self.last.get("n")}, root=None)
+        except Exception:
+            pass
         return self.last
 
     def _stage(self, stage: str, text: str, bank: Dict[str, Any]) -> Dict[str, Any]:

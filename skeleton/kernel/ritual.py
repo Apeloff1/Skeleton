@@ -32,5 +32,6 @@ def card() -> Dict[str, Any]:
         "block": blk,
         "stock_live": live_stock,
         "profiles": profiles_card(),
+        "scoreboard": __import__("skeleton.kernel.scoreboard", fromlist=["card"]).card(),
         "stored_prose": 0,
     }

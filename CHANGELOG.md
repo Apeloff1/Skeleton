@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Scoreboard + persist last orch walk
+
+- scoreboard cards every live kernel.
+- orch.json next to chronicle. Itinerary gets the walk.
+- Version 2026.09.03-board.
+
+---
+
 ## 2026-09-03 — SLO feedback + orch on health
 
 - Each stage records into the SLO kernel. Trip tightens the next plan.
