@@ -25,9 +25,12 @@ def ready_card(org=None, *, neo=None, walk: bool = False, n: int = 2, fix: bool 
     health = health_card(org, neo=neo)
     nxt = hint(org, neo=neo)
     walked = None
+    season = None
     if walk:
         from skeleton.organism.runloop import walk as do_walk
         walked = do_walk(org, neo=neo, n=n)
+        from skeleton.kernel.season import run as season_run
+        season = season_run("plan tensor ttk", n=n)
     return {
         "kind": "ready",
         "ok": health.get("ok"),
@@ -46,5 +49,6 @@ def ready_card(org=None, *, neo=None, walk: bool = False, n: int = 2, fix: bool 
         "follow": __import__("skeleton.organism.follow", fromlist=["card"]).card(getattr(org, "root", None)),
         "helix_agree": __import__("skeleton.organism.helix_consensus", fromlist=["agree"]).agree(getattr(org, "root", None)),
         "walk": walked,
+        "season": season,
         "stored_prose": health.get("stored_prose"),
     }

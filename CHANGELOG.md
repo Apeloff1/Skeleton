@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — ready --walk runs kernel season
+
+- Operator walk now dispatches the kernel season too.
+- Version 2026.09.03-readyk.
+
+---
+
 ## 2026-09-03 — Kernel season
 
 - N orch walks capped by profile walk_n. Stops on pressure or SLO trip.
