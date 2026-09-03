@@ -63,6 +63,7 @@ def health_card(org=None, *, neo=None) -> Dict[str, Any]:
         "ctx_n": __import__("skeleton.organism.context_step", fromlist=["last"]).last(getattr(org, "root", None)).get("n") or 0,
         "runtime_n": __import__("skeleton.organism.runtime", fromlist=["last"]).last(getattr(org, "root", None)).get("n") or 0,
         "observe": __import__("skeleton.organism.observe", fromlist=["card"]).card(getattr(org, "root", None)),
+        "stacks": __import__("skeleton.organism.stacks", fromlist=["card"]).card(getattr(org, "root", None)),
     }
 
 

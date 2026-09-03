@@ -37,6 +37,7 @@ def card(*, live: bool = False) -> Dict[str, Any]:
         "runtime": __import__("skeleton.organism.runtime", fromlist=["last"]).last(),
         "conductor": {},
         "observe": __import__("skeleton.organism.observe", fromlist=["card"]).card(),
+        "stacks": __import__("skeleton.organism.stacks", fromlist=["card"]).card(),
         "live": int(live),
         "stored_prose": 0,
     }

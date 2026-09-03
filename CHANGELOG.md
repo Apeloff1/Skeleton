@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Stacks on health, ready, product, ritual
+
+- Version 2026.09.03-stackstamp.
+
+---
+
 ## 2026-09-03 — Stacks card
 
 - One view of organism/kernel/galaxy/social/chronicle/memory/editor.
