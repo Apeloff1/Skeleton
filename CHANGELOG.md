@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Conductor pulse may rotate, not divert to week
+
+- Removed pulse→week on rt-hit. Version 2026.09.03-rotlaw.
+
+---
+
 ## 2026-09-03 — Pulse rotates to the next SOTA pointer on hash hit
 
 - Same cue walks the next field topic. G moves. Version 2026.09.03-rotate.
