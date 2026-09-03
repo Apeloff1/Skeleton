@@ -22,7 +22,8 @@ from typing import Any, Dict, List
 
 EDGES = {
     "admit": ["quota"],
-    "quota": ["place"],
+    "quota": ["kernel"],
+    "kernel": ["place"],
     "place": ["prefill"],
     "prefill": ["decode"],
     "decode": ["check"],
@@ -61,7 +62,10 @@ def dispatch(org=None, stimulus: str = "", *, neo=None) -> Dict[str, Any]:
         card = _stage(stage, org, stim, neo=neo, ctx=ctx)
         if stage == "prefill":
             ctx = card
-        trace.append({"stage": stage, "kind": card.get("kind"), "ok": card.get("ok", 1)})
+        item = {"stage": stage, "kind": card.get("kind"), "ok": card.get("ok", 1)}
+        if card.get("n") is not None:
+            item["n"] = card.get("n")
+        trace.append(item)
     out = {
         "kind": "runtime",
         "profile": profile,
@@ -69,6 +73,7 @@ def dispatch(org=None, stimulus: str = "", *, neo=None) -> Dict[str, Any]:
         "skip": sorted(skip),
         "trace": trace,
         "ctx_n": ctx.get("n") or 0,
+        "kernel_n": next((t.get("n") or t.get("ok") for t in trace if t.get("stage") == "kernel"), 0),
         "stored_prose": 0,
     }
     try:
@@ -90,6 +95,7 @@ def persist(card: Dict[str, Any], *, root=None):
         "n": card.get("n"),
         "skip": card.get("skip"),
         "ctx_n": card.get("ctx_n"),
+        "kernel_n": card.get("kernel_n"),
         "stored_prose": 0,
     }
     p.write_text(json.dumps(slim, indent=2), encoding="utf-8")
@@ -118,6 +124,27 @@ def _stage(name: str, org, stim: str, *, neo=None, ctx: Dict[str, Any]) -> Dict[
         from skeleton.organism.caps import card as caps_card
         cap = caps_card()
         return {"kind": "quota", "ok": 1, "pressure": cap.get("pressure"), "tier": cap.get("tier")}
+    if name == "kernel":
+        try:
+            from skeleton.kernel.bank import get, snapshot
+            from skeleton.kernel.orchestrator import Orchestrator
+            orch = get("orch") or Orchestrator()
+            walked = orch.dispatch(stim)
+            arena = get("ram")
+            mesh = {}
+            if arena is not None:
+                from skeleton.kernel.meshmem import place as mesh_place
+                mesh = mesh_place(org.galaxy.mesh, arena)
+            return {
+                "kind": "kernel-orch",
+                "ok": 1,
+                "n": walked.get("n") or 0,
+                "runs": walked.get("runs") or 0,
+                "meshmem": bool(mesh),
+                "bank_n": snapshot().get("n"),
+            }
+        except Exception:
+            return {"kind": "kernel-orch", "ok": 0}
     if name == "place":
         from skeleton.organism.scope import compose
         q = compose(org, neo=neo)

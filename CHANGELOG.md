@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Kernel orch is a runtime stage
+
+- admit→quota→kernel→place→prefill→decode→check→stock→reclaim
+- Pulse no longer dispatches orch on its own.
+- Version 2026.09.03-onegraph.
+
+---
+
 ## 2026-09-03 — Pulse walks the organism runtime spine
 
 - ctx/polish tail removed. pulse.runtime is the DAG card.

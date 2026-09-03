@@ -22,19 +22,6 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
         gov = gov_tick()
     except Exception:
         gov = {}
-    bank: Dict[str, Any] = {}
-    try:
-        from skeleton.kernel.orchestrator import Orchestrator
-        from skeleton.kernel.bank import get, snapshot
-        orch = get("orch") or Orchestrator()
-        bank = orch.dispatch(stimulus or "plan tensor ttk")
-        arena = get("ram")
-        if arena is not None:
-            from skeleton.kernel.meshmem import place
-            bank["meshmem"] = place(org.galaxy.mesh, arena)
-        bank["snapshot"] = snapshot()
-    except Exception:
-        bank = {}
     nxt = hint(org, neo=neo)
     code = str(nxt.get("code") or "pulse")
     acted: Dict[str, Any] = {"code": code}
@@ -71,6 +58,7 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
             "ctx_n": walked.get("ctx_n"),
             "profile": walked.get("profile"),
             "skip": walked.get("skip"),
+            "kernel_n": walked.get("kernel_n"),
         }
     except Exception:
         rt = {}
@@ -79,7 +67,6 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
         "next": nxt,
         "acted": acted,
         "gov": gov,
-        "bank": bank,
         "runtime": rt,
         "G": round(org.G, 6),
         "stored_prose": 0,
