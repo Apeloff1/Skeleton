@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Extras live on the bank
+
+- Named extra ops poke on the stock stage.
+- Coverage treats extras as covered. Health carries pct_obl.
+- Version 2026.09.03-extras.
+
+---
+
 ## 2026-09-03 — Coverage auditor + decade runner
 
 - coverage: catalog vs live vs hot.

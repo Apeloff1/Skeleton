@@ -53,6 +53,7 @@ def health_card(org=None, *, neo=None) -> Dict[str, Any]:
         "stored_prose": prose,
         "helix": __import__("skeleton.organism.helix", fromlist=["card"]).card(getattr(org, "root", None)),
         "orch": _orch_stamp(),
+        "coverage": __import__("skeleton.kernel.coverage", fromlist=["card"]).card().get("pct_obl"),
     }
 
 

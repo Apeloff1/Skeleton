@@ -133,6 +133,9 @@ class Orchestrator:
                 return chk.card()
             return {"kind": "check", "ok": 0}
         if stage == "stock":
+            ex = bank.get("extras")
+            if ex is not None and hasattr(ex, "poke"):
+                ex.poke()
             sl = bank.get("stock_live")
             if sl is not None and hasattr(sl, "tick"):
                 return sl.tick("orch")

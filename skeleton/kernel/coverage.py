@@ -18,8 +18,10 @@ def card() -> Dict[str, Any]:
     covered = set(live)
     if "ops" in live or "block" in live:
         covered.update(bundled)
+    if "extras" in live or "block" in live:
+        covered.update(set(extra))
     missing_obl = [k for k in obl if k not in covered]
-    missing_extra = [k for k in extra if k not in live]
+    missing_extra = [k for k in extra if k not in covered]
     return {
         "kind": "kernel-coverage",
         "live_n": len(live),

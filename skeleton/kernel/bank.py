@@ -35,6 +35,7 @@ from skeleton.kernel.ram.check import Check
 from skeleton.kernel.stock import Stock
 from skeleton.kernel.ops.block import Block
 from skeleton.kernel.stock_live import StockLive
+from skeleton.kernel.ops.extras import Extras
 
 _MAKERS = {
     "admission": lambda ov: Admission(window=16 if ov else 32),
@@ -71,6 +72,7 @@ _MAKERS = {
     "block": lambda ov: Block(d=8 if ov else 16),
     "stock_live": lambda ov: StockLive(mobile=bool(ov)),
     "orch": lambda ov: __import__("skeleton.kernel.orchestrator", fromlist=["Orchestrator"]).Orchestrator(),
+    "extras": lambda ov: Extras(),
 }
 
 _LIVE: Dict[str, Any] = {}
@@ -96,7 +98,7 @@ def boot(profile: str = "", overlay: Dict[str, Any] | None = None) -> Dict[str, 
             "throttle", "quota", "reclaim", "bloom", "isolate", "prefetch", "admission",
             "page", "prefix", "batch", "slo", "pack", "ops", "ram", "gpu",
             "pipeline", "breaker", "bulkhead", "embed", "dma", "catalog",
-            "check", "stock", "block", "stock_live", "orch",
+            "check", "stock", "block", "stock_live", "orch", "extras",
         ]
     _LIVE = {k: _MAKERS[k](tight) for k in chosen}
     _PROFILE = name
