@@ -105,6 +105,7 @@ def main(argv: list[str] | None = None) -> int:
     dy.add_argument("-n", type=int, default=0)
     wk = sub.add_parser("week", help="days then dump")
     wk.add_argument("--days", type=int, default=2)
+    sub.add_parser("calendar", help="day + dump inventory + last gov")
     dc = sub.add_parser("decade", help="seasons until cap")
     dc.add_argument("text", nargs="?", default="plan tensor ttk")
     dc.add_argument("--seasons", type=int, default=3)
@@ -369,6 +370,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "rot":
         from skeleton.organism.rotctx import card as rot_card
         print(json.dumps(rot_card(), indent=2, default=str))
+        return 0
+
+    if args.cmd == "calendar":
+        from skeleton.organism.calendar import card as cal_card
+        print(json.dumps(cal_card(), indent=2, default=str))
         return 0
 
     if args.cmd == "week":

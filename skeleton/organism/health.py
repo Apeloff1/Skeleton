@@ -59,6 +59,7 @@ def health_card(org=None, *, neo=None) -> Dict[str, Any]:
         "cage": __import__("skeleton.galaxy.quarantine", fromlist=["card"]).card(),
         "field_score": __import__("skeleton.social.coverage", fromlist=["coverage_card"]).coverage_card().get("score"),
         "rot": __import__("skeleton.organism.rotctx", fromlist=["card"]).card(),
+        "calendar": __import__("skeleton.organism.calendar", fromlist=["card"]).card(getattr(org, "root", None)),
     }
 
 

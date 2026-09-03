@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Calendar card
+
+- day.json + rot + gov + dump inventory. health carries calendar.
+- Version 2026.09.03-cal.
+
+---
+
 ## 2026-09-03 — Week cycle
 
 - Two days then decade dump. Version 2026.09.03-week.
