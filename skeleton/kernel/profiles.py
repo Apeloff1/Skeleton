@@ -74,10 +74,15 @@ ROSTER: Dict[str, Tuple[str, ...]] = {
     "stock_live": ("skeleton.kernel.stock_live",),
     "orch": ("skeleton.kernel.orchestrator",),
     "krouter": ("skeleton.kernel.krouter",),
+    "hold": ("skeleton.kernel.hold",),
+    "sfence": ("skeleton.kernel.fence",),
 }
 
 PROFILES: Dict[str, Tuple[str, ...]] = {
-    "tight": ("pressure", "life", "log", "throttle", "quota", "reclaim", "bloom", "page", "slo", "ops"),
+    "tight": (
+        "pressure", "life", "log", "throttle", "quota", "reclaim", "bloom",
+        "page", "slo", "ops", "orch", "hold", "sfence",
+    ),
     "mobile": (
         "schedule", "pressure", "life", "log", "time", "box",
         "throttle", "quota", "reclaim", "bloom", "isolate", "prefetch", "admission",

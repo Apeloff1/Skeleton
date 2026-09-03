@@ -103,7 +103,10 @@ def boot(profile: str = "", overlay: Dict[str, Any] | None = None) -> Dict[str, 
     # profile kernels are old names; new ten always candidate
     chosen = list(_MAKERS.keys())
     if name == "tight":
-        chosen = ["throttle", "quota", "reclaim", "bloom", "page", "slo", "ops", "ram", "pipeline", "breaker"]
+        chosen = [
+            "throttle", "quota", "reclaim", "bloom", "page", "slo", "ops", "ram",
+            "pipeline", "breaker", "block", "orch", "hold", "sfence", "extras",
+        ]
     elif name == "mobile":
         chosen = [
             "throttle", "quota", "reclaim", "bloom", "isolate", "prefetch", "admission",

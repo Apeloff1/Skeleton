@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Tight roster keeps control plane
+
+- tight includes orch, hold, sfence, block, extras.
+- Witness stays populated under pressure.
+- Version 2026.09.03-tightctl.
+
+---
+
 ## 2026-09-03 — Governor rebuilds bank on tighten/ease + witness
 
 - tighten/ease calls switch.to so the roster shrinks in the same tick.
