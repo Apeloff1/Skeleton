@@ -50,5 +50,6 @@ def ready_card(org=None, *, neo=None, walk: bool = False, n: int = 2, fix: bool 
         "helix_agree": __import__("skeleton.organism.helix_consensus", fromlist=["agree"]).agree(getattr(org, "root", None)),
         "walk": walked,
         "season": season,
+        "cage": __import__("skeleton.galaxy.quarantine", fromlist=["card"]).card(),
         "stored_prose": health.get("stored_prose"),
     }

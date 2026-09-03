@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Restore caged ids on live()
+
+- cage.json ids reload into the cage. ready_card carries cage.
+- Version 2026.09.03-cagerestore.
+
+---
+
 ## 2026-09-03 — Cage persist + doctor stamp
 
 - chronicle/cage.json stores ids only. doctor_card carries cage.

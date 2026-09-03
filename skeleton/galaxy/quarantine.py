@@ -43,6 +43,8 @@ _CAGE = Cage()
 
 
 def live() -> Cage:
+    if not _CAGE.held and not _CAGE.denied:
+        restore()
     return _CAGE
 
 
@@ -67,3 +69,31 @@ def persist(*, root: Optional[Path] = None) -> Path:
     }
     p.write_text(json.dumps(slim, indent=2), encoding="utf-8")
     return p
+
+
+def restore(*, root: Optional[Path] = None) -> int:
+    p = path(root)
+    if not p.is_file():
+        return 0
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return 0
+    n = 0
+    for aid in data.get("ids") or []:
+        key = str(aid)
+        if key and key not in _CAGE.held:
+            _CAGE.held[key] = Atom.mint(
+                kind="capture",
+                tier="T0_FLASH",
+                topic="caged",
+                dialect="hold",
+                brain="memory",
+                color="cyan",
+                confidence=0.1,
+            )
+            _CAGE.held[key].id = key
+            n += 1
+    _CAGE.denied = max(_CAGE.denied, int(data.get("denied") or n))
+    _CAGE.passed = max(_CAGE.passed, int(data.get("passed") or 0))
+    return n
