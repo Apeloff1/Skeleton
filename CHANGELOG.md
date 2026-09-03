@@ -4,6 +4,15 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Follow-state + local helix consensus + compact lattice
+
+- follow.py grows a 64-token operator bag. Pulse writes it.
+- helix_consensus.agree checks pair tips. Repair is report-only.
+- Lattice ASCII compact on mobile/tight.
+- Version 2026.09.03-follow.
+
+---
+
 ## 2026-09-03 — Kernel governor mid-run
 
 - tight latches at pressure 0.82. Two calm probes ≤0.55 release it.

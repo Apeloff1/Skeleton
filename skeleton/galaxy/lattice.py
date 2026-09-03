@@ -35,12 +35,25 @@ def card(mesh=None, *, neo=None) -> Dict[str, Any]:
         xf = getattr(neo, "transformer", None)
         bound = int(bool(xf) or bool(slots))
     ascii_rows.append(f"gap mouths={len(mouths)} bound={bound} via=jeeves color={GAP['color']}")
+    profile = ""
+    compact = False
+    try:
+        from skeleton.kernel.profiles import card as kernels_card
+        k = kernels_card()
+        profile = str(k.get("profile") or "")
+        compact = profile in {"mobile", "tight"}
+    except Exception:
+        pass
+    if compact:
+        ascii_rows = ascii_rows[:3] + [ascii_rows[-1]]
     return {
         "kind": "lattice",
         "hoag": galaxy_card(),
         "nodes": nodes,
         "mouths": len(mouths),
         "bound": bound,
+        "profile": profile,
+        "compact": int(compact),
         "ascii": "\n".join(ascii_rows),
         "stored_prose": 0,
     }

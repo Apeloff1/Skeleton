@@ -19,7 +19,7 @@ from skeleton.social.sota import sota_card
 from skeleton.social.sources import SOTA_POINTERS
 
 
-VERSION = "2026.09.03-kgov"
+VERSION = "2026.09.03-follow"
 
 
 ENDPOINTS = (
@@ -55,6 +55,8 @@ ENDPOINTS = (
     "GET /cortex/scope",
     "POST /cortex/enact",
     "GET /cortex/kernels",
+    "GET /cortex/follow",
+    "GET /cortex/agree",
 )
 
 

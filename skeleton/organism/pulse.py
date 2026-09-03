@@ -44,6 +44,11 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
         stim = rotate_stimulus(int(org.steps or 0), stimulus)
         acted["step"] = org.step(stim, neo=neo)
         acted["stimulus"] = stim.split()[0]
+        try:
+            from skeleton.organism.follow import grow
+            acted["follow"] = grow(stim, root=getattr(org, "root", None))
+        except Exception:
+            pass
     return {
         "kind": "pulse",
         "next": nxt,

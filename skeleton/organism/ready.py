@@ -43,6 +43,8 @@ def ready_card(org=None, *, neo=None, walk: bool = False, n: int = 2, fix: bool 
         "chronicle": __import__("skeleton.organism.chronicle", fromlist=["card"]).card(org, cue="memory graph"),
         "scope": __import__("skeleton.organism.scope", fromlist=["card"]).card(org, neo=neo),
         "kernels": __import__("skeleton.kernel.profiles", fromlist=["card"]).card(),
+        "follow": __import__("skeleton.organism.follow", fromlist=["card"]).card(getattr(org, "root", None)),
+        "helix_agree": __import__("skeleton.organism.helix_consensus", fromlist=["agree"]).agree(getattr(org, "root", None)),
         "walk": walked,
         "stored_prose": health.get("stored_prose"),
     }

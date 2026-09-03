@@ -272,6 +272,16 @@ class CommandDeck:
         apply_overlay(neo=self.neo)
         return kernels_card()
 
+    def follow(self) -> Dict[str, Any]:
+        from skeleton.organism.follow import card as follow_card
+        from skeleton.organism.organismer import live_organismer
+        return follow_card(getattr(live_organismer(), "root", None))
+
+    def agree(self) -> Dict[str, Any]:
+        from skeleton.organism.helix_consensus import agree
+        from skeleton.organism.organismer import live_organismer
+        return agree(getattr(live_organismer(), "root", None))
+
     def caps(self) -> Dict[str, Any]:
         from skeleton.organism.caps import card
         return card()

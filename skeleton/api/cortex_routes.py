@@ -296,6 +296,16 @@ async def cortex_kernels_get(state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).kernels()
 
 
+@router.get("/cortex/follow")
+async def cortex_follow_get(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).follow()
+
+
+@router.get("/cortex/agree")
+async def cortex_agree_get(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).agree()
+
+
 @router.post("/cortex/dump")
 async def cortex_dump_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).dump(force=bool(request.get("force")))

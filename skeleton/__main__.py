@@ -86,6 +86,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("caps", help="hardware-aware multi-cap table")
     sub.add_parser("kernels", help="multi-kernel profile (mobile/tight/desktop)")
     sub.add_parser("kgov", help="tick the mid-run kernel governor")
+    sub.add_parser("follow", help="operator token bag the organism grows")
+    sub.add_parser("agree", help="local dual-helix consensus")
     sub.add_parser("lattice", help="Hoag lattice + gated KV handles")
     sub.add_parser("health", help="operator health card")
     dc = sub.add_parser("doctor", help="laws + health + caps + field")
@@ -315,6 +317,16 @@ def main(argv: list[str] | None = None) -> int:
         from skeleton.cortex.deck import live_deck
         out = live_deck().banks()
         print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "follow":
+        from skeleton.cortex.deck import live_deck
+        print(json.dumps(live_deck().follow(), indent=2, default=str))
+        return 0
+
+    if args.cmd == "agree":
+        from skeleton.cortex.deck import live_deck
+        print(json.dumps(live_deck().agree(), indent=2, default=str))
         return 0
 
     if args.cmd == "kgov":

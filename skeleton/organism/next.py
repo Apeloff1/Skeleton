@@ -53,6 +53,12 @@ def hint(org, *, neo=None) -> Dict[str, Any]:
         code, why = "hold", "at-target"
     else:
         code, why = "pulse", "gap"
+    follow_bias = 0.0
+    try:
+        from skeleton.organism.follow import bias as follow_bias_fn
+        follow_bias = follow_bias_fn(str(getattr(org, "last_stim", "") or ""))
+    except Exception:
+        follow_bias = 0.0
     return {
         "kind": "next",
         "code": code,
@@ -64,5 +70,6 @@ def hint(org, *, neo=None) -> Dict[str, Any]:
         "budget": budget["op"],
         "rot": loop.get("rot"),
         "forest_n": loop.get("forest_n"),
+        "follow": follow_bias,
         "stored_prose": 0,
     }
