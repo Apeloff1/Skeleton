@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — rot guard sees mix
+
+- Version 2026.09.03-mixrot.
+
+---
+
 ## 2026-09-03 — hot rank sees mix
 
 - Version 2026.09.03-mixhot.

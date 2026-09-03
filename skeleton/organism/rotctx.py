@@ -28,6 +28,10 @@ def card() -> Dict[str, Any]:
     st = _GUARD.stats()
     st["kind"] = "scope-rot-stats"
     st["stored_prose"] = 0
+    try:
+        st["mix"] = __import__("skeleton.organism.context_step", fromlist=["mix_card"]).mix_card()
+    except Exception:
+        pass
     return st
 
 
