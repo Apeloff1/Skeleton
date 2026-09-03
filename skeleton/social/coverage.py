@@ -44,5 +44,6 @@ def coverage_card(stimulus: str = "") -> Dict[str, Any]:
         "wiki_bound": wiki_hit,
         "score": round(score, 4),
         "mode": mode,
+        "mix": __import__("skeleton.organism.context_step", fromlist=["mix_card"]).mix_card(),
         "stored_prose": 0,
     }
