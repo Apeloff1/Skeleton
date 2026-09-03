@@ -73,6 +73,7 @@ def dispatch(org=None, stimulus: str = "", *, neo=None) -> Dict[str, Any]:
         "skip": sorted(skip),
         "trace": trace,
         "ctx_n": ctx.get("n") or 0,
+        "mix": ctx.get("mix") or 0,
         "kernel_n": next((t.get("n") or t.get("ok") for t in trace if t.get("stage") == "kernel"), 0),
         "stored_prose": 0,
     }

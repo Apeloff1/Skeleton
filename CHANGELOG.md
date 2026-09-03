@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Mix T4/T5/T3 indexed by the editor
+
+- Editor index_topic on principle, index, zettel mix atoms.
+- observe records mix. Version 2026.09.03-mixidx.
+
+---
+
 ## 2026-09-03 — Mix depths follow the hardware profile
 
 - desktop T0–T5, mobile T0/T2/T4, tight T0+T4.

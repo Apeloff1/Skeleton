@@ -30,6 +30,11 @@ def run(org, stimulus: str = "", *, sleep: bool = False, neo=None) -> Dict[str, 
         mixed = org.galaxy.codec.mix(stim, profile=profile)
         for atom in mixed:
             org.galaxy.mesh.publish(atom)
+            if atom.kind in {"principle", "index", "zettel"}:
+                try:
+                    org.galaxy.editor.index_topic(atom)
+                except Exception:
+                    pass
             ids.append(atom.id)
             mix_n += 1
     except Exception:
