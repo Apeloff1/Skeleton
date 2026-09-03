@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Editor conductor
+
+- 5th brain picks one verb from prose, pressure, cage, rot, coverage, calendar.
+- conductor --run executes it. Version 2026.09.03-conductor.
+
+---
+
 ## 2026-09-03 — Calendar card
 
 - day.json + rot + gov + dump inventory. health carries calendar.

@@ -30,6 +30,8 @@ python -m skeleton enact
 python -m skeleton day -n 2
 python -m skeleton week --days 2
 python -m skeleton calendar
+python -m skeleton conductor
+python -m skeleton conductor --run
 python -m skeleton walk -n 3
 python -m skeleton sleep --force
 python -m skeleton forget "old trace"
