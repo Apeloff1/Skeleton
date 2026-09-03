@@ -53,7 +53,14 @@ def bind_row(row: dict, *, root=None) -> dict:
     import json
     p = bound_path(root)
     p.parent.mkdir(parents=True, exist_ok=True)
-    rec = {"kind": "bound", "topic": row.get("topic"), "url": row.get("url"), "house": row.get("house"), "stored_prose": 0}
+    topic = str(row.get("topic") or "")
+    if topic and p.is_file():
+        try:
+            if topic in p.read_text(encoding="utf-8"):
+                return {"kind": "bound", "topic": topic, "dup": 1, "stored_prose": 0}
+        except Exception:
+            pass
+    rec = {"kind": "bound", "topic": topic, "url": row.get("url"), "house": row.get("house"), "stored_prose": 0}
     with p.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(rec) + "\n")
     return rec

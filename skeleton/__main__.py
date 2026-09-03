@@ -118,6 +118,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("mix", help="last F-6 depth mix")
     sub.add_parser("path", help="10x path card")
     sub.add_parser("bound", help="bound SOTA field inventory")
+    fw = sub.add_parser("fieldwalk", help="bind next unbound SOTA pointers")
+    fw.add_argument("-n", type=int, default=0)
     cdn = sub.add_parser("conductor", help="editor traffic control")
     cdn.add_argument("--run", action="store_true")
     cdn.add_argument("--commit", action="store_true")
@@ -397,6 +399,12 @@ def main(argv: list[str] | None = None) -> int:
         else:
             out = decide()
         print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "fieldwalk":
+        from skeleton.organism.fieldwalk import walk as field_walk
+        from skeleton.organism.organismer import live_organismer
+        print(json.dumps(field_walk(live_organismer(), n=int(getattr(args, "n", 0) or 0)), indent=2, default=str))
         return 0
 
     if args.cmd == "bound":

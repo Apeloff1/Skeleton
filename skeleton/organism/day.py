@@ -17,6 +17,12 @@ def run(org=None, *, n: int = 0, neo=None) -> Dict[str, Any]:
 
     org = org or live_organismer()
     seed = seed_field(org.galaxy)
+    field: Dict[str, Any] = {}
+    try:
+        from skeleton.organism.fieldwalk import walk as field_walk
+        field = field_walk(org, root=getattr(org, "root", None))
+    except Exception:
+        field = {}
     composed = compose(org, neo=neo)
     ambition = int(n or composed.get("ambition") or 2)
     ambition = max(1, min(4, ambition))
@@ -48,6 +54,7 @@ def run(org=None, *, n: int = 0, neo=None) -> Dict[str, Any]:
         "stopped": stopped,
         "coverage": composed.get("coverage"),
         "rot": (composed.get("rot") or {}).get("verdict"),
+        "field": {"ok": field.get("ok"), "topics": field.get("topics"), "pct": (field.get("inventory") or {}).get("field_pct")},
         "stored_prose": 0,
     }
     try:
@@ -63,5 +70,5 @@ def _persist(card: Dict[str, Any], *, root=None) -> None:
     base = Path(root) if root else Path(".")
     p = base / "chronicle" / "day.json"
     p.parent.mkdir(parents=True, exist_ok=True)
-    slim = {k: card.get(k) for k in ("kind", "heads", "n", "asked", "stopped", "coverage", "rot", "stored_prose")}
+    slim = {k: card.get(k) for k in ("kind", "heads", "n", "asked", "stopped", "coverage", "rot", "field", "stored_prose")}
     p.write_text(json.dumps(slim, indent=2), encoding="utf-8")

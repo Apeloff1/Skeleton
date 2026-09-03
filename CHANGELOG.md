@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Field walker
+
+- Profile cap tight=1 mobile=2 desktop=4. Day and pulse claim unbound pointers.
+- Measured: walk 2 → 4.26%, day +2 → 12.77%.
+- Version 2026.09.03-fieldwalk.
+
+---
+
 ## 2026-09-03 — Bound card reports unique field percent
 
 - unique topics / SOTA_POINTERS. Version 2026.09.03-fieldpct.

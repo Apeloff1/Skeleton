@@ -44,6 +44,8 @@ python -m skeleton doctor
 python -m skeleton satellites
 python -m skeleton path
 python -m skeleton bound
+python -m skeleton fieldwalk -n 2
+python -m skeleton day -n 1
 python -m skeleton dump --hot
 python -m skeleton walk -n 3
 python -m skeleton sleep --force

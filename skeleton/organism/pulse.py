@@ -47,28 +47,17 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
             from skeleton.organism.runtime import last as rt_last
             h = hashlib.sha256(stim.encode("utf-8")).hexdigest()[:16]
             if rt_last(getattr(org, "root", None)).get("hash") == h:
-                from skeleton.organism.runloop import advance
-                i = advance(getattr(org, "root", None))
-                stim = rotate_stimulus(i, "")
-                acted["rotated"] = 1
-                acted["cursor"] = i
-                try:
-                    from skeleton.social.sources import SOTA_POINTERS
-                    row = SOTA_POINTERS[i % len(SOTA_POINTERS)]
-                    atom = org.galaxy.codec.encode(
-                        row["topic"], kind="citation", brain="editor",
-                        citation=row["url"], url=row["url"], depth_hint=5,
-                        tags=("social", row.get("house") or "web"),
-                    )
-                    org.galaxy.mesh.publish(atom)
-                    org.galaxy.editor.index_topic(atom)
-                    acted["bound"] = row["topic"]
-                    from skeleton.organism.runloop import bind_row
-                    bind_row(row, root=getattr(org, "root", None))
-                    from skeleton.organism.follow import grow
-                    acted["follow"] = grow(row["topic"] + " " + row["url"], root=getattr(org, "root", None))
-                except Exception:
-                    pass
+                from skeleton.organism.fieldwalk import unbound, claim
+                nxt = (unbound(getattr(org, "root", None)) or [None])[0]
+                if nxt:
+                    claimed = claim(org, nxt, root=getattr(org, "root", None))
+                    stim = f"{nxt['topic']} {nxt['url']}"
+                    acted["rotated"] = 1
+                    acted["bound"] = claimed.get("topic")
+                    acted["cursor"] = claimed
+                else:
+                    stim = rotate_stimulus(int(org.steps or 0) + 1, "")
+                    acted["rotated"] = 1
         except Exception:
             pass
         acted["stimulus"] = stim.split()[0] if stim else ""
