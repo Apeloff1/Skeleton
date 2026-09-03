@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Mix is idempotent on the same stimulus
+
+- Second ctx on the same hash reuses last mix. No extra atoms.
+- Version 2026.09.03-mixidemp. Stamp cascade stops here.
+
+---
+
 ## 2026-09-03 — rot guard sees mix
 
 - Version 2026.09.03-mixrot.

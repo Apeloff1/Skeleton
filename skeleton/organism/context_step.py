@@ -6,6 +6,7 @@ URL pointers ingest as citations, bodies stay off-shelf.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -21,27 +22,36 @@ def run(org, stimulus: str = "", *, sleep: bool = False, neo=None) -> Dict[str, 
     ids: List[str] = list(gxy.get("atom_ids") or [])
     mix_n = 0
     dens: Dict[str, Any] = {}
+    reused = 0
+    stim_hash = hashlib.sha256(stim.encode("utf-8")).hexdigest()[:16]
     try:
-        profile = "mobile"
-        try:
-            from skeleton.kernel.profiles import card as profiles_card
-            profile = str(profiles_card().get("profile") or "mobile")
-        except Exception:
+        prev = last(getattr(org, "root", None))
+        if prev.get("hash") == stim_hash and int(prev.get("mix") or 0) > 0:
+            mix_n = int(prev.get("mix") or 0)
+            dens = {"mean_depth": prev.get("density") or 0}
+            reused = 1
+        else:
             profile = "mobile"
-        mixed = org.galaxy.codec.mix(stim, profile=profile)
-        for atom in mixed:
-            org.galaxy.mesh.publish(atom)
-            if atom.kind in {"principle", "index", "zettel"}:
-                try:
-                    org.galaxy.editor.index_topic(atom)
-                except Exception:
-                    pass
-            ids.append(atom.id)
-            mix_n += 1
-        dens = org.galaxy.codec.density(mixed)
+            try:
+                from skeleton.kernel.profiles import card as profiles_card
+                profile = str(profiles_card().get("profile") or "mobile")
+            except Exception:
+                profile = "mobile"
+            mixed = org.galaxy.codec.mix(stim, profile=profile)
+            for atom in mixed:
+                org.galaxy.mesh.publish(atom)
+                if atom.kind in {"principle", "index", "zettel"}:
+                    try:
+                        org.galaxy.editor.index_topic(atom)
+                    except Exception:
+                        pass
+                ids.append(atom.id)
+                mix_n += 1
+            dens = org.galaxy.codec.density(mixed)
     except Exception:
         mix_n = 0
         dens = {}
+        reused = 0
     if not gxy.get("principle"):
         try:
             atom = org.galaxy.distiller.glean(stim)
@@ -93,6 +103,8 @@ def run(org, stimulus: str = "", *, sleep: bool = False, neo=None) -> Dict[str, 
         "decoded": bool(gxy.get("decoded")),
         "mix": mix_n,
         "density": dens.get("mean_depth") if dens else 0,
+        "reused": reused,
+        "hash": stim_hash,
         "longform": longform.get("atoms") or 0,
         "structure": longform.get("structure") or {},
         "social_n": social.get("bound") or len(social.get("cards") or []),
@@ -125,6 +137,8 @@ def persist(card: Dict[str, Any], *, root: Optional[Path] = None) -> Path:
         "recall": card.get("recall"),
         "mix": card.get("mix") or 0,
         "density": card.get("density") or 0,
+        "hash": card.get("hash"),
+        "reused": card.get("reused") or 0,
         "stored_prose": 0,
     }
     p.write_text(json.dumps(slim, indent=2), encoding="utf-8")
