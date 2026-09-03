@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Kernel orchestrator + router
+
+- krouter picks stages from profile and pressure.
+- Orchestrator walks admit quota place prefill decode check stock reclaim.
+- Pulse dispatches through orch. Version 2026.09.03-orch.
+
+---
+
 ## 2026-09-03 — Kernel ritual card
 
 - One card: catalog + bank + block + stock.

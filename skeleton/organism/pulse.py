@@ -24,44 +24,15 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
         gov = {}
     bank: Dict[str, Any] = {}
     try:
-        from skeleton.kernel.bank import boot, get, snapshot
-        boot()
-        thr = get("throttle")
-        if thr is not None:
-            thr.allow()
-        rec = get("reclaim")
-        if rec is not None and gov.get("profile") == "tight":
-            rec.run(org.galaxy.mesh)
-        ops = get("ops")
-        step = ops.step() if ops is not None and hasattr(ops, "step") else {}
-        gpu = get("gpu")
-        launch = gpu.launch() if gpu is not None and hasattr(gpu, "launch") else {}
-        ram = get("ram")
-        if ram is not None and hasattr(ram, "pressure"):
-            try:
-                from skeleton.organism.caps import live as live_caps
-                ram.pressure(float(live_caps().pressure))
-            except Exception:
-                pass
-        bank = snapshot()
-        if step:
-            bank["ops_step"] = step
-        if launch:
-            bank["gpu_launch"] = launch
-        pipe = get("pipeline")
-        if pipe is not None and hasattr(pipe, "run"):
-            from skeleton.kernel.bank import live as bank_live
-            bank["pipeline"] = pipe.run("plan tensor ttk", bank=bank_live())
+        from skeleton.kernel.orchestrator import Orchestrator
+        from skeleton.kernel.bank import get, snapshot
+        orch = get("orch") or Orchestrator()
+        bank = orch.dispatch(stimulus or "plan tensor ttk")
         arena = get("ram")
         if arena is not None:
             from skeleton.kernel.meshmem import place
             bank["meshmem"] = place(org.galaxy.mesh, arena)
-        blk = get("block")
-        if blk is not None and hasattr(blk, "forward"):
-            bank["block"] = blk.forward(["plan", "tensor"])
-        live_stock = get("stock_live")
-        if live_stock is not None and hasattr(live_stock, "tick"):
-            bank["stock_live"] = live_stock.tick("pulse")
+        bank["snapshot"] = snapshot()
     except Exception:
         bank = {}
     nxt = hint(org, neo=neo)

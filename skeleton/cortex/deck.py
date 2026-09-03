@@ -281,6 +281,10 @@ class CommandDeck:
         from skeleton.kernel.ritual import card as ritual_card
         return ritual_card()
 
+    def orch(self, text: str = "plan tensor ttk") -> Dict[str, Any]:
+        from skeleton.kernel.orchestrator import Orchestrator
+        return Orchestrator().dispatch(text)
+
     def follow(self) -> Dict[str, Any]:
         from skeleton.organism.follow import card as follow_card
         from skeleton.organism.organismer import live_organismer
