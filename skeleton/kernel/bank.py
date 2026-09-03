@@ -94,6 +94,18 @@ def boot(profile: str = "", overlay: Dict[str, Any] | None = None) -> Dict[str, 
 
     info = profiles_card()
     name = profile or str(info.get("profile") or "mobile")
+    restored = 0
+    if not profile:
+        try:
+            from skeleton.kernel.persist import load_gov
+            from skeleton.kernel.profiles import force
+            prev = load_gov()
+            if prev.get("action") == "tighten" and prev.get("profile") == "tight":
+                force("tight")
+                name = "tight"
+                restored = 1
+        except Exception:
+            restored = 0
     if _LIVE and name == _PROFILE:
         return {"kind": "kernel-bank", "profile": name, "n": len(_LIVE), "names": list(_LIVE), "stored_prose": 0, "reused": 1}
     ov = overlay if overlay is not None else (info.get("overlay") or {})
@@ -116,7 +128,14 @@ def boot(profile: str = "", overlay: Dict[str, Any] | None = None) -> Dict[str, 
         ]
     _LIVE = {k: _MAKERS[k](tight) for k in chosen}
     _PROFILE = name
-    return {"kind": "kernel-bank", "profile": name, "n": len(_LIVE), "names": list(_LIVE), "stored_prose": 0}
+    return {
+        "kind": "kernel-bank",
+        "profile": name,
+        "n": len(_LIVE),
+        "names": list(_LIVE),
+        "restored": restored,
+        "stored_prose": 0,
+    }
 
 
 def live() -> Dict[str, Any]:

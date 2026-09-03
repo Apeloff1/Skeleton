@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Restore tight profile from gov.json on boot
+
+- Empty-profile boot reads last tighten and force(tight).
+- Version 2026.09.03-govrestore.
+
+---
+
 ## 2026-09-03 — Persist last governor action
 
 - chronicle/gov.json. health carries gov + witness.
