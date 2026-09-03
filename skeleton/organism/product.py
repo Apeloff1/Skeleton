@@ -55,10 +55,29 @@ ENDPOINTS = (
 )
 
 
+def _quality_snapshot() -> Dict[str, Any]:
+    from skeleton.intelligence.plan_verifier import PlanVerifier
+    from skeleton.intelligence.pipeline_verifier import PipelineVerifier
+    from skeleton.organism.quality_state import summarize_quality
+
+    plan = PlanVerifier().verify({"era": "soulslike", "room_bias": "pressure labyrinth", "primary_dps": 144.0}, vision="like Elden Ring").quality.to_dict()
+    pipe = PipelineVerifier().verify_game_logic(
+        {
+            "title": "Arena Ops",
+            "combat": {"base_values": {"health": 100, "attack": 10}, "damage_formula": "atk * 2"},
+            "economy": {"currency": "credits", "starting_balance": 50},
+            "progression": {"curve": "quadratic", "max_level": 20},
+        },
+        description="arena credits quadratic combat",
+    ).quality.to_dict()
+    return {"plan": plan, "pipeline": pipe, "rollup": summarize_quality([plan, pipe])}
+
+
 def product_card() -> Dict[str, Any]:
     org = live_organismer()
     snap = org.snapshot()
     laws = laws_card(org.galaxy.mesh)
+    quality = _quality_snapshot()
     return {
         "kind": "product",
         "name": "Jeeves Cortex Organism",
@@ -86,5 +105,6 @@ def product_card() -> Dict[str, Any]:
         "field": [dict(p) for p in SOTA_POINTERS],
         "sota": sota_card("", G=org.G),
         "laws": laws,
+        "quality": quality,
         "stored_prose": laws["stored_prose"],
     }

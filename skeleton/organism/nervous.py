@@ -1,8 +1,4 @@
-"""Nervous system card — SLO budgets + intelligence roster.
-
-Does not run the full orchestrator. Names the five reasoners and
-records prose/pressure/helix against house SLOs.
-"""
+"""Nervous system card — SLO budgets + intelligence roster."""
 from __future__ import annotations
 
 from typing import Any, Dict
@@ -17,11 +13,16 @@ def nervous_card(org=None, *, neo=None) -> Dict[str, Any]:
     from skeleton.organism.helix import verify as helix_verify
     from skeleton.organism.laws import scan_prose
     from skeleton.organism.organismer import live_organismer
+    from skeleton.organism.product import _quality_snapshot
+    from skeleton.organism.quality_state import quality_pressure
 
     org = org or live_organismer()
     caps = caps_card()
     prose = scan_prose(org.galaxy.mesh)
     pressure = float(caps.get("pressure") or 0)
+    q = _quality_snapshot()
+    q_rollup = q["rollup"]
+    q_pressure = quality_pressure(q_rollup)
     try:
         helix_ok = int(helix_verify(getattr(org, "root", None)).get("ok") or 0)
     except Exception:
@@ -30,11 +31,13 @@ def nervous_card(org=None, *, neo=None) -> Dict[str, Any]:
     tracker.register(ServiceLevelObjective("prose", 1.0))
     tracker.register(ServiceLevelObjective("pressure", 0.90))
     tracker.register(ServiceLevelObjective("helix", 1.0))
+    tracker.register(ServiceLevelObjective("quality", 0.80))
     tracker.record("prose", bad=prose > 0)
     tracker.record("pressure", bad=pressure >= 0.90)
     tracker.record("helix", bad=helix_ok != 1)
+    tracker.record("quality", bad=q_pressure > 0.20)
     slos = {}
-    for name in ("prose", "pressure", "helix"):
+    for name in ("prose", "pressure", "helix", "quality"):
         slos[name] = {
             "remaining": round(tracker.remaining(name), 4),
             "burn": round(tracker.burn_rate(name), 4),
@@ -47,9 +50,11 @@ def nervous_card(org=None, *, neo=None) -> Dict[str, Any]:
         teachers = []
     return {
         "kind": "nervous",
-        "ok": int(prose == 0 and pressure < 0.90 and helix_ok == 1),
+        "ok": int(prose == 0 and pressure < 0.90 and helix_ok == 1 and q_pressure <= 0.20),
         "slos": slos,
         "intelligence": list(INTELLIGENCE),
         "teachers": teachers,
+        "quality": q,
+        "quality_pressure": q_pressure,
         "stored_prose": prose,
     }

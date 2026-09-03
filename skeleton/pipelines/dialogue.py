@@ -5,14 +5,6 @@ Text-to-NPC generates the persona; this module generates what the persona
 and fallback edges. Trees are data (JSON-serialisable), so the pipeline can
 store them, the runtime can walk them, and the validator can prove them
 safe before either happens.
-
-Invariants
-----------
-1. Every node is reachable from the entry node (no orphan dialogue).
-2. Every node has at least one outgoing edge (no dead air) — explicit
-   ``terminal=True`` opts out.
-3. Condition expressions are pure functions over a fact bag; they never
-   touch I/O or the outside world.
 """
 
 from __future__ import annotations
@@ -35,11 +27,10 @@ Condition = Callable[[FactBag], bool]
 
 @dataclass
 class DialogueEdge:
-    """One player-facing option leading to the next node."""
     text: str
     target: str
-    condition: Optional[Condition] = None     # gate: shown only if true
-    effects: Dict[str, Any] = field(default_factory=dict)  # applied on choice
+    condition: Optional[Condition] = None
+    effects: Dict[str, Any] = field(default_factory=dict)
 
     def available(self, facts: FactBag) -> bool:
         return self.condition is None or self.condition(facts)
@@ -52,18 +43,18 @@ class DialogueNode:
     line: str
     edges: List[DialogueEdge] = field(default_factory=list)
     terminal: bool = False
-    on_enter: Dict[str, Any] = field(default_factory=dict)  # effects on entry
+    on_enter: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class DialogueTree:
-    """A complete, validated conversation."""
     tree_id: str
     entry: str
     nodes: Dict[str, DialogueNode]
+    quality: Dict[str, Any] = field(default_factory=dict)
+    quality_stats: Dict[str, Any] = field(default_factory=dict)
 
     def validate(self) -> List[str]:
-        """Return a list of structural problems; empty means valid."""
         problems: List[str] = []
         if self.entry not in self.nodes:
             problems.append(f"entry node {self.entry!r} missing")
@@ -73,7 +64,6 @@ class DialogueTree:
             for edge in node.edges:
                 if edge.target not in self.nodes:
                     problems.append(f"node {nid!r} edge targets missing node {edge.target!r}")
-        # reachability
         seen, stack = set(), [self.entry]
         while stack:
             current = stack.pop()
@@ -103,12 +93,12 @@ class DialogueTree:
                 }
                 for nid, n in self.nodes.items()
             },
+            "quality": dict(self.quality),
+            "quality_stats": dict(self.quality_stats),
         }
 
 
 class DialogueWalker:
-    """Runtime traversal: tracks position + fact bag, applies effects."""
-
     def __init__(self, tree: DialogueTree, *, bus: Optional[EventBus] = None) -> None:
         problems = tree.validate()
         if problems:
@@ -126,11 +116,9 @@ class DialogueWalker:
         self.facts.update(effects)
 
     def options(self) -> List[DialogueEdge]:
-        """Currently visible choices, in authored order."""
         return [e for e in self.node.edges if e.available(self.facts)]
 
     def choose(self, index: int) -> DialogueNode:
-        """Take the index-th visible option; returns the new node."""
         visible = self.options()
         if not 0 <= index < len(visible):
             raise DialogueError(
@@ -158,3 +146,13 @@ class DialogueWalker:
     @property
     def finished(self) -> bool:
         return self.node.terminal
+
+
+def quality_check(tree: DialogueTree, *, description: str = "") -> DialogueTree:
+    from skeleton.intelligence.dialogue_verifier import DialogueVerifier
+
+    verifier = DialogueVerifier()
+    report = verifier.verify(tree.to_dict(), description=description)
+    tree.quality = report.to_dict()
+    tree.quality_stats = verifier.stats()
+    return tree

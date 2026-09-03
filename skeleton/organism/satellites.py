@@ -52,17 +52,11 @@ def retrieve_card(cue: str = "", *, org=None) -> Dict[str, Any]:
     if org is not None:
         wiki_topics = list((org.galaxy.mesh.wiki.topics or {}).keys())[:24]
         root = getattr(org, "root", None)
-    wiki = [ScoredResult(item_id=t, score=1.0 / (i + 1), source="wiki")
-            for i, t in enumerate(wiki_topics)]
-    field = [ScoredResult(item_id=p["topic"], score=1.0 / (i + 1), source="field")
-             for i, p in enumerate(SOTA_POINTERS[:24])]
+    wiki = [ScoredResult(item_id=t, score=1.0 / (i + 1), source="wiki") for i, t in enumerate(wiki_topics)]
+    field = [ScoredResult(item_id=p["topic"], score=1.0 / (i + 1), source="field") for i, p in enumerate(SOTA_POINTERS[:24])]
     helix_hits = recall(cue or "memory", root=root).get("hits") or []
-    helix = [ScoredResult(item_id=str(h.get("sha") or h.get("topic") or i)[:16],
-                          score=float(h.get("score") or 0), source="helix")
-             for i, h in enumerate(helix_hits)]
-    fused = Fuser(FusionStrategy.RRF, top_k=8).fuse({
-        "wiki": wiki, "field": field, "helix": helix,
-    })
+    helix = [ScoredResult(item_id=str(h.get("sha") or h.get("topic") or i)[:16], score=float(h.get("score") or 0), source="helix") for i, h in enumerate(helix_hits)]
+    fused = Fuser(FusionStrategy.RRF, top_k=8).fuse({"wiki": wiki, "field": field, "helix": helix})
     return {
         "kind": "retrieve",
         "cue": (cue or "")[:80],
@@ -74,10 +68,14 @@ def retrieve_card(cue: str = "", *, org=None) -> Dict[str, Any]:
 
 
 def satellites_card(org=None, *, cue: str = "") -> Dict[str, Any]:
+    from skeleton.organism.product import _quality_snapshot
+
+    quality = _quality_snapshot()
     return {
         "kind": "satellites",
         "jeeves": jeeves_card(),
         "vault": vault_card(),
         "retrieve": retrieve_card(cue, org=org),
+        "quality": quality,
         "stored_prose": 0,
     }

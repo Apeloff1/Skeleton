@@ -15,6 +15,8 @@ def doctor_card(org=None, *, neo=None, fix: bool = False) -> Dict[str, Any]:
     from skeleton.organism.laws import clip_fat, laws_card, persist_clip
     from skeleton.organism.next import hint
     from skeleton.organism.organismer import live_organismer
+    from skeleton.organism.product import _quality_snapshot
+    from skeleton.organism.quality_state import quality_pressure
     from skeleton.social.field import field_card
 
     org = org or live_organismer()
@@ -28,6 +30,8 @@ def doctor_card(org=None, *, neo=None, fix: bool = False) -> Dict[str, Any]:
     nxt = hint(org, neo=neo)
     laws = laws_card(org.galaxy.mesh)
     prose = int(laws.get("stored_prose") or 0)
+    quality = _quality_snapshot()
+    q_pressure = quality_pressure(quality["rollup"])
     helix = {}
     try:
         from skeleton.organism.helix import verify as helix_verify
@@ -39,15 +43,17 @@ def doctor_card(org=None, *, neo=None, fix: bool = False) -> Dict[str, Any]:
         from skeleton.intelligence.verification import VerificationLoop, VerificationVerdict
         def _v(claim, ctx):
             p = int((ctx or {}).get("prose") or 0)
-            return VerificationVerdict(confidence=1.0 if p == 0 else 0.2,
-                                      issues=() if p == 0 else ("stored_prose",))
+            qp = float((ctx or {}).get("quality_pressure") or 0)
+            ok = p == 0 and qp <= 0.20
+            return VerificationVerdict(confidence=1.0 if ok else 0.2,
+                                      issues=() if ok else ("quality",))
         _, verified_tr = VerificationLoop(max_rounds=2, min_rounds=1).run(
-            "stored_prose=0", _v, context={"prose": prose})
+            "stored_prose=0 and quality healthy", _v, context={"prose": prose, "quality_pressure": q_pressure})
         verified = verified_tr.to_dict()
     except Exception:
         verified = {}
     helix_ok = int(helix.get("ok", 1))
-    ok = int(bool(health.get("ok")) and prose == 0 and field["n"] >= 16 and helix_ok)
+    ok = int(bool(health.get("ok")) and prose == 0 and field["n"] >= 16 and helix_ok and q_pressure <= 0.20)
     return {
         "kind": "doctor",
         "ok": ok,
@@ -63,6 +69,8 @@ def doctor_card(org=None, *, neo=None, fix: bool = False) -> Dict[str, Any]:
         "version": _version(),
         "laws": laws["names"],
         "laws_ok": laws["ok"],
+        "quality": quality,
+        "quality_pressure": q_pressure,
         "fix": clipped,
         "helix_ok": helix_ok,
         "helix_sense_n": (helix.get("sense") or {}).get("n"),

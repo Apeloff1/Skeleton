@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from skeleton.kernel.errors import GenerationError, ValidationError
-from skeleton.kernel.events import EventBus
+from skeleton.kernel.events import DomainEvent, EventBus
 from skeleton.kernel.ids import PipelineRunId
 
 GeneratorFn = Callable[[str, dict[str, Any]], dict[str, Any]]
@@ -35,7 +35,7 @@ class BehaviourState:
     name: str
     enter_action: str
     exit_action: str
-    transitions: tuple[tuple[str, str], ...] = ()  # (trigger, target_state)
+    transitions: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass
@@ -49,6 +49,8 @@ class NpcSpec:
     dialogue_tree: list[DialogueNode]
     behaviour_graph: list[BehaviourState]
     generated_at: float = field(default_factory=time.time)
+    quality: dict[str, Any] = field(default_factory=dict)
+    quality_stats: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -63,6 +65,8 @@ class NpcSpec:
                 for s in self.behaviour_graph
             ],
             "generated_at": self.generated_at,
+            "quality": dict(self.quality),
+            "quality_stats": dict(self.quality_stats),
         }
 
 
@@ -83,7 +87,6 @@ def _seeded(description: str) -> int:
 
 
 def _default_generator(description: str, params: dict[str, Any]) -> dict[str, Any]:
-    """Deterministic local synthesis — no external calls, stable per description."""
     seed = _seeded(description)
     archetype = params.get("archetype") or _ARCHETYPES[seed % len(_ARCHETYPES)]
     n_traits = 2 + seed % 3
@@ -98,17 +101,11 @@ def _default_generator(description: str, params: dict[str, Any]) -> dict[str, An
 
 
 def _build_dialogue(persona: dict[str, Any], beats: int) -> list[DialogueNode]:
-    nodes: list[DialogueNode] = [
-        DialogueNode("root",
-                     f"A {persona['traits'][0]} greeting in a {persona['speech_register']} register.")
-    ]
+    nodes: list[DialogueNode] = [DialogueNode("root", f"A {persona['traits'][0]} greeting in a {persona['speech_register']} register.")]
     for i in range(1, beats + 1):
         prev = nodes[-1]
         nodes[-1] = DialogueNode(prev.node_id, prev.speaker_line, prev.choices + (f"beat_{i}",))
-        nodes.append(DialogueNode(
-            f"beat_{i}",
-            f"Beat {i}: {persona['archetype']} response driven by {persona['motivation'][:40]}",
-        ))
+        nodes.append(DialogueNode(f"beat_{i}", f"Beat {i}: {persona['archetype']} response driven by {persona['motivation'][:40]}"))
     last = nodes[-1]
     nodes[-1] = DialogueNode(last.node_id, last.speaker_line, last.choices + ("farewell",))
     nodes.append(DialogueNode("farewell", "A closing line consistent with the persona quirk."))
@@ -117,12 +114,9 @@ def _build_dialogue(persona: dict[str, Any], beats: int) -> list[DialogueNode]:
 
 def _build_behaviour(archetype: str) -> list[BehaviourState]:
     return [
-        BehaviourState("idle", "play_idle_anim", "stop_idle_anim",
-                       (("player_near", "greet"), ("threat", "alert"))),
-        BehaviourState("greet", f"play_{archetype}_greet", "reset_greet",
-                       (("dialogue_end", "idle"), ("threat", "alert"))),
-        BehaviourState("alert", "raise_weapon", "lower_weapon",
-                       (("threat_gone", "idle"),)),
+        BehaviourState("idle", "play_idle_anim", "stop_idle_anim", (("player_near", "greet"), ("threat", "alert"))),
+        BehaviourState("greet", f"play_{archetype}_greet", "reset_greet", (("dialogue_end", "idle"), ("threat", "alert"))),
+        BehaviourState("alert", "raise_weapon", "lower_weapon", (("threat_gone", "idle"),)),
     ]
 
 
@@ -135,6 +129,8 @@ class NpcPipeline:
 
     def run(self, description: str, *, name: str | None = None,
             dialogue_beats: int = 3, params: dict[str, Any] | None = None) -> NpcSpec:
+        from skeleton.intelligence.npc_verifier import NpcVerifier
+
         if not description or not description.strip():
             raise ValidationError("NPC description must be non-empty")
         if not 1 <= dialogue_beats <= 12:
@@ -158,9 +154,27 @@ class NpcPipeline:
             )
         except (ValidationError, GenerationError):
             raise
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise GenerationError("NPC generation failed", cause=exc,
                                   context={"run_id": run_id}) from exc
+
+        verifier = NpcVerifier()
+        quality = verifier.verify(spec.to_dict(), description=description)
+        spec.quality = quality.to_dict()
+        spec.quality_stats = verifier.stats()
+        self._bus.publish(DomainEvent(
+            topic="pipeline.npc.quality",
+            payload={
+                "run_id": run_id,
+                "name": spec.name,
+                "accepted": quality.accepted,
+                "reason": quality.reason,
+                "score": quality.score,
+                "weakest_path": quality.weakest_path,
+            },
+            correlation_id=start.correlation_id,
+            causation_id=start.event_id,
+        ))
         self._bus.emit("pipeline.npc.completed",
                        {"run_id": run_id, "name": spec.name, "archetype": spec.archetype},
                        correlation_id=start.correlation_id, causation_id=start.event_id)
