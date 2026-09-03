@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Bound card reports unique field percent
+
+- unique topics / SOTA_POINTERS. Version 2026.09.03-fieldpct.
+
+---
+
 ## 2026-09-03 — 10x path card shows bound field inventory
 
 - Version 2026.09.03-pathb.

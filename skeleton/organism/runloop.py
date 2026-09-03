@@ -70,7 +70,19 @@ def bound_card(root=None) -> dict:
             except Exception:
                 continue
     houses = sorted({str(r.get("house")) for r in rows if r.get("house")})
-    return {"kind": "bound", "n": len(rows), "houses": houses, "last": (rows[-1].get("topic") if rows else ""), "stored_prose": 0}
+    topics = sorted({str(r.get("topic")) for r in rows if r.get("topic")})
+    from skeleton.social.sources import SOTA_POINTERS
+    field_n = max(1, len(SOTA_POINTERS))
+    return {
+        "kind": "bound",
+        "n": len(rows),
+        "unique": len(topics),
+        "houses": houses,
+        "last": (rows[-1].get("topic") if rows else ""),
+        "field_pct": round(100.0 * len(topics) / field_n, 2),
+        "field_n": field_n,
+        "stored_prose": 0,
+    }
 
 
 def walk(org=None, *, neo=None, stimulus: str = "", n: int = 4,
