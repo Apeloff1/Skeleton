@@ -60,7 +60,25 @@ def bind_row(row: dict, *, root=None) -> dict:
                 return {"kind": "bound", "topic": topic, "dup": 1, "stored_prose": 0}
         except Exception:
             pass
-    rec = {"kind": "bound", "topic": topic, "url": row.get("url"), "house": row.get("house"), "stored_prose": 0}
+    cdx = str(row.get("cdx") or "")
+    xarchive = str(row.get("xarchive") or "")
+    if not cdx and row.get("url"):
+        try:
+            from skeleton.social.archivex import pointer, wayback_cdx_url
+            ptr = pointer(str(row.get("url")))
+            cdx = str(ptr.get("cdx") or wayback_cdx_url(str(row.get("url"))))
+            xarchive = xarchive or str(ptr.get("xarchive") or "")
+        except Exception:
+            cdx = ""
+    rec = {
+        "kind": "bound",
+        "topic": topic,
+        "url": row.get("url"),
+        "house": row.get("house"),
+        "cdx": cdx,
+        "xarchive": xarchive,
+        "stored_prose": 0,
+    }
     with p.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(rec) + "\n")
     return rec
@@ -88,6 +106,7 @@ def bound_card(root=None) -> dict:
         "last": (rows[-1].get("topic") if rows else ""),
         "field_pct": round(100.0 * len(topics) / field_n, 2),
         "field_n": field_n,
+        "cdx_n": sum(1 for r in rows if r.get("cdx")),
         "stored_prose": 0,
     }
 

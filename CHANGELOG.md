@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Bound ledger stores CDX handles; X lab pointers
+
+- bind_row writes cdx + xarchive. observe records field_pct/cdx_n.
+- Six X house pointers. Walk n=4 houses Xarchive/IA/X/GitHub, cdx_n=4.
+- Version 2026.09.03-cdxled.
+
+---
+
 ## 2026-09-03 — House-round-robin field walk + CDX handles
 
 - Walk order: Xarchive → IA → X → GitHub → arXiv.

@@ -56,6 +56,14 @@ def record(org, walked: Dict[str, Any], *, root: Optional[Path] = None) -> Dict[
     except Exception:
         row["cursor"] = 0
     try:
+        from skeleton.organism.runloop import bound_card
+        inv = bound_card(root if root is not None else getattr(org, "root", None))
+        row["field_pct"] = inv.get("field_pct") or 0
+        row["field_unique"] = inv.get("unique") or 0
+        row["cdx_n"] = inv.get("cdx_n") or 0
+    except Exception:
+        row["field_pct"] = 0
+    try:
         from skeleton.organism.follow import card as follow_card
         row["follow"] = follow_card(getattr(org, "root", None)).get("n") or 0
     except Exception:
@@ -115,6 +123,8 @@ def card(root: Optional[Path] = None) -> Dict[str, Any]:
         "atoms": (rows[-1].get("atoms") if rows else 0) or 0,
         "coverage": (rows[-1].get("coverage") if rows else 0) or 0,
         "field": (rows[-1].get("field") if rows else 0) or 0,
+        "field_pct": (rows[-1].get("field_pct") if rows else 0) or 0,
+        "cdx_n": (rows[-1].get("cdx_n") if rows else 0) or 0,
         "follow": (rows[-1].get("follow") if rows else 0) or 0,
         "hot": (rows[-1].get("hot") if rows else "") or "",
         "helix_ok": (rows[-1].get("helix_ok") if rows else 1) or 0,

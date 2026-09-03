@@ -19,7 +19,7 @@ from skeleton.social.sota import sota_card
 from skeleton.social.sources import SOTA_POINTERS
 
 
-VERSION = "2026.09.03-houserr"
+VERSION = "2026.09.03-cdxled"
 
 
 ENDPOINTS = (
