@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Mapping, Tuple
 
 from skeleton.forge.gdscript_check import check_files
+from skeleton.intelligence.quality import QualityIssue, QualityReport, QualitySignal
 from skeleton.intelligence.verifier import CodeVerifier
 
 _UNSAFE = re.compile(r"\b(eval|exec)\s*\(|except\s*:|os\.system|subprocess\.", re.M)
@@ -47,6 +48,7 @@ class ForgeVerificationReport:
     thresholds: Dict[str, float]
     summary: Dict[str, int]
     file_reports: Tuple[ForgeFileReport, ...]
+    quality: QualityReport
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -59,6 +61,7 @@ class ForgeVerificationReport:
             "thresholds": {k: round(v, 4) for k, v in self.thresholds.items()},
             "summary": dict(self.summary),
             "file_reports": [r.to_dict() for r in self.file_reports],
+            "quality": self.quality.to_dict(),
         }
 
 
@@ -103,6 +106,15 @@ class ForgeVerifier:
         if accepted:
             self.accepted += 1
         reason = self._reason(project_issues, reports, avg)
+        quality = self._quality_report(
+            accepted=accepted,
+            reason=reason,
+            score=avg,
+            weakest_path=weakest,
+            project_issues=project_issues,
+            reports=reports,
+            summary=summary,
+        )
         return ForgeVerificationReport(
             accepted=accepted,
             score=avg,
@@ -113,6 +125,7 @@ class ForgeVerifier:
             thresholds={"project_accept_at": self.accept_at, "gdscript_accept_at": self.gd_accept_at},
             summary=summary,
             file_reports=reports,
+            quality=quality,
         )
 
     def stats(self) -> Dict[str, Any]:
@@ -130,6 +143,41 @@ class ForgeVerifier:
         if any(r.score < self.gd_accept_at for r in reports) or avg < self.accept_at:
             return "low_score"
         return "accepted"
+
+    def _quality_report(
+        self,
+        *,
+        accepted: bool,
+        reason: str,
+        score: float,
+        weakest_path: str,
+        project_issues: Tuple[str, ...],
+        reports: Tuple[ForgeFileReport, ...],
+        summary: Dict[str, int],
+    ) -> QualityReport:
+        issues = []
+        for issue in project_issues:
+            issues.append(QualityIssue(path="project.godot", message=issue, severity="hard"))
+        for report in reports:
+            for issue in report.hard_issues:
+                issues.append(QualityIssue(path=report.path, message=issue, severity="hard"))
+            for issue in report.soft_issues:
+                issues.append(QualityIssue(path=report.path, message=issue, severity="soft"))
+        signals = tuple(
+            QualitySignal(path=r.path, score=r.score, subscores=dict(r.subscores or {}))
+            for r in reports
+        )
+        return QualityReport(
+            accepted=accepted,
+            reason=reason,
+            score=score,
+            weakest_path=weakest_path,
+            thresholds={"project_accept_at": self.accept_at, "gdscript_accept_at": self.gd_accept_at},
+            summary=summary,
+            issues=tuple(issues),
+            signals=signals,
+            metadata={"kind": "forge", "files_checked": len(reports)},
+        )
 
     def _verify_gdscript(self, path: str, text: str, *, request: str = "") -> ForgeFileReport:
         base = self.code.verify(text, request=request or path)

@@ -14,6 +14,7 @@ from .cascade import CascadeRouter, ModelResponse, RouteDecision, difficulty_est
 from .uncertainty import Candidate, GateDecision, GateVerdict, UncertaintyGate
 from .verification import VerificationLoop, VerificationTrace, VerificationVerdict
 from .verifier import CodeVerifier, RubricScore, VerifierReport
+from .quality import QualityIssue, QualityReport, QualitySignal
 from .forge_verifier import ForgeVerifier, ForgeVerificationReport, ForgeFileReport
 from .improve_loop import ImproveLoop, ImproveResult, Iteration
 from .routed_gate import RoutedAnswer, RoutedGate
@@ -31,6 +32,7 @@ __all__ = [
     'Candidate', 'GateDecision', 'GateVerdict', 'UncertaintyGate',
     'VerificationLoop', 'VerificationTrace', 'VerificationVerdict',
     'CodeVerifier', 'RubricScore', 'VerifierReport',
+    'QualityIssue', 'QualityReport', 'QualitySignal',
     'ForgeVerifier', 'ForgeVerificationReport', 'ForgeFileReport',
     'ImproveLoop', 'ImproveResult', 'Iteration',
     'RoutedAnswer', 'RoutedGate',

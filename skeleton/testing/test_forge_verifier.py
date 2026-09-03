@@ -30,6 +30,8 @@ def test_forge_verifier_accepts_emitted_project():
     assert report.accepted
     assert report.score >= 0.7
     assert report.reason == "accepted"
+    assert report.quality.accepted is True
+    assert report.quality.metadata["kind"] == "forge"
     assert not report.project_issues
     assert report.file_reports
     assert report.summary["files_checked"] == len(report.file_reports)
@@ -45,6 +47,7 @@ def test_forge_verifier_rejects_missing_required_file():
     report = ForgeVerifier().verify(files)
     assert not report.accepted
     assert report.reason == "project_closure"
+    assert report.quality.reason == "project_closure"
     assert any("missing project.godot" in issue for issue in report.project_issues)
 
 
@@ -69,6 +72,7 @@ def test_forge_verifier_rejects_bad_gdscript():
     assert not report.accepted
     assert any(r.path.endswith("heat_system.gd") and r.score < 0.7 for r in report.file_reports)
     assert any("unsafe" in issue or "unbalanced" in issue for issue in report.blocking_issues)
+    assert any(i.path.endswith("heat_system.gd") and i.severity == "hard" for i in report.quality.issues)
 
 
 def test_gdscript_verifier_accepts_func_without_python_def():
@@ -103,7 +107,6 @@ def test_gdscript_verifier_flags_world_map_role_gap():
 
 def test_verifier_stats_track_runs_and_acceptance():
     verifier = ForgeVerifier()
-    verifier._reason((), tuple(), 1.0)
     verifier.verify({
         "project.godot": 'config_version=5\nrun/main_scene="res://scenes/levels/run_level.tscn"\n',
         "scenes/levels/run_level.tscn": '[gd_scene load_steps=1 format=3]\n[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="3"]\n[ext_resource type="PackedScene" path="res://scenes/door.tscn" id="7"]\n[node name="RunLevel" type="Node2D"]\n[node name="Room_r00" type="Node2D" parent="."]\n[node name="Player" parent="." instance=ExtResource("3")]\n[node name="Door" parent="." instance=ExtResource("7")]\n',
@@ -132,6 +135,7 @@ def test_materialise_attaches_verification_on_godot_output():
     assert out["verification"]["accepted"] is True
     assert out["verification"]["score"] >= 0.7
     assert out["verification"]["reason"] == "accepted"
+    assert out["verification"]["quality"]["metadata"]["kind"] == "forge"
     assert out["verification_stats"]["runs"] == 1
 
 
