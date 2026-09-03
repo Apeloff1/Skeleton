@@ -4,6 +4,15 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — House-round-robin field walk + CDX handles
+
+- Walk order: Xarchive → IA → X → GitHub → arXiv.
+- Each claim stores wayback CDX + xarchive query URLs. No body fetch.
+- sota_card reports field_pct / unique / houses.
+- Version 2026.09.03-houserr.
+
+---
+
 ## 2026-09-03 — Conductor day when field_pct < 25
 
 - Coverage and week carry field_pct. Version 2026.09.03-fieldlaw.

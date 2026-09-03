@@ -26,12 +26,18 @@ HOUSE_CLAIMS = (
 )
 
 
-def sota_card(stimulus: str = "", *, G: float = 1.0) -> Dict[str, Any]:
+def sota_card(stimulus: str = "", *, G: float = 1.0, root=None) -> Dict[str, Any]:
     social = ingest(stimulus)
     seeds = seed_sota()
     sources = catalog()
     toward = min(100.0, max(0.0, (float(G) - 1.0) / 9.0 * 100.0))
     cov = coverage_card(stimulus)
+    inventory: Dict[str, Any] = {}
+    try:
+        from skeleton.organism.runloop import bound_card
+        inventory = bound_card(root)
+    except Exception:
+        inventory = {}
     return {
         "kind": "social-sota",
         "house_claims": list(HOUSE_CLAIMS),
@@ -41,6 +47,9 @@ def sota_card(stimulus: str = "", *, G: float = 1.0) -> Dict[str, Any]:
         "G": round(float(G), 6),
         "toward_10x_pct": round(toward, 2),
         "coverage_score": cov["score"],
+        "field_pct": inventory.get("field_pct") or 0,
+        "field_unique": inventory.get("unique") or 0,
+        "field_houses": inventory.get("houses") or [],
         "coverage": {
             "arxiv_seeded": sum(1 for s in seeds if s["house"] == "arXiv"),
             "archive_seeded": sum(1 for s in seeds if s["house"] in {"Xarchive", "Internet Archive"}),

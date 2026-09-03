@@ -44,6 +44,26 @@ def unbound(root=None) -> List[Dict[str, str]]:
     return [dict(r) for r in SOTA_POINTERS if r.get("topic") not in have]
 
 
+HOUSE_ORDER = ("Xarchive", "Internet Archive", "X", "GitHub", "arXiv")
+
+
+def take(root=None, k: int = 2) -> List[Dict[str, str]]:
+    """House-round-robin so arXiv cannot starve archive/github."""
+    from collections import defaultdict, deque
+    buckets: Dict[str, Any] = defaultdict(deque)
+    for row in unbound(root):
+        buckets[str(row.get("house") or "web")].append(row)
+    order = [h for h in HOUSE_ORDER if h in buckets] + [h for h in buckets if h not in HOUSE_ORDER]
+    out: List[Dict[str, str]] = []
+    while len(out) < k and any(buckets[h] for h in order):
+        for h in order:
+            if len(out) >= k:
+                break
+            if buckets[h]:
+                out.append(buckets[h].popleft())
+    return out
+
+
 def claim(org, row: Dict[str, str], *, root=None) -> Dict[str, Any]:
     from skeleton.organism.runloop import bind_row, advance
     topic = str(row.get("topic") or "")
@@ -51,11 +71,21 @@ def claim(org, row: Dict[str, str], *, root=None) -> Dict[str, Any]:
         return {"ok": 0, "why": "seen", "topic": topic, "stored_prose": 0}
     bind_row(row, root=root)
     advance(root)
+    cdx = ""
+    xarchive = ""
+    try:
+        from skeleton.social.archivex import pointer, wayback_cdx_url
+        ptr = pointer(str(row.get("url") or ""))
+        cdx = str(ptr.get("cdx") or wayback_cdx_url(str(row.get("url") or "")))
+        xarchive = str(ptr.get("xarchive") or "")
+    except Exception:
+        cdx = ""
+        xarchive = ""
     try:
         atom = org.galaxy.codec.encode(
             topic, kind="citation", brain="editor",
             citation=str(row.get("url") or ""), url=str(row.get("url") or ""),
-            depth_hint=5, tags=("social", str(row.get("house") or "web")),
+            depth_hint=5, tags=("social", str(row.get("house") or "web"), "cdx"),
         )
         org.galaxy.mesh.publish(atom)
         org.galaxy.editor.index_topic(atom)
@@ -66,7 +96,15 @@ def claim(org, row: Dict[str, str], *, root=None) -> Dict[str, Any]:
         grow(topic + " " + str(row.get("url") or ""), root=root)
     except Exception:
         pass
-    return {"ok": 1, "topic": topic, "house": row.get("house"), "url": row.get("url"), "stored_prose": 0}
+    return {
+        "ok": 1,
+        "topic": topic,
+        "house": row.get("house"),
+        "url": row.get("url"),
+        "cdx": cdx,
+        "xarchive": xarchive,
+        "stored_prose": 0,
+    }
 
 
 def walk(org=None, *, n: int = 0, root=None) -> Dict[str, Any]:
@@ -74,8 +112,9 @@ def walk(org=None, *, n: int = 0, root=None) -> Dict[str, Any]:
     org = org or live_organismer()
     root = root if root is not None else getattr(org, "root", None)
     profile = _profile()
-    k = max(1, min(cap(profile), int(n or cap(profile))))
-    took = unbound(root)[:k]
+    asked = int(n or 0)
+    k = max(1, min(4, asked if asked else cap(profile)))
+    took = take(root, k)
     bound = [claim(org, row, root=root) for row in took]
     from skeleton.organism.runloop import bound_card
     inventory = bound_card(root)
@@ -85,6 +124,7 @@ def walk(org=None, *, n: int = 0, root=None) -> Dict[str, Any]:
         "asked": k,
         "ok": sum(1 for b in bound if b.get("ok")),
         "topics": [b.get("topic") for b in bound if b.get("ok")],
+        "houses": [b.get("house") for b in bound if b.get("ok")],
         "bound": bound,
         "inventory": inventory,
         "stored_prose": 0,
