@@ -17,6 +17,32 @@ def rotate_stimulus(i: int, explicit: str = "") -> str:
     return f"{row['topic']} {row['url']}"
 
 
+def cursor_path(root=None):
+    from pathlib import Path
+    base = Path(root) if root else Path(".")
+    return base / "chronicle" / "rotate.json"
+
+
+def cursor(root=None) -> int:
+    import json
+    p = cursor_path(root)
+    if not p.is_file():
+        return 0
+    try:
+        return int(json.loads(p.read_text(encoding="utf-8")).get("i") or 0)
+    except Exception:
+        return 0
+
+
+def advance(root=None) -> int:
+    import json
+    i = cursor(root) + 1
+    p = cursor_path(root)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"kind": "rotate", "i": i, "stored_prose": 0}, indent=2), encoding="utf-8")
+    return i
+
+
 def walk(org=None, *, neo=None, stimulus: str = "", n: int = 4,
          persist: Optional[bool] = None) -> Dict[str, Any]:
     from skeleton.organism.organismer import live_organismer

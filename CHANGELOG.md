@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Field rotate cursor persists
+
+- chronicle/rotate.json. Decade dump includes it.
+- Version 2026.09.03-cursor.
+
+---
+
 ## 2026-09-03 — Conductor pulse may rotate, not divert to week
 
 - Removed pulse→week on rt-hit. Version 2026.09.03-rotlaw.

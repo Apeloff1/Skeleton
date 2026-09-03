@@ -47,8 +47,11 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
             from skeleton.organism.runtime import last as rt_last
             h = hashlib.sha256(stim.encode("utf-8")).hexdigest()[:16]
             if rt_last(getattr(org, "root", None)).get("hash") == h:
-                stim = rotate_stimulus(int(org.steps or 0) + 1, "")
+                from skeleton.organism.runloop import advance
+                i = advance(getattr(org, "root", None))
+                stim = rotate_stimulus(i, "")
                 acted["rotated"] = 1
+                acted["cursor"] = i
         except Exception:
             pass
         acted["stimulus"] = stim.split()[0] if stim else ""
