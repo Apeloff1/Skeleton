@@ -54,7 +54,7 @@ def dispatch(org=None, stimulus: str = "", *, neo=None) -> Dict[str, Any]:
         if stage == "prefill":
             ctx = card
         trace.append({"stage": stage, "kind": card.get("kind"), "ok": card.get("ok", 1)})
-    return {
+    out = {
         "kind": "runtime",
         "profile": profile,
         "n": len([t for t in trace if not t.get("skipped")]),
@@ -63,6 +63,42 @@ def dispatch(org=None, stimulus: str = "", *, neo=None) -> Dict[str, Any]:
         "ctx_n": ctx.get("n") or 0,
         "stored_prose": 0,
     }
+    try:
+        persist(out, root=getattr(org, "root", None))
+    except Exception:
+        pass
+    return out
+
+
+def persist(card: Dict[str, Any], *, root=None):
+    import json
+    from pathlib import Path
+    base = Path(root) if root else Path(".")
+    p = base / "chronicle" / "runtime.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    slim = {
+        "kind": "runtime",
+        "profile": card.get("profile"),
+        "n": card.get("n"),
+        "skip": card.get("skip"),
+        "ctx_n": card.get("ctx_n"),
+        "stored_prose": 0,
+    }
+    p.write_text(json.dumps(slim, indent=2), encoding="utf-8")
+    return p
+
+
+def last(root=None) -> Dict[str, Any]:
+    import json
+    from pathlib import Path
+    base = Path(root) if root else Path(".")
+    p = base / "chronicle" / "runtime.json"
+    if not p.is_file():
+        return {"kind": "runtime", "n": 0, "stored_prose": 0}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {"kind": "runtime", "n": 0, "stored_prose": 0}
 
 
 def _stage(name: str, org, stim: str, *, neo=None, ctx: Dict[str, Any]) -> Dict[str, Any]:

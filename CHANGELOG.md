@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Persist last runtime walk
+
+- chronicle/runtime.json. health and calendar carry runtime_n.
+- Version 2026.09.03-rtpersist.
+
+---
+
 ## 2026-09-03 — Organism runtime DAG
 
 - admit→quota→place→prefill→decode→check→stock→reclaim over the house.
