@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Conductor horizon + hysteresis + helix
+
+- 3-step itinerary. doctor/tighten stick two ticks.
+- Decision stamps the dual helix. Version 2026.09.03-horizon.
+
+---
+
 ## 2026-09-03 — Editor conductor
 
 - 5th brain picks one verb from prose, pressure, cage, rot, coverage, calendar.

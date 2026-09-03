@@ -17,7 +17,20 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+_LAST: str = ""
+_HOLD: int = 0
+FOLLOW: Dict[str, Tuple[str, str]] = {
+    "doctor": ("pulse", "day"),
+    "tighten": ("hold", "pulse"),
+    "day": ("pulse", "week"),
+    "week": ("pulse", "doctor"),
+    "dream": ("pulse", "day"),
+    "bind-source": ("pulse", "day"),
+    "pulse": ("day", "pulse"),
+    "hold": ("pulse", "day"),
+}
 
 
 def decide(org=None, *, neo=None) -> Dict[str, Any]:
@@ -65,11 +78,15 @@ def decide(org=None, *, neo=None) -> Dict[str, Any]:
             code, why = str(nxt.get("code") or "pulse"), str(nxt.get("why") or "hint")
         except Exception:
             code, why = "pulse", "gap"
+    code, why, latch = _latch(code, why)
+    horizon: List[str] = [code, *FOLLOW.get(code, ("pulse", "day"))]
     out = {
         "kind": "conductor",
         "brain": "editor",
         "code": code,
         "why": why,
+        "horizon": horizon,
+        "latch": latch,
         "pressure": round(pressure, 4),
         "prose": prose,
         "cage_denied": int(cage.get("denied") or 0),
@@ -80,10 +97,35 @@ def decide(org=None, *, neo=None) -> Dict[str, Any]:
         "stored_prose": 0,
     }
     try:
+        from skeleton.organism.helix import stamp
+        out["helix"] = stamp(org, {
+            "code": code,
+            "why": why,
+            "phase": "conductor",
+            "stored_prose": 0,
+        }, root=getattr(org, "root", None))
+    except Exception:
+        out["helix"] = {}
+    try:
         _save(out, root=getattr(org, "root", None))
     except Exception:
         pass
     return out
+
+
+def _latch(code: str, why: str) -> Tuple[str, str, int]:
+    global _LAST, _HOLD
+    if not _LAST or code == _LAST:
+        _LAST = code
+        _HOLD += 1
+        return code, why, _HOLD
+    sticky = _LAST in {"doctor", "tighten"} and why not in {"prose", "pressure"}
+    if sticky and _HOLD < 2:
+        _HOLD += 1
+        return _LAST, "hysteresis", _HOLD
+    _LAST = code
+    _HOLD = 1
+    return code, why, _HOLD
 
 
 def run(org=None, *, neo=None) -> Dict[str, Any]:
@@ -125,5 +167,5 @@ def _save(card: Dict[str, Any], *, root: Optional[Path] = None) -> None:
     base = Path(root) if root else Path(".")
     p = base / "chronicle" / "conductor.json"
     p.parent.mkdir(parents=True, exist_ok=True)
-    slim = {k: card.get(k) for k in ("kind", "code", "why", "pressure", "rot", "coverage", "stored_prose")}
+    slim = {k: card.get(k) for k in ("kind", "code", "why", "horizon", "latch", "pressure", "rot", "coverage", "stored_prose")}
     p.write_text(json.dumps(slim, indent=2), encoding="utf-8")
