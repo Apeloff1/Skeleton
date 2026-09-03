@@ -42,6 +42,7 @@ python -m skeleton stacks
 python -m skeleton mix
 python -m skeleton doctor
 python -m skeleton satellites
+python -m skeleton path
 python -m skeleton dump --hot
 python -m skeleton walk -n 3
 python -m skeleton sleep --force

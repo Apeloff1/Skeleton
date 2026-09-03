@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — 10x path card sees mix and observe
+
+- python -m skeleton path. Version 2026.09.03-mix10x.
+
+---
+
 ## 2026-09-03 — mix on satellites
 
 - Version 2026.09.03-mixsat.

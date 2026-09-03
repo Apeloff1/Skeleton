@@ -24,5 +24,7 @@ def path_card(org, *, last_growth: Optional[float] = None) -> Dict[str, Any]:
         "steps": int(org.steps or 0),
         "mean_step": round(per_step, 6),
         "last_growth": round(float(last_growth or 1.0), 6),
+        "mix": __import__("skeleton.organism.context_step", fromlist=["mix_card"]).mix_card(getattr(org, "root", None)),
+        "observe": __import__("skeleton.organism.observe", fromlist=["card"]).card(getattr(org, "root", None)),
         "stored_prose": 0,
     }

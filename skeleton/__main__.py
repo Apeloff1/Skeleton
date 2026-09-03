@@ -116,6 +116,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("observe", help="F-2 observe ledger")
     sub.add_parser("stacks", help="last card from every plane")
     sub.add_parser("mix", help="last F-6 depth mix")
+    sub.add_parser("path", help="10x path card")
     cdn = sub.add_parser("conductor", help="editor traffic control")
     cdn.add_argument("--run", action="store_true")
     cdn.add_argument("--commit", action="store_true")
@@ -395,6 +396,12 @@ def main(argv: list[str] | None = None) -> int:
         else:
             out = decide()
         print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "path":
+        from skeleton.organism.organismer import live_organismer
+        from skeleton.organism.path10 import path_card
+        print(json.dumps(path_card(live_organismer()), indent=2, default=str))
         return 0
 
     if args.cmd == "mix":
