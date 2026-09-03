@@ -38,6 +38,18 @@ def dispatch(org=None, stimulus: str = "", *, neo=None) -> Dict[str, Any]:
 
     org = org or live_organismer()
     stim = stimulus or "plan tensor ttk"
+    import hashlib
+    stim_hash = hashlib.sha256(stim.encode("utf-8")).hexdigest()[:16]
+    try:
+        prev = last(getattr(org, "root", None))
+        if prev.get("hash") == stim_hash:
+            out = dict(prev)
+            out["reused"] = 1
+            out["n"] = 0
+            out["skip"] = list(EDGES)
+            return out
+    except Exception:
+        pass
     profile = "mobile"
     try:
         from skeleton.kernel.profiles import card as profiles_card
@@ -75,6 +87,8 @@ def dispatch(org=None, stimulus: str = "", *, neo=None) -> Dict[str, Any]:
         "ctx_n": ctx.get("n") or 0,
         "mix": ctx.get("mix") or 0,
         "kernel_n": next((t.get("n") or t.get("ok") for t in trace if t.get("stage") == "kernel"), 0),
+        "hash": stim_hash,
+        "reused": 0,
         "stored_prose": 0,
     }
     try:
@@ -108,6 +122,8 @@ def persist(card: Dict[str, Any], *, root=None):
         "ctx_n": card.get("ctx_n"),
         "kernel_n": card.get("kernel_n"),
         "mix": card.get("mix"),
+        "hash": card.get("hash"),
+        "reused": card.get("reused") or 0,
         "stored_prose": 0,
     }
     p.write_text(json.dumps(slim, indent=2), encoding="utf-8")

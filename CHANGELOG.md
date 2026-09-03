@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Repeat runtime walk is a hash hit
+
+- Same stimulus: first n=9, second n=0 skip=9.
+- Version 2026.09.03-rthit.
+
+---
+
 ## 2026-09-03 — Step skips galaxy.pulse when ctx already wrote the hash
 
 - First pulse: G moves, galaxy pulses=1. Repeat: step skipped.
