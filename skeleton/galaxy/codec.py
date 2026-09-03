@@ -94,12 +94,23 @@ class KnowledgeCodec:
             confidence=0.62 if kind == "capture" else 0.78,
         )
 
-    def mix(self, stimulus: str, *, citation: str = "") -> List[Atom]:
-        """F-6 — one stimulus at three depths: flash, episode, principle."""
+    def mix(self, stimulus: str, *, citation: str = "", profile: str = "mobile") -> List[Atom]:
+        """F-6 — stacked depths. Tight keeps T0+T4. Desktop does T0–T5."""
+        layers = [
+            (0, "capture", "memory"),
+            (1, "commitment", "compiler"),
+            (2, "episode", "dream"),
+            (3, "zettel", "compiler"),
+            (4, "principle", "distiller"),
+            (5, "index", "editor"),
+        ]
+        if profile == "tight":
+            layers = [layers[0], layers[4]]
+        elif profile == "mobile":
+            layers = [layers[0], layers[2], layers[4]]
         return [
-            self.encode(stimulus, kind="capture", brain="memory", citation=citation, depth_hint=0),
-            self.encode(stimulus, kind="episode", brain="compiler", citation=citation, depth_hint=2),
-            self.encode(stimulus, kind="principle", brain="distiller", citation=citation, depth_hint=4),
+            self.encode(stimulus, kind=kind, brain=brain, citation=citation, depth_hint=depth)
+            for depth, kind, brain in layers
         ]
 
     def encode_conversation(self, turns: Iterable[str], *, citation: str = "") -> List[Atom]:

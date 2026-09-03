@@ -21,7 +21,13 @@ def run(org, stimulus: str = "", *, sleep: bool = False, neo=None) -> Dict[str, 
     ids: List[str] = list(gxy.get("atom_ids") or [])
     mix_n = 0
     try:
-        mixed = org.galaxy.codec.mix(stim)
+        profile = "mobile"
+        try:
+            from skeleton.kernel.profiles import card as profiles_card
+            profile = str(profiles_card().get("profile") or "mobile")
+        except Exception:
+            profile = "mobile"
+        mixed = org.galaxy.codec.mix(stim, profile=profile)
         for atom in mixed:
             org.galaxy.mesh.publish(atom)
             ids.append(atom.id)

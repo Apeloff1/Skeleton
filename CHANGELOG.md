@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Mix depths follow the hardware profile
+
+- desktop T0–T5, mobile T0/T2/T4, tight T0+T4.
+- Version 2026.09.03-mix6.
+
+---
+
 ## 2026-09-03 — Mixture of depths (F-6)
 
 - codec.mix mints T0 flash, T2 episode, T4 principle per stimulus.
