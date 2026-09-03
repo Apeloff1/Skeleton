@@ -35,3 +35,7 @@ def helix_snap_path(root: Optional[Path] = None) -> Path:
 
 def kv_path(root: Optional[Path] = None) -> Path:
     return organism_dir(root) / "kv.json"
+
+
+def quality_path(root: Optional[Path] = None) -> Path:
+    return organism_dir(root) / "quality.jsonl"

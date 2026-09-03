@@ -4,7 +4,7 @@ from __future__ import annotations
 from skeleton.pipelines.dialogue import DialogueEdge, DialogueNode, DialogueTree, quality_check
 
 
-def test_dialogue_quality_check_attaches_contract():
+def test_dialogue_quality_check_attaches_contract(tmp_path):
     tree = DialogueTree(
         tree_id="dlg1",
         entry="root",
@@ -13,7 +13,7 @@ def test_dialogue_quality_check_attaches_contract():
             "end": DialogueNode("end", "npc", "Done.", [], terminal=True),
         },
     )
-    checked = quality_check(tree, description="choose and end")
+    checked = quality_check(tree, description="choose and end", root=tmp_path)
     payload = checked.to_dict()
     assert payload["quality"]["accepted"] is True
     assert payload["quality"]["quality"]["metadata"]["pipeline"] == "dialogue"

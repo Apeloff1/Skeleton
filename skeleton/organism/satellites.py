@@ -68,9 +68,10 @@ def retrieve_card(cue: str = "", *, org=None) -> Dict[str, Any]:
 
 
 def satellites_card(org=None, *, cue: str = "") -> Dict[str, Any]:
-    from skeleton.organism.product import _quality_snapshot
+    from skeleton.organism.quality_state import quality_snapshot
 
-    quality = _quality_snapshot()
+    root = getattr(org, "root", None) if org is not None else None
+    quality = quality_snapshot(root=root)
     return {
         "kind": "satellites",
         "jeeves": jeeves_card(),

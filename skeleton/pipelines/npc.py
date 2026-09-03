@@ -40,8 +40,6 @@ class BehaviourState:
 
 @dataclass
 class NpcSpec:
-    """The materialised NPC."""
-
     run_id: str
     name: str
     archetype: str
@@ -121,15 +119,15 @@ def _build_behaviour(archetype: str) -> list[BehaviourState]:
 
 
 class NpcPipeline:
-    """Orchestrates Text-to-NPC generation."""
-
-    def __init__(self, bus: EventBus | None = None, generator: GeneratorFn | None = None) -> None:
+    def __init__(self, bus: EventBus | None = None, generator: GeneratorFn | None = None, *, root=None) -> None:
         self._bus = bus or EventBus()
         self._generator = generator or _default_generator
+        self._root = root
 
     def run(self, description: str, *, name: str | None = None,
             dialogue_beats: int = 3, params: dict[str, Any] | None = None) -> NpcSpec:
         from skeleton.intelligence.npc_verifier import NpcVerifier
+        from skeleton.organism.quality_state import append_quality
 
         if not description or not description.strip():
             raise ValidationError("NPC description must be non-empty")
@@ -162,6 +160,16 @@ class NpcPipeline:
         quality = verifier.verify(spec.to_dict(), description=description)
         spec.quality = quality.to_dict()
         spec.quality_stats = verifier.stats()
+        append_quality({
+            "kind": "quality",
+            "surface": "npc",
+            "accepted": quality.accepted,
+            "reason": quality.reason,
+            "score": quality.score,
+            "weakest_path": quality.weakest_path,
+            "summary": quality.summary,
+            "metadata": quality.quality.metadata,
+        }, root=self._root)
         self._bus.publish(DomainEvent(
             topic="pipeline.npc.quality",
             payload={

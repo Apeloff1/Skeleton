@@ -13,14 +13,13 @@ def nervous_card(org=None, *, neo=None) -> Dict[str, Any]:
     from skeleton.organism.helix import verify as helix_verify
     from skeleton.organism.laws import scan_prose
     from skeleton.organism.organismer import live_organismer
-    from skeleton.organism.product import _quality_snapshot
-    from skeleton.organism.quality_state import quality_pressure
+    from skeleton.organism.quality_state import quality_pressure, quality_snapshot
 
     org = org or live_organismer()
     caps = caps_card()
     prose = scan_prose(org.galaxy.mesh)
     pressure = float(caps.get("pressure") or 0)
-    q = _quality_snapshot()
+    q = quality_snapshot(root=getattr(org, "root", None))
     q_rollup = q["rollup"]
     q_pressure = quality_pressure(q_rollup)
     try:

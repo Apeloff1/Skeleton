@@ -148,11 +148,22 @@ class DialogueWalker:
         return self.node.terminal
 
 
-def quality_check(tree: DialogueTree, *, description: str = "") -> DialogueTree:
+def quality_check(tree: DialogueTree, *, description: str = "", root=None) -> DialogueTree:
     from skeleton.intelligence.dialogue_verifier import DialogueVerifier
+    from skeleton.organism.quality_state import append_quality
 
     verifier = DialogueVerifier()
     report = verifier.verify(tree.to_dict(), description=description)
     tree.quality = report.to_dict()
     tree.quality_stats = verifier.stats()
+    append_quality({
+        "kind": "quality",
+        "surface": "dialogue",
+        "accepted": report.accepted,
+        "reason": report.reason,
+        "score": report.score,
+        "weakest_path": report.weakest_path,
+        "summary": report.summary,
+        "metadata": report.quality.metadata,
+    }, root=root)
     return tree

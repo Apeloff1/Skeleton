@@ -24,7 +24,6 @@ class CombatSystem:
     damage_formula: str
 
     def damage(self, attack: float, defense: float) -> float:
-        """Reference implementation of the declared formula."""
         return max(1.0, attack * (100.0 / (100.0 + max(0.0, defense))))
 
 
@@ -85,15 +84,15 @@ class GameLogicSpec:
 
 
 class GameLogicPipeline:
-    """Orchestrates game-system synthesis."""
-
-    def __init__(self, bus: EventBus | None = None) -> None:
+    def __init__(self, bus: EventBus | None = None, *, root=None) -> None:
         self._bus = bus or EventBus()
+        self._root = root
 
     def run(self, description: str, *, title: str = "untitled",
             max_level: int = 50, curve: str = "quadratic",
             currency: str = "gold") -> GameLogicSpec:
         from skeleton.intelligence.pipeline_verifier import PipelineVerifier
+        from skeleton.organism.quality_state import append_quality
 
         if not description or not description.strip():
             raise ValidationError("description must be non-empty")
@@ -126,6 +125,16 @@ class GameLogicPipeline:
         quality = verifier.verify_game_logic(spec.to_dict(), description=description)
         spec.quality = quality.to_dict()
         spec.quality_stats = verifier.stats()
+        append_quality({
+            "kind": "quality",
+            "surface": "game_logic",
+            "accepted": quality.accepted,
+            "reason": quality.reason,
+            "score": quality.score,
+            "weakest_path": quality.weakest_path,
+            "summary": quality.summary,
+            "metadata": quality.quality.metadata,
+        }, root=self._root)
 
         self._bus.publish(DomainEvent(
             topic="pipeline.game_logic.quality",

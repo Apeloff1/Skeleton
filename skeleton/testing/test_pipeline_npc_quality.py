@@ -5,8 +5,8 @@ from skeleton.kernel.events import EventBus
 from skeleton.pipelines.npc import NpcPipeline
 
 
-def test_npc_pipeline_attaches_quality_contract():
-    pipe = NpcPipeline(bus=EventBus())
+def test_npc_pipeline_attaches_quality_contract(tmp_path):
+    pipe = NpcPipeline(bus=EventBus(), root=tmp_path)
     spec = pipe.run("stoic guardian who counts doorways", name="Gatewatch")
     payload = spec.to_dict()
     assert payload["quality"]["accepted"] is True

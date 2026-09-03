@@ -15,8 +15,7 @@ def doctor_card(org=None, *, neo=None, fix: bool = False) -> Dict[str, Any]:
     from skeleton.organism.laws import clip_fat, laws_card, persist_clip
     from skeleton.organism.next import hint
     from skeleton.organism.organismer import live_organismer
-    from skeleton.organism.product import _quality_snapshot
-    from skeleton.organism.quality_state import quality_pressure
+    from skeleton.organism.quality_state import quality_pressure, quality_snapshot
     from skeleton.social.field import field_card
 
     org = org or live_organismer()
@@ -30,7 +29,7 @@ def doctor_card(org=None, *, neo=None, fix: bool = False) -> Dict[str, Any]:
     nxt = hint(org, neo=neo)
     laws = laws_card(org.galaxy.mesh)
     prose = int(laws.get("stored_prose") or 0)
-    quality = _quality_snapshot()
+    quality = quality_snapshot(root=getattr(org, "root", None))
     q_pressure = quality_pressure(quality["rollup"])
     helix = {}
     try:

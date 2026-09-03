@@ -5,8 +5,8 @@ from skeleton.kernel.events import EventBus
 from skeleton.pipelines.game_logic import GameLogicPipeline
 
 
-def test_game_logic_pipeline_attaches_quality_contract():
-    pipe = GameLogicPipeline(bus=EventBus())
+def test_game_logic_pipeline_attaches_quality_contract(tmp_path):
+    pipe = GameLogicPipeline(bus=EventBus(), root=tmp_path)
     spec = pipe.run("quadratic credits arena combat", title="Arena Ops", curve="quadratic", currency="credits")
     payload = spec.to_dict()
     assert payload["quality"]["accepted"] is True
