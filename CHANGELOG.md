@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Persist mix density on ctx.json
+
+- mix=3 density=2.0 on mobile. Version 2026.09.03-mixden.
+
+---
+
 ## 2026-09-03 — Mix T4/T5/T3 indexed by the editor
 
 - Editor index_topic on principle, index, zettel mix atoms.

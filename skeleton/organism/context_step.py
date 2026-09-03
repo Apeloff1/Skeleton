@@ -20,6 +20,7 @@ def run(org, stimulus: str = "", *, sleep: bool = False, neo=None) -> Dict[str, 
         gxy = {"kind": "galaxy-pulse", "error": type(exc).__name__, "stored_prose": 0}
     ids: List[str] = list(gxy.get("atom_ids") or [])
     mix_n = 0
+    dens: Dict[str, Any] = {}
     try:
         profile = "mobile"
         try:
@@ -37,8 +38,10 @@ def run(org, stimulus: str = "", *, sleep: bool = False, neo=None) -> Dict[str, 
                     pass
             ids.append(atom.id)
             mix_n += 1
+        dens = org.galaxy.codec.density(mixed)
     except Exception:
         mix_n = 0
+        dens = {}
     if not gxy.get("principle"):
         try:
             atom = org.galaxy.distiller.glean(stim)
@@ -89,6 +92,7 @@ def run(org, stimulus: str = "", *, sleep: bool = False, neo=None) -> Dict[str, 
         "pulses": gxy.get("pulses") or 0,
         "decoded": bool(gxy.get("decoded")),
         "mix": mix_n,
+        "density": dens.get("mean_depth") if dens else 0,
         "longform": longform.get("atoms") or 0,
         "structure": longform.get("structure") or {},
         "social_n": social.get("bound") or len(social.get("cards") or []),
@@ -119,6 +123,8 @@ def persist(card: Dict[str, Any], *, root: Optional[Path] = None) -> Path:
         "n": card.get("n") or 0,
         "conductor": card.get("conductor"),
         "recall": card.get("recall"),
+        "mix": card.get("mix") or 0,
+        "density": card.get("density") or 0,
         "stored_prose": 0,
     }
     p.write_text(json.dumps(slim, indent=2), encoding="utf-8")
