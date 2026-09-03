@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — 10x path card shows bound field inventory
+
+- Version 2026.09.03-pathb.
+
+---
+
 ## 2026-09-03 — Bound field ledger
 
 - chronicle/bound.jsonl. python -m skeleton bound.
