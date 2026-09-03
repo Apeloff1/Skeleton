@@ -65,6 +65,15 @@ def product_card() -> Dict[str, Any]:
     snap = org.snapshot()
     laws = laws_card(org.galaxy.mesh)
     quality = _quality_snapshot(root=getattr(org, "root", None))
+    latest_repair = quality.get("latest_repair") or {}
+    repair_view = {
+        "surface": latest_repair.get("surface") or "",
+        "reason": latest_repair.get("reason") or "",
+        "changed": (latest_repair.get("metadata") or {}).get("changed", 0),
+        "before_reason": (latest_repair.get("metadata") or {}).get("before_reason") or "",
+        "after_reason": (latest_repair.get("metadata") or {}).get("after_reason") or "",
+        "target": latest_repair.get("weakest_path") or "",
+    }
     return {
         "kind": "product",
         "name": "Jeeves Cortex Organism",
@@ -93,6 +102,7 @@ def product_card() -> Dict[str, Any]:
         "sota": sota_card("", G=org.G),
         "laws": laws,
         "quality": quality,
-        "latest_repair": quality.get("latest_repair") or {},
+        "latest_repair": latest_repair,
+        "repair_view": repair_view,
         "stored_prose": laws["stored_prose"],
     }

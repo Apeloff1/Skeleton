@@ -14,6 +14,7 @@ def test_product_card_exposes_quality(tmp_path):
     Organismer(root=tmp_path, persist=False, galaxy=GalaxySystem())
     card = product_card.__wrapped__() if hasattr(product_card, "__wrapped__") else product_card()
     assert "quality" in card
+    assert "repair_view" in card
 
 
 def test_nervous_card_exposes_quality_pressure(tmp_path):
@@ -28,6 +29,7 @@ def test_nervous_card_exposes_quality_pressure(tmp_path):
     assert "quality" in card
     assert "quality_pressure" in card
     assert "latest_repair" in card
+    assert "repair_view" in card
 
 
 def test_doctor_card_exposes_quality(tmp_path):
@@ -42,6 +44,7 @@ def test_doctor_card_exposes_quality(tmp_path):
     assert "quality" in card
     assert "quality_pressure" in card
     assert "latest_repair" in card
+    assert "repair_view" in card
 
 
 def test_satellites_card_exposes_quality(tmp_path):
@@ -56,3 +59,4 @@ def test_satellites_card_exposes_quality(tmp_path):
     assert "quality" in card
     assert card["quality"]["rollup"]["count"] >= 1
     assert "latest_repair" in card
+    assert "repair_view" in card

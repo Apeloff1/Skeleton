@@ -23,6 +23,13 @@ def nervous_card(org=None, *, neo=None) -> Dict[str, Any]:
     q_rollup = q["rollup"]
     q_pressure = quality_pressure(q_rollup)
     latest_repair = q.get("latest_repair") or {}
+    repair_view = {
+        "surface": latest_repair.get("surface") or "",
+        "changed": (latest_repair.get("metadata") or {}).get("changed", 0),
+        "before_reason": (latest_repair.get("metadata") or {}).get("before_reason") or "",
+        "after_reason": (latest_repair.get("metadata") or {}).get("after_reason") or "",
+        "target": latest_repair.get("weakest_path") or "",
+    }
     try:
         helix_ok = int(helix_verify(getattr(org, "root", None)).get("ok") or 0)
     except Exception:
@@ -57,5 +64,6 @@ def nervous_card(org=None, *, neo=None) -> Dict[str, Any]:
         "quality": q,
         "quality_pressure": q_pressure,
         "latest_repair": latest_repair,
+        "repair_view": repair_view,
         "stored_prose": prose,
     }

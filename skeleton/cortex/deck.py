@@ -271,8 +271,9 @@ class CommandDeck:
         card["G"] = round(_g(self.neo), 6)
         return card
 
-    def plan(self, vision: str) -> Dict[str, Any]:
+    def plan(self, vision: str, *, repair: bool = False) -> Dict[str, Any]:
         from skeleton.cortex.era_bind import resolve
+        from skeleton.intelligence.plan_repair import attempt_plan_repair
         from skeleton.intelligence.plan_verifier import PlanVerifier
         from skeleton.organism.quality_state import append_quality
 
@@ -303,7 +304,15 @@ class CommandDeck:
                     "weakest_path": report.weakest_path,
                     "summary": report.summary,
                     "metadata": report.quality.metadata,
+                    "evidence": {"issues": list(report.issues)},
                 }, root=self.root)
+                if not report.accepted and repair:
+                    fixed = attempt_plan_repair(out, vision=vision, root=self.root)
+                    out["repair"] = {k: v for k, v in fixed.items() if k != "plan"}
+                    if fixed.get("ok"):
+                        out = dict(fixed["plan"])
+                        out["quality"] = fixed["after"]
+                        out["quality_stats"] = verifier.stats()
                 self.last_plan = out
                 return out
         pack = card.get("pack") or {}
@@ -330,7 +339,15 @@ class CommandDeck:
             "weakest_path": report.weakest_path,
             "summary": report.summary,
             "metadata": report.quality.metadata,
+            "evidence": {"issues": list(report.issues)},
         }, root=self.root)
+        if not report.accepted and repair:
+            fixed = attempt_plan_repair(out, vision=vision, root=self.root)
+            out["repair"] = {k: v for k, v in fixed.items() if k != "plan"}
+            if fixed.get("ok"):
+                out = dict(fixed["plan"])
+                out["quality"] = fixed["after"]
+                out["quality_stats"] = verifier.stats()
         self.last_plan = out
         return out
 

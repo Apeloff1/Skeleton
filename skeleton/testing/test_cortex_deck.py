@@ -6,7 +6,7 @@ from skeleton.cortex.deck import CommandDeck
 from skeleton.cortex.dodeca import FACES, face_card
 from skeleton.cortex.laws import LAWS, LawError, check
 from skeleton.cortex.refs import lookup, refer
-from skeleton.organism.quality_state import load_quality
+from skeleton.organism.quality_state import latest_repair, load_quality
 
 
 class _Engine:
@@ -138,6 +138,13 @@ def test_deck_plan_attaches_quality_contract_and_persists(tmp_path):
     assert card["era"] == "soulslike"
     rows = load_quality(root=tmp_path)
     assert rows and rows[-1]["surface"] == "plan"
+
+
+def test_deck_plan_can_repair_once(tmp_path):
+    deck = CommandDeck(_Dummy(), root=tmp_path)
+    card = deck.plan("", repair=True)
+    assert "quality" in card
+    assert latest_repair(root=tmp_path, surface="plan")
 
 
 def test_deck_walk_and_pick():
