@@ -94,6 +94,14 @@ class KnowledgeCodec:
             confidence=0.62 if kind == "capture" else 0.78,
         )
 
+    def mix(self, stimulus: str, *, citation: str = "") -> List[Atom]:
+        """F-6 — one stimulus at three depths: flash, episode, principle."""
+        return [
+            self.encode(stimulus, kind="capture", brain="memory", citation=citation, depth_hint=0),
+            self.encode(stimulus, kind="episode", brain="compiler", citation=citation, depth_hint=2),
+            self.encode(stimulus, kind="principle", brain="distiller", citation=citation, depth_hint=4),
+        ]
+
     def encode_conversation(self, turns: Iterable[str], *, citation: str = "") -> List[Atom]:
         atoms: List[Atom] = []
         buf: List[str] = []

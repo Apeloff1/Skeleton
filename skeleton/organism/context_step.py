@@ -19,6 +19,15 @@ def run(org, stimulus: str = "", *, sleep: bool = False, neo=None) -> Dict[str, 
     except Exception as exc:
         gxy = {"kind": "galaxy-pulse", "error": type(exc).__name__, "stored_prose": 0}
     ids: List[str] = list(gxy.get("atom_ids") or [])
+    mix_n = 0
+    try:
+        mixed = org.galaxy.codec.mix(stim)
+        for atom in mixed:
+            org.galaxy.mesh.publish(atom)
+            ids.append(atom.id)
+            mix_n += 1
+    except Exception:
+        mix_n = 0
     if not gxy.get("principle"):
         try:
             atom = org.galaxy.distiller.glean(stim)
@@ -68,6 +77,7 @@ def run(org, stimulus: str = "", *, sleep: bool = False, neo=None) -> Dict[str, 
         "n": len(ids),
         "pulses": gxy.get("pulses") or 0,
         "decoded": bool(gxy.get("decoded")),
+        "mix": mix_n,
         "longform": longform.get("atoms") or 0,
         "structure": longform.get("structure") or {},
         "social_n": social.get("bound") or len(social.get("cards") or []),

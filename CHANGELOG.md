@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Mixture of depths (F-6)
+
+- codec.mix mints T0 flash, T2 episode, T4 principle per stimulus.
+- context_step publishes all three. Version 2026.09.03-mixf6.
+
+---
+
 ## 2026-09-03 — dump --hot lists decade targets
 
 - Version 2026.09.03-dumphotcard.
