@@ -40,6 +40,7 @@ python -m skeleton live "plan tensor ttk"
 python -m skeleton observe
 python -m skeleton stacks
 python -m skeleton mix
+python -m skeleton doctor
 python -m skeleton dump --hot
 python -m skeleton walk -n 3
 python -m skeleton sleep --force
