@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Galaxy quarantine cage (F-8)
+
+- Low-confidence bare atoms and high-risk atoms stay off the live shelf.
+- Version 2026.09.03-cage.
+
+---
+
 ## 2026-09-03 — Storm gate (F-9)
 
 - Identical orch stimuli drop inside the TTL window.

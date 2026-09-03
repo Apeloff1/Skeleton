@@ -5,7 +5,6 @@ from skeleton.galaxy.decoder import KnowledgeDecoder
 from skeleton.galaxy.hoag import BRAINS, HOAG_CITE, color_of, galaxy_card
 from skeleton.galaxy.librarians import LibrarianMesh, WikiLibrarian
 from skeleton.galaxy.mirrors import bind_mouth, mouth_mirrors
-from skeleton.galaxy.system import GalaxySystem, live_galaxy, reset_galaxy
 
 __all__ = [
     "Atom",
@@ -26,3 +25,10 @@ __all__ = [
     "live_galaxy",
     "reset_galaxy",
 ]
+
+
+def __getattr__(name: str):
+    if name in {"GalaxySystem", "live_galaxy", "reset_galaxy"}:
+        from skeleton.galaxy import system as _system
+        return getattr(_system, name)
+    raise AttributeError(name)

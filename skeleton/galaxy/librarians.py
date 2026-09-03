@@ -20,6 +20,10 @@ class Librarian:
         self.log: List[str] = []
 
     def shelve(self, atom: Atom) -> Atom:
+        from skeleton.galaxy.quarantine import live as live_cage
+        if not live_cage().admit(atom):
+            self.log.append("cage:" + atom.id)
+            return atom
         self.shelf[atom.id] = atom
         self.log.append(atom.id)
         return atom
@@ -122,5 +126,6 @@ class LibrarianMesh:
         return {
             "wiki": self.wiki.catalog(),
             "brains": {n: l.card() for n, l in self.brains.items()},
+            "cage": __import__("skeleton.galaxy.quarantine", fromlist=["card"]).card(),
             "stored_prose": 0,
         }
