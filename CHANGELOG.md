@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — dump --hot lists decade targets
+
+- Version 2026.09.03-dumphotcard.
+
+---
+
 ## 2026-09-03 — Stacks on health, ready, product, ritual
 
 - Version 2026.09.03-stackstamp.

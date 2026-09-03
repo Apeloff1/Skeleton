@@ -145,6 +145,7 @@ def main(argv: list[str] | None = None) -> int:
     ch.add_argument("cue", nargs="?", default="memory graph")
     dp = sub.add_parser("dump", help="rotate hot books into decade backup")
     dp.add_argument("--force", action="store_true")
+    dp.add_argument("--hot", action="store_true")
     sub.add_parser("scope", help="multi-horizon queue beyond one next code")
     sub.add_parser("enact", help="run the head of the scope queue")
     sub.add_parser("standin", help="bind a local teacher copy (no HF)")
@@ -582,6 +583,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "dump":
+        if getattr(args, "hot", False):
+            from skeleton.organism.chronicle.dump import hot_card
+            print(json.dumps(hot_card(), indent=2, default=str))
+            return 0
         from skeleton.cortex.deck import live_deck
         out = live_deck().dump(force=bool(getattr(args, "force", False)))
         print(json.dumps(out, indent=2, default=str))

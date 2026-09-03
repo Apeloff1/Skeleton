@@ -39,6 +39,7 @@ python -m skeleton ctx "plan tensor ttk" --refine
 python -m skeleton live "plan tensor ttk"
 python -m skeleton observe
 python -m skeleton stacks
+python -m skeleton dump --hot
 python -m skeleton walk -n 3
 python -m skeleton sleep --force
 python -m skeleton forget "old trace"

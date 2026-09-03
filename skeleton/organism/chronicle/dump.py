@@ -116,6 +116,25 @@ def dump(root: Optional[Path] = None, *, force: bool = False) -> Dict[str, Any]:
     }
 
 
+def hot_card(root: Optional[Path] = None) -> Dict[str, Any]:
+    due_names = due(root)
+    rows = []
+    for p in _hot_targets(root):
+        rows.append({
+            "name": p.name,
+            "bytes": p.stat().st_size if p.exists() else 0,
+            "due": int(p.name in due_names),
+        })
+    return {
+        "kind": "dump-hot",
+        "n": len(rows),
+        "due": due_names,
+        "rows": rows,
+        "horizon_years": HORIZON_YEARS,
+        "stored_prose": 0,
+    }
+
+
 def inventory(root: Optional[Path] = None) -> Dict[str, Any]:
     path = manifest_path(root)
     rows: List[Dict[str, Any]] = []
