@@ -28,6 +28,7 @@ python -m skeleton rot
 python -m skeleton fieldcov
 python -m skeleton enact
 python -m skeleton day -n 2
+python -m skeleton week --days 2
 python -m skeleton walk -n 3
 python -m skeleton sleep --force
 python -m skeleton forget "old trace"

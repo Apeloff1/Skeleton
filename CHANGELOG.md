@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Week cycle
+
+- Two days then decade dump. Version 2026.09.03-week.
+
+---
+
 ## 2026-09-03 — Day cycle
 
 - seed + compose + enact × ambition. Stops on rot or pressure.
