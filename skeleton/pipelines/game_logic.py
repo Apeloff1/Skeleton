@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from skeleton.kernel.errors import GenerationError, ValidationError
-from skeleton.kernel.events import EventBus
+from skeleton.kernel.events import DomainEvent, EventBus
 from skeleton.kernel.ids import PipelineRunId
 
 
@@ -31,8 +31,8 @@ class CombatSystem:
 @dataclass(frozen=True)
 class EconomySystem:
     currency: str
-    taps: tuple[str, ...]   # currency sources
-    sinks: tuple[str, ...]  # currency drains
+    taps: tuple[str, ...]
+    sinks: tuple[str, ...]
     starting_balance: float
 
     def is_closed(self) -> bool:
@@ -42,7 +42,7 @@ class EconomySystem:
 @dataclass(frozen=True)
 class ProgressionSystem:
     max_level: int
-    curve: str  # "linear" | "quadratic" | "exponential"
+    curve: str
     base_xp: float
 
     def xp_for_level(self, level: int) -> float:
@@ -64,6 +64,8 @@ class GameLogicSpec:
     economy: EconomySystem
     progression: ProgressionSystem
     generated_at: float = field(default_factory=time.time)
+    quality: dict[str, Any] = field(default_factory=dict)
+    quality_stats: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -77,6 +79,8 @@ class GameLogicSpec:
             "progression": {"max_level": self.progression.max_level,
                              "curve": self.progression.curve, "base_xp": self.progression.base_xp},
             "generated_at": self.generated_at,
+            "quality": dict(self.quality),
+            "quality_stats": dict(self.quality_stats),
         }
 
 
@@ -89,6 +93,8 @@ class GameLogicPipeline:
     def run(self, description: str, *, title: str = "untitled",
             max_level: int = 50, curve: str = "quadratic",
             currency: str = "gold") -> GameLogicSpec:
+        from skeleton.intelligence.pipeline_verifier import PipelineVerifier
+
         if not description or not description.strip():
             raise ValidationError("description must be non-empty")
         if curve not in {"linear", "quadratic", "exponential"}:
@@ -115,6 +121,25 @@ class GameLogicPipeline:
         progression = ProgressionSystem(max_level=max_level, curve=curve, base_xp=100.0)
         spec = GameLogicSpec(run_id=run_id, title=title, combat=combat,
                              economy=economy, progression=progression)
+
+        verifier = PipelineVerifier()
+        quality = verifier.verify_game_logic(spec.to_dict(), description=description)
+        spec.quality = quality.to_dict()
+        spec.quality_stats = verifier.stats()
+
+        self._bus.publish(DomainEvent(
+            topic="pipeline.game_logic.quality",
+            payload={
+                "run_id": run_id,
+                "title": title,
+                "accepted": quality.accepted,
+                "reason": quality.reason,
+                "score": quality.score,
+                "weakest_path": quality.weakest_path,
+            },
+            correlation_id=start.correlation_id,
+            causation_id=start.event_id,
+        ))
         self._bus.emit("pipeline.game_logic.completed",
                        {"run_id": run_id, "title": title},
                        correlation_id=start.correlation_id, causation_id=start.event_id)

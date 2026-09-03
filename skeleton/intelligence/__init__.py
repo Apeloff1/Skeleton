@@ -16,6 +16,7 @@ from .verification import VerificationLoop, VerificationTrace, VerificationVerdi
 from .verifier import CodeVerifier, RubricScore, VerifierReport
 from .quality import QualityIssue, QualityReport, QualitySignal
 from .plan_verifier import PlanVerifier, PlanVerificationReport
+from .pipeline_verifier import PipelineVerifier, PipelineVerificationReport
 from .forge_verifier import ForgeVerifier, ForgeVerificationReport, ForgeFileReport
 from .improve_loop import ImproveLoop, ImproveResult, Iteration
 from .routed_gate import RoutedAnswer, RoutedGate
@@ -35,6 +36,7 @@ __all__ = [
     'CodeVerifier', 'RubricScore', 'VerifierReport',
     'QualityIssue', 'QualityReport', 'QualitySignal',
     'PlanVerifier', 'PlanVerificationReport',
+    'PipelineVerifier', 'PipelineVerificationReport',
     'ForgeVerifier', 'ForgeVerificationReport', 'ForgeFileReport',
     'ImproveLoop', 'ImproveResult', 'Iteration',
     'RoutedAnswer', 'RoutedGate',
