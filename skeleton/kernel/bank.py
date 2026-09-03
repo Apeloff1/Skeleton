@@ -13,6 +13,16 @@ from skeleton.kernel.priority import Priority
 from skeleton.kernel.quota import Quota
 from skeleton.kernel.reclaim import Reclaim
 from skeleton.kernel.throttle import Throttle
+from skeleton.kernel.page import Page
+from skeleton.kernel.tile import Tile
+from skeleton.kernel.speculate import Speculate
+from skeleton.kernel.prefix import Prefix
+from skeleton.kernel.batch import Batch
+from skeleton.kernel.radix import Radix
+from skeleton.kernel.split import Split
+from skeleton.kernel.slo import SLO
+from skeleton.kernel.pin import Pin
+from skeleton.kernel.pack import Pack
 
 _MAKERS = {
     "admission": lambda ov: Admission(window=16 if ov else 32),
@@ -25,6 +35,16 @@ _MAKERS = {
     "isolate": lambda ov: Isolate(),
     "prefetch": lambda ov: Prefetch(depth=1 if ov else 3),
     "fuse": lambda ov: Fuse(cap=2 if ov else 8),
+    "page": lambda ov: Page(frames=16 if ov else 64, size=8 if ov else 16),
+    "tile": lambda ov: Tile(width=4 if ov else 8),
+    "speculate": lambda ov: Speculate(k=2 if ov else 4),
+    "prefix": lambda ov: Prefix(cap=8 if ov else 32),
+    "batch": lambda ov: Batch(cap=1 if ov else 4),
+    "radix": lambda ov: Radix(),
+    "split": lambda ov: Split(prefill=2 if ov else 4, decode=4 if ov else 8),
+    "slo": lambda ov: SLO(miss_cap=2 if ov else 5),
+    "pin": lambda ov: Pin(cap=4 if ov else 12),
+    "pack": lambda ov: Pack(width=4 if ov else 8),
 }
 
 _LIVE: Dict[str, Any] = {}
@@ -44,9 +64,12 @@ def boot(profile: str = "", overlay: Dict[str, Any] | None = None) -> Dict[str, 
     # profile kernels are old names; new ten always candidate
     chosen = list(_MAKERS.keys())
     if name == "tight":
-        chosen = ["throttle", "quota", "reclaim", "bloom"]
+        chosen = ["throttle", "quota", "reclaim", "bloom", "page", "slo"]
     elif name == "mobile":
-        chosen = ["throttle", "quota", "reclaim", "bloom", "isolate", "prefetch", "admission"]
+        chosen = [
+            "throttle", "quota", "reclaim", "bloom", "isolate", "prefetch", "admission",
+            "page", "prefix", "batch", "slo", "pack",
+        ]
     _LIVE = {k: _MAKERS[k](tight) for k in chosen}
     _PROFILE = name
     return {"kind": "kernel-bank", "profile": name, "n": len(_LIVE), "names": list(_LIVE), "stored_prose": 0}

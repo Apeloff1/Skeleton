@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Serving kernels page..pack
+
+- page tile speculate prefix batch radix split slo pin pack
+- PersistentKV / PagedAttention / prefix-cache / RadixAttention handles.
+- Version 2026.09.03-k20.
+
+---
+
 ## 2026-09-03 — Ten more kernels + live bank
 
 - admission quota affinity throttle bloom priority reclaim isolate prefetch fuse

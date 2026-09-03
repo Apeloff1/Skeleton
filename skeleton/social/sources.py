@@ -98,6 +98,8 @@ SOTA_POINTERS: Tuple[Dict[str, str], ...] = (
     {"topic": "flexserve-mobile", "url": "https://arxiv.org/abs/2606.23370", "house": "arXiv"},
     {"topic": "mobilemoe", "url": "https://arxiv.org/abs/2605.27358", "house": "arXiv"},
     {"topic": "hero-mobile-rag", "url": "https://arxiv.org/abs/2603.01661", "house": "arXiv"},
+    {"topic": "persistentkv-page", "url": "https://arxiv.org/abs/2606.26666", "house": "arXiv"},
+    {"topic": "paged-attention", "url": "https://arxiv.org/abs/2309.06180", "house": "arXiv"},
 )
 
 

@@ -24,6 +24,8 @@ CITE = (
     "https://arxiv.org/abs/2606.23370",
     "https://arxiv.org/abs/2605.27358",
     "https://arxiv.org/abs/2603.01661",
+    "https://arxiv.org/abs/2606.26666",
+    "https://arxiv.org/abs/2309.06180",
 )
 
 ROSTER: Dict[str, Tuple[str, ...]] = {
@@ -47,21 +49,34 @@ ROSTER: Dict[str, Tuple[str, ...]] = {
     "isolate": ("skeleton.kernel.isolate",),
     "prefetch": ("skeleton.kernel.prefetch",),
     "fuse": ("skeleton.kernel.fuse",),
+    "page": ("skeleton.kernel.page",),
+    "tile": ("skeleton.kernel.tile",),
+    "speculate": ("skeleton.kernel.speculate",),
+    "prefix": ("skeleton.kernel.prefix",),
+    "batch": ("skeleton.kernel.batch",),
+    "radix": ("skeleton.kernel.radix",),
+    "split": ("skeleton.kernel.split",),
+    "slo": ("skeleton.kernel.slo",),
+    "pin": ("skeleton.kernel.pin",),
+    "pack": ("skeleton.kernel.pack",),
 }
 
 PROFILES: Dict[str, Tuple[str, ...]] = {
-    "tight": ("pressure", "life", "log", "throttle", "quota", "reclaim", "bloom"),
+    "tight": ("pressure", "life", "log", "throttle", "quota", "reclaim", "bloom", "page", "slo"),
     "mobile": (
         "schedule", "pressure", "life", "log", "time", "box",
         "throttle", "quota", "reclaim", "bloom", "isolate", "prefetch", "admission",
+        "page", "prefix", "batch", "slo", "pack",
     ),
     "desktop": (
         "schedule", "pressure", "life", "fence", "log", "time", "box", "work", "gossip", "saga",
         "admission", "quota", "affinity", "throttle", "bloom", "priority", "reclaim", "isolate", "prefetch", "fuse",
+        "page", "tile", "speculate", "prefix", "batch", "radix", "split", "slo", "pin", "pack",
     ),
     "max": (
         "schedule", "pressure", "life", "fence", "log", "time", "box", "work", "gossip", "saga",
         "admission", "quota", "affinity", "throttle", "bloom", "priority", "reclaim", "isolate", "prefetch", "fuse",
+        "page", "tile", "speculate", "prefix", "batch", "radix", "split", "slo", "pin", "pack",
     ),
 }
 
