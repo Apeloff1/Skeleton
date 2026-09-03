@@ -19,7 +19,7 @@ from skeleton.social.sota import sota_card
 from skeleton.social.sources import SOTA_POINTERS
 
 
-VERSION = "2026.09.03-mix10x"
+VERSION = "2026.09.03-mixfield"
 
 
 ENDPOINTS = (

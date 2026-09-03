@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — social field sees mix
+
+- Version 2026.09.03-mixfield.
+
+---
+
 ## 2026-09-03 — 10x path card sees mix and observe
 
 - python -m skeleton path. Version 2026.09.03-mix10x.

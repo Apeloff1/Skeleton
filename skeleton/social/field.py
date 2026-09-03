@@ -15,6 +15,7 @@ def field_card() -> Dict[str, Any]:
         "houses": houses,
         "families": len(catalog()),
         "pointers": rows,
+        "mix": __import__("skeleton.organism.context_step", fromlist=["mix_card"]).mix_card(),
         "stored_prose": 0,
         "law": "cite-do-not-copy",
     }
