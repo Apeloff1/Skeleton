@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from skeleton.forge.repair import attempt_repair, candidate_failures, latest_repair_plan
-from skeleton.organism.quality_state import append_quality
+from skeleton.organism.quality_state import append_quality, latest_repair
 
 
 def test_latest_repair_plan_returns_no_failure(tmp_path):
@@ -27,23 +27,44 @@ def test_candidate_failures_reads_recent_forge_failures(tmp_path):
     assert out["items"]
 
 
-def test_attempt_repair_patches_missing_extends_and_func():
+def test_attempt_repair_patches_missing_extends_and_func(tmp_path):
     files = {
         "project.godot": 'config_version=5\nrun/main_scene="res://scenes/levels/run_level.tscn"\n',
         "scenes/levels/run_level.tscn": '[gd_scene load_steps=1 format=3]\n[node name="RunLevel" type="Node2D"]\n',
         "scripts/world/world_map.gd": 'var x = 1\n',
     }
-    out = attempt_repair(files, request="repair world map")
+    out = attempt_repair(files, request="repair world map", root=tmp_path)
     assert out["changed"] == 1
     assert out["actions"]
     assert "extends Node" in out["files"]["scripts/world/world_map.gd"]
+    assert latest_repair(root=tmp_path, surface="forge")["kind"] == "repair"
 
 
-def test_attempt_repair_comments_eval_once():
+def test_attempt_repair_comments_eval_once(tmp_path):
     files = {
         "project.godot": 'config_version=5\n',
         "scripts/world/world_map.gd": 'extends Node\nfunc tick():\n    eval(user_input)\n',
     }
-    out = attempt_repair(files, request="repair world map")
+    out = attempt_repair(files, request="repair world map", root=tmp_path)
     assert out["changed"] == 1
     assert "# eval(" in out["files"]["scripts/world/world_map.gd"]
+
+
+def test_materialise_can_repair_once_and_return_result(tmp_path, monkeypatch):
+    from skeleton.forge.universal import Forge
+
+    forge = Forge(root=tmp_path)
+    bp = forge.new_blueprint("Repairable")
+    forge.instantiate(bp, "player", "player")
+
+    def weak_emit(*args, **kwargs):
+        return {
+            "project.godot": 'config_version=5\nrun/main_scene="res://scenes/levels/run_level.tscn"\n',
+            "scenes/levels/run_level.tscn": '[gd_scene load_steps=1 format=3]\n[node name="RunLevel" type="Node2D"]\n',
+            "scripts/world/world_map.gd": 'var x = 1\n',
+        }
+
+    monkeypatch.setattr("skeleton.forge.godot_emit.emit_godot", weak_emit)
+    out = forge.materialise(bp, target="godot", repair=True)
+    assert "repair" in out
+    assert out["repair"]["changed"] == 1

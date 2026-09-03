@@ -70,6 +70,24 @@ def append_quality(entry: Dict[str, Any], *, root: Optional[Path] = None) -> Dic
     return row
 
 
+def append_repair(entry: Dict[str, Any], *, root: Optional[Path] = None) -> Dict[str, Any]:
+    payload = dict(entry)
+    payload.setdefault("kind", "repair")
+    payload.setdefault("surface", payload.get("surface") or "forge")
+    payload.setdefault("accepted", bool(payload.get("ok")))
+    payload.setdefault("reason", payload.get("reason") or "repair")
+    payload.setdefault("score", float(payload.get("after", {}).get("score") or 0.0))
+    payload.setdefault("weakest_path", payload.get("after", {}).get("weakest_path") or payload.get("weakest_path") or "")
+    payload.setdefault("summary", {"actions": len(payload.get("actions") or [])})
+    payload.setdefault("metadata", {
+        "repair": 1,
+        "changed": int(bool(payload.get("changed"))),
+        "before_reason": str((payload.get("before") or {}).get("reason") or ""),
+        "after_reason": str((payload.get("after") or {}).get("reason") or ""),
+    })
+    return append_quality(payload, root=root)
+
+
 def trim_quality(*, root: Optional[Path] = None, cap: int = 256) -> int:
     path = quality_path(root)
     if not path.exists():
@@ -101,7 +119,15 @@ def latest_quality(*, root: Optional[Path] = None) -> Dict[str, Any]:
 
 def latest_failure(*, root: Optional[Path] = None, surface: str = "") -> Dict[str, Any]:
     rows = load_quality(root=root, limit=256)
-    rows = [r for r in rows if not r.get("accepted")]
+    rows = [r for r in rows if not r.get("accepted") and r.get("kind") == "quality"]
+    if surface:
+        rows = [r for r in rows if str(r.get("surface") or "") == surface]
+    return rows[-1] if rows else {}
+
+
+def latest_repair(*, root: Optional[Path] = None, surface: str = "") -> Dict[str, Any]:
+    rows = load_quality(root=root, limit=256)
+    rows = [r for r in rows if r.get("kind") == "repair"]
     if surface:
         rows = [r for r in rows if str(r.get("surface") or "") == surface]
     return rows[-1] if rows else {}
@@ -109,7 +135,7 @@ def latest_failure(*, root: Optional[Path] = None, surface: str = "") -> Dict[st
 
 def repair_candidates(*, root: Optional[Path] = None, surface: str = "forge") -> List[Dict[str, Any]]:
     rows = load_quality(root=root, limit=256)
-    rows = [r for r in rows if not r.get("accepted") and str(r.get("surface") or "") == surface]
+    rows = [r for r in rows if not r.get("accepted") and str(r.get("surface") or "") == surface and r.get("kind") == "quality"]
     rows.sort(key=lambda r: (float(r.get("score") or 0.0), int(r.get("at") or 0)), reverse=True)
     return rows
 
@@ -119,6 +145,7 @@ def quality_snapshot(*, root: Optional[Path] = None, limit: int = 32) -> Dict[st
     return {
         "latest": rows[-1] if rows else {},
         "latest_failure": latest_failure(root=root),
+        "latest_repair": latest_repair(root=root),
         "recent": rows,
         "rollup": summarize_quality(rows),
     }

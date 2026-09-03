@@ -26,8 +26,7 @@ class Port:
 
     def __post_init__(self) -> None:
         if self.direction not in {"in", "out"}:
-            raise BlueprintError("port direction must be 'in' or 'out'",
-                                 context={"port": self.name})
+            raise BlueprintError("port direction must be 'in' or 'out'", context={"port": self.name})
 
 
 @dataclass(frozen=True)
@@ -41,8 +40,7 @@ class Component:
         for p in self.ports:
             if p.name == name:
                 return p
-        raise BlueprintError("component has no such port",
-                             context={"component": self.instance_id, "port": name})
+        raise BlueprintError("component has no such port", context={"component": self.instance_id, "port": name})
 
 
 @dataclass(frozen=True)
@@ -61,8 +59,7 @@ class Blueprint:
 
     def add_component(self, component: Component) -> None:
         if component.instance_id in self.components:
-            raise BlueprintError("duplicate component instance",
-                                 context={"instance_id": component.instance_id})
+            raise BlueprintError("duplicate component instance", context={"instance_id": component.instance_id})
         self.components[component.instance_id] = component
 
     def connect(self, src: tuple[str, str], dst: tuple[str, str]) -> None:
@@ -122,9 +119,7 @@ class Blueprint:
             "blueprint_id": self.blueprint_id,
             "name": self.name,
             "components": {
-                cid: {"kind": c.kind,
-                       "ports": [{"name": p.name, "type": p.port_type, "direction": p.direction} for p in c.ports],
-                       "config": c.config}
+                cid: {"kind": c.kind, "ports": [{"name": p.name, "type": p.port_type, "direction": p.direction} for p in c.ports], "config": c.config}
                 for cid, c in self.components.items()
             },
             "wires": [{"from": list(w.src), "to": list(w.dst)} for w in self.wires],
@@ -173,16 +168,15 @@ class Forge:
         ports = self._kinds.get(kind)
         if ports is None:
             raise BlueprintError("unknown component kind", context={"kind": kind, "available": self.available_kinds()})
-        component = Component(instance_id=instance_id, kind=kind,
-                              ports=tuple(Port(p.name, p.port_type, p.direction) for p in ports),
-                              config=dict(config or {}))
+        component = Component(instance_id=instance_id, kind=kind, ports=tuple(Port(p.name, p.port_type, p.direction) for p in ports), config=dict(config or {}))
         blueprint.add_component(component)
         return component
 
-    def materialise(self, blueprint: Blueprint, *, era: str = "extraction_now", target: str = "json", pack: dict[str, Any] | None = None, build_plan: dict[str, Any] | None = None) -> dict[str, Any]:
+    def materialise(self, blueprint: Blueprint, *, era: str = "extraction_now", target: str = "json", pack: dict[str, Any] | None = None, build_plan: dict[str, Any] | None = None, repair: bool = False) -> dict[str, Any]:
         from skeleton.forge.eras import compile_era
         from skeleton.forge.godot_emit import emit_godot
         from skeleton.forge.planner import MaterialisationPlanner
+        from skeleton.forge.repair import attempt_repair
         from skeleton.intelligence.forge_verifier import ForgeVerifier
         from skeleton.organism.quality_state import append_quality
 
@@ -236,6 +230,15 @@ class Forge:
                 correlation_id=f"forge_verify_{blueprint.blueprint_id}",
             )
             self._bus.publish(event)
+            if not verification.accepted and repair:
+                repaired = attempt_repair(files, request=blueprint.name, root=self._root)
+                result["repair"] = {k: v for k, v in repaired.items() if k != "files"}
+                if repaired.get("ok"):
+                    result["files"] = repaired["files"]
+                    result["file_count"] = len(repaired["files"])
+                    result["verification"] = repaired["after"]
+                    result["verification_stats"] = verifier.stats()
+                    return result
             if not verification.accepted:
                 raise MaterialisationError(
                     "emitted Godot project failed verification",
@@ -245,8 +248,7 @@ class Forge:
                         "verification_stats": verifier.stats(),
                     },
                 )
-        self._bus.emit("forge.blueprint.materialised",
-                       {"blueprint_id": blueprint.blueprint_id, "components": len(blueprint.components), "wires": len(blueprint.wires), "era": pack["era"], "target": target})
+        self._bus.emit("forge.blueprint.materialised", {"blueprint_id": blueprint.blueprint_id, "components": len(blueprint.components), "wires": len(blueprint.wires), "era": pack["era"], "target": target})
         return result
 
     @staticmethod

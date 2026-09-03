@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Mapping
 
 from skeleton.intelligence.forge_verifier import ForgeVerifier
-from skeleton.organism.quality_state import latest_failure, repair_candidates
+from skeleton.organism.quality_state import append_repair, latest_failure, repair_candidates
 
 
 def latest_repair_plan(*, root=None) -> Dict[str, Any]:
@@ -43,7 +43,7 @@ def candidate_failures(*, root=None, limit: int = 5) -> Dict[str, Any]:
     }
 
 
-def attempt_repair(files: Mapping[str, str], *, request: str = "") -> Dict[str, Any]:
+def attempt_repair(files: Mapping[str, str], *, request: str = "", root=None) -> Dict[str, Any]:
     """One bounded repair pass over an emitted file map, then re-verify."""
     before = ForgeVerifier().verify(files, request=request)
     fixed = dict(files)
@@ -71,9 +71,12 @@ def attempt_repair(files: Mapping[str, str], *, request: str = "") -> Dict[str, 
                 actions.append({"path": "project.godot", "action": "restored main scene entry"})
 
     after = ForgeVerifier().verify(fixed, request=request)
-    return {
+    result = {
         "kind": "forge-repair-attempt",
         "ok": int(after.accepted),
+        "surface": "forge",
+        "reason": str(after.reason),
+        "weakest_path": str(after.weakest_path or before.weakest_path or ""),
         "before": before.to_dict(),
         "after": after.to_dict(),
         "actions": actions,
@@ -81,6 +84,8 @@ def attempt_repair(files: Mapping[str, str], *, request: str = "") -> Dict[str, 
         "stored_prose": 0,
         "files": fixed,
     }
+    append_repair(result, root=root)
+    return result
 
 
 def _targets(failure: Dict[str, Any]) -> List[Dict[str, Any]]:
