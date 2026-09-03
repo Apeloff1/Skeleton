@@ -114,6 +114,7 @@ def main(argv: list[str] | None = None) -> int:
     lv = sub.add_parser("live", help="organism runtime DAG walk")
     lv.add_argument("text", nargs="?", default="plan tensor ttk")
     sub.add_parser("observe", help="F-2 observe ledger")
+    sub.add_parser("stacks", help="last card from every plane")
     cdn = sub.add_parser("conductor", help="editor traffic control")
     cdn.add_argument("--run", action="store_true")
     cdn.add_argument("--commit", action="store_true")
@@ -392,6 +393,11 @@ def main(argv: list[str] | None = None) -> int:
         else:
             out = decide()
         print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "stacks":
+        from skeleton.organism.stacks import card as stacks_card
+        print(json.dumps(stacks_card(), indent=2, default=str))
         return 0
 
     if args.cmd == "observe":

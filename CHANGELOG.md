@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Stacks card
+
+- One view of organism/kernel/galaxy/social/chronicle/memory/editor.
+- Version 2026.09.03-stacks.
+
+---
+
 ## 2026-09-03 — Decade dump includes persist cards
 
 - observe/ctx/runtime/conductor/horizon/day/cage/rot/gov are hot targets.
