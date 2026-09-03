@@ -30,4 +30,8 @@ def card() -> Dict[str, Any]:
         save_board(out)
     except Exception:
         pass
+    try:
+        out["mix"] = __import__("skeleton.organism.context_step", fromlist=["mix_card"]).mix_card()
+    except Exception:
+        pass
     return out
