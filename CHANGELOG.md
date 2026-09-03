@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Rotate grows the follow bag from the bound topic
+
+- Version 2026.09.03-folrot.
+
+---
+
 ## 2026-09-03 — Rotate binds the SOTA pointer as a citation
 
 - Editor + wiki hear the field topic. Version 2026.09.03-bindrot.
