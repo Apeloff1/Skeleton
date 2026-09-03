@@ -21,8 +21,8 @@ from skeleton.kernel.ids import BlueprintId
 @dataclass(frozen=True)
 class Port:
     name: str
-    port_type: str  # e.g. "event", "state", "resource", "signal"
-    direction: str  # "in" | "out"
+    port_type: str
+    direction: str
 
     def __post_init__(self) -> None:
         if self.direction not in {"in", "out"}:
@@ -47,8 +47,7 @@ class Component:
 
 @dataclass(frozen=True)
 class Wire:
-    """A typed connection: from an out-port to an in-port."""
-    src: tuple[str, str]  # (component, port)
+    src: tuple[str, str]
     dst: tuple[str, str]
 
 
@@ -70,7 +69,6 @@ class Blueprint:
         self.wires.append(Wire(src=src, dst=dst))
 
     def validate(self) -> list[str]:
-        """Return a list of structural problems; empty means valid."""
         problems: list[str] = []
         for wire in self.wires:
             for end, direction in ((wire.src, "out"), (wire.dst, "in")):
@@ -85,9 +83,7 @@ class Blueprint:
                     problems.append(f"{comp_id!r} has no port {port_name!r}")
                     continue
                 if port.direction != direction:
-                    problems.append(
-                        f"{comp_id}.{port_name} is a {port.direction}-port; "
-                        f"expected {direction}")
+                    problems.append(f"{comp_id}.{port_name} is a {port.direction}-port; expected {direction}")
             src_comp = self.components.get(wire.src[0])
             dst_comp = self.components.get(wire.dst[0])
             if src_comp is not None and dst_comp is not None:
@@ -95,9 +91,7 @@ class Blueprint:
                     s = src_comp.port(wire.src[1])
                     d = dst_comp.port(wire.dst[1])
                     if s.port_type != d.port_type:
-                        problems.append(
-                            f"type mismatch {wire.src[0]}.{wire.src[1]} ({s.port_type}) "
-                            f"-> {wire.dst[0]}.{wire.dst[1]} ({d.port_type})")
+                        problems.append(f"type mismatch {wire.src[0]}.{wire.src[1]} ({s.port_type}) -> {wire.dst[0]}.{wire.dst[1]} ({d.port_type})")
                 except BlueprintError:
                     pass
         edges: dict[str, list[str]] = {c: [] for c in self.components}
@@ -129,8 +123,7 @@ class Blueprint:
             "name": self.name,
             "components": {
                 cid: {"kind": c.kind,
-                       "ports": [{"name": p.name, "type": p.port_type,
-                                   "direction": p.direction} for p in c.ports],
+                       "ports": [{"name": p.name, "type": p.port_type, "direction": p.direction} for p in c.ports],
                        "config": c.config}
                 for cid, c in self.components.items()
             },
@@ -142,18 +135,17 @@ class Blueprint:
 class Forge:
     """The universal synthesis engine."""
 
-    def __init__(self, bus: EventBus | None = None) -> None:
+    def __init__(self, bus: EventBus | None = None, *, root=None) -> None:
         self._bus = bus or EventBus()
         self._kinds: dict[str, tuple[Port, ...]] = {}
+        self._root = root
         self._register_stdlib()
 
     def _register_stdlib(self) -> None:
         self.register_kind("source", (Port("out", "event", "out"),))
-        self.register_kind("transform",
-                           (Port("in", "event", "in"), Port("out", "event", "out")))
+        self.register_kind("transform", (Port("in", "event", "in"), Port("out", "event", "out")))
         self.register_kind("sink", (Port("in", "event", "in"),))
-        self.register_kind("state_store",
-                           (Port("write", "state", "in"), Port("read", "state", "out")))
+        self.register_kind("state_store", (Port("write", "state", "in"), Port("read", "state", "out")))
         self.register_kind("player", (Port("intent", "event", "out"), Port("state", "state", "out")))
         self.register_kind("heat", (Port("in", "event", "in"), Port("critical", "signal", "out")))
         self.register_kind("weapon_forge", (Port("parts", "resource", "in"), Port("weapon", "event", "out")))
@@ -174,36 +166,29 @@ class Forge:
         if not name.strip():
             raise BlueprintError("blueprint name must be non-empty")
         bp = Blueprint(blueprint_id=str(BlueprintId.new()), name=name)
-        self._bus.emit("forge.blueprint.created",
-                       {"blueprint_id": bp.blueprint_id, "name": name})
+        self._bus.emit("forge.blueprint.created", {"blueprint_id": bp.blueprint_id, "name": name})
         return bp
 
-    def instantiate(self, blueprint: Blueprint, kind: str, instance_id: str,
-                    *, config: dict[str, Any] | None = None) -> Component:
+    def instantiate(self, blueprint: Blueprint, kind: str, instance_id: str, *, config: dict[str, Any] | None = None) -> Component:
         ports = self._kinds.get(kind)
         if ports is None:
-            raise BlueprintError("unknown component kind",
-                                 context={"kind": kind, "available": self.available_kinds()})
+            raise BlueprintError("unknown component kind", context={"kind": kind, "available": self.available_kinds()})
         component = Component(instance_id=instance_id, kind=kind,
                               ports=tuple(Port(p.name, p.port_type, p.direction) for p in ports),
                               config=dict(config or {}))
         blueprint.add_component(component)
         return component
 
-    def materialise(self, blueprint: Blueprint, *, era: str = "extraction_now",
-                    target: str = "json", pack: dict[str, Any] | None = None,
-                    build_plan: dict[str, Any] | None = None) -> dict[str, Any]:
-        """Validate, compile era numbers, optionally emit Godot files."""
+    def materialise(self, blueprint: Blueprint, *, era: str = "extraction_now", target: str = "json", pack: dict[str, Any] | None = None, build_plan: dict[str, Any] | None = None) -> dict[str, Any]:
         from skeleton.forge.eras import compile_era
         from skeleton.forge.godot_emit import emit_godot
         from skeleton.forge.planner import MaterialisationPlanner
         from skeleton.intelligence.forge_verifier import ForgeVerifier
+        from skeleton.organism.quality_state import append_quality
 
         problems = blueprint.validate()
         if problems:
-            raise MaterialisationError("blueprint failed validation",
-                                       context={"blueprint_id": blueprint.blueprint_id,
-                                                "problems": problems})
+            raise MaterialisationError("blueprint failed validation", context={"blueprint_id": blueprint.blueprint_id, "problems": problems})
         pack = pack or compile_era(era)
         order = self._topological_order(blueprint)
         plan = MaterialisationPlanner(bus=self._bus).plan_blueprint(blueprint)
@@ -226,6 +211,16 @@ class Forge:
             result["file_count"] = len(files)
             result["verification"] = verification.to_dict()
             result["verification_stats"] = verifier.stats()
+            append_quality({
+                "kind": "quality",
+                "surface": "forge",
+                "accepted": verification.accepted,
+                "reason": verification.reason,
+                "score": verification.score,
+                "weakest_path": verification.weakest_path,
+                "summary": verification.summary,
+                "metadata": verification.quality.metadata,
+            }, root=self._root)
             event = DomainEvent(
                 topic="forge.verification.completed" if verification.accepted else "forge.verification.failed",
                 payload={
@@ -251,11 +246,7 @@ class Forge:
                     },
                 )
         self._bus.emit("forge.blueprint.materialised",
-                       {"blueprint_id": blueprint.blueprint_id,
-                        "components": len(blueprint.components),
-                        "wires": len(blueprint.wires),
-                        "era": pack["era"],
-                        "target": target})
+                       {"blueprint_id": blueprint.blueprint_id, "components": len(blueprint.components), "wires": len(blueprint.wires), "era": pack["era"], "target": target})
         return result
 
     @staticmethod

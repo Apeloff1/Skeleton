@@ -10,12 +10,13 @@ import pytest
 
 from skeleton.intelligence.forge_verifier import ForgeVerifier
 from skeleton.kernel.errors import MaterialisationError
+from skeleton.organism.quality_state import latest_failure, load_quality
 
 
-def _bp():
+def _bp(tmp_path=None):
     from skeleton.forge.universal import Forge
 
-    forge = Forge()
+    forge = Forge(root=tmp_path)
     bp = forge.new_blueprint("VerifierGate")
     forge.instantiate(bp, "player", "player")
     return forge, bp
@@ -128,8 +129,8 @@ def test_verifier_stats_track_runs_and_acceptance():
     assert 0.0 <= stats["accept_rate"] <= 1.0
 
 
-def test_materialise_attaches_verification_on_godot_output():
-    forge, bp = _bp()
+def test_materialise_attaches_verification_on_godot_output(tmp_path):
+    forge, bp = _bp(tmp_path)
     out = forge.materialise(bp, target="godot")
     assert out["file_count"] > 0
     assert out["verification"]["accepted"] is True
@@ -137,10 +138,12 @@ def test_materialise_attaches_verification_on_godot_output():
     assert out["verification"]["reason"] == "accepted"
     assert out["verification"]["quality"]["metadata"]["kind"] == "forge"
     assert out["verification_stats"]["runs"] == 1
+    rows = load_quality(root=tmp_path)
+    assert rows and rows[-1]["surface"] == "forge"
 
 
-def test_materialise_rejects_broken_emitter(monkeypatch):
-    forge, bp = _bp()
+def test_materialise_rejects_broken_emitter_and_records_failure(tmp_path, monkeypatch):
+    forge, bp = _bp(tmp_path)
 
     def bad_emit(*args, **kwargs):
         return {"project.godot": "config_version=5\n"}
@@ -150,3 +153,5 @@ def test_materialise_rejects_broken_emitter(monkeypatch):
         forge.materialise(bp, target="godot")
     assert "verification" in exc.value.context
     assert "verification_stats" in exc.value.context
+    fail = latest_failure(root=tmp_path, surface="forge")
+    assert fail["surface"] == "forge"

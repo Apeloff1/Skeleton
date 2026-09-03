@@ -99,10 +99,19 @@ def latest_quality(*, root: Optional[Path] = None) -> Dict[str, Any]:
     return rows[-1] if rows else {}
 
 
+def latest_failure(*, root: Optional[Path] = None, surface: str = "") -> Dict[str, Any]:
+    rows = load_quality(root=root, limit=256)
+    rows = [r for r in rows if not r.get("accepted")]
+    if surface:
+        rows = [r for r in rows if str(r.get("surface") or "") == surface]
+    return rows[-1] if rows else {}
+
+
 def quality_snapshot(*, root: Optional[Path] = None, limit: int = 32) -> Dict[str, Any]:
     rows = load_quality(root=root, limit=limit)
     return {
         "latest": rows[-1] if rows else {},
+        "latest_failure": latest_failure(root=root),
         "recent": rows,
         "rollup": summarize_quality(rows),
     }

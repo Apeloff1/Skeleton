@@ -31,13 +31,14 @@ def _trace_dict(trace: Any) -> Dict[str, Any]:
 class CommandDeck:
     """Live instrument over a JeevesCortex (or any neo with the same mouth)."""
 
-    def __init__(self, neo: Any) -> None:
+    def __init__(self, neo: Any, *, root=None) -> None:
         self.neo = neo
         self.traces: List[Dict[str, Any]] = []
         self.last_ref: Optional[Dict[str, Any]] = None
         self.last_improve: Optional[Dict[str, Any]] = None
         self.last_plan: Optional[Dict[str, Any]] = None
         self.position = 0
+        self.root = root
 
     def status(self) -> Dict[str, Any]:
         neo = self.neo
@@ -273,6 +274,7 @@ class CommandDeck:
     def plan(self, vision: str) -> Dict[str, Any]:
         from skeleton.cortex.era_bind import resolve
         from skeleton.intelligence.plan_verifier import PlanVerifier
+        from skeleton.organism.quality_state import append_quality
 
         card = resolve(vision)
         if card.get("hit"):
@@ -289,8 +291,19 @@ class CommandDeck:
                 out.setdefault("citation", card.get("citation"))
                 out.setdefault("stored_prose", 0)
                 verifier = PlanVerifier()
-                out["quality"] = verifier.verify(out, vision=vision).to_dict()
+                report = verifier.verify(out, vision=vision)
+                out["quality"] = report.to_dict()
                 out["quality_stats"] = verifier.stats()
+                append_quality({
+                    "kind": "quality",
+                    "surface": "plan",
+                    "accepted": report.accepted,
+                    "reason": report.reason,
+                    "score": report.score,
+                    "weakest_path": report.weakest_path,
+                    "summary": report.summary,
+                    "metadata": report.quality.metadata,
+                }, root=self.root)
                 self.last_plan = out
                 return out
         pack = card.get("pack") or {}
@@ -305,8 +318,19 @@ class CommandDeck:
             "law": "ok",
         }
         verifier = PlanVerifier()
-        out["quality"] = verifier.verify(out, vision=vision).to_dict()
+        report = verifier.verify(out, vision=vision)
+        out["quality"] = report.to_dict()
         out["quality_stats"] = verifier.stats()
+        append_quality({
+            "kind": "quality",
+            "surface": "plan",
+            "accepted": report.accepted,
+            "reason": report.reason,
+            "score": report.score,
+            "weakest_path": report.weakest_path,
+            "summary": report.summary,
+            "metadata": report.quality.metadata,
+        }, root=self.root)
         self.last_plan = out
         return out
 
@@ -339,33 +363,14 @@ class CommandDeck:
         for i in range(steps):
             self.position = (self.position + 1 + (8847291 % 5)) % 12
             walked.append({"face_index": self.position, "face_name": FACES[self.position], "step": i})
-        return {
-            "seed": 8847291,
-            "position": self.position,
-            "face": FACES[self.position],
-            "walk": walked,
-            "card": face_card(self.neo),
-        }
+        return {"seed": 8847291, "position": self.position, "face": FACES[self.position], "walk": walked, "card": face_card(self.neo)}
 
     def pick(self, index: int) -> Dict[str, Any]:
         self.position = int(index) % 12
-        return {
-            "seed": 8847291,
-            "position": self.position,
-            "face": FACES[self.position],
-            "card": face_card(self.neo),
-        }
+        return {"seed": 8847291, "position": self.position, "face": FACES[self.position], "card": face_card(self.neo)}
 
     def snapshot(self) -> Dict[str, Any]:
-        return {
-            "status": self.status(),
-            "last_ref": self.last_ref,
-            "last_improve": self.last_improve,
-            "last_plan": self.last_plan,
-            "traces": list(self.traces[:8]),
-            "position": self.position,
-            "face": FACES[self.position],
-        }
+        return {"status": self.status(), "last_ref": self.last_ref, "last_improve": self.last_improve, "last_plan": self.last_plan, "traces": list(self.traces[:8]), "position": self.position, "face": FACES[self.position]}
 
 
 def live_deck():
