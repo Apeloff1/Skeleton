@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — F-2 observe ledger
+
+- One jsonl row per runtime walk: G, recall, pressure, kernel_n.
+- Falling G over 3 rows → conductor contact.
+- Version 2026.09.03-observe.
+
+---
+
 ## 2026-09-03 — Kernel orch is a runtime stage
 
 - admit→quota→kernel→place→prefill→decode→check→stock→reclaim

@@ -67,6 +67,8 @@ def decide(org=None, *, neo=None) -> Dict[str, Any]:
         code, why = "dream", "rot"
     elif float((__import__("skeleton.organism.context_step", fromlist=["last"]).last(getattr(org, "root", None)).get("recall") or 1)) < 0.50:
         code, why = "dream", "recall"
+    elif float((__import__("skeleton.organism.observe", fromlist=["card"]).card(getattr(org, "root", None)).get("delta_G") or 0)) < 0 and int((__import__("skeleton.organism.observe", fromlist=["card"]).card(getattr(org, "root", None)).get("n") or 0)) >= 3:
+        code, why = "contact", "growth"
     elif float(cov.get("score") or 0) < 0.20:
         code, why = "bind-source", "coverage"
     elif int(cal.get("day_n") or 0) == 0:

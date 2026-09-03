@@ -113,6 +113,7 @@ def main(argv: list[str] | None = None) -> int:
     cx.add_argument("--refine", action="store_true")
     lv = sub.add_parser("live", help="organism runtime DAG walk")
     lv.add_argument("text", nargs="?", default="plan tensor ttk")
+    sub.add_parser("observe", help="F-2 observe ledger")
     cdn = sub.add_parser("conductor", help="editor traffic control")
     cdn.add_argument("--run", action="store_true")
     cdn.add_argument("--commit", action="store_true")
@@ -391,6 +392,11 @@ def main(argv: list[str] | None = None) -> int:
         else:
             out = decide()
         print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "observe":
+        from skeleton.organism.observe import card as obs_card
+        print(json.dumps(obs_card(), indent=2, default=str))
         return 0
 
     if args.cmd == "live":

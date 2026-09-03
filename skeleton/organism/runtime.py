@@ -80,6 +80,11 @@ def dispatch(org=None, stimulus: str = "", *, neo=None) -> Dict[str, Any]:
         persist(out, root=getattr(org, "root", None))
     except Exception:
         pass
+    try:
+        from skeleton.organism.observe import record as observe_record
+        observe_record(org, out, root=getattr(org, "root", None))
+    except Exception:
+        pass
     return out
 
 
