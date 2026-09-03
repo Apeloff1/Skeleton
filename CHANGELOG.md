@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Follow feed + hot stages on product
+
+- Orchestrator tokens come from the follow bag.
+- hot ranks stages from orch.json. Product card carries kernels.
+- Version 2026.09.03-hot.
+
+---
+
 ## 2026-09-03 — Scoreboard + persist last orch walk
 
 - scoreboard cards every live kernel.

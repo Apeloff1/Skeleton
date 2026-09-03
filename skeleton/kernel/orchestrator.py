@@ -18,8 +18,10 @@ class Orchestrator:
         from skeleton.kernel.bank import boot, get, live, snapshot
         from skeleton.kernel.krouter import plan
         from skeleton.kernel.governor import tick as gov_tick
+        from skeleton.kernel.feed import tokens as feed_tokens
 
         boot()
+        text = " ".join(feed_tokens(text))
         gov = gov_tick()
         pressure = float(gov.get("pressure") or 0)
         profile = str(gov.get("profile") or snapshot().get("profile") or "mobile")

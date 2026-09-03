@@ -88,6 +88,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("bank", help="live kernel bank snapshot")
     sub.add_parser("ritual", help="catalog + bank + block + stock in one card")
     sub.add_parser("scoreboard", help="card every live kernel")
+    sub.add_parser("hot", help="stages that ran on the last orch walk")
     oc = sub.add_parser("orch", help="dispatch the kernel orchestrator")
     oc.add_argument("text", nargs="?", default="plan tensor ttk")
     sub.add_parser("kgov", help="tick the mid-run kernel governor")
@@ -342,6 +343,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "orch":
         from skeleton.cortex.deck import live_deck
         print(json.dumps(live_deck().orch(getattr(args, "text", "plan tensor ttk")), indent=2, default=str))
+        return 0
+
+    if args.cmd == "hot":
+        from skeleton.kernel.hot import rank
+        print(json.dumps(rank(), indent=2, default=str))
         return 0
 
     if args.cmd == "scoreboard":

@@ -19,7 +19,7 @@ from skeleton.social.sota import sota_card
 from skeleton.social.sources import SOTA_POINTERS
 
 
-VERSION = "2026.09.03-board"
+VERSION = "2026.09.03-hot"
 
 
 ENDPOINTS = (
@@ -100,6 +100,12 @@ def product_card() -> Dict[str, Any]:
         "path10": path_card(org),
         "mhc": mhc_card(org),
         "budget": next_hint(org).get("budget"),
+        "kernels": {
+            "scoreboard_n": __import__("skeleton.kernel.scoreboard", fromlist=["card"]).card().get("n"),
+            "hot": __import__("skeleton.kernel.hot", fromlist=["rank"]).rank().get("hot"),
+            "persist_n": __import__("skeleton.kernel.persist", fromlist=["load"]).load().get("n"),
+            "stored_prose": 0,
+        },
         "coverage": coverage_card(""),
         "fresh": org.galaxy.editor.freshness(),
         "endpoints": list(ENDPOINTS),
