@@ -42,7 +42,7 @@ def card(root: Optional[Path] = None) -> Dict[str, Any]:
         "galaxy": {"wiki": obs.get("wiki"), "atoms": obs.get("atoms"), "cage": cage.get("denied")},
         "social": {"coverage": cov.get("score") or obs.get("coverage"), "field": field.get("n") or obs.get("field")},
         "chronicle": {"dumps": obs.get("dumps"), "years": cal.get("years")},
-        "memory": {"recall": obs.get("last_recall"), "helix_ok": obs.get("helix_ok")},
+        "memory": {"recall": obs.get("last_recall"), "helix_ok": obs.get("helix_ok"), "mix": ctx.get("mix") or obs.get("mix"), "density": ctx.get("density")},
         "editor": {"conductor": _read(root, "conductor.json").get("code")},
         "stored_prose": 0,
     }

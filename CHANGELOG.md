@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Stacks memory plane carries mix density
+
+- Version 2026.09.03-mixstack.
+
+---
+
 ## 2026-09-03 — Persist mix density on ctx.json
 
 - mix=3 density=2.0 on mobile. Version 2026.09.03-mixden.
