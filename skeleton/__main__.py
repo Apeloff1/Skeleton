@@ -85,7 +85,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("banks", help="common vs long-tail memory banks")
     sub.add_parser("caps", help="hardware-aware multi-cap table")
     sub.add_parser("kernels", help="multi-kernel profile (mobile/tight/desktop)")
-    sub.add_parser("bank", help="live kernel bank snapshot")
+    bp = sub.add_parser("bank", help="live kernel bank snapshot")
+    bp.add_argument("--reset", action="store_true")
     sub.add_parser("ritual", help="catalog + bank + block + stock in one card")
     sub.add_parser("scoreboard", help="card every live kernel")
     sub.add_parser("hot", help="stages that ran on the last orch walk")
@@ -389,6 +390,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "bank":
+        if getattr(args, "reset", False):
+            from skeleton.kernel.bank import reset, boot
+            reset()
+            print(json.dumps(boot(), indent=2, default=str))
+            return 0
         from skeleton.cortex.deck import live_deck
         print(json.dumps(live_deck().bank(), indent=2, default=str))
         return 0

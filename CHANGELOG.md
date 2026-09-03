@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Bank reset
+
+- python -m skeleton bank --reset rebuilds the live roster.
+- Version 2026.09.03-reboot.
+
+---
+
 ## 2026-09-03 — Season fence lease
 
 - One season walker at a time. Denied returns stopped=lease.

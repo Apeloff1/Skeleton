@@ -81,6 +81,13 @@ _LIVE: Dict[str, Any] = {}
 _PROFILE = ""
 
 
+def reset() -> Dict[str, Any]:
+    global _LIVE, _PROFILE
+    _LIVE = {}
+    _PROFILE = ""
+    return {"kind": "kernel-bank", "n": 0, "reset": 1, "stored_prose": 0}
+
+
 def boot(profile: str = "", overlay: Dict[str, Any] | None = None) -> Dict[str, Any]:
     global _LIVE, _PROFILE
     from skeleton.kernel.profiles import card as profiles_card
