@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Coverage auditor + decade runner
+
+- coverage: catalog vs live vs hot.
+- decade: seasons until pressure/SLO.
+- Version 2026.09.03-decade.
+
+---
+
 ## 2026-09-03 — ready --walk runs kernel season
 
 - Operator walk now dispatches the kernel season too.

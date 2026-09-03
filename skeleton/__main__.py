@@ -90,6 +90,10 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("scoreboard", help="card every live kernel")
     sub.add_parser("hot", help="stages that ran on the last orch walk")
     sn = sub.add_parser("season", help="N orch walks under profile walk_n")
+    sub.add_parser("coverage", help="catalog vs live vs hot")
+    dc = sub.add_parser("decade", help="seasons until cap")
+    dc.add_argument("text", nargs="?", default="plan tensor ttk")
+    dc.add_argument("--seasons", type=int, default=3)
     sn.add_argument("text", nargs="?", default="plan tensor ttk")
     sn.add_argument("-n", type=int, default=0)
     oc = sub.add_parser("orch", help="dispatch the kernel orchestrator")
@@ -346,6 +350,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "orch":
         from skeleton.cortex.deck import live_deck
         print(json.dumps(live_deck().orch(getattr(args, "text", "plan tensor ttk")), indent=2, default=str))
+        return 0
+
+    if args.cmd == "coverage":
+        from skeleton.kernel.coverage import card as cov_card
+        print(json.dumps(cov_card(), indent=2, default=str))
+        return 0
+
+    if args.cmd == "decade":
+        from skeleton.kernel.decade import run as decade_run
+        print(json.dumps(decade_run(getattr(args, "text", "plan tensor ttk"), seasons=getattr(args, "seasons", 3)), indent=2, default=str))
         return 0
 
     if args.cmd == "season":

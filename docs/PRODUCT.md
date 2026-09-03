@@ -13,6 +13,12 @@ python -m skeleton caps
 python -m skeleton lattice
 python -m skeleton wiki 'SELECT * WHERE kind=principle'
 python -m skeleton pulse
+python -m skeleton orch
+python -m skeleton season -n 2
+python -m skeleton scoreboard
+python -m skeleton hot
+python -m skeleton coverage
+python -m skeleton decade
 python -m skeleton walk -n 3
 python -m skeleton sleep --force
 python -m skeleton forget "old trace"
