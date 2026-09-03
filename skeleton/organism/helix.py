@@ -246,5 +246,6 @@ def card(root: Optional[Path] = None) -> Dict[str, Any]:
         "sense_n": v["sense"]["n"],
         "snap_n": v["snap"]["n"],
         "ok": v["ok"],
+        "mix": __import__("skeleton.organism.context_step", fromlist=["mix_card"]).mix_card(root),
         "stored_prose": 0,
     }
