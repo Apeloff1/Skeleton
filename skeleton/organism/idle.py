@@ -18,9 +18,17 @@ def _cadence(explicit: int | None = None) -> int:
         return explicit
     try:
         from skeleton.organism.caps import live as live_caps
-        return int(live_caps().idle_cadence)
+        cadence = int(live_caps().idle_cadence)
     except Exception:
-        return CADENCE
+        cadence = CADENCE
+    try:
+        from skeleton.kernel.profiles import live_overlay
+        extra = live_overlay().get("idle_cadence")
+        if extra:
+            cadence = max(cadence, int(extra))
+    except Exception:
+        pass
+    return cadence
 
 
 def due(steps: int, last_dream_step: int, *, cadence: int | None = None) -> bool:

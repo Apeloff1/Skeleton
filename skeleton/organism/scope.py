@@ -15,7 +15,15 @@ FILL = ("pulse", "dream", "pulse", "contact")
 def _ambition(pressure: float) -> int:
     # 0.00 pressure → 12 slots. 0.90+ → 2. Headroom lives below the wall.
     p = max(0.0, min(1.0, float(pressure)))
-    return max(2, min(12, int(round((1.0 - p) * 10)) + 2))
+    n = max(2, min(12, int(round((1.0 - p) * 10)) + 2))
+    try:
+        from skeleton.kernel.profiles import live_overlay
+        cap = live_overlay().get("ambition_cap")
+        if cap:
+            n = min(n, int(cap))
+    except Exception:
+        pass
+    return max(1, n)
 
 
 def compose(org, *, neo=None) -> Dict[str, Any]:

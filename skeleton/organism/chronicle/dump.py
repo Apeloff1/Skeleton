@@ -43,7 +43,15 @@ def _hot_targets(root: Optional[Path] = None) -> List[Path]:
 def due(root: Optional[Path] = None) -> List[str]:
     ready = []
     for path in _hot_targets(root):
-        if path.exists() and path.stat().st_size >= HOT_BYTES:
+        limit = HOT_BYTES
+        try:
+            from skeleton.kernel.profiles import live_overlay
+            extra = live_overlay().get("dump_hot_bytes")
+            if extra:
+                limit = min(limit, int(extra))
+        except Exception:
+            pass
+        if path.exists() and path.stat().st_size >= limit:
             ready.append(str(path.name))
     return ready
 

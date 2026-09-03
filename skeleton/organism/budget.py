@@ -31,4 +31,11 @@ def choose(pressure: float, stale_n: int = 0, *, atoms: int = 0, atom_cap: int =
 
 def walk_limit(tier: str, requested: int) -> int:
     cap = {"tiny": 3, "small": 4, "medium": 5, "large": 6, "max": 8}.get(str(tier), 4)
+    try:
+        from skeleton.kernel.profiles import live_overlay
+        extra = live_overlay().get("walk_n")
+        if extra:
+            cap = min(cap, int(extra))
+    except Exception:
+        pass
     return max(1, min(cap, int(requested or cap)))

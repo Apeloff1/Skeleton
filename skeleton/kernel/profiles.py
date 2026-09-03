@@ -113,6 +113,10 @@ def card(*, caps: Dict[str, Any] | None = None) -> Dict[str, Any]:
     }
 
 
+def live_overlay() -> Dict[str, Any]:
+    return dict(card().get("overlay") or {})
+
+
 def apply_overlay(org=None, *, neo=None) -> Dict[str, Any]:
     """Push mobile/tight overlay onto live scope ambition and dump heat."""
     info = card()

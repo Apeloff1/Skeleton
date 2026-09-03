@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Kernel overlay binds walk/scope/idle/dump
+
+- live_overlay() caps walk_n, ambition, idle cadence, dump heat.
+- Mobile/tight now constrain the organism, not just the card.
+- Version 2026.09.03-kbind.
+
+---
+
 ## 2026-09-03 — Multi-kernel profiles + mobile overlay
 
 - kernel/profiles.py. tight / mobile / desktop / max.
