@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — SLO feedback + orch on health
+
+- Each stage records into the SLO kernel. Trip tightens the next plan.
+- health_card carries orch runs/n/decode_n.
+- Version 2026.09.03-slofb.
+
+---
+
 ## 2026-09-03 — Orchestrator DAG + multi-token decode
 
 - Router carries edges, decode_n, slo_trip.

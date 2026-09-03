@@ -37,6 +37,9 @@ class Orchestrator:
 
         for stage in route["run"]:
             card = self._stage(stage, text, bank)
+            good = not card.get("stop") and card.get("ok", 1) != 0
+            if slo is not None and hasattr(slo, "record"):
+                slo.record(bool(good))
             trace.append({"stage": stage, **{k: card.get(k) for k in ("kind", "ok", "writes", "placed", "killed") if k in card}})
             if card.get("stop"):
                 break

@@ -52,4 +52,21 @@ def health_card(org=None, *, neo=None) -> Dict[str, Any]:
         "journal": tail(4, root=getattr(org, "root", None)),
         "stored_prose": prose,
         "helix": __import__("skeleton.organism.helix", fromlist=["card"]).card(getattr(org, "root", None)),
+        "orch": _orch_stamp(),
     }
+
+
+def _orch_stamp() -> Dict[str, Any]:
+    try:
+        from skeleton.kernel.bank import get
+        o = get("orch")
+        last = o.last if o is not None else {}
+        return {
+            "runs": last.get("runs") or 0,
+            "n": last.get("n") or 0,
+            "profile": (last.get("route") or {}).get("profile"),
+            "decode_n": (last.get("route") or {}).get("decode_n"),
+            "stored_prose": 0,
+        }
+    except Exception:
+        return {"runs": 0, "n": 0, "stored_prose": 0}
