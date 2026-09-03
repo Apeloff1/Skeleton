@@ -18,5 +18,6 @@ def rank(*, root=None) -> Dict[str, Any]:
         "hot": hot,
         "n": len(hot),
         "runs": last.get("runs") or 0,
+        "mix": __import__("skeleton.organism.context_step", fromlist=["mix_card"]).mix_card(),
         "stored_prose": 0,
     }
