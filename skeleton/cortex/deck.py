@@ -267,6 +267,11 @@ class CommandDeck:
         from skeleton.galaxy.system import live_galaxy
         return card(live_galaxy().mesh, neo=self.neo)
 
+    def kernels(self) -> Dict[str, Any]:
+        from skeleton.kernel.profiles import apply_overlay, card as kernels_card
+        apply_overlay(neo=self.neo)
+        return kernels_card()
+
     def caps(self) -> Dict[str, Any]:
         from skeleton.organism.caps import card
         return card()

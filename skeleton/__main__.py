@@ -84,6 +84,7 @@ def main(argv: list[str] | None = None) -> int:
     cx.add_argument("cue", nargs="?", default="memory graph")
     sub.add_parser("banks", help="common vs long-tail memory banks")
     sub.add_parser("caps", help="hardware-aware multi-cap table")
+    sub.add_parser("kernels", help="multi-kernel profile (mobile/tight/desktop)")
     sub.add_parser("lattice", help="Hoag lattice + gated KV handles")
     sub.add_parser("health", help="operator health card")
     dc = sub.add_parser("doctor", help="laws + health + caps + field")
@@ -312,6 +313,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "banks":
         from skeleton.cortex.deck import live_deck
         out = live_deck().banks()
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+
+    if args.cmd == "kernels":
+        from skeleton.cortex.deck import live_deck
+        out = live_deck().kernels()
         print(json.dumps(out, indent=2, default=str))
         return 0
 

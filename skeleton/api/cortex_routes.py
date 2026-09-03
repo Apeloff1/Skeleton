@@ -291,6 +291,11 @@ async def cortex_enact_post(state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).enact()
 
 
+@router.get("/cortex/kernels")
+async def cortex_kernels_get(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).kernels()
+
+
 @router.post("/cortex/dump")
 async def cortex_dump_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).dump(force=bool(request.get("force")))

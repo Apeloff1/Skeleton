@@ -93,6 +93,11 @@ SOTA_POINTERS: Tuple[Dict[str, str], ...] = (
     {"topic": "fsfm-selective-forget", "url": "https://arxiv.org/abs/2604.20300", "house": "arXiv"},
     {"topic": "forget-control-plane", "url": "https://arxiv.org/abs/2606.15903", "house": "arXiv"},
     {"topic": "reversible-forgetting", "url": "https://arxiv.org/abs/2608.18177", "house": "arXiv"},
+    {"topic": "mobile-kernel-bench", "url": "https://arxiv.org/abs/2603.11935", "house": "arXiv"},
+    {"topic": "cosm-mobile-pim", "url": "https://arxiv.org/abs/2606.30553", "house": "arXiv"},
+    {"topic": "flexserve-mobile", "url": "https://arxiv.org/abs/2606.23370", "house": "arXiv"},
+    {"topic": "mobilemoe", "url": "https://arxiv.org/abs/2605.27358", "house": "arXiv"},
+    {"topic": "hero-mobile-rag", "url": "https://arxiv.org/abs/2603.01661", "house": "arXiv"},
 )
 
 

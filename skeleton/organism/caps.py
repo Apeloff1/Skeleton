@@ -238,4 +238,9 @@ def card() -> Dict[str, Any]:
         d["disk_free_mb"] = int(usage.free // (1024 * 1024))
     except OSError:
         d["disk_free_mb"] = 0
+    try:
+        from skeleton.kernel.profiles import card as kernels_card
+        d["kernels"] = kernels_card(caps=d)
+    except Exception:
+        pass
     return d

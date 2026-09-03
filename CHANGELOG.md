@@ -4,6 +4,16 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Multi-kernel profiles + mobile overlay
+
+- kernel/profiles.py. tight / mobile / desktop / max.
+  Mobile drops election, gossip, saga. Tighter dump and walk.
+- Caps and ready carry the profile. CLI kernels.
+- Pointers: 2603.11935, 2606.30553, 2606.23370, 2605.27358, 2603.01661.
+- Version 2026.09.03-kernels.
+
+---
+
 ## 2026-09-03 — Local stand-in teacher
 
 - organism/standin.py. NGram copy named teacher. No HF.
