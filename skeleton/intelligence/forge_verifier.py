@@ -21,12 +21,18 @@ class ForgeFileReport:
     path: str
     score: float
     issues: Tuple[str, ...]
+    hard_issues: Tuple[str, ...] = ()
+    soft_issues: Tuple[str, ...] = ()
+    subscores: Dict[str, float] | None = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "path": self.path,
             "score": round(self.score, 4),
             "issues": list(self.issues),
+            "hard_issues": list(self.hard_issues),
+            "soft_issues": list(self.soft_issues),
+            "subscores": {k: round(v, 4) for k, v in (self.subscores or {}).items()},
         }
 
 
@@ -34,16 +40,24 @@ class ForgeFileReport:
 class ForgeVerificationReport:
     accepted: bool
     score: float
+    reason: str
     project_issues: Tuple[str, ...]
     blocking_issues: Tuple[str, ...]
+    weakest_path: str
+    thresholds: Dict[str, float]
+    summary: Dict[str, int]
     file_reports: Tuple[ForgeFileReport, ...]
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "accepted": self.accepted,
             "score": round(self.score, 4),
+            "reason": self.reason,
             "project_issues": list(self.project_issues),
             "blocking_issues": list(self.blocking_issues),
+            "weakest_path": self.weakest_path,
+            "thresholds": {k: round(v, 4) for k, v in self.thresholds.items()},
+            "summary": dict(self.summary),
             "file_reports": [r.to_dict() for r in self.file_reports],
         }
 
@@ -55,37 +69,73 @@ class ForgeVerifier:
         self.accept_at = accept_at
         self.gd_accept_at = gd_accept_at
         self.code = CodeVerifier(accept_at=accept_at)
+        self.runs = 0
+        self.accepted = 0
 
     def verify(self, files: Mapping[str, str], *, request: str = "") -> ForgeVerificationReport:
+        self.runs += 1
         project_issues = tuple(check_files(files))
-        file_reports = []
+        reports = []
         blocking = list(project_issues)
 
         for path in sorted(files):
             if not path.endswith(".gd"):
                 continue
             report = self._verify_gdscript(path, files[path], request=request)
-            file_reports.append(report)
+            reports.append(report)
             if report.score < self.gd_accept_at:
                 blocking.append(f"{path}: verifier score {report.score:.4f} below {self.gd_accept_at:.2f}")
-            for issue in report.issues:
-                if "unsafe" in issue or "unbalanced" in issue:
-                    blocking.append(f"{path}: {issue}")
+            for issue in report.hard_issues:
+                blocking.append(f"{path}: {issue}")
 
-        avg = (sum(r.score for r in file_reports) / len(file_reports)) if file_reports else 1.0
-        accepted = (not project_issues) and all(r.score >= self.gd_accept_at for r in file_reports) and avg >= self.accept_at
+        reports = tuple(sorted(reports, key=lambda r: (r.score, r.path)))
+        avg = (sum(r.score for r in reports) / len(reports)) if reports else 1.0
+        weakest = reports[0].path if reports else ""
+        summary = {
+            "files_checked": len(reports),
+            "failed_files": sum(1 for r in reports if r.score < self.gd_accept_at),
+            "warned_files": sum(1 for r in reports if r.soft_issues and r.score >= self.gd_accept_at),
+            "passed_files": sum(1 for r in reports if r.score >= self.gd_accept_at and not r.soft_issues),
+            "project_issues": len(project_issues),
+            "blocking_issues": len(blocking),
+        }
+        accepted = (not project_issues) and all(r.score >= self.gd_accept_at for r in reports) and avg >= self.accept_at
+        if accepted:
+            self.accepted += 1
+        reason = self._reason(project_issues, reports, avg)
         return ForgeVerificationReport(
             accepted=accepted,
             score=avg,
+            reason=reason,
             project_issues=project_issues,
             blocking_issues=tuple(blocking),
-            file_reports=tuple(file_reports),
+            weakest_path=weakest,
+            thresholds={"project_accept_at": self.accept_at, "gdscript_accept_at": self.gd_accept_at},
+            summary=summary,
+            file_reports=reports,
         )
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "runs": self.runs,
+            "accepted": self.accepted,
+            "accept_rate": round(self.accepted / max(1, self.runs), 4),
+        }
+
+    def _reason(self, project_issues: Tuple[str, ...], reports: Tuple[ForgeFileReport, ...], avg: float) -> str:
+        if project_issues:
+            return "project_closure"
+        if any(r.hard_issues for r in reports):
+            return "unsafe_code"
+        if any(r.score < self.gd_accept_at for r in reports) or avg < self.accept_at:
+            return "low_score"
+        return "accepted"
 
     def _verify_gdscript(self, path: str, text: str, *, request: str = "") -> ForgeFileReport:
         base = self.code.verify(text, request=request or path)
         issues = list(base.issues)
-        score = base.score
+        hard = []
+        soft = []
 
         has_extends = "extends " in text
         has_func = "func " in text
@@ -96,11 +146,11 @@ class ForgeVerifier:
         if has_extends:
             structure += 0.35
         else:
-            issues.append("missing extends")
+            soft.append("missing extends")
         if has_func:
             structure += 0.45
         else:
-            issues.append("no func definition")
+            soft.append("no func definition")
         if has_class:
             structure += 0.20
 
@@ -111,26 +161,45 @@ class ForgeVerifier:
             hits = sum(1 for a in anchors if a.lower() in text.lower())
             grounded = hits / len(anchors)
             if grounded < 0.34:
-                issues.append("file body weakly reflects its role")
+                soft.append("file body weakly reflects its role")
 
         if path.endswith("player_controller.gd"):
             if "move_and_slide" not in text:
-                issues.append("player controller never moves")
+                soft.append("player controller never moves")
             if "HeatSystem" not in text:
-                issues.append("player controller never talks to HeatSystem")
+                soft.append("player controller never talks to HeatSystem")
         elif path.endswith("heat_system.gd"):
             if "current_heat" not in text or "heat_critical" not in text:
-                issues.append("heat system misses thermal flow")
+                soft.append("heat system misses thermal flow")
         elif path.endswith("world_map.gd"):
             if "room" not in text.lower() and "door" not in text.lower():
-                issues.append("world map misses room or door semantics")
+                soft.append("world map misses room or door semantics")
 
-        syntax = 1.0 if not any("unbalanced" in i for i in issues) else 0.0
+        syntax = 1.0 if not any("unbalanced" in i for i in base.issues) else 0.0
         safety = 0.0 if unsafe else 1.0
-        if unsafe and not any("unsafe" in i for i in issues):
-            issues.append("unsafe constructs detected")
+        if any("unbalanced" in i for i in base.issues):
+            hard.append("unbalanced delimiters")
+        if unsafe:
+            hard.append("unsafe constructs detected")
 
         lines = [l for l in text.splitlines() if l.strip()]
         size = 1.0 if 2 <= len(lines) <= 500 else (0.5 if lines else 0.0)
         score = round(0.25 * syntax + 0.25 * safety + 0.25 * structure + 0.15 * grounded + 0.10 * size, 4)
-        return ForgeFileReport(path=path, score=score, issues=tuple(dict.fromkeys(issues)))
+
+        issues.extend(hard)
+        issues.extend(soft)
+        issues = tuple(dict.fromkeys(issues))
+        return ForgeFileReport(
+            path=path,
+            score=score,
+            issues=issues,
+            hard_issues=tuple(dict.fromkeys(hard)),
+            soft_issues=tuple(dict.fromkeys(soft)),
+            subscores={
+                "syntax": syntax,
+                "safety": safety,
+                "structure": structure,
+                "grounding": grounded,
+                "size": size,
+            },
+        )

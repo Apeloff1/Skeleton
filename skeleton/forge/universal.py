@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from skeleton.kernel.errors import BlueprintError, MaterialisationError
-from skeleton.kernel.events import EventBus
+from skeleton.kernel.events import DomainEvent, EventBus
 from skeleton.kernel.ids import BlueprintId
 
 
@@ -100,7 +100,6 @@ class Blueprint:
                             f"-> {wire.dst[0]}.{wire.dst[1]} ({d.port_type})")
                 except BlueprintError:
                     pass
-        # cycle detection over the component dependency graph
         edges: dict[str, list[str]] = {c: [] for c in self.components}
         for wire in self.wires:
             if wire.src[0] in edges and wire.dst[0] in edges:
@@ -155,7 +154,6 @@ class Forge:
         self.register_kind("sink", (Port("in", "event", "in"),))
         self.register_kind("state_store",
                            (Port("write", "state", "in"), Port("read", "state", "out")))
-        # Game-loop kinds (extraction / heat / Jeeves / combat)
         self.register_kind("player", (Port("intent", "event", "out"), Port("state", "state", "out")))
         self.register_kind("heat", (Port("in", "event", "in"), Port("critical", "signal", "out")))
         self.register_kind("weapon_forge", (Port("parts", "resource", "in"), Port("weapon", "event", "out")))
@@ -222,16 +220,34 @@ class Forge:
         }
         if target == "godot":
             files = emit_godot(pack, title=blueprint.name, build_plan=build_plan)
-            verification = ForgeVerifier().verify(files, request=blueprint.name)
+            verifier = ForgeVerifier()
+            verification = verifier.verify(files, request=blueprint.name)
             result["files"] = files
             result["file_count"] = len(files)
             result["verification"] = verification.to_dict()
+            result["verification_stats"] = verifier.stats()
+            event = DomainEvent(
+                topic="forge.verification.completed" if verification.accepted else "forge.verification.failed",
+                payload={
+                    "blueprint_id": blueprint.blueprint_id,
+                    "name": blueprint.name,
+                    "target": target,
+                    "accepted": verification.accepted,
+                    "reason": verification.reason,
+                    "score": verification.score,
+                    "weakest_path": verification.weakest_path,
+                    "summary": verification.summary,
+                },
+                correlation_id=f"forge_verify_{blueprint.blueprint_id}",
+            )
+            self._bus.publish(event)
             if not verification.accepted:
                 raise MaterialisationError(
                     "emitted Godot project failed verification",
                     context={
                         "blueprint_id": blueprint.blueprint_id,
                         "verification": verification.to_dict(),
+                        "verification_stats": verifier.stats(),
                     },
                 )
         self._bus.emit("forge.blueprint.materialised",
