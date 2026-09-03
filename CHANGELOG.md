@@ -4,6 +4,12 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — cage card sees mix
+
+- Version 2026.09.03-mixcage.
+
+---
+
 ## 2026-09-03 — social field sees mix
 
 - Version 2026.09.03-mixfield.

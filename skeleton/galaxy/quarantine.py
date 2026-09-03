@@ -49,7 +49,12 @@ def live() -> Cage:
 
 
 def card() -> Dict[str, Any]:
-    return _CAGE.card()
+    out = _CAGE.card()
+    try:
+        out["mix"] = __import__("skeleton.organism.context_step", fromlist=["mix_card"]).mix_card()
+    except Exception:
+        out["mix"] = {"kind": "mix", "last_mix": 0, "stored_prose": 0}
+    return out
 
 
 def path(root: Optional[Path] = None) -> Path:
