@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Profile switch rebuilds the bank
+
+- python -m skeleton switch mobile|tight|desktop|max
+- Version 2026.09.03-switch.
+
+---
+
 ## 2026-09-03 — Bank reset
 
 - python -m skeleton bank --reset rebuilds the live roster.
