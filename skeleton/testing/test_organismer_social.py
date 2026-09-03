@@ -72,6 +72,24 @@ def test_laws_scan_flags_long_dialect():
     assert scan_prose(gxy.mesh) == 0
 
 
+def test_standin_teacher_is_contactable():
+    from types import SimpleNamespace
+    from skeleton.cortex.contact import is_teacher
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.standin import StandinTeacher, bind
+    from skeleton.organism.teachers import slots_of
+    from skeleton.organism.writeback import absorb
+    port = StandinTeacher("right")
+    assert is_teacher(port)
+    neo = SimpleNamespace(slots={})
+    card = bind(neo, slot="right")
+    assert card["bound"] == 1
+    assert "right" in slots_of(neo)
+    wb = absorb(GalaxySystem().mesh, neo=neo)
+    assert wb["mouth"] == 1
+    assert wb["stored_prose"] == 0
+
+
 def test_writeback_fail_closed_without_mouth():
     from skeleton.galaxy.system import GalaxySystem
     from skeleton.organism.writeback import absorb

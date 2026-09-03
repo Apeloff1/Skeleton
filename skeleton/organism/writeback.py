@@ -17,7 +17,7 @@ def high_value(atom) -> bool:
 
 def into_mouth(neo, topics_n: int) -> Dict[str, Any]:
     """Parametric path. Fail-closed. No HF. No teacher prose."""
-    if neo is None or topics_n <= 0:
+    if neo is None:
         return {"mouth": 0, "lora": 0, "merged": 0, "residual": 0}
     out = {"mouth": 1, "lora": 0, "merged": 0, "residual": 0}
     try:

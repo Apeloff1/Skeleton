@@ -183,6 +183,10 @@ class CommandDeck:
         from skeleton.organism.writeback import absorb
         return absorb(live_galaxy().mesh, neo=self.neo)
 
+    def standin(self, slot: str = "right") -> Dict[str, Any]:
+        from skeleton.organism.standin import bind
+        return bind(self.neo, slot=slot)
+
     def chronicle(self, cue: str = "") -> Dict[str, Any]:
         from skeleton.organism.chronicle import card
         from skeleton.organism.organismer import live_organismer

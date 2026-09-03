@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Local stand-in teacher
+
+- organism/standin.py. NGram copy named teacher. No HF.
+- bind() installs on neo.slots. Write-back can attach LoRA on that copy.
+- CLI standin. Version 2026.09.03-standin.
+
+---
+
 ## 2026-09-03 — Parametric write-back + scoped walks
 
 - writeback.into_mouth: attach_lora / ingest_residual / merge_lora
