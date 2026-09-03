@@ -21,6 +21,7 @@ python -m skeleton coverage
 python -m skeleton decade
 python -m skeleton bank --reset
 python -m skeleton switch mobile
+python -m skeleton witness
 python -m skeleton walk -n 3
 python -m skeleton sleep --force
 python -m skeleton forget "old trace"

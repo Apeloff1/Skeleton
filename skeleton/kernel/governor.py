@@ -47,11 +47,21 @@ def tick(pressure: float | None = None) -> Dict[str, Any]:
         if pressure > CALM:
             _CALM = 0
     after = card()
+    rebuilt = 0
+    if action in {"tighten", "ease"}:
+        try:
+            from skeleton.kernel.switch import to as switch_to
+            target = "tight" if action == "tighten" else str(after.get("profile") or pick(pressure=pressure))
+            switch_to(target)
+            rebuilt = 1
+        except Exception:
+            rebuilt = 0
     return {
         "kind": "kernel-gov",
         "action": action,
         "pressure": round(pressure, 4),
         "profile": after.get("profile"),
         "was": name,
+        "rebuilt": rebuilt,
         "stored_prose": 0,
     }

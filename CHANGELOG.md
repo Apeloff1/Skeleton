@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Governor rebuilds bank on tighten/ease + witness
+
+- tighten/ease calls switch.to so the roster shrinks in the same tick.
+- witness cards fence, hold, hot, coverage, last orch.
+- Version 2026.09.03-witness.
+
+---
+
 ## 2026-09-03 — Profile switch rebuilds the bank
 
 - python -m skeleton switch mobile|tight|desktop|max
