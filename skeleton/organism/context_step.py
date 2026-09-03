@@ -97,6 +97,7 @@ def persist(card: Dict[str, Any], *, root: Optional[Path] = None) -> Path:
         "atom_ids": card.get("atom_ids") or [],
         "n": card.get("n") or 0,
         "conductor": card.get("conductor"),
+        "recall": card.get("recall"),
         "stored_prose": 0,
     }
     p.write_text(json.dumps(slim, indent=2), encoding="utf-8")
@@ -127,6 +128,42 @@ def replay(org, query: str = "", *, root: Optional[Path] = None) -> Dict[str, An
         "recall": card.get("atom_recall") or 0,
         "hits": len(card.get("hits") or []),
         "critical": len(card.get("critical_passthrough") or []),
+        "stored_prose": 0,
+    }
+
+
+def refine(org, stimulus: str = "", *, rounds: int = 2, floor: float = 0.55, neo=None) -> Dict[str, Any]:
+    stim = stimulus or "plan tensor ttk"
+    rounds = max(1, min(3, int(rounds)))
+    traces = []
+    best = {"recall": 0.0}
+    for i in range(rounds):
+        step = run(org, stim, neo=neo)
+        rec = replay(org, stim)
+        rec["round"] = i
+        traces.append(rec)
+        if float(rec.get("recall") or 0) >= float(best.get("recall") or 0):
+            best = rec
+        if float(rec.get("recall") or 0) >= floor:
+            break
+        try:
+            org.galaxy.distiller.glean(stim)
+            org.galaxy.compiler.compile(stim)
+        except Exception:
+            pass
+    try:
+        prev = last(getattr(org, "root", None))
+        prev["recall"] = best.get("recall")
+        persist(prev, root=getattr(org, "root", None))
+    except Exception:
+        pass
+    return {
+        "kind": "ctx-refine",
+        "rounds": len(traces),
+        "best": best.get("recall") or 0,
+        "floor": floor,
+        "ok": int(float(best.get("recall") or 0) >= floor),
+        "traces": traces,
         "stored_prose": 0,
     }
 

@@ -109,6 +109,7 @@ def main(argv: list[str] | None = None) -> int:
     cx = sub.add_parser("ctx", help="five-brain context post-process")
     cx.add_argument("text", nargs="?", default="plan tensor ttk")
     cx.add_argument("--replay", action="store_true")
+    cx.add_argument("--refine", action="store_true")
     cdn = sub.add_parser("conductor", help="editor traffic control")
     cdn.add_argument("--run", action="store_true")
     cdn.add_argument("--commit", action="store_true")
@@ -394,7 +395,10 @@ def main(argv: list[str] | None = None) -> int:
         from skeleton.organism.organismer import live_organismer
         org = live_organismer()
         text = getattr(args, "text", "") or ""
-        if getattr(args, "replay", False):
+        if getattr(args, "refine", False):
+            from skeleton.organism.context_step import refine as ctx_refine
+            print(json.dumps(ctx_refine(org, text), indent=2, default=str))
+        elif getattr(args, "replay", False):
             ctx_run(org, text)
             print(json.dumps(ctx_replay(org, text), indent=2, default=str))
         else:

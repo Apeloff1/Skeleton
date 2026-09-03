@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Context refine loop + recall law
+
+- Encode/decode until recall ≥ 0.55 or 2 rounds. Low recall → dream.
+- Version 2026.09.03-refine.
+
+---
+
 ## 2026-09-03 — Context replay through the decoder
 
 - Last ctx ids decoded. recall + hits, no prose dump.

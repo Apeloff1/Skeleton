@@ -65,6 +65,8 @@ def decide(org=None, *, neo=None) -> Dict[str, Any]:
         code, why = "doctor", "cage"
     elif rot == "rot":
         code, why = "dream", "rot"
+    elif float((__import__("skeleton.organism.context_step", fromlist=["last"]).last(getattr(org, "root", None)).get("recall") or 1)) < 0.50:
+        code, why = "dream", "recall"
     elif float(cov.get("score") or 0) < 0.20:
         code, why = "bind-source", "coverage"
     elif int(cal.get("day_n") or 0) == 0:
