@@ -70,6 +70,8 @@ ROSTER: Dict[str, Tuple[str, ...]] = {
     "catalog": ("skeleton.kernel.ops.catalog",),
     "check": ("skeleton.kernel.ram.check",),
     "stock": ("skeleton.kernel.stock",),
+    "block": ("skeleton.kernel.ops.block",),
+    "stock_live": ("skeleton.kernel.stock_live",),
 }
 
 PROFILES: Dict[str, Tuple[str, ...]] = {

@@ -56,6 +56,12 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
         if arena is not None:
             from skeleton.kernel.meshmem import place
             bank["meshmem"] = place(org.galaxy.mesh, arena)
+        blk = get("block")
+        if blk is not None and hasattr(blk, "forward"):
+            bank["block"] = blk.forward(["plan", "tensor"])
+        live_stock = get("stock_live")
+        if live_stock is not None and hasattr(live_stock, "tick"):
+            bank["stock_live"] = live_stock.tick("pulse")
     except Exception:
         bank = {}
     nxt = hint(org, neo=neo)

@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Full house block + live stock
+
+- Block: embed RMS RoPE qkv attn residual SwiGLU sample.
+- StockLive: entropy, dedup, checkpoint, sliding counter.
+- Version 2026.09.03-block.
+
+---
+
 ## 2026-09-03 — More extras: act alibi window int4 check stock
 
 - GELU/ReLU/tanh, ALiBi, sliding window, INT4 pack.
