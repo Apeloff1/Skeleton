@@ -22,6 +22,19 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
         gov = gov_tick()
     except Exception:
         gov = {}
+    bank: Dict[str, Any] = {}
+    try:
+        from skeleton.kernel.bank import boot, get, snapshot
+        boot()
+        thr = get("throttle")
+        if thr is not None:
+            thr.allow()
+        rec = get("reclaim")
+        if rec is not None and gov.get("profile") == "tight":
+            rec.run(org.galaxy.mesh)
+        bank = snapshot()
+    except Exception:
+        bank = {}
     nxt = hint(org, neo=neo)
     code = str(nxt.get("code") or "pulse")
     acted: Dict[str, Any] = {"code": code}
@@ -54,6 +67,8 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
         "next": nxt,
         "acted": acted,
         "gov": gov,
+        "bank": bank,
+        "bank": bank,
         "G": round(org.G, 6),
         "stored_prose": 0,
     }

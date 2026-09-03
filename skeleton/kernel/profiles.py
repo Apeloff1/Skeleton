@@ -37,13 +37,32 @@ ROSTER: Dict[str, Tuple[str, ...]] = {
     "work": ("skeleton.kernel.work_queue",),
     "gossip": ("skeleton.kernel.gossip",),
     "saga": ("skeleton.kernel.saga",),
+    "admission": ("skeleton.kernel.admission",),
+    "quota": ("skeleton.kernel.quota",),
+    "affinity": ("skeleton.kernel.affinity",),
+    "throttle": ("skeleton.kernel.throttle",),
+    "bloom": ("skeleton.kernel.bloom",),
+    "priority": ("skeleton.kernel.priority",),
+    "reclaim": ("skeleton.kernel.reclaim",),
+    "isolate": ("skeleton.kernel.isolate",),
+    "prefetch": ("skeleton.kernel.prefetch",),
+    "fuse": ("skeleton.kernel.fuse",),
 }
 
 PROFILES: Dict[str, Tuple[str, ...]] = {
-    "tight": ("pressure", "life", "log"),
-    "mobile": ("schedule", "pressure", "life", "log", "time", "box"),
-    "desktop": ("schedule", "pressure", "life", "fence", "log", "time", "box", "work", "gossip", "saga"),
-    "max": ("schedule", "pressure", "life", "fence", "log", "time", "box", "work", "gossip", "saga"),
+    "tight": ("pressure", "life", "log", "throttle", "quota", "reclaim", "bloom"),
+    "mobile": (
+        "schedule", "pressure", "life", "log", "time", "box",
+        "throttle", "quota", "reclaim", "bloom", "isolate", "prefetch", "admission",
+    ),
+    "desktop": (
+        "schedule", "pressure", "life", "fence", "log", "time", "box", "work", "gossip", "saga",
+        "admission", "quota", "affinity", "throttle", "bloom", "priority", "reclaim", "isolate", "prefetch", "fuse",
+    ),
+    "max": (
+        "schedule", "pressure", "life", "fence", "log", "time", "box", "work", "gossip", "saga",
+        "admission", "quota", "affinity", "throttle", "bloom", "priority", "reclaim", "isolate", "prefetch", "fuse",
+    ),
 }
 
 MOBILE_OVERLAY = {

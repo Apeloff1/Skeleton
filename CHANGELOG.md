@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-03 — Ten more kernels + live bank
+
+- admission quota affinity throttle bloom priority reclaim isolate prefetch fuse
+- Profiles pick a subset. Pulse boots the bank. Version 2026.09.03-k10.
+
+---
+
 ## 2026-09-03 — Follow-state + local helix consensus + compact lattice
 
 - follow.py grows a 64-token operator bag. Pulse writes it.

@@ -272,6 +272,11 @@ class CommandDeck:
         apply_overlay(neo=self.neo)
         return kernels_card()
 
+    def bank(self) -> Dict[str, Any]:
+        from skeleton.kernel.bank import boot, snapshot
+        boot()
+        return snapshot()
+
     def follow(self) -> Dict[str, Any]:
         from skeleton.organism.follow import card as follow_card
         from skeleton.organism.organismer import live_organismer
