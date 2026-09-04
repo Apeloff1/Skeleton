@@ -59,15 +59,26 @@ def repair_summary(items: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             "successes": 0,
             "failures": 0,
             "success_rate": 0.0,
+            "reasons": {},
+            "surfaces": {},
         }
     successes = sum(1 for x in rows if x.get("accepted"))
     failures = len(rows) - successes
+    reasons: Dict[str, int] = {}
+    surfaces: Dict[str, int] = {}
+    for row in rows:
+        reason = str(row.get("reason") or "unknown")
+        surface = str(row.get("surface") or "unknown")
+        reasons[reason] = reasons.get(reason, 0) + 1
+        surfaces[surface] = surfaces.get(surface, 0) + 1
     return {
         "kind": "repair-rollup",
         "count": len(rows),
         "successes": successes,
         "failures": failures,
         "success_rate": round(successes / max(1, len(rows)), 4),
+        "reasons": reasons,
+        "surfaces": surfaces,
     }
 
 
@@ -168,6 +179,16 @@ def repair_candidates(*, root: Optional[Path] = None, surface: str = "forge") ->
     return rows
 
 
+def recent_activity(*, root: Optional[Path] = None, limit: int = 8) -> Dict[str, Any]:
+    rows = load_quality(root=root, limit=limit)
+    return {
+        "kind": "quality-activity",
+        "n": len(rows),
+        "items": rows,
+        "stored_prose": 0,
+    }
+
+
 def quality_snapshot(*, root: Optional[Path] = None, limit: int = 32) -> Dict[str, Any]:
     rows = load_quality(root=root, limit=limit)
     return {
@@ -177,4 +198,5 @@ def quality_snapshot(*, root: Optional[Path] = None, limit: int = 32) -> Dict[st
         "recent": rows,
         "rollup": summarize_quality(rows),
         "repairs": repair_summary(rows),
+        "activity": recent_activity(root=root, limit=min(limit, 8)),
     }

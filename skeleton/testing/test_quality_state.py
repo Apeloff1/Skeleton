@@ -1,7 +1,7 @@
 """Quality state persistence tests."""
 from __future__ import annotations
 
-from skeleton.organism.quality_state import append_quality, append_repair, latest_failure, latest_quality, latest_repair, load_quality, quality_snapshot, repair_candidates
+from skeleton.organism.quality_state import append_quality, append_repair, latest_failure, latest_quality, latest_repair, load_quality, quality_snapshot, recent_activity, repair_candidates
 
 
 def test_quality_state_appends_and_reads(tmp_path):
@@ -43,3 +43,11 @@ def test_quality_evidence_is_persisted(tmp_path):
     }, root=tmp_path)
     row = latest_failure(root=tmp_path, surface="forge")
     assert row["evidence"]["top_file_reports"][0]["path"].endswith("world_map.gd")
+
+
+def test_recent_activity_rollup(tmp_path):
+    append_quality({"surface": "plan", "accepted": True, "reason": "accepted", "score": 0.9}, root=tmp_path)
+    append_repair({"surface": "forge", "ok": 1, "before": {"reason": "low_score"}, "after": {"reason": "accepted", "score": 0.8}}, root=tmp_path)
+    activity = recent_activity(root=tmp_path)
+    assert activity["n"] == 2
+    assert activity["items"]
