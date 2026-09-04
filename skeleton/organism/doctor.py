@@ -16,6 +16,7 @@ def doctor_card(org=None, *, neo=None, fix: bool = False) -> Dict[str, Any]:
     from skeleton.organism.next import hint
     from skeleton.organism.organismer import live_organismer
     from skeleton.organism.quality_state import quality_pressure, quality_snapshot
+    from skeleton.organism.repair_card import repair_card
     from skeleton.social.field import field_card
 
     org = org or live_organismer()
@@ -31,14 +32,6 @@ def doctor_card(org=None, *, neo=None, fix: bool = False) -> Dict[str, Any]:
     prose = int(laws.get("stored_prose") or 0)
     quality = quality_snapshot(root=getattr(org, "root", None))
     q_pressure = quality_pressure(quality["rollup"])
-    latest_repair = quality.get("latest_repair") or {}
-    repair_view = {
-        "surface": latest_repair.get("surface") or "",
-        "changed": (latest_repair.get("metadata") or {}).get("changed", 0),
-        "before_reason": (latest_repair.get("metadata") or {}).get("before_reason") or "",
-        "after_reason": (latest_repair.get("metadata") or {}).get("after_reason") or "",
-        "target": latest_repair.get("weakest_path") or "",
-    }
     helix = {}
     try:
         from skeleton.organism.helix import verify as helix_verify
@@ -78,15 +71,11 @@ def doctor_card(org=None, *, neo=None, fix: bool = False) -> Dict[str, Any]:
         "laws_ok": laws["ok"],
         "quality": quality,
         "quality_pressure": q_pressure,
-        "latest_repair": latest_repair,
-        "repair_view": repair_view,
+        "repair_card": repair_card(root=getattr(org, "root", None)),
         "fix": clipped,
         "helix_ok": helix_ok,
         "helix_sense_n": (helix.get("sense") or {}).get("n"),
         "helix_snap_n": (helix.get("snap") or {}).get("n"),
         "verified": verified,
         "satellites": __import__("skeleton.organism.satellites", fromlist=["satellites_card"]).satellites_card(org),
-        "cage": __import__("skeleton.galaxy.quarantine", fromlist=["card"]).card(),
-        "observe": __import__("skeleton.organism.observe", fromlist=["card"]).card(getattr(org, "root", None)),
-        "mix": __import__("skeleton.organism.context_step", fromlist=["mix_card"]).mix_card(getattr(org, "root", None)),
     }

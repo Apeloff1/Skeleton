@@ -14,6 +14,7 @@ def nervous_card(org=None, *, neo=None) -> Dict[str, Any]:
     from skeleton.organism.laws import scan_prose
     from skeleton.organism.organismer import live_organismer
     from skeleton.organism.quality_state import quality_pressure, quality_snapshot
+    from skeleton.organism.repair_card import repair_card
 
     org = org or live_organismer()
     caps = caps_card()
@@ -22,14 +23,6 @@ def nervous_card(org=None, *, neo=None) -> Dict[str, Any]:
     q = quality_snapshot(root=getattr(org, "root", None))
     q_rollup = q["rollup"]
     q_pressure = quality_pressure(q_rollup)
-    latest_repair = q.get("latest_repair") or {}
-    repair_view = {
-        "surface": latest_repair.get("surface") or "",
-        "changed": (latest_repair.get("metadata") or {}).get("changed", 0),
-        "before_reason": (latest_repair.get("metadata") or {}).get("before_reason") or "",
-        "after_reason": (latest_repair.get("metadata") or {}).get("after_reason") or "",
-        "target": latest_repair.get("weakest_path") or "",
-    }
     try:
         helix_ok = int(helix_verify(getattr(org, "root", None)).get("ok") or 0)
     except Exception:
@@ -63,7 +56,6 @@ def nervous_card(org=None, *, neo=None) -> Dict[str, Any]:
         "teachers": teachers,
         "quality": q,
         "quality_pressure": q_pressure,
-        "latest_repair": latest_repair,
-        "repair_view": repair_view,
+        "repair_card": repair_card(root=getattr(org, "root", None)),
         "stored_prose": prose,
     }

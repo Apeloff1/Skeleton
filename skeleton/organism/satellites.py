@@ -69,25 +69,16 @@ def retrieve_card(cue: str = "", *, org=None) -> Dict[str, Any]:
 
 def satellites_card(org=None, *, cue: str = "") -> Dict[str, Any]:
     from skeleton.organism.quality_state import quality_snapshot
+    from skeleton.organism.repair_card import repair_card
 
     root = getattr(org, "root", None) if org is not None else None
     quality = quality_snapshot(root=root)
-    latest_repair = quality.get("latest_repair") or {}
-    repair_view = {
-        "surface": latest_repair.get("surface") or "",
-        "changed": (latest_repair.get("metadata") or {}).get("changed", 0),
-        "before_reason": (latest_repair.get("metadata") or {}).get("before_reason") or "",
-        "after_reason": (latest_repair.get("metadata") or {}).get("after_reason") or "",
-        "target": latest_repair.get("weakest_path") or "",
-    }
     return {
         "kind": "satellites",
         "jeeves": jeeves_card(),
         "vault": vault_card(),
         "retrieve": retrieve_card(cue, org=org),
         "quality": quality,
-        "latest_repair": latest_repair,
-        "repair_view": repair_view,
-        "mix": __import__("skeleton.organism.context_step", fromlist=["mix_card"]).mix_card(root),
+        "repair_card": repair_card(root=root),
         "stored_prose": 0,
     }
