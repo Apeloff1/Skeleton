@@ -1,57 +1,64 @@
-"""python -m skeleton — run, intake, eras, check.
-
-Fix (2026-08-29): two subparsers were both registered under the name
-``plan`` (``pl`` and ``pb``), so argparse raised ``conflicting subparser``
-at startup — no CLI command could run at all. The builder-plan command is
-now ``build-plan``; ``plan`` keeps the live-Jeeves plan_build path.
-"""
+"""python -m skeleton — operator diagnostics and policy steering."""
 from __future__ import annotations
 
 import argparse
 import json
-import sys
 
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="python -m skeleton")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("product", help="operator product card for the living organism")
-    sub.add_parser("failures", help="latest failure and recurring failure issues")
-    sub.add_parser("repairs", help="latest repair and repair rollups")
-    ac = sub.add_parser("activity", help="recent quality and repair activity")
+    sub.add_parser("product")
+    fl = sub.add_parser("failures")
+    fl.add_argument("--surface", default="")
+    rp = sub.add_parser("repairs")
+    rp.add_argument("--surface", default="")
+    ac = sub.add_parser("activity")
     ac.add_argument("-n", type=int, default=8)
-    sub.add_parser("recurring", help="recurring failure issues and repair targets")
+    ac.add_argument("--surface", default="")
+    ac.add_argument("--kind", default="")
+    rc = sub.add_parser("recurring")
+    rc.add_argument("--surface", default="")
+    sub.add_parser("policy")
+    th = sub.add_parser("threshold")
+    th.add_argument("--surface", default="")
+    sth = sub.add_parser("set-threshold")
+    sth.add_argument("surface")
+    sth.add_argument("value", type=float)
+    sre = sub.add_parser("set-repair-enabled")
+    sre.add_argument("surface")
+    sre.add_argument("enabled")
+    src = sub.add_parser("set-repair-class")
+    src.add_argument("name")
+    src.add_argument("enabled")
 
     args = p.parse_args(argv)
+    from skeleton.cortex.deck import live_deck
+    deck = live_deck()
 
     if args.cmd == "product":
-        from skeleton.cortex.deck import live_deck
-        print(json.dumps(live_deck().product(), indent=2, default=str))
-        return 0
-
+        print(json.dumps(deck.product(), indent=2, default=str)); return 0
     if args.cmd == "failures":
-        from skeleton.cortex.deck import live_deck
-        print(json.dumps(live_deck().failures(), indent=2, default=str))
-        return 0
-
+        print(json.dumps(deck.failures(surface=args.surface), indent=2, default=str)); return 0
     if args.cmd == "repairs":
-        from skeleton.cortex.deck import live_deck
-        print(json.dumps(live_deck().repairs(), indent=2, default=str))
-        return 0
-
+        print(json.dumps(deck.repairs(surface=args.surface), indent=2, default=str)); return 0
     if args.cmd == "activity":
-        from skeleton.cortex.deck import live_deck
-        out = live_deck().activity()
-        out["requested_n"] = int(args.n)
-        print(json.dumps(out, indent=2, default=str))
-        return 0
-
+        print(json.dumps(deck.activity(surface=args.surface, kind=args.kind, limit=args.n), indent=2, default=str)); return 0
     if args.cmd == "recurring":
-        from skeleton.cortex.deck import live_deck
-        print(json.dumps(live_deck().recurring(), indent=2, default=str))
-        return 0
-
+        print(json.dumps(deck.recurring(surface=args.surface), indent=2, default=str)); return 0
+    if args.cmd == "policy":
+        print(json.dumps(deck.policy(), indent=2, default=str)); return 0
+    if args.cmd == "threshold":
+        print(json.dumps(deck.threshold(surface=args.surface), indent=2, default=str)); return 0
+    if args.cmd == "set-threshold":
+        print(json.dumps(deck.set_threshold(args.surface, args.value), indent=2, default=str)); return 0
+    if args.cmd == "set-repair-enabled":
+        enabled = str(args.enabled).lower() in {"1", "true", "yes", "on"}
+        print(json.dumps(deck.set_repair_enabled(args.surface, enabled), indent=2, default=str)); return 0
+    if args.cmd == "set-repair-class":
+        enabled = str(args.enabled).lower() in {"1", "true", "yes", "on"}
+        print(json.dumps(deck.set_repair_class(args.name, enabled), indent=2, default=str)); return 0
     return 0
 
 

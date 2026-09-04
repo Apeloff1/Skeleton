@@ -1,24 +1,14 @@
-"""Cortex command deck — inspect AND speak.
-
-Read surface stays. Mutation paths (speak / refer / improve / ascend /
-plan / genos / dodeca) are the organism the CLI already had; HTTP now
-carries the same mouth. Genesis handle if wired; live_cortex otherwise.
-Laws gate every write. Pointers only.
-"""
+"""Cortex command deck — inspect AND speak."""
 from __future__ import annotations
 
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from skeleton.api.server import get_state
 from skeleton.cortex.deck import CommandDeck
-from skeleton.cortex.dodeca import FACES, face_card
-from skeleton.cortex.laws import LAWS
-from skeleton.cortex.refs import index as refs_index
 
 router = APIRouter()
-
 _decks: Dict[int, CommandDeck] = {}
 
 
@@ -60,3 +50,23 @@ async def cortex_activity(surface: str = "", kind: str = "", limit: int = 8, sta
 @router.get("/cortex/recurring")
 async def cortex_recurring(surface: str = "", state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).recurring(surface=surface)
+
+@router.get("/cortex/policy")
+async def cortex_policy(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).policy()
+
+@router.get("/cortex/threshold")
+async def cortex_threshold(surface: str = "", state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).threshold(surface=surface)
+
+@router.post("/cortex/threshold")
+async def cortex_threshold_set(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).set_threshold(str(request.get("surface") or ""), float(request.get("value") or 0.7))
+
+@router.post("/cortex/repair-enabled")
+async def cortex_repair_enabled(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).set_repair_enabled(str(request.get("surface") or ""), bool(request.get("enabled")))
+
+@router.post("/cortex/repair-class")
+async def cortex_repair_class(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).set_repair_class(str(request.get("name") or ""), bool(request.get("enabled")))

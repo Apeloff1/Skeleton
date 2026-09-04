@@ -16,6 +16,24 @@ The segment currently introduces persistent operator policy state for:
 - `skeleton/organism/policy_card.py`
 - `skeleton/organism/policy_control_card.py`
 
+## Current surfaces
+
+### CLI
+
+- `python -m skeleton policy`
+- `python -m skeleton threshold --surface forge`
+- `python -m skeleton set-threshold forge 0.82`
+- `python -m skeleton set-repair-enabled npc false`
+- `python -m skeleton set-repair-class scene_stub false`
+
+### HTTP
+
+- `GET /api/v1/cortex/policy`
+- `GET /api/v1/cortex/threshold?surface=`
+- `POST /api/v1/cortex/threshold`
+- `POST /api/v1/cortex/repair-enabled`
+- `POST /api/v1/cortex/repair-class`
+
 ## Current persisted state
 
 The policy state lives under organism storage in `policy.json`.
@@ -26,7 +44,7 @@ It currently tracks three buckets:
 2. `repair_enabled`
 3. `repair_classes`
 
-## Current surfaces
+## Current state
 
 What is real now:
 
@@ -35,13 +53,15 @@ What is real now:
 - repair enabled helper
 - repair class helper
 - policy card views
-
-What is still pending:
-
 - command-deck policy methods
 - CLI steering commands
 - HTTP steering endpoints
-- wiring thresholds and toggles into repair execution decisions
+
+What is still pending:
+
+- wiring thresholds into verifier thresholds by surface
+- wiring repair toggles/classes into execution gating
+- policy visibility in top-level operator cards
 
 ## Design stance
 

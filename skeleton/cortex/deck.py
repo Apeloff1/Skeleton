@@ -55,33 +55,9 @@ class CommandDeck:
             self.last_ref = out.get("ref")
         return out
 
-    def improve(self, stimulus: str, *, rounds: int = 6) -> Dict[str, Any]:
-        if hasattr(self.neo, "improve"):
-            card = self.neo.improve(stimulus, rounds=rounds)
-        else:
-            from skeleton.cortex.improve import improve as improve_fn
-            card = improve_fn(self.neo, stimulus, rounds=rounds)
-        if isinstance(card, dict) and card.get("improved"):
-            self.last_improve = card
-        return card if isinstance(card, dict) else {"improved": 0}
-
-    def ascend(self, stimulus: str, *, rounds: int = 6) -> Dict[str, Any]:
-        if hasattr(self.neo, "ascend"):
-            card = self.neo.ascend(stimulus, rounds=rounds)
-        else:
-            card = self.improve(stimulus, rounds=rounds)
-            if isinstance(card, dict) and card.get("improved"):
-                card = {**card, "kind": "ascend"}
-        if isinstance(card, dict) and card.get("improved"):
-            self.last_improve = card
-        return card if isinstance(card, dict) else {"improved": 0}
-
     def speak(self, stimulus: str) -> Dict[str, Any]:
         stim = stimulus or ""
         hit = self.refer(stim)
-        improve: Optional[Dict[str, Any]] = None
-        if "like " in stim.lower() and hit.get("hit"):
-            improve = self.ascend(stim, rounds=6)
         trace = None
         if hasattr(self.neo, "think"):
             trace = self.neo.think(stim)
@@ -91,7 +67,7 @@ class CommandDeck:
             amalgam = f"HOUSE {ref.get('era')} · {ref.get('dialect') or ''}"
         elif trace is not None and hasattr(trace, "amalgam"):
             amalgam = getattr(trace.amalgam, "text", "") or ""
-        card = {"stimulus": stim[:240], "amalgam": amalgam[:400], "mouth": self.neo.speaking_name() if hasattr(self.neo, "speaking_name") else "neo", "G": round(_g(self.neo), 6), "law": "ok", "used_own": bool(getattr(trace, "used_own", False)), "hit": int(bool(hit.get("hit"))), "citation": (hit.get("ref") or {}).get("citation") if hit.get("hit") else None, "stored_prose": 0, "improve": improve, "think": _trace_dict(trace), "at": int(time.time() * 1000)}
+        card = {"stimulus": stim[:240], "amalgam": amalgam[:400], "mouth": self.neo.speaking_name() if hasattr(self.neo, "speaking_name") else "neo", "G": round(_g(self.neo), 6), "law": "ok", "used_own": bool(getattr(trace, "used_own", False)), "hit": int(bool(hit.get("hit"))), "citation": (hit.get("ref") or {}).get("citation") if hit.get("hit") else None, "stored_prose": 0, "think": _trace_dict(trace), "at": int(time.time() * 1000)}
         check({"kind": "speak", "dialect": card["amalgam"][:160], "title": (self.last_ref or {}).get("title") or ""})
         self.traces = [card, *self.traces][:24]
         return card
@@ -102,80 +78,41 @@ class CommandDeck:
         card["mouth_G"] = round(_g(self.neo), 6)
         return card
 
-    def failures(self) -> Dict[str, Any]:
+    def failures(self, *, surface: str = "") -> Dict[str, Any]:
         from skeleton.organism.failure_card import failure_card
-        return failure_card(root=self.root)
+        return failure_card(root=self.root, surface=surface)
 
-    def repairs(self) -> Dict[str, Any]:
+    def repairs(self, *, surface: str = "") -> Dict[str, Any]:
         from skeleton.organism.repair_card import repair_card
-        return repair_card(root=self.root)
+        return repair_card(root=self.root, surface=surface)
 
-    def activity(self) -> Dict[str, Any]:
+    def activity(self, *, surface: str = "", kind: str = "", limit: int = 8) -> Dict[str, Any]:
         from skeleton.organism.activity_card import activity_card
-        return activity_card(root=self.root)
+        return activity_card(root=self.root, surface=surface, kind=kind, limit=limit)
 
-    def recurring(self) -> Dict[str, Any]:
+    def recurring(self, *, surface: str = "") -> Dict[str, Any]:
         from skeleton.organism.recurring_card import recurring_card
-        return recurring_card(root=self.root)
+        return recurring_card(root=self.root, surface=surface)
 
-    def health(self) -> Dict[str, Any]:
-        from skeleton.organism.health import health_card
-        return health_card(neo=self.neo)
+    def policy(self) -> Dict[str, Any]:
+        from skeleton.organism.policy_control_card import policy_control_card
+        return policy_control_card(root=self.root)
 
-    def doctor(self, fix: bool = False) -> Dict[str, Any]:
-        from skeleton.organism.doctor import doctor_card
-        return doctor_card(neo=self.neo, fix=fix)
+    def threshold(self, *, surface: str = "") -> Dict[str, Any]:
+        from skeleton.organism.policy_card import threshold_card
+        return threshold_card(root=self.root, surface=surface)
 
-    def satellites(self, cue: str = "") -> Dict[str, Any]:
-        from skeleton.organism.organismer import live_organismer
-        from skeleton.organism.satellites import satellites_card
-        return satellites_card(live_organismer(), cue=cue)
+    def set_threshold(self, surface: str, value: float) -> Dict[str, Any]:
+        from skeleton.organism.policy_card import set_threshold_card
+        return set_threshold_card(surface, value, root=self.root)
 
-    def nervous(self) -> Dict[str, Any]:
-        from skeleton.organism.nervous import nervous_card
-        from skeleton.organism.organismer import live_organismer
-        return nervous_card(live_organismer(), neo=self.neo)
+    def set_repair_enabled(self, surface: str, enabled: bool) -> Dict[str, Any]:
+        from skeleton.organism.policy_card import set_repair_enabled_card
+        return set_repair_enabled_card(surface, enabled, root=self.root)
 
-    def chronicle(self, cue: str = "") -> Dict[str, Any]:
-        from skeleton.organism.chronicle import card
-        from skeleton.organism.organismer import live_organismer
-        return card(live_organismer(), cue=cue)
-
-    def dump(self, force: bool = False) -> Dict[str, Any]:
-        from skeleton.organism.chronicle.dump import dump
-        from skeleton.organism.organismer import live_organismer
-        return dump(live_organismer().root, force=force)
-
-    def laws(self) -> Dict[str, Any]:
-        from skeleton.organism.laws import laws_card
-        from skeleton.galaxy.system import live_galaxy
-        return laws_card(live_galaxy().mesh)
-
-    def next(self) -> Dict[str, Any]:
-        from skeleton.organism.next import hint
-        from skeleton.organism.organismer import live_organismer
-        return hint(live_organismer(), neo=self.neo)
-
-    def seed(self) -> Dict[str, Any]:
-        from skeleton.galaxy.system import live_galaxy
-        from skeleton.social.seed import seed_field
-        return seed_field(live_galaxy())
-
-    def field(self) -> Dict[str, Any]:
-        from skeleton.social.field import field_card
-        return field_card()
-
-    def ready(self, walk: bool = False, n: int = 2, fix: bool = False) -> Dict[str, Any]:
-        from skeleton.organism.ready import ready_card
-        return ready_card(neo=self.neo, walk=walk, n=n, fix=fix)
-
-    def pulse(self, stimulus: str = "") -> Dict[str, Any]:
-        from skeleton.organism.pulse import pulse
-        return pulse(neo=self.neo, stimulus=stimulus)
-
-    def walk(self, stimulus: str = "", n: int = 4) -> Dict[str, Any]:
-        from skeleton.organism.runloop import walk
-        return walk(neo=self.neo, stimulus=stimulus, n=n)
+    def set_repair_class(self, name: str, enabled: bool) -> Dict[str, Any]:
+        from skeleton.organism.policy_card import set_repair_class_card
+        return set_repair_class_card(name, enabled, root=self.root)
 
     def snapshot(self) -> Dict[str, Any]:
         return {"status": self.status(), "last_ref": self.last_ref, "last_improve": self.last_improve, "last_plan": self.last_plan, "traces": list(self.traces[:8]), "position": self.position, "face": FACES[self.position]}
