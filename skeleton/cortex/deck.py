@@ -47,20 +47,7 @@ class CommandDeck:
             st = {}
         g = _g(neo)
         toward = min(100.0, max(0.0, (g - 1.0) / 9.0 * 100.0))
-        return {
-            "G": round(g, 6),
-            "target": 10.0,
-            "toward_pct": round(toward, 1),
-            "pulses": int(getattr(getattr(neo, "genos_engine", None), "pulses", 0) or 0),
-            "epsilon": float(getattr(getattr(neo, "genos_engine", None), "epsilon", 0) or 0),
-            "mouth": neo.speaking_name() if hasattr(neo, "speaking_name") else "neo",
-            "dodeca": face_card(neo),
-            "laws": list(LAWS),
-            "refs": len(refs_index()),
-            "traces": len(self.traces),
-            "last_title": (self.last_ref or {}).get("title"),
-            "cortex": st,
-        }
+        return {"G": round(g, 6), "target": 10.0, "toward_pct": round(toward, 1), "pulses": int(getattr(getattr(neo, "genos_engine", None), "pulses", 0) or 0), "epsilon": float(getattr(getattr(neo, "genos_engine", None), "epsilon", 0) or 0), "mouth": neo.speaking_name() if hasattr(neo, "speaking_name") else "neo", "dodeca": face_card(neo), "laws": list(LAWS), "refs": len(refs_index()), "traces": len(self.traces), "last_title": (self.last_ref or {}).get("title"), "cortex": st}
 
     def refer(self, stimulus: str, *, live: bool = False) -> Dict[str, Any]:
         out = refer(stimulus, live=live)
@@ -104,53 +91,32 @@ class CommandDeck:
             amalgam = f"HOUSE {ref.get('era')} · {ref.get('dialect') or ''}"
         elif trace is not None and hasattr(trace, "amalgam"):
             amalgam = getattr(trace.amalgam, "text", "") or ""
-        card = {
-            "stimulus": stim[:240],
-            "amalgam": amalgam[:400],
-            "mouth": self.neo.speaking_name() if hasattr(self.neo, "speaking_name") else "neo",
-            "G": round(_g(self.neo), 6),
-            "law": "ok",
-            "used_own": bool(getattr(trace, "used_own", False)),
-            "hit": int(bool(hit.get("hit"))),
-            "citation": (hit.get("ref") or {}).get("citation") if hit.get("hit") else None,
-            "stored_prose": 0,
-            "improve": improve,
-            "think": _trace_dict(trace),
-            "at": int(time.time() * 1000),
-        }
+        card = {"stimulus": stim[:240], "amalgam": amalgam[:400], "mouth": self.neo.speaking_name() if hasattr(self.neo, "speaking_name") else "neo", "G": round(_g(self.neo), 6), "law": "ok", "used_own": bool(getattr(trace, "used_own", False)), "hit": int(bool(hit.get("hit"))), "citation": (hit.get("ref") or {}).get("citation") if hit.get("hit") else None, "stored_prose": 0, "improve": improve, "think": _trace_dict(trace), "at": int(time.time() * 1000)}
         check({"kind": "speak", "dialect": card["amalgam"][:160], "title": (self.last_ref or {}).get("title") or ""})
         self.traces = [card, *self.traces][:24]
         return card
-
-    def galaxy(self, stimulus: str = "", *, sleep: bool = False) -> Dict[str, Any]:
-        from skeleton.galaxy.system import live_galaxy
-        gxy = live_galaxy()
-        if stimulus:
-            card = gxy.pulse(stimulus, sleep=sleep)
-        else:
-            card = gxy.snapshot()
-        card["G"] = round(_g(self.neo), 6)
-        card["stored_prose"] = 0
-        return card
-
-    def organismer(self, stimulus: str = "", *, sleep: bool = False, live_cdx: bool = False) -> Dict[str, Any]:
-        from skeleton.organism.organismer import live_organismer
-        org = live_organismer()
-        if stimulus:
-            return org.step(stimulus, neo=self.neo, sleep=sleep, live_cdx=live_cdx)
-        snap = org.snapshot()
-        snap["G"] = round(_g(self.neo), 6) if _g(self.neo) > snap["G"] else snap["G"]
-        return snap
-
-    def social(self, stimulus: str = "") -> Dict[str, Any]:
-        from skeleton.social.sota import sota_card
-        return sota_card(stimulus, G=_g(self.neo))
 
     def product(self) -> Dict[str, Any]:
         from skeleton.organism.product import product_card
         card = product_card()
         card["mouth_G"] = round(_g(self.neo), 6)
         return card
+
+    def failures(self) -> Dict[str, Any]:
+        from skeleton.organism.failure_card import failure_card
+        return failure_card(root=self.root)
+
+    def repairs(self) -> Dict[str, Any]:
+        from skeleton.organism.repair_card import repair_card
+        return repair_card(root=self.root)
+
+    def activity(self) -> Dict[str, Any]:
+        from skeleton.organism.activity_card import activity_card
+        return activity_card(root=self.root)
+
+    def recurring(self) -> Dict[str, Any]:
+        from skeleton.organism.recurring_card import recurring_card
+        return recurring_card(root=self.root)
 
     def health(self) -> Dict[str, Any]:
         from skeleton.organism.health import health_card
@@ -169,23 +135,6 @@ class CommandDeck:
         from skeleton.organism.nervous import nervous_card
         from skeleton.organism.organismer import live_organismer
         return nervous_card(live_organismer(), neo=self.neo)
-
-    def scope(self) -> Dict[str, Any]:
-        from skeleton.organism.scope import card as scope_card
-        return scope_card(neo=self.neo)
-
-    def enact(self) -> Dict[str, Any]:
-        from skeleton.organism.scope import enact
-        return enact(neo=self.neo)
-
-    def writeback(self) -> Dict[str, Any]:
-        from skeleton.galaxy.system import live_galaxy
-        from skeleton.organism.writeback import absorb
-        return absorb(live_galaxy().mesh, neo=self.neo)
-
-    def standin(self, slot: str = "right") -> Dict[str, Any]:
-        from skeleton.organism.standin import bind
-        return bind(self.neo, slot=slot)
 
     def chronicle(self, cue: str = "") -> Dict[str, Any]:
         from skeleton.organism.chronicle import card
@@ -220,25 +169,6 @@ class CommandDeck:
         from skeleton.organism.ready import ready_card
         return ready_card(neo=self.neo, walk=walk, n=n, fix=fix)
 
-    def sleep(self, force: bool = False, cue: str = "") -> Dict[str, Any]:
-        from skeleton.organism.sleep import cycle
-        return cycle(neo=self.neo, force=force, cue=cue)
-
-    def forget(self, cue: str = "") -> Dict[str, Any]:
-        from skeleton.galaxy.system import live_galaxy
-        from skeleton.organism.forget import sweep
-        return sweep(live_galaxy().mesh, cue=cue)
-
-    def helix(self) -> Dict[str, Any]:
-        from skeleton.organism.helix import card
-        from skeleton.organism.organismer import live_organismer
-        return card(live_organismer().root)
-
-    def recall(self, cue: str = "") -> Dict[str, Any]:
-        from skeleton.organism.helix import recall
-        from skeleton.organism.organismer import live_organismer
-        return recall(cue, root=live_organismer().root)
-
     def pulse(self, stimulus: str = "") -> Dict[str, Any]:
         from skeleton.organism.pulse import pulse
         return pulse(neo=self.neo, stimulus=stimulus)
@@ -246,194 +176,6 @@ class CommandDeck:
     def walk(self, stimulus: str = "", n: int = 4) -> Dict[str, Any]:
         from skeleton.organism.runloop import walk
         return walk(neo=self.neo, stimulus=stimulus, n=n)
-
-    def wiki(self, q: str = "") -> Dict[str, Any]:
-        from skeleton.galaxy.query import run
-        from skeleton.galaxy.system import live_galaxy
-        return run(live_galaxy().mesh, q)
-
-    def graph(self, cue: str = "") -> Dict[str, Any]:
-        from skeleton.galaxy.graph import card as graph_card
-        from skeleton.galaxy.system import live_galaxy
-        return graph_card(live_galaxy().mesh, cue)
-
-    def context(self, cue: str = "") -> Dict[str, Any]:
-        from skeleton.organism.context_loop import assess
-        from skeleton.organism.organismer import live_organismer
-        return assess(live_organismer(), cue=cue, neo=self.neo)
-
-    def banks(self) -> Dict[str, Any]:
-        from skeleton.galaxy.banks import card
-        from skeleton.galaxy.system import live_galaxy
-        return card(live_galaxy().mesh, neo=self.neo)
-
-    def kernels(self) -> Dict[str, Any]:
-        from skeleton.kernel.profiles import apply_overlay, card as kernels_card
-        apply_overlay(neo=self.neo)
-        return kernels_card()
-
-    def bank(self) -> Dict[str, Any]:
-        from skeleton.kernel.bank import boot, snapshot
-        boot()
-        return snapshot()
-
-    def ritual(self) -> Dict[str, Any]:
-        from skeleton.kernel.ritual import card as ritual_card
-        return ritual_card()
-
-    def orch(self, text: str = "plan tensor ttk") -> Dict[str, Any]:
-        from skeleton.kernel.orchestrator import Orchestrator
-        return Orchestrator().dispatch(text)
-
-    def season(self, text: str = "plan tensor ttk", n: int = 0) -> Dict[str, Any]:
-        from skeleton.kernel.season import run as season_run
-        return season_run(text, n=n)
-
-    def follow(self) -> Dict[str, Any]:
-        from skeleton.organism.follow import card as follow_card
-        from skeleton.organism.organismer import live_organismer
-        return follow_card(getattr(live_organismer(), "root", None))
-
-    def agree(self) -> Dict[str, Any]:
-        from skeleton.organism.helix_consensus import agree
-        from skeleton.organism.organismer import live_organismer
-        return agree(getattr(live_organismer(), "root", None))
-
-    def caps(self) -> Dict[str, Any]:
-        from skeleton.organism.caps import card
-        return card()
-
-    def lattice(self) -> Dict[str, Any]:
-        from skeleton.galaxy.kv import archive
-        from skeleton.galaxy.lattice import card as lattice_card
-        from skeleton.galaxy.system import live_galaxy
-        gxy = live_galaxy()
-        out = lattice_card(gxy.mesh, neo=self.neo)
-        out["kv"] = archive(gxy.mesh, neo=self.neo)
-        return out
-
-    def contact(self, stimulus: str = "") -> Dict[str, Any]:
-        from skeleton.organism.teachers import glean_rule, sync
-        from skeleton.galaxy.system import live_galaxy
-        card = sync(self.neo, stimulus)
-        card["rule"] = glean_rule(live_galaxy(), stimulus=stimulus, contact=card)
-        card["G"] = round(_g(self.neo), 6)
-        return card
-
-    def plan(self, vision: str, *, repair: bool = False) -> Dict[str, Any]:
-        from skeleton.cortex.era_bind import resolve
-        from skeleton.intelligence.plan_repair import attempt_plan_repair
-        from skeleton.intelligence.plan_verifier import PlanVerifier
-        from skeleton.organism.quality_state import append_quality
-
-        card = resolve(vision)
-        if card.get("hit"):
-            self.last_ref = {
-                "title": card.get("title"),
-                "era": card.get("era"),
-                "citation": card.get("citation"),
-                "url": card.get("url"),
-            }
-        if hasattr(self.neo, "plan_build"):
-            out = self.neo.plan_build(vision=vision)
-            if isinstance(out, dict):
-                out.setdefault("era", card.get("era"))
-                out.setdefault("citation", card.get("citation"))
-                out.setdefault("stored_prose", 0)
-                verifier = PlanVerifier()
-                report = verifier.verify(out, vision=vision)
-                out["quality"] = report.to_dict()
-                out["quality_stats"] = verifier.stats()
-                append_quality({
-                    "kind": "quality",
-                    "surface": "plan",
-                    "accepted": report.accepted,
-                    "reason": report.reason,
-                    "score": report.score,
-                    "weakest_path": report.weakest_path,
-                    "summary": report.summary,
-                    "metadata": report.quality.metadata,
-                    "evidence": {"issues": list(report.issues)},
-                }, root=self.root)
-                if not report.accepted and repair:
-                    fixed = attempt_plan_repair(out, vision=vision, root=self.root)
-                    out["repair"] = {k: v for k, v in fixed.items() if k != "plan"}
-                    if fixed.get("ok"):
-                        out = dict(fixed["plan"])
-                        out["quality"] = fixed["after"]
-                        out["quality_stats"] = verifier.stats()
-                self.last_plan = out
-                return out
-        pack = card.get("pack") or {}
-        out = {
-            "era": card.get("era"),
-            "title": card.get("title"),
-            "citation": card.get("citation"),
-            "url": card.get("url"),
-            "room_bias": pack.get("room_bias") or (pack.get("meta") or {}).get("philosophy") or card.get("era"),
-            "primary_dps": card.get("primary_dps") or pack.get("primary_dps"),
-            "stored_prose": 0,
-            "law": "ok",
-        }
-        verifier = PlanVerifier()
-        report = verifier.verify(out, vision=vision)
-        out["quality"] = report.to_dict()
-        out["quality_stats"] = verifier.stats()
-        append_quality({
-            "kind": "quality",
-            "surface": "plan",
-            "accepted": report.accepted,
-            "reason": report.reason,
-            "score": report.score,
-            "weakest_path": report.weakest_path,
-            "summary": report.summary,
-            "metadata": report.quality.metadata,
-            "evidence": {"issues": list(report.issues)},
-        }, root=self.root)
-        if not report.accepted and repair:
-            fixed = attempt_plan_repair(out, vision=vision, root=self.root)
-            out["repair"] = {k: v for k, v in fixed.items() if k != "plan"}
-            if fixed.get("ok"):
-                out = dict(fixed["plan"])
-                out["quality"] = fixed["after"]
-                out["quality_stats"] = verifier.stats()
-        self.last_plan = out
-        return out
-
-    def cut(self, stimulus: str, *, rounds: int = 3, live: bool = False) -> Dict[str, Any]:
-        from skeleton.cortex.perpendicular import cut as perp_cut
-        card = perp_cut(self.neo, stimulus, rounds=rounds, live=live)
-        if card.get("title"):
-            self.last_ref = {
-                "title": card.get("title"),
-                "era": card.get("era"),
-                "citation": card.get("citation"),
-                "url": card.get("url"),
-            }
-        if card.get("improved"):
-            self.last_improve = card.get("improve")
-        self.traces = [card, *self.traces][:24]
-        return card
-
-    def genos(self, stimulus: str = "plan tensor ttk lattice soulslike") -> Dict[str, Any]:
-        if hasattr(self.neo, "genos"):
-            return self.neo.genos(stimulus)
-        engine = getattr(self.neo, "genos_engine", None)
-        if engine is not None and hasattr(engine, "pulse"):
-            return engine.pulse(self.neo, stimulus=stimulus)
-        return {"ok": 0, "reason": "no-genos"}
-
-    def octwalk(self, steps: int = 1) -> Dict[str, Any]:
-        steps = max(1, min(12, int(steps)))
-        walked = []
-        for i in range(steps):
-            self.position = (self.position + 1 + (8847291 % 5)) % 12
-            walked.append({"face_index": self.position, "face_name": FACES[self.position], "step": i})
-        return {"seed": 8847291, "position": self.position, "face": FACES[self.position], "walk": walked, "card": face_card(self.neo)}
-
-    def pick(self, index: int) -> Dict[str, Any]:
-        self.position = int(index) % 12
-        return {"seed": 8847291, "position": self.position, "face": FACES[self.position], "card": face_card(self.neo)}
 
     def snapshot(self) -> Dict[str, Any]:
         return {"status": self.status(), "last_ref": self.last_ref, "last_improve": self.last_improve, "last_plan": self.last_plan, "traces": list(self.traces[:8]), "position": self.position, "face": FACES[self.position]}

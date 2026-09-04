@@ -45,303 +45,35 @@ def _deck(state: Any) -> CommandDeck:
         _decks[key] = inst
     return inst
 
-
 @router.get("/cortex/status")
 async def cortex_status(state=Depends(_state)) -> Dict[str, Any]:
     deck = _deck(state)
     return {"cortex": deck.status()}
 
-
 @router.get("/cortex/deck")
 async def cortex_deck(state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).snapshot()
-
 
 @router.get("/cortex/laws")
 async def cortex_laws() -> Dict[str, Any]:
     return {"laws": list(LAWS), "stored_prose": 0}
 
-
 @router.get("/cortex/refs")
 async def cortex_refs() -> Dict[str, Any]:
     return {"refs": refs_index(), "stored_prose": 0}
 
-
-@router.get("/cortex/dodeca")
-async def cortex_dodeca(state=Depends(_state)) -> Dict[str, Any]:
-    deck = _deck(state)
-    return {
-        "faces": list(FACES),
-        "position": deck.position,
-        "face": FACES[deck.position],
-        "card": face_card(deck.neo),
-        "seed": 8847291,
-    }
-
-
-@router.post("/cortex/think")
-async def cortex_think(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    stimulus = str(request.get("stimulus", "")).strip()
-    if not stimulus:
-        raise HTTPException(status_code=422, detail="stimulus is required")
-    deck = _deck(state)
-    ctx = {"era": request.get("era", "extraction_now")}
-    trace = deck.neo.think(stimulus, ctx)
-    return {"trace": trace.to_dict() if hasattr(trace, "to_dict") else trace}
-
-
-@router.post("/cortex/speak")
-async def cortex_speak(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    stimulus = str(request.get("stimulus", "")).strip()
-    if not stimulus:
-        raise HTTPException(status_code=422, detail="stimulus is required")
-    return _deck(state).speak(stimulus)
-
-
-@router.post("/cortex/refer")
-async def cortex_refer(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    stimulus = str(request.get("stimulus", "")).strip()
-    if not stimulus:
-        raise HTTPException(status_code=422, detail="stimulus is required")
-    return _deck(state).refer(stimulus, live=bool(request.get("live")))
-
-
-@router.post("/cortex/improve")
-async def cortex_improve(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    stimulus = str(request.get("stimulus", "")).strip()
-    if not stimulus:
-        raise HTTPException(status_code=422, detail="stimulus is required")
-    rounds = int(request.get("rounds") or 6)
-    return _deck(state).improve(stimulus, rounds=rounds)
-
-
-@router.post("/cortex/ascend")
-async def cortex_ascend(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    stimulus = str(request.get("stimulus", "")).strip()
-    if not stimulus:
-        raise HTTPException(status_code=422, detail="stimulus is required")
-    rounds = int(request.get("rounds") or 6)
-    return _deck(state).ascend(stimulus, rounds=rounds)
-
-
-@router.post("/cortex/plan")
-async def cortex_plan(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    vision = str(request.get("vision") or request.get("stimulus") or "").strip()
-    if not vision:
-        raise HTTPException(status_code=422, detail="vision is required")
-    return _deck(state).plan(vision)
-
-
-@router.post("/cortex/genos")
-async def cortex_genos(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    stimulus = str(request.get("stimulus") or "plan tensor ttk lattice soulslike")
-    return _deck(state).genos(stimulus)
-
-
-@router.post("/cortex/cut")
-async def cortex_cut(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    stimulus = str(request.get("stimulus") or request.get("vision") or "").strip()
-    if not stimulus:
-        raise HTTPException(status_code=422, detail="stimulus is required")
-    rounds = int(request.get("rounds") or 3)
-    return _deck(state).cut(stimulus, rounds=rounds, live=bool(request.get("live")))
-
-
-@router.post("/cortex/dodeca/walk")
-async def cortex_dodeca_walk(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    steps = int(request.get("steps") or 1)
-    return _deck(state).walk(steps)
-
-
-@router.post("/cortex/dodeca/pick")
-async def cortex_dodeca_pick(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).pick(int(request.get("index") or 0))
-
-
-@router.get("/cortex/galaxy")
-async def cortex_galaxy_get() -> Dict[str, Any]:
-    from skeleton.galaxy.system import live_galaxy
-    return live_galaxy().snapshot()
-
-
-@router.post("/cortex/galaxy")
-async def cortex_galaxy_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    stimulus = str(request.get("stimulus") or request.get("vision") or "").strip()
-    return _deck(state).galaxy(stimulus, sleep=bool(request.get("sleep")))
-
-
-@router.get("/cortex/social")
-async def cortex_social_get(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).social("")
-
-
-@router.post("/cortex/social")
-async def cortex_social_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).social(str(request.get("stimulus") or request.get("url") or ""))
-
-
-@router.get("/cortex/organismer")
-async def cortex_organismer_get(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).organismer("")
-
-
-@router.post("/cortex/organismer")
-async def cortex_organismer_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    stimulus = str(request.get("stimulus") or request.get("vision") or "").strip()
-    return _deck(state).organismer(stimulus, sleep=bool(request.get("sleep")))
-
-
-@router.get("/cortex/product")
-async def cortex_product_get(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).product()
-
-
-@router.post("/cortex/contact")
-async def cortex_contact_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).contact(str(request.get("stimulus") or ""))
-
-
-@router.get("/cortex/wiki")
-async def cortex_wiki_get(q: str = "", state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).wiki(q)
-
-
-@router.get("/cortex/graph")
-async def cortex_graph_get(cue: str = "", state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).graph(cue)
-
-
-@router.get("/cortex/context")
-async def cortex_context_get(cue: str = "", state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).context(cue)
-
-
-@router.get("/cortex/banks")
-async def cortex_banks_get(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).banks()
-
-
-@router.get("/cortex/caps")
-async def cortex_caps_get(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).caps()
-
-
-@router.get("/cortex/lattice")
-async def cortex_lattice_get(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).lattice()
-
-
-@router.get("/cortex/health")
-async def cortex_health_get(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).health()
-
-
-@router.get("/cortex/doctor")
-async def cortex_doctor_get(fix: bool = False, state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).doctor(fix=fix)
-
-
-@router.post("/cortex/sleep")
-async def cortex_sleep_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).sleep(force=bool(request.get("force")), cue=str(request.get("cue") or ""))
-
-
-@router.get("/cortex/sleep")
-async def cortex_sleep_get(force: bool = False, cue: str = "", state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).sleep(force=force, cue=cue)
-
-
-@router.post("/cortex/forget")
-async def cortex_forget_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).forget(str(request.get("cue") or ""))
-
-
-@router.get("/cortex/helix")
-async def cortex_helix_get(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).helix()
-
-
-@router.get("/cortex/recall")
-async def cortex_recall_get(q: str = "", state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).recall(q)
-
-
-@router.get("/cortex/satellites")
-async def cortex_satellites_get(cue: str = "", state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).satellites(cue)
-
-
-@router.get("/cortex/nervous")
-async def cortex_nervous_get(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).nervous()
-
-
-@router.get("/cortex/chronicle")
-async def cortex_chronicle_get(cue: str = "", state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).chronicle(cue)
-
-
-@router.get("/cortex/scope")
-async def cortex_scope_get(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).scope()
-
-
-@router.post("/cortex/enact")
-async def cortex_enact_post(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).enact()
-
-
-@router.get("/cortex/kernels")
-async def cortex_kernels_get(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).kernels()
-
-
-@router.get("/cortex/follow")
-async def cortex_follow_get(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).follow()
-
-
-@router.get("/cortex/agree")
-async def cortex_agree_get(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).agree()
-
-
-@router.post("/cortex/dump")
-async def cortex_dump_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).dump(force=bool(request.get("force")))
-
-
-@router.get("/cortex/laws")
-async def cortex_laws_get(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).laws()
-
-
-@router.get("/cortex/next")
-async def cortex_next_get(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).next()
-
-
-@router.post("/cortex/seed")
-async def cortex_seed_post(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).seed()
-
-
-@router.get("/cortex/field")
-async def cortex_field_get(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).field()
-
-
-@router.get("/cortex/ready")
-async def cortex_ready_get(walk: bool = False, n: int = 2, fix: bool = False, state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).ready(walk=walk, n=n, fix=fix)
-
-
-@router.post("/cortex/pulse")
-async def cortex_pulse_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).pulse(str(request.get("stimulus") or ""))
-
-
-@router.post("/cortex/walk")
-async def cortex_walk_post(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
-    n = int(request.get("n") or 4)
-    return _deck(state).walk(str(request.get("stimulus") or ""), n=n)
+@router.get("/cortex/failures")
+async def cortex_failures(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).failures()
+
+@router.get("/cortex/repairs")
+async def cortex_repairs(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).repairs()
+
+@router.get("/cortex/activity")
+async def cortex_activity(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).activity()
+
+@router.get("/cortex/recurring")
+async def cortex_recurring(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).recurring()
