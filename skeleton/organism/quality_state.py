@@ -17,15 +17,7 @@ from skeleton.organism.paths import quality_path
 def summarize_quality(items: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
     rows: List[Dict[str, Any]] = [dict(x) for x in items if x]
     if not rows:
-        return {
-            "kind": "quality-rollup",
-            "count": 0,
-            "accepted": 0,
-            "rejected": 0,
-            "accept_rate": 0.0,
-            "weakest": "",
-            "reasons": {},
-        }
+        return {"kind": "quality-rollup", "count": 0, "accepted": 0, "rejected": 0, "accept_rate": 0.0, "weakest": "", "reasons": {}}
     accepted = sum(1 for x in rows if x.get("accepted"))
     rejected = len(rows) - accepted
     weakest = min(rows, key=lambda x: float(x.get("score", 0.0) or 0.0))
@@ -50,19 +42,30 @@ def quality_pressure(rollup: Dict[str, Any]) -> float:
     return round(rejected / max(1, count), 4)
 
 
+def failure_summary(items: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+    rows = [dict(x) for x in items if x and x.get("kind") == "quality" and not x.get("accepted")]
+    if not rows:
+        return {"kind": "failure-rollup", "count": 0, "issues": {}, "surfaces": {}, "top_issue": "", "top_surface": ""}
+    issues: Dict[str, int] = {}
+    surfaces: Dict[str, int] = {}
+    for row in rows:
+        surfaces[str(row.get("surface") or "unknown")] = surfaces.get(str(row.get("surface") or "unknown"), 0) + 1
+        for issue in list((row.get("evidence") or {}).get("issue_names") or []):
+            issues[str(issue)] = issues.get(str(issue), 0) + 1
+    return {
+        "kind": "failure-rollup",
+        "count": len(rows),
+        "issues": issues,
+        "surfaces": surfaces,
+        "top_issue": max(issues, key=issues.get) if issues else "",
+        "top_surface": max(surfaces, key=surfaces.get) if surfaces else "",
+    }
+
+
 def repair_summary(items: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
     rows = [dict(x) for x in items if x and x.get("kind") == "repair"]
     if not rows:
-        return {
-            "kind": "repair-rollup",
-            "count": 0,
-            "successes": 0,
-            "failures": 0,
-            "success_rate": 0.0,
-            "reasons": {},
-            "surfaces": {},
-            "targets": {},
-        }
+        return {"kind": "repair-rollup", "count": 0, "successes": 0, "failures": 0, "success_rate": 0.0, "reasons": {}, "surfaces": {}, "targets": {}}
     successes = sum(1 for x in rows if x.get("accepted"))
     failures = len(rows) - successes
     reasons: Dict[str, int] = {}
@@ -188,12 +191,7 @@ def repair_candidates(*, root: Optional[Path] = None, surface: str = "forge") ->
 
 def recent_activity(*, root: Optional[Path] = None, limit: int = 8) -> Dict[str, Any]:
     rows = load_quality(root=root, limit=limit)
-    return {
-        "kind": "quality-activity",
-        "n": len(rows),
-        "items": rows,
-        "stored_prose": 0,
-    }
+    return {"kind": "quality-activity", "n": len(rows), "items": rows, "stored_prose": 0}
 
 
 def quality_snapshot(*, root: Optional[Path] = None, limit: int = 32) -> Dict[str, Any]:
@@ -204,6 +202,7 @@ def quality_snapshot(*, root: Optional[Path] = None, limit: int = 32) -> Dict[st
         "latest_repair": latest_repair(root=root),
         "recent": rows,
         "rollup": summarize_quality(rows),
+        "failures": failure_summary(rows),
         "repairs": repair_summary(rows),
         "activity": recent_activity(root=root, limit=min(limit, 8)),
     }

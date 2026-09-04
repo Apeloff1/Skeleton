@@ -19,6 +19,8 @@ def repair_card(*, root=None) -> Dict[str, Any]:
             "surface": latest_fail.get("surface") or "",
             "reason": latest_fail.get("reason") or "",
             "target": latest_fail.get("weakest_path") or "",
+            "issues": (latest_fail.get("evidence") or {}).get("issue_names") or [],
+            "top_files": (latest_fail.get("evidence") or {}).get("top_paths") or [],
         },
         "latest_repair": {
             "surface": latest_fix.get("surface") or "",
@@ -30,5 +32,6 @@ def repair_card(*, root=None) -> Dict[str, Any]:
             "targeted_path": (latest_fix.get("evidence") or {}).get("targeted_path") or "",
         },
         "top_target": (snap.get("repairs") or {}).get("top_target") or "",
+        "top_issue": (snap.get("failures") or {}).get("top_issue") or "",
         "stored_prose": 0,
     }
