@@ -17,6 +17,7 @@ from skeleton.social.coverage import coverage_card
 from skeleton.organism.paths import ledger_path, state_path
 from skeleton.social.sota import sota_card
 from skeleton.social.sources import SOTA_POINTERS
+from skeleton.organism.repair_card import repair_card
 
 
 VERSION = "2026.09.02-chronicle"
@@ -65,16 +66,6 @@ def product_card() -> Dict[str, Any]:
     snap = org.snapshot()
     laws = laws_card(org.galaxy.mesh)
     quality = _quality_snapshot(root=getattr(org, "root", None))
-    latest_repair = quality.get("latest_repair") or {}
-    repair_view = {
-        "surface": latest_repair.get("surface") or "",
-        "reason": latest_repair.get("reason") or "",
-        "changed": (latest_repair.get("metadata") or {}).get("changed", 0),
-        "before_reason": (latest_repair.get("metadata") or {}).get("before_reason") or "",
-        "after_reason": (latest_repair.get("metadata") or {}).get("after_reason") or "",
-        "target": latest_repair.get("weakest_path") or "",
-        "targeted_path": (latest_repair.get("evidence") or {}).get("targeted_path") or "",
-    }
     return {
         "kind": "product",
         "name": "Jeeves Cortex Organism",
@@ -103,8 +94,6 @@ def product_card() -> Dict[str, Any]:
         "sota": sota_card("", G=org.G),
         "laws": laws,
         "quality": quality,
-        "latest_repair": latest_repair,
-        "repair_view": repair_view,
-        "repair_stats": quality.get("repairs") or {},
+        "repair_card": repair_card(root=getattr(org, "root", None)),
         "stored_prose": laws["stored_prose"],
     }

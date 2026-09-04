@@ -81,6 +81,16 @@ def test_attempt_repair_restores_run_level_and_player_ref(tmp_path):
     assert "scenes/levels/run_level.tscn" in out["files"]
 
 
+def test_attempt_repair_restores_door_scene_and_ref(tmp_path):
+    files = {
+        "project.godot": 'config_version=5\nrun/main_scene="res://scenes/levels/run_level.tscn"\n',
+        "scenes/levels/run_level.tscn": '[gd_scene load_steps=1 format=3]\n[node name="RunLevel" type="Node2D"]\n[node name="Room_r00" type="Node2D" parent="."]\n',
+    }
+    out = attempt_repair(files, request="repair project", root=tmp_path)
+    assert "scenes/door.tscn" in out["files"]
+    assert 'instance=ExtResource("7")' in out["files"]["scenes/levels/run_level.tscn"]
+
+
 def test_materialise_can_repair_once_and_return_result(tmp_path, monkeypatch):
     from skeleton.forge.universal import Forge
 

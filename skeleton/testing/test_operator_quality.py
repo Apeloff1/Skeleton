@@ -14,5 +14,4 @@ def test_product_card_exposes_quality(tmp_path):
     Organismer(root=tmp_path, persist=False, galaxy=GalaxySystem())
     card = product_card.__wrapped__() if hasattr(product_card, "__wrapped__") else product_card()
     assert "quality" in card
-    assert "repair_view" in card
-    assert "repair_stats" in card
+    assert "repair_card" in card
