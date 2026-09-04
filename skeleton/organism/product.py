@@ -19,7 +19,7 @@ from skeleton.social.sota import sota_card
 from skeleton.social.sources import SOTA_POINTERS
 
 
-VERSION = "2026.09.03-cdxled"
+VERSION = "2026.09.02-chronicle"
 
 
 ENDPOINTS = (
@@ -52,11 +52,6 @@ ENDPOINTS = (
     "GET /cortex/nervous",
     "GET /cortex/chronicle",
     "POST /cortex/dump",
-    "GET /cortex/scope",
-    "POST /cortex/enact",
-    "GET /cortex/kernels",
-    "GET /cortex/follow",
-    "GET /cortex/agree",
 )
 
 
@@ -78,6 +73,7 @@ def product_card() -> Dict[str, Any]:
         "before_reason": (latest_repair.get("metadata") or {}).get("before_reason") or "",
         "after_reason": (latest_repair.get("metadata") or {}).get("after_reason") or "",
         "target": latest_repair.get("weakest_path") or "",
+        "targeted_path": (latest_repair.get("evidence") or {}).get("targeted_path") or "",
     }
     return {
         "kind": "product",
@@ -100,12 +96,6 @@ def product_card() -> Dict[str, Any]:
         "path10": path_card(org),
         "mhc": mhc_card(org),
         "budget": next_hint(org).get("budget"),
-        "kernels": {
-            "scoreboard_n": __import__("skeleton.kernel.scoreboard", fromlist=["card"]).card().get("n"),
-            "hot": __import__("skeleton.kernel.hot", fromlist=["rank"]).rank().get("hot"),
-            "persist_n": __import__("skeleton.kernel.persist", fromlist=["load"]).load().get("n"),
-            "stored_prose": 0,
-        },
         "coverage": coverage_card(""),
         "fresh": org.galaxy.editor.freshness(),
         "endpoints": list(ENDPOINTS),
@@ -115,8 +105,6 @@ def product_card() -> Dict[str, Any]:
         "quality": quality,
         "latest_repair": latest_repair,
         "repair_view": repair_view,
-        "observe": __import__("skeleton.organism.observe", fromlist=["card"]).card(getattr(org, "root", None)),
-        "stacks": __import__("skeleton.organism.stacks", fromlist=["card"]).card(getattr(org, "root", None)),
-        "mix": __import__("skeleton.organism.context_step", fromlist=["mix_card"]).mix_card(getattr(org, "root", None)),
+        "repair_stats": quality.get("repairs") or {},
         "stored_prose": laws["stored_prose"],
     }

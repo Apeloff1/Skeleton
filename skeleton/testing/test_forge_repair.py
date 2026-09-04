@@ -60,6 +60,19 @@ def test_attempt_repair_restores_eventbus_autoload(tmp_path):
     assert 'EventBus="*res://scripts/autoloads/event_bus.gd"' in out["files"]["project.godot"]
 
 
+def test_attempt_repair_prefers_evidence_target(tmp_path):
+    files = {
+        "project.godot": 'config_version=5\nrun/main_scene="res://scenes/levels/run_level.tscn"\n',
+        "scenes/levels/run_level.tscn": '[gd_scene load_steps=1 format=3]\n[node name="RunLevel" type="Node2D"]\n',
+        "scripts/world/world_map.gd": 'var x = 1\n',
+        "scripts/autoloads/heat_system.gd": 'func bad():\n    eval(user_input)\n',
+    }
+    out = attempt_repair(files, request="repair project", root=tmp_path, evidence={
+        "top_file_reports": [{"path": "scripts/autoloads/heat_system.gd", "hard_issues": ["unsafe constructs detected"]}]
+    })
+    assert out["targeted_path"].endswith("heat_system.gd")
+
+
 def test_materialise_can_repair_once_and_return_result(tmp_path, monkeypatch):
     from skeleton.forge.universal import Forge
 

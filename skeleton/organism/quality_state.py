@@ -50,6 +50,27 @@ def quality_pressure(rollup: Dict[str, Any]) -> float:
     return round(rejected / max(1, count), 4)
 
 
+def repair_summary(items: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+    rows = [dict(x) for x in items if x and x.get("kind") == "repair"]
+    if not rows:
+        return {
+            "kind": "repair-rollup",
+            "count": 0,
+            "successes": 0,
+            "failures": 0,
+            "success_rate": 0.0,
+        }
+    successes = sum(1 for x in rows if x.get("accepted"))
+    failures = len(rows) - successes
+    return {
+        "kind": "repair-rollup",
+        "count": len(rows),
+        "successes": successes,
+        "failures": failures,
+        "success_rate": round(successes / max(1, len(rows)), 4),
+    }
+
+
 def append_quality(entry: Dict[str, Any], *, root: Optional[Path] = None) -> Dict[str, Any]:
     path = quality_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -90,6 +111,7 @@ def append_repair(entry: Dict[str, Any], *, root: Optional[Path] = None) -> Dict
         "actions": list(payload.get("actions") or []),
         "before": dict(payload.get("before") or {}),
         "after": dict(payload.get("after") or {}),
+        "targeted_path": payload.get("targeted_path") or "",
     })
     return append_quality(payload, root=root)
 
@@ -154,4 +176,5 @@ def quality_snapshot(*, root: Optional[Path] = None, limit: int = 32) -> Dict[st
         "latest_repair": latest_repair(root=root),
         "recent": rows,
         "rollup": summarize_quality(rows),
+        "repairs": repair_summary(rows),
     }

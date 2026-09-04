@@ -43,13 +43,14 @@ def candidate_failures(*, root=None, limit: int = 5) -> Dict[str, Any]:
     }
 
 
-def attempt_repair(files: Mapping[str, str], *, request: str = "", root=None) -> Dict[str, Any]:
+def attempt_repair(files: Mapping[str, str], *, request: str = "", root=None, evidence: Dict[str, Any] | None = None) -> Dict[str, Any]:
     before = ForgeVerifier().verify(files, request=request)
     fixed = dict(files)
     actions: List[Dict[str, Any]] = []
+    target = _select_target(before.to_dict(), evidence or {})
 
     if not before.accepted:
-        weakest = before.weakest_path or ""
+        weakest = target or before.weakest_path or ""
         if weakest.endswith(".gd") and weakest in fixed:
             src = fixed[weakest]
             changed = src
@@ -61,7 +62,7 @@ def attempt_repair(files: Mapping[str, str], *, request: str = "", root=None) ->
                 changed = changed.replace("eval(", "# eval(")
             if changed != src:
                 fixed[weakest] = changed
-                actions.append({"path": weakest, "action": "patched weakest script once"})
+                actions.append({"path": weakest, "action": "patched targeted script once"})
 
         if before.reason == "project_closure":
             project = fixed.get("project.godot", "")
@@ -71,6 +72,9 @@ def attempt_repair(files: Mapping[str, str], *, request: str = "", root=None) ->
             if 'EventBus="*res://scripts/autoloads/event_bus.gd"' not in project and project:
                 fixed["project.godot"] = fixed["project.godot"] + 'EventBus="*res://scripts/autoloads/event_bus.gd"\n'
                 actions.append({"path": "project.godot", "action": "restored EventBus autoload"})
+            if "scripts/autoloads/event_bus.gd" not in fixed:
+                fixed["scripts/autoloads/event_bus.gd"] = "extends Node\nsignal repaired()\n"
+                actions.append({"path": "scripts/autoloads/event_bus.gd", "action": "stubbed missing EventBus autoload file"})
 
     after = ForgeVerifier().verify(fixed, request=request)
     result = {
@@ -83,11 +87,23 @@ def attempt_repair(files: Mapping[str, str], *, request: str = "", root=None) ->
         "after": after.to_dict(),
         "actions": actions,
         "changed": int(bool(actions)),
+        "targeted_path": weakest if not before.accepted else "",
         "stored_prose": 0,
         "files": fixed,
     }
     append_repair(result, root=root)
     return result
+
+
+def _select_target(before: Dict[str, Any], evidence: Dict[str, Any]) -> str:
+    top = list(evidence.get("top_file_reports") or [])
+    for item in top:
+        if item.get("hard_issues") and item.get("path"):
+            return str(item["path"])
+    for item in top:
+        if item.get("path"):
+            return str(item["path"])
+    return str(before.get("weakest_path") or "")
 
 
 def _targets(failure: Dict[str, Any]) -> List[Dict[str, Any]]:
