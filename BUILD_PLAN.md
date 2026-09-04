@@ -1,7 +1,7 @@
 # Skeleton — Surrounding Systems Build Plan
 
 Status legend: ✅ done · 🔨 scaffolded · ⬜ pending
-Updated 2026-09-04, anchored to the deep-cut ledger and the corrective-control pass.
+Updated 2026-09-04, anchored to the deep-cut ledger and the diagnostics pass.
 
 ## Tracks — all DONE
 
@@ -15,33 +15,18 @@ Waves 1–4 plus routed gate and bound-field lineage shipped.
 
 Direction A and B landed previously and remain intact.
 
-## Track N — Corrective-control segment — ACTIVE
+## Track N — Corrective-control segment — DONE
 
 ### N1. Shared quality contract — DONE
-- `intelligence/quality.py`
-- shared issue / signal / report vocabulary across plan, forge, and pipelines
-
 ### N2. Surface verifiers — DONE
-- forge verifier
-- plan verifier
-- pipeline verifier
-- NPC verifier
-- dialogue verifier
-
 ### N3. Quality persistence — DONE
-- `organism/quality_state.py`
-- quality and repair history persisted separately under organism storage
-
 ### N4. Operator repair surface — DONE
-- `organism/repair_card.py`
-- reused by product / nervous / doctor / satellites
-
-### N5. Bounded repair paths — PARTIAL
+### N5. Bounded repair paths — DONE
 - forge repair: active
 - plan repair: active
+- game-logic repair: active
 - NPC repair: active
 - dialogue repair: active
-- game-logic repair: pending
 
 ### N6. Repair telemetry rollups — DONE
 - recent activity
@@ -49,19 +34,43 @@ Direction A and B landed previously and remain intact.
 - recurring repair target
 - per-surface repair counts
 
+## Track O — Operator diagnostics command surface — ACTIVE
+
+### O1. Direct diagnostics cards — DONE
+- `organism/failure_card.py`
+- `organism/activity_card.py`
+- `organism/recurring_card.py`
+
+### O2. Command-deck diagnostics methods — DONE
+- `failures()`
+- `repairs()`
+- `activity()`
+- `recurring()`
+
+### O3. HTTP diagnostics endpoints — DONE
+- `/cortex/failures`
+- `/cortex/repairs`
+- `/cortex/activity`
+- `/cortex/recurring`
+
+### O4. CLI diagnostics commands — DONE
+- `python -m skeleton failures`
+- `python -m skeleton repairs`
+- `python -m skeleton activity`
+- `python -m skeleton recurring`
+
+### O5. Filtering and policy controls — PENDING
+- filter by surface
+- filter by limit and type
+- threshold/policy steering segment
+
 ## Track E — Cleanup pass (deferred, requires local git ops)
 
 E1–E4 unchanged (root sprawl, SEVEN_BY file moves, godot binary, shim removal).
 
 ## Integration seams for the next pass
 
-- `rot_guard.assess` → `memory/compaction.ContextCompactor` trigger.
-- `handoff.HandoffRegistry` → `agents/mesh.py` routing.
-- game-logic repair path → full corrective-control parity.
-- repair-card / quality-state queries → dedicated operator commands.
-
-## Active architectural note
-
-The corrective-control segment is now a first-class app segment. It surrounds
-existing generation surfaces rather than replacing them: verify → persist →
-target → repair once → re-verify → surface.
+- diagnostics filtering → command deck / CLI / HTTP parity
+- threshold and repair-policy steering → new operator control segment
+- rot_guard.assess → memory/compaction.ContextCompactor trigger
+- handoff routing → agents/mesh.py
