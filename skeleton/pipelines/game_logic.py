@@ -65,6 +65,7 @@ class GameLogicSpec:
     generated_at: float = field(default_factory=time.time)
     quality: dict[str, Any] = field(default_factory=dict)
     quality_stats: dict[str, Any] = field(default_factory=dict)
+    repair: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -80,6 +81,7 @@ class GameLogicSpec:
             "generated_at": self.generated_at,
             "quality": dict(self.quality),
             "quality_stats": dict(self.quality_stats),
+            "repair": dict(self.repair),
         }
 
 
@@ -90,7 +92,8 @@ class GameLogicPipeline:
 
     def run(self, description: str, *, title: str = "untitled",
             max_level: int = 50, curve: str = "quadratic",
-            currency: str = "gold") -> GameLogicSpec:
+            currency: str = "gold", repair: bool = False) -> GameLogicSpec:
+        from skeleton.intelligence.game_logic_repair import attempt_game_logic_repair
         from skeleton.intelligence.pipeline_verifier import PipelineVerifier
         from skeleton.organism.quality_state import append_quality
 
@@ -135,6 +138,15 @@ class GameLogicPipeline:
             "summary": quality.summary,
             "metadata": quality.quality.metadata,
         }, root=self._root)
+        if not quality.accepted and repair:
+            fixed = attempt_game_logic_repair(spec.to_dict(), description=description, root=self._root)
+            spec.repair = {k: v for k, v in fixed.items() if k != "spec"}
+            if fixed.get("ok"):
+                repaired = fixed["spec"]
+                spec.quality = fixed.get("after", spec.quality)
+                spec.combat = CombatSystem(tuple((repaired.get("combat") or {}).get("stats") or spec.combat.stats), dict((repaired.get("combat") or {}).get("base_values") or spec.combat.base_values), str((repaired.get("combat") or {}).get("damage_formula") or spec.combat.damage_formula))
+                spec.economy = EconomySystem(str((repaired.get("economy") or {}).get("currency") or spec.economy.currency), tuple((repaired.get("economy") or {}).get("taps") or spec.economy.taps), tuple((repaired.get("economy") or {}).get("sinks") or spec.economy.sinks), float((repaired.get("economy") or {}).get("starting_balance") or spec.economy.starting_balance))
+                spec.progression = ProgressionSystem(int((repaired.get("progression") or {}).get("max_level") or spec.progression.max_level), str((repaired.get("progression") or {}).get("curve") or spec.progression.curve), float((repaired.get("progression") or {}).get("base_xp") or spec.progression.base_xp))
 
         self._bus.publish(DomainEvent(
             topic="pipeline.game_logic.quality",

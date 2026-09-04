@@ -15,6 +15,7 @@ from .uncertainty import Candidate, GateDecision, GateVerdict, UncertaintyGate
 from .verification import VerificationLoop, VerificationTrace, VerificationVerdict
 from .verifier import CodeVerifier, RubricScore, VerifierReport
 from .quality import QualityIssue, QualityReport, QualitySignal
+from .game_logic_repair import attempt_game_logic_repair
 from .plan_verifier import PlanVerifier, PlanVerificationReport
 from .plan_repair import attempt_plan_repair
 from .pipeline_repair import attempt_dialogue_repair, attempt_npc_repair
@@ -39,6 +40,7 @@ __all__ = [
     'VerificationLoop', 'VerificationTrace', 'VerificationVerdict',
     'CodeVerifier', 'RubricScore', 'VerifierReport',
     'QualityIssue', 'QualityReport', 'QualitySignal',
+    'attempt_game_logic_repair',
     'PlanVerifier', 'PlanVerificationReport', 'attempt_plan_repair',
     'attempt_dialogue_repair', 'attempt_npc_repair',
     'PipelineVerifier', 'PipelineVerificationReport',
