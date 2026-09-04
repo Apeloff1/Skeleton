@@ -237,7 +237,19 @@ class Forge:
             )
             self._bus.publish(event)
             if not verification.accepted and repair:
-                repaired = attempt_repair(files, request=blueprint.name, root=self._root)
+                repaired = attempt_repair(files, request=blueprint.name, root=self._root, evidence=evidence)
+                self._bus.publish(DomainEvent(
+                    topic="forge.repair.completed" if repaired.get("ok") else "forge.repair.failed",
+                    payload={
+                        "blueprint_id": blueprint.blueprint_id,
+                        "name": blueprint.name,
+                        "accepted": bool(repaired.get("ok")),
+                        "reason": repaired.get("reason"),
+                        "targeted_path": repaired.get("targeted_path"),
+                        "changed": repaired.get("changed"),
+                    },
+                    correlation_id=f"forge_repair_{blueprint.blueprint_id}",
+                ))
                 result["repair"] = {k: v for k, v in repaired.items() if k != "files"}
                 if repaired.get("ok"):
                     result["files"] = repaired["files"]

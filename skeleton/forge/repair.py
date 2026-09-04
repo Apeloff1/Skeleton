@@ -75,6 +75,12 @@ def attempt_repair(files: Mapping[str, str], *, request: str = "", root=None, ev
             if "scripts/autoloads/event_bus.gd" not in fixed:
                 fixed["scripts/autoloads/event_bus.gd"] = "extends Node\nsignal repaired()\n"
                 actions.append({"path": "scripts/autoloads/event_bus.gd", "action": "stubbed missing EventBus autoload file"})
+            if "scenes/levels/run_level.tscn" not in fixed:
+                fixed["scenes/levels/run_level.tscn"] = '[gd_scene load_steps=1 format=3]\n[node name="RunLevel" type="Node2D"]\n[node name="Room_r00" type="Node2D" parent="."]\n'
+                actions.append({"path": "scenes/levels/run_level.tscn", "action": "stubbed missing run level scene"})
+            elif 'instance=ExtResource("3")' not in fixed["scenes/levels/run_level.tscn"]:
+                fixed["scenes/levels/run_level.tscn"] += '[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="3"]\n[node name="Player" parent="." instance=ExtResource("3")]\n'
+                actions.append({"path": "scenes/levels/run_level.tscn", "action": "restored player packed-scene reference"})
 
     after = ForgeVerifier().verify(fixed, request=request)
     result = {

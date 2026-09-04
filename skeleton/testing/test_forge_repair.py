@@ -73,6 +73,14 @@ def test_attempt_repair_prefers_evidence_target(tmp_path):
     assert out["targeted_path"].endswith("heat_system.gd")
 
 
+def test_attempt_repair_restores_run_level_and_player_ref(tmp_path):
+    files = {
+        "project.godot": 'config_version=5\nrun/main_scene="res://scenes/levels/run_level.tscn"\n',
+    }
+    out = attempt_repair(files, request="repair project", root=tmp_path)
+    assert "scenes/levels/run_level.tscn" in out["files"]
+
+
 def test_materialise_can_repair_once_and_return_result(tmp_path, monkeypatch):
     from skeleton.forge.universal import Forge
 
