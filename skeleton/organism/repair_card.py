@@ -13,6 +13,7 @@ def repair_card(*, root=None) -> Dict[str, Any]:
     return {
         "kind": "repair-card",
         "quality": snap.get("rollup") or {},
+        "failures": snap.get("failures") or {},
         "repairs": snap.get("repairs") or {},
         "activity": snap.get("activity") or {},
         "latest_failure": {
@@ -33,5 +34,6 @@ def repair_card(*, root=None) -> Dict[str, Any]:
         },
         "top_target": (snap.get("repairs") or {}).get("top_target") or "",
         "top_issue": (snap.get("failures") or {}).get("top_issue") or "",
+        "top_surface": (snap.get("failures") or {}).get("top_surface") or "",
         "stored_prose": 0,
     }

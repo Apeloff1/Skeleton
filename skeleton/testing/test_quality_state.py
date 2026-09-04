@@ -39,7 +39,7 @@ def test_quality_evidence_is_persisted(tmp_path):
         "reason": "unsafe_code",
         "score": 0.1,
         "weakest_path": "scripts/world/world_map.gd",
-        "evidence": {"top_file_reports": [{"path": "scripts/world/world_map.gd", "hard_issues": ["unsafe constructs detected"]}]},
+        "evidence": {"top_file_reports": [{"path": "scripts/world/world_map.gd", "hard_issues": ["unsafe constructs detected"]}], "issue_names": ["unsafe constructs detected"], "top_paths": ["scripts/world/world_map.gd"]},
     }, root=tmp_path)
     row = latest_failure(root=tmp_path, surface="forge")
     assert row["evidence"]["top_file_reports"][0]["path"].endswith("world_map.gd")
@@ -58,3 +58,10 @@ def test_repair_rollup_tracks_top_target(tmp_path):
     append_repair({"surface": "forge", "ok": 0, "before": {"reason": "unsafe_code"}, "after": {"reason": "low_score", "score": 0.4, "weakest_path": "a.gd"}, "targeted_path": "a.gd"}, root=tmp_path)
     snap = quality_snapshot(root=tmp_path)
     assert snap["repairs"]["top_target"] == "a.gd"
+
+
+def test_failure_rollup_tracks_top_issue(tmp_path):
+    append_quality({"surface": "forge", "accepted": False, "reason": "unsafe_code", "score": 0.1, "evidence": {"issue_names": ["unsafe constructs detected"]}}, root=tmp_path)
+    append_quality({"surface": "npc", "accepted": False, "reason": "low_score", "score": 0.2, "evidence": {"issue_names": ["unsafe constructs detected", "missing traits"]}}, root=tmp_path)
+    snap = quality_snapshot(root=tmp_path)
+    assert snap["failures"]["top_issue"] == "unsafe constructs detected"
