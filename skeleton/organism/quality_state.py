@@ -14,6 +14,15 @@ from typing import Any, Dict, Iterable, List, Optional
 from skeleton.organism.paths import quality_path
 
 
+def _filter_rows(rows: List[Dict[str, Any]], *, surface: str = "", kind: str = "") -> List[Dict[str, Any]]:
+    out = rows
+    if surface:
+        out = [r for r in out if str(r.get("surface") or "") == surface]
+    if kind:
+        out = [r for r in out if str(r.get("kind") or "") == kind]
+    return out
+
+
 def summarize_quality(items: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
     rows: List[Dict[str, Any]] = [dict(x) for x in items if x]
     if not rows:
@@ -95,18 +104,7 @@ def repair_summary(items: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
 def append_quality(entry: Dict[str, Any], *, root: Optional[Path] = None) -> Dict[str, Any]:
     path = quality_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    row = {
-        "at": int(time.time() * 1000),
-        "kind": str(entry.get("kind") or "quality"),
-        "surface": str(entry.get("surface") or entry.get("pipeline") or "unknown"),
-        "accepted": bool(entry.get("accepted")),
-        "reason": str(entry.get("reason") or "unknown"),
-        "score": float(entry.get("score") or 0.0),
-        "weakest_path": str(entry.get("weakest_path") or ""),
-        "summary": dict(entry.get("summary") or {}),
-        "metadata": dict(entry.get("metadata") or {}),
-        "evidence": dict(entry.get("evidence") or {}),
-    }
+    row = {"at": int(time.time() * 1000), "kind": str(entry.get("kind") or "quality"), "surface": str(entry.get("surface") or entry.get("pipeline") or "unknown"), "accepted": bool(entry.get("accepted")), "reason": str(entry.get("reason") or "unknown"), "score": float(entry.get("score") or 0.0), "weakest_path": str(entry.get("weakest_path") or ""), "summary": dict(entry.get("summary") or {}), "metadata": dict(entry.get("metadata") or {}), "evidence": dict(entry.get("evidence") or {})}
     with path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(row, sort_keys=True, default=str) + "\n")
     trim_quality(root=root)
@@ -122,18 +120,8 @@ def append_repair(entry: Dict[str, Any], *, root: Optional[Path] = None) -> Dict
     payload.setdefault("score", float(payload.get("after", {}).get("score") or 0.0))
     payload.setdefault("weakest_path", payload.get("after", {}).get("weakest_path") or payload.get("weakest_path") or "")
     payload.setdefault("summary", {"actions": len(payload.get("actions") or [])})
-    payload.setdefault("metadata", {
-        "repair": 1,
-        "changed": int(bool(payload.get("changed"))),
-        "before_reason": str((payload.get("before") or {}).get("reason") or ""),
-        "after_reason": str((payload.get("after") or {}).get("reason") or ""),
-    })
-    payload.setdefault("evidence", {
-        "actions": list(payload.get("actions") or []),
-        "before": dict(payload.get("before") or {}),
-        "after": dict(payload.get("after") or {}),
-        "targeted_path": payload.get("targeted_path") or "",
-    })
+    payload.setdefault("metadata", {"repair": 1, "changed": int(bool(payload.get("changed"))), "before_reason": str((payload.get("before") or {}).get("reason") or ""), "after_reason": str((payload.get("after") or {}).get("reason") or "")})
+    payload.setdefault("evidence", {"actions": list(payload.get("actions") or []), "before": dict(payload.get("before") or {}), "after": dict(payload.get("after") or {}), "targeted_path": payload.get("targeted_path") or ""})
     return append_quality(payload, root=root)
 
 
@@ -148,61 +136,48 @@ def trim_quality(*, root: Optional[Path] = None, cap: int = 256) -> int:
     return len(lines) - cap
 
 
-def load_quality(*, root: Optional[Path] = None, limit: int = 32) -> List[Dict[str, Any]]:
+def load_quality(*, root: Optional[Path] = None, limit: int = 32, surface: str = "", kind: str = "") -> List[Dict[str, Any]]:
     path = quality_path(root)
     if not path.exists():
         return []
     rows: List[Dict[str, Any]] = []
-    for line in path.read_text(encoding="utf-8").splitlines()[-max(1, limit):]:
+    for line in path.read_text(encoding="utf-8").splitlines()[-max(1, limit * 4):]:
         try:
             rows.append(json.loads(line))
         except json.JSONDecodeError:
             continue
-    return rows
+    rows = _filter_rows(rows, surface=surface, kind=kind)
+    return rows[-max(1, limit):]
 
 
-def latest_quality(*, root: Optional[Path] = None) -> Dict[str, Any]:
-    rows = load_quality(root=root, limit=1)
+def latest_quality(*, root: Optional[Path] = None, surface: str = "", kind: str = "") -> Dict[str, Any]:
+    rows = load_quality(root=root, limit=1, surface=surface, kind=kind)
     return rows[-1] if rows else {}
 
 
 def latest_failure(*, root: Optional[Path] = None, surface: str = "") -> Dict[str, Any]:
-    rows = load_quality(root=root, limit=256)
-    rows = [r for r in rows if not r.get("accepted") and r.get("kind") == "quality"]
-    if surface:
-        rows = [r for r in rows if str(r.get("surface") or "") == surface]
+    rows = load_quality(root=root, limit=256, surface=surface, kind="quality")
+    rows = [r for r in rows if not r.get("accepted")]
     return rows[-1] if rows else {}
 
 
 def latest_repair(*, root: Optional[Path] = None, surface: str = "") -> Dict[str, Any]:
-    rows = load_quality(root=root, limit=256)
-    rows = [r for r in rows if r.get("kind") == "repair"]
-    if surface:
-        rows = [r for r in rows if str(r.get("surface") or "") == surface]
+    rows = load_quality(root=root, limit=256, surface=surface, kind="repair")
     return rows[-1] if rows else {}
 
 
 def repair_candidates(*, root: Optional[Path] = None, surface: str = "forge") -> List[Dict[str, Any]]:
-    rows = load_quality(root=root, limit=256)
-    rows = [r for r in rows if not r.get("accepted") and str(r.get("surface") or "") == surface and r.get("kind") == "quality"]
+    rows = load_quality(root=root, limit=256, surface=surface, kind="quality")
+    rows = [r for r in rows if not r.get("accepted")]
     rows.sort(key=lambda r: (float(r.get("score") or 0.0), int(r.get("at") or 0)), reverse=True)
     return rows
 
 
-def recent_activity(*, root: Optional[Path] = None, limit: int = 8) -> Dict[str, Any]:
-    rows = load_quality(root=root, limit=limit)
+def recent_activity(*, root: Optional[Path] = None, limit: int = 8, surface: str = "", kind: str = "") -> Dict[str, Any]:
+    rows = load_quality(root=root, limit=limit, surface=surface, kind=kind)
     return {"kind": "quality-activity", "n": len(rows), "items": rows, "stored_prose": 0}
 
 
-def quality_snapshot(*, root: Optional[Path] = None, limit: int = 32) -> Dict[str, Any]:
-    rows = load_quality(root=root, limit=limit)
-    return {
-        "latest": rows[-1] if rows else {},
-        "latest_failure": latest_failure(root=root),
-        "latest_repair": latest_repair(root=root),
-        "recent": rows,
-        "rollup": summarize_quality(rows),
-        "failures": failure_summary(rows),
-        "repairs": repair_summary(rows),
-        "activity": recent_activity(root=root, limit=min(limit, 8)),
-    }
+def quality_snapshot(*, root: Optional[Path] = None, limit: int = 32, surface: str = "") -> Dict[str, Any]:
+    rows = load_quality(root=root, limit=limit, surface=surface)
+    return {"latest": rows[-1] if rows else {}, "latest_failure": latest_failure(root=root, surface=surface), "latest_repair": latest_repair(root=root, surface=surface), "recent": rows, "rollup": summarize_quality(rows), "failures": failure_summary(rows), "repairs": repair_summary(rows), "activity": recent_activity(root=root, limit=min(limit, 8), surface=surface)}

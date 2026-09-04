@@ -45,35 +45,18 @@ def _deck(state: Any) -> CommandDeck:
         _decks[key] = inst
     return inst
 
-@router.get("/cortex/status")
-async def cortex_status(state=Depends(_state)) -> Dict[str, Any]:
-    deck = _deck(state)
-    return {"cortex": deck.status()}
-
-@router.get("/cortex/deck")
-async def cortex_deck(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).snapshot()
-
-@router.get("/cortex/laws")
-async def cortex_laws() -> Dict[str, Any]:
-    return {"laws": list(LAWS), "stored_prose": 0}
-
-@router.get("/cortex/refs")
-async def cortex_refs() -> Dict[str, Any]:
-    return {"refs": refs_index(), "stored_prose": 0}
-
 @router.get("/cortex/failures")
-async def cortex_failures(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).failures()
+async def cortex_failures(surface: str = "", state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).failures(surface=surface)
 
 @router.get("/cortex/repairs")
-async def cortex_repairs(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).repairs()
+async def cortex_repairs(surface: str = "", state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).repairs(surface=surface)
 
 @router.get("/cortex/activity")
-async def cortex_activity(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).activity()
+async def cortex_activity(surface: str = "", kind: str = "", limit: int = 8, state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).activity(surface=surface, kind=kind, limit=limit)
 
 @router.get("/cortex/recurring")
-async def cortex_recurring(state=Depends(_state)) -> Dict[str, Any]:
-    return _deck(state).recurring()
+async def cortex_recurring(surface: str = "", state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).recurring(surface=surface)
