@@ -53,6 +53,7 @@ class DialogueTree:
     nodes: Dict[str, DialogueNode]
     quality: Dict[str, Any] = field(default_factory=dict)
     quality_stats: Dict[str, Any] = field(default_factory=dict)
+    repair: Dict[str, Any] = field(default_factory=dict)
 
     def validate(self) -> List[str]:
         problems: List[str] = []
@@ -95,6 +96,7 @@ class DialogueTree:
             },
             "quality": dict(self.quality),
             "quality_stats": dict(self.quality_stats),
+            "repair": dict(self.repair),
         }
 
 
@@ -148,8 +150,9 @@ class DialogueWalker:
         return self.node.terminal
 
 
-def quality_check(tree: DialogueTree, *, description: str = "", root=None) -> DialogueTree:
+def quality_check(tree: DialogueTree, *, description: str = "", root=None, repair: bool = False) -> DialogueTree:
     from skeleton.intelligence.dialogue_verifier import DialogueVerifier
+    from skeleton.intelligence.pipeline_repair import attempt_dialogue_repair
     from skeleton.organism.quality_state import append_quality
 
     verifier = DialogueVerifier()
@@ -166,4 +169,11 @@ def quality_check(tree: DialogueTree, *, description: str = "", root=None) -> Di
         "summary": report.summary,
         "metadata": report.quality.metadata,
     }, root=root)
+    if not report.accepted and repair:
+        fixed = attempt_dialogue_repair(tree.to_dict(), description=description, root=root)
+        tree.repair = {k: v for k, v in fixed.items() if k != "tree"}
+        if fixed.get("ok"):
+            repaired = fixed["tree"]
+            tree.entry = repaired.get("entry", tree.entry)
+            tree.quality = fixed.get("after", tree.quality)
     return tree

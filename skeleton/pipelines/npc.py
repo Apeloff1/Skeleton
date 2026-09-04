@@ -49,6 +49,7 @@ class NpcSpec:
     generated_at: float = field(default_factory=time.time)
     quality: dict[str, Any] = field(default_factory=dict)
     quality_stats: dict[str, Any] = field(default_factory=dict)
+    repair: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -65,6 +66,7 @@ class NpcSpec:
             "generated_at": self.generated_at,
             "quality": dict(self.quality),
             "quality_stats": dict(self.quality_stats),
+            "repair": dict(self.repair),
         }
 
 
@@ -125,8 +127,10 @@ class NpcPipeline:
         self._root = root
 
     def run(self, description: str, *, name: str | None = None,
-            dialogue_beats: int = 3, params: dict[str, Any] | None = None) -> NpcSpec:
+            dialogue_beats: int = 3, params: dict[str, Any] | None = None,
+            repair: bool = False) -> NpcSpec:
         from skeleton.intelligence.npc_verifier import NpcVerifier
+        from skeleton.intelligence.pipeline_repair import attempt_npc_repair
         from skeleton.organism.quality_state import append_quality
 
         if not description or not description.strip():
@@ -170,6 +174,15 @@ class NpcPipeline:
             "summary": quality.summary,
             "metadata": quality.quality.metadata,
         }, root=self._root)
+        if not quality.accepted and repair:
+            fixed = attempt_npc_repair(spec.to_dict(), description=description, root=self._root)
+            spec.repair = {k: v for k, v in fixed.items() if k != "spec"}
+            if fixed.get("ok"):
+                repaired = fixed["spec"]
+                spec.name = repaired.get("name", spec.name)
+                spec.archetype = repaired.get("archetype", spec.archetype)
+                spec.persona = repaired.get("persona", spec.persona)
+                spec.quality = fixed.get("after", spec.quality)
         self._bus.publish(DomainEvent(
             topic="pipeline.npc.quality",
             payload={
