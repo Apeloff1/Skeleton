@@ -51,3 +51,10 @@ def test_recent_activity_rollup(tmp_path):
     activity = recent_activity(root=tmp_path)
     assert activity["n"] == 2
     assert activity["items"]
+
+
+def test_repair_rollup_tracks_top_target(tmp_path):
+    append_repair({"surface": "forge", "ok": 1, "before": {"reason": "low_score"}, "after": {"reason": "accepted", "score": 0.8, "weakest_path": "a.gd"}, "targeted_path": "a.gd"}, root=tmp_path)
+    append_repair({"surface": "forge", "ok": 0, "before": {"reason": "unsafe_code"}, "after": {"reason": "low_score", "score": 0.4, "weakest_path": "a.gd"}, "targeted_path": "a.gd"}, root=tmp_path)
+    snap = quality_snapshot(root=tmp_path)
+    assert snap["repairs"]["top_target"] == "a.gd"

@@ -16,3 +16,4 @@ def test_product_card_exposes_quality(tmp_path):
     assert "quality" in card
     assert "repair_card" in card
     assert card["repair_card"]["activity"]["n"] >= 1
+    assert "top_target" in card["repair_card"]

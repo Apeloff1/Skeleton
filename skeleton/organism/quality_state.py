@@ -61,16 +61,21 @@ def repair_summary(items: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             "success_rate": 0.0,
             "reasons": {},
             "surfaces": {},
+            "targets": {},
         }
     successes = sum(1 for x in rows if x.get("accepted"))
     failures = len(rows) - successes
     reasons: Dict[str, int] = {}
     surfaces: Dict[str, int] = {}
+    targets: Dict[str, int] = {}
     for row in rows:
         reason = str(row.get("reason") or "unknown")
         surface = str(row.get("surface") or "unknown")
+        target = str((row.get("evidence") or {}).get("targeted_path") or row.get("weakest_path") or "")
         reasons[reason] = reasons.get(reason, 0) + 1
         surfaces[surface] = surfaces.get(surface, 0) + 1
+        if target:
+            targets[target] = targets.get(target, 0) + 1
     return {
         "kind": "repair-rollup",
         "count": len(rows),
@@ -79,6 +84,8 @@ def repair_summary(items: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
         "success_rate": round(successes / max(1, len(rows)), 4),
         "reasons": reasons,
         "surfaces": surfaces,
+        "targets": targets,
+        "top_target": max(targets, key=targets.get) if targets else "",
     }
 
 
