@@ -157,3 +157,4 @@ chronicle/runtime.json
 chronicle/observe.jsonl
 chronicle/rotate.json
 chronicle/bound.jsonl
+chronicle/persistkv.json

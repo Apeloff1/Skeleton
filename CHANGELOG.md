@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-05 — Social kernel wave 2
+
+- treeattn, chunkprefill, ragged, prefixhash, marlin, onlinesm,
+  packgqa, persistkv, cascade, megafuse, kselect.
+- SocialK poke 20/20. kselect: mobile+long→linattn, spec→tree, embed→ragged.
+
+---
+
 ## 2026-09-05 — Social-parsed inference kernels
 
 - linattn, xquant, fp8kv, pagekv, flashdec, specdec/MTP, GQA, sparseattn.

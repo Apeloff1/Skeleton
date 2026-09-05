@@ -27,6 +27,9 @@ OBSCURE: Tuple[str, ...] = (
 SOCIAL: Tuple[str, ...] = (
     "linattn", "xquant", "fp8kv", "pagekv",
     "flashdec", "specdec", "mtp", "gqa", "sparseattn",
+    "treeattn", "chunkprefill", "ragged", "prefixhash",
+    "marlin", "onlinesm", "packgqa", "persistkv",
+    "cascade", "megafuse", "kselect",
 )
 
 
