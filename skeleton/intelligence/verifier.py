@@ -66,10 +66,22 @@ def _balanced(text: str) -> bool:
 class CodeVerifier:
     """Rubric-based verification of generated code — the pre-accept gate."""
 
-    def __init__(self, *, accept_at: float = 0.7) -> None:
+    def __init__(
+        self,
+        *,
+        accept_at: float | None = None,
+        root=None,
+        surface: str = "forge",
+    ) -> None:
+        # Explicit accept_at overrides policy; None reads threshold_for(surface).
+        if accept_at is None:
+            from skeleton.organism.policy_enforcement import threshold_for
+            accept_at = threshold_for(surface, root=root, fallback=0.7)
         self.accept_at = accept_at
         self.checks = 0
         self.accepted = 0
+        self._root = root
+        self._surface = surface
 
     def verify(self, code: str, *, request: str = "") -> VerifierReport:
         self.checks += 1
