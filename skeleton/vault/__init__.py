@@ -7,6 +7,8 @@ Exports:
 - Permission: Permission enum
 - EnvelopeKMS: Key envelope encryption
 - Predefined roles: ROLE_GUEST, ROLE_USER, ROLE_OPERATOR, ROLE_ADMIN
+- AuditLog / WORM refuse-on-boot helpers (AuditChainBroken, verify_chain_or_refuse)
+- ShamirSeal: secret sharing seal
 """
 
 from skeleton.vault.access import (
@@ -19,6 +21,14 @@ from skeleton.vault.access import (
     Permission,
     Role,
 )
+from skeleton.vault.audit import (
+    AuditChainBroken,
+    AuditEntry,
+    AuditError,
+    AuditLog,
+    verify_chain_or_refuse,
+)
+from skeleton.vault.shamir import ShamirSeal
 
 __all__ = [
     "AccessPolicy",
@@ -29,4 +39,10 @@ __all__ = [
     "ROLE_USER",
     "ROLE_OPERATOR",
     "ROLE_ADMIN",
+    "AuditChainBroken",
+    "AuditEntry",
+    "AuditError",
+    "AuditLog",
+    "verify_chain_or_refuse",
+    "ShamirSeal",
 ]

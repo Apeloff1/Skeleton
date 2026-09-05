@@ -23,7 +23,7 @@ class TestGenesisBoot:
             "rag", "cag", "mag", "trinity", "repetition", "dream", "drift",
             "orchestrator", "adaptive",
             "mesh", "pheromones", "stigmergy", "hive", "negotiator", "platoons",
-            "fortress", "canaries",
+            "fortress", "canaries", "worm_audit",
             "anomaly", "provenance", "reranker",
         }
         assert required <= set(g.handles)

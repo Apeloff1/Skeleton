@@ -142,12 +142,19 @@ class Genesis:
         self.report.phases.append("resilience")
         from skeleton.resilience import ResilienceFortress
         from skeleton.resilience.canary import CanaryRegistry
+        from skeleton.vault.audit import AuditLog
 
         self._wire("resilience", "fortress", ResilienceFortress(bus=self.bus))
         canaries = CanaryRegistry(bus=self.bus)
         canaries.plant("memory.rag")
         canaries.plant("vault")
         self._wire("resilience", "canaries", canaries)
+        # Durable WORM refuse-on-boot (sibling of Gate WormAuditLog.RestoreChain).
+        # Opens/restores the hash-chained ledger and raises AuditChainBroken if
+        # broken — fail closed. Not a lifespan rewrite; vault open path only.
+        worm_audit = AuditLog.open_default()
+        worm_audit.verify_chain_or_refuse()
+        self._wire("resilience", "worm_audit", worm_audit)
 
     def _phase_interface(self) -> None:
         self.report.phases.append("interface")
