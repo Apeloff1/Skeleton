@@ -81,3 +81,54 @@ class RotGuardedCompactor:
             "guard": self.guard.stats(),
             "compactions": self.compactor.compactions,
         }
+
+
+def turns_from_payload(raw: Any) -> List[Turn]:
+    """Coerce API/request ``turns`` payloads into ``Turn`` objects.
+
+    Accepts a list of ``{role, content}`` dicts. Malformed entries are
+    skipped. Empty / non-list input yields ``[]`` so callers can gate
+    on truthiness.
+    """
+    if not isinstance(raw, list):
+        return []
+    out: List[Turn] = []
+    for item in raw:
+        if isinstance(item, Turn):
+            out.append(item)
+            continue
+        if not isinstance(item, dict):
+            continue
+        content = item.get("content")
+        if content is None:
+            continue
+        role = str(item.get("role") or "user")
+        out.append(Turn(role=role, content=str(content)))
+    return out
+
+
+def compact_turns(
+    raw_turns: Any,
+    *,
+    constraints: Optional[Sequence[str]] = None,
+    compactor: Optional["RotGuardedCompactor"] = None,
+) -> Optional[Dict[str, Any]]:
+    """Run rot-triggered compaction when turns are present.
+
+    Returns ``None`` when no usable turns were supplied (caller leaves
+    the response shape unchanged). Otherwise a dict ready for the API
+    ``compaction`` field.
+    """
+    turns = turns_from_payload(raw_turns)
+    if not turns:
+        return None
+    gc = compactor or RotGuardedCompactor()
+    guarded = gc.process(turns, constraints=constraints)
+    return {
+        "compacted": guarded.compacted,
+        "verdict": guarded.report.verdict,
+        "hint": guarded.hint,
+        "report": guarded.report.to_dict(),
+        "turns": [{"role": t.role, "content": t.content} for t in guarded.turns],
+    }
+
