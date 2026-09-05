@@ -55,7 +55,7 @@ def attempt_repair(files: Mapping[str, str], *, request: str = "", root=None, ev
                 fixed["project.godot"] = fixed["project.godot"] + 'EventBus="*res://scripts/autoloads/event_bus.gd"\n'
                 actions.append({"path": "project.godot", "action": "restored EventBus autoload"})
             if "scripts/autoloads/event_bus.gd" not in fixed and repair_class_enabled("scene_stub", root=root):
-                fixed["scripts/autoloads/event_bus.gd"] = "extends Node\nsignal repaired()\n"
+                fixed["scripts/autoloads/event_bus.gd"] = "extends Node\n## EventBus repair stub\nsignal repaired()\nfunc emit_repaired() -> void:\n    repaired.emit()\n"
                 actions.append({"path": "scripts/autoloads/event_bus.gd", "action": "stubbed missing EventBus autoload file"})
     after = ForgeVerifier(accept_at=threshold, gd_accept_at=threshold, root=root).verify(fixed, request=request)
     result = {"kind": "forge-repair-attempt", "ok": int(after.accepted), "surface": "forge", "reason": str(after.reason), "weakest_path": str(after.weakest_path or before.weakest_path or ""), "before": before.to_dict(), "after": after.to_dict(), "actions": actions, "changed": int(bool(actions)), "targeted_path": weakest if not before.accepted else "", "stored_prose": 0, "files": fixed}

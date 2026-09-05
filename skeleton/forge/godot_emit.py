@@ -66,12 +66,25 @@ def emit_godot(
     )
     files["scripts/autoloads/event_bus.gd"] = (
         "extends Node\n"
+        "## EventBus — typed run signals + thin emit helpers\n"
         "signal heat_changed(current: float, max_heat: float)\n"
         "signal heat_critical()\n"
         "signal advice_issued(text: String, priority: int)\n"
         "signal run_ended(success: bool)\n"
         "signal data_core_picked(core: Dictionary)\n"
-        "signal room_entered(room_id: String)\n"
+        "signal room_entered(room_id: String)\n\n"
+        "func emit_heat_changed(current: float, max_heat: float) -> void:\n"
+        "\theat_changed.emit(current, max_heat)\n\n"
+        "func emit_heat_critical() -> void:\n"
+        "\theat_critical.emit()\n\n"
+        "func emit_advice(text: String, priority: int) -> void:\n"
+        "\tadvice_issued.emit(text, priority)\n\n"
+        "func emit_run_ended(success: bool) -> void:\n"
+        "\trun_ended.emit(success)\n\n"
+        "func emit_data_core_picked(core: Dictionary) -> void:\n"
+        "\tdata_core_picked.emit(core)\n\n"
+        "func emit_room_entered(room_id: String) -> void:\n"
+        "\troom_entered.emit(room_id)\n"
     )
     files["scripts/autoloads/heat_system.gd"] = (
         "extends Node\n"
