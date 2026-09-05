@@ -36,6 +36,14 @@ Usage:
     python -m skeleton lora card
     python -m skeleton decoder card
     python -m skeleton master
+
+    GameForge (CI / unit thin wrappers):
+    python -m skeleton eras
+    python -m skeleton generations
+    python -m skeleton plan "soulslike extraction with bonfire rest"
+    python -m skeleton cockpit "BLEND ERA arcade_golden_age soulslike 0.5"
+    python -m skeleton walk --era soulslike
+    python -m skeleton run "vision text" --out /tmp/out --overwrite --json
 """
 from __future__ import annotations
 
@@ -169,7 +177,90 @@ def cmd_master(args) -> None:
     _out(_deck(args).master_card())
 
 
+
+def cmd_eras(args) -> int:
+    from skeleton.forge.eras import list_eras, compile_era
+    for era in list_eras():
+        pack = compile_era(era)
+        print(f"{era:22} dps={pack['primary_dps']:<7} speed={pack['player']['speed']}")
+    return 0
+
+
+def cmd_generations(args) -> int:
+    from skeleton.forge.hardware import catalog
+    for g in catalog():
+        print(f"{g['key']:10} {g['label']:16} {g['viewport'][0]}x{g['viewport'][1]}  {g['tagline']}")
+    return 0
+
+
+def cmd_plan(args) -> int:
+    from skeleton.cortex.live import live_jeeves, persist
+    out = live_jeeves().plan_build(vision=args.vision)
+    persist()
+    print(json.dumps(out, indent=2, default=str))
+    return 0
+
+
+def cmd_cockpit(args) -> int:
+    from skeleton.context.cockpit import Cockpit
+    out = Cockpit().apply(args.cockpit_cmd)
+    print(json.dumps(out, indent=2, default=str))
+    return 0
+
+
+def cmd_walk(args) -> int:
+    """Prove spawn→extract on the emitted door graph (CI GameForge walk)."""
+    from skeleton.forge.eras import blend_eras, compile_era
+    from skeleton.forge.walk import walk_from_pack
+    from skeleton.jeeves.builder import BuilderBrain
+    from skeleton.context.tensor import ContextTensor
+    from skeleton.context.dodeca import Dodecahedron
+    from skeleton.context.oracle import Magic8Ball
+    if getattr(args, "blend", None):
+        pack = blend_eras(args.blend[0], args.blend[1], args.t)
+        tensor = ContextTensor.from_era(args.blend[0]).lerp(
+            ContextTensor.from_era(args.blend[1]), args.t
+        )
+    else:
+        pack = compile_era(args.era)
+        tensor = ContextTensor.from_era(args.era)
+    reading = Magic8Ball(Dodecahedron.from_tensor(tensor)).roll(tensor)
+    plan = BuilderBrain().plan(pack, tensor=tensor, reading=reading)
+    wr = walk_from_pack(pack, plan=plan.to_dict())
+    payload = wr.to_dict()
+    payload["plan"] = {"bias": plan.room_bias, "extract_late": plan.extract_late, "era": plan.era}
+    if getattr(args, "json", False):
+        print(json.dumps(payload, indent=2, default=str))
+    else:
+        print(f"extracted={wr.extracted} t={wr.t:.2f} hops={wr.hops} cores={wr.cores}/{wr.required_cores}")
+    return 0 if wr.passed else 1
+
+
+def cmd_run(args) -> int:
+    from skeleton.context.pipeline import GameForgeRun
+    vision = args.vision
+    era = getattr(args, "era", None)
+    out = getattr(args, "out", None)
+    overwrite = bool(getattr(args, "overwrite", False))
+    as_json = bool(getattr(args, "json", False))
+    blend = tuple(args.blend) + (args.t,) if getattr(args, "blend", None) else None
+    generation = getattr(args, "generation", None)
+    payload = GameForgeRun.live().execute(
+        vision, era=era, answers={}, project_root=out, overwrite=overwrite, target="godot",
+        blend=blend, generation=generation,
+    )
+    if as_json:
+        slim = {k: payload[k] for k in ("succeeded", "era", "mass", "complete", "sim", "project", "forge") if k in payload}
+        print(json.dumps(slim, indent=2, default=str))
+    else:
+        print(f"era={payload.get('era')} mass={payload.get('mass')} sim={(payload.get('sim') or {}).get('passed')} files={(payload.get('forge') or {}).get('file_count')}")
+        if payload.get("project"):
+            print("wrote", payload["project"]["root"])
+    return 0 if payload.get("succeeded") else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
+
     parser = argparse.ArgumentParser(prog="skeleton", description="Skeleton operator CLI")
     parser.add_argument("--root", default=None, help="Project root path")
     sub = parser.add_subparsers(dest="command")
@@ -275,12 +366,42 @@ def build_parser() -> argparse.ArgumentParser:
     # Master
     sub.add_parser("master", help="Master deck card")
 
+    # GameForge thin wrappers (CI + tests/run_unit TestCLI)
+    sub.add_parser("eras", help="List era dialects")
+    sub.add_parser("generations", help="List hardware generations")
+    pl = sub.add_parser("plan", help="Jeeves BuildPlan for a vision / era")
+    pl.add_argument("vision", nargs="?", default="")
+    pl.add_argument("--era")
+    pl.add_argument("--blend", nargs=2, metavar=("ERA_A", "ERA_B"))
+    pl.add_argument("--t", dest="t", type=float, default=0.5)
+    ck = sub.add_parser("cockpit", help="Apply one cockpit command")
+    ck.add_argument("cockpit_cmd", metavar="COMMAND", help="Cockpit command line")
+    wk = sub.add_parser("walk", help="Prove spawn→extract on the emitted door graph")
+    wk.add_argument("--era", default="extraction_now")
+    wk.add_argument("--blend", nargs=2, metavar=("ERA_A", "ERA_B"))
+    wk.add_argument("--t", dest="t", type=float, default=0.5)
+    wk.add_argument("--json", action="store_true")
+    rn = sub.add_parser("run", help="Vision → Godot project via GameForgeRun")
+    rn.add_argument("vision", nargs="?", default="")
+    rn.add_argument("--era")
+    rn.add_argument("--out", dest="out")
+    rn.add_argument("--overwrite", action="store_true")
+    rn.add_argument("--json", action="store_true")
+    rn.add_argument("--blend", nargs=2, metavar=("ERA_A", "ERA_B"))
+    rn.add_argument("--t", dest="t", type=float, default=0.5)
+    rn.add_argument("--generation")
+
     return parser
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = build_parser()
-    args = parser.parse_args(argv)
+    try:
+        args = parser.parse_args(argv)
+    except SystemExit as exc:
+        # Keep unit tests / embedded callers from being killed by argparse.
+        code = exc.code
+        return int(code) if isinstance(code, int) else (1 if code else 0)
     if not args.command:
         parser.print_help()
         return 1
@@ -295,13 +416,19 @@ def main(argv: Optional[List[str]] = None) -> int:
         "lora": cmd_lora,
         "decoder": cmd_decoder,
         "master": cmd_master,
+        "eras": cmd_eras,
+        "generations": cmd_generations,
+        "plan": cmd_plan,
+        "cockpit": cmd_cockpit,
+        "walk": cmd_walk,
+        "run": cmd_run,
     }
     handler = handlers.get(args.command)
     if handler is None:
         parser.print_help()
         return 1
-    handler(args)
-    return 0
+    rc = handler(args)
+    return int(rc) if rc is not None else 0
 
 
 if __name__ == "__main__":
