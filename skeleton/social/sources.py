@@ -108,6 +108,10 @@ SOTA_POINTERS: Tuple[Dict[str, str], ...] = (
     {"topic": "paged-attention", "url": "https://arxiv.org/abs/2309.06180", "house": "arXiv"},
     {"topic": "flashnorm", "url": "https://arxiv.org/abs/2407.09577", "house": "arXiv"},
     {"topic": "fireq-int4-fp8", "url": "https://arxiv.org/abs/2505.20839", "house": "arXiv"},
+    {"topic": "xquant-kv", "url": "https://arxiv.org/abs/2508.10395", "house": "arXiv"},
+    {"topic": "specdec-llama", "url": "https://arxiv.org/html/2508.08192", "house": "arXiv"},
+    {"topic": "flashmla", "url": "https://github.com/deepseek-ai/FlashMLA", "house": "GitHub"},
+    {"topic": "flashqla-x", "url": "https://x.com/Alibaba_Qwen/status/2049462666734026923", "house": "X"},
 )
 
 

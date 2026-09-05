@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-05 — Social-parsed inference kernels
+
+- linattn, xquant, fp8kv, pagekv, flashdec, specdec/MTP, GQA, sparseattn.
+- Bank slot socialk. Cites FlashQLA / XQuant / FlashMLA / specdec.
+- Version 2026.09.05-socialk.
+
+---
+
 ## 2026-09-05 — Obscure and superfluous kernels
 
 - 20 named ops + bank slot obscure on mobile.

@@ -24,6 +24,11 @@ OBSCURE: Tuple[str, ...] = (
     "earlyexit", "dry", "presence",
 )
 
+SOCIAL: Tuple[str, ...] = (
+    "linattn", "xquant", "fp8kv", "pagekv",
+    "flashdec", "specdec", "mtp", "gqa", "sparseattn",
+)
+
 
 class Catalog:
     def card(self) -> Dict[str, Any]:
@@ -32,6 +37,7 @@ class Catalog:
             "obligatory": list(OBLIGATORY),
             "extra": list(EXTRA),
             "obscure": list(OBSCURE),
-            "n": len(OBLIGATORY) + len(EXTRA) + len(OBSCURE),
+            "social": list(SOCIAL),
+            "n": len(OBLIGATORY) + len(EXTRA) + len(OBSCURE) + len(SOCIAL),
             "stored_prose": 0,
         }
