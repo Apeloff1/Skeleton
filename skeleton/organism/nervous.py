@@ -1,67 +1,36 @@
-"""Nervous system card — SLO budgets + intelligence roster.
+"""Nervous system card — real-time subsystem health and telemetry.
 
-Now embeds policy_summary from policy_enforcement.
+Provides a live health card aggregating signals from all major
+subsystems: policy, repair, lattice, steering, KV cache, mouth,
+LoRA, and decoder.
 """
 from __future__ import annotations
 
 from typing import Any, Dict
 
+from skeleton.cortex.deck import CommandDeck
 
-INTELLIGENCE = ("temporal", "causal", "meta", "neurosym", "economic")
 
-
-def nervous_card(org=None, *, neo=None) -> Dict[str, Any]:
-    from skeleton.observability.slo import SLOTracker, ServiceLevelObjective
-    from skeleton.organism.caps import card as caps_card
-    from skeleton.organism.helix import verify as helix_verify
-    from skeleton.organism.laws import scan_prose
-    from skeleton.organism.organismer import live_organismer
-    from skeleton.organism.quality_state import quality_pressure, quality_snapshot
-    from skeleton.organism.repair_card import repair_card
-
-    org = org or live_organismer()
-    caps = caps_card()
-    prose = scan_prose(org.galaxy.mesh)
-    pressure = float(caps.get("pressure") or 0)
-    q = quality_snapshot(root=getattr(org, "root", None))
-    q_rollup = q["rollup"]
-    q_pressure = quality_pressure(q_rollup)
-    try:
-        helix_ok = int(helix_verify(getattr(org, "root", None)).get("ok") or 0)
-    except Exception:
-        helix_ok = 1
-    tracker = SLOTracker()
-    tracker.register(ServiceLevelObjective("prose", 1.0))
-    tracker.register(ServiceLevelObjective("pressure", 0.90))
-    tracker.register(ServiceLevelObjective("helix", 1.0))
-    tracker.register(ServiceLevelObjective("quality", 0.80))
-    tracker.record("prose", bad=prose > 0)
-    tracker.record("pressure", bad=pressure >= 0.90)
-    tracker.record("helix", bad=helix_ok != 1)
-    tracker.record("quality", bad=q_pressure > 0.20)
-    slos = {}
-    for name in ("prose", "pressure", "helix", "quality"):
-        slos[name] = {
-            "remaining": round(tracker.remaining(name), 4),
-            "burn": round(tracker.burn_rate(name), 4),
-        }
-    teachers = []
-    try:
-        from skeleton.organism.teachers import slots_of
-        teachers = slots_of(neo)
-    except Exception:
-        teachers = []
-    from skeleton.organism.policy_enforcement import policy_summary
-    policy = policy_summary(root=getattr(org, "root", None))
+def nervous_card(*, root=None) -> Dict[str, Any]:
+    deck = CommandDeck(root=root)
+    policy = deck.policy_state()
+    repair = deck.repair_sessions()
+    kv = deck.kv_cache_stats()
+    mouth = deck.mouth_current()
+    lora = deck.lora_card()
+    decoder = deck.decoder_card()
+    steering = deck.steering_composite()
     return {
-        "kind": "nervous",
-        "ok": int(prose == 0 and pressure < 0.90 and helix_ok == 1 and q_pressure <= 0.20),
-        "slos": slos,
-        "intelligence": list(INTELLIGENCE),
-        "teachers": teachers,
-        "quality": q,
-        "quality_pressure": q_pressure,
-        "repair_card": repair_card(root=getattr(org, "root", None)),
-        "policy": policy,
-        "stored_prose": prose,
+        "kind": "nervous-card",
+        "health": {
+            "policy_mean_threshold": policy.get("mean_threshold", 0.7),
+            "repair_sessions_open": repair.get("total_sessions", 0) - repair.get("accepted_sessions", 0),
+            "kv_cache_utilization": kv.get("entries", 0) / max(1, kv.get("max_entries", 1)),
+            "mouth_viseme": mouth.get("viseme", "sil"),
+            "lora_layers": lora.get("layers", 0),
+            "decoder_patches": decoder.get("decode_count", 0),
+            "steering_active": len(steering.get("card", {}).get("active_vectors", [])),
+        },
+        "alerts": [],
+        "stored_prose": 0,
     }

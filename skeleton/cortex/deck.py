@@ -1,173 +1,184 @@
-"""Command deck — the organism you can speak through.
+"""Command deck — operator control surface for all Skeleton subsystems.
 
-Unifies think → refer → improve → ascend → plan → dodeca → genos
-into one instrument. Laws gate every write. Pointers only.
-
-Now includes repair orchestrator integration for multi-pass repairs,
-telemetry, learned policy, and session diagnostics.
-Also includes adaptive policy for self-tuning thresholds.
+Wires together policy, verification, repair, versioning, lattice,
+steering, and advanced subsystems into a single operator-facing deck.
 """
 from __future__ import annotations
 
-import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
-from skeleton.cortex.dodeca import FACES, face_card
-from skeleton.cortex.laws import LAWS, check
-from skeleton.cortex.refs import index as refs_index
-from skeleton.cortex.refs import refer
+# Core policy surfaces
+from skeleton.organism.policy_enforcement import gate_check, policy_summary, repair_gate, threshold_for
+from skeleton.organism.policy_versioning import (
+    diff_versions,
+    inherit_version,
+    list_versions,
+    rollback,
+    rollback_by_surface,
+    save_version,
+    version_card,
+    version_lineage,
+)
+from skeleton.organism.policy_rollback_control import rollback_control_card, rollback_preview
 
+# Verification surfaces
+from skeleton.intelligence.forge_verifier import ForgeVerifier
+from skeleton.intelligence.plan_verifier import PlanVerifier
+from skeleton.intelligence.pipeline_verifier import PipelineVerifier
+from skeleton.intelligence.npc_verifier import NPCVerifier
+from skeleton.intelligence.dialogue_verifier import DialogueVerifier
 
-def _g(neo) -> float:
-    return float(getattr(getattr(neo, "genos_engine", None), "G", 1.0) or 1.0)
+# Repair surfaces
+from skeleton.intelligence.repair_autonomy import repair_effectiveness, repair_session_card, run_multi_pass
+from skeleton.intelligence.repair_orchestrator import orchestrated_repair, repair_orchestrator_card
+from skeleton.intelligence.repair_telemetry import telemetry_card, error_summary
+from skeleton.intelligence.learned_repair import learned_policy_card, suggest_repair_strategy
 
-
-def _trace_dict(trace: Any) -> Dict[str, Any]:
-    if trace is None:
-        return {}
-    if hasattr(trace, "to_dict"):
-        return trace.to_dict()
-    if isinstance(trace, dict):
-        return dict(trace)
-    return {"text": str(trace)}
+# Advanced subsystems
+from skeleton.organism.pixel_lattice import default_editor_lattice, default_hud_lattice, lattice_card
+from skeleton.organism.advanced_operator_steering import AdvancedOperatorSteering
+from skeleton.intelligence.octahedral_kv_cache import OctahedralKVCache
+from skeleton.intelligence.live_teacher_mouth import LiveMouthBinding
+from skeleton.intelligence.parametric_lora import ParametricLoRAWriteBack
+from skeleton.intelligence.gpu_decoder_prior import GPUDecoderPrior
 
 
 class CommandDeck:
-    """Live instrument over a JeevesCortex (or any neo with the same mouth)."""
+    """Central operator deck exposing all control surfaces."""
 
-    def __init__(self, neo: Any, *, root=None) -> None:
-        self.neo = neo
-        self.traces: List[Dict[str, Any]] = []
-        self.last_ref: Optional[Dict[str, Any]] = None
-        self.last_improve: Optional[Dict[str, Any]] = None
-        self.last_plan: Optional[Dict[str, Any]] = None
-        self.position = 0
+    def __init__(self, root=None):
         self.root = root
+        self._steering = AdvancedOperatorSteering(dim=64)
+        self._kv_cache = OctahedralKVCache(max_entries=4096)
+        self._mouth = LiveMouthBinding(smoothing_window=3)
+        self._lora = ParametricLoRAWriteBack(base_dim=768, default_rank=8)
+        self._decoder = GPUDecoderPrior(patch_size=32, latent_dim=64)
 
-    def status(self) -> Dict[str, Any]:
-        neo = self.neo
-        st = neo.status() if hasattr(neo, "status") else {}
-        if not isinstance(st, dict):
-            st = {}
-        g = _g(neo)
-        toward = min(100.0, max(0.0, (g - 1.0) / 9.0 * 100.0))
-        return {"G": round(g, 6), "target": 10.0, "toward_pct": round(toward, 1), "pulses": int(getattr(getattr(neo, "genos_engine", None), "pulses", 0) or 0), "epsilon": float(getattr(getattr(neo, "genos_engine", None), "epsilon", 0) or 0), "mouth": neo.speaking_name() if hasattr(neo, "speaking_name") else "neo", "dodeca": face_card(neo), "laws": list(LAWS), "refs": len(refs_index()), "traces": len(self.traces), "last_title": (self.last_ref or {}).get("title"), "cortex": st}
+    # ── Policy ──────────────────────────────────────────────
 
-    def refer(self, stimulus: str, *, live: bool = False) -> Dict[str, Any]:
-        out = refer(stimulus, live=live)
-        if out.get("hit"):
-            self.last_ref = out.get("ref")
-        return out
+    def policy_state(self) -> Dict[str, Any]:
+        return policy_summary(root=self.root)
 
-    def speak(self, stimulus: str) -> Dict[str, Any]:
-        stim = stimulus or ""
-        hit = self.refer(stim)
-        trace = None
-        if hasattr(self.neo, "think"):
-            trace = self.neo.think(stim)
-        amalgam = ""
-        if hit.get("hit"):
-            ref = hit.get("ref") or {}
-            amalgam = f"HOUSE {ref.get('era')} · {ref.get('dialect') or ''}"
-        elif trace is not None and hasattr(trace, "amalgam"):
-            amalgam = getattr(trace.amalgam, "text", "") or ""
-        card = {"stimulus": stim[:240], "amalgam": amalgam[:400], "mouth": self.neo.speaking_name() if hasattr(self.neo, "speaking_name") else "neo", "G": round(_g(self.neo), 6), "law": "ok", "used_own": bool(getattr(trace, "used_own", False)), "hit": int(bool(hit.get("hit"))), "citation": (hit.get("ref") or {}).get("citation") if hit.get("hit") else None, "stored_prose": 0, "think": _trace_dict(trace), "at": int(time.time() * 1000)}
-        check({"kind": "speak", "dialect": card["amalgam"][:160], "title": (self.last_ref or {}).get("title") or ""})
-        self.traces = [card, *self.traces][:24]
-        return card
+    def policy_gate(self, surface: str, score: float) -> Dict[str, Any]:
+        return gate_check(surface, score, root=self.root)
 
-    def product(self) -> Dict[str, Any]:
-        from skeleton.organism.product import product_card
-        card = product_card()
-        card["mouth_G"] = round(_g(self.neo), 6)
-        return card
+    def save_policy_version(self, comment: str = "", author: str = "operator") -> str:
+        return save_version(comment=comment, author=author, root=self.root)
 
-    def failures(self, *, surface: str = "") -> Dict[str, Any]:
-        from skeleton.organism.failure_card import failure_card
-        return failure_card(root=self.root, surface=surface)
+    def rollback_policy(self, version_id: str) -> Dict[str, Any]:
+        return rollback(version_id, root=self.root)
 
-    def repairs(self, *, surface: str = "") -> Dict[str, Any]:
-        from skeleton.organism.repair_card import repair_card
-        return repair_card(root=self.root, surface=surface)
+    def rollback_policy_surface(self, surface: str) -> Dict[str, Any]:
+        return rollback_by_surface(surface, root=self.root)
 
-    def activity(self, *, surface: str = "", kind: str = "", limit: int = 8) -> Dict[str, Any]:
-        from skeleton.organism.activity_card import activity_card
-        return activity_card(root=self.root, surface=surface, kind=kind, limit=limit)
+    def policy_versions(self, limit: int = 8) -> Dict[str, Any]:
+        return version_card(root=self.root, limit=limit)
 
-    def recurring(self, *, surface: str = "") -> Dict[str, Any]:
-        from skeleton.organism.recurring_card import recurring_card
-        return recurring_card(root=self.root, surface=surface)
+    def policy_diff(self, a: str, b: str) -> Dict[str, Any]:
+        return diff_versions(a, b, root=self.root)
 
-    def policy(self) -> Dict[str, Any]:
-        from skeleton.organism.policy_control_card import policy_control_card
-        return policy_control_card(root=self.root)
+    def policy_lineage(self, version_id: str) -> List[str]:
+        return version_lineage(version_id, root=self.root)
 
-    def threshold(self, *, surface: str = "") -> Dict[str, Any]:
-        from skeleton.organism.policy_card import threshold_card
-        return threshold_card(root=self.root, surface=surface)
+    def rollback_preview(self, version_id: str) -> Dict[str, Any]:
+        return rollback_preview(version_id, root=self.root)
 
-    def set_threshold(self, surface: str, value: float) -> Dict[str, Any]:
-        from skeleton.organism.policy_card import set_threshold_card
-        return set_threshold_card(surface, value, root=self.root)
+    # ── Verification ──────────────────────────────────────────
 
-    def set_repair_enabled(self, surface: str, enabled: bool) -> Dict[str, Any]:
-        from skeleton.organism.policy_card import set_repair_enabled_card
-        return set_repair_enabled_card(surface, enabled, root=self.root)
+    def verify_forge(self, files, request: str = "") -> Dict[str, Any]:
+        v = ForgeVerifier(root=self.root)
+        return v.verify(files, request=request).to_dict()
 
-    def set_repair_class(self, name: str, enabled: bool) -> Dict[str, Any]:
-        from skeleton.organism.policy_card import set_repair_class_card
-        return set_repair_class_card(name, enabled, root=self.root)
+    def verify_plan(self, plan) -> Dict[str, Any]:
+        v = PlanVerifier(root=self.root)
+        return v.verify(plan).to_dict()
 
-    # Repair orchestrator integration
-    def repair_sessions(self, *, surface: str = "", limit: int = 8) -> Dict[str, Any]:
-        from skeleton.intelligence.repair_autonomy import repair_session_card
-        return repair_session_card(surface=surface, root=self.root, limit=limit)
+    def verify_pipeline(self, tree) -> Dict[str, Any]:
+        v = PipelineVerifier(root=self.root)
+        return v.verify(tree).to_dict()
 
-    def repair_effectiveness(self, *, surface: str = "") -> Dict[str, Any]:
-        from skeleton.intelligence.repair_autonomy import repair_effectiveness
+    def verify_npc(self, spec) -> Dict[str, Any]:
+        v = NPCVerifier(root=self.root)
+        return v.verify(spec).to_dict()
+
+    def verify_dialogue(self, script) -> Dict[str, Any]:
+        v = DialogueVerifier(root=self.root)
+        return v.verify(script).to_dict()
+
+    # ── Repair ──────────────────────────────────────────────
+
+    def repair_orchestrate(self, surface: str, target_id: str, **kwargs) -> Dict[str, Any]:
+        return orchestrated_repair(surface, target_id, root=self.root, **kwargs)
+
+    def repair_sessions(self, surface: str = "") -> Dict[str, Any]:
+        return repair_session_card(surface=surface, root=self.root)
+
+    def repair_effectiveness(self, surface: str = "") -> Dict[str, Any]:
         return repair_effectiveness(surface=surface, root=self.root)
 
-    def repair_telemetry(self, *, surface: str = "", limit: int = 16) -> Dict[str, Any]:
-        from skeleton.intelligence.repair_telemetry import telemetry_card
-        return telemetry_card(surface=surface, root=self.root, limit=limit)
+    def repair_telemetry(self, surface: str = "") -> Dict[str, Any]:
+        return telemetry_card(surface=surface, root=self.root)
 
-    def repair_errors(self, *, surface: str = "") -> Dict[str, Any]:
-        from skeleton.intelligence.repair_telemetry import error_summary
+    def repair_errors(self, surface: str = "") -> Dict[str, Any]:
         return error_summary(surface=surface, root=self.root)
 
-    def learned_policy(self) -> Dict[str, Any]:
-        from skeleton.intelligence.learned_repair import learned_policy_card
+    def repair_learned(self) -> Dict[str, Any]:
         return learned_policy_card(root=self.root)
 
-    def repair_orchestrator(self) -> Dict[str, Any]:
-        from skeleton.intelligence.repair_orchestrator import repair_orchestrator_card
-        return repair_orchestrator_card(root=self.root)
+    def repair_strategy(self, surface: str, reason: str) -> Dict[str, Any]:
+        return suggest_repair_strategy(surface, reason, root=self.root)
 
-    # Adaptive policy integration
-    def adaptive_policy(self) -> Dict[str, Any]:
-        from skeleton.intelligence.adaptive_policy import adaptive_policy_card
-        return adaptive_policy_card(root=self.root)
+    # ── Advanced subsystems ───────────────────────────────────
 
-    def adapt_surface(self, surface: str, *, dry_run: bool = False) -> Dict[str, Any]:
-        from skeleton.intelligence.adaptive_policy import adapt_surface
-        return adapt_surface(surface, root=self.root, dry_run=dry_run)
+    def lattice_hud(self) -> Dict[str, Any]:
+        return lattice_card(default_hud_lattice())
 
-    def adapt_all(self, *, dry_run: bool = False) -> Dict[str, Any]:
-        from skeleton.intelligence.adaptive_policy import adapt_all_surfaces
-        return adapt_all_surfaces(root=self.root, dry_run=dry_run)
+    def lattice_editor(self) -> Dict[str, Any]:
+        return lattice_card(default_editor_lattice())
 
-    def set_adaptive_config(self, **kwargs) -> Dict[str, Any]:
-        from skeleton.intelligence.adaptive_policy import set_adaptive_config
-        return set_adaptive_config(root=self.root, **kwargs)
+    def steering_register(self, name: str, dims=None, strength: float = 1.0) -> Dict[str, Any]:
+        vec = self._steering.register(name, dims=dims, strength=strength)
+        return vec.to_dict()
 
-    def set_surface_adaptive(self, surface: str, **kwargs) -> Dict[str, Any]:
-        from skeleton.intelligence.adaptive_policy import set_surface_adaptive_config
-        return set_surface_adaptive_config(surface, root=self.root, **kwargs)
+    def steering_activate(self, name: str, weight: float = 1.0) -> None:
+        self._steering.activate(name, weight)
 
-    def snapshot(self) -> Dict[str, Any]:
-        return {"status": self.status(), "last_ref": self.last_ref, "last_improve": self.last_improve, "last_plan": self.last_plan, "traces": list(self.traces[:8]), "position": self.position, "face": FACES[self.position]}
+    def steering_deactivate(self, name: str) -> None:
+        self._steering.deactivate(name)
 
+    def steering_composite(self) -> Dict[str, Any]:
+        return {"composite": self._steering.composite_vector(), "card": self._steering.card()}
 
-def live_deck():
-    from skeleton.cortex.live import live_cortex
-    return CommandDeck(live_cortex())
+    def kv_cache_stats(self) -> Dict[str, Any]:
+        return self._kv_cache.card()
+
+    def mouth_feed(self, phoneme: str, ts_ms: float, confidence: float = 1.0) -> Dict[str, Any]:
+        return self._mouth.feed_phoneme(phoneme, ts_ms, confidence).to_dict()
+
+    def mouth_current(self) -> Dict[str, Any]:
+        return self._mouth.current().to_dict()
+
+    def lora_card(self) -> Dict[str, Any]:
+        return self._lora.card()
+
+    def decoder_card(self) -> Dict[str, Any]:
+        return self._decoder.card()
+
+    # ── Master card ─────────────────────────────────────────
+
+    def master_card(self) -> Dict[str, Any]:
+        return {
+            "kind": "command-deck-master",
+            "policy": self.policy_state(),
+            "versions": self.policy_versions(limit=4),
+            "rollback": rollback_control_card(root=self.root),
+            "repair_orchestrator": repair_orchestrator_card(root=self.root),
+            "steering": self._steering.card(),
+            "kv_cache": self.kv_cache_stats(),
+            "mouth": self._mouth.card(),
+            "lora": self.lora_card(),
+            "decoder": self.decoder_card(),
+            "lattice_hud": self.lattice_hud(),
+            "lattice_editor": self.lattice_editor(),
+            "stored_prose": 0,
+        }

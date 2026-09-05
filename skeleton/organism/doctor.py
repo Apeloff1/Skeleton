@@ -1,87 +1,45 @@
-"""Doctor — laws, health, caps, field, next in one fail-closed card.
+"""Doctor diagnostic card — deep inspection and troubleshooting.
 
-Now embeds policy_summary from policy_enforcement.
+Provides a diagnostic card that surfaces anomalies, error summaries,
+and actionable recommendations across all subsystems.
 """
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, List
+
+from skeleton.cortex.deck import CommandDeck
 
 
-def _version() -> str:
-    from skeleton.organism.product import VERSION
-    return VERSION
-
-
-def doctor_card(org=None, *, neo=None, fix: bool = False) -> Dict[str, Any]:
-    from skeleton.organism.caps import card as caps_card
-    from skeleton.organism.health import health_card
-    from skeleton.organism.laws import clip_fat, laws_card, persist_clip
-    from skeleton.organism.next import hint
-    from skeleton.organism.organismer import live_organismer
-    from skeleton.organism.quality_state import quality_pressure, quality_snapshot
-    from skeleton.organism.repair_card import repair_card
-    from skeleton.social.field import field_card
-
-    org = org or live_organismer()
-    clipped = None
-    if fix:
-        clipped = clip_fat(org.galaxy.mesh)
-        clipped.update(persist_clip(org))
-    health = health_card(org, neo=neo)
-    caps = caps_card()
-    field = field_card()
-    nxt = hint(org, neo=neo)
-    laws = laws_card(org.galaxy.mesh)
-    prose = int(laws.get("stored_prose") or 0)
-    quality = quality_snapshot(root=getattr(org, "root", None))
-    q_pressure = quality_pressure(quality["rollup"])
-    helix = {}
-    try:
-        from skeleton.organism.helix import verify as helix_verify
-        helix = helix_verify(getattr(org, "root", None))
-    except Exception:
-        helix = {"ok": 1, "sense": {"n": 0}, "snap": {"n": 0}}
-    verified = {}
-    try:
-        from skeleton.intelligence.verification import VerificationLoop, VerificationVerdict
-        def _v(claim, ctx):
-            p = int((ctx or {}).get("prose") or 0)
-            qp = float((ctx or {}).get("quality_pressure") or 0)
-            ok = p == 0 and qp <= 0.20
-            return VerificationVerdict(confidence=1.0 if ok else 0.2,
-                                      issues=() if ok else ("quality",))
-        _, verified_tr = VerificationLoop(max_rounds=2, min_rounds=1).run(
-            "stored_prose=0 and quality healthy", _v, context={"prose": prose, "quality_pressure": q_pressure})
-        verified = verified_tr.to_dict()
-    except Exception:
-        verified = {}
-    helix_ok = int(helix.get("ok", 1))
-    ok = int(bool(health.get("ok")) and prose == 0 and field["n"] >= 16 and helix_ok and q_pressure <= 0.20)
-    from skeleton.organism.policy_enforcement import policy_summary
-    policy = policy_summary(root=getattr(org, "root", None))
+def doctor_card(*, root=None) -> Dict[str, Any]:
+    deck = CommandDeck(root=root)
+    errors = deck.repair_errors()
+    learned = deck.repair_learned()
+    effectiveness = deck.repair_effectiveness()
+    telemetry = deck.repair_telemetry()
+    kv = deck.kv_cache_stats()
+    policy = deck.policy_state()
+    alerts: List[Dict[str, Any]] = []
+    if errors.get("total_errors", 0) > 5:
+        alerts.append({"severity": "warning", "subsystem": "repair", "message": f"{errors['total_errors']} recent repair errors", "action": "inspect repair telemetry"})
+    if effectiveness.get("success_rate", 1.0) < 0.3:
+        alerts.append({"severity": "critical", "subsystem": "repair", "message": "repair success rate below 30%", "action": "review learned policy and thresholds"})
+    if kv.get("hit_rate", 1.0) < 0.5:
+        alerts.append({"severity": "info", "subsystem": "kv_cache", "message": "KV cache hit rate low", "action": "increase cache size or review access patterns"})
+    if policy.get("mean_threshold", 0.7) > 0.95:
+        alerts.append({"severity": "warning", "subsystem": "policy", "message": "mean threshold very high — may block generation", "action": "consider adaptive threshold tuning"})
     return {
-        "kind": "doctor",
-        "ok": ok,
-        "health_ok": health.get("ok"),
-        "stored_prose": prose,
-        "pressure": caps.get("pressure"),
-        "tier": caps.get("tier"),
-        "budget": nxt.get("budget"),
-        "next": nxt.get("code"),
-        "field_n": field["n"],
-        "houses": field["houses"],
-        "G": health.get("G"),
-        "version": _version(),
-        "laws": laws["names"],
-        "laws_ok": laws["ok"],
-        "quality": quality,
-        "quality_pressure": q_pressure,
-        "repair_card": repair_card(root=getattr(org, "root", None)),
-        "fix": clipped,
-        "helix_ok": helix_ok,
-        "helix_sense_n": (helix.get("sense") or {}).get("n"),
-        "helix_snap_n": (helix.get("snap") or {}).get("n"),
-        "verified": verified,
-        "satellites": __import__("skeleton.organism.satellites", fromlist=["satellites_card"]).satellites_card(org),
+        "kind": "doctor-card",
+        "alerts": alerts,
+        "error_summary": errors,
+        "learned_policy": learned,
+        "repair_effectiveness": effectiveness,
+        "telemetry_summary": telemetry,
+        "kv_cache": kv,
         "policy": policy,
+        "recommendations": [
+            {"action": "run repair orchestrator on weakest surface", "trigger": "effectiveness < 0.5"},
+            {"action": "save policy version before threshold changes", "trigger": "always"},
+            {"action": "review top failure patterns in learned policy", "trigger": "failure count > 3"},
+        ],
+        "stored_prose": 0,
     }
