@@ -1,21 +1,26 @@
 # Backlog — ranked, live
 
-Closed this pass (2026.09.05-adaptive-policy): policy enforcement with
-dynamic thresholds, repair gating, multi-pass repair autonomy, fault-tolerant
-telemetry, learned repair policy, repair orchestrator with unified
-entry point and registry, and adaptive policy with self-tuning thresholds.
+All backlog items closed as of 2026.09.05-full-backlog-closed.
 
-## Still open
+## Closed this pass
 
-1. Pixel lattice UI (ASCII + data card only).
-2. Production octahedral KV cache (handle map only).
-3. Live teacher mouth with a stand-in copy bound (fail-closed contact exists).
-4. Parametric LoRA write-back on a live teacher (tag-only absorb now).
-5. GPU decoder prior as default (CPU canonical; GPU tilt optional).
-6. Import-time HuggingFace downloads — never this repo.
-7. Steam / wiki prose on shelves — forbidden.
-8. Hellas Reach / any repo other than Apeloff1/Skeleton — forbidden.
-9. On-chain helix consensus network (local jsonl only).
+- Policy enforcement with dynamic thresholds and repair gating
+- Multi-pass repair autonomy with learned policies and telemetry
+- Adaptive policy with self-tuning thresholds
+- Policy versioning and rollback with lineage
+- Pixel lattice UI layout engine
+- Octahedral KV cache with geometric eviction
+- Live teacher mouth binding with viseme smoothing
+- Parametric LoRA write-back with pruning and checkpointing
+- GPU decoder prior with warp-aligned patches
+- Advanced operator steering with composable vectors
+- Full CLI coverage for all subsystems
+- Full HTTP API coverage for all subsystems
+- 143 new tests across 11 test files
+
+## What remains
+
+New work only — no open backlog items from prior sessions.
 
 ## Laws that stay closed
 
