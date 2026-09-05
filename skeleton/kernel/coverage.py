@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from skeleton.kernel.ops.catalog import EXTRA, OBLIGATORY
+from skeleton.kernel.ops.catalog import EXTRA, OBLIGATORY, OBSCURE
 from skeleton.kernel.hot import rank
 from skeleton.kernel.scoreboard import card as score_card
 
@@ -20,8 +20,12 @@ def card() -> Dict[str, Any]:
         covered.update(bundled)
     if "extras" in live or "block" in live:
         covered.update(set(extra))
+    obscure = list(OBSCURE)
+    if "obscure" in live or "block" in live:
+        covered.update(set(obscure))
     missing_obl = [k for k in obl if k not in covered]
     missing_extra = [k for k in extra if k not in covered]
+    missing_obscure = [k for k in obscure if k not in covered]
     return {
         "kind": "kernel-coverage",
         "live_n": len(live),
@@ -29,6 +33,8 @@ def card() -> Dict[str, Any]:
         "obligatory": obl,
         "missing_obl": missing_obl,
         "missing_extra": missing_extra,
+        "missing_obscure": missing_obscure,
+        "pct_obscure": round(100 * (1 - len(missing_obscure) / max(1, len(obscure))), 1),
         "live": sorted(live),
         "hot": sorted(hot),
         "pct_obl": round(100 * (1 - len(missing_obl) / max(1, len(obl))), 1),

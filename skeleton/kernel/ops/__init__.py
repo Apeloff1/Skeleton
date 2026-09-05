@@ -21,10 +21,11 @@ from skeleton.kernel.ops.residual import residual
 from skeleton.kernel.ops.moe import route
 from skeleton.kernel.ops.dma import Dma
 from skeleton.kernel.ops.catalog import Catalog
+from skeleton.kernel.ops.obscure import Obscure
 
 __all__ = [
     "Engine", "writes", "matmul", "attend", "rmsnorm",
     "KVCache", "qlinear", "quantize", "sample", "fused_block",
     "softmax", "rope", "swiglu", "Embed", "layernorm", "residual",
-    "route", "Dma", "Catalog",
+    "route", "Dma", "Catalog", "Obscure",
 ]

@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-05 — Obscure and superfluous kernels
+
+- 20 named ops + bank slot obscure on mobile.
+- Version 2026.09.05-obscure.
+
+---
+
 ## 2026-09-04 — Policy steering segment begins
 
 - Added persistent operator policy state for quality thresholds and repair toggles.

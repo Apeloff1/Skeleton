@@ -20,7 +20,7 @@ from skeleton.social.sources import SOTA_POINTERS
 from skeleton.organism.repair_card import repair_card
 
 
-VERSION = "2026.09.02-chronicle"
+VERSION = "2026.09.05-obscure"
 
 
 ENDPOINTS = (

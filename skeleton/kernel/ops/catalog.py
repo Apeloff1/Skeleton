@@ -15,6 +15,15 @@ EXTRA: Tuple[str, ...] = (
     "block", "stock_live", "scale", "clamp",
 )
 
+OBSCURE: Tuple[str, ...] = (
+    "geglu", "reglue", "sqrelu", "silu",
+    "qknorm", "qkclip", "softcap",
+    "yarn", "ntk", "xpos",
+    "sink", "minp", "typical",
+    "mla", "ssm", "bitnet", "hadamard",
+    "earlyexit", "dry", "presence",
+)
+
 
 class Catalog:
     def card(self) -> Dict[str, Any]:
@@ -22,6 +31,7 @@ class Catalog:
             "kind": "kernel-catalog",
             "obligatory": list(OBLIGATORY),
             "extra": list(EXTRA),
-            "n": len(OBLIGATORY) + len(EXTRA),
+            "obscure": list(OBSCURE),
+            "n": len(OBLIGATORY) + len(EXTRA) + len(OBSCURE),
             "stored_prose": 0,
         }
