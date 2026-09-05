@@ -5,6 +5,7 @@ import pytest
 fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
+from skeleton.api.hmac_seal import mint_seal  # noqa: E402
 from skeleton.api.server import create_app  # noqa: E402
 
 
@@ -59,7 +60,9 @@ class TestSurface:
         assert res.status_code == 422
         assert res.json()["code"] == "PPL.VALIDATION"
 
-    def test_forge_e2e(self, client):
+    def test_forge_e2e(self, client, monkeypatch):
+        monkeypatch.setenv("GF_SEAL_SECRET", "test-api-seal-secret")
+        headers = {"x-gf-seal": mint_seal("test-api", secret="test-api-seal-secret")}
         res = client.post("/api/v1/forge/materialise", json={
             "name": "pipe",
             "components": [
@@ -67,7 +70,7 @@ class TestSurface:
                 {"kind": "sink", "instance_id": "b"},
             ],
             "wires": [{"from": ["a", "out"], "to": ["b", "in"]}],
-        })
+        }, headers=headers)
         assert res.status_code == 200
         assert res.json()["artefact"]["execution_order"] == ["a", "b"]
 
