@@ -421,10 +421,15 @@ class QuadRetriever:
             "kag": self.kag.search(query, k=k * 2),
         }
 
+        weights = (
+            self._weight_learner.effective_weights()
+            if getattr(self, "_weight_learner", None)
+            else self.weights
+        )
         fused: Dict[str, float] = defaultdict(float)
         best_fragment: Dict[str, Fragment] = {}
         for plane, hits in plane_hits.items():
-            weight = self.weights.get(plane, 1.0)
+            weight = weights.get(plane, 1.0)
             for rank, frag in enumerate(hits):
                 key = frag.provenance or frag.fragment_id
                 fused[key] += weight / (self.RRF_K + rank + 1)
@@ -443,7 +448,22 @@ class QuadRetriever:
                "planes": {p: len(h) for p, h in plane_hits.items()}})
         return results
 
+    def observe(self, used_planes, *, all_planes=None):
+        """Feed retrieval outcome into the attached plane-weight learner."""
+        from skeleton.retrieval.plane_weights import attach_learner
+        learner = getattr(self, "_weight_learner", None)
+        if learner is None:
+            learner = attach_learner(self)
+        learner.observe(used_planes, all_planes=all_planes)
+        # keep static table in sync so retrieve without re-read still sees updates
+        self.weights.update(learner.effective_weights())
+        return learner.stats()
+
     def stats(self) -> Dict[str, Any]:
-        return {"cag": self.cag.stats(), "kag": self.kag.stats(),
-                "mag_traces": len(self.mag._traces),
-                "rag_docs": len(self.rag._docs), "weights": dict(self.weights)}
+        out = {"cag": self.cag.stats(), "kag": self.kag.stats(),
+               "mag_traces": len(self.mag._traces),
+               "rag_docs": len(self.rag._docs), "weights": dict(self.weights)}
+        learner = getattr(self, "_weight_learner", None)
+        if learner is not None:
+            out["learner"] = learner.stats()
+        return out
