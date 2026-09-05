@@ -1,23 +1,22 @@
 """Bounded game-logic repair scaffold.
 
-Performs one conservative repair pass over a game-logic spec, then re-verifies.
-This closes the main parity gap in the corrective-control segment.
+Now wired to policy_enforcement for dynamic threshold/repair gating.
 """
 from __future__ import annotations
 
 from typing import Any, Dict, Mapping
 
 from skeleton.intelligence.pipeline_verifier import PipelineVerifier
-from skeleton.organism.policy_state import load_policy
+from skeleton.organism.policy_enforcement import repair_class_enabled, repair_enabled_for, threshold_for
 from skeleton.organism.quality_state import append_repair
 
 
 def attempt_game_logic_repair(spec: Mapping[str, Any], *, description: str = "", root=None) -> Dict[str, Any]:
-    policy = load_policy(root=root)
-    if not bool((policy.get("repair_enabled") or {}).get("game_logic", True)):
+    gate = repair_enabled_for("game_logic", root=root)
+    if not gate:
         return {"kind": "pipeline-repair-attempt", "surface": "game_logic", "ok": 0, "reason": "repair-disabled", "actions": [], "changed": 0, "stored_prose": 0, "spec": dict(spec)}
-    threshold = float((policy.get("quality_thresholds") or {}).get("game_logic", 0.7))
-    verifier = PipelineVerifier(accept_at=threshold)
+    threshold = threshold_for("game_logic", root=root, fallback=0.7)
+    verifier = PipelineVerifier(accept_at=threshold, root=root)
     before = verifier.verify_game_logic(spec, description=description)
     fixed = dict(spec)
     actions = []
@@ -25,7 +24,7 @@ def attempt_game_logic_repair(spec: Mapping[str, Any], *, description: str = "",
     economy = dict(fixed.get("economy") or {})
     progression = dict(fixed.get("progression") or {})
     base_values = dict(combat.get("base_values") or {})
-    allow_fill = bool((policy.get("repair_classes") or {}).get("pipeline_seed", True))
+    allow_fill = repair_class_enabled("pipeline_seed", root=root)
     if not before.accepted and allow_fill:
         if not combat.get("damage_formula"):
             combat["damage_formula"] = "max(1, atk * 100 / (100 + def))"

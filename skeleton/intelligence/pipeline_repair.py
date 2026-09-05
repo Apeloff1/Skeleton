@@ -1,7 +1,6 @@
 """Bounded pipeline repair scaffold.
 
-Starts with dialogue trees and NPC specs. One conservative repair pass,
-then re-verify and persist the repair as its own record.
+Now wired to policy_enforcement for dynamic threshold/repair gating.
 """
 from __future__ import annotations
 
@@ -9,21 +8,21 @@ from typing import Any, Dict, Mapping
 
 from skeleton.intelligence.dialogue_verifier import DialogueVerifier
 from skeleton.intelligence.npc_verifier import NpcVerifier
-from skeleton.organism.policy_state import load_policy
+from skeleton.organism.policy_enforcement import repair_class_enabled, repair_enabled_for, threshold_for
 from skeleton.organism.quality_state import append_repair
 
 
 def attempt_npc_repair(spec: Mapping[str, Any], *, description: str = "", root=None) -> Dict[str, Any]:
-    policy = load_policy(root=root)
-    if not bool((policy.get("repair_enabled") or {}).get("npc", True)):
+    gate = repair_enabled_for("npc", root=root)
+    if not gate:
         return {"kind": "pipeline-repair-attempt", "surface": "npc", "ok": 0, "reason": "repair-disabled", "actions": [], "changed": 0, "stored_prose": 0, "spec": dict(spec)}
-    threshold = float((policy.get("quality_thresholds") or {}).get("npc", 0.7))
-    verifier = NpcVerifier(accept_at=threshold)
+    threshold = threshold_for("npc", root=root, fallback=0.7)
+    verifier = NpcVerifier(accept_at=threshold, root=root)
     before = verifier.verify(spec, description=description)
     fixed = dict(spec)
     actions = []
     persona = dict(fixed.get("persona") or {})
-    allow_seed = bool((policy.get("repair_classes") or {}).get("pipeline_seed", True))
+    allow_seed = repair_class_enabled("pipeline_seed", root=root)
     if not before.accepted and allow_seed:
         if not fixed.get("name"):
             fixed["name"] = "npc_repaired"
@@ -50,16 +49,16 @@ def attempt_npc_repair(spec: Mapping[str, Any], *, description: str = "", root=N
 
 
 def attempt_dialogue_repair(tree: Mapping[str, Any], *, description: str = "", root=None) -> Dict[str, Any]:
-    policy = load_policy(root=root)
-    if not bool((policy.get("repair_enabled") or {}).get("dialogue", True)):
+    gate = repair_enabled_for("dialogue", root=root)
+    if not gate:
         return {"kind": "pipeline-repair-attempt", "surface": "dialogue", "ok": 0, "reason": "repair-disabled", "actions": [], "changed": 0, "stored_prose": 0, "tree": dict(tree)}
-    threshold = float((policy.get("quality_thresholds") or {}).get("dialogue", 0.7))
-    verifier = DialogueVerifier(accept_at=threshold)
+    threshold = threshold_for("dialogue", root=root, fallback=0.7)
+    verifier = DialogueVerifier(accept_at=threshold, root=root)
     before = verifier.verify(tree, description=description)
     fixed = dict(tree)
     actions = []
     nodes = dict(fixed.get("nodes") or {})
-    allow_seed = bool((policy.get("repair_classes") or {}).get("pipeline_seed", True))
+    allow_seed = repair_class_enabled("pipeline_seed", root=root)
     if not before.accepted and allow_seed:
         if not fixed.get("entry"):
             fixed["entry"] = "root"

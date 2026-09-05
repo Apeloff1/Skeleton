@@ -1,10 +1,13 @@
-"""Bounded forge repair scaffold."""
+"""Bounded forge repair scaffold.
+
+Now wired to policy_enforcement for dynamic threshold/repair gating.
+"""
 from __future__ import annotations
 
 from typing import Any, Dict, List, Mapping
 
 from skeleton.intelligence.forge_verifier import ForgeVerifier
-from skeleton.organism.policy_state import load_policy
+from skeleton.organism.policy_enforcement import repair_class_enabled, repair_enabled_for, threshold_for
 from skeleton.organism.quality_state import append_repair, latest_failure, repair_candidates
 
 
@@ -21,17 +24,17 @@ def candidate_failures(*, root=None, limit: int = 5) -> Dict[str, Any]:
 
 
 def attempt_repair(files: Mapping[str, str], *, request: str = "", root=None, evidence: Dict[str, Any] | None = None) -> Dict[str, Any]:
-    policy = load_policy(root=root)
-    if not bool((policy.get("repair_enabled") or {}).get("forge", True)):
+    gate = repair_enabled_for("forge", root=root)
+    if not gate:
         return {"kind": "forge-repair-attempt", "ok": 0, "surface": "forge", "reason": "repair-disabled", "actions": [], "changed": 0, "stored_prose": 0, "files": dict(files)}
-    before = ForgeVerifier(accept_at=float((policy.get("quality_thresholds") or {}).get("forge", 0.7)), gd_accept_at=float((policy.get("quality_thresholds") or {}).get("forge", 0.7))).verify(files, request=request)
+    threshold = threshold_for("forge", root=root, fallback=0.7)
+    before = ForgeVerifier(accept_at=threshold, gd_accept_at=threshold, root=root).verify(files, request=request)
     fixed = dict(files)
     actions: List[Dict[str, Any]] = []
     target = _select_target(before.to_dict(), evidence or {})
-    classes = dict(policy.get("repair_classes") or {})
     if not before.accepted:
         weakest = target or before.weakest_path or ""
-        if weakest.endswith(".gd") and weakest in fixed and classes.get("script_patch", True):
+        if weakest.endswith(".gd") and weakest in fixed and repair_class_enabled("script_patch", root=root):
             src = fixed[weakest]
             changed = src
             if "extends " not in changed:
@@ -45,16 +48,16 @@ def attempt_repair(files: Mapping[str, str], *, request: str = "", root=None, ev
                 actions.append({"path": weakest, "action": "patched targeted script once"})
         if before.reason == "project_closure":
             project = fixed.get("project.godot", "")
-            if project and 'run/main_scene=' not in project and classes.get("project_closure", True):
+            if project and 'run/main_scene=' not in project and repair_class_enabled("project_closure", root=root):
                 fixed["project.godot"] = project + 'run/main_scene="res://scenes/levels/run_level.tscn"\n'
                 actions.append({"path": "project.godot", "action": "restored main scene entry"})
-            if 'EventBus="*res://scripts/autoloads/event_bus.gd"' not in project and project and classes.get("project_closure", True):
+            if 'EventBus="*res://scripts/autoloads/event_bus.gd"' not in project and project and repair_class_enabled("project_closure", root=root):
                 fixed["project.godot"] = fixed["project.godot"] + 'EventBus="*res://scripts/autoloads/event_bus.gd"\n'
                 actions.append({"path": "project.godot", "action": "restored EventBus autoload"})
-            if "scripts/autoloads/event_bus.gd" not in fixed and classes.get("scene_stub", True):
+            if "scripts/autoloads/event_bus.gd" not in fixed and repair_class_enabled("scene_stub", root=root):
                 fixed["scripts/autoloads/event_bus.gd"] = "extends Node\nsignal repaired()\n"
                 actions.append({"path": "scripts/autoloads/event_bus.gd", "action": "stubbed missing EventBus autoload file"})
-    after = ForgeVerifier(accept_at=float((policy.get("quality_thresholds") or {}).get("forge", 0.7)), gd_accept_at=float((policy.get("quality_thresholds") or {}).get("forge", 0.7))).verify(fixed, request=request)
+    after = ForgeVerifier(accept_at=threshold, gd_accept_at=threshold, root=root).verify(fixed, request=request)
     result = {"kind": "forge-repair-attempt", "ok": int(after.accepted), "surface": "forge", "reason": str(after.reason), "weakest_path": str(after.weakest_path or before.weakest_path or ""), "before": before.to_dict(), "after": after.to_dict(), "actions": actions, "changed": int(bool(actions)), "targeted_path": weakest if not before.accepted else "", "stored_prose": 0, "files": fixed}
     append_repair(result, root=root)
     return result
