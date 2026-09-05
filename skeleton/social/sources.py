@@ -117,6 +117,10 @@ SOTA_POINTERS: Tuple[Dict[str, str], ...] = (
     {"topic": "plt-parallel-loop", "url": "https://arxiv.org/abs/2510.24824", "house": "arXiv"},
     {"topic": "loop-think-gen", "url": "https://arxiv.org/abs/2604.07822", "house": "arXiv"},
     {"topic": "scse-loop", "url": "https://arxiv.org/abs/2607.27656", "house": "arXiv"},
+    {"topic": "softpick", "url": "https://arxiv.org/abs/2504.20966", "house": "arXiv"},
+    {"topic": "qk-normed-mla", "url": "https://arxiv.org/abs/2606.16310", "house": "arXiv"},
+    {"topic": "qerl-aqnoise", "url": "https://arxiv.org/abs/2510.11696", "house": "arXiv"},
+    {"topic": "yarn-life-of-token", "url": "https://www.aleksagordic.com/blog/transformer", "house": "Internet Archive"},
 )
 
 

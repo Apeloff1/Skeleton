@@ -41,7 +41,7 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
         acted["sleep"] = sleep_cycle(org, neo=neo, force=True, cue=stimulus)
     else:
         from skeleton.organism.runloop import rotate_stimulus
-        stim = rotate_stimulus(int(org.steps or 0), stimulus)
+        stim = rotate_stimulus(int(org.steps or 0), stimulus, root=getattr(org, "root", None))
         try:
             import hashlib
             from skeleton.organism.runtime import last as rt_last
@@ -56,7 +56,7 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
                     acted["bound"] = claimed.get("topic")
                     acted["cursor"] = claimed
                 else:
-                    stim = rotate_stimulus(int(org.steps or 0) + 1, "")
+                    stim = rotate_stimulus(int(org.steps or 0) + 1, "", root=getattr(org, "root", None))
                     acted["rotated"] = 1
         except Exception:
             pass

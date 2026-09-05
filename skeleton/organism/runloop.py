@@ -9,12 +9,16 @@ from typing import Any, Dict, List, Optional
 STOP = {"hold", "tighten"}
 
 
-def rotate_stimulus(i: int, explicit: str = "") -> str:
-    if explicit:
-        return explicit
-    from skeleton.social.sources import SOTA_POINTERS
-    row = SOTA_POINTERS[i % len(SOTA_POINTERS)]
-    return f"{row['topic']} {row['url']}"
+def rotate_stimulus(i: int, explicit: str = "", root=None) -> str:
+    try:
+        from skeleton.organism.rotors import tick
+        return str(tick(root, explicit=explicit).get("cue") or explicit or "plan")
+    except Exception:
+        if explicit:
+            return explicit
+        from skeleton.social.sources import SOTA_POINTERS
+        row = SOTA_POINTERS[i % len(SOTA_POINTERS)]
+        return f"{row['topic']} {row['url']}"
 
 
 def cursor_path(root=None):
@@ -143,7 +147,7 @@ def walk(org=None, *, neo=None, stimulus: str = "", n: int = 4,
             cards.append({"code": "dump", "G": round(org.G, 6)})
             used.append("dump")
             continue
-        stim = rotate_stimulus(i, stimulus)
+        stim = rotate_stimulus(i, stimulus, root=getattr(org, "root", None))
         used.append(stim.split()[0])
         card = pulse(org, neo=neo, stimulus=stim, persist=persist)
         cards.append({

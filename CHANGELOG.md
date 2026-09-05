@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-05 — Multi-rotor + obscure parse
+
+- Five rotors: house, topic, depth, think, obscure.
+- softpick, qk-mla, aq-noise from 2025-26 field.
+- rotate_stimulus composes all axes.
+
+---
+
 ## 2026-09-05 — Looped limit pack
 
 - Re-export rollback_by_surface so organism imports.

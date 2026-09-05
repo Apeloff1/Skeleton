@@ -15,6 +15,9 @@ from skeleton.kernel.ops.sink import with_sink
 from skeleton.kernel.ops.softcap import softcap
 from skeleton.kernel.ops.ssm import scan, step
 from skeleton.kernel.ops.yarn import ntk, xpos, yarn
+from skeleton.kernel.ops.softpick import softpick
+from skeleton.kernel.ops.qkmla import qkmla
+from skeleton.kernel.ops.aqnoise import aqnoise
 
 
 class Obscure:
@@ -25,6 +28,7 @@ class Obscure:
         "sink", "minp", "typical",
         "mla", "ssm", "bitnet", "hadamard",
         "earlyexit", "dry", "presence",
+        "softpick", "qkmla", "aqnoise",
     )
 
     def __init__(self) -> None:
@@ -55,6 +59,9 @@ class Obscure:
         halt(x); self.hits["earlyexit"] += 1
         dry(x, [1]); self.hits["dry"] += 1
         presence(x, [0]); self.hits["presence"] += 1
+        softpick(x); self.hits["softpick"] += 1
+        qkmla(x, [(x, g), (g, x)]); self.hits["qkmla"] += 1
+        aqnoise(x, step=2); self.hits["aqnoise"] += 1
         return self.card()
 
     def card(self) -> Dict[str, Any]:
