@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-05 — Looped transformer kernels
+
+- unroll, MoR, SMELT, ETD, PLT, overthink halt, KV-share, RK4, inject, ponder.
+- Bank slot looped. Law: R=2 default; R>2 only with halt.
+- Version 2026.09.05-looped.
+
+---
+
 ## 2026-09-05 — Social kernel wave 2
 
 - treeattn, chunkprefill, ragged, prefixhash, marlin, onlinesm,

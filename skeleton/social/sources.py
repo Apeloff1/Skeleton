@@ -112,6 +112,11 @@ SOTA_POINTERS: Tuple[Dict[str, str], ...] = (
     {"topic": "specdec-llama", "url": "https://arxiv.org/html/2508.08192", "house": "arXiv"},
     {"topic": "flashmla", "url": "https://github.com/deepseek-ai/FlashMLA", "house": "GitHub"},
     {"topic": "flashqla-x", "url": "https://x.com/Alibaba_Qwen/status/2049462666734026923", "house": "X"},
+    {"topic": "smelt-moe-loop", "url": "https://arxiv.org/abs/2609.01343", "house": "arXiv"},
+    {"topic": "etd-latent", "url": "https://arxiv.org/abs/2510.07358", "house": "arXiv"},
+    {"topic": "plt-parallel-loop", "url": "https://arxiv.org/abs/2510.24824", "house": "arXiv"},
+    {"topic": "loop-think-gen", "url": "https://arxiv.org/abs/2604.07822", "house": "arXiv"},
+    {"topic": "scse-loop", "url": "https://arxiv.org/abs/2607.27656", "house": "arXiv"},
 )
 
 

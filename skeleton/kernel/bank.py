@@ -75,6 +75,7 @@ _MAKERS = {
     "extras": lambda ov: Extras(),
     "obscure": lambda ov: __import__("skeleton.kernel.ops.obscure", fromlist=["Obscure"]).Obscure(),
     "socialk": lambda ov: __import__("skeleton.kernel.ops.socialk", fromlist=["SocialK"]).SocialK(),
+    "looped": lambda ov: __import__("skeleton.kernel.ops.looped", fromlist=["Looped"]).Looped(),
     "hold": lambda ov: __import__("skeleton.kernel.hold", fromlist=["Hold"]).Hold(),
     "sfence": lambda ov: __import__("skeleton.kernel.fence", fromlist=["Fence"]).Fence(),
     "storm": lambda ov: __import__("skeleton.kernel.storm", fromlist=["Storm"]).Storm(ttl_s=4.0 if ov else 8.0),
@@ -127,7 +128,7 @@ def boot(profile: str = "", overlay: Dict[str, Any] | None = None) -> Dict[str, 
             "throttle", "quota", "reclaim", "bloom", "isolate", "prefetch", "admission",
             "page", "prefix", "batch", "slo", "pack", "ops", "ram", "gpu",
             "pipeline", "breaker", "bulkhead", "embed", "dma", "catalog",
-            "check", "stock", "block", "stock_live", "orch", "extras", "obscure", "socialk", "hold", "sfence", "storm",
+            "check", "stock", "block", "stock_live", "orch", "extras", "obscure", "socialk", "looped", "hold", "sfence", "storm",
         ]
     _LIVE = {k: _MAKERS[k](tight) for k in chosen}
     _PROFILE = name

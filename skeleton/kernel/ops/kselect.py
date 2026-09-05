@@ -11,11 +11,13 @@ from typing import Any, Dict
 
 
 def pick(*, profile: str = "mobile", seq: int = 8, spec: bool = False,
-         embed: bool = False, kv: int = 0) -> Dict[str, Any]:
+         embed: bool = False, kv: int = 0, loop: bool = False) -> Dict[str, Any]:
     p = str(profile or "mobile")
     n = max(0, int(seq))
     k = max(n, int(kv))
-    if embed:
+    if loop:
+        fam = "loop"
+    elif embed:
         fam = "ragged"
     elif spec:
         fam = "treeattn"

@@ -32,6 +32,11 @@ SOCIAL: Tuple[str, ...] = (
     "cascade", "megafuse", "kselect",
 )
 
+LOOPED: Tuple[str, ...] = (
+    "loop", "mor", "smelt", "etd", "plt",
+    "overthink", "kvshare", "rk4", "inject", "ponder",
+)
+
 
 class Catalog:
     def card(self) -> Dict[str, Any]:
@@ -41,6 +46,7 @@ class Catalog:
             "extra": list(EXTRA),
             "obscure": list(OBSCURE),
             "social": list(SOCIAL),
-            "n": len(OBLIGATORY) + len(EXTRA) + len(OBSCURE) + len(SOCIAL),
+            "looped": list(LOOPED),
+            "n": len(OBLIGATORY) + len(EXTRA) + len(OBSCURE) + len(SOCIAL) + len(LOOPED),
             "stored_prose": 0,
         }
