@@ -1,7 +1,6 @@
 """Cortex command deck — inspect AND speak.
 
-Now includes repair orchestrator endpoints for multi-pass repairs,
-telemetry, learned policy, and session diagnostics.
+Now includes repair orchestrator and adaptive policy endpoints.
 """
 from __future__ import annotations
 
@@ -99,3 +98,23 @@ async def cortex_learned_policy(state=Depends(_state)) -> Dict[str, Any]:
 @router.get("/cortex/repair-orchestrator")
 async def cortex_repair_orchestrator(state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).repair_orchestrator()
+
+# Adaptive policy endpoints
+@router.get("/cortex/adaptive-policy")
+async def cortex_adaptive_policy(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).adaptive_policy()
+
+@router.get("/cortex/adapt")
+async def cortex_adapt(surface: str = "", dry_run: bool = False, state=Depends(_state)) -> Dict[str, Any]:
+    if surface:
+        return _deck(state).adapt_surface(surface, dry_run=dry_run)
+    return _deck(state).adapt_all(dry_run=dry_run)
+
+@router.post("/cortex/adaptive-config")
+async def cortex_adaptive_config(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).set_adaptive_config(**request)
+
+@router.post("/cortex/adaptive-surface-config")
+async def cortex_adaptive_surface_config(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    surface = str(request.pop("surface", ""))
+    return _deck(state).set_surface_adaptive(surface, **request)

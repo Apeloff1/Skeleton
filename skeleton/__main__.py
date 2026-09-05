@@ -1,7 +1,7 @@
 """python -m skeleton — operator diagnostics and policy steering.
 
 Now includes repair orchestrator, telemetry, learned policy,
-and multi-pass repair commands.
+multi-pass repair, and adaptive threshold tuning.
 """
 from __future__ import annotations
 
@@ -60,6 +60,27 @@ def main(argv: list[str] | None = None) -> int:
     rerr.add_argument("--surface", default="")
     sub.add_parser("learned-policy")
     sub.add_parser("repair-orchestrator")
+    # Adaptive policy CLI
+    sub.add_parser("adaptive-policy")
+    ad = sub.add_parser("adapt")
+    ad.add_argument("--surface", default="")
+    ad.add_argument("--dry-run", action="store_true")
+    sub.add_parser("adapt-all")
+    ada = sub.add_parser("adapt-all")
+    ada.add_argument("--dry-run", action="store_true")
+    sac = sub.add_parser("set-adaptive-config")
+    sac.add_argument("--target-accept-rate", type=float)
+    sac.add_argument("--adjustment-rate", type=float)
+    sac.add_argument("--window-size", type=int)
+    sac.add_argument("--min-threshold", type=float)
+    sac.add_argument("--max-threshold", type=float)
+    sac.add_argument("--enabled", type=lambda x: x.lower() in {"true", "1", "yes", "on"})
+    ssc = sub.add_parser("set-surface-adaptive")
+    ssc.add_argument("surface")
+    ssc.add_argument("--target-accept-rate", type=float)
+    ssc.add_argument("--adjustment-rate", type=float)
+    ssc.add_argument("--min-threshold", type=float)
+    ssc.add_argument("--max-threshold", type=float)
 
     args = p.parse_args(argv)
     from skeleton.cortex.deck import live_deck
@@ -105,6 +126,40 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(deck.learned_policy(), indent=2, default=str)); return 0
     if args.cmd == "repair-orchestrator":
         print(json.dumps(deck.repair_orchestrator(), indent=2, default=str)); return 0
+    if args.cmd == "adaptive-policy":
+        print(json.dumps(deck.adaptive_policy(), indent=2, default=str)); return 0
+    if args.cmd == "adapt":
+        if args.surface:
+            print(json.dumps(deck.adapt_surface(args.surface, dry_run=args.dry_run), indent=2, default=str)); return 0
+        print(json.dumps(deck.adapt_all(dry_run=args.dry_run), indent=2, default=str)); return 0
+    if args.cmd == "adapt-all":
+        print(json.dumps(deck.adapt_all(dry_run=args.dry_run), indent=2, default=str)); return 0
+    if args.cmd == "set-adaptive-config":
+        kwargs = {}
+        if args.target_accept_rate is not None:
+            kwargs["target_accept_rate"] = args.target_accept_rate
+        if args.adjustment_rate is not None:
+            kwargs["adjustment_rate"] = args.adjustment_rate
+        if args.window_size is not None:
+            kwargs["window_size"] = args.window_size
+        if args.min_threshold is not None:
+            kwargs["min_threshold"] = args.min_threshold
+        if args.max_threshold is not None:
+            kwargs["max_threshold"] = args.max_threshold
+        if args.enabled is not None:
+            kwargs["enabled"] = args.enabled
+        print(json.dumps(deck.set_adaptive_config(**kwargs), indent=2, default=str)); return 0
+    if args.cmd == "set-surface-adaptive":
+        kwargs = {}
+        if args.target_accept_rate is not None:
+            kwargs["target_accept_rate"] = args.target_accept_rate
+        if args.adjustment_rate is not None:
+            kwargs["adjustment_rate"] = args.adjustment_rate
+        if args.min_threshold is not None:
+            kwargs["min_threshold"] = args.min_threshold
+        if args.max_threshold is not None:
+            kwargs["max_threshold"] = args.max_threshold
+        print(json.dumps(deck.set_surface_adaptive(args.surface, **kwargs), indent=2, default=str)); return 0
     return 0
 
 

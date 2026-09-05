@@ -5,6 +5,7 @@ into one instrument. Laws gate every write. Pointers only.
 
 Now includes repair orchestrator integration for multi-pass repairs,
 telemetry, learned policy, and session diagnostics.
+Also includes adaptive policy for self-tuning thresholds.
 """
 from __future__ import annotations
 
@@ -141,6 +142,27 @@ class CommandDeck:
     def repair_orchestrator(self) -> Dict[str, Any]:
         from skeleton.intelligence.repair_orchestrator import repair_orchestrator_card
         return repair_orchestrator_card(root=self.root)
+
+    # Adaptive policy integration
+    def adaptive_policy(self) -> Dict[str, Any]:
+        from skeleton.intelligence.adaptive_policy import adaptive_policy_card
+        return adaptive_policy_card(root=self.root)
+
+    def adapt_surface(self, surface: str, *, dry_run: bool = False) -> Dict[str, Any]:
+        from skeleton.intelligence.adaptive_policy import adapt_surface
+        return adapt_surface(surface, root=self.root, dry_run=dry_run)
+
+    def adapt_all(self, *, dry_run: bool = False) -> Dict[str, Any]:
+        from skeleton.intelligence.adaptive_policy import adapt_all_surfaces
+        return adapt_all_surfaces(root=self.root, dry_run=dry_run)
+
+    def set_adaptive_config(self, **kwargs) -> Dict[str, Any]:
+        from skeleton.intelligence.adaptive_policy import set_adaptive_config
+        return set_adaptive_config(root=self.root, **kwargs)
+
+    def set_surface_adaptive(self, surface: str, **kwargs) -> Dict[str, Any]:
+        from skeleton.intelligence.adaptive_policy import set_surface_adaptive_config
+        return set_surface_adaptive_config(surface, root=self.root, **kwargs)
 
     def snapshot(self) -> Dict[str, Any]:
         return {"status": self.status(), "last_ref": self.last_ref, "last_improve": self.last_improve, "last_plan": self.last_plan, "traces": list(self.traces[:8]), "position": self.position, "face": FACES[self.position]}

@@ -1,7 +1,7 @@
-# Freeze — 2026.09.05-repair-autonomy
+# Freeze — 2026.09.05-adaptive-policy
 
 Repo: Apeloff1/Skeleton  
-Ritual: `python -m skeleton product`, `python -m skeleton repair-orchestrator`, and `python -m skeleton ready --walk -n 3`
+Ritual: `python -m skeleton product`, `python -m skeleton adaptive-policy`, and `python -m skeleton ready --walk -n 3`
 
 Shipped this lineage: five-brain Hoag galaxy, codec T0–T5, decoder prior
 (CPU canonical), CCL vault, adaptive caps, wiki SELECT, banks,
@@ -10,7 +10,8 @@ bound field ledger, field-walk/house-round-robin/CDX handle work, the
 corrective-control segment across forge/plan/game-logic/NPC/dialogue,
 direct operator diagnostics surface over failures/repairs/activity/recurring,
 policy enforcement with dynamic thresholds and repair gating,
-and now multi-pass repair autonomy with learned policies and telemetry.
+multi-pass repair autonomy with learned policies and telemetry,
+and now adaptive policy with self-tuning thresholds based on quality history.
 
 Policy enforcement now includes:
 - Dynamic thresholds loaded from persisted policy.json into all 5 verifiers
@@ -42,6 +43,13 @@ Orchestrator now includes:
 - Repair function registry (register_repair / orchestrated_repair)
 - Wires multi-pass + telemetry + learned policy + policy enforcement
 - Operator card showing all registered surfaces and their stats
+
+Adaptive policy now includes:
+- Self-tuning thresholds based on historical accept rates
+- Configurable target accept rate (default 85%), adjustment rate, window size
+- Per-surface adaptive config overrides
+- Dry-run mode for safe preview before applying
+- Operator card showing current adaptive state per surface
 
 Not claimed: pixel lattice UI, production transformer KV cache,
 import-time HuggingFace downloads, third-party prose on shelves.

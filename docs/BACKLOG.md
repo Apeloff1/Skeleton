@@ -1,9 +1,9 @@
 # Backlog — ranked, live
 
-Closed this pass (2026.09.05-repair-autonomy): policy enforcement with
+Closed this pass (2026.09.05-adaptive-policy): policy enforcement with
 dynamic thresholds, repair gating, multi-pass repair autonomy, fault-tolerant
-telemetry, learned repair policy, and repair orchestrator with unified
-entry point and registry.
+telemetry, learned repair policy, repair orchestrator with unified
+entry point and registry, and adaptive policy with self-tuning thresholds.
 
 ## Still open
 
