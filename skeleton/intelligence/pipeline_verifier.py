@@ -1,7 +1,6 @@
 """Pipeline verifier — shared quality contract for pipeline outputs.
 
-Starts with the game-logic pipeline and scores whether the produced
-systems are complete, coherent, balanced enough, and actionable.
+Now wired to policy_enforcement for dynamic thresholds.
 """
 from __future__ import annotations
 
@@ -9,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Mapping, Tuple
 
 from skeleton.intelligence.quality import QualityIssue, QualityReport, QualitySignal
+from skeleton.organism.policy_enforcement import threshold_for
 
 
 @dataclass(frozen=True)
@@ -21,6 +21,7 @@ class PipelineVerificationReport:
     summary: Dict[str, int]
     issues: Tuple[str, ...]
     quality: QualityReport
+    policy_gate: Dict[str, Any]
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -32,16 +33,18 @@ class PipelineVerificationReport:
             "summary": dict(self.summary),
             "issues": list(self.issues),
             "quality": self.quality.to_dict(),
+            "policy_gate": self.policy_gate,
         }
 
 
 class PipelineVerifier:
     """Verifier for pipeline outputs, starting with game logic specs."""
 
-    def __init__(self, *, accept_at: float = 0.7) -> None:
-        self.accept_at = accept_at
+    def __init__(self, *, accept_at: float | None = None, root=None) -> None:
+        self.accept_at = accept_at if accept_at is not None else threshold_for("game_logic", root=root, fallback=0.7)
         self.runs = 0
         self.accepted = 0
+        self._root = root
 
     def verify_game_logic(self, spec: Mapping[str, Any], *, description: str = "") -> PipelineVerificationReport:
         self.runs += 1
@@ -96,6 +99,8 @@ class PipelineVerifier:
             ),
             metadata={"kind": "pipeline", "pipeline": "game_logic", "description": description[:160]},
         )
+        from skeleton.organism.policy_enforcement import gate_check
+        policy_gate = gate_check("game_logic", score, root=self._root)
         return PipelineVerificationReport(
             accepted=accepted,
             score=score,
@@ -105,6 +110,7 @@ class PipelineVerifier:
             summary=summary,
             issues=tuple(issues),
             quality=quality,
+            policy_gate=policy_gate,
         )
 
     def stats(self) -> Dict[str, Any]:

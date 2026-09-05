@@ -1,4 +1,7 @@
-"""Forge verification adapter — accept/reject emitted project files."""
+"""Forge verification adapter — accept/reject emitted project files.
+
+Now wired to policy_enforcement for dynamic thresholds.
+"""
 from __future__ import annotations
 
 import re
@@ -8,6 +11,7 @@ from typing import Any, Dict, Mapping, Tuple
 from skeleton.forge.gdscript_check import check_files
 from skeleton.intelligence.quality import QualityIssue, QualityReport, QualitySignal
 from skeleton.intelligence.verifier import CodeVerifier
+from skeleton.organism.policy_enforcement import threshold_for
 
 _UNSAFE = re.compile(r"\b(eval|exec)\s*\(|except\s*:|os\.system|subprocess\.", re.M)
 
@@ -37,18 +41,20 @@ class ForgeVerificationReport:
     summary: Dict[str, int]
     file_reports: Tuple[ForgeFileReport, ...]
     quality: QualityReport
+    policy_gate: Dict[str, Any]
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"accepted": self.accepted, "score": round(self.score, 4), "reason": self.reason, "project_issues": list(self.project_issues), "blocking_issues": list(self.blocking_issues), "weakest_path": self.weakest_path, "thresholds": {k: round(v, 4) for k, v in self.thresholds.items()}, "summary": dict(self.summary), "file_reports": [r.to_dict() for r in self.file_reports], "quality": self.quality.to_dict()}
+        return {"accepted": self.accepted, "score": round(self.score, 4), "reason": self.reason, "project_issues": list(self.project_issues), "blocking_issues": list(self.blocking_issues), "weakest_path": self.weakest_path, "thresholds": {k: round(v, 4) for k, v in self.thresholds.items()}, "summary": dict(self.summary), "file_reports": [r.to_dict() for r in self.file_reports], "quality": self.quality.to_dict(), "policy_gate": self.policy_gate}
 
 
 class ForgeVerifier:
-    def __init__(self, *, accept_at: float = 0.7, gd_accept_at: float = 0.7) -> None:
-        self.accept_at = accept_at
-        self.gd_accept_at = gd_accept_at
-        self.code = CodeVerifier(accept_at=accept_at)
+    def __init__(self, *, accept_at: float | None = None, gd_accept_at: float | None = None, root=None) -> None:
+        self.accept_at = accept_at if accept_at is not None else threshold_for("forge", root=root, fallback=0.7)
+        self.gd_accept_at = gd_accept_at if gd_accept_at is not None else self.accept_at
+        self.code = CodeVerifier(accept_at=self.accept_at)
         self.runs = 0
         self.accepted = 0
+        self._root = root
 
     def verify(self, files: Mapping[str, str], *, request: str = "") -> ForgeVerificationReport:
         self.runs += 1
@@ -73,7 +79,9 @@ class ForgeVerifier:
             self.accepted += 1
         reason = self._reason(project_issues, reports, avg)
         quality = self._quality_report(accepted=accepted, reason=reason, score=avg, weakest_path=weakest, project_issues=project_issues, reports=reports, summary=summary)
-        return ForgeVerificationReport(accepted=accepted, score=avg, reason=reason, project_issues=project_issues, blocking_issues=tuple(blocking), weakest_path=weakest, thresholds={"project_accept_at": self.accept_at, "gdscript_accept_at": self.gd_accept_at}, summary=summary, file_reports=reports, quality=quality)
+        from skeleton.organism.policy_enforcement import gate_check
+        policy_gate = gate_check("forge", avg, root=self._root)
+        return ForgeVerificationReport(accepted=accepted, score=avg, reason=reason, project_issues=project_issues, blocking_issues=tuple(blocking), weakest_path=weakest, thresholds={"project_accept_at": self.accept_at, "gdscript_accept_at": self.gd_accept_at}, summary=summary, file_reports=reports, quality=quality, policy_gate=policy_gate)
 
     def stats(self) -> Dict[str, Any]:
         return {"runs": self.runs, "accepted": self.accepted, "accept_rate": round(self.accepted / max(1, self.runs), 4)}

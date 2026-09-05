@@ -1,8 +1,6 @@
 """Plan verifier — quality gate for build-plan cards.
 
-Scores a plan on completeness, coherence, grounding, and actionability,
-then emits the shared quality contract so plan and forge speak the same
-quality language.
+Now wired to policy_enforcement for dynamic thresholds.
 """
 from __future__ import annotations
 
@@ -10,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Mapping, Tuple
 
 from skeleton.intelligence.quality import QualityIssue, QualityReport, QualitySignal
+from skeleton.organism.policy_enforcement import threshold_for
 
 
 @dataclass(frozen=True)
@@ -22,6 +21,7 @@ class PlanVerificationReport:
     summary: Dict[str, int]
     issues: Tuple[str, ...]
     quality: QualityReport
+    policy_gate: Dict[str, Any]
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -33,16 +33,18 @@ class PlanVerificationReport:
             "summary": dict(self.summary),
             "issues": list(self.issues),
             "quality": self.quality.to_dict(),
+            "policy_gate": self.policy_gate,
         }
 
 
 class PlanVerifier:
     """Verifier for plan/build cards returned by the command deck."""
 
-    def __init__(self, *, accept_at: float = 0.7) -> None:
-        self.accept_at = accept_at
+    def __init__(self, *, accept_at: float | None = None, root=None) -> None:
+        self.accept_at = accept_at if accept_at is not None else threshold_for("plan", root=root, fallback=0.7)
         self.runs = 0
         self.accepted = 0
+        self._root = root
 
     def verify(self, plan: Mapping[str, Any], *, vision: str = "") -> PlanVerificationReport:
         self.runs += 1
@@ -98,6 +100,8 @@ class PlanVerifier:
             ),
             metadata={"kind": "plan", "vision": vision[:160]},
         )
+        from skeleton.organism.policy_enforcement import gate_check
+        policy_gate = gate_check("plan", score, root=self._root)
         return PlanVerificationReport(
             accepted=accepted,
             score=score,
@@ -107,6 +111,7 @@ class PlanVerifier:
             summary=summary,
             issues=tuple(issues),
             quality=quality,
+            policy_gate=policy_gate,
         )
 
     def stats(self) -> Dict[str, Any]:
