@@ -8,6 +8,13 @@ module.exports = defineConfig([
     ignores: ['dist/*', 'node_modules/*', '.expo/*'],
   },
   {
+    // Pre-existing unused eslint-disable comments across frontend; #5 must not
+    // mass-edit the app. Keep Expo URL PR scoped.
+    linterOptions: {
+      reportUnusedDisableDirectives: 'off',
+    },
+  },
+  {
     files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
       parserOptions: {
