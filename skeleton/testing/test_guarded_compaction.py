@@ -38,3 +38,42 @@ def test_buried_constraint_yields_restate_hint():
     body += _turns(30, words=50)
     out = gc.process(body, constraints=["CRITICAL RULE: never leak keys"])
     assert out.hint is not None and "restate" in out.hint
+
+
+def test_turns_from_payload_coercion():
+    from skeleton.memory.guarded_compaction import turns_from_payload
+
+    raw = [
+        {"role": "system", "content": "CRITICAL RULE: never leak keys"},
+        {"role": "user", "content": "hello"},
+        "skip-me",
+        {"role": "assistant"},  # no content → skip
+    ]
+    turns = turns_from_payload(raw)
+    assert len(turns) == 2
+    assert turns[0].role == "system"
+    assert turns_from_payload(None) == []
+    assert turns_from_payload("nope") == []
+
+
+def test_compact_turns_none_without_payload():
+    from skeleton.memory.guarded_compaction import compact_turns
+
+    assert compact_turns(None) is None
+    assert compact_turns([]) is None
+    assert compact_turns([{"role": "user"}]) is None  # no content
+
+
+def test_compact_turns_returns_api_shape():
+    from skeleton.memory.guarded_compaction import compact_turns
+
+    out = compact_turns([
+        {"role": "user", "content": "what is a map"},
+        {"role": "assistant", "content": "a key-value structure"},
+    ])
+    assert out is not None
+    assert out["verdict"] in {"fresh", "watch", "rot"}
+    assert isinstance(out["compacted"], bool)
+    assert out["turns"][0]["role"] == "user"
+    assert "report" in out
+

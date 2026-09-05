@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from skeleton.api.idempotency import IdempotencyGuard
 from skeleton.api.server import get_state
 from skeleton.jeeves.core import SessionMode
+from skeleton.memory.guarded_compaction import compact_turns
 
 router = APIRouter()
 
@@ -198,7 +199,7 @@ async def memory_query(request: Dict[str, Any], state=Depends(_state)) -> Dict[s
         top_k_per_tier=request.get("top_k", 3),
         metadata_filter=request.get("metadata_filter"),
     )
-    return {
+    body: Dict[str, Any] = {
         "facts": [r.chunk.text for r in result.facts],
         "persona_frame": [r.chunk.text for r in result.persona_frame],
         "personal_history": [r.chunk.text for r in result.personal_history],
@@ -206,6 +207,14 @@ async def memory_query(request: Dict[str, Any], state=Depends(_state)) -> Dict[s
         "token_estimate": result.token_estimate,
         "provenance": result.provenance_chain,
     }
+    # F-3: when turns are supplied, run rot-triggered compaction on them.
+    constraints = request.get("constraints")
+    if constraints is not None and not isinstance(constraints, (list, tuple)):
+        constraints = None
+    compaction = compact_turns(request.get("turns"), constraints=constraints)
+    if compaction is not None:
+        body["compaction"] = compaction
+    return body
 
 
 @router.get("/swarm/stats")
