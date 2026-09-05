@@ -16,7 +16,7 @@ def pick(*, profile: str = "mobile", seq: int = 8, spec: bool = False,
     n = max(0, int(seq))
     k = max(n, int(kv))
     if loop:
-        fam = "loop"
+        fam = "smelt" if k >= 16 else "loop"
     elif embed:
         fam = "ragged"
     elif spec:

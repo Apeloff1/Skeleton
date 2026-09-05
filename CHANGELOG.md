@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-05 — Looped transformer burst
+
+- SCSE, shortcut, layer/stack loop, MoDr, R-budget, orbit,
+  per-loop KV policy, test-time R schedule.
+- Looped poke 19/19. kselect long+loop → smelt.
+
+---
+
 ## 2026-09-05 — Looped transformer kernels
 
 - unroll, MoR, SMELT, ETD, PLT, overthink halt, KV-share, RK4, inject, ponder.

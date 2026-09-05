@@ -13,6 +13,14 @@ from skeleton.kernel.ops.plt import plt
 from skeleton.kernel.ops.ponder import act
 from skeleton.kernel.ops.rk4 import rk4
 from skeleton.kernel.ops.smelt import smelt
+from skeleton.kernel.ops.scse import scse
+from skeleton.kernel.ops.shortcut import shortcut
+from skeleton.kernel.ops.layerloop import layerloop, stackloop
+from skeleton.kernel.ops.modr import modr
+from skeleton.kernel.ops.budgetr import budget
+from skeleton.kernel.ops.orbit import orbit
+from skeleton.kernel.ops.loopkv import run as loopkv
+from skeleton.kernel.ops.schedule import run as rschedule
 
 
 CITES = (
@@ -28,6 +36,8 @@ class Looped:
     NAMES = (
         "loop", "mor", "smelt", "etd", "plt",
         "overthink", "kvshare", "rk4", "inject", "ponder",
+        "scse", "shortcut", "layerloop", "stackloop", "modr",
+        "budgetr", "orbit", "loopkv", "schedule",
     )
 
     def __init__(self) -> None:
@@ -46,6 +56,15 @@ class Looped:
         rk4(x, damp=0.5); self.hits["rk4"] += 1
         loop_inject(x, r=2); self.hits["inject"] += 1
         act(x, floor=0.8, r_max=3); self.hits["ponder"] += 1
+        scse(x, r=2); self.hits["scse"] += 1
+        shortcut(x, r=3, skip=2); self.hits["shortcut"] += 1
+        layerloop(x, layers=2, inner=2); self.hits["layerloop"] += 1
+        stackloop(x, layers=2, r=2); self.hits["stackloop"] += 1
+        modr(x, branches=2); self.hits["modr"] += 1
+        budget(profile="mobile", want=3, halt=False); self.hits["budgetr"] += 1
+        orbit(x, r=4); self.hits["orbit"] += 1
+        loopkv(x, r=2, mode="share"); self.hits["loopkv"] += 1
+        rschedule(x, profile="mobile"); self.hits["schedule"] += 1
         return self.card()
 
     def card(self) -> Dict[str, Any]:

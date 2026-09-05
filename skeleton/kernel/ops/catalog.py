@@ -35,6 +35,8 @@ SOCIAL: Tuple[str, ...] = (
 LOOPED: Tuple[str, ...] = (
     "loop", "mor", "smelt", "etd", "plt",
     "overthink", "kvshare", "rk4", "inject", "ponder",
+    "scse", "shortcut", "layerloop", "stackloop", "modr",
+    "budgetr", "orbit", "loopkv", "schedule",
 )
 
 
