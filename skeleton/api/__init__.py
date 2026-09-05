@@ -15,7 +15,7 @@ from .middleware import (
     get_request_id,
 )
 from .routes import router
-from .server import AppState, bootstrap, get_state, lifespan
+from .server import AppState, create_app, get_state, lifespan
 from .telemetry import RouteMetrics, RouteTelemetry
 from .validation import FieldRule, RequestValidator, ValidationIssue, ValidationError
 from .versioning import SUPPORTED, Version, VersionError, extract, negotiate
@@ -48,7 +48,7 @@ __all__ = [
     "get_request_id",
     "router",
     "AppState",
-    "bootstrap",
+    "create_app",
     "get_state",
     "lifespan",
     "RouteMetrics",

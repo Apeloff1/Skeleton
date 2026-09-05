@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from skeleton.api.hmac_seal import require_seal
 from skeleton.api.idempotency import IdempotencyGuard
 from skeleton.api.server import get_state
 from skeleton.jeeves.core import SessionMode
@@ -287,7 +288,7 @@ async def pipeline_animation(request: Dict[str, Any], state=Depends(_state)) -> 
 
 
 @router.post("/forge/blueprint")
-async def forge_blueprint(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+async def forge_blueprint(request: Dict[str, Any], state=Depends(_state), attester: str = Depends(require_seal)) -> Dict[str, Any]:
     forge = _require(state.forge, "Forge")
     bp = forge.new_blueprint(request.get("name", "unnamed"))
     for comp in request.get("components", []):
@@ -299,7 +300,7 @@ async def forge_blueprint(request: Dict[str, Any], state=Depends(_state)) -> Dic
 
 
 @router.post("/forge/materialise")
-async def forge_materialise(http_request: Request, request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+async def forge_materialise(http_request: Request, request: Dict[str, Any], state=Depends(_state), attester: str = Depends(require_seal)) -> Dict[str, Any]:
     replay = _idempotency.replay(dict(http_request.headers))
     if replay is not None:
         return replay  # type: ignore[return-value]
@@ -341,7 +342,7 @@ async def forge_eras() -> Dict[str, Any]:
 
 
 @router.post("/forge/archetype")
-async def forge_archetype(http_request: Request, request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+async def forge_archetype(http_request: Request, request: Dict[str, Any], state=Depends(_state), attester: str = Depends(require_seal)) -> Dict[str, Any]:
     replay = _idempotency.replay(dict(http_request.headers))
     if replay is not None:
         return replay  # type: ignore[return-value]
@@ -405,7 +406,7 @@ async def context_command(request: Dict[str, Any], state=Depends(_state)) -> Dic
 
 
 @router.post("/gameforge/run")
-async def gameforge_run(http_request: Request, request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+async def gameforge_run(http_request: Request, request: Dict[str, Any], state=Depends(_state), attester: str = Depends(require_seal)) -> Dict[str, Any]:
     replay = _idempotency.replay(dict(http_request.headers))
     if replay is not None:
         return replay  # type: ignore[return-value]
@@ -427,7 +428,7 @@ async def gameforge_run(http_request: Request, request: Dict[str, Any], state=De
 
 
 @router.post("/gameforge/intake")
-async def gameforge_intake(http_request: Request, request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+async def gameforge_intake(http_request: Request, request: Dict[str, Any], state=Depends(_state), attester: str = Depends(require_seal)) -> Dict[str, Any]:
     replay = _idempotency.replay(dict(http_request.headers))
     if replay is not None:
         return replay  # type: ignore[return-value]
