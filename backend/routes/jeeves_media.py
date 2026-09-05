@@ -27,6 +27,19 @@ router = APIRouter(prefix="/api/jeeves/media", tags=["jeeves-media"])
 
 _JOBS: Dict[str, Dict] = {}
 
+def _safe_job_id(job_id: str) -> str:
+    s = str(job_id or "").strip()
+    if (
+        not s
+        or s in {".", ".."}
+        or ".." in s
+        or "/" in s
+        or "\\" in s
+        or s.startswith(("~", "/", "\\"))
+    ):
+        raise HTTPException(status_code=400, detail="invalid job_id")
+    return s
+
 
 def _world(game_name: str) -> GameWorld:
     files = []
@@ -98,6 +111,7 @@ async def video_status(job_id: str):
 
 @router.get("/download/{job_id}")
 async def download(job_id: str):
+    job_id = _safe_job_id(job_id)
     path = media_path(job_id)
     if not path:
         raise HTTPException(status_code=404, detail="media not ready")
@@ -128,6 +142,7 @@ async def presskit(req: MediaReq):
 
 @router.get("/presskit/download/{job_id}")
 async def presskit_download(job_id: str):
+    job_id = _safe_job_id(job_id)
     path = presskit_path(job_id)
     if not path:
         raise HTTPException(status_code=404, detail="press kit not ready")

@@ -37,13 +37,28 @@ class SecretManager:
         return base64.urlsafe_b64encode(digest)
 
     def _load(self) -> None:
-        if self._file.exists():
-            data = json.loads(self._file.read_text(encoding="utf-8"))
+        if not self._file.exists():
+            return
+        raw = self._file.read_bytes()
+        # Prefer Fernet-wrapped blob; fall back to legacy cleartext JSON for migration.
+        if self._fernet is not None:
+            try:
+                raw = self._fernet.decrypt(raw)
+            except Exception:
+                pass
+        try:
+            data = json.loads(raw.decode("utf-8"))
             self._secrets = data.get("secrets", {})
+        except Exception:
+            self._secrets = {}
 
     def _save(self) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
-        self._file.write_text(json.dumps({"secrets": self._secrets}, indent=2), encoding="utf-8")
+        payload = json.dumps({"secrets": self._secrets}, indent=2).encode("utf-8")
+        # Never persist secrets as clear text — wrap the whole document when Fernet is available.
+        if self._fernet is None:
+            raise RuntimeError("cryptography.Fernet required to persist secrets")
+        self._file.write_bytes(self._fernet.encrypt(payload))
 
     def _encrypt(self, plaintext: str) -> str:
         if not self._fernet:

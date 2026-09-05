@@ -72,7 +72,7 @@ def improve(neo, stimulus: str, *, rounds: int = 16) -> Dict[str, Any]:
         try:
             guard(t, title)
         except LawError as exc:
-            return {"improved": 0, "reason": str(exc), "law": exc.law}
+            return {"improved": 0, "reason": "law-violation", "law": exc.law}
 
     check({"kind": "improve", "dialect": texts[0], "title": title, "era": era})
 
