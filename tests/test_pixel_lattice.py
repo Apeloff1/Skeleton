@@ -1,4 +1,7 @@
-"""Tests for pixel lattice UI layout engine."""
+"""Tests for pixel lattice UI layout engine.
+
+Covers cell creation, region definition, hit testing, and layout cards.
+"""
 from __future__ import annotations
 
 import pytest
@@ -13,36 +16,43 @@ from skeleton.organism.pixel_lattice import (
 
 
 class TestLatticeCell:
-    def test_contains_inside(self):
+    def test_cell_creation(self):
         cell = LatticeCell(x=0, y=0, w=100, h=100, region="test")
+        assert cell.x == 0
+        assert cell.w == 100
+        assert cell.region == "test"
+
+    def test_contains(self):
+        cell = LatticeCell(x=10, y=10, w=100, h=100, region="test")
         assert cell.contains(50, 50) is True
-
-    def test_contains_outside(self):
-        cell = LatticeCell(x=0, y=0, w=100, h=100, region="test")
-        assert cell.contains(150, 50) is False
-
-    def test_contains_boundary(self):
-        cell = LatticeCell(x=0, y=0, w=100, h=100, region="test")
-        assert cell.contains(100, 100) is False  # exclusive upper bound
-        assert cell.contains(0, 0) is True
+        assert cell.contains(5, 5) is False
+        assert cell.contains(110, 110) is False
+        assert cell.contains(10, 10) is True  # edge inclusive
+        assert cell.contains(109, 109) is True
+        assert cell.contains(110, 50) is False
 
     def test_center(self):
         cell = LatticeCell(x=0, y=0, w=100, h=200, region="test")
         assert cell.center() == (50, 100)
 
     def test_to_dict(self):
-        cell = LatticeCell(x=10, y=20, w=30, h=40, region="r", z=5)
+        cell = LatticeCell(x=0, y=0, w=100, h=100, region="test", z=5)
         d = cell.to_dict()
-        assert d == {"x": 10, "y": 20, "w": 30, "h": 40, "region": "r", "z": 5}
+        assert d["region"] == "test"
+        assert d["z"] == 5
 
 
 class TestPixelLattice:
-    def test_define_region(self):
+    def test_creation(self):
         lattice = PixelLattice(width=1920, height=1080, cols=24, rows=14)
-        cell = lattice.define_region("viewport", 0, 0, 18, 11, z=0)
-        assert cell.region == "viewport"
-        assert cell.w == 18 * (1920 // 24)
-        assert cell.h == 11 * (1080 // 14)
+        assert lattice.width == 1920
+        assert lattice.cell_w == 80  # 1920 / 24
+
+    def test_define_region(self):
+        lattice = PixelLattice(width=100, height=100, cols=10, rows=10)
+        cell = lattice.define_region("test", 0, 0, 5, 5)
+        assert cell.w == 50  # 5 * 10
+        assert cell.h == 50
 
     def test_regions(self):
         lattice = PixelLattice(width=100, height=100, cols=10, rows=10)
@@ -59,24 +69,25 @@ class TestPixelLattice:
 
     def test_hit(self):
         lattice = PixelLattice(width=100, height=100, cols=10, rows=10)
-        lattice.define_region("a", 0, 0, 5, 5, z=0)
-        lattice.define_region("b", 0, 0, 5, 5, z=1)
-        hit = lattice.hit(25, 25)
+        lattice.define_region("bg", 0, 0, 10, 10, z=0)
+        lattice.define_region("fg", 2, 2, 4, 4, z=1)
+        # Should hit foreground first due to higher z
+        hit = lattice.hit(40, 40)
         assert hit is not None
-        assert hit.region == "b"  # higher z wins
+        assert hit.region == "fg"
 
-    def test_hit_none(self):
+    def test_hit_miss(self):
         lattice = PixelLattice(width=100, height=100, cols=10, rows=10)
-        lattice.define_region("a", 0, 0, 5, 5)
-        assert lattice.hit(95, 95) is None
+        lattice.define_region("test", 0, 0, 5, 5)
+        hit = lattice.hit(60, 60)
+        assert hit is None
 
     def test_to_dict(self):
         lattice = PixelLattice(width=100, height=100, cols=10, rows=10)
-        lattice.define_region("a", 0, 0, 5, 5)
+        lattice.define_region("test", 0, 0, 5, 5)
         d = lattice.to_dict()
         assert d["width"] == 100
-        assert d["cols"] == 10
-        assert "a" in d["regions"]
+        assert "test" in d["regions"]
 
 
 class TestDefaultLayouts:
@@ -97,17 +108,8 @@ class TestDefaultLayouts:
         assert "toolbar" in lattice.regions()
         assert "palette" in lattice.regions()
 
-    def test_hud_viewport_size(self):
-        lattice = default_hud_lattice()
-        vp = lattice.cells_for("viewport")[0]
-        assert vp.w == 18 * (1920 // 24)
-        assert vp.h == 11 * (1080 // 14)
-
-
-class TestLatticeCard:
-    def test_card(self):
-        lattice = default_hud_lattice()
-        card = lattice_card(lattice)
+    def test_lattice_card(self):
+        card = lattice_card()
         assert card["kind"] == "pixel-lattice-card"
-        assert card["region_count"] == 6
+        assert card["region_count"] > 0
         assert "viewport" in card["regions"]

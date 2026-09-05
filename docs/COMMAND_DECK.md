@@ -1,31 +1,111 @@
-# Command deck
+# Command Deck Reference
 
-The organism over HTTP and `python -m skeleton deck`.
+The command deck is the unified operator surface for all Skeleton subsystems.
 
-```
-GET  /api/v1/cortex/status
-GET  /api/v1/cortex/deck
-GET  /api/v1/cortex/laws
-GET  /api/v1/cortex/refs
-GET  /api/v1/cortex/dodeca
-POST /api/v1/cortex/think    {"stimulus":"..."}
-POST /api/v1/cortex/speak    {"stimulus":"like Elden Ring"}
-POST /api/v1/cortex/refer    {"stimulus":"elden ring","live":false}
-POST /api/v1/cortex/improve  {"stimulus":"like Elden Ring","rounds":6}
-POST /api/v1/cortex/ascend   {"stimulus":"like Elden Ring","rounds":6}
-POST /api/v1/cortex/plan     {"vision":"like Elden Ring"}
-POST /api/v1/cortex/genos    {"stimulus":"plan tensor ttk"}
-POST /api/v1/cortex/dodeca/walk {"steps":3}
-POST /api/v1/cortex/dodeca/pick {"index":7}
-POST /api/v1/cortex/cut     {"stimulus":"like Elden Ring","rounds":3}
+## Usage
+
+```bash
+python -m skeleton <command> <subcommand> [options]
 ```
 
-`like <title>` cites the Steam pointer, trains house mouths, pulses G.
-Tenfold is the heading. Source prose is never stored.
+## Commands
 
-```
-python -m skeleton deck
-python -m skeleton deck "like Elden Ring"
-python -m skeleton deck --walk 3
-python -m skeleton cut "like Elden Ring"
-```
+### policy — Policy versioning and control
+
+| Command | Description |
+|---------|-------------|
+| `policy state` | Show current policy state |
+| `policy save --comment "..."` | Save policy version |
+| `policy rollback --version-id pv-xxx` | Rollback to version |
+| `policy rollback-surface --surface forge` | Rollback surface |
+| `policy versions` | List versions |
+| `policy diff --a pv-1 --b pv-2` | Diff two versions |
+| `policy lineage --version-id pv-xxx` | Show version lineage |
+| `policy rollback-preview --version-id pv-xxx` | Preview rollback |
+
+### verify — Verification commands
+
+| Command | Description |
+|---------|-------------|
+| `verify forge --files f1.gd,f2.gd` | Verify forge output |
+| `verify plan --plan plan.json` | Verify plan |
+| `verify pipeline --tree tree.json` | Verify pipeline |
+| `verify npc --spec spec.json` | Verify NPC spec |
+| `verify dialogue --script script.json` | Verify dialogue script |
+
+### repair — Repair commands
+
+| Command | Description |
+|---------|-------------|
+| `repair orchestrate --surface forge --target-id main` | Orchestrate repair |
+| `repair sessions --surface forge` | Show repair sessions |
+| `repair effectiveness --surface forge` | Repair effectiveness |
+| `repair telemetry --surface forge` | Repair telemetry |
+| `repair errors --surface forge` | Repair errors |
+| `repair learned` | Learned policy |
+| `repair strategy --surface forge --reason low_score` | Strategy suggestion |
+
+### lattice — Pixel lattice layouts
+
+| Command | Description |
+|---------|-------------|
+| `lattice hud` | HUD layout |
+| `lattice editor` | Editor layout |
+
+### steering — Operator steering
+
+| Command | Description |
+|---------|-------------|
+| `steering register --name mood_dark` | Register vector |
+| `steering activate --name mood_dark --weight 0.8` | Activate vector |
+| `steering deactivate --name mood_dark` | Deactivate vector |
+| `steering composite` | Show composite vector |
+
+### kv — KV cache
+
+| Command | Description |
+|---------|-------------|
+| `kv stats` | Cache statistics |
+
+### mouth — Mouth binding
+
+| Command | Description |
+|---------|-------------|
+| `mouth feed --phoneme AA --ts 12345` | Feed phoneme |
+| `mouth current` | Current mouth state |
+
+### lora — LoRA adapter
+
+| Command | Description |
+|---------|-------------|
+| `lora card` | LoRA status |
+
+### decoder — GPU decoder
+
+| Command | Description |
+|---------|-------------|
+| `decoder card` | Decoder status |
+
+### master — Full system card
+
+| Command | Description |
+|---------|-------------|
+| `master` | Show master card with all subsystems |
+
+## HTTP API Routes
+
+All commands are also available via HTTP:
+
+- `GET /api/v1/cortex/policy-state`
+- `POST /api/v1/cortex/policy-save`
+- `POST /api/v1/cortex/policy-rollback`
+- `GET /api/v1/cortex/policy-versions`
+- `GET /api/v1/cortex/policy-diff`
+- `POST /api/v1/cortex/verify-forge`
+- `POST /api/v1/cortex/verify-plan`
+- `POST /api/v1/cortex/repair-orchestrate`
+- `GET /api/v1/cortex/repair-sessions`
+- `GET /api/v1/cortex/lattice-hud`
+- `POST /api/v1/cortex/steering-register`
+- `GET /api/v1/cortex/kv-stats`
+- `GET /api/v1/cortex/master-card`

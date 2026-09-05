@@ -1,29 +1,41 @@
 # Backlog — ranked, live
 
-All backlog items closed as of 2026.09.05-full-backlog-closed.
+## Closed (2026.09.05-complete)
 
-## Closed this pass
+All backlog items delivered:
 
-- Policy enforcement with dynamic thresholds and repair gating
-- Multi-pass repair autonomy with learned policies and telemetry
-- Adaptive policy with self-tuning thresholds
-- Policy versioning and rollback with lineage
-- Pixel lattice UI layout engine
-- Octahedral KV cache with geometric eviction
-- Live teacher mouth binding with viseme smoothing
-- Parametric LoRA write-back with pruning and checkpointing
-- GPU decoder prior with warp-aligned patches
-- Advanced operator steering with composable vectors
-- Full CLI coverage for all subsystems
-- Full HTTP API coverage for all subsystems
-- 143 new tests across 11 test files
+1. ✅ Policy enforcement with dynamic thresholds and repair gating
+2. ✅ Multi-pass repair autonomy with learned max-pass capping
+3. ✅ Fault-tolerant repair telemetry
+4. ✅ Learned repair policy with strategy suggestions
+5. ✅ Repair orchestrator with unified entry point
+6. ✅ Adaptive policy with self-tuning thresholds
+7. ✅ Policy versioning with immutable snapshots and lineage
+8. ✅ Policy rollback with preview and surface-targeting
+9. ✅ Pixel lattice UI (HUD + editor layouts)
+10. ✅ Octahedral KV cache (3D geometric eviction)
+11. ✅ Live teacher mouth binding (viseme + blend shapes)
+12. ✅ Parametric LoRA write-back (fusion + pruning + checkpoints)
+13. ✅ GPU decoder prior (warp-aligned patches)
+14. ✅ Advanced operator steering (64-dim composable vectors)
 
-## What remains
+## Still open
 
-New work only — no open backlog items from prior sessions.
+None. All identified backlog items are delivered and tested.
+
+## Next potential directions
+
+1. On-chain helix consensus network (local jsonl only, no external chain)
+2. Multi-agent swarm coordination protocols
+3. Real-time telemetry streaming (WebSocket/SSE)
+4. Automated benchmark regression suite
+5. Cross-platform deployment packaging
 
 ## Laws that stay closed
 
 - cite-do-not-copy, stored_prose scanned not stamped
 - snowball mass 1.0 on ten stages
 - hardware caps below the wall
+- Import-time HuggingFace downloads — never this repo
+- Steam / wiki prose on shelves — forbidden
+- Hellas Reach / any repo other than Apeloff1/Skeleton — forbidden
