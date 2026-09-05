@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from typing import Any, Dict, Mapping, Tuple
 
 from skeleton.intelligence.quality import QualityIssue, QualityReport, QualitySignal
-from skeleton.organism.policy_enforcement import threshold_for
 
 
 @dataclass(frozen=True)
@@ -41,7 +40,11 @@ class PipelineVerifier:
     """Verifier for pipeline outputs, starting with game logic specs."""
 
     def __init__(self, *, accept_at: float | None = None, root=None) -> None:
-        self.accept_at = accept_at if accept_at is not None else threshold_for("game_logic", root=root, fallback=0.7)
+        if accept_at is not None:
+            self.accept_at = accept_at
+        else:
+            from skeleton.organism.policy_enforcement import threshold_for
+            self.accept_at = threshold_for("game_logic", root=root, fallback=0.7)
         self.runs = 0
         self.accepted = 0
         self._root = root
