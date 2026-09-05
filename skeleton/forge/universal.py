@@ -130,10 +130,11 @@ class Blueprint:
 class Forge:
     """The universal synthesis engine."""
 
-    def __init__(self, bus: EventBus | None = None, *, root=None) -> None:
+    def __init__(self, bus: EventBus | None = None, *, root=None, outbox=None) -> None:
         self._bus = bus or EventBus()
         self._kinds: dict[str, tuple[Port, ...]] = {}
         self._root = root
+        self._outbox = outbox  # optional MaterialiseOutbox; see skeleton.forge.outbox
         self._register_stdlib()
 
     def _register_stdlib(self) -> None:
@@ -327,7 +328,24 @@ class Forge:
                             "verification_stats": verifier.stats(),
                         },
                     )
-        self._bus.emit("forge.blueprint.materialised", {"blueprint_id": blueprint.blueprint_id, "components": len(blueprint.components), "wires": len(blueprint.wires), "era": pack["era"], "target": target})
+        materialised = {
+            "blueprint_id": blueprint.blueprint_id,
+            "components": len(blueprint.components),
+            "wires": len(blueprint.wires),
+            "era": pack["era"],
+            "target": target,
+        }
+        # Journal before bus observability when an outbox is injected (extend-only).
+        if self._outbox is not None:
+            self._outbox.append_materialisation(
+                blueprint_id=materialised["blueprint_id"],
+                components=materialised["components"],
+                wires=materialised["wires"],
+                era=materialised["era"],
+                target=materialised["target"],
+                name=blueprint.name,
+            )
+        self._bus.emit("forge.blueprint.materialised", materialised)
         return result
 
     @staticmethod
