@@ -197,6 +197,11 @@ class RagUnavailableError(RetrievalError):
     http_status = 503
 
 
+class RetrievalFeedbackError(RetrievalError):
+    code = "RET.FEEDBACK"
+    http_status = 422
+
+
 class ForgeError(SkeletonError):
     code = "FRG.UNKNOWN"
 

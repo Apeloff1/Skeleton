@@ -123,6 +123,20 @@ async def retrieval_ingest(request: Dict[str, Any], state=Depends(_state)) -> Di
     return {"doc_id": doc_id, "chunks": chunks, "status": "ingested"}
 
 
+@router.post("/retrieval/feedback")
+async def retrieval_feedback(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    """Report which retrieval planes were used — trains plane-weight learner."""
+    from skeleton.retrieval.feedback import record_plane_feedback
+
+    genesis = _require(state.genesis, "Genesis")
+    quad = genesis.handles.get("quad")
+    if quad is None:
+        raise HTTPException(status_code=503, detail="quad retriever not wired")
+
+    used = request.get("used_planes", request.get("used"))
+    return record_plane_feedback(quad, used, all_planes=request.get("all_planes"))
+
+
 @router.get("/capabilities")
 async def capabilities(state=Depends(_state)) -> List[Dict[str, Any]]:
     return [cap.to_dict() for cap in _require(state.registry, "Registry").list()]
