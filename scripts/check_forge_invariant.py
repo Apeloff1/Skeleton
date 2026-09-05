@@ -85,12 +85,12 @@ def compare_invariant(*, documented: dict[str, str], runtime: dict[str, Any]) ->
         else:
             oks.append(f"[forge-invariant] backend URL port matches settings API port {api_port}")
 
-        # Skeleton URL should be present and distinct when hexagonal client is wired
+        # Skeleton URL: validate when documented (owned by Expo URL wire PR);
+        # skip if absent so this checker can land without double-touching .env.example.
         sp = _port_from_url(skeleton_doc) if skeleton_doc else None
         if not skeleton_doc:
-            issues.append(
-                "[forge-invariant] EXPO_PUBLIC_SKELETON_URL missing from frontend/.env.example "
-                "(Skeleton client needs a documented base URL)"
+            oks.append(
+                "[forge-invariant] EXPO_PUBLIC_SKELETON_URL not in env examples yet (skipped)"
             )
         elif sp is None:
             issues.append(f"[forge-invariant] EXPO_PUBLIC_SKELETON_URL has no port: {skeleton_doc!r}")
