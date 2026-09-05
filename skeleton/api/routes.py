@@ -300,7 +300,22 @@ async def forge_materialise(http_request: Request, request: Dict[str, Any], stat
         forge.instantiate(bp, comp["kind"], comp["instance_id"], config=comp.get("config"))
     for wire in request.get("wires", []):
         bp.connect(tuple(wire["from"]), tuple(wire["to"]))
-    response = {"artefact": forge.materialise(bp, era=request.get("era", "extraction_now"), target=request.get("target", "json")), "status": "materialised"}
+    repair = bool(request.get("repair", False))
+    max_rounds = int(request.get("max_rounds", 3) or 3)
+    artefact = forge.materialise(
+        bp,
+        era=request.get("era", "extraction_now"),
+        target=request.get("target", "json"),
+        repair=repair,
+        max_rounds=max_rounds,
+    )
+    response = {
+        "artefact": artefact,
+        "status": "materialised",
+        "verification": artefact.get("verification"),
+        "verify_loop": artefact.get("verify_loop"),
+        "repair": artefact.get("repair"),
+    }
     _idempotency.remember(dict(http_request.headers), response)
     return response
 
@@ -327,8 +342,17 @@ async def forge_archetype(http_request: Request, request: Dict[str, Any], state=
     era = request.get("era", "extraction_now")
     target = request.get("target", "godot")
     bp = default_library().build(forge, name)
-    artefact = forge.materialise(bp, era=era, target=target)
-    response = {"blueprint_id": bp.blueprint_id, "artefact": artefact, "status": "materialised"}
+    repair = bool(request.get("repair", target == "godot"))
+    max_rounds = int(request.get("max_rounds", 3) or 3)
+    artefact = forge.materialise(bp, era=era, target=target, repair=repair, max_rounds=max_rounds)
+    response = {
+        "blueprint_id": bp.blueprint_id,
+        "artefact": artefact,
+        "status": "materialised",
+        "verification": artefact.get("verification"),
+        "verify_loop": artefact.get("verify_loop"),
+        "repair": artefact.get("repair"),
+    }
     _idempotency.remember(dict(http_request.headers), response)
     return response
 
