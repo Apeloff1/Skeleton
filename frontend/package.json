@@ -75,6 +75,7 @@
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@babel/plugin-transform-class-static-block": "^7.27.1",
+    "eslint": "^9",
     "typescript": "~5.9.3"
   },
   "private": true,
