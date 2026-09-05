@@ -184,20 +184,10 @@ def _stage(name: str, org, stim: str, *, neo=None, ctx: Dict[str, Any]) -> Dict[
         from skeleton.organism.context_step import polish
         out = polish(org, stim)
         try:
-            from skeleton.kernel.ops.thinkgate import gated
-            from skeleton.kernel.ops.budgetr import budget
-            from skeleton.kernel.ops.loop import unroll
-            g = gated(stim)
-            if g.get("open"):
-                prof = "mobile"
-                try:
-                    from skeleton.kernel.profiles import card as profiles_card
-                    prof = str(profiles_card().get("profile") or "mobile")
-                except Exception:
-                    prof = "mobile"
-                r = int(budget(profile=prof, want=2, halt=True).get("r") or 2)
-                seed = [float((i % 5) - 2) * 0.1 for i in range(4)]
-                lp = unroll(seed, r=r)
+            from skeleton.kernel.ops.thinkmix import thinkmix
+            tm = thinkmix(stim, profile="mobile")
+            if tm.get("open"):
+                lp = {"kind": tm.get("run") or tm.get("family"), "r": tm.get("r") or 2}
                 if isinstance(out, dict):
                     out = dict(out)
                     out["loop"] = lp.get("kind")
@@ -206,7 +196,7 @@ def _stage(name: str, org, stim: str, *, neo=None, ctx: Dict[str, Any]) -> Dict[
                 try:
                     from skeleton.organism.loop_log import record
                     record(
-                        {"open": 1, "fire": 1, "family": lp.get("kind") or "loop", "r": lp.get("r") or r},
+                        {"open": 1, "fire": 1, "family": lp.get("kind") or "loop", "r": lp.get("r") or 2},
                         root=getattr(org, "root", None),
                     )
                 except Exception:

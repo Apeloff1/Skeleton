@@ -11,6 +11,7 @@ from skeleton.kernel.ops._stat import bump
 NEEDLES = (
     "why", "how", "reason", "proof", "loop", "think", "plan",
     "derive", "solve", "depth", "recur", "latent",
+    "smelt", "huginn", "ouro", "nanbeige", "recurrent",
 )
 
 
