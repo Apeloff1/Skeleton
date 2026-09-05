@@ -24,7 +24,7 @@ from skeleton.organism.policy_rollback_control import rollback_control_card, rol
 # Verification surfaces
 from skeleton.intelligence.forge_verifier import ForgeVerifier
 from skeleton.intelligence.plan_verifier import PlanVerifier
-from skeleton.intelligence.pipeline_verifier import PipelineVerifier
+# PipelineVerifier imported lazily in verify_pipeline() to avoid import cycles
 from skeleton.intelligence.npc_verifier import NPCVerifier
 from skeleton.intelligence.dialogue_verifier import DialogueVerifier
 
@@ -94,6 +94,7 @@ class CommandDeck:
         return v.verify(plan).to_dict()
 
     def verify_pipeline(self, tree) -> Dict[str, Any]:
+        from skeleton.intelligence.pipeline_verifier import PipelineVerifier
         v = PipelineVerifier(root=self.root)
         return v.verify(tree).to_dict()
 

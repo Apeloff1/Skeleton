@@ -58,6 +58,7 @@ __all__ = [
     "latest_repair_plan",
     "candidate_failures",
     "attempt_repair",
+    "forge_verify_until_green",
     "Blueprint",
     "Component",
     "Forge",
@@ -70,3 +71,10 @@ __all__ = [
     "ValidationRule",
     "default_validator",
 ]
+
+
+def __getattr__(name: str):
+    if name == "forge_verify_until_green":
+        from skeleton.forge.verify_loop import forge_verify_until_green
+        return forge_verify_until_green
+    raise AttributeError(name)

@@ -90,6 +90,8 @@ class GameForgeRun:
             "blend": blend,
             "generation": generation,
             "reference": hit,
+            "repair": True,
+            "max_rounds": 3,
         }
         stages = [
             Stage("ingest", _stage_ingest),
@@ -128,6 +130,9 @@ class GameForgeRun:
                 "blueprint_id": run.context.get("blueprint_id"),
                 "file_count": run.context.get("file_count"),
                 "primary_dps": run.context.get("primary_dps"),
+                "verification": run.context.get("verification"),
+                "verify_loop": run.context.get("verify_loop"),
+                "repair": run.context.get("repair"),
             },
             "jeeves": run.context.get("jeeves_advice"),
             "cortex": run.context.get("cortex"),
@@ -265,9 +270,12 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
         cortex=cortex, last_walk=last_walk,
     )
     ctx["build_plan"] = build_plan
+    repair = bool(ctx.get("repair", True))
+    max_rounds = int(ctx.get("max_rounds", 3) or 3)
     art = forge.materialise(
         bp, era=ctx["era"], target=ctx.get("target") or "godot",
         pack=pack, build_plan=build_plan.to_dict(),
+        repair=repair, max_rounds=max_rounds,
     )
     _commit(ctx, "forge", name, art.get("blueprint_id", ""), {
         "blueprint_id": art.get("blueprint_id"),
@@ -276,6 +284,8 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "file_count": art.get("file_count"),
         "build_seed": build_plan.seed,
         "room_bias": build_plan.room_bias,
+        "verification_accepted": (art.get("verification") or {}).get("accepted"),
+        "verify_loop_rounds": ((art.get("verify_loop") or {}).get("trace") or {}).get("rounds"),
     })
     return {
         "blueprint_id": art.get("blueprint_id"),
@@ -284,6 +294,9 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "files": art.get("files") or {},
         "file_count": art.get("file_count") or len(art.get("files") or {}),
         "build_plan": build_plan.to_dict(),
+        "verification": art.get("verification"),
+        "verify_loop": art.get("verify_loop"),
+        "repair": art.get("repair"),
     }
 
 

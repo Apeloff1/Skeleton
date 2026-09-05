@@ -172,11 +172,10 @@ class Forge:
         blueprint.add_component(component)
         return component
 
-    def materialise(self, blueprint: Blueprint, *, era: str = "extraction_now", target: str = "json", pack: dict[str, Any] | None = None, build_plan: dict[str, Any] | None = None, repair: bool = False) -> dict[str, Any]:
+    def materialise(self, blueprint: Blueprint, *, era: str = "extraction_now", target: str = "json", pack: dict[str, Any] | None = None, build_plan: dict[str, Any] | None = None, repair: bool = False, max_rounds: int = 3) -> dict[str, Any]:
         from skeleton.forge.eras import compile_era
         from skeleton.forge.godot_emit import emit_godot
         from skeleton.forge.planner import MaterialisationPlanner
-        from skeleton.forge.repair import attempt_repair
         from skeleton.intelligence.forge_verifier import ForgeVerifier
         from skeleton.organism.quality_state import append_quality
 
@@ -199,73 +198,135 @@ class Forge:
         }
         if target == "godot":
             files = emit_godot(pack, title=blueprint.name, build_plan=build_plan)
-            verifier = ForgeVerifier()
-            verification = verifier.verify(files, request=blueprint.name)
-            result["files"] = files
-            result["file_count"] = len(files)
-            result["verification"] = verification.to_dict()
-            result["verification_stats"] = verifier.stats()
-            evidence = {
-                "project_issues": list(verification.project_issues),
-                "blocking_issues": list(verification.blocking_issues),
-                "top_file_reports": [r.to_dict() for r in verification.file_reports[:3]],
-            }
-            append_quality({
-                "kind": "quality",
-                "surface": "forge",
-                "accepted": verification.accepted,
-                "reason": verification.reason,
-                "score": verification.score,
-                "weakest_path": verification.weakest_path,
-                "summary": verification.summary,
-                "metadata": verification.quality.metadata,
-                "evidence": evidence,
-            }, root=self._root)
-            event = DomainEvent(
-                topic="forge.verification.completed" if verification.accepted else "forge.verification.failed",
-                payload={
-                    "blueprint_id": blueprint.blueprint_id,
-                    "name": blueprint.name,
-                    "target": target,
+            verifier = ForgeVerifier(root=self._root)
+            if repair:
+                # F-5: revise-until-green via VerificationLoop + CodeVerifier.verdict.
+                from skeleton.forge.verify_loop import forge_verify_until_green
+                looped = forge_verify_until_green(
+                    files,
+                    request=blueprint.name,
+                    root=self._root,
+                    max_rounds=max_rounds,
+                )
+                result["files"] = looped["files"]
+                result["file_count"] = len(looped["files"])
+                result["verification"] = looped["verification"]
+                result["verification_stats"] = looped["verification_stats"]
+                result["verify_loop"] = {
+                    "accepted": looped["accepted"],
+                    "trace": looped["trace"],
+                    "code_verdict": looped.get("code_verdict"),
+                    "stopped_reason": looped.get("stopped_reason"),
+                    "rounds_detail": looped.get("rounds_detail"),
+                    "threshold": looped.get("threshold"),
+                }
+                if looped.get("repairs"):
+                    result["repair"] = looped["repairs"][-1]
+                    result["repairs"] = looped["repairs"]
+                verification_accepted = bool(looped["accepted"])
+                verification_payload = looped["verification"]
+                evidence = {
+                    "project_issues": list(verification_payload.get("project_issues") or []),
+                    "blocking_issues": list(verification_payload.get("blocking_issues") or []),
+                    "top_file_reports": list(verification_payload.get("file_reports") or [])[:3],
+                    "verify_loop": result["verify_loop"],
+                }
+                append_quality({
+                    "kind": "quality",
+                    "surface": "forge",
+                    "accepted": verification_accepted,
+                    "reason": verification_payload.get("reason"),
+                    "score": verification_payload.get("score"),
+                    "weakest_path": verification_payload.get("weakest_path"),
+                    "summary": verification_payload.get("summary") or {},
+                    "metadata": (verification_payload.get("quality") or {}).get("metadata") or {"kind": "forge"},
+                    "evidence": evidence,
+                }, root=self._root)
+                self._bus.publish(DomainEvent(
+                    topic="forge.verification.completed" if verification_accepted else "forge.verification.failed",
+                    payload={
+                        "blueprint_id": blueprint.blueprint_id,
+                        "name": blueprint.name,
+                        "target": target,
+                        "accepted": verification_accepted,
+                        "reason": verification_payload.get("reason"),
+                        "score": verification_payload.get("score"),
+                        "weakest_path": verification_payload.get("weakest_path"),
+                        "summary": verification_payload.get("summary") or {},
+                        "verify_loop": result["verify_loop"]["trace"],
+                    },
+                    correlation_id=f"forge_verify_{blueprint.blueprint_id}",
+                ))
+                if looped.get("repairs"):
+                    last = looped["repairs"][-1]
+                    self._bus.publish(DomainEvent(
+                        topic="forge.repair.completed" if last.get("ok") else "forge.repair.failed",
+                        payload={
+                            "blueprint_id": blueprint.blueprint_id,
+                            "name": blueprint.name,
+                            "accepted": bool(last.get("ok")),
+                            "reason": last.get("reason"),
+                            "targeted_path": last.get("targeted_path"),
+                            "changed": last.get("changed"),
+                            "rounds": looped["trace"].get("rounds"),
+                        },
+                        correlation_id=f"forge_repair_{blueprint.blueprint_id}",
+                    ))
+                if not verification_accepted:
+                    raise MaterialisationError(
+                        "emitted Godot project failed verification",
+                        context={
+                            "blueprint_id": blueprint.blueprint_id,
+                            "verification": verification_payload,
+                            "verification_stats": looped["verification_stats"],
+                            "verify_loop": result["verify_loop"],
+                        },
+                    )
+            else:
+                verification = verifier.verify(files, request=blueprint.name)
+                result["files"] = files
+                result["file_count"] = len(files)
+                result["verification"] = verification.to_dict()
+                result["verification_stats"] = verifier.stats()
+                evidence = {
+                    "project_issues": list(verification.project_issues),
+                    "blocking_issues": list(verification.blocking_issues),
+                    "top_file_reports": [r.to_dict() for r in verification.file_reports[:3]],
+                }
+                append_quality({
+                    "kind": "quality",
+                    "surface": "forge",
                     "accepted": verification.accepted,
                     "reason": verification.reason,
                     "score": verification.score,
                     "weakest_path": verification.weakest_path,
                     "summary": verification.summary,
-                },
-                correlation_id=f"forge_verify_{blueprint.blueprint_id}",
-            )
-            self._bus.publish(event)
-            if not verification.accepted and repair:
-                repaired = attempt_repair(files, request=blueprint.name, root=self._root, evidence=evidence)
+                    "metadata": verification.quality.metadata,
+                    "evidence": evidence,
+                }, root=self._root)
                 self._bus.publish(DomainEvent(
-                    topic="forge.repair.completed" if repaired.get("ok") else "forge.repair.failed",
+                    topic="forge.verification.completed" if verification.accepted else "forge.verification.failed",
                     payload={
                         "blueprint_id": blueprint.blueprint_id,
                         "name": blueprint.name,
-                        "accepted": bool(repaired.get("ok")),
-                        "reason": repaired.get("reason"),
-                        "targeted_path": repaired.get("targeted_path"),
-                        "changed": repaired.get("changed"),
+                        "target": target,
+                        "accepted": verification.accepted,
+                        "reason": verification.reason,
+                        "score": verification.score,
+                        "weakest_path": verification.weakest_path,
+                        "summary": verification.summary,
                     },
-                    correlation_id=f"forge_repair_{blueprint.blueprint_id}",
+                    correlation_id=f"forge_verify_{blueprint.blueprint_id}",
                 ))
-                result["repair"] = {k: v for k, v in repaired.items() if k != "files"}
-                if repaired.get("ok"):
-                    result["files"] = repaired["files"]
-                    result["file_count"] = len(repaired["files"])
-                    result["verification"] = repaired["after"]
-                    result["verification_stats"] = verifier.stats()
-                    return result
-            if not verification.accepted:
-                raise MaterialisationError(
-                    "emitted Godot project failed verification",
-                    context={
-                        "blueprint_id": blueprint.blueprint_id,
-                        "verification": verification.to_dict(),
-                        "verification_stats": verifier.stats(),
-                    },
-                )
+                if not verification.accepted:
+                    raise MaterialisationError(
+                        "emitted Godot project failed verification",
+                        context={
+                            "blueprint_id": blueprint.blueprint_id,
+                            "verification": verification.to_dict(),
+                            "verification_stats": verifier.stats(),
+                        },
+                    )
         self._bus.emit("forge.blueprint.materialised", {"blueprint_id": blueprint.blueprint_id, "components": len(blueprint.components), "wires": len(blueprint.wires), "era": pack["era"], "target": target})
         return result
 
