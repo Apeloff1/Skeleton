@@ -37,7 +37,7 @@ LOOPED: Tuple[str, ...] = (
     "overthink", "kvshare", "rk4", "inject", "ponder",
     "scse", "shortcut", "layerloop", "stackloop", "modr",
     "budgetr", "orbit", "loopkv", "schedule",
-    "thinkgate", "loopscale",
+    "thinkgate", "loopscale", "haltmix", "loopfuse",
 )
 
 

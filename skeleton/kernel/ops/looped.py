@@ -23,6 +23,8 @@ from skeleton.kernel.ops.loopkv import run as loopkv
 from skeleton.kernel.ops.schedule import run as rschedule
 from skeleton.kernel.ops.thinkgate import gated
 from skeleton.kernel.ops.loopscale import scaled
+from skeleton.kernel.ops.haltmix import haltmix
+from skeleton.kernel.ops.loopfuse import loopfuse
 
 
 CITES = (
@@ -40,7 +42,7 @@ class Looped:
         "overthink", "kvshare", "rk4", "inject", "ponder",
         "scse", "shortcut", "layerloop", "stackloop", "modr",
         "budgetr", "orbit", "loopkv", "schedule",
-        "thinkgate", "loopscale",
+        "thinkgate", "loopscale", "haltmix", "loopfuse",
     )
 
     def __init__(self) -> None:
@@ -70,6 +72,8 @@ class Looped:
         rschedule(x, profile="mobile"); self.hits["schedule"] += 1
         gated("why loop think"); self.hits["thinkgate"] += 1
         scaled(x, r=2); self.hits["loopscale"] += 1
+        haltmix(x, r_max=3); self.hits["haltmix"] += 1
+        loopfuse(x, r=2); self.hits["loopfuse"] += 1
         return self.card()
 
     def card(self) -> Dict[str, Any]:

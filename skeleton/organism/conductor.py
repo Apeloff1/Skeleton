@@ -30,6 +30,7 @@ FOLLOW: Dict[str, Tuple[str, str]] = {
     "bind-source": ("pulse", "day"),
     "pulse": ("day", "pulse"),
     "hold": ("pulse", "day"),
+    "think": ("pulse", "day"),
 }
 
 
@@ -77,6 +78,8 @@ def decide(org=None, *, neo=None) -> Dict[str, Any]:
         code, why = "day", "no-day"
     elif float((__import__("skeleton.organism.runloop", fromlist=["bound_card"]).bound_card(getattr(org, "root", None)).get("field_pct") or 0)) < 25.0:
         code, why = "day", "field"
+    elif int((__import__("skeleton.organism.loop_log", fromlist=["card"]).card(getattr(org, "root", None)).get("fired") or 0)) == 0:
+        code, why = "think", "cold-loop"
     elif int(cal.get("dumps") or 0) == 0:
         code, why = "week", "no-dump"
     else:
@@ -156,6 +159,12 @@ def _act(code: str, org, *, neo=None) -> Dict[str, Any]:
     elif code == "dream":
         from skeleton.organism.sleep import cycle
         acted = cycle(org, neo=neo, force=True)
+    elif code == "think":
+        from skeleton.kernel.ops.looped import Looped
+        from skeleton.organism.loop_log import record
+        card = Looped().poke()
+        record({"open": 1, "fire": 1, "family": "looped", "r": 2}, root=getattr(org, "root", None))
+        acted = {"kind": "think", "ok": 1, "n": card.get("n"), "hits": sum((card.get("hits") or {}).values())}
     else:
         from skeleton.organism.pulse import pulse
         acted = pulse(org, neo=neo, stimulus="")

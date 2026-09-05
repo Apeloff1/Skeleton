@@ -129,5 +129,6 @@ def card(root: Optional[Path] = None) -> Dict[str, Any]:
         "hot": (rows[-1].get("hot") if rows else "") or "",
         "helix_ok": (rows[-1].get("helix_ok") if rows else 1) or 0,
         "dumps": (rows[-1].get("dumps") if rows else 0) or 0,
+        "loop_fired": (rows[-1].get("loop_fired") if rows else 0) or 0,
         "stored_prose": 0,
     }

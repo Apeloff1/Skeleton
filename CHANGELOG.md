@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-05 — Loop log + think verb
+
+- chronicle/loop.jsonl. Conductor think when never fired.
+- haltmix + loopfuse. Looped poke 23.
+
+---
+
 ## 2026-09-05 — Looped decode wiring
 
 - think-gate opens on reasoning tokens. krouter sets loop+family.

@@ -203,6 +203,14 @@ def _stage(name: str, org, stim: str, *, neo=None, ctx: Dict[str, Any]) -> Dict[
                     out["loop"] = lp.get("kind")
                     out["loop_r"] = lp.get("r")
                     out["think"] = 1
+                try:
+                    from skeleton.organism.loop_log import record
+                    record(
+                        {"open": 1, "fire": 1, "family": lp.get("kind") or "loop", "r": lp.get("r") or r},
+                        root=getattr(org, "root", None),
+                    )
+                except Exception:
+                    pass
         except Exception:
             pass
         return out
