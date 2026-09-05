@@ -1,4 +1,8 @@
-"""Cortex command deck — inspect AND speak."""
+"""Cortex command deck — inspect AND speak.
+
+Now includes repair orchestrator endpoints for multi-pass repairs,
+telemetry, learned policy, and session diagnostics.
+"""
 from __future__ import annotations
 
 from typing import Any, Dict
@@ -70,3 +74,28 @@ async def cortex_repair_enabled(request: Dict[str, Any], state=Depends(_state)) 
 @router.post("/cortex/repair-class")
 async def cortex_repair_class(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     return _deck(state).set_repair_class(str(request.get("name") or ""), bool(request.get("enabled")))
+
+# Repair orchestrator endpoints
+@router.get("/cortex/repair-sessions")
+async def cortex_repair_sessions(surface: str = "", limit: int = 8, state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).repair_sessions(surface=surface, limit=limit)
+
+@router.get("/cortex/repair-effectiveness")
+async def cortex_repair_effectiveness(surface: str = "", state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).repair_effectiveness(surface=surface)
+
+@router.get("/cortex/repair-telemetry")
+async def cortex_repair_telemetry(surface: str = "", limit: int = 16, state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).repair_telemetry(surface=surface, limit=limit)
+
+@router.get("/cortex/repair-errors")
+async def cortex_repair_errors(surface: str = "", state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).repair_errors(surface=surface)
+
+@router.get("/cortex/learned-policy")
+async def cortex_learned_policy(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).learned_policy()
+
+@router.get("/cortex/repair-orchestrator")
+async def cortex_repair_orchestrator(state=Depends(_state)) -> Dict[str, Any]:
+    return _deck(state).repair_orchestrator()

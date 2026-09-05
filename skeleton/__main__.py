@@ -1,6 +1,7 @@
 """python -m skeleton — operator diagnostics and policy steering.
 
-Now includes policy-enforcement CLI commands.
+Now includes repair orchestrator, telemetry, learned policy,
+and multi-pass repair commands.
 """
 from __future__ import annotations
 
@@ -35,14 +36,30 @@ def main(argv: list[str] | None = None) -> int:
     src = sub.add_parser("set-repair-class")
     src.add_argument("name")
     src.add_argument("enabled")
-    # New enforcement CLI
-    sub.add_parser("gate-check")
-    gc = sub.add_parser("gate")
+    # Enforcement CLI
+    gc = sub.add_parser("gate-check")
     gc.add_argument("surface")
     gc.add_argument("score", type=float)
     sub.add_parser("repair-gate")
     rg = sub.add_parser("repair-gate")
     rg.add_argument("--surface", default="")
+    # Repair orchestrator CLI
+    sub.add_parser("repair-sessions")
+    rs = sub.add_parser("repair-sessions")
+    rs.add_argument("--surface", default="")
+    rs.add_argument("-n", type=int, default=8)
+    sub.add_parser("repair-effectiveness")
+    reff = sub.add_parser("repair-effectiveness")
+    reff.add_argument("--surface", default="")
+    sub.add_parser("repair-telemetry")
+    rt = sub.add_parser("repair-telemetry")
+    rt.add_argument("--surface", default="")
+    rt.add_argument("-n", type=int, default=16)
+    sub.add_parser("repair-errors")
+    rerr = sub.add_parser("repair-errors")
+    rerr.add_argument("--surface", default="")
+    sub.add_parser("learned-policy")
+    sub.add_parser("repair-orchestrator")
 
     args = p.parse_args(argv)
     from skeleton.cortex.deck import live_deck
@@ -73,12 +90,21 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "gate-check":
         from skeleton.organism.policy_enforcement import gate_check
         print(json.dumps(gate_check(args.surface, args.score), indent=2, default=str)); return 0
-    if args.cmd == "gate":
-        from skeleton.organism.policy_enforcement import gate_check
-        print(json.dumps(gate_check(args.surface, args.score), indent=2, default=str)); return 0
     if args.cmd == "repair-gate":
         from skeleton.organism.policy_enforcement import repair_gate
         print(json.dumps(repair_gate(args.surface or "forge"), indent=2, default=str)); return 0
+    if args.cmd == "repair-sessions":
+        print(json.dumps(deck.repair_sessions(surface=args.surface, limit=args.n), indent=2, default=str)); return 0
+    if args.cmd == "repair-effectiveness":
+        print(json.dumps(deck.repair_effectiveness(surface=args.surface), indent=2, default=str)); return 0
+    if args.cmd == "repair-telemetry":
+        print(json.dumps(deck.repair_telemetry(surface=args.surface, limit=args.n), indent=2, default=str)); return 0
+    if args.cmd == "repair-errors":
+        print(json.dumps(deck.repair_errors(surface=args.surface), indent=2, default=str)); return 0
+    if args.cmd == "learned-policy":
+        print(json.dumps(deck.learned_policy(), indent=2, default=str)); return 0
+    if args.cmd == "repair-orchestrator":
+        print(json.dumps(deck.repair_orchestrator(), indent=2, default=str)); return 0
     return 0
 
 

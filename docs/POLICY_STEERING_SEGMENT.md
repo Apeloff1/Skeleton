@@ -4,17 +4,24 @@ This segment sits above the corrective-control and diagnostics segments. Its rol
 
 ## What this segment is
 
-The segment currently introduces persistent operator policy state for:
+The segment introduces persistent operator policy state for:
 
 - quality thresholds by surface
 - repair enable/disable toggles by surface
 - repair-class enable/disable toggles
 
+And now includes full enforcement:
+
+- All 5 verifiers read thresholds from policy.json dynamically
+- All 4 repair scaffolds check repair_enabled and repair_classes before acting
+- Policy gates are visible in every verification report
+
 ## Core modules
 
-- `skeleton/organism/policy_state.py`
-- `skeleton/organism/policy_card.py`
-- `skeleton/organism/policy_control_card.py`
+- `skeleton/organism/policy_state.py` — persistence
+- `skeleton/organism/policy_enforcement.py` — enforcement bridge
+- `skeleton/organism/policy_card.py` — operator views
+- `skeleton/organism/policy_control_card.py` — aggregated control view
 
 ## Current surfaces
 
@@ -25,6 +32,8 @@ The segment currently introduces persistent operator policy state for:
 - `python -m skeleton set-threshold forge 0.82`
 - `python -m skeleton set-repair-enabled npc false`
 - `python -m skeleton set-repair-class scene_stub false`
+- `python -m skeleton gate-check forge 0.75` — test a score against threshold
+- `python -m skeleton repair-gate --surface forge` — check if repair allowed
 
 ### HTTP
 
@@ -38,7 +47,7 @@ The segment currently introduces persistent operator policy state for:
 
 The policy state lives under organism storage in `policy.json`.
 
-It currently tracks three buckets:
+It tracks three buckets:
 
 1. `quality_thresholds`
 2. `repair_enabled`
@@ -56,12 +65,14 @@ What is real now:
 - command-deck policy methods
 - CLI steering commands
 - HTTP steering endpoints
+- **policy enforcement wired into all verifiers and repair scaffolds**
+- **gate_check and repair_gate for operator testing**
 
 What is still pending:
 
-- wiring thresholds into verifier thresholds by surface
-- wiring repair toggles/classes into execution gating
-- policy visibility in top-level operator cards
+- adaptive threshold adjustment based on historical quality pressure
+- cross-surface policy inheritance
+- policy versioning and rollback
 
 ## Design stance
 

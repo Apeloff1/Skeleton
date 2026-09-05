@@ -2,6 +2,9 @@
 
 Unifies think → refer → improve → ascend → plan → dodeca → genos
 into one instrument. Laws gate every write. Pointers only.
+
+Now includes repair orchestrator integration for multi-pass repairs,
+telemetry, learned policy, and session diagnostics.
 """
 from __future__ import annotations
 
@@ -113,6 +116,31 @@ class CommandDeck:
     def set_repair_class(self, name: str, enabled: bool) -> Dict[str, Any]:
         from skeleton.organism.policy_card import set_repair_class_card
         return set_repair_class_card(name, enabled, root=self.root)
+
+    # Repair orchestrator integration
+    def repair_sessions(self, *, surface: str = "", limit: int = 8) -> Dict[str, Any]:
+        from skeleton.intelligence.repair_autonomy import repair_session_card
+        return repair_session_card(surface=surface, root=self.root, limit=limit)
+
+    def repair_effectiveness(self, *, surface: str = "") -> Dict[str, Any]:
+        from skeleton.intelligence.repair_autonomy import repair_effectiveness
+        return repair_effectiveness(surface=surface, root=self.root)
+
+    def repair_telemetry(self, *, surface: str = "", limit: int = 16) -> Dict[str, Any]:
+        from skeleton.intelligence.repair_telemetry import telemetry_card
+        return telemetry_card(surface=surface, root=self.root, limit=limit)
+
+    def repair_errors(self, *, surface: str = "") -> Dict[str, Any]:
+        from skeleton.intelligence.repair_telemetry import error_summary
+        return error_summary(surface=surface, root=self.root)
+
+    def learned_policy(self) -> Dict[str, Any]:
+        from skeleton.intelligence.learned_repair import learned_policy_card
+        return learned_policy_card(root=self.root)
+
+    def repair_orchestrator(self) -> Dict[str, Any]:
+        from skeleton.intelligence.repair_orchestrator import repair_orchestrator_card
+        return repair_orchestrator_card(root=self.root)
 
     def snapshot(self) -> Dict[str, Any]:
         return {"status": self.status(), "last_ref": self.last_ref, "last_improve": self.last_improve, "last_plan": self.last_plan, "traces": list(self.traces[:8]), "position": self.position, "face": FACES[self.position]}
