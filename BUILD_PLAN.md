@@ -22,7 +22,8 @@ Direct diagnostics cards, command-deck methods, HTTP endpoints, CLI commands, an
 ### P3. Command-deck steering methods — DONE
 ### P4. CLI steering commands — DONE
 ### P5. HTTP steering endpoints — DONE
-### P6. Enforcement in repair/verification paths — PENDING
+### P6. Enforcement in repair/verification paths — DONE ✅
+Enforcement is live in surface verifiers/repairs + CodeVerifier policy default.
 
 ## Integration seams for the next pass
 
