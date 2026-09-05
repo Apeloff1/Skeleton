@@ -39,7 +39,9 @@ class Orchestrator:
         blocked = bool(thr is not None and hasattr(thr, "allow") and not thr.allow())
         slo = get("slo")
         slo_trip = bool(slo is not None and hasattr(slo, "trip") and slo.trip())
-        route = plan(profile, pressure=pressure, blocked=blocked, slo_trip=slo_trip)
+        route = plan(profile, pressure=pressure, blocked=blocked, slo_trip=slo_trip, text=text)
+        self._loop = int(route.get("loop") or 0)
+        self._family = str(route.get("family") or "")
         self._decode_n = int(route.get("decode_n") or 1)
         pf = get("prefetch")
         if pf is not None and hasattr(pf, "load"):
@@ -52,7 +54,8 @@ class Orchestrator:
             good = not card.get("stop") and card.get("ok", 1) != 0
             if slo is not None and hasattr(slo, "record"):
                 slo.record(bool(good))
-            trace.append({"stage": stage, **{k: card.get(k) for k in ("kind", "ok", "writes", "placed", "killed") if k in card}})
+            keep = ("kind", "ok", "writes", "placed", "killed", "loop", "loop_r", "family", "steps")
+            trace.append({"stage": stage, **{k: card.get(k) for k in keep if k in card}})
             if card.get("stop"):
                 break
 
@@ -134,6 +137,21 @@ class Orchestrator:
             last = dict(last)
             last["steps"] = steps
             last["kind"] = last.get("kind") or "decode"
+            if getattr(self, "_loop", 0):
+                try:
+                    from skeleton.kernel.ops.loop import unroll
+                    from skeleton.kernel.ops.loopscale import scaled
+                    seed = [float((i % 5) - 2) * 0.1 for i in range(4)]
+                    if self._family == "smelt":
+                        from skeleton.kernel.ops.smelt import smelt
+                        looped = smelt(seed, layers=8)
+                    else:
+                        looped = scaled(seed, r=max(1, n))
+                    last["loop"] = looped.get("kind")
+                    last["loop_r"] = looped.get("r") or looped.get("visits") or n
+                    last["family"] = self._family or "loop"
+                except Exception:
+                    last["loop"] = 0
             return last
         if stage == "check":
             chk = bank.get("check")
@@ -147,6 +165,12 @@ class Orchestrator:
             if ex is not None and hasattr(ex, "poke"):
                 ex.poke()
             sl = bank.get("stock_live")
+            lp = bank.get("looped")
+            if lp is not None and hasattr(lp, "poke"):
+                lp.poke()
+            sk = bank.get("socialk")
+            if sk is not None and hasattr(sk, "poke"):
+                sk.poke()
             if sl is not None and hasattr(sl, "tick"):
                 return sl.tick("orch")
             return {"kind": "stock", "ok": 0}

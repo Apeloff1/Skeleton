@@ -182,7 +182,30 @@ def _stage(name: str, org, stim: str, *, neo=None, ctx: Dict[str, Any]) -> Dict[
         return ctx_run(org, stim, neo=neo)
     if name == "decode":
         from skeleton.organism.context_step import polish
-        return polish(org, stim)
+        out = polish(org, stim)
+        try:
+            from skeleton.kernel.ops.thinkgate import gated
+            from skeleton.kernel.ops.budgetr import budget
+            from skeleton.kernel.ops.loop import unroll
+            g = gated(stim)
+            if g.get("open"):
+                prof = "mobile"
+                try:
+                    from skeleton.kernel.profiles import card as profiles_card
+                    prof = str(profiles_card().get("profile") or "mobile")
+                except Exception:
+                    prof = "mobile"
+                r = int(budget(profile=prof, want=2, halt=True).get("r") or 2)
+                seed = [float((i % 5) - 2) * 0.1 for i in range(4)]
+                lp = unroll(seed, r=r)
+                if isinstance(out, dict):
+                    out = dict(out)
+                    out["loop"] = lp.get("kind")
+                    out["loop_r"] = lp.get("r")
+                    out["think"] = 1
+        except Exception:
+            pass
+        return out
     if name == "check":
         from skeleton.galaxy.quarantine import card as cage_card
         from skeleton.organism.laws import scan_prose

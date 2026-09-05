@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-05 — Looped decode wiring
+
+- think-gate opens on reasoning tokens. krouter sets loop+family.
+- Orchestrator decode runs scaled/smelt. Runtime polish tags loop_r.
+
+---
+
 ## 2026-09-05 — Looped transformer burst
 
 - SCSE, shortcut, layer/stack loop, MoDr, R-budget, orbit,

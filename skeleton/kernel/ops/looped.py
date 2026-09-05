@@ -21,6 +21,8 @@ from skeleton.kernel.ops.budgetr import budget
 from skeleton.kernel.ops.orbit import orbit
 from skeleton.kernel.ops.loopkv import run as loopkv
 from skeleton.kernel.ops.schedule import run as rschedule
+from skeleton.kernel.ops.thinkgate import gated
+from skeleton.kernel.ops.loopscale import scaled
 
 
 CITES = (
@@ -38,6 +40,7 @@ class Looped:
         "overthink", "kvshare", "rk4", "inject", "ponder",
         "scse", "shortcut", "layerloop", "stackloop", "modr",
         "budgetr", "orbit", "loopkv", "schedule",
+        "thinkgate", "loopscale",
     )
 
     def __init__(self) -> None:
@@ -65,6 +68,8 @@ class Looped:
         orbit(x, r=4); self.hits["orbit"] += 1
         loopkv(x, r=2, mode="share"); self.hits["loopkv"] += 1
         rschedule(x, profile="mobile"); self.hits["schedule"] += 1
+        gated("why loop think"); self.hits["thinkgate"] += 1
+        scaled(x, r=2); self.hits["loopscale"] += 1
         return self.card()
 
     def card(self) -> Dict[str, Any]:
