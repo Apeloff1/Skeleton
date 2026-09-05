@@ -17,6 +17,13 @@ module.exports = ({ config }) => {
     base?.extra?.EXPO_PUBLIC_BACKEND_URL ||
     '';
 
+  const skeletonUrl =
+    process.env.EXPO_PUBLIC_SKELETON_URL ||
+    process.env.EXPO_SKELETON_URL ||
+    base?.extra?.EXPO_PUBLIC_SKELETON_URL ||
+    base?.extra?.EXPO_SKELETON_URL ||
+    '';
+
   return {
     ...base,
     ...fromContext,
@@ -33,6 +40,8 @@ module.exports = ({ config }) => {
       ...(fromContext.extra || {}),
       EXPO_PUBLIC_BACKEND_URL: backendUrl,
       EXPO_BACKEND_URL: backendUrl,
+      EXPO_PUBLIC_SKELETON_URL: skeletonUrl,
+      EXPO_SKELETON_URL: skeletonUrl,
     },
   };
 };

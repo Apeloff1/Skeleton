@@ -8,8 +8,9 @@
 import Constants from 'expo-constants';
 
 const BASE =
-  (Constants.expoConfig?.extra?.EXPO_BACKEND_URL as string | undefined) ||
   (Constants.expoConfig?.extra?.EXPO_SKELETON_URL as string | undefined) ||
+  (Constants.expoConfig?.extra?.EXPO_PUBLIC_SKELETON_URL as string | undefined) ||
+  (Constants.expoConfig?.extra?.EXPO_BACKEND_URL as string | undefined) ||
   '';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
