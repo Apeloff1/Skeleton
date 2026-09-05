@@ -1,4 +1,7 @@
-"""python -m skeleton — operator diagnostics and policy steering."""
+"""python -m skeleton — operator diagnostics and policy steering.
+
+Now includes policy-enforcement CLI commands.
+"""
 from __future__ import annotations
 
 import argparse
@@ -32,6 +35,14 @@ def main(argv: list[str] | None = None) -> int:
     src = sub.add_parser("set-repair-class")
     src.add_argument("name")
     src.add_argument("enabled")
+    # New enforcement CLI
+    sub.add_parser("gate-check")
+    gc = sub.add_parser("gate")
+    gc.add_argument("surface")
+    gc.add_argument("score", type=float)
+    sub.add_parser("repair-gate")
+    rg = sub.add_parser("repair-gate")
+    rg.add_argument("--surface", default="")
 
     args = p.parse_args(argv)
     from skeleton.cortex.deck import live_deck
@@ -59,6 +70,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "set-repair-class":
         enabled = str(args.enabled).lower() in {"1", "true", "yes", "on"}
         print(json.dumps(deck.set_repair_class(args.name, enabled), indent=2, default=str)); return 0
+    if args.cmd == "gate-check":
+        from skeleton.organism.policy_enforcement import gate_check
+        print(json.dumps(gate_check(args.surface, args.score), indent=2, default=str)); return 0
+    if args.cmd == "gate":
+        from skeleton.organism.policy_enforcement import gate_check
+        print(json.dumps(gate_check(args.surface, args.score), indent=2, default=str)); return 0
+    if args.cmd == "repair-gate":
+        from skeleton.organism.policy_enforcement import repair_gate
+        print(json.dumps(repair_gate(args.surface or "forge"), indent=2, default=str)); return 0
     return 0
 
 

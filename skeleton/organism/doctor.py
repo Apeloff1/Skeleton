@@ -1,4 +1,7 @@
-"""Doctor — laws, health, caps, field, next in one fail-closed card."""
+"""Doctor — laws, health, caps, field, next in one fail-closed card.
+
+Now embeds policy_summary from policy_enforcement.
+"""
 from __future__ import annotations
 
 from typing import Any, Dict
@@ -54,6 +57,8 @@ def doctor_card(org=None, *, neo=None, fix: bool = False) -> Dict[str, Any]:
         verified = {}
     helix_ok = int(helix.get("ok", 1))
     ok = int(bool(health.get("ok")) and prose == 0 and field["n"] >= 16 and helix_ok and q_pressure <= 0.20)
+    from skeleton.organism.policy_enforcement import policy_summary
+    policy = policy_summary(root=getattr(org, "root", None))
     return {
         "kind": "doctor",
         "ok": ok,
@@ -78,4 +83,5 @@ def doctor_card(org=None, *, neo=None, fix: bool = False) -> Dict[str, Any]:
         "helix_snap_n": (helix.get("snap") or {}).get("n"),
         "verified": verified,
         "satellites": __import__("skeleton.organism.satellites", fromlist=["satellites_card"]).satellites_card(org),
+        "policy": policy,
     }

@@ -1,4 +1,7 @@
-"""Product card — one operator-facing snapshot of the living system."""
+"""Product card — one operator-facing snapshot of the living system.
+
+Now embeds policy_summary from policy_enforcement.
+"""
 from __future__ import annotations
 
 from typing import Any, Dict
@@ -20,7 +23,7 @@ from skeleton.social.sources import SOTA_POINTERS
 from skeleton.organism.repair_card import repair_card
 
 
-VERSION = "2026.09.05-obscure"
+VERSION = "2026.09.05-policy-enforcement"
 
 
 ENDPOINTS = (
@@ -53,6 +56,15 @@ ENDPOINTS = (
     "GET /cortex/nervous",
     "GET /cortex/chronicle",
     "POST /cortex/dump",
+    "GET /cortex/failures",
+    "GET /cortex/repairs",
+    "GET /cortex/activity",
+    "GET /cortex/recurring",
+    "GET /cortex/policy",
+    "GET /cortex/threshold",
+    "POST /cortex/threshold",
+    "POST /cortex/repair-enabled",
+    "POST /cortex/repair-class",
 )
 
 
@@ -66,6 +78,8 @@ def product_card() -> Dict[str, Any]:
     snap = org.snapshot()
     laws = laws_card(org.galaxy.mesh)
     quality = _quality_snapshot(root=getattr(org, "root", None))
+    from skeleton.organism.policy_enforcement import policy_summary
+    policy = policy_summary(root=getattr(org, "root", None))
     return {
         "kind": "product",
         "name": "Jeeves Cortex Organism",
@@ -95,5 +109,6 @@ def product_card() -> Dict[str, Any]:
         "laws": laws,
         "quality": quality,
         "repair_card": repair_card(root=getattr(org, "root", None)),
+        "policy": policy,
         "stored_prose": laws["stored_prose"],
     }

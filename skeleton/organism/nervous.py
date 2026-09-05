@@ -1,4 +1,7 @@
-"""Nervous system card — SLO budgets + intelligence roster."""
+"""Nervous system card — SLO budgets + intelligence roster.
+
+Now embeds policy_summary from policy_enforcement.
+"""
 from __future__ import annotations
 
 from typing import Any, Dict
@@ -48,6 +51,8 @@ def nervous_card(org=None, *, neo=None) -> Dict[str, Any]:
         teachers = slots_of(neo)
     except Exception:
         teachers = []
+    from skeleton.organism.policy_enforcement import policy_summary
+    policy = policy_summary(root=getattr(org, "root", None))
     return {
         "kind": "nervous",
         "ok": int(prose == 0 and pressure < 0.90 and helix_ok == 1 and q_pressure <= 0.20),
@@ -57,5 +62,6 @@ def nervous_card(org=None, *, neo=None) -> Dict[str, Any]:
         "quality": q,
         "quality_pressure": q_pressure,
         "repair_card": repair_card(root=getattr(org, "root", None)),
+        "policy": policy,
         "stored_prose": prose,
     }
