@@ -38,6 +38,7 @@ LOOPED: Tuple[str, ...] = (
     "scse", "shortcut", "layerloop", "stackloop", "modr",
     "budgetr", "orbit", "loopkv", "schedule",
     "thinkgate", "loopscale", "haltmix", "loopfuse",
+    "huginn", "loopie", "residamp", "thinkmix",
 )
 
 

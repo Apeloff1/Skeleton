@@ -25,6 +25,10 @@ from skeleton.kernel.ops.thinkgate import gated
 from skeleton.kernel.ops.loopscale import scaled
 from skeleton.kernel.ops.haltmix import haltmix
 from skeleton.kernel.ops.loopfuse import loopfuse
+from skeleton.kernel.ops.huginn import huginn
+from skeleton.kernel.ops.loopie import loopie
+from skeleton.kernel.ops.residamp import residamp
+from skeleton.kernel.ops.thinkmix import thinkmix
 
 
 CITES = (
@@ -43,6 +47,7 @@ class Looped:
         "scse", "shortcut", "layerloop", "stackloop", "modr",
         "budgetr", "orbit", "loopkv", "schedule",
         "thinkgate", "loopscale", "haltmix", "loopfuse",
+        "huginn", "loopie", "residamp", "thinkmix",
     )
 
     def __init__(self) -> None:
@@ -74,6 +79,10 @@ class Looped:
         scaled(x, r=2); self.hits["loopscale"] += 1
         haltmix(x, r_max=3); self.hits["haltmix"] += 1
         loopfuse(x, r=2); self.hits["loopfuse"] += 1
+        huginn(x, r=3); self.hits["huginn"] += 1
+        loopie([x, g], r=2); self.hits["loopie"] += 1
+        residamp(x, r=3); self.hits["residamp"] += 1
+        thinkmix("why derive this", x, profile="mobile"); self.hits["thinkmix"] += 1
         return self.card()
 
     def card(self) -> Dict[str, Any]:

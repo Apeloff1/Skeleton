@@ -182,3 +182,13 @@ class CommandDeck:
             "lattice_editor": self.lattice_editor(),
             "stored_prose": 0,
         }
+
+
+_LIVE = None
+
+
+def live_deck(root=None) -> CommandDeck:
+    global _LIVE
+    if _LIVE is None or (root is not None and getattr(_LIVE, "root", None) != root):
+        _LIVE = CommandDeck(root=root)
+    return _LIVE

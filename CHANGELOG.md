@@ -4,6 +4,14 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-05 — Looped limit pack
+
+- Re-export rollback_by_surface so organism imports.
+- Huginn, loopie, residamp, thinkmix. Pulse fires thinkmix.
+- Looped poke 27.
+
+---
+
 ## 2026-09-05 — Loop log + think verb
 
 - chronicle/loop.jsonl. Conductor think when never fired.

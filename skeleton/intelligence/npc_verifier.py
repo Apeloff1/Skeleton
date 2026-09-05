@@ -127,3 +127,6 @@ class NpcVerifier:
         if score < 0.2:
             issues.append("soft: npc output weakly reflects the description")
         return score
+
+
+NPCVerifier = NpcVerifier

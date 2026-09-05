@@ -257,3 +257,8 @@ def version_card(root=None, limit: int = 8) -> Dict[str, Any]:
         "versions": versions,
         "stored_prose": 0,
     }
+
+
+def rollback_by_surface(surface: str, *, root=None, comment: str = "") -> Dict[str, Any]:
+    from skeleton.organism.policy_rollback_control import rollback_by_surface as _r
+    return _r(surface, root=root, comment=comment)

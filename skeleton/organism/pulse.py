@@ -61,6 +61,19 @@ def pulse(org=None, *, neo=None, stimulus: str = "", persist: Optional[bool] = N
         except Exception:
             pass
         acted["stimulus"] = stim.split()[0] if stim else ""
+        try:
+            from skeleton.kernel.ops.thinkmix import thinkmix
+            tm = thinkmix(stim, profile=str(gov.get("profile") or "mobile"))
+            acted["think"] = tm.get("open")
+            acted["loop_family"] = tm.get("family") or ""
+            if tm.get("open"):
+                from skeleton.organism.loop_log import record
+                record(
+                    {"open": 1, "fire": 1, "family": tm.get("run") or tm.get("family"), "r": tm.get("r") or 2},
+                    root=getattr(org, "root", None),
+                )
+        except Exception:
+            acted["think"] = 0
         rt_early: Dict[str, Any] = {}
         try:
             from skeleton.organism.runtime import dispatch as live_dispatch

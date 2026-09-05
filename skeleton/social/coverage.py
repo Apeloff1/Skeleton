@@ -46,5 +46,6 @@ def coverage_card(stimulus: str = "") -> Dict[str, Any]:
         "mode": mode,
         "field": __import__("skeleton.organism.runloop", fromlist=["bound_card"]).bound_card().get("field_pct") or 0,
         "mix": __import__("skeleton.organism.context_step", fromlist=["mix_card"]).mix_card(),
+        "looped": len(__import__("skeleton.kernel.ops.catalog", fromlist=["LOOPED"]).LOOPED),
         "stored_prose": 0,
     }
