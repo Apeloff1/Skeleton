@@ -1,53 +1,27 @@
-"""Intelligence package — quad-system cognitive substrate (split from the v16 monolith)."""
+"""
+Skeleton Intelligence Package
 
-from ._tensor import Tensor
-from .temporal import TemporalEvent, TemporalReasoner
-from .causal import CausalVariable, CausalGraph, CausalInference
-from .counterfactual import CounterfactualEngine, CounterfactualError, StructuralModel
-from .metalearning import TaskEmbedding, MetaLearner
-from .neurosymbolic import SymbolicRule, NeuralSymbolicEngine
-from .economic import ModelOption, BudgetConstraint, EconomicOptimiser
-from .orchestrator import IntelligenceOrchestrator
-from .adaptive import AdaptiveLearner, Arm, RunRecord, default_meta_grid
-from .dream import DreamEngine, DreamReport
-from .cascade import CascadeRouter, ModelResponse, RouteDecision, difficulty_estimate
-from .uncertainty import Candidate, GateDecision, GateVerdict, UncertaintyGate
-from .verification import VerificationLoop, VerificationTrace, VerificationVerdict
-from .verifier import CodeVerifier, RubricScore, VerifierReport
-from .quality import QualityIssue, QualityReport, QualitySignal
-from .game_logic_repair import attempt_game_logic_repair
-from .plan_verifier import PlanVerifier, PlanVerificationReport
-from .plan_repair import attempt_plan_repair
-from .pipeline_repair import attempt_dialogue_repair, attempt_npc_repair
-from .pipeline_verifier import PipelineVerifier, PipelineVerificationReport
-from .npc_verifier import NpcVerifier, NpcVerificationReport
-from .dialogue_verifier import DialogueVerifier, DialogueVerificationReport
-from .forge_verifier import ForgeVerifier, ForgeVerificationReport, ForgeFileReport
-from .improve_loop import ImproveLoop, ImproveResult, Iteration
-from .routed_gate import RoutedAnswer, RoutedGate
-from .contract import Contract, ContractIssue, RepairResult
+Exports:
+- IntelligenceOrchestrator: Task coordination
+- AdaptiveLearner: Meta-learning
+- MetaGrid: Learning hyperparameters
+- default_meta_grid: Factory for default grid
+"""
+
+from skeleton.intelligence.orchestrator import (
+    AdaptiveLearner,
+    IntelligenceOrchestrator,
+    MetaGrid,
+    ReasoningResult,
+    ReasoningTask,
+    default_meta_grid,
+)
 
 __all__ = [
-    'Tensor', 'TemporalEvent', 'TemporalReasoner',
-    'CausalVariable', 'CausalGraph', 'CausalInference',
-    'CounterfactualEngine', 'CounterfactualError', 'StructuralModel',
-    'TaskEmbedding', 'MetaLearner', 'SymbolicRule', 'NeuralSymbolicEngine',
-    'ModelOption', 'BudgetConstraint', 'EconomicOptimiser',
-    'IntelligenceOrchestrator', 'AdaptiveLearner', 'Arm', 'RunRecord',
-    'default_meta_grid', 'DreamEngine', 'DreamReport',
-    'CascadeRouter', 'ModelResponse', 'RouteDecision', 'difficulty_estimate',
-    'Candidate', 'GateDecision', 'GateVerdict', 'UncertaintyGate',
-    'VerificationLoop', 'VerificationTrace', 'VerificationVerdict',
-    'CodeVerifier', 'RubricScore', 'VerifierReport',
-    'QualityIssue', 'QualityReport', 'QualitySignal',
-    'attempt_game_logic_repair',
-    'PlanVerifier', 'PlanVerificationReport', 'attempt_plan_repair',
-    'attempt_dialogue_repair', 'attempt_npc_repair',
-    'PipelineVerifier', 'PipelineVerificationReport',
-    'NpcVerifier', 'NpcVerificationReport',
-    'DialogueVerifier', 'DialogueVerificationReport',
-    'ForgeVerifier', 'ForgeVerificationReport', 'ForgeFileReport',
-    'ImproveLoop', 'ImproveResult', 'Iteration',
-    'RoutedAnswer', 'RoutedGate',
-    'Contract', 'ContractIssue', 'RepairResult',
+    "IntelligenceOrchestrator",
+    "AdaptiveLearner",
+    "MetaGrid",
+    "default_meta_grid",
+    "ReasoningTask",
+    "ReasoningResult",
 ]

@@ -1,104 +1,197 @@
-"""Intelligence Orchestrator — split from the intelligence monolith (v16.2)."""
+"""
+Skeleton Intelligence — Orchestrator and adaptive learning
+
+Provides:
+- IntelligenceOrchestrator: Coordinate reasoning tasks across subsystems
+- AdaptiveLearner: Meta-learning grid for capability improvement
+- default_meta_grid: Default learning hyperparameters
+"""
 
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, Optional
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from skeleton.kernel.events import EventBus
 
-from .temporal import TemporalEvent, TemporalReasoner
-from .causal import CausalInference
-from .metalearning import MetaLearner
-from .neurosymbolic import NeuralSymbolicEngine
-from .economic import BudgetConstraint, EconomicOptimiser
 
-# =============================================================================
-# INTELLIGENCE ORCHESTRATOR
-# =============================================================================
+@dataclass
+class ReasoningTask:
+    """A single reasoning task for the orchestrator."""
+    task_id: str
+    query: str
+    context: Dict[str, Any] = field(default_factory=dict)
+    priority: int = 1
+    deadline: Optional[float] = None
+
+
+@dataclass
+class ReasoningResult:
+    """Result of a reasoning task."""
+    task_id: str
+    answer: Any
+    confidence: float
+    sources: List[str] = field(default_factory=list)
+    latency_ms: float = 0.0
+
 
 class IntelligenceOrchestrator:
-    """
-    Composes all advanced intelligence systems into a unified interface.
-    """
+    """Coordinate reasoning tasks across memory, swarm, and cortex."""
 
-    def __init__(self, bus: Optional[EventBus] = None) -> None:
-        self.temporal = TemporalReasoner(bus)
-        self.causal = CausalInference(bus)
-        self.meta = MetaLearner(bus=bus)
-        self.neurosym = NeuralSymbolicEngine(bus)
-        self.economic = EconomicOptimiser(bus)
+    def __init__(self, bus: Optional[EventBus] = None):
         self._bus = bus
+        self._tasks: Dict[str, ReasoningTask] = {}
+        self._results: Dict[str, ReasoningResult] = {}
+        self._handlers: Dict[str, Callable[[ReasoningTask], ReasoningResult]] = {}
+        self._stats = {"submitted": 0, "completed": 0, "failed": 0}
 
-    def reason(
-        self,
-        query: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """
-        Multi-modal reasoning: temporal, causal, symbolic, economic.
-        Returns integrated result with confidence scores.
-        """
-        results = {
-            "temporal": None,
-            "causal": None,
-            "symbolic": None,
-            "economic": None,
-            "confidence": 0.0,
+    def register_handler(self, capability: str, handler: Callable[[ReasoningTask], ReasoningResult]) -> None:
+        """Register a handler for a specific capability."""
+        self._handlers[capability] = handler
+
+    def reason(self, query: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Submit a reasoning query and return the result."""
+        import uuid
+        task = ReasoningTask(
+            task_id=str(uuid.uuid4())[:8],
+            query=query,
+            context=context or {},
+        )
+        self._tasks[task.task_id] = task
+        self._stats["submitted"] += 1
+        
+        start = time.time()
+        
+        # Try each handler until one succeeds
+        for capability, handler in self._handlers.items():
+            try:
+                result = handler(task)
+                result.latency_ms = (time.time() - start) * 1000
+                self._results[task.task_id] = result
+                self._stats["completed"] += 1
+                
+                if self._bus:
+                    self._bus.emit("intelligence.reasoning.completed", {
+                        "task_id": task.task_id,
+                        "capability": capability,
+                        "confidence": result.confidence,
+                        "latency_ms": result.latency_ms,
+                    })
+                
+                return {
+                    "answer": result.answer,
+                    "confidence": result.confidence,
+                    "sources": result.sources,
+                    "latency_ms": result.latency_ms,
+                    "handler": capability,
+                }
+            except Exception as e:
+                continue
+        
+        self._stats["failed"] += 1
+        return {"error": "No handler could process the query", "task_id": task.task_id}
+
+    def stats(self) -> Dict[str, Any]:
+        return dict(self._stats)
+
+
+@dataclass
+class MetaGrid:
+    """Hyperparameter grid for adaptive learning."""
+    learning_rate: float = 0.01
+    exploration_rate: float = 0.1
+    discount_factor: float = 0.95
+    batch_size: int = 32
+    memory_window: int = 1000
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "learning_rate": self.learning_rate,
+            "exploration_rate": self.exploration_rate,
+            "discount_factor": self.discount_factor,
+            "batch_size": self.batch_size,
+            "memory_window": self.memory_window,
         }
 
-        # Temporal reasoning
-        if context and "events" in context:
-            for event_data in context["events"]:
-                event = TemporalEvent(
-                    event_id=event_data.get("id", str(hash(event_data))),
-                    description=event_data.get("description", ""),
-                    timestamp=event_data.get("timestamp", time.time()),
-                    duration=event_data.get("duration"),
-                )
-                self.temporal.add_event(event)
-            # Query temporal patterns
-            if context.get("predict_next"):
-                predictions = self.temporal.predict_next(context["predict_next"])
-                results["temporal"] = {"predictions": predictions}
 
-        # Causal reasoning
-        if context and "intervention" in context:
-            treatment = context["intervention"].get("treatment")
-            outcome = context["intervention"].get("outcome")
-            if treatment and outcome:
-                ate, se = self.causal.estimate_ate(treatment, outcome)
-                results["causal"] = {"ate": ate, "se": se}
+def default_meta_grid() -> MetaGrid:
+    return MetaGrid()
 
-        # Symbolic reasoning
-        if context and "goal" in context:
-            proved, chain, confidence = self.neurosym.infer(context["goal"])
-            results["symbolic"] = {"proved": proved, "chain": [r.conclusion for r in chain], "confidence": confidence}
 
-        # Economic optimisation
-        if context and "query_complexity" in context:
-            model = self.economic.route_query(
-                context["query_complexity"],
-                set(context.get("required_capabilities", [])),
-                BudgetConstraint(
-                    total_budget=context.get("budget", 100.0),
-                    max_cost_per_query=context.get("max_cost", 10.0),
-                    min_quality=context.get("min_quality", 0.7),
-                    max_latency_ms=context.get("max_latency", 5000),
-                ),
-            )
-            if model:
-                results["economic"] = {
-                    "model_id": model.model_id,
-                    "cost": model.cost_per_token,
-                    "quality": model.quality_score,
-                }
+class AdaptiveLearner:
+    """Meta-learning system that improves capabilities over time."""
 
-        # Aggregate confidence
-        confidences = [
-            v.get("confidence", 0) if isinstance(v, dict) else 0
-            for v in results.values() if v is not None
-        ]
-        results["confidence"] = sum(confidences) / len(confidences) if confidences else 0.0
+    def __init__(self, grid: MetaGrid, bus: Optional[EventBus] = None):
+        self.grid = grid
+        self._bus = bus
+        self._experience: List[Dict[str, Any]] = []
+        self._capability_scores: Dict[str, float] = {}
+        self._stats = {"updates": 0, "experiences": 0}
 
-        return results
+    def record_experience(self, capability: str, input_data: Any, outcome: float, metadata: Optional[Dict[str, Any]] = None) -> None:
+        """Record a learning experience."""
+        self._experience.append({
+            "capability": capability,
+            "input": input_data,
+            "outcome": outcome,
+            "metadata": metadata or {},
+            "timestamp": time.time(),
+        })
+        self._stats["experiences"] += 1
+        
+        # Update running score for capability
+        alpha = self.grid.learning_rate
+        current = self._capability_scores.get(capability, 0.5)
+        self._capability_scores[capability] = current + alpha * (outcome - current)
+        
+        if self._bus:
+            self._bus.emit("intelligence.learning.experience", {
+                "capability": capability,
+                "outcome": outcome,
+                "score": self._capability_scores[capability],
+            })
+
+    def adapt(self, capability: str) -> Dict[str, Any]:
+        """Adapt learning parameters based on recent performance."""
+        recent = [e for e in self._experience[-self.grid.memory_window:] if e["capability"] == capability]
+        if not recent:
+            return {"status": "no_data", "capability": capability}
+        
+        outcomes = [e["outcome"] for e in recent]
+        avg_outcome = sum(outcomes) / len(outcomes)
+        
+        # Adjust exploration based on performance variance
+        if len(outcomes) > 10:
+            import statistics
+            try:
+                variance = statistics.variance(outcomes)
+                if variance > 0.1:
+                    self.grid.exploration_rate = min(0.5, self.grid.exploration_rate * 1.1)
+                else:
+                    self.grid.exploration_rate = max(0.01, self.grid.exploration_rate * 0.95)
+            except statistics.StatisticsError:
+                pass
+        
+        self._stats["updates"] += 1
+        
+        return {
+            "capability": capability,
+            "avg_outcome": avg_outcome,
+            "exploration_rate": self.grid.exploration_rate,
+            "score": self._capability_scores.get(capability, 0.5),
+            "experiences": len(recent),
+        }
+
+    def best_capability(self) -> Optional[str]:
+        """Return the highest-scoring capability."""
+        if not self._capability_scores:
+            return None
+        return max(self._capability_scores.items(), key=lambda x: x[1])[0]
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            **self._stats,
+            "capabilities": len(self._capability_scores),
+            "scores": dict(self._capability_scores),
+        }

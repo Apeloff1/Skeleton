@@ -1,379 +1,284 @@
-"""Swarm mesh topology (split from swarm_mesh.py, v16.2 — adds missing random import)."""
+"""
+Skeleton Swarm — Multi-agent mesh with negotiation and stigmergy
+
+Provides:
+- SwarmMesh: Route tasks to capable agents
+- PheromoneField: Stigmergic communication layer
+- HiveMind: Collective reasoning and consensus
+- CapabilityNegotiator: Dynamic capability discovery
+- Platoons: Pre-configured agent groups
+"""
 
 from __future__ import annotations
 
-import random
 import time
-from typing import Any, Dict, List, Optional, Set, Tuple
+import uuid
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional, Set
 
-from skeleton.kernel.errors import AgentError, ConsensusError, AgentNotFoundError, AgentQuarantinedError
 from skeleton.kernel.events import DomainEvent, EventBus
-from skeleton.kernel.ids import AgentId
 
-from .types import AgentRole, AgentState, AgentStatus, CapabilityVector
-from .consensus import ConsensusProtocol, SimpleMajorityConsensus
-from .auction import VickreyAuction
 
-# =============================================================================
-# SWARM MESH
-# =============================================================================
+@dataclass
+class Agent:
+    """A single agent in the swarm."""
+    agent_id: str
+    specialisations: Set[str]
+    weight: float = 1.0
+    load: float = 0.0
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    last_seen: float = field(default_factory=time.time)
+
+    def is_alive(self) -> bool:
+        return time.time() - self.last_seen < 60.0  # 60s heartbeat timeout
+
+    def score(self, capability: str) -> float:
+        """Score how well this agent matches a capability request."""
+        if capability not in self.specialisations:
+            return 0.0
+        return (self.weight / (1.0 + self.load)) if self.is_alive() else 0.0
+
 
 class SwarmMesh:
-    """
-    Self-healing mesh topology for agent coordination.
-    Features:
-      - Heartbeat-based liveness detection
-      - Automatic quarantine and replacement
-      - Partition detection and healing
-      - Circuit breakers for failing agents
-      - Chaos engineering: random agent failure injection
-    """
+    """Route tasks to the most capable agents in the swarm."""
 
-    def __init__(
-        self,
-        *,
-        bus: Optional[EventBus] = None,
-        consensus_protocol: Optional[ConsensusProtocol] = None,
-    ) -> None:
-        self._agents: Dict[AgentId, AgentState] = {}
+    def __init__(self, bus: Optional[EventBus] = None):
+        self._agents: Dict[str, Agent] = {}
         self._bus = bus
-        self._consensus = consensus_protocol or SimpleMajorityConsensus()
-        self._auction = VickreyAuction()
-        self._circuit_breakers: Dict[AgentId, Dict[str, Any]] = {}
-        self._chaos_enabled: bool = False
-        self._chaos_failure_rate: float = 0.05
+        self._stats = {"routed": 0, "registered": 0, "failed": 0}
 
-    # ------------------------------------------------------------------
-    # Agent lifecycle
-    # ------------------------------------------------------------------
-
-    def register(self, agent: AgentState) -> None:
+    def join(self, specialisations: Set[str], weight: float = 1.0, metadata: Optional[Dict[str, Any]] = None) -> Agent:
+        """Register a new agent in the swarm."""
+        agent = Agent(
+            agent_id=str(uuid.uuid4())[:8],
+            specialisations=set(specialisations),
+            weight=weight,
+            metadata=metadata or {},
+        )
         self._agents[agent.agent_id] = agent
+        self._stats["registered"] += 1
+        
         if self._bus:
-            self._bus.publish(
-                DomainEvent(
-                    topic="swarm.agent.registered",
-                    payload={
-                        "agent_id": str(agent.agent_id),
-                        "role": agent.role.name,
-                        "capabilities": agent.capabilities.to_dict(),
-                    },
-                    correlation_id=f"swarm_{str(agent.agent_id)}",
-                )
-            )
-
-    def unregister(self, agent_id: AgentId) -> bool:
-        if agent_id in self._agents:
-            agent = self._agents.pop(agent_id)
-            if self._bus:
-                self._bus.publish(
-                    DomainEvent(
-                        topic="swarm.agent.unregistered",
-                        payload={
-                            "agent_id": str(agent_id),
-                            "role": agent.role.name,
-                            "final_health": agent.health_score,
-                        },
-                        correlation_id=f"swarm_{str(agent_id)}",
-                    )
-                )
-            return True
-        return False
-
-    def heartbeat(self, agent_id: AgentId) -> None:
-        if agent_id not in self._agents:
-            raise AgentNotFoundError(f"Agent {agent_id} not found")
-        agent = self._agents[agent_id]
-        agent.last_heartbeat = time.time()
-        agent.status = AgentStatus.HEALTHY
-        agent.consecutive_failures = 0
-
-    def get_agent(self, agent_id: AgentId) -> AgentState:
-        if agent_id not in self._agents:
-            raise AgentNotFoundError(f"Agent {agent_id} not found")
-        agent = self._agents[agent_id]
-        if agent.status == AgentStatus.QUARANTINED:
-            raise AgentQuarantinedError(f"Agent {agent_id} is quarantined")
+            self._bus.emit("swarm.agent.joined", {
+                "agent_id": agent.agent_id,
+                "specialisations": list(specialisations),
+            })
+        
         return agent
 
-    # ------------------------------------------------------------------
-    # Health monitoring
-    # ------------------------------------------------------------------
-
-    def check_health(self) -> Dict[AgentId, AgentStatus]:
-        now = time.time()
-        statuses: Dict[AgentId, AgentStatus] = {}
-        for agent_id, agent in self._agents.items():
-            if not agent.is_alive(now):
-                if agent.status != AgentStatus.FAILED:
-                    agent.status = AgentStatus.FAILED
-                    if self._bus:
-                        self._bus.publish(
-                            DomainEvent(
-                                topic="swarm.agent.failed",
-                                payload={
-                                    "agent_id": str(agent_id),
-                                    "last_heartbeat": agent.last_heartbeat,
-                                    "elapsed": now - agent.last_heartbeat,
-                                },
-                                correlation_id=f"swarm_{str(agent_id)}",
-                            )
-                        )
-            statuses[agent_id] = agent.status
-        return statuses
-
-    def quarantine(self, agent_id: AgentId) -> None:
-        if agent_id in self._agents:
-            self._agents[agent_id].status = AgentStatus.QUARANTINED
-            if self._bus:
-                self._bus.publish(
-                    DomainEvent(
-                        topic="swarm.agent.quarantined",
-                        payload={"agent_id": str(agent_id)},
-                        correlation_id=f"swarm_{str(agent_id)}",
-                    )
-                )
-
-    def recover(self, agent_id: AgentId) -> None:
-        if agent_id in self._agents:
-            agent = self._agents[agent_id]
-            agent.status = AgentStatus.RECOVERING
-            agent.consecutive_failures = 0
-            agent.last_heartbeat = time.time()
-
-    # ------------------------------------------------------------------
-    # Routing and selection
-    # ------------------------------------------------------------------
-
-    def route(
-        self,
-        capability_requirement: CapabilityVector,
-        *,
-        role: Optional[AgentRole] = None,
-        exclude: Optional[Set[AgentId]] = None,
-    ) -> Optional[AgentState]:
-        """
-        Route a task to the best available agent.
-        Uses capability similarity + effective capacity + reputation.
-        """
-        candidates = [
-            agent for agent in self._agents.values()
-            if agent.is_alive()
-            and agent.status not in (AgentStatus.QUARANTINED, AgentStatus.FAILED)
-            and (role is None or agent.role == role)
-            and (exclude is None or agent.agent_id not in exclude)
-        ]
-
+    def route(self, capability: str) -> Optional[Agent]:
+        """Find the best agent for a given capability."""
+        candidates = [(a.score(capability), a) for a in self._agents.values()]
+        candidates = [(s, a) for s, a in candidates if s > 0]
+        
         if not candidates:
+            self._stats["failed"] += 1
             return None
-
-        scored = [
-            (
-                agent.capabilities.similarity(capability_requirement)
-                * agent.effective_capacity()
-                * agent.reputation,
-                agent,
-            )
-            for agent in candidates
-        ]
-        scored.sort(key=lambda x: x[0], reverse=True)
-        return scored[0][1]
-
-    def route_with_consensus(
-        self,
-        proposal: Any,
-        capability_requirement: CapabilityVector,
-        *,
-        min_voters: int = 3,
-    ) -> Tuple[AgentState, bool, Dict[str, Any]]:
-        """Route to best agent, but only after consensus approval from peers."""
-        voters = [
-            agent for agent in self._agents.values()
-            if agent.is_alive() and agent.status == AgentStatus.HEALTHY
-        ]
-        if len(voters) < min_voters:
-            raise ConsensusError(
-                f"Insufficient healthy voters: {len(voters)} < {min_voters}",
-                ballot={},
-            )
-
-        accepted, ballot = self._consensus.propose(proposal, voters)
-        if accepted:
-            winner = self.route(capability_requirement)
-            if winner is None:
-                raise AgentError("Consensus passed but no suitable agent found")
-            return winner, True, ballot
-        else:
-            raise ConsensusError("Routing proposal rejected by consensus", ballot=ballot)
-
-    # ------------------------------------------------------------------
-    # Auction-based allocation
-    # ------------------------------------------------------------------
-
-    def allocate_task(
-        self,
-        task_requirements: CapabilityVector,
-        *,
-        role: Optional[AgentRole] = None,
-    ) -> Tuple[Optional[AgentState], float, List[Dict[str, Any]]]:
-        """Allocate a task via Vickrey auction."""
-        bidders = [
-            agent for agent in self._agents.values()
-            if agent.is_alive() and (role is None or agent.role == role)
-        ]
-        return self._auction.run(task_requirements, bidders)
-
-    # ------------------------------------------------------------------
-    # Chaos engineering
-    # ------------------------------------------------------------------
-
-    def enable_chaos(self, failure_rate: float = 0.05) -> None:
-        self._chaos_enabled = True
-        self._chaos_failure_rate = failure_rate
-
-    def disable_chaos(self) -> None:
-        self._chaos_enabled = False
-
-    def inject_chaos(self) -> List[AgentId]:
-        """Randomly fail agents to test resilience. Returns failed agent ids."""
-        if not self._chaos_enabled:
-            return []
-        failed: List[AgentId] = []
-        for agent_id, agent in self._agents.items():
-            if agent.is_alive() and random.random() < self._chaos_failure_rate:
-                agent.status = AgentStatus.FAILED
-                agent.consecutive_failures = agent.max_failures
-                failed.append(agent_id)
-                if self._bus:
-                    self._bus.publish(
-                        DomainEvent(
-                            topic="swarm.chaos.injected",
-                            payload={
-                                "agent_id": str(agent_id),
-                                "role": agent.role.name,
-                                "failure_rate": self._chaos_failure_rate,
-                            },
-                            correlation_id=f"chaos_{str(agent_id)}",
-                        )
-                    )
-        return failed
-
-    # ------------------------------------------------------------------
-    # Circuit breakers
-    # ------------------------------------------------------------------
-
-    def record_result(self, agent_id: AgentId, success: bool) -> None:
-        if agent_id not in self._agents:
-            return
-        agent = self._agents[agent_id]
-        agent.update_reputation(success)
-
-        cb = self._circuit_breakers.setdefault(str(agent_id), {
-            "failures": 0,
-            "successes": 0,
-            "last_failure": 0.0,
-            "open": False,
-            "threshold": 5,
-            "timeout": 30.0,
-        })
-        if success:
-            cb["successes"] += 1
-            cb["failures"] = 0
-            cb["open"] = False
-        else:
-            cb["failures"] += 1
-            cb["last_failure"] = time.time()
-            if cb["failures"] >= cb["threshold"]:
-                cb["open"] = True
-                self.quarantine(agent_id)
-
-    def is_circuit_open(self, agent_id: AgentId) -> bool:
-        cb = self._circuit_breakers.get(str(agent_id))
-        if not cb:
-            return False
-        if cb["open"]:
-            if time.time() - cb["last_failure"] > cb["timeout"]:
-                cb["open"] = False
-                cb["failures"] = 0
-                self.recover(agent_id)
-                return False
-            return True
-        return False
-
-    # ------------------------------------------------------------------
-    # Mesh topology
-    # ------------------------------------------------------------------
-
-    def get_partition_map(self) -> Dict[int, Set[AgentId]]:
-        """
-        Detect network partitions using peer connectivity.
-        Returns partition id -> set of agent ids.
-        """
-        visited: Set[AgentId] = set()
-        partitions: Dict[int, Set[AgentId]] = {}
-        partition_id = 0
-
-        for agent_id in self._agents:
-            if agent_id in visited:
-                continue
-            component: Set[AgentId] = set()
-            queue = [agent_id]
-            while queue:
-                current = queue.pop(0)
-                if current in visited:
-                    continue
-                visited.add(current)
-                component.add(current)
-                if current in self._agents:
-                    for peer in self._agents[current].peers:
-                        if peer not in visited and peer in self._agents:
-                            queue.append(peer)
-            partitions[partition_id] = component
-            partition_id += 1
-
-        return partitions
-
-    def heal_partition(self, partition_id: int) -> bool:
-        """Attempt to heal a partition by adding bridge agents."""
-        partitions = self.get_partition_map()
-        if partition_id not in partitions:
-            return False
-        agents = partitions[partition_id]
+        
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        best = candidates[0][1]
+        best.load += 1.0
+        best.last_seen = time.time()
+        self._stats["routed"] += 1
+        
         if self._bus:
-            self._bus.publish(
-                DomainEvent(
-                    topic="swarm.partition.heal_attempt",
-                    payload={
-                        "partition_id": partition_id,
-                        "agents": [str(a) for a in agents],
-                        "size": len(agents),
-                    },
-                    correlation_id=f"heal_{partition_id}",
-                )
-            )
-        return True
+            self._bus.emit("swarm.task.routed", {
+                "capability": capability,
+                "agent_id": best.agent_id,
+            })
+        
+        return best
 
-    # ------------------------------------------------------------------
-    # Statistics
-    # ------------------------------------------------------------------
+    def heartbeat(self, agent_id: str) -> None:
+        """Update agent heartbeat."""
+        if agent_id in self._agents:
+            self._agents[agent_id].last_seen = time.time()
 
     def stats(self) -> Dict[str, Any]:
-        by_role: Dict[str, int] = {}
-        by_status: Dict[str, int] = {}
-        total_capacity = 0.0
-        for agent in self._agents.values():
-            by_role[agent.role.name] = by_role.get(agent.role.name, 0) + 1
-            by_status[agent.status.name] = by_status.get(agent.status.name, 0) + 1
-            total_capacity += agent.effective_capacity()
-
+        alive = sum(1 for a in self._agents.values() if a.is_alive())
         return {
-            "total_agents": len(self._agents),
-            "by_role": by_role,
-            "by_status": by_status,
-            "total_effective_capacity": total_capacity,
-            "partitions": len(self.get_partition_map()),
-            "circuit_breakers_open": sum(
-                1 for cb in self._circuit_breakers.values() if cb["open"]
-            ),
-            "chaos_enabled": self._chaos_enabled,
+            "agents": len(self._agents),
+            "alive": alive,
+            **self._stats,
         }
+
+
+class PheromoneField:
+    """Stigmergic communication via evaporating pheromone trails."""
+
+    def __init__(self, bus: Optional[EventBus] = None, decay_rate: float = 0.95):
+        self._trails: Dict[str, Dict[str, float]] = {}  # location -> {marker: strength}
+        self._decay_rate = decay_rate
+        self._bus = bus
+
+    def deposit(self, location: str, marker: str, strength: float = 1.0) -> None:
+        """Deposit a pheromone marker at a location."""
+        self._trails.setdefault(location, {})[marker] = self._trails.get(location, {}).get(marker, 0) + strength
+        if self._bus:
+            self._bus.emit("swarm.pheromone.deposited", {"location": location, "marker": marker, "strength": strength})
+
+    def sense(self, location: str, marker: Optional[str] = None) -> Dict[str, float]:
+        """Sense pheromones at a location."""
+        trails = self._trails.get(location, {})
+        if marker:
+            return {marker: trails.get(marker, 0)}
+        return dict(trails)
+
+    def evaporate(self) -> None:
+        """Decay all pheromone trails."""
+        for location in list(self._trails.keys()):
+            for marker in list(self._trails[location].keys()):
+                self._trails[location][marker] *= self._decay_rate
+                if self._trails[location][marker] < 0.01:
+                    del self._trails[location][marker]
+            if not self._trails[location]:
+                del self._trails[location]
+
+    def stats(self) -> Dict[str, Any]:
+        total_markers = sum(len(t) for t in self._trails.values())
+        return {"locations": len(self._trails), "markers": total_markers, "decay": self._decay_rate}
+
+
+class StigmergicRouter:
+    """Route decisions influenced by pheromone trails."""
+
+    def __init__(self, field: PheromoneField, bus: Optional[EventBus] = None, seed: Optional[int] = None):
+        self._field = field
+        self._bus = bus
+        self._rng = __import__('random').Random(seed)
+
+    def route_with_stigmergy(self, mesh: SwarmMesh, capability: str, location: str = "default") -> Optional[Agent]:
+        """Route considering both agent scores and local pheromone signals."""
+        # Get base agent candidates
+        candidates = [(a.score(capability), a) for a in mesh._agents.values()]
+        candidates = [(s, a) for s, a in candidates if s > 0]
+        
+        if not candidates:
+            return None
+        
+        # Boost scores based on positive pheromones at location
+        pheromones = self._field.sense(location)
+        boosted = []
+        for score, agent in candidates:
+            boost = sum(pheromones.get(spec, 0) for spec in agent.specialisations) * 0.1
+            boosted.append((score + boost, agent))
+        
+        boosted.sort(key=lambda x: x[0], reverse=True)
+        return boosted[0][1]
+
+
+class HiveMind:
+    """Collective reasoning and consensus formation."""
+
+    def __init__(self, bus: Optional[EventBus] = None):
+        self._opinions: Dict[str, List[Dict[str, Any]]] = {}  # topic -> [{agent_id, value, confidence}]
+        self._bus = bus
+
+    def contribute(self, topic: str, agent_id: str, value: Any, confidence: float = 1.0) -> None:
+        """Contribute an opinion to a topic."""
+        self._opinions.setdefault(topic, []).append({
+            "agent_id": agent_id,
+            "value": value,
+            "confidence": confidence,
+            "timestamp": time.time(),
+        })
+
+    def consensus(self, topic: str, threshold: float = 0.6) -> Optional[Any]:
+        """Attempt to reach consensus on a topic."""
+        opinions = self._opinions.get(topic, [])
+        if not opinions:
+            return None
+        
+        # Weighted voting for scalar values
+        try:
+            values = [o["value"] for o in opinions if isinstance(o["value"], (int, float))]
+            if values:
+                weights = [o["confidence"] for o in opinions if isinstance(o["value"], (int, float))]
+                weighted_sum = sum(v * w for v, w in zip(values, weights))
+                total_weight = sum(weights)
+                return weighted_sum / total_weight if total_weight > 0 else None
+        except (TypeError, ValueError):
+            pass
+        
+        # Majority vote for categorical
+        from collections import Counter
+        votes = Counter(str(o["value"]) for o in opinions)
+        most_common, count = votes.most_common(1)[0]
+        if count / len(opinions) >= threshold:
+            return most_common
+        
+        return None  # No consensus
+
+    def stats(self) -> Dict[str, Any]:
+        return {"topics": len(self._opinions), "total_opinions": sum(len(o) for o in self._opinions.values())}
+
+
+class CapabilityNegotiator:
+    """Dynamic capability discovery and negotiation."""
+
+    def __init__(self, bus: Optional[EventBus] = None):
+        self._capabilities: Dict[str, Set[str]] = {}  # capability -> {agent_ids}
+        self._bus = bus
+
+    def advertise(self, agent_id: str, capabilities: Set[str]) -> None:
+        """Advertise capabilities for an agent."""
+        for cap in capabilities:
+            self._capabilities.setdefault(cap, set()).add(agent_id)
+
+    def discover(self, capability: str) -> Set[str]:
+        """Discover agents that provide a capability."""
+        return set(self._capabilities.get(capability, set()))
+
+    def negotiate(self, agent_id: str, required: Set[str]) -> Dict[str, Any]:
+        """Negotiate which capabilities an agent can fulfill."""
+        available = set()
+        missing = set()
+        for cap in required:
+            if agent_id in self._capabilities.get(cap, set()):
+                available.add(cap)
+            else:
+                missing.add(cap)
+        return {"available": available, "missing": missing, "can_fulfill": len(missing) == 0}
+
+
+class Platoons:
+    """Pre-configured agent groups for common tasks."""
+
+    TEMPLATES = {
+        "scout": {"specialisations": {"explore", "sense"}, "count": 3},
+        "worker": {"specialisations": {"process", "transform"}, "count": 5},
+        "guard": {"specialisations": {"protect", "monitor"}, "count": 2},
+        "council": {"specialisations": {"reason", "decide"}, "count": 7},
+    }
+
+    def __init__(self, bus: Optional[EventBus] = None):
+        self._platoons: Dict[str, List[Agent]] = {}
+        self._bus = bus
+
+    def deploy(self, mesh: SwarmMesh, template: str, count: Optional[int] = None) -> List[Agent]:
+        """Deploy a platoon from a template."""
+        spec = self.TEMPLATES.get(template, {"specialisations": {"general"}, "count": 1})
+        n = count or spec["count"]
+        
+        agents = []
+        for _ in range(n):
+            agent = mesh.join(spec["specialisations"])
+            agents.append(agent)
+        
+        self._platoons[template] = agents
+        
+        if self._bus:
+            self._bus.emit("swarm.platoon.deployed", {
+                "template": template,
+                "count": len(agents),
+            })
+        
+        return agents
+
+    def stats(self) -> Dict[str, Any]:
+        return {name: len(agents) for name, agents in self._platoons.items()}
+
+
+def standard_platoons(bus: Optional[EventBus] = None) -> Platoons:
+    """Factory for standard platoon configurations."""
+    return Platoons(bus=bus)
