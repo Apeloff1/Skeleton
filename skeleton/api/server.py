@@ -101,6 +101,10 @@ def create_app() -> Any:
     # Import and include routers
     from skeleton.api.routes import router
     app.include_router(router, prefix="/api/v1")
+
+    # Gate gauntlet (outer→inner): RequestSeal → BodyBound → WORM → Auth → PolicyGate
+    from skeleton.api.middleware import install_gate
+    install_gate(app)
     
     @app.on_event("startup")
     async def startup():
