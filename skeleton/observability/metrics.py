@@ -1,160 +1,155 @@
-"""Metrics — counters, gauges, histograms with sliding-window percentiles.
+"""
+Skeleton Observability — Metrics, tracing, and anomaly detection
 
-A fully in-process metrics registry. Instruments carry labels; the registry
-renders both a JSON snapshot and a Prometheus-compatible text exposition.
-Histograms retain a bounded sliding window of raw observations so percentiles
-are computed over recent data, not cumulative history.
+Provides:
+- Sampler: Adaptive sampling for telemetry
+- MetricsCollector: Counter, gauge, histogram aggregation
+- AnomalyDetector: Statistical anomaly detection on event streams
 """
 
 from __future__ import annotations
 
-import threading
+import statistics
 import time
-from collections import defaultdict, deque
+from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, Deque, Dict, List, Optional, Tuple
+from typing import Any, Callable, Deque, Dict, List, Optional
 
-LabelSet = Tuple[Tuple[str, str], ...]
-
-
-def _labels(labels: Optional[Dict[str, str]]) -> LabelSet:
-    return tuple(sorted((labels or {}).items()))
-
-
-def _render_labels(ls: LabelSet) -> str:
-    if not ls:
-        return ""
-    inner = ",".join(f'{k}="{v}"' for k, v in ls)
-    return "{" + inner + "}"
-
-
-class Counter:
-    def __init__(self, name: str, help_text: str) -> None:
-        self.name, self.help_text = name, help_text
-        self._values: Dict[LabelSet, float] = defaultdict(float)
-        self._lock = threading.Lock()
-
-    def inc(self, amount: float = 1.0, labels: Optional[Dict[str, str]] = None) -> None:
-        if amount < 0:
-            raise ValueError("counters only increase")
-        with self._lock:
-            self._values[_labels(labels)] += amount
-
-    def collect(self) -> Dict[LabelSet, float]:
-        return dict(self._values)
-
-
-class Gauge:
-    def __init__(self, name: str, help_text: str) -> None:
-        self.name, self.help_text = name, help_text
-        self._values: Dict[LabelSet, float] = {}
-        self._lock = threading.Lock()
-
-    def set(self, value: float, labels: Optional[Dict[str, str]] = None) -> None:
-        with self._lock:
-            self._values[_labels(labels)] = value
-
-    def inc(self, amount: float = 1.0, labels: Optional[Dict[str, str]] = None) -> None:
-        with self._lock:
-            ls = _labels(labels)
-            self._values[ls] = self._values.get(ls, 0.0) + amount
-
-    def dec(self, amount: float = 1.0, labels: Optional[Dict[str, str]] = None) -> None:
-        self.inc(-amount, labels)
-
-    def collect(self) -> Dict[LabelSet, float]:
-        return dict(self._values)
+from skeleton.kernel.events import DomainEvent, EventBus
 
 
 @dataclass
-class _Window:
-    observations: Deque[Tuple[float, float]] = field(default_factory=lambda: deque(maxlen=2048))
+class MetricPoint:
+    """A single metric observation."""
+    name: str
+    value: float
+    timestamp: float = field(default_factory=time.time)
+    labels: Dict[str, str] = field(default_factory=dict)
 
 
-class Histogram:
-    """Sliding-window histogram with exact percentile computation."""
+class Sampler:
+    """Adaptive sampling for telemetry data."""
 
-    def __init__(self, name: str, help_text: str, window_seconds: float = 600.0) -> None:
-        self.name, self.help_text = name, help_text
-        self._window_seconds = window_seconds
-        self._windows: Dict[LabelSet, _Window] = defaultdict(_Window)
-        self._lock = threading.Lock()
+    def __init__(self, base_rate: float = 0.1, max_rate: float = 1.0):
+        self.base_rate = base_rate
+        self.max_rate = max_rate
+        self._current_rate = base_rate
+        self._error_count = 0
+        self._total = 0
 
-    def observe(self, value: float, labels: Optional[Dict[str, str]] = None) -> None:
-        with self._lock:
-            self._windows[_labels(labels)].observations.append((time.time(), value))
+    def should_sample(self) -> bool:
+        import random
+        return random.random() < self._current_rate
 
-    def _prune(self, w: _Window) -> List[float]:
-        cutoff = time.time() - self._window_seconds
-        while w.observations and w.observations[0][0] < cutoff:
-            w.observations.popleft()
-        return sorted(v for _, v in w.observations)
+    def record_error(self) -> None:
+        self._error_count += 1
+        self._current_rate = min(self.max_rate, self._current_rate * 1.5)
 
-    @staticmethod
-    def _percentile(sorted_vals: List[float], q: float) -> float:
-        if not sorted_vals:
-            return 0.0
-        idx = min(len(sorted_vals) - 1, max(0, int(q * (len(sorted_vals) - 1))))
-        return sorted_vals[idx]
+    def record_success(self) -> None:
+        self._total += 1
+        self._current_rate = max(self.base_rate, self._current_rate * 0.95)
 
-    def summarise(self, labels: Optional[Dict[str, str]] = None,
-                  quantiles: Tuple[float, ...] = (0.5, 0.9, 0.99)) -> Dict[str, float]:
-        with self._lock:
-            vals = self._prune(self._windows[_labels(labels)])
-        out: Dict[str, float] = {"count": float(len(vals)),
-                                 "sum": float(sum(vals)),
-                                 "min": vals[0] if vals else 0.0,
-                                 "max": vals[-1] if vals else 0.0}
-        for q in quantiles:
-            out[f"p{int(q * 100)}"] = self._percentile(vals, q)
-        return out
-
-
-class MetricsRegistry:
-    """Central registry: factory + exposition."""
-
-    def __init__(self) -> None:
-        self._counters: Dict[str, Counter] = {}
-        self._gauges: Dict[str, Gauge] = {}
-        self._histograms: Dict[str, Histogram] = {}
-
-    def counter(self, name: str, help_text: str = "") -> Counter:
-        return self._counters.setdefault(name, Counter(name, help_text))
-
-    def gauge(self, name: str, help_text: str = "") -> Gauge:
-        return self._gauges.setdefault(name, Gauge(name, help_text))
-
-    def histogram(self, name: str, help_text: str = "",
-                  window_seconds: float = 600.0) -> Histogram:
-        return self._histograms.setdefault(name, Histogram(name, help_text, window_seconds))
-
-    def snapshot(self) -> Dict[str, Any]:
+    def stats(self) -> Dict[str, Any]:
         return {
-            "counters": {n: {str(k): v for k, v in c.collect().items()}
-                         for n, c in self._counters.items()},
-            "gauges": {n: {str(k): v for k, v in g.collect().items()}
-                       for n, g in self._gauges.items()},
-            "histograms": {n: {"series": len(h._windows)} for n, h in self._histograms.items()},
+            "rate": self._current_rate,
+            "errors": self._error_count,
+            "total": self._total,
         }
 
-    def prometheus(self) -> str:
-        lines: List[str] = []
-        for c in self._counters.values():
-            lines.append(f"# HELP {c.name} {c.help_text}\n# TYPE {c.name} counter")
-            for ls, v in c.collect().items():
-                lines.append(f"{c.name}{_render_labels(ls)} {v}")
-        for g in self._gauges.values():
-            lines.append(f"# HELP {g.name} {g.help_text}\n# TYPE {g.name} gauge")
-            for ls, v in g.collect().items():
-                lines.append(f"{g.name}{_render_labels(ls)} {v}")
-        for h in self._histograms.values():
-            lines.append(f"# HELP {h.name} {h.help_text}\n# TYPE {h.name} summary")
-            for ls in h._windows:
-                s = h.summarise(dict(ls))
-                for q in (0.5, 0.9, 0.99):
-                    qv = s[f"p{int(q * 100)}"]
-                    qlabels = _render_labels(ls + (("quantile", str(q)),))
-                    lines.append(f"{h.name}{qlabels} {qv}")
-                lines.append(f"{h.name}_count{_render_labels(ls)} {s['count']}")
-                lines.append(f"{h.name}_sum{_render_labels(ls)} {s['sum']}")
-        return "\n".join(lines) + "\n"
+
+def default_sampler() -> Sampler:
+    return Sampler(base_rate=0.1)
+
+
+class MetricsCollector:
+    """Counter, gauge, and histogram aggregation."""
+
+    def __init__(self, retention_seconds: int = 86400):
+        self._counters: Dict[str, float] = {}
+        self._gauges: Dict[str, float] = {}
+        self._histograms: Dict[str, Deque[MetricPoint]] = {}
+        self._retention = retention_seconds
+
+    def increment(self, name: str, value: float = 1.0, labels: Optional[Dict[str, str]] = None) -> None:
+        key = self._key(name, labels)
+        self._counters[key] = self._counters.get(key, 0) + value
+
+    def gauge(self, name: str, value: float, labels: Optional[Dict[str, str]] = None) -> None:
+        key = self._key(name, labels)
+        self._gauges[key] = value
+
+    def histogram(self, name: str, value: float, labels: Optional[Dict[str, str]] = None) -> None:
+        key = self._key(name, labels)
+        if key not in self._histograms:
+            self._histograms[key] = deque(maxlen=10000)
+        self._histograms[key].append(MetricPoint(name=name, value=value, labels=labels or {}))
+
+    def snapshot(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "counters": dict(self._counters),
+            "gauges": dict(self._gauges),
+            "histograms": {},
+        }
+        for key, points in self._histograms.items():
+            values = [p.value for p in points]
+            if values:
+                result["histograms"][key] = {
+                    "count": len(values),
+                    "min": min(values),
+                    "max": max(values),
+                    "mean": statistics.mean(values),
+                    "p50": statistics.median(values),
+                    "p99": sorted(values)[int(len(values) * 0.99)] if len(values) > 1 else values[0],
+                }
+        return result
+
+    @staticmethod
+    def _key(name: str, labels: Optional[Dict[str, str]]) -> str:
+        if not labels:
+            return name
+        label_str = ",".join(f"{k}={v}" for k, v in sorted(labels.items()))
+        return f"{name}{{{label_str}}}"
+
+
+class AnomalyDetector:
+    """Statistical anomaly detection on event streams."""
+
+    def __init__(self, bus: Optional[EventBus] = None, window_size: int = 100):
+        self._bus = bus
+        self._window_size = window_size
+        self._values: Deque[float] = deque(maxlen=window_size)
+        self._threshold_multiplier = 3.0
+
+    def observe(self, value: float) -> Optional[str]:
+        """Observe a value, return alert if anomalous."""
+        if len(self._values) < 10:
+            self._values.append(value)
+            return None
+        
+        mean = statistics.mean(self._values)
+        try:
+            stdev = statistics.stdev(self._values)
+        except statistics.StatisticsError:
+            stdev = 0
+        
+        self._values.append(value)
+        
+        if stdev > 0 and abs(value - mean) > self._threshold_multiplier * stdev:
+            alert = f"Anomaly detected: {value:.2f} (mean={mean:.2f}, std={stdev:.2f})"
+            if self._bus:
+                self._bus.emit("observability.anomaly", {
+                    "value": value,
+                    "mean": mean,
+                    "stdev": stdev,
+                    "threshold": self._threshold_multiplier,
+                })
+            return alert
+        
+        return None
+
+    def stats(self) -> Dict[str, Any]:
+        return {
+            "observations": len(self._values),
+            "window_size": self._window_size,
+            "threshold": self._threshold_multiplier,
+        }
