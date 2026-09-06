@@ -13,6 +13,29 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from gameforge.exocortex.zaibatsu.studio import STUDIO_ROOMS
+
+def _safe_segment(value: str, *, what: str = "path") -> str:
+    """Reject path traversal / absolute segments in user-supplied ids."""
+    s = str(value or "").strip()
+    if (
+        not s
+        or s in {".", ".."}
+        or ".." in s
+        or "/" in s
+        or "\\" in s
+        or s.startswith(("~", "/", "\\"))
+    ):
+        raise ValueError(f"invalid {what}: {value!r}")
+    return s
+
+
+def _resolve_under(root: Path, *parts: str) -> Path:
+    """Join parts under root; raise if the result escapes root."""
+    root_r = root.resolve()
+    candidate = root_r.joinpath(*parts).resolve()
+    if candidate != root_r and root_r not in candidate.parents:
+        raise ValueError(f"path escapes sandbox: {parts!r}")
+    return candidate
 try:
     from gameforge.rooms.full_room_registry import all_rooms as _all_rooms
 except Exception:
@@ -42,11 +65,11 @@ class RoomLogBook:
     """Per-room append-only log + twin mirror callback."""
 
     def __init__(self, room_id: str, user_id: str, twin_write=None):
-        self.room_id = room_id
-        self.user_id = user_id
+        self.room_id = _safe_segment(room_id, what="room_id")
+        self.user_id = _safe_segment(user_id, what="user_id")
         self.twin_write = twin_write
         base = Path(os.getenv("GAMEFORGE_DATA_DIR", "/tmp/gameforge_data"))
-        self.path = base / "room_logs" / user_id / f"{room_id}.jsonl"
+        self.path = _resolve_under(base / "room_logs", self.user_id, f"{self.room_id}.jsonl")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.cache: List[Dict[str, Any]] = []
 

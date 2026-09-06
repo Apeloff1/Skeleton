@@ -46,6 +46,31 @@ AGENT_MANIFEST = {
 }
 
 # ═══════════════════════════════════════════════════════════════════════
+
+def _safe_build_id(build_id: str) -> str:
+    """Reject path traversal in user-supplied build ids."""
+    s = str(build_id or "").strip()
+    if (
+        not s
+        or s in {".", ".."}
+        or ".." in s
+        or "/" in s
+        or "\\" in s
+        or s.startswith(("~", "/", "\\"))
+    ):
+        raise HTTPException(400, "invalid build_id")
+    return s
+
+
+def _resolve_under_dir(root: str, *parts: str) -> str:
+    """Join under root; 400 if result escapes root."""
+    root_r = os.path.realpath(root)
+    candidate = os.path.realpath(os.path.join(root_r, *parts))
+    if candidate != root_r and not candidate.startswith(root_r + os.sep):
+        raise HTTPException(400, "path escapes build sandbox")
+    return candidate
+
+
 # BUILD PHASES — 600 phases orchestrating all agent layers
 # ═══════════════════════════════════════════════════════════════════════
 BUILD_PHASES = [
@@ -1878,13 +1903,14 @@ async def _advance_build(build_id: str) -> dict:
 
 async def _package_build(build_id: str) -> str:
     """Package build files into a ZIP and return path."""
+    build_id = _safe_build_id(build_id)
     build = await _load_build(build_id)
     if not build or not build["files"]:
         raise HTTPException(400, "Build has no files to package")
 
     zip_dir = "/tmp/jeeves_builds"
     os.makedirs(zip_dir, exist_ok=True)
-    zip_path = os.path.join(zip_dir, f"{build_id}.zip")
+    zip_path = _resolve_under_dir(zip_dir, f"{build_id}.zip")
 
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
         project_name = build["title"].lower().replace(" ", "-")[:20]
@@ -2077,15 +2103,26 @@ async def compile_build(build_id: str, expo_token: Optional[str] = None):
 
     # Package the build files to disk
     try:
-        zip_path = _package_build(build_id)
-        project_dir = f"/tmp/jeeves_projects/{build_id}"
+        build_id = _safe_build_id(build_id)
+        zip_path = await _package_build(build_id)
+        projects_root = "/tmp/jeeves_projects"
+        os.makedirs(projects_root, exist_ok=True)
+        project_dir = _resolve_under_dir(projects_root, build_id)
         os.makedirs(project_dir, exist_ok=True)
         with zipfile.ZipFile(zip_path, "r") as zf:
             zf.extractall(project_dir)
         subdirs = [d for d in os.listdir(project_dir) if os.path.isdir(os.path.join(project_dir, d))]
-        actual_dir = os.path.join(project_dir, subdirs[0]) if subdirs else project_dir
+        if subdirs:
+            actual_dir = os.path.realpath(os.path.join(project_dir, subdirs[0]))
+            root_r = os.path.realpath(project_dir)
+            if actual_dir != root_r and not actual_dir.startswith(root_r + os.sep):
+                raise HTTPException(400, "extracted project escapes sandbox")
+        else:
+            actual_dir = project_dir
+    except HTTPException:
+        raise
     except Exception as pe:
-        return {"build_id": build_id, "status": "package_error", "message": f"ZIP extract failed: {pe}"}
+        return {"build_id": build_id, "status": "package_error", "message": "ZIP extract failed"}
 
     env = os.environ.copy()
     env["EXPO_TOKEN"] = token
@@ -2114,7 +2151,7 @@ async def compile_build(build_id: str, expo_token: Optional[str] = None):
         npm_err_tail = (npm_res.stderr or "")[-400:] if npm_res.returncode != 0 else ""
 
         # Strip invalid "projectId": "auto" from app.json so eas init can set a real one
-        app_json_path = os.path.join(actual_dir, "app.json")
+        app_json_path = _resolve_under_dir(actual_dir, "app.json")
         if os.path.exists(app_json_path):
             try:
                 with open(app_json_path, "r") as f:
@@ -2239,6 +2276,7 @@ async def check_eas_status(build_id: str):
 @router.get("/download/{build_id}")
 async def download_build(build_id: str):
     """Download the game project as ZIP (or APK if EAS build completed)."""
+    build_id = _safe_build_id(build_id)
     build = await _load_build(build_id)
     if not build:
         raise HTTPException(404, "Build not found")
@@ -2251,7 +2289,7 @@ async def download_build(build_id: str):
     if not build["files"]:
         raise HTTPException(400, "No files to download. Complete build first.")
 
-    zip_path = _package_build(build_id)
+    zip_path = await _package_build(build_id)
     filename = f"{build['title'].lower().replace(' ', '-')[:20]}-game.zip"
     return FileResponse(zip_path, media_type="application/zip", filename=filename)
 

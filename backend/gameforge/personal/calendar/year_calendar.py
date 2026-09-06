@@ -16,6 +16,30 @@ from gameforge.personal.calendar.weather_decade import DecadeWeatherLog, Weather
 from gameforge.personal.calendar.affect import simulate_daily_affect, DailyAffect
 
 
+def _safe_segment(value: str, *, what: str = "path") -> str:
+    """Reject path traversal / absolute segments in user-supplied ids."""
+    s = str(value or "").strip()
+    if (
+        not s
+        or s in {".", ".."}
+        or ".." in s
+        or "/" in s
+        or "\\" in s
+        or s.startswith(("~", "/", "\\"))
+    ):
+        raise ValueError(f"invalid {what}: {value!r}")
+    return s
+
+
+def _resolve_under(root: Path, *parts: str) -> Path:
+    """Join parts under root; raise if the result escapes root."""
+    root_r = root.resolve()
+    candidate = root_r.joinpath(*parts).resolve()
+    if candidate != root_r and root_r not in candidate.parents:
+        raise ValueError(f"path escapes sandbox: {parts!r}")
+    return candidate
+
+
 @dataclass
 class ScheduleItem:
     item_id: str
@@ -65,20 +89,20 @@ class YearCalendar:
         city: str = "Lillestrøm",
         latitude: float = 59.95,
     ):
-        self.user_id = user_id
+        self.user_id = _safe_segment(user_id, what="user_id")
         self.year = year or date.today().year
         self.country = country
         self.city = city
         self.latitude = latitude
         base = Path(os.getenv("GAMEFORGE_DATA_DIR", "/tmp/gameforge_data"))
-        self.root = base / "year_calendar" / user_id
+        self.root = _resolve_under(base / "year_calendar", self.user_id)
         self.root.mkdir(parents=True, exist_ok=True)
         self.weather_log = DecadeWeatherLog(user_id)
         self.days: Dict[str, DayLog] = {}
         self._load()
 
     def _path(self) -> Path:
-        return self.root / f"{self.year}.json"
+        return _resolve_under(self.root, f"{int(self.year)}.json")
 
     def _load(self):
         path = self._path()

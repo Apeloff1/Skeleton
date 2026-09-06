@@ -26,6 +26,30 @@ from gameforge.media.renderer import GameWorld
 _MEDIA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "artifacts_media")
 os.makedirs(_MEDIA_DIR, exist_ok=True)
 
+def _safe_segment(value: str, *, what: str = "path") -> str:
+    """Reject path traversal / absolute segments in user-supplied ids."""
+    s = str(value or "").strip()
+    if (
+        not s
+        or s in {".", ".."}
+        or ".." in s
+        or "/" in s
+        or "\\" in s
+        or s.startswith(("~", "/", "\\"))
+    ):
+        raise ValueError(f"invalid {what}: {value!r}")
+    return s
+
+
+def _media_join(job_id: str, suffix: str) -> str:
+    """Join job_id under _MEDIA_DIR; reject escapes."""
+    safe = _safe_segment(job_id, what="job_id")
+    root = os.path.realpath(_MEDIA_DIR)
+    candidate = os.path.realpath(os.path.join(root, f"{safe}{suffix}"))
+    if candidate != root and not candidate.startswith(root + os.sep):
+        raise ValueError(f"path escapes media dir: {job_id!r}")
+    return candidate
+
 # name → (duration_s, fps, mode, label)
 VIDEO_TYPES = {
     "clip30":    (30,  15, "gameplay",  "30s Gameplay"),
@@ -183,7 +207,10 @@ def produce_video(world: GameWorld, vtype: str, job_id: str,
 
 def media_path(job_id: str) -> Optional[str]:
     for suffix in ("_av.mp4", ".mp4"):
-        p = os.path.join(_MEDIA_DIR, f"{job_id}{suffix}")
+        try:
+            p = _media_join(job_id, suffix)
+        except ValueError:
+            return None
         if os.path.exists(p):
             return p
     return None
@@ -250,7 +277,10 @@ def produce_presskit(world: GameWorld, job_id: str, progress: Optional[Dict] = N
 
 
 def presskit_path(job_id: str) -> Optional[str]:
-    p = os.path.join(_MEDIA_DIR, f"{job_id}_presskit.zip")
+    try:
+        p = _media_join(job_id, "_presskit.zip")
+    except ValueError:
+        return None
     return p if os.path.exists(p) else None
 
 
