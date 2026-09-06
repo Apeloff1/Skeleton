@@ -94,3 +94,40 @@ def _targets(failure: Dict[str, Any]) -> List[Dict[str, Any]]:
     if not targets:
         targets.append({"target": weakest or "forge output", "action": "re-emit and re-verify once"})
     return targets
+
+
+def polish_artefact(
+    item: Mapping[str, Any],
+    *,
+    root=None,
+    max_rounds: int = 3,
+    stage_index: int = 0,
+    stage_floor_grade: int = 0,
+    gdd_stages=(),
+    regions=(),
+    era: str | None = None,
+    artefact_id: str = "",
+    use_file_repair: bool = True,
+) -> Dict[str, Any]:
+    """Bounded forge quality polish loop (Prood forge_quality / polish surface).
+
+    Composes ``forge_quality.polish_loop`` with optional ``attempt_repair`` on
+    embedded file maps. Does not rewrite VerificationLoop.
+    """
+    from skeleton.forge.forge_quality import polish_loop
+
+    repair_fn = attempt_repair if use_file_repair else None
+    return polish_loop(
+        item,
+        stage_index=stage_index,
+        stage_floor_grade=stage_floor_grade,
+        gdd_stages=gdd_stages,
+        regions=regions,
+        era=era,
+        max_rounds=max_rounds,
+        persist=True,
+        artefact_id=artefact_id,
+        root=root,
+        repair_files=repair_fn,
+    )
+

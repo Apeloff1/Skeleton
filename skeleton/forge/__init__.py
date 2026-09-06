@@ -13,7 +13,7 @@ from skeleton.forge.planner import MaterialisationPlanner, BuildPlan
 from skeleton.forge.archetypes import Archetype, ArchetypeError, ArchetypeLibrary, default_library
 from skeleton.forge.diagram import to_dot
 from skeleton.forge.materialisers import Materialiser, MaterialisationRegistry
-from skeleton.forge.repair import latest_repair_plan, candidate_failures, attempt_repair
+from skeleton.forge.repair import latest_repair_plan, candidate_failures, attempt_repair, polish_artefact
 from skeleton.forge.universal import Blueprint, Component, Forge, Port, Wire
 from skeleton.forge.outbox import (
     MaterialiseIntent,
@@ -22,6 +22,14 @@ from skeleton.forge.outbox import (
     OutboxFull,
     bind_materialise_outbox,
 )
+from skeleton.forge.forge_quality import (
+    PRODUCTION_THRESHOLD,
+    evaluate as evaluate_forge_quality,
+    polish_loop,
+    summarize as summarize_forge_quality,
+    persist_quality,
+)
+from skeleton.forge.validators import validate_with_quality
 from skeleton.forge.validator import (
     CompositeValidator,
     Severity,
@@ -65,6 +73,7 @@ __all__ = [
     "latest_repair_plan",
     "candidate_failures",
     "attempt_repair",
+    "polish_artefact",
     "forge_verify_until_green",
     "Blueprint",
     "Component",
@@ -77,6 +86,12 @@ __all__ = [
     "ValidationReport",
     "ValidationRule",
     "default_validator",
+    "validate_with_quality",
+    "persist_quality",
+    "summarize_forge_quality",
+    "polish_loop",
+    "evaluate_forge_quality",
+    "PRODUCTION_THRESHOLD",
     "MaterialiseIntent",
     "MaterialiseOutbox",
     "MemorySink",
