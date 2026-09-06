@@ -45,6 +45,12 @@ def run(org=None, *, n: int = 0, neo=None) -> Dict[str, Any]:
         except Exception:
             pass
         composed = compose(org, neo=neo)
+    forged: Dict[str, Any] = {}
+    try:
+        from skeleton.organism.gamespec import forge as forge_day
+        forged = forge_day(org)
+    except Exception as exc:
+        forged = {"kind": "game-forge-day", "ok": 0, "err": type(exc).__name__, "stored_prose": 0}
     out = {
         "kind": "day",
         "seed": {"minted": seed.get("minted"), "wiki_topics": seed.get("wiki_topics")},
@@ -55,6 +61,7 @@ def run(org=None, *, n: int = 0, neo=None) -> Dict[str, Any]:
         "coverage": composed.get("coverage"),
         "rot": (composed.get("rot") or {}).get("verdict"),
         "field": {"ok": field.get("ok"), "topics": field.get("topics"), "pct": (field.get("inventory") or {}).get("field_pct")},
+        "forge": {k: forged.get(k) for k in ("spec", "game", "files", "passed", "report", "era", "err") if k in forged},
         "stored_prose": 0,
     }
     try:

@@ -133,10 +133,10 @@ Do these in order. Do not fan out until the current row is closed.
 
 ### P0 — Playable spine
 
-- [ ] Questionnaire → Game Spec JSON on `day` (schema frozen).
-- [ ] One Godot 4 slice from spec (player + one verb + one room) written by gamefile-ops.
-- [ ] Headless sim that returns a scorecard (deaths, time-to-fun, tokens spent).
-- [ ] `build_report.md` emitted per pulse that forges files.
+- [x] Questionnaire → Game Spec JSON on `day` (schema frozen).
+- [x] One Godot 4 slice from spec (`emit_godot` + `write_project`).
+- [x] Headless sim scorecard (`walk_graph`).
+- [x] `build_report.md` emitted by `gamespec.forge`.
 
 ### P1 — Factory
 

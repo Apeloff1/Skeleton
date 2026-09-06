@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-06 — P0 game spine on day
+
+- organism/gamespec.py: spec → Godot slice → walk score → build_report.
+- day.run forges under root/game. P0 checklist closed.
+
+---
+
 ## 2026-09-05 — Multi-rotor + obscure parse
 
 - Five rotors: house, topic, depth, think, obscure.
