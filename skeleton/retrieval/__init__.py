@@ -1,23 +1,19 @@
 """
-Skeleton Retrieval Package
+Skeleton Retrieval Package — Additional utilities
 
 Exports:
-- Fuser: Multi-plane result fusion
-- FusionStrategy: RRF, weighted, confidence, first
-- ScoredResult: Typed retrieval result
-- Ranker: Feature-based re-ranking
+- ProvenanceLedger: Data lineage tracking
+- ProvenanceEntry: Single provenance record
+- QuadRetriever: Four-plane unified retrieval
+- PlaneResult: Per-plane results
 """
 
-from skeleton.retrieval.fusion import (
-    FusionStrategy,
-    Fuser,
-    Ranker,
-    ScoredResult,
-)
+from skeleton.retrieval.provenance import ProvenanceEntry, ProvenanceLedger
+from skeleton.retrieval.quad import PlaneResult, QuadRetriever
 
 __all__ = [
-    "Fuser",
-    "FusionStrategy",
-    "ScoredResult",
-    "Ranker",
+    "ProvenanceLedger",
+    "ProvenanceEntry",
+    "QuadRetriever",
+    "PlaneResult",
 ]
