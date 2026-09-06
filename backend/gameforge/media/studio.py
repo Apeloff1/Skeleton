@@ -15,6 +15,7 @@ import io
 import os
 import subprocess
 import time
+from pathlib import Path
 from typing import Dict, List, Optional
 
 import imageio.v2 as iio
@@ -41,14 +42,20 @@ def _safe_segment(value: str, *, what: str = "path") -> str:
     return s
 
 
+def _resolve_under(root: Path, *parts: str) -> Path:
+    """Join parts under root; raise if the result escapes root."""
+    root_r = root.resolve()
+    candidate = root_r.joinpath(*parts).resolve()
+    if candidate != root_r and root_r not in candidate.parents:
+        raise ValueError(f"path escapes sandbox: {parts!r}")
+    return candidate
+
+
 def _media_join(job_id: str, suffix: str) -> str:
     """Join job_id under _MEDIA_DIR; reject escapes."""
     safe = _safe_segment(job_id, what="job_id")
-    root = os.path.realpath(_MEDIA_DIR)
-    candidate = os.path.realpath(os.path.join(root, f"{safe}{suffix}"))
-    if candidate != root and not candidate.startswith(root + os.sep):
-        raise ValueError(f"path escapes media dir: {job_id!r}")
-    return candidate
+    return str(_resolve_under(Path(_MEDIA_DIR), f"{safe}{suffix}"))
+
 
 # name → (duration_s, fps, mode, label)
 VIDEO_TYPES = {
@@ -206,13 +213,15 @@ def produce_video(world: GameWorld, vtype: str, job_id: str,
 
 
 def media_path(job_id: str) -> Optional[str]:
+    try:
+        safe = _safe_segment(job_id, what="job_id")
+    except ValueError:
+        return None
+    root = Path(_MEDIA_DIR)
     for suffix in ("_av.mp4", ".mp4"):
-        try:
-            p = _media_join(job_id, suffix)
-        except ValueError:
-            return None
-        if os.path.exists(p):
-            return p
+        p = _resolve_under(root, f"{safe}{suffix}")
+        if p.is_file():
+            return str(p)
     return None
 
 
@@ -278,10 +287,11 @@ def produce_presskit(world: GameWorld, job_id: str, progress: Optional[Dict] = N
 
 def presskit_path(job_id: str) -> Optional[str]:
     try:
-        p = _media_join(job_id, "_presskit.zip")
+        safe = _safe_segment(job_id, what="job_id")
+        p = _resolve_under(Path(_MEDIA_DIR), f"{safe}_presskit.zip")
     except ValueError:
         return None
-    return p if os.path.exists(p) else None
+    return str(p) if p.is_file() else None
 
 
 __all__ = ["GameWorld", "render_image_set", "produce_video", "media_path",

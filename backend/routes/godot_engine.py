@@ -44,6 +44,30 @@ _PROJECTS_ROOT = Path(
 _SLUG_RE = re.compile(r"^[a-z0-9_]{1,48}$")
 
 
+def _safe_segment(value: str, *, what: str = "path") -> str:
+    """Reject path traversal / absolute segments in user-supplied ids."""
+    s = str(value or "").strip()
+    if (
+        not s
+        or s in {".", ".."}
+        or ".." in s
+        or "/" in s
+        or "\\" in s
+        or s.startswith(("~", "/", "\\"))
+    ):
+        raise ValueError(f"invalid {what}: {value!r}")
+    return s
+
+
+def _resolve_under(root: Path, *parts: str) -> Path:
+    """Join parts under root; raise if the result escapes root."""
+    root_r = root.resolve()
+    candidate = root_r.joinpath(*parts).resolve()
+    if candidate != root_r and root_r not in candidate.parents:
+        raise ValueError(f"path escapes sandbox: {parts!r}")
+    return candidate
+
+
 def _project_dir_for(slug: str) -> Path:
     """Resolve a user-supplied slug to a project dir, or 404/422 out.
 
@@ -52,7 +76,11 @@ def _project_dir_for(slug: str) -> Path:
     """
     if not _SLUG_RE.match(slug):
         raise HTTPException(422, f"invalid project slug: {slug!r}")
-    project_dir = _PROJECTS_ROOT / slug
+    try:
+        safe = _safe_segment(slug, what="project slug")
+        project_dir = _resolve_under(_PROJECTS_ROOT, safe)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
     if not project_dir.is_dir():
         raise HTTPException(404, f"no project named {slug!r}")
     return project_dir
@@ -64,13 +92,20 @@ def _resolve_within(base: Path, relative: str, what: str) -> Path:
     Absolute paths, ``..`` segments, and anything else that resolves outside
     ``base`` get a 422 — the pipeline never sees a path outside the sandbox.
     """
-    if not relative or relative.startswith(("/", "\\", "~")):
+    if (
+        not relative
+        or relative.startswith(("/", "\\", "~"))
+        or Path(relative).is_absolute()
+    ):
         raise HTTPException(422, f"{what} must be a relative path inside the project")
-    resolved = (base / relative).resolve()
-    root = base.resolve()
-    if resolved != root and root not in resolved.parents:
-        raise HTTPException(422, f"{what} escapes the project sandbox: {relative!r}")
-    return resolved
+    parts = Path(relative).parts
+    try:
+        safe_parts = [_safe_segment(part, what=what) for part in parts]
+        return _resolve_under(base, *safe_parts)
+    except ValueError as e:
+        raise HTTPException(
+            422, f"{what} escapes the project sandbox: {relative!r}"
+        ) from e
 
 
 # ── Models ────────────────────────────────────────────────────────────────

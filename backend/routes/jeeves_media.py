@@ -11,6 +11,7 @@ Real captured frames from the game's world:
 from __future__ import annotations
 
 import asyncio
+import os
 import uuid
 from typing import Dict, Optional
 
@@ -19,8 +20,8 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from gameforge.media.studio import (
-    GameWorld, render_image_set, produce_video, media_path, VIDEO_TYPES,
-    produce_presskit, presskit_path,
+    GameWorld, render_image_set, produce_video, VIDEO_TYPES,
+    produce_presskit, _MEDIA_DIR,
 )
 
 router = APIRouter(prefix="/api/jeeves/media", tags=["jeeves-media"])
@@ -39,6 +40,24 @@ def _safe_job_id(job_id: str) -> str:
     ):
         raise HTTPException(status_code=400, detail="invalid job_id")
     return s
+
+
+def _resolve_under_dir(root: str, *parts: str) -> str:
+    """Join under root; 400 if result escapes root."""
+    root_r = os.path.realpath(root)
+    candidate = os.path.realpath(os.path.join(root_r, *parts))
+    if candidate != root_r and not candidate.startswith(root_r + os.sep):
+        raise HTTPException(status_code=400, detail="path escapes media sandbox")
+    return candidate
+
+
+def _media_file_for(job_id: str, suffixes):
+    """Resolve a job artifact under _MEDIA_DIR (same-file sanitizer for FileResponse)."""
+    for suffix in suffixes:
+        candidate = _resolve_under_dir(_MEDIA_DIR, f"{job_id}{suffix}")
+        if os.path.isfile(candidate):
+            return candidate
+    return None
 
 
 def _world(game_name: str) -> GameWorld:
@@ -112,7 +131,7 @@ async def video_status(job_id: str):
 @router.get("/download/{job_id}")
 async def download(job_id: str):
     job_id = _safe_job_id(job_id)
-    path = media_path(job_id)
+    path = _media_file_for(job_id, ("_av.mp4", ".mp4"))
     if not path:
         raise HTTPException(status_code=404, detail="media not ready")
     return FileResponse(path, media_type="video/mp4", filename=f"{job_id}.mp4")
@@ -143,7 +162,7 @@ async def presskit(req: MediaReq):
 @router.get("/presskit/download/{job_id}")
 async def presskit_download(job_id: str):
     job_id = _safe_job_id(job_id)
-    path = presskit_path(job_id)
+    path = _media_file_for(job_id, ("_presskit.zip",))
     if not path:
         raise HTTPException(status_code=404, detail="press kit not ready")
     return FileResponse(path, media_type="application/zip", filename=f"{job_id}_presskit.zip")
