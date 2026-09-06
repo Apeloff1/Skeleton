@@ -16,6 +16,8 @@ ZIP-packaging helper (_package_build) and binary-prefix sentinel
 """
 from __future__ import annotations
 
+import os
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
@@ -26,6 +28,32 @@ from routes.galaxy_studio_state import (
 )
 
 router = APIRouter(tags=["galaxy-studio"])
+
+
+def _safe_segment(value: str, *, what: str = "path") -> str:
+    """Reject path traversal / absolute segments in user-supplied ids."""
+    s = str(value or "").strip()
+    if (
+        not s
+        or s in {".", ".."}
+        or ".." in s
+        or "/" in s
+        or "\\" in s
+        or s.startswith(("~", "/", "\\"))
+    ):
+        raise HTTPException(400, f"invalid {what}")
+    return s
+
+
+def _resolve_under_dir(root: str, *parts: str) -> str:
+    """Join under root; 400 if result escapes root."""
+    root_r = os.path.realpath(root)
+    candidate = os.path.realpath(os.path.join(root_r, *parts))
+    if candidate != root_r and not candidate.startswith(root_r + os.sep):
+        raise HTTPException(400, "path escapes download sandbox")
+    return candidate
+
+
 
 
 @router.get("/files/{build_id}")
@@ -161,7 +189,12 @@ async def download_build(build_id: str):
     if vault_count == 0 and mem_count == 0:
         raise HTTPException(400, "No files. Complete build first.")
 
-    zip_path = await get_package_build(build_id)
+    safe_id = _safe_segment(build_id, what="build_id")
+    zip_path = await get_package_build(safe_id)
+    # Same-file sanitizer for FileResponse (CodeQL path-injection).
+    zip_path = _resolve_under_dir("/tmp/galaxy_studio", safe_id, os.path.basename(zip_path))
+    if not os.path.isfile(zip_path):
+        raise HTTPException(404, "ZIP not ready")
     filename = f"{(build.get('title') or 'game').lower().replace(' ', '-')[:20]}-galaxy-studio.zip"
     return FileResponse(zip_path, media_type="application/zip", filename=filename)
 

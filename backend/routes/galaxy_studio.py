@@ -88,6 +88,39 @@ try:
 except Exception:  # pragma: no cover — defensive fallback
     VAULT_DIR = os.environ.get("GALAXY_BUILDS_VAULT_DIR", "/app/backend/data/builds_vault")
 
+
+def _safe_segment(value: str, *, what: str = "path") -> str:
+    """Reject path traversal / absolute segments in user-supplied ids."""
+    s = str(value or "").strip()
+    if (
+        not s
+        or s in {".", ".."}
+        or ".." in s
+        or "/" in s
+        or "\\" in s
+        or s.startswith(("~", "/", "\\"))
+    ):
+        raise HTTPException(400, f"invalid {what}")
+    return s
+
+
+def _safe_slug(title: str, *, fallback: str = "game") -> str:
+    """Derive a single-segment slug from a free-form title."""
+    raw = (title or fallback).lower().replace(" ", "-")
+    cleaned = "".join(c if (c.isalnum() or c in "-_") else "-" for c in raw)
+    cleaned = cleaned.strip("-_")[:20] or fallback
+    return _safe_segment(cleaned, what="slug")
+
+
+def _resolve_under_dir(root: str, *parts: str) -> str:
+    """Join under root; 400 if result escapes root."""
+    root_r = os.path.realpath(root)
+    candidate = os.path.realpath(os.path.join(root_r, *parts))
+    if candidate != root_r and not candidate.startswith(root_r + os.sep):
+        raise HTTPException(400, "path escapes sandbox")
+    return candidate
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # EXPANSION_PHASES — agent pipeline for the /expand (DLC / expansion pack) flow.
 # Restores a name referenced by galaxy_expand() (was undefined → NameError 500
@@ -1926,10 +1959,11 @@ async def _package_build(build_id: str) -> str:
     if not build:
         raise HTTPException(400, "Build not found")
 
-    slug = (build.get("title") or "game").lower().replace(" ", "-")[:20]
-    zip_dir = f"/tmp/galaxy_studio/{build_id}"
+    safe_id = _safe_segment(build_id, what="build_id")
+    slug = _safe_slug(build.get("title") or "game")
+    zip_dir = _resolve_under_dir("/tmp/galaxy_studio", safe_id)
     os.makedirs(zip_dir, exist_ok=True)
-    zip_path = os.path.join(zip_dir, f"{slug}-game.zip")
+    zip_path = _resolve_under_dir(zip_dir, f"{slug}-game.zip")
 
     # Prefer streaming from the vault when present — this is the ONLY path
     # that works for massive builds (files no longer in RAM).
@@ -3587,16 +3621,17 @@ async def deploy_build(build_id: str, expo_token: Optional[str] = None):
         raise HTTPException(400, "No code files. Complete build first.")
 
     # Package to disk
-    zip_path = _package_build(build_id)
-    slug = build["title"].lower().replace(" ", "-")[:20]
-    project_dir = f"/tmp/galaxy_studio_projects/{build_id}"
+    safe_id = _safe_segment(build_id, what="build_id")
+    zip_path = _package_build(safe_id)
+    slug = _safe_slug(build["title"])
+    project_dir = _resolve_under_dir("/tmp/galaxy_studio_projects", safe_id)
     os.makedirs(project_dir, exist_ok=True)
 
     with zipfile.ZipFile(zip_path, 'r') as zf:
         zf.extractall(project_dir)
 
-    subdirs = os.listdir(project_dir)
-    actual_dir = os.path.join(project_dir, subdirs[0]) if subdirs else project_dir
+    subdirs = [d for d in os.listdir(project_dir) if d not in {".", ".."}]
+    actual_dir = _resolve_under_dir(project_dir, subdirs[0]) if subdirs else project_dir
 
     token = expo_token or os.environ.get("EXPO_TOKEN", "")
     if not token:
@@ -3628,7 +3663,7 @@ async def deploy_build(build_id: str, expo_token: Optional[str] = None):
         subprocess.run(["npm", "install", "--legacy-peer-deps"], cwd=actual_dir, capture_output=True, timeout=120)
 
         # Fix app.json — remove invalid projectId so eas init can set a real one
-        app_json_path = os.path.join(actual_dir, "app.json")
+        app_json_path = _resolve_under_dir(actual_dir, "app.json")
         if os.path.exists(app_json_path):
             with open(app_json_path, 'r') as f:
                 app_config = json.load(f)
@@ -3692,12 +3727,24 @@ async def deploy_build(build_id: str, expo_token: Optional[str] = None):
 # ─── /domains extracted → routes/galaxy_studio_meta.py
 def _vault_save(build_id: str, vault_type: str, title: str, file_path: str, extra: dict = {}) -> dict:
     """Save a file to the vault."""
-    vault_id = f"{vault_type}_{build_id}_{int(datetime.utcnow().timestamp())}"
+    safe_id = _safe_segment(build_id, what="build_id")
+    vault_id = f"{vault_type}_{safe_id}_{int(datetime.utcnow().timestamp())}"
+    # Constrain vault artifact paths to known sandboxes (CodeQL path-injection).
+    real = os.path.realpath(file_path)
+    allowed = (
+        os.path.realpath(VAULT_DIR),
+        os.path.realpath("/tmp/galaxy_studio"),
+        os.path.realpath("/tmp/galaxy_studio_projects"),
+        os.path.realpath("/tmp/galaxy_projects"),
+    )
+    if not any(real == r or real.startswith(r + os.sep) for r in allowed):
+        raise HTTPException(400, "path escapes vault sandbox")
+    file_path = real
     size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
     entry = {
         "vault_id": vault_id,
         "type": vault_type,
-        "build_id": build_id,
+        "build_id": safe_id,
         "title": title,
         "filename": os.path.basename(file_path),
         "path": file_path,
@@ -4622,7 +4669,7 @@ async def vault_zip_to_apk(build_id: str, req: ZipToApkRequest):
         from dotenv import load_dotenv
         load_dotenv()
         token = os.environ.get("EXPO_TOKEN", "")
-    slug = (build.get("title") or "build").lower().replace(" ", "-")[:20] or "build"
+    slug = _safe_slug(build.get("title") or "build", fallback="build")
 
     build["_apk"] = {
         "status": "running",
@@ -4660,8 +4707,10 @@ def _apk_pipeline_sync(build: dict, build_id: str, token: str, slug: str, prog: 
 
     # ─── Stream the ZIP from vault ────────────────────────────────────
     prog["stage"] = "zipping"
-    zip_filename = f"{slug}-{build_id[:8]}.zip"
-    zip_path = os.path.join(VAULT_DIR, "zips", zip_filename)
+    safe_id = _safe_segment(build_id, what="build_id")
+    safe_slug = _safe_slug(slug, fallback="build")
+    zip_filename = f"{safe_slug}-{safe_id[:8]}.zip"
+    zip_path = _resolve_under_dir(VAULT_DIR, "zips", zip_filename)
     os.makedirs(os.path.dirname(zip_path), exist_ok=True)
     written_paths: set[str] = set()
     total_files = 0
@@ -4683,7 +4732,7 @@ def _apk_pipeline_sync(build: dict, build_id: str, token: str, slug: str, prog: 
             except Exception:
                 continue
 
-    zip_entry = _vault_save(build_id, "zip", build.get("title", "game"), zip_path, {
+    zip_entry = _vault_save(safe_id, "zip", build.get("title", "game"), zip_path, {
         "file_count": total_files, "genre": build.get("genre", "unknown"),
     })
     entries.append(zip_entry)
@@ -4703,8 +4752,8 @@ def _apk_pipeline_sync(build: dict, build_id: str, token: str, slug: str, prog: 
 
     if token:
         try:
-            project_dir = f"/tmp/galaxy_studio_projects/{build_id}"
-            actual_dir = os.path.join(project_dir, slug)
+            project_dir = _resolve_under_dir("/tmp/galaxy_studio_projects", safe_id)
+            actual_dir = _resolve_under_dir(project_dir, safe_slug)
             os.makedirs(actual_dir, exist_ok=True)
 
             prog["stage"] = "materializing"
@@ -4745,7 +4794,7 @@ def _apk_pipeline_sync(build: dict, build_id: str, token: str, slug: str, prog: 
             prog["stage"] = "npm_install"
             subprocess.run(["npm", "install", "--legacy-peer-deps"], cwd=actual_dir, capture_output=True, timeout=120)
 
-            app_json_path = os.path.join(actual_dir, "app.json")
+            app_json_path = _resolve_under_dir(actual_dir, "app.json")
             if os.path.exists(app_json_path):
                 with open(app_json_path, 'r') as f:
                     app_config = json.load(f)
@@ -5035,18 +5084,19 @@ async def galaxy_compile_build(build_id: str, expo_token: Optional[str] = None):
         }
 
     # Package the build into a ZIP + extract to /tmp project dir
-    project_dir = f"/tmp/galaxy_projects/{build_id}"
+    safe_id = _safe_segment(build_id, what="build_id")
+    project_dir = _resolve_under_dir("/tmp/galaxy_projects", safe_id)
     _os.makedirs(project_dir, exist_ok=True)
     try:
-        zip_path = f"{project_dir}.zip"
+        zip_path = _resolve_under_dir("/tmp/galaxy_projects", f"{safe_id}.zip")
         with _zf.ZipFile(zip_path, "w", _zf.ZIP_DEFLATED) as zf:
             for path, content in (build.get("files") or {}).items():
                 if isinstance(content, str):
                     zf.writestr(path, content)
         with _zf.ZipFile(zip_path, "r") as zf:
             zf.extractall(project_dir)
-        subdirs = [d for d in _os.listdir(project_dir) if _os.path.isdir(_os.path.join(project_dir, d))]
-        actual_dir = _os.path.join(project_dir, subdirs[0]) if subdirs else project_dir
+        subdirs = [d for d in _os.listdir(project_dir) if _os.path.isdir(_os.path.join(project_dir, d)) and d not in {".", ".."}]
+        actual_dir = _resolve_under_dir(project_dir, subdirs[0]) if subdirs else project_dir
     except Exception as pe:
         return {"build_id": build_id, "status": "package_error", "message": f"ZIP extract failed: {pe}"}
 
@@ -5069,7 +5119,7 @@ async def galaxy_compile_build(build_id: str, expo_token: Optional[str] = None):
             cwd=actual_dir, capture_output=True, text=True, timeout=240,
         )
         # Sanitise app.json (strip placeholder projectId)
-        app_json_path = _os.path.join(actual_dir, "app.json")
+        app_json_path = _resolve_under_dir(actual_dir, "app.json")
         if _os.path.exists(app_json_path):
             try:
                 with open(app_json_path) as f:

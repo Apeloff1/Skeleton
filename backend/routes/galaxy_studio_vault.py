@@ -35,6 +35,39 @@ from routes.galaxy_studio_state import (
 router = APIRouter(tags=["galaxy-studio"])
 
 
+def _safe_segment(value: str, *, what: str = "path") -> str:
+    """Reject path traversal / absolute segments in user-supplied ids."""
+    s = str(value or "").strip()
+    if (
+        not s
+        or s in {".", ".."}
+        or ".." in s
+        or "/" in s
+        or "\\" in s
+        or s.startswith(("~", "/", "\\"))
+    ):
+        raise HTTPException(400, f"invalid {what}")
+    return s
+
+
+def _safe_slug(title: str, *, fallback: str = "build") -> str:
+    raw = (title or fallback).lower().replace(" ", "-")
+    cleaned = "".join(c if (c.isalnum() or c in "-_") else "-" for c in raw)
+    cleaned = cleaned.strip("-_")[:20] or fallback
+    return _safe_segment(cleaned, what="slug")
+
+
+def _resolve_under_dir(root: str, *parts: str) -> str:
+    """Join under root; 400 if result escapes root."""
+    root_r = os.path.realpath(root)
+    candidate = os.path.realpath(os.path.join(root_r, *parts))
+    if candidate != root_r and not candidate.startswith(root_r + os.sep):
+        raise HTTPException(400, "path escapes vault sandbox")
+    return candidate
+
+
+
+
 @router.post("/vault/zip/{build_id}")
 async def vault_create_zip(build_id: str) -> dict:
     """Generate ZIP from a completed build and save it to the vault.
@@ -52,9 +85,10 @@ async def vault_create_zip(build_id: str) -> dict:
     if vault_count == 0 and not mem_files:
         raise HTTPException(400, "No files to package. Complete build first.")
 
-    slug = (build.get("title") or "build").lower().replace(" ", "-")[:20] or "build"
-    zip_filename = f"{slug}-{build_id[:8]}.zip"
-    zip_path = os.path.join(get_vault_dir(), "zips", zip_filename)
+    safe_id = _safe_segment(build_id, what="build_id")
+    slug = _safe_slug(build.get("title") or "build", fallback="build")
+    zip_filename = f"{slug}-{safe_id[:8]}.zip"
+    zip_path = _resolve_under_dir(get_vault_dir(), "zips", zip_filename)
     os.makedirs(os.path.dirname(zip_path), exist_ok=True)
 
     zip_write_file = get_zip_write_file()
@@ -83,7 +117,7 @@ async def vault_create_zip(build_id: str) -> dict:
                 continue
 
     entry = get_vault_save()(
-        build_id,
+        safe_id,
         "zip",
         build.get("title", "game"),
         zip_path,
@@ -154,10 +188,15 @@ async def vault_download(vault_id: str):
          underlying file got swept (eviction, dev-box cleanup, …).
     """
     await get_all_vault_entries()
-    entry = _vault_entries.get(vault_id)
+    safe_vid = _safe_segment(vault_id, what="vault_id")
+    entry = _vault_entries.get(safe_vid) or _vault_entries.get(vault_id)
     if not entry:
         raise HTTPException(404, "Vault entry not found")
-    file_path = entry["path"]
+    root = os.path.realpath(get_vault_dir())
+    real = os.path.realpath(entry["path"])
+    if real != root and not real.startswith(root + os.sep):
+        raise HTTPException(400, "path escapes vault sandbox")
+    file_path = real
     if not os.path.exists(file_path):
         raise HTTPException(404, "File no longer exists on disk")
     media_type = (
