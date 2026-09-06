@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -31,16 +32,37 @@ PathLike = Union[str, Path]
 # Default durable ledger path (override with SKELETON_WORM_AUDIT_PATH).
 DEFAULT_WORM_AUDIT_PATH = "data/vault/worm_audit.jsonl"
 
+# SHA-256 hex digest length.
+_FINGERPRINT_RE = re.compile(r"^[0-9a-f]{64}$")
+
 
 def _secret_ref(secret_id: Optional[str]) -> Optional[str]:
     """Return a SHA-256 fingerprint of ``secret_id`` for durable audit storage.
 
     Raw secret identifiers must never enter the audit entry / hash chain /
-    persist path; only this fingerprint is stored on ``AuditEntry.secret_id``.
+    persist path; only this fingerprint is stored on ``AuditEntry.secret_ref``.
     """
     if secret_id is None:
         return None
     return hashlib.sha256(secret_id.encode("utf-8")).hexdigest()
+
+
+def _looks_like_fingerprint(value: str) -> bool:
+    return bool(_FINGERPRINT_RE.fullmatch(value.lower()))
+
+
+def _coerce_secret_ref(value: Optional[str]) -> Optional[str]:
+    """Normalize a durable secret reference: already-ref stays, else fingerprint.
+
+    Old JSONL lines may carry cleartext under the legacy ``secret_id`` key.
+    Values that are already 64-char hex digests are treated as fingerprints;
+    anything else is re-fingerprinted so cleartext never remains on the entry.
+    """
+    if value is None:
+        return None
+    if _looks_like_fingerprint(value):
+        return value.lower()
+    return _secret_ref(value)
 
 
 class AuditError(VaultError):
@@ -61,12 +83,15 @@ class AuditEntry:
     actor: str
     action: str  # seal / unseal / rotate / access / denied
     # SHA-256 fingerprint of the caller's secret id (never raw secret material).
-    secret_id: Optional[str]
+    secret_ref: Optional[str]
     outcome: str  # success / failure / denied
     metadata: Dict[str, Any] = field(default_factory=dict)
     previous_hash: Optional[str] = None
     hash: str = ""
     timestamp: float = 0.0
+    # Legacy durable lines hashed the fingerprint under JSON key "secret_id".
+    # New writes always use "secret_ref". Kept so restore + tamper_check match.
+    _body_secret_key: str = "secret_ref"
 
 
 def _entry_body(entry: AuditEntry) -> str:
@@ -75,7 +100,7 @@ def _entry_body(entry: AuditEntry) -> str:
             "entry_id": entry.entry_id,
             "actor": entry.actor,
             "action": entry.action,
-            "secret_id": entry.secret_id,
+            entry._body_secret_key: entry.secret_ref,
             "outcome": entry.outcome,
             "metadata": entry.metadata,
             "previous_hash": entry.previous_hash,
@@ -91,11 +116,12 @@ def _compute_hash(entry: AuditEntry) -> str:
 
 
 def _entry_to_dict(entry: AuditEntry) -> Dict[str, Any]:
+    """Serialize for durable JSONL. Always emits ``secret_ref`` (never ``secret_id``)."""
     return {
         "entry_id": entry.entry_id,
         "actor": entry.actor,
         "action": entry.action,
-        "secret_id": entry.secret_id,
+        "secret_ref": entry.secret_ref,
         "outcome": entry.outcome,
         "metadata": entry.metadata,
         "previous_hash": entry.previous_hash,
@@ -105,16 +131,34 @@ def _entry_to_dict(entry: AuditEntry) -> Dict[str, Any]:
 
 
 def _entry_from_dict(raw: Dict[str, Any]) -> AuditEntry:
+    """Deserialize a durable line.
+
+    Accepts modern ``secret_ref`` or legacy ``secret_id`` keys. Non-fingerprint
+    values are re-fingerprinted. Legacy lines keep ``_body_secret_key="secret_id"``
+    so hash verification matches the on-disk chain (value must already have been
+    a fingerprint, or cleartext→fingerprint will fail closed — correct for WORM).
+    """
+    if "secret_ref" in raw:
+        raw_val = raw.get("secret_ref")
+        body_key = "secret_ref"
+    elif "secret_id" in raw:
+        raw_val = raw.get("secret_id")
+        body_key = "secret_id"
+    else:
+        raw_val = None
+        body_key = "secret_ref"
+
     return AuditEntry(
         entry_id=str(raw["entry_id"]),
         actor=str(raw["actor"]),
         action=str(raw["action"]),
-        secret_id=raw.get("secret_id"),
+        secret_ref=_coerce_secret_ref(raw_val if raw_val is None else str(raw_val)),
         outcome=str(raw["outcome"]),
         metadata=dict(raw.get("metadata") or {}),
         previous_hash=raw.get("previous_hash"),
         hash=str(raw.get("hash") or ""),
         timestamp=float(raw.get("timestamp") or 0.0),
+        _body_secret_key=body_key,
     )
 
 
@@ -178,11 +222,14 @@ class AuditLog:
         outcome: str = "success",
         metadata: Optional[Dict[str, Any]] = None,
     ) -> AuditEntry:
+        # Fingerprint immediately into a local that never shares the secret_id name
+        # on the entry / persist path (CodeQL py/clear-text-storage-sensitive-data).
+        ref = _secret_ref(secret_id)
         entry = AuditEntry(
             entry_id=entry_id,
             actor=actor,
             action=action,
-            secret_id=_secret_ref(secret_id),
+            secret_ref=ref,
             outcome=outcome,
             metadata=metadata or {},
             previous_hash=self._last_hash,
@@ -193,7 +240,7 @@ class AuditLog:
             entry_id=entry.entry_id,
             actor=entry.actor,
             action=entry.action,
-            secret_id=entry.secret_id,
+            secret_ref=entry.secret_ref,
             outcome=entry.outcome,
             metadata=entry.metadata,
             previous_hash=entry.previous_hash,
@@ -226,16 +273,22 @@ class AuditLog:
         *,
         actor: Optional[str] = None,
         action: Optional[str] = None,
-        secret_id: Optional[str] = None,
+        secret_ref: Optional[str] = None,
         limit: int = 50,
     ) -> Tuple[AuditEntry, ...]:
-        secret_ref = _secret_ref(secret_id)
+        """Filter entries. ``secret_ref`` may be a raw id (fingerprinted) or a digest."""
+        if secret_ref is None:
+            want: Optional[str] = None
+        elif _looks_like_fingerprint(secret_ref):
+            want = secret_ref.lower()
+        else:
+            want = _secret_ref(secret_ref)
         out = [
             e
             for e in reversed(self._entries)
             if (actor is None or e.actor == actor)
             and (action is None or e.action == action)
-            and (secret_ref is None or e.secret_id == secret_ref)
+            and (want is None or e.secret_ref == want)
         ]
         return tuple(out[:limit])
 

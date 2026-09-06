@@ -85,7 +85,7 @@ class TestWormRefuseOnBoot:
             entry_id=bad.entry_id,
             actor=bad.actor,
             action=bad.action,
-            secret_id=bad.secret_id,
+            secret_ref=bad.secret_ref,
             outcome=bad.outcome,
             metadata=bad.metadata,
             previous_hash=bad.previous_hash,
@@ -102,7 +102,7 @@ class TestWormRefuseOnBoot:
         assert len(log) == 0
 
 
-class TestSecretIdFingerprint:
+class TestSecretRefFingerprint:
     """CodeQL py/clear-text-storage-sensitive-data: never persist raw secret ids."""
 
     def test_append_stores_sha256_fingerprint(self, tmp_path: Path):
@@ -117,24 +117,83 @@ class TestSecretIdFingerprint:
             outcome="success",
         )
         expected = hashlib.sha256(raw_id.encode("utf-8")).hexdigest()
-        assert entry.secret_id == expected
-        assert entry.secret_id == _secret_ref(raw_id)
-        assert raw_id not in path.read_text(encoding="utf-8")
-        persisted = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
-        assert persisted["secret_id"] == expected
+        assert entry.secret_ref == expected
+        assert entry.secret_ref == _secret_ref(raw_id)
+        text = path.read_text(encoding="utf-8")
+        assert raw_id not in text
+        assert "secret_id" not in text  # durable key must be secret_ref
+        persisted = json.loads(text.splitlines()[0])
+        assert persisted["secret_ref"] == expected
+        assert "secret_id" not in persisted
 
     def test_query_fingerprints_filter(self):
         log = AuditLog()
         raw_id = "vault/api-key"
         log.append(entry_id="e1", actor="a", action="access", secret_id=raw_id)
         log.append(entry_id="e2", actor="a", action="access", secret_id="other/id")
-        hits = log.query(secret_id=raw_id)
+        # Filter by raw id (fingerprinted) or by digest directly.
+        hits = log.query(secret_ref=raw_id)
         assert len(hits) == 1
         assert hits[0].entry_id == "e1"
-        assert hits[0].secret_id == _secret_ref(raw_id)
+        assert hits[0].secret_ref == _secret_ref(raw_id)
+        hits_fp = log.query(secret_ref=_secret_ref(raw_id))
+        assert len(hits_fp) == 1
+        assert hits_fp[0].entry_id == "e1"
 
-    def test_none_secret_id_stays_none(self):
+    def test_none_secret_ref_stays_none(self):
         log = AuditLog()
         entry = log.append(entry_id="e1", actor="a", action="seal", secret_id=None)
-        assert entry.secret_id is None
+        assert entry.secret_ref is None
         assert _secret_ref(None) is None
+
+    def test_restore_legacy_secret_id_key(self, tmp_path: Path):
+        """Old JSONL with secret_id key (fingerprint value) restores into secret_ref."""
+        from skeleton.vault.audit import AuditEntry, _compute_hash
+
+        path = tmp_path / "worm_audit.jsonl"
+        raw_id = "legacy/secret"
+        fp = _secret_ref(raw_id)
+        entry = AuditEntry(
+            entry_id="e1",
+            actor="root",
+            action="seal",
+            secret_ref=fp,
+            outcome="success",
+            metadata={},
+            previous_hash=None,
+            timestamp=1.0,
+            _body_secret_key="secret_id",
+        )
+        entry = AuditEntry(
+            entry_id=entry.entry_id,
+            actor=entry.actor,
+            action=entry.action,
+            secret_ref=entry.secret_ref,
+            outcome=entry.outcome,
+            metadata=entry.metadata,
+            previous_hash=entry.previous_hash,
+            hash=_compute_hash(entry),
+            timestamp=entry.timestamp,
+            _body_secret_key="secret_id",
+        )
+        # Simulate pre-rename durable line.
+        legacy = {
+            "entry_id": entry.entry_id,
+            "actor": entry.actor,
+            "action": entry.action,
+            "secret_id": entry.secret_ref,
+            "outcome": entry.outcome,
+            "metadata": entry.metadata,
+            "previous_hash": entry.previous_hash,
+            "hash": entry.hash,
+            "timestamp": entry.timestamp,
+        }
+        path.write_text(
+            json.dumps(legacy, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+        restored = AuditLog.open(path)
+        assert len(restored) == 1
+        assert restored._entries[0].secret_ref == fp
+        assert not hasattr(restored._entries[0], "secret_id")
+        restored.verify_chain_or_refuse()
