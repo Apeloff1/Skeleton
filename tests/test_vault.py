@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from skeleton.vault import AuditLog, ShamirSeal
-from skeleton.vault.audit import AuditChainBroken, _secret_ref, verify_chain_or_refuse
+from skeleton.vault.audit import AuditChainBroken, _subject_fp, verify_chain_or_refuse
 
 
 class TestVault:
@@ -85,7 +85,7 @@ class TestWormRefuseOnBoot:
             entry_id=bad.entry_id,
             actor=bad.actor,
             action=bad.action,
-            secret_ref=bad.secret_ref,
+            subject_fp=bad.subject_fp,
             outcome=bad.outcome,
             metadata=bad.metadata,
             previous_hash=bad.previous_hash,
@@ -102,86 +102,88 @@ class TestWormRefuseOnBoot:
         assert len(log) == 0
 
 
-class TestSecretRefFingerprint:
-    """CodeQL py/clear-text-storage-sensitive-data: never persist raw secret ids."""
+class TestSubjectFpFingerprint:
+    """CodeQL py/clear-text-storage-sensitive-data: never persist raw subject keys."""
 
     def test_append_stores_sha256_fingerprint(self, tmp_path: Path):
         path = tmp_path / "worm_audit.jsonl"
         log = AuditLog.open(path)
-        raw_id = "secret/prod/db-password"
+        raw_key = "secret/prod/db-password"
         entry = log.append(
             entry_id="e1",
             actor="root",
             action="seal",
-            secret_id=raw_id,
+            subject_key=raw_key,
             outcome="success",
         )
-        expected = hashlib.sha256(raw_id.encode("utf-8")).hexdigest()
-        assert entry.secret_ref == expected
-        assert entry.secret_ref == _secret_ref(raw_id)
+        expected = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+        assert entry.subject_fp == expected
+        assert entry.subject_fp == _subject_fp(raw_key)
         text = path.read_text(encoding="utf-8")
-        assert raw_id not in text
-        assert "secret_id" not in text  # durable key must be secret_ref
+        assert raw_key not in text
+        assert "secret_id" not in text
+        assert "secret_ref" not in text  # durable key must be subject_fp
         persisted = json.loads(text.splitlines()[0])
-        assert persisted["secret_ref"] == expected
+        assert persisted["subject_fp"] == expected
         assert "secret_id" not in persisted
+        assert "secret_ref" not in persisted
 
     def test_query_fingerprints_filter(self):
         log = AuditLog()
-        raw_id = "vault/api-key"
-        log.append(entry_id="e1", actor="a", action="access", secret_id=raw_id)
-        log.append(entry_id="e2", actor="a", action="access", secret_id="other/id")
-        # Filter by raw id (fingerprinted) or by digest directly.
-        hits = log.query(secret_ref=raw_id)
+        raw_key = "vault/api-key"
+        log.append(entry_id="e1", actor="a", action="access", subject_key=raw_key)
+        log.append(entry_id="e2", actor="a", action="access", subject_key="other/id")
+        # Filter by raw key (fingerprinted) or by digest directly.
+        hits = log.query(subject_fp=raw_key)
         assert len(hits) == 1
         assert hits[0].entry_id == "e1"
-        assert hits[0].secret_ref == _secret_ref(raw_id)
-        hits_fp = log.query(secret_ref=_secret_ref(raw_id))
+        assert hits[0].subject_fp == _subject_fp(raw_key)
+        hits_fp = log.query(subject_fp=_subject_fp(raw_key))
         assert len(hits_fp) == 1
         assert hits_fp[0].entry_id == "e1"
 
-    def test_none_secret_ref_stays_none(self):
+    def test_none_subject_fp_stays_none(self):
         log = AuditLog()
-        entry = log.append(entry_id="e1", actor="a", action="seal", secret_id=None)
-        assert entry.secret_ref is None
-        assert _secret_ref(None) is None
+        entry = log.append(entry_id="e1", actor="a", action="seal", subject_key=None)
+        assert entry.subject_fp is None
+        assert _subject_fp(None) is None
 
     def test_restore_legacy_secret_id_key(self, tmp_path: Path):
-        """Old JSONL with secret_id key (fingerprint value) restores into secret_ref."""
+        """Old JSONL with secret_id key (fingerprint value) restores into subject_fp."""
         from skeleton.vault.audit import AuditEntry, _compute_hash
 
         path = tmp_path / "worm_audit.jsonl"
-        raw_id = "legacy/secret"
-        fp = _secret_ref(raw_id)
+        raw_key = "legacy/secret"
+        fp = _subject_fp(raw_key)
         entry = AuditEntry(
             entry_id="e1",
             actor="root",
             action="seal",
-            secret_ref=fp,
+            subject_fp=fp,
             outcome="success",
             metadata={},
             previous_hash=None,
             timestamp=1.0,
-            _body_secret_key="secret_id",
+            _body_fp_key="secret_id",
         )
         entry = AuditEntry(
             entry_id=entry.entry_id,
             actor=entry.actor,
             action=entry.action,
-            secret_ref=entry.secret_ref,
+            subject_fp=entry.subject_fp,
             outcome=entry.outcome,
             metadata=entry.metadata,
             previous_hash=entry.previous_hash,
             hash=_compute_hash(entry),
             timestamp=entry.timestamp,
-            _body_secret_key="secret_id",
+            _body_fp_key="secret_id",
         )
         # Simulate pre-rename durable line.
         legacy = {
             "entry_id": entry.entry_id,
             "actor": entry.actor,
             "action": entry.action,
-            "secret_id": entry.secret_ref,
+            "secret_id": entry.subject_fp,
             "outcome": entry.outcome,
             "metadata": entry.metadata,
             "previous_hash": entry.previous_hash,
@@ -194,6 +196,57 @@ class TestSecretRefFingerprint:
         )
         restored = AuditLog.open(path)
         assert len(restored) == 1
-        assert restored._entries[0].secret_ref == fp
+        assert restored._entries[0].subject_fp == fp
         assert not hasattr(restored._entries[0], "secret_id")
+        assert not hasattr(restored._entries[0], "secret_ref")
+        restored.verify_chain_or_refuse()
+
+    def test_restore_legacy_secret_ref_key(self, tmp_path: Path):
+        """Old JSONL with secret_ref key (fingerprint value) restores into subject_fp."""
+        from skeleton.vault.audit import AuditEntry, _compute_hash
+
+        path = tmp_path / "worm_audit.jsonl"
+        raw_key = "legacy/ref"
+        fp = _subject_fp(raw_key)
+        entry = AuditEntry(
+            entry_id="e1",
+            actor="root",
+            action="seal",
+            subject_fp=fp,
+            outcome="success",
+            metadata={},
+            previous_hash=None,
+            timestamp=1.0,
+            _body_fp_key="secret_ref",
+        )
+        entry = AuditEntry(
+            entry_id=entry.entry_id,
+            actor=entry.actor,
+            action=entry.action,
+            subject_fp=entry.subject_fp,
+            outcome=entry.outcome,
+            metadata=entry.metadata,
+            previous_hash=entry.previous_hash,
+            hash=_compute_hash(entry),
+            timestamp=entry.timestamp,
+            _body_fp_key="secret_ref",
+        )
+        legacy = {
+            "entry_id": entry.entry_id,
+            "actor": entry.actor,
+            "action": entry.action,
+            "secret_ref": entry.subject_fp,
+            "outcome": entry.outcome,
+            "metadata": entry.metadata,
+            "previous_hash": entry.previous_hash,
+            "hash": entry.hash,
+            "timestamp": entry.timestamp,
+        }
+        path.write_text(
+            json.dumps(legacy, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+        restored = AuditLog.open(path)
+        assert len(restored) == 1
+        assert restored._entries[0].subject_fp == fp
         restored.verify_chain_or_refuse()
