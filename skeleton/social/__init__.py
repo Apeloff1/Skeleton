@@ -1,18 +1,23 @@
-"""Social SOTA layer — ArchiveX, Wayback, arXiv, lab pointers. No prose."""
-from skeleton.social.archivex import parse_x_status, pointer
-from skeleton.social.cdx import probe
-from skeleton.social.ingest import ingest, seed_sota
-from skeleton.social.sota import sota_card
-from skeleton.social.sources import SOURCES, catalog, classify
+"""
+Skeleton Social Package
+
+Exports:
+- SocialGraph: Agent relationship tracking
+- ReputationEngine: Trust scoring
+- InteractionLog: Immutable interaction history
+- Interaction: Single interaction record
+"""
+
+from skeleton.social.graph import (
+    Interaction,
+    InteractionLog,
+    ReputationEngine,
+    SocialGraph,
+)
 
 __all__ = [
-    "SOURCES",
-    "catalog",
-    "classify",
-    "parse_x_status",
-    "pointer",
-    "ingest",
-    "probe",
-    "seed_sota",
-    "sota_card",
+    "SocialGraph",
+    "ReputationEngine",
+    "InteractionLog",
+    "Interaction",
 ]
