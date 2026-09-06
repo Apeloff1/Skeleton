@@ -1,18 +1,26 @@
-"""Organism + organismer — 10× Genos path over galaxy and social pointers.
-
-Heavy symbols are lazy-loaded so policy_enforcement (and other leaf modules)
-can import without pulling cortex/intelligence and creating cycles.
 """
-from __future__ import annotations
+Skeleton Organism Package
 
-__all__ = ["Organismer", "live_organismer", "reset_organismer", "product_card"]
+Exports:
+- OrganismState: Central runtime state
+- FeatureFlags: Runtime feature toggles
+- HealthMonitor: Continuous health checking
+- QualityState: Quality metrics tracking
+- append_quality: Global quality metric helper
+"""
 
+from skeleton.organism.state import (
+    FeatureFlags,
+    HealthMonitor,
+    OrganismState,
+    QualityState,
+    append_quality,
+)
 
-def __getattr__(name: str):
-    if name in {"Organismer", "live_organismer", "reset_organismer"}:
-        from skeleton.organism import organismer as _organismer
-        return getattr(_organismer, name)
-    if name == "product_card":
-        from skeleton.organism.product import product_card
-        return product_card
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+__all__ = [
+    "OrganismState",
+    "FeatureFlags",
+    "HealthMonitor",
+    "QualityState",
+    "append_quality",
+]

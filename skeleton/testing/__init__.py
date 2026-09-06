@@ -1,8 +1,18 @@
-"""Testing helpers package — fixtures + accessors."""
+"""
+Skeleton Testing Package
 
-from .fixtures import Fixture, FixtureRegistry
+Exports:
+- TestCase: Enhanced unittest with skeleton helpers
+- TestScaffold: Genesis boot for tests
+- TestOutcome: Structured test results
+- TestRunner: Custom runner with JSON output
+"""
+
+from skeleton.testing.scaffold import TestCase, TestOutcome, TestRunner, TestScaffold
 
 __all__ = [
-    "Fixture",
-    "FixtureRegistry",
+    "TestCase",
+    "TestScaffold",
+    "TestOutcome",
+    "TestRunner",
 ]
