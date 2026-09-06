@@ -873,28 +873,16 @@ class JeevesCortex:
     def _lm_amalgam(self, stim: str, composed: Thought, jaccard: float) -> Thought:
         """Neo transformer speaks. Compose keeps numbers and acquired text.
 
-        Unfitted net falls back to compose (tape). Fitted net is the LM.
-        Decode on the bound device (CPU default, CUDA if harnessed).
+        Decode on the bound device even when unfitted (birth weights still
+        utter). Fitted net keeps acquired/composed text beside the decode.
         MoE mix stitches in when the left expert is fitted and compose
         has no mix numbers of its own.
         """
         xf = self.speaking_lm()
         mouth_name = self.speaking_name()
-        fitted = int(getattr(xf, "fitted", 0) or 0) if xf is not None else 0
-        if xf is None or fitted <= 0:
-            # Tape path — own recall, not an LM utterance.
-            tags = tuple(dict.fromkeys(list(composed.tags) + ["neo", "own", "surpass", mouth_name]))
-            return Thought(
-                slot="neo",
-                kind="own",
-                text=composed.text or "",
-                confidence=composed.confidence,
-                tags=tags,
-                numbers=composed.numbers,
-            )
         seed = int(fingerprint(stim)[:8], 16) if stim else 0
         gen = ""
-        if hasattr(xf, "decode"):
+        if xf is not None and hasattr(xf, "decode"):
             gen = str(xf.decode(stim or "", n=14, seed=seed) or "")
         tags = tuple(dict.fromkeys(list(composed.tags) + ["lm", "neo", "own", "surpass", mouth_name]))
         numbers = composed.numbers
@@ -903,7 +891,7 @@ class JeevesCortex:
             numbers = tuple(float(x) for x in moe_mix)
             tags = tuple(dict.fromkeys(list(tags) + ["moe", "mix"]))
         # Keep acquired/composed text beside the LM decode (sigil survival).
-        body = f"{gen} || {composed.text}" if (gen or composed.text) else ""
+        body = f"{gen} || {composed.text}" if (gen or composed.text) else (gen or composed.text or "")
         return Thought(
             slot="neo",
             kind="own-lm",

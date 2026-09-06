@@ -31,8 +31,10 @@ class PrefrontalCortex:
     def __init__(self, *, span: int = 7) -> None:
         self.memory: deque[str] = deque(maxlen=max(3, span))
         from skeleton.cortex.learned import LearnedWeights
-        # Small LM: n-gram + skip-gram only. Medium (midbrain) owns the transformer.
-        self.weights = LearnedWeights(order=2, dim=8, seed=2, attn=False)
+        # Small LM: n-gram + 1-layer transformer (no FFN). Boilerplate stays the think() spine.
+        self.weights = LearnedWeights(
+            order=2, dim=8, seed=2, attn=True, ctx=4, n_heads=1, n_layers=1, d_ff=0,
+        )
 
     @property
     def lm(self):
