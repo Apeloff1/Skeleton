@@ -209,3 +209,14 @@ class CommandDeck:
             "audit": self.audit.card(),
             "health": self.health_probes.card(),
         }
+
+
+_LIVE = None
+
+
+def live_deck(root=None) -> CommandDeck:
+    """Process-local CommandDeck singleton (operator deck entrypoint)."""
+    global _LIVE
+    if _LIVE is None or (root is not None and getattr(_LIVE, "root", None) != root):
+        _LIVE = CommandDeck(root=root)
+    return _LIVE
