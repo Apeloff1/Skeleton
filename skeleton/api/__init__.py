@@ -1,6 +1,6 @@
 """REST API surface — HMAC seal, idempotency, Gate middleware."""
 
-from skeleton.api.hmac_seal import mint_seal, require_seal, verify_seal
+from skeleton.api.hmac_seal import HMACSeal, mint_seal, require_seal, verify_seal
 from skeleton.api.idempotency import IdempotencyGuard
 from skeleton.api.middleware import (
     AuthError,
@@ -19,6 +19,7 @@ from skeleton.api.middleware import (
 )
 
 __all__ = [
+    "HMACSeal",
     "mint_seal",
     "require_seal",
     "verify_seal",
