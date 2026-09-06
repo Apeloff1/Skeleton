@@ -6,7 +6,7 @@
 """
 import hashlib
 
-def _aid(n): return f"ach_{hashlib.md5(n.encode()).hexdigest()[:12]}"
+def _aid(n): return f"ach_{hashlib.sha256(n.encode()).hexdigest()[:12]}"
 
 def get_mega_achievements():
     achievements = []

@@ -1318,7 +1318,7 @@ class JeevesMemoryRAG:
         full_metadata = {
             "type": memory_type,
             "timestamp": datetime.utcnow().isoformat(),
-            "content_hash": hashlib.md5(content.encode()).hexdigest()
+            "content_hash": hashlib.sha256(content.encode()).hexdigest()
         }
         if metadata:
             full_metadata.update(metadata)
