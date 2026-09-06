@@ -1,4 +1,7 @@
-"""Tutolage Skeleton — the v16 rewrite of the Tutolage platform.
+"""
+Skeleton — Root package metadata
+
+Tutolage Skeleton — the v16 rewrite of the Tutolage platform.
 
 Root exports kernel primitives plus curated light exports from the
 dependency-light subsystems; heavier surfaces stay in their own
