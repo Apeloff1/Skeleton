@@ -179,8 +179,14 @@ class Genesis:
         """
         self.report.phases.append("cortex")
         from skeleton.cortex.neocortex import JeevesCortex
+        from skeleton.jeeves.core import Jeeves
 
-        self._wire("cortex", "cortex", JeevesCortex(bus=self.bus))
+        neo = JeevesCortex(bus=self.bus)
+        self._wire("cortex", "cortex", neo)
+        # Alias for GameForge/cockpit callers that look up the "jeeves" handle.
+        j = Jeeves(bus=self.bus)
+        j.cortex = neo
+        self._wire("cortex", "jeeves", j)
 
     def health(self) -> Dict[str, Any]:
         assert self.lattice is not None
