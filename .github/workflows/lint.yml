@@ -12,6 +12,9 @@ on:
     paths:
       - "frontend/**"
 
+permissions:
+  contents: read
+
 jobs:
   eslint:
     runs-on: ubuntu-latest

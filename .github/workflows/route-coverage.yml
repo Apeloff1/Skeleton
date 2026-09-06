@@ -14,6 +14,9 @@ on:
       - 'frontend/app/**'
       - 'scripts/route_coverage_check.py'
 
+permissions:
+  contents: read
+
 jobs:
   route-coverage:
     name: Validate registry ↔ filesystem
