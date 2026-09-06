@@ -50,7 +50,7 @@ HOUSE_ERA: Dict[str, str] = {
     "fighting_game": "fighting_game",
 }
 
-_LIKE = re.compile(r"\blike\s+(.+)$", re.I)
+_LIKE = re.compile(r"\blike\s+(\S.*)$", re.I)
 _TOKEN = re.compile(r"[a-z0-9]+")
 
 

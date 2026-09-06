@@ -1,6 +1,8 @@
 """Perpendicular cut — era alias, like-title bind, seven axes, laws."""
 from __future__ import annotations
 
+from urllib.parse import urlparse
+
 from skeleton.cortex.era_bind import HOUSE_ERA, house_era, resolve
 from skeleton.cortex.laws import LawError, check
 from skeleton.cortex.perpendicular import AXES, cut
@@ -32,7 +34,10 @@ def test_resolve_like_elden_ring_is_soulslike_pointer():
     assert card["pack_era"] == "soulslike"
     assert card["stored_prose"] == 0
     assert card["citation"]
-    assert "store.steampowered.com" in (card.get("url") or "")
+    steam_host = (urlparse(card.get("url") or "").hostname or "").lower()
+    assert steam_host == "store.steampowered.com" or steam_host.endswith(
+        ".store.steampowered.com"
+    )
 
 
 def test_resolve_stardew_is_cozy_wholesome():

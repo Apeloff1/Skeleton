@@ -1,6 +1,8 @@
 """Five-brain Hoag galaxy — codec, decoder, librarians, postprocess."""
 from __future__ import annotations
 
+from urllib.parse import urlparse
+
 from skeleton.context.postprocess import postprocess_context
 from skeleton.cortex.deck import CommandDeck
 from skeleton.galaxy.atoms import TIERS, Atom, house_dialect
@@ -21,7 +23,8 @@ def test_hoag_has_five_colored_rings_and_citation():
     colors = {b["color"] for b in BRAINS}
     assert len(colors) == 5
     assert HOAG_CITE["stored_prose"] == 0
-    assert "nasa.gov" in HOAG_CITE["url"]
+    nasa_host = (urlparse(HOAG_CITE["url"]).hostname or "").lower()
+    assert nasa_host == "nasa.gov" or nasa_host.endswith(".nasa.gov")
 
 
 def test_codec_tiers_and_longform_structure():

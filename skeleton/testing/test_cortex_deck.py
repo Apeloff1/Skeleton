@@ -1,6 +1,8 @@
 """Command-deck smoke — laws, refs, speak-like path, dodeca, genos card."""
 from __future__ import annotations
 
+from urllib.parse import urlparse
+
 from skeleton.cortex.antiplag import guard, score
 from skeleton.cortex.deck import CommandDeck
 from skeleton.cortex.dodeca import FACES, face_card
@@ -79,7 +81,8 @@ def test_lookup_elden_ring_is_pointer():
     assert ref["title"] == "Elden Ring"
     assert ref["appid"] == 1245620
     assert ref["stored_prose"] == 0
-    assert "steampowered.com" in ref["url"]
+    steam_host = (urlparse(ref["url"]).hostname or "").lower()
+    assert steam_host == "steampowered.com" or steam_host.endswith(".steampowered.com")
     assert ref["license"].startswith("LicenseRef-Steam")
 
 

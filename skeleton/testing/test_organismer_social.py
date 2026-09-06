@@ -1,6 +1,8 @@
 """Organismer 10x path + ArchiveX / social SOTA pointers."""
 from __future__ import annotations
 
+from urllib.parse import urlparse
+
 from skeleton.cortex.deck import CommandDeck
 from skeleton.organism.organismer import Organismer, reset_organismer
 from skeleton.social.archivex import parse_x_status, pointer
@@ -22,8 +24,10 @@ def test_archivex_status_pointer_stores_no_prose():
     card = parse_x_status(raw)
     assert card is not None
     assert card["post_id"] == "2093311693010894922"
-    assert "xarchive.net" in card["xarchive"]
-    assert "web.archive.org" in card["cdx"]
+    xarchive_host = (urlparse(card["xarchive"]).hostname or "").lower()
+    assert xarchive_host == "xarchive.net" or xarchive_host.endswith(".xarchive.net")
+    cdx_host = (urlparse(card["cdx"]).hostname or "").lower()
+    assert cdx_host == "web.archive.org" or cdx_host.endswith(".web.archive.org")
     assert card["stored_prose"] == "0"
     p = pointer(raw)
     assert p["kind"] == "x-status"
