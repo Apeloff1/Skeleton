@@ -5,10 +5,13 @@ Now wired to policy_enforcement for dynamic thresholds.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Mapping, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple
 
 from skeleton.intelligence.quality import QualityIssue, QualityReport, QualitySignal
 from skeleton.organism.policy_enforcement import threshold_for
+
+if TYPE_CHECKING:
+    from skeleton.intelligence.cognition import Cognition, Schism
 
 
 @dataclass(frozen=True)
@@ -40,11 +43,18 @@ class PlanVerificationReport:
 class PlanVerifier:
     """Verifier for plan/build cards returned by the command deck."""
 
-    def __init__(self, *, accept_at: float | None = None, root=None) -> None:
+    def __init__(
+        self,
+        *,
+        accept_at: float | None = None,
+        root=None,
+        cognition: "Cognition | None" = None,
+    ) -> None:
         self.accept_at = accept_at if accept_at is not None else threshold_for("plan", root=root, fallback=0.7)
         self.runs = 0
         self.accepted = 0
         self._root = root
+        self._cognition = cognition
 
     def verify(self, plan: Mapping[str, Any], *, vision: str = "") -> PlanVerificationReport:
         self.runs += 1
@@ -54,6 +64,9 @@ class PlanVerifier:
         coherence = self._coherence(plan, issues)
         grounding = self._grounding(plan, vision, issues)
         actionability = self._actionability(plan, issues)
+
+        if self._cognition is not None:
+            coherence = self._cognition_coherence(plan, self._cognition, issues, coherence)
 
         score = round(
             0.30 * completeness +
@@ -123,10 +136,10 @@ class PlanVerifier:
 
     def _completeness(self, plan: Mapping[str, Any], issues: list[str]) -> float:
         required = ("era", "primary_dps", "room_bias")
-        hits = sum(1 for k in required if plan.get(k) not in {None, "", []})
+        hits = sum(1 for k in required if plan.get(k) not in (None, "", []))
         score = hits / len(required)
         if hits < len(required):
-            missing = [k for k in required if plan.get(k) in {None, "", []}]
+            missing = [k for k in required if plan.get(k) in (None, "", [])]
             issues.append(f"soft: missing required plan fields {missing}")
         return score
 
@@ -171,3 +184,55 @@ class PlanVerifier:
         if useful < 2:
             issues.append("soft: plan is thin on buildable direction")
         return score
+
+    def ingest_claim(
+        self,
+        predicate: str,
+        polarity: bool,
+        witness: str,
+        supports: bool,
+        weight: float,
+    ) -> List["Schism"]:
+        """Update cognition with a claim and return open schisms for that predicate."""
+        if self._cognition is None:
+            raise RuntimeError("PlanVerifier has no cognition engine")
+        bid = self._cognition.hold(predicate, polarity)
+        self._cognition.testify(bid, witness, supports, weight)
+        return [s for s in self._cognition.schisms() if s.predicate == predicate]
+
+    def _cognition_coherence(
+        self,
+        plan: Mapping[str, Any],
+        cognition: "Cognition",
+        issues: list[str],
+        coherence: float,
+    ) -> float:
+        """Assert plan claims into cognition; open schisms → hard issue + score penalty.
+
+        Relies on ``Cognition.assert_plan_claims``: a lone plan witness will not
+        open a schism by itself; hard failures need pre-seeded opposition or
+        ``ingest_claim`` with additional witnesses.
+        """
+        raw = plan.get("claims")
+        if raw is None:
+            raw = plan.get("beliefs")
+        claims: list = list(raw) if isinstance(raw, (list, tuple)) else []
+        if not claims:
+            return coherence
+        opened = cognition.assert_plan_claims(claims)
+        # Also surface any open schisms on claimed predicates (pre-seeded opposition).
+        claimed = {
+            str(c.get("predicate") or "").strip()
+            for c in claims
+            if isinstance(c, Mapping) and str(c.get("predicate") or "").strip()
+        }
+        by_pred = {s.predicate: s for s in cognition.schisms() if s.predicate in claimed}
+        for s in opened:
+            by_pred[s.predicate] = s
+        if not by_pred:
+            return coherence
+        for pred in sorted(by_pred):
+            issues.append(f"hard: schism on predicate {pred}")
+        penalty = min(0.5, 0.25 * len(by_pred))
+        return max(0.0, coherence - penalty)
+
