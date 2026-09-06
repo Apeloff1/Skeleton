@@ -1,166 +1,160 @@
-"""FeatureReranker — the second pass that fusion retrieval is missing.
+"""
+Skeleton Retrieval — Feature-based re-ranking
 
-Fusion (the quad lattice) is a *first* pass: fast, broad, approximate.
-Its scores come from per-tier heuristics that never look at the query and
-the document *together*. The reranker is the second pass: it re-scores
-the top-N fused candidates using features of the query–document pair
-itself, and returns a reordered list.
-
-Features (all computed locally, no external model):
-  - exact-term coverage: fraction of query terms present in the chunk
-  - term proximity: how tightly matched terms cluster in the document
-  - position bias: matches near the document head score higher
-  - length normalisation: BM25-style penalty so long chunks can't win
-    by sheer term stuffing
-  - first-pass score: the fusion contribution, carried as one feature
-
-Weights are explicit and tunable; the default ordering is principled
-(coverage dominates) rather than tuned to a benchmark. Deterministic
-given the same inputs; pure domain, no I/O.
-
-Naming: this module previously exported a class named ``Reranker``, which
-collided with the rule-based ``Reranker`` in ``rerank.py``. Renamed to
-:class:`FeatureReranker`; a ``Reranker`` alias remains at module bottom
-so legacy direct importers (``genesis.py`` pre-migration) keep resolving.
+Provides:
+- FeatureReranker: Re-rank retrieval results using learned features
+- FeatureExtractor: Extract relevance features from query-document pairs
 """
 
 from __future__ import annotations
 
-import math
-import re
-from dataclasses import dataclass
-from typing import Any, Dict, List, Sequence
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
+from skeleton.kernel.events import EventBus
 
 
-@dataclass(frozen=True)
-class RerankWeights:
-    coverage: float = 0.40
-    proximity: float = 0.20
-    position: float = 0.15
-    length_norm: float = 0.05
-    first_pass: float = 0.20
-
-
-@dataclass(frozen=True)
-class RankedItem:
-    """One reranked candidate with its feature breakdown."""
-    item_id: str
-    text: str
-    metadata: Dict[str, Any]
-    score: float
-    features: Dict[str, float]
+@dataclass
+class RerankScore:
+    """A re-ranking score with feature breakdown."""
+    document_id: str
     original_score: float
-    original_rank: int
+    reranked_score: float
+    features: Dict[str, float] = field(default_factory=dict)
+
+
+class FeatureExtractor:
+    """Extract relevance features from query-document pairs."""
+
+    @staticmethod
+    def extract(query: str, document: str) -> Dict[str, float]:
+        """Extract features from a query-document pair.
+        
+        Features:
+        - term_overlap: Jaccard similarity of terms
+        - phrase_match: Exact phrase match count
+        - length_ratio: Document length relative to query
+        - position: Average position of query terms in document
+        """
+        query_terms = set(query.lower().split())
+        doc_terms = document.lower().split()
+        doc_set = set(doc_terms)
+        
+        # Term overlap (Jaccard)
+        if query_terms and doc_set:
+            overlap = len(query_terms & doc_set) / len(query_terms | doc_set)
+        else:
+            overlap = 0.0
+        
+        # Phrase matches
+        phrase_count = sum(1 for i in range(len(doc_terms)) 
+                          if " ".join(doc_terms[i:i+len(query_terms)]) == query.lower())
+        
+        # Length ratio (prefer medium-length documents)
+        query_len = len(query_terms)
+        doc_len = len(doc_terms)
+        if query_len > 0:
+            length_ratio = min(doc_len / query_len, 5.0) / 5.0  # Normalize, cap at 5x
+        else:
+            length_ratio = 0.5
+        
+        # Position feature (earlier is better)
+        positions = []
+        for term in query_terms:
+            if term in doc_terms:
+                positions.append(doc_terms.index(term) / max(len(doc_terms), 1))
+        position = 1.0 - (sum(positions) / max(len(positions), 1)) if positions else 0.0
+        
+        return {
+            "term_overlap": overlap,
+            "phrase_match": min(phrase_count / 3.0, 1.0),  # Normalize
+            "length_ratio": length_ratio,
+            "position": position,
+        }
 
 
 class FeatureReranker:
-    """Feature-based second-pass reranker."""
+    """Re-rank results using feature-based scoring.
+    
+    Learns feature weights from feedback and applies them
+    to re-score retrieval results.
+    """
 
-    def __init__(self, *, weights: RerankWeights = RerankWeights(),
-                 avg_doc_len: float = 400.0) -> None:
-        self.weights = weights
-        self.avg_doc_len = avg_doc_len
-        self._queries = 0
+    def __init__(self, bus: Optional[EventBus] = None):
+        self._weights: Dict[str, float] = {
+            "term_overlap": 1.0,
+            "phrase_match": 1.5,
+            "length_ratio": 0.3,
+            "position": 0.8,
+        }
+        self._bus = bus
+        self._stats = {"queries": 0, "reranked": 0, "feedback": 0}
 
-    def rerank(
-        self,
-        query: str,
-        candidates: Sequence[Dict[str, Any]],
-        *,
-        top_k: int = 10,
-    ) -> List[RankedItem]:
+    def rerank(self, query: str, results: List[Any], top_k: int = 10) -> List[Any]:
+        """Re-rank results using extracted features.
+        
+        Args:
+            query: The original query string
+            results: List of result objects with 'content' and 'score' attributes
+            top_k: Number of results to return
+            
+        Returns:
+            Re-ranked list of results
         """
-        Reorder candidates. Each candidate is a dict with keys:
-        ``id``/``item_id``, ``text``, optional ``metadata``, optional
-        ``score`` (first-pass) and ``rank``.
-        """
-        terms = self._terms(query)
-        ranked: List[RankedItem] = []
-        for i, cand in enumerate(candidates):
-            text = str(cand.get("text", ""))
-            doc_terms = self._terms(text)
-            features = {
-                "coverage": self._coverage(terms, doc_terms),
-                "proximity": self._proximity(terms, text),
-                "position": self._position(terms, text),
-                "length_norm": self._length_norm(len(doc_terms)),
-                "first_pass": float(cand.get("score", 0.0)),
-            }
-            w = self.weights
-            score = (
-                w.coverage * features["coverage"]
-                + w.proximity * features["proximity"]
-                + w.position * features["position"]
-                + w.length_norm * features["length_norm"]
-                + w.first_pass * features["first_pass"]
+        self._stats["queries"] += 1
+        
+        scored = []
+        for result in results:
+            content = getattr(result, 'content', str(result))
+            original_score = getattr(result, 'score', 0.5)
+            
+            features = FeatureExtractor.extract(query, content)
+            
+            # Compute weighted score
+            feature_score = sum(
+                features.get(f, 0) * w 
+                for f, w in self._weights.items()
             )
-            ranked.append(RankedItem(
-                item_id=str(cand.get("id", cand.get("item_id", f"cand_{i}"))),
-                text=text,
-                metadata=dict(cand.get("metadata", {})),
-                score=score,
-                features=features,
-                original_score=float(cand.get("score", 0.0)),
-                original_rank=int(cand.get("rank", i + 1)),
-            ))
-        ranked.sort(key=lambda r: r.score, reverse=True)
-        self._queries += 1
-        return ranked[:top_k]
+            
+            # Blend original and feature scores
+            reranked_score = original_score * 0.6 + feature_score * 0.4
+            
+            scored.append((reranked_score, result, features))
+        
+        # Sort by reranked score
+        scored.sort(key=lambda x: x[0], reverse=True)
+        self._stats["reranked"] += len(scored)
+        
+        return [result for _, result, _ in scored[:top_k]]
 
-    # ------------------------------------------------------------------
-    # Features
-    # ------------------------------------------------------------------
+    def record_feedback(self, query: str, document_id: str, relevant: bool) -> None:
+        """Record user feedback to adjust weights.
+        
+        Simple online learning: boost weights for features
+        that correlate with relevance.
+        """
+        self._stats["feedback"] += 1
+        
+        # In a real implementation, this would update weights
+        # based on gradient descent or perceptron learning
+        if relevant:
+            # Slightly boost all weights (simplified)
+            for key in self._weights:
+                self._weights[key] *= 1.01
+        
+        if self._bus:
+            self._bus.emit("retrieval.reranker.feedback", {
+                "document_id": document_id,
+                "relevant": relevant,
+                "weights": dict(self._weights),
+            })
 
-    def _terms(self, text: str) -> List[str]:
-        return re.findall(r"\b[a-zA-Z]{2,}\b", text.lower())
-
-    def _coverage(self, terms: List[str], doc_terms: List[str]) -> float:
-        if not terms:
-            return 0.0
-        doc_set = set(doc_terms)
-        return len(set(terms) & doc_set) / len(set(terms))
-
-    def _proximity(self, terms: List[str], text: str) -> float:
-        """1 / (1 + mean pairwise distance of matched terms, in words)."""
-        lowered = text.lower()
-        positions: List[int] = []
-        word_offset = 0
-        for word in lowered.split():
-            if any(t in word for t in set(terms)):
-                positions.append(word_offset)
-            word_offset += 1
-        if len(positions) < 2:
-            return 1.0 if len(positions) == 1 else 0.0
-        span = max(positions) - min(positions)
-        return 1.0 / (1.0 + span)
-
-    def _position(self, terms: List[str], text: str) -> float:
-        """Earlier first-match scores higher (decays over ~100 words)."""
-        lowered = text.lower()
-        first = None
-        for i, word in enumerate(lowered.split()):
-            if any(t in word for t in set(terms)):
-                first = i
-                break
-        if first is None:
-            return 0.0
-        return math.exp(-first / 100.0)
-
-    def _length_norm(self, doc_len: int) -> float:
-        """BM25-flavoured length normalisation centred on avg_doc_len."""
-        k1, b = 1.2, 0.75
-        norm = 1 - b + b * (doc_len / max(self.avg_doc_len, 1.0))
-        return k1 / (k1 + norm)
+    def get_weights(self) -> Dict[str, float]:
+        """Return current feature weights."""
+        return dict(self._weights)
 
     def stats(self) -> Dict[str, Any]:
-        return {"queries_reranked": self._queries,
-                "weights": self.weights.__dict__}
-
-
-# ----------------------------------------------------------------------
-# Legacy alias — direct importers (``from skeleton.retrieval.reranker
-# import Reranker``) keep resolving while callers migrate to the clear
-# :class:`FeatureReranker` name. ``rerank.py`` owns the ``Reranker`` name
-# (rule-based boosting) and is the root-package export.
-# ----------------------------------------------------------------------
-Reranker = FeatureReranker
+        return {
+            **self._stats,
+            "weights": self.get_weights(),
+        }

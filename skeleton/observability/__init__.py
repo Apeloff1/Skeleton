@@ -1,14 +1,20 @@
 """
-Skeleton Observability Package
+Skeleton Observability Package — Additional exports
 
 Exports:
-- Sampler: Adaptive telemetry sampling
-- MetricsCollector: Counter/gauge/histogram aggregation
 - AnomalyDetector: Statistical anomaly detection
+- AnomalyReport: Detected anomaly record
+- AdaptiveThreshold: Self-adjusting thresholds
+- SeasonalDecomposer: Time-series decomposition
 """
 
-from skeleton.observability.metrics import (
+from skeleton.observability.anomaly import (
+    AdaptiveThreshold,
     AnomalyDetector,
+    AnomalyReport,
+    SeasonalDecomposer,
+)
+from skeleton.observability.metrics import (
     MetricPoint,
     MetricsCollector,
     Sampler,
@@ -19,6 +25,9 @@ __all__ = [
     "Sampler",
     "default_sampler",
     "MetricsCollector",
-    "AnomalyDetector",
     "MetricPoint",
+    "AnomalyDetector",
+    "AnomalyReport",
+    "AdaptiveThreshold",
+    "SeasonalDecomposer",
 ]
