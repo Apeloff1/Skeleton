@@ -181,7 +181,7 @@ class RAGService:
         """Store a learning session in memory."""
         collection = self._get_collection("learning_sessions")
         
-        session_id = hashlib.md5(
+        session_id = hashlib.sha256(
             f"{user_id}:{topic}:{datetime.utcnow().isoformat()}".encode()
         ).hexdigest()[:16]
         
@@ -446,7 +446,7 @@ class RAGService:
         """Store user feedback."""
         collection = self._get_collection("feedback")
         
-        feedback_id = hashlib.md5(
+        feedback_id = hashlib.sha256(
             f"{user_id}:{feedback_type}:{datetime.utcnow().isoformat()}".encode()
         ).hexdigest()[:16]
         
@@ -509,7 +509,7 @@ def store_memory(memory_type: str, content: str, metadata: Optional[Dict] = None
         )
     elif memory_type == "concept":
         return rag_service.store_concept(
-            concept_id=metadata.get("concept_id", hashlib.md5(content.encode()).hexdigest()[:8]),
+            concept_id=metadata.get("concept_id", hashlib.sha256(content.encode()).hexdigest()[:8]),
             name=metadata.get("name", "Unnamed Concept"),
             explanation=content,
             examples=metadata.get("examples", []),
@@ -525,7 +525,7 @@ def store_memory(memory_type: str, content: str, metadata: Optional[Dict] = None
     else:
         # Generic storage
         collection = rag_service._get_collection("learning_sessions")
-        memory_id = hashlib.md5(content.encode()).hexdigest()[:16]
+        memory_id = hashlib.sha256(content.encode()).hexdigest()[:16]
         collection.add(
             documents=[content],
             metadatas=[{"type": memory_type, **(metadata or {})}],

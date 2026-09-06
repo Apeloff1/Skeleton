@@ -72,7 +72,7 @@ def cache_version() -> int:
 
 
 def _bucket(user_id: str, name: str) -> int:
-    h = hashlib.md5(f"{user_id}|{name}".encode()).hexdigest()
+    h = hashlib.sha256(f"{user_id}|{name}".encode()).hexdigest()
     return int(h[:8], 16) % 100
 
 
