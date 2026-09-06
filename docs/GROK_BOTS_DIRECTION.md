@@ -140,10 +140,10 @@ Do these in order. Do not fan out until the current row is closed.
 
 ### P1 — Factory
 
-- [ ] Forge manifests for levels / NPC / items / quests with seeds.
-- [ ] Cockpit param file (JSON) overlaying `@export` / data tables.
-- [ ] Snowball mass metric on observe card.
-- [ ] Compatibility matrix stub (style × mechanic × tone).
+- [x] Forge manifests for levels / NPC / items / quests with seeds.
+- [x] Cockpit param file (JSON) overlaying `@export` / data tables.
+- [x] Snowball mass metric on observe card.
+- [x] Compatibility matrix stub (style × mechanic × tone).
 
 ### P2 — Organism fidelity
 

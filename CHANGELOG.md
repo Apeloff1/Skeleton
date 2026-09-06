@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-06 — P1 factory manifests
+
+- manifests + snowball mass + compat matrix + cockpit.json.
+- observe.card exposes mass.
+
+---
+
 ## 2026-09-06 — P0 game spine on day
 
 - organism/gamespec.py: spec → Godot slice → walk score → build_report.

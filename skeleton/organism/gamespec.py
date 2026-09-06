@@ -131,7 +131,33 @@ def forge(org=None, *, answers: Optional[Dict[str, Any]] = None) -> Dict[str, An
         field_pct = float(bound_card(root).get("field_pct") or 0)
     except Exception:
         field_pct = 0.0
-    rep = report(spec, sl, sc, root=root, cue=cue, field_pct=field_pct)
+    man: Dict[str, Any] = {}
+    try:
+        from skeleton.organism.manifests import write as write_man
+        man = write_man(spec, root)
+    except Exception as exc:
+        man = {"err": type(exc).__name__}
+    try:
+        from skeleton.organism.compat import card as compat_card
+        spec["compat"] = compat_card(spec)
+    except Exception:
+        pass
+    mass = 0.0
+    try:
+        from skeleton.organism.snowball import tick as snow_tick
+        mass = float(snow_tick(root, critique="pass" if sc.get("passed") else "fail").get("mass") or 0)
+    except Exception:
+        mass = 0.0
+    cockpit = root / "game" / "data" / "cockpit.json"
+    try:
+        cockpit.parent.mkdir(parents=True, exist_ok=True)
+        cockpit.write_text(
+            json.dumps({"kind": "cockpit", "era": spec.get("era"), "mass": mass, "stored_prose": 0}, indent=2),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
+    rep = report(spec, sl, sc, root=root, cue=cue, mass=mass, field_pct=field_pct)
     return {
         "kind": "game-forge-day",
         "spec": str(spec_path),
@@ -140,5 +166,8 @@ def forge(org=None, *, answers: Optional[Dict[str, Any]] = None) -> Dict[str, An
         "passed": int(bool(sc.get("passed"))),
         "report": str(rep),
         "era": spec.get("era"),
+        "manifests": man.get("n"),
+        "mass": mass,
+        "compat": (spec.get("compat") or {}).get("ok"),
         "stored_prose": 0,
     }

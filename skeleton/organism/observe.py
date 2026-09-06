@@ -130,5 +130,6 @@ def card(root: Optional[Path] = None) -> Dict[str, Any]:
         "helix_ok": (rows[-1].get("helix_ok") if rows else 1) or 0,
         "dumps": (rows[-1].get("dumps") if rows else 0) or 0,
         "loop_fired": (rows[-1].get("loop_fired") if rows else 0) or 0,
+        "mass": float((__import__("skeleton.organism.snowball", fromlist=["card"]).card(root).get("mass") or 0)),
         "stored_prose": 0,
     }
