@@ -72,6 +72,28 @@ jobs:
           python -m skeleton walk --era soulslike
 
   # ========================================
+  # Cockpit smoke gauntlet (#11) — scripts/cockpit-smoke.sh
+  # Extend-only hook; skeleton-test inline gates kept above.
+  # ========================================
+  cockpit-smoke:
+    name: "Cockpit Smoke"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run cockpit smoke gauntlet
+        env:
+          PYTHONPATH: "."
+        run: chmod +x scripts/cockpit-smoke.sh && ./scripts/cockpit-smoke.sh
+
+  # ========================================
   # Backend: Test
   # ========================================
   backend-test:
