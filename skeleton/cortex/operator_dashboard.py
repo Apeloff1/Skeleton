@@ -10,9 +10,6 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
-from skeleton.organism.doctor import doctor_card
-from skeleton.organism.nervous import nervous_card
-from skeleton.organism.product import product_card
 
 
 @dataclass
@@ -99,6 +96,11 @@ class OperatorDashboard:
         self._subscribers.append(callback)
 
     def card(self) -> Dict[str, Any]:
+        # Lazy imports avoid deck -> dashboard -> organism -> deck cycles
+        # when skeleton.cortex package init pulls CommandDeck.
+        from skeleton.organism.doctor import doctor_card
+        from skeleton.organism.nervous import nervous_card
+        from skeleton.organism.product import product_card
         return {
             "kind": "operator-dashboard",
             "updated_at_ns": self._last_update_ns,

@@ -44,7 +44,7 @@ def probe_interchange() -> Dict[str, Any]:
 
 
 class HuggingFaceBackend:
-    """ModelPort. Real AutoModel when transformers is installed; else stand-in."""
+    """ModelPort. Cortex stays closed-world: local stand-in mouth only."""
 
     def __init__(
         self,
@@ -66,16 +66,11 @@ class HuggingFaceBackend:
         self._maybe_load()
 
     def _maybe_load(self) -> None:
-        try:
-            from transformers import AutoModelForCausalLM, AutoTokenizer
-            self._tok = AutoTokenizer.from_pretrained(self.model_id)
-            self._model = AutoModelForCausalLM.from_pretrained(self.model_id)
-            self._model.eval()
-            self.remote = True
-        except Exception:
-            self.remote = False
-            self._tok = None
-            self._model = None
+        # Closed-world cortex: never pull remote weights into this package.
+        # Bindable teacher identity remains; decode/fit use the local stand-in.
+        self.remote = False
+        self._tok = None
+        self._model = None
 
     @property
     def transformer(self):
