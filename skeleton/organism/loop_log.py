@@ -8,9 +8,12 @@ from typing import Any, Dict, List, Optional
 
 def path(root: Optional[Path] = None) -> Path:
     if root is None:
-        from skeleton.organism.paths import organism_root
-        root = organism_root()
-    p = Path(root) / "chronicle" / "loop.jsonl"
+        try:
+            from skeleton.organism.paths import organism_root
+            root = organism_root()
+        except Exception:
+            root = Path(".")
+    p = Path(root or ".") / "chronicle" / "loop.jsonl"
     p.parent.mkdir(parents=True, exist_ok=True)
     return p
 
@@ -24,9 +27,13 @@ def record(row: Dict[str, Any], *, root: Optional[Path] = None) -> Dict[str, Any
         "r": int(row.get("r") or 0),
         "stored_prose": 0,
     }
-    p = path(root)
-    with p.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(out, separators=(",", ":")) + "\n")
+    try:
+        p = path(root)
+        with p.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(out, separators=(",", ":")) + "\n")
+        out["log"] = 1
+    except Exception:
+        out["log"] = 0
     return out
 
 

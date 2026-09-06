@@ -163,8 +163,18 @@ def _act(code: str, org, *, neo=None) -> Dict[str, Any]:
         from skeleton.kernel.ops.looped import Looped
         from skeleton.organism.loop_log import record
         card = Looped().poke()
-        record({"open": 1, "fire": 1, "family": "looped", "r": 2}, root=getattr(org, "root", None))
-        acted = {"kind": "think", "ok": 1, "n": card.get("n"), "hits": sum((card.get("hits") or {}).values())}
+        logged = record({"open": 1, "fire": 1, "family": "looped", "r": 2}, root=getattr(org, "root", None))
+        from skeleton.organism.pulse import pulse
+        nxt = pulse(org, neo=neo, stimulus="why derive loop plan")
+        acted = {
+            "kind": "think",
+            "ok": 1,
+            "n": card.get("n"),
+            "hits": sum((card.get("hits") or {}).values()),
+            "log": logged.get("log"),
+            "next": "pulse",
+            "pulse": nxt.get("kind"),
+        }
     else:
         from skeleton.organism.pulse import pulse
         acted = pulse(org, neo=neo, stimulus="")

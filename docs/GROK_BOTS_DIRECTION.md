@@ -147,10 +147,10 @@ Do these in order. Do not fan out until the current row is closed.
 
 ### P2 — Organism fidelity
 
-- [ ] `loop.jsonl` writes without failing on missing root (log=1).
-- [ ] Decade dump includes `rotors.json`, `loop.jsonl`, `bound.jsonl`.
-- [ ] Conductor `think` warms bank then returns to `pulse`.
-- [ ] Coverage card lists `looped` + `obscure` + `social` counts.
+- [x] `loop.jsonl` writes without failing on missing root (log=1).
+- [x] Decade dump includes `rotors.json`, `loop.jsonl`, `bound.jsonl`.
+- [x] Conductor `think` warms bank then returns to `pulse`.
+- [x] Coverage card lists `looped` + `obscure` + `social` counts.
 
 ### P3 — Social SOTA field
 

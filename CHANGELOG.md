@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-06 — P2 organism fidelity
+
+- loop.jsonl log=1 on missing root. Dump hot list includes rotors/loop/bound/snowball.
+- think warms looped bank then pulses. Coverage lists looped/obscure/social.
+
+---
+
 ## 2026-09-06 — P1 factory manifests
 
 - manifests + snowball mass + compat matrix + cockpit.json.
