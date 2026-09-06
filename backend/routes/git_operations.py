@@ -28,15 +28,39 @@ _active = {"project": "default"}
 _SAFE = re.compile(r"[^A-Za-z0-9_.\-]")
 
 
-def _repo_dir(project: Optional[str] = None) -> Path:
-    name = _SAFE.sub("_", (project or _active["project"]) or "default")
-    if not name or name in {".", ".."} or ".." in name:
-        name = "default"
-    root = GIT_WORKSPACE_BASE.resolve()
-    candidate = root.joinpath(name).resolve()
-    if candidate != root and root not in candidate.parents:
-        raise HTTPException(status_code=400, detail="invalid project path")
+def _safe_segment(value: str, *, what: str = "path") -> str:
+    """Reject path traversal / absolute segments in user-supplied ids."""
+    s = str(value or "").strip()
+    if (
+        not s
+        or s in {".", ".."}
+        or ".." in s
+        or "/" in s
+        or "\\" in s
+        or s.startswith(("~", "/", "\\"))
+    ):
+        raise ValueError(f"invalid {what}: {value!r}")
+    return s
+
+
+def _resolve_under(root: Path, *parts: str) -> Path:
+    """Join parts under root; raise if the result escapes root."""
+    root_r = root.resolve()
+    candidate = root_r.joinpath(*parts).resolve()
+    if candidate != root_r and root_r not in candidate.parents:
+        raise ValueError(f"path escapes sandbox: {parts!r}")
     return candidate
+
+
+def _repo_dir(project: Optional[str] = None) -> Path:
+    # Normalize charset for workspace folder names, then harden via
+    # _safe_segment → _resolve_under (CodeQL: never joinpath raw/regex-only).
+    name = _SAFE.sub("_", (project or _active["project"]) or "default") or "default"
+    try:
+        safe = _safe_segment(name, what="project")
+        return _resolve_under(GIT_WORKSPACE_BASE, safe)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="invalid project path") from e
 
 
 async def _git(args: List[str], project: Optional[str] = None, cwd: Optional[Path] = None) -> dict:
