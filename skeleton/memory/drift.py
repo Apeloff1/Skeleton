@@ -1,138 +1,136 @@
-"""Persona drift detection — watch a persona wander from its anchor.
+"""
+Skeleton Memory — Persona drift detection
 
-A CAG persona accumulates knowledge over time: facts are added, importance
-scores shift, evictions fire. Nothing in the trinity currently notices when
-the cumulative effect is a persona that no longer resembles its system
-prompt — a support persona that has drifted into politics, a tutor persona
-whose knowledge graph is now 80% trivia.
-
-The drift detector keeps a fixed **anchor vector** (a term-frequency
-fingerprint of the persona's system prompt, taken at registration) and
-periodically compares it against a live fingerprint of the knowledge
-graph. Drift is 1 − cosine(anchor, live), smoothed over snapshots so a
-single odd addition doesn't trip the alarm.
-
-When smoothed drift crosses the threshold, the detector publishes a
-``memory.persona.drifted`` event with the terms most responsible — the
-dimensions of the drift, not just its size — so the operator can see
-*which way* the persona wandered.
+Provides:
+- PersonaDriftDetector: Detect when agent behavior drifts from baseline
 """
 
 from __future__ import annotations
 
-import math
-import re
+import statistics
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from skeleton.kernel.events import DomainEvent, EventBus
 
 
-def _fingerprint(text: str) -> Dict[str, float]:
-    """L2-normalised term-frequency vector over meaningful words."""
-    terms = re.findall(r"\b[a-zA-Z]{3,}\b", text.lower())
-    freq: Dict[str, float] = {}
-    for t in terms:
-        freq[t] = freq.get(t, 0.0) + 1.0
-    norm = math.sqrt(sum(v * v for v in freq.values())) or 1.0
-    return {t: v / norm for t, v in freq.items()}
-
-
-def _cosine(a: Dict[str, float], b: Dict[str, float]) -> float:
-    shared = set(a) & set(b)
-    return sum(a[t] * b[t] for t in shared)
-
-
 @dataclass
-class DriftSnapshot:
-    drift: float
-    taken_at_index: int
-    top_divergent_terms: List[str]
-
-
-@dataclass
-class PersonaWatch:
-    """Drift state for one persona."""
-    persona_id: str
-    anchor: Dict[str, float]
-    snapshots: List[DriftSnapshot] = field(default_factory=list)
-    alerted: bool = False
+class BehaviorSample:
+    """A single behavior observation."""
+    timestamp: float
+    action: str
+    context: Dict[str, Any] = field(default_factory=dict)
+    embedding: Optional[List[float]] = None
 
 
 class PersonaDriftDetector:
-    """
-    Tracks per-persona drift between the anchor prompt and live knowledge.
-
-    Parameters
-    ----------
-    threshold:
-        Smoothed drift that triggers an alert (0.5 = half the persona's
-        effective vocabulary has rotated).
-    smoothing:
-        EMA weight on the newest snapshot; higher reacts faster.
+    """Detect when agent behavior deviates from established baseline.
+    
+    Uses statistical anomaly detection on action distributions
+    and optional embedding distance metrics.
     """
 
-    def __init__(self, *, threshold: float = 0.5, smoothing: float = 0.3,
-                 bus: Optional[EventBus] = None) -> None:
-        if not 0.0 < threshold <= 1.0:
-            raise ValueError("threshold must be in (0, 1]")
-        self.threshold = threshold
-        self.smoothing = smoothing
-        self._watches: Dict[str, PersonaWatch] = {}
+    def __init__(self, bus: Optional[EventBus] = None, window_size: int = 100):
         self._bus = bus
+        self._window_size = window_size
+        self._baseline: Dict[str, float] = {}  # action -> frequency
+        self._recent: List[BehaviorSample] = []
+        self._drift_threshold = 2.0  # standard deviations
+        self._stats = {"checks": 0, "drifts_detected": 0}
 
-    def register(self, persona_id: str, system_prompt: str) -> PersonaWatch:
-        watch = PersonaWatch(persona_id=persona_id, anchor=_fingerprint(system_prompt))
-        self._watches[persona_id] = watch
-        return watch
-
-    def check(self, persona_id: str, live_text: str) -> DriftSnapshot:
-        """Take a snapshot of the persona's current knowledge text."""
-        watch = self._watches.get(persona_id) or self.register(persona_id, live_text)
-        live = _fingerprint(live_text)
-        raw_drift = 1.0 - _cosine(watch.anchor, live)
-        prior = watch.snapshots[-1].drift if watch.snapshots else raw_drift
-        smoothed = (1 - self.smoothing) * prior + self.smoothing * raw_drift
-
-        # terms present in live but absent/weak in anchor, by contribution
-        divergence = sorted(
-            (t for t in live if watch.anchor.get(t, 0.0) < live[t] * 0.5),
-            key=lambda t: -live[t],
-        )[:5]
-
-        snapshot = DriftSnapshot(
-            drift=smoothed,
-            taken_at_index=len(watch.snapshots),
-            top_divergent_terms=divergence,
+    def record(self, action: str, context: Optional[Dict[str, Any]] = None) -> None:
+        """Record a behavior observation."""
+        sample = BehaviorSample(
+            timestamp=time.time(),
+            action=action,
+            context=context or {},
         )
-        watch.snapshots.append(snapshot)
+        self._recent.append(sample)
+        
+        # Trim window
+        if len(self._recent) > self._window_size:
+            self._recent = self._recent[-self._window_size:]
 
-        if smoothed >= self.threshold and not watch.alerted:
-            watch.alerted = True
+    def establish_baseline(self, samples: List[str]) -> None:
+        """Establish baseline from historical action distribution."""
+        from collections import Counter
+        counts = Counter(samples)
+        total = len(samples)
+        self._baseline = {action: count / total for action, count in counts.items()}
+
+    def check_drift(self) -> Optional[Dict[str, Any]]:
+        """Check if recent behavior deviates from baseline.
+        
+        Returns drift report if drift detected, None otherwise.
+        """
+        if not self._baseline or len(self._recent) < 10:
+            return None
+        
+        self._stats["checks"] += 1
+        
+        from collections import Counter
+        recent_actions = [s.action for s in self._recent]
+        recent_counts = Counter(recent_actions)
+        recent_total = len(recent_actions)
+        
+        # Calculate chi-squared-like deviation
+        deviations = []
+        for action, baseline_freq in self._baseline.items():
+            recent_freq = recent_counts.get(action, 0) / recent_total
+            if baseline_freq > 0:
+                deviation = (recent_freq - baseline_freq) / baseline_freq
+                deviations.append(deviation ** 2)
+        
+        if not deviations:
+            return None
+        
+        # Check if any action significantly deviated
+        max_deviation = max(deviations) if deviations else 0
+        
+        if max_deviation > self._drift_threshold:
+            self._stats["drifts_detected"] += 1
+            
+            drift_report = {
+                "detected": True,
+                "severity": "high" if max_deviation > 4.0 else "medium",
+                "max_deviation": max_deviation,
+                "threshold": self._drift_threshold,
+                "sample_count": len(self._recent),
+                "baseline_actions": len(self._baseline),
+            }
+            
             if self._bus:
-                self._bus.publish(
-                    DomainEvent(
-                        topic="memory.persona.drifted",
-                        payload={
-                            "persona_id": persona_id,
-                            "drift": round(smoothed, 4),
-                            "threshold": self.threshold,
-                            "divergent_terms": divergence,
-                            "snapshots": len(watch.snapshots),
-                        },
-                        correlation_id=f"drift_{persona_id}",
-                    )
-                )
-        elif smoothed < self.threshold * 0.8:
-            watch.alerted = False  # hysteresis: re-arm well below the line
-        return snapshot
+                self._bus.publish(DomainEvent(
+                    topic="memory.drift.detected",
+                    payload=drift_report,
+                ))
+            
+            return drift_report
+        
+        return None
+
+    def get_profile(self) -> Dict[str, Any]:
+        """Get current behavior profile."""
+        from collections import Counter
+        if not self._recent:
+            return {"status": "no_data"}
+        
+        recent_actions = [s.action for s in self._recent]
+        counts = Counter(recent_actions)
+        total = len(recent_actions)
+        
+        return {
+            "total_observations": total,
+            "unique_actions": len(counts),
+            "action_distribution": {action: count / total for action, count in counts.most_common(10)},
+            "baseline_established": bool(self._baseline),
+        }
 
     def stats(self) -> Dict[str, Any]:
         return {
-            "personas_watched": len(self._watches),
-            "alerted": [pid for pid, w in self._watches.items() if w.alerted],
-            "mean_drift": round(
-                sum(w.snapshots[-1].drift for w in self._watches.values() if w.snapshots)
-                / max(sum(1 for w in self._watches.values() if w.snapshots), 1), 4
-            ),
+            **self._stats,
+            "window_size": self._window_size,
+            "threshold": self._drift_threshold,
+            "observations": len(self._recent),
         }

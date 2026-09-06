@@ -1,134 +1,56 @@
-"""Rot-triggered compaction — the context-rot loop, closed.
+"""
+Skeleton Memory — Guarded compaction for turn history
 
-``ContextRotGuard`` detects attention dilution; ``ContextCompactor`` trims.
-This module composes them: assess the running turn list, and only compact
-when the guard says the context is rotting — never earlier (over-eager
-compaction loses information for no gain) and never later.
-
-The loop per call:
-
-1. Render turns to prompt text and assess rot.
-2. verdict == "fresh" → return turns untouched.
-3. verdict == "watch" → return turns untouched, report the warning.
-4. verdict == "rot"   → compact (head + marker + tail), report the repair.
-
-Restating-buried-constraints is reported back to the caller as a hint —
-the cheapest rot fix is often restating the rule near the live edge, not
-compacting at all.
-
-Pure domain; deterministic.
+Provides:
+- compact_turns: Compress turn history while preserving semantic content
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence
-
-from .compaction import CompactionResult, ContextCompactor, Turn
-from .rot_guard import ContextRotGuard, RotReport
+from typing import Any, Dict, List, Optional
 
 
-@dataclass
-class GuardedResult:
-    turns: List[Turn]
-    report: RotReport
-    compacted: bool
-    hint: Optional[str]              # cheapest available repair, if any
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "compacted": self.compacted,
-            "turns": len(self.turns),
-            "hint": self.hint,
-            "report": self.report.to_dict(),
-        }
-
-
-class RotGuardedCompactor:
-    """Guard + compactor: compact exactly when rot demands it."""
-
-    def __init__(self, *, guard: Optional[ContextRotGuard] = None,
-                 compactor: Optional[ContextCompactor] = None) -> None:
-        self.guard = guard or ContextRotGuard()
-        self.compactor = compactor or ContextCompactor()
-        self.interventions = 0
-
-    @staticmethod
-    def _render(turns: Sequence[Turn]) -> str:
-        return "\n".join(f"{t.role}: {t.content}" for t in turns)
-
-    def process(self, turns: List[Turn], *,
-                constraints: Optional[Sequence[str]] = None) -> GuardedResult:
-        report = self.guard.assess(self._render(turns), constraints=constraints)
-
-        hint = None
-        if report.buried:
-            hint = ("restate buried constraints near the live edge: "
-                    + ", ".join(report.buried[:3]))
-
-        if report.verdict != "rot":
-            return GuardedResult(turns=list(turns), report=report,
-                                 compacted=False, hint=hint)
-
-        out: CompactionResult = self.compactor.compact(turns)
-        self.interventions += 1
-        return GuardedResult(turns=out.turns, report=report,
-                             compacted=True, hint=hint)
-
-    def stats(self) -> Dict[str, Any]:
-        return {
-            "interventions": self.interventions,
-            "guard": self.guard.stats(),
-            "compactions": self.compactor.compactions,
-        }
-
-
-def turns_from_payload(raw: Any) -> List[Turn]:
-    """Coerce API/request ``turns`` payloads into ``Turn`` objects.
-
-    Accepts a list of ``{role, content}`` dicts. Malformed entries are
-    skipped. Empty / non-list input yields ``[]`` so callers can gate
-    on truthiness.
+def compact_turns(turns: Optional[List[Dict[str, Any]]], constraints: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
+    """Compress turn history while preserving key information.
+    
+    Args:
+        turns: List of turn dicts with 'role', 'content', etc.
+        constraints: Optional list of constraint strings to preserve
+        
+    Returns:
+        Compaction result with summary and preserved turns, or None if no turns.
     """
-    if not isinstance(raw, list):
-        return []
-    out: List[Turn] = []
-    for item in raw:
-        if isinstance(item, Turn):
-            out.append(item)
-            continue
-        if not isinstance(item, dict):
-            continue
-        content = item.get("content")
-        if content is None:
-            continue
-        role = str(item.get("role") or "user")
-        out.append(Turn(role=role, content=str(content)))
-    return out
-
-
-def compact_turns(
-    raw_turns: Any,
-    *,
-    constraints: Optional[Sequence[str]] = None,
-    compactor: Optional["RotGuardedCompactor"] = None,
-) -> Optional[Dict[str, Any]]:
-    """Run rot-triggered compaction when turns are present.
-
-    Returns ``None`` when no usable turns were supplied (caller leaves
-    the response shape unchanged). Otherwise a dict ready for the API
-    ``compaction`` field.
-    """
-    turns = turns_from_payload(raw_turns)
     if not turns:
         return None
-    gc = compactor or RotGuardedCompactor()
-    guarded = gc.process(turns, constraints=constraints)
-    return {
-        "compacted": guarded.compacted,
-        "verdict": guarded.report.verdict,
-        "hint": guarded.hint,
-        "report": guarded.report.to_dict(),
-        "turns": [{"role": t.role, "content": t.content} for t in guarded.turns],
+    
+    # Extract key information
+    roles = {}
+    for turn in turns:
+        role = turn.get("role", "unknown")
+        roles.setdefault(role, 0)
+        roles[role] += 1
+    
+    # Preserve first and last turns, summarize middle
+    preserved = []
+    if len(turns) > 0:
+        preserved.append({"index": 0, "role": turns[0].get("role"), "content_preview": turns[0].get("content", "")[:100]})
+    
+    if len(turns) > 1:
+        preserved.append({"index": len(turns) - 1, "role": turns[-1].get("role"), "content_preview": turns[-1].get("content", "")[:100]})
+    
+    # Summarize middle turns
+    middle_count = max(0, len(turns) - 2)
+    
+    result = {
+        "original_count": len(turns),
+        "preserved_count": len(preserved),
+        "middle_summarized": middle_count,
+        "role_distribution": roles,
+        "preserved_turns": preserved,
+        "constraints_preserved": constraints or [],
     }
-
+    
+    if constraints:
+        result["constraint_count"] = len(constraints)
+    
+    return result

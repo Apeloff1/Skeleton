@@ -1,23 +1,13 @@
 """
-Skeleton API Package
+Skeleton API Package — Additional utilities
 
 Exports:
-- create_app: FastAPI application factory
-- get_state: Server state accessor
-- ServerState: Shared runtime state
-- run_server: Uvicorn runner
+- HMACSeal: Request signing
+- require_seal: FastAPI dependency
+- IdempotencyGuard: Deduplication
 """
 
-from skeleton.api.server import (
-    ServerState,
-    create_app,
-    get_state,
-    run_server,
-)
+from skeleton.api.hmac_seal import HMACSeal, require_seal
+from skeleton.api.idempotency import IdempotencyGuard
 
-__all__ = [
-    "create_app",
-    "get_state",
-    "ServerState",
-    "run_server",
-]
+__all__ = ["HMACSeal", "require_seal", "IdempotencyGuard"]
