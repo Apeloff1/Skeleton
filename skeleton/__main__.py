@@ -11,6 +11,7 @@ Provides a comprehensive command-line interface for all subsystems:
 - Observability (tracing, audit, events, metrics, anomalies)
 - Dashboard and push server control
 - Feature flags, config, schema registry, secret management
+- Developer tools (scaffold, wizard, health, visualize, extension)
 """
 from __future__ import annotations
 
@@ -155,6 +156,11 @@ def main() -> None:
     # Meta
     p_meta = sub.add_parser("meta", help="Meta information")
     p_meta.add_argument("--card", action="store_true", help="Show command deck meta")
+
+    # Developer tools
+    p_dev = sub.add_parser("dev", help="Developer tools (scaffold, wizard, health, visualize, extension)")
+    p_dev.add_argument("subcommand", nargs="?", help="Dev subcommand (scaffold, wizard, health, visualize, extension, list-templates, validate, docs)")
+    p_dev.add_argument("args", nargs=argparse.REMAINDER, help="Arguments for the subcommand")
 
     args = parser.parse_args()
     deck = CommandDeck()
@@ -327,6 +333,13 @@ def main() -> None:
     elif args.command == "meta":
         if args.card:
             print(json.dumps(deck.meta_card(), indent=2))
+
+    elif args.command == "dev":
+        from skeleton.developer.cli import run_dev_cli
+        result = run_dev_cli(args.args)
+        if isinstance(result, dict):
+            print(json.dumps(result, indent=2, default=str))
+        sys.exit(0 if (isinstance(result, dict) and "error" not in result) else 1)
 
     else:
         parser.print_help()
