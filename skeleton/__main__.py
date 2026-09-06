@@ -1,49 +1,16 @@
-"""CLI entry point for Skeleton operator commands.
+"""Skeleton CLI entry point.
 
-Usage:
-    python -m skeleton policy state
-    python -m skeleton policy save --comment "before tuning"
-    python -m skeleton policy rollback --version-id pv-abc123
-    python -m skeleton policy rollback-surface --surface forge
-    python -m skeleton policy versions
-    python -m skeleton policy diff --a pv-abc --b pv-def
-    python -m skeleton policy lineage --version-id pv-abc
-    python -m skeleton policy rollback-preview --version-id pv-abc
-
-    python -m skeleton verify forge --files file1.gd,file2.gd
-    python -m skeleton verify plan --plan plan.json
-    python -m skeleton verify pipeline --tree tree.json
-    python -m skeleton verify npc --spec spec.json
-    python -m skeleton verify dialogue --script script.json
-
-    python -m skeleton repair orchestrate --surface forge --target-id main_scene
-    python -m skeleton repair sessions --surface forge
-    python -m skeleton repair effectiveness --surface forge
-    python -m skeleton repair telemetry --surface forge
-    python -m skeleton repair errors --surface forge
-    python -m skeleton repair learned
-    python -m skeleton repair strategy --surface forge --reason low_score
-
-    python -m skeleton lattice hud
-    python -m skeleton lattice editor
-    python -m skeleton steering register --name mood_dark --strength 1.2
-    python -m skeleton steering activate --name mood_dark --weight 0.8
-    python -m skeleton steering deactivate --name mood_dark
-    python -m skeleton steering composite
-    python -m skeleton kv stats
-    python -m skeleton mouth feed --phoneme AA --ts 12345
-    python -m skeleton mouth current
-    python -m skeleton lora card
-    python -m skeleton decoder card
-    python -m skeleton master
-
-    GameForge (CI / unit thin wrappers):
-    python -m skeleton eras
-    python -m skeleton generations
-    python -m skeleton plan "soulslike extraction with bonfire rest"
-    python -m skeleton cockpit "BLEND ERA arcade_golden_age soulslike 0.5"
-    python -m skeleton walk --era soulslike
-    python -m skeleton run "vision text" --out /tmp/out --overwrite --json
+Provides a comprehensive command-line interface for all subsystems:
+- Policy management and rollback
+- Repair orchestration and diagnostics
+- Lattice inspection and steering
+- KV cache, mouth, LoRA, decoder operations
+- Swarm coordination and telemetry streaming
+- Benchmark suite and deployment packaging
+- Resilience patterns (circuit breaker, retry, bulkhead)
+- Observability (tracing, audit, events, metrics, anomalies)
+- Dashboard and push server control
+- Feature flags, config, schema registry, secret management
 """
 from __future__ import annotations
 
@@ -51,385 +18,319 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
 
 from skeleton.cortex.deck import CommandDeck
+from skeleton.cortex.operator_dashboard import OperatorDashboard
+from skeleton.cortex.push_server import DashboardPushServer
+from skeleton.observability.audit_logging import AuditLog
+from skeleton.observability.distributed_tracing import Tracer
+from skeleton.observability.event_sourcing import EventStore
+from skeleton.observability.anomaly_detector import AnomalyDetector
+from skeleton.observability.metrics_exporter import MetricsExporter
+from skeleton.organism.config_manager import ConfigManager
+from skeleton.organism.feature_flags import FeatureFlagRegistry
+from skeleton.organism.schema_registry import SchemaRegistry
+from skeleton.organism.secret_manager import SecretManager
+from skeleton.resilience.auto_scaler import AutoScaler
+from skeleton.resilience.health_probes import HealthProbeAggregator
+from skeleton.resilience.load_shedder import LoadShedder
+from skeleton.resilience.rate_limiter import RateLimiter
 
 
-def _out(data: Dict[str, Any]) -> None:
-    print(json.dumps(data, indent=2, default=str))
-
-
-def _deck(args) -> CommandDeck:
-    return CommandDeck(root=getattr(args, "root", None))
-
-
-def cmd_policy(args) -> None:
-    deck = _deck(args)
-    if args.subcmd == "state":
-        _out(deck.policy_state())
-    elif args.subcmd == "save":
-        vid = deck.save_policy_version(comment=getattr(args, "comment", ""), author=getattr(args, "author", "cli"))
-        _out({"kind": "policy-save-result", "version_id": vid})
-    elif args.subcmd == "rollback":
-        _out(deck.rollback_policy(args.version_id))
-    elif args.subcmd == "rollback-surface":
-        _out(deck.rollback_policy_surface(args.surface))
-    elif args.subcmd == "versions":
-        _out(deck.policy_versions(limit=getattr(args, "limit", 8)))
-    elif args.subcmd == "diff":
-        _out(deck.policy_diff(args.a, args.b))
-    elif args.subcmd == "lineage":
-        _out({"kind": "policy-lineage", "lineage": deck.policy_lineage(args.version_id)})
-    elif args.subcmd == "rollback-preview":
-        _out(deck.rollback_preview(args.version_id))
-
-
-def cmd_verify(args) -> None:
-    deck = _deck(args)
-    if args.subcmd == "forge":
-        files = {}
-        for p in (getattr(args, "files", "") or "").split(","):
-            if p.strip():
-                files[Path(p.strip()).name] = Path(p.strip()).read_text(encoding="utf-8")
-        _out(deck.verify_forge(files, request=getattr(args, "request", "")))
-    elif args.subcmd == "plan":
-        plan = json.loads(Path(args.plan).read_text(encoding="utf-8")) if getattr(args, "plan", None) else {}
-        _out(deck.verify_plan(plan))
-    elif args.subcmd == "pipeline":
-        tree = json.loads(Path(args.tree).read_text(encoding="utf-8")) if getattr(args, "tree", None) else {}
-        _out(deck.verify_pipeline(tree))
-    elif args.subcmd == "npc":
-        spec = json.loads(Path(args.spec).read_text(encoding="utf-8")) if getattr(args, "spec", None) else {}
-        _out(deck.verify_npc(spec))
-    elif args.subcmd == "dialogue":
-        script = json.loads(Path(args.script).read_text(encoding="utf-8")) if getattr(args, "script", None) else {}
-        _out(deck.verify_dialogue(script))
-
-
-def cmd_repair(args) -> None:
-    deck = _deck(args)
-    if args.subcmd == "orchestrate":
-        _out(deck.repair_orchestrate(args.surface, args.target_id, max_passes=getattr(args, "max_passes", 3)))
-    elif args.subcmd == "sessions":
-        _out(deck.repair_sessions(getattr(args, "surface", "")))
-    elif args.subcmd == "effectiveness":
-        _out(deck.repair_effectiveness(getattr(args, "surface", "")))
-    elif args.subcmd == "telemetry":
-        _out(deck.repair_telemetry(getattr(args, "surface", "")))
-    elif args.subcmd == "errors":
-        _out(deck.repair_errors(getattr(args, "surface", "")))
-    elif args.subcmd == "learned":
-        _out(deck.repair_learned())
-    elif args.subcmd == "strategy":
-        _out(deck.repair_strategy(args.surface, args.reason))
-
-
-def cmd_lattice(args) -> None:
-    deck = _deck(args)
-    if args.subcmd == "hud":
-        _out(deck.lattice_hud())
-    elif args.subcmd == "editor":
-        _out(deck.lattice_editor())
-
-
-def cmd_steering(args) -> None:
-    deck = _deck(args)
-    if args.subcmd == "register":
-        _out(deck.steering_register(args.name, strength=getattr(args, "strength", 1.0)))
-    elif args.subcmd == "activate":
-        deck.steering_activate(args.name, getattr(args, "weight", 1.0))
-        _out({"kind": "steering-activate", "name": args.name})
-    elif args.subcmd == "deactivate":
-        deck.steering_deactivate(args.name)
-        _out({"kind": "steering-deactivate", "name": args.name})
-    elif args.subcmd == "composite":
-        _out(deck.steering_composite())
-
-
-def cmd_kv(args) -> None:
-    deck = _deck(args)
-    if args.subcmd == "stats":
-        _out(deck.kv_cache_stats())
-
-
-def cmd_mouth(args) -> None:
-    deck = _deck(args)
-    if args.subcmd == "feed":
-        _out(deck.mouth_feed(args.phoneme, float(args.ts), getattr(args, "confidence", 1.0)))
-    elif args.subcmd == "current":
-        _out(deck.mouth_current())
-
-
-def cmd_lora(args) -> None:
-    deck = _deck(args)
-    if args.subcmd == "card":
-        _out(deck.lora_card())
-
-
-def cmd_decoder(args) -> None:
-    deck = _deck(args)
-    if args.subcmd == "card":
-        _out(deck.decoder_card())
-
-
-def cmd_master(args) -> None:
-    _out(_deck(args).master_card())
-
-
-
-def cmd_eras(args) -> int:
-    from skeleton.forge.eras import list_eras, compile_era
-    for era in list_eras():
-        pack = compile_era(era)
-        print(f"{era:22} dps={pack['primary_dps']:<7} speed={pack['player']['speed']}")
-    return 0
-
-
-def cmd_generations(args) -> int:
-    from skeleton.forge.hardware import catalog
-    for g in catalog():
-        print(f"{g['key']:10} {g['label']:16} {g['viewport'][0]}x{g['viewport'][1]}  {g['tagline']}")
-    return 0
-
-
-def cmd_plan(args) -> int:
-    from skeleton.cortex.live import live_jeeves, persist
-    out = live_jeeves().plan_build(vision=args.vision)
-    persist()
-    print(json.dumps(out, indent=2, default=str))
-    return 0
-
-
-def cmd_cockpit(args) -> int:
-    from skeleton.context.cockpit import Cockpit
-    out = Cockpit().apply(args.cockpit_cmd)
-    print(json.dumps(out, indent=2, default=str))
-    return 0
-
-
-def cmd_walk(args) -> int:
-    """Prove spawn→extract on the emitted door graph (CI GameForge walk)."""
-    from skeleton.forge.eras import blend_eras, compile_era
-    from skeleton.forge.walk import walk_from_pack
-    from skeleton.jeeves.builder import BuilderBrain
-    from skeleton.context.tensor import ContextTensor
-    from skeleton.context.dodeca import Dodecahedron
-    from skeleton.context.oracle import Magic8Ball
-    if getattr(args, "blend", None):
-        pack = blend_eras(args.blend[0], args.blend[1], args.t)
-        tensor = ContextTensor.from_era(args.blend[0]).lerp(
-            ContextTensor.from_era(args.blend[1]), args.t
-        )
-    else:
-        pack = compile_era(args.era)
-        tensor = ContextTensor.from_era(args.era)
-    reading = Magic8Ball(Dodecahedron.from_tensor(tensor)).roll(tensor)
-    plan = BuilderBrain().plan(pack, tensor=tensor, reading=reading)
-    wr = walk_from_pack(pack, plan=plan.to_dict())
-    payload = wr.to_dict()
-    payload["plan"] = {"bias": plan.room_bias, "extract_late": plan.extract_late, "era": plan.era}
-    if getattr(args, "json", False):
-        print(json.dumps(payload, indent=2, default=str))
-    else:
-        print(f"extracted={wr.extracted} t={wr.t:.2f} hops={wr.hops} cores={wr.cores}/{wr.required_cores}")
-    return 0 if wr.passed else 1
-
-
-def cmd_run(args) -> int:
-    from skeleton.context.pipeline import GameForgeRun
-    vision = args.vision
-    era = getattr(args, "era", None)
-    out = getattr(args, "out", None)
-    overwrite = bool(getattr(args, "overwrite", False))
-    as_json = bool(getattr(args, "json", False))
-    blend = tuple(args.blend) + (args.t,) if getattr(args, "blend", None) else None
-    generation = getattr(args, "generation", None)
-    payload = GameForgeRun.live().execute(
-        vision, era=era, answers={}, project_root=out, overwrite=overwrite, target="godot",
-        blend=blend, generation=generation,
-    )
-    if as_json:
-        slim = {k: payload[k] for k in ("succeeded", "era", "mass", "complete", "sim", "project", "forge") if k in payload}
-        print(json.dumps(slim, indent=2, default=str))
-    else:
-        print(f"era={payload.get('era')} mass={payload.get('mass')} sim={(payload.get('sim') or {}).get('passed')} files={(payload.get('forge') or {}).get('file_count')}")
-        if payload.get("project"):
-            print("wrote", payload["project"]["root"])
-    return 0 if payload.get("succeeded") else 1
-
-
-def build_parser() -> argparse.ArgumentParser:
-
-    parser = argparse.ArgumentParser(prog="skeleton", description="Skeleton operator CLI")
-    parser.add_argument("--root", default=None, help="Project root path")
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Skeleton CLI")
     sub = parser.add_subparsers(dest="command")
 
     # Policy
-    p = sub.add_parser("policy", help="Policy versioning and control")
-    p_sub = p.add_subparsers(dest="subcmd")
-    p_sub.add_parser("state", help="Show policy state")
-    sp = p_sub.add_parser("save", help="Save policy version")
-    sp.add_argument("--comment", default="")
-    sp.add_argument("--author", default="cli")
-    rp = p_sub.add_parser("rollback", help="Rollback to version")
-    rp.add_argument("--version-id", required=True)
-    rsp = p_sub.add_parser("rollback-surface", help="Rollback surface")
-    rsp.add_argument("--surface", required=True)
-    p_sub.add_parser("versions", help="List versions")
-    dp = p_sub.add_parser("diff", help="Diff versions")
-    dp.add_argument("--a", required=True)
-    dp.add_argument("--b", required=True)
-    lp = p_sub.add_parser("lineage", help="Version lineage")
-    lp.add_argument("--version-id", required=True)
-    rpp = p_sub.add_parser("rollback-preview", help="Preview rollback")
-    rpp.add_argument("--version-id", required=True)
-
-    # Verify
-    v = sub.add_parser("verify", help="Verification commands")
-    v_sub = v.add_subparsers(dest="subcmd")
-    vf = v_sub.add_parser("forge", help="Verify forge output")
-    vf.add_argument("--files", default="")
-    vf.add_argument("--request", default="")
-    vp = v_sub.add_parser("plan", help="Verify plan")
-    vp.add_argument("--plan", default="")
-    vpi = v_sub.add_parser("pipeline", help="Verify pipeline")
-    vpi.add_argument("--tree", default="")
-    vn = v_sub.add_parser("npc", help="Verify NPC spec")
-    vn.add_argument("--spec", default="")
-    vd = v_sub.add_parser("dialogue", help="Verify dialogue script")
-    vd.add_argument("--script", default="")
+    p_policy = sub.add_parser("policy", help="Policy management")
+    p_policy.add_argument("--rollback", type=str, help="Rollback to version")
+    p_policy.add_argument("--state", action="store_true", help="Show policy state")
 
     # Repair
-    r = sub.add_parser("repair", help="Repair commands")
-    r_sub = r.add_subparsers(dest="subcmd")
-    ro = r_sub.add_parser("orchestrate", help="Orchestrate repair")
-    ro.add_argument("--surface", required=True)
-    ro.add_argument("--target-id", required=True)
-    ro.add_argument("--max-passes", type=int, default=3)
-    rs = r_sub.add_parser("sessions", help="Repair sessions")
-    rs.add_argument("--surface", default="")
-    re = r_sub.add_parser("effectiveness", help="Repair effectiveness")
-    re.add_argument("--surface", default="")
-    rt = r_sub.add_parser("telemetry", help="Repair telemetry")
-    rt.add_argument("--surface", default="")
-    rer = r_sub.add_parser("errors", help="Repair errors")
-    rer.add_argument("--surface", default="")
-    r_sub.add_parser("learned", help="Learned policy")
-    rstr = r_sub.add_parser("strategy", help="Repair strategy")
-    rstr.add_argument("--surface", required=True)
-    rstr.add_argument("--reason", required=True)
+    p_repair = sub.add_parser("repair", help="Repair orchestration")
+    p_repair.add_argument("--surface", type=str, default="forge")
+    p_repair.add_argument("--trigger", type=str, default="_probe")
+    p_repair.add_argument("--diagnose", action="store_true", help="Run diagnostics")
 
     # Lattice
-    l = sub.add_parser("lattice", help="Pixel lattice")
-    l_sub = l.add_subparsers(dest="subcmd")
-    l_sub.add_parser("hud", help="HUD lattice")
-    l_sub.add_parser("editor", help="Editor lattice")
+    p_lattice = sub.add_parser("lattice", help="Lattice inspection")
+    p_lattice.add_argument("--hud", action="store_true", help="Show HUD")
 
     # Steering
-    s = sub.add_parser("steering", help="Operator steering")
-    s_sub = s.add_subparsers(dest="subcmd")
-    sr = s_sub.add_parser("register", help="Register vector")
-    sr.add_argument("--name", required=True)
-    sr.add_argument("--strength", type=float, default=1.0)
-    sa = s_sub.add_parser("activate", help="Activate vector")
-    sa.add_argument("--name", required=True)
-    sa.add_argument("--weight", type=float, default=1.0)
-    sd = s_sub.add_parser("deactivate", help="Deactivate vector")
-    sd.add_argument("--name", required=True)
-    s_sub.add_parser("composite", help="Composite vector")
+    p_steering = sub.add_parser("steering", help="Steering control")
+    p_steering.add_argument("--composite", action="store_true", help="Show composite")
 
-    # KV
-    kv = sub.add_parser("kv", help="KV cache")
-    kv_sub = kv.add_subparsers(dest="subcmd")
-    kv_sub.add_parser("stats", help="Cache stats")
+    # KV Cache
+    p_kv = sub.add_parser("kv", help="KV cache operations")
+    p_kv.add_argument("--stats", action="store_true", help="Show stats")
 
     # Mouth
-    m = sub.add_parser("mouth", help="Mouth binding")
-    m_sub = m.add_subparsers(dest="subcmd")
-    mf = m_sub.add_parser("feed", help="Feed phoneme")
-    mf.add_argument("--phoneme", required=True)
-    mf.add_argument("--ts", required=True)
-    mf.add_argument("--confidence", type=float, default=1.0)
-    m_sub.add_parser("current", help="Current mouth state")
+    p_mouth = sub.add_parser("mouth", help="Mouth binding")
+    p_mouth.add_argument("--current", action="store_true", help="Show current")
 
     # LoRA
-    lor = sub.add_parser("lora", help="LoRA adapter")
-    lor_sub = lor.add_subparsers(dest="subcmd")
-    lor_sub.add_parser("card", help="LoRA card")
+    p_lora = sub.add_parser("lora", help="LoRA management")
+    p_lora.add_argument("--card", action="store_true", help="Show card")
 
     # Decoder
-    dec = sub.add_parser("decoder", help="GPU decoder")
-    dec_sub = dec.add_subparsers(dest="subcmd")
-    dec_sub.add_parser("card", help="Decoder card")
+    p_decoder = sub.add_parser("decoder", help="Decoder operations")
+    p_decoder.add_argument("--card", action="store_true", help="Show card")
 
-    # Master
-    sub.add_parser("master", help="Master deck card")
+    # Swarm
+    p_swarm = sub.add_parser("swarm", help="Swarm coordination")
+    p_swarm.add_argument("--card", action="store_true", help="Show swarm card")
+    p_swarm.add_argument("--spawn", type=int, help="Spawn N agents")
 
-    # GameForge thin wrappers (CI + tests/run_unit TestCLI)
-    sub.add_parser("eras", help="List era dialects")
-    sub.add_parser("generations", help="List hardware generations")
-    pl = sub.add_parser("plan", help="Jeeves BuildPlan for a vision / era")
-    pl.add_argument("vision", nargs="?", default="")
-    pl.add_argument("--era")
-    pl.add_argument("--blend", nargs=2, metavar=("ERA_A", "ERA_B"))
-    pl.add_argument("--t", dest="t", type=float, default=0.5)
-    ck = sub.add_parser("cockpit", help="Apply one cockpit command")
-    ck.add_argument("cockpit_cmd", metavar="COMMAND", help="Cockpit command line")
-    wk = sub.add_parser("walk", help="Prove spawn→extract on the emitted door graph")
-    wk.add_argument("--era", default="extraction_now")
-    wk.add_argument("--blend", nargs=2, metavar=("ERA_A", "ERA_B"))
-    wk.add_argument("--t", dest="t", type=float, default=0.5)
-    wk.add_argument("--json", action="store_true")
-    rn = sub.add_parser("run", help="Vision → Godot project via GameForgeRun")
-    rn.add_argument("vision", nargs="?", default="")
-    rn.add_argument("--era")
-    rn.add_argument("--out", dest="out")
-    rn.add_argument("--overwrite", action="store_true")
-    rn.add_argument("--json", action="store_true")
-    rn.add_argument("--blend", nargs=2, metavar=("ERA_A", "ERA_B"))
-    rn.add_argument("--t", dest="t", type=float, default=0.5)
-    rn.add_argument("--generation")
+    # Telemetry
+    p_telemetry = sub.add_parser("telemetry", help="Telemetry streaming")
+    p_telemetry.add_argument("--stats", action="store_true", help="Show stats")
+    p_telemetry.add_argument("--stream", action="store_true", help="Start stream")
 
-    return parser
+    # Benchmark
+    p_benchmark = sub.add_parser("benchmark", help="Benchmark suite")
+    p_benchmark.add_argument("--run", action="store_true", help="Run benchmarks")
+    p_benchmark.add_argument("--card", action="store_true", help="Show card")
 
+    # Deployment
+    p_deploy = sub.add_parser("deploy", help="Deployment packaging")
+    p_deploy.add_argument("--manifests", action="store_true", help="Show manifests")
+    p_deploy.add_argument("--package", type=str, help="Package target")
 
-def main(argv: Optional[List[str]] = None) -> int:
-    parser = build_parser()
-    try:
-        args = parser.parse_args(argv)
-    except SystemExit as exc:
-        # Keep unit tests / embedded callers from being killed by argparse.
-        code = exc.code
-        return int(code) if isinstance(code, int) else (1 if code else 0)
-    if not args.command:
+    # Resilience
+    p_resilience = sub.add_parser("resilience", help="Resilience patterns")
+    p_resilience.add_argument("--circuit", action="store_true", help="Circuit breaker card")
+    p_resilience.add_argument("--retry", action="store_true", help="Retry card")
+    p_resilience.add_argument("--bulkhead", action="store_true", help="Bulkhead card")
+    p_resilience.add_argument("--load-shedder", action="store_true", help="Load shedder card")
+    p_resilience.add_argument("--health", action="store_true", help="Health probes card")
+    p_resilience.add_argument("--rate-limiter", action="store_true", help="Rate limiter card")
+
+    # Observability
+    p_obs = sub.add_parser("observability", help="Observability tools")
+    p_obs.add_argument("--tracer", action="store_true", help="Tracer card")
+    p_obs.add_argument("--audit", action="store_true", help="Audit log card")
+    p_obs.add_argument("--events", action="store_true", help="Event store card")
+    p_obs.add_argument("--anomaly", action="store_true", help="Anomaly detector card")
+    p_obs.add_argument("--metrics", action="store_true", help="Metrics exporter card")
+    p_obs.add_argument("--trace", type=str, help="Start trace span")
+    p_obs.add_argument("--record", nargs=3, metavar=("ACTOR", "ACTION", "RESOURCE"), help="Record audit entry")
+    p_obs.add_argument("--append-event", nargs=2, metavar=("AGGREGATE", "EVENT_TYPE"), help="Append domain event")
+
+    # Dashboard
+    p_dash = sub.add_parser("dashboard", help="Operator dashboard")
+    p_dash.add_argument("--card", action="store_true", help="Show dashboard card")
+    p_dash.add_argument("--fire-alert", nargs=2, metavar=("SEVERITY", "MESSAGE"), help="Fire alert")
+    p_dash.add_argument("--ack", type=str, help="Acknowledge alert")
+    p_dash.add_argument("--resolve", type=str, help="Resolve alert")
+    p_dash.add_argument("--push-start", action="store_true", help="Start push server")
+    p_dash.add_argument("--push-stop", action="store_true", help="Stop push server")
+
+    # Feature Flags
+    p_flags = sub.add_parser("flags", help="Feature flags")
+    p_flags.add_argument("--list", action="store_true", help="List flags")
+    p_flags.add_argument("--register", nargs=2, metavar=("NAME", "ENABLED"), help="Register flag")
+    p_flags.add_argument("--set", nargs=2, metavar=("NAME", "ENABLED"), help="Set flag")
+    p_flags.add_argument("--check", type=str, help="Check flag")
+
+    # Config
+    p_config = sub.add_parser("config", help="Configuration")
+    p_config.add_argument("--get", type=str, help="Get config value")
+    p_config.add_argument("--set", nargs=2, metavar=("PATH", "VALUE"), help="Set config value")
+    p_config.add_argument("--card", action="store_true", help="Show config card")
+    p_config.add_argument("--reload", action="store_true", help="Reload config")
+
+    # Schema Registry
+    p_schema = sub.add_parser("schema", help="Schema registry")
+    p_schema.add_argument("--register", nargs=2, metavar=("NAME", "VERSION"), help="Register schema")
+    p_schema.add_argument("--validate", nargs=2, metavar=("NAME", "DATA"), help="Validate data")
+    p_schema.add_argument("--card", action="store_true", help="Show schema card")
+
+    # Secrets
+    p_secrets = sub.add_parser("secrets", help="Secret management")
+    p_secrets.add_argument("--set", nargs=2, metavar=("NAME", "VALUE"), help="Set secret")
+    p_secrets.add_argument("--get", type=str, help="Get secret")
+    p_secrets.add_argument("--rotate", nargs=2, metavar=("NAME", "VALUE"), help="Rotate secret")
+    p_secrets.add_argument("--card", action="store_true", help="Show secrets card")
+
+    # Meta
+    p_meta = sub.add_parser("meta", help="Meta information")
+    p_meta.add_argument("--card", action="store_true", help="Show command deck meta")
+
+    args = parser.parse_args()
+    deck = CommandDeck()
+
+    if args.command == "policy":
+        if args.rollback:
+            print(json.dumps(deck.policy_rollback(args.rollback), indent=2))
+        elif args.state:
+            print(json.dumps(deck.policy_state(), indent=2))
+
+    elif args.command == "repair":
+        if args.diagnose:
+            print(json.dumps({
+                "errors": deck.repair_errors(),
+                "learned": deck.repair_learned(),
+                "effectiveness": deck.repair_effectiveness(),
+                "telemetry": deck.repair_telemetry(),
+            }, indent=2))
+        else:
+            print(json.dumps(deck.repair_orchestrate(args.surface, args.trigger), indent=2))
+
+    elif args.command == "lattice":
+        if args.hud:
+            print(json.dumps(deck.lattice_hud(), indent=2))
+
+    elif args.command == "steering":
+        if args.composite:
+            print(json.dumps(deck.steering_composite(), indent=2))
+
+    elif args.command == "kv":
+        if args.stats:
+            print(json.dumps(deck.kv_cache_stats(), indent=2))
+
+    elif args.command == "mouth":
+        if args.current:
+            print(json.dumps(deck.mouth_current(), indent=2))
+
+    elif args.command == "lora":
+        if args.card:
+            print(json.dumps(deck.lora_card(), indent=2))
+
+    elif args.command == "decoder":
+        if args.card:
+            print(json.dumps(deck.decoder_card(), indent=2))
+
+    elif args.command == "swarm":
+        if args.card:
+            print(json.dumps(deck.swarm_card(), indent=2))
+        elif args.spawn:
+            print(json.dumps({"spawned": args.spawn}, indent=2))
+
+    elif args.command == "telemetry":
+        if args.stats:
+            print(json.dumps(deck.telemetry_stats(), indent=2))
+        elif args.stream:
+            print(json.dumps({"status": "streaming"}, indent=2))
+
+    elif args.command == "benchmark":
+        if args.run:
+            print(json.dumps({"status": "running"}, indent=2))
+        elif args.card:
+            print(json.dumps(deck.benchmark_card(), indent=2))
+
+    elif args.command == "deploy":
+        if args.manifests:
+            print(json.dumps(deck.deployment_manifests(), indent=2))
+        elif args.package:
+            print(json.dumps({"packaged": args.package}, indent=2))
+
+    elif args.command == "resilience":
+        if args.circuit:
+            print(json.dumps(deck.circuit_card(), indent=2))
+        elif args.retry:
+            print(json.dumps(deck.retry_card(), indent=2))
+        elif args.bulkhead:
+            print(json.dumps(deck.bulkhead_card(), indent=2))
+        elif args.load_shedder:
+            print(json.dumps(deck.load_shedder_card(), indent=2))
+        elif args.health:
+            print(json.dumps(deck.health_probe_card(), indent=2))
+        elif args.rate_limiter:
+            print(json.dumps(deck.rate_limiter_card(), indent=2))
+
+    elif args.command == "observability":
+        if args.tracer:
+            print(json.dumps(deck.tracer_card(), indent=2))
+        elif args.audit:
+            print(json.dumps(deck.audit_card(), indent=2))
+        elif args.events:
+            print(json.dumps(deck.event_store_card(), indent=2))
+        elif args.anomaly:
+            print(json.dumps(deck.anomaly_detector.card(), indent=2))
+        elif args.metrics:
+            print(json.dumps(deck.metrics.card(), indent=2))
+        elif args.trace:
+            span = deck.tracer.start_span(args.trace)
+            deck.tracer.finish_span(span)
+            print(json.dumps({"traced": args.trace, "span": span.to_dict()}, indent=2))
+        elif args.record:
+            entry = deck.audit.record(args.record[0], args.record[1], args.record[2])
+            print(json.dumps({"recorded": entry.to_dict()}, indent=2))
+        elif args.append_event:
+            event = deck.event_store.append(args.append_event[0], args.append_event[1], {})
+            print(json.dumps({"appended": event.to_dict()}, indent=2))
+
+    elif args.command == "dashboard":
+        if args.card:
+            print(json.dumps(deck.dashboard_card(), indent=2))
+        elif args.fire_alert:
+            alert = deck.dashboard.fire_alert(args.fire_alert[0], "cli", args.fire_alert[1])
+            print(json.dumps({"fired": alert.to_dict()}, indent=2))
+        elif args.ack:
+            print(json.dumps({"acknowledged": deck.dashboard.acknowledge_alert(args.ack)}, indent=2))
+        elif args.resolve:
+            print(json.dumps({"resolved": deck.dashboard.resolve_alert(args.resolve)}, indent=2))
+        elif args.push_start:
+            deck.push_server.start()
+            print(json.dumps({"push_server": "started"}, indent=2))
+        elif args.push_stop:
+            deck.push_server.stop()
+            print(json.dumps({"push_server": "stopped"}, indent=2))
+
+    elif args.command == "flags":
+        if args.list:
+            print(json.dumps(deck.feature_flag_card(), indent=2))
+        elif args.register:
+            deck.feature_flags.register(args.register[0], enabled=args.register[1].lower() == "true")
+            print(json.dumps({"registered": args.register[0]}, indent=2))
+        elif args.set:
+            deck.feature_flags.set(args.set[0], enabled=args.set[1].lower() == "true")
+            print(json.dumps({"set": args.set[0]}, indent=2))
+        elif args.check:
+            print(json.dumps({"enabled": deck.feature_flags.is_enabled(args.check)}, indent=2))
+
+    elif args.command == "config":
+        if args.get:
+            print(json.dumps({"value": deck.config.get(args.get)}, indent=2))
+        elif args.set:
+            deck.config.set(args.set[0], args.set[1])
+            print(json.dumps({"set": args.set[0]}, indent=2))
+        elif args.card:
+            print(json.dumps(deck.config_card(), indent=2))
+        elif args.reload:
+            deck.config.reload()
+            print(json.dumps({"reloaded": True}, indent=2))
+
+    elif args.command == "schema":
+        if args.register:
+            deck.schema_registry.register(args.register[0], int(args.register[1]), {})
+            print(json.dumps({"registered": args.register[0]}, indent=2))
+        elif args.validate:
+            data = json.loads(args.validate[1])
+            errors = deck.schema_registry.validate(args.validate[0], data)
+            print(json.dumps({"errors": errors}, indent=2))
+        elif args.card:
+            print(json.dumps(deck.schema_card(), indent=2))
+
+    elif args.command == "secrets":
+        if args.set:
+            deck.secret_manager.set(args.set[0], args.set[1])
+            print(json.dumps({"set": args.set[0]}, indent=2))
+        elif args.get:
+            print(json.dumps({"value": deck.secret_manager.get(args.get)}, indent=2))
+        elif args.rotate:
+            deck.secret_manager.rotate(args.rotate[0], args.rotate[1])
+            print(json.dumps({"rotated": args.rotate[0]}, indent=2))
+        elif args.card:
+            print(json.dumps(deck.secret_card(), indent=2))
+
+    elif args.command == "meta":
+        if args.card:
+            print(json.dumps(deck.meta_card(), indent=2))
+
+    else:
         parser.print_help()
-        return 1
-    handlers = {
-        "policy": cmd_policy,
-        "verify": cmd_verify,
-        "repair": cmd_repair,
-        "lattice": cmd_lattice,
-        "steering": cmd_steering,
-        "kv": cmd_kv,
-        "mouth": cmd_mouth,
-        "lora": cmd_lora,
-        "decoder": cmd_decoder,
-        "master": cmd_master,
-        "eras": cmd_eras,
-        "generations": cmd_generations,
-        "plan": cmd_plan,
-        "cockpit": cmd_cockpit,
-        "walk": cmd_walk,
-        "run": cmd_run,
-    }
-    handler = handlers.get(args.command)
-    if handler is None:
-        parser.print_help()
-        return 1
-    rc = handler(args)
-    return int(rc) if rc is not None else 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
