@@ -184,5 +184,30 @@ class Orchestrator:
             return {"kind": "reclaim", "killed": 0}
         return {"kind": stage, "ok": 0}
 
+    def admit_tool(self, name: str, args: Any = None) -> bool:
+        """F-9 tool-call storm gate — compose with bank ``storm.admit_tool``.
+
+        Wire point for issuers that lack a dedicated tool bus: call this
+        (or ``batch_tools``) before spending a tool slot. Returns False when
+        an identical (name, args) call was already admitted in the turn window.
+        """
+        from skeleton.kernel.bank import boot, get
+
+        boot()
+        storm = get("storm")
+        if storm is None or not hasattr(storm, "admit_tool"):
+            return True
+        return bool(storm.admit_tool(name, args))
+
+    def batch_tools(self, calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """F-9 turn-window batch/dedupe for identical tool calls via bank storm."""
+        from skeleton.kernel.bank import boot, get
+
+        boot()
+        storm = get("storm")
+        if storm is None or not hasattr(storm, "batch_tools"):
+            return [dict(c) for c in calls]
+        return list(storm.batch_tools(calls))
+
     def card(self) -> Dict[str, Any]:
         return self.last or {"kind": "kernel-orch", "runs": self.runs, "stored_prose": 0}
