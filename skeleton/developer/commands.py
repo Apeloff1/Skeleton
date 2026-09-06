@@ -1,289 +1,183 @@
 """
-Skeleton Developer CLI — Command integration and extension generator
+Skeleton Developer CLI - Command Registry
 
-Provides:
-- New CLI commands: dev scaffold, dev wizard, dev health, dev visualize
-- Extension generator for new subsystems
-- Developer utility commands
+Integrates scaffold, wizard, health, visualize, and extension commands
+into a unified developer interface.
 """
 
-from __future__ import annotations
-
-import argparse
-import json
 import sys
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+import os
+from typing import Optional, Dict, Any
 
-from skeleton import Genesis
-from skeleton.api.server import get_state
-from skeleton.forge.universal import Forge
+from skeleton.developer.scaffold import ScaffoldEngine, list_templates
+from skeleton.developer.wizard import Wizard, WizardMode
 
 
-class DevCommandRegistry:
-    """Registry for all developer CLI commands."""
+class CommandRegistry:
+    """Central registry for all developer CLI commands."""
 
     def __init__(self):
-        self.commands: Dict[str, Any] = {}
+        self._commands = {
+            "scaffold": self._cmd_scaffold,
+            "wizard": self._cmd_wizard,
+            "health": self._cmd_health,
+            "visualize": self._cmd_visualize,
+            "extension": self._cmd_extension,
+        }
 
-    def register(self, name: str, handler: Any) -> None:
-        self.commands[name] = handler
-
-    def run(self, name: str, args: List[str]) -> Any:
-        handler = self.commands.get(name)
-        if handler is None:
-            raise ValueError(f"Unknown dev command: {name}")
+    def execute(self, command: str, args) -> Optional[str]:
+        """Execute a registered command with parsed arguments."""
+        handler = self._commands.get(command)
+        if not handler:
+            return f"Unknown command: {command}"
         return handler(args)
 
+    def _cmd_scaffold(self, args) -> str:
+        """Handle scaffold command."""
+        engine = ScaffoldEngine(output_dir=args.output)
 
-class ScaffoldCommand:
-    """skeleton dev scaffold — Generate projects from templates."""
+        if not args.template:
+            templates = list_templates()
+            lines = ["Available templates:", ""]
+            for name, info in templates.items():
+                lines.append(f"  {name:20s} - {info['description']}")
+            lines.append("")
+            lines.append("Usage: skeleton dev scaffold <template> --name <project>")
+            return "\n".join(lines)
 
-    def __call__(self, args: List[str]) -> Dict[str, Any]:
-        parser = argparse.ArgumentParser(prog="skeleton dev scaffold")
-        parser.add_argument("project_name", help="Name of the new project")
-        parser.add_argument("--template", "-t", default="minimal-agent",
-                          choices=["minimal-agent", "game-forge", "swarm-orchestrator"],
-                          help="Project template to use")
-        parser.add_argument("--dir", "-d", default=".", help="Target directory")
-        parser.add_argument("--dry-run", action="store_true", help="Show what would be created")
-        parsed = parser.parse_args(args)
+        project_name = args.name or args.template
+        result = engine.create_project(args.template, project_name, force=args.force)
+        return result
 
-        from skeleton.developer.scaffold import ScaffoldEngine
+    def _cmd_wizard(self, args) -> str:
+        """Handle wizard command."""
+        mode = WizardMode(args.mode) if args.mode else WizardMode.FULL
+        wizard = Wizard(mode=mode)
+        return wizard.run()
 
-        engine = ScaffoldEngine(Path(parsed.dir))
-        templates = engine.list_templates()
-
-        if parsed.dry_run:
-            return {
-                "action": "dry_run",
-                "project_name": parsed.project_name,
-                "template": parsed.template,
-                "target_dir": str(Path(parsed.dir) / parsed.project_name),
-                "available_templates": templates,
-            }
-
-        dest = engine.scaffold(parsed.template, parsed.project_name)
-        validation = engine.validate_project(dest)
-
-        return {
-            "action": "scaffold",
-            "project_name": parsed.project_name,
-            "template": parsed.template,
-            "created_at": str(dest),
-            "validation": validation,
-            "next_steps": [
-                f"cd {dest}",
-                "Edit config/settings.yaml",
-                "Run: skeleton dev health",
-            ],
-        }
-
-
-class WizardCommand:
-    """skeleton dev wizard — Interactive project creation."""
-
-    def __call__(self, args: List[str]) -> Dict[str, Any]:
-        from skeleton.developer.wizard import ProjectWizard, ScaffoldEngine
-
-        engine = ScaffoldEngine(Path("."))
-        wizard = ProjectWizard(engine)
-
-        parser = argparse.ArgumentParser(prog="skeleton dev wizard")
-        parser.add_argument("--answers", type=str, help="JSON string of pre-filled answers")
-        parser.add_argument("--non-interactive", action="store_true", help="Use default answers")
-        parsed = parser.parse_args(args)
-
-        answers = None
-        if parsed.answers:
-            answers = json.loads(parsed.answers)
-        elif parsed.non_interactive:
-            answers = {
-                "project_type": "minimal-agent",
-                "project_name": "my-skeleton-project",
-                "subsystem_bundle": "all",
-                "target_platform": "json",
-            }
-
-        plan = wizard.run(answers)
-
-        if not parsed.non_interactive and not parsed.answers:
-            print("\nProject plan generated:")
-            print(json.dumps(plan, indent=2))
+    def _cmd_health(self, args) -> str:
+        """Handle health check command."""
+        lines = ["Skeleton System Health", "=" * 40]
+        
+        # Check core modules
+        core_modules = [
+            "skeleton.genesis",
+            "skeleton.forge.universal",
+            "skeleton.intelligence.orchestrator",
+            "skeleton.api.routes",
+        ]
+        
+        for module in core_modules:
             try:
-                proceed = input("\nScaffold now? [Y/n]: ").strip().lower()
-            except (EOFError, KeyboardInterrupt):
-                proceed = "n"
+                __import__(module)
+                status = "OK"
+            except ImportError as e:
+                status = f"MISSING ({e})"
+            lines.append(f"  {module:30s} {status}")
 
-            if proceed in ("", "y", "yes"):
-                scaffold = ScaffoldCommand()
-                return scaffold([
-                    plan["project_name"],
-                    "--template", plan["template"],
-                ])
+        # Check developer modules
+        dev_modules = [
+            "skeleton.developer.scaffold",
+            "skeleton.developer.wizard",
+            "skeleton.developer.commands",
+        ]
+        
+        lines.append("")
+        lines.append("Developer CLI:")
+        for module in dev_modules:
+            try:
+                __import__(module)
+                status = "OK"
+            except ImportError as e:
+                status = f"MISSING ({e})"
+            lines.append(f"  {module:30s} {status}")
 
-        return plan
+        if args.verbose:
+            lines.append("")
+            lines.append("Environment:")
+            lines.append(f"  Python: {sys.version}")
+            lines.append(f"  Platform: {sys.platform}")
+            lines.append(f"  Working dir: {os.getcwd()}")
 
+        return "\n".join(lines)
 
-class HealthCommand:
-    """skeleton dev health — Subsystem health dashboard."""
-
-    def __call__(self, args: List[str]) -> Dict[str, Any]:
-        parser = argparse.ArgumentParser(prog="skeleton dev health")
-        parser.add_argument("--json", action="store_true", help="Output as JSON")
-        parser.add_argument("--watch", "-w", action="store_true", help="Continuous monitoring")
-        parser.add_argument("--interval", type=int, default=5, help="Watch interval in seconds")
-        parsed = parser.parse_args(args)
-
-        from skeleton.developer.wizard import SubsystemExplorer
+    def _cmd_visualize(self, args) -> str:
+        """Handle visualize command."""
+        target = args.target or "skeleton.forge.universal"
+        fmt = args.format
 
         try:
-            state = get_state()
-        except Exception:
-            genesis = Genesis(seed=42).boot()
-            state = type("MockState", (), {"genesis": genesis})()
+            module = __import__(target, fromlist=["Blueprint"])
+            blueprint = getattr(module, "Blueprint", None)
+        except ImportError:
+            blueprint = None
 
-        explorer = SubsystemExplorer(state)
+        if not blueprint:
+            return f"Could not load blueprint from {target}"
 
-        if parsed.watch:
-            import time
-            try:
-                while True:
-                    summary = explorer.summary()
-                    self._render_summary(summary, parsed.json)
-                    time.sleep(parsed.interval)
-            except KeyboardInterrupt:
-                print("\nHealth watch stopped.")
-                return {"status": "stopped"}
+        if fmt == "text":
+            lines = [f"Blueprint: {target}", "=" * 40]
+            for attr in dir(blueprint):
+                if not attr.startswith("_"):
+                    val = getattr(blueprint, attr)
+                    if callable(val):
+                        lines.append(f"  [method] {attr}")
+                    else:
+                        lines.append(f"  [field]  {attr} = {val}")
+            return "\n".join(lines)
 
-        summary = explorer.summary()
-        self._render_summary(summary, parsed.json)
-        return summary
+        elif fmt == "json":
+            import json
+            schema = {"target": target, "methods": [], "fields": []}
+            for attr in dir(blueprint):
+                if not attr.startswith("_"):
+                    val = getattr(blueprint, attr)
+                    if callable(val):
+                        schema["methods"].append(attr)
+                    else:
+                        schema["fields"].append({"name": attr, "value": str(val)})
+            return json.dumps(schema, indent=2)
 
-    @staticmethod
-    def _render_summary(summary: Dict[str, Any], as_json: bool) -> None:
-        if as_json:
-            print(json.dumps(summary, indent=2, default=str))
-            return
+        else:
+            return f"Format '{fmt}' visualization not yet implemented"
 
-        from skeleton.developer.wizard import SubsystemExplorer
-        explorer = SubsystemExplorer()
-        print(explorer.render_table())
-        print(f"\nOverall: {summary['overall'].upper()}")
-        print(f"Subsystems: {summary['total_subsystems']} | Phases: {summary['phases_booted']}")
-        for status, count in summary.get("status_breakdown", {}).items():
-            print(f"  {status}: {count}")
+    def _cmd_extension(self, args) -> str:
+        """Handle extension management command."""
+        action = args.action
+        name = args.name
 
+        ext_dir = os.path.expanduser("~/.skeleton/extensions")
+        os.makedirs(ext_dir, exist_ok=True)
 
-class VisualizeCommand:
-    """skeleton dev visualize — Blueprint and topology visualization."""
+        if action == "list":
+            exts = os.listdir(ext_dir) if os.path.exists(ext_dir) else []
+            if not exts:
+                return "No extensions installed."
+            lines = ["Installed extensions:", ""]
+            for ext in exts:
+                lines.append(f"  - {ext}")
+            return "\n".join(lines)
 
-    def __call__(self, args: List[str]) -> Dict[str, Any]:
-        parser = argparse.ArgumentParser(prog="skeleton dev visualize")
-        parser.add_argument("--blueprint", "-b", help="Blueprint ID or name to visualize")
-        parser.add_argument("--topology", "-t", action="store_true", help="Show topology as JSON")
-        parser.add_argument("--compact", "-c", action="store_true", help="Compact output")
-        parser.add_argument("--save", "-s", help="Save output to file")
-        parsed = parser.parse_args(args)
+        elif action == "install":
+            if not name:
+                return "Extension name required for install"
+            ext_path = os.path.join(ext_dir, name)
+            os.makedirs(ext_path, exist_ok=True)
+            with open(os.path.join(ext_path, "__init__.py"), "w") as f:
+                f.write(f'"""Extension: {name}"""\n')
+            return f"Extension '{name}' installed to {ext_path}"
 
-        from skeleton.developer.wizard import BlueprintVisualizer
+        elif action == "remove":
+            if not name:
+                return "Extension name required for remove"
+            ext_path = os.path.join(ext_dir, name)
+            if os.path.exists(ext_path):
+                import shutil
+                shutil.rmtree(ext_path)
+                return f"Extension '{name}' removed"
+            return f"Extension '{name}' not found"
 
-        if parsed.blueprint:
-            try:
-                state = get_state()
-                forge = getattr(state, "forge", None)
-                if forge is None:
-                    raise RuntimeError("No forge available")
-                bp = forge.new_blueprint(parsed.blueprint)
-                forge.instantiate(bp, "source", "input")
-                forge.instantiate(bp, "transform", "process")
-                forge.instantiate(bp, "sink", "output")
-                bp.connect(("input", "out"), ("process", "in"))
-                bp.connect(("process", "out"), ("output", "in"))
-            except Exception:
-                forge = Forge()
-                bp = forge.new_blueprint(parsed.blueprint or "demo")
-                forge.instantiate(bp, "source", "input")
-                forge.instantiate(bp, "transform", "process")
-                forge.instantiate(bp, "sink", "output")
-                bp.connect(("input", "out"), ("process", "in"))
-                bp.connect(("process", "out"), ("output", "in"))
+        elif action == "update":
+            return "Extension update not yet implemented"
 
-            visualizer = BlueprintVisualizer()
-
-            if parsed.topology:
-                output = visualizer.render_topology(bp)
-            else:
-                output = visualizer.render(bp, compact=parsed.compact)
-
-            if parsed.save:
-                Path(parsed.save).write_text(output)
-                return {"saved_to": parsed.save, "blueprint": bp.name}
-
-            print(output)
-            return {"blueprint": bp.name, "components": len(bp.components), "wires": len(bp.wires)}
-
-        return {"error": "No blueprint specified. Use --blueprint <name>"}
-
-
-class ExtensionCommand:
-    """skeleton dev extension — Generate boilerplate for new subsystems."""
-
-    def __call__(self, args: List[str]) -> Dict[str, Any]:
-        parser = argparse.ArgumentParser(prog="skeleton dev extension")
-        parser.add_argument("name", help="Extension/subsystem name")
-        parser.add_argument("--type", choices=["subsystem", "pipeline", "agent", "tool"], default="subsystem")
-        parser.add_argument("--with-tests", action="store_true", default=True, help="Generate tests")
-        parser.add_argument("--with-api", action="store_true", help="Generate API routes")
-        parsed = parser.parse_args(args)
-
-        dest = Path("extensions") / parsed.name
-        dest.mkdir(parents=True, exist_ok=True)
-
-        files = self._generate_files(parsed.name, parsed.type, parsed.with_tests, parsed.with_api)
-        for path, content in files.items():
-            file_path = dest / path
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-            file_path.write_text(content.strip() + "\n")
-
-        return {
-            "extension": parsed.name,
-            "type": parsed.type,
-            "created_at": str(dest),
-            "files": list(files.keys()),
-        }
-
-    @staticmethod
-    def _generate_files(name: str, ext_type: str, with_tests: bool, with_api: bool) -> Dict[str, str]:
-        files: Dict[str, str] = {}
-        class_name = "".join(p.capitalize() for p in name.split("_"))
-
-        if ext_type == "subsystem":
-            files[f"{name}/__init__.py"] = f'"""{class_name} subsystem for Skeleton."""\nfrom skeleton.kernel.events import EventBus\n\nclass {class_name}:\n    def __init__(self, bus: EventBus | None = None):\n        self.bus = bus or EventBus()\n        self._state = {{}}\n\n    def health(self) -> dict:\n        return {{"healthy": True, "state": self._state}}\n\n    def stats(self) -> dict:\n        return {{"events_processed": 0}}\n'
-        elif ext_type == "pipeline":
-            files[f"{name}/__init__.py"] = f'"""{class_name} pipeline for Skeleton."""\nfrom skeleton.kernel.events import EventBus\n\nclass {class_name}Pipeline:\n    def __init__(self, bus: EventBus | None = None):\n        self.bus = bus or EventBus()\n\n    def run(self, description: str, **kwargs) -> dict:\n        """Execute the pipeline."""\n        return {{"description": description, "status": "generated", "result": {{}}}}\n'
-        elif ext_type == "agent":
-            files[f"{name}/__init__.py"] = f'"""{class_name} agent for Skeleton."""\nfrom skeleton import Genesis\n\nclass {class_name}Agent:\n    def __init__(self):\n        self.genesis = Genesis(seed=42).boot()\n\n    def act(self, observation: str) -> str:\n        """Process observation and return action."""\n        return f"Action for: {{observation}}"\n'
-        elif ext_type == "tool":
-            files[f"{name}/__init__.py"] = f'"""{class_name} tool for Skeleton."""\nclass {class_name}Tool:\n    def __init__(self):\n        pass\n\n    def invoke(self, **params) -> dict:\n        """Invoke the tool with parameters."""\n        return {{"result": None, "params": params}}\n'
-
-        if with_tests:
-            files[f"tests/test_{name}.py"] = f'"""Tests for {name}."""\nfrom skeleton.testing.scaffold import TestCase\n\nclass Test{class_name}(TestCase):\n    def test_initialization(self):\n        pass\n'
-
-        if with_api:
-            files[f"{name}/routes.py"] = f'"""API routes for {name}."""\nfrom fastapi import APIRouter\n\nrouter = APIRouter(prefix="/{name}")\n\n@router.get("/health")\nasync def health() -> dict:\n    return {{"status": "healthy"}}\n'
-
-        return files
-
-
-_dev_registry = DevCommandRegistry()
-_dev_registry.register("scaffold", ScaffoldCommand())
-_dev_registry.register("wizard", WizardCommand())
-_dev_registry.register("health", HealthCommand())
-_dev_registry.register("visualize", VisualizeCommand())
-_dev_registry.register("extension", ExtensionCommand())
-
-
-def run_dev_command(command: str, args: List[str]) -> Any:
-    """Entry point for all dev subcommands."""
-    return _dev_registry.run(command, args)
+        return f"Unknown extension action: {action}"

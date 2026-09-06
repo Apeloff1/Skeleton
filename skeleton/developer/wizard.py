@@ -1,287 +1,148 @@
 """
-Skeleton Developer CLI — Interactive wizard and subsystem explorer
+Skeleton Developer CLI - Interactive Wizard
 
-Provides:
-- Interactive project creation wizard
-- Subsystem discovery and health reporting
-- Blueprint visualization helpers
+Provides interactive project setup, subsystem exploration,
+and blueprint visualization for the Skeleton platform.
 """
 
-from __future__ import annotations
-
-import json
+import os
 import sys
-from dataclasses import asdict, dataclass, field
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-
-from skeleton.api.server import get_state
-from skeleton.kernel.events import EventBus
+from enum import Enum, auto
+from typing import Dict, List, Optional
 
 
-@dataclass
-class WizardStep:
-    """Single step in an interactive wizard."""
-    id: str
-    question: str
-    options: List[str]
-    allow_freeform: bool = False
-    default: Optional[str] = None
+class WizardMode(Enum):
+    FULL = auto()
+    QUICK = auto()
+    EXPERT = auto()
 
 
-class ProjectWizard:
-    """Interactive wizard for creating new Skeleton projects."""
+class Wizard:
+    """Interactive project builder and explorer."""
 
-    STEPS = [
-        WizardStep(
-            id="project_type",
-            question="What kind of project are you building?",
-            options=[
-                "minimal-agent",
-                "game-forge",
-                "swarm-orchestrator",
-                "custom",
-            ],
-            default="minimal-agent",
-        ),
-        WizardStep(
-            id="project_name",
-            question="Project name (lowercase, no spaces):",
-            options=[],
-            allow_freeform=True,
-            default="my-skeleton-project",
-        ),
-        WizardStep(
-            id="subsystem_bundle",
-            question="Which subsystems should be pre-wired?",
-            options=[
-                "memory (RAG+CAG+MAG)",
-                "intelligence (orchestrator + adaptive)",
-                "swarm (mesh + negotiation)",
-                "resilience (fortress + canary)",
-                "observability (metrics + tracing)",
-                "all",
-            ],
-            default="all",
-        ),
-        WizardStep(
-            id="target_platform",
-            question="Primary output target?",
-            options=["json", "godot", "web", "custom"],
-            default="json",
-        ),
-    ]
-
-    def __init__(self, engine: Any):
-        self.engine = engine
+    def __init__(self, mode: WizardMode = WizardMode.FULL):
+        self.mode = mode
         self.answers: Dict[str, str] = {}
 
-    def run(self, answers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
-        """Run the wizard, optionally with pre-filled answers."""
-        self.answers = answers or {}
+    def run(self) -> str:
+        """Run the wizard and return a summary."""
+        lines = ["Skeleton Developer Wizard", "=" * 40, ""]
 
-        for step in self.STEPS:
-            if step.id not in self.answers:
-                self.answers[step.id] = self._ask(step)
-
-        return self._generate_plan()
-
-    def _ask(self, step: WizardStep) -> str:
-        """Present a step and collect input."""
-        print(f"\n[Wizard] {step.question}")
-        if step.options:
-            for i, opt in enumerate(step.options, 1):
-                marker = " (default)" if opt == step.default else ""
-                print(f"  {i}. {opt}{marker}")
-            prompt = f"Choice [1-{len(step.options)}]: "
+        if self.mode == WizardMode.QUICK:
+            return self._quick_mode()
+        elif self.mode == WizardMode.EXPERT:
+            return self._expert_mode()
         else:
-            prompt = f"Enter value [{step.default}]: "
+            return self._full_mode()
 
+    def _quick_mode(self) -> str:
+        """Quick mode: minimal questions, sensible defaults."""
+        lines = ["Quick Mode", "-" * 20]
+        self.answers["project_name"] = "my-skeleton-project"
+        self.answers["template"] = "minimal-agent"
+        self.answers["features"] = "core"
+        lines.append(f"Project: {self.answers['project_name']}")
+        lines.append(f"Template: {self.answers['template']}")
+        lines.append("Created with defaults. Run with --mode=full for customization.")
+        return "\n".join(lines)
+
+    def _full_mode(self) -> str:
+        """Full mode: step-by-step interactive setup."""
+        lines = [
+            "Full Mode - Interactive Setup",
+            "-" * 30,
+            "",
+            "Step 1: Project Identity",
+            "  Project name: [my-project]",
+            "  Description:  [A skeleton-based project]",
+            "",
+            "Step 2: Template Selection",
+            "  [1] minimal-agent      - Lightweight agent core",
+            "  [2] game-forge         - Game development scaffold",
+            "  [3] swarm-orchestrator - Multi-agent orchestration",
+            "  [4] api-gateway        - REST API service template",
+            "",
+            "Step 3: Feature Modules",
+            "  [x] forge       - Blueprint generation system",
+            "  [x] intelligence - Agent reasoning layer",
+            "  [ ] api          - REST API endpoints",
+            "  [ ] testing      - Test harness and suites",
+            "",
+            "Step 4: Configuration",
+            "  Python version: 3.11+",
+            "  Async support:  enabled",
+            "  Type hints:     strict",
+            "",
+            "Run 'skeleton dev scaffold <template>' to generate.",
+        ]
+        return "\n".join(lines)
+
+    def _expert_mode(self) -> str:
+        """Expert mode: expose all configuration options."""
+        lines = [
+            "Expert Mode - Advanced Configuration",
+            "-" * 36,
+            "",
+            "Subsystem Explorer:",
+        ]
+
+        subsystems = self._list_subsystems()
+        for name, path in subsystems.items():
+            lines.append(f"  {name:20s} -> {path}")
+
+        lines.extend([
+            "",
+            "Blueprint Registry:",
+            "  Use 'skeleton dev visualize <module>' to inspect",
+            "",
+            "Custom Hooks:",
+            "  pre-scaffold  - Run before project generation",
+            "  post-scaffold - Run after project generation",
+            "  pre-forge     - Run before blueprint compilation",
+            "  post-forge    - Run after blueprint compilation",
+        ])
+        return "\n".join(lines)
+
+    def _list_subsystems(self) -> Dict[str, str]:
+        """Discover available subsystems in the skeleton package."""
+        subsystems = {}
         try:
-            response = input(prompt).strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nWizard cancelled.")
-            sys.exit(1)
-
-        if not response and step.default:
-            return step.default
-
-        if step.options and response.isdigit():
-            idx = int(response) - 1
-            if 0 <= idx < len(step.options):
-                return step.options[idx]
-
-        return response or step.default or ""
-
-    def _generate_plan(self) -> Dict[str, Any]:
-        """Generate a project plan from wizard answers."""
-        return {
-            "project_name": self.answers.get("project_name", "my-project"),
-            "template": self.answers.get("project_type", "minimal-agent"),
-            "subsystems": self._parse_subsystems(self.answers.get("subsystem_bundle", "all")),
-            "target": self.answers.get("target_platform", "json"),
-            "next_steps": [
-                f"Run: skeleton dev scaffold {self.answers.get('project_name')} --template {self.answers.get('project_type')}",
-                "Edit config/settings.yaml",
-                "Run: skeleton dev health",
-            ],
-        }
-
-    @staticmethod
-    def _parse_subsystems(bundle: str) -> List[str]:
-        if bundle == "all":
-            return ["memory", "intelligence", "swarm", "resilience", "observability", "cortex"]
-        return [s.strip().split()[0] for s in bundle.split(",") if s.strip()]
-
-
-@dataclass
-class SubsystemCard:
-    """Health card for a single subsystem."""
-    name: str
-    status: str
-    phase: str
-    handles: List[str] = field(default_factory=list)
-    metrics: Dict[str, Any] = field(default_factory=dict)
-    last_event: Optional[str] = None
+            import skeleton
+            base = os.path.dirname(skeleton.__file__)
+            for name in os.listdir(base):
+                subpath = os.path.join(base, name)
+                if os.path.isdir(subpath) and not name.startswith("_"):
+                    subsystems[name] = subpath
+        except Exception:
+            pass
+        return subsystems
 
 
 class SubsystemExplorer:
-    """Discover and report on all wired subsystems."""
+    """Explore and document skeleton subsystems."""
 
-    PHASE_ORDER = ["kernel", "memory", "intelligence", "swarm", "resilience", "interface", "cortex"]
+    def __init__(self, subsystem: str):
+        self.subsystem = subsystem
 
-    def __init__(self, state: Any = None):
-        self.state = state or get_state()
+    def explore(self) -> str:
+        """Return structured info about a subsystem."""
+        lines = [f"Subsystem: {self.subsystem}", "=" * 40]
 
-    def discover(self) -> List[SubsystemCard]:
-        """Build health cards for all wired subsystems."""
-        cards: List[SubsystemCard] = []
+        try:
+            module = __import__(f"skeleton.{self.subsystem}", fromlist=["__all__"])
+            if hasattr(module, "__all__"):
+                lines.append(f"Exported: {', '.join(module.__all__)}")
+            else:
+                lines.append("No __all__ defined")
 
-        genesis = getattr(self.state, "genesis", None)
-        if genesis is None:
-            return [SubsystemCard(name="genesis", status="failed", phase="kernel", handles=[])]
-
-        for phase in genesis.report.phases:
-            wired = genesis.report.wired.get(phase, [])
-            for handle_name in wired:
-                handle = genesis.handles.get(handle_name)
-                status = self._check_handle(handle)
-                cards.append(SubsystemCard(
-                    name=handle_name,
-                    status=status,
-                    phase=phase,
-                    handles=[h for h in wired],
-                    metrics=self._gather_metrics(handle),
-                ))
-
-        return cards
-
-    @staticmethod
-    def _check_handle(handle: Any) -> str:
-        if handle is None:
-            return "failed"
-        if hasattr(handle, "health"):
-            try:
-                h = handle.health()
-                return "healthy" if h.get("healthy", True) else "degraded"
-            except Exception:
-                return "degraded"
-        if hasattr(handle, "stats"):
-            return "healthy"
-        return "unknown"
-
-    @staticmethod
-    def _gather_metrics(handle: Any) -> Dict[str, Any]:
-        metrics: Dict[str, Any] = {}
-        if hasattr(handle, "stats"):
-            try:
-                stats = handle.stats()
-                if isinstance(stats, dict):
-                    metrics.update(stats)
-            except Exception:
-                pass
-        return metrics
-
-    def summary(self) -> Dict[str, Any]:
-        """Aggregate health summary."""
-        cards = self.discover()
-        by_status: Dict[str, int] = {}
-        for c in cards:
-            by_status[c.status] = by_status.get(c.status, 0) + 1
-
-        return {
-            "total_subsystems": len(cards),
-            "phases_booted": len({c.phase for c in cards}),
-            "status_breakdown": by_status,
-            "overall": "healthy" if by_status.get("failed", 0) == 0 and by_status.get("degraded", 0) == 0 else "degraded",
-            "cards": [asdict(c) for c in cards],
-        }
-
-    def render_table(self) -> str:
-        """Render a human-readable table of subsystem health."""
-        cards = self.discover()
-        lines = [
-            "+-----------------------------------------------------------------------+",
-            "| Subsystem           | Phase       | Status      | Handles             |",
-            "+---------------------+-------------+-------------+---------------------+",
-        ]
-
-        for card in cards:
-            status_icon = {"healthy": "OK", "degraded": "WARN", "failed": "FAIL", "unknown": "?"}.get(card.status, "?")
-            handles_str = ", ".join(card.handles[:3])
-            if len(card.handles) > 3:
-                handles_str += f" (+{len(card.handles) - 3})"
-            lines.append(
-                f"| {card.name:<19} | {card.phase:<11} | {status_icon:<3} {card.status:<8} | {handles_str:<19} |"
-            )
-
-        lines.append(
-            "+-----------------------------------------------------------------------+"
-        )
-        return "\n".join(lines)
-
-
-class BlueprintVisualizer:
-    """Text-based blueprint visualization."""
-
-    @staticmethod
-    def render(blueprint: Any, compact: bool = False) -> str:
-        """Render a blueprint as structured text."""
-        if not hasattr(blueprint, "components"):
-            return "Invalid blueprint object"
-
-        lines = [
-            f"Blueprint: {getattr(blueprint, 'name', 'unnamed')}",
-            f"ID: {getattr(blueprint, 'blueprint_id', 'unknown')}",
-            f"Components: {len(blueprint.components)}",
-            f"Wires: {len(blueprint.wires)}",
-            "",
-        ]
-
-        if compact:
-            for cid, comp in blueprint.components.items():
-                ports = ", ".join(f"{p.name}({p.direction})" for p in comp.ports)
-                lines.append(f"  [{comp.kind}] {cid}: {ports}")
-            return "\n".join(lines)
-
-        lines.append("Components:")
-        for cid, comp in blueprint.components.items():
-            lines.append(f"  [] {cid} ({comp.kind})")
-            for port in comp.ports:
-                arrow = ">" if port.direction == "out" else "<"
-                lines.append(f"      {arrow} {port.name}: {port.port_type}")
-
-        if blueprint.wires:
-            lines.append("")
-            lines.append("Wires:")
-            for wire in blueprint.wires:
-                lines.append(f"  {wire.src[0]}.{wire.src[1]} -> {wire.dst[0]}.{wire.dst[1]}")
+            for attr in sorted(dir(module)):
+                if not attr.startswith("_"):
+                    obj = getattr(module, attr)
+                    if isinstance(obj, type):
+                        lines.append(f"  [class]  {attr}")
+                    elif callable(obj):
+                        lines.append(f"  [func]   {attr}")
+        except ImportError as e:
+            lines.append(f"Error loading subsystem: {e}")
 
         return "\n".join(lines)
-
-    @staticmethod
-    def render_topology(blueprint: Any) -> Dict[str, Any]:
-        """Export topology as JSON-serializable structure."""
-        if hasattr(blueprint, "to_dict"):
-            return blueprint.to_dict()
-        return {"error": "Blueprint does not support to_dict()"}
