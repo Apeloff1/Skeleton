@@ -52,7 +52,11 @@ def _project_dir_for(slug: str) -> Path:
     """
     if not _SLUG_RE.match(slug):
         raise HTTPException(422, f"invalid project slug: {slug!r}")
-    project_dir = _PROJECTS_ROOT / slug
+    # Whitelist already rejected separators / '..'; resolve + parents check for CodeQL.
+    root = _PROJECTS_ROOT.resolve()
+    project_dir = root.joinpath(slug).resolve()
+    if project_dir != root and root not in project_dir.parents:
+        raise HTTPException(422, f"project slug escapes sandbox: {slug!r}")
     if not project_dir.is_dir():
         raise HTTPException(404, f"no project named {slug!r}")
     return project_dir
@@ -64,14 +68,22 @@ def _resolve_within(base: Path, relative: str, what: str) -> Path:
     Absolute paths, ``..`` segments, and anything else that resolves outside
     ``base`` get a 422 — the pipeline never sees a path outside the sandbox.
     """
-    if not relative or relative.startswith(("/", "\\", "~")):
+    if (
+        not relative
+        or relative.startswith(("/", "\\", "~"))
+        or Path(relative).is_absolute()
+    ):
         raise HTTPException(422, f"{what} must be a relative path inside the project")
-    resolved = (base / relative).resolve()
+    parts = Path(relative).parts
+    # Strip taint before resolve: reject '.' / '..' / empties in any segment.
+    bad = ("", ".", "..")
+    if any(part in bad or part.startswith("~") for part in parts):
+        raise HTTPException(422, f"{what} escapes the project sandbox: {relative!r}")
     root = base.resolve()
+    resolved = root.joinpath(*parts).resolve()
     if resolved != root and root not in resolved.parents:
         raise HTTPException(422, f"{what} escapes the project sandbox: {relative!r}")
     return resolved
-
 
 # ── Models ────────────────────────────────────────────────────────────────
 

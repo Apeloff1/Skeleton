@@ -30,7 +30,13 @@ _SAFE = re.compile(r"[^A-Za-z0-9_.\-]")
 
 def _repo_dir(project: Optional[str] = None) -> Path:
     name = _SAFE.sub("_", (project or _active["project"]) or "default")
-    return GIT_WORKSPACE_BASE / name
+    if not name or name in {".", ".."} or ".." in name:
+        name = "default"
+    root = GIT_WORKSPACE_BASE.resolve()
+    candidate = root.joinpath(name).resolve()
+    if candidate != root and root not in candidate.parents:
+        raise HTTPException(status_code=400, detail="invalid project path")
+    return candidate
 
 
 async def _git(args: List[str], project: Optional[str] = None, cwd: Optional[Path] = None) -> dict:
