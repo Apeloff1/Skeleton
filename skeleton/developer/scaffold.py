@@ -1,133 +1,193 @@
 """
-Skeleton Developer CLI — Core scaffolding engine
+Skeleton Developer CLI - Scaffold Engine
 
-Provides:
-- Project template generation
-- Subsystem scaffolding
-- Interactive wizard support
+Provides project templates and scaffolding for:
+  - minimal-agent      : Lightweight agent core
+  - game-forge         : Game development scaffold
+  - swarm-orchestrator : Multi-agent orchestration
+  - api-gateway        : REST API service template
 """
 
-from __future__ import annotations
-
-import json
 import os
 import shutil
-import sys
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, Any
 
 
-@dataclass
-class ScaffoldTemplate:
-    """A reusable project template."""
-    name: str
-    description: str
-    files: Dict[str, str] = field(default_factory=dict)
-    directories: List[str] = field(default_factory=list)
-    post_hooks: List[str] = field(default_factory=list)
+TEMPLATES: Dict[str, Dict[str, Any]] = {
+    "minimal-agent": {
+        "description": "Lightweight agent core with minimal dependencies",
+        "files": {
+            "agent.py": '''"""Minimal agent implementation."""
+from skeleton.forge.universal import Blueprint
+
+class MinimalAgent:
+    """A lightweight agent built on Skeleton."""
+    def __init__(self):
+        self.blueprint = Blueprint()
+        self.state = {}
+
+    def act(self, perception: dict) -> dict:
+        """Process perception and return action."""
+        return {"action": "noop", "confidence": 1.0}
+''',
+            "main.py": '''"""Entry point for minimal agent."""
+from agent import MinimalAgent
+
+if __name__ == "__main__":
+    agent = MinimalAgent()
+    print("Minimal agent ready.")
+''',
+            "README.md": """# Minimal Agent
+
+A lightweight agent built on the Skeleton platform.
+
+## Usage
+
+```bash
+python main.py
+```
+""",
+        },
+    },
+    "game-forge": {
+        "description": "Game development scaffold with forge integration",
+        "files": {
+            "game.py": '''"""Game forge scaffold."""
+from skeleton.forge.universal import Blueprint
+
+class GameWorld:
+    """A game world built from blueprints."""
+    def __init__(self):
+        self.entities = []
+        self.systems = []
+
+    def spawn(self, blueprint: Blueprint):
+        """Spawn an entity from a blueprint."""
+        self.entities.append(blueprint)
+''',
+            "main.py": '''"""Entry point for game forge."""
+from game import GameWorld
+
+if __name__ == "__main__":
+    world = GameWorld()
+    print("Game world initialized.")
+''',
+            "README.md": """# Game Forge
+
+Game development scaffold using Skeleton blueprints.
+
+## Usage
+
+```bash
+python main.py
+```
+""",
+        },
+    },
+    "swarm-orchestrator": {
+        "description": "Multi-agent orchestration and coordination",
+        "files": {
+            "swarm.py": '''"""Swarm orchestrator scaffold."""
+from skeleton.forge.universal import Blueprint
+from typing import List
+
+class SwarmOrchestrator:
+    """Orchestrate multiple agents in a swarm."""
+    def __init__(self):
+        self.agents: List[Blueprint] = []
+
+    def add_agent(self, agent: Blueprint):
+        """Add an agent to the swarm."""
+        self.agents.append(agent)
+
+    def broadcast(self, message: dict):
+        """Broadcast a message to all agents."""
+        for agent in self.agents:
+            pass  # Agent processing
+''',
+            "main.py": '''"""Entry point for swarm orchestrator."""
+from swarm import SwarmOrchestrator
+
+if __name__ == "__main__":
+    swarm = SwarmOrchestrator()
+    print("Swarm ready.")
+''',
+            "README.md": """# Swarm Orchestrator
+
+Multi-agent orchestration using Skeleton.
+
+## Usage
+
+```bash
+python main.py
+```
+""",
+        },
+    },
+    "api-gateway": {
+        "description": "REST API service template with routes",
+        "files": {
+            "service.py": '''"""API gateway service scaffold."""
+from skeleton.api.routes import Router
+
+class GatewayService:
+    """A REST API gateway built on Skeleton."""
+    def __init__(self):
+        self.router = Router()
+
+    def start(self, host="0.0.0.0", port=8000):
+        """Start the gateway service."""
+        print(f"Gateway starting on {host}:{port}")
+''',
+            "main.py": '''"""Entry point for API gateway."""
+from service import GatewayService
+
+if __name__ == "__main__":
+    service = GatewayService()
+    service.start()
+''',
+            "README.md": """# API Gateway
+
+REST API service template using Skeleton routes.
+
+## Usage
+
+```bash
+python main.py
+```
+""",
+        },
+    },
+}
 
 
-class TemplateLibrary:
-    """Built-in templates for common Skeleton projects."""
-
-    @staticmethod
-    def minimal_agent() -> ScaffoldTemplate:
-        return ScaffoldTemplate(
-            name="minimal-agent",
-            description="Single-agent project with memory and reasoning",
-            directories=["src", "tests", "config"],
-            files={
-                "src/agent.py": '"""Minimal Skeleton agent."""\nfrom skeleton import Genesis\n\nclass MinimalAgent:\n    def __init__(self):\n        self.genesis = Genesis(seed=42).boot()\n        self.memory = self.genesis.get("rag")\n        self.orchestrator = self.genesis.get("orchestrator")\n\n    def think(self, query: str) -> str:\n        """Reason over memory and return a response."""\n        context = self.memory.query(query, k=3)\n        return self.orchestrator.reason(query=query, context=context)\n',
-                "tests/test_agent.py": '"""Tests for minimal agent."""\nfrom skeleton.testing.scaffold import TestCase\nfrom src.agent import MinimalAgent\n\nclass TestMinimalAgent(TestCase):\n    def setUp(self):\n        self.agent = MinimalAgent()\n\n    def test_think_returns_string(self):\n        result = self.agent.think("hello")\n        self.assertIsInstance(result, str)\n',
-                "config/settings.yaml": '# Minimal agent configuration\nmemory:\n  rag_k: 3\n  cag_enabled: false\n\norchestrator:\n  max_reasoning_depth: 5\n',
-                "README.md": '# Minimal Agent\n\nA single-agent Skeleton project.\n\n## Quick Start\n\n```bash\npython -m skeleton dev run\n```\n',
-            },
-        )
-
-    @staticmethod
-    def game_forge_project() -> ScaffoldTemplate:
-        return ScaffoldTemplate(
-            name="game-forge",
-            description="Game development project with forge pipeline",
-            directories=["src", "assets", "scenes", "tests", "scripts"],
-            files={
-                "src/game.py": '"""Game forge project."""\nfrom skeleton.forge.universal import Forge, Blueprint\nfrom skeleton.forge.eras import compile_era\n\nclass GameProject:\n    def __init__(self, era="extraction_now"):\n        self.forge = Forge()\n        self.era = compile_era(era)\n\n    def build_player(self) -> Blueprint:\n        bp = self.forge.new_blueprint("player")\n        self.forge.instantiate(bp, "player", "hero")\n        self.forge.instantiate(bp, "weapon_forge", "gear")\n        bp.connect(("hero", "intent"), ("gear", "parts"))\n        return bp\n',
-                "tests/test_game.py": '"""Game project tests."""\nfrom skeleton.testing.scaffold import TestCase\nfrom src.game import GameProject\n\nclass TestGameProject(TestCase):\n    def test_build_player(self):\n        game = GameProject()\n        bp = game.build_player()\n        self.assertEqual(len(bp.components), 2)\n',
-                "scripts/build.sh": '#!/bin/bash\nset -e\necho "Building game project..."\npython -m skeleton forge materialise --target godot\n',
-            },
-        )
-
-    @staticmethod
-    def swarm_orchestrator() -> ScaffoldTemplate:
-        return ScaffoldTemplate(
-            name="swarm-orchestrator",
-            description="Multi-agent swarm with negotiation",
-            directories=["src/agents", "src/coordination", "tests", "config"],
-            files={
-                "src/coordination/hive.py": '"""Swarm coordination."""\nfrom skeleton import Genesis\nfrom skeleton.swarm import SwarmMesh\n\nclass HiveCoordinator:\n    def __init__(self, agent_count=3):\n        self.genesis = Genesis(seed=42).boot()\n        self.mesh = self.genesis.get("mesh")\n        self.negotiator = self.genesis.get("negotiator")\n        self._spawn_agents(agent_count)\n\n    def _spawn_agents(self, count: int):\n        for i in range(count):\n            self.mesh.join(\n                specialisations={"reasoning", "memory"},\n                weight=1.0,\n                metadata={"id": f"agent_{i}"}\n            )\n\n    def delegate(self, task: str) -> str:\n        agent = self.mesh.route("reasoning")\n        return f"Task \'{task}\' delegated to {agent.agent_id}"\n',
-                "tests/test_hive.py": '"""Swarm tests."""\nfrom skeleton.testing.scaffold import TestCase\nfrom src.coordination.hive import HiveCoordinator\n\nclass TestHiveCoordinator(TestCase):\n    def test_delegation(self):\n        hive = HiveCoordinator(agent_count=2)\n        result = hive.delegate("analyze data")\n        self.assertIn("delegated", result)\n',
-            },
-        )
-
-    @classmethod
-    def all_templates(cls) -> List[ScaffoldTemplate]:
-        return [
-            cls.minimal_agent(),
-            cls.game_forge_project(),
-            cls.swarm_orchestrator(),
-        ]
+def list_templates() -> Dict[str, Dict[str, Any]]:
+    """Return available template metadata."""
+    return {k: {"description": v["description"]} for k, v in TEMPLATES.items()}
 
 
 class ScaffoldEngine:
-    """Generates projects from templates."""
+    """Engine for scaffolding new projects from templates."""
 
-    def __init__(self, root: Path):
-        self.root = Path(root)
-        self.library = TemplateLibrary()
+    def __init__(self, output_dir: str = "."):
+        self.output_dir = output_dir
 
-    def list_templates(self) -> List[Dict[str, str]]:
-        return [
-            {"name": t.name, "description": t.description}
-            for t in self.library.all_templates()
-        ]
+    def create_project(self, template: str, name: str, force: bool = False) -> str:
+        """Create a new project from a template."""
+        if template not in TEMPLATES:
+            available = ", ".join(TEMPLATES.keys())
+            return f"Unknown template '{template}'. Available: {available}"
 
-    def scaffold(self, template_name: str, project_name: str, target_dir: Optional[Path] = None) -> Path:
-        template = next((t for t in self.library.all_templates() if t.name == template_name), None)
-        if template is None:
-            raise ValueError(f"Unknown template: {template_name}")
+        project_dir = os.path.join(self.output_dir, name)
+        if os.path.exists(project_dir) and not force:
+            return f"Directory '{project_dir}' exists. Use --force to overwrite."
 
-        dest = Path(target_dir or self.root) / project_name
-        if dest.exists():
-            raise FileExistsError(f"Project directory already exists: {dest}")
+        os.makedirs(project_dir, exist_ok=True)
+        tmpl = TEMPLATES[template]
 
-        dest.mkdir(parents=True)
+        for filename, content in tmpl["files"].items():
+            filepath = os.path.join(project_dir, filename)
+            with open(filepath, "w") as f:
+                f.write(content)
 
-        for directory in template.directories:
-            (dest / directory).mkdir(parents=True, exist_ok=True)
-
-        for path, content in template.files.items():
-            file_path = dest / path
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-            file_path.write_text(content.strip() + "\n")
-            if path.endswith(".sh"):
-                file_path.chmod(0o755)
-
-        return dest
-
-    def validate_project(self, project_dir: Path) -> Dict[str, Any]:
-        """Check a project for Skeleton conventions."""
-        results = {
-            "has_src": (project_dir / "src").exists(),
-            "has_tests": (project_dir / "tests").exists(),
-            "has_config": (project_dir / "config").exists(),
-            "has_readme": (project_dir / "README.md").exists(),
-            "skeleton_imports": [],
-        }
-
-        for py_file in project_dir.rglob("*.py"):
-            content = py_file.read_text()
-            if "from skeleton" in content or "import skeleton" in content:
-                results["skeleton_imports"].append(str(py_file.relative_to(project_dir)))
-
-        return results
+        return f"Created '{template}' project at {project_dir}"
