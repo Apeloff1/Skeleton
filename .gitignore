@@ -158,3 +158,6 @@ chronicle/observe.jsonl
 chronicle/rotate.json
 chronicle/bound.jsonl
 chronicle/persistkv.json
+
+# WORM vault audit chain (runtime durable ledger)
+data/vault/
