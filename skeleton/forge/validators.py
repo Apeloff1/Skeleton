@@ -181,3 +181,35 @@ class BlueprintValidator:
                 if found:
                     return found
         return None
+
+
+def validate_with_quality(
+    blueprint: Dict[str, Any],
+    *,
+    rules: Optional[List[FieldRule]] = None,
+    stage_index: int = 0,
+    stage_floor_grade: int = 0,
+    gdd_stages: Optional[Any] = None,
+    regions: Optional[List[str]] = None,
+    era: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Compose BlueprintValidator with forge_quality.evaluate (extend-only)."""
+    from skeleton.forge.forge_quality import evaluate
+
+    structural = BlueprintValidator(rules=rules).validate(blueprint)
+    quality = evaluate(
+        blueprint,
+        stage_index=stage_index,
+        stage_floor_grade=stage_floor_grade,
+        gdd_stages=gdd_stages or (),
+        regions=regions or (),
+        era=era,
+    )
+    return {
+        "kind": "blueprint-quality-verdict",
+        "valid": structural.valid and bool(quality.get("passed")),
+        "validation": structural.to_dict(),
+        "quality": quality,
+        "stored_prose": 0,
+    }
+
