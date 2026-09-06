@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
 import pytest
 
 from skeleton.vault import AuditLog, ShamirSeal
-from skeleton.vault.audit import AuditChainBroken, verify_chain_or_refuse
+from skeleton.vault.audit import AuditChainBroken, _secret_ref, verify_chain_or_refuse
 
 
 class TestVault:
@@ -99,3 +100,41 @@ class TestWormRefuseOnBoot:
         log = AuditLog.open(path)
         log.verify_chain_or_refuse()
         assert len(log) == 0
+
+
+class TestSecretIdFingerprint:
+    """CodeQL py/clear-text-storage-sensitive-data: never persist raw secret ids."""
+
+    def test_append_stores_sha256_fingerprint(self, tmp_path: Path):
+        path = tmp_path / "worm_audit.jsonl"
+        log = AuditLog.open(path)
+        raw_id = "secret/prod/db-password"
+        entry = log.append(
+            entry_id="e1",
+            actor="root",
+            action="seal",
+            secret_id=raw_id,
+            outcome="success",
+        )
+        expected = hashlib.sha256(raw_id.encode("utf-8")).hexdigest()
+        assert entry.secret_id == expected
+        assert entry.secret_id == _secret_ref(raw_id)
+        assert raw_id not in path.read_text(encoding="utf-8")
+        persisted = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
+        assert persisted["secret_id"] == expected
+
+    def test_query_fingerprints_filter(self):
+        log = AuditLog()
+        raw_id = "vault/api-key"
+        log.append(entry_id="e1", actor="a", action="access", secret_id=raw_id)
+        log.append(entry_id="e2", actor="a", action="access", secret_id="other/id")
+        hits = log.query(secret_id=raw_id)
+        assert len(hits) == 1
+        assert hits[0].entry_id == "e1"
+        assert hits[0].secret_id == _secret_ref(raw_id)
+
+    def test_none_secret_id_stays_none(self):
+        log = AuditLog()
+        entry = log.append(entry_id="e1", actor="a", action="seal", secret_id=None)
+        assert entry.secret_id is None
+        assert _secret_ref(None) is None

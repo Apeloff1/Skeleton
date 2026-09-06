@@ -32,6 +32,17 @@ PathLike = Union[str, Path]
 DEFAULT_WORM_AUDIT_PATH = "data/vault/worm_audit.jsonl"
 
 
+def _secret_ref(secret_id: Optional[str]) -> Optional[str]:
+    """Return a SHA-256 fingerprint of ``secret_id`` for durable audit storage.
+
+    Raw secret identifiers must never enter the audit entry / hash chain /
+    persist path; only this fingerprint is stored on ``AuditEntry.secret_id``.
+    """
+    if secret_id is None:
+        return None
+    return hashlib.sha256(secret_id.encode("utf-8")).hexdigest()
+
+
 class AuditError(VaultError):
     code = "VLT.AUDIT"
 
@@ -49,6 +60,7 @@ class AuditEntry:
     entry_id: str
     actor: str
     action: str  # seal / unseal / rotate / access / denied
+    # SHA-256 fingerprint of the caller's secret id (never raw secret material).
     secret_id: Optional[str]
     outcome: str  # success / failure / denied
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -170,7 +182,7 @@ class AuditLog:
             entry_id=entry_id,
             actor=actor,
             action=action,
-            secret_id=secret_id,
+            secret_id=_secret_ref(secret_id),
             outcome=outcome,
             metadata=metadata or {},
             previous_hash=self._last_hash,
@@ -217,12 +229,13 @@ class AuditLog:
         secret_id: Optional[str] = None,
         limit: int = 50,
     ) -> Tuple[AuditEntry, ...]:
+        secret_ref = _secret_ref(secret_id)
         out = [
             e
             for e in reversed(self._entries)
             if (actor is None or e.actor == actor)
             and (action is None or e.action == action)
-            and (secret_id is None or e.secret_id == secret_id)
+            and (secret_ref is None or e.secret_id == secret_ref)
         ]
         return tuple(out[:limit])
 
