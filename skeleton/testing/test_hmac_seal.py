@@ -71,3 +71,53 @@ def test_require_seal_ok(monkeypatch):
     monkeypatch.setenv("GF_SEAL_SECRET", SECRET)
     token = mint_seal("bob", secret=SECRET)
     assert require_seal(x_gf_seal=token) == "bob"
+
+
+def test_keyring_rotates_verify_old_and_new(monkeypatch):
+    monkeypatch.setenv("GF_SEAL_SECRET", "primary-secret")
+    monkeypatch.setenv("GF_SEAL_KEYRING", "old=legacy-secret,new=primary-secret")
+    from skeleton.api import hmac_seal as mod
+    # Mint with primary
+    token = mod.mint_seal("alice", ttl_secs=60, secret="primary-secret", now=1_700_000_000)
+    assert mod.verify_seal(token, secret="primary-secret", now=1_700_000_000) == "alice"
+    # Old key still verifies a seal minted with it
+    old_token = mod.mint_seal("bob", ttl_secs=60, secret="legacy-secret", now=1_700_000_000)
+    assert (
+        mod.verify_seal(
+            old_token,
+            secret="primary-secret",
+            keyring="old=legacy-secret",
+            now=1_700_000_000,
+        )
+        == "bob"
+    )
+
+
+def test_principal_seal_roundtrip():
+    from skeleton.api.hmac_seal import mint_seal, verify_seal
+    token = mint_seal(
+        "bot",
+        ttl_secs=60,
+        secret=SECRET,
+        principal="user1",
+        now=1_700_000_000,
+    )
+    assert token is not None
+    assert token.count(".") == 3  # principal.attester.expiry.sig → 3 dots
+    assert verify_seal(token, secret=SECRET, now=1_700_000_000) == "bot"
+
+
+def test_principal_seal_rejects_bad_sig():
+    from skeleton.api.hmac_seal import mint_seal, verify_seal
+    token = mint_seal("bot", secret=SECRET, principal="user1", now=1_700_000_000, ttl_secs=60)
+    bad = token[:-4] + "abcd"
+    with pytest.raises(AuthError):
+        verify_seal(bad, secret=SECRET, now=1_700_000_000)
+
+
+def test_require_seal_503_when_only_empty_keyring(monkeypatch):
+    monkeypatch.delenv("GF_SEAL_SECRET", raising=False)
+    monkeypatch.delenv("GF_SEAL_KEYRING", raising=False)
+    with pytest.raises(HTTPException) as ei:
+        require_seal(x_gf_seal="x")
+    assert ei.value.status_code == 503
