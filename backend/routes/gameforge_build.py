@@ -41,6 +41,12 @@ def _gamefiles(game_name: str) -> list[dict]:
 
 
 def _register(build_id: str, game_name: str, kind: str, path: str) -> dict:
+    # Constrain artifact path to the builds sandbox (CodeQL #198/#199 leftovers).
+    root = os.path.realpath(_ARTIFACTS)
+    real = os.path.realpath(path)
+    if real != root and not real.startswith(root + os.sep):
+        raise ValueError("path escapes artifacts sandbox")
+    path = real
     size = os.path.getsize(path)
     with open(path, "rb") as f:
         sha = hashlib.sha256(f.read()).hexdigest()
