@@ -328,6 +328,159 @@ class Forge:
                             "verification_stats": verifier.stats(),
                         },
                     )
+        elif target in {"json", "yaml"}:
+            # Structured targets: encode via MaterialisationRegistry, then
+            # CodeVerifier.verdict (+ optional VerificationLoop repair) without
+            # Godot ForgeVerifier project checks.
+            from skeleton.forge.structured_verify import (
+                encode_structured_files,
+                structured_verify_until_green,
+                verify_structured,
+            )
+
+            if repair:
+                looped = structured_verify_until_green(
+                    result,
+                    target=target,
+                    name=blueprint.name,
+                    request=blueprint.name,
+                    root=self._root,
+                    max_rounds=max_rounds,
+                )
+                result["files"] = looped["files"]
+                result["file_count"] = len(looped["files"])
+                result["verification"] = looped["verification"]
+                result["verification_stats"] = looped["verification_stats"]
+                result["verify_loop"] = {
+                    "accepted": looped["accepted"],
+                    "trace": looped["trace"],
+                    "code_verdict": looped.get("code_verdict"),
+                    "stopped_reason": looped.get("stopped_reason"),
+                    "rounds_detail": looped.get("rounds_detail"),
+                    "threshold": looped.get("threshold"),
+                }
+                if looped.get("repairs"):
+                    result["repair"] = looped["repairs"][-1]
+                    result["repairs"] = looped["repairs"]
+                verification_accepted = bool(looped["accepted"])
+                verification_payload = looped["verification"]
+                evidence = {
+                    "project_issues": list(verification_payload.get("project_issues") or []),
+                    "blocking_issues": list(verification_payload.get("blocking_issues") or []),
+                    "top_file_reports": list(verification_payload.get("file_reports") or [])[:3],
+                    "verify_loop": result["verify_loop"],
+                    "target": target,
+                }
+                append_quality({
+                    "kind": "quality",
+                    "surface": "forge",
+                    "accepted": verification_accepted,
+                    "reason": verification_payload.get("reason"),
+                    "score": verification_payload.get("score"),
+                    "weakest_path": verification_payload.get("weakest_path"),
+                    "summary": verification_payload.get("summary") or {},
+                    "metadata": (verification_payload.get("quality") or {}).get("metadata")
+                    or {"kind": "forge", "target": target},
+                    "evidence": evidence,
+                }, root=self._root)
+                self._bus.publish(DomainEvent(
+                    topic="forge.verification.completed" if verification_accepted else "forge.verification.failed",
+                    payload={
+                        "blueprint_id": blueprint.blueprint_id,
+                        "name": blueprint.name,
+                        "target": target,
+                        "accepted": verification_accepted,
+                        "reason": verification_payload.get("reason"),
+                        "score": verification_payload.get("score"),
+                        "weakest_path": verification_payload.get("weakest_path"),
+                        "summary": verification_payload.get("summary") or {},
+                        "verify_loop": result["verify_loop"]["trace"],
+                    },
+                    correlation_id=f"forge_verify_{blueprint.blueprint_id}",
+                ))
+                if looped.get("repairs"):
+                    last = looped["repairs"][-1]
+                    self._bus.publish(DomainEvent(
+                        topic="forge.repair.completed" if last.get("ok") else "forge.repair.failed",
+                        payload={
+                            "blueprint_id": blueprint.blueprint_id,
+                            "name": blueprint.name,
+                            "target": target,
+                            "accepted": bool(last.get("ok")),
+                            "reason": last.get("reason"),
+                            "targeted_path": last.get("targeted_path"),
+                            "changed": last.get("changed"),
+                            "rounds": looped["trace"].get("rounds"),
+                        },
+                        correlation_id=f"forge_repair_{blueprint.blueprint_id}",
+                    ))
+                if not verification_accepted:
+                    raise MaterialisationError(
+                        f"emitted {target} artefact failed verification",
+                        context={
+                            "blueprint_id": blueprint.blueprint_id,
+                            "target": target,
+                            "verification": verification_payload,
+                            "verification_stats": looped["verification_stats"],
+                            "verify_loop": result["verify_loop"],
+                        },
+                    )
+            else:
+                files = encode_structured_files(result, target=target, name=blueprint.name)
+                verification = verify_structured(
+                    files,
+                    target=target,
+                    request=blueprint.name,
+                    root=self._root,
+                )
+                result["files"] = files
+                result["file_count"] = len(files)
+                result["verification"] = {
+                    k: v for k, v in verification.items() if k != "verification_stats"
+                }
+                result["verification_stats"] = verification.get("verification_stats") or {}
+                evidence = {
+                    "project_issues": list(verification.get("project_issues") or []),
+                    "blocking_issues": list(verification.get("blocking_issues") or []),
+                    "top_file_reports": list(verification.get("file_reports") or [])[:3],
+                    "target": target,
+                }
+                append_quality({
+                    "kind": "quality",
+                    "surface": "forge",
+                    "accepted": verification["accepted"],
+                    "reason": verification.get("reason"),
+                    "score": verification.get("score"),
+                    "weakest_path": verification.get("weakest_path"),
+                    "summary": verification.get("summary") or {},
+                    "metadata": (verification.get("quality") or {}).get("metadata")
+                    or {"kind": "forge", "target": target},
+                    "evidence": evidence,
+                }, root=self._root)
+                self._bus.publish(DomainEvent(
+                    topic="forge.verification.completed" if verification["accepted"] else "forge.verification.failed",
+                    payload={
+                        "blueprint_id": blueprint.blueprint_id,
+                        "name": blueprint.name,
+                        "target": target,
+                        "accepted": verification["accepted"],
+                        "reason": verification.get("reason"),
+                        "score": verification.get("score"),
+                        "weakest_path": verification.get("weakest_path"),
+                        "summary": verification.get("summary") or {},
+                    },
+                    correlation_id=f"forge_verify_{blueprint.blueprint_id}",
+                ))
+                if not verification["accepted"]:
+                    raise MaterialisationError(
+                        f"emitted {target} artefact failed verification",
+                        context={
+                            "blueprint_id": blueprint.blueprint_id,
+                            "target": target,
+                            "verification": result["verification"],
+                            "verification_stats": result["verification_stats"],
+                        },
+                    )
         materialised = {
             "blueprint_id": blueprint.blueprint_id,
             "components": len(blueprint.components),
@@ -346,6 +499,7 @@ class Forge:
                 name=blueprint.name,
             )
         self._bus.emit("forge.blueprint.materialised", materialised)
+
         return result
 
     @staticmethod
