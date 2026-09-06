@@ -1,50 +1,32 @@
-"""Secrets vault subsystem — sealed store, policies, recovery, entropy, KMS, quorum."""
+"""
+Skeleton Vault Package
 
-from .access import AccessDenied, AccessPolicy, Role
-from .audit import AuditEntry, AuditLog
-from .entropy import EntropyError, EntropyQuality, EntropyRegistry, EntropySource
-from .kms import DataKey, EnvelopeError, EnvelopeKMS
-from .keys import KeyRegistry, KeyVersion, KeyVersionError
-from .policies import PolicyRegistry, PolicyViolation, VaultPolicy, enforce_plaintext_minimum, require_prefix
-from .quorum import QuorumError, QuorumGate, QuorumRequest
-from .recovery import RecoveryError, RecoveryManager, RecoverySnapshot
-from .rotation import RotationPolicy, RotationScheduler, RotationTrigger
-from .shamir import SealingError, ShamirSeal, Share
-from .store import IntegrityError, SealedStore
+Exports:
+- AccessPolicy: Role-based access control
+- Role: Named role with permissions
+- Permission: Permission enum
+- EnvelopeKMS: Key envelope encryption
+- Predefined roles: ROLE_GUEST, ROLE_USER, ROLE_OPERATOR, ROLE_ADMIN
+"""
+
+from skeleton.vault.access import (
+    ROLE_ADMIN,
+    ROLE_GUEST,
+    ROLE_OPERATOR,
+    ROLE_USER,
+    AccessPolicy,
+    EnvelopeKMS,
+    Permission,
+    Role,
+)
 
 __all__ = [
-    "AccessDenied",
     "AccessPolicy",
     "Role",
-    "AuditEntry",
-    "AuditLog",
-    "EntropyError",
-    "EntropyQuality",
-    "EntropyRegistry",
-    "EntropySource",
-    "DataKey",
-    "EnvelopeError",
+    "Permission",
     "EnvelopeKMS",
-    "KeyRegistry",
-    "KeyVersion",
-    "KeyVersionError",
-    "PolicyRegistry",
-    "PolicyViolation",
-    "VaultPolicy",
-    "enforce_plaintext_minimum",
-    "require_prefix",
-    "QuorumError",
-    "QuorumGate",
-    "QuorumRequest",
-    "RecoveryError",
-    "RecoveryManager",
-    "RecoverySnapshot",
-    "RotationPolicy",
-    "RotationScheduler",
-    "RotationTrigger",
-    "SealingError",
-    "ShamirSeal",
-    "Share",
-    "IntegrityError",
-    "SealedStore",
+    "ROLE_GUEST",
+    "ROLE_USER",
+    "ROLE_OPERATOR",
+    "ROLE_ADMIN",
 ]

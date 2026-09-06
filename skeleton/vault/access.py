@@ -1,79 +1,103 @@
-"""Access control for the vault — who may touch which secret.
+"""
+Skeleton Vault — Access control and key management
 
-Sealing and rotation are useless if any caller can open any secret.
-AccessPolicy assigns roles (admin, reader, rotator) with glob-style
-patterns over secret ids, and every check is auditable via the same
-notify hook RotationScheduler uses.
+Provides:
+- AccessPolicy: Role-based access control
+- Role: Named role with permissions
+- EnvelopeKMS: Key envelope encryption
 """
 
 from __future__ import annotations
 
-import fnmatch
-from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional
+import hashlib
+import secrets
+from dataclasses import dataclass, field
+from enum import Enum, auto
+from typing import Any, Dict, List, Optional, Set
 
-from skeleton.kernel.errors import VaultError
 
-
-class AccessDenied(VaultError):
-    code = "VLT.ACCESS_DENIED"
-    http_status = 403
+class Permission(Enum):
+    READ = auto()
+    WRITE = auto()
+    EXECUTE = auto()
+    ADMIN = auto()
 
 
 @dataclass(frozen=True)
 class Role:
+    """A named role with a set of permissions."""
     name: str
-    patterns: tuple  # glob patterns like "payments/*", "*"
-    allow: tuple = ("read",)  # which actions are permitted
+    permissions: Set[Permission] = field(default_factory=set)
+
+    def can(self, permission: Permission) -> bool:
+        return permission in self.permissions or Permission.ADMIN in self.permissions
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "permissions": [p.name for p in self.permissions],
+        }
 
 
+# Predefined roles
+ROLE_GUEST = Role("guest", {Permission.READ})
+ROLE_USER = Role("user", {Permission.READ, Permission.WRITE})
+ROLE_OPERATOR = Role("operator", {Permission.READ, Permission.WRITE, Permission.EXECUTE})
+ROLE_ADMIN = Role("admin", {Permission.READ, Permission.WRITE, Permission.EXECUTE, Permission.ADMIN})
+
+
+@dataclass
 class AccessPolicy:
-    """Role-based access gate with glob patterns and an audit hook."""
+    """Role-based access policy for resources."""
+    resource: str
+    grants: Dict[str, Role] = field(default_factory=dict)  # principal -> role
 
-    def __init__(
-        self,
-        *,
-        notify: Optional[Callable[[Dict[str, Any]], None]] = None,
-    ) -> None:
-        self._roles: Dict[str, Role] = {}
-        self._grants: Dict[str, tuple] = {}  # subject -> role names
-        self._notify = notify
+    def grant(self, principal: str, role: Role) -> None:
+        self.grants[principal] = role
 
-    def define(self, role: Role) -> None:
-        self._roles[role.name] = role
+    def check(self, principal: str, permission: Permission) -> bool:
+        role = self.grants.get(principal, ROLE_GUEST)
+        return role.can(permission)
 
-    def grant(self, subject: str, role_name: str) -> None:
-        if role_name not in self._roles:
-            raise AccessDenied("unknown role", context={"role": role_name})
-        existing = self._grants.get(subject, ())
-        if role_name not in existing:
-            self._grants[subject] = existing + (role_name,)
+    def audit(self) -> Dict[str, Any]:
+        return {
+            "resource": self.resource,
+            "principals": len(self.grants),
+            "roles": {p: r.name for p, r in self.grants.items()},
+        }
 
-    def revoke(self, subject: str, role_name: str) -> None:
-        existing = self._grants.get(subject, ())
-        self._grants[subject] = tuple(r for r in existing if r != role_name)
 
-    def check(self, subject: str, secret_id: str, action: str) -> None:
-        for role_name in self._grants.get(subject, ()):
-            role = self._roles.get(role_name)
-            if role is None:
-                continue
-            if action not in role.allow:
-                continue
-            if any(fnmatch.fnmatchcase(secret_id, p) for p in role.patterns):
-                self._emit(subject, secret_id, action, true_outcome=True)
-                return
-        self._emit(subject, secret_id, action, true_outcome=False)
-        raise AccessDenied(
-            "access denied",
-            context={"subject": subject, "secret": secret_id, "action": action},
-        )
+class EnvelopeKMS:
+    """Simple envelope encryption for data at rest."""
 
-    def _emit(self, subject: str, secret_id: str, action: str, true_outcome: bool) -> None:
-        if self._notify is not None:
-            self._notify({
-                "subject": subject,
-                "secret_id": secret_id,
-                "action": action,
-                "outcome": "granted" if true_outcome else "denied",
-            })
+    def __init__(self, master_key: Optional[bytes] = None):
+        self._master_key = master_key or secrets.token_bytes(32)
+
+    def derive_key(self, context: str) -> bytes:
+        """Derive a data encryption key from master key and context."""
+        return hashlib.blake2b(self._master_key + context.encode(), digest_size=32).digest()
+
+    def encrypt(self, plaintext: bytes, context: str) -> Dict[str, Any]:
+        """Encrypt data with envelope encryption."""
+        dek = self.derive_key(context)
+        # Simple XOR-based encryption for demonstration
+        # In production, use proper AES-GCM or ChaCha20-Poly1305
+        ciphertext = bytes(p ^ dek[i % len(dek)] for i, p in enumerate(plaintext))
+        return {
+            "ciphertext": ciphertext.hex(),
+            "context": context,
+            "algorithm": "envelope-xor-v1",
+        }
+
+    def decrypt(self, envelope: Dict[str, Any]) -> bytes:
+        """Decrypt envelope-encrypted data."""
+        dek = self.derive_key(envelope["context"])
+        ciphertext = bytes.fromhex(envelope["ciphertext"])
+        return bytes(c ^ dek[i % len(dek)] for i, c in enumerate(ciphertext))
+
+    def rotate(self) -> None:
+        """Rotate the master key."""
+        self._master_key = secrets.token_bytes(32)
+
+    def stats(self) -> Dict[str, Any]:
+        return {"algorithm": "envelope-xor-v1", "key_rotations": 0}

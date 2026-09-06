@@ -1,170 +1,44 @@
-"""Pure domain kernel — zero I/O, zero framework imports."""
+"""
+Skeleton Kernel — Core primitives and foundational types
 
-from skeleton.kernel.errors import (
-    AgentNotFoundError,
+Provides:
+- errors: SkeletonError, BlueprintError, MaterialisationError
+- events: DomainEvent, EventBus
+- ids: UserId, BlueprintId
+- entropy: EntropyPool
+- clocks: VectorClock
+- invariants: Invariant, InvariantLattice
+- registry: CapabilityRegistry
+"""
+
+from __future__ import annotations
+
+from skeleton.kernel.primitives import (
     BlueprintError,
-    CapabilityNotFoundError,
-    ConfigurationError,
-    ConsensusError,
-    DuplicateCapabilityError,
-    EventBusError,
-    GenerationError,
-    InvalidIdentifierError,
+    BlueprintId,
+    CapabilityRegistry,
+    DomainEvent,
+    EntropyPool,
+    EventBus,
+    Invariant,
+    InvariantLattice,
     MaterialisationError,
-    NoCapableAgentError,
-    RagQueryError,
-    RagUnavailableError,
-    RegistryError,
-    SchedulingError,
-    SessionError,
     SkeletonError,
-    TaskDeadLetteredError,
-    ValidationError,
-    http_status_for,
-)
-from skeleton.kernel.events import DomainEvent, EventBus
-from skeleton.kernel.ids import AgentId, BlueprintId, MemoryId, PipelineRunId, SessionId, UserId
-from skeleton.kernel.registry import CapabilityKind, CapabilityRegistry, bootstrap_registry
-
-# --- v16.2 kernel hardening modules -------------------------------------
-from skeleton.kernel.clocks import ClockError, ClockRegistry, VectorClock
-from skeleton.kernel.backpressure import BackpressureGovernor, GovernorStats, Priority
-from skeleton.kernel.supervisor import Health, Lifecycle, SupervisorError
-from skeleton.kernel.leases import (
-    FencingGate,
-    Lease,
-    LeaseError,
-    LeaseHeldError,
-    LeaseManager,
-)
-from skeleton.kernel.election import (
-    Election,
-    ElectionError,
-    NodeState,
-    Role,
-    StaleTermError,
-    VoteRequest,
-)
-from skeleton.kernel.breaker import (
-    CircuitBreaker,
-    CircuitOpenError,
-    CircuitState,
-    RetriesExhausted,
-    RetryError,
-    RetryPolicy,
-)
-from skeleton.kernel.trace import Span, SpanRecorder, SpanStatus, TraceContext, TraceError
-from skeleton.kernel.budget import (
-    Budget,
-    BudgetError,
-    BudgetExceeded,
-    BudgetLedger,
-    UnknownCurrency,
-)
-from skeleton.kernel.shutdown import ShutdownError, ShutdownPhase
-from skeleton.kernel.config_snapshots import AuditEntry, ConfigSnapshot, ConfigStore
-from skeleton.kernel.health import (
-    HealthError,
-    HealthRegistry,
-    ProbeReport,
-    ProbeResult,
-    ProbeStatus,
-    Rollup,
-)
-from skeleton.kernel.work_queue import (
-    Lane,
-    LaneFullError,
-    SubmitterCapError,
-    WorkItem,
-    WorkQueue,
-    WorkQueueError,
+    UserId,
+    VectorClock,
 )
 
 __all__ = [
-    # errors + primitives
     "SkeletonError",
-    "RegistryError",
-    "CapabilityNotFoundError",
-    "DuplicateCapabilityError",
-    "EventBusError",
-    "InvalidIdentifierError",
-    "ConfigurationError",
-    "AgentNotFoundError",
-    "NoCapableAgentError",
-    "ConsensusError",
-    "SchedulingError",
-    "TaskDeadLetteredError",
-    "GenerationError",
-    "ValidationError",
-    "SessionError",
-    "RagQueryError",
-    "RagUnavailableError",
     "BlueprintError",
     "MaterialisationError",
-    "http_status_for",
     "DomainEvent",
     "EventBus",
-    "AgentId",
-    "SessionId",
-    "PipelineRunId",
-    "BlueprintId",
     "UserId",
-    "MemoryId",
-    "CapabilityKind",
-    "CapabilityRegistry",
-    "bootstrap_registry",
-    # v16.2 hardening
-    "ClockError",
-    "ClockRegistry",
+    "BlueprintId",
+    "EntropyPool",
     "VectorClock",
-    "BackpressureGovernor",
-    "GovernorStats",
-    "Priority",
-    "Health",
-    "Lifecycle",
-    "SupervisorError",
-    "FencingGate",
-    "Lease",
-    "LeaseError",
-    "LeaseHeldError",
-    "LeaseManager",
-    "Election",
-    "ElectionError",
-    "NodeState",
-    "Role",
-    "StaleTermError",
-    "VoteRequest",
-    "CircuitBreaker",
-    "CircuitOpenError",
-    "CircuitState",
-    "RetriesExhausted",
-    "RetryError",
-    "RetryPolicy",
-    "Span",
-    "SpanRecorder",
-    "SpanStatus",
-    "TraceContext",
-    "TraceError",
-    "Budget",
-    "BudgetError",
-    "BudgetExceeded",
-    "BudgetLedger",
-    "UnknownCurrency",
-    "ShutdownError",
-    "ShutdownPhase",
-    "AuditEntry",
-    "ConfigSnapshot",
-    "ConfigStore",
-    "HealthError",
-    "HealthRegistry",
-    "ProbeReport",
-    "ProbeResult",
-    "ProbeStatus",
-    "Rollup",
-    "Lane",
-    "LaneFullError",
-    "SubmitterCapError",
-    "WorkItem",
-    "WorkQueue",
-    "WorkQueueError",
+    "Invariant",
+    "InvariantLattice",
+    "CapabilityRegistry",
 ]
