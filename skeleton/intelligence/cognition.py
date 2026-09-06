@@ -214,6 +214,10 @@ class Cognition:
         For each ``{predicate, polarity}``, holds the belief and testifies once with
         witness ``"plan"`` / weight 1.0 supporting the claim. Returns currently open
         schisms whose predicate appears in the claim set (newly opened or pre-existing).
+
+        Note: one plan witness yields lodds≈1.2 (conf≈0.77), below the schism
+        conviction threshold (0.5+0.3). Cold plans do not self-schism — opposition
+        must be pre-seeded or added via further testify / PlanVerifier.ingest_claim.
         """
         predicates: List[str] = []
         for raw in claims:

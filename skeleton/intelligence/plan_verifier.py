@@ -207,7 +207,12 @@ class PlanVerifier:
         issues: list[str],
         coherence: float,
     ) -> float:
-        """Assert plan claims into cognition; open schisms → hard issue + score penalty."""
+        """Assert plan claims into cognition; open schisms → hard issue + score penalty.
+
+        Relies on ``Cognition.assert_plan_claims``: a lone plan witness will not
+        open a schism by itself; hard failures need pre-seeded opposition or
+        ``ingest_claim`` with additional witnesses.
+        """
         raw = plan.get("claims")
         if raw is None:
             raw = plan.get("beliefs")
