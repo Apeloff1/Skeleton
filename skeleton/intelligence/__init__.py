@@ -6,6 +6,7 @@ Exports:
 - AdaptiveLearner: Meta-learning
 - MetaGrid: Learning hyperparameters
 - default_meta_grid: Factory for default grid
+- ImproveLoop / PromptImproveDriver: bounded prompt self-improvement (F-10)
 """
 
 from skeleton.intelligence.orchestrator import (
@@ -16,6 +17,15 @@ from skeleton.intelligence.orchestrator import (
     ReasoningTask,
     default_meta_grid,
 )
+from skeleton.intelligence.improve_loop import ImproveLoop, ImproveResult, Iteration
+from skeleton.intelligence.prompt_improve import (
+    PrefixVariant,
+    PromptImproveDriver,
+    PromptImproveResult,
+    answer_quality_score,
+    improve_prefix_prompt,
+    mutate_prefix,
+)
 
 __all__ = [
     "IntelligenceOrchestrator",
@@ -24,4 +34,13 @@ __all__ = [
     "default_meta_grid",
     "ReasoningTask",
     "ReasoningResult",
+    "ImproveLoop",
+    "ImproveResult",
+    "Iteration",
+    "PrefixVariant",
+    "PromptImproveDriver",
+    "PromptImproveResult",
+    "answer_quality_score",
+    "improve_prefix_prompt",
+    "mutate_prefix",
 ]
