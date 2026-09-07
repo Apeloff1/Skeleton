@@ -129,6 +129,15 @@ class Genesis:
         self._wire("swarm", "negotiator", CapabilityNegotiator(bus=self.bus))
         self._wire("swarm", "platoons", standard_platoons(bus=self.bus))
 
+        # Bridge the agents Coordinator onto the live mesh so task
+        # bookkeeping rides on capability routing
+        from skeleton.agents import Coordinator
+        from skeleton.agents.bridge import MeshBridge
+        coordinator = Coordinator(bus=self.bus)
+        bridge = MeshBridge(mesh, bus=self.bus)
+        self._wire("swarm", "coordinator", coordinator)
+        self._wire("swarm", "bridge", bridge)
+
         assert self.lattice is not None
         self.lattice.register(Invariant(
             name="swarm_quorum_viable",
