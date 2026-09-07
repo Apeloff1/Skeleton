@@ -1,36 +1,56 @@
-"""Result ranking for the retrieval subsystem.
+"""
+Skeleton Retrieval — Ranking module
 
-Post-fusion ranking: apply diversity, recency, and relevance
-re-ranking to the fused result set before it enters the context window.
+Provides:
+- Ranker: Score-based result ordering with diversity and recency boosts
 """
 
 from __future__ import annotations
 
-from typing import Dict, Sequence, Tuple
-
-from skeleton.retrieval.fusion import ScoredResult
+import time
+from typing import Any, Dict, List, Optional
 
 
 class Ranker:
-    """Re-rank fused results with diversity and recency bonuses."""
+    """Order retrieval results by blended score signals.
 
-    def __init__(self, *, diversity_weight: float = 0.2, recency_weight: float = 0.1) -> None:
-        self.diversity_weight = diversity_weight
+    Blends:
+    - relevance: base retrieval score
+    - recency: newer documents rank higher
+    - diversity: avoid duplicate-near results
+    """
+
+    def __init__(self, recency_weight: float = 0.2, diversity_weight: float = 0.1):
         self.recency_weight = recency_weight
+        self.diversity_weight = diversity_weight
+        self._ranked = 0
 
-    def rank(
-        self, items: Sequence[ScoredResult], top_k: int = 10
-    ) -> Tuple[ScoredResult, ...]:
+    def rank(self, results: List[Any], top_k: Optional[int] = None) -> List[Any]:
+        """Rank results by blended score."""
+        if not results:
+            return []
+        self._ranked += len(results)
+        now = time.time()
+
         scored = []
-        seen_sources: set = set()
-        for item in items:
-            source_bonus = (
-                self.diversity_weight if item.source not in seen_sources else 0.0
-            )
-            seen_sources.add(item.source)
-            recency = item.metadata.get("timestamp", 0)
-            recency_bonus = self.recency_weight * recency if recency else 0.0
-            final_score = item.score + source_bonus + recency_bonus
-            scored.append((item, final_score))
-        scored.sort(key=lambda kv: -kv[1])
-        return tuple(item for item, _ in scored[:top_k])
+        seen_content: set = set()
+        for r in results:
+            base = getattr(r, "score", 0.5)
+            ts = getattr(r, "metadata", {}).get("timestamp", now) if hasattr(r, "metadata") else now
+            age_hours = max(0.0, (now - ts) / 3600.0)
+            recency = 1.0 / (1.0 + age_hours / 24.0)
+
+            content = getattr(r, "content", "") or getattr(getattr(r, "chunk", None), "text", "")
+            sig = content[:64]
+            diversity = 0.0 if sig in seen_content else 1.0
+            seen_content.add(sig)
+
+            blended = base + self.recency_weight * recency + self.diversity_weight * diversity
+            scored.append((blended, r))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        ranked = [r for _, r in scored]
+        return ranked[:top_k] if top_k else ranked
+
+    def stats(self) -> Dict[str, Any]:
+        return {"ranked": self._ranked}
