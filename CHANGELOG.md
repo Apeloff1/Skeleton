@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-07 — P3 field uniqueness and source gate
+
+- CDX stamped before bind. house_balance on bound_card.
+- sourcegate.allowed(name) requires a SOTA pointer.
+
+---
+
 ## 2026-09-06 — P2 organism fidelity
 
 - loop.jsonl log=1 on missing root. Dump hot list includes rotors/loop/bound/snowball.

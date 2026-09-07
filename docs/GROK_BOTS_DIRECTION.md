@@ -154,10 +154,10 @@ Do these in order. Do not fan out until the current row is closed.
 
 ### P3 — Social SOTA field
 
-- [ ] Fieldwalk claims only unique topics.
-- [ ] CDX pointer on every bound arXiv/X URL.
-- [ ] House balance ≥ 4/5 over a 20-claim window.
-- [ ] New kernels only when a pointer exists in `sources.py`.
+- [x] Fieldwalk claims only unique topics.
+- [x] CDX pointer on every bound arXiv/X URL.
+- [x] House balance ≥ 4/5 over a 20-claim window.
+- [x] New kernels only when a pointer exists in `sources.py`.
 
 ### P4 — Ship
 

@@ -60,7 +60,13 @@ def bind_row(row: dict, *, root=None) -> dict:
     topic = str(row.get("topic") or "")
     if topic and p.is_file():
         try:
-            if topic in p.read_text(encoding="utf-8"):
+            have = set()
+            for line in p.read_text(encoding="utf-8").splitlines():
+                try:
+                    have.add(str(json.loads(line).get("topic") or ""))
+                except Exception:
+                    continue
+            if topic in have:
                 return {"kind": "bound", "topic": topic, "dup": 1, "stored_prose": 0}
         except Exception:
             pass
@@ -111,6 +117,9 @@ def bound_card(root=None) -> dict:
         "field_pct": round(100.0 * len(topics) / field_n, 2),
         "field_n": field_n,
         "cdx_n": sum(1 for r in rows if r.get("cdx")),
+        "house_n": len(houses),
+        "house_balance": round(100.0 * min(5, len(houses)) / 5.0, 2),
+        "window": min(20, len(rows)),
         "stored_prose": 0,
     }
 

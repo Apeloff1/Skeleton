@@ -69,6 +69,17 @@ def claim(org, row: Dict[str, str], *, root=None) -> Dict[str, Any]:
     topic = str(row.get("topic") or "")
     if not topic or topic in seen(root):
         return {"ok": 0, "why": "seen", "topic": topic, "stored_prose": 0}
+    if not row.get("cdx") and row.get("url"):
+        try:
+            from skeleton.social.archivex import pointer, wayback_cdx_url
+            ptr = pointer(str(row.get("url") or ""))
+            row = dict(row)
+            row["cdx"] = str(ptr.get("cdx") or wayback_cdx_url(str(row.get("url") or "")))
+            row["xarchive"] = str(row.get("xarchive") or ptr.get("xarchive") or "")
+        except Exception:
+            from skeleton.social.archivex import wayback_cdx_url
+            row = dict(row)
+            row["cdx"] = wayback_cdx_url(str(row.get("url") or ""))
     bind_row(row, root=root)
     advance(root)
     cdx = ""
@@ -127,5 +138,7 @@ def walk(org=None, *, n: int = 0, root=None) -> Dict[str, Any]:
         "houses": [b.get("house") for b in bound if b.get("ok")],
         "bound": bound,
         "inventory": inventory,
+        "house_balance": inventory.get("house_balance"),
+        "cdx_n": inventory.get("cdx_n"),
         "stored_prose": 0,
     }
