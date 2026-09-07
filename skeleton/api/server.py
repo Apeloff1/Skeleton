@@ -2,7 +2,7 @@
 Skeleton API Server — FastAPI application factory and state management
 
 Provides:
-- create_app: FastAPI application factory (mounts core + gameforge routers)
+- create_app: FastAPI application factory (mounts core + gameforge + cockpit routers)
 - get_state: Dependency injection for server state
 - ServerState: Shared runtime state container
 """
@@ -141,8 +141,10 @@ def create_app() -> Any:
 
     from skeleton.api.routes import router
     from skeleton.api.gameforge_routes import router as gameforge_router
+    from skeleton.api.cockpit import router as cockpit_router
     app.include_router(router, prefix="/api/v1")
     app.include_router(gameforge_router, prefix="/api/v1")
+    app.include_router(cockpit_router)
 
     @app.on_event("startup")
     async def startup():
@@ -159,6 +161,7 @@ def create_app() -> Any:
             "version": "16.0.0",
             "status": "running",
             "jeeves_provider": state.jeeves.provider_name if state.jeeves else None,
+            "cockpit": "/cockpit",
         }
 
     @app.get("/cortex/status")
