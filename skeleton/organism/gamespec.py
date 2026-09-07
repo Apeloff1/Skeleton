@@ -158,6 +158,12 @@ def forge(org=None, *, answers: Optional[Dict[str, Any]] = None) -> Dict[str, An
     except Exception:
         pass
     rep = report(spec, sl, sc, root=root, cue=cue, mass=mass, field_pct=field_pct)
+    shipped: Dict[str, Any] = {}
+    try:
+        from skeleton.organism.ship import ship as do_ship
+        shipped = do_ship(type("O", (), {"root": root})(), spec=spec)
+    except Exception as exc:
+        shipped = {"err": type(exc).__name__}
     return {
         "kind": "game-forge-day",
         "spec": str(spec_path),
@@ -169,5 +175,7 @@ def forge(org=None, *, answers: Optional[Dict[str, Any]] = None) -> Dict[str, An
         "manifests": man.get("n"),
         "mass": mass,
         "compat": (spec.get("compat") or {}).get("ok"),
+        "ship_ok": shipped.get("ok"),
+        "health": (shipped.get("health") or {}).get("ok"),
         "stored_prose": 0,
     }

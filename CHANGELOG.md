@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-07 — P4 ship export
+
+- godot.zip / data.zip / web.zip + store.json stills.
+- health_mobile requires looped+socialk+obscure+orch.
+
+---
+
 ## 2026-09-07 — P3 field uniqueness and source gate
 
 - CDX stamped before bind. house_balance on bound_card.

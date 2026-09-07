@@ -161,9 +161,9 @@ Do these in order. Do not fan out until the current row is closed.
 
 ### P4 — Ship
 
-- [ ] Export script: Godot project + web bundle + data-only zip.
-- [ ] Store metadata generated from spec (description, tags, 3 stills prompts).
-- [ ] Health: `python -m skeleton dev health` green on mobile profile.
+- [x] Export script: Godot project + web bundle + data-only zip.
+- [x] Store metadata generated from spec (description, tags, 3 stills prompts).
+- [x] Health: mobile bank card green (`health_mobile`).
 
 ---
 
