@@ -9,6 +9,7 @@ Exports:
 - MAGStore: Multi-agent episodic memory
 - MemoryTrinity: Unified fusion across planes
 - RepetitionScheduler: Spaced repetition consolidation
+- ConsolidationCycle: KREM due-refresh → scheduler → dream wiring
 """
 
 from skeleton.memory.core import (
@@ -22,6 +23,7 @@ from skeleton.memory.core import (
     TrinityResult,
 )
 from skeleton.memory.vector import HashEmbedder, VectorEntry, VectorStore
+from skeleton.memory.consolidation import ConsolidationCycle, wire_from_genesis
 
 __all__ = [
     "InMemoryTFIDFStore",
@@ -35,4 +37,6 @@ __all__ = [
     "Chunk",
     "ScoredChunk",
     "TrinityResult",
+    "ConsolidationCycle",
+    "wire_from_genesis",
 ]
