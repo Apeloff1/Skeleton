@@ -2,10 +2,9 @@
 Skeleton Pipelines Package
 
 Exports:
-- NPCPipeline: NPC specification generation
-- GameLogicPipeline: Game mechanics design
-- AnimationPipeline: Animation specification
-- NPCSpec, GameLogicSpec, AnimationSpec: Data types
+- NPCPipeline / GameLogicPipeline / AnimationPipeline: Content generators
+- GameForge: End-to-end game generation orchestrator
+- GameSpec: Packaged output artifact
 """
 
 from skeleton.pipelines.generation import (
@@ -16,6 +15,7 @@ from skeleton.pipelines.generation import (
     NPCPipeline,
     NPCSpec,
 )
+from skeleton.pipelines.gameforge import GameForge, GameSpec
 
 __all__ = [
     "NPCPipeline",
@@ -24,4 +24,6 @@ __all__ = [
     "GameLogicSpec",
     "AnimationPipeline",
     "AnimationSpec",
+    "GameForge",
+    "GameSpec",
 ]
