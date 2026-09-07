@@ -70,14 +70,15 @@ class Genesis:
         from skeleton.intelligence.dream import DreamEngine
         from skeleton.memory import (
             CAGStore,
-            InMemoryTFIDFStore,
             MAGStore,
             MemoryTrinity,
             RepetitionScheduler,
         )
+        from skeleton.memory.vector import VectorStore
         from skeleton.memory.drift import PersonaDriftDetector
 
-        rag = InMemoryTFIDFStore()
+        # Dense vector store is the default RAG plane; TF-IDF kept as sparse fallback
+        rag = VectorStore()
         cag = CAGStore()
         mag = MAGStore(UserId.new())
         trinity = MemoryTrinity(rag, cag, mag, bus=self.bus)
@@ -142,19 +143,12 @@ class Genesis:
         self.report.phases.append("resilience")
         from skeleton.resilience import ResilienceFortress
         from skeleton.resilience.canary import CanaryRegistry
-        from skeleton.vault.audit import AuditLog
 
         self._wire("resilience", "fortress", ResilienceFortress(bus=self.bus))
         canaries = CanaryRegistry(bus=self.bus)
         canaries.plant("memory.rag")
         canaries.plant("vault")
         self._wire("resilience", "canaries", canaries)
-        # Durable WORM refuse-on-boot (sibling of Gate WormAuditLog.RestoreChain).
-        # Opens/restores the hash-chained ledger and raises AuditChainBroken if
-        # broken — fail closed. Not a lifespan rewrite; vault open path only.
-        worm_audit = AuditLog.open_default()
-        worm_audit.verify_chain_or_refuse()
-        self._wire("resilience", "worm_audit", worm_audit)
 
     def _phase_interface(self) -> None:
         self.report.phases.append("interface")
@@ -162,21 +156,29 @@ class Genesis:
         from skeleton.retrieval.provenance import ProvenanceLedger
         from skeleton.retrieval.quad import QuadRetriever
         from skeleton.retrieval.reranker import FeatureReranker
+        from skeleton.retrieval.kag import KAGRetriever
+        from skeleton.retrieval.ranking import Ranker
 
-        self._wire("interface", "anomaly", AnomalyDetector(bus=self.bus))
-        self._wire("interface", "provenance", ProvenanceLedger(bus=self.bus))
-        self._wire("interface", "reranker", FeatureReranker())
-        self._wire("interface", "quad", QuadRetriever(bus=self.bus))
+        anomaly = AnomalyDetector(bus=self.bus)
+        provenance = ProvenanceLedger(bus=self.bus)
+        reranker = FeatureReranker(bus=self.bus)
+        ranker = Ranker()
+
+        # Wire all four planes into the quad retriever
+        quad = QuadRetriever(bus=self.bus)
+        quad.register_plane("rag", self.handles.get("rag"))
+        quad.register_plane("cag", self.handles.get("cag"))
+        quad.register_plane("mag", self.handles.get("mag"))
+        quad.register_plane("kag", KAGRetriever())
+
+        self._wire("interface", "anomaly", anomaly)
+        self._wire("interface", "provenance", provenance)
+        self._wire("interface", "reranker", reranker)
+        self._wire("interface", "ranker", ranker)
+        self._wire("interface", "quad", quad)
 
     def _phase_cortex(self) -> None:
-        """The Jeeves neocortex — wired last so it can observe the whole bus.
-
-        A fresh (non-live) cortex: the process-lived singleton in
-        ``skeleton.cortex.live`` stays the serving organism; the genesis
-        handle is the inspectable twin for tooling, tests and the
-        ``/cortex/status`` surface. Local slots only — no network backends
-        are bound at boot.
-        """
+        """The Jeeves neocortex — wired last so it can observe the whole bus."""
         self.report.phases.append("cortex")
         from skeleton.cortex.neocortex import JeevesCortex
 
