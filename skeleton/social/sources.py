@@ -121,6 +121,12 @@ SOTA_POINTERS: Tuple[Dict[str, str], ...] = (
     {"topic": "qk-normed-mla", "url": "https://arxiv.org/abs/2606.16310", "house": "arXiv"},
     {"topic": "qerl-aqnoise", "url": "https://arxiv.org/abs/2510.11696", "house": "arXiv"},
     {"topic": "yarn-life-of-token", "url": "https://www.aleksagordic.com/blog/transformer", "house": "Internet Archive"},
+    {"topic": "diffattn", "url": "https://arxiv.org/abs/2410.05258", "house": "arXiv"},
+    {"topic": "nsa", "url": "https://arxiv.org/abs/2502.11089", "house": "arXiv"},
+    {"topic": "mamba2", "url": "https://arxiv.org/abs/2405.21060", "house": "arXiv"},
+    {"topic": "latentscan", "url": "https://arxiv.org/abs/2402.13368", "house": "arXiv"},
+    {"topic": "mixhead", "url": "https://arxiv.org/abs/2405.04434", "house": "arXiv"},
+    {"topic": "rope2", "url": "https://arxiv.org/abs/2104.09864", "house": "arXiv"},
 )
 
 

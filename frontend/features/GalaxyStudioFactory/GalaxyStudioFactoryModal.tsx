@@ -17,6 +17,7 @@ import { GAME_TEMPLATES, randomizeConfig, GameTemplate } from './presets';
 import { GAME_ERAS, DEFAULT_ERA_ID } from './gameEras';
 import { STYLE_SLIDERS, DEFAULT_STYLE_PARAMS } from './styleSliders';
 import { ProductionStudioPanel } from './ProductionStudioPanel';
+import { OrganismPreviewPanel } from './OrganismPreviewPanel';
 import { DEFAULT_PRODUCTION_STATE, ProductionState } from './productionSections';
 import { YourChoicesCard } from './YourChoicesCard';
 import { NarrativePhaseSliders, defaultPhaseValues as defaultNarrativePhaseValues, AllPhaseValues } from './NarrativePhaseSliders';
@@ -1778,6 +1779,7 @@ export default function GalaxyStudioFactoryModal
   const renderPick = () => (
     <ScrollView ref={pickScrollRef} style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
       <View style={s.pickContent}>
+        <OrganismPreviewPanel />
         {/* ═══ 2026 SOTA Quick / Advanced Mode Toggle — sticky-top hero pill ═══ */}
         <View style={{
           flexDirection: 'row',

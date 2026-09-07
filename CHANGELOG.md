@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-07 — Organism preview + wave kernels
+
+- Galaxy pick screen + /organism show factory spine on T tokens.
+- Wave: diffattn, nsa, mamba2, latentscan, mixhead, rope2. Mobile bank includes wave.
+
+---
+
 ## 2026-09-07 — Cockpit knobs move walk time
 
 - speed/heat/collapse multipliers retune the pack and re-score.

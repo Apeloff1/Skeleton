@@ -23,6 +23,7 @@ OBSCURE: Tuple[str, ...] = (
     "mla", "ssm", "bitnet", "hadamard",
     "earlyexit", "dry", "presence",
     "softpick", "qkmla", "aqnoise",
+    "diffattn", "nsa", "mamba2", "latentscan", "mixhead", "rope2",
 )
 
 SOCIAL: Tuple[str, ...] = (
