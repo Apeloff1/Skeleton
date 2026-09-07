@@ -70,8 +70,10 @@ def slice_godot(spec: Dict[str, Any], root: Optional[Path] = None) -> Dict[str, 
     return {"kind": "godot-slice", "root": str(game_root), "n": manifest.get("count"), "pack": pack, "graph": graph, "stored_prose": 0}
 
 
-def score(pack: Dict[str, Any], graph: Dict[str, Any]) -> Dict[str, Any]:
+def score(pack: Dict[str, Any], graph: Dict[str, Any], *, root: Optional[Path] = None) -> Dict[str, Any]:
     from skeleton.forge.walk import walk_graph
+    from skeleton.organism.cockpit import apply, load
+    pack = apply(pack, load(root))
     report = walk_graph(pack, graph)
     card = report.to_dict() if hasattr(report, "to_dict") else dict(report)
     card["kind"] = "headless-score"
@@ -122,9 +124,16 @@ def forge(org=None, *, answers: Optional[Dict[str, Any]] = None) -> Dict[str, An
     graph = sl.pop("graph", {})
     sc = {"kind": "headless-score", "passed": 0, "stored_prose": 0}
     try:
-        sc = score(pack, graph)
+        sc = score(pack, graph, root=root)
     except Exception as exc:
         sc["err"] = type(exc).__name__
+    tune: Dict[str, Any] = {}
+    try:
+        from skeleton.organism.cockpit import retune
+        tune = retune(pack, graph, root=root, speed_mul=1.25)
+        sc["tune"] = tune.get("delta_t")
+    except Exception as exc:
+        tune = {"err": type(exc).__name__}
     field_pct = 0.0
     try:
         from skeleton.organism.runloop import bound_card
@@ -148,13 +157,12 @@ def forge(org=None, *, answers: Optional[Dict[str, Any]] = None) -> Dict[str, An
         mass = float(snow_tick(root, critique="pass" if sc.get("passed") else "fail").get("mass") or 0)
     except Exception:
         mass = 0.0
-    cockpit = root / "game" / "data" / "cockpit.json"
     try:
-        cockpit.parent.mkdir(parents=True, exist_ok=True)
-        cockpit.write_text(
-            json.dumps({"kind": "cockpit", "era": spec.get("era"), "mass": mass, "stored_prose": 0}, indent=2),
-            encoding="utf-8",
-        )
+        from skeleton.organism.cockpit import load as cockpit_load, save as cockpit_save
+        knobs = cockpit_load(root)
+        knobs["era"] = spec.get("era")
+        knobs["mass"] = mass
+        cockpit_save(knobs, root)
     except Exception:
         pass
     rep = report(spec, sl, sc, root=root, cue=cue, mass=mass, field_pct=field_pct)
@@ -176,6 +184,8 @@ def forge(org=None, *, answers: Optional[Dict[str, Any]] = None) -> Dict[str, An
         "mass": mass,
         "compat": (spec.get("compat") or {}).get("ok"),
         "ship_ok": shipped.get("ok"),
+        "ship_err": shipped.get("err"),
         "health": (shipped.get("health") or {}).get("ok"),
+        "tune": tune.get("delta_t") if isinstance(tune, dict) else None,
         "stored_prose": 0,
     }

@@ -13,6 +13,9 @@ from typing import Any, Callable, Dict, List, Mapping, Optional
 
 from skeleton.organism.quality_state import append_quality
 
+PRODUCTION_THRESHOLD = 0.72
+STAGING_THRESHOLD = 0.55
+
 
 def _score_item(item: Mapping[str, Any]) -> Dict[str, Any]:
     """Heuristic artefact scoring: completeness of expected fields."""
@@ -86,3 +89,33 @@ def polish_loop(
             "evidence": {"history": history},
         }, root=root)
     return result
+
+
+def evaluate(item: Mapping[str, Any] | None = None, **_: Any) -> Dict[str, Any]:
+    scored = _score_item(item or {})
+    return {
+        "kind": "forge-quality",
+        "score": scored["score"],
+        "ok": int(scored["score"] >= PRODUCTION_THRESHOLD),
+        "stored_prose": 0,
+    }
+
+
+def summarize(rows: List[Mapping[str, Any]] | None = None, **_: Any) -> Dict[str, Any]:
+    rows = list(rows or [])
+    return {
+        "kind": "forge-quality-sum",
+        "n": len(rows),
+        "stored_prose": 0,
+    }
+
+
+def persist_quality(row: Mapping[str, Any] | None = None, *, root=None, **_: Any) -> Dict[str, Any]:
+    payload = dict(row or {})
+    payload.setdefault("kind", "forge-quality")
+    payload["stored_prose"] = 0
+    try:
+        append_quality(payload, root=root)
+    except Exception:
+        pass
+    return payload

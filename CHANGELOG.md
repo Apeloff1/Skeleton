@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-07 — Cockpit knobs move walk time
+
+- speed/heat/collapse multipliers retune the pack and re-score.
+- Severity/ForgeError restored so the package imports.
+
+---
+
 ## 2026-09-07 — P4 ship export
 
 - godot.zip / data.zip / web.zip + store.json stills.
