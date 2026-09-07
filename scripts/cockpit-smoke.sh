@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Smoke test the cockpit: boot genesis, hit health, verify handles,
 # four-plane retrieval with self-populating KAG, Jeeves provider path,
-# memory matrices, swarm-agents bridge, and persistence round-trip.
+# memory matrices, swarm-agents bridge, persistence round-trip,
+# and the genesis-wired forge with verify-until-green.
 set -euo pipefail
 
 SMOKE_DIR="$(mktemp -d)"
@@ -17,14 +18,25 @@ g = Genesis(seed=42).boot()
 health = g.health()
 
 assert "kernel" in health["phases"]
+assert "forge" in health["phases"], f"forge phase missing: {health['phases']}"
 assert "cortex" in health["phases"]
-assert health["subsystems"] >= 22, f"expected 22+ subsystems, got {health['subsystems']}"
+assert health["subsystems"] >= 23, f"expected 23+ subsystems, got {health['subsystems']}"
 assert health["invariant_violations"] == 0
 
 required = ["lattice", "rag", "trinity", "orchestrator", "mesh", "fortress",
-            "quad", "cortex", "ranker", "coordinator", "bridge"]
+            "quad", "cortex", "ranker", "coordinator", "bridge", "forge"]
 for handle in required:
     assert handle in g.handles, f"missing handle: {handle}"
+
+# Genesis-wired forge: materialize through it and verify the loop accepts
+forge = g.get("forge")
+bp = forge.new_blueprint("smoke-bp")
+forge.instantiate(bp, "player", "hero")
+forge.instantiate(bp, "sink", "output")
+bp.connect(("hero", "intent"), ("output", "in"))
+result = forge.materialise(bp, era="extraction_now", target="godot", repair=True, max_rounds=2)
+assert result["verification"]["accepted"], f"godot materialise rejected: {result['verification'].get('reason')}"
+assert result["verify_loop"]["stopped_reason"] == "accepted"
 
 # Retrieval: vector RAG default + four quad planes
 from skeleton.memory.vector import VectorStore
@@ -65,10 +77,12 @@ assert state.jeeves_krem.stats()["concepts"] > 0, "KREM tracked nothing"
 matrices = state.jeeves.matrices()
 assert set(matrices.keys()) == {"sam", "clom", "krem"}
 
-# Live cortex observed the traffic
+# Live cortex observed the traffic (including forge events)
 from skeleton.cortex import live
 status = live.status()
 assert status["live"] and status["events_captured"] > 0
+forge_events = live.get_live().recent_events("forge", n=5)
+assert len(forge_events) > 0, "cortex saw no forge events"
 
 # Persistence round-trip: snapshot, simulate restart, restore, verify
 from skeleton.deploy.harness import Harness
@@ -85,5 +99,9 @@ assert restored.get("kag", 0) > 0, f"nothing restored: {restored}"
 kag2 = h2.genesis.get("quad")._planes["kag"]
 assert kag2.graph.stats()["triples"] > 0, "restored KAG is empty"
 
-print(f"cockpit smoke: OK ({health['subsystems']} subsystems, 4 planes, kag={kag.graph.stats()['triples']} triples, jeeves={reply['provider']}, persistence round-trip OK)")
+# Harness materialize rides the genesis forge handle
+mresult = h2.materialize("smoke-harness-bp")
+assert "blueprint_id" in mresult
+
+print(f"cockpit smoke: OK ({health['subsystems']} subsystems, forge wired, godot verified, 4 planes, jeeves={reply['provider']}, persistence OK)")
 PY
