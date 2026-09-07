@@ -1,13 +1,17 @@
-"""Jeeves self-learning matrices: SAM, CLOM, KREM — full implementations.
+"""
+Skeleton Jeeves — Memory matrices
 
-- SAM (Self-Adaptive Memory): per-concept mastery with exponential decay and
-  spaced-repetition scheduling.
-- CLOM (Cross-Learner Ontology Map): an explicit learner model — goals,
-  misconceptions, preferred modality, difficulty — updated from every turn.
-- KREM (Knowledge-Retrieval Effectiveness Matrix): scores which retrieval
-  sources actually helped, biasing future retrieval.
+Provides the three Jeeves matrices surfaced at /jeeves/matrices:
 
-All three are pure in-process structures; persistence is a store concern.
+- SAM  (Semantic Association Map): co-occurrence graph over terms
+        observed in conversation; supports association lookups that
+        prime retrieval beyond the raw query text.
+- CLOM (Compressed Learned Outcome Model): rolling per-intent
+        outcome statistics — what worked, for which kind of request.
+- KREM (Knowledge Retention Matrix): per-concept retention estimate
+        with spaced-repetition decay; flags what needs refreshing.
+
+Each matrix exposes `observe(...)`, `snapshot()`, and `stats()`.
 """
 
 from __future__ import annotations
@@ -15,154 +19,199 @@ from __future__ import annotations
 import math
 import time
 from dataclasses import dataclass, field
-
-# ---------------------------------------------------------------------------
-# SAM — Self-Adaptive Memory
-# ---------------------------------------------------------------------------
-
-_HALF_LIFE_S = 3 * 24 * 3600  # mastery halves every 3 days without practice
+from typing import Any, Dict, List, Optional, Set
 
 
-@dataclass
-class MasteryRecord:
-    concept: str
-    mastery: float = 0.0          # 0..1
-    successes: int = 0
-    attempts: int = 0
-    last_seen: float = field(default_factory=time.time)
+class SemanticAssociationMap:
+    """Co-occurrence graph over conversation terms.
 
-    def decayed_mastery(self, now: float | None = None) -> float:
-        now = now or time.time()
-        elapsed = max(0.0, now - self.last_seen)
-        return self.mastery * math.pow(0.5, elapsed / _HALF_LIFE_S)
+    Terms appearing in the same turn become associated; edges decay
+    so stale associations fade. Used to expand queries with
+    associated terms before hitting the retrieval planes.
+    """
 
-    def due_for_review(self, now: float | None = None) -> bool:
-        return self.decayed_mastery(now) < 0.6
+    DECAY = 0.98
 
+    def __init__(self):
+        self._edges: Dict[str, Dict[str, float]] = {}
+        self._stats = {"turns": 0}
 
-class SamMatrix:
-    """Per-learner concept mastery with decay and review scheduling."""
+    def observe(self, text: str) -> None:
+        """Record term co-occurrences from a turn of text."""
+        terms = self._terms(text)
+        self._stats["turns"] += 1
+        for i, a in enumerate(terms):
+            for b in terms[i + 1:]:
+                self._bump(a, b)
+                self._bump(b, a)
 
-    def __init__(self) -> None:
-        self._records: dict[str, MasteryRecord] = {}
+    def associations(self, term: str, top_k: int = 5) -> List[tuple]:
+        """Top associated terms for a query term."""
+        edges = self._edges.get(term.lower(), {})
+        ranked = sorted(edges.items(), key=lambda x: x[1], reverse=True)
+        return ranked[:top_k]
 
-    def record_attempt(self, concept: str, *, success: bool, weight: float = 0.2) -> MasteryRecord:
-        rec = self._records.setdefault(concept, MasteryRecord(concept))
-        current = rec.decayed_mastery()
-        delta = weight if success else -weight * 0.5
-        rec.mastery = min(1.0, max(0.0, current + delta))
-        rec.attempts += 1
-        rec.successes += int(success)
-        rec.last_seen = time.time()
-        return rec
+    def expand(self, query: str, top_k: int = 3) -> List[str]:
+        """Expand a query with its strongest associations."""
+        expansions: Set[str] = set()
+        for term in self._terms(query):
+            for assoc, _ in self.associations(term, top_k=top_k):
+                expansions.add(assoc)
+        return sorted(expansions - set(self._terms(query)))
 
-    def mastery(self, concept: str) -> float:
-        rec = self._records.get(concept)
-        return rec.decayed_mastery() if rec else 0.0
+    def decay(self) -> None:
+        """Fade all edge weights; prune the near-zero."""
+        for a in list(self._edges.keys()):
+            for b in list(self._edges[a].keys()):
+                self._edges[a][b] *= self.DECAY
+                if self._edges[a][b] < 0.01:
+                    del self._edges[a][b]
+            if not self._edges[a]:
+                del self._edges[a]
 
-    def review_queue(self, *, limit: int = 10) -> list[str]:
-        due = [r for r in self._records.values() if r.due_for_review()]
-        due.sort(key=lambda r: r.decayed_mastery())
-        return [r.concept for r in due[:limit]]
+    def _bump(self, a: str, b: str) -> None:
+        self._edges.setdefault(a, {})[b] = self._edges.get(a, {}).get(b, 0.0) + 1.0
 
-    def snapshot(self) -> dict[str, float]:
-        return {c: round(r.decayed_mastery(), 4) for c, r in self._records.items()}
+    @staticmethod
+    def _terms(text: str) -> List[str]:
+        words = [w.lower().strip(".,!?;:()[]{}\"'") for w in text.split()]
+        return sorted({w for w in words if len(w) > 3})
 
-
-# ---------------------------------------------------------------------------
-# CLOM — Cross-Learner Ontology Map
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class LearnerModel:
-    goals: set[str] = field(default_factory=set)
-    misconceptions: dict[str, int] = field(default_factory=dict)  # concept -> count
-    modality_scores: dict[str, float] = field(
-        default_factory=lambda: {"visual": 0.5, "verbal": 0.5, "hands_on": 0.5})
-    difficulty: float = 0.5  # 0 easy .. 1 hard
-
-    def preferred_modality(self) -> str:
-        return max(self.modality_scores, key=lambda k: self.modality_scores[k])
-
-
-class ClomMatrix:
-    """The explicit learner model, updated from observed behaviour."""
-
-    def __init__(self) -> None:
-        self.model = LearnerModel()
-
-    def add_goal(self, goal: str) -> None:
-        if goal.strip():
-            self.model.goals.add(goal.strip())
-
-    def record_misconception(self, concept: str) -> int:
-        self.model.misconceptions[concept] = self.model.misconceptions.get(concept, 0) + 1
-        return self.model.misconceptions[concept]
-
-    def resolve_misconception(self, concept: str) -> None:
-        self.model.misconceptions.pop(concept, None)
-
-    def reinforce_modality(self, modality: str, *, amount: float = 0.05) -> None:
-        scores = self.model.modality_scores
-        if modality in scores:
-            scores[modality] = min(1.0, scores[modality] + amount)
-
-    def adjust_difficulty(self, *, success_rate: float) -> float:
-        """Keep the learner in the zone of proximal development (~75% success)."""
-        if success_rate > 0.85:
-            self.model.difficulty = min(1.0, self.model.difficulty + 0.1)
-        elif success_rate < 0.6:
-            self.model.difficulty = max(0.0, self.model.difficulty - 0.1)
-        return self.model.difficulty
-
-    def snapshot(self) -> dict[str, object]:
+    def snapshot(self) -> Dict[str, Any]:
+        top = sorted(
+            ((a, b, w) for a, es in self._edges.items() for b, w in es.items()),
+            key=lambda x: x[2], reverse=True,
+        )[:10]
         return {
-            "goals": sorted(self.model.goals),
-            "misconceptions": dict(self.model.misconceptions),
-            "preferred_modality": self.model.preferred_modality(),
-            "difficulty": round(self.model.difficulty, 3),
+            "terms": len(self._edges),
+            "edges": sum(len(es) for es in self._edges.values()),
+            "strongest": [{"from": a, "to": b, "weight": round(w, 3)} for a, b, w in top],
         }
 
-
-# ---------------------------------------------------------------------------
-# KREM — Knowledge-Retrieval Effectiveness Matrix
-# ---------------------------------------------------------------------------
+    def stats(self) -> Dict[str, Any]:
+        return {**self._stats, "terms": len(self._edges)}
 
 
 @dataclass
-class SourceStats:
-    retrievals: int = 0
-    helpful: int = 0
-
-    @property
-    def effectiveness(self) -> float:
-        if self.retrievals == 0:
-            return 0.5  # uninformative prior
-        # Laplace smoothing keeps cold sources explorable
-        return (self.helpful + 1) / (self.retrievals + 2)
+class OutcomeRecord:
+    intent: str
+    success: bool
+    latency_ms: float
+    timestamp: float = field(default_factory=time.time)
 
 
-class KremMatrix:
-    """Scores retrieval sources by measured helpfulness."""
+class CompressedLearnedOutcomeModel:
+    """Rolling per-intent outcome statistics.
 
-    def __init__(self) -> None:
-        self._sources: dict[str, SourceStats] = {}
+    Tracks success rate and latency per intent category so Jeeves
+    can route requests to the strategy that historically worked,
+    and surface degraded intents before users notice.
+    """
 
-    def record_retrieval(self, source: str) -> None:
-        self._sources.setdefault(source, SourceStats()).retrievals += 1
+    def __init__(self, window: int = 200):
+        self._window = window
+        self._records: Dict[str, List[OutcomeRecord]] = {}
 
-    def record_feedback(self, source: str, *, helpful: bool) -> None:
-        stats = self._sources.setdefault(source, SourceStats())
-        if stats.retrievals == 0:
-            stats.retrievals = 1
-        stats.helpful += int(helpful)
+    def observe(self, intent: str, success: bool, latency_ms: float = 0.0) -> None:
+        records = self._records.setdefault(intent, [])
+        records.append(OutcomeRecord(intent=intent, success=success, latency_ms=latency_ms))
+        if len(records) > self._window:
+            self._records[intent] = records[-self._window:]
 
-    def rank_sources(self, sources: list[str]) -> list[str]:
-        """Order candidate sources best-first by effectiveness."""
-        return sorted(sources,
-                      key=lambda s: self._sources.get(s, SourceStats()).effectiveness,
-                      reverse=True)
+    def success_rate(self, intent: str) -> Optional[float]:
+        records = self._records.get(intent, [])
+        if not records:
+            return None
+        return sum(1 for r in records if r.success) / len(records)
 
-    def snapshot(self) -> dict[str, float]:
-        return {s: round(st.effectiveness, 4) for s, st in self._sources.items()}
+    def best_intent(self) -> Optional[str]:
+        rates = {i: self.success_rate(i) for i in self._records if self._records[i]}
+        rates = {i: r for i, r in rates.items() if r is not None}
+        return max(rates, key=rates.get) if rates else None
+
+    def degraded(self, threshold: float = 0.5, min_samples: int = 5) -> List[str]:
+        """Intents with enough data but poor recent outcomes."""
+        out = []
+        for intent, records in self._records.items():
+            if len(records) >= min_samples:
+                rate = self.success_rate(intent)
+                if rate is not None and rate < threshold:
+                    out.append(intent)
+        return out
+
+    def snapshot(self) -> Dict[str, Any]:
+        return {
+            "intents": {
+                intent: {
+                    "samples": len(records),
+                    "success_rate": round(self.success_rate(intent) or 0.0, 3),
+                    "avg_latency_ms": round(sum(r.latency_ms for r in records) / len(records), 1),
+                }
+                for intent, records in self._records.items()
+            },
+            "degraded": self.degraded(),
+        }
+
+    def stats(self) -> Dict[str, Any]:
+        return {"intents": len(self._records), "records": sum(len(r) for r in self._records.values())}
+
+
+@dataclass
+class RetentionCell:
+    concept: str
+    strength: float = 1.0
+    reviews: int = 0
+    last_seen: float = field(default_factory=time.time)
+
+
+class KnowledgeRetentionMatrix:
+    """Per-concept retention estimate with spaced decay.
+
+    Concepts start at strength 1.0 and decay with a half-life;
+    re-observation refreshes and strengthens them. `due()` returns
+    concepts whose retention has fallen below threshold — the
+    refresh list that pairs with the RepetitionScheduler.
+    """
+
+    HALF_LIFE_HOURS = 72.0
+    DUE_THRESHOLD = 0.4
+
+    def __init__(self):
+        self._cells: Dict[str, RetentionCell] = {}
+
+    def observe(self, concept: str) -> None:
+        cell = self._cells.get(concept)
+        if cell is None:
+            self._cells[concept] = RetentionCell(concept=concept)
+        else:
+            cell.strength = min(2.0, self._retained(cell) + 0.3)
+            cell.reviews += 1
+            cell.last_seen = time.time()
+
+    def retention(self, concept: str) -> float:
+        cell = self._cells.get(concept)
+        return self._retained(cell) if cell else 0.0
+
+    def due(self, threshold: Optional[float] = None) -> List[str]:
+        """Concepts whose retention fell below the refresh threshold."""
+        cut = threshold if threshold is not None else self.DUE_THRESHOLD
+        return [c for c, cell in self._cells.items() if self._retained(cell) < cut]
+
+    def _retained(self, cell: RetentionCell) -> float:
+        elapsed_hours = (time.time() - cell.last_seen) / 3600.0
+        decay = math.pow(0.5, elapsed_hours / self.HALF_LIFE_HOURS)
+        return cell.strength * decay
+
+    def snapshot(self) -> Dict[str, Any]:
+        weakest = sorted(self._cells.values(), key=self._retained)[:10]
+        return {
+            "concepts": len(self._cells),
+            "due_count": len(self.due()),
+            "weakest": [
+                {"concept": c.concept, "retention": round(self._retained(c), 3), "reviews": c.reviews}
+                for c in weakest
+            ],
+        }
+
+    def stats(self) -> Dict[str, Any]:
+        return {"concepts": len(self._cells), "due": len(self.due())}
