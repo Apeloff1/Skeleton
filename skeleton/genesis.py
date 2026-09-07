@@ -43,6 +43,7 @@ class Genesis:
         self._phase_swarm()
         self._phase_resilience()
         self._phase_interface()
+        self._phase_forge()
         self._phase_cortex()
         self.bus.publish(
             DomainEvent(
@@ -185,6 +186,29 @@ class Genesis:
         self._wire("interface", "reranker", reranker)
         self._wire("interface", "ranker", ranker)
         self._wire("interface", "quad", quad)
+
+    def _phase_forge(self) -> None:
+        """Wire the universal forge as a first-class genesis handle.
+
+        Sits after interface (verifier chain available) and before cortex
+        (so cortex observes forge events). The forge owns blueprint
+        composition, validation, and materialization; the verify-until-green
+        loop and quality ledger plug in through its bus.
+        """
+        self.report.phases.append("forge")
+        from skeleton.forge.universal import Forge
+
+        forge = Forge(bus=self.bus)
+        self._wire("forge", "forge", forge)
+
+        assert self.lattice is not None
+        self.lattice.register(Invariant(
+            name="forge_kinds_registered",
+            subject="forge",
+            snapshot=lambda: len(forge.available_kinds()),
+            predicate=lambda kinds: kinds >= 5,
+        ))
+        self.report.invariants_registered += 1
 
     def _phase_cortex(self) -> None:
         """The Jeeves neocortex — wired last so it can observe the whole bus."""
