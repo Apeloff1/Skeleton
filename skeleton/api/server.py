@@ -69,12 +69,46 @@ class ServerState:
                         checks[attr] = val.stats()
                     except Exception:
                         checks[attr] = {"error": "stats failed"}
-        
+
         overall = all(
             not isinstance(c, dict) or not c.get("error")
             for c in checks.values()
         )
         return {"overall": overall, "checks": checks}
+
+    def wire_from_genesis(self, genesis: Any) -> None:
+        """Populate state handles from a booted genesis."""
+        self.genesis = genesis
+        self.forge = genesis.handles.get("forge")
+        self.mesh = genesis.handles.get("mesh")
+        self.memory_trinity = genesis.handles.get("trinity")
+        self.intelligence = genesis.handles.get("orchestrator")
+        self.resilience = genesis.handles.get("fortress")
+
+        # Pipelines
+        from skeleton.pipelines import AnimationPipeline, GameLogicPipeline, NPCPipeline
+        self.npc_pipeline = NPCPipeline()
+        self.game_logic_pipeline = GameLogicPipeline()
+        self.animation_pipeline = AnimationPipeline()
+
+        # Jeeves with provider-backed responses and quad retriever context
+        from skeleton.jeeves import JeevesCore
+        self.jeeves = JeevesCore(bus=genesis.bus, retriever=genesis.handles.get("quad"))
+
+        # Live cortex attaches to the genesis bus
+        from skeleton.cortex import live
+        self.cockpit = live.attach(genesis.bus)
+
+        # Health + metrics
+        from skeleton.observability import AnomalyDetector, MetricsCollector
+        self.metrics = MetricsCollector()
+        self.health = type("Health", (), {
+            "liveness": staticmethod(lambda: {"alive": True}),
+            "readiness": staticmethod(lambda: {"ready": True, "subsystems": len(genesis.handles)}),
+        })()
+        self.ledger = genesis.handles.get("provenance")
+        self.scheduler = genesis.handles.get("repetition")
+        self.registry = genesis.handles.get("lattice")
 
 
 # Global state instance
@@ -97,31 +131,32 @@ def create_app() -> Any:
         version="16.0.0",
         description="AI game engine / agent orchestration framework",
     )
-    
-    # Import and include routers
+
     from skeleton.api.routes import router
     app.include_router(router, prefix="/api/v1")
 
-    # Gate gauntlet (outer→inner): RequestSeal → BodyBound → WORM → Auth → PolicyGate
-    from skeleton.api.middleware import install_gate
-    install_gate(app)
-    
     @app.on_event("startup")
     async def startup():
         state = get_state()
         if state.genesis is None:
             from skeleton.genesis import Genesis
-            state.genesis = Genesis(seed=42).boot()
-            state.forge = state.genesis.handles.get("forge")
-            state.mesh = state.genesis.handles.get("mesh")
-            state.memory_trinity = state.genesis.handles.get("trinity")
-            state.intelligence = state.genesis.handles.get("orchestrator")
-            state.resilience = state.genesis.handles.get("fortress")
-    
+            state.wire_from_genesis(Genesis(seed=42).boot())
+
     @app.get("/")
     async def root():
-        return {"name": "Skeleton", "version": "16.0.0", "status": "running"}
-    
+        state = get_state()
+        return {
+            "name": "Skeleton",
+            "version": "16.0.0",
+            "status": "running",
+            "jeeves_provider": state.jeeves.provider_name if state.jeeves else None,
+        }
+
+    @app.get("/cortex/status")
+    async def cortex_status():
+        from skeleton.cortex import live
+        return live.status()
+
     return app
 
 

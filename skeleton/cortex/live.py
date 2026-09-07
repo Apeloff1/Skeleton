@@ -1,65 +1,48 @@
-"""Process-lived Jeeves — the same neocortex across HTTP, CLI, genesis.
-
-Every `JeevesCortex()` in the HTTP routes was a new amnesiac. Train then
-run must be the same organism. This module is the singleton: one cortex,
-one Jeeves, optional disk persist at $SKELETON_OWN (default
-`.skeleton/own.json`). Tests stay hermetic via `GameForgeRun()` (not live)
-or `reset_live()`.
 """
+Skeleton Cortex — Live serving organism singleton
+
+The genesis handle is the inspectable twin; this module holds the
+process-lived JeevesCortex that serving surfaces (API, cockpit)
+observe and control at runtime.
+"""
+
 from __future__ import annotations
 
-import os
-import threading
-from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
-_LOCK = threading.RLock()
-_CORTEX = None
-_JEEVES = None
+from skeleton.cortex.neocortex import ControlSurface, JeevesCortex
+from skeleton.kernel.events import EventBus
 
-
-def own_path() -> Path:
-    raw = os.environ.get("SKELETON_OWN")
-    if raw:
-        return Path(raw)
-    return Path(".skeleton") / "own.json"
+_live_cortex: Optional[JeevesCortex] = None
+_live_control: Optional[ControlSurface] = None
 
 
-def live_cortex():
-    """The neocortex. Loads disk on first touch."""
-    global _CORTEX
-    from skeleton.cortex.neocortex import JeevesCortex
-    with _LOCK:
-        if _CORTEX is None:
-            _CORTEX = JeevesCortex()
-            path = own_path()
-            if path.exists():
-                _CORTEX.load(path)
-        return _CORTEX
+def get_live(bus: Optional[EventBus] = None) -> JeevesCortex:
+    """Get or create the process-lived cortex singleton."""
+    global _live_cortex, _live_control
+    if _live_cortex is None:
+        _live_cortex = JeevesCortex(bus=bus or EventBus())
+        _live_control = ControlSurface(_live_cortex, bus=bus)
+    return _live_cortex
 
 
-def live_jeeves():
-    global _JEEVES
-    from skeleton.jeeves.core import Jeeves
-    with _LOCK:
-        if _JEEVES is None:
-            j = Jeeves()
-            j.cortex = live_cortex()
-            _JEEVES = j
-        return _JEEVES
+def get_control() -> Optional[ControlSurface]:
+    """Control surface bound to the live cortex, if initialized."""
+    return _live_control
 
 
-def persist() -> dict:
-    cortex = live_cortex()
-    return cortex.save(own_path())
+def attach(bus: EventBus) -> JeevesCortex:
+    """Attach the live cortex to a bus (idempotent)."""
+    cortex = get_live(bus)
+    cortex._bus = bus
+    bus.subscribe("*", cortex._on_event)
+    return cortex
 
 
-def reset_live(*, wipe_disk: bool = False) -> None:
-    """Drop the process singleton. Tests only."""
-    global _CORTEX, _JEEVES
-    with _LOCK:
-        path = own_path()
-        if wipe_disk and path.exists():
-            path.unlink()
-        _CORTEX = None
-        _JEEVES = None
+def status() -> dict[str, Any]:
+    """Snapshot of the live organism for /cortex/status surfaces."""
+    if _live_cortex is None:
+        return {"live": False, "events_captured": 0}
+    stats = _live_cortex.stats()
+    stats["live"] = True
+    return stats
