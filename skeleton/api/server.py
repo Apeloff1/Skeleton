@@ -2,7 +2,7 @@
 Skeleton API Server — FastAPI application factory and state management
 
 Provides:
-- create_app: FastAPI application factory
+- create_app: FastAPI application factory (mounts core + gameforge routers)
 - get_state: Dependency injection for server state
 - ServerState: Shared runtime state container
 """
@@ -86,10 +86,11 @@ class ServerState:
         self.resilience = genesis.handles.get("fortress")
 
         # Pipelines
-        from skeleton.pipelines import AnimationPipeline, GameLogicPipeline, NPCPipeline
+        from skeleton.pipelines import AnimationPipeline, GameForge, GameLogicPipeline, NPCPipeline
         self.npc_pipeline = NPCPipeline()
         self.game_logic_pipeline = GameLogicPipeline()
         self.animation_pipeline = AnimationPipeline()
+        self.gameforge = GameForge(genesis=genesis, bus=genesis.bus)
 
         # Jeeves with provider-backed responses and quad retriever context
         from skeleton.jeeves import JeevesCore
@@ -100,7 +101,7 @@ class ServerState:
         self.cockpit = live.attach(genesis.bus)
 
         # Health + metrics
-        from skeleton.observability import AnomalyDetector, MetricsCollector
+        from skeleton.observability import MetricsCollector
         self.metrics = MetricsCollector()
         self.health = type("Health", (), {
             "liveness": staticmethod(lambda: {"alive": True}),
@@ -133,7 +134,9 @@ def create_app() -> Any:
     )
 
     from skeleton.api.routes import router
+    from skeleton.api.gameforge_routes import router as gameforge_router
     app.include_router(router, prefix="/api/v1")
+    app.include_router(gameforge_router, prefix="/api/v1")
 
     @app.on_event("startup")
     async def startup():
