@@ -1,62 +1,103 @@
-"""API versioning — negotiate semantic versions from header or path.
+"""API versioning — version negotiation and deprecation lifecycle.
 
-Routes stay thin; this extracts a requested (major, minor) from either
-the ``X-API-Version`` header or a ``/vN[/M]`` path prefix and compares
-it against the supported set.
+Serves multiple API versions side by side with request negotiation
+(header or path based), sunset dates, deprecation warnings injected
+into responses, and usage tracking per version so retirement
+decisions are data-driven. Blocks requests to versions past sunset.
 """
-
 from __future__ import annotations
 
-import re
-from dataclasses import dataclass
-from typing import Optional, Tuple
-
-from skeleton.api.middleware import MiddlewareError
+import time
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional
 
 
-class VersionError(MiddlewareError):
-    code = "API.VERSION"
-    http_status = 400
+DAY_NS = 86_400_000_000_000
 
 
-@dataclass(frozen=True)
-class Version:
-    major: int
-    minor: int = 0
-
-    def __str__(self) -> str:
-        return f"{self.major}.{self.minor}"
-
-
-_VERSION_PATTERN = re.compile(r"/v(\d+)(?:\.(\d+))?")
+@dataclass
+class APIVersion:
+    version: str
+    handler: Callable[[Dict[str, Any]], Any]
+    deprecated: bool = False
+    sunset_ns: Optional[int] = None
+    calls: int = 0
+    introduced_ns: int = 0
 
 
-def extract(*, path: str = "", header: Optional[str] = None) -> Version:
-    """Header wins; otherwise the first /vN segment; otherwise 1.0."""
-    if header:
+class APIVersioning:
+    """Version negotiation with sunset enforcement."""
+
+    def __init__(self):
+        self._versions: Dict[str, Dict[str, APIVersion]] = {}
+
+    def register(self, route: str, version: str,
+                 handler: Callable[[Dict[str, Any]], Any]) -> APIVersion:
+        v = APIVersion(version=version, handler=handler, introduced_ns=time.time_ns())
+        self._versions.setdefault(route, {})[version] = v
+        return v
+
+    def deprecate(self, route: str, version: str, sunset_days: float = 90.0) -> bool:
+        v = self._versions.get(route, {}).get(version)
+        if not v:
+            return False
+        v.deprecated = True
+        v.sunset_ns = time.time_ns() + int(sunset_days * DAY_NS)
+        return True
+
+    def negotiate(self, route: str, requested: Optional[str] = None) -> Optional[APIVersion]:
+        versions = self._versions.get(route, {})
+        if not versions:
+            return None
+        if requested and requested in versions:
+            return versions[requested]
+        candidates = sorted(versions.keys())
+        return versions[candidates[-1]] if candidates else None
+
+    def serve(self, route: str, payload: Dict[str, Any],
+              requested: Optional[str] = None) -> Dict[str, Any]:
+        v = self.negotiate(route, requested)
+        if not v:
+            return {"status": 404, "error": f"no handler for {route}"}
+        if v.sunset_ns and time.time_ns() > v.sunset_ns:
+            return {"status": 410, "error": f"version {v.version} sunset", "sunset": True}
+        v.calls += 1
         try:
-            parts = header.split(".")
-            return Version(int(parts[0]), int(parts[1]) if len(parts) > 1 else 0)
-        except (ValueError, IndexError):
-            raise VersionError("malformed version header", context={"header": header})
-    match = _VERSION_PATTERN.search(path)
-    if match:
-        return Version(int(match.group(1)), int(match.group(2) or 0))
-    return Version(1, 0)
+            body = v.handler(payload)
+            status = 200
+        except Exception as exc:  # noqa: BLE001
+            return {"status": 500, "error": str(exc), "version": v.version}
+        response: Dict[str, Any] = {"status": status, "body": body, "version": v.version}
+        if v.deprecated:
+            days_left = (v.sunset_ns - time.time_ns()) / DAY_NS if v.sunset_ns else None
+            response["warning"] = f"version {v.version} deprecated" + (f", sunsets in {int(days_left)}d" if days_left is not None else "")
+        return response
 
+    def usage(self, route: Optional[str] = None) -> Dict[str, Any]:
+        out: Dict[str, Any] = {}
+        for r, versions in self._versions.items():
+            if route and r != route:
+                continue
+            out[r] = {v.version: {"calls": v.calls, "deprecated": v.deprecated,
+                                  "sunset_ns": v.sunset_ns} for v in versions.values()}
+        return out
 
-def negotiate(
-    supported: Tuple[Version, ...], requested: Version
-) -> Version:
-    """Pick the best supported version ≤ requested, or raise."""
-    eligible = [v for v in supported if v.major == requested.major]
-    if not eligible:
-        raise VersionError(
-            "unsupported major version",
-            context={"requested": str(requested), "supported": [str(v) for v in supported]},
-        )
-    best = max(eligible, key=lambda v: v.minor)
-    return best
+    def retirement_candidates(self, min_share: float = 0.05) -> List[str]:
+        candidates = []
+        for r, versions in self._versions.items():
+            total = sum(v.calls for v in versions.values())
+            if total == 0:
+                continue
+            for v in versions.values():
+                if v.deprecated and v.calls / total < min_share:
+                    candidates.append(f"{r}@{v.version}")
+        return candidates
 
-
-SUPPORTED: Tuple[Version, ...] = (Version(1, 0),)
+    def card(self) -> Dict[str, Any]:
+        return {
+            "kind": "api-versioning-card",
+            "routes": len(self._versions),
+            "versions": sum(len(v) for v in self._versions.values()),
+            "deprecated": sum(1 for vs in self._versions.values() for v in vs.values() if v.deprecated),
+            "retirement_candidates": self.retirement_candidates(),
+        }
