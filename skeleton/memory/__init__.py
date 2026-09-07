@@ -2,11 +2,13 @@
 Skeleton Memory Package
 
 Exports:
-- InMemoryTFIDFStore: RAG retrieval
+- InMemoryTFIDFStore: Sparse RAG retrieval (fallback)
+- VectorStore: Dense embedding retrieval (default RAG plane)
+- HashEmbedder: Deterministic local embedder
 - CAGStore: Contextual associative memory
 - MAGStore: Multi-agent episodic memory
-- MemoryTrinity: Unified fusion across all three planes
-- RepetitionScheduler: Spaced repetition for consolidation
+- MemoryTrinity: Unified fusion across planes
+- RepetitionScheduler: Spaced repetition consolidation
 """
 
 from skeleton.memory.core import (
@@ -19,9 +21,13 @@ from skeleton.memory.core import (
     ScoredChunk,
     TrinityResult,
 )
+from skeleton.memory.vector import HashEmbedder, VectorEntry, VectorStore
 
 __all__ = [
     "InMemoryTFIDFStore",
+    "VectorStore",
+    "HashEmbedder",
+    "VectorEntry",
     "CAGStore",
     "MAGStore",
     "MemoryTrinity",
