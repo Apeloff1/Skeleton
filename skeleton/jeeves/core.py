@@ -1,9 +1,12 @@
 """
-Skeleton Jeeves — Conversational AI orchestration layer (provider-backed)
+Skeleton Jeeves — Conversational AI orchestration layer (provider-backed,
+with memory matrices: SAM, CLOM, KREM)
 
-JeevesCore now delegates response generation to an LLM provider
-(local-echo fallback, OpenAI/Anthropic when keys are set), while
-keeping session management, tool dispatch, and memory integration.
+JeevesCore delegates response generation to an LLM provider while the
+matrices observe every turn:
+- SAM builds a co-occurrence graph used to expand queries
+- CLOM tracks per-intent outcome rates
+- KREM tracks per-concept retention with spaced decay
 """
 
 from __future__ import annotations
@@ -15,6 +18,11 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
 from skeleton.kernel.events import DomainEvent, EventBus
+from skeleton.jeeves.matrices import (
+    CompressedLearnedOutcomeModel,
+    KnowledgeRetentionMatrix,
+    SemanticAssociationMap,
+)
 
 
 class SessionMode(Enum):
@@ -101,13 +109,18 @@ MODE_SYSTEM_PROMPTS: Dict[SessionMode, str] = {
 
 
 class JeevesCore:
-    """Conversational orchestration with pluggable LLM backends."""
+    """Conversational orchestration with pluggable LLM backends and memory matrices."""
 
     def __init__(self, bus: Optional[EventBus] = None, retriever: Optional[Any] = None, provider: Optional[Any] = None):
         self._bus = bus
         self._memory = MemoryManager()
         self._tools: Dict[str, Callable[[Dict[str, Any]], Any]] = {}
         self._stats = {"interactions": 0, "tool_calls": 0}
+
+        # Memory matrices
+        self.sam = SemanticAssociationMap()
+        self.clom = CompressedLearnedOutcomeModel()
+        self.krem = KnowledgeRetentionMatrix()
 
         if provider is not None:
             self._provider = provider
@@ -139,13 +152,32 @@ class JeevesCore:
 
         session.add_turn("user", input_text, **(context or {}))
 
+        # Matrices observe the input
+        self.sam.observe(input_text)
+        for term in self.sam._terms(input_text):
+            self.krem.observe(term)
+
+        # SAM expansion enriches the prompt with associated concepts
+        expansions = self.sam.expand(input_text)
         system = MODE_SYSTEM_PROMPTS.get(session.mode, "")
         prompt = f"{system}\n\n{input_text}" if system else input_text
+        if expansions:
+            prompt += f"\n\nRelated concepts: {', '.join(expansions[:5])}"
 
+        start = time.time()
         try:
             content = self._provider.complete(prompt, context=session.context_window())
+            success = True
         except Exception as e:
             content = f"[provider error: {e}]"
+            success = False
+        latency_ms = (time.time() - start) * 1000
+
+        # CLOM tracks the outcome for this intent (= session mode)
+        self.clom.observe(session.mode.value, success, latency_ms)
+
+        # Matrices observe the response too (assistant language feeds SAM)
+        self.sam.observe(content)
 
         tools_used = [t for t in self._tools if t in input_text.lower()]
         for tool in tools_used:
@@ -164,15 +196,35 @@ class JeevesCore:
                 "provider": self.provider_name,
                 "input_length": len(input_text),
                 "response_length": len(content),
+                "sam_expansions": len(expansions),
+                "latency_ms": latency_ms,
             })
 
-        return {"content": content, "tools": tools_used, "mode": session.mode.value, "provider": self.provider_name}
+        return {
+            "content": content,
+            "tools": tools_used,
+            "mode": session.mode.value,
+            "provider": self.provider_name,
+            "expansions": expansions[:5],
+            "latency_ms": round(latency_ms, 1),
+        }
+
+    def matrices(self) -> Dict[str, Any]:
+        """Snapshot all three memory matrices (API /jeeves/matrices surface)."""
+        return {
+            "sam": self.sam.snapshot(),
+            "clom": self.clom.snapshot(),
+            "krem": self.krem.snapshot(),
+        }
+
+    def refresh_due(self) -> List[str]:
+        """Concepts due for refresh per KREM (pairs with RepetitionScheduler)."""
+        return self.krem.due()
 
     def review_code(self, session_id: str, code: str) -> Dict[str, Any]:
         session = self._memory.get_session(session_id)
         if not session:
             return {"error": "Session not found"}
-
         issues = []
         if "import *" in code:
             issues.append("Avoid wildcard imports")
@@ -198,4 +250,9 @@ class JeevesCore:
             "provider": self.provider_name,
             "active_sessions": self._memory.stats()["active_sessions"],
             "tools_available": len(self._tools),
+            "matrices": {
+                "sam": self.sam.stats(),
+                "clom": self.clom.stats(),
+                "krem": self.krem.stats(),
+            },
         }

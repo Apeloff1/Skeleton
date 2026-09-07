@@ -1,4 +1,4 @@
-"""Skeleton Jeeves Package — with provider abstraction."""
+"""Skeleton Jeeves Package — with provider abstraction and memory matrices."""
 
 from skeleton.jeeves.core import (
     JeevesCore,
@@ -14,6 +14,11 @@ from skeleton.jeeves.providers import (
     OpenAIProvider,
     get_provider,
 )
+from skeleton.jeeves.matrices import (
+    CompressedLearnedOutcomeModel,
+    KnowledgeRetentionMatrix,
+    SemanticAssociationMap,
+)
 
 __all__ = [
     "JeevesCore",
@@ -26,4 +31,7 @@ __all__ = [
     "OpenAIProvider",
     "AnthropicProvider",
     "get_provider",
+    "SemanticAssociationMap",
+    "CompressedLearnedOutcomeModel",
+    "KnowledgeRetentionMatrix",
 ]
