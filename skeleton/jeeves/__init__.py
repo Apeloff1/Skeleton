@@ -1,13 +1,4 @@
-"""
-Skeleton Jeeves Package
-
-Exports:
-- JeevesCore: Conversational AI orchestration
-- SessionMode: Conversation modes
-- Session: Conversation state
-- MemoryManager: Episodic memory
-- Turn: Single conversation turn
-"""
+"""Skeleton Jeeves Package — with provider abstraction."""
 
 from skeleton.jeeves.core import (
     JeevesCore,
@@ -16,6 +7,13 @@ from skeleton.jeeves.core import (
     SessionMode,
     Turn,
 )
+from skeleton.jeeves.providers import (
+    AnthropicProvider,
+    LLMProvider,
+    LocalEchoProvider,
+    OpenAIProvider,
+    get_provider,
+)
 
 __all__ = [
     "JeevesCore",
@@ -23,4 +21,9 @@ __all__ = [
     "Session",
     "MemoryManager",
     "Turn",
+    "LLMProvider",
+    "LocalEchoProvider",
+    "OpenAIProvider",
+    "AnthropicProvider",
+    "get_provider",
 ]
