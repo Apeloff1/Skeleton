@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 # Smoke test the cockpit: boot genesis, hit health, verify handles,
 # four-plane retrieval with self-populating KAG, Jeeves provider path,
-# memory matrices, and the swarm-agents bridge.
+# memory matrices, swarm-agents bridge, and persistence round-trip.
 set -euo pipefail
 
-python - <<'PY'
+SMOKE_DIR="$(mktemp -d)"
+trap 'rm -rf "$SMOKE_DIR"' EXIT
+
+python - "$SMOKE_DIR" <<'PY'
+import sys
 from skeleton.genesis import Genesis
+
+smoke_dir = sys.argv[1]
 
 g = Genesis(seed=42).boot()
 health = g.health()
@@ -64,5 +70,20 @@ from skeleton.cortex import live
 status = live.status()
 assert status["live"] and status["events_captured"] > 0
 
-print(f"cockpit smoke: OK ({health['subsystems']} subsystems, 4 planes, kag={kag.graph.stats()['triples']} triples, jeeves={reply['provider']}, matrices live)")
+# Persistence round-trip: snapshot, simulate restart, restore, verify
+from skeleton.deploy.harness import Harness
+
+h1 = Harness(seed=42, snapshot_root=smoke_dir)
+h1.boot()
+h1.genesis.get("quad").ingest_document("persist-smoke", "Persistence keeps knowledge alive.")
+h1.snapshot_state(name="smoke")
+
+h2 = Harness(seed=42, snapshot_root=smoke_dir)
+h2.boot(restore=False)
+restored = h2.restore_state(name="smoke")
+assert restored.get("kag", 0) > 0, f"nothing restored: {restored}"
+kag2 = h2.genesis.get("quad")._planes["kag"]
+assert kag2.graph.stats()["triples"] > 0, "restored KAG is empty"
+
+print(f"cockpit smoke: OK ({health['subsystems']} subsystems, 4 planes, kag={kag.graph.stats()['triples']} triples, jeeves={reply['provider']}, persistence round-trip OK)")
 PY
