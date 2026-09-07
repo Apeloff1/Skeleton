@@ -4,6 +4,7 @@ Skeleton Developer CLI — Command integration and extension generator
 Provides:
 - New CLI commands: dev scaffold, dev wizard, dev health, dev visualize
 - Extension generator for new subsystems
+- Persistence commands: dev snapshot, dev restore, dev snapshots
 - Developer utility commands
 """
 
@@ -89,7 +90,6 @@ class WizardCommand:
         engine = ScaffoldEngine(Path("."))
         wizard = ProjectWizard(engine)
 
-        # Check for --non-interactive with --answers
         parser = argparse.ArgumentParser(prog="skeleton dev wizard")
         parser.add_argument("--answers", type=str, help="JSON string of pre-filled answers")
         parser.add_argument("--non-interactive", action="store_true", help="Use default answers")
@@ -109,7 +109,6 @@ class WizardCommand:
         plan = wizard.run(answers)
 
         if not parsed.non_interactive and not parsed.answers:
-            # In interactive mode, offer to scaffold immediately
             print("\nProject plan generated:")
             print(json.dumps(plan, indent=2))
             try:
@@ -142,7 +141,6 @@ class HealthCommand:
         try:
             state = get_state()
         except Exception:
-            # Fallback: boot a fresh genesis for standalone health check
             genesis = Genesis(seed=42).boot()
             state = type("MockState", (), {"genesis": genesis})()
 
@@ -192,13 +190,11 @@ class VisualizeCommand:
         from skeleton.developer.wizard import BlueprintVisualizer
 
         if parsed.blueprint:
-            # Try to find blueprint in running state
             try:
                 state = get_state()
                 forge = getattr(state, "forge", None)
                 if forge is None:
                     raise RuntimeError("No forge available")
-                # Blueprints aren't directly stored; create a sample for demo
                 bp = forge.new_blueprint(parsed.blueprint)
                 forge.instantiate(bp, "source", "input")
                 forge.instantiate(bp, "transform", "process")
@@ -206,7 +202,6 @@ class VisualizeCommand:
                 bp.connect(("input", "out"), ("process", "in"))
                 bp.connect(("process", "out"), ("output", "in"))
             except Exception:
-                # Fallback: create a demo blueprint
                 forge = Forge()
                 bp = forge.new_blueprint(parsed.blueprint or "demo")
                 forge.instantiate(bp, "source", "input")
@@ -346,13 +341,22 @@ async def health() -> dict:
         return files
 
 
-# Global registry instance
+# Global registry instance — with persistence commands
+from skeleton.developer.persistence_commands import (
+    RestoreCommand,
+    SnapshotCommand,
+    SnapshotsCommand,
+)
+
 _dev_registry = DevCommandRegistry()
 _dev_registry.register("scaffold", ScaffoldCommand())
 _dev_registry.register("wizard", WizardCommand())
 _dev_registry.register("health", HealthCommand())
 _dev_registry.register("visualize", VisualizeCommand())
 _dev_registry.register("extension", ExtensionCommand())
+_dev_registry.register("snapshot", SnapshotCommand())
+_dev_registry.register("restore", RestoreCommand())
+_dev_registry.register("snapshots", SnapshotsCommand())
 
 
 def run_dev_command(command: str, args: List[str]) -> Any:
