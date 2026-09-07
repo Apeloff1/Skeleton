@@ -2,7 +2,7 @@
 # Smoke test the cockpit: boot genesis, hit health, verify handles,
 # four-plane retrieval with self-populating KAG, Jeeves provider path,
 # memory matrices, swarm-agents bridge, persistence round-trip,
-# and the genesis-wired forge with verify-until-green.
+# genesis-wired forge with verify-until-green, and the consolidation cycle.
 set -euo pipefail
 
 SMOKE_DIR="$(mktemp -d)"
@@ -77,12 +77,25 @@ assert state.jeeves_krem.stats()["concepts"] > 0, "KREM tracked nothing"
 matrices = state.jeeves.matrices()
 assert set(matrices.keys()) == {"sam", "clom", "krem"}
 
-# Live cortex observed the traffic (including forge events)
+# Consolidation cycle: KREM due-refresh closes the retention loop
+import time
+from skeleton.memory.consolidation import wire_from_genesis
+cycle = wire_from_genesis(g, state.jeeves, bus=g.bus)
+state.jeeves.krem._cells  # concepts exist from the ask above
+for concept in list(state.jeeves.krem._cells)[:2]:
+    state.jeeves.krem._cells[concept].last_seen = time.time() - (state.jeeves.krem.HALF_LIFE_HOURS * 10 * 3600)
+report = cycle.cycle()
+assert "due" in report and "scheduled" in report
+assert cycle.stats()["cycles"] == 1
+
+# Live cortex observed the traffic (including forge + consolidation events)
 from skeleton.cortex import live
 status = live.status()
 assert status["live"] and status["events_captured"] > 0
 forge_events = live.get_live().recent_events("forge", n=5)
 assert len(forge_events) > 0, "cortex saw no forge events"
+consolidation_events = live.get_live().recent_events("memory.consolidation.cycle", n=5)
+assert len(consolidation_events) > 0, "cortex saw no consolidation events"
 
 # Persistence round-trip: snapshot, simulate restart, restore, verify
 from skeleton.deploy.harness import Harness
@@ -103,5 +116,5 @@ assert kag2.graph.stats()["triples"] > 0, "restored KAG is empty"
 mresult = h2.materialize("smoke-harness-bp")
 assert "blueprint_id" in mresult
 
-print(f"cockpit smoke: OK ({health['subsystems']} subsystems, forge wired, godot verified, 4 planes, jeeves={reply['provider']}, persistence OK)")
+print(f"cockpit smoke: OK ({health['subsystems']} subsystems, forge wired, godot verified, 4 planes, jeeves={reply['provider']}, consolidation live, persistence OK)")
 PY
