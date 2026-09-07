@@ -96,6 +96,12 @@ class ServerState:
         from skeleton.jeeves import JeevesCore
         self.jeeves = JeevesCore(bus=genesis.bus, retriever=genesis.handles.get("quad"))
 
+        # Jeeves memory matrices (served at /jeeves/matrices/{session_id})
+        self.jeeves_sam = self.jeeves.sam
+        self.jeeves_clom = self.jeeves.clom
+        self.jeeves_krem = self.jeeves.krem
+        self.jeeves_memory = self.jeeves._memory
+
         # Live cortex attaches to the genesis bus
         from skeleton.cortex import live
         self.cockpit = live.attach(genesis.bus)
