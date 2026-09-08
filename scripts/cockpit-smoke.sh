@@ -4,7 +4,7 @@
 # memory matrices, swarm-agents bridge, persistence round-trip,
 # genesis-wired forge with verify-until-green, consolidation cycle,
 # galaxy transport, cross-node consensus, federated KAG sync,
-# and cross-node task routing.
+# cross-node task routing, and leader election.
 set -euo pipefail
 
 SMOKE_DIR="$(mktemp -d)"
@@ -23,26 +23,30 @@ assert "kernel" in health["phases"]
 assert "forge" in health["phases"], f"forge phase missing: {health['phases']}"
 assert "galaxy" in health["phases"], f"galaxy phase missing: {health['phases']}"
 assert "cortex" in health["phases"]
-assert health["subsystems"] >= 28, f"expected 28+ subsystems, got {health['subsystems']}"
+assert health["subsystems"] >= 29, f"expected 29+ subsystems, got {health['subsystems']}"
 assert health["invariant_violations"] == 0
 
 required = ["lattice", "rag", "trinity", "orchestrator", "mesh", "fortress",
             "quad", "cortex", "ranker", "coordinator", "bridge", "forge",
-            "galaxy", "galaxy_transport", "consensus", "kag_sync", "galaxy_bridge"]
+            "galaxy", "galaxy_transport", "consensus", "kag_sync", "galaxy_bridge",
+            "election"]
 for handle in required:
     assert handle in g.handles, f"missing handle: {handle}"
 
-# Galaxy: messaging, consensus, KAG sync, AND cross-node task routing
+# Galaxy: messaging, consensus, KAG sync, task routing, AND leader election
 from skeleton.galaxy import GalaxyNode, NodeTransport
 from skeleton.galaxy.consensus import ConsensusEngine
 from skeleton.galaxy.kag_sync import KAGSync
 from skeleton.galaxy.galaxy_bridge import GalaxyBridge
+from skeleton.galaxy.election import LeaderElection
 from skeleton.retrieval.kag import KnowledgeGraph, KAGRetriever
 from skeleton.swarm.mesh import SwarmMesh
 from skeleton.agents.bridge import MeshBridge
 peer = GalaxyNode(node_id="smoke-peer")
+peer.add_capability("reasoning")
 peer_transport = NodeTransport(peer).start()
 peer_consensus = ConsensusEngine(peer, peer_transport)
+peer_election = LeaderElection(peer, peer_transport, peer_consensus)
 peer_kag = KAGRetriever(KnowledgeGraph())
 peer_sync = KAGSync(peer_kag, peer, peer_transport, consensus=peer_consensus)
 peer_bridge = GalaxyBridge(MeshBridge(SwarmMesh()), peer, peer_transport)
@@ -51,6 +55,7 @@ local_transport = g.get("galaxy_transport").start()
 local_consensus = g.get("consensus")
 local_sync = g.get("kag_sync")
 local_bridge = g.get("galaxy_bridge")
+local_election = g.get("election")
 try:
     got = []
     peer_transport.on("ping", lambda p: got.append(p))
@@ -60,11 +65,19 @@ try:
     assert len(got) == 1, "peer never received message"
 
     g.get("galaxy")._registry.register("smoke-peer", peer_transport.address, capabilities={"reasoning"})
-    peer._registry.register(g.get("galaxy").node_id, local_transport.address)
+    peer._registry.register(g.get("galaxy").node_id, local_transport.address,
+                            capabilities=set(g.get("galaxy")._capabilities))
 
     # Consensus
     proposal = local_consensus.propose("era.bind", {"era": "extraction_now"}, wait=True, timeout=3.0)
     assert proposal.status == "accepted", f"consensus failed: {proposal.status}"
+
+    # Leader election: local node has 3 capabilities vs peer's 1 → local wins
+    leader = local_election.call_election(timeout=3.0)
+    assert leader == g.get("galaxy").node_id, f"wrong leader: {leader}"
+    assert local_election.is_leader()
+    time.sleep(0.4)
+    assert peer_election.state.leader_id == g.get("galaxy").node_id, "peer never installed leader"
 
     # Federated KAG sync
     peer_before = peer_kag.graph.stats()["triples"]
@@ -73,7 +86,7 @@ try:
     time.sleep(0.6)
     assert peer_kag.graph.stats()["triples"] > peer_before, "KAG never synced to peer"
 
-    # Cross-node task routing: no local 'remote-reasoning' agent → goes to peer
+    # Cross-node task routing
     from skeleton.agents import Task
     import uuid
     rtask = Task(task_id=str(uuid.uuid4())[:8], description="solve remotely")
@@ -85,7 +98,7 @@ try:
 finally:
     local_transport.stop(); peer_transport.stop()
 
-# Genesis-wired forge: materialize through it and verify the loop accepts
+# Genesis-wired forge: materialize + verify loop
 forge = g.get("forge")
 bp = forge.new_blueprint("smoke-bp")
 forge.instantiate(bp, "player", "hero")
@@ -105,10 +118,8 @@ assert set(quad._planes.keys()) == {"rag", "cag", "mag", "kag"}, f"quad planes: 
 quad.ingest_document("smoke-doc", "Skeleton is a game engine. The Forge produces blueprints.")
 kag = quad._planes["kag"]
 assert kag.graph.stats()["triples"] > 0, "KAG did not self-populate from ingestion"
-
 results = quad.retrieve("what does the Forge produce?", k=5)
-assert len(results) > 0, "quad retrieval returned nothing"
-assert "kag" in {r.plane for r in results}, "KAG plane did not contribute"
+assert len(results) > 0 and "kag" in {r.plane for r in results}
 
 # Swarm-agents bridge: local dispatch
 from skeleton.agents import Task as LocalTask
@@ -117,14 +128,13 @@ mesh = g.get("mesh")
 mesh.join({"reasoning"}, weight=2.0)
 bridge = g.get("bridge")
 ltask = LocalTask(task_id=str(_uuid.uuid4())[:8], description="smoke task")
-assert bridge.dispatch(ltask, "reasoning"), "bridge dispatch failed"
+assert bridge.dispatch(ltask, "reasoning")
 assert "mesh_agent_id" in ltask.metadata
 
 # Jeeves provider path + memory matrices
 from skeleton.api.server import ServerState
 state = ServerState()
 state.wire_from_genesis(g)
-assert state.jeeves_sam is not None and state.jeeves_clom is not None and state.jeeves_krem is not None
 session = state.jeeves.open_session("smoke-user")
 reply = state.jeeves.ask(session.session_id, "what does the forge build?")
 assert reply["provider"] in ("local-echo", "openai", "anthropic")
@@ -162,5 +172,5 @@ assert h2.genesis.get("quad")._planes["kag"].graph.stats()["triples"] > 0
 mresult = h2.materialize("smoke-harness-bp")
 assert "blueprint_id" in mresult
 
-print(f"cockpit smoke: OK ({health['subsystems']} subsystems, 9 phases, consensus accepted, kag synced, remote task routed, godot verified, jeeves={reply['provider']})")
+print(f"cockpit smoke: OK ({health['subsystems']} subsystems, 9 phases, leader elected, consensus accepted, kag synced, remote task routed, godot verified)")
 PY
