@@ -3,7 +3,7 @@
 # four-plane retrieval with self-populating KAG, Jeeves provider path,
 # memory matrices, swarm-agents bridge, persistence round-trip,
 # genesis-wired forge with verify-until-green, consolidation cycle,
-# and the galaxy node with live HTTP transport between two nodes.
+# galaxy transport, and cross-node consensus.
 set -euo pipefail
 
 SMOKE_DIR="$(mktemp -d)"
@@ -22,20 +22,23 @@ assert "kernel" in health["phases"]
 assert "forge" in health["phases"], f"forge phase missing: {health['phases']}"
 assert "galaxy" in health["phases"], f"galaxy phase missing: {health['phases']}"
 assert "cortex" in health["phases"]
-assert health["subsystems"] >= 25, f"expected 25+ subsystems, got {health['subsystems']}"
+assert health["subsystems"] >= 26, f"expected 26+ subsystems, got {health['subsystems']}"
 assert health["invariant_violations"] == 0
 
 required = ["lattice", "rag", "trinity", "orchestrator", "mesh", "fortress",
             "quad", "cortex", "ranker", "coordinator", "bridge", "forge",
-            "galaxy", "galaxy_transport"]
+            "galaxy", "galaxy_transport", "consensus"]
 for handle in required:
     assert handle in g.handles, f"missing handle: {handle}"
 
-# Galaxy: two live nodes exchange a real HTTP message
+# Galaxy: two live nodes exchange a real HTTP message AND reach consensus
 from skeleton.galaxy import GalaxyNode, NodeTransport
+from skeleton.galaxy.consensus import ConsensusEngine
 peer = GalaxyNode(node_id="smoke-peer")
 peer_transport = NodeTransport(peer).start()
+peer_consensus = ConsensusEngine(peer, peer_transport)
 local_transport = g.get("galaxy_transport").start()
+local_consensus = g.get("consensus")
 try:
     got = []
     peer_transport.on("ping", lambda p: got.append(p))
@@ -43,7 +46,13 @@ try:
     assert ok, "galaxy send failed"
     time.sleep(0.2)
     assert len(got) == 1, "peer never received message"
-    assert "smoke" in str(g.get("galaxy").node_id)
+
+    # Cross-node consensus: register peers both ways, propose, wait for votes
+    g.get("galaxy")._registry.register("smoke-peer", peer_transport.address)
+    peer._registry.register(g.get("galaxy").node_id, local_transport.address)
+    proposal = local_consensus.propose("era.bind", {"era": "extraction_now"}, wait=True, timeout=3.0)
+    assert proposal.status == "accepted", f"consensus failed: {proposal.status}"
+    assert proposal.votes.get("smoke-peer") is True
 finally:
     local_transport.stop(); peer_transport.stop()
 
@@ -105,7 +114,7 @@ report = cycle.cycle()
 assert "due" in report and "scheduled" in report
 assert cycle.stats()["cycles"] == 1
 
-# Live cortex observed the traffic (including forge + consolidation events)
+# Live cortex observed the traffic (including forge + consolidation + consensus events)
 from skeleton.cortex import live
 status = live.status()
 assert status["live"] and status["events_captured"] > 0
@@ -133,5 +142,5 @@ assert kag2.graph.stats()["triples"] > 0, "restored KAG is empty"
 mresult = h2.materialize("smoke-harness-bp")
 assert "blueprint_id" in mresult
 
-print(f"cockpit smoke: OK ({health['subsystems']} subsystems, 9 phases, galaxy live, godot verified, jeeves={reply['provider']}, persistence OK)")
+print(f"cockpit smoke: OK ({health['subsystems']} subsystems, 9 phases, consensus accepted, godot verified, jeeves={reply['provider']}, persistence OK)")
 PY
