@@ -2,14 +2,15 @@
 # Smoke test the cockpit: boot genesis, hit health, verify handles,
 # four-plane retrieval with self-populating KAG, Jeeves provider path,
 # memory matrices, swarm-agents bridge, persistence round-trip,
-# genesis-wired forge with verify-until-green, and the consolidation cycle.
+# genesis-wired forge with verify-until-green, consolidation cycle,
+# and the galaxy node with live HTTP transport between two nodes.
 set -euo pipefail
 
 SMOKE_DIR="$(mktemp -d)"
 trap 'rm -rf "$SMOKE_DIR"' EXIT
 
 python - "$SMOKE_DIR" <<'PY'
-import sys
+import sys, time
 from skeleton.genesis import Genesis
 
 smoke_dir = sys.argv[1]
@@ -19,14 +20,32 @@ health = g.health()
 
 assert "kernel" in health["phases"]
 assert "forge" in health["phases"], f"forge phase missing: {health['phases']}"
+assert "galaxy" in health["phases"], f"galaxy phase missing: {health['phases']}"
 assert "cortex" in health["phases"]
-assert health["subsystems"] >= 23, f"expected 23+ subsystems, got {health['subsystems']}"
+assert health["subsystems"] >= 25, f"expected 25+ subsystems, got {health['subsystems']}"
 assert health["invariant_violations"] == 0
 
 required = ["lattice", "rag", "trinity", "orchestrator", "mesh", "fortress",
-            "quad", "cortex", "ranker", "coordinator", "bridge", "forge"]
+            "quad", "cortex", "ranker", "coordinator", "bridge", "forge",
+            "galaxy", "galaxy_transport"]
 for handle in required:
     assert handle in g.handles, f"missing handle: {handle}"
+
+# Galaxy: two live nodes exchange a real HTTP message
+from skeleton.galaxy import GalaxyNode, NodeTransport
+peer = GalaxyNode(node_id="smoke-peer")
+peer_transport = NodeTransport(peer).start()
+local_transport = g.get("galaxy_transport").start()
+try:
+    got = []
+    peer_transport.on("ping", lambda p: got.append(p))
+    ok = local_transport.send(peer_transport.address, {"type": "ping", "data": "smoke"})
+    assert ok, "galaxy send failed"
+    time.sleep(0.2)
+    assert len(got) == 1, "peer never received message"
+    assert "smoke" in str(g.get("galaxy").node_id)
+finally:
+    local_transport.stop(); peer_transport.stop()
 
 # Genesis-wired forge: materialize through it and verify the loop accepts
 forge = g.get("forge")
@@ -78,10 +97,8 @@ matrices = state.jeeves.matrices()
 assert set(matrices.keys()) == {"sam", "clom", "krem"}
 
 # Consolidation cycle: KREM due-refresh closes the retention loop
-import time
 from skeleton.memory.consolidation import wire_from_genesis
 cycle = wire_from_genesis(g, state.jeeves, bus=g.bus)
-state.jeeves.krem._cells  # concepts exist from the ask above
 for concept in list(state.jeeves.krem._cells)[:2]:
     state.jeeves.krem._cells[concept].last_seen = time.time() - (state.jeeves.krem.HALF_LIFE_HOURS * 10 * 3600)
 report = cycle.cycle()
@@ -116,5 +133,5 @@ assert kag2.graph.stats()["triples"] > 0, "restored KAG is empty"
 mresult = h2.materialize("smoke-harness-bp")
 assert "blueprint_id" in mresult
 
-print(f"cockpit smoke: OK ({health['subsystems']} subsystems, forge wired, godot verified, 4 planes, jeeves={reply['provider']}, consolidation live, persistence OK)")
+print(f"cockpit smoke: OK ({health['subsystems']} subsystems, 9 phases, galaxy live, godot verified, jeeves={reply['provider']}, persistence OK)")
 PY
