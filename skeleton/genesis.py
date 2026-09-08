@@ -44,6 +44,7 @@ class Genesis:
         self._phase_resilience()
         self._phase_interface()
         self._phase_forge()
+        self._phase_galaxy()
         self._phase_cortex()
         self.bus.publish(
             DomainEvent(
@@ -207,6 +208,35 @@ class Genesis:
             subject="forge",
             snapshot=lambda: len(forge.available_kinds()),
             predicate=lambda kinds: kinds >= 5,
+        ))
+        self.report.invariants_registered += 1
+
+    def _phase_galaxy(self) -> None:
+        """Wire the galaxy node for distributed federation.
+
+        Sits after forge (full local stack live) and before cortex
+        (so cortex observes cross-node traffic). The node gets the
+        subsystem capabilities as its advertised set; transport binds
+        lazily — call galaxy_node.start() to open the HTTP inbox.
+        """
+        self.report.phases.append("galaxy")
+        from skeleton.galaxy import GalaxyNode, NodeTransport
+
+        node = GalaxyNode(address="127.0.0.1", bus=self.bus)
+        node.add_capability("reasoning")
+        node.add_capability("retrieval")
+        node.add_capability("forge")
+        transport = NodeTransport(node)
+
+        self._wire("galaxy", "galaxy", node)
+        self._wire("galaxy", "galaxy_transport", transport)
+
+        assert self.lattice is not None
+        self.lattice.register(Invariant(
+            name="galaxy_node_identified",
+            subject="galaxy.node",
+            snapshot=lambda: bool(node.node_id),
+            predicate=lambda identified: identified is True,
         ))
         self.report.invariants_registered += 1
 
