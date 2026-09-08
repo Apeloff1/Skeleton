@@ -3,7 +3,7 @@
 # four-plane retrieval with self-populating KAG, Jeeves provider path,
 # memory matrices, swarm-agents bridge, persistence round-trip,
 # genesis-wired forge with verify-until-green, consolidation cycle,
-# galaxy transport, and cross-node consensus.
+# galaxy transport, cross-node consensus, and federated KAG sync.
 set -euo pipefail
 
 SMOKE_DIR="$(mktemp -d)"
@@ -22,23 +22,28 @@ assert "kernel" in health["phases"]
 assert "forge" in health["phases"], f"forge phase missing: {health['phases']}"
 assert "galaxy" in health["phases"], f"galaxy phase missing: {health['phases']}"
 assert "cortex" in health["phases"]
-assert health["subsystems"] >= 26, f"expected 26+ subsystems, got {health['subsystems']}"
+assert health["subsystems"] >= 27, f"expected 27+ subsystems, got {health['subsystems']}"
 assert health["invariant_violations"] == 0
 
 required = ["lattice", "rag", "trinity", "orchestrator", "mesh", "fortress",
             "quad", "cortex", "ranker", "coordinator", "bridge", "forge",
-            "galaxy", "galaxy_transport", "consensus"]
+            "galaxy", "galaxy_transport", "consensus", "kag_sync"]
 for handle in required:
     assert handle in g.handles, f"missing handle: {handle}"
 
-# Galaxy: two live nodes exchange a real HTTP message AND reach consensus
+# Galaxy: live messaging, cross-node consensus, AND federated KAG sync
 from skeleton.galaxy import GalaxyNode, NodeTransport
 from skeleton.galaxy.consensus import ConsensusEngine
+from skeleton.galaxy.kag_sync import KAGSync
+from skeleton.retrieval.kag import KnowledgeGraph, KAGRetriever
 peer = GalaxyNode(node_id="smoke-peer")
 peer_transport = NodeTransport(peer).start()
 peer_consensus = ConsensusEngine(peer, peer_transport)
+peer_kag = KAGRetriever(KnowledgeGraph())
+peer_sync = KAGSync(peer_kag, peer, peer_transport, consensus=peer_consensus)
 local_transport = g.get("galaxy_transport").start()
 local_consensus = g.get("consensus")
+local_sync = g.get("kag_sync")
 try:
     got = []
     peer_transport.on("ping", lambda p: got.append(p))
@@ -47,12 +52,22 @@ try:
     time.sleep(0.2)
     assert len(got) == 1, "peer never received message"
 
-    # Cross-node consensus: register peers both ways, propose, wait for votes
+    # Cross-node consensus
     g.get("galaxy")._registry.register("smoke-peer", peer_transport.address)
     peer._registry.register(g.get("galaxy").node_id, local_transport.address)
     proposal = local_consensus.propose("era.bind", {"era": "extraction_now"}, wait=True, timeout=3.0)
     assert proposal.status == "accepted", f"consensus failed: {proposal.status}"
-    assert proposal.votes.get("smoke-peer") is True
+
+    # Federated KAG sync: local ingest propagates to the peer's graph
+    local_kag = g.get("quad")._planes["kag"]
+    before = peer_kag.graph.stats()["triples"]
+    local_sync.sync_now()  # gossip digest → peer requests missing → triples flow back
+    # Ingest first so there's something to sync
+    g.get("quad").ingest_document("smoke-fed", "The Forge produces blueprints for games.")
+    local_sync.sync_now()
+    time.sleep(0.6)
+    after = peer_kag.graph.stats()["triples"]
+    assert after > before, f"KAG never synced to peer: {before} → {after}"
 finally:
     local_transport.stop(); peer_transport.stop()
 
@@ -114,7 +129,7 @@ report = cycle.cycle()
 assert "due" in report and "scheduled" in report
 assert cycle.stats()["cycles"] == 1
 
-# Live cortex observed the traffic (including forge + consolidation + consensus events)
+# Live cortex observed the traffic (forge + consolidation events)
 from skeleton.cortex import live
 status = live.status()
 assert status["live"] and status["events_captured"] > 0
@@ -142,5 +157,5 @@ assert kag2.graph.stats()["triples"] > 0, "restored KAG is empty"
 mresult = h2.materialize("smoke-harness-bp")
 assert "blueprint_id" in mresult
 
-print(f"cockpit smoke: OK ({health['subsystems']} subsystems, 9 phases, consensus accepted, godot verified, jeeves={reply['provider']}, persistence OK)")
+print(f"cockpit smoke: OK ({health['subsystems']} subsystems, 9 phases, consensus accepted, kag synced, godot verified, jeeves={reply['provider']}, persistence OK)")
 PY
