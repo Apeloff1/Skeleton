@@ -1,4 +1,4 @@
-"""Skeleton Galaxy Package — with transport, consensus, and KAG sync."""
+"""Skeleton Galaxy Package — transport, consensus, KAG sync, cross-node routing."""
 
 from skeleton.galaxy.federation import (
     FederationMesh,
@@ -9,6 +9,7 @@ from skeleton.galaxy.federation import (
 from skeleton.galaxy.transport import NodeTransport
 from skeleton.galaxy.consensus import ConsensusEngine, Proposal
 from skeleton.galaxy.kag_sync import KAGSync
+from skeleton.galaxy.galaxy_bridge import GalaxyBridge, RemoteTask
 
 __all__ = [
     "GalaxyNode",
@@ -19,4 +20,6 @@ __all__ = [
     "ConsensusEngine",
     "Proposal",
     "KAGSync",
+    "GalaxyBridge",
+    "RemoteTask",
 ]
