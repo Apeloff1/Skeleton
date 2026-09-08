@@ -1,4 +1,4 @@
-"""Skeleton Galaxy Package — with HTTP transport."""
+"""Skeleton Galaxy Package — with HTTP transport and consensus."""
 
 from skeleton.galaxy.federation import (
     FederationMesh,
@@ -7,6 +7,7 @@ from skeleton.galaxy.federation import (
     NodeRegistry,
 )
 from skeleton.galaxy.transport import NodeTransport
+from skeleton.galaxy.consensus import ConsensusEngine, Proposal
 
 __all__ = [
     "GalaxyNode",
@@ -14,4 +15,6 @@ __all__ = [
     "NodeRegistry",
     "NodeIdentity",
     "NodeTransport",
+    "ConsensusEngine",
+    "Proposal",
 ]
