@@ -1,4 +1,8 @@
-"""Genesis protocol — boot the whole substrate as one wired system."""
+"""Genesis protocol — boot the whole substrate as one wired system.
+
+Galaxy phase wires: galaxy node, transport, consensus, kag_sync,
+galaxy_bridge, and leader election.
+"""
 
 from __future__ import annotations
 
@@ -79,7 +83,6 @@ class Genesis:
         from skeleton.memory.vector import VectorStore
         from skeleton.memory.drift import PersonaDriftDetector
 
-        # Dense vector store is the default RAG plane; TF-IDF kept as sparse fallback
         rag = VectorStore()
         cag = CAGStore()
         mag = MAGStore(UserId.new())
@@ -131,8 +134,6 @@ class Genesis:
         self._wire("swarm", "negotiator", CapabilityNegotiator(bus=self.bus))
         self._wire("swarm", "platoons", standard_platoons(bus=self.bus))
 
-        # Bridge the agents Coordinator onto the live mesh so task
-        # bookkeeping rides on capability routing
         from skeleton.agents import Coordinator
         from skeleton.agents.bridge import MeshBridge
         coordinator = Coordinator(bus=self.bus)
@@ -175,7 +176,6 @@ class Genesis:
         reranker = FeatureReranker(bus=self.bus)
         ranker = Ranker()
 
-        # Wire all four planes into the quad retriever
         quad = QuadRetriever(bus=self.bus)
         quad.register_plane("rag", self.handles.get("rag"))
         quad.register_plane("cag", self.handles.get("cag"))
@@ -189,13 +189,7 @@ class Genesis:
         self._wire("interface", "quad", quad)
 
     def _phase_forge(self) -> None:
-        """Wire the universal forge as a first-class genesis handle.
-
-        Sits after interface (verifier chain available) and before cortex
-        (so cortex observes forge events). The forge owns blueprint
-        composition, validation, and materialization; the verify-until-green
-        loop and quality ledger plug in through its bus.
-        """
+        """Wire the universal forge as a first-class genesis handle."""
         self.report.phases.append("forge")
         from skeleton.forge.universal import Forge
 
@@ -214,19 +208,15 @@ class Genesis:
     def _phase_galaxy(self) -> None:
         """Wire the galaxy node for distributed federation.
 
-        Sits after forge (full local stack live) and before cortex
-        (so cortex observes cross-node traffic). Handles:
-        - galaxy: the node with advertised capabilities
-        - galaxy_transport: HTTP inbox/outbox (bind lazily)
-        - consensus: Raft-lite propose/vote over the wire
-        - kag_sync: anti-entropy triple replication from the quad's KAG plane
-        - galaxy_bridge: cross-node task routing (local-first dispatch)
+        Handles: galaxy node, transport, consensus, kag_sync,
+        galaxy_bridge, and leader election.
         """
         self.report.phases.append("galaxy")
         from skeleton.galaxy import GalaxyNode, NodeTransport
         from skeleton.galaxy.consensus import ConsensusEngine
         from skeleton.galaxy.kag_sync import KAGSync
         from skeleton.galaxy.galaxy_bridge import GalaxyBridge
+        from skeleton.galaxy.election import LeaderElection
 
         node = GalaxyNode(address="127.0.0.1", bus=self.bus)
         node.add_capability("reasoning")
@@ -234,6 +224,7 @@ class Genesis:
         node.add_capability("forge")
         transport = NodeTransport(node)
         consensus = ConsensusEngine(node, transport, bus=self.bus)
+        election = LeaderElection(node, transport, consensus, bus=self.bus)
 
         quad = self.handles.get("quad")
         if quad is not None:
@@ -242,7 +233,6 @@ class Genesis:
                 kag_sync = KAGSync(kag, node, transport, consensus=consensus, bus=self.bus)
                 self._wire("galaxy", "kag_sync", kag_sync)
 
-        # Cross-node task routing rides the local mesh bridge
         mesh_bridge = self.handles.get("bridge")
         if mesh_bridge is not None:
             galaxy_bridge = GalaxyBridge(mesh_bridge, node, transport, bus=self.bus)
@@ -251,6 +241,7 @@ class Genesis:
         self._wire("galaxy", "galaxy", node)
         self._wire("galaxy", "galaxy_transport", transport)
         self._wire("galaxy", "consensus", consensus)
+        self._wire("galaxy", "election", election)
 
         assert self.lattice is not None
         self.lattice.register(Invariant(
