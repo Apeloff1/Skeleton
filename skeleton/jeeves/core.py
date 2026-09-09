@@ -1,6 +1,6 @@
 """
 Skeleton Jeeves — Conversational AI orchestration layer (provider-backed,
-with memory matrices: SAM, CLOM, KREM, and KAG citations)
+with memory matrices: SAM, CLOM, KREM, KAG citations, and the ResponseCycle)
 
 JeevesCore delegates response generation to an LLM provider while the
 matrices observe every turn:
@@ -8,6 +8,7 @@ matrices observe every turn:
 - CLOM tracks per-intent outcome rates
 - KREM tracks per-concept retention with spaced decay
 - CitationEngine grounds replies in knowledge-graph facts
+- ResponseCycle distills each reply into work orders between turns
 """
 
 from __future__ import annotations
@@ -112,9 +113,10 @@ MODE_SYSTEM_PROMPTS: Dict[SessionMode, str] = {
 
 class JeevesCore:
     """Conversational orchestration with pluggable LLM backends, memory
-    matrices, and knowledge-graph citations."""
+    matrices, knowledge-graph citations, and the between-turns ResponseCycle."""
 
-    def __init__(self, bus: Optional[EventBus] = None, retriever: Optional[Any] = None, provider: Optional[Any] = None):
+    def __init__(self, bus: Optional[EventBus] = None, retriever: Optional[Any] = None,
+                 provider: Optional[Any] = None, cycle: Optional[Any] = None):
         self._bus = bus
         self._memory = MemoryManager()
         self._tools: Dict[str, Callable[[Dict[str, Any]], Any]] = {}
@@ -133,6 +135,9 @@ class JeevesCore:
             if kag is None and hasattr(retriever, "graph"):
                 kag = retriever
         self.citations = CitationEngine(kag=kag)
+
+        # ResponseCycle: distills replies into work orders between turns
+        self._cycle = cycle
 
         if provider is not None:
             self._provider = provider
@@ -204,6 +209,17 @@ class JeevesCore:
             except Exception:
                 pass
 
+        # Context fabric: consume the interjection earned last turn, then
+        # run the between-turns cycle on this reply (distill → execute → guide)
+        cycle_report = None
+        interjection = None
+        if self._cycle is not None:
+            interjection = self._cycle.before_reply()
+            if interjection:
+                content = interjection + "\n\n" + content
+            token_count = max(1, len(content) // 4)  # rough token estimate
+            cycle_report = self._cycle.after_reply(content, token_count)
+
         session.add_turn("assistant", content, tools_used=tools_used,
                          provider=self.provider_name, citations=len(cited))
         self._stats["interactions"] += 1
@@ -219,7 +235,7 @@ class JeevesCore:
                 "latency_ms": latency_ms,
             })
 
-        return {
+        result: Dict[str, Any] = {
             "content": content,
             "tools": tools_used,
             "mode": session.mode.value,
@@ -228,6 +244,13 @@ class JeevesCore:
             "citations": [c.to_dict() for c in cited],
             "latency_ms": round(latency_ms, 1),
         }
+        if interjection:
+            result["interjection"] = interjection
+        if cycle_report is not None:
+            result["cycle"] = cycle_report.to_dict()
+            if cycle_report.oracle_shift:
+                result["oracle"] = cycle_report.oracle_shift
+        return result
 
     def matrices(self) -> Dict[str, Any]:
         """Snapshot all three memory matrices (API /jeeves/matrices surface)."""
@@ -271,6 +294,7 @@ class JeevesCore:
             "active_sessions": self._memory.stats()["active_sessions"],
             "tools_available": len(self._tools),
             "citations": self.citations.stats(),
+            "cycle": self._cycle.stats() if self._cycle is not None else None,
             "matrices": {
                 "sam": self.sam.stats(),
                 "clom": self.clom.stats(),
