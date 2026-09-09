@@ -1,31 +1,5 @@
-"""
-Skeleton Contexts — The Context Fabric
+"""Skeleton Contexts — The Context Fabric (with ResponseCycle)."""
 
-Spider-connected context planes forming the conversational work fabric:
-
-- WorkOrderEngine    — parses only external-tool workload, distills
-                       max-token responses into fixed-size work orders,
-                       MAG-enhanced, with interjected positive summaries
-- BacklogContext     — unfinished work → tensor cubes → idle-mined
-                       blockchain
-- PlanningContext    — goal decomposition into ordered plan steps
-- QueByPriority      — adaptive queue scored by all 18 probability systems
-- OracleMatrix       — Oracle/Prophet/Seer strings of fate guiding the
-                       user to a finished product at max quality
-- ContextSyntaxFixer — spider-connected grammar repair across all planes
-
-Usage:
-    fabric = ContextFabric(bus=genesis.bus, mag=genesis.get("mag"))
-    fabric.connect_all()  # spider-web the planes together
-    fabric.distill(response_text, token_count=4000)
-    summary = fabric.interject()
-"""
-
-from __future__ import annotations
-
-from typing import Any, Dict, Optional
-
-from skeleton.kernel.events import DomainEvent, EventBus
 from skeleton.contexts.workorder import WorkOrderEngine, WorkOrder, WorkOrderContext
 from skeleton.contexts.backlog import BacklogContext, TensorCube, WorkChain, BacklogItem
 from skeleton.contexts.planning import (
@@ -38,6 +12,9 @@ from skeleton.contexts.planning import (
 )
 from skeleton.contexts.oracle import OracleMatrix, OracleReading, FateString
 from skeleton.contexts.syntax import ContextSyntaxFixer, SyntaxIssue
+from skeleton.contexts.cycle import ResponseCycle, ConnectorExecutor, CycleReport
+from typing import Any, Dict, Optional
+from skeleton.kernel.events import EventBus
 
 
 class ContextFabric:
@@ -57,7 +34,6 @@ class ContextFabric:
         self._stats = {"cycles": 0}
 
     def connect_all(self) -> "ContextFabric":
-        """Spider-web every plane into the syntax fixer."""
         self.syntax.connect_all(
             workorder=self.workorders,
             backlog=self.backlog,
@@ -67,12 +43,10 @@ class ContextFabric:
         return self
 
     def distill(self, response_text: str, token_count: int) -> Dict[str, Any]:
-        """One full response cycle: parse external work, queue it, weave fate."""
         self._stats["cycles"] += 1
         context = self.workorders.distill(response_text, token_count)
         self.backlog.age_all()
 
-        # Queue any new orders by 18-system probability
         for order in context.active():
             if not any(i.payload is order for i in self.queue.items):
                 self.queue.enqueue("workorder", order, record={
@@ -81,7 +55,6 @@ class ContextFabric:
                     "appearances": 1,
                 })
 
-        # Repair pass across the web
         issues = self.syntax.scan()
 
         return {
@@ -93,15 +66,12 @@ class ContextFabric:
         }
 
     def interject(self) -> Optional[str]:
-        """Positive mid-conversation summary from completed work."""
         return self.workorders.interjected_summary()
 
     def guide(self) -> str:
-        """Oracle narration guiding toward the finished product."""
         return self.oracle.guide()
 
     def start_idle_work(self) -> None:
-        """Begin mining the backlog chain while idle."""
         self.backlog.start_idle_miner()
 
     def stop_idle_work(self) -> None:
@@ -139,4 +109,7 @@ __all__ = [
     "FateString",
     "ContextSyntaxFixer",
     "SyntaxIssue",
+    "ResponseCycle",
+    "ConnectorExecutor",
+    "CycleReport",
 ]
