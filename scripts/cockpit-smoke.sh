@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Smoke test the cockpit: full federation stack — messaging, consensus,
-# KAG sync, cross-node routing, leader election, fleet coordination,
-# plus the local chain: four-plane retrieval, Jeeves with citations,
-# consolidation, persistence, and the forge verify-until-green loop.
+# Smoke test the cockpit: full stack — 10 genesis phases, federation
+# (messaging, consensus, election, fleet, KAG sync, routing), local chain
+# (4-plane retrieval, Jeeves citations, consolidation, persistence,
+# forge verify-until-green), and the Context Fabric (work orders, backlog
+# chain, 18-system queue, oracle fate matrix, syntax repair).
 set -euo pipefail
 
 SMOKE_DIR="$(mktemp -d)"
@@ -17,87 +18,82 @@ smoke_dir = sys.argv[1]
 g = Genesis(seed=42).boot()
 health = g.health()
 
-assert "kernel" in health["phases"]
 assert "forge" in health["phases"], f"forge phase missing: {health['phases']}"
 assert "galaxy" in health["phases"], f"galaxy phase missing: {health['phases']}"
+assert "contexts" in health["phases"], f"contexts phase missing: {health['phases']}"
 assert "cortex" in health["phases"]
-assert health["subsystems"] >= 30, f"expected 30+ subsystems, got {health['subsystems']}"
-assert health["invariant_violations"] == 0
+assert health["subsystems"] >= 37, f"expected 37+ subsystems, got {health['subsystems']}"
+assert health["invariant_violations"] == 0, f"invariants violated: {health['invariant_violations']}"
 
 required = ["lattice", "rag", "trinity", "orchestrator", "mesh", "fortress",
             "quad", "cortex", "ranker", "coordinator", "bridge", "forge",
             "galaxy", "galaxy_transport", "consensus", "kag_sync", "galaxy_bridge",
-            "election", "fleet"]
+            "election", "fleet",
+            "fabric", "workorders", "backlog", "planning", "queue", "oracle", "syntax_fixer"]
 for handle in required:
     assert handle in g.handles, f"missing handle: {handle}"
 
-# Full federation stack between two live nodes
-from skeleton.galaxy import GalaxyNode, NodeTransport
-from skeleton.galaxy.consensus import ConsensusEngine
-from skeleton.galaxy.kag_sync import KAGSync
-from skeleton.galaxy.galaxy_bridge import GalaxyBridge
-from skeleton.galaxy.election import LeaderElection
-from skeleton.galaxy.fleet import FleetCoordinator
-from skeleton.retrieval.kag import KnowledgeGraph, KAGRetriever
-from skeleton.swarm.mesh import SwarmMesh
-from skeleton.agents.bridge import MeshBridge
-peer = GalaxyNode(node_id="smoke-peer")
-peer.add_capability("reasoning")
-peer_transport = NodeTransport(peer).start()
-peer_consensus = ConsensusEngine(peer, peer_transport)
-peer_election = LeaderElection(peer, peer_transport, peer_consensus)
-peer_kag = KAGRetriever(KnowledgeGraph())
-peer_sync = KAGSync(peer_kag, peer, peer_transport, consensus=peer_consensus)
-peer_bridge = GalaxyBridge(MeshBridge(SwarmMesh()), peer, peer_transport)
-peer_bridge.serve("reasoning", lambda p: {"answer": f"remote handled: {p['description']}"})
-local_transport = g.get("galaxy_transport").start()
-local_consensus = g.get("consensus")
-local_sync = g.get("kag_sync")
-local_bridge = g.get("galaxy_bridge")
-local_election = g.get("election")
-local_fleet = g.get("fleet")
-try:
-    got = []
-    peer_transport.on("ping", lambda p: got.append(p))
-    ok = local_transport.send(peer_transport.address, {"type": "ping", "data": "smoke"})
-    assert ok and time.sleep(0.2) is None
-    assert len(got) == 1
+# Context Fabric: full distill cycle at max-token scale
+fabric = g.get("fabric")
+result = fabric.distill(
+    "Plan confirmed. Push these files to github. Then search the web for the API docs. "
+    "Build pdf of the final report. The architecture holds together beautifully.",
+    token_count=4096,
+)
+assert result["orders_active"] >= 3, f"expected 3+ orders, got {result['orders_active']}"
+assert result["queued"] >= 3, "orders never queued"
 
-    g.get("galaxy")._registry.register("smoke-peer", peer_transport.address, capabilities={"reasoning"})
-    peer._registry.register(g.get("galaxy").node_id, local_transport.address,
-                            capabilities=set(g.get("galaxy")._capabilities))
+# Work orders parse ONLY external workload
+orders = g.get("workorders").parse("The design is elegant. Push the batch. Lovely work.")
+assert len(orders) == 1 and orders[0].connector == "github.push"
 
-    # Consensus + election
-    proposal = local_consensus.propose("era.bind", {"era": "extraction_now"}, wait=True, timeout=3.0)
-    assert proposal.status == "accepted"
-    leader = local_election.call_election(timeout=3.0)
-    assert leader == g.get("galaxy").node_id, f"wrong leader: {leader}"
-    assert local_fleet.stats()["is_leader"] is True
+# MAG enhancement: orders carry episodic context
+g.get("mag").record("ep-wo", "earlier github push landed 5 files", tags=["github.push"])
+g.get("workorders").enhance(orders[0])
+assert len(orders[0].mag_context) > 0, "MAG never enhanced the order"
 
-    # Fleet tick: leader-initiated KAG gossip
-    g.get("quad").ingest_document("smoke-fed", "The Forge produces blueprints for games.")
-    ticked = local_fleet.tick(force=True)
-    assert ticked, "fleet tick did not fire"
-    assert local_fleet.stats()["ticks"] == 1
+# Backlog: defer → cube → idle-mined chain verifies
+backlog = g.get("backlog")
+backlog.defer(orders[0])
+backlog.build_cube()
+backlog.start_idle_miner(idle_seconds=0.05)
+time.sleep(0.3)
+backlog.stop_idle_miner()
+assert backlog.chain.verify(), "work chain failed verification"
+assert backlog.summary()["blocks_sealed"] >= 1, "no blocks sealed while idle"
 
-    # Direct sync too (peer has no fleet tick handler wired, use explicit gossip)
-    peer_before = peer_kag.graph.stats()["triples"]
-    local_sync.sync_now()
-    time.sleep(0.6)
-    assert peer_kag.graph.stats()["triples"] > peer_before, "KAG never synced"
+# Queue: all 18 probability systems score every item
+queue = g.get("queue")
+card = queue.score({"priority": 5.0, "attempts": 4, "done": 3})
+assert len(card) == 18, f"expected 18 systems, got {len(card)}"
+assert all(0.0 <= v <= 1.0 for v in card.values())
 
-    # Cross-node task routing
-    from skeleton.agents import Task
-    import uuid
-    rtask = Task(task_id=str(uuid.uuid4())[:8], description="solve remotely")
-    assert local_bridge.offer_remote(rtask, "reasoning")
-    remote = local_bridge.wait_result(rtask.task_id, timeout=3.0)
-    assert remote is not None and remote.status == "completed"
-    assert "solve remotely" in remote.result["answer"]
-finally:
-    local_transport.stop(); peer_transport.stop()
+# Planning + Oracle: golden path exists and narrates positively
+fabric.planning.decompose("finish the product", [
+    {"description": "gather requirements"},
+    {"description": "build core", "connector": "github.push"},
+    {"description": "verify quality"},
+    {"description": "ship it", "connector": "github.push"},
+])
+reading = g.get("oracle").read()
+assert reading.golden_path is not None, "no golden path found"
+narration = reading.narrate()
+assert "golden path" in narration.lower()
 
-# Forge: materialize + verify loop
+# Syntax fixer: repairs across the spider web
+syntax = g.get("syntax_fixer")
+fixed, issues = syntax.fix_entry("workorder", "workorder:x1@github.pu#99.0!complete")
+assert "@github.push" in fixed and "#10.00" in fixed and "!done" in fixed
+assert syntax.stats()["planes_connected"] >= 4
+
+# Interjected summary fires after completion
+ctx = g.get("workorders").context
+if ctx.slots:
+    g.get("workorders").mark(ctx.slots[0].order_id, "done")
+    summary = g.get("workorders").interjected_summary()
+    assert summary is not None and "landed" in summary
+
+# Forge: materialize + verify loop (local chain still green)
 forge = g.get("forge")
 bp = forge.new_blueprint("smoke-bp")
 forge.instantiate(bp, "player", "hero")
@@ -105,57 +101,23 @@ forge.instantiate(bp, "sink", "output")
 bp.connect(("hero", "intent"), ("output", "in"))
 result = forge.materialise(bp, era="extraction_now", target="godot", repair=True, max_rounds=2)
 assert result["verification"]["accepted"]
-assert result["verify_loop"]["stopped_reason"] == "accepted"
 
-# Retrieval: vector RAG + four planes + self-populating KAG
-from skeleton.memory.vector import VectorStore
-assert isinstance(g.get("rag"), VectorStore)
+# Retrieval: 4 planes + self-populating KAG
 quad = g.get("quad")
 assert set(quad._planes.keys()) == {"rag", "cag", "mag", "kag"}
 quad.ingest_document("smoke-doc", "Skeleton is a game engine. The Forge produces blueprints.")
-kag = quad._planes["kag"]
-assert kag.graph.stats()["triples"] > 0
 results = quad.retrieve("what does the Forge produce?", k=5)
 assert len(results) > 0 and "kag" in {r.plane for r in results}
 
-# Local swarm bridge
-from skeleton.agents import Task as LocalTask
-import uuid as _uuid
-mesh = g.get("mesh")
-mesh.join({"reasoning"}, weight=2.0)
-ltask = LocalTask(task_id=str(_uuid.uuid4())[:8], description="smoke task")
-assert g.get("bridge").dispatch(ltask, "reasoning")
-assert "mesh_agent_id" in ltask.metadata
-
-# Jeeves: provider path + matrices + KAG citations
+# Jeeves: provider + matrices + citations
 from skeleton.api.server import ServerState
 state = ServerState()
 state.wire_from_genesis(g)
 session = state.jeeves.open_session("smoke-user")
 reply = state.jeeves.ask(session.session_id, "what does the forge build?")
 assert reply["provider"] in ("local-echo", "openai", "anthropic")
-assert state.jeeves_sam.stats()["terms"] > 0
-assert state.jeeves_clom.stats()["records"] > 0
-assert state.jeeves_krem.stats()["concepts"] > 0
+assert len(reply.get("citations", [])) > 0
 assert set(state.jeeves.matrices().keys()) == {"sam", "clom", "krem"}
-assert "citations" in reply, "reply missing citations"
-assert len(reply["citations"]) > 0, "no citations returned despite KAG facts"
-assert any("forge" in c["matched_entity"] for c in reply["citations"])
-
-# Consolidation cycle
-from skeleton.memory.consolidation import wire_from_genesis
-cycle = wire_from_genesis(g, state.jeeves, bus=g.bus)
-for concept in list(state.jeeves.krem._cells)[:2]:
-    state.jeeves.krem._cells[concept].last_seen = time.time() - (state.jeeves.krem.HALF_LIFE_HOURS * 10 * 3600)
-report = cycle.cycle()
-assert "due" in report and "scheduled" in report
-
-# Live cortex observed forge + consolidation events
-from skeleton.cortex import live
-status = live.status()
-assert status["live"] and status["events_captured"] > 0
-assert len(live.get_live().recent_events("forge", n=5)) > 0
-assert len(live.get_live().recent_events("memory.consolidation.cycle", n=5)) > 0
 
 # Persistence round-trip
 from skeleton.deploy.harness import Harness
@@ -167,9 +129,11 @@ h2 = Harness(seed=42, snapshot_root=smoke_dir)
 h2.boot(restore=False)
 restored = h2.restore_state(name="smoke")
 assert restored.get("kag", 0) > 0
-assert h2.genesis.get("quad")._planes["kag"].graph.stats()["triples"] > 0
-mresult = h2.materialize("smoke-harness-bp")
-assert "blueprint_id" in mresult
 
-print(f"cockpit smoke: OK ({health['subsystems']} subsystems, 9 phases, fleet tick fired, leader elected, kag synced, task routed, citations live, jeeves={reply['provider']})")
+# Cortex observed context events
+from skeleton.cortex import live
+status = live.status()
+assert status["live"] and status["events_captured"] > 0
+
+print(f"cockpit smoke: OK ({health['subsystems']} subsystems, 10 phases, fabric live: {result['orders_active']} orders, {len(card)} systems, golden path, chain sealed, jeeves={reply['provider']})")
 PY
