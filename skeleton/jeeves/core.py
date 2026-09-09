@@ -1,12 +1,13 @@
 """
 Skeleton Jeeves — Conversational AI orchestration layer (provider-backed,
-with memory matrices: SAM, CLOM, KREM)
+with memory matrices: SAM, CLOM, KREM, and KAG citations)
 
 JeevesCore delegates response generation to an LLM provider while the
 matrices observe every turn:
 - SAM builds a co-occurrence graph used to expand queries
 - CLOM tracks per-intent outcome rates
 - KREM tracks per-concept retention with spaced decay
+- CitationEngine grounds replies in knowledge-graph facts
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
 from skeleton.kernel.events import DomainEvent, EventBus
+from skeleton.jeeves.citations import CitationEngine
 from skeleton.jeeves.matrices import (
     CompressedLearnedOutcomeModel,
     KnowledgeRetentionMatrix,
@@ -109,7 +111,8 @@ MODE_SYSTEM_PROMPTS: Dict[SessionMode, str] = {
 
 
 class JeevesCore:
-    """Conversational orchestration with pluggable LLM backends and memory matrices."""
+    """Conversational orchestration with pluggable LLM backends, memory
+    matrices, and knowledge-graph citations."""
 
     def __init__(self, bus: Optional[EventBus] = None, retriever: Optional[Any] = None, provider: Optional[Any] = None):
         self._bus = bus
@@ -121,6 +124,15 @@ class JeevesCore:
         self.sam = SemanticAssociationMap()
         self.clom = CompressedLearnedOutcomeModel()
         self.krem = KnowledgeRetentionMatrix()
+
+        # Citations: grounded in the retriever's KAG plane when available
+        kag = None
+        if retriever is not None:
+            planes = getattr(retriever, "_planes", None) or {}
+            kag = planes.get("kag")
+            if kag is None and hasattr(retriever, "graph"):
+                kag = retriever
+        self.citations = CitationEngine(kag=kag)
 
         if provider is not None:
             self._provider = provider
@@ -164,6 +176,11 @@ class JeevesCore:
         if expansions:
             prompt += f"\n\nRelated concepts: {', '.join(expansions[:5])}"
 
+        # Citations: graph facts supporting this query (+ SAM context)
+        cited = self.citations.cite(input_text, context_terms=expansions)
+        if cited:
+            prompt += "\n\nKnown facts:\n" + "\n".join(f"- {c.render()}" for c in cited[:5])
+
         start = time.time()
         try:
             content = self._provider.complete(prompt, context=session.context_window())
@@ -187,7 +204,8 @@ class JeevesCore:
             except Exception:
                 pass
 
-        session.add_turn("assistant", content, tools_used=tools_used, provider=self.provider_name)
+        session.add_turn("assistant", content, tools_used=tools_used,
+                         provider=self.provider_name, citations=len(cited))
         self._stats["interactions"] += 1
 
         if self._bus:
@@ -197,6 +215,7 @@ class JeevesCore:
                 "input_length": len(input_text),
                 "response_length": len(content),
                 "sam_expansions": len(expansions),
+                "citations": len(cited),
                 "latency_ms": latency_ms,
             })
 
@@ -206,6 +225,7 @@ class JeevesCore:
             "mode": session.mode.value,
             "provider": self.provider_name,
             "expansions": expansions[:5],
+            "citations": [c.to_dict() for c in cited],
             "latency_ms": round(latency_ms, 1),
         }
 
@@ -250,6 +270,7 @@ class JeevesCore:
             "provider": self.provider_name,
             "active_sessions": self._memory.stats()["active_sessions"],
             "tools_available": len(self._tools),
+            "citations": self.citations.stats(),
             "matrices": {
                 "sam": self.sam.stats(),
                 "clom": self.clom.stats(),

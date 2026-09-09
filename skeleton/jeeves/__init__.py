@@ -1,4 +1,4 @@
-"""Skeleton Jeeves Package — with provider abstraction and memory matrices."""
+"""Skeleton Jeeves Package — providers, matrices, citations."""
 
 from skeleton.jeeves.core import (
     JeevesCore,
@@ -19,6 +19,7 @@ from skeleton.jeeves.matrices import (
     KnowledgeRetentionMatrix,
     SemanticAssociationMap,
 )
+from skeleton.jeeves.citations import Citation, CitationEngine
 
 __all__ = [
     "JeevesCore",
@@ -34,4 +35,6 @@ __all__ = [
     "SemanticAssociationMap",
     "CompressedLearnedOutcomeModel",
     "KnowledgeRetentionMatrix",
+    "Citation",
+    "CitationEngine",
 ]
