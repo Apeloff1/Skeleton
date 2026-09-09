@@ -1,7 +1,7 @@
 """Genesis protocol — boot the whole substrate as one wired system.
 
-Galaxy phase wires: galaxy node, transport, consensus, kag_sync,
-galaxy_bridge, leader election, and fleet coordinator.
+Boot phases: kernel, memory, intelligence, swarm, resilience,
+interface, forge, galaxy, contexts, cortex.
 """
 
 from __future__ import annotations
@@ -49,6 +49,7 @@ class Genesis:
         self._phase_interface()
         self._phase_forge()
         self._phase_galaxy()
+        self._phase_contexts()
         self._phase_cortex()
         self.bus.publish(
             DomainEvent(
@@ -254,6 +255,43 @@ class Genesis:
             subject="galaxy.node",
             snapshot=lambda: bool(node.node_id),
             predicate=lambda identified: identified is True,
+        ))
+        self.report.invariants_registered += 1
+
+    def _phase_contexts(self) -> None:
+        """Wire the context fabric — the spider-connected work planes.
+
+        Sits after galaxy (connectors live) and before cortex (so cortex
+        observes every context event). Handles:
+        - fabric: the ContextFabric spider web (workorders, backlog,
+          planning, queue, oracle, syntax — all connected)
+        - workorders: the WorkOrderEngine for external-tool parsing
+        - backlog: the BacklogContext with tensor cubes + work chain
+        - planning: the PlanningContext for goal decomposition
+        - queue: the QueByPriority 18-system adaptive queue
+        - oracle: the OracleMatrix for fate-string guidance
+        - syntax_fixer: the ContextSyntaxFixer spider repair engine
+        """
+        self.report.phases.append("contexts")
+        from skeleton.contexts import ContextFabric
+
+        fabric = ContextFabric(bus=self.bus, mag=self.handles.get("mag"))
+        fabric.connect_all()
+
+        self._wire("contexts", "fabric", fabric)
+        self._wire("contexts", "workorders", fabric.workorders)
+        self._wire("contexts", "backlog", fabric.backlog)
+        self._wire("contexts", "planning", fabric.planning)
+        self._wire("contexts", "queue", fabric.queue)
+        self._wire("contexts", "oracle", fabric.oracle)
+        self._wire("contexts", "syntax_fixer", fabric.syntax)
+
+        assert self.lattice is not None
+        self.lattice.register(Invariant(
+            name="contexts_planes_connected",
+            subject="contexts.fabric",
+            snapshot=lambda: fabric.syntax.stats()["planes_connected"],
+            predicate=lambda connected: connected >= 4,
         ))
         self.report.invariants_registered += 1
 
