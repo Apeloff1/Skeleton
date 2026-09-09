@@ -1,7 +1,7 @@
 """Genesis protocol — boot the whole substrate as one wired system.
 
 Galaxy phase wires: galaxy node, transport, consensus, kag_sync,
-galaxy_bridge, and leader election.
+galaxy_bridge, leader election, and fleet coordinator.
 """
 
 from __future__ import annotations
@@ -209,7 +209,7 @@ class Genesis:
         """Wire the galaxy node for distributed federation.
 
         Handles: galaxy node, transport, consensus, kag_sync,
-        galaxy_bridge, and leader election.
+        galaxy_bridge, leader election, and fleet coordinator.
         """
         self.report.phases.append("galaxy")
         from skeleton.galaxy import GalaxyNode, NodeTransport
@@ -217,6 +217,7 @@ class Genesis:
         from skeleton.galaxy.kag_sync import KAGSync
         from skeleton.galaxy.galaxy_bridge import GalaxyBridge
         from skeleton.galaxy.election import LeaderElection
+        from skeleton.galaxy.fleet import FleetCoordinator
 
         node = GalaxyNode(address="127.0.0.1", bus=self.bus)
         node.add_capability("reasoning")
@@ -227,6 +228,7 @@ class Genesis:
         election = LeaderElection(node, transport, consensus, bus=self.bus)
 
         quad = self.handles.get("quad")
+        kag_sync = None
         if quad is not None:
             kag = quad._planes.get("kag")
             if kag is not None:
@@ -238,10 +240,13 @@ class Genesis:
             galaxy_bridge = GalaxyBridge(mesh_bridge, node, transport, bus=self.bus)
             self._wire("galaxy", "galaxy_bridge", galaxy_bridge)
 
+        fleet = FleetCoordinator(node, transport, election, kag_sync=kag_sync, bus=self.bus)
+
         self._wire("galaxy", "galaxy", node)
         self._wire("galaxy", "galaxy_transport", transport)
         self._wire("galaxy", "consensus", consensus)
         self._wire("galaxy", "election", election)
+        self._wire("galaxy", "fleet", fleet)
 
         assert self.lattice is not None
         self.lattice.register(Invariant(
