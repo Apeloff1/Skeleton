@@ -92,9 +92,14 @@ class ServerState:
         self.animation_pipeline = AnimationPipeline()
         self.gameforge = GameForge(genesis=genesis, bus=genesis.bus)
 
-        # Jeeves with provider-backed responses and quad retriever context
+        # Jeeves with provider-backed responses, quad retriever context,
+        # and the genesis-wired ResponseCycle driving the context fabric
         from skeleton.jeeves import JeevesCore
-        self.jeeves = JeevesCore(bus=genesis.bus, retriever=genesis.handles.get("quad"))
+        self.jeeves = JeevesCore(
+            bus=genesis.bus,
+            retriever=genesis.handles.get("quad"),
+            cycle=genesis.handles.get("cycle"),
+        )
 
         # Jeeves memory matrices (served at /jeeves/matrices/{session_id})
         self.jeeves_sam = self.jeeves.sam
