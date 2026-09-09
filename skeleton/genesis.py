@@ -207,11 +207,7 @@ class Genesis:
         self.report.invariants_registered += 1
 
     def _phase_galaxy(self) -> None:
-        """Wire the galaxy node for distributed federation.
-
-        Handles: galaxy node, transport, consensus, kag_sync,
-        galaxy_bridge, leader election, and fleet coordinator.
-        """
+        """Wire the galaxy node for distributed federation."""
         self.report.phases.append("galaxy")
         from skeleton.galaxy import GalaxyNode, NodeTransport
         from skeleton.galaxy.consensus import ConsensusEngine
@@ -261,22 +257,16 @@ class Genesis:
     def _phase_contexts(self) -> None:
         """Wire the context fabric — the spider-connected work planes.
 
-        Sits after galaxy (connectors live) and before cortex (so cortex
-        observes every context event). Handles:
-        - fabric: the ContextFabric spider web (workorders, backlog,
-          planning, queue, oracle, syntax — all connected)
-        - workorders: the WorkOrderEngine for external-tool parsing
-        - backlog: the BacklogContext with tensor cubes + work chain
-        - planning: the PlanningContext for goal decomposition
-        - queue: the QueByPriority 18-system adaptive queue
-        - oracle: the OracleMatrix for fate-string guidance
-        - syntax_fixer: the ContextSyntaxFixer spider repair engine
+        Handles: fabric, workorders, backlog, planning, queue, oracle,
+        syntax_fixer, and cycle (the ResponseCycle driving the fabric
+        through the live conversation loop).
         """
         self.report.phases.append("contexts")
-        from skeleton.contexts import ContextFabric
+        from skeleton.contexts import ContextFabric, ResponseCycle
 
         fabric = ContextFabric(bus=self.bus, mag=self.handles.get("mag"))
         fabric.connect_all()
+        cycle = ResponseCycle(fabric, bus=self.bus)
 
         self._wire("contexts", "fabric", fabric)
         self._wire("contexts", "workorders", fabric.workorders)
@@ -285,6 +275,7 @@ class Genesis:
         self._wire("contexts", "queue", fabric.queue)
         self._wire("contexts", "oracle", fabric.oracle)
         self._wire("contexts", "syntax_fixer", fabric.syntax)
+        self._wire("contexts", "cycle", cycle)
 
         assert self.lattice is not None
         self.lattice.register(Invariant(
