@@ -1,4 +1,4 @@
-"""Skeleton Overseer Package — hardware-specialized engines (V1 + V2)."""
+"""Skeleton Overseer Package — V1/V2/V3 engine stack."""
 
 from skeleton.overseer.graphs import (
     FateGraph,
@@ -41,6 +41,20 @@ from skeleton.overseer.control import (
     TierAllocation,
 )
 from skeleton.overseer.engine_v2 import OverseerEngineV2, EngineV2Tick
+from skeleton.overseer.mpc import (
+    ChannelModel,
+    ModelPredictiveController,
+    MPCResult,
+    SystemIdentifier,
+)
+from skeleton.overseer.twin import (
+    ChannelScorecard,
+    Counterfactual,
+    DigitalTwin,
+    MetaCognition,
+    ParameterRewrite,
+)
+from skeleton.overseer.engine_v3 import OverseerEngineV3, EngineV3Tick
 
 __all__ = [
     "Overseer",
@@ -75,4 +89,15 @@ __all__ = [
     "TierAllocation",
     "OverseerEngineV2",
     "EngineV2Tick",
+    "ChannelModel",
+    "ModelPredictiveController",
+    "MPCResult",
+    "SystemIdentifier",
+    "ChannelScorecard",
+    "Counterfactual",
+    "DigitalTwin",
+    "MetaCognition",
+    "ParameterRewrite",
+    "OverseerEngineV3",
+    "EngineV3Tick",
 ]
