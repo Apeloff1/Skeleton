@@ -283,15 +283,21 @@ class Genesis:
         self.report.invariants_registered += 1
 
     def _phase_support(self) -> None:
-        """Wire the support fabric + engine stack (V1/V2/V3).
+        """Wire the support fabric + full engine stack (V1 → V3.5).
 
         Handles: support, loader, agentic_rag, overseer, engine,
-        engine_v2, engine_v3. All three engines bind the same
-        consumers — V3 ticks last so its MPC budget is authoritative.
+        engine_v2, engine_v3, engine_v35. All engines bind the same
+        consumers — V3.5 ticks last so its over-achiever control
+        (MPC + energy + fleet ceiling) is authoritative.
         """
         self.report.phases.append("support")
         from skeleton.support import SupportFabric
-        from skeleton.overseer import OverseerEngine, OverseerEngineV2, OverseerEngineV3
+        from skeleton.overseer import (
+            OverseerEngine,
+            OverseerEngineV2,
+            OverseerEngineV3,
+            OverseerEngineV35,
+        )
 
         quad = self.handles.get("quad")
         support = SupportFabric(bus=self.bus, quad=quad)
@@ -299,15 +305,22 @@ class Genesis:
         engine_v2 = OverseerEngineV2(bus=self.bus)
         engine_v3 = OverseerEngineV3(bus=self.bus)
 
-        for eng in (engine, engine_v2, engine_v3):
+        node = self.handles.get("galaxy")
+        transport = self.handles.get("galaxy_transport")
+        consensus = self.handles.get("consensus")
+        engine_v35 = OverseerEngineV35(
+            bus=self.bus, node=node, transport=transport, consensus=consensus,
+        )
+
+        for eng in (engine, engine_v2, engine_v3, engine_v35):
             eng.bind_loader(support.loader)
         fabric = self.handles.get("fabric")
         if fabric is not None:
-            for eng in (engine, engine_v2, engine_v3):
+            for eng in (engine, engine_v2, engine_v3, engine_v35):
                 eng.bind_queue(fabric.queue)
                 eng.bind_miner(fabric.backlog)
         if support.agentic_rag is not None:
-            for eng in (engine, engine_v2, engine_v3):
+            for eng in (engine, engine_v2, engine_v3, engine_v35):
                 eng.bind_rag(support.agentic_rag)
 
         self._wire("support", "support", support)
@@ -318,6 +331,7 @@ class Genesis:
         self._wire("support", "engine", engine)
         self._wire("support", "engine_v2", engine_v2)
         self._wire("support", "engine_v3", engine_v3)
+        self._wire("support", "engine_v35", engine_v35)
 
         assert self.lattice is not None
         self.lattice.register(Invariant(
@@ -331,6 +345,7 @@ class Genesis:
         engine.engine_tick()
         engine_v2.tick()
         engine_v3.tick()
+        engine_v35.tick()
 
     def _phase_cortex(self) -> None:
         """The Jeeves neocortex — wired last so it can observe the whole bus."""
