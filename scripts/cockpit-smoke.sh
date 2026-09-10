@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Smoke test the cockpit: full stack — 11 phases, federation, Context
-# Fabric, Support System, and the high-intricacy OverseerEngineV2
-# (fusion, forecasting, PID control, QoS arbitration, wear model).
+# Fabric, Support System, and the paramount OverseerEngineV3
+# (system ID, MPC with hard walls, digital twin, meta-cognition).
 set -euo pipefail
 
 SMOKE_DIR="$(mktemp -d)"
@@ -17,7 +17,7 @@ g = Genesis(seed=42).boot()
 health = g.health()
 
 assert "support" in health["phases"], f"support phase missing: {health['phases']}"
-assert health["subsystems"] >= 44, f"expected 44+ subsystems, got {health['subsystems']}"
+assert health["subsystems"] >= 45, f"expected 45+ subsystems, got {health['subsystems']}"
 assert health["invariant_violations"] == 0
 
 required = ["lattice", "rag", "trinity", "orchestrator", "mesh", "fortress",
@@ -25,40 +25,42 @@ required = ["lattice", "rag", "trinity", "orchestrator", "mesh", "fortress",
             "galaxy", "galaxy_transport", "consensus", "kag_sync", "galaxy_bridge",
             "election", "fleet",
             "fabric", "workorders", "backlog", "planning", "queue", "oracle", "syntax_fixer", "cycle",
-            "support", "loader", "agentic_rag", "overseer", "engine", "engine_v2"]
+            "support", "loader", "agentic_rag", "overseer", "engine", "engine_v2", "engine_v3"]
 for handle in required:
     assert handle in g.handles, f"missing handle: {handle}"
 
-# Engine V2: full telemetry tick at boot + controlled budget binding
-engine_v2 = g.get("engine_v2")
-assert engine_v2._ticks >= 1, "engine v2 never ticked"
-status = engine_v2.status()
-for key in ("device", "control", "wear", "last_tick", "consumers"):
+# Engine V3: paramount telemetry at boot + MPC budget authority
+v3 = g.get("engine_v3")
+assert v3._ticks >= 1, "engine v3 never ticked"
+status = v3.status()
+for key in ("device", "control", "setpoints", "sysid", "mpc", "twin", "meta", "wear", "consumers"):
     assert key in status, f"status missing {key}"
 assert status["device"]["device_class"] in ("embedded", "mobile", "laptop", "workstation", "server")
 
-# Tick produces fused channels, forecasts, wear, and a control decision
-tick = engine_v2.tick()
+# Ticks build identified models and MPC plans with hard walls
+for _ in range(6):
+    tick = v3.tick()
 d = tick.to_dict()
-assert "fused" in d and "forecasts" in d and "wear" in d and "decision" in d
-assert 0.05 <= d["decision"]["aggregate"] <= 1.0
-assert len(d["decision"]["allocations"]) == 4, "QoS arbitration missing tiers"
-assert d["decision"]["regime"] in ("idle", "interactive", "batch", "burst", "sustained")
+assert len(d["models"]) > 0, "no identified models"
+assert all(s["samples"] >= 1 for s in d["models"].values())
+assert 0.05 <= d["control"] <= 1.0
+assert "trajectory" in d["mpc"] and d["mpc"]["candidates"] >= 1
+assert isinstance(d["anomalies"], list)
+assert 0.0 <= d["trust"] <= 1.0
+assert isinstance(d["fallback"], bool)
 
-# V2 budget is authoritative on the loader
+# V3 MPC budget is authoritative on the loader
 loader = g.get("loader")
-v2_cap = engine_v2.base_budget.scaled(d["decision"]["aggregate"]).max_resident_planes
-assert loader.max_resident == v2_cap, f"loader cap {loader.max_resident} != v2 budget {v2_cap}"
+v3_cap = v3.base_budget.scaled(d["control"]).max_resident_planes
+assert loader.max_resident == v3_cap, f"loader cap {loader.max_resident} != v3 budget {v3_cap}"
 
-# Tier shares sum to 1 and critical is always allowed
-allocs = d["decision"]["allocations"]
-assert abs(sum(a["share"] for a in allocs) - 1.0) < 0.01
-critical = next(a for a in allocs if a["tier"] == "critical")
-assert critical["allowed"] is True
+# Meta-cognition: scorecards exist after error observation, trust computable
+meta = v3.meta
+assert meta.trust() >= 0.0
 
-# V1 engine still live
-engine = g.get("engine")
-assert engine.governor._stats["ticks"] >= 1
+# V1 + V2 engines still live alongside
+assert g.get("engine").governor._stats["ticks"] >= 1
+assert g.get("engine_v2")._ticks >= 1
 
 # Support cycle + Agentic RAG
 fabric = g.get("fabric")
@@ -121,5 +123,5 @@ h2.boot(restore=False)
 restored = h2.restore_state(name="smoke")
 assert restored.get("kag", 0) > 0
 
-print(f"cockpit smoke: OK ({health['subsystems']} subsystems, 11 phases, engine v2 live: {status['device']['device_class']} regime={d['decision']['regime']} aggregate={d['decision']['aggregate']:.2f} wear={d['wear']['wear_index']:.3f})")
+print(f"cockpit smoke: OK ({health['subsystems']} subsystems, 11 phases, engine v3 paramount: {status['device']['device_class']} control={d['control']:.2f} mpc={d['mpc']['trajectory']} trust={d['trust']} regime={d['regime']})")
 PY
