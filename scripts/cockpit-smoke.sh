@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Smoke test the cockpit: full stack — 11 phases, federation, Context
-# Fabric with ResponseCycle, Support System, and the hardware-specialized
-# OverseerEngine (device classification, governor throttles, budget binding).
+# Fabric, Support System, and the high-intricacy OverseerEngineV2
+# (fusion, forecasting, PID control, QoS arbitration, wear model).
 set -euo pipefail
 
 SMOKE_DIR="$(mktemp -d)"
@@ -17,7 +17,7 @@ g = Genesis(seed=42).boot()
 health = g.health()
 
 assert "support" in health["phases"], f"support phase missing: {health['phases']}"
-assert health["subsystems"] >= 43, f"expected 43+ subsystems, got {health['subsystems']}"
+assert health["subsystems"] >= 44, f"expected 44+ subsystems, got {health['subsystems']}"
 assert health["invariant_violations"] == 0
 
 required = ["lattice", "rag", "trinity", "orchestrator", "mesh", "fortress",
@@ -25,39 +25,47 @@ required = ["lattice", "rag", "trinity", "orchestrator", "mesh", "fortress",
             "galaxy", "galaxy_transport", "consensus", "kag_sync", "galaxy_bridge",
             "election", "fleet",
             "fabric", "workorders", "backlog", "planning", "queue", "oracle", "syntax_fixer", "cycle",
-            "support", "loader", "agentic_rag", "overseer", "engine"]
+            "support", "loader", "agentic_rag", "overseer", "engine", "engine_v2"]
 for handle in required:
     assert handle in g.handles, f"missing handle: {handle}"
 
-# OverseerEngine: device classified, governor ticked at boot, budgets bound
-engine = g.get("engine")
-device = engine.device()
-assert device["profile"]["device_class"] in ("embedded", "mobile", "laptop", "workstation", "server")
-assert device["profile"]["cpu_cores"] >= 1
-assert engine.governor._stats["ticks"] >= 1, "engine never ticked"
-consumers = engine.governor.enforcer.consumers()
-assert "loading_queue" in consumers and "priority_queue" in consumers and "backlog_miner" in consumers
+# Engine V2: full telemetry tick at boot + controlled budget binding
+engine_v2 = g.get("engine_v2")
+assert engine_v2._ticks >= 1, "engine v2 never ticked"
+status = engine_v2.status()
+for key in ("device", "control", "wear", "last_tick", "consumers"):
+    assert key in status, f"status missing {key}"
+assert status["device"]["device_class"] in ("embedded", "mobile", "laptop", "workstation", "server")
 
-# Budget binding actually applied: loader caps follow the budget, not defaults
+# Tick produces fused channels, forecasts, wear, and a control decision
+tick = engine_v2.tick()
+d = tick.to_dict()
+assert "fused" in d and "forecasts" in d and "wear" in d and "decision" in d
+assert 0.05 <= d["decision"]["aggregate"] <= 1.0
+assert len(d["decision"]["allocations"]) == 4, "QoS arbitration missing tiers"
+assert d["decision"]["regime"] in ("idle", "interactive", "batch", "burst", "sustained")
+
+# V2 budget is authoritative on the loader
 loader = g.get("loader")
-budget_cap = engine.governor.base_budget.scaled(engine.governor._active_throttle).max_resident_planes
-assert loader.max_resident == budget_cap, f"loader cap {loader.max_resident} != budget {budget_cap}"
+v2_cap = engine_v2.base_budget.scaled(d["decision"]["aggregate"]).max_resident_planes
+assert loader.max_resident == v2_cap, f"loader cap {loader.max_resident} != v2 budget {v2_cap}"
 
-# Engine verdict + equilibrium surface
-verdict = engine.engine_tick()
-assert verdict.state in ("thriving", "stable", "strained", "critical")
-eq = engine.equilibrium()
-assert "pressure" in eq and "throttle" in eq
-assert 0.0 <= eq["throttle"] <= 1.0
+# Tier shares sum to 1 and critical is always allowed
+allocs = d["decision"]["allocations"]
+assert abs(sum(a["share"] for a in allocs) - 1.0) < 0.01
+critical = next(a for a in allocs if a["tier"] == "critical")
+assert critical["allowed"] is True
 
-# Support cycle still live under the engine
+# V1 engine still live
+engine = g.get("engine")
+assert engine.governor._stats["ticks"] >= 1
+
+# Support cycle + Agentic RAG
 fabric = g.get("fabric")
 fabric.distill("push files to github. search the web for docs. build pdf.", 1500)
 support = g.get("support")
 out = support.support_cycle(fabric)
 assert len(out["loaded"]) >= 1
-
-# Agentic RAG classified retrieval
 g.get("quad").ingest_document("smoke-rag", "The Forge produces blueprints. Skeleton is a game engine.")
 rag = g.get("agentic_rag")
 result = rag.retrieve("how does the forge relate to blueprints?")
@@ -73,7 +81,7 @@ assert "cycle" in r1 and r1["cycle"]["orders_executed"] >= 1
 r2 = state.jeeves.ask(session.session_id, "what next?")
 assert "interjection" in r2
 
-# Fabric planes: 18 systems, golden path, syntax repair
+# Fabric: 18 systems, golden path, syntax repair, backlog chain
 queue = g.get("queue")
 assert len(queue.score({"priority": 5.0})) == 18
 fabric.planning.decompose("finish product", [
@@ -84,8 +92,6 @@ assert g.get("oracle").read().golden_path is not None
 syntax = g.get("syntax_fixer")
 fixed, _ = syntax.fix_entry("workorder", "workorder:x@github.pu#99.0!complete")
 assert "@github.push" in fixed and "#10.00" in fixed and "!done" in fixed
-
-# Backlog chain seals while idle
 backlog = g.get("backlog")
 orders = g.get("workorders").parse("push more files")
 backlog.defer(orders[0])
@@ -115,5 +121,5 @@ h2.boot(restore=False)
 restored = h2.restore_state(name="smoke")
 assert restored.get("kag", 0) > 0
 
-print(f"cockpit smoke: OK ({health['subsystems']} subsystems, 11 phases, engine live: {device['profile']['device_class']} @ throttle {eq['throttle']}, verdict={verdict.state})")
+print(f"cockpit smoke: OK ({health['subsystems']} subsystems, 11 phases, engine v2 live: {status['device']['device_class']} regime={d['decision']['regime']} aggregate={d['decision']['aggregate']:.2f} wear={d['wear']['wear_index']:.3f})")
 PY
