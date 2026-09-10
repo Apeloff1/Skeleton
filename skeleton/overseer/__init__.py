@@ -1,4 +1,4 @@
-"""Skeleton Overseer Package — V1/V2/V3 engine stack."""
+"""Skeleton Overseer Package — full engine stack V1 → V3.5."""
 
 from skeleton.overseer.graphs import (
     FateGraph,
@@ -55,49 +55,35 @@ from skeleton.overseer.twin import (
     ParameterRewrite,
 )
 from skeleton.overseer.engine_v3 import OverseerEngineV3, EngineV3Tick
+from skeleton.overseer.fleet_gov import (
+    CoordinatedThrottle,
+    DeviceReport,
+    FleetGovernor,
+    FleetRegistry,
+    LoadMigrationAdvisor,
+    MigrationHint,
+)
+from skeleton.overseer.energy import (
+    BatteryModel,
+    DrainForecast,
+    EnergyModel,
+    PowerDraw,
+    PowerModel,
+)
+from skeleton.overseer.recovery import (
+    CureLedger,
+    Fault,
+    FaultClassifier,
+    RecoveryEngine,
+    RepairAttempt,
+)
+from skeleton.overseer.atlas import (
+    Availability,
+    AvailabilityGate,
+    Capability,
+    CapabilityAtlas,
+    CAPABILITIES,
+)
+from skeleton.overseer.engine_v35 import OverseerEngineV35, EngineV35Tick
 
-__all__ = [
-    "Overseer",
-    "OverseerVerdict",
-    "SystemGraph",
-    "FlowGraph",
-    "HealthGraph",
-    "LoadGraph",
-    "FateGraph",
-    "DeviceClass",
-    "GPUClass",
-    "HardwareProbe",
-    "HardwareProfile",
-    "HardwareState",
-    "HardwareChange",
-    "BudgetProfile",
-    "BudgetEnforcer",
-    "ResourceGovernor",
-    "ThrottleDecision",
-    "OverseerEngine",
-    "SensorFusion",
-    "TrendForecaster",
-    "WearModel",
-    "WorkloadProfiler",
-    "WorkloadRegime",
-    "ControlCore",
-    "ControlDecision",
-    "PIDGains",
-    "PIDRegulator",
-    "QoSArbiter",
-    "QoSTier",
-    "TierAllocation",
-    "OverseerEngineV2",
-    "EngineV2Tick",
-    "ChannelModel",
-    "ModelPredictiveController",
-    "MPCResult",
-    "SystemIdentifier",
-    "ChannelScorecard",
-    "Counterfactual",
-    "DigitalTwin",
-    "MetaCognition",
-    "ParameterRewrite",
-    "OverseerEngineV3",
-    "EngineV3Tick",
-]
+__all__ = [name for name in dir() if not name.startswith("_")]
