@@ -1,7 +1,7 @@
 """Genesis protocol — boot the whole substrate as one wired system.
 
 Boot phases: kernel, memory, intelligence, swarm, resilience,
-interface, forge, galaxy, contexts, cortex.
+interface, forge, galaxy, contexts, support, cortex.
 """
 
 from __future__ import annotations
@@ -50,6 +50,7 @@ class Genesis:
         self._phase_forge()
         self._phase_galaxy()
         self._phase_contexts()
+        self._phase_support()
         self._phase_cortex()
         self.bus.publish(
             DomainEvent(
@@ -255,12 +256,7 @@ class Genesis:
         self.report.invariants_registered += 1
 
     def _phase_contexts(self) -> None:
-        """Wire the context fabric — the spider-connected work planes.
-
-        Handles: fabric, workorders, backlog, planning, queue, oracle,
-        syntax_fixer, and cycle (the ResponseCycle driving the fabric
-        through the live conversation loop).
-        """
+        """Wire the context fabric — the spider-connected work planes."""
         self.report.phases.append("contexts")
         from skeleton.contexts import ContextFabric, ResponseCycle
 
@@ -283,6 +279,34 @@ class Genesis:
             subject="contexts.fabric",
             snapshot=lambda: fabric.syntax.stats()["planes_connected"],
             predicate=lambda connected: connected >= 4,
+        ))
+        self.report.invariants_registered += 1
+
+    def _phase_support(self) -> None:
+        """Wire the support fabric — the mirror web overseeing the contexts.
+
+        Handles: support, loader, agentic_rag, overseer. All support
+        planes are lazy-loaded via the LoadingQueue to keep resident
+        footprint minimal.
+        """
+        self.report.phases.append("support")
+        from skeleton.support import SupportFabric
+
+        quad = self.handles.get("quad")
+        support = SupportFabric(bus=self.bus, quad=quad)
+
+        self._wire("support", "support", support)
+        self._wire("support", "loader", support.loader)
+        if support.agentic_rag is not None:
+            self._wire("support", "agentic_rag", support.agentic_rag)
+        self._wire("support", "overseer", support.overseer)
+
+        assert self.lattice is not None
+        self.lattice.register(Invariant(
+            name="support_loader_bounded",
+            subject="support.loader",
+            snapshot=lambda: len(support.loader.resident_planes()),
+            predicate=lambda resident: resident <= support.loader.max_resident,
         ))
         self.report.invariants_registered += 1
 
