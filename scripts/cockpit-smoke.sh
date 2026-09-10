@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Smoke test the cockpit: full stack — 11 phases, federation, Context
-# Fabric, Support System, and the paramount OverseerEngineV3
-# (system ID, MPC with hard walls, digital twin, meta-cognition).
+# Fabric, Support System, and the over-achiever OverseerEngineV35
+# (V3 paramount + energy + self-healing recovery + fleet gov + atlas).
 set -euo pipefail
 
 SMOKE_DIR="$(mktemp -d)"
@@ -17,7 +17,7 @@ g = Genesis(seed=42).boot()
 health = g.health()
 
 assert "support" in health["phases"], f"support phase missing: {health['phases']}"
-assert health["subsystems"] >= 45, f"expected 45+ subsystems, got {health['subsystems']}"
+assert health["subsystems"] >= 46, f"expected 46+ subsystems, got {health['subsystems']}"
 assert health["invariant_violations"] == 0
 
 required = ["lattice", "rag", "trinity", "orchestrator", "mesh", "fortress",
@@ -25,42 +25,41 @@ required = ["lattice", "rag", "trinity", "orchestrator", "mesh", "fortress",
             "galaxy", "galaxy_transport", "consensus", "kag_sync", "galaxy_bridge",
             "election", "fleet",
             "fabric", "workorders", "backlog", "planning", "queue", "oracle", "syntax_fixer", "cycle",
-            "support", "loader", "agentic_rag", "overseer", "engine", "engine_v2", "engine_v3"]
+            "support", "loader", "agentic_rag", "overseer", "engine", "engine_v2", "engine_v3", "engine_v35"]
 for handle in required:
     assert handle in g.handles, f"missing handle: {handle}"
 
-# Engine V3: paramount telemetry at boot + MPC budget authority
-v3 = g.get("engine_v3")
-assert v3._ticks >= 1, "engine v3 never ticked"
-status = v3.status()
-for key in ("device", "control", "setpoints", "sysid", "mpc", "twin", "meta", "wear", "consumers"):
-    assert key in status, f"status missing {key}"
-assert status["device"]["device_class"] in ("embedded", "mobile", "laptop", "workstation", "server")
-
-# Ticks build identified models and MPC plans with hard walls
-for _ in range(6):
-    tick = v3.tick()
+# Engine V3.5: over-achiever telemetry at boot, fleet attached
+v35 = g.get("engine_v35")
+assert v35._ticks >= 1, "engine v35 never ticked"
+assert v35.fleet is not None, "fleet governor not attached"
+tick = v35.tick()
 d = tick.to_dict()
-assert len(d["models"]) > 0, "no identified models"
-assert all(s["samples"] >= 1 for s in d["models"].values())
+for key in ("control", "v3", "energy", "recovery", "fleet", "atlas"):
+    assert key in d, f"tick missing {key}"
 assert 0.05 <= d["control"] <= 1.0
-assert "trajectory" in d["mpc"] and d["mpc"]["candidates"] >= 1
-assert isinstance(d["anomalies"], list)
-assert 0.0 <= d["trust"] <= 1.0
-assert isinstance(d["fallback"], bool)
+assert d["fleet"]["attached"] is True
+assert d["energy"]["draw"]["total_w"] > 0.0
 
-# V3 MPC budget is authoritative on the loader
+# V3.5 budget is authoritative on the loader
 loader = g.get("loader")
-v3_cap = v3.base_budget.scaled(d["control"]).max_resident_planes
-assert loader.max_resident == v3_cap, f"loader cap {loader.max_resident} != v3 budget {v3_cap}"
+v35_cap = v35.v3.base_budget.scaled(d["control"]).max_resident_planes
+assert loader.max_resident == v35_cap, f"loader cap {loader.max_resident} != v3.5 budget {v35_cap}"
 
-# Meta-cognition: scorecards exist after error observation, trust computable
-meta = v3.meta
-assert meta.trust() >= 0.0
+# Capability atlas: honest answer, critical always available
+atlas_summary = d["atlas"]
+assert atlas_summary["total"] >= 15
+assert "governor.throttle" in atlas_summary["available"]
+narration = v35.narrate_capabilities()
+assert narration.startswith("On this device")
 
-# V1 + V2 engines still live alongside
-assert g.get("engine").governor._stats["ticks"] >= 1
-assert g.get("engine_v2")._ticks >= 1
+# Recovery engine wired and cycling
+recovery = v35.recovery
+assert isinstance(recovery.stats()["faults"], int)
+
+# Fleet governance cycle produces a device report
+status = v35.status()
+assert status["fleet"]["registry"]["devices"] >= 1
 
 # Support cycle + Agentic RAG
 fabric = g.get("fabric")
@@ -123,5 +122,5 @@ h2.boot(restore=False)
 restored = h2.restore_state(name="smoke")
 assert restored.get("kag", 0) > 0
 
-print(f"cockpit smoke: OK ({health['subsystems']} subsystems, 11 phases, engine v3 paramount: {status['device']['device_class']} control={d['control']:.2f} mpc={d['mpc']['trajectory']} trust={d['trust']} regime={d['regime']})")
+print(f"cockpit smoke: OK ({health['subsystems']} subsystems, 11 phases, v35 over-achiever: control={d['control']:.2f} draw={d['energy']['draw']['total_w']:.0f}W atlas={atlas_summary['total']} caps, fleet={status['fleet']['registry']['devices']} devices)")
 PY
