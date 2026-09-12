@@ -84,12 +84,17 @@ class Genesis:
         )
         from skeleton.memory.vector import VectorStore
         from skeleton.memory.drift import PersonaDriftDetector
+        from skeleton.memory.dp import DifferentialPrivacy
 
         rag = VectorStore()
         cag = CAGStore()
         mag = MAGStore(UserId.new())
         trinity = MemoryTrinity(rag, cag, mag, bus=self.bus)
         srs = RepetitionScheduler(bus=self.bus)
+        dp = DifferentialPrivacy(session_budget=1.0, per_plane_budget=0.5)
+        dp.wrap("rag", rag)
+        dp.wrap("mag", mag)
+        dp.wrap("cag", cag)
         self._wire("memory", "rag", rag)
         self._wire("memory", "cag", cag)
         self._wire("memory", "mag", mag)
@@ -97,6 +102,7 @@ class Genesis:
         self._wire("memory", "repetition", srs)
         self._wire("memory", "dream", DreamEngine(mag, rag, bus=self.bus))
         self._wire("memory", "drift", PersonaDriftDetector(bus=self.bus))
+        self._wire("memory", "dp", dp)
 
         assert self.lattice is not None
         self.lattice.register(Invariant(
@@ -157,12 +163,14 @@ class Genesis:
         self.report.phases.append("resilience")
         from skeleton.resilience import ResilienceFortress
         from skeleton.resilience.canary import CanaryRegistry
+        from skeleton.resilience.chaos import ChaosHarness
 
         self._wire("resilience", "fortress", ResilienceFortress(bus=self.bus))
         canaries = CanaryRegistry(bus=self.bus)
         canaries.plant("memory.rag")
         canaries.plant("vault")
         self._wire("resilience", "canaries", canaries)
+        self._wire("resilience", "chaos", ChaosHarness(bus=self.bus))
 
     def _phase_interface(self) -> None:
         self.report.phases.append("interface")
@@ -216,6 +224,7 @@ class Genesis:
         from skeleton.galaxy.galaxy_bridge import GalaxyBridge
         from skeleton.galaxy.election import LeaderElection
         from skeleton.galaxy.fleet import FleetCoordinator
+        from skeleton.galaxy.byzantine import ByzantineEngine
 
         node = GalaxyNode(address="127.0.0.1", bus=self.bus)
         node.add_capability("reasoning")
@@ -224,6 +233,7 @@ class Genesis:
         transport = NodeTransport(node)
         consensus = ConsensusEngine(node, transport, bus=self.bus)
         election = LeaderElection(node, transport, consensus, bus=self.bus)
+        byzantine = ByzantineEngine(node.node_id, [node.node_id], secret=b"skeleton-fleet-key")
 
         quad = self.handles.get("quad")
         kag_sync = None
@@ -245,6 +255,7 @@ class Genesis:
         self._wire("galaxy", "consensus", consensus)
         self._wire("galaxy", "election", election)
         self._wire("galaxy", "fleet", fleet)
+        self._wire("galaxy", "byzantine", byzantine)
 
         assert self.lattice is not None
         self.lattice.register(Invariant(
@@ -259,10 +270,12 @@ class Genesis:
         """Wire the context fabric — the spider-connected work planes."""
         self.report.phases.append("contexts")
         from skeleton.contexts import ContextFabric, ResponseCycle
+        from skeleton.contexts.causal import CausalEngine
 
         fabric = ContextFabric(bus=self.bus, mag=self.handles.get("mag"))
         fabric.connect_all()
         cycle = ResponseCycle(fabric, bus=self.bus)
+        causal = CausalEngine()
 
         self._wire("contexts", "fabric", fabric)
         self._wire("contexts", "workorders", fabric.workorders)
@@ -272,6 +285,7 @@ class Genesis:
         self._wire("contexts", "oracle", fabric.oracle)
         self._wire("contexts", "syntax_fixer", fabric.syntax)
         self._wire("contexts", "cycle", cycle)
+        self._wire("contexts", "causal", causal)
 
         assert self.lattice is not None
         self.lattice.register(Invariant(
@@ -283,13 +297,7 @@ class Genesis:
         self.report.invariants_registered += 1
 
     def _phase_support(self) -> None:
-        """Wire the support fabric + full engine stack (V1 → V3.5).
-
-        Handles: support, loader, agentic_rag, overseer, engine,
-        engine_v2, engine_v3, engine_v35. All engines bind the same
-        consumers — V3.5 ticks last so its over-achiever control
-        (MPC + energy + fleet ceiling) is authoritative.
-        """
+        """Wire the support fabric + full engine stack (V1 → V3.5)."""
         self.report.phases.append("support")
         from skeleton.support import SupportFabric
         from skeleton.overseer import (
