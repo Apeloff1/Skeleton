@@ -14,7 +14,8 @@ def test_runtime_attestation_round_trip(runtime_snapshot, ledger):
     assert attestation.session_root_decision_id == runtime_snapshot.events[0].decision_id
     assert attestation.selected_policy_decision_id == runtime_snapshot.selected_policy_decision_id
     assert len(attestation.capsule_digest) == 64
-    assert len(attestation.session_record_hashes) == attestation.ledger_count
+    assert len(attestation.session_record_hashes) == len(ledger.session(runtime_snapshot.session_id))
+    assert attestation.ledger_count == len(ledger.records)
 
 
 def test_runtime_attestation_detects_runtime_tamper(runtime_snapshot, ledger):
