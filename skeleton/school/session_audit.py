@@ -23,13 +23,17 @@ def audit_session(ledger: DecisionLedger, session_id: str) -> SessionAudit:
         ledger.verify(); checks.append("hash-chain")
     except ValueError as exc:
         failures.append(f"hash-chain: {exc}")
-    all_ids = {record.decision_id for record in ledger.records}
+    by_id = {record.decision_id: record for record in ledger.records}
     expected_sequence = [r.sequence for r in records]
     if expected_sequence != sorted(expected_sequence) or len(set(expected_sequence)) != len(expected_sequence):
         failures.append("session decision sequence is not ordered")
     for record in records:
-        if any(predecessor not in all_ids for predecessor in record.predecessors):
-            failures.append(f"missing predecessor for {record.decision_id}")
+        for predecessor in record.predecessors:
+            prior = by_id.get(predecessor)
+            if prior is None:
+                failures.append(f"missing predecessor for {record.decision_id}")
+            elif prior.sequence >= record.sequence:
+                failures.append(f"causal predecessor is not earlier: {record.decision_id}")
     checks.append("causal-ancestry" if records[0].predecessors else "causal-root")
 
     rejected = tuple(r for r in records if r.disposition is DecisionDisposition.REJECTED)
