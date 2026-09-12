@@ -33,6 +33,17 @@ def test_runtime_capture_accepts_lifecycle_bound_policy_identity():
     assert audit_runtime(snapshot, ledger).valid
 
 
+def test_runtime_capture_accepts_selected_action_with_rejected_counterfactual_same_action():
+    ledger = _ledger()
+    ledger.append(session_id="s1", decision_id="s1:challenge-rejected", domain="session_runtime", action="challenge", rationale=("counterfactual",), disposition=DecisionDisposition.REJECTED, predecessors=("s1:orient",))
+    ledger.append(session_id="s1", decision_id="s1:challenge-selected", domain="session_runtime", action="challenge", rationale=("selected",), disposition=DecisionDisposition.ACCEPTED, predecessors=("s1:challenge-rejected",))
+    snapshot = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),), selected_policy="challenge", selected_policy_decision_id="s1:challenge-selected", rejected_policies=("challenge",), ledger=ledger)
+    audit = audit_runtime(snapshot, ledger)
+    assert audit.valid, audit.violations
+    assert snapshot.selected_policy_decision_id == "s1:challenge-selected"
+    assert snapshot.rejected_policy_decision_ids == ("s1:challenge-rejected",)
+
+
 def test_runtime_capture_rejects_unbound_selected_policy_identity():
     ledger = _ledger()
     snapshot = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),), selected_policy="practice", selected_policy_decision_id="s1:forged", rejected_policies=(), ledger=ledger)
