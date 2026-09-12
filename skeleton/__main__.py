@@ -136,7 +136,6 @@ def _parse_run_args(rest: List[str]):
 def _cmd_gameforge_run(rest: List[str]) -> int:
     from skeleton.context.pipeline import GameForgeRun
     vision, era, out, overwrite, as_json, blend, generation = _parse_run_args(rest)
-    # Bare `run` with no vision boots genesis (operator path).
     if not vision and era is None and out is None and blend is None:
         from skeleton.genesis import Genesis
         genesis = Genesis(seed=42).boot()
@@ -157,6 +156,18 @@ def _cmd_gameforge_run(rest: List[str]) -> int:
     return 0 if payload.get("succeeded") else 1
 
 
+def _cmd_test(_rest: List[str]) -> int:
+    """Run the configured pytest suite, with unittest discovery as a fallback."""
+    try:
+        import pytest
+    except ImportError:
+        import unittest
+        suite = unittest.TestLoader().discover("skeleton/testing", pattern="test_*.py")
+        result = unittest.TextTestRunner(verbosity=2).run(suite)
+        return 0 if result.wasSuccessful() else 1
+    return int(pytest.main(["skeleton/testing", "-ra"]))
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     if not args:
@@ -165,52 +176,27 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     cmd = args[0]
     rest = args[1:]
-
-    if cmd == "run":
-        return _cmd_gameforge_run(rest)
-
+    if cmd == "run": return _cmd_gameforge_run(rest)
     if cmd == "forge":
         from skeleton.forge.universal import Forge
-        forge = Forge()
-        print("Forge ready.")
+        forge = Forge(); print("Forge ready.")
         if rest:
             bp = forge.new_blueprint(rest[0])
             print(f"Blueprint '{rest[0]}' created with {len(bp.components)} components.")
         return 0
-
-    if cmd == "test":
-        import unittest
-        loader = unittest.TestLoader()
-        suite = loader.discover("skeleton/testing", pattern="test_*.py")
-        runner = unittest.TextTestRunner(verbosity=2)
-        result = runner.run(suite)
-        return 0 if result.wasSuccessful() else 1
-
+    if cmd == "test": return _cmd_test(rest)
     if cmd == "dev":
         from skeleton.developer.cli import run_dev_cli
         result = run_dev_cli(rest)
-        if isinstance(result, dict):
-            print(json.dumps(result, indent=2, default=str))
+        if isinstance(result, dict): print(json.dumps(result, indent=2, default=str))
         return 0 if (isinstance(result, dict) and "error" not in result) else 1
-
-    if cmd == "eras":
-        return _cmd_eras(rest)
-    if cmd == "generations":
-        return _cmd_generations(rest)
-    if cmd == "plan":
-        return _cmd_plan(rest)
-    if cmd == "cockpit":
-        return _cmd_cockpit(rest)
-    if cmd == "walk":
-        return _cmd_walk(rest)
-
-    if cmd in ("help", "-h", "--help"):
-        print(__doc__)
-        return 0
-
-    print(f"Unknown command: {cmd}")
-    print(__doc__)
-    return 1
+    if cmd == "eras": return _cmd_eras(rest)
+    if cmd == "generations": return _cmd_generations(rest)
+    if cmd == "plan": return _cmd_plan(rest)
+    if cmd == "cockpit": return _cmd_cockpit(rest)
+    if cmd == "walk": return _cmd_walk(rest)
+    if cmd in ("help", "-h", "--help"): print(__doc__); return 0
+    print(f"Unknown command: {cmd}"); print(__doc__); return 1
 
 
 if __name__ == "__main__":
