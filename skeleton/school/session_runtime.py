@@ -73,6 +73,8 @@ class JeevesSessionRuntime:
     events: list[SessionEvent] = field(default_factory=list)
     phase: SessionPhase = SessionPhase.INTAKE
     session_id: str = ""
+    pipeline_contract_digest: str = ""
+    provenance_digest: str = ""
     _sequence: int = 0
     _last_decision_id: str | None = None
     _selected_policy: str | None = None
@@ -88,6 +90,8 @@ class JeevesSessionRuntime:
         candidates = rank_knowledge(self.knowledge, self.knowledge_state, query_terms=query_terms, goals=student.goals)
         objective = primary or (query_terms[0] if query_terms else "advance the learner's current objective")
         pipeline = plan_pipeline(PipelineRequest(kind=pipeline_kind, objective=objective, learner_skill=primary, require_tests=pipeline_kind not in {PipelineKind.LESSON, PipelineKind.ASSESS}))
+        self.pipeline_contract_digest = pipeline.digest
+        self.provenance_digest = control.provenance_digest
         context = cocoding or CoCodingContext(CodingPhase.UNDERSTAND, HandoffStage.DEMONSTRATE)
         action = choose_action(context)
         handoff = next_handoff(context.handoff, successful=False, learner_explained=False)
@@ -103,10 +107,10 @@ class JeevesSessionRuntime:
         self._emit(SessionPhase.INTAKE, "session_opened", {"session_id": session_id})
         self.phase = SessionPhase.DIAGNOSE
         self._emit(self.phase, "control_plan_ready", {"primary_skill": primary or "none", "arbitration": selected_policy, "policy": selected_policy})
-        self._record_decision(decision_id=f"{session_id}:orient", action=selected_policy, rationale=(control.policy_competition.rationale if control.policy_competition else arbitration.rationale), state={"skill": primary or objective, "mastery": self.knowledge_state.mastery(primary or objective), "pipeline_digest": pipeline.digest}, policy={"confidence": arbitration.confidence, "counterfactual_margin": control.policy_competition.margin if control.policy_competition else 0.0, "calibrated_reliability": control.policy_calibrator.snapshot(), "rejected_policies": rejected_policies, "executed_policy": selected_policy, "pipeline_digest": pipeline.digest})
+        self._record_decision(decision_id=f"{session_id}:orient", action=selected_policy, rationale=(control.policy_competition.rationale if control.policy_competition else arbitration.rationale), state={"skill": primary or objective, "mastery": self.knowledge_state.mastery(primary or objective), "pipeline_digest": pipeline.digest, "provenance_digest": control.provenance_digest}, policy={"confidence": arbitration.confidence, "counterfactual_margin": control.policy_competition.margin if control.policy_competition else 0.0, "calibrated_reliability": control.policy_calibrator.snapshot(), "rejected_policies": rejected_policies, "executed_policy": selected_policy, "pipeline_digest": pipeline.digest, "provenance_digest": control.provenance_digest})
         if control.policy_competition:
             for candidate in control.policy_competition.rejected:
-                self._record_decision(decision_id=f"{session_id}:alternative:{candidate.action.value}", action=candidate.action.value, rationale=candidate.rationale + ("counterfactual alternative", "not executed"), state={"skill": primary or objective, "pipeline_digest": pipeline.digest}, policy={"selected": selected_policy, "counterfactual": True, "calibrated_reliability": control.policy_calibrator.snapshot(), "pipeline_digest": pipeline.digest}, disposition=DecisionDisposition.REJECTED)
+                self._record_decision(decision_id=f"{session_id}:alternative:{candidate.action.value}", action=candidate.action.value, rationale=candidate.rationale + ("counterfactual alternative", "not executed"), state={"skill": primary or objective, "pipeline_digest": pipeline.digest, "provenance_digest": control.provenance_digest}, policy={"selected": selected_policy, "counterfactual": True, "calibrated_reliability": control.policy_calibrator.snapshot(), "pipeline_digest": pipeline.digest, "provenance_digest": control.provenance_digest}, disposition=DecisionDisposition.REJECTED)
         return RuntimePlan(session_id, control, self.phase, pipeline_kind, tuple(s.stage.value for s in pipeline.steps), tuple(c.node_id for c in candidates), action.pattern.value, handoff.value, selected_policy, arbitration.confidence, gates, transitions, selected_policy, control.policy_competition.margin if control.policy_competition else 0.0, rejected_policies, pipeline.digest, control.provenance_digest)
 
     def record_outcome(self, student: StudentProfile, outcome: SessionOutcome) -> OutcomeResult:
@@ -118,7 +122,7 @@ class JeevesSessionRuntime:
         result = self.control.record_outcome(student, outcome, policy_action=policy)
         outcome_id = f"{self.session_id}:outcome:{self._sequence + 1}"
         self.ledger.register_evidence(EvidenceRef(outcome_id, EvidenceKind.ASSESSMENT, outcome.skill_id, outcome.kind.value, max(0.0, min(1.0, outcome.score)), "outcome"))
-        self._record_decision(decision_id=f"{self.session_id}:outcome:{self._sequence + 1}", action=f"outcome:{outcome.kind.value}", rationale=(f"score={outcome.score:.3f}", f"policy={policy or 'unknown'}"), evidence=(outcome_id,), state={"skill": outcome.skill_id, "score": outcome.score}, policy={"executed_policy": policy or "unknown", "calibration": self.control.policy_calibrator.snapshot()}, disposition=DecisionDisposition.ACCEPTED)
+        self._record_decision(decision_id=f"{self.session_id}:outcome:{self._sequence + 1}", action=f"outcome:{outcome.kind.value}", rationale=(f"score={outcome.score:.3f}", f"policy={policy or 'unknown'}"), evidence=(outcome_id,), state={"skill": outcome.skill_id, "score": outcome.score, "pipeline_digest": self.pipeline_contract_digest, "provenance_digest": self.provenance_digest}, policy={"executed_policy": policy or "unknown", "calibration": self.control.policy_calibrator.snapshot(), "pipeline_digest": self.pipeline_contract_digest, "provenance_digest": self.provenance_digest}, disposition=DecisionDisposition.ACCEPTED)
         self._emit(self.phase, "outcome_recorded", {"kind": outcome.kind.value, "skill": outcome.skill_id, "policy": policy or "unknown"})
         return result
 
@@ -130,7 +134,7 @@ class JeevesSessionRuntime:
         if target in {SessionPhase.VERIFY, SessionPhase.COMMIT} and any(g.required and not g.satisfied for g in gate_set): raise ValueError("required evidence gate is unsatisfied")
         source = self.phase; kind = self._transition_kind(source, target); self.phase = target
         self._emit(target, f"transition:{kind.value}", {"from": source.value, "rationale": rationale})
-        self._record_decision(decision_id=f"{self.session_id}:transition:{self._sequence}", action=f"{kind.value}:{target.value}", rationale=(rationale,), state={"source":source.value,"target":target.value}, policy={"gate_count":len(gate_set), "selected_policy": self._selected_policy or "unknown"})
+        self._record_decision(decision_id=f"{self.session_id}:transition:{self._sequence}", action=f"{kind.value}:{target.value}", rationale=(rationale,), state={"source":source.value,"target":target.value,"pipeline_digest":self.pipeline_contract_digest,"provenance_digest":self.provenance_digest}, policy={"gate_count":len(gate_set), "selected_policy": self._selected_policy or "unknown", "pipeline_digest":self.pipeline_contract_digest,"provenance_digest":self.provenance_digest})
         return SessionTransition(source, target, kind, rationale, gate_set)
 
     def record_evidence(self, *, event: str, subject: str = "", claim: str = "", score: float | None = None, polarity: EvidencePolarity = EvidencePolarity.NEUTRAL, source_id: str = "runtime", **payload: str) -> SessionEvent:
@@ -144,14 +148,14 @@ class JeevesSessionRuntime:
             update = self.epistemics.observe(EpistemicEvidence(evidence_id=evidence_id, claim=claim, polarity=polarity, strength=strength, source_id=source_id, step=self._sequence))
             self.ledger.register_evidence(EvidenceRef(evidence_id, EvidenceKind.OBSERVATION, subject or claim, event, strength, source_id))
             self._emit(self.phase, event, payload | {"claim": claim})
-            self._record_decision(decision_id=f"{self.session_id}:evidence:{self._sequence}", action=f"observe:{claim}", rationale=update.rationale, evidence=(evidence_id,), state={"confidence": update.belief.confidence, "contradiction": update.contradiction}, policy={"polarity": polarity.value, "selected_policy": self._selected_policy or "unknown"})
+            self._record_decision(decision_id=f"{self.session_id}:evidence:{self._sequence}", action=f"observe:{claim}", rationale=update.rationale, evidence=(evidence_id,), state={"confidence": update.belief.confidence, "contradiction": update.contradiction, "pipeline_digest":self.pipeline_contract_digest,"provenance_digest":self.provenance_digest}, policy={"polarity": polarity.value, "selected_policy": self._selected_policy or "unknown", "pipeline_digest":self.pipeline_contract_digest,"provenance_digest":self.provenance_digest})
             return self.events[-1]
         self._emit(self.phase, event, payload); return self.events[-1]
 
     def recover(self, *, reason: str) -> SessionTransition:
         if self.phase in {SessionPhase.COMPLETE, SessionPhase.INTAKE}: raise ValueError("recovery is not available in the current phase")
         source = self.phase; self.phase = SessionPhase.RECOVER; self._emit(self.phase, "recovery_required", {"reason": reason})
-        self._record_decision(decision_id=f"{self.session_id}:recover:{self._sequence}", action=TransitionKind.REPAIR.value, rationale=(reason,), state={"source":source.value}, policy={"selected_policy": self._selected_policy or "unknown"})
+        self._record_decision(decision_id=f"{self.session_id}:recover:{self._sequence}", action=TransitionKind.REPAIR.value, rationale=(reason,), state={"source":source.value,"pipeline_digest":self.pipeline_contract_digest,"provenance_digest":self.provenance_digest}, policy={"selected_policy": self._selected_policy or "unknown","pipeline_digest":self.pipeline_contract_digest,"provenance_digest":self.provenance_digest})
         return SessionTransition(source, SessionPhase.RECOVER, TransitionKind.REPAIR, reason)
 
     def _prepare_session(self, session_id: str) -> None:
@@ -164,6 +168,8 @@ class JeevesSessionRuntime:
         self.session_id = session_id
         self.phase = SessionPhase.INTAKE
         self.events.clear()
+        self.pipeline_contract_digest = ""
+        self.provenance_digest = ""
         self._sequence = 0
         self._last_decision_id = None
         self._selected_policy = None
