@@ -226,7 +226,7 @@ class BlueprintContext:
         return pairs
 
     def parallel_lanes(self, plan: Any) -> List[List[str]]:
-        """Groups of mutually independent steps that can run concurrently.""
+        """Groups of mutually independent steps that can run concurrently."""
         lanes: Dict[int, List[str]] = {}
         depth_cache: Dict[str, int] = {}
 
