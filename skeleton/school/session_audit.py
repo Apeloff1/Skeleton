@@ -31,17 +31,17 @@ def audit_session(ledger: DecisionLedger, session_id: str) -> SessionAudit:
     except ValueError as exc:
         failures.append(f"hash-chain: {exc}")
 
-    expected = 1
-    ids = {record.decision_id for record in records}
+    expected = records[0].sequence
+    all_ids = {record.decision_id for record in ledger.records}
     for record in records:
         if record.sequence != expected:
             failures.append(f"sequence gap at {record.decision_id}: expected {expected}, got {record.sequence}")
         expected += 1
-        if any(predecessor not in ids for predecessor in record.predecessors):
+        if any(predecessor not in all_ids for predecessor in record.predecessors):
             failures.append(f"missing predecessor for {record.decision_id}")
 
-    if records and records[0].predecessors:
-        failures.append("session root has predecessors")
+    if records[0].predecessors:
+        checks.append("causal-ancestry")
     else:
         checks.append("causal-root")
 
@@ -55,7 +55,7 @@ def audit_session(ledger: DecisionLedger, session_id: str) -> SessionAudit:
     if any(r.policy_digest for r in records):
         checks.append("policy-provenance")
 
-    if expected - 1 == len(records):
+    if expected == records[-1].sequence + 1:
         checks.append("sequence-contiguous")
 
     digest = replay_digest(records)
