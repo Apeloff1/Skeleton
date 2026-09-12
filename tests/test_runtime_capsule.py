@@ -59,3 +59,22 @@ def test_capsule_detects_capsule_digest_tampering():
     audit = tampered.verify(ledger)
     assert not audit.valid
     assert any("capsule-integrity divergence" in item for item in audit.violations)
+
+
+def test_capsule_detects_ledger_extension():
+    ledger = _ledger()
+    capsule = RuntimeIntegrityCapsule.capture(_snapshot(ledger), ledger)
+    ledger.register_evidence(EvidenceRef("e2", EvidenceKind.OBSERVATION, "skill", "later", 1.0, "test"))
+    ledger.append(
+        session_id="s1",
+        decision_id="s1:later",
+        domain="session_runtime",
+        action="review",
+        rationale=("later",),
+        evidence=("e2",),
+        disposition=DecisionDisposition.ACCEPTED,
+        predecessors=("s1:orient",),
+    )
+    audit = capsule.verify(ledger)
+    assert not audit.valid
+    assert any("ledger checkpoint has advanced" in item for item in audit.violations)
