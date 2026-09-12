@@ -1,6 +1,6 @@
 from skeleton.school.ai_pipeline import PipelineKind
 from skeleton.school.curriculum import CurriculumGraph
-from skeleton.school.decision_ledger import DecisionLedger
+from skeleton.school.decision_ledger import DecisionDisposition, DecisionLedger
 from skeleton.school.epistemics import EpistemicEngine, EpistemicEvidence, EvidencePolarity
 from skeleton.school.jeeves import JeevesControlPlane
 from skeleton.school.knowledge import KnowledgeGraph, KnowledgeNode, KnowledgeState, rank_knowledge
@@ -18,6 +18,15 @@ def test_epistemic_conflict_is_explicit_and_bounded() -> None:
     assert engine.contradictions()
 
 
+def test_epistemic_supersession_recomputes_active_belief() -> None:
+    engine = EpistemicEngine()
+    engine.observe(EpistemicEvidence("old", "binary search is linear", EvidencePolarity.SUPPORTS, strength=1.0))
+    repaired = engine.observe(EpistemicEvidence("new", "binary search is linear", EvidencePolarity.REFUTES, strength=1.0, supersedes=("old",)))
+    assert repaired.belief.evidence_ids == ("new",)
+    assert repaired.belief.confidence < 0.5
+    assert engine.active_evidence("binary search is linear")[0].evidence_id == "new"
+
+
 def test_ledger_hash_chain_is_replayable() -> None:
     ledger = DecisionLedger()
     ledger.append(session_id="s1", decision_id="d1", domain="school", action="practice", state={"mastery": 0.4}, policy={"confidence": 0.8})
@@ -32,6 +41,18 @@ def test_runtime_records_epistemic_evidence_and_ledger() -> None:
     runtime.begin(StudentProfile(student_id="s1"), session_id="s1", query_terms=("algorithms",), pipeline_kind=PipelineKind.LESSON)
     runtime.record_evidence(event="answer", subject="algorithms", claim="a loop always terminates", score=0.9, polarity=EvidencePolarity.SUPPORTS)
     assert runtime.epistemics.evidence
+    assert runtime.ledger.records[-1].evidence
+    assert runtime.ledger.records[-1].action.startswith("observe:")
+    runtime.ledger.verify()
+
+
+def test_counterfactual_rejections_are_audited() -> None:
+    curriculum = CurriculumGraph()
+    runtime = JeevesSessionRuntime(JeevesControlPlane(curriculum), curriculum, KnowledgeGraph())
+    runtime.begin(StudentProfile(student_id="s1"), session_id="s1", query_terms=("algorithms",), pipeline_kind=PipelineKind.LESSON)
+    rejected = [r for r in runtime.ledger.records if r.disposition is DecisionDisposition.REJECTED]
+    assert rejected
+    assert all("counterfactual alternative" in r.rationale for r in rejected)
     runtime.ledger.verify()
 
 
