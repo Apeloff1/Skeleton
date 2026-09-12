@@ -27,12 +27,18 @@ def test_runtime_snapshot_is_deterministic_and_auditable():
 
 def test_runtime_capture_accepts_lifecycle_bound_policy_identity():
     ledger = _ledger()
-    ledger.append(session_id="s1", decision_id="s1:practice-later", domain="session_runtime", action="practice", rationale=("later accepted action",), disposition=DecisionDisposition.ACCEPTED)
+    ledger.append(session_id="s1", decision_id="s1:practice-later", domain="session_runtime", action="practice", rationale=("later accepted action",), disposition=DecisionDisposition.ACCEPTED, predecessors=("s1:orient",))
     snapshot = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),), selected_policy="practice", selected_policy_decision_id="s1:orient", rejected_policies=(), ledger=ledger)
     assert snapshot.selected_policy_decision_id == "s1:orient"
+    assert audit_runtime(snapshot, ledger).valid
+
+
+def test_runtime_capture_rejects_unbound_selected_policy_identity():
+    ledger = _ledger()
+    snapshot = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),), selected_policy="practice", selected_policy_decision_id="s1:forged", rejected_policies=(), ledger=ledger)
     audit = audit_runtime(snapshot, ledger)
     assert not audit.valid
-    assert any("unique ACCEPTED ledger attribution" in item for item in audit.violations)
+    assert any("decision identity is absent from ledger" in item for item in audit.violations)
 
 
 def test_runtime_audit_detects_runtime_digest_tampering():
@@ -73,7 +79,7 @@ def test_runtime_audit_rejects_selected_policy_marked_rejected():
     assert any("does not have a unique ACCEPTED ledger attribution" in item for item in audit.violations)
 
 
-def test_runtime_audit_rejects_duplicate_accepted_policy_identity():
+def test_runtime_audit_rejects_duplicate_accepted_policy_without_identity():
     ledger = _ledger()
     ledger.append(session_id="s1", decision_id="s1:practice-duplicate", domain="session_runtime", action="practice", rationale=("duplicate action",), disposition=DecisionDisposition.ACCEPTED)
     snapshot = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),), selected_policy="practice", rejected_policies=(), ledger=ledger)
