@@ -8,6 +8,7 @@ def test_runtime_attestation_round_trip(runtime_snapshot, ledger):
     assert verify_attestation(attestation, runtime_snapshot, ledger) == ()
     assert attestation.session_root_decision_id == runtime_snapshot.events[0].decision_id
     assert attestation.selected_policy_decision_id == runtime_snapshot.selected_policy_decision_id
+    assert len(attestation.capsule_digest) == 64
 
 
 def test_runtime_attestation_detects_runtime_tamper(runtime_snapshot, ledger):
@@ -20,3 +21,11 @@ def test_runtime_attestation_detects_attestation_tamper(runtime_snapshot, ledger
     attestation = RuntimeAttestation.capture(runtime_snapshot, ledger)
     tampered = replace(attestation, ledger_count=attestation.ledger_count + 1)
     assert "attestation ledger identity diverges" in verify_attestation(tampered, runtime_snapshot, ledger)
+
+
+def test_runtime_attestation_detects_capsule_binding_tamper(runtime_snapshot, ledger):
+    attestation = RuntimeAttestation.capture(runtime_snapshot, ledger)
+    tampered = replace(attestation, capsule_digest="0" * 64)
+    failures = verify_attestation(tampered, runtime_snapshot, ledger)
+    assert "attestation capsule digest diverges" in failures
+    assert "attestation digest diverges" in failures
