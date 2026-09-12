@@ -1,5 +1,6 @@
 """School primitives for the Tutolage + Jeeves learning core."""
 
+from skeleton.school.ai_pipeline import PipelineKind, PipelinePlan, PipelineRequest, PipelineStage, PipelineStep, pipeline_capabilities, plan_pipeline
 from skeleton.school.assessment import AssessmentEngine, AssessmentEvidence, AssessmentKind, Intervention
 from skeleton.school.code_intelligence import CodeIntelligenceEngine, CodeIntelligenceReport, CodeSignal, CodeSignalKind, CodeTask as IntelligenceTask, CodeTaskKind
 from skeleton.school.code_lab import CodeFinding, CodeLabEngine, CodeReview, CodeTask, FindingSeverity
@@ -19,11 +20,11 @@ from skeleton.school.reflection import ReflectionEntry, ReflectionImportance, Re
 from skeleton.school.student import SkillState, StudentProfile
 
 __all__ = [
+    "PipelineKind", "PipelinePlan", "PipelineRequest", "PipelineStage", "PipelineStep", "pipeline_capabilities", "plan_pipeline",
     "AssessmentEngine", "AssessmentEvidence", "AssessmentKind", "Intervention",
     "CodeIntelligenceEngine", "CodeIntelligenceReport", "CodeSignal", "CodeSignalKind", "IntelligenceTask", "CodeTaskKind",
     "CodeFinding", "CodeLabEngine", "CodeReview", "CodeTask", "FindingSeverity",
-    "CodingPhase", "CoCodingAction", "CoCodingContext", "HandoffStage", "InteractionPattern",
-    "choose_action", "next_handoff",
+    "CodingPhase", "CoCodingAction", "CoCodingContext", "HandoffStage", "InteractionPattern", "choose_action", "next_handoff",
     "CurriculumGraph", "CurriculumNode", "LearningRecommendation", "rank_recommendations",
     "DebugAction", "DebugExperiment", "DebugFocus", "DebugHypothesis", "DebugPlan", "DebuggingPolicy",
     "EnergyBudget", "EnergyDecision", "EnergyStrategy", "choose_energy_strategy",
