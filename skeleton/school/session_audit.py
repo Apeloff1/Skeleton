@@ -31,22 +31,37 @@ def audit_session(ledger: DecisionLedger, session_id: str) -> SessionAudit:
         if any(predecessor not in all_ids for predecessor in record.predecessors):
             failures.append(f"missing predecessor for {record.decision_id}")
     checks.append("causal-ancestry" if records[0].predecessors else "causal-root")
+
     rejected = tuple(r for r in records if r.disposition is DecisionDisposition.REJECTED)
     if rejected:
         checks.append("counterfactual-audit")
         for record in rejected:
             if "counterfactual alternative" not in record.rationale or "not executed" not in record.rationale:
                 failures.append(f"rejected alternative lacks audit rationale: {record.decision_id}")
+
     superseded = tuple(r for r in records if r.disposition is DecisionDisposition.SUPERSEDED)
     if superseded:
         checks.append("supersession-audit")
         for record in superseded:
             if len(record.predecessors) != 1:
                 failures.append(f"supersession must name exactly one predecessor: {record.decision_id}")
-    if any(r.policy_digest for r in records): checks.append("policy-provenance")
-    if tuple(r.sequence for r in ledger.active_records(session_id)) == tuple(r.sequence for r in records if r.decision_id not in ledger.superseded_ids() and r.disposition is not DecisionDisposition.SUPERSEDED):
+
+    superseded_ids = ledger.superseded_ids()
+    active = ledger.active_records(session_id)
+    expected_active = tuple(
+        record
+        for record in records
+        if record.decision_id not in superseded_ids and record.disposition is not DecisionDisposition.SUPERSEDED
+    )
+    if tuple(record.decision_id for record in active) == tuple(record.decision_id for record in expected_active):
         checks.append("active-record-filter")
-    if not failures: checks.append("session-audit-clean")
+    else:
+        failures.append("active-record filter diverges from supersession semantics")
+
+    if any(r.policy_digest for r in records):
+        checks.append("policy-provenance")
+    if not failures:
+        checks.append("session-audit-clean")
     return SessionAudit(session_id, not failures, tuple(checks), tuple(failures), replay_digest(records))
 
 def policy_chain(records: Sequence[DecisionRecord]) -> tuple[str, ...]:
