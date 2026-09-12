@@ -49,7 +49,7 @@ class DecisionLedger:
         if previous!=self._head_hash: raise ValueError("ledger head hash mismatch")
     def session(self,session_id): return tuple(r for r in self.records if r.session_id==session_id)
     def superseded_ids(self) -> frozenset[str]:
-        return frozenset(p for r in self.records if r.disposition is DecisionDisposition.SUPERSEDED for p in r.predecessors)
+        return frozenset(p for r in self.records if "supersedes:" in " ".join(r.rationale) for p in r.predecessors)
     def active_records(self, session_id: str | None = None) -> tuple[DecisionRecord, ...]:
         records = self.session(session_id) if session_id is not None else tuple(self.records)
         superseded = self.superseded_ids()
@@ -71,7 +71,7 @@ class DecisionLedger:
         target=next((r for r in self.records if r.decision_id==decision_id),None)
         if target is None: raise KeyError(decision_id)
         if decision_id in self.superseded_ids(): raise ValueError(f"decision already superseded: {decision_id}")
-        return self.append(session_id=target.session_id,decision_id=replacement_id,domain=target.domain,action=target.action,rationale=target.rationale+(f"supersedes:{decision_id}",),evidence=target.evidence,predecessors=(decision_id,),disposition=DecisionDisposition.SUPERSEDED)
+        return self.append(session_id=target.session_id,decision_id=replacement_id,domain=target.domain,action=target.action,rationale=target.rationale+(f"supersedes:{decision_id}",),evidence=target.evidence,predecessors=(decision_id,),disposition=DecisionDisposition.ACCEPTED)
     @staticmethod
     def _digest(value): return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(",",":"),default=str).encode()).hexdigest()
 def evidence_bundle(items:Iterable[EvidenceRef]):
