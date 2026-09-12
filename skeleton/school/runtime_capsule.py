@@ -1,8 +1,8 @@
 """Portable, deterministic integrity capsules for Jeeves runtime sessions.
 
 A capsule is the smallest audit artifact that can be persisted or transported
-without coupling callers to the live runtime object.  It binds the runtime
-snapshot, session audit, and both digest layers into one immutable record.
+without coupling callers to the live runtime object. It binds the runtime
+snapshot, session audit, and ledger checkpoint into one immutable record.
 """
 from __future__ import annotations
 
@@ -20,6 +20,8 @@ class RuntimeIntegrityCapsule:
     session_id: str
     runtime: RuntimeReplaySnapshot
     session: SessionAudit
+    ledger_head: str
+    ledger_count: int
     capsule_digest: str
 
     @classmethod
@@ -31,9 +33,11 @@ class RuntimeIntegrityCapsule:
             "replay_digest": replay_digest(runtime),
             "session_digest": session.digest,
             "session_valid": session.valid,
+            "ledger_head": ledger.head_hash,
+            "ledger_count": len(ledger.records),
         }
         digest = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-        return cls(runtime.session_id, runtime, session, digest)
+        return cls(runtime.session_id, runtime, session, ledger.head_hash, len(ledger.records), digest)
 
     def verify(self, ledger: DecisionLedger) -> RuntimeAudit:
         runtime_audit = audit_runtime(self.runtime, ledger)
@@ -44,11 +48,15 @@ class RuntimeIntegrityCapsule:
             "replay_digest": replay_digest(self.runtime),
             "session_digest": session_audit.digest,
             "session_valid": session_audit.valid,
+            "ledger_head": ledger.head_hash,
+            "ledger_count": len(ledger.records),
         }
         expected = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
         violations = list(runtime_audit.violations)
         if not session_audit.valid:
             violations.extend(f"session audit: {item}" for item in session_audit.failures)
+        if self.ledger_head != ledger.head_hash or self.ledger_count != len(ledger.records):
+            violations.append("capsule-integrity divergence: ledger checkpoint has advanced")
         if self.capsule_digest != expected:
             violations.append("capsule-integrity divergence: capsule digest does not match its bound audits")
         return RuntimeAudit(not violations, tuple(dict.fromkeys(violations)))
