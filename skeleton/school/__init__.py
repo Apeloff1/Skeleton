@@ -24,7 +24,7 @@ from skeleton.school.policy_calibration import PolicyCalibrator, PolicyStats
 from skeleton.school.progression import AchievementEvidence, AchievementRequirement, AchievementResult, ProgressionSnapshot, achievement_learning_signal, evaluate_achievement, evaluate_progression
 from skeleton.school.prompting import PromptRefinement, RefinementNeed, refine_prompt
 from skeleton.school.reflection import ReflectionEntry, ReflectionImportance, ReflectionJournal, ReflectionKind, ReflectionPrompt, reflection_prompts, summarize_reflection
-from skeleton.school.replay import JeevesReplay, ReplayMismatch, ReplayReport, replay_digest
+from skeleton.school.replay import JeevesReplay, ReplayMismatch, ReplayReport, ReplaySnapshot, replay_digest
 from skeleton.school.session_audit import SessionAudit, audit_session, policy_chain
 from skeleton.school.session_runtime import EvidenceGate, JeevesSessionRuntime, RuntimePlan, SessionEvent, SessionPhase, SessionTransition, TransitionKind
 from skeleton.school.session import JeevesSessionEngine, SessionDecision
@@ -54,7 +54,7 @@ __all__ = [
     "AchievementEvidence", "AchievementRequirement", "AchievementResult", "ProgressionSnapshot", "achievement_learning_signal", "evaluate_achievement", "evaluate_progression",
     "PromptRefinement", "RefinementNeed", "refine_prompt",
     "ReflectionEntry", "ReflectionImportance", "ReflectionJournal", "ReflectionKind", "ReflectionPrompt", "reflection_prompts", "summarize_reflection",
-    "JeevesReplay", "ReplayMismatch", "ReplayReport", "replay_digest",
+    "JeevesReplay", "ReplayMismatch", "ReplayReport", "ReplaySnapshot", "replay_digest",
     "SessionAudit", "audit_session", "policy_chain",
     "EvidenceGate", "JeevesSessionRuntime", "RuntimePlan", "SessionEvent", "SessionPhase", "SessionTransition", "TransitionKind",
     "JeevesSessionEngine", "SessionDecision", "SkillState", "StudentProfile",
