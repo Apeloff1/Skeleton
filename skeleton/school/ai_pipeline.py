@@ -1,10 +1,4 @@
-"""Provider-neutral AI pipeline planning for Jeeves.
-
-Rebuilds the useful orchestration idea from Tutolage's AI pipeline without
-coupling Skeleton to FastAPI, credentials, a vendor SDK, or a specific model.
-The output is a typed execution plan that can later be handed to any model or
-tool adapter.
-"""
+"""Provider-neutral AI pipeline planning for Jeeves."""
 
 from __future__ import annotations
 
@@ -97,4 +91,8 @@ def plan_pipeline(request: PipelineRequest) -> PipelinePlan:
 
 def pipeline_capabilities() -> Mapping[PipelineKind, tuple[PipelineStage, ...]]:
     """Expose the canonical stage graph for adapters and UI layers."""
-    return {kind: tuple(step.stage for step in plan_pipeline(PipelineRequest(kind, "placeholder" )).steps) for kind in PipelineKind}
+    result: dict[PipelineKind, tuple[PipelineStage, ...]] = {}
+    for kind in PipelineKind:
+        plan = plan_pipeline(PipelineRequest(kind=kind, objective="capability probe"))
+        result[kind] = tuple(step.stage for step in plan.steps)
+    return result
