@@ -68,4 +68,36 @@ def test_runtime_audit_rejects_invalid_provenance_digest():
     snapshot = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),), selected_policy="practice", rejected_policies=(), ledger=ledger, pipeline_contract_digest="not-a-digest")
     audit = audit_runtime(snapshot, ledger)
     assert not audit.valid
-    assert any("pipeline contract digest" in item for item in audit.violations)
+    assert any("provenance is incomplete" in item for item in audit.violations)
+
+
+def test_runtime_audit_rejects_unpaired_valid_provenance():
+    ledger = _ledger()
+    snapshot = RuntimeReplaySnapshot.capture(
+        session_id="s1",
+        phase=SessionPhase.DIAGNOSE,
+        events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),),
+        selected_policy="practice",
+        rejected_policies=(),
+        ledger=ledger,
+        pipeline_contract_digest="a" * 64,
+    )
+    audit = audit_runtime(snapshot, ledger)
+    assert not audit.valid
+    assert any("provenance is incomplete" in item for item in audit.violations)
+
+
+def test_replay_digest_changes_when_provenance_changes():
+    ledger = _ledger()
+    events = (SessionEvent(1, SessionPhase.INTAKE, "session_opened"),)
+    first = RuntimeReplaySnapshot.capture(
+        session_id="s1", phase=SessionPhase.DIAGNOSE, events=events,
+        selected_policy="practice", rejected_policies=(), ledger=ledger,
+        pipeline_contract_digest="a" * 64, provenance_digest="b" * 64,
+    )
+    second = RuntimeReplaySnapshot.capture(
+        session_id="s1", phase=SessionPhase.DIAGNOSE, events=events,
+        selected_policy="practice", rejected_policies=(), ledger=ledger,
+        pipeline_contract_digest="c" * 64, provenance_digest="b" * 64,
+    )
+    assert replay_digest(first) != replay_digest(second)
