@@ -13,8 +13,8 @@ def _ledger(session="s1"):
 def test_runtime_snapshot_is_deterministic_and_auditable():
     ledger = _ledger()
     events = (SessionEvent(1, SessionPhase.INTAKE, "session_opened", (("session_id", "s1"),)),)
-    first = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=events, selected_policy="practice", rejected_policies=(), ledger=ledger)
-    second = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=events, selected_policy="practice", rejected_policies=(), ledger=ledger)
+    first = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=events, selected_policy="practice", rejected_policies=(), ledger=ledger, pipeline_contract_digest="a" * 64, provenance_digest="b" * 64)
+    second = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=events, selected_policy="practice", rejected_policies=(), ledger=ledger, pipeline_contract_digest="a" * 64, provenance_digest="b" * 64)
     assert first == second
     assert replay_digest(first) == replay_digest(second)
     assert first.runtime_digest
@@ -61,3 +61,11 @@ def test_runtime_audit_rejects_noncontiguous_event_sequences():
     audit = audit_runtime(snapshot, ledger)
     assert not audit.valid
     assert any("event sequence" in item for item in audit.violations)
+
+
+def test_runtime_audit_rejects_invalid_provenance_digest():
+    ledger = _ledger()
+    snapshot = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),), selected_policy="practice", rejected_policies=(), ledger=ledger, pipeline_contract_digest="not-a-digest")
+    audit = audit_runtime(snapshot, ledger)
+    assert not audit.valid
+    assert any("pipeline contract digest" in item for item in audit.violations)
