@@ -100,12 +100,12 @@ class JeevesSessionRuntime:
         rejected_policies = tuple(c.action.value for c in control.policy_competition.rejected) if control.policy_competition else ()
         self._emit(SessionPhase.INTAKE, "session_opened", {"session_id": session_id})
         self.phase = SessionPhase.DIAGNOSE
-        self._emit(self.phase, "control_plan_ready", {"primary_skill": primary or "none", "arbitration": arbitration.action.value, "policy": selected_policy})
+        self._emit(self.phase, "control_plan_ready", {"primary_skill": primary or "none", "arbitration": selected_policy, "policy": selected_policy})
         self._record_decision(
             decision_id=f"{session_id}:orient", action=selected_policy,
             rationale=(control.policy_competition.rationale if control.policy_competition else arbitration.rationale),
             state={"skill": primary or objective, "mastery": self.knowledge_state.mastery(primary or objective)},
-            policy={"confidence": arbitration.confidence, "counterfactual_margin": control.policy_competition.margin if control.policy_competition else 0.0, "calibrated_reliability": control.policy_calibrator.snapshot(), "rejected_policies": rejected_policies},
+            policy={"confidence": arbitration.confidence, "counterfactual_margin": control.policy_competition.margin if control.policy_competition else 0.0, "calibrated_reliability": control.policy_calibrator.snapshot(), "rejected_policies": rejected_policies, "executed_policy": selected_policy},
         )
         if control.policy_competition:
             for candidate in control.policy_competition.rejected:
