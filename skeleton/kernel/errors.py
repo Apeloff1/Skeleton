@@ -37,6 +37,30 @@ class ProfileError(KernelError):
     """Hardware profile failure."""
 
 
+class SessionError(SkeletonError):
+    """Jeeves session lifecycle failure."""
+
+
+class JeevesError(SkeletonError):
+    """Jeeves subsystem failure."""
+
+
+class PipelineError(SkeletonError):
+    """Pipeline composition or execution failure."""
+
+
+class StageError(PipelineError):
+    """A single pipeline stage failed or was rejected."""
+
+
+class ValidationError(SkeletonError):
+    """Validation failure."""
+
+
+class GenerationError(SkeletonError):
+    """Generation failure."""
+
+
 __all__ = [
     "SkeletonError",
     "BlueprintError",
@@ -45,4 +69,10 @@ __all__ = [
     "VaultError",
     "ForgeError",
     "KernelError",
+    "SessionError",
+    "JeevesError",
+    "PipelineError",
+    "StageError",
+    "ValidationError",
+    "GenerationError",
 ]
