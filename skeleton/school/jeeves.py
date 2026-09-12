@@ -36,6 +36,7 @@ class JeevesSessionPlan:
     suggested_minutes: int
     next_evidence: tuple[str, ...]
     policy_competition: CounterfactualResult | None = None
+    policy_calibrator: PolicyCalibrator | None = None
 
 
 @dataclass
@@ -89,7 +90,7 @@ class JeevesControlPlane:
             evidence.append("retention outcome for due memory")
         if contradiction:
             evidence.append("resolution of contradictory evidence")
-        return JeevesSessionPlan(recommendations, primary, memories, due, control, energy, progression, decisions, max(5, energy.session_minutes), tuple(dict.fromkeys(evidence)), competition)
+        return JeevesSessionPlan(recommendations, primary, memories, due, control, energy, progression, decisions, max(5, energy.session_minutes), tuple(dict.fromkeys(evidence)), competition, self.policy_calibrator)
 
     def record_outcome(self, student: StudentProfile, outcome: SessionOutcome, *, previous_unlocked=frozenset(), policy_action: str | None = None) -> OutcomeResult:
         result = apply_outcome(student, outcome, memory=self.memory, reflections=self.reflections, previous_unlocked=previous_unlocked)
