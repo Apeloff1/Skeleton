@@ -24,7 +24,7 @@ jobs:
         with: {python-version: "3.11"}
       - run: uv tool install ruff
       - run: uvx ruff check .
-      - run: uvx ruff format --check . || true
+      - run: uvx ruff format --check .
   skeleton-test:
     name: "Skeleton GameForge"
     runs-on: ubuntu-latest
@@ -68,7 +68,6 @@ jobs:
     name: "Backend Test"
     runs-on: ubuntu-latest
     needs: backend-lint
-    continue-on-error: true
     defaults: {run: {working-directory: ./backend}}
     services:
       mongodb:
@@ -83,22 +82,21 @@ jobs:
           uv venv
           uv pip install -e ".[test]"
       - env: {MONGO_URL: mongodb://localhost:27017/test}
-        run: uv run pytest tests/ -v --cov=. --cov-report=xml || true
+        run: uv run pytest tests/ -v --cov=. --cov-report=xml
       - uses: codecov/codecov-action@v4
         with: {files: ./backend/coverage.xml, fail_ci_if_error: false}
   frontend:
     name: "Frontend"
     runs-on: ubuntu-latest
-    continue-on-error: true
     defaults: {run: {working-directory: ./frontend}}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: {node-version: "20"}
       - run: yarn install --frozen-lockfile || yarn install
-      - run: yarn lint || true
-      - run: npx tsc --noEmit || true
-      - run: npx expo export --platform web || true
+      - run: yarn lint
+      - run: npx tsc --noEmit
+      - run: npx expo export --platform web
   docker:
     name: "Docker Build"
     runs-on: ubuntu-latest
@@ -123,13 +121,11 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - uses: docker/build-push-action@v5
-        continue-on-error: true
         with:
           context: ./backend
           push: true
           tags: ${{ env.IMAGE }}/backend:latest
       - uses: docker/build-push-action@v5
-        continue-on-error: true
         with:
           context: ./frontend
           target: production
