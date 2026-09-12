@@ -1,13 +1,8 @@
 """Grand Jeeves control plane.
 
-This module is the integration layer for Skeleton's school intelligence.  It
-turns independent policy primitives into a single auditable session decision:
-what to teach, why now, how hard, how long, which memories matter, when to
-review, and what evidence must be captured next.
-
-The control plane is deliberately provider-neutral. Models, vector stores,
-UI, databases, tools, and transport can sit above it without changing the
-learning policy.
+This module composes Skeleton's learning policies into an auditable session
+planner. It is intentionally provider-neutral: models, vector stores, UI,
+databases, tools, and transport can sit above this decision layer.
 """
 
 from __future__ import annotations
@@ -18,7 +13,7 @@ from typing import Sequence
 from skeleton.school.curriculum import CurriculumGraph, LearningRecommendation, rank_recommendations
 from skeleton.school.energy import EnergyBudget, EnergyDecision, choose_energy_strategy
 from skeleton.school.learning_control import LearningControl, LearningControlDecision, LearningState
-from skeleton.school.memory import LearnerMemory, MemoryKind, MemoryMatch, MemoryStore
+from skeleton.school.memory import LearnerMemory, MemoryMatch, MemoryStore
 from skeleton.school.progression import ProgressionSnapshot, evaluate_progression
 from skeleton.school.reflection import ReflectionJournal
 from skeleton.school.student import StudentProfile
@@ -36,8 +31,6 @@ class JeevesDecision:
 
 @dataclass(frozen=True)
 class JeevesSessionPlan:
-    """Complete next-action plan for one learner session."""
-
     recommendations: tuple[LearningRecommendation, ...]
     primary_skill: str | None
     memory_matches: tuple[MemoryMatch, ...]
@@ -71,7 +64,6 @@ class JeevesControlPlane:
         energy_budget: EnergyBudget | None = None,
         max_results: int = 3,
     ) -> JeevesSessionPlan:
-        """Generate a full session plan from current learner evidence."""
         recommendations = tuple(
             rank_recommendations(
                 self.curriculum,
@@ -83,60 +75,31 @@ class JeevesControlPlane:
         )
         primary = recommendations[0].skill_id if recommendations else None
         skills = (primary,) if primary else ()
-
-        memories = tuple(
-            self.memory.retrieve(
-                query_terms=query_terms,
-                skill_ids=skills,
-                limit=5,
-            )
-        )
+        memories = tuple(self.memory.retrieve(query_terms=query_terms, skill_ids=skills, limit=5))
         due = tuple(self.memory.retention_due())
-
-        if learning_state is None:
-            state = self._derive_learning_state(student, primary)
-        else:
-            state = learning_state
+        state = learning_state or self._derive_learning_state(student, primary)
         control = self.learning_control.decide(state)
-
         budget = energy_budget or EnergyBudget(current=student.energy)
-        energy = choose_energy_strategy(budget, mastery=state.mastery, cognitive_load=state.cognitive_load)
+        energy = choose_energy_strategy(
+            budget,
+            requested_minutes=recommendations[0].estimated_minutes if recommendations else 30,
+            high_cognitive_load=state.cognitive_load > 0.8,
+        )
         progression = evaluate_progression(student)
 
-        decisions: list[JeevesDecision] = [
+        decisions = (
             JeevesDecision(
-                "curriculum",
-                primary or "review_memory",
+                "curriculum", primary or "review_memory",
                 tuple(r.reason for r in recommendations[:2]) or ("No prerequisite-ready skill; use retrieval/reflection.",),
             ),
+            JeevesDecision("learning_control", control.difficulty_adjustment, control.rationale or ("Maintain current trajectory.",)),
             JeevesDecision(
-                "learning_control",
-                control.difficulty_adjustment,
-                control.rationale or ("Maintain current learning trajectory.",),
-            ),
-            JeevesDecision(
-                "memory",
-                "retrieve" if memories else "build_memory",
+                "memory", "retrieve" if memories else "build_memory",
                 tuple(m.reason for m in memories[:2]) or ("No retained match; create new evidence.",),
             ),
-            JeevesDecision(
-                "retention",
-                "review_due_memory" if due else "continue_schedule",
-                (f"{len(due)} memories are below retention threshold.",),
-            ),
-            JeevesDecision(
-                "energy",
-                energy.strategy.value,
-                (energy.rationale,),
-            ),
-        ]
-
-        suggested_minutes = min(
-            recommendations[0].estimated_minutes if recommendations else 30,
-            energy.session_minutes,
+            JeevesDecision("retention", "review_due_memory" if due else "continue_schedule", (f"{len(due)} memories are below retention threshold.",)),
+            JeevesDecision("energy", energy.strategy.value, energy.rationale),
         )
-        if state.cognitive_load > 0.8:
-            suggested_minutes = min(suggested_minutes, 25)
 
         evidence = [
             "response quality or solution score",
@@ -158,8 +121,8 @@ class JeevesControlPlane:
             learning_control=control,
             energy=energy,
             progression=progression,
-            decisions=tuple(decisions),
-            suggested_minutes=max(5, suggested_minutes),
+            decisions=decisions,
+            suggested_minutes=max(5, energy.session_minutes),
             next_evidence=tuple(dict.fromkeys(evidence)),
         )
 
