@@ -111,8 +111,18 @@ class DecisionLedger:
             raise ValueError("predecessor decisions must precede the appended decision")
         if supersedes is not None and supersedes not in by_id:
             raise ValueError(f"unknown superseded decision: {supersedes}")
-        if supersedes is not None and by_id[supersedes].sequence >= len(self.records) + 1:
-            raise ValueError("superseded decision must precede its replacement")
+        if supersedes is not None:
+            target = by_id[supersedes]
+            if target.sequence >= len(self.records) + 1:
+                raise ValueError("superseded decision must precede its replacement")
+            if target.session_id != session_id:
+                raise ValueError("superseded decision must belong to the same session")
+            if disposition is not DecisionDisposition.ACCEPTED:
+                raise ValueError("superseding replacement must be accepted")
+            if tuple(predecessors) != (supersedes,):
+                raise ValueError("supersession predecessor must name the superseded decision")
+            if target.supersedes is not None or target.decision_id in self.superseded_ids():
+                raise ValueError(f"decision already superseded: {supersedes}")
         sequence = len(self.records) + 1
         state_digest = self._digest(state or {})
         policy_digest = self._digest(policy or {})
@@ -179,6 +189,14 @@ class DecisionLedger:
                     raise ValueError(f"superseded decision must precede replacement: {record.decision_id}")
                 if prior.sequence >= record.sequence:
                     raise ValueError(f"superseded decision must precede replacement: {record.decision_id}")
+                if prior.session_id != record.session_id:
+                    raise ValueError(f"superseded decision must belong to the same session: {record.decision_id}")
+                if record.disposition is not DecisionDisposition.ACCEPTED:
+                    raise ValueError(f"superseding replacement must be accepted: {record.decision_id}")
+                if record.predecessors != (record.supersedes,):
+                    raise ValueError(f"supersession predecessor must name target: {record.decision_id}")
+                if prior.supersedes is not None:
+                    raise ValueError(f"supersession target is itself a replacement: {record.decision_id}")
             payload = {
                 "sequence": record.sequence,
                 "decision_id": record.decision_id,
