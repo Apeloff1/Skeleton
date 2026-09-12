@@ -52,24 +52,8 @@ class JeevesControlPlane:
     def __post_init__(self) -> None:
         self.curriculum.validate()
 
-    def plan(
-        self,
-        student: StudentProfile,
-        *,
-        query_terms: Sequence[str] = (),
-        learning_state: LearningState | None = None,
-        energy_budget: EnergyBudget | None = None,
-        max_results: int = 3,
-    ) -> JeevesSessionPlan:
-        recommendations = tuple(
-            rank_recommendations(
-                self.curriculum,
-                {skill_id: state.mastery for skill_id, state in student.skills.items()},
-                goals=student.goals,
-                interests=student.interests,
-                max_results=max_results,
-            )
-        )
+    def plan(self, student: StudentProfile, *, query_terms: Sequence[str] = (), learning_state: LearningState | None = None, energy_budget: EnergyBudget | None = None, max_results: int = 3) -> JeevesSessionPlan:
+        recommendations = tuple(rank_recommendations(self.curriculum, {skill_id: state.mastery for skill_id, state in student.skills.items()}, goals=student.goals, interests=student.interests, max_results=max_results))
         primary = recommendations[0].skill_id if recommendations else None
         skills = (primary,) if primary else ()
         memories = tuple(self.memory.retrieve(query_terms=query_terms, skill_ids=skills, limit=5))
@@ -77,11 +61,7 @@ class JeevesControlPlane:
         state = learning_state or self._derive_learning_state(student, primary)
         control = self.learning_control.decide(state)
         budget = energy_budget or EnergyBudget(current=student.energy)
-        energy = choose_energy_strategy(
-            budget,
-            requested_minutes=recommendations[0].estimated_minutes if recommendations else 30,
-            high_cognitive_load=state.cognitive_load > 0.8,
-        )
+        energy = choose_energy_strategy(budget, requested_minutes=recommendations[0].estimated_minutes if recommendations else 30, high_cognitive_load=state.cognitive_load > 0.8)
         progression = evaluate_progression(evidence={
             "successful_attempts": float(sum(skill.successes for skill in student.skills.values())),
             "independent_solutions": float(student.facts.get("independent_solutions", "0")),
@@ -90,7 +70,6 @@ class JeevesControlPlane:
             "misconceptions_repaired": float(student.facts.get("misconceptions_repaired", "0")),
             "projects_completed": float(student.facts.get("projects_completed", "0")),
         })
-
         decisions = (
             JeevesDecision("curriculum", primary or "review_memory", tuple(r.reason for r in recommendations[:2]) or ("No prerequisite-ready skill; use retrieval/reflection.",)),
             JeevesDecision("learning_control", control.difficulty_adjustment, control.rationale or ("Maintain current trajectory.",)),
@@ -105,34 +84,11 @@ class JeevesControlPlane:
             evidence.append("retrieval result after delayed review")
         if due:
             evidence.append("retention outcome for due memory")
-        return JeevesSessionPlan(
-            recommendations=recommendations,
-            primary_skill=primary,
-            memory_matches=memories,
-            retention_due=due,
-            learning_control=control,
-            energy=energy,
-            progression=progression,
-            decisions=decisions,
-            suggested_minutes=max(5, energy.session_minutes),
-            next_evidence=tuple(dict.fromkeys(evidence)),
-        )
+        return JeevesSessionPlan(recommendations, primary, memories, due, control, energy, progression, decisions, max(5, energy.session_minutes), tuple(dict.fromkeys(evidence)))
 
-    def record_outcome(
-        self,
-        student: StudentProfile,
-        outcome: SessionOutcome,
-        *,
-        previous_unlocked: frozenset[str] = frozenset(),
-    ) -> OutcomeResult:
+    def record_outcome(self, student: StudentProfile, outcome: SessionOutcome, *, previous_unlocked: frozenset[str] = frozenset()) -> OutcomeResult:
         """Close the loop: write evidence into learner state and memory."""
-        return apply_outcome(
-            student,
-            outcome,
-            memory=self.memory,
-            reflections=self.reflections,
-            previous_unlocked=previous_unlocked,
-        )
+        return apply_outcome(student, outcome, memory=self.memory, reflections=self.reflections, previous_unlocked=previous_unlocked)
 
     @staticmethod
     def _derive_learning_state(student: StudentProfile, primary_skill: str | None) -> LearningState:
@@ -140,13 +96,4 @@ class JeevesControlPlane:
         mastery = skill.mastery if skill else 0.5
         confidence = skill.confidence if skill else 0.5
         acquisition = skill.last_score if skill and skill.attempts else mastery
-        return LearningState(
-            mastery=mastery,
-            acquisition_rate=acquisition,
-            retention_rate=max(0.0, min(1.0, 0.5 * mastery + 0.5 * confidence)),
-            transfer_rate=confidence,
-            depth_score=mastery,
-            cognitive_load=max(0.0, min(1.0, 1.0 - student.energy)),
-            time_since_review_hours=24.0 if skill and skill.last_seen_step else 0.0,
-            response_time_ratio=1.0,
-        )
+        return LearningState(mastery=mastery, acquisition_rate=acquisition, retention_rate=max(0.0, min(1.0, 0.5 * mastery + 0.5 * confidence)), transfer_rate=confidence, depth_score=mastery, cognitive_load=max(0.0, min(1.0, 1.0 - student.energy)), time_since_review_hours=24.0 if skill and skill.last_seen_step else 0.0, response_time_ratio=1.0)
