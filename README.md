@@ -51,6 +51,23 @@ python -m skeleton test
 | `skeleton.agents` | Agent coordination |
 | `skeleton.context` | Questionnaire and intake |
 | `skeleton.config` | Layered configuration |
+| `skeleton.content` | Reusable domain knowledge packs |
+
+## Lorebuffa AI Domain Pack
+
+The Skeleton AI now has a domain adapter for the AI-relevant work developed in Lorebuffa. It keeps the generic engine clean while importing the useful world-model concepts: NPC personas, faction context, schedules, voice styles, reputation-aware dialogue choices, and quest objective patterns.
+
+```python
+from skeleton.pipelines.lorebuffa_npc import LorebuffaNpcPipeline
+
+npc = LorebuffaNpcPipeline().run(
+    "A veteran fisherman who hides a dangerous secret.",
+    npc="barnacle_bill",
+    dialogue_beats=4,
+)
+```
+
+The adapter reuses Skeleton's existing NPC verification and repair path instead of bypassing the control plane. Lorebuffa's game transport/UI/backend persistence code is intentionally not pulled into Skeleton's AI core.
 
 ## Developer CLI
 
