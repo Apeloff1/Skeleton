@@ -103,13 +103,16 @@ class DecisionLedger:
         missing = tuple(e for e in evidence if e not in self.evidence)
         if missing:
             raise ValueError(f"unknown evidence references: {missing}")
-        missingp = tuple(
-            p for p in predecessors if not any(r.decision_id == p for r in self.records)
-        )
+        by_id = {r.decision_id: r for r in self.records}
+        missingp = tuple(p for p in predecessors if p not in by_id)
         if missingp:
             raise ValueError(f"unknown predecessor decisions: {missingp}")
-        if supersedes is not None and supersedes not in {r.decision_id for r in self.records}:
+        if any(by_id[p].sequence >= len(self.records) + 1 for p in predecessors):
+            raise ValueError("predecessor decisions must precede the appended decision")
+        if supersedes is not None and supersedes not in by_id:
             raise ValueError(f"unknown superseded decision: {supersedes}")
+        if supersedes is not None and by_id[supersedes].sequence >= len(self.records) + 1:
+            raise ValueError("superseded decision must precede its replacement")
         sequence = len(self.records) + 1
         state_digest = self._digest(state or {})
         policy_digest = self._digest(policy or {})
@@ -154,16 +157,28 @@ class DecisionLedger:
     def verify(self) -> None:
         previous = "GENESIS"
         ids: set[str] = set()
+        by_id: dict[str, DecisionRecord] = {}
         for expected, record in enumerate(self.records, 1):
             if record.sequence != expected:
                 raise ValueError("decision sequence is not contiguous")
             if record.decision_id in ids:
                 raise ValueError(f"duplicate decision id: {record.decision_id}")
             ids.add(record.decision_id)
+            by_id[record.decision_id] = record
+            for predecessor in record.predecessors:
+                prior = by_id.get(predecessor)
+                if prior is None:
+                    raise ValueError(f"unknown predecessor decision: {predecessor}")
+                if prior.sequence >= record.sequence:
+                    raise ValueError(f"predecessor must precede decision: {record.decision_id}")
             if record.supersedes == record.decision_id:
                 raise ValueError("decision cannot supersede itself")
-            if record.supersedes is not None and record.supersedes not in ids - {record.decision_id}:
-                raise ValueError(f"superseded decision must precede replacement: {record.decision_id}")
+            if record.supersedes is not None:
+                prior = by_id.get(record.supersedes)
+                if prior is None:
+                    raise ValueError(f"superseded decision must precede replacement: {record.decision_id}")
+                if prior.sequence >= record.sequence:
+                    raise ValueError(f"superseded decision must precede replacement: {record.decision_id}")
             payload = {
                 "sequence": record.sequence,
                 "decision_id": record.decision_id,
