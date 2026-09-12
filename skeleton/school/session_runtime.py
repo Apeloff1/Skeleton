@@ -64,13 +64,17 @@ class JeevesSessionRuntime:
     curriculum: CurriculumGraph
     knowledge: KnowledgeGraph = field(default_factory=KnowledgeGraph)
     knowledge_state: KnowledgeState = field(default_factory=KnowledgeState)
-    epistemics: EpistemicEngine = field(default_factory=EpistemicEngine)
     ledger: DecisionLedger = field(default_factory=DecisionLedger)
     events: list[SessionEvent] = field(default_factory=list)
     phase: SessionPhase = SessionPhase.INTAKE
     session_id: str = ""
     _sequence: int = 0
     _last_decision_id: str | None = None
+
+    @property
+    def epistemics(self) -> EpistemicEngine:
+        """Expose the control plane's epistemic authority to the runtime."""
+        return self.control.epistemics
 
     def begin(self, student: StudentProfile, *, session_id: str, query_terms: Sequence[str] = (), pipeline_kind: PipelineKind = PipelineKind.LESSON, cocoding: CoCodingContext | None = None) -> RuntimePlan:
         self.session_id = session_id
@@ -97,7 +101,11 @@ class JeevesSessionRuntime:
             action=selected_policy,
             rationale=(control.policy_competition.rationale if control.policy_competition else arbitration.rationale),
             state={"skill": primary or objective, "mastery": self.knowledge_state.mastery(primary or objective)},
-            policy={"confidence": arbitration.confidence, "counterfactual_margin": control.policy_competition.margin if control.policy_competition else 0.0},
+            policy={
+                "confidence": arbitration.confidence,
+                "counterfactual_margin": control.policy_competition.margin if control.policy_competition else 0.0,
+                "calibrated_reliability": control.policy_calibrator.snapshot(),
+            },
         )
         if control.policy_competition:
             for candidate in control.policy_competition.rejected:
@@ -106,7 +114,7 @@ class JeevesSessionRuntime:
                     action=candidate.action.value,
                     rationale=candidate.rationale + ("counterfactual alternative; not executed",),
                     state={"skill": primary or objective},
-                    policy={"selected": selected_policy, "counterfactual": True},
+                    policy={"selected": selected_policy, "counterfactual": True, "calibrated_reliability": control.policy_calibrator.snapshot()},
                     disposition=DecisionDisposition.REJECTED,
                 )
         return RuntimePlan(session_id, control, self.phase, pipeline_kind, tuple(s.stage.value for s in pipeline.steps), tuple(c.node_id for c in candidates), action.pattern.value, handoff.value, arbitration.action.value, arbitration.confidence, gates, transitions, selected_policy)
@@ -134,12 +142,24 @@ class JeevesSessionRuntime:
         return SessionTransition(source, target, kind, rationale, gate_set)
 
     def record_evidence(self, *, event: str, subject: str = "", claim: str = "", score: float | None = None, polarity: EvidencePolarity = EvidencePolarity.NEUTRAL, source_id: str = "runtime", **payload: str) -> SessionEvent:
+        evidence_ids: tuple[str, ...] = ()
         if claim:
             evidence_id = f"{self.session_id}:evidence:{self._sequence + 1}"
             strength = 1.0 if score is None else max(0.0, min(1.0, score))
-            self.epistemics.observe(EpistemicEvidence(evidence_id=evidence_id, claim=claim, polarity=polarity, strength=strength, source_id=source_id, step=self._sequence))
+            update = self.epistemics.observe(EpistemicEvidence(evidence_id=evidence_id, claim=claim, polarity=polarity, strength=strength, source_id=source_id, step=self._sequence))
             self.ledger.register_evidence(EvidenceRef(evidence_id, EvidenceKind.OBSERVATION, subject or claim, event, strength, source_id))
-        self._emit(self.phase, event, payload | ({"claim": claim} if claim else {}))
+            evidence_ids = (evidence_id,)
+            self._emit(self.phase, event, payload | {"claim": claim})
+            self._record_decision(
+                decision_id=f"{self.session_id}:evidence:{self._sequence}",
+                action=f"observe:{claim}",
+                rationale=update.rationale,
+                evidence=evidence_ids,
+                state={"confidence": update.belief.confidence, "contradiction": update.contradiction},
+                policy={"polarity": polarity.value},
+            )
+            return self.events[-1]
+        self._emit(self.phase, event, payload)
         return self.events[-1]
 
     def recover(self, *, reason: str) -> SessionTransition:
@@ -179,9 +199,9 @@ class JeevesSessionRuntime:
             SessionTransition(SessionPhase.COMMIT, SessionPhase.COMPLETE, TransitionKind.COMPLETE, f"close {pipeline_kind.value} session"),
         )
 
-    def _record_decision(self, *, decision_id: str, action: str, rationale: Sequence[str], state: dict[str, object], policy: dict[str, object], disposition: DecisionDisposition = DecisionDisposition.PROPOSED) -> None:
+    def _record_decision(self, *, decision_id: str, action: str, rationale: Sequence[str], state: dict[str, object], policy: dict[str, object], evidence: Sequence[str] = (), disposition: DecisionDisposition = DecisionDisposition.PROPOSED) -> None:
         predecessors = (self._last_decision_id,) if self._last_decision_id else ()
-        record = self.ledger.append(session_id=self.session_id, decision_id=decision_id, domain="session_runtime", action=action, rationale=rationale, predecessors=predecessors, state=state, policy=policy, disposition=disposition)
+        record = self.ledger.append(session_id=self.session_id, decision_id=decision_id, domain="session_runtime", action=action, rationale=rationale, evidence=evidence, predecessors=predecessors, state=state, policy=policy, disposition=disposition)
         self._last_decision_id = record.decision_id
 
     def _emit(self, phase: SessionPhase, event: str, payload: dict[str, str]) -> None:
