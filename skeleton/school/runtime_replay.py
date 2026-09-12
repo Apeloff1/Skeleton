@@ -10,63 +10,12 @@ from skeleton.school.decision_ledger import DecisionDisposition, DecisionLedger
 from skeleton.school.session_runtime import SessionEvent, SessionPhase
 
 
-def _runtime_payload(
-    *,
-    session_id: str,
-    phase: str,
-    events: tuple[tuple[int, str, str, tuple[tuple[str, str], ...]], ...],
-    selected_policy: str,
-    selected_policy_decision_id: str,
-    rejected_policies: tuple[str, ...],
-    rejected_policy_decision_ids: tuple[str, ...],
-    ledger_head: str,
-    ledger_count: int,
-    pipeline_contract_digest: str,
-    provenance_digest: str,
-) -> dict[str, object]:
-    return {
-        "session_id": session_id,
-        "phase": phase,
-        "events": events,
-        "selected_policy": selected_policy,
-        "selected_policy_decision_id": selected_policy_decision_id,
-        "rejected_policies": rejected_policies,
-        "rejected_policy_decision_ids": rejected_policy_decision_ids,
-        "ledger_head": ledger_head,
-        "ledger_count": ledger_count,
-        "pipeline_contract_digest": pipeline_contract_digest,
-        "provenance_digest": provenance_digest,
-    }
+def _runtime_payload(*, session_id: str, phase: str, events, selected_policy: str, selected_policy_decision_id: str, rejected_policies: tuple[str, ...], rejected_policy_decision_ids: tuple[str, ...], ledger_head: str, ledger_count: int, pipeline_contract_digest: str, provenance_digest: str) -> dict[str, object]:
+    return {"session_id": session_id, "phase": phase, "events": events, "selected_policy": selected_policy, "selected_policy_decision_id": selected_policy_decision_id, "rejected_policies": rejected_policies, "rejected_policy_decision_ids": rejected_policy_decision_ids, "ledger_head": ledger_head, "ledger_count": ledger_count, "pipeline_contract_digest": pipeline_contract_digest, "provenance_digest": provenance_digest}
 
 
-def _runtime_digest(
-    *,
-    session_id: str,
-    phase: str,
-    events: tuple[tuple[int, str, str, tuple[tuple[str, str], ...]], ...],
-    selected_policy: str,
-    selected_policy_decision_id: str,
-    rejected_policies: tuple[str, ...],
-    rejected_policy_decision_ids: tuple[str, ...],
-    ledger_head: str,
-    ledger_count: int,
-    pipeline_contract_digest: str,
-    provenance_digest: str,
-) -> str:
-    payload = _runtime_payload(
-        session_id=session_id,
-        phase=phase,
-        events=events,
-        selected_policy=selected_policy,
-        selected_policy_decision_id=selected_policy_decision_id,
-        rejected_policies=rejected_policies,
-        rejected_policy_decision_ids=rejected_policy_decision_ids,
-        ledger_head=ledger_head,
-        ledger_count=ledger_count,
-        pipeline_contract_digest=pipeline_contract_digest,
-        provenance_digest=provenance_digest,
-    )
-    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
+def _runtime_digest(**kwargs: object) -> str:
+    return hashlib.sha256(json.dumps(_runtime_payload(**kwargs), sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -86,60 +35,20 @@ class RuntimeReplaySnapshot:
     runtime_digest: str
 
     @classmethod
-    def capture(
-        cls,
-        *,
-        session_id: str,
-        phase: SessionPhase,
-        events: Sequence[SessionEvent],
-        selected_policy: str | None,
-        rejected_policies: Sequence[str],
-        ledger: DecisionLedger,
-        pipeline_contract_digest: str = "",
-        provenance_digest: str = "",
-    ) -> "RuntimeReplaySnapshot":
+    def capture(cls, *, session_id: str, phase: SessionPhase, events: Sequence[SessionEvent], selected_policy: str | None, selected_policy_decision_id: str | None = None, rejected_policies: Sequence[str], ledger: DecisionLedger, pipeline_contract_digest: str = "", provenance_digest: str = "") -> "RuntimeReplaySnapshot":
         normalized = tuple((e.sequence, e.phase.value, e.event, tuple(e.payload)) for e in events)
         selected = selected_policy or ""
         rejected = tuple(rejected_policies)
         session_records = ledger.session(session_id)
-        selected_records = tuple(
-            record for record in session_records
-            if selected and record.action == selected and record.disposition is DecisionDisposition.ACCEPTED
-        )
-        selected_id = selected_records[0].decision_id if len(selected_records) == 1 else ""
-        rejected_records = tuple(
-            record for record in session_records
-            if record.action in rejected and record.disposition is DecisionDisposition.REJECTED
-        )
+        if selected_policy_decision_id:
+            selected_id = selected_policy_decision_id
+        else:
+            selected_records = tuple(record for record in session_records if selected and record.action == selected and record.disposition is DecisionDisposition.ACCEPTED)
+            selected_id = selected_records[0].decision_id if len(selected_records) == 1 else ""
+        rejected_records = tuple(record for record in session_records if record.action in rejected and record.disposition is DecisionDisposition.REJECTED)
         rejected_ids = tuple(record.decision_id for record in rejected_records)
-        digest = _runtime_digest(
-            session_id=session_id,
-            phase=phase.value,
-            events=normalized,
-            selected_policy=selected,
-            selected_policy_decision_id=selected_id,
-            rejected_policies=rejected,
-            rejected_policy_decision_ids=rejected_ids,
-            ledger_head=ledger.head_hash,
-            ledger_count=len(ledger.records),
-            pipeline_contract_digest=pipeline_contract_digest,
-            provenance_digest=provenance_digest,
-        )
-        return cls(
-            session_id,
-            phase.value,
-            len(normalized),
-            normalized,
-            selected,
-            selected_id,
-            rejected,
-            rejected_ids,
-            ledger.head_hash,
-            len(ledger.records),
-            pipeline_contract_digest,
-            provenance_digest,
-            digest,
-        )
+        digest = _runtime_digest(session_id=session_id, phase=phase.value, events=normalized, selected_policy=selected, selected_policy_decision_id=selected_id, rejected_policies=rejected, rejected_policy_decision_ids=rejected_ids, ledger_head=ledger.head_hash, ledger_count=len(ledger.records), pipeline_contract_digest=pipeline_contract_digest, provenance_digest=provenance_digest)
+        return cls(session_id, phase.value, len(normalized), normalized, selected, selected_id, rejected, rejected_ids, ledger.head_hash, len(ledger.records), pipeline_contract_digest, provenance_digest, digest)
 
 
 @dataclass(frozen=True)
@@ -158,38 +67,22 @@ def audit_runtime(snapshot: RuntimeReplaySnapshot, ledger: DecisionLedger) -> Ru
         violations.append("runtime snapshot ledger head diverges from ledger")
     if snapshot.ledger_count != len(ledger.records):
         violations.append("runtime snapshot ledger count diverges from ledger")
-
-    expected_runtime_digest = _runtime_digest(
-        session_id=snapshot.session_id,
-        phase=snapshot.phase,
-        events=snapshot.events,
-        selected_policy=snapshot.selected_policy,
-        selected_policy_decision_id=snapshot.selected_policy_decision_id,
-        rejected_policies=snapshot.rejected_policies,
-        rejected_policy_decision_ids=snapshot.rejected_policy_decision_ids,
-        ledger_head=snapshot.ledger_head,
-        ledger_count=snapshot.ledger_count,
-        pipeline_contract_digest=snapshot.pipeline_contract_digest,
-        provenance_digest=snapshot.provenance_digest,
-    )
+    expected_runtime_digest = _runtime_digest(session_id=snapshot.session_id, phase=snapshot.phase, events=snapshot.events, selected_policy=snapshot.selected_policy, selected_policy_decision_id=snapshot.selected_policy_decision_id, rejected_policies=snapshot.rejected_policies, rejected_policy_decision_ids=snapshot.rejected_policy_decision_ids, ledger_head=snapshot.ledger_head, ledger_count=snapshot.ledger_count, pipeline_contract_digest=snapshot.pipeline_contract_digest, provenance_digest=snapshot.provenance_digest)
     if snapshot.runtime_digest != expected_runtime_digest:
         violations.append("runtime-integrity divergence: runtime digest does not match snapshot payload")
 
     session_records = ledger.session(snapshot.session_id)
     by_id = {record.decision_id: record for record in ledger.records}
-    actions = {record.action for record in session_records}
     rejected_records = tuple(record for record in session_records if record.disposition is DecisionDisposition.REJECTED)
     accepted_records = tuple(record for record in session_records if record.disposition is DecisionDisposition.ACCEPTED)
 
     if snapshot.event_count and not session_records:
         violations.append("runtime has events but ledger has no session decisions")
     if snapshot.selected_policy:
-        selected_matches = tuple(
-            record for record in accepted_records if record.action == snapshot.selected_policy
-        )
+        selected_matches = tuple(record for record in accepted_records if record.action == snapshot.selected_policy)
         if not session_records:
             violations.append("selected policy cannot be audited without session decisions")
-        elif snapshot.selected_policy not in actions:
+        elif snapshot.selected_policy not in {record.action for record in session_records}:
             violations.append("selected policy is absent from session ledger")
         elif any(record.action == snapshot.selected_policy for record in rejected_records):
             violations.append("selected policy is incorrectly recorded as rejected")
@@ -258,6 +151,8 @@ def audit_runtime(snapshot: RuntimeReplaySnapshot, ledger: DecisionLedger) -> Ru
             prior = by_id.get(predecessor)
             if prior is None:
                 violations.append(f"decision {record.decision_id!r} references missing predecessor")
+            elif prior.session_id != snapshot.session_id:
+                violations.append(f"decision {record.decision_id!r} has a cross-session predecessor")
             elif prior.sequence >= record.sequence:
                 violations.append(f"decision {record.decision_id!r} has a non-causal predecessor")
 
@@ -265,18 +160,5 @@ def audit_runtime(snapshot: RuntimeReplaySnapshot, ledger: DecisionLedger) -> Ru
 
 
 def replay_digest(snapshot: RuntimeReplaySnapshot) -> str:
-    payload = {
-        "session_id": snapshot.session_id,
-        "phase": snapshot.phase,
-        "events": snapshot.events,
-        "selected_policy": snapshot.selected_policy,
-        "selected_policy_decision_id": snapshot.selected_policy_decision_id,
-        "rejected_policies": snapshot.rejected_policies,
-        "rejected_policy_decision_ids": snapshot.rejected_policy_decision_ids,
-        "ledger_head": snapshot.ledger_head,
-        "ledger_count": snapshot.ledger_count,
-        "pipeline_contract_digest": snapshot.pipeline_contract_digest,
-        "provenance_digest": snapshot.provenance_digest,
-        "runtime_digest": snapshot.runtime_digest,
-    }
+    payload = {"session_id": snapshot.session_id, "phase": snapshot.phase, "events": snapshot.events, "selected_policy": snapshot.selected_policy, "selected_policy_decision_id": snapshot.selected_policy_decision_id, "rejected_policies": snapshot.rejected_policies, "rejected_policy_decision_ids": snapshot.rejected_policy_decision_ids, "ledger_head": snapshot.ledger_head, "ledger_count": snapshot.ledger_count, "pipeline_contract_digest": snapshot.pipeline_contract_digest, "provenance_digest": snapshot.provenance_digest, "runtime_digest": snapshot.runtime_digest}
     return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
