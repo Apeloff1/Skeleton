@@ -5,6 +5,7 @@ from skeleton.school.assessment import AssessmentEngine, AssessmentEvidence, Ass
 from skeleton.school.code_intelligence import CodeIntelligenceEngine, CodeIntelligenceReport, CodeSignal, CodeSignalKind, CodeTask as IntelligenceTask, CodeTaskKind
 from skeleton.school.code_lab import CodeFinding, CodeLabEngine, CodeReview, CodeTask, FindingSeverity
 from skeleton.school.cocoding import CodingPhase, CoCodingAction, CoCodingContext, HandoffStage, InteractionPattern, choose_action, next_handoff
+from skeleton.school.counterfactual import CandidateAction, CounterfactualResult, PolicyCandidate, compete, default_candidates
 from skeleton.school.curriculum import CurriculumGraph, CurriculumNode, LearningRecommendation, rank_recommendations
 from skeleton.school.debugging import DebugAction, DebugExperiment, DebugFocus, DebugHypothesis, DebugPlan, DebuggingPolicy
 from skeleton.school.decision_ledger import DecisionDisposition, DecisionLedger, DecisionRecord, EvidenceKind, EvidenceRef, LedgerCheckpoint, evidence_bundle
@@ -32,6 +33,7 @@ __all__ = [
     "CodeIntelligenceEngine", "CodeIntelligenceReport", "CodeSignal", "CodeSignalKind", "IntelligenceTask", "CodeTaskKind",
     "CodeFinding", "CodeLabEngine", "CodeReview", "CodeTask", "FindingSeverity",
     "CodingPhase", "CoCodingAction", "CoCodingContext", "HandoffStage", "InteractionPattern", "choose_action", "next_handoff",
+    "CandidateAction", "CounterfactualResult", "PolicyCandidate", "compete", "default_candidates",
     "CurriculumGraph", "CurriculumNode", "LearningRecommendation", "rank_recommendations",
     "DebugAction", "DebugExperiment", "DebugFocus", "DebugHypothesis", "DebugPlan", "DebuggingPolicy",
     "DecisionDisposition", "DecisionLedger", "DecisionRecord", "EvidenceKind", "EvidenceRef", "LedgerCheckpoint", "evidence_bundle",
