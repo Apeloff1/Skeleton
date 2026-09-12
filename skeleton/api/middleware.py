@@ -4,7 +4,7 @@ FastAPI doesn't ship with these; they live here so routes stay thin.
 
 Gate stack (outer → inner), sibling of Zaibatsu.Gate Program.cs::
 
-    RequestSeal → BodyBound → WORM → Auth → PolicyGate
+    RequestSeal → WriteAdmit → BodyBound → WORM → Auth → PolicyGate
 
 Install with :func:`install_gate` (Starlette LIFO: last added = outermost).
 """
@@ -142,8 +142,17 @@ class GatePolicy:
 
     def is_open_route(self, path: str) -> bool:
         p = path or "/"
-        return any(p == pref or p.startswith(pref.rstrip("/") + "/") or p.startswith(pref)
-                   for pref in self._open if pref)
+        for pref in self._open:
+            if not pref:
+                continue
+            # Bare "/" is exact-only — never a prefix of every path.
+            if pref == "/":
+                if p == "/":
+                    return True
+                continue
+            if p == pref or p.startswith(pref.rstrip("/") + "/") or p.startswith(pref):
+                return True
+        return False
 
     def required_domain(self, path: str) -> Optional[str]:
         p = path or "/"
@@ -394,16 +403,30 @@ def install_gate(
     policy: Optional[GatePolicy] = None,
     audit_log: Any = None,
     max_body_bytes: Optional[int] = None,
+    write_gate: Any = None,
+    write_governor: Any = None,
 ) -> Any:
     """Wire Gate stack outer→inner onto a Starlette/FastAPI app.
 
     Starlette ``add_middleware`` is LIFO: the last registered runs first.
+
+    Order (outer → inner), sibling of Zaibatsu.Gate + gf-server admit_write::
+
+        RequestSeal → WriteAdmit → BodyBound → WORM → Auth → PolicyGate
     """
+    from skeleton.api.admit_write import WriteAdmitMiddleware
+
     policy = policy or GatePolicy()
     # Innermost first:
     app.add_middleware(PolicyGateMiddleware, policy=policy, audit_log=audit_log)
     app.add_middleware(AuthMiddleware, policy=policy)
     app.add_middleware(WormAuditMiddleware, audit_log=audit_log)
     app.add_middleware(BodyBoundMiddleware, max_body_bytes=max_body_bytes)
+    app.add_middleware(
+        WriteAdmitMiddleware,
+        policy=policy,
+        gate=write_gate,
+        governor=write_governor,
+    )
     app.add_middleware(RequestSealMiddleware, policy=policy)
     return app
