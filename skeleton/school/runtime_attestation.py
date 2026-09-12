@@ -4,11 +4,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
-from typing import Sequence
 
 from skeleton.school.decision_ledger import DecisionDisposition, DecisionLedger
 from skeleton.school.runtime_replay import RuntimeReplaySnapshot, audit_runtime, replay_digest
-from skeleton.school.session_audit import SessionAudit, audit_session
+from skeleton.school.session_audit import audit_session
 
 
 def _digest(payload: object) -> str:
@@ -23,6 +22,8 @@ class RuntimeAttestation:
     session_audit_digest: str
     ledger_head: str
     ledger_count: int
+    session_root_decision_id: str
+    selected_policy_decision_id: str | None
     accepted_decision_ids: tuple[str, ...]
     rejected_decision_ids: tuple[str, ...]
     attestation_digest: str
@@ -31,8 +32,20 @@ class RuntimeAttestation:
     def capture(cls, snapshot: RuntimeReplaySnapshot, ledger: DecisionLedger) -> "RuntimeAttestation":
         runtime_audit = audit_runtime(snapshot, ledger)
         session_audit = audit_session(ledger, snapshot.session_id)
-        accepted = tuple(record.decision_id for record in ledger.session(snapshot.session_id) if record.disposition is DecisionDisposition.ACCEPTED)
-        rejected = tuple(record.decision_id for record in ledger.session(snapshot.session_id) if record.disposition is DecisionDisposition.REJECTED)
+        records = ledger.session(snapshot.session_id)
+        if not records:
+            raise ValueError("cannot attest an empty session")
+        roots = tuple(record for record in records if not record.predecessors)
+        if len(roots) != 1:
+            raise ValueError("session must have exactly one causal root")
+        root = roots[0]
+        accepted = tuple(record.decision_id for record in records if record.disposition is DecisionDisposition.ACCEPTED)
+        rejected = tuple(record.decision_id for record in records if record.disposition is DecisionDisposition.REJECTED)
+        selected = snapshot.selected_policy_decision_id
+        if selected is not None:
+            selected_record = next((record for record in records if record.decision_id == selected), None)
+            if selected_record is None or selected_record.disposition is not DecisionDisposition.ACCEPTED:
+                raise ValueError("selected policy decision is not an accepted session record")
         payload = {
             "session_id": snapshot.session_id,
             "runtime_digest": snapshot.runtime_digest,
@@ -40,12 +53,26 @@ class RuntimeAttestation:
             "session_audit_digest": session_audit.digest,
             "ledger_head": ledger.head_hash,
             "ledger_count": len(ledger.records),
+            "session_root_decision_id": root.decision_id,
+            "selected_policy_decision_id": selected,
             "accepted_decision_ids": accepted,
             "rejected_decision_ids": rejected,
             "runtime_valid": runtime_audit.valid,
             "session_valid": session_audit.valid,
         }
-        return cls(snapshot.session_id, snapshot.runtime_digest, payload["replay_digest"], session_audit.digest, ledger.head_hash, len(ledger.records), accepted, rejected, _digest(payload))
+        return cls(
+            snapshot.session_id,
+            snapshot.runtime_digest,
+            payload["replay_digest"],
+            session_audit.digest,
+            ledger.head_hash,
+            len(ledger.records),
+            root.decision_id,
+            selected,
+            accepted,
+            rejected,
+            _digest(payload),
+        )
 
 
 def verify_attestation(attestation: RuntimeAttestation, snapshot: RuntimeReplaySnapshot, ledger: DecisionLedger) -> tuple[str, ...]:
@@ -53,7 +80,11 @@ def verify_attestation(attestation: RuntimeAttestation, snapshot: RuntimeReplayS
     failures: list[str] = []
     runtime = audit_runtime(snapshot, ledger)
     session = audit_session(ledger, snapshot.session_id)
-    expected = RuntimeAttestation.capture(snapshot, ledger)
+    try:
+        expected = RuntimeAttestation.capture(snapshot, ledger)
+    except ValueError as exc:
+        failures.append(str(exc))
+        expected = None
     if not runtime.valid:
         failures.append("runtime audit is invalid")
     if not session.valid:
@@ -68,10 +99,14 @@ def verify_attestation(attestation: RuntimeAttestation, snapshot: RuntimeReplayS
         failures.append("attestation session audit digest diverges")
     if attestation.ledger_head != ledger.head_hash or attestation.ledger_count != len(ledger.records):
         failures.append("attestation ledger identity diverges")
-    if attestation.accepted_decision_ids != expected.accepted_decision_ids:
+    if attestation.session_root_decision_id != (expected.session_root_decision_id if expected else ""):
+        failures.append("attestation causal root diverges")
+    if attestation.selected_policy_decision_id != (expected.selected_policy_decision_id if expected else None):
+        failures.append("attestation selected policy identity diverges")
+    if attestation.accepted_decision_ids != (expected.accepted_decision_ids if expected else ()):
         failures.append("attestation accepted decision identities diverge")
-    if attestation.rejected_decision_ids != expected.rejected_decision_ids:
+    if attestation.rejected_decision_ids != (expected.rejected_decision_ids if expected else ()):
         failures.append("attestation rejected decision identities diverge")
-    if attestation.attestation_digest != expected.attestation_digest:
+    if expected is not None and attestation.attestation_digest != expected.attestation_digest:
         failures.append("attestation digest diverges")
     return tuple(dict.fromkeys(failures))
