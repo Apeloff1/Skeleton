@@ -20,20 +20,14 @@ def test_runtime_snapshot_is_deterministic_and_auditable():
     assert first == second
     assert replay_digest(first) == replay_digest(second)
     assert first.runtime_digest
+    assert first.selected_policy_decision_id == "s1:orient"
     audit = audit_runtime(first, ledger)
     assert audit.valid
 
 
 def test_runtime_audit_detects_runtime_digest_tampering():
     ledger = _ledger()
-    snapshot = RuntimeReplaySnapshot.capture(
-        session_id="s1",
-        phase=SessionPhase.DIAGNOSE,
-        events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),),
-        selected_policy="practice",
-        rejected_policies=(),
-        ledger=ledger,
-    )
+    snapshot = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),), selected_policy="practice", rejected_policies=(), ledger=ledger)
     tampered = replace(snapshot, runtime_digest="f" * 64)
     audit = audit_runtime(tampered, ledger)
     assert not audit.valid
@@ -66,15 +60,22 @@ def test_runtime_audit_rejects_selected_policy_marked_rejected():
     snapshot = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),), selected_policy="challenge", rejected_policies=("challenge",), ledger=ledger)
     audit = audit_runtime(snapshot, ledger)
     assert not audit.valid
-    assert any("incorrectly recorded as rejected" in item for item in audit.violations)
+    assert any("does not have a unique ACCEPTED ledger attribution" in item for item in audit.violations)
+
+
+def test_runtime_audit_rejects_duplicate_accepted_policy_identity():
+    ledger = _ledger()
+    ledger.append(session_id="s1", decision_id="s1:practice-duplicate", domain="session_runtime", action="practice", rationale=("duplicate action",), disposition=DecisionDisposition.ACCEPTED)
+    snapshot = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),), selected_policy="practice", rejected_policies=(), ledger=ledger)
+    assert snapshot.selected_policy_decision_id == ""
+    audit = audit_runtime(snapshot, ledger)
+    assert not audit.valid
+    assert any("missing a decision identity" in item for item in audit.violations)
 
 
 def test_runtime_audit_rejects_noncontiguous_event_sequences():
     ledger = _ledger()
-    events = (
-        SessionEvent(1, SessionPhase.INTAKE, "session_opened"),
-        SessionEvent(3, SessionPhase.DIAGNOSE, "control_plan_ready"),
-    )
+    events = (SessionEvent(1, SessionPhase.INTAKE, "session_opened"), SessionEvent(3, SessionPhase.DIAGNOSE, "control_plan_ready"))
     snapshot = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=events, selected_policy="practice", rejected_policies=(), ledger=ledger)
     audit = audit_runtime(snapshot, ledger)
     assert not audit.valid
@@ -91,15 +92,7 @@ def test_runtime_audit_rejects_invalid_provenance_digest():
 
 def test_runtime_audit_rejects_unpaired_valid_provenance():
     ledger = _ledger()
-    snapshot = RuntimeReplaySnapshot.capture(
-        session_id="s1",
-        phase=SessionPhase.DIAGNOSE,
-        events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),),
-        selected_policy="practice",
-        rejected_policies=(),
-        ledger=ledger,
-        pipeline_contract_digest="a" * 64,
-    )
+    snapshot = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),), selected_policy="practice", rejected_policies=(), ledger=ledger, pipeline_contract_digest="a" * 64)
     audit = audit_runtime(snapshot, ledger)
     assert not audit.valid
     assert any("provenance is incomplete" in item for item in audit.violations)
@@ -108,14 +101,6 @@ def test_runtime_audit_rejects_unpaired_valid_provenance():
 def test_replay_digest_changes_when_provenance_changes():
     ledger = _ledger()
     events = (SessionEvent(1, SessionPhase.INTAKE, "session_opened"),)
-    first = RuntimeReplaySnapshot.capture(
-        session_id="s1", phase=SessionPhase.DIAGNOSE, events=events,
-        selected_policy="practice", rejected_policies=(), ledger=ledger,
-        pipeline_contract_digest="a" * 64, provenance_digest="b" * 64,
-    )
-    second = RuntimeReplaySnapshot.capture(
-        session_id="s1", phase=SessionPhase.DIAGNOSE, events=events,
-        selected_policy="practice", rejected_policies=(), ledger=ledger,
-        pipeline_contract_digest="c" * 64, provenance_digest="b" * 64,
-    )
+    first = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=events, selected_policy="practice", rejected_policies=(), ledger=ledger, pipeline_contract_digest="a" * 64, provenance_digest="b" * 64)
+    second = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=events, selected_policy="practice", rejected_policies=(), ledger=ledger, pipeline_contract_digest="c" * 64, provenance_digest="b" * 64)
     assert replay_digest(first) != replay_digest(second)
