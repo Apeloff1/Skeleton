@@ -72,6 +72,8 @@ def audit_session(ledger: DecisionLedger, session_id: str) -> SessionAudit:
         if target_id in seen_targets:
             failures.append(f"decision {target_id} is superseded more than once")
         seen_targets.add(target_id)
+        if target.supersedes is not None:
+            failures.append(f"supersession target is itself a replacement: {replacement.decision_id}")
 
     superseded = tuple(record for record in records if record.disposition is DecisionDisposition.SUPERSEDED)
     if superseded:
