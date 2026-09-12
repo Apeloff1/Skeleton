@@ -2,7 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 import hashlib, json
-from typing import Mapping, Sequence
+from typing import Sequence
 from skeleton.school.decision_ledger import DecisionDisposition, DecisionLedger
 from skeleton.school.session_runtime import SessionEvent, SessionPhase
 
@@ -17,7 +17,7 @@ class RuntimeReplaySnapshot:
     rejected_policies: tuple[str, ...]
     ledger_head: str
     ledger_count: int
-    ledger_digest: str
+    runtime_digest: str
 
     @classmethod
     def capture(cls, *, session_id: str, phase: SessionPhase, events: Sequence[SessionEvent], selected_policy: str | None, rejected_policies: Sequence[str], ledger: DecisionLedger) -> "RuntimeReplaySnapshot":
@@ -54,14 +54,18 @@ def audit_runtime(snapshot: RuntimeReplaySnapshot, ledger: DecisionLedger) -> Ru
     session_records = ledger.session(snapshot.session_id)
     if snapshot.event_count and not session_records:
         violations.append("runtime has events but ledger has no session decisions")
-    accepted = {r.action for r in session_records if r.disposition is DecisionDisposition.ACCEPTED}
-    if snapshot.selected_policy and session_records and snapshot.selected_policy not in accepted:
-        # The orient record may remain PROPOSED while outcome/transition records carry
-        # the accepted action, so only flag a stronger contradiction when no record names it.
+    if snapshot.selected_policy and session_records:
         named = {r.action for r in session_records}
         if snapshot.selected_policy not in named:
             violations.append("selected policy is absent from session ledger")
-    return RuntimeAudit(not violations, tuple(violations))
+    rejected = set(snapshot.rejected_policies)
+    for record in session_records:
+        if record.action in rejected and record.disposition is not DecisionDisposition.REJECTED:
+            violations.append(f"rejected policy {record.action!r} is not audited as rejected")
+    for record in session_records:
+        if any(predecessor not in {candidate.decision_id for candidate in ledger.records} for predecessor in record.predecessors):
+            violations.append(f"decision {record.decision_id!r} references missing predecessor")
+    return RuntimeAudit(not violations, tuple(dict.fromkeys(violations)))
 
 
 def replay_digest(snapshot: RuntimeReplaySnapshot) -> str:
@@ -73,6 +77,6 @@ def replay_digest(snapshot: RuntimeReplaySnapshot) -> str:
         "rejected_policies": snapshot.rejected_policies,
         "ledger_head": snapshot.ledger_head,
         "ledger_count": snapshot.ledger_count,
-        "ledger_digest": snapshot.ledger_digest,
+        "runtime_digest": snapshot.runtime_digest,
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
