@@ -30,9 +30,22 @@ class PrefrontalCortex:
 
     def __init__(self, *, span: int = 7) -> None:
         self.memory: deque[str] = deque(maxlen=max(3, span))
+        self._hide_untrained_transformer = False
         from skeleton.cortex.learned import LearnedWeights
-        # Small LM: n-gram + skip-gram only. Medium (midbrain) owns the transformer.
-        self.weights = LearnedWeights(order=2, dim=8, seed=2, attn=False)
+        # PFC owns a deliberately tiny causal transformer in addition to its
+        # n-gram/skip-gram substrate. The transformer remains an internal
+        # training mouth; the public PFC port can hide an untrained mouth
+        # until it has actually participated in the cortex training loop.
+        self.weights = LearnedWeights(
+            order=2,
+            dim=8,
+            seed=2,
+            attn=True,
+            ctx=4,
+            n_heads=1,
+            n_layers=1,
+            d_ff=0,
+        )
 
     @property
     def lm(self):
@@ -44,7 +57,10 @@ class PrefrontalCortex:
 
     @property
     def transformer(self):
-        return self.weights.transformer
+        xf = self.weights.transformer
+        if self._hide_untrained_transformer and int(getattr(xf, "steps", 0) or 0) <= 0:
+            return None
+        return xf
 
     def fit(self, text: str) -> int:
         return self.weights.fit(text)
@@ -53,16 +69,16 @@ class PrefrontalCortex:
         return self.weights.snapshot()
 
     def perplexity(self, texts) -> float:
-        xf = self.transformer
-        if xf is not None and hasattr(xf, "perplexity"):
+        xf = self.weights.transformer
+        if xf is not None and getattr(xf, "steps", 0) > 0 and hasattr(xf, "perplexity"):
             return float(xf.perplexity(texts))
         if hasattr(self.lm, "perplexity"):
             return float(self.lm.perplexity(texts))
         return float("inf")
 
     def decode(self, stimulus: str, *, n: int = 8, seed: int = 0) -> str:
-        xf = self.transformer
-        if xf is not None and hasattr(xf, "decode"):
+        xf = self.weights.transformer
+        if xf is not None and getattr(xf, "steps", 0) > 0 and hasattr(xf, "decode"):
             return str(xf.decode(stimulus or "", n=n, seed=seed))
         return (stimulus or "")[:160]
 
@@ -94,8 +110,8 @@ class PrefrontalCortex:
             conf = 0.95
         else:
             body = " | ".join(steps)
-            xf = self.transformer
-            if xf is not None and hasattr(xf, "decode"):
+            xf = self.weights.transformer
+            if xf is not None and getattr(xf, "steps", 0) > 0 and hasattr(xf, "decode"):
                 draft = str(xf.decode(text, n=6, seed=2) or "").strip()
                 if draft:
                     body = body + " | DRAFT " + draft

@@ -14,15 +14,26 @@ FACES = (
 )
 
 
-def _live_lm(lm) -> bool:
-    if lm is None:
+def _live_lm(mouth) -> bool:
+    """Return whether a model mouth is callable/finite through its public seam.
+
+    A mouth can intentionally hide an internal transformer (PFC does this
+    before training) while remaining a live ModelPort backed by its smaller
+    learned substrate.  Dodeca measures the capability, not a private field.
+    """
+    if mouth is None:
         return False
-    if hasattr(lm, "perplexity"):
+    candidate = mouth
+    if not hasattr(candidate, "perplexity"):
+        candidate = getattr(mouth, "transformer", None)
+    if candidate is None:
+        return False
+    if hasattr(candidate, "perplexity"):
         try:
-            return float(lm.perplexity(["plan tensor ttk"])) < 1e8
+            return float(candidate.perplexity(["plan tensor ttk"])) < 1e8
         except Exception:
             return False
-    return int(getattr(lm, "steps", 0) or getattr(lm, "fitted", 0) or 0) >= 0
+    return int(getattr(candidate, "steps", 0) or getattr(candidate, "fitted", 0) or 0) >= 0
 
 
 def face_card(neo) -> Dict[str, Any]:
@@ -34,10 +45,10 @@ def face_card(neo) -> Dict[str, Any]:
     bpe = getattr(neo, "bpe", None)
     sleep = getattr(neo, "sleep", None)
     faces = {
-        "pfc": _live_lm(getattr(slots.get("pfc"), "transformer", None)),
-        "midbrain": _live_lm(getattr(slots.get("midbrain"), "transformer", None)),
-        "left": _live_lm(getattr(slots.get("left"), "transformer", None)),
-        "right": _live_lm(getattr(slots.get("right"), "transformer", None)),
+        "pfc": _live_lm(slots.get("pfc")),
+        "midbrain": _live_lm(slots.get("midbrain")),
+        "left": _live_lm(slots.get("left")),
+        "right": _live_lm(slots.get("right")),
         "neo": _live_lm(xf),
         "neo_rms": _live_lm(rms),
         "callosum": int(getattr(cc, "fires", 0) or 0) >= 0 and cc is not None,

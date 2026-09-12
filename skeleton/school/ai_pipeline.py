@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import hashlib
+import json
 from typing import Mapping
 
 
@@ -55,6 +57,40 @@ class PipelinePlan:
     quality_gates: tuple[str, ...]
     learner_evidence: tuple[str, ...]
 
+    @property
+    def stages(self) -> tuple[PipelineStage, ...]:
+        return tuple(step.stage for step in self.steps)
+
+    @property
+    def digest(self) -> str:
+        payload = {
+            "kind": self.kind.value,
+            "steps": [
+                {"stage": step.stage.value, "instruction": step.instruction, "required": step.required}
+                for step in self.steps
+            ],
+            "quality_gates": self.quality_gates,
+            "learner_evidence": self.learner_evidence,
+        }
+        return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+    def validate(self) -> tuple[str, ...]:
+        """Return deterministic contract violations without executing a provider."""
+        violations: list[str] = []
+        if not self.steps:
+            violations.append("pipeline_has_no_steps")
+        if self.steps and self.steps[0].stage is not PipelineStage.UNDERSTAND:
+            violations.append("understand_must_be_first")
+        if self.steps and self.steps[-1].stage is not PipelineStage.REFLECT:
+            violations.append("reflect_must_be_last")
+        if any(step.stage is PipelineStage.GENERATE for step in self.steps) and PipelineStage.PLAN not in self.stages:
+            violations.append("generate_requires_plan")
+        if "verification_evidence_present" in self.quality_gates and PipelineStage.VERIFY not in self.stages:
+            violations.append("verification_gate_requires_verify_stage")
+        if "claim_is_supported_by_measurement_or_reproduction" in self.quality_gates and PipelineStage.VERIFY not in self.stages:
+            violations.append("measurement_gate_requires_verify_stage")
+        return tuple(dict.fromkeys(violations))
+
 
 def plan_pipeline(request: PipelineRequest) -> PipelinePlan:
     if not request.objective.strip():
@@ -81,12 +117,16 @@ def plan_pipeline(request: PipelineRequest) -> PipelinePlan:
         evidence.append("before/after technical evidence")
     if request.kind in {PipelineKind.LESSON, PipelineKind.ASSESS}:
         evidence.append("independent learner response")
-    return PipelinePlan(request.kind, tuple(steps), tuple(dict.fromkeys(gates)), tuple(dict.fromkeys(evidence)))
+    plan = PipelinePlan(request.kind, tuple(steps), tuple(dict.fromkeys(gates)), tuple(dict.fromkeys(evidence)))
+    violations = plan.validate()
+    if violations:
+        raise ValueError("invalid pipeline contract: " + ", ".join(violations))
+    return plan
 
 
 def pipeline_capabilities() -> Mapping[PipelineKind, tuple[PipelineStage, ...]]:
     result: dict[PipelineKind, tuple[PipelineStage, ...]] = {}
     for kind in PipelineKind:
         plan = plan_pipeline(PipelineRequest(kind=kind, objective="capability probe"))
-        result[kind] = tuple(step.stage for step in plan.steps)
+        result[kind] = plan.stages
     return result

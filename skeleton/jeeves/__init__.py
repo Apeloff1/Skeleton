@@ -50,6 +50,25 @@ from .templates import PromptRegistry, PromptTemplate, TemplateError
 from .tracking import SessionTracker, SessionTracking
 from .troubleshooting import Troubleshooter, TroubleshootingStep
 
+# Keep CORTEX mode lazy without falling back merely because _cortex has not
+# been materialised yet. The core object intentionally lazy-loads the real
+# neocortex, so a first CORTEX request must use that same lifecycle-bound model.
+_core_think = Jeeves.think
+
+def _jeeves_think_lazy_cortex(self, stimulus: str, *, context=None):
+    cortex = self.cortex
+    if callable(getattr(cortex, "think", None)):
+        trace = cortex.think(stimulus, context)
+        self._bus.emit("jeeves.cortex.thought", {
+            "fp": trace.fingerprint,
+            "used_own": trace.used_own,
+            "hive": trace.hive_value,
+        })
+        return trace
+    return _core_think(self, stimulus, context=context)
+
+Jeeves.think = _jeeves_think_lazy_cortex
+
 __all__ = [
     "Jeeves",
     "JeevesCore",

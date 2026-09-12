@@ -24,7 +24,12 @@ from skeleton.school.policy_calibration import PolicyCalibrator, PolicyStats
 from skeleton.school.progression import AchievementEvidence, AchievementRequirement, AchievementResult, ProgressionSnapshot, achievement_learning_signal, evaluate_achievement, evaluate_progression
 from skeleton.school.prompting import PromptRefinement, RefinementNeed, refine_prompt
 from skeleton.school.reflection import ReflectionEntry, ReflectionImportance, ReflectionJournal, ReflectionKind, ReflectionPrompt, reflection_prompts, summarize_reflection
-from skeleton.school.replay import JeevesReplay, ReplayMismatch, ReplayReport, replay_digest
+from skeleton.school.replay import JeevesReplay, ReplayMismatch, ReplayReport, ReplaySnapshot, replay_digest
+from skeleton.school.runtime_replay import RuntimeAudit, RuntimeReplaySnapshot, audit_runtime, replay_digest as runtime_replay_digest
+from skeleton.school.runtime_audit_api import capture_runtime, complete_runtime
+from skeleton.school.runtime_attestation import RuntimeAttestation, verify_attestation
+from skeleton.school.runtime_capsule import RuntimeIntegrityCapsule
+from skeleton.school.session_audit import SessionAudit, audit_session, policy_chain
 from skeleton.school.session_runtime import EvidenceGate, JeevesSessionRuntime, RuntimePlan, SessionEvent, SessionPhase, SessionTransition, TransitionKind
 from skeleton.school.session import JeevesSessionEngine, SessionDecision
 from skeleton.school.student import SkillState, StudentProfile
@@ -53,7 +58,9 @@ __all__ = [
     "AchievementEvidence", "AchievementRequirement", "AchievementResult", "ProgressionSnapshot", "achievement_learning_signal", "evaluate_achievement", "evaluate_progression",
     "PromptRefinement", "RefinementNeed", "refine_prompt",
     "ReflectionEntry", "ReflectionImportance", "ReflectionJournal", "ReflectionKind", "ReflectionPrompt", "reflection_prompts", "summarize_reflection",
-    "JeevesReplay", "ReplayMismatch", "ReplayReport", "replay_digest",
+    "JeevesReplay", "ReplayMismatch", "ReplayReport", "ReplaySnapshot", "replay_digest",
+    "RuntimeAudit", "RuntimeReplaySnapshot", "audit_runtime", "runtime_replay_digest", "capture_runtime", "complete_runtime", "RuntimeAttestation", "verify_attestation", "RuntimeIntegrityCapsule",
+    "SessionAudit", "audit_session", "policy_chain",
     "EvidenceGate", "JeevesSessionRuntime", "RuntimePlan", "SessionEvent", "SessionPhase", "SessionTransition", "TransitionKind",
     "JeevesSessionEngine", "SessionDecision", "SkillState", "StudentProfile",
 ]

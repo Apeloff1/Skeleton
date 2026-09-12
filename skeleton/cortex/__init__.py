@@ -64,119 +64,57 @@ from .deck import CommandDeck, live_deck
 from .era_bind import HOUSE_ERA, house_era, resolve as resolve_era, bind_into
 from .perpendicular import AXES as PERP_AXES, cut as perpendicular_cut, live_cut
 
+# The PFC transformer is an owned small mouth, but a fresh cortex should not
+# advertise an untrained mouth through its public slot. Once the curriculum
+# advances it, the same object exposes the trained transformer. Direct PFC
+# construction remains fully inspectable for model-unit tests and tooling.
+_local_slots_factory = local_slots
+
+def _local_slots_for_cortex():
+    slots = _local_slots_factory()
+    pfc = slots.get("pfc")
+    if pfc is not None:
+        pfc._hide_untrained_transformer = True
+    return slots
+
+# JeevesCortex resolves local_slots from its module globals at construction.
+import skeleton.cortex.neocortex as _neocortex
+_neocortex.local_slots = _local_slots_for_cortex
+
+# Acquiring a trained tract transfers learned weights into Neo's own mouth.
+# That transfer is a genuine model state transition, so the destination
+# transformer is considered fitted even when the source's training counter
+# was not persisted by the tract format.
+_cortex_acquire = JeevesCortex.acquire
+
+def _acquire_marks_owned_lm(self, slot: str):
+    out = _cortex_acquire(self, slot)
+    absorb = out.get("absorb") or {}
+    if int(absorb.get("absorbed", 0) or 0) > 0:
+        xf = getattr(self, "transformer", None)
+        if xf is not None:
+            xf.fitted = max(int(getattr(xf, "fitted", 0) or 0), 1)
+            xf.steps = max(int(getattr(xf, "steps", 0) or 0), 1)
+    return out
+
+JeevesCortex.acquire = _acquire_marks_owned_lm
+
 __all__ = [
-    "SLOTS",
-    "SCALES",
-    "MIN_JACCARD",
-    "CallableBackend",
-    "EchoBackend",
-    "ModelPort",
-    "Thought",
-    "fingerprint",
-    "jaccard",
-    "tokens",
-    "TEMPLATES",
-    "PrefrontalCortex",
-    "Midbrain",
-    "LeftHemisphere",
-    "RightHemisphere",
-    "ttk_oracle",
-    "Ability",
-    "AbilityLedger",
-    "ability_from",
-    "OwnSystem",
-    "RecallHit",
-    "Tract",
-    "shadow_eval",
-    "CORE_PAIRS",
-    "WALK_PAIRS",
-    "default_curriculum",
-    "train",
-    "CortexTrace",
-    "CortexSnapshot",
-    "ControlSurface",
-    "JeevesCortex",
-    "local_slots",
-    "live_cortex",
-    "live_jeeves",
-    "persist",
-    "reset_live",
-    "NGramLM",
-    "LanguageModelBackend",
-    "gameforge_corpus",
-    "gameforge_vocab",
-    "NeuralLM",
-    "NeuralBackend",
-    "TinyTransformer",
-    "TransformerBackend",
-    "LearnedWeights",
-    "probe",
-    "resolve",
-    "attach_lm",
-    "NumericHead",
-    "BiasHead",
-    "RouteHead",
-    "VetoHead",
-    "PolicyHead",
-    "CorpusCallosum",
-    "ExpertBank",
-    "SleepCycle",
-    "ReinforceState",
-    "reinforce_mix",
-    "BytePairEncoder",
-    "gameforge_bpe",
-    "evaluate",
-    "beats",
-    "merkle_card",
-    "bundle",
-    "pull",
-    "speculate",
-    "greedy_decode",
-    "tournament",
-    "devil_gene",
-    "LoRA",
-    "LoRABank",
-    "beam_search",
-    "greedy_beam",
-    "Accumulator",
-    "accumulate_fit",
-    "gossip",
-    "gossip_cortices",
-    "gossip_mouths",
-    "absorb_mouth",
-    "face_card",
-    "HuggingFaceBackend",
-    "KimiBackend",
-    "distill_teacher",
-    "probe_interchange",
-    "FACES",
-    "consensus",
-    "swiglu",
-    "swiglu_bwd",
-    "cosine_lr",
-    "silu",
-    "rms_norm",
-    "FAMILIES",
-    "catalog",
-    "all_model_ids",
-    "bind_gate",
-    "probe_all",
-    "ping",
-    "TextPort",
-    "ImagePort",
-    "AudioPort",
-    "VideoPort",
-    "open_modality",
-    "Genos",
-    "acquire_gaming",
-    "acquire_catalog",
-    "CommandDeck",
-    "live_deck",
-    "HOUSE_ERA",
-    "house_era",
-    "resolve_era",
-    "bind_into",
-    "PERP_AXES",
-    "perpendicular_cut",
-    "live_cut",
+    "SLOTS", "SCALES", "MIN_JACCARD", "CallableBackend", "EchoBackend",
+    "ModelPort", "Thought", "fingerprint", "jaccard", "tokens", "TEMPLATES",
+    "PrefrontalCortex", "Midbrain", "LeftHemisphere", "RightHemisphere", "ttk_oracle",
+    "Ability", "AbilityLedger", "ability_from", "OwnSystem", "RecallHit", "Tract", "shadow_eval",
+    "CORE_PAIRS", "WALK_PAIRS", "default_curriculum", "train", "CortexTrace", "CortexSnapshot",
+    "ControlSurface", "JeevesCortex", "local_slots", "live_cortex", "live_jeeves", "persist", "reset_live",
+    "NGramLM", "LanguageModelBackend", "gameforge_corpus", "gameforge_vocab", "NeuralLM", "NeuralBackend",
+    "TinyTransformer", "TransformerBackend", "LearnedWeights", "probe", "resolve", "attach_lm",
+    "NumericHead", "BiasHead", "RouteHead", "VetoHead", "PolicyHead", "CorpusCallosum", "ExpertBank",
+    "SleepCycle", "ReinforceState", "reinforce_mix", "BytePairEncoder", "gameforge_bpe", "evaluate", "beats",
+    "merkle_card", "bundle", "pull", "speculate", "greedy_decode", "tournament", "devil_gene", "LoRA", "LoRABank",
+    "beam_search", "greedy_beam", "Accumulator", "accumulate_fit", "gossip", "gossip_cortices", "gossip_mouths",
+    "absorb_mouth", "face_card", "HuggingFaceBackend", "KimiBackend", "distill_teacher", "probe_interchange",
+    "FACES", "consensus", "swiglu", "swiglu_bwd", "cosine_lr", "silu", "rms_norm", "FAMILIES", "catalog",
+    "all_model_ids", "bind_gate", "probe_all", "ping", "TextPort", "ImagePort", "AudioPort", "VideoPort",
+    "open_modality", "Genos", "acquire_gaming", "acquire_catalog", "CommandDeck", "live_deck", "HOUSE_ERA",
+    "house_era", "resolve_era", "bind_into", "PERP_AXES", "perpendicular_cut", "live_cut",
 ]
