@@ -15,14 +15,14 @@ from skeleton.school.memory import LearnerMemory, MemoryKind, MemoryMatch, Memor
 from skeleton.school.progression import AchievementEvidence, AchievementRequirement, AchievementResult, ProgressionSnapshot, achievement_learning_signal, evaluate_achievement, evaluate_progression
 from skeleton.school.prompting import PromptRefinement, RefinementNeed, refine_prompt
 from skeleton.school.reflection import ReflectionEntry, ReflectionImportance, ReflectionJournal, ReflectionKind, ReflectionPrompt, reflection_prompts, summarize_reflection
+from skeleton.school.session import JeevesSessionEngine, JeevesSessionPlan, SessionDecision
 from skeleton.school.student import SkillState, StudentProfile
 
 __all__ = [
     "AssessmentEngine", "AssessmentEvidence", "AssessmentKind", "Intervention",
     "CodeIntelligenceEngine", "CodeIntelligenceReport", "CodeSignal", "CodeSignalKind", "IntelligenceTask", "CodeTaskKind",
     "CodeFinding", "CodeLabEngine", "CodeReview", "CodeTask", "FindingSeverity",
-    "CodingPhase", "CoCodingAction", "CoCodingContext", "HandoffStage", "InteractionPattern",
-    "choose_action", "next_handoff",
+    "CodingPhase", "CoCodingAction", "CoCodingContext", "HandoffStage", "InteractionPattern", "choose_action", "next_handoff",
     "CurriculumGraph", "CurriculumNode", "LearningRecommendation", "rank_recommendations",
     "DebugAction", "DebugExperiment", "DebugFocus", "DebugHypothesis", "DebugPlan", "DebuggingPolicy",
     "EnergyBudget", "EnergyDecision", "EnergyStrategy", "choose_energy_strategy",
@@ -33,5 +33,6 @@ __all__ = [
     "AchievementEvidence", "AchievementRequirement", "AchievementResult", "ProgressionSnapshot", "achievement_learning_signal", "evaluate_achievement", "evaluate_progression",
     "PromptRefinement", "RefinementNeed", "refine_prompt",
     "ReflectionEntry", "ReflectionImportance", "ReflectionJournal", "ReflectionKind", "ReflectionPrompt", "reflection_prompts", "summarize_reflection",
+    "JeevesSessionEngine", "JeevesSessionPlan", "SessionDecision",
     "SkillState", "StudentProfile",
 ]
