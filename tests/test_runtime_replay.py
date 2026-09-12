@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from skeleton.school.decision_ledger import DecisionDisposition, DecisionLedger, EvidenceKind, EvidenceRef
 from skeleton.school.runtime_replay import RuntimeReplaySnapshot, audit_runtime, replay_digest
 from skeleton.school.session_runtime import SessionEvent, SessionPhase
@@ -20,6 +22,22 @@ def test_runtime_snapshot_is_deterministic_and_auditable():
     assert first.runtime_digest
     audit = audit_runtime(first, ledger)
     assert audit.valid
+
+
+def test_runtime_audit_detects_runtime_digest_tampering():
+    ledger = _ledger()
+    snapshot = RuntimeReplaySnapshot.capture(
+        session_id="s1",
+        phase=SessionPhase.DIAGNOSE,
+        events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),),
+        selected_policy="practice",
+        rejected_policies=(),
+        ledger=ledger,
+    )
+    tampered = replace(snapshot, runtime_digest="f" * 64)
+    audit = audit_runtime(tampered, ledger)
+    assert not audit.valid
+    assert any("runtime-integrity divergence" in item for item in audit.violations)
 
 
 def test_runtime_audit_detects_ledger_tampering():
