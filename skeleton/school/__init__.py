@@ -12,6 +12,7 @@ from skeleton.school.cs_pathways import CSFamily, CSPathway, PATHWAYS, next_path
 from skeleton.school.learning_control import LearningControl, LearningControlDecision, LearningState
 from skeleton.school.lesson_content import LessonContent, LessonExercise, LessonTopic, generate_lesson_content
 from skeleton.school.memory import LearnerMemory, MemoryKind, MemoryMatch, MemoryStore
+from skeleton.school.jeeves import JeevesControlPlane, JeevesDecision, JeevesSessionPlan
 from skeleton.school.progression import AchievementEvidence, AchievementRequirement, AchievementResult, ProgressionSnapshot, achievement_learning_signal, evaluate_achievement, evaluate_progression
 from skeleton.school.prompting import PromptRefinement, RefinementNeed, refine_prompt
 from skeleton.school.reflection import ReflectionEntry, ReflectionImportance, ReflectionJournal, ReflectionKind, ReflectionPrompt, reflection_prompts, summarize_reflection
@@ -30,6 +31,7 @@ __all__ = [
     "LearningControl", "LearningControlDecision", "LearningState",
     "LessonContent", "LessonExercise", "LessonTopic", "generate_lesson_content",
     "LearnerMemory", "MemoryKind", "MemoryMatch", "MemoryStore",
+    "JeevesControlPlane", "JeevesDecision", "JeevesSessionPlan",
     "AchievementEvidence", "AchievementRequirement", "AchievementResult", "ProgressionSnapshot", "achievement_learning_signal", "evaluate_achievement", "evaluate_progression",
     "PromptRefinement", "RefinementNeed", "refine_prompt",
     "ReflectionEntry", "ReflectionImportance", "ReflectionJournal", "ReflectionKind", "ReflectionPrompt", "reflection_prompts", "summarize_reflection",
