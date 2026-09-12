@@ -1,13 +1,7 @@
-"""
-Skeleton Intelligence Package
+"""Skeleton Intelligence Package
 
-Exports:
-- IntelligenceOrchestrator: Task coordination
-- AdaptiveLearner: Meta-learning
-- MetaGrid: Learning hyperparameters
-- ImproveLoop / PromptImproveDriver: bounded prompt self-improvement (F-10)
-- Jeeves learning policy: stage/difficulty/interaction adaptation
-- Game context: faction reputation and novelty governance
+Exports core orchestration, bounded self-improvement, adaptive Jeeves learning,
+game context, and portable Jeeves pedagogy primitives.
 """
 
 from skeleton.intelligence.orchestrator import (
@@ -42,6 +36,21 @@ from skeleton.intelligence.game_context import (
     novelty_gate,
     GAMEFORGE_DOCTRINE,
 )
+from skeleton.intelligence.jeeves_pedagogy import (
+    AssessmentKind,
+    ScaffoldLevel,
+    LearningSession,
+    RetrievalReview,
+    RETRIEVAL_SCHEDULE,
+    SOCRATIC_QUESTION_TYPES,
+    WORKED_EXAMPLE_FADING,
+    assessment_strategy,
+    build_session,
+    choose_session_structure,
+    interleave_topics,
+    next_scaffold,
+    retrieval_schedule,
+)
 
 __all__ = [
     "IntelligenceOrchestrator",
@@ -70,4 +79,17 @@ __all__ = [
     "reputation_level",
     "novelty_gate",
     "GAMEFORGE_DOCTRINE",
+    "AssessmentKind",
+    "ScaffoldLevel",
+    "LearningSession",
+    "RetrievalReview",
+    "RETRIEVAL_SCHEDULE",
+    "SOCRATIC_QUESTION_TYPES",
+    "WORKED_EXAMPLE_FADING",
+    "assessment_strategy",
+    "build_session",
+    "choose_session_structure",
+    "interleave_topics",
+    "next_scaffold",
+    "retrieval_schedule",
 ]
