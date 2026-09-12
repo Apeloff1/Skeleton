@@ -7,6 +7,13 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main]
+
+# Prevent stale PR runs from piling up and spamming failure notifications.
+# A newer commit supersedes the older run for the same PR/ref.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   PYTHON_VERSION: "3.11"
   NODE_VERSION: "20"
@@ -16,6 +23,7 @@ jobs:
   backend-lint:
     name: "Backend Lint"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults: {run: {working-directory: ./backend}}
     steps:
       - uses: actions/checkout@v4
@@ -28,6 +36,7 @@ jobs:
   skeleton-test:
     name: "Skeleton GameForge"
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -35,6 +44,7 @@ jobs:
       - name: Test forge / jeeves / context
         env: {PYTHONPATH: "."}
         run: |
+          set -euo pipefail
           python -m compileall -q skeleton
           python tests/run_unit.py
           python -m skeleton eras
@@ -44,6 +54,7 @@ jobs:
   school-jeeves-test:
     name: "Jeeves School Reasoning"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -58,6 +69,7 @@ jobs:
   cockpit-smoke:
     name: "Cockpit Smoke"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -67,6 +79,7 @@ jobs:
   backend-test:
     name: "Backend Test"
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: backend-lint
     continue-on-error: true
     defaults: {run: {working-directory: ./backend}}
@@ -89,6 +102,7 @@ jobs:
   frontend:
     name: "Frontend"
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     continue-on-error: true
     defaults: {run: {working-directory: ./frontend}}
     steps:
@@ -102,6 +116,7 @@ jobs:
   docker:
     name: "Docker Build"
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     needs: [skeleton-test]
     if: github.ref == 'refs/heads/main'
     permissions: {contents: read, packages: write}
