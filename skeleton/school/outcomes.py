@@ -52,7 +52,11 @@ def apply_outcome(
 ) -> OutcomeResult:
     score = max(0.0, min(1.0, outcome.score))
     text = outcome.summary or outcome.learner_explanation or outcome.kind.value
-    state = student.record_evidence(
+    # Mutate through the public learner API, then resolve the canonical state
+    # from the profile.  This keeps the outcome engine robust to lightweight
+    # learner adapters that implement record_evidence for side effects without
+    # returning the updated SkillState object.
+    student.record_evidence(
         outcome.skill_id,
         score,
         confidence=outcome.confidence,
@@ -60,6 +64,7 @@ def apply_outcome(
         step=outcome.step,
         evidence=text,
     )
+    state = student.skill(outcome.skill_id)
     kind = (
         MemoryKind.MISCONCEPTION
         if outcome.kind is OutcomeKind.MISCONCEPTION
