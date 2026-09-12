@@ -30,10 +30,12 @@ class PrefrontalCortex:
 
     def __init__(self, *, span: int = 7) -> None:
         self.memory: deque[str] = deque(maxlen=max(3, span))
+        self._hide_untrained_transformer = False
         from skeleton.cortex.learned import LearnedWeights
         # PFC owns a deliberately tiny causal transformer in addition to its
         # n-gram/skip-gram substrate. The transformer remains an internal
-        # training mouth; the public PFC port stays the small symbolic surface.
+        # training mouth; the public PFC port can hide an untrained mouth
+        # until it has actually participated in the cortex training loop.
         self.weights = LearnedWeights(
             order=2,
             dim=8,
@@ -55,9 +57,10 @@ class PrefrontalCortex:
 
     @property
     def transformer(self):
-        # Keep the public small-mouth contract distinct from the internal
-        # transformer weights. Training/serialization still owns the tiny net.
-        return None
+        xf = self.weights.transformer
+        if self._hide_untrained_transformer and int(getattr(xf, "steps", 0) or 0) <= 0:
+            return None
+        return xf
 
     def fit(self, text: str) -> int:
         return self.weights.fit(text)
