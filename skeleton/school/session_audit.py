@@ -31,18 +31,25 @@ def audit_session(ledger: DecisionLedger, session_id: str) -> SessionAudit:
         failures.append(f"hash-chain: {exc}")
 
     by_id = {record.decision_id: record for record in ledger.records}
+    session_ids = {record.decision_id for record in records}
     expected_sequence = [record.sequence for record in records]
     if expected_sequence != sorted(expected_sequence) or len(set(expected_sequence)) != len(expected_sequence):
         failures.append("session decision sequence is not ordered")
 
+    # Causality is session-local: a runtime decision cannot silently inherit
+    # ancestry from another session, even when the referenced record exists.
     for record in records:
         for predecessor in record.predecessors:
             prior = by_id.get(predecessor)
             if prior is None:
                 failures.append(f"missing predecessor for {record.decision_id}")
+            elif predecessor not in session_ids:
+                failures.append(f"cross-session predecessor for {record.decision_id}")
             elif prior.sequence >= record.sequence:
                 failures.append(f"causal predecessor is not earlier: {record.decision_id}")
-    checks.append("causal-ancestry" if records[0].predecessors else "causal-root")
+    if records[0].predecessors:
+        failures.append(f"session root has predecessors: {records[0].decision_id}")
+    checks.append("causal-ancestry" if any(record.predecessors for record in records) else "causal-root")
 
     rejected = tuple(record for record in records if record.disposition is DecisionDisposition.REJECTED)
     if rejected:
@@ -63,6 +70,8 @@ def audit_session(ledger: DecisionLedger, session_id: str) -> SessionAudit:
         if target is None:
             failures.append(f"superseded target is missing: {replacement.decision_id}")
             continue
+        if target_id not in session_ids:
+            failures.append(f"cross-session supersession for {replacement.decision_id}")
         if target.sequence >= replacement.sequence:
             failures.append(f"superseded target is not earlier: {replacement.decision_id}")
         if replacement.disposition is not DecisionDisposition.ACCEPTED:
