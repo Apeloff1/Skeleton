@@ -71,10 +71,7 @@ class JeevesControlPlane:
         claim = primary or (query_terms[0] if query_terms else "current objective")
         belief = self.epistemics.beliefs.get(claim)
         contradiction = 1.0 if belief and belief.contradiction else 0.0
-        competition = compete(
-            default_candidates(mastery=state.mastery, contradiction=contradiction, energy=student.energy, transfer_ready=state.transfer_rate >= .7 and state.mastery >= .7),
-            reliability=self.policy_calibrator.snapshot(),
-        )
+        competition = compete(default_candidates(mastery=state.mastery, contradiction=contradiction, energy=student.energy, transfer_ready=state.transfer_rate >= .7 and state.mastery >= .7), reliability=self.policy_calibrator.snapshot())
         decisions = (
             JeevesDecision("curriculum", primary or "review_memory", tuple(r.reason for r in recommendations[:2]) or ("No prerequisite-ready skill; use retrieval/reflection.",)),
             JeevesDecision("learning_control", control.difficulty_adjustment, control.rationale or ("Maintain current trajectory.",)),
@@ -101,6 +98,8 @@ class JeevesControlPlane:
 
     @staticmethod
     def _policy_reward(outcome: SessionOutcome) -> float:
+        if outcome.kind is OutcomeKind.MISCONCEPTION_REPAIRED:
+            return 1.0 if outcome.score >= .7 else 0.35
         if outcome.kind is OutcomeKind.MISCONCEPTION:
             return -0.6
         if outcome.kind is OutcomeKind.FAILURE:
@@ -116,13 +115,4 @@ class JeevesControlPlane:
         mastery = skill.mastery if skill else .5
         confidence = skill.confidence if skill else .5
         acquisition = skill.last_score if skill and skill.attempts else mastery
-        return LearningState(
-            mastery=mastery,
-            acquisition_rate=acquisition,
-            retention_rate=max(0.0, min(1.0, .5 * mastery + .5 * confidence)),
-            transfer_rate=confidence,
-            depth_score=mastery,
-            cognitive_load=max(0.0, min(1.0, 1.0 - student.energy)),
-            time_since_review_hours=24.0 if skill and skill.last_seen_step else 0.0,
-            response_time_ratio=1.0,
-        )
+        return LearningState(mastery=mastery, acquisition_rate=acquisition, retention_rate=max(0.0, min(1.0, .5 * mastery + .5 * confidence)), transfer_rate=confidence, depth_score=mastery, cognitive_load=max(0.0, min(1.0, 1.0 - student.energy)), time_since_review_hours=24.0 if skill and skill.last_seen_step else 0.0, response_time_ratio=1.0)
