@@ -6,6 +6,7 @@ import hashlib
 import json
 
 from skeleton.school.decision_ledger import DecisionDisposition, DecisionLedger
+from skeleton.school.runtime_capsule import RuntimeIntegrityCapsule
 from skeleton.school.runtime_replay import RuntimeReplaySnapshot, audit_runtime, replay_digest
 from skeleton.school.session_audit import audit_session
 
@@ -19,6 +20,7 @@ class RuntimeAttestation:
     session_id: str
     runtime_digest: str
     replay_digest: str
+    capsule_digest: str
     session_audit_digest: str
     ledger_head: str
     ledger_count: int
@@ -32,6 +34,7 @@ class RuntimeAttestation:
     def capture(cls, snapshot: RuntimeReplaySnapshot, ledger: DecisionLedger) -> "RuntimeAttestation":
         runtime_audit = audit_runtime(snapshot, ledger)
         session_audit = audit_session(ledger, snapshot.session_id)
+        capsule = RuntimeIntegrityCapsule.capture(snapshot, ledger)
         records = ledger.session(snapshot.session_id)
         if not records:
             raise ValueError("cannot attest an empty session")
@@ -50,6 +53,7 @@ class RuntimeAttestation:
             "session_id": snapshot.session_id,
             "runtime_digest": snapshot.runtime_digest,
             "replay_digest": replay_digest(snapshot),
+            "capsule_digest": capsule.capsule_digest,
             "session_audit_digest": session_audit.digest,
             "ledger_head": ledger.head_hash,
             "ledger_count": len(ledger.records),
@@ -64,6 +68,7 @@ class RuntimeAttestation:
             snapshot.session_id,
             snapshot.runtime_digest,
             payload["replay_digest"],
+            capsule.capsule_digest,
             session_audit.digest,
             ledger.head_hash,
             len(ledger.records),
@@ -82,19 +87,27 @@ def verify_attestation(attestation: RuntimeAttestation, snapshot: RuntimeReplayS
     session = audit_session(ledger, snapshot.session_id)
     try:
         expected = RuntimeAttestation.capture(snapshot, ledger)
+        capsule = RuntimeIntegrityCapsule.capture(snapshot, ledger)
+        capsule_audit = capsule.verify(ledger)
     except ValueError as exc:
         failures.append(str(exc))
         expected = None
+        capsule = None
+        capsule_audit = None
     if not runtime.valid:
         failures.append("runtime audit is invalid")
     if not session.valid:
         failures.append("session audit is invalid")
+    if capsule_audit is not None and not capsule_audit.valid:
+        failures.append("integrity capsule is invalid")
     if attestation.session_id != snapshot.session_id:
         failures.append("attestation session identity diverges")
     if attestation.runtime_digest != snapshot.runtime_digest:
         failures.append("attestation runtime digest diverges")
     if attestation.replay_digest != replay_digest(snapshot):
         failures.append("attestation replay digest diverges")
+    if capsule is not None and attestation.capsule_digest != capsule.capsule_digest:
+        failures.append("attestation capsule digest diverges")
     if attestation.session_audit_digest != session.digest:
         failures.append("attestation session audit digest diverges")
     if attestation.ledger_head != ledger.head_hash or attestation.ledger_count != len(ledger.records):
