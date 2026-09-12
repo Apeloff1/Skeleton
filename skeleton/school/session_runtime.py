@@ -60,6 +60,8 @@ class RuntimePlan:
     selected_policy: str = ""
     policy_margin: float = 0.0
     rejected_policies: tuple[str, ...] = ()
+    pipeline_contract_digest: str = ""
+    provenance_digest: str = ""
 
 @dataclass
 class JeevesSessionRuntime:
@@ -105,7 +107,7 @@ class JeevesSessionRuntime:
         if control.policy_competition:
             for candidate in control.policy_competition.rejected:
                 self._record_decision(decision_id=f"{session_id}:alternative:{candidate.action.value}", action=candidate.action.value, rationale=candidate.rationale + ("counterfactual alternative", "not executed"), state={"skill": primary or objective, "pipeline_digest": pipeline.digest}, policy={"selected": selected_policy, "counterfactual": True, "calibrated_reliability": control.policy_calibrator.snapshot(), "pipeline_digest": pipeline.digest}, disposition=DecisionDisposition.REJECTED)
-        return RuntimePlan(session_id, control, self.phase, pipeline_kind, tuple(s.stage.value for s in pipeline.steps), tuple(c.node_id for c in candidates), action.pattern.value, handoff.value, selected_policy, arbitration.confidence, gates, transitions, selected_policy, control.policy_competition.margin if control.policy_competition else 0.0, rejected_policies)
+        return RuntimePlan(session_id, control, self.phase, pipeline_kind, tuple(s.stage.value for s in pipeline.steps), tuple(c.node_id for c in candidates), action.pattern.value, handoff.value, selected_policy, arbitration.confidence, gates, transitions, selected_policy, control.policy_competition.margin if control.policy_competition else 0.0, rejected_policies, pipeline.digest, control.provenance_digest)
 
     def record_outcome(self, student: StudentProfile, outcome: SessionOutcome) -> OutcomeResult:
         if not self.session_id:
