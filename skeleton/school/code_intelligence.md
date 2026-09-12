@@ -1,0 +1,1 @@
+Tutolage mining produced a broad code-intelligence surface: semantic search, documentation, migration, test generation, bug prediction, dependency analysis, architecture analysis, API/schema design, merge conflict resolution, code review, and performance profiling. Skeleton keeps deterministic signals and prioritized learning tasks as the provider-neutral layer.
