@@ -52,8 +52,7 @@ def audit_session(ledger: DecisionLedger, session_id: str) -> SessionAudit:
             if "counterfactual alternative" not in record.rationale:
                 failures.append(f"rejected alternative lacks rationale: {record.decision_id}")
 
-    policy_records = tuple(r for r in records if r.policy_digest)
-    if policy_records:
+    if any(r.policy_digest for r in records):
         checks.append("policy-provenance")
 
     if expected - 1 == len(records):
@@ -64,10 +63,9 @@ def audit_session(ledger: DecisionLedger, session_id: str) -> SessionAudit:
 
 
 def policy_chain(records: Sequence[DecisionRecord]) -> tuple[str, ...]:
-    """Return the executed policy lineage in deterministic ledger order."""
+    """Return policy-bearing actions in deterministic ledger order."""
     return tuple(
         record.action
         for record in records
-        if record.disposition is not DecisionDisposition.REJECTED
-        and ("selected_policy" in record.policy_digest or "executed_policy" in record.policy_digest)
+        if record.disposition is not DecisionDisposition.REJECTED and record.policy_digest
     )
