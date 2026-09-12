@@ -22,7 +22,6 @@ def test_runtime_resets_ephemeral_state_after_completed_session():
     runtime = _runtime()
     runtime._prepare_session("first")
     runtime.phase = SessionPhase.COMPLETE
-    runtime.events.append(runtime.events[0] if runtime.events else None) if False else None
     runtime._sequence = 17
     runtime._last_decision_id = "first:decision"
     runtime._selected_policy = "practice"
