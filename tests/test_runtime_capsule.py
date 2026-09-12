@@ -39,6 +39,8 @@ def test_capsule_is_deterministic_and_verifiable():
     first = RuntimeIntegrityCapsule.capture(_snapshot(ledger), ledger)
     second = RuntimeIntegrityCapsule.capture(_snapshot(ledger), ledger)
     assert first == second
+    assert first.root_decision_id == "s1:orient"
+    assert first.selected_policy_decision_id is None
     assert first.verify(ledger).valid
 
 
@@ -78,3 +80,12 @@ def test_capsule_detects_ledger_extension():
     audit = capsule.verify(ledger)
     assert not audit.valid
     assert any("ledger checkpoint has advanced" in item for item in audit.violations)
+
+
+def test_capsule_detects_root_identity_tampering():
+    ledger = _ledger()
+    capsule = RuntimeIntegrityCapsule.capture(_snapshot(ledger), ledger)
+    tampered = replace(capsule, root_decision_id="s1:forged-root")
+    audit = tampered.verify(ledger)
+    assert not audit.valid
+    assert any("causal root identity changed" in item for item in audit.violations)
