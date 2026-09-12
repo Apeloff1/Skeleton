@@ -56,11 +56,7 @@ class JeevesReplay:
     def session(self, records: Sequence[DecisionRecord], session_id: str) -> tuple[DecisionRecord, ...]:
         return tuple(r for r in records if r.session_id == session_id)
 
-    def compare_actions(
-        self,
-        expected: Sequence[DecisionRecord],
-        actual: Sequence[DecisionRecord],
-    ) -> ReplayReport:
+    def compare_actions(self, expected: Sequence[DecisionRecord], actual: Sequence[DecisionRecord]) -> ReplayReport:
         """Compare full causal decision semantics, not only the chosen action."""
         mismatches: list[ReplayMismatch] = []
         pairs = zip(expected, actual)
@@ -77,21 +73,18 @@ class JeevesReplay:
                 if exp != act:
                     mismatches.append(ReplayMismatch(index, str(exp), str(act), reason))
         if len(expected) != len(actual):
-            mismatches.append(
-                ReplayMismatch(
-                    min(len(expected), len(actual)) + 1,
-                    str(len(expected)),
-                    str(len(actual)),
-                    "record count divergence",
-                )
-            )
-        matches = max(0, min(len(expected), len(actual)) - len({m.sequence for m in mismatches}))
+            mismatches.append(ReplayMismatch(min(len(expected), len(actual)) + 1, str(len(expected)), str(len(actual)), "record count divergence"))
+        compared = min(len(expected), len(actual))
+        divergent_positions = {m.sequence for m in mismatches if m.sequence <= compared}
+        matches = compared - len(divergent_positions)
         session_id = expected[0].session_id if expected else (actual[0].session_id if actual else "")
         return ReplayReport(session_id, matches, tuple(mismatches))
 
     def compare_snapshots(self, expected: ReplaySnapshot, actual: ReplaySnapshot) -> ReplayReport:
-        """Compare the semantic execution projection independent of record ordering details."""
+        """Compare semantic execution projections, including session identity."""
         mismatches: list[ReplayMismatch] = []
+        if expected.session_id != actual.session_id:
+            mismatches.append(ReplayMismatch(0, expected.session_id, actual.session_id, "session identity divergence"))
         checks = (
             (expected.selected_actions, actual.selected_actions, "selected-policy divergence"),
             (expected.rejected_actions, actual.rejected_actions, "rejected-policy divergence"),
@@ -103,7 +96,8 @@ class JeevesReplay:
         for index, (exp, act, reason) in enumerate(checks, 1):
             if exp != act:
                 mismatches.append(ReplayMismatch(index, str(exp), str(act), reason))
-        return ReplayReport(expected.session_id or actual.session_id, len(checks) - len(mismatches), tuple(mismatches))
+        compared = len(checks)
+        return ReplayReport(expected.session_id or actual.session_id, compared - len(mismatches), tuple(mismatches))
 
     def causal_path(self, ledger, decision_id: str) -> tuple[DecisionRecord, ...]:
         return ledger.explain(decision_id)
@@ -111,20 +105,5 @@ class JeevesReplay:
 
 def replay_digest(records: Sequence[DecisionRecord]) -> str:
     """Hash the complete deterministic replay surface, including causal metadata."""
-    payload = [
-        {
-            "sequence": r.sequence,
-            "decision_id": r.decision_id,
-            "session_id": r.session_id,
-            "action": r.action,
-            "rationale": r.rationale,
-            "evidence": r.evidence,
-            "predecessors": r.predecessors,
-            "state_digest": r.state_digest,
-            "policy_digest": r.policy_digest,
-            "disposition": r.disposition.value,
-            "record_hash": r.record_hash,
-        }
-        for r in records
-    ]
+    payload = [{"sequence": r.sequence, "decision_id": r.decision_id, "session_id": r.session_id, "action": r.action, "rationale": r.rationale, "evidence": r.evidence, "predecessors": r.predecessors, "state_digest": r.state_digest, "policy_digest": r.policy_digest, "disposition": r.disposition.value, "record_hash": r.record_hash} for r in records]
     return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
