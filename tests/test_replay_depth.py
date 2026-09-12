@@ -34,7 +34,6 @@ def test_replay_detects_policy_and_evidence_divergence() -> None:
 
 def test_replay_snapshot_separates_selected_and_rejected_policies() -> None:
     ledger = _ledger("practice")
-    ledger.register_evidence(ledger.evidence["e1"])
     rejected = ledger.append(
         session_id="s1",
         decision_id="d2",
@@ -48,6 +47,19 @@ def test_replay_snapshot_separates_selected_and_rejected_policies() -> None:
     snapshot = ReplaySnapshot.from_records(ledger.records)
     assert snapshot.selected_actions == ("practice",)
     assert snapshot.rejected_actions == ("challenge",)
+    assert snapshot.decision_ids == ("d1", "d2")
+    assert snapshot.predecessors == ((), ("d1",))
+    assert snapshot.record_hashes == (ledger.records[0].record_hash, ledger.records[1].record_hash)
     assert snapshot.evidence_ids == ("e1", "e1")
     assert replay_digest(ledger.records) == replay_digest(ledger.records)
     assert rejected.disposition is DecisionDisposition.REJECTED
+
+
+def test_replay_detects_causal_or_integrity_divergence() -> None:
+    left = _ledger("practice")
+    right = _ledger("practice")
+    right.records[0] = right.records[0].__class__(
+        **{**right.records[0].__dict__, "record_hash": "tampered"}
+    )
+    report = JeevesReplay().compare_actions(left.records, right.records)
+    assert any(m.reason == "record-integrity divergence" for m in report.mismatches)
