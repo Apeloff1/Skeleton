@@ -18,7 +18,7 @@ def test_session_audit_tracks_first_class_supersession_lineage():
     audit = audit_session(ledger, "s1")
     assert audit.valid
     assert "active-record-filter" in audit.checks
-    assert "supersession-audit" not in audit.checks  # supersession is now explicit, not a legacy SUPERSEDED disposition
+    assert "supersession-audit" in audit.checks
 
 
 def test_session_audit_detects_duplicate_supersession_target():
@@ -26,7 +26,6 @@ def test_session_audit_detects_duplicate_supersession_target():
     ledger.register_evidence(EvidenceRef("e1", EvidenceKind.OBSERVATION, "skill", "observed"))
     ledger.append(session_id="s1", decision_id="d1", domain="runtime", action="practice", evidence=("e1",), disposition=DecisionDisposition.ACCEPTED)
     ledger.supersede("d1", replacement_id="d2")
-    # Construct an impossible second replacement directly to exercise audit semantics.
     target = ledger.records[0]
     ledger.records.append(
         target.__class__(
