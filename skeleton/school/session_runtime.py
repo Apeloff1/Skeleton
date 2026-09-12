@@ -1,21 +1,11 @@
-"""Grand Jeeves session state machine.
-
-This is the execution membrane between planning and observable learner work.
-It turns the many deterministic policies in :mod:`skeleton.school` into a
-single auditable lifecycle with explicit phase transitions, evidence gates,
-recovery paths and commit semantics.
-"""
-
+"""Grand Jeeves session state machine."""
 from __future__ import annotations
-
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Sequence
-
 from skeleton.school.ai_pipeline import PipelineKind, PipelineRequest, plan_pipeline
-from skeleton.school.cocoding import CoCodingContext, choose_action, next_handoff
+from skeleton.school.cocoding import CodingPhase, CoCodingContext, HandoffStage, choose_action, next_handoff
 from skeleton.school.curriculum import CurriculumGraph
-from skeleton.school.debugging import DebuggingPolicy
 from skeleton.school.jeeves import JeevesControlPlane, JeevesSessionPlan
 from skeleton.school.knowledge import KnowledgeGraph, KnowledgeState, rank_knowledge
 from skeleton.school.student import StudentProfile
@@ -94,62 +84,31 @@ class JeevesSessionRuntime:
     phase: SessionPhase = SessionPhase.INTAKE
     _sequence: int = 0
 
-    def begin(
-        self,
-        student: StudentProfile,
-        *,
-        session_id: str,
-        query_terms: Sequence[str] = (),
-        pipeline_kind: PipelineKind = PipelineKind.LESSON,
-        cocoding: CoCodingContext | None = None,
-    ) -> RuntimePlan:
+    def begin(self, student: StudentProfile, *, session_id: str, query_terms: Sequence[str] = (), pipeline_kind: PipelineKind = PipelineKind.LESSON, cocoding: CoCodingContext | None = None) -> RuntimePlan:
         control = self.control.plan(student, query_terms=query_terms)
         primary = control.primary_skill
         candidates = rank_knowledge(self.knowledge, self.knowledge_state, query_terms=query_terms, goals=student.goals)
-        request = PipelineRequest(
-            kind=pipeline_kind,
-            objective=primary or (query_terms[0] if query_terms else "advance the learner's current objective"),
-            learner_skill=primary,
-            require_tests=pipeline_kind not in {PipelineKind.LESSON, PipelineKind.ASSESS},
-        )
-        pipeline = plan_pipeline(request)
-        context = cocoding or CoCodingContext()
+        pipeline = plan_pipeline(PipelineRequest(kind=pipeline_kind, objective=primary or (query_terms[0] if query_terms else "advance the learner's current objective"), learner_skill=primary, require_tests=pipeline_kind not in {PipelineKind.LESSON, PipelineKind.ASSESS}))
+        context = cocoding or CoCodingContext(CodingPhase.UNDERSTAND, HandoffStage.DEMONSTRATE)
         action = choose_action(context)
-        handoff = next_handoff(context)
+        handoff = next_handoff(context.handoff, successful=False, learner_explained=False)
         gates = self._gates(control, pipeline_kind)
         transitions = self._transitions(gates, pipeline_kind)
         self._emit(SessionPhase.INTAKE, "session_opened", {"session_id": session_id})
         self.phase = SessionPhase.DIAGNOSE
         self._emit(self.phase, "control_plan_ready", {"primary_skill": primary or "none"})
-        return RuntimePlan(
-            session_id=session_id,
-            control=control,
-            phase=self.phase,
-            pipeline_kind=pipeline_kind,
-            pipeline_stages=tuple(step.stage.value for step in pipeline.steps),
-            knowledge_candidates=tuple(candidate.node_id for candidate in candidates),
-            co_coding_action=action.pattern.value,
-            handoff_stage=handoff.value,
-            gates=gates,
-            transitions=transitions,
-        )
+        return RuntimePlan(session_id, control, self.phase, pipeline_kind, tuple(step.stage.value for step in pipeline.steps), tuple(c.node_id for c in candidates), action.pattern.value, handoff.value, gates, transitions)
 
     def transition(self, target: SessionPhase, *, rationale: str, evidence: Sequence[EvidenceGate] = ()) -> SessionTransition:
         if target == self.phase:
             raise ValueError("session is already in requested phase")
         allowed = {
-            SessionPhase.INTAKE: {SessionPhase.DIAGNOSE},
-            SessionPhase.DIAGNOSE: {SessionPhase.ORIENT, SessionPhase.RECOVER},
-            SessionPhase.ORIENT: {SessionPhase.TEACH, SessionPhase.PRACTICE},
-            SessionPhase.TEACH: {SessionPhase.PRACTICE, SessionPhase.VERIFY, SessionPhase.RECOVER},
-            SessionPhase.PRACTICE: {SessionPhase.CHALLENGE, SessionPhase.VERIFY, SessionPhase.RECOVER},
-            SessionPhase.CHALLENGE: {SessionPhase.VERIFY, SessionPhase.RECOVER},
-            SessionPhase.VERIFY: {SessionPhase.REFLECT, SessionPhase.RECOVER, SessionPhase.CHALLENGE},
-            SessionPhase.REFLECT: {SessionPhase.COMMIT, SessionPhase.RECOVER},
-            SessionPhase.COMMIT: {SessionPhase.SCHEDULE, SessionPhase.COMPLETE},
-            SessionPhase.SCHEDULE: {SessionPhase.COMPLETE},
-            SessionPhase.RECOVER: {SessionPhase.TEACH, SessionPhase.PRACTICE, SessionPhase.ORIENT},
-            SessionPhase.COMPLETE: set(),
+            SessionPhase.INTAKE: {SessionPhase.DIAGNOSE}, SessionPhase.DIAGNOSE: {SessionPhase.ORIENT, SessionPhase.RECOVER},
+            SessionPhase.ORIENT: {SessionPhase.TEACH, SessionPhase.PRACTICE}, SessionPhase.TEACH: {SessionPhase.PRACTICE, SessionPhase.VERIFY, SessionPhase.RECOVER},
+            SessionPhase.PRACTICE: {SessionPhase.CHALLENGE, SessionPhase.VERIFY, SessionPhase.RECOVER}, SessionPhase.CHALLENGE: {SessionPhase.VERIFY, SessionPhase.RECOVER},
+            SessionPhase.VERIFY: {SessionPhase.REFLECT, SessionPhase.RECOVER, SessionPhase.CHALLENGE}, SessionPhase.REFLECT: {SessionPhase.COMMIT, SessionPhase.RECOVER},
+            SessionPhase.COMMIT: {SessionPhase.SCHEDULE, SessionPhase.COMPLETE}, SessionPhase.SCHEDULE: {SessionPhase.COMPLETE},
+            SessionPhase.RECOVER: {SessionPhase.TEACH, SessionPhase.PRACTICE, SessionPhase.ORIENT}, SessionPhase.COMPLETE: set(),
         }
         if target not in allowed[self.phase]:
             raise ValueError(f"invalid session transition: {self.phase.value} -> {target.value}")
@@ -175,25 +134,20 @@ class JeevesSessionRuntime:
         return SessionTransition(source, SessionPhase.RECOVER, TransitionKind.REPAIR, reason)
 
     def _gates(self, control: JeevesSessionPlan, pipeline_kind: PipelineKind) -> tuple[EvidenceGate, ...]:
-        gates = [
+        return (
             EvidenceGate("objective", "learner objective is explicit", True, bool(control.primary_skill)),
             EvidenceGate("attempt", "learner has produced observable work", True, False),
             EvidenceGate("reasoning", "learner can explain the result", True, False),
             EvidenceGate("verification", "result has verification evidence", pipeline_kind not in {PipelineKind.LESSON}, False),
             EvidenceGate("reflection", "learner reflection is recorded", True, False),
-        ]
-        return tuple(gates)
+        )
 
     @staticmethod
     def _transition_kind(source: SessionPhase, target: SessionPhase) -> TransitionKind:
-        if target == SessionPhase.RECOVER:
-            return TransitionKind.REPAIR
-        if target == SessionPhase.CHALLENGE:
-            return TransitionKind.ESCALATE
-        if target == SessionPhase.TEACH and source == SessionPhase.RECOVER:
-            return TransitionKind.DEESCALATE
-        if target == SessionPhase.COMPLETE:
-            return TransitionKind.COMPLETE
+        if target == SessionPhase.RECOVER: return TransitionKind.REPAIR
+        if target == SessionPhase.CHALLENGE: return TransitionKind.ESCALATE
+        if target == SessionPhase.TEACH and source == SessionPhase.RECOVER: return TransitionKind.DEESCALATE
+        if target == SessionPhase.COMPLETE: return TransitionKind.COMPLETE
         return TransitionKind.ADVANCE
 
     @staticmethod
@@ -201,7 +155,7 @@ class JeevesSessionRuntime:
         return (
             SessionTransition(SessionPhase.DIAGNOSE, SessionPhase.ORIENT, TransitionKind.ADVANCE, "diagnostic evidence determines the starting point", gates[:1]),
             SessionTransition(SessionPhase.PRACTICE, SessionPhase.CHALLENGE, TransitionKind.ESCALATE, "sufficient evidence permits harder transfer", gates[1:3]),
-            SessionTransition(SessionPhase.PRACTICE, SessionPhase.RECOVER, TransitionKind.REPAIR, "failure or overload requires scaffolding", ()),
+            SessionTransition(SessionPhase.PRACTICE, SessionPhase.RECOVER, TransitionKind.REPAIR, "failure or overload requires scaffolding"),
             SessionTransition(SessionPhase.VERIFY, SessionPhase.REFLECT, TransitionKind.ADVANCE, "verification evidence is available", gates[1:4]),
             SessionTransition(SessionPhase.REFLECT, SessionPhase.COMMIT, TransitionKind.ADVANCE, "reflection converts experience into durable evidence", gates[-1:]),
             SessionTransition(SessionPhase.COMMIT, SessionPhase.COMPLETE, TransitionKind.COMPLETE, f"close {pipeline_kind.value} session"),
