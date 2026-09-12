@@ -34,7 +34,14 @@ class RuntimeAttestation:
     def capture(cls, snapshot: RuntimeReplaySnapshot, ledger: DecisionLedger) -> "RuntimeAttestation":
         runtime_audit = audit_runtime(snapshot, ledger)
         session_audit = audit_session(ledger, snapshot.session_id)
+        if not runtime_audit.valid:
+            raise ValueError("cannot attest an invalid runtime snapshot")
+        if not session_audit.valid:
+            raise ValueError("cannot attest an invalid session audit")
         capsule = RuntimeIntegrityCapsule.capture(snapshot, ledger)
+        capsule_audit = capsule.verify(ledger)
+        if not capsule_audit.valid:
+            raise ValueError("cannot attest an invalid integrity capsule")
         records = ledger.session(snapshot.session_id)
         if not records:
             raise ValueError("cannot attest an empty session")
@@ -44,11 +51,13 @@ class RuntimeAttestation:
         root = roots[0]
         accepted = tuple(record.decision_id for record in records if record.disposition is DecisionDisposition.ACCEPTED)
         rejected = tuple(record.decision_id for record in records if record.disposition is DecisionDisposition.REJECTED)
-        selected = snapshot.selected_policy_decision_id
+        selected = snapshot.selected_policy_decision_id or None
         if selected is not None:
             selected_record = next((record for record in records if record.decision_id == selected), None)
             if selected_record is None or selected_record.disposition is not DecisionDisposition.ACCEPTED:
                 raise ValueError("selected policy decision is not an accepted session record")
+            if selected_record.action != snapshot.selected_policy:
+                raise ValueError("selected policy decision does not match selected policy")
         payload = {
             "session_id": snapshot.session_id,
             "runtime_digest": snapshot.runtime_digest,
@@ -61,8 +70,6 @@ class RuntimeAttestation:
             "selected_policy_decision_id": selected,
             "accepted_decision_ids": accepted,
             "rejected_decision_ids": rejected,
-            "runtime_valid": runtime_audit.valid,
-            "session_valid": session_audit.valid,
         }
         return cls(
             snapshot.session_id,
