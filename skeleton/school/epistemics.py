@@ -109,6 +109,10 @@ class EpistemicEngine:
         original = self.evidence.get(evidence_id)
         if original is None:
             raise KeyError(evidence_id)
+        if evidence_id in {sid for item in self.evidence.values() for sid in item.supersedes}:
+            raise ValueError(f"evidence already superseded: {evidence_id}")
+        if replacement_id in self.evidence:
+            raise ValueError(f"duplicate evidence id: {replacement_id}")
         replacement = EpistemicEvidence(
             evidence_id=replacement_id,
             claim=original.claim,
