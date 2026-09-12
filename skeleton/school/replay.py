@@ -31,6 +31,9 @@ class ReplaySnapshot:
     """Stable semantic projection used to compare two Jeeves executions."""
 
     session_id: str
+    decision_ids: tuple[str, ...]
+    predecessors: tuple[tuple[str, ...], ...]
+    record_hashes: tuple[str, ...]
     selected_actions: tuple[str, ...]
     rejected_actions: tuple[str, ...]
     evidence_ids: tuple[str, ...]
@@ -43,6 +46,9 @@ class ReplaySnapshot:
         ordered = tuple(records)
         return cls(
             session_id=ordered[0].session_id if ordered else "",
+            decision_ids=tuple(r.decision_id for r in ordered),
+            predecessors=tuple(r.predecessors for r in ordered),
+            record_hashes=tuple(r.record_hash for r in ordered),
             selected_actions=tuple(r.action for r in ordered if r.disposition != DecisionDisposition.REJECTED),
             rejected_actions=tuple(r.action for r in ordered if r.disposition == DecisionDisposition.REJECTED),
             evidence_ids=tuple(e for r in ordered for e in r.evidence),
@@ -62,12 +68,14 @@ class JeevesReplay:
         pairs = zip(expected, actual)
         for index, (left, right) in enumerate(pairs, 1):
             checks = (
+                (left.decision_id, right.decision_id, "decision-identity divergence"),
                 (left.action, right.action, "action divergence"),
                 (left.evidence, right.evidence, "evidence-reference divergence"),
                 (left.predecessors, right.predecessors, "causal-predecessor divergence"),
                 (left.policy_digest, right.policy_digest, "policy-state divergence"),
                 (left.state_digest, right.state_digest, "learner-state divergence"),
                 (left.disposition.value, right.disposition.value, "disposition divergence"),
+                (left.record_hash, right.record_hash, "record-integrity divergence"),
             )
             for exp, act, reason in checks:
                 if exp != act:
@@ -81,11 +89,14 @@ class JeevesReplay:
         return ReplayReport(session_id, matches, tuple(mismatches))
 
     def compare_snapshots(self, expected: ReplaySnapshot, actual: ReplaySnapshot) -> ReplayReport:
-        """Compare semantic execution projections, including session identity."""
+        """Compare semantic execution projections, including causal identity."""
         mismatches: list[ReplayMismatch] = []
         if expected.session_id != actual.session_id:
             mismatches.append(ReplayMismatch(0, expected.session_id, actual.session_id, "session identity divergence"))
         checks = (
+            (expected.decision_ids, actual.decision_ids, "decision-identity divergence"),
+            (expected.predecessors, actual.predecessors, "causal-predecessor divergence"),
+            (expected.record_hashes, actual.record_hashes, "record-integrity divergence"),
             (expected.selected_actions, actual.selected_actions, "selected-policy divergence"),
             (expected.rejected_actions, actual.rejected_actions, "rejected-policy divergence"),
             (expected.evidence_ids, actual.evidence_ids, "evidence-attribution divergence"),
@@ -96,7 +107,7 @@ class JeevesReplay:
         for index, (exp, act, reason) in enumerate(checks, 1):
             if exp != act:
                 mismatches.append(ReplayMismatch(index, str(exp), str(act), reason))
-        compared = len(checks)
+        compared = len(checks) + (1 if expected.session_id == actual.session_id else 0)
         return ReplayReport(expected.session_id or actual.session_id, compared - len(mismatches), tuple(mismatches))
 
     def causal_path(self, ledger, decision_id: str) -> tuple[DecisionRecord, ...]:
