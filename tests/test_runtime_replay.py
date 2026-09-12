@@ -39,4 +39,25 @@ def test_runtime_audit_rejects_a_policy_claimed_as_rejected_but_accepted():
     snapshot = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),), selected_policy="practice", rejected_policies=("challenge",), ledger=ledger)
     audit = audit_runtime(snapshot, ledger)
     assert not audit.valid
-    assert any("not audited as rejected" in item for item in audit.violations)
+    assert any("lacks a REJECTED ledger record" in item for item in audit.violations)
+
+
+def test_runtime_audit_rejects_selected_policy_marked_rejected():
+    ledger = _ledger()
+    ledger.append(session_id="s1", decision_id="s1:alternative", domain="session_runtime", action="challenge", rationale=("counterfactual alternative", "not executed"), disposition=DecisionDisposition.REJECTED)
+    snapshot = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),), selected_policy="challenge", rejected_policies=("challenge",), ledger=ledger)
+    audit = audit_runtime(snapshot, ledger)
+    assert not audit.valid
+    assert any("incorrectly recorded as rejected" in item for item in audit.violations)
+
+
+def test_runtime_audit_rejects_noncontiguous_event_sequences():
+    ledger = _ledger()
+    events = (
+        SessionEvent(1, SessionPhase.INTAKE, "session_opened"),
+        SessionEvent(3, SessionPhase.DIAGNOSE, "control_plan_ready"),
+    )
+    snapshot = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=events, selected_policy="practice", rejected_policies=(), ledger=ledger)
+    audit = audit_runtime(snapshot, ledger)
+    assert not audit.valid
+    assert any("event sequence" in item for item in audit.violations)
