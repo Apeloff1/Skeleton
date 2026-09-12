@@ -1,12 +1,9 @@
 """Deterministic audit checks for the Jeeves session control loop."""
 from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Sequence
-
 from skeleton.school.decision_ledger import DecisionDisposition, DecisionLedger, DecisionRecord
 from skeleton.school.replay import replay_digest
-
 
 @dataclass(frozen=True)
 class SessionAudit:
@@ -16,56 +13,41 @@ class SessionAudit:
     failures: tuple[str, ...]
     digest: str
 
-
 def audit_session(ledger: DecisionLedger, session_id: str) -> SessionAudit:
-    records = tuple(r for r in ledger.records if r.session_id == session_id)
+    records = ledger.session(session_id)
     checks: list[str] = []
     failures: list[str] = []
-
     if not records:
         return SessionAudit(session_id, False, (), ("session has no ledger records",), replay_digest(()))
-
     try:
-        ledger.verify()
-        checks.append("hash-chain")
+        ledger.verify(); checks.append("hash-chain")
     except ValueError as exc:
         failures.append(f"hash-chain: {exc}")
-
-    expected = records[0].sequence
     all_ids = {record.decision_id for record in ledger.records}
+    expected_sequence = [r.sequence for r in records]
+    if expected_sequence != sorted(expected_sequence) or len(set(expected_sequence)) != len(expected_sequence):
+        failures.append("session decision sequence is not ordered")
     for record in records:
-        if record.sequence != expected:
-            failures.append(f"sequence gap at {record.decision_id}: expected {expected}, got {record.sequence}")
-        expected += 1
         if any(predecessor not in all_ids for predecessor in record.predecessors):
             failures.append(f"missing predecessor for {record.decision_id}")
-
-    if records[0].predecessors:
-        checks.append("causal-ancestry")
-    else:
-        checks.append("causal-root")
-
+    checks.append("causal-ancestry" if records[0].predecessors else "causal-root")
     rejected = tuple(r for r in records if r.disposition is DecisionDisposition.REJECTED)
     if rejected:
         checks.append("counterfactual-audit")
         for record in rejected:
-            if "counterfactual alternative" not in record.rationale:
-                failures.append(f"rejected alternative lacks rationale: {record.decision_id}")
-
-    if any(r.policy_digest for r in records):
-        checks.append("policy-provenance")
-
-    if expected == records[-1].sequence + 1:
-        checks.append("sequence-contiguous")
-
-    digest = replay_digest(records)
-    return SessionAudit(session_id, not failures, tuple(checks), tuple(failures), digest)
-
+            if "counterfactual alternative" not in record.rationale or "not executed" not in record.rationale:
+                failures.append(f"rejected alternative lacks audit rationale: {record.decision_id}")
+    superseded = tuple(r for r in records if r.disposition is DecisionDisposition.SUPERSEDED)
+    if superseded:
+        checks.append("supersession-audit")
+        for record in superseded:
+            if len(record.predecessors) != 1:
+                failures.append(f"supersession must name exactly one predecessor: {record.decision_id}")
+    if any(r.policy_digest for r in records): checks.append("policy-provenance")
+    if tuple(r.sequence for r in ledger.active_records(session_id)) == tuple(r.sequence for r in records if r.decision_id not in ledger.superseded_ids() and r.disposition is not DecisionDisposition.SUPERSEDED):
+        checks.append("active-record-filter")
+    if not failures: checks.append("session-audit-clean")
+    return SessionAudit(session_id, not failures, tuple(checks), tuple(failures), replay_digest(records))
 
 def policy_chain(records: Sequence[DecisionRecord]) -> tuple[str, ...]:
-    """Return policy-bearing actions in deterministic ledger order."""
-    return tuple(
-        record.action
-        for record in records
-        if record.disposition is not DecisionDisposition.REJECTED and record.policy_digest
-    )
+    return tuple(record.action for record in records if record.disposition is not DecisionDisposition.REJECTED and record.policy_digest)
