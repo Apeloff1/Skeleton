@@ -78,7 +78,7 @@ def test_runtime_attestation_accepts_same_action_rejected_counterfactual():
         decision_id="s1:challenge-rejected",
         domain="session_runtime",
         action="challenge",
-        rationale=("counterfactual",),
+        rationale=("counterfactual alternative", "not executed"),
         disposition=DecisionDisposition.REJECTED,
         predecessors=("s1:orient",),
     )
