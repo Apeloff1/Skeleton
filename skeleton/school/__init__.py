@@ -25,6 +25,7 @@ from skeleton.school.progression import AchievementEvidence, AchievementRequirem
 from skeleton.school.prompting import PromptRefinement, RefinementNeed, refine_prompt
 from skeleton.school.reflection import ReflectionEntry, ReflectionImportance, ReflectionJournal, ReflectionKind, ReflectionPrompt, reflection_prompts, summarize_reflection
 from skeleton.school.replay import JeevesReplay, ReplayMismatch, ReplayReport, replay_digest
+from skeleton.school.session_audit import SessionAudit, audit_session, policy_chain
 from skeleton.school.session_runtime import EvidenceGate, JeevesSessionRuntime, RuntimePlan, SessionEvent, SessionPhase, SessionTransition, TransitionKind
 from skeleton.school.session import JeevesSessionEngine, SessionDecision
 from skeleton.school.student import SkillState, StudentProfile
@@ -54,6 +55,7 @@ __all__ = [
     "PromptRefinement", "RefinementNeed", "refine_prompt",
     "ReflectionEntry", "ReflectionImportance", "ReflectionJournal", "ReflectionKind", "ReflectionPrompt", "reflection_prompts", "summarize_reflection",
     "JeevesReplay", "ReplayMismatch", "ReplayReport", "replay_digest",
+    "SessionAudit", "audit_session", "policy_chain",
     "EvidenceGate", "JeevesSessionRuntime", "RuntimePlan", "SessionEvent", "SessionPhase", "SessionTransition", "TransitionKind",
     "JeevesSessionEngine", "SessionDecision", "SkillState", "StudentProfile",
 ]
