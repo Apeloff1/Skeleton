@@ -1,0 +1,1 @@
+Tutolage mining: advanced code intelligence included semantic search, documentation, migration, test generation, bug prediction, dependency analysis, architecture analysis, API/schema design, merge conflict resolution, review, and performance profiling. Skeleton ports only provider-independent signals and learning-task prioritization.
