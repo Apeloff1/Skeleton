@@ -4,6 +4,7 @@ from skeleton.school.decision_ledger import DecisionDisposition, DecisionLedger
 from skeleton.school.epistemics import EpistemicEngine, EpistemicEvidence, EvidencePolarity
 from skeleton.school.jeeves import JeevesControlPlane
 from skeleton.school.knowledge import KnowledgeGraph, KnowledgeNode, KnowledgeState, rank_knowledge
+from skeleton.school.outcomes import OutcomeKind, SessionOutcome
 from skeleton.school.policy_calibration import PolicyCalibrator
 from skeleton.school.session_runtime import JeevesSessionRuntime
 from skeleton.school.student import StudentProfile
@@ -49,10 +50,27 @@ def test_runtime_records_epistemic_evidence_and_ledger() -> None:
 def test_counterfactual_rejections_are_audited() -> None:
     curriculum = CurriculumGraph()
     runtime = JeevesSessionRuntime(JeevesControlPlane(curriculum), curriculum, KnowledgeGraph())
-    runtime.begin(StudentProfile(student_id="s1"), session_id="s1", query_terms=("algorithms",), pipeline_kind=PipelineKind.LESSON)
+    plan = runtime.begin(StudentProfile(student_id="s1"), session_id="s1", query_terms=("algorithms",), pipeline_kind=PipelineKind.LESSON)
     rejected = [r for r in runtime.ledger.records if r.disposition is DecisionDisposition.REJECTED]
     assert rejected
     assert all("counterfactual alternative" in r.rationale for r in rejected)
+    assert plan.selected_policy
+    assert plan.rejected_policies
+    runtime.ledger.verify()
+
+
+def test_runtime_outcome_closes_policy_calibration_loop() -> None:
+    curriculum = CurriculumGraph()
+    control = JeevesControlPlane(curriculum)
+    runtime = JeevesSessionRuntime(control, curriculum, KnowledgeGraph())
+    student = StudentProfile(student_id="s1")
+    plan = runtime.begin(student, session_id="s1", query_terms=("algorithms",), pipeline_kind=PipelineKind.LESSON)
+    before = control.policy_calibrator.reliability(plan.selected_policy)
+    runtime.record_outcome(student, SessionOutcome(skill_id="algorithms", score=1.0, kind=OutcomeKind.INDEPENDENT, summary="independent solution"))
+    after = control.policy_calibrator.reliability(plan.selected_policy)
+    assert after > before
+    assert runtime.ledger.records[-1].action == "outcome:independent"
+    assert runtime.ledger.records[-1].evidence
     runtime.ledger.verify()
 
 
