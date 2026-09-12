@@ -114,14 +114,15 @@ def audit_runtime(snapshot: RuntimeReplaySnapshot, ledger: DecisionLedger) -> Ru
         violations.append("runtime event sequence is not contiguous")
     if len(snapshot.events) != snapshot.event_count:
         violations.append("runtime event count does not match event payload")
-    if snapshot.events and snapshot.events[-1][1] != snapshot.phase:
-        violations.append("runtime snapshot phase diverges from last event phase")
-    if any(event[1] == SessionPhase.COMPLETE.value for event in snapshot.events):
-        complete_index = next(
-            index for index, event in enumerate(snapshot.events) if event[1] == SessionPhase.COMPLETE.value
-        )
+    complete_events = [index for index, event in enumerate(snapshot.events) if event[1] == SessionPhase.COMPLETE.value]
+    if complete_events:
+        complete_index = complete_events[0]
         if complete_index != len(snapshot.events) - 1:
             violations.append("runtime contains events after COMPLETE")
+        if snapshot.phase != SessionPhase.COMPLETE.value:
+            violations.append("runtime snapshot phase diverges from terminal COMPLETE event")
+    elif snapshot.phase == SessionPhase.COMPLETE.value:
+        violations.append("runtime snapshot claims COMPLETE without a terminal COMPLETE event")
 
     for record in session_records:
         for predecessor in record.predecessors:
