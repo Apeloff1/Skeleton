@@ -25,6 +25,16 @@ def test_runtime_snapshot_is_deterministic_and_auditable():
     assert audit.valid
 
 
+def test_runtime_capture_accepts_lifecycle_bound_policy_identity():
+    ledger = _ledger()
+    ledger.append(session_id="s1", decision_id="s1:practice-later", domain="session_runtime", action="practice", rationale=("later accepted action",), disposition=DecisionDisposition.ACCEPTED)
+    snapshot = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),), selected_policy="practice", selected_policy_decision_id="s1:orient", rejected_policies=(), ledger=ledger)
+    assert snapshot.selected_policy_decision_id == "s1:orient"
+    audit = audit_runtime(snapshot, ledger)
+    assert not audit.valid
+    assert any("unique ACCEPTED ledger attribution" in item for item in audit.violations)
+
+
 def test_runtime_audit_detects_runtime_digest_tampering():
     ledger = _ledger()
     snapshot = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),), selected_policy="practice", rejected_policies=(), ledger=ledger)
@@ -80,6 +90,23 @@ def test_runtime_audit_rejects_noncontiguous_event_sequences():
     audit = audit_runtime(snapshot, ledger)
     assert not audit.valid
     assert any("event sequence" in item for item in audit.violations)
+
+
+def test_runtime_audit_rejects_complete_without_terminal_event():
+    ledger = _ledger()
+    snapshot = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.COMPLETE, events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),), selected_policy="practice", rejected_policies=(), ledger=ledger)
+    audit = audit_runtime(snapshot, ledger)
+    assert not audit.valid
+    assert any("without a terminal COMPLETE event" in item for item in audit.violations)
+
+
+def test_runtime_audit_rejects_events_after_complete():
+    ledger = _ledger()
+    events = (SessionEvent(1, SessionPhase.INTAKE, "session_opened"), SessionEvent(2, SessionPhase.COMPLETE, "transition:complete"), SessionEvent(3, SessionPhase.COMPLETE, "late_event"))
+    snapshot = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.COMPLETE, events=events, selected_policy="practice", rejected_policies=(), ledger=ledger)
+    audit = audit_runtime(snapshot, ledger)
+    assert not audit.valid
+    assert any("events after COMPLETE" in item for item in audit.violations)
 
 
 def test_runtime_audit_rejects_invalid_provenance_digest():
