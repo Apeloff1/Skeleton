@@ -1,8 +1,7 @@
 """Grand Jeeves control plane.
 
 This is Skeleton's provider-neutral integration layer for curriculum, memory,
-learning control, energy, progression, and evidence capture. It is designed to
-become the decision core underneath model/tool/storage adapters.
+learning control, energy, progression, epistemics, and policy competition.
 """
 
 from __future__ import annotations
@@ -10,8 +9,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Sequence
 
+from skeleton.school.counterfactual import CounterfactualResult, default_candidates, compete
 from skeleton.school.curriculum import CurriculumGraph, LearningRecommendation, rank_recommendations
 from skeleton.school.energy import EnergyBudget, EnergyDecision, choose_energy_strategy
+from skeleton.school.epistemics import EpistemicEngine
 from skeleton.school.learning_control import LearningControl, LearningControlDecision, LearningState
 from skeleton.school.memory import LearnerMemory, MemoryMatch, MemoryStore
 from skeleton.school.outcomes import OutcomeResult, SessionOutcome, apply_outcome
@@ -40,6 +41,7 @@ class JeevesSessionPlan:
     decisions: tuple[JeevesDecision, ...]
     suggested_minutes: int
     next_evidence: tuple[str, ...]
+    policy_competition: CounterfactualResult | None = None
 
 
 @dataclass
@@ -48,6 +50,7 @@ class JeevesControlPlane:
     memory: MemoryStore = field(default_factory=MemoryStore)
     reflections: ReflectionJournal = field(default_factory=ReflectionJournal)
     learning_control: LearningControl = field(default_factory=LearningControl)
+    epistemics: EpistemicEngine = field(default_factory=EpistemicEngine)
 
     def __post_init__(self) -> None:
         self.curriculum.validate()
@@ -70,12 +73,23 @@ class JeevesControlPlane:
             "misconceptions_repaired": float(student.facts.get("misconceptions_repaired", "0")),
             "projects_completed": float(student.facts.get("projects_completed", "0")),
         })
+        claim = primary or (query_terms[0] if query_terms else "current objective")
+        belief = self.epistemics.beliefs.get(claim)
+        contradiction = 1.0 if belief and belief.contradiction else 0.0
+        candidates = default_candidates(
+            mastery=state.mastery,
+            contradiction=contradiction,
+            energy=student.energy,
+            transfer_ready=state.transfer_rate >= 0.7 and state.mastery >= 0.7,
+        )
+        competition = compete(candidates)
         decisions = (
             JeevesDecision("curriculum", primary or "review_memory", tuple(r.reason for r in recommendations[:2]) or ("No prerequisite-ready skill; use retrieval/reflection.",)),
             JeevesDecision("learning_control", control.difficulty_adjustment, control.rationale or ("Maintain current trajectory.",)),
             JeevesDecision("memory", "retrieve" if memories else "build_memory", tuple(m.reason for m in memories[:2]) or ("No retained match; create new evidence.",)),
             JeevesDecision("retention", "review_due_memory" if due else "continue_schedule", (f"{len(due)} memories are below retention threshold.",)),
             JeevesDecision("energy", energy.strategy.value, energy.rationale),
+            JeevesDecision("policy_competition", competition.selected.action.value, competition.rationale, tuple(c.action.value for c in competition.rejected)),
         )
         evidence = ["response quality or solution score", "learner explanation / reasoning quality", "independence or scaffold required"]
         if primary:
@@ -84,7 +98,9 @@ class JeevesControlPlane:
             evidence.append("retrieval result after delayed review")
         if due:
             evidence.append("retention outcome for due memory")
-        return JeevesSessionPlan(recommendations, primary, memories, due, control, energy, progression, decisions, max(5, energy.session_minutes), tuple(dict.fromkeys(evidence)))
+        if contradiction:
+            evidence.append("resolution of contradictory evidence")
+        return JeevesSessionPlan(recommendations, primary, memories, due, control, energy, progression, decisions, max(5, energy.session_minutes), tuple(dict.fromkeys(evidence)), competition)
 
     def record_outcome(self, student: StudentProfile, outcome: SessionOutcome, *, previous_unlocked: frozenset[str] = frozenset()) -> OutcomeResult:
         """Close the loop: write evidence into learner state and memory."""
