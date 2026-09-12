@@ -28,6 +28,7 @@ class RuntimeAttestation:
     selected_policy_decision_id: str | None
     accepted_decision_ids: tuple[str, ...]
     rejected_decision_ids: tuple[str, ...]
+    session_record_hashes: tuple[str, ...]
     attestation_digest: str
 
     @classmethod
@@ -51,6 +52,7 @@ class RuntimeAttestation:
         root = roots[0]
         accepted = tuple(record.decision_id for record in records if record.disposition is DecisionDisposition.ACCEPTED)
         rejected = tuple(record.decision_id for record in records if record.disposition is DecisionDisposition.REJECTED)
+        record_hashes = tuple(record.record_hash for record in records)
         selected = snapshot.selected_policy_decision_id or None
         if selected is not None:
             selected_record = next((record for record in records if record.decision_id == selected), None)
@@ -70,6 +72,7 @@ class RuntimeAttestation:
             "selected_policy_decision_id": selected,
             "accepted_decision_ids": accepted,
             "rejected_decision_ids": rejected,
+            "session_record_hashes": record_hashes,
         }
         return cls(
             snapshot.session_id,
@@ -83,6 +86,7 @@ class RuntimeAttestation:
             selected,
             accepted,
             rejected,
+            record_hashes,
             _digest(payload),
         )
 
@@ -127,6 +131,8 @@ def verify_attestation(attestation: RuntimeAttestation, snapshot: RuntimeReplayS
         failures.append("attestation accepted decision identities diverge")
     if attestation.rejected_decision_ids != (expected.rejected_decision_ids if expected else ()):
         failures.append("attestation rejected decision identities diverge")
+    if attestation.session_record_hashes != (expected.session_record_hashes if expected else ()):
+        failures.append("attestation session record hashes diverge")
     if expected is not None and attestation.attestation_digest != expected.attestation_digest:
         failures.append("attestation digest diverges")
     return tuple(dict.fromkeys(failures))
