@@ -1,7 +1,7 @@
 """Small streaming metrics used by evaluation and control loops."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from math import sqrt
 
 
@@ -35,8 +35,8 @@ class RunningStats:
 class QualityWindow:
     """Tracks quality, latency, and failure rate without retaining samples."""
 
-    quality: RunningStats = RunningStats()
-    latency_ms: RunningStats = RunningStats()
+    quality: RunningStats = field(default_factory=RunningStats)
+    latency_ms: RunningStats = field(default_factory=RunningStats)
     failures: int = 0
 
     def record(self, quality: float, latency_ms: float, *, failed: bool = False) -> None:
