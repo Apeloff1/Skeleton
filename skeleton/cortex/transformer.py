@@ -176,6 +176,31 @@ class TransformerBlock:
         }
         return Y, cache
 
+    def forward_shallow(self, X: List[List[float]], n_heads: int):
+        """Attention residual only — MoD shallow path (no FFN)."""
+        n = len(X)
+        Xn: List[List[float]] = []
+        hats1: List[List[float]] = []
+        invs1: List[float] = []
+        for x in X:
+            y, hat, inv = self._norm(x, self.ln1_g, self.ln1_b)
+            Xn.append(y)
+            hats1.append(hat)
+            invs1.append(inv)
+        Q = [apply_rope(matvec(self.Wq, x), t) for t, x in enumerate(Xn)]
+        K = [apply_rope(matvec(self.Wk, x), t) for t, x in enumerate(Xn)]
+        V = [matvec(self.Wv, x) for x in Xn]
+        C, As = multi_head_attend(Q, K, V, n_heads)
+        attn = [matvec(self.Wo, c) for c in C]
+        U = [add(X[t], attn[t]) for t in range(n)]
+        cache = {
+            "X": X, "Xn": Xn, "hats1": hats1, "invs1": invs1,
+            "Q": Q, "K": K, "V": V, "C": C, "As": As, "attn": attn, "U": U,
+            "Un": [], "hats2": [], "invs2": [], "z": [], "pre": [],
+            "gate": [], "up": [], "n_heads": n_heads, "shallow": True,
+        }
+        return U, cache
+
     def backward(self, dY: List[List[float]], cache: Dict[str, Any], lr: float) -> List[List[float]]:
         n = len(dY)
         D = self.dim
@@ -332,6 +357,9 @@ class TinyTransformer:
         d_ff: int = 0,
         norm: str = "ln",
         ffn_kind: str = "gelu",
+        use_mod: bool = False,
+        mod_deep: float = 0.25,
+        mod_shallow: float = 0.25,
     ) -> None:
         itos = [UNK] + sorted({str(t) for t in (vocab or ()) if t and t != UNK})
         self.itos: List[str] = itos
@@ -369,6 +397,16 @@ class TinyTransformer:
         self.requested = "cpu"
         self.resident = False
         self._accel = None
+        self.use_mod = bool(use_mod)
+        self.mod = None
+        if self.use_mod:
+            from skeleton.cortex.mod import MixtureOfDepths
+            self.mod = MixtureOfDepths(
+                D,
+                seed=int(seed) ^ 0x4D4F44,  # "MOD"
+                deep_capacity=float(mod_deep),
+                shallow_capacity=float(mod_shallow),
+            )
 
     @property
     def V(self) -> int:
@@ -481,8 +519,12 @@ class TinyTransformer:
     def _forward(self, ids: Sequence[int]):
         H = self._encode(ids)
         caches = []
+        mod = self.mod if self.use_mod else None
         for layer in self.layers:
-            H, cache = layer.forward(H, self.n_heads)
+            if mod is not None:
+                H, cache = mod.forward_block(layer, H, self.n_heads)
+            else:
+                H, cache = layer.forward(H, self.n_heads)
             caches.append(cache)
         return H, caches
 
@@ -781,6 +823,8 @@ class TinyTransformer:
             "W2": _copy_mat(L0.W2) if L0.W2 else [],
             "b2": list(L0.b2) if L0.b2 else [],
             "layers": [L.snapshot() for L in self.layers],
+            "use_mod": bool(self.use_mod),
+            "mod": None if self.mod is None else self.mod.snapshot(),
         }
 
     @classmethod
@@ -797,6 +841,9 @@ class TinyTransformer:
             d_ff=int((data or {}).get("d_ff") or 0),
             norm=str((data or {}).get("norm") or "ln"),
             ffn_kind=str((data or {}).get("ffn_kind") or "gelu"),
+            use_mod=bool((data or {}).get("use_mod")),
+            mod_deep=float(((data or {}).get("mod") or {}).get("router", {}).get("deep_capacity") or 0.25),
+            mod_shallow=float(((data or {}).get("mod") or {}).get("router", {}).get("shallow_capacity") or 0.25),
         )
         lm.itos = itos
         lm.stoi = {t: i for i, t in enumerate(itos)}
@@ -830,6 +877,9 @@ class TinyTransformer:
                 L0.b1 = [float(x) for x in data["b1"]]
             if (data or {}).get("b2"):
                 L0.b2 = [float(x) for x in data["b2"]]
+        if (data or {}).get("mod") and lm.mod is not None:
+            from skeleton.cortex.mod import MixtureOfDepths
+            lm.mod = MixtureOfDepths.from_snapshot(data["mod"])
         lm.fitted = int((data or {}).get("fitted") or 0)
         lm.steps = int((data or {}).get("steps") or 0)
         lm.device = str((data or {}).get("device") or "cpu")
