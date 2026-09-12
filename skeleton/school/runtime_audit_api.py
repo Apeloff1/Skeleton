@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 def capture_runtime(runtime: "JeevesSessionRuntime") -> RuntimeReplaySnapshot:
-    """Capture a runtime with all currently available provenance bound automatically."""
+    """Capture a runtime using its intrinsic, lifecycle-bound provenance."""
     return RuntimeReplaySnapshot.capture(
         session_id=runtime.session_id,
         phase=runtime.phase,
@@ -23,8 +23,8 @@ def capture_runtime(runtime: "JeevesSessionRuntime") -> RuntimeReplaySnapshot:
             if record.disposition.value == "rejected"
         ),
         ledger=runtime.ledger,
-        pipeline_contract_digest=_pipeline_digest(runtime),
-        provenance_digest=_provenance_digest(runtime),
+        pipeline_contract_digest=runtime.pipeline_contract_digest,
+        provenance_digest=runtime.provenance_digest,
     )
 
 
@@ -37,22 +37,3 @@ def complete_runtime(runtime: "JeevesSessionRuntime", *, rationale: str = "compl
     if runtime.phase is SessionPhase.SCHEDULE:
         return runtime.transition(SessionPhase.COMPLETE, rationale=rationale)
     raise ValueError(f"session must be in commit or schedule before completion, got {runtime.phase.value}")
-
-
-def _pipeline_digest(runtime: "JeevesSessionRuntime") -> str:
-    for record in reversed(runtime.ledger.session(runtime.session_id)):
-        digest = record.state.get("pipeline_digest") if isinstance(record.state, dict) else None
-        if isinstance(digest, str) and digest:
-            return digest
-    return ""
-
-
-def _provenance_digest(runtime: "JeevesSessionRuntime") -> str:
-    for record in reversed(runtime.ledger.session(runtime.session_id)):
-        value = record.state.get("provenance_digest") if isinstance(record.state, dict) else None
-        if isinstance(value, str) and value:
-            return value
-        value = record.policy.get("provenance_digest") if isinstance(record.policy, dict) else None
-        if isinstance(value, str) and value:
-            return value
-    return ""
