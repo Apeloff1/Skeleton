@@ -11,6 +11,7 @@ from skeleton.school.decision_ledger import DecisionDisposition, DecisionLedger,
 from skeleton.school.energy import EnergyBudget, EnergyDecision, EnergyStrategy, choose_energy_strategy
 from skeleton.school.engine import SchoolEngine, SchoolPlan
 from skeleton.school.cs_pathways import CSFamily, CSPathway, PATHWAYS, next_pathway, pathways_for
+from skeleton.school.epistemics import BeliefState, EpistemicEngine, EpistemicEvidence, EpistemicUpdate, EvidencePolarity, MisconceptionStage, contradiction_matrix
 from skeleton.school.knowledge import KnowledgeAssertion, KnowledgeCandidate, KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeState, RelationKind, infer_ready_frontier, rank_knowledge
 from skeleton.school.learning_control import LearningControl, LearningControlDecision, LearningState
 from skeleton.school.lesson_content import LessonContent, LessonExercise, LessonTopic, generate_lesson_content
@@ -35,6 +36,7 @@ __all__ = [
     "DecisionDisposition", "DecisionLedger", "DecisionRecord", "EvidenceKind", "EvidenceRef", "LedgerCheckpoint", "evidence_bundle",
     "EnergyBudget", "EnergyDecision", "EnergyStrategy", "choose_energy_strategy",
     "SchoolEngine", "SchoolPlan", "CSFamily", "CSPathway", "PATHWAYS", "next_pathway", "pathways_for",
+    "BeliefState", "EpistemicEngine", "EpistemicEvidence", "EpistemicUpdate", "EvidencePolarity", "MisconceptionStage", "contradiction_matrix",
     "KnowledgeAssertion", "KnowledgeCandidate", "KnowledgeEdge", "KnowledgeGraph", "KnowledgeNode", "KnowledgeState", "RelationKind", "infer_ready_frontier", "rank_knowledge",
     "LearningControl", "LearningControlDecision", "LearningState",
     "LessonContent", "LessonExercise", "LessonTopic", "generate_lesson_content",
