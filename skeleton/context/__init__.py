@@ -1,12 +1,35 @@
-"""
-Skeleton Context Package
+"""Context substrate — tensor cube, dodeca oracle, DNA helix, ledger, snowball, cockpit."""
 
-Exports:
-- intake: Process questionnaire answers
-- Questionnaire: Interactive game design questionnaire
-- IntakeResult: Structured intake result
-"""
+from skeleton.context.cockpit import Cockpit, CockpitError
+from skeleton.context.dodeca import Dodecahedron, FACES
+from skeleton.context.helix import DNAHelix, BasePair
+from skeleton.context.ledger import ContextLedger, LedgerError
+from skeleton.context.oracle import Magic8Ball, OracleReading
+from skeleton.context.pipeline import GameForgeRun
+from skeleton.context.questionnaire import Intake, IntakeResult, Questionnaire, intake, BEATS
+from skeleton.context.snowball import Snowball, STAGES as SNOWBALL_STAGES
+from skeleton.context.tensor import AXES, ContextTensor, detect_era
 
-from skeleton.context.questionnaire import IntakeResult, Questionnaire, intake
-
-__all__ = ["intake", "Questionnaire", "IntakeResult"]
+__all__ = [
+    "AXES",
+    "ContextTensor",
+    "detect_era",
+    "Dodecahedron",
+    "FACES",
+    "Magic8Ball",
+    "OracleReading",
+    "DNAHelix",
+    "BasePair",
+    "ContextLedger",
+    "LedgerError",
+    "Snowball",
+    "SNOWBALL_STAGES",
+    "Cockpit",
+    "CockpitError",
+    "GameForgeRun",
+    "Intake",
+    "IntakeResult",
+    "Questionnaire",
+    "intake",
+    "BEATS",
+]
