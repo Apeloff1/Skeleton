@@ -873,16 +873,25 @@ class JeevesCortex:
     def _lm_amalgam(self, stim: str, composed: Thought, jaccard: float) -> Thought:
         """Neo transformer speaks. Compose keeps numbers and acquired text.
 
-        Decode on the bound device even when unfitted (birth weights still
-        utter). Fitted net keeps acquired/composed text beside the decode.
+        Unfitted net falls back to compose (tape). Fitted net is the LM.
         MoE mix stitches in when the left expert is fitted and compose
         has no mix numbers of its own.
         """
         xf = self.speaking_lm()
         mouth_name = self.speaking_name()
+        fitted = int(getattr(xf, "fitted", 0) or 0) if xf is not None else 0
+        if xf is None or fitted <= 0:
+            return Thought(
+                slot="neo",
+                kind="own",
+                text=composed.text or "",
+                confidence=min(1.0, 0.5 + 0.3 * float(jaccard or 0.0)),
+                tags=tuple(dict.fromkeys(list(composed.tags) + ["own", "surpass", mouth_name])),
+                numbers=composed.numbers,
+            )
         seed = int(fingerprint(stim)[:8], 16) if stim else 0
         gen = ""
-        if xf is not None and hasattr(xf, "decode"):
+        if hasattr(xf, "decode"):
             gen = str(xf.decode(stim or "", n=14, seed=seed) or "")
         tags = tuple(dict.fromkeys(list(composed.tags) + ["lm", "neo", "own", "surpass", mouth_name]))
         numbers = composed.numbers
