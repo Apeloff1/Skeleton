@@ -39,11 +39,13 @@ def audit_session(ledger: DecisionLedger, session_id: str) -> SessionAudit:
     # Causality is session-local: a runtime decision cannot silently inherit
     # ancestry from another session, even when the referenced record exists.
     for record in records:
+        if record.session_id != session_id:
+            failures.append(f"record belongs to another session: {record.decision_id}")
         for predecessor in record.predecessors:
             prior = by_id.get(predecessor)
             if prior is None:
                 failures.append(f"missing predecessor for {record.decision_id}")
-            elif predecessor not in session_ids:
+            elif predecessor not in session_ids or prior.session_id != session_id:
                 failures.append(f"cross-session predecessor for {record.decision_id}")
             elif prior.sequence >= record.sequence:
                 failures.append(f"causal predecessor is not earlier: {record.decision_id}")
@@ -70,7 +72,7 @@ def audit_session(ledger: DecisionLedger, session_id: str) -> SessionAudit:
         if target is None:
             failures.append(f"superseded target is missing: {replacement.decision_id}")
             continue
-        if target_id not in session_ids:
+        if target_id not in session_ids or target.session_id != session_id:
             failures.append(f"cross-session supersession for {replacement.decision_id}")
         if target.sequence >= replacement.sequence:
             failures.append(f"superseded target is not earlier: {replacement.decision_id}")
