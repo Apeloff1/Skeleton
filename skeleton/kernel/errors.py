@@ -61,6 +61,11 @@ class GenerationError(SkeletonError):
     """Generation failure."""
 
 
+class AgentError(SkeletonError):
+    """Agent-plane failure (mesh, Diet, reputation, routing)."""
+    code = "AGT.UNKNOWN"
+
+
 __all__ = [
     "SkeletonError",
     "BlueprintError",
@@ -75,4 +80,5 @@ __all__ = [
     "StageError",
     "ValidationError",
     "GenerationError",
+    "AgentError",
 ]
