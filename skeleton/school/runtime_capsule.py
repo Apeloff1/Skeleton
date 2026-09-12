@@ -36,11 +36,13 @@ class RuntimeIntegrityCapsule:
         if len(roots) != 1:
             raise ValueError("session must have exactly one causal root")
         root = roots[0]
-        selected = runtime.selected_policy_decision_id
+        selected = runtime.selected_policy_decision_id or None
         if selected is not None:
             selected_record = next((record for record in records if record.decision_id == selected), None)
             if selected_record is None or selected_record.disposition is not DecisionDisposition.ACCEPTED:
                 raise ValueError("selected policy decision is not an accepted session record")
+            if selected_record.action != runtime.selected_policy:
+                raise ValueError("selected policy decision does not match selected policy")
         payload = {
             "session_id": runtime.session_id,
             "runtime_digest": runtime.runtime_digest,
