@@ -51,19 +51,40 @@ def audit_runtime(snapshot: RuntimeReplaySnapshot, ledger: DecisionLedger) -> Ru
         violations.append("runtime snapshot ledger head diverges from ledger")
     if snapshot.ledger_count != len(ledger.records):
         violations.append("runtime snapshot ledger count diverges from ledger")
+
     session_records = ledger.session(snapshot.session_id)
+    record_ids = {record.decision_id for record in ledger.records}
+    actions = {record.action for record in session_records}
+    rejected_records = {
+        record.action
+        for record in session_records
+        if record.disposition is DecisionDisposition.REJECTED
+    }
+
     if snapshot.event_count and not session_records:
         violations.append("runtime has events but ledger has no session decisions")
-    if snapshot.selected_policy and session_records:
-        named = {r.action for r in session_records}
-        if snapshot.selected_policy not in named:
+    if snapshot.selected_policy:
+        if not session_records:
+            violations.append("selected policy cannot be audited without session decisions")
+        elif snapshot.selected_policy not in actions:
             violations.append("selected policy is absent from session ledger")
-    rejected = set(snapshot.rejected_policies)
+        elif snapshot.selected_policy in rejected_records:
+            violations.append("selected policy is incorrectly recorded as rejected")
+    missing_rejections = set(snapshot.rejected_policies) - rejected_records
+    for policy in sorted(missing_rejections):
+        violations.append(f"rejected policy {policy!r} lacks a REJECTED ledger record")
+    unlisted_rejections = rejected_records - set(snapshot.rejected_policies)
+    for policy in sorted(unlisted_rejections):
+        violations.append(f"ledger rejected policy {policy!r} is absent from runtime snapshot")
+
+    event_sequences = [event[0] for event in snapshot.events]
+    if event_sequences != list(range(1, snapshot.event_count + 1)):
+        violations.append("runtime event sequence is not contiguous")
+    if len(snapshot.events) != snapshot.event_count:
+        violations.append("runtime event count does not match event payload")
+
     for record in session_records:
-        if record.action in rejected and record.disposition is not DecisionDisposition.REJECTED:
-            violations.append(f"rejected policy {record.action!r} is not audited as rejected")
-    for record in session_records:
-        if any(predecessor not in {candidate.decision_id for candidate in ledger.records} for predecessor in record.predecessors):
+        if any(predecessor not in record_ids for predecessor in record.predecessors):
             violations.append(f"decision {record.decision_id!r} references missing predecessor")
     return RuntimeAudit(not violations, tuple(dict.fromkeys(violations)))
 
