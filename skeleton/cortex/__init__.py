@@ -1,19 +1,66 @@
-"""
-Skeleton Cortex Package
+"""Cortex package exports for the Jeeves model-building surface."""
 
-Exports:
-- JeevesCortex: Central observability hub
-- CortexSnapshot: System state capture
-- ControlSurface: Runtime control
-- live: Process-lived serving singleton
-"""
-
-from skeleton.cortex.neocortex import ControlSurface, CortexSnapshot, JeevesCortex
-from skeleton.cortex import live
+from .port import (
+    SLOTS, SCALES, CallableBackend, EchoBackend, ModelPort, Thought,
+    fingerprint, jaccard, tokens,
+)
+from .pfc import TEMPLATES, PrefrontalCortex
+from .midbrain import Midbrain
+from .hemispheres import LeftHemisphere, RightHemisphere, ttk_oracle
+from .distill import Ability, AbilityLedger, ability_from
+from .own import MIN_JACCARD, OwnSystem, RecallHit, Tract, shadow_eval
+from .curriculum import CORE_PAIRS, WALK_PAIRS, default_curriculum, train
+from .neocortex import ControlSurface, CortexSnapshot, CortexTrace, JeevesCortex, local_slots
+from .live import live_cortex, live_jeeves, persist, reset_live
+from .lm import NGramLM, LanguageModelBackend, gameforge_corpus, gameforge_vocab
+from .neural import NeuralLM, NeuralBackend
+from .transformer import TinyTransformer, TransformerBackend
+from .learned import LearnedWeights
+from .device import probe, resolve, attach_lm
+from .heads import BiasHead, NumericHead, PolicyHead, RouteHead, VetoHead
+from .callosum import CorpusCallosum
+from .moe import ExpertBank
+from .sleep import SleepCycle
+from .rl import ReinforceState, reinforce_mix
+from .bpe import BytePairEncoder, gameforge_bpe
+from .metrics import evaluate, beats
+from .hive import merkle_card, bundle, pull, consensus
+from .speculate import speculate, greedy_decode
+from .zaibatsu import tournament, devil_gene
+from .lora import LoRA, LoRABank
+from .beam import beam_search, greedy_beam
+from .accum import Accumulator, accumulate_fit
+from .gossip import absorb_mouth, gossip, gossip_cortices, gossip_mouths
+from .dodeca import FACES, face_card
+from .interchange import HuggingFaceBackend, KimiBackend, distill_teacher, probe_interchange
+from .contact import ContactEngine, is_teacher
+from .catalog import FAMILIES, catalog, all_model_ids
+from .gates import bind_gate, probe_all, ping
+from .multimodal import AudioPort, ImagePort, TextPort, VideoPort, open_modality
+from .genos import Genos
+from .acquire_repo import acquire_catalog, acquire_gaming, acquire_spree, parse_ref, references
+from .laws import LAWS, LawError, check
+from .antiplag import distill_dialect, guard
+from .cite import steam_cite, wiki_cite, SPDX_STEAM, SPDX_WIKI
+from .refs import GameRefPort, lookup, match, refer
+from .improve import improve
+from .attn import swiglu, swiglu_bwd, cosine_lr, silu, rms_norm
+from .deck import CommandDeck, live_deck
+from .era_bind import HOUSE_ERA, house_era, resolve as resolve_era, bind_into
+from .perpendicular import AXES as PERP_AXES, cut as perpendicular_cut, live_cut
 
 __all__ = [
-    "JeevesCortex",
-    "CortexSnapshot",
-    "ControlSurface",
-    "live",
+    "SLOTS", "SCALES", "MIN_JACCARD", "CallableBackend", "EchoBackend", "ModelPort", "Thought",
+    "fingerprint", "jaccard", "tokens", "TEMPLATES", "PrefrontalCortex", "Midbrain",
+    "LeftHemisphere", "RightHemisphere", "ttk_oracle", "Ability", "AbilityLedger", "ability_from",
+    "OwnSystem", "RecallHit", "Tract", "shadow_eval", "CORE_PAIRS", "WALK_PAIRS", "default_curriculum", "train",
+    "CortexTrace", "CortexSnapshot", "ControlSurface", "JeevesCortex", "local_slots", "live_cortex", "live_jeeves", "persist", "reset_live",
+    "NGramLM", "LanguageModelBackend", "gameforge_corpus", "gameforge_vocab", "NeuralLM", "NeuralBackend", "TinyTransformer", "TransformerBackend",
+    "LearnedWeights", "probe", "resolve", "attach_lm", "NumericHead", "BiasHead", "RouteHead", "VetoHead", "PolicyHead", "CorpusCallosum",
+    "ExpertBank", "SleepCycle", "ReinforceState", "reinforce_mix", "BytePairEncoder", "gameforge_bpe", "evaluate", "beats", "merkle_card", "bundle", "pull",
+    "speculate", "greedy_decode", "tournament", "devil_gene", "LoRA", "LoRABank", "beam_search", "greedy_beam", "Accumulator", "accumulate_fit",
+    "gossip", "gossip_cortices", "gossip_mouths", "absorb_mouth", "FACES", "face_card", "HuggingFaceBackend", "KimiBackend", "distill_teacher", "probe_interchange",
+    "consensus", "swiglu", "swiglu_bwd", "cosine_lr", "silu", "rms_norm", "FAMILIES", "catalog", "all_model_ids", "bind_gate", "probe_all", "ping",
+    "TextPort", "ImagePort", "AudioPort", "VideoPort", "open_modality", "Genos", "acquire_gaming", "acquire_catalog", "CommandDeck", "live_deck",
+    "HOUSE_ERA", "house_era", "resolve_era", "bind_into", "PERP_AXES", "perpendicular_cut", "live_cut",
 ]
