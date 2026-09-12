@@ -30,7 +30,7 @@ __all__ = [
     "CodeIntelligenceEngine", "CodeIntelligenceReport", "CodeSignal", "CodeSignalKind", "IntelligenceTask", "CodeTaskKind",
     "CodeFinding", "CodeLabEngine", "CodeReview", "CodeTask", "FindingSeverity",
     "CodingPhase", "CoCodingAction", "CoCodingContext", "HandoffStage", "InteractionPattern", "choose_action", "next_handoff",
-    "CurriculumGraph", "CurriculumNode", "LearningRecommendation", "LearningRecommendation", "rank_recommendations",
+    "CurriculumGraph", "CurriculumNode", "LearningRecommendation", "rank_recommendations",
     "DebugAction", "DebugExperiment", "DebugFocus", "DebugHypothesis", "DebugPlan", "DebuggingPolicy",
     "DecisionDisposition", "DecisionLedger", "DecisionRecord", "EvidenceKind", "EvidenceRef", "LedgerCheckpoint", "evidence_bundle",
     "EnergyBudget", "EnergyDecision", "EnergyStrategy", "choose_energy_strategy",
