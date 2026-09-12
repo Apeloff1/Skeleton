@@ -45,7 +45,13 @@ def _parse_bias(text: str, tags: Sequence[str] = ()) -> Optional[str]:
 
 
 def evaluate(neo) -> Dict[str, Any]:
-    """Score the live organism against the GameForge closed world."""
+    """Score the live organism against the GameForge closed world.
+
+    Slot liveness is measured through the ModelPort seam, not by reaching
+    through a port to a specific implementation detail.  This matters for
+    PFC: a fresh cortex deliberately hides its untrained transformer from
+    the public slot while the port still owns a finite n-gram/neural mouth.
+    """
     from skeleton.cortex.curriculum import CORE_PAIRS, WALK_PAIRS
     from skeleton.cortex.lm import gameforge_corpus
 
@@ -53,17 +59,25 @@ def evaluate(neo) -> Dict[str, Any]:
     ppl_texts = [a for a, _ in list(CORE_PAIRS)] + [a for a, _ in list(WALK_PAIRS)]
     ppl = float(xf.perplexity(ppl_texts)) if xf is not None and hasattr(xf, "perplexity") else float("inf")
 
-    def _mouth_ppl(lm) -> float:
-        if lm is None or not hasattr(lm, "perplexity"):
+    def _mouth_ppl(mouth) -> float:
+        """Perplexity through the mouth contract, with transformer fallback."""
+        if mouth is None:
+            return float("inf")
+        candidate = mouth
+        if not hasattr(candidate, "perplexity"):
+            candidate = getattr(mouth, "transformer", None)
+        if candidate is None or not hasattr(candidate, "perplexity"):
             return float("inf")
         try:
-            return float(lm.perplexity(ppl_texts[:6]))
+            return float(candidate.perplexity(ppl_texts[:6]))
         except Exception:
             return float("inf")
 
     slots = getattr(neo, "slots", {}) or {}
-    ppl_pfc = _mouth_ppl(getattr(slots.get("pfc"), "transformer", None))
-    ppl_mid = _mouth_ppl(getattr(slots.get("midbrain"), "transformer", None))
+    # Ask ports whether they are finite.  Do not equate a deliberately-hidden
+    # internal transformer with a dead mouth.
+    ppl_pfc = _mouth_ppl(slots.get("pfc"))
+    ppl_mid = _mouth_ppl(slots.get("midbrain"))
     ppl_rms = _mouth_ppl(getattr(neo, "neo_rms", None))
 
     mix_err: List[float] = []
