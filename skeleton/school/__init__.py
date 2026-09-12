@@ -7,6 +7,7 @@ from skeleton.school.cocoding import CodingPhase, CoCodingAction, CoCodingContex
 from skeleton.school.curriculum import CurriculumGraph, CurriculumNode, LearningRecommendation, rank_recommendations
 from skeleton.school.engine import SchoolEngine, SchoolPlan
 from skeleton.school.learning_control import LearningControl, LearningControlDecision, LearningState
+from skeleton.school.lesson_content import LessonContent, LessonExercise, LessonTopic, generate_lesson_content
 from skeleton.school.memory import LearnerMemory, MemoryKind, MemoryMatch, MemoryStore
 from skeleton.school.prompting import PromptRefinement, RefinementNeed, refine_prompt
 from skeleton.school.student import SkillState, StudentProfile
@@ -19,6 +20,7 @@ __all__ = [
     "choose_action", "next_handoff",
     "CurriculumGraph", "CurriculumNode", "LearningRecommendation", "rank_recommendations",
     "SchoolEngine", "SchoolPlan", "LearningControl", "LearningControlDecision", "LearningState",
+    "LessonContent", "LessonExercise", "LessonTopic", "generate_lesson_content",
     "LearnerMemory", "MemoryKind", "MemoryMatch", "MemoryStore",
     "PromptRefinement", "RefinementNeed", "refine_prompt",
     "SkillState", "StudentProfile",
