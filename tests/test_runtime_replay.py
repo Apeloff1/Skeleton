@@ -13,10 +13,11 @@ def _ledger(session="s1"):
 def test_runtime_snapshot_is_deterministic_and_auditable():
     ledger = _ledger()
     events = (SessionEvent(1, SessionPhase.INTAKE, "session_opened", (("session_id", "s1"),)),)
-    first = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=events, selected_policy="practice", rejected_policies=("challenge",), ledger=ledger)
-    second = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=events, selected_policy="practice", rejected_policies=("challenge",), ledger=ledger)
+    first = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=events, selected_policy="practice", rejected_policies=(), ledger=ledger)
+    second = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=events, selected_policy="practice", rejected_policies=(), ledger=ledger)
     assert first == second
     assert replay_digest(first) == replay_digest(second)
+    assert first.runtime_digest
     audit = audit_runtime(first, ledger)
     assert audit.valid
 
@@ -30,3 +31,12 @@ def test_runtime_audit_detects_ledger_tampering():
     audit = audit_runtime(snapshot, ledger)
     assert not audit.valid
     assert any("ledger integrity" in item for item in audit.violations)
+
+
+def test_runtime_audit_rejects_a_policy_claimed_as_rejected_but_accepted():
+    ledger = _ledger()
+    ledger.append(session_id="s1", decision_id="s1:challenge", domain="session_runtime", action="challenge", rationale=("candidate",), disposition=DecisionDisposition.ACCEPTED)
+    snapshot = RuntimeReplaySnapshot.capture(session_id="s1", phase=SessionPhase.DIAGNOSE, events=(SessionEvent(1, SessionPhase.INTAKE, "session_opened"),), selected_policy="practice", rejected_policies=("challenge",), ledger=ledger)
+    audit = audit_runtime(snapshot, ledger)
+    assert not audit.valid
+    assert any("not audited as rejected" in item for item in audit.violations)
