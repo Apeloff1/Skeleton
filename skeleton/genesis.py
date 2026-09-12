@@ -1,7 +1,7 @@
 """Genesis protocol — boot the whole substrate as one wired system.
 
-Boot phases: kernel, memory, intelligence, swarm, resilience,
-interface, forge, galaxy, contexts, support, cortex.
+Boot phases: foundation, kernel, memory, intelligence, swarm,
+resilience, interface, forge, galaxy, contexts, support, cortex.
 """
 
 from __future__ import annotations
@@ -39,8 +39,10 @@ class Genesis:
         self.report = GenesisReport()
         self._seed = seed
         self.lattice: InvariantLattice | None = None
+        self.journal: Optional[Any] = None
 
     def boot(self) -> "Genesis":
+        self._phase_foundation()
         self._phase_kernel()
         self._phase_memory()
         self._phase_intelligence()
@@ -64,6 +66,53 @@ class Genesis:
     def _wire(self, phase: str, name: str, handle: Any) -> None:
         self.handles[name] = handle
         self.report.wired.setdefault(phase, []).append(name)
+
+    def _phase_foundation(self) -> None:
+        """The bedrock: Merkle DAG, event journal, capability kernel,
+        temporal lattice. Boots FIRST — everything after it is journaled,
+        content-addressable, capability-guarded, and temporally checked.
+
+        Handles: dag, journal, replay, ocap, membrane, temporal.
+        The bus is wrapped in a JournaledBus so every subsequent event
+        lands in the hash-chained journal.
+        """
+        self.report.phases.append("foundation")
+        from skeleton.foundation import (
+            CapabilityKernel,
+            EventJournal,
+            JournaledBus,
+            Membrane,
+            MerkleDAG,
+            ReplayEngine,
+            TemporalLattice,
+        )
+
+        dag = MerkleDAG()
+        journal = EventJournal(dag=dag)
+        self.journal = journal
+        # Wrap the bus: every event from here on is journaled
+        self.bus = JournaledBus(self.bus, journal)
+        replay = ReplayEngine(journal)
+        ocap = CapabilityKernel()
+        membrane = Membrane(ocap)
+        temporal = TemporalLattice(journal=journal)
+
+        self._wire("foundation", "dag", dag)
+        self._wire("foundation", "journal", journal)
+        self._wire("foundation", "replay", replay)
+        self._wire("foundation", "ocap", ocap)
+        self._wire("foundation", "membrane", membrane)
+        self._wire("foundation", "temporal", temporal)
+
+        # Bedrock temporal invariants: the boot itself must be well-formed
+        temporal.eventually(
+            "genesis_boots_eventually",
+            lambda e: e.get("topic") == "kernel.genesis.booted",
+        )
+        temporal.never(
+            "no_invariant_panic",
+            lambda e: e.get("topic", "").endswith("panic"),
+        )
 
     def _phase_kernel(self) -> None:
         self.report.phases.append("kernel")
@@ -365,12 +414,18 @@ class Genesis:
     def health(self) -> Dict[str, Any]:
         assert self.lattice is not None
         violations = self.lattice.evaluate()
+        temporal_healthy = True
+        temporal = self.handles.get("temporal")
+        if temporal is not None and self.journal is not None:
+            temporal_healthy = temporal.healthy()
         return {
             "phases": self.report.phases,
             "subsystems": sum(len(v) for v in self.report.wired.values()),
             "bus": self.bus.stats(),
             "invariant_violations": len(violations),
-            "healthy": not violations,
+            "temporal_healthy": temporal_healthy,
+            "journal_integrity": self.journal.integrity() if self.journal else None,
+            "healthy": not violations and temporal_healthy,
         }
 
     def get(self, name: str) -> Any:
