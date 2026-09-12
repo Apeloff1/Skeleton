@@ -1,5 +1,7 @@
 from dataclasses import replace
 
+import pytest
+
 from skeleton.school.runtime_attestation import RuntimeAttestation, verify_attestation
 
 
@@ -29,3 +31,15 @@ def test_runtime_attestation_detects_capsule_binding_tamper(runtime_snapshot, le
     failures = verify_attestation(tampered, runtime_snapshot, ledger)
     assert "attestation capsule digest diverges" in failures
     assert "attestation digest diverges" in failures
+
+
+def test_runtime_attestation_capture_fails_closed_on_invalid_runtime(runtime_snapshot, ledger):
+    tampered = replace(runtime_snapshot, phase="complete")
+    with pytest.raises(ValueError, match="invalid runtime snapshot"):
+        RuntimeAttestation.capture(tampered, ledger)
+
+
+def test_runtime_attestation_capture_requires_selected_identity_match(runtime_snapshot, ledger):
+    tampered = replace(runtime_snapshot, selected_policy="challenge")
+    with pytest.raises(ValueError, match="invalid runtime snapshot"):
+        RuntimeAttestation.capture(tampered, ledger)
