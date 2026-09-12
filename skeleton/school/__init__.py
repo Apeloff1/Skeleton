@@ -10,6 +10,7 @@ from skeleton.school.debugging import DebugAction, DebugExperiment, DebugFocus, 
 from skeleton.school.energy import EnergyBudget, EnergyDecision, EnergyStrategy, choose_energy_strategy
 from skeleton.school.engine import SchoolEngine, SchoolPlan
 from skeleton.school.cs_pathways import CSFamily, CSPathway, PATHWAYS, next_pathway, pathways_for
+from skeleton.school.knowledge import KnowledgeAssertion, KnowledgeCandidate, KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeState, RelationKind, infer_ready_frontier, rank_knowledge
 from skeleton.school.learning_control import LearningControl, LearningControlDecision, LearningState
 from skeleton.school.lesson_content import LessonContent, LessonExercise, LessonTopic, generate_lesson_content
 from skeleton.school.memory import LearnerMemory, MemoryKind, MemoryMatch, MemoryStore
@@ -18,6 +19,7 @@ from skeleton.school.outcomes import OutcomeKind, OutcomeResult, SessionOutcome,
 from skeleton.school.progression import AchievementEvidence, AchievementRequirement, AchievementResult, ProgressionSnapshot, achievement_learning_signal, evaluate_achievement, evaluate_progression
 from skeleton.school.prompting import PromptRefinement, RefinementNeed, refine_prompt
 from skeleton.school.reflection import ReflectionEntry, ReflectionImportance, ReflectionJournal, ReflectionKind, ReflectionPrompt, reflection_prompts, summarize_reflection
+from skeleton.school.session_runtime import EvidenceGate, JeevesSessionRuntime, RuntimePlan, SessionEvent, SessionPhase, SessionTransition, TransitionKind
 from skeleton.school.student import SkillState, StudentProfile
 
 __all__ = [
@@ -30,6 +32,7 @@ __all__ = [
     "DebugAction", "DebugExperiment", "DebugFocus", "DebugHypothesis", "DebugPlan", "DebuggingPolicy",
     "EnergyBudget", "EnergyDecision", "EnergyStrategy", "choose_energy_strategy",
     "SchoolEngine", "SchoolPlan", "CSFamily", "CSPathway", "PATHWAYS", "next_pathway", "pathways_for",
+    "KnowledgeAssertion", "KnowledgeCandidate", "KnowledgeEdge", "KnowledgeGraph", "KnowledgeNode", "KnowledgeState", "RelationKind", "infer_ready_frontier", "rank_knowledge",
     "LearningControl", "LearningControlDecision", "LearningState",
     "LessonContent", "LessonExercise", "LessonTopic", "generate_lesson_content",
     "LearnerMemory", "MemoryKind", "MemoryMatch", "MemoryStore",
@@ -38,5 +41,6 @@ __all__ = [
     "AchievementEvidence", "AchievementRequirement", "AchievementResult", "ProgressionSnapshot", "achievement_learning_signal", "evaluate_achievement", "evaluate_progression",
     "PromptRefinement", "RefinementNeed", "refine_prompt",
     "ReflectionEntry", "ReflectionImportance", "ReflectionJournal", "ReflectionKind", "ReflectionPrompt", "reflection_prompts", "summarize_reflection",
+    "EvidenceGate", "JeevesSessionRuntime", "RuntimePlan", "SessionEvent", "SessionPhase", "SessionTransition", "TransitionKind",
     "SkillState", "StudentProfile",
 ]
