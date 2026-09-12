@@ -43,3 +43,39 @@ def test_supersession_tampering_breaks_hash_chain() -> None:
     )
     with pytest.raises(ValueError, match="hash mismatch"):
         ledger.verify()
+
+
+def test_supersession_cannot_target_another_session() -> None:
+    ledger = make_ledger()
+    ledger.append(session_id="other", decision_id="other-1", domain="school", action="practice", evidence=("e",))
+    with pytest.raises(ValueError, match="same session"):
+        ledger.append(
+            session_id="s",
+            decision_id="d2",
+            domain="school",
+            action="practice",
+            predecessors=("d1",),
+            supersedes="other-1",
+            disposition=DecisionDisposition.ACCEPTED,
+        )
+
+
+def test_superseding_record_must_be_accepted() -> None:
+    ledger = make_ledger()
+    with pytest.raises(ValueError, match="accepted"):
+        ledger.append(
+            session_id="s",
+            decision_id="d2",
+            domain="school",
+            action="practice",
+            predecessors=("d1",),
+            supersedes="d1",
+            disposition=DecisionDisposition.REJECTED,
+        )
+
+
+def test_supersession_target_can_only_be_replaced_once() -> None:
+    ledger = make_ledger()
+    ledger.supersede("d1", replacement_id="d2")
+    with pytest.raises(ValueError, match="already superseded"):
+        ledger.supersede("d1", replacement_id="d3")
