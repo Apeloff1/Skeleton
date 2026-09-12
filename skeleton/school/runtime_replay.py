@@ -84,8 +84,6 @@ def audit_runtime(snapshot: RuntimeReplaySnapshot, ledger: DecisionLedger) -> Ru
             violations.append("selected policy cannot be audited without session decisions")
         elif snapshot.selected_policy not in {record.action for record in session_records}:
             violations.append("selected policy is absent from session ledger")
-        elif any(record.action == snapshot.selected_policy for record in rejected_records):
-            violations.append("selected policy is incorrectly recorded as rejected")
         selected_id = snapshot.selected_policy_decision_id
         if not selected_id:
             violations.append("selected policy is missing a decision identity")
@@ -99,8 +97,6 @@ def audit_runtime(snapshot: RuntimeReplaySnapshot, ledger: DecisionLedger) -> Ru
                 violations.append("selected policy decision identity does not match selected action")
             elif selected_record.disposition is not DecisionDisposition.ACCEPTED:
                 violations.append("selected policy decision identity is not ACCEPTED")
-        # Lifecycle-bound identity is authoritative. Only legacy snapshots
-        # without an identity need action-level uniqueness as a fallback.
         if not selected_id and len(selected_matches) != 1:
             violations.append("selected policy does not have a unique ACCEPTED ledger attribution")
 
