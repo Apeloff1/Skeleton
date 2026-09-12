@@ -1,6 +1,8 @@
 """Grand Jeeves provider-neutral school control plane."""
 from __future__ import annotations
 from dataclasses import dataclass, field
+import hashlib
+import json
 from typing import Sequence
 from skeleton.school.counterfactual import CounterfactualResult, default_candidates, compete
 from skeleton.school.curriculum import CurriculumGraph, LearningRecommendation, rank_recommendations
@@ -37,6 +39,18 @@ class JeevesSessionPlan:
     next_evidence: tuple[str, ...]
     policy_competition: CounterfactualResult | None = None
     policy_calibrator: PolicyCalibrator | None = None
+    pipeline_contract_digest: str | None = None
+
+    @property
+    def provenance_digest(self) -> str:
+        payload = {
+            "primary_skill": self.primary_skill,
+            "suggested_minutes": self.suggested_minutes,
+            "next_evidence": self.next_evidence,
+            "policy": self.policy_competition.selected.action.value if self.policy_competition else None,
+            "pipeline_contract_digest": self.pipeline_contract_digest,
+        }
+        return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 @dataclass
