@@ -64,6 +64,23 @@ from .deck import CommandDeck, live_deck
 from .era_bind import HOUSE_ERA, house_era, resolve as resolve_era, bind_into
 from .perpendicular import AXES as PERP_AXES, cut as perpendicular_cut, live_cut
 
+# The PFC transformer is an owned small mouth, but a fresh cortex should not
+# advertise an untrained mouth through its public slot. Once the curriculum
+# advances it, the same object exposes the trained transformer. Direct PFC
+# construction remains fully inspectable for model-unit tests and tooling.
+_local_slots_factory = local_slots
+
+def _local_slots_for_cortex():
+    slots = _local_slots_factory()
+    pfc = slots.get("pfc")
+    if pfc is not None:
+        pfc._hide_untrained_transformer = True
+    return slots
+
+# JeevesCortex resolves local_slots from its module globals at construction.
+import skeleton.cortex.neocortex as _neocortex
+_neocortex.local_slots = _local_slots_for_cortex
+
 __all__ = [
     "SLOTS",
     "SCALES",
