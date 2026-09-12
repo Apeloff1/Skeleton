@@ -1,8 +1,8 @@
 """Grand Jeeves control plane.
 
-This module composes Skeleton's learning policies into an auditable session
-planner. It is intentionally provider-neutral: models, vector stores, UI,
-databases, tools, and transport can sit above this decision layer.
+This is Skeleton's provider-neutral integration layer for curriculum, memory,
+learning control, energy, progression, and evidence capture. It is designed to
+become the decision core underneath model/tool/storage adapters.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from skeleton.school.curriculum import CurriculumGraph, LearningRecommendation, 
 from skeleton.school.energy import EnergyBudget, EnergyDecision, choose_energy_strategy
 from skeleton.school.learning_control import LearningControl, LearningControlDecision, LearningState
 from skeleton.school.memory import LearnerMemory, MemoryMatch, MemoryStore
+from skeleton.school.outcomes import OutcomeResult, SessionOutcome, apply_outcome
 from skeleton.school.progression import ProgressionSnapshot, evaluate_progression
 from skeleton.school.reflection import ReflectionJournal
 from skeleton.school.student import StudentProfile
@@ -21,8 +22,6 @@ from skeleton.school.student import StudentProfile
 
 @dataclass(frozen=True)
 class JeevesDecision:
-    """One auditable decision emitted by the control plane."""
-
     domain: str
     decision: str
     rationale: tuple[str, ...]
@@ -45,8 +44,6 @@ class JeevesSessionPlan:
 
 @dataclass
 class JeevesControlPlane:
-    """Compose curriculum, memory, learning control, energy and progression."""
-
     curriculum: CurriculumGraph
     memory: MemoryStore = field(default_factory=MemoryStore)
     reflections: ReflectionJournal = field(default_factory=ReflectionJournal)
@@ -85,34 +82,29 @@ class JeevesControlPlane:
             requested_minutes=recommendations[0].estimated_minutes if recommendations else 30,
             high_cognitive_load=state.cognitive_load > 0.8,
         )
-        progression = evaluate_progression(student)
+        progression = evaluate_progression(evidence={
+            "successful_attempts": float(sum(skill.successes for skill in student.skills.values())),
+            "independent_solutions": float(student.facts.get("independent_solutions", "0")),
+            "transfer_tasks": float(student.facts.get("transfer_tasks", "0")),
+            "quality_reflections": float(len(self.reflections.entries)),
+            "misconceptions_repaired": float(student.facts.get("misconceptions_repaired", "0")),
+            "projects_completed": float(student.facts.get("projects_completed", "0")),
+        })
 
         decisions = (
-            JeevesDecision(
-                "curriculum", primary or "review_memory",
-                tuple(r.reason for r in recommendations[:2]) or ("No prerequisite-ready skill; use retrieval/reflection.",),
-            ),
+            JeevesDecision("curriculum", primary or "review_memory", tuple(r.reason for r in recommendations[:2]) or ("No prerequisite-ready skill; use retrieval/reflection.",)),
             JeevesDecision("learning_control", control.difficulty_adjustment, control.rationale or ("Maintain current trajectory.",)),
-            JeevesDecision(
-                "memory", "retrieve" if memories else "build_memory",
-                tuple(m.reason for m in memories[:2]) or ("No retained match; create new evidence.",),
-            ),
+            JeevesDecision("memory", "retrieve" if memories else "build_memory", tuple(m.reason for m in memories[:2]) or ("No retained match; create new evidence.",)),
             JeevesDecision("retention", "review_due_memory" if due else "continue_schedule", (f"{len(due)} memories are below retention threshold.",)),
             JeevesDecision("energy", energy.strategy.value, energy.rationale),
         )
-
-        evidence = [
-            "response quality or solution score",
-            "learner explanation / reasoning quality",
-            "independence or scaffold required",
-        ]
+        evidence = ["response quality or solution score", "learner explanation / reasoning quality", "independence or scaffold required"]
         if primary:
             evidence.append(f"evidence for skill:{primary}")
         if control.practice_schedule == "increase_spaced_repetition":
             evidence.append("retrieval result after delayed review")
         if due:
             evidence.append("retention outcome for due memory")
-
         return JeevesSessionPlan(
             recommendations=recommendations,
             primary_skill=primary,
@@ -124,6 +116,22 @@ class JeevesControlPlane:
             decisions=decisions,
             suggested_minutes=max(5, energy.session_minutes),
             next_evidence=tuple(dict.fromkeys(evidence)),
+        )
+
+    def record_outcome(
+        self,
+        student: StudentProfile,
+        outcome: SessionOutcome,
+        *,
+        previous_unlocked: frozenset[str] = frozenset(),
+    ) -> OutcomeResult:
+        """Close the loop: write evidence into learner state and memory."""
+        return apply_outcome(
+            student,
+            outcome,
+            memory=self.memory,
+            reflections=self.reflections,
+            previous_unlocked=previous_unlocked,
         )
 
     @staticmethod
