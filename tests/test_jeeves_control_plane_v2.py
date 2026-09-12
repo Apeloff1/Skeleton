@@ -44,3 +44,5 @@ def test_debugging_priority_is_not_lexicographic():
     report = CodeIntelligenceEngine().analyze("def f(x):\n    return eval(x)\n")
     plan = DebuggingPolicy().plan(report)
     assert plan.next_step in {DebugAction.ISOLATE, DebugAction.REPRODUCE}
+
+# Fresh PR push marker: the test suite is intentionally deterministic.
