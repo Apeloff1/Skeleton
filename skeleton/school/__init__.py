@@ -8,6 +8,7 @@ from skeleton.school.cocoding import CodingPhase, CoCodingAction, CoCodingContex
 from skeleton.school.curriculum import CurriculumGraph, CurriculumNode, LearningRecommendation, rank_recommendations
 from skeleton.school.debugging import DebugAction, DebugExperiment, DebugFocus, DebugHypothesis, DebugPlan, DebuggingPolicy
 from skeleton.school.decision_ledger import DecisionDisposition, DecisionLedger, DecisionRecord, EvidenceKind, EvidenceRef, LedgerCheckpoint, evidence_bundle
+from skeleton.school.decision_policy import ArbitrationAction, ArbitrationResult, EvidenceSignal, arbitrate
 from skeleton.school.energy import EnergyBudget, EnergyDecision, EnergyStrategy, choose_energy_strategy
 from skeleton.school.engine import SchoolEngine, SchoolPlan
 from skeleton.school.cs_pathways import CSFamily, CSPathway, PATHWAYS, next_pathway, pathways_for
@@ -34,6 +35,7 @@ __all__ = [
     "CurriculumGraph", "CurriculumNode", "LearningRecommendation", "rank_recommendations",
     "DebugAction", "DebugExperiment", "DebugFocus", "DebugHypothesis", "DebugPlan", "DebuggingPolicy",
     "DecisionDisposition", "DecisionLedger", "DecisionRecord", "EvidenceKind", "EvidenceRef", "LedgerCheckpoint", "evidence_bundle",
+    "ArbitrationAction", "ArbitrationResult", "EvidenceSignal", "arbitrate",
     "EnergyBudget", "EnergyDecision", "EnergyStrategy", "choose_energy_strategy",
     "SchoolEngine", "SchoolPlan", "CSFamily", "CSPathway", "PATHWAYS", "next_pathway", "pathways_for",
     "BeliefState", "EpistemicEngine", "EpistemicEvidence", "EpistemicUpdate", "EvidencePolarity", "MisconceptionStage", "contradiction_matrix",
