@@ -13,6 +13,7 @@ class CSPathway:
 
 PATHWAYS: tuple[CSPathway, ...] = (
     CSPathway("arrays_to_pools",CSFamily.DATA_STRUCTURES,"arrays and lists",(),"Implement a dynamic array or object pool",("entity storage","command buffers"),"When does contiguous storage improve a real system?"),
+    CSPathway("graphs",CSFamily.DATA_STRUCTURES,"graphs",("arrays and lists",),"Implement adjacency lists and a graph traversal",("dependency planning","navigation"),"What representation makes the graph's structure easiest to reason about?"),
     CSPathway("trees_to_spatial",CSFamily.DATA_STRUCTURES,"trees and spatial structures",("arrays and lists",),"Implement a quadtree or BVH",("collision detection","spatial queries"),"How does spatial partitioning change the search work?"),
     CSPathway("graphs_to_pathfinding",CSFamily.ALGORITHMS,"graph traversal and shortest paths",("graphs",),"Implement BFS, Dijkstra, or A*",("navigation","dependency planning"),"Which graph assumptions make one pathfinding strategy preferable?"),
     CSPathway("dp_to_optimization",CSFamily.ALGORITHMS,"dynamic programming",("graph traversal and shortest paths",),"Implement a memoized and tabulated solution",("resource planning","sequence optimization"),"What repeated subproblem justifies storing state?"),
