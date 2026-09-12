@@ -151,6 +151,23 @@ def create_app() -> Any:
     app.include_router(gameforge_router, prefix="/api/v1")
     app.include_router(cockpit_router)
 
+    # Zaibatsu gate — sibling of gameforge-middleware / gf-server.
+    # Live app previously left install_gate test-only; wire it here.
+    from skeleton.api.middleware import DEFAULT_OPEN_PREFIXES, GatePolicy, install_gate
+
+    gate_policy = GatePolicy(
+        open_prefixes=DEFAULT_OPEN_PREFIXES
+        + (
+            "/",
+            "/cortex/status",
+            "/cockpit",
+            "/docs",
+            "/openapi.json",
+            "/redoc",
+        )
+    )
+    install_gate(app, policy=gate_policy)
+
     @app.on_event("startup")
     async def startup():
         state = get_state()
