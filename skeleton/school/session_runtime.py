@@ -80,7 +80,7 @@ class JeevesSessionRuntime:
         return self.control.epistemics
 
     def begin(self, student: StudentProfile, *, session_id: str, query_terms: Sequence[str] = (), pipeline_kind: PipelineKind = PipelineKind.LESSON, cocoding: CoCodingContext | None = None) -> RuntimePlan:
-        self.session_id = session_id
+        self._prepare_session(session_id)
         control = self.control.plan(student, query_terms=query_terms)
         primary = control.primary_skill
         candidates = rank_knowledge(self.knowledge, self.knowledge_state, query_terms=query_terms, goals=student.goals)
@@ -101,26 +101,17 @@ class JeevesSessionRuntime:
         self._emit(SessionPhase.INTAKE, "session_opened", {"session_id": session_id})
         self.phase = SessionPhase.DIAGNOSE
         self._emit(self.phase, "control_plan_ready", {"primary_skill": primary or "none", "arbitration": selected_policy, "policy": selected_policy})
-        self._record_decision(
-            decision_id=f"{session_id}:orient", action=selected_policy,
-            rationale=(control.policy_competition.rationale if control.policy_competition else arbitration.rationale),
-            state={"skill": primary or objective, "mastery": self.knowledge_state.mastery(primary or objective)},
-            policy={"confidence": arbitration.confidence, "counterfactual_margin": control.policy_competition.margin if control.policy_competition else 0.0, "calibrated_reliability": control.policy_calibrator.snapshot(), "rejected_policies": rejected_policies, "executed_policy": selected_policy},
-        )
+        self._record_decision(decision_id=f"{session_id}:orient", action=selected_policy, rationale=(control.policy_competition.rationale if control.policy_competition else arbitration.rationale), state={"skill": primary or objective, "mastery": self.knowledge_state.mastery(primary or objective)}, policy={"confidence": arbitration.confidence, "counterfactual_margin": control.policy_competition.margin if control.policy_competition else 0.0, "calibrated_reliability": control.policy_calibrator.snapshot(), "rejected_policies": rejected_policies, "executed_policy": selected_policy})
         if control.policy_competition:
             for candidate in control.policy_competition.rejected:
-                self._record_decision(
-                    decision_id=f"{session_id}:alternative:{candidate.action.value}", action=candidate.action.value,
-                    rationale=candidate.rationale + ("counterfactual alternative", "not executed"),
-                    state={"skill": primary or objective},
-                    policy={"selected": selected_policy, "counterfactual": True, "calibrated_reliability": control.policy_calibrator.snapshot()},
-                    disposition=DecisionDisposition.REJECTED,
-                )
+                self._record_decision(decision_id=f"{session_id}:alternative:{candidate.action.value}", action=candidate.action.value, rationale=candidate.rationale + ("counterfactual alternative", "not executed"), state={"skill": primary or objective}, policy={"selected": selected_policy, "counterfactual": True, "calibrated_reliability": control.policy_calibrator.snapshot()}, disposition=DecisionDisposition.REJECTED)
         return RuntimePlan(session_id, control, self.phase, pipeline_kind, tuple(s.stage.value for s in pipeline.steps), tuple(c.node_id for c in candidates), action.pattern.value, handoff.value, selected_policy, arbitration.confidence, gates, transitions, selected_policy, control.policy_competition.margin if control.policy_competition else 0.0, rejected_policies)
 
     def record_outcome(self, student: StudentProfile, outcome: SessionOutcome) -> OutcomeResult:
         if not self.session_id:
             raise ValueError("begin a session before recording an outcome")
+        if self.phase is SessionPhase.COMPLETE:
+            raise ValueError("cannot record an outcome after session completion")
         policy = self._selected_policy
         result = self.control.record_outcome(student, outcome, policy_action=policy)
         outcome_id = f"{self.session_id}:outcome:{self._sequence + 1}"
@@ -141,6 +132,10 @@ class JeevesSessionRuntime:
         return SessionTransition(source, target, kind, rationale, gate_set)
 
     def record_evidence(self, *, event: str, subject: str = "", claim: str = "", score: float | None = None, polarity: EvidencePolarity = EvidencePolarity.NEUTRAL, source_id: str = "runtime", **payload: str) -> SessionEvent:
+        if not self.session_id:
+            raise ValueError("begin a session before recording evidence")
+        if self.phase is SessionPhase.COMPLETE:
+            raise ValueError("cannot record evidence after session completion")
         if claim:
             evidence_id = f"{self.session_id}:evidence:{self._sequence + 1}"
             strength = 1.0 if score is None else max(0.0, min(1.0, score))
@@ -156,6 +151,20 @@ class JeevesSessionRuntime:
         source = self.phase; self.phase = SessionPhase.RECOVER; self._emit(self.phase, "recovery_required", {"reason": reason})
         self._record_decision(decision_id=f"{self.session_id}:recover:{self._sequence}", action=TransitionKind.REPAIR.value, rationale=(reason,), state={"source":source.value}, policy={"selected_policy": self._selected_policy or "unknown"})
         return SessionTransition(source, SessionPhase.RECOVER, TransitionKind.REPAIR, reason)
+
+    def _prepare_session(self, session_id: str) -> None:
+        if not session_id.strip():
+            raise ValueError("session_id must be non-empty")
+        if self.session_id and self.phase is not SessionPhase.COMPLETE:
+            raise RuntimeError(f"session {self.session_id!r} is still active; complete it before starting another")
+        if self.ledger.session(session_id):
+            raise ValueError(f"session_id {session_id!r} already exists in the decision ledger")
+        self.session_id = session_id
+        self.phase = SessionPhase.INTAKE
+        self.events.clear()
+        self._sequence = 0
+        self._last_decision_id = None
+        self._selected_policy = None
 
     def _gates(self, control: JeevesSessionPlan, pipeline_kind: PipelineKind, objective: str) -> tuple[EvidenceGate, ...]:
         return (EvidenceGate("objective", "learner objective is explicit", True, bool(control.primary_skill or objective)), EvidenceGate("attempt", "learner has produced observable work", True, False), EvidenceGate("reasoning", "learner can explain the result", True, False), EvidenceGate("verification", "result has verification evidence", pipeline_kind not in {PipelineKind.LESSON}, False), EvidenceGate("reflection", "learner reflection is recorded", True, False))
