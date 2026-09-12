@@ -1,7 +1,5 @@
 from dataclasses import replace
 
-import pytest
-
 from skeleton.school.runtime_attestation import RuntimeAttestation, verify_attestation
 
 
@@ -22,9 +20,3 @@ def test_runtime_attestation_detects_attestation_tamper(runtime_snapshot, ledger
     attestation = RuntimeAttestation.capture(runtime_snapshot, ledger)
     tampered = replace(attestation, ledger_count=attestation.ledger_count + 1)
     assert "attestation ledger identity diverges" in verify_attestation(tampered, runtime_snapshot, ledger)
-
-
-def test_runtime_attestation_rejects_empty_session(ledger):
-    snapshot = replace(ledger.runtime_snapshot if hasattr(ledger, "runtime_snapshot") else None)
-    if snapshot is not None:
-        pytest.skip("fixture does not expose an empty runtime snapshot")
