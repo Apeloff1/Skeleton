@@ -11,12 +11,13 @@ if TYPE_CHECKING:
 
 
 def capture_runtime(runtime: "JeevesSessionRuntime") -> RuntimeReplaySnapshot:
-    """Capture a runtime using its intrinsic, lifecycle-bound provenance."""
+    """Capture a runtime using lifecycle-bound policy and provenance identities."""
     return RuntimeReplaySnapshot.capture(
         session_id=runtime.session_id,
         phase=runtime.phase,
         events=runtime.events,
         selected_policy=runtime._selected_policy,
+        selected_policy_decision_id=runtime.selected_policy_decision_id,
         rejected_policies=tuple(
             record.action
             for record in runtime.ledger.session(runtime.session_id)
