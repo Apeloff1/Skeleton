@@ -28,7 +28,12 @@ class RuntimeIntegrityCapsule:
 
     @classmethod
     def capture(cls, runtime: RuntimeReplaySnapshot, ledger: DecisionLedger) -> "RuntimeIntegrityCapsule":
+        runtime_audit = audit_runtime(runtime, ledger)
+        if not runtime_audit.valid:
+            raise ValueError("cannot capsule an invalid runtime snapshot")
         session = audit_session(ledger, runtime.session_id)
+        if not session.valid:
+            raise ValueError("cannot capsule an invalid session audit")
         records = ledger.session(runtime.session_id)
         if not records:
             raise ValueError("cannot capsule an empty session")
