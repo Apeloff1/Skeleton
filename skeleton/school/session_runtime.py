@@ -7,7 +7,7 @@ from skeleton.school.ai_pipeline import PipelineKind,PipelineRequest,plan_pipeli
 from skeleton.school.cocoding import CodingPhase,CoCodingContext,HandoffStage,choose_action,next_handoff
 from skeleton.school.curriculum import CurriculumGraph
 from skeleton.school.decision_ledger import DecisionLedger,EvidenceKind,EvidenceRef
-from skeleton.school.decision_policy import ArbitrationAction,EvidenceSignal,arbitrate
+from skeleton.school.decision_policy import EvidenceSignal,arbitrate
 from skeleton.school.epistemics import EpistemicEngine,EvidencePolarity,EpistemicEvidence
 from skeleton.school.jeeves import JeevesControlPlane,JeevesSessionPlan
 from skeleton.school.knowledge import KnowledgeGraph,KnowledgeState,rank_knowledge
@@ -40,7 +40,7 @@ class JeevesSessionRuntime:
   source=self.phase; kind=self._transition_kind(source,target); self.phase=target; self._emit(target,f"transition:{kind.value}",{"from":source.value,"rationale":rationale}); self._record_decision(decision_id=f"{self.session_id}:transition:{self._sequence}",action=f"{kind.value}:{target.value}",rationale=(rationale,),state={"source":source.value,"target":target.value},policy={"gate_count":len(gate_set)}); return SessionTransition(source,target,kind,rationale,gate_set)
  def record_evidence(self,*,event:str,subject:str="",claim:str="",score:float|None=None,polarity:EvidencePolarity=EvidencePolarity.NEUTRAL,source_id:str="runtime",**payload:str):
   if claim:
-   evidence_id=f"{self.session_id}:evidence:{self._sequence+1}"; strength=1. if score is None else max(0.,min(1.,score)); self.epistemics.observe(EpistemicEvidence(evidence_id,claim,polarity,strength,source_id,self._sequence)); self.ledger.register_evidence(EvidenceRef(evidence_id,EvidenceKind.OBSERVATION,subject or claim,event,strength,source_id))
+   evidence_id=f"{self.session_id}:evidence:{self._sequence+1}"; strength=1. if score is None else max(0.,min(1.,score)); self.epistemics.observe(EpistemicEvidence(evidence_id=evidence_id,claim=claim,polarity=polarity,strength=strength,source_id=source_id,step=self._sequence)); self.ledger.register_evidence(EvidenceRef(evidence_id,EvidenceKind.OBSERVATION,subject or claim,event,strength,source_id))
   self._emit(self.phase,event,payload|({"claim":claim} if claim else {})); return self.events[-1]
  def recover(self,*,reason:str):
   if self.phase in {SessionPhase.COMPLETE,SessionPhase.INTAKE}: raise ValueError("recovery is not available in the current phase")
