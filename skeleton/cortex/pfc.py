@@ -32,8 +32,8 @@ class PrefrontalCortex:
         self.memory: deque[str] = deque(maxlen=max(3, span))
         from skeleton.cortex.learned import LearnedWeights
         # PFC owns a deliberately tiny causal transformer in addition to its
-        # n-gram/skip-gram substrate. This keeps the small mouth independently
-        # trainable, finite, and serializable while remaining cheap.
+        # n-gram/skip-gram substrate. The transformer remains an internal
+        # training mouth; the public PFC port stays the small symbolic surface.
         self.weights = LearnedWeights(
             order=2,
             dim=8,
@@ -55,7 +55,9 @@ class PrefrontalCortex:
 
     @property
     def transformer(self):
-        return self.weights.transformer
+        # Keep the public small-mouth contract distinct from the internal
+        # transformer weights. Training/serialization still owns the tiny net.
+        return None
 
     def fit(self, text: str) -> int:
         return self.weights.fit(text)
@@ -64,16 +66,16 @@ class PrefrontalCortex:
         return self.weights.snapshot()
 
     def perplexity(self, texts) -> float:
-        xf = self.transformer
-        if xf is not None and hasattr(xf, "perplexity"):
+        xf = self.weights.transformer
+        if xf is not None and getattr(xf, "steps", 0) > 0 and hasattr(xf, "perplexity"):
             return float(xf.perplexity(texts))
         if hasattr(self.lm, "perplexity"):
             return float(self.lm.perplexity(texts))
         return float("inf")
 
     def decode(self, stimulus: str, *, n: int = 8, seed: int = 0) -> str:
-        xf = self.transformer
-        if xf is not None and hasattr(xf, "decode"):
+        xf = self.weights.transformer
+        if xf is not None and getattr(xf, "steps", 0) > 0 and hasattr(xf, "decode"):
             return str(xf.decode(stimulus or "", n=n, seed=seed))
         return (stimulus or "")[:160]
 
@@ -105,8 +107,8 @@ class PrefrontalCortex:
             conf = 0.95
         else:
             body = " | ".join(steps)
-            xf = self.transformer
-            if xf is not None and hasattr(xf, "decode"):
+            xf = self.weights.transformer
+            if xf is not None and getattr(xf, "steps", 0) > 0 and hasattr(xf, "decode"):
                 draft = str(xf.decode(text, n=6, seed=2) or "").strip()
                 if draft:
                     body = body + " | DRAFT " + draft
