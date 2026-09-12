@@ -1,68 +1,39 @@
 # ============================================================================
 # Tutolage CI/CD Pipeline
 # ============================================================================
-
 name: CI/CD
-
 on:
   push:
     branches: [main, develop]
   pull_request:
     branches: [main]
-
 env:
   PYTHON_VERSION: "3.11"
   NODE_VERSION: "20"
-
 permissions:
   contents: read
-
 jobs:
-  # ========================================
-  # Backend: Lint
-  # ========================================
   backend-lint:
     name: "Backend Lint"
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./backend
+    defaults: {run: {working-directory: ./backend}}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-
-      - name: Set up Python
-        run: uv python install ${{ env.PYTHON_VERSION }}
-
-      - name: Install ruff
-        run: uv tool install ruff
-
-      - name: Lint
-        run: uvx ruff check .
-
-      - name: Format check
-        continue-on-error: true
-        run: uvx ruff format --check . || true
-
-  # ========================================
-  # Skeleton GameForge (root package) — the gate
-  # ========================================
+      - uses: astral-sh/setup-uv@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: uv tool install ruff
+      - run: uvx ruff check .
+      - run: uvx ruff format --check . || true
   skeleton-test:
     name: "Skeleton GameForge"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
       - name: Test forge / jeeves / context
-        env:
-          PYTHONPATH: "."
+        env: {PYTHONPATH: "."}
         run: |
           python -m compileall -q skeleton
           python tests/run_unit.py
@@ -70,130 +41,80 @@ jobs:
           python -m skeleton plan "soulslike extraction with bonfire rest"
           python -m skeleton cockpit "BLEND ERA arcade_golden_age soulslike 0.5"
           python -m skeleton walk --era soulslike
-
-  # ========================================
-  # Cockpit smoke gauntlet (#11) — scripts/cockpit-smoke.sh
-  # Extend-only hook; skeleton-test inline gates kept above.
-  # Replay of #29 onto post-#50 main (CLI gauntlet).
-  # ========================================
+  school-jeeves-test:
+    name: "Jeeves School Reasoning"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - name: Install test runner
+        run: python -m pip install pytest
+      - name: Compile school package
+        run: python -m compileall -q skeleton/school
+      - name: Run focused reasoning suite
+        env: {PYTHONPATH: "."}
+        run: python -m pytest -q tests/test_jeeves_reasoning_stack.py
   cockpit-smoke:
     name: "Cockpit Smoke"
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Run cockpit smoke gauntlet
-        env:
-          PYTHONPATH: "."
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - env: {PYTHONPATH: "."}
         run: chmod +x scripts/cockpit-smoke.sh && ./scripts/cockpit-smoke.sh
-
-  # ========================================
-  # Backend: Test
-  # ========================================
   backend-test:
     name: "Backend Test"
     runs-on: ubuntu-latest
     needs: backend-lint
     continue-on-error: true
-    defaults:
-      run:
-        working-directory: ./backend
+    defaults: {run: {working-directory: ./backend}}
     services:
       mongodb:
         image: mongo:7.0
-        ports:
-          - 27017:27017
+        ports: [27017:27017]
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-
-      - name: Set up Python
-        run: uv python install ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: |
+      - uses: astral-sh/setup-uv@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: |
           uv venv
           uv pip install -e ".[test]"
-
-      - name: Run tests
-        env:
-          MONGO_URL: mongodb://localhost:27017/test
+      - env: {MONGO_URL: mongodb://localhost:27017/test}
         run: uv run pytest tests/ -v --cov=. --cov-report=xml || true
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./backend/coverage.xml
-          fail_ci_if_error: false
-
-  # ========================================
-  # Frontend: Lint & Build
-  # ========================================
+      - uses: codecov/codecov-action@v4
+        with: {files: ./backend/coverage.xml, fail_ci_if_error: false}
   frontend:
     name: "Frontend"
     runs-on: ubuntu-latest
     continue-on-error: true
-    defaults:
-      run:
-        working-directory: ./frontend
+    defaults: {run: {working-directory: ./frontend}}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile || yarn install
-
-      - name: Lint
-        run: yarn lint || true
-
-      - name: Type check
-        run: npx tsc --noEmit || true
-
-      - name: Build web
-        run: npx expo export --platform web || true
-
-  # ========================================
-  # Docker Build — lowercase GHCR names (Apeloff1/Skeleton is mixed case)
-  # ========================================
+      - uses: actions/setup-node@v4
+        with: {node-version: "20"}
+      - run: yarn install --frozen-lockfile || yarn install
+      - run: yarn lint || true
+      - run: npx tsc --noEmit || true
+      - run: npx expo export --platform web || true
   docker:
     name: "Docker Build"
     runs-on: ubuntu-latest
     needs: [skeleton-test]
     if: github.ref == 'refs/heads/main'
-    permissions:
-      contents: read
-      packages: write
+    permissions: {contents: read, packages: write}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Lowercase image prefix
-        run: echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
-
-      - name: Build & Push Skeleton
-        uses: docker/build-push-action@v5
+      - run: echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+      - uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
@@ -201,24 +122,16 @@ jobs:
           tags: ${{ env.IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Build & Push Backend
+      - uses: docker/build-push-action@v5
         continue-on-error: true
-        uses: docker/build-push-action@v5
         with:
           context: ./backend
           push: true
           tags: ${{ env.IMAGE }}/backend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build & Push Frontend
+      - uses: docker/build-push-action@v5
         continue-on-error: true
-        uses: docker/build-push-action@v5
         with:
           context: ./frontend
           target: production
           push: true
           tags: ${{ env.IMAGE }}/frontend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
