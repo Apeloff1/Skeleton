@@ -134,9 +134,9 @@ jobs:
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
       - run: yarn install --frozen-lockfile
-      - run: yarn lint --max-warnings=0
-      - run: npx tsc --noEmit
-      - run: npx expo export --platform web
+      - run: yarn lint:ci
+      - run: yarn typecheck
+      - run: yarn export:web
   docker:
     name: "Docker Build"
     runs-on: ubuntu-latest
