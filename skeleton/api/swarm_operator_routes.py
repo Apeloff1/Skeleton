@@ -41,7 +41,8 @@ def _state():
 def _runtime() -> SwarmRuntime:
     state = _state()
     if state.swarm is None:
-        state.swarm = SwarmRuntime()
+        from skeleton.agents.swarm_hardened import HardenedSwarmRuntime
+        state.bind_swarm_runtime(HardenedSwarmRuntime())
     return state.swarm
 
 
@@ -118,7 +119,7 @@ def compact_snapshot(max_terminal_tasks: int = Query(default=10_000, ge=0, le=1_
 @router.post("/gc")
 def gc(keep_terminal: int = Query(default=10_000, ge=0, le=1_000_000), runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
     rebuilt, result = compact_runtime(runtime, keep_terminal=keep_terminal)
-    _state().swarm = rebuilt
+    _state().bind_swarm_runtime(rebuilt)
     return {"result": asdict(result), "capacity": capacity(rebuilt), "snapshot": asdict(rebuilt.snapshot())}
 
 
@@ -133,7 +134,7 @@ def restore_latest(recovery: SwarmRecoveryManager = Depends(_recovery)) -> dict[
     runtime = recovery.restore_latest()
     if runtime is None:
         raise HTTPException(status_code=404, detail="no checkpoint available")
-    _state().swarm = runtime
+    _state().bind_swarm_runtime(runtime)
     return {"restored": True, "status": asdict(recovery.status()), "snapshot": asdict(runtime.snapshot())}
 
 
