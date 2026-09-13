@@ -1,6 +1,7 @@
 """Small immutable runtime state snapshot for bounded observability."""
 from dataclasses import dataclass
 
+
 @dataclass(frozen=True)
 class RuntimeSnapshot:
     lifecycle: str
@@ -13,12 +14,18 @@ class RuntimeSnapshot:
     health: float = 1.0
 
     def __post_init__(self):
+        counters = (self.active, self.budget_used, self.budget_capacity,
+                    self.quota_used, self.queue_depth)
+        if any(not isinstance(value, int) or isinstance(value, bool) for value in counters):
+            raise TypeError("runtime counters must be integers")
         if self.active < 0 or self.budget_used < 0 or self.budget_capacity <= 0:
             raise ValueError("runtime counters must be non-negative")
         if self.budget_used > self.budget_capacity:
             raise ValueError("budget_used exceeds budget_capacity")
         if self.quota_used < 0 or self.queue_depth < 0:
             raise ValueError("queue counters must be non-negative")
+        if not isinstance(self.health, (int, float)) or isinstance(self.health, bool):
+            raise TypeError("health must be numeric")
         if not 0.0 <= self.health <= 1.0:
             raise ValueError("health must be between zero and one")
 
