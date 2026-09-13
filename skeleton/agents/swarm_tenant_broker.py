@@ -61,6 +61,30 @@ class TenantSwarmBroker:
         while len(self._terminal_tenants) > self.max_terminal_records:
             self._terminal_tenants.popitem(last=False)
 
+    def rebind(self, broker: SwarmBroker) -> None:
+        """Swap the underlying runtime broker without discarding tenant metadata."""
+        with self._lock:
+            self.broker = broker
+
+    def reconcile(self) -> dict[str, tuple[str, ...]]:
+        """Report tenant metadata that no longer matches resident runtime tasks."""
+        with self._lock:
+            resident = {task.id: task for task in self.broker.runtime.tasks()}
+            missing_active = tuple(sorted(task_id for task_id in self._tenant_by_task if task_id not in resident))
+            terminal_not_terminal = tuple(
+                sorted(
+                    task_id
+                    for task_id in self._terminal_tenants
+                    if task_id in resident
+                    and resident[task_id].state
+                    not in {TaskState.SUCCEEDED, TaskState.DEAD, TaskState.CANCELLED, TaskState.FAILED}
+                )
+            )
+            return {
+                "missing_active": missing_active,
+                "terminal_not_terminal": terminal_not_terminal,
+            }
+
     def tenant_for(self, task_id: str) -> str | None:
         task_id = self._task_id(task_id)
         with self._lock:
@@ -172,5 +196,6 @@ class TenantSwarmBroker:
                 "terminal_tenants": dict(self._terminal_tenants),
                 "tracked_tasks": len(self._tenant_by_task),
                 "terminal_records": len(self._terminal_tenants),
+                "reconcile": self.reconcile(),
                 "ingress": self.ingress.status(),
             }
