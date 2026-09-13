@@ -50,5 +50,8 @@ jobs:
       - name: Process invocation safety gate
         run: python scripts/check_process_safety.py
 
-      - name: Execution boundary regression tests
-        run: python -m pytest -q tests/test_exec_guard.py
+      - name: Security boundary regression tests
+        run: >-
+          python -m pytest -q
+          tests/test_exec_guard.py
+          tests/test_process_safety_gate.py
