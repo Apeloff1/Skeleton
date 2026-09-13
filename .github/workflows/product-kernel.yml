@@ -8,6 +8,7 @@ on:
       - "backend/tests/test_charter_policy.py"
       - "backend/tests/test_product_kernel.py"
       - "frontend/src/product/productCatalog.ts"
+      - "frontend/app/product.tsx"
       - ".github/workflows/product-kernel.yml"
   pull_request:
     paths:
@@ -16,6 +17,7 @@ on:
       - "backend/tests/test_charter_policy.py"
       - "backend/tests/test_product_kernel.py"
       - "frontend/src/product/productCatalog.ts"
+      - "frontend/app/product.tsx"
       - ".github/workflows/product-kernel.yml"
 
 permissions:
