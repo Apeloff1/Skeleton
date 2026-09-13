@@ -64,6 +64,11 @@ class QuotaLedger:
                     raise QuotaExceeded(f"new quota below current usage: {scope}")
             self._limits[scope] = quota
 
+    def configured_limits(self) -> dict[str, Quota]:
+        """Return an immutable-value copy of configured quota overrides."""
+        with self._lock:
+            return dict(sorted(self._limits.items()))
+
     def limit(self, scope: str) -> Quota:
         scope = self._scope(scope)
         with self._lock:
