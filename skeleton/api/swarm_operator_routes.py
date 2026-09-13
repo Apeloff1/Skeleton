@@ -22,6 +22,7 @@ from skeleton.agents.swarm_slo import SLOPolicy
 from skeleton.agents.swarm_snapshot import SnapshotError, normalize_snapshot
 from skeleton.agents.swarm_tenant_broker import TenantSwarmBroker
 from skeleton.agents.swarm_tenant_checkpoint import TenantCheckpointStore
+from skeleton.api.swarm_recovery_service import activate_recovery
 
 router = APIRouter(prefix="/swarm/operator", tags=["swarm-operator"])
 
@@ -72,38 +73,21 @@ def _stage_tenant_bundle(
     return staged_ingress, staged_broker, staged_tenant
 
 
-def _stage_paired_restore(
-    recovery: SwarmRecoveryManager,
-    runtime: SwarmRuntime,
-    sequence: int,
-) -> dict[str, Any] | None:
-    """Validate a paired runtime/tenant restore completely before publishing it."""
-    state = _state()
-    current_tenant = getattr(state, "swarm_tenant_broker", None)
-    if current_tenant is None or recovery.tenant_store.get(sequence) is None:
-        return None
-
-    staged_ingress, staged_broker, staged_tenant = _stage_tenant_bundle(runtime, current_tenant)
-    repair = recovery.restore_tenants(staged_tenant, sequence)
-    if repair is None:
-        raise RuntimeError(f"tenant checkpoint disappeared during staged restore: {sequence}")
-    state.commit_swarm_bundle(runtime, staged_broker, staged_ingress, staged_tenant)
-    return asdict(repair)
-
-
 def _stage_live_metadata_restore(runtime: SwarmRuntime) -> dict[str, Any] | None:
-    """Atomically carry current tenant ownership across a runtime replacement."""
+    """Carry current tenant ownership across runtime replacement with generation fencing."""
     state = _state()
     current_tenant = getattr(state, "swarm_tenant_broker", None)
     if current_tenant is None:
         return None
 
-    staged_ingress, staged_broker, staged_tenant = _stage_tenant_bundle(runtime, current_tenant)
-    transient = TenantCheckpointStore(max_checkpoints=1)
-    transient.capture(1, current_tenant)
-    repair = transient.restore(staged_tenant, 1)
-    state.commit_swarm_bundle(runtime, staged_broker, staged_ingress, staged_tenant)
-    return asdict(repair)
+    with current_tenant._lock:
+        current_tenant._assert_active()
+        staged_ingress, staged_broker, staged_tenant = _stage_tenant_bundle(runtime, current_tenant)
+        transient = TenantCheckpointStore(max_checkpoints=1)
+        transient.capture(1, current_tenant)
+        repair = transient.restore(staged_tenant, 1)
+        state.commit_swarm_bundle(runtime, staged_broker, staged_ingress, staged_tenant)
+        return asdict(repair)
 
 
 def _publish_runtime(runtime: SwarmRuntime) -> dict[str, Any] | None:
@@ -203,7 +187,7 @@ def gc(keep_terminal: int = Query(default=10_000, ge=0, le=1_000_000), runtime: 
     rebuilt, result = compact_runtime(runtime, keep_terminal=keep_terminal)
     try:
         tenant_repair = _publish_runtime(rebuilt)
-    except (KeyError, ValueError, RuntimeError) as exc:
+    except (AdmissionError, KeyError, ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=409, detail=f"staged compaction rejected: {exc}") from exc
     return {"result": asdict(result), "tenant_repair": tenant_repair, "capacity": capacity(rebuilt), "snapshot": asdict(rebuilt.snapshot())}
 
@@ -217,21 +201,22 @@ def checkpoint(runtime: SwarmRuntime = Depends(_runtime), recovery: SwarmRecover
 
 @router.post("/restore-latest")
 def restore_latest(recovery: SwarmRecoveryManager = Depends(_recovery)) -> dict[str, Any]:
-    runtime = recovery.restore_latest()
-    if runtime is None:
-        raise HTTPException(status_code=404, detail="no checkpoint available")
     sequence = recovery.status().latest_sequence
     if sequence is None:
-        raise HTTPException(status_code=409, detail="checkpoint sequence unavailable")
-
+        raise HTTPException(status_code=404, detail="no checkpoint available")
     try:
-        tenant_repair = _stage_paired_restore(recovery, runtime, sequence)
-        if tenant_repair is None:
-            tenant_repair = _publish_runtime(runtime)
-    except (KeyError, ValueError, RuntimeError) as exc:
+        result = activate_recovery(_state(), recovery, sequence)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (AdmissionError, TypeError, ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=409, detail=f"staged restore rejected: {exc}") from exc
-
-    return {"restored": True, "tenant_repair": tenant_repair, "status": asdict(recovery.status()), "snapshot": asdict(runtime.snapshot())}
+    runtime = _state().swarm
+    return {
+        "restored": True,
+        "tenant_repair": result.tenant_repair,
+        "status": asdict(recovery.status()),
+        "snapshot": asdict(runtime.snapshot()),
+    }
 
 
 @router.post("/failover/elect")
