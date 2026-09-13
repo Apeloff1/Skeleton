@@ -17,9 +17,11 @@ on:
 permissions:
   contents: read
 
+# Do not terminate the active lint pass when main is receiving rapid commits.
+# GitHub keeps only the newest pending run, so validation completes without an unbounded queue.
 concurrency:
   group: lint-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   eslint:
