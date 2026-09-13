@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
 from threading import RLock
 from time import monotonic
 from typing import Callable
@@ -18,13 +19,20 @@ class Bucket:
 
 class TokenBucketLimiter:
     def __init__(self, *, capacity: float, refill_per_second: float, clock: Callable[[], float] = monotonic) -> None:
-        if capacity <= 0 or refill_per_second <= 0:
-            raise ValueError("capacity and refill_per_second must be positive")
-        self.capacity = float(capacity)
-        self.refill_per_second = float(refill_per_second)
+        capacity = self._positive_finite(capacity, "capacity")
+        refill_per_second = self._positive_finite(refill_per_second, "refill_per_second")
+        self.capacity = capacity
+        self.refill_per_second = refill_per_second
         self._clock = clock
         self._buckets: dict[str, Bucket] = {}
         self._lock = RLock()
+
+    @staticmethod
+    def _positive_finite(value: float, name: str) -> float:
+        value = float(value)
+        if not isfinite(value) or value <= 0:
+            raise ValueError(f"{name} must be a positive finite number")
+        return value
 
     @staticmethod
     def _key(key: str) -> str:
@@ -33,12 +41,9 @@ class TokenBucketLimiter:
             raise ValueError("rate-limit key must not be empty")
         return normalized
 
-    @staticmethod
-    def _cost(cost: float) -> float:
-        cost = float(cost)
-        if cost <= 0:
-            raise ValueError("cost must be positive")
-        return cost
+    @classmethod
+    def _cost(cls, cost: float) -> float:
+        return cls._positive_finite(cost, "cost")
 
     def _refill(self, bucket: Bucket, now: float) -> None:
         elapsed = max(0.0, now - bucket.updated_at)
