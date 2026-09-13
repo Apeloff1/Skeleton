@@ -18,6 +18,7 @@ from skeleton.agents.swarm_pressure import PressureReport, classify_pressure
 from skeleton.agents.swarm_queries import TaskPage, query_tasks
 from skeleton.agents.swarm_rate_limit import Bucket, TokenBucketLimiter
 from skeleton.agents.swarm_recovery import RecoveryStatus, SwarmRecoveryManager
+from skeleton.agents.swarm_resilient_scheduler import ResilientRanking, ResilientSwarmScheduler
 from skeleton.agents.swarm_restore import validate_restore_state
 from skeleton.agents.swarm_retention import PrunePlan, RetentionPolicy, TERMINAL_STATES
 from skeleton.agents.swarm_scheduler import SwarmScheduler, WorkerScore
@@ -45,7 +46,8 @@ __all__ = [
     "IdempotencyRecord", "IdempotencyRegistry", "InvariantReport", "audit",
     "compact_runtime", "compact_state", "SwarmOperator", "PressureReport",
     "classify_pressure", "TaskPage", "query_tasks", "Bucket", "TokenBucketLimiter",
-    "RecoveryStatus", "SwarmRecoveryManager", "validate_restore_state", "PrunePlan",
-    "RetentionPolicy", "TERMINAL_STATES", "SwarmScheduler", "WorkerScore", "SLOPolicy",
-    "CURRENT_VERSION", "SnapshotError", "normalize_snapshot", "validate_snapshot",
+    "RecoveryStatus", "SwarmRecoveryManager", "ResilientRanking", "ResilientSwarmScheduler",
+    "validate_restore_state", "PrunePlan", "RetentionPolicy", "TERMINAL_STATES",
+    "SwarmScheduler", "WorkerScore", "SLOPolicy", "CURRENT_VERSION", "SnapshotError",
+    "normalize_snapshot", "validate_snapshot",
 ]
