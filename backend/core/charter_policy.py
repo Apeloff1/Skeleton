@@ -154,8 +154,27 @@ class CharterPolicy:
             )
 
     def snapshot(self) -> GovernanceSnapshot:
+        """Return detached copies so callers cannot mutate live policy state."""
         with self._lock:
-            return GovernanceSnapshot(
-                charters=list(self._charters.values()),
-                edicts=list(self._edicts.values()),
-            )
+            charters = [
+                Charter(
+                    id=charter.id,
+                    domain=charter.domain,
+                    rules=list(charter.rules),
+                    ratified_at=charter.ratified_at,
+                    amendments=charter.amendments,
+                )
+                for charter in self._charters.values()
+            ]
+            edicts = [
+                Edict(
+                    id=edict.id,
+                    charter_id=edict.charter_id,
+                    rule=edict.rule,
+                    proposed_by=edict.proposed_by,
+                    proposed_at=edict.proposed_at,
+                    in_force=edict.in_force,
+                )
+                for edict in self._edicts.values()
+            ]
+            return GovernanceSnapshot(charters=charters, edicts=edicts)
