@@ -69,7 +69,7 @@ class InputDevice(str, Enum):
 # ============================================================================
 
 class CombatSequenceRequest(BaseModel):
-    sequence_name: str
+    sequence_name: str = Field(..., min_length=1, max_length=200)
     combat_style: Literal["melee", "ranged", "magic", "hybrid"] = "melee"
     action_count: int = Field(5, ge=2, le=20)
     difficulty: Literal["easy", "medium", "hard", "extreme"] = "medium"
@@ -77,7 +77,7 @@ class CombatSequenceRequest(BaseModel):
 
 
 class ComboSystemRequest(BaseModel):
-    system_name: str
+    system_name: str = Field(..., min_length=1, max_length=200)
     combo_type: ComboType = ComboType.SEQUENTIAL
     max_chain_length: int = Field(10, ge=3, le=50)
     timing_window_ms: int = Field(500, ge=100, le=2000)
@@ -93,7 +93,7 @@ class AbilityChainRequest(BaseModel):
 
 
 class QTESequenceRequest(BaseModel):
-    sequence_name: str
+    sequence_name: str = Field(..., min_length=1, max_length=200)
     qte_type: QTEType = QTEType.BUTTON_PRESS
     duration_seconds: float = Field(5.0, ge=1.0, le=60.0)
     difficulty: Literal["easy", "medium", "hard"] = "medium"
