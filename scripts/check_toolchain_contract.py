@@ -35,12 +35,36 @@ def main() -> int:
     project = backend.get("project", {})
     tool = backend.get("tool", {})
     dev = project.get("optional-dependencies", {}).get("dev", [])
+    test_deps = project.get("optional-dependencies", {}).get("test", [])
     runtime_deps = project.get("dependencies", [])
     requirements = read("backend/requirements.txt")
+    pytest_cfg = tool.get("pytest", {}).get("ini_options", {})
+    pytest_markers = pytest_cfg.get("markers", [])
+    conftest = read("backend/tests/conftest.py")
+
     require(project.get("requires-python") == ">=3.11", "backend requires Python >=3.11", failures)
     require(tool.get("ruff", {}).get("target-version") == "py311", "Ruff target must be py311", failures)
     require(str(tool.get("mypy", {}).get("python_version")) == "3.11", "mypy target must be 3.11", failures)
     require(any(re.fullmatch(r"ruff>=0\.9,<0\.10", item) for item in dev), "dev Ruff must be 0.9.x", failures)
+    require(
+        any(str(item).startswith("pytest-timeout>=") for item in dev)
+        and any(str(item).startswith("pytest-timeout>=") for item in test_deps),
+        "backend dev/test dependencies must include pytest-timeout",
+        failures,
+    )
+    require(
+        any(str(marker).startswith("timeout(") for marker in pytest_markers),
+        "pytest strict-marker contract must register timeout(seconds)",
+        failures,
+    )
+    require(
+        "pytest_ignore_collect" in conftest
+        and "EXPO_PUBLIC_BACKEND_URL" in conftest
+        and "EXPO_BACKEND_URL" in conftest
+        and "/app/frontend/.env" in conftest,
+        "backend hermetic collection boundary for live Expo suites drifted",
+        failures,
+    )
     require(
         not any(str(item).lower().startswith("emergentintegrations") for item in runtime_deps),
         "retired emergentintegrations SDK must not be a project dependency",
@@ -141,7 +165,7 @@ def main() -> int:
         for failure in failures:
             print(f"  - {failure}", file=sys.stderr)
         return 1
-    print("Toolchain contract passed: proven CI actions, runtime, local SDK boundaries, quality, security, destructuring/partial/namespace/getattribute coverage, self-enforcement, and fail-closed deployment gates aligned.")
+    print("Toolchain contract passed: proven CI actions, runtime, hermetic/live test isolation, timeout support, local SDK boundaries, quality, security, destructuring/partial/namespace/getattribute coverage, self-enforcement, and fail-closed deployment gates aligned.")
     return 0
 
 
