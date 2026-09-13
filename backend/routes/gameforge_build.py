@@ -22,6 +22,8 @@ from fastapi import APIRouter
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from core.exec_guard import code_execution_enabled, execution_disabled_response
+
 router = APIRouter(prefix="/api/gameforge/build", tags=["gameforge-build"])
 
 _ARTIFACTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "artifacts", "builds")
@@ -134,6 +136,9 @@ class DesktopBody(BaseModel):
 @router.post("/desktop")
 async def build_desktop(b: DesktopBody):
     """Real native desktop binary via PyInstaller (Linux ELF in this environment)."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Desktop native build")
+
     import subprocess
     import sys
     if not _has_pyinstaller():
@@ -180,6 +185,9 @@ async def build_godot(b: BuildBody):
     """Generate a real, importable Godot 4 project (project.godot + scene + script)
     from the gamefiles and validate it with the native Godot engine (headless).
     The bundled Godot 4.3 binary actually runs the project to prove it boots."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Godot native build")
+
     import subprocess
     files = _gamefiles(b.game_name)
     safe_name, build_id, workdir = _artifact_build(b.game_name, "godot")

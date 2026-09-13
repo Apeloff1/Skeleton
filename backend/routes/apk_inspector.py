@@ -21,6 +21,7 @@ from fastapi import APIRouter, HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
 from core.databases import client as _SHARED_MONGO_CLIENT
+from core.exec_guard import code_execution_enabled, execution_disabled_response
 
 from services import binary_builder
 
@@ -46,6 +47,9 @@ async def install_toolchain():
     """Manually trigger the Android SDK + qemu + JDK installer.
     Useful when the background startup install failed silently.
     Returns immediately; the installer runs detached in the background."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Android toolchain installation")
+
     import subprocess
     import os
     installer = "/app/scripts/install_android_toolchain.sh"
