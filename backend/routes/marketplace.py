@@ -127,7 +127,10 @@ async def unlist(pid: str):
 
 
 @router.get("/marketplace/listings")
-async def listings(limit: int = Query(40, le=100), sort: str = Query("newest")):
+async def listings(
+    limit: int = Query(40, ge=1, le=100),
+    sort: str = Query("newest", min_length=1, max_length=30),
+):
     """Browse active listings, hydrated with light game metadata + cover flag."""
     rows = await _db.marketplace_listings.find(
         {"active": True}, {"_id": 0}).sort("created_at", -1).limit(200).to_list(200)
@@ -155,7 +158,10 @@ async def listings(limit: int = Query(40, le=100), sort: str = Query("newest")):
 
 
 @router.get("/marketplace/listing/{pid}")
-async def listing_detail(pid: str, buyer_id: str = Query("")):
+async def listing_detail(
+    pid: str,
+    buyer_id: str = Query("", max_length=200),
+):
     r = await _db.marketplace_listings.find_one({"playable_id": pid}, {"_id": 0})
     if not r:
         return {"error": "not listed"}
@@ -325,7 +331,10 @@ async def stripe_webhook(request: Request):
 
 
 @router.get("/marketplace/purchases")
-async def purchases(buyer_id: str = Query(...), limit: int = Query(50, le=100)):
+async def purchases(
+    buyer_id: str = Query(..., min_length=1, max_length=200),
+    limit: int = Query(50, ge=1, le=100),
+):
     rows = await _db.marketplace_purchases.find(
         {"buyer_id": buyer_id, "payment_status": "paid"}, {"_id": 0}
     ).sort("purchased_at", -1).limit(limit).to_list(limit)
@@ -341,7 +350,7 @@ async def purchases(buyer_id: str = Query(...), limit: int = Query(50, le=100)):
 
 
 @router.get("/marketplace/mine")
-async def my_studio(creator_id: str = Query(...)):
+async def my_studio(creator_id: str = Query(..., min_length=1, max_length=200)):
     """Creator Dashboard data: a creator's listings (active + inactive) hydrated
     with game meta, plus aggregate KPIs (games / active / sales / revenue / plays)."""
     rows = await _db.marketplace_listings.find(
@@ -378,7 +387,7 @@ async def my_studio(creator_id: str = Query(...)):
 
 
 @router.get("/marketplace/creators/trending")
-async def trending_creators(limit: int = Query(20, le=50)):
+async def trending_creators(limit: int = Query(20, ge=1, le=50)):
     """Leaderboard of creators ranked by a composite of revenue + sales + plays.
     Powers the Creator Dashboard 'Trending Creators' rail."""
     rows = await _db.marketplace_listings.aggregate([
