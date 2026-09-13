@@ -151,7 +151,10 @@ class ServerState:
         if isinstance(tenant_check, dict):
             reconcile = tenant_check.get("reconcile")
             if isinstance(reconcile, dict):
-                tenant_mismatch = bool(reconcile.get("missing_active") or reconcile.get("terminal_not_terminal"))
+                tenant_mismatch = any(
+                    bool(reconcile.get(field))
+                    for field in ("missing_active", "terminal_not_terminal", "active_terminal", "phase_mismatch")
+                )
         overall = not has_error and not swarm_critical and not recovery_mismatch and not tenant_mismatch
         return {"overall": overall, "checks": checks}
 
