@@ -1,0 +1,82 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Oslo
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:15"
+      timezone: Europe/Oslo
+    open-pull-requests-limit: 5
+    groups:
+      backend-runtime:
+        dependency-type: production
+        patterns: ["*"]
+      backend-development:
+        dependency-type: development
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:30"
+      timezone: Europe/Oslo
+    open-pull-requests-limit: 5
+    versioning-strategy: increase-if-necessary
+    groups:
+      frontend-runtime:
+        dependency-type: production
+        patterns: ["*"]
+      frontend-development:
+        dependency-type: development
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:45"
+      timezone: Europe/Oslo
+    open-pull-requests-limit: 3
+    groups:
+      root-images:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/Oslo
+    open-pull-requests-limit: 3
+    groups:
+      backend-images:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:15"
+      timezone: Europe/Oslo
+    open-pull-requests-limit: 3
+    groups:
+      frontend-images:
+        patterns: ["*"]
