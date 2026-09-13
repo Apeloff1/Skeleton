@@ -103,6 +103,9 @@ class ServerState:
         if any(bool(values) for values in reconcile.values()):
             raise ValueError("staged tenant bundle is not reconciled")
         with self._swarm_bind_lock:
+            previous_tenant = self.swarm_tenant_broker
+            if previous_tenant is not None and previous_tenant is not tenant_broker:
+                previous_tenant.retire()
             self.swarm = runtime
             self.swarm_broker = broker
             self.swarm_ingress = ingress
@@ -162,9 +165,11 @@ class ServerState:
         tenant_mismatch = False
         tenant_check = checks.get("swarm_tenant_broker")
         if isinstance(tenant_check, dict):
+            if tenant_check.get("retired") is True:
+                tenant_mismatch = True
             reconcile = tenant_check.get("reconcile")
             if isinstance(reconcile, dict):
-                tenant_mismatch = any(
+                tenant_mismatch = tenant_mismatch or any(
                     bool(reconcile.get(field))
                     for field in ("missing_active", "terminal_not_terminal", "active_terminal", "phase_mismatch")
                 )
