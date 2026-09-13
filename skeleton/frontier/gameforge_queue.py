@@ -1,5 +1,6 @@
 """Bounded FIFO queue with explicit backpressure."""
 from collections import deque
+from threading import Lock
 
 
 class BoundedQueue:
@@ -8,44 +9,54 @@ class BoundedQueue:
             raise ValueError("capacity must be a positive integer")
         self.capacity = capacity
         self._items = deque()
+        self._lock = Lock()
 
     @property
     def remaining(self):
-        return self.capacity - len(self._items)
+        with self._lock:
+            return self.capacity - len(self._items)
 
     @property
     def full(self):
-        return len(self._items) >= self.capacity
+        with self._lock:
+            return len(self._items) >= self.capacity
 
     def push(self, item):
-        if self.full:
-            return False
-        self._items.append(item)
-        return True
+        with self._lock:
+            if len(self._items) >= self.capacity:
+                return False
+            self._items.append(item)
+            return True
 
     def pop(self):
-        return self._items.popleft() if self._items else None
+        with self._lock:
+            return self._items.popleft() if self._items else None
 
     def remove(self, item):
         """Remove the first matching item without disturbing other reservations."""
-        try:
-            self._items.remove(item)
-        except ValueError:
-            return False
-        return True
+        with self._lock:
+            try:
+                self._items.remove(item)
+            except ValueError:
+                return False
+            return True
 
     def peek(self):
-        return self._items[0] if self._items else None
+        with self._lock:
+            return self._items[0] if self._items else None
 
     def clear(self):
         """Empty the queue and return the number of discarded items."""
-        count = len(self._items)
-        self._items.clear()
-        return count
+        with self._lock:
+            count = len(self._items)
+            self._items.clear()
+            return count
 
     def snapshot(self):
         """Return an immutable point-in-time view of queued items."""
-        return tuple(self._items)
+        with self._lock:
+            return tuple(self._items)
 
     def __len__(self):
-        return len(self._items)
+        with self._lock:
+            return len(self._items)
