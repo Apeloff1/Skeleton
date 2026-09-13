@@ -18,7 +18,13 @@ class ExecutionOutcomeV2:
             raise TypeError("terminal must be bool")
         if not isinstance(self.reason, str):
             raise TypeError("reason must be str")
+        if self.success and not self.terminal:
+            raise ValueError("successful outcomes must be terminal")
 
     @property
     def recoverable(self):
         return not self.success and not self.terminal
+
+    @property
+    def failed(self):
+        return not self.success
