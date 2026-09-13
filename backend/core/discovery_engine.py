@@ -28,20 +28,22 @@ class DiscoveryEngine:
     OPERATORS = {"eq", "gte", "lte", "contains", "contains_all", "truthy"}
 
     def __init__(self, rules: Iterable[DiscoveryRule]) -> None:
-        self.rules = {rule.id: rule for rule in rules}
-        if not self.rules:
+        materialized = tuple(rules)
+        if not materialized:
             raise ValueError("discovery engine requires rules")
-        if any(not rid.strip() for rid in self.rules):
+        ids = [rule.id for rule in materialized]
+        if any(not rid.strip() for rid in ids):
             raise ValueError("blank discovery rule id")
-        if len(self.rules) != len(tuple(rules)) if not isinstance(rules, (list, tuple)) else False:
+        if len(ids) != len(set(ids)):
             raise ValueError("duplicate discovery rule id")
-        for rule in self.rules.values():
+        self.rules = {rule.id: rule for rule in materialized}
+        for rule in materialized:
             if not rule.fact.strip():
                 raise ValueError("discovery fact cannot be blank")
             if rule.operator not in self.OPERATORS:
                 raise ValueError(f"unsupported discovery operator: {rule.operator}")
-            if not rule.unlocks:
-                raise ValueError("discovery rule must unlock content")
+            if not rule.unlocks or any(not item.strip() for item in rule.unlocks):
+                raise ValueError("discovery rule must unlock named content")
         self.discovered: set[str] = set()
         self.unlocked: set[str] = set()
 
