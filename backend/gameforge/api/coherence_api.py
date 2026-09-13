@@ -2,7 +2,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, Field
 
 from gameforge.enterprise.auth import Principal, get_principal
 from gameforge.personal.synergy.coherence import CoherenceEngine
@@ -26,40 +26,40 @@ def _eng(uid: str) -> CoherenceEngine:
 
 
 class TranscriptBody(BaseModel):
-    segment: str
+    segment: str = Field(..., min_length=1, max_length=10000)
 
 
 class SleepBody(BaseModel):
-    sleep_hours: float
+    sleep_hours: float = Field(..., ge=0, le=24)
 
 
 class ScheduleBody(BaseModel):
-    title: str
+    title: str = Field(..., min_length=1, max_length=500)
     day: Optional[str] = None
-    kind: str = "task"
-    project_id: Optional[str] = None
+    kind: str = Field("task", max_length=100)
+    project_id: Optional[str] = Field(None, max_length=200)
 
 
 class ProgressBody(BaseModel):
-    project_id: str
-    name: str
-    percent: float
+    project_id: str = Field(..., min_length=1, max_length=200)
+    name: str = Field(..., min_length=1, max_length=500)
+    percent: float = Field(..., ge=0, le=100)
     day: Optional[str] = None
-    note: str = ""
+    note: str = Field("", max_length=10000)
 
 
 class PainBody(BaseModel):
-    pain_level: float
+    pain_level: float = Field(..., ge=0, le=10)
 
 
 class MidnightBody(BaseModel):
-    segments: List[str]
+    segments: List[str] = Field(..., min_length=1, max_length=200)
 
 
 class LocationBody(BaseModel):
-    country: str
-    city: str
-    latitude: float = 59.95
+    country: str = Field(..., min_length=2, max_length=100)
+    city: str = Field(..., min_length=1, max_length=200)
+    latitude: float = Field(59.95, ge=-90, le=90)
 
 
 @router.get("/triggers")

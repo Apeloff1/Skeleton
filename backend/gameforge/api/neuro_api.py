@@ -17,28 +17,28 @@ def _orch(user_id: str) -> NeuroOrchestrator:
 
 
 class FilterBody(BaseModel):
-    segments: List[str]
+    segments: List[str] = Field(..., min_length=1, max_length=200)
 
 
 class ControlBody(BaseModel):
-    sleep_hours: float = 7.0
-    weather_condition: str = "clear"
-    noise_db: float = 45.0
-    affect_energy: float = 0.55
-    affect_valence: float = 0.1
-    pain_level: float = 0.0
-    progress_delta: float = 0.0
-    scheduled_count: int = 0
-    stress_hints: int = 0
+    sleep_hours: float = Field(7.0, ge=0, le=24)
+    weather_condition: str = Field("clear", max_length=100)
+    noise_db: float = Field(45.0, ge=0, le=200)
+    affect_energy: float = Field(0.55, ge=-1, le=1)
+    affect_valence: float = Field(0.1, ge=-1, le=1)
+    pain_level: float = Field(0.0, ge=0, le=10)
+    progress_delta: float = Field(0.0, ge=-100, le=100)
+    scheduled_count: int = Field(0, ge=0, le=10000)
+    stress_hints: int = Field(0, ge=0, le=10000)
 
 
 class ConsolidateBody(BaseModel):
-    segments: List[str]
-    extra_notes: Optional[List[str]] = None
+    segments: List[str] = Field(..., min_length=1, max_length=200)
+    extra_notes: Optional[List[str]] = Field(None, max_length=200)
 
 
 class RewardBody(BaseModel):
-    magnitude: float = 0.3
+    magnitude: float = Field(0.3, ge=-1, le=1)
 
 
 @router.post("/salience/filter")

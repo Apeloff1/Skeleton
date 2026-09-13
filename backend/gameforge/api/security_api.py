@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import Optional
 from fastapi import APIRouter, Depends, Header
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from gameforge.enterprise.auth import Principal, get_principal
 from gameforge.enterprise.zaibatsu_security import SECURITY
@@ -11,22 +11,22 @@ router = APIRouter(prefix="/security", tags=["zaibatsu-security"])
 
 
 class FreezeBody(BaseModel):
-    reason: str = "manual"
+    reason: str = Field("manual", max_length=500)
 
 
 class UnfreezeBody(BaseModel):
     emperor_seal: bool = False
-    actor: str = "user"
+    actor: str = Field("user", max_length=200)
 
 
 class UnblockBody(BaseModel):
-    user_id: str
+    user_id: str = Field(..., min_length=1, max_length=200)
     emperor_seal: bool = False
 
 
 class InspectBody(BaseModel):
-    text: str
-    path: str = ""
+    text: str = Field(..., min_length=1, max_length=100000)
+    path: str = Field("", max_length=1000)
 
 
 @router.get("/status")

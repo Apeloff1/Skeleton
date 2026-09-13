@@ -25,31 +25,31 @@ def _cal(user_id: str, country: str = "NO", city: str = "Lillestrøm") -> YearCa
 
 
 class LocationBody(BaseModel):
-    country: str = "NO"
-    city: str = "Lillestrøm"
-    latitude: float = 59.95
+    country: str = Field("NO", min_length=2, max_length=100)
+    city: str = Field("Lillestrøm", min_length=1, max_length=200)
+    latitude: float = Field(59.95, ge=-90, le=90)
 
 
 class ScheduleBody(BaseModel):
-    day: str  # ISO date
-    title: str
-    when: Optional[str] = None
-    kind: str = "task"
-    project_id: Optional[str] = None
-    notes: str = ""
+    day: str = Field(..., min_length=10, max_length=10)  # ISO date
+    title: str = Field(..., min_length=1, max_length=500)
+    when: Optional[str] = Field(None, max_length=100)
+    kind: str = Field("task", max_length=100)
+    project_id: Optional[str] = Field(None, max_length=200)
+    notes: str = Field("", max_length=10000)
 
 
 class ProgressBody(BaseModel):
-    day: str
-    project_id: str
-    name: str
-    percent: float
-    note: str = ""
+    day: str = Field(..., min_length=10, max_length=10)
+    project_id: str = Field(..., min_length=1, max_length=200)
+    name: str = Field(..., min_length=1, max_length=500)
+    percent: float = Field(..., ge=0, le=100)
+    note: str = Field("", max_length=10000)
 
 
 class NoteBody(BaseModel):
-    day: str
-    note: str
+    day: str = Field(..., min_length=10, max_length=10)
+    note: str = Field(..., min_length=1, max_length=10000)
 
 
 @router.get("/today")
