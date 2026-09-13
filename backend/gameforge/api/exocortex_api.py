@@ -480,7 +480,10 @@ async def studio_status(principal: Principal = Depends(get_principal)):
 
 
 @router.get("/studio/features")
-async def studio_features(n: int = 15, principal: Principal = Depends(get_principal)):
+async def studio_features(
+    n: int = Query(15, ge=1, le=100),
+    principal: Principal = Depends(get_principal),
+):
     return {"features": _x(principal.user_id).studio_best_features(n)}
 
 
@@ -497,7 +500,11 @@ async def rooms_log(req: RoomLogBody, principal: Principal = Depends(get_princip
 
 
 @router.get("/rooms/logs/{room_id}")
-async def rooms_logs(room_id: str, n: int = 30, principal: Principal = Depends(get_principal)):
+async def rooms_logs(
+    room_id: str,
+    n: int = Query(30, ge=1, le=200),
+    principal: Principal = Depends(get_principal),
+):
     return {"room_id": room_id, "entries": _x(principal.user_id).zaibatsu.room_logs.tail(room_id, n)}
 
 
@@ -507,7 +514,11 @@ async def training_idle(recursive_depth: int = 2, principal: Principal = Depends
 
 
 @router.get("/training/suggest")
-async def training_suggest(context: str, n: int = 8, principal: Principal = Depends(get_principal)):
+async def training_suggest(
+    context: str,
+    n: int = Query(8, ge=1, le=100),
+    principal: Principal = Depends(get_principal),
+):
     return {"suggestions": _x(principal.user_id).idle_suggest(context, n)}
 
 
@@ -532,7 +543,12 @@ async def boardroom_interconnect(principal: Principal = Depends(get_principal)):
 
 
 @router.get("/masterlog/tail")
-async def masterlog_tail(n: int = 50, source: Optional[str] = None, category: Optional[str] = None, principal: Principal = Depends(get_principal)):
+async def masterlog_tail(
+    n: int = Query(50, ge=1, le=200),
+    source: Optional[str] = None,
+    category: Optional[str] = None,
+    principal: Principal = Depends(get_principal),
+):
     return {"entries": _x(principal.user_id).master_tail(n, source, category)}
 
 

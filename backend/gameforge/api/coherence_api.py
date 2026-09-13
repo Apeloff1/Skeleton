@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from gameforge.enterprise.auth import Principal, get_principal
@@ -125,7 +125,10 @@ async def history(principal: Principal = Depends(get_principal)):
 
 
 @router.get("/trigger_logs")
-async def trigger_logs(n: int = 50, principal: Principal = Depends(get_principal)):
+async def trigger_logs(
+    n: int = Query(50, ge=1, le=200),
+    principal: Principal = Depends(get_principal),
+):
     eng = _eng(principal.user_id)
     return {"logs": eng.trigger_logs(n), "stats": eng.trigger_stats()}
 

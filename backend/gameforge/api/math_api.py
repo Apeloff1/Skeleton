@@ -213,7 +213,11 @@ async def scale_eval(req: ScaleIdBody, principal: Principal = Depends(get_princi
 
 
 @router.get("/logs")
-async def math_logs(tier: Optional[str] = None, n: int = 50, principal: Principal = Depends(get_principal)):
+async def math_logs(
+    tier: Optional[str] = None,
+    n: int = Query(50, ge=1, le=200),
+    principal: Principal = Depends(get_principal),
+):
     return _m(principal.user_id).logs(tier=tier, n=n)
 
 
