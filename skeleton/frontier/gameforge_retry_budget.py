@@ -3,8 +3,8 @@
 
 class RetryBudget:
     def __init__(self, attempts):
-        if not isinstance(attempts, int) or attempts < 0:
-            raise ValueError("attempts must be non-negative")
+        if not isinstance(attempts, int) or isinstance(attempts, bool) or attempts < 0:
+            raise ValueError("attempts must be a non-negative integer")
         self.capacity = attempts
         self.remaining = attempts
 
