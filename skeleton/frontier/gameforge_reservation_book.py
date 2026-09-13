@@ -14,10 +14,11 @@ class ReservationBook:
     def add(self, request_id: str):
         if not request_id:
             raise ValueError("request_id is required")
+        existing = self._items.get(request_id)
+        if existing is not None:
+            return existing
         if len(self._items) >= self.capacity:
             return None
-        if request_id in self._items:
-            return self._items[request_id]
         reservation = Reservation(request_id, self._sequence)
         self._sequence += 1
         self._items[request_id] = reservation
@@ -29,9 +30,16 @@ class ReservationBook:
     def contains(self, request_id: str) -> bool:
         return request_id in self._items
 
+    def get(self, request_id: str):
+        return self._items.get(request_id)
+
     def __len__(self):
         return len(self._items)
 
     @property
     def remaining(self):
         return self.capacity - len(self._items)
+
+    @property
+    def full(self):
+        return len(self._items) >= self.capacity
