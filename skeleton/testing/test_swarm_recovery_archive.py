@@ -109,6 +109,30 @@ def test_recovery_archive_rejects_non_finite_json_values() -> None:
         SwarmRecoveryManager.from_archive_bytes(b'{"version":1,"x":NaN}')
 
 
+def test_recovery_archive_rejects_unverified_top_level_fields() -> None:
+    manager = SwarmRecoveryManager()
+    manager.checkpoint(HardenedSwarmRuntime())
+    archive = manager.export_archive()
+    archive["operator_note"] = "not covered by archive_checksum"
+
+    with pytest.raises(ValueError, match="fields mismatch.*operator_note"):
+        SwarmRecoveryManager.from_archive(archive)
+
+    encoded = SwarmRecoveryManager._json_bytes(archive)
+    with pytest.raises(ValueError, match="fields mismatch.*operator_note"):
+        SwarmRecoveryManager.from_archive_bytes(encoded)
+
+
+def test_recovery_archive_rejects_missing_canonical_fields_before_restore() -> None:
+    manager = SwarmRecoveryManager()
+    manager.checkpoint(HardenedSwarmRuntime())
+    archive = manager.export_archive()
+    archive.pop("tenant")
+
+    with pytest.raises(ValueError, match="fields mismatch.*tenant"):
+        SwarmRecoveryManager.from_archive(archive)
+
+
 def test_recovery_archive_rejects_oversized_byte_payload_before_decode(monkeypatch) -> None:
     monkeypatch.setattr("skeleton.agents.swarm_recovery.MAX_RECOVERY_ARCHIVE_BYTES", 32)
     with pytest.raises(ValueError, match="maximum size"):
