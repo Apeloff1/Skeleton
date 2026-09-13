@@ -28,3 +28,20 @@ def test_unhealthy_release_is_dropped():
     healthy["ok"] = False
     assert not pool.release(leased)
     assert pool.idle == 0
+
+
+def test_new_unhealthy_resource_is_counted_once():
+    pool = HealthPool(lambda: object(), lambda _: False)
+    with pytest.raises(RuntimeError):
+        pool.checkout()
+    assert pool.stats().rejected == 1
+
+
+def test_new_health_predicate_failure_is_counted_once():
+    def broken(_: object) -> bool:
+        raise RuntimeError("health probe failed")
+
+    pool = HealthPool(lambda: object(), broken)
+    with pytest.raises(RuntimeError, match="health probe failed"):
+        pool.checkout()
+    assert pool.stats().rejected == 1
