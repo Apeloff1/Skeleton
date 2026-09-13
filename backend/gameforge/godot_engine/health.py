@@ -87,7 +87,7 @@ async def deep_health(probe_timeout: int = 45) -> HealthReport:
         with tempfile.NamedTemporaryFile(dir=PROJECTS_DIR, delete=True):
             pass
         report.projects_dir_writable = True
-    except Exception as e:
+    except OSError as e:
         report.projects_dir_writable = False
         report.problems.append(f"projects dir not writable: {type(e).__name__}")
 
