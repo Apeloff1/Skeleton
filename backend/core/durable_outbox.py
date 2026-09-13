@@ -73,6 +73,17 @@ class DurableOutbox:
         with self._lock:
             return len(self._entries)
 
+    @property
+    def capacity_remaining(self) -> int:
+        with self._lock:
+            return max(0, self.cap - len(self._entries))
+
+    def has_capacity(self, count: int = 1) -> bool:
+        if count < 0:
+            raise ValueError("count cannot be negative")
+        with self._lock:
+            return len(self._entries) + count <= self.cap
+
     def pending(self) -> tuple[OutboxEntry, ...]:
         with self._lock:
             return tuple(self._entries)
