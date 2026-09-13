@@ -7,6 +7,7 @@ Handles final build, signing (placeholder), distribution, and device delivery fo
 import os
 import time
 from typing import Dict, Any, Optional
+from core.exec_guard import execution_disabled_message, require_execution_allowed
 from gameforge.snowball.final_build_export import final_build_exporter
 from gameforge.snowball.git_github_integration import git_github
 
@@ -15,6 +16,13 @@ class DeploymentPipeline:
         self.deployment_history = []
 
     def deploy_game(self, game_name: str, target_platforms: list = None) -> Dict[str, Any]:
+        if not require_execution_allowed("GameForge deployment"):
+            return {
+                "status": "disabled",
+                "ok": False,
+                "disabled": True,
+                "error": execution_disabled_message("GameForge deployment"),
+            }
         if target_platforms is None:
             target_platforms = ["android", "windows"]
 

@@ -17,6 +17,7 @@ import json
 import time
 import zipfile
 from typing import Any, Dict, List
+from core.exec_guard import execution_disabled_message, require_execution_allowed
 
 _RUNTIME_STUB = '''#!/usr/bin/env python3
 """GameForge Internal Runtime (self-contained)."""
@@ -49,6 +50,13 @@ class InternalBuildSystem:
 
     def build_game(self, game_data: Dict, phase: str = "final") -> Dict:
         """Assemble source files → zip bundle → runnable descriptor + signing."""
+        if not require_execution_allowed("GameForge internal build"):
+            return {
+                "status": "disabled",
+                "ok": False,
+                "disabled": True,
+                "error": execution_disabled_message("GameForge internal build"),
+            }
         source = self._generate_source(game_data)
         bundle_bytes, files = self._zip_bundle(source, game_data)
         signature = self._sign(bundle_bytes)

@@ -7,6 +7,7 @@ Adds web build export capability to the deployment pipeline.
 import os
 import time
 from typing import Dict
+from core.exec_guard import execution_disabled_message, require_execution_allowed
 
 class WebExport:
     def __init__(self, output_dir: str = "/tmp/snowball_web_builds"):
@@ -14,6 +15,17 @@ class WebExport:
         os.makedirs(output_dir, exist_ok=True)
 
     def export_web(self, game_name: str, build_config: Dict) -> str:
+        if not require_execution_allowed("GameForge web export"):
+            raise RuntimeError(execution_disabled_message("GameForge web export"))
+        game_name = str(game_name or "").strip()
+        if (
+            not game_name
+            or game_name in {".", ".."}
+            or ".." in game_name
+            or "/" in game_name
+            or "\\" in game_name
+        ):
+            raise ValueError("game_name must be a relative name")
         print(f"[WebExport] Building web version for {game_name}...")
         
         web_dir = os.path.join(self.output_dir, f"{game_name}_web_{int(time.time())}")

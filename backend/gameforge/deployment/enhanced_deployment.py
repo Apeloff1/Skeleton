@@ -6,6 +6,7 @@ Adds signing placeholders, multi-platform support, and distribution.
 
 from gameforge.deployment.deployment_pipeline import deployment_pipeline
 from gameforge.snowball.final_build_export import final_build_exporter
+from core.exec_guard import execution_disabled_message, require_execution_allowed
 import time
 
 class EnhancedDeployment:
@@ -13,6 +14,13 @@ class EnhancedDeployment:
         self.pipeline = deployment_pipeline
 
     def full_deploy(self, game_name: str, platforms: list = None, sign: bool = True) -> dict:
+        if not require_execution_allowed("GameForge full deployment"):
+            return {
+                "status": "disabled",
+                "ok": False,
+                "disabled": True,
+                "error": execution_disabled_message("GameForge full deployment"),
+            }
         if platforms is None:
             platforms = ["android", "windows", "web"]
 
