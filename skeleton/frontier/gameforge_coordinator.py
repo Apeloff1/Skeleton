@@ -10,6 +10,7 @@ from .gameforge_quota import Quota
 from .gameforge_queue import BoundedQueue
 from .gameforge_retry_budget import RetryBudget
 from .gameforge_health_score import HealthScore
+from .gameforge_snapshot import RuntimeSnapshot
 
 @dataclass
 class RuntimeCoordinator:
@@ -42,3 +43,5 @@ class RuntimeCoordinator:
   self.budget.release()
   self.quota.release()
   self.queue.pop()
+ def snapshot(self,active:int=0):
+  return RuntimeSnapshot(self.lifecycle.state.value,self.dependencies.ready,active,self.budget.used,self.budget.capacity)
