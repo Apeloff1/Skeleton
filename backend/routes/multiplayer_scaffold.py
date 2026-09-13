@@ -303,10 +303,10 @@ Point the client at `ws://localhost:8080` and call `netClient.connect(url, roomI
 
 
 class ScaffoldBody(BaseModel):
-    pid: Optional[str] = None
-    game: str = "Your Game"
-    genre: str = ""
-    model: Optional[str] = None
+    pid: Optional[str] = Field(None, min_length=1, max_length=200)
+    game: str = Field("Your Game", min_length=1, max_length=200)
+    genre: str = Field("", max_length=100)
+    model: Optional[str] = Field(None, min_length=1, max_length=50)
     max_players: int = Field(4, ge=2, le=64)
     tick_rate: int = Field(0, ge=0, le=128)   # 0 ⇒ use the model's recommended tick
 

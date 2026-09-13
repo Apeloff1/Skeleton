@@ -11,7 +11,7 @@ Capabilities:
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
 from datetime import datetime
 
@@ -34,10 +34,12 @@ class WorldGenerationRequest(BaseModel):
     seed: Optional[int] = None
 
 class TerrainRequest(BaseModel):
-    description: str
-    terrain_type: str = "mixed"  # flat, hills, mountains, valleys, islands, caves
-    size: Dict[str, int] = {"width": 256, "height": 256, "depth": 64}
-    features: List[str] = []  # rivers, lakes, cliffs, canyons, beaches
+    description: str = Field(..., min_length=1, max_length=10000)
+    terrain_type: str = Field("mixed", max_length=100)  # flat, hills, mountains, valleys, islands, caves
+    size: Dict[str, int] = Field(
+        default_factory=lambda: {"width": 256, "height": 256, "depth": 64}
+    )
+    features: List[str] = Field(default_factory=list, max_length=100)  # rivers, lakes, cliffs, canyons, beaches
 
 class BiomeRequest(BaseModel):
     climate: str = "temperate"  # arctic, temperate, tropical, desert, volcanic

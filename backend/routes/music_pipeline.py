@@ -35,7 +35,7 @@ EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 # ============================================================================
 
 class MusicGenerationRequest(BaseModel):
-    description: str = Field(..., min_length=5, description="Music description")
+    description: str = Field(..., min_length=5, max_length=10000, description="Music description")
     genre: Literal[
         "8bit", "chiptune", "orchestral", "ambient", "electronic", 
         "rock", "jazz", "synthwave", "lofi", "epic", "horror",
@@ -48,10 +48,10 @@ class MusicGenerationRequest(BaseModel):
     duration: Literal["short", "medium", "long"] = "medium"  # 15s, 30s, 60s+
     loopable: bool = True
     tempo: Optional[int] = Field(None, ge=40, le=200, description="BPM")
-    game_context: Optional[str] = Field(None, description="Game scene/context")
+    game_context: Optional[str] = Field(None, max_length=10000, description="Game scene/context")
 
 class SoundEffectRequest(BaseModel):
-    description: str = Field(..., min_length=3)
+    description: str = Field(..., min_length=3, max_length=5000)
     category: Literal[
         "ui", "combat", "environment", "character", "item",
         "ambient", "explosion", "magic", "mechanical", "nature"
@@ -59,13 +59,13 @@ class SoundEffectRequest(BaseModel):
     duration: Literal["instant", "short", "medium"] = "short"  # <0.5s, 0.5-2s, 2-5s
 
 class AdaptiveMusicRequest(BaseModel):
-    game_state: str = Field(..., description="Current game state")
+    game_state: str = Field(..., min_length=1, max_length=10000, description="Current game state")
     intensity: float = Field(0.5, ge=0.0, le=1.0, description="Action intensity 0-1")
-    base_theme: Optional[str] = Field(None, description="Base musical theme")
+    base_theme: Optional[str] = Field(None, max_length=5000, description="Base musical theme")
     transitions: bool = True
 
 class MusicTheoryRequest(BaseModel):
-    description: str
+    description: str = Field(..., min_length=1, max_length=10000)
     output_format: Literal["midi_data", "sheet_music", "chord_progression", "melody_notes"] = "chord_progression"
 
 # ============================================================================

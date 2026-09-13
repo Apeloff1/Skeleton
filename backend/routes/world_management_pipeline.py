@@ -93,9 +93,9 @@ class SceneTransitionRequest(BaseModel):
 
 
 class WorldStateRequest(BaseModel):
-    state_name: str
-    tracked_entities: List[str] = []
-    tracked_variables: List[str] = []
+    state_name: str = Field(..., min_length=1, max_length=200)
+    tracked_entities: List[str] = Field(default_factory=list, max_length=500)
+    tracked_variables: List[str] = Field(default_factory=list, max_length=500)
     auto_save: bool = True
     save_interval_seconds: int = Field(300, ge=60, le=3600)
 
