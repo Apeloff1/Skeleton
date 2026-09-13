@@ -87,12 +87,16 @@ class RuntimeCoordinator:
     def saturated(self):
         return self.budget.exhausted or self.quota.exhausted or self.queue.full
 
-    def release(self):
+    def release(self, request_id=None):
+        """Release one reservation, optionally targeting its request identity."""
         if self._reservations <= 0:
             return False
+        if request_id is not None and not self.queue.remove(request_id):
+            return False
+        if request_id is None:
+            self.queue.pop()
         self.budget.release()
         self.quota.release()
-        self.queue.pop()
         self._reservations -= 1
         return True
 
