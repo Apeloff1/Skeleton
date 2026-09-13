@@ -26,6 +26,14 @@ class BoundedQueue:
     def pop(self):
         return self._items.popleft() if self._items else None
 
+    def remove(self, item):
+        """Remove the first matching item without disturbing other reservations."""
+        try:
+            self._items.remove(item)
+        except ValueError:
+            return False
+        return True
+
     def peek(self):
         return self._items[0] if self._items else None
 
