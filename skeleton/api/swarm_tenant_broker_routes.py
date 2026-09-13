@@ -44,9 +44,13 @@ def _tenant_broker() -> TenantSwarmBroker:
             state.bind_swarm_runtime(HardenedSwarmRuntime())
         from skeleton.agents.swarm_ingress import SwarmIngressGovernor
         ingress = getattr(state, "swarm_ingress", None) or SwarmIngressGovernor()
-        state.swarm_ingress = ingress
-        broker = TenantSwarmBroker(state.swarm_broker, ingress)
-        state.swarm_tenant_broker = broker
+        if hasattr(state, "bind_swarm_ingress"):
+            state.bind_swarm_ingress(ingress)
+            broker = state.swarm_tenant_broker
+        else:
+            state.swarm_ingress = ingress
+            broker = TenantSwarmBroker(state.swarm_broker, ingress)
+            state.swarm_tenant_broker = broker
     return broker
 
 
@@ -55,11 +59,19 @@ def tenant_broker_status(broker: TenantSwarmBroker = Depends(_tenant_broker)) ->
     return broker.status()
 
 
+@router.get("/reconcile")
+def reconcile(broker: TenantSwarmBroker = Depends(_tenant_broker)) -> dict[str, tuple[str, ...]]:
+    return broker.reconcile()
+
+
+@router.post("/reconcile/repair")
+def repair(broker: TenantSwarmBroker = Depends(_tenant_broker)) -> dict[str, object]:
+    result = broker.repair()
+    return {"repair": asdict(result), "reconcile": broker.reconcile(), "status": broker.status()}
+
+
 @router.post("/submit", status_code=status.HTTP_201_CREATED)
-def submit(
-    body: TenantSubmission,
-    broker: TenantSwarmBroker = Depends(_tenant_broker),
-) -> dict[str, object]:
+def submit(body: TenantSubmission, broker: TenantSwarmBroker = Depends(_tenant_broker)) -> dict[str, object]:
     try:
         result = broker.submit_and_dispatch(
             body.tenant,
@@ -82,12 +94,7 @@ def submit(
 
 
 @router.post("/workers/{worker_id}/tasks/{task_id}/success")
-def succeed(
-    worker_id: str,
-    task_id: str,
-    body: TenantCompletion,
-    broker: TenantSwarmBroker = Depends(_tenant_broker),
-) -> dict[str, object]:
+def succeed(worker_id: str, task_id: str, body: TenantCompletion, broker: TenantSwarmBroker = Depends(_tenant_broker)) -> dict[str, object]:
     try:
         result = broker.record_success(worker_id, task_id, completion_token=body.completion_token)
     except (AdmissionError, LeaseError, ValueError) as exc:
@@ -102,19 +109,9 @@ def succeed(
 
 
 @router.post("/workers/{worker_id}/tasks/{task_id}/failure")
-def fail(
-    worker_id: str,
-    task_id: str,
-    body: TenantFailure,
-    broker: TenantSwarmBroker = Depends(_tenant_broker),
-) -> dict[str, object]:
+def fail(worker_id: str, task_id: str, body: TenantFailure, broker: TenantSwarmBroker = Depends(_tenant_broker)) -> dict[str, object]:
     try:
-        result = broker.record_failure(
-            worker_id,
-            task_id,
-            body.error,
-            completion_token=body.completion_token,
-        )
+        result = broker.record_failure(worker_id, task_id, body.error, completion_token=body.completion_token)
     except (AdmissionError, LeaseError, ValueError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return {
