@@ -53,8 +53,8 @@ export default function AssetGenesis() {
   const [gameId, setGameId] = React.useState<string | null>(null);
   const [applying, setApplying] = React.useState(false);
   const [applyStatus, setApplyStatus] = React.useState('');
-  const gameTitle = games.find(g => g.playable_id === gameId)?.title || gameCtx?.title || '';
   const [gameCtx, setGameCtx] = React.useState<any>(null);
+  const gameTitle = games.find(g => g.playable_id === gameId)?.title || gameCtx?.title || '';
   const [selected, setSelected] = React.useState<Record<string, string>>({});
 
   const loadGameCtx = React.useCallback(async (gid: string) => {
