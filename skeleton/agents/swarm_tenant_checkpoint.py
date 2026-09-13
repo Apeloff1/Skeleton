@@ -77,6 +77,15 @@ class TenantCheckpointStore:
         with self._lock:
             return next((item for item in self._items if item.sequence == sequence), None)
 
+    def discard(self, sequence: int) -> bool:
+        """Discard one sidecar checkpoint, used to roll back paired capture failures."""
+        with self._lock:
+            retained = [item for item in self._items if item.sequence != sequence]
+            if len(retained) == len(self._items):
+                return False
+            self._items = deque(retained, maxlen=self.max_checkpoints)
+            return True
+
     def restore(self, broker: TenantSwarmBroker, sequence: int | None = None) -> TenantRepairResult:
         checkpoint = self.latest() if sequence is None else self.get(sequence)
         if checkpoint is None:
