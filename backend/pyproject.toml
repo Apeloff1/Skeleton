@@ -2,8 +2,7 @@
 # Tutolage Backend - Modern Python Project Configuration
 # ============================================================================
 # Package manager: uv | Linter/Formatter: ruff | Testing: pytest | Types: mypy
-# Consolidated: Tutolage repo's stricter lint/type/coverage tooling applied to
-# the canonical Skeleton project. Deps aligned with requirements.txt (2026-08).
+# Canonical backend runtime/tooling baseline: Python 3.11 + Ruff 0.9.x.
 # ============================================================================
 
 [project]
@@ -12,7 +11,7 @@ version = "15.0.0"
 description = "Tutolage - Ultimate AI-Powered Learning & Game Development Platform"
 readme = "README.md"
 license = { text = "MIT" }
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [
     { name = "Tutolage Team", email = "team@tutolage.dev" }
 ]
@@ -29,7 +28,6 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Education",
@@ -38,46 +36,35 @@ classifiers = [
 ]
 
 dependencies = [
-    # Web framework
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.25.0",
     "python-multipart>=0.0.6",
-    # Database
     "motor>=3.3.0",
     "pymongo>=4.6.0",
-    # Validation / config
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
-    # AI / LLM
     "openai>=1.10.0",
     "emergentintegrations>=0.1.2",
-    # Vector database / RAG
     "chromadb>=0.4.22",
-    # HTTP client
     "httpx>=0.26.0",
-    # Utilities
     "python-dotenv>=1.0.0",
     "loguru>=0.7.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    # Testing
-    "pytest>=8.0.0",
+    "pytest>=8,<9",
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
     "pytest-xdist>=3.5.0",
     "httpx>=0.26.0",
-    # Linting & formatting
-    "ruff>=0.2.0",
-    # Type checking
+    "ruff>=0.9,<0.10",
     "mypy>=1.8.0",
     "types-python-jose>=3.3.0",
-    # Pre-commit
     "pre-commit>=3.6.0",
 ]
 test = [
-    "pytest>=8.0.0",
+    "pytest>=8,<9",
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
     "pytest-xdist>=3.5.0",
@@ -89,10 +76,6 @@ Homepage = "https://github.com/Apeloff1/Skeleton"
 Repository = "https://github.com/Apeloff1/Skeleton"
 Issues = "https://github.com/Apeloff1/Skeleton/issues"
 
-# ============================================================================
-# Build System
-# ============================================================================
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -100,26 +83,18 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["."]
 
-# ============================================================================
-# UV Configuration
-# ============================================================================
-
 [tool.uv]
 dev-dependencies = [
-    "pytest>=8.0.0",
+    "pytest>=8,<9",
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
-    "ruff>=0.2.0",
+    "ruff>=0.9,<0.10",
     "pre-commit>=3.6.0",
     "mypy>=1.8.0",
 ]
 
-# ============================================================================
-# Ruff Configuration (Linting + Formatting)
-# ============================================================================
-
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 100
 indent-width = 4
 
@@ -147,10 +122,6 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 docstring-code-format = true
 docstring-code-line-length = 80
-
-# ============================================================================
-# Pytest Configuration
-# ============================================================================
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -186,12 +157,8 @@ exclude_lines = [
     "if TYPE_CHECKING:",
 ]
 
-# ============================================================================
-# MyPy Configuration (Type Checking)
-# ============================================================================
-
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
