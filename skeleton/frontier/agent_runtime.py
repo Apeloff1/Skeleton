@@ -18,7 +18,7 @@ from uuid import uuid4
 from skeleton.frontier.capabilities import CapabilityPolicy, capability_names
 from skeleton.frontier.contracts import AgentContract, ProvenanceRecord
 from skeleton.frontier.execution import (
-    ExecutionPolicy, ExecutionStatus, RuntimeBusy, RuntimeClosed, positive_seconds,
+    ExecutionPolicy, ExecutionStatus, RuntimeBusy, RuntimeClosed, TransientAgentError, positive_seconds,
 )
 from skeleton.frontier.health import HealthState
 from skeleton.frontier.payloads import json_snapshot
@@ -70,7 +70,7 @@ class AgentRuntime:
                  *, execution_policy: ExecutionPolicy | None = None) -> None:
         self.policy = policy if policy is not None else CapabilityPolicy.from_names(())
         self.health = health
-        self.execution_policy = execution_policy or ExecutionPolicy()
+        self._execution_policy = execution_policy or ExecutionPolicy()
         if not isinstance(self.policy, CapabilityPolicy) or not isinstance(self.health, HealthState):
             raise TypeError("policy and health must use the frontier contracts")
         if not isinstance(self.execution_policy, ExecutionPolicy):
@@ -82,11 +82,15 @@ class AgentRuntime:
         self._pending = self._active = 0
         self._tasks: set[asyncio.Task] = set()
         self._closed = False
-        self._counts = {"completed": 0, "failed": 0, "timed_out": 0, "cancelled": 0, "rejected": 0}
+        self._counts = {"completed": 0, "failed": 0, "timed_out": 0, "cancelled": 0, "rejected": 0, "retries": 0}
         for name, agent in (agents or {}).items():
             if name != agent.name:
                 raise ValueError("agent registry key must match agent.name")
             self.register(agent)
+
+    @property
+    def execution_policy(self) -> ExecutionPolicy:
+        return self._execution_policy
 
     @property
     def agents(self) -> Mapping[str, AgentLike]:
@@ -143,6 +147,9 @@ class AgentRuntime:
                       timeout: float | None = None) -> ExecutionResult:
         if not isinstance(task, str) or not task.strip():
             raise ValueError("task must not be empty")
+        task_digest = hashlib.sha256(task.encode("utf-8")).hexdigest()
+        if not isinstance(source_repository, str) or not source_repository.strip() or len(source_repository) > 256:
+            raise ValueError("source_repository must contain 1 to 256 characters")
         if context is not None and not isinstance(context, Mapping):
             raise ValueError("context must be a mapping")
         if request_id is None:
@@ -182,14 +189,27 @@ class AgentRuntime:
             tick = loop.time()
             output = error = None
             status = ExecutionStatus.COMPLETED
+            attempts = 0
             try:
                 async with asyncio.timeout(timeout) as deadline:
-                    try:
-                        output = await agent.run(task, snapshot["context"])
-                        output = json_snapshot(output, max_bytes=limits.max_payload_bytes)
-                    except Exception as exc:
-                        error = f"agent execution failed ({type(exc).__name__})"
-                        status = ExecutionStatus.FAILED
+                    while attempts < limits.max_attempts:
+                        attempts += 1
+                        try:
+                            attempt_context = json_snapshot(snapshot["context"], max_bytes=limits.max_payload_bytes)
+                            output = await agent.run(task, attempt_context)
+                            output = json_snapshot(output, max_bytes=limits.max_payload_bytes)
+                        except TransientAgentError as exc:
+                            if attempts < limits.max_attempts:
+                                self._counts["retries"] += 1
+                                await asyncio.sleep(limits.backoff(attempts))
+                                self._authorize(agent_name, required_capability)
+                                continue
+                            error = f"agent execution failed ({type(exc).__name__})"
+                            status = ExecutionStatus.FAILED
+                        except Exception as exc:
+                            error = f"agent execution failed ({type(exc).__name__})"
+                            status = ExecutionStatus.FAILED
+                        break
                 if deadline.expired():
                     raise TimeoutError
             except TimeoutError:
@@ -200,11 +220,11 @@ class AgentRuntime:
             return ExecutionResult(
                 task=task, agent=agent_name, started_at=started,
                 finished_at=datetime.now(timezone.utc), output=output, error=error,
-                request_id=request_id, status=status, elapsed_ms=(loop.time() - tick) * 1000,
+                request_id=request_id, status=status, attempts=attempts, elapsed_ms=(loop.time() - tick) * 1000,
                 provenance=ProvenanceRecord(
                     source_repository=source_repository, operation=f"agent.execute.{status.value}",
                     metadata={"agent": agent_name, "request_id": request_id,
-                              "task_sha256": hashlib.sha256(task.encode("utf-8")).hexdigest()},
+                              "task_sha256": task_digest},
                 ),
             )
         except asyncio.CancelledError:
