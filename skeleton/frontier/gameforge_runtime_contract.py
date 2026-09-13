@@ -1,5 +1,6 @@
 """Composition boundary for evolving runtime admission contracts."""
 from dataclasses import dataclass
+
 from .gameforge_admission import Admission, decide
 from .gameforge_dependency import DependencyGate
 from .gameforge_lifecycle import ServiceLifecycle
@@ -13,13 +14,15 @@ class RuntimeContract:
     version: int = 1
 
     def __post_init__(self):
-        if not isinstance(self.version, int) or self.version <= 0:
-            raise ValueError("version must be positive")
+        if not isinstance(self.version, int) or isinstance(self.version, bool) or self.version <= 0:
+            raise ValueError("version must be a positive integer")
 
     def admit(self, request_id, *, background=False, active=0, limit=1, read_only=False):
-        if not request_id:
-            return Receipt(request_id, Admission.SHED.value, "missing_request_id")
-        if not isinstance(active, int) or not isinstance(limit, int) or active < 0 or limit <= 0:
+        if not isinstance(request_id, str) or not request_id:
+            return Receipt("invalid-request", Admission.SHED.value, "missing_request_id")
+        if (not isinstance(active, int) or isinstance(active, bool)
+                or not isinstance(limit, int) or isinstance(limit, bool)
+                or active < 0 or limit <= 0):
             return Receipt(request_id, Admission.SHED.value, "invalid_limits")
         if not self.lifecycle.can_accept:
             return Receipt(request_id, Admission.SHED.value, "lifecycle")
