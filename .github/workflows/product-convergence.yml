@@ -33,6 +33,8 @@ on:
       - "backend/core/travel_graph.py"
       - "backend/core/discovery_engine.py"
       - "backend/core/achievement_engine.py"
+      - "backend/core/economy_runtime.py"
+      - "backend/core/dialogue_runtime.py"
       - "backend/tests/test_content_store.py"
       - "backend/tests/test_product_operations.py"
       - "backend/tests/test_progression.py"
@@ -50,6 +52,8 @@ on:
       - "backend/tests/test_environment_world_runtime.py"
       - "backend/tests/test_relationship_travel_discovery.py"
       - "backend/tests/test_world_runtime_social_travel.py"
+      - "backend/tests/test_economy_dialogue_runtime.py"
+      - "backend/tests/test_world_economy_dialogue.py"
       - ".github/workflows/product-convergence.yml"
   pull_request:
     paths:
@@ -83,6 +87,8 @@ on:
       - "backend/core/travel_graph.py"
       - "backend/core/discovery_engine.py"
       - "backend/core/achievement_engine.py"
+      - "backend/core/economy_runtime.py"
+      - "backend/core/dialogue_runtime.py"
       - "backend/tests/test_content_store.py"
       - "backend/tests/test_product_operations.py"
       - "backend/tests/test_progression.py"
@@ -100,6 +106,8 @@ on:
       - "backend/tests/test_environment_world_runtime.py"
       - "backend/tests/test_relationship_travel_discovery.py"
       - "backend/tests/test_world_runtime_social_travel.py"
+      - "backend/tests/test_economy_dialogue_runtime.py"
+      - "backend/tests/test_world_economy_dialogue.py"
       - ".github/workflows/product-convergence.yml"
 
 permissions:
@@ -138,6 +146,8 @@ jobs:
           tests/test_environment_world_runtime.py
           tests/test_relationship_travel_discovery.py
           tests/test_world_runtime_social_travel.py
+          tests/test_economy_dialogue_runtime.py
+          tests/test_world_economy_dialogue.py
           tests/test_charter_policy.py
           tests/test_durable_outbox.py
           tests/test_worm_audit.py
