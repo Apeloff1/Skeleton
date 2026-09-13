@@ -58,6 +58,8 @@ class SwarmIngressGovernor:
 
     def configure_tenant(self, tenant: str, *, quota: Quota | None = None, weight: int | None = None) -> None:
         tenant = self._tenant(tenant)
+        if weight is not None:
+            self.fairness._weight(weight)
         with self._lock:
             if quota is not None:
                 self.quota.configure(tenant, quota)
