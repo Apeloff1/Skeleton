@@ -38,9 +38,23 @@ class RuntimeCoordinator:
         if not isinstance(request_id, str) or not request_id.strip():
             raise ValueError("request_id must be None or a non-empty string")
 
+    @staticmethod
+    def _validate_admission_inputs(now, active, limit, background, retry, read_only):
+        if not isinstance(now, int) or isinstance(now, bool):
+            raise TypeError("now must be an integer")
+        for name, value in (("active", active), ("limit", limit)):
+            if not isinstance(value, int) or isinstance(value, bool):
+                raise TypeError(f"{name} must be an integer")
+        if active < 0 or limit <= 0:
+            raise ValueError("active must be non-negative and limit must be positive")
+        for name, value in (("background", background), ("retry", retry), ("read_only", read_only)):
+            if not isinstance(value, bool):
+                raise TypeError(f"{name} must be bool")
+
     def admit(self, now: int, active: int, limit: int = 1, background: bool = False,
               request_id=None, retry: bool = False, read_only: bool = False):
         self._validate_request_id(request_id)
+        self._validate_admission_inputs(now, active, limit, background, retry, read_only)
         if request_id is not None and request_id in self._request_ids:
             self.health.record(False)
             return Admission.SHED
@@ -126,6 +140,8 @@ class RuntimeCoordinator:
         return True
 
     def snapshot(self, active: int = 0):
+        if not isinstance(active, int) or isinstance(active, bool) or active < 0:
+            raise ValueError("active must be a non-negative integer")
         return RuntimeSnapshot(self.lifecycle.state.value, self.dependencies.ready, active,
                                self.budget.used, self.budget.capacity, self.quota.used,
                                len(self.queue), self.health.value)
