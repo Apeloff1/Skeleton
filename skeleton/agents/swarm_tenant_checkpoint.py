@@ -11,6 +11,7 @@ from collections import OrderedDict, deque
 from dataclasses import dataclass
 from hashlib import sha256
 import json
+from math import isfinite
 from threading import RLock
 from time import time
 from typing import Callable, Deque
@@ -31,7 +32,7 @@ class TenantCheckpointStore:
     """Keep tenant metadata aligned with a bounded runtime checkpoint history."""
 
     def __init__(self, *, max_checkpoints: int = 32, clock: Callable[[], float] = time) -> None:
-        if max_checkpoints < 1:
+        if isinstance(max_checkpoints, bool) or not isinstance(max_checkpoints, int) or max_checkpoints < 1:
             raise ValueError("max_checkpoints must be positive")
         self.max_checkpoints = max_checkpoints
         self._clock = clock
@@ -63,11 +64,16 @@ class TenantCheckpointStore:
             seen.add(task_id)
 
     @classmethod
-    def _validate_checkpoint(cls, checkpoint: TenantMetadataCheckpoint) -> None:
-        if checkpoint.sequence < 1:
-            raise ValueError("tenant checkpoint sequence must be positive")
-        if checkpoint.created_at < 0:
-            raise ValueError("tenant checkpoint created_at must be non-negative")
+    def _validate_checkpoint(cls, checkpoint: TenantMetadataCheckpoint) -> TenantMetadataCheckpoint:
+        if isinstance(checkpoint.sequence, bool) or not isinstance(checkpoint.sequence, int) or checkpoint.sequence < 1:
+            raise ValueError("tenant checkpoint sequence must be a positive integer")
+        if isinstance(checkpoint.created_at, bool) or not isinstance(checkpoint.created_at, (int, float)):
+            raise ValueError("tenant checkpoint created_at must be a finite non-negative number")
+        created_at = float(checkpoint.created_at)
+        if not isfinite(created_at) or created_at < 0:
+            raise ValueError("tenant checkpoint created_at must be a finite non-negative number")
+        if not isinstance(checkpoint.checksum, str) or not checkpoint.checksum:
+            raise ValueError("tenant checkpoint checksum must not be empty")
         cls._validate_pairs("active", checkpoint.active)
         cls._validate_pairs("terminal", checkpoint.terminal)
         overlap = set(dict(checkpoint.active)).intersection(dict(checkpoint.terminal))
@@ -76,30 +82,57 @@ class TenantCheckpointStore:
         expected = cls._checksum(checkpoint.sequence, checkpoint.active, checkpoint.terminal)
         if expected != checkpoint.checksum:
             raise ValueError("tenant checkpoint checksum mismatch")
+        return TenantMetadataCheckpoint(
+            checkpoint.sequence,
+            created_at,
+            checkpoint.checksum,
+            tuple(checkpoint.active),
+            tuple(checkpoint.terminal),
+        )
 
     def capture(self, sequence: int, broker: TenantSwarmBroker) -> TenantMetadataCheckpoint:
-        if sequence < 1:
+        if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 1:
             raise ValueError("sequence must be positive")
         status = broker.status()
         active = tuple(sorted(dict(status["tenants_by_task"]).items()))
         terminal = tuple(dict(status["terminal_tenants"]).items())
+        created_at = self._clock()
+        if isinstance(created_at, bool) or not isinstance(created_at, (int, float)) or not isfinite(float(created_at)) or float(created_at) < 0:
+            raise RuntimeError("tenant checkpoint clock must return a finite non-negative number")
         checkpoint = TenantMetadataCheckpoint(
             sequence=sequence,
-            created_at=self._clock(),
+            created_at=float(created_at),
             checksum=self._checksum(sequence, active, terminal),
             active=active,
             terminal=terminal,
         )
-        self._validate_checkpoint(checkpoint)
+        checkpoint = self._validate_checkpoint(checkpoint)
         with self._lock:
             existing = next((item for item in self._items if item.sequence == sequence), None)
             if existing is not None:
-                self._validate_checkpoint(existing)
+                existing = self._validate_checkpoint(existing)
                 if existing.checksum != checkpoint.checksum:
                     raise ValueError(f"tenant checkpoint sequence conflict: {sequence}")
                 return existing
+            if self._items and checkpoint.sequence <= self._items[-1].sequence:
+                raise ValueError("tenant checkpoint history must be strictly increasing")
             self._items.append(checkpoint)
         return checkpoint
+
+    def load_verified(self, checkpoint: TenantMetadataCheckpoint) -> TenantMetadataCheckpoint:
+        """Append persisted tenant metadata after full checksum and ordering validation."""
+        verified = self._validate_checkpoint(checkpoint)
+        with self._lock:
+            existing = next((item for item in self._items if item.sequence == verified.sequence), None)
+            if existing is not None:
+                existing = self._validate_checkpoint(existing)
+                if existing.checksum != verified.checksum:
+                    raise ValueError(f"tenant checkpoint sequence conflict: {verified.sequence}")
+                return existing
+            if self._items and verified.sequence <= self._items[-1].sequence:
+                raise ValueError("tenant checkpoint history must be strictly increasing")
+            self._items.append(verified)
+            return verified
 
     def latest(self) -> TenantMetadataCheckpoint | None:
         with self._lock:
@@ -108,6 +141,10 @@ class TenantCheckpointStore:
     def get(self, sequence: int) -> TenantMetadataCheckpoint | None:
         with self._lock:
             return next((item for item in self._items if item.sequence == sequence), None)
+
+    def history(self) -> tuple[TenantMetadataCheckpoint, ...]:
+        with self._lock:
+            return tuple(self._items)
 
     def discard(self, sequence: int) -> bool:
         """Discard one sidecar checkpoint, used to roll back paired capture failures."""
@@ -122,7 +159,7 @@ class TenantCheckpointStore:
         checkpoint = self.latest() if sequence is None else self.get(sequence)
         if checkpoint is None:
             raise KeyError("tenant checkpoint not found")
-        self._validate_checkpoint(checkpoint)
+        checkpoint = self._validate_checkpoint(checkpoint)
         if len(checkpoint.terminal) > broker.max_terminal_records:
             raise ValueError("tenant checkpoint exceeds target terminal record capacity")
 
