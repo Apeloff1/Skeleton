@@ -68,6 +68,7 @@ class JobScheduler:
     """
 
     def __init__(self, max_concurrent: int = 2, stagger_s: float = 0.5) -> None:
+        self._max_concurrent = max_concurrent
         self._sem = asyncio.Semaphore(max_concurrent)
         self._stagger = stagger_s
         self._last_spawn = 0.0
@@ -79,7 +80,7 @@ class JobScheduler:
 
     @property
     def max_concurrent(self) -> int:
-        return self._sem._value  # available slots as proxy; configured below
+        return self._max_concurrent
 
     async def _stagger_wait(self) -> None:
         async with self._spawn_lock:
@@ -98,26 +99,35 @@ class JobScheduler:
         self._queued_at[job_id] = time.monotonic()
 
         async def _wrapped() -> Any:
-            async with self._sem:
-                self.stats.started += 1
-                self.stats.total_wait_s += (
-                    time.monotonic() - self._queued_at.pop(job_id, time.monotonic())
-                )
-                await self._stagger_wait()
-                t0 = time.monotonic()
-                try:
-                    result = await body()
-                    self.stats.completed += 1
-                    return result
-                except asyncio.CancelledError:
+            entered = False
+            try:
+                async with self._sem:
+                    entered = True
+                    self.stats.started += 1
+                    self.stats.total_wait_s += (
+                        time.monotonic() - self._queued_at.pop(job_id, time.monotonic())
+                    )
+                    await self._stagger_wait()
+                    t0 = time.monotonic()
+                    try:
+                        result = await body()
+                        self.stats.completed += 1
+                        return result
+                    except asyncio.CancelledError:
+                        self.stats.cancelled += 1
+                        raise
+                    except Exception:
+                        self.stats.failed += 1
+                        raise
+                    finally:
+                        self.stats.total_run_s += time.monotonic() - t0
+            except asyncio.CancelledError:
+                if not entered:
                     self.stats.cancelled += 1
-                    raise
-                except Exception:
-                    self.stats.failed += 1
-                    raise
-                finally:
-                    self.stats.total_run_s += time.monotonic() - t0
-                    self._tasks.pop(job_id, None)
+                raise
+            finally:
+                self._queued_at.pop(job_id, None)
+                self._tasks.pop(job_id, None)
 
         task = asyncio.create_task(_wrapped(), name=f"godot-job-{job_id}")
         self._tasks[job_id] = task
