@@ -58,7 +58,8 @@ def test_refund_rejects_non_finite_cost_without_poisoning_bucket(value: float) -
 
 @pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
 def test_allow_rejects_non_finite_clock_without_creating_bucket(value: float) -> None:
-    limiter = TokenBucketLimiter(capacity=2, refill_per_second=1, clock=lambda: value)
+    readings = iter([value, 0.0])
+    limiter = TokenBucketLimiter(capacity=2, refill_per_second=1, clock=lambda: next(readings))
     with pytest.raises(ValueError, match="clock must return a finite number"):
         limiter.allow("tenant")
     assert limiter.snapshot() == {}
