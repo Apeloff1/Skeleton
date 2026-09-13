@@ -91,6 +91,32 @@ def test_duplicate_completion_token_is_idempotent_at_tenant_boundary() -> None:
     assert broker.status()["terminal_records"] == 1
 
 
+def test_tokenless_success_callback_is_idempotent_after_terminalization() -> None:
+    runtime, ingress, broker = _broker()
+    broker.submit_and_dispatch("acme", SwarmTask("task", {}))
+    first = broker.record_success("w", "task")
+    second = broker.record_success("w", "task")
+
+    assert first.duplicate is False
+    assert second.duplicate is True
+    assert second.task.state is TaskState.SUCCEEDED
+    assert runtime.task("task").state is TaskState.SUCCEEDED
+    assert ingress.phase("acme", "task") is None
+
+
+def test_tokenless_failure_callback_is_idempotent_after_terminalization() -> None:
+    runtime, ingress, broker = _broker()
+    broker.submit_and_dispatch("acme", SwarmTask("task", {}, max_attempts=1))
+    first = broker.record_failure("w", "task", "fatal")
+    second = broker.record_failure("w", "task", "duplicate fatal")
+
+    assert first.duplicate is False
+    assert second.duplicate is True
+    assert second.task.state is TaskState.DEAD
+    assert runtime.task("task").state is TaskState.DEAD
+    assert ingress.phase("acme", "task") is None
+
+
 def test_terminal_task_resubmission_is_stable_duplicate_without_runtime_mutation() -> None:
     runtime, ingress, broker = _broker()
     broker.submit_and_dispatch("acme", SwarmTask("task", {"version": 1}))
