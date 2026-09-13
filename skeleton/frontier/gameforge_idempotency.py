@@ -3,9 +3,11 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from dataclasses import dataclass
+from threading import Lock
 from typing import Generic, Hashable, Optional, TypeVar
 
 T = TypeVar("T")
+_MISSING = object()
 
 
 @dataclass(frozen=True)
@@ -26,27 +28,33 @@ class IdempotencyWindow(Generic[T]):
         self._accepted = 0
         self._duplicates = 0
         self._evicted = 0
+        self._lock = Lock()
 
     @property
     def capacity(self) -> int:
         return self._capacity
 
     def record(self, key: Hashable, value: T) -> tuple[bool, T]:
-        if key in self._values:
-            self._duplicates += 1
-            return False, self._values[key]
-        if len(self._values) >= self._capacity:
-            self._values.popitem(last=False)
-            self._evicted += 1
-        self._values[key] = value
-        self._accepted += 1
-        return True, value
+        with self._lock:
+            existing = self._values.get(key, _MISSING)
+            if existing is not _MISSING or key in self._values:
+                self._duplicates += 1
+                return False, self._values[key]
+            if len(self._values) >= self._capacity:
+                self._values.popitem(last=False)
+                self._evicted += 1
+            self._values[key] = value
+            self._accepted += 1
+            return True, value
 
     def lookup(self, key: Hashable) -> Optional[T]:
-        return self._values.get(key)
+        with self._lock:
+            return self._values.get(key)
 
     def stats(self) -> IdempotencyStats:
-        return IdempotencyStats(self._accepted, self._duplicates, self._evicted)
+        with self._lock:
+            return IdempotencyStats(self._accepted, self._duplicates, self._evicted)
 
     def __len__(self) -> int:
-        return len(self._values)
+        with self._lock:
+            return len(self._values)
