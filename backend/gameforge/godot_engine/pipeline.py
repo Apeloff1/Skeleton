@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+from core.exec_guard import execution_disabled_message, require_execution_allowed
 from gameforge.godot_engine.binary import get_binary
 from gameforge.godot_engine.logbuffer import get_buffer
 from gameforge.godot_engine.scheduler import JobScheduler, JobStatus, ScheduledJob, scheduler
@@ -17,6 +18,10 @@ DEFAULT_TIMEOUT = 600
 
 
 async def _run_godot(job: ScheduledJob, argv: list[str], timeout: int) -> None:
+    if not require_execution_allowed("Godot engine execution"):
+        job.status = JobStatus.FAILED
+        job.error = execution_disabled_message("Godot engine execution")
+        return
     buf = get_buffer(job.id)
     buf.append("system", f"exec: {' '.join(argv)}")
     proc = await asyncio.create_subprocess_exec(

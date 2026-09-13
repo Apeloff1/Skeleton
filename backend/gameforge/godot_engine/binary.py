@@ -30,6 +30,8 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from core.exec_guard import execution_disabled_message, require_execution_allowed
+
 _BACKEND_DIR = Path(__file__).resolve().parents[2]
 _REPO_BINARY = _BACKEND_DIR / "godot"
 
@@ -88,6 +90,8 @@ class GodotBinary:
 
     async def _run(self, *args: str, timeout: int = 30) -> tuple[int, str, str]:
         self.ensure_executable()
+        if not require_execution_allowed("Godot engine probing"):
+            return -1, "", execution_disabled_message("Godot engine probing")
         proc = await asyncio.create_subprocess_exec(
             str(self.path), *args,
             stdout=asyncio.subprocess.PIPE,
