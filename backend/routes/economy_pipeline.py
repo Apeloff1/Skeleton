@@ -102,8 +102,8 @@ class MonetizationRequest(BaseModel):
 class EconomyBalanceRequest(BaseModel):
     economy_name: str
     target_inflation_rate: float = Field(0.02, ge=-0.1, le=0.2)
-    faucets: List[str] = []
-    sinks: List[SinkType] = []
+    faucets: List[str] = Field(default_factory=list, max_length=100)
+    sinks: List[SinkType] = Field(default_factory=list, max_length=100)
     monitoring_enabled: bool = True
 
 

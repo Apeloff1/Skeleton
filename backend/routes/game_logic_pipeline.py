@@ -186,16 +186,16 @@ class ProgressionSystemRequest(BaseModel):
     skill_tree_branches: int = 3
 
 class EconomySystemRequest(BaseModel):
-    currencies: List[str] = ["gold"]
+    currencies: List[str] = Field(default_factory=lambda: ["gold"], max_length=50)
     include_trading: bool = True
     include_crafting: bool = False
     inflation_model: bool = False
 
 class AIBehaviorRequest(BaseModel):
     entity_type: str
-    behaviors: List[str] = []
-    aggression_level: float = 0.5
-    intelligence_level: float = 0.5
+    behaviors: List[str] = Field(default_factory=list, max_length=100)
+    aggression_level: float = Field(0.5, ge=0, le=1)
+    intelligence_level: float = Field(0.5, ge=0, le=1)
 
 # ============================================================================
 # GAME LOGIC GENERATOR ENGINE

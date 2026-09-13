@@ -5,7 +5,7 @@ Covers: OpenCV, WebRTC, MediaPipe, FFmpeg, Computer Vision, AR/VR, Streaming
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
@@ -22,10 +22,10 @@ class Lesson(BaseModel):
     duration_minutes: int
     difficulty: str
     video_url: Optional[str] = None
-    code_examples: List[str] = []
-    exercises: List[Dict[str, Any]] = []
+    code_examples: List[str] = Field(default_factory=list, max_length=100)
+    exercises: List[Dict[str, Any]] = Field(default_factory=list, max_length=100)
     quiz_questions: int = 0
-    prerequisites: List[str] = []
+    prerequisites: List[str] = Field(default_factory=list, max_length=50)
 
 class Module(BaseModel):
     id: str
@@ -33,7 +33,7 @@ class Module(BaseModel):
     description: str
     total_hours: float
     lessons: List[Lesson]
-    projects: List[Dict[str, Any]] = []
+    projects: List[Dict[str, Any]] = Field(default_factory=list, max_length=100)
     certification_points: int = 0
 
 class Track(BaseModel):
@@ -44,7 +44,7 @@ class Track(BaseModel):
     color: str
     total_hours: int
     modules: List[Module]
-    career_paths: List[str] = []
+    career_paths: List[str] = Field(default_factory=list, max_length=50)
 
 # =============================================================================
 # COMPREHENSIVE CAMERA CODING CURRICULUM
