@@ -10,6 +10,8 @@ from skeleton.agents.swarm_broker import CompletionResult, SwarmBroker
 from skeleton.agents.swarm_ingress import IngressDecision, SwarmIngressGovernor
 from skeleton.agents.swarm_runtime import AdmissionError, SwarmTask, TaskState
 
+TERMINAL_STATES = {TaskState.SUCCEEDED, TaskState.DEAD, TaskState.CANCELLED, TaskState.FAILED}
+
 
 @dataclass(frozen=True, slots=True)
 class TenantBrokerResult:
@@ -20,6 +22,15 @@ class TenantBrokerResult:
     worker_id: str | None
     leased: bool
     reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class TenantRepairResult:
+    removed_orphans: int
+    restored_accounting: int
+    phase_repairs: int
+    terminalized: int
+    reactivated: int
 
 
 class TenantSwarmBroker:
@@ -62,12 +73,10 @@ class TenantSwarmBroker:
             self._terminal_tenants.popitem(last=False)
 
     def rebind(self, broker: SwarmBroker) -> None:
-        """Swap the underlying runtime broker without discarding tenant metadata."""
         with self._lock:
             self.broker = broker
 
     def reconcile(self) -> dict[str, tuple[str, ...]]:
-        """Report tenant metadata that no longer matches resident runtime tasks."""
         with self._lock:
             resident = {task.id: task for task in self.broker.runtime.tasks()}
             missing_active = tuple(sorted(task_id for task_id in self._tenant_by_task if task_id not in resident))
@@ -75,15 +84,83 @@ class TenantSwarmBroker:
                 sorted(
                     task_id
                     for task_id in self._terminal_tenants
-                    if task_id in resident
-                    and resident[task_id].state
-                    not in {TaskState.SUCCEEDED, TaskState.DEAD, TaskState.CANCELLED, TaskState.FAILED}
+                    if task_id in resident and resident[task_id].state not in TERMINAL_STATES
                 )
             )
+            active_terminal = tuple(
+                sorted(
+                    task_id
+                    for task_id in self._tenant_by_task
+                    if task_id in resident and resident[task_id].state in TERMINAL_STATES
+                )
+            )
+            phase_mismatch: list[str] = []
+            for task_id, tenant in self._tenant_by_task.items():
+                task = resident.get(task_id)
+                if task is None or task.state in TERMINAL_STATES:
+                    continue
+                expected = "leased" if task.state is TaskState.LEASED else "queued"
+                if self.ingress.phase(tenant, task_id) != expected:
+                    phase_mismatch.append(task_id)
             return {
                 "missing_active": missing_active,
                 "terminal_not_terminal": terminal_not_terminal,
+                "active_terminal": active_terminal,
+                "phase_mismatch": tuple(sorted(phase_mismatch)),
             }
+
+    def repair(self) -> TenantRepairResult:
+        """Reconcile tenant metadata/accounting against the live runtime as authority."""
+        with self._lock:
+            resident = {task.id: task for task in self.broker.runtime.tasks()}
+            removed_orphans = restored_accounting = phase_repairs = terminalized = reactivated = 0
+
+            for task_id, tenant in list(self._tenant_by_task.items()):
+                task = resident.get(task_id)
+                phase = self.ingress.phase(tenant, task_id)
+                if task is None:
+                    if phase is not None:
+                        self.ingress.complete(tenant, task_id)
+                    self._tenant_by_task.pop(task_id, None)
+                    removed_orphans += 1
+                    continue
+                if task.state in TERMINAL_STATES:
+                    if phase is not None:
+                        self.ingress.complete(tenant, task_id)
+                    self._tenant_by_task.pop(task_id, None)
+                    self._remember_terminal(task_id, tenant)
+                    terminalized += 1
+                    continue
+                expected = "leased" if task.state is TaskState.LEASED else "queued"
+                if phase is None:
+                    self.ingress.restore_task(tenant, task_id, task.payload, phase=expected)
+                    restored_accounting += 1
+                elif phase != expected:
+                    if expected == "leased":
+                        self.ingress.mark_leased(tenant, task_id)
+                    else:
+                        self.ingress.mark_requeued(tenant, task_id)
+                    phase_repairs += 1
+
+            for task_id, tenant in list(self._terminal_tenants.items()):
+                task = resident.get(task_id)
+                if task is None or task.state in TERMINAL_STATES:
+                    continue
+                self._terminal_tenants.pop(task_id, None)
+                self._tenant_by_task[task_id] = tenant
+                expected = "leased" if task.state is TaskState.LEASED else "queued"
+                if self.ingress.phase(tenant, task_id) is None:
+                    self.ingress.restore_task(tenant, task_id, task.payload, phase=expected)
+                    restored_accounting += 1
+                reactivated += 1
+
+            return TenantRepairResult(
+                removed_orphans,
+                restored_accounting,
+                phase_repairs,
+                terminalized,
+                reactivated,
+            )
 
     def tenant_for(self, task_id: str) -> str | None:
         task_id = self._task_id(task_id)
@@ -106,30 +183,14 @@ class TenantSwarmBroker:
                 if active_tenant != tenant:
                     raise AdmissionError(f"task already belongs to tenant: {active_tenant}")
                 result = self.broker.submit_and_dispatch(task, idempotency_key=idempotency_key)
-                return TenantBrokerResult(
-                    tenant,
-                    result.task_id,
-                    True,
-                    result.duplicate,
-                    result.worker_id,
-                    result.leased,
-                    result.reason,
-                )
+                return TenantBrokerResult(tenant, result.task_id, True, result.duplicate, result.worker_id, result.leased, result.reason)
 
             terminal_tenant = self._terminal_tenants.get(task_id)
             if terminal_tenant is not None:
                 if terminal_tenant != tenant:
                     raise AdmissionError(f"task already belongs to tenant: {terminal_tenant}")
                 self._terminal_tenants.move_to_end(task_id)
-                return TenantBrokerResult(
-                    tenant,
-                    task_id,
-                    True,
-                    True,
-                    None,
-                    False,
-                    "terminal task already accounted",
-                )
+                return TenantBrokerResult(tenant, task_id, True, True, None, False, "terminal task already accounted")
 
             decision: IngressDecision = self.ingress.admit(tenant, task_id, task.payload, cost=cost)
             if not decision.accepted:
@@ -145,23 +206,9 @@ class TenantSwarmBroker:
 
             if result.leased:
                 self.ingress.mark_leased(tenant, task_id)
-            return TenantBrokerResult(
-                tenant,
-                result.task_id,
-                True,
-                result.duplicate,
-                result.worker_id,
-                result.leased,
-                result.reason,
-            )
+            return TenantBrokerResult(tenant, result.task_id, True, result.duplicate, result.worker_id, result.leased, result.reason)
 
-    def record_success(
-        self,
-        worker_id: str,
-        task_id: str,
-        *,
-        completion_token: str | None = None,
-    ) -> CompletionResult:
+    def record_success(self, worker_id: str, task_id: str, *, completion_token: str | None = None) -> CompletionResult:
         task_id = self._task_id(task_id)
         with self._lock:
             tenant = self._tenant_by_task.get(task_id) or self._terminal_tenants.get(task_id)
@@ -174,30 +221,18 @@ class TenantSwarmBroker:
                 self._remember_terminal(task_id, tenant)
             return result
 
-    def record_failure(
-        self,
-        worker_id: str,
-        task_id: str,
-        error: str,
-        *,
-        completion_token: str | None = None,
-    ) -> CompletionResult:
+    def record_failure(self, worker_id: str, task_id: str, error: str, *, completion_token: str | None = None) -> CompletionResult:
         task_id = self._task_id(task_id)
         with self._lock:
             tenant = self._tenant_by_task.get(task_id) or self._terminal_tenants.get(task_id)
             if tenant is None:
                 raise AdmissionError(f"task has no tenant accounting: {task_id}")
-            result = self.broker.record_failure(
-                worker_id,
-                task_id,
-                error,
-                completion_token=completion_token,
-            )
+            result = self.broker.record_failure(worker_id, task_id, error, completion_token=completion_token)
             if result.duplicate:
                 return result
             if result.task.state is TaskState.QUEUED:
                 self.ingress.mark_requeued(tenant, task_id)
-            elif result.task.state in {TaskState.SUCCEEDED, TaskState.DEAD, TaskState.CANCELLED, TaskState.FAILED}:
+            elif result.task.state in TERMINAL_STATES:
                 if task_id in self._tenant_by_task:
                     self.ingress.complete(tenant, task_id)
                     self._tenant_by_task.pop(task_id, None)
