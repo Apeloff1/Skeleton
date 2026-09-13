@@ -36,7 +36,7 @@ def test_queue_remove_preserves_remaining_order():
     assert queue.remove("b")
     assert queue.snapshot() == ("a", "c")
     assert not queue.remove("missing")
-    assert queue.remaining == 2
+    assert queue.remaining == 1
 
 
 def test_queue_remove_reopens_capacity_atomically():

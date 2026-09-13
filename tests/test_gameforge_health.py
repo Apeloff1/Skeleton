@@ -16,17 +16,20 @@ def test_pool_reuses_only_healthy_resources() -> None:
 
 
 def test_pool_has_hard_idle_capacity() -> None:
-    pool = HealthPool(lambda: "new", lambda _: True, capacity=2)
-    assert pool.release("a") is True
-    assert pool.release("b") is True
-    assert pool.release("c") is False
+    resources = iter(["a", "b", "c"])
+    pool = HealthPool(lambda: next(resources), lambda _: True, capacity=2)
+    a, b, c = pool.checkout(), pool.checkout(), pool.checkout()
+    assert pool.release(a) is True
+    assert pool.release(b) is True
+    assert pool.release(c) is False
     assert pool.idle == 2
 
 
 def test_pool_expires_resources_by_age() -> None:
     now = [100.0]
-    pool = HealthPool(lambda: "fresh", lambda _: True, max_age_seconds=5, clock=lambda: now[0])
-    assert pool.release("old") is True
+    resources = iter(["old", "fresh"])
+    pool = HealthPool(lambda: next(resources), lambda _: True, max_age_seconds=5, clock=lambda: now[0])
+    assert pool.release(pool.checkout()) is True
     now[0] = 106.0
     assert pool.checkout() == "fresh"
     assert pool.idle == 0

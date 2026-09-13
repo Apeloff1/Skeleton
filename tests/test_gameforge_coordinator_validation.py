@@ -19,7 +19,7 @@ def coordinator():
     dependencies = DependencyGate(["db"])
     dependencies.mark("db")
     return RuntimeCoordinator(
-        lifecycle, dependencies, RateWindow(10, 100), Circuit(3, 1.0),
+        lifecycle, dependencies, RateWindow(10, 100), Circuit(3),
         Budget(4), Quota(4), BoundedQueue(4), RetryBudget(4), HealthScore(),
     )
 

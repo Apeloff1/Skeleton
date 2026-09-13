@@ -13,7 +13,7 @@ from skeleton.frontier.gameforge_health_score import HealthScore
 def coordinator():
     lifecycle = ServiceLifecycle()
     lifecycle.ready()
-    return RuntimeCoordinator(lifecycle, DependencyGate(), RateWindow(8), Circuit(),
+    return RuntimeCoordinator(lifecycle, _ready_dependencies(), RateWindow(8), Circuit(),
                               Budget(2), Quota(2), BoundedQueue(2), RetryBudget(2), HealthScore())
 
 
@@ -31,3 +31,9 @@ def test_release_reverses_one_reservation():
     assert c.reservations == 0
     assert c.budget.used == 0
     assert c.quota.used == 0
+
+
+def _ready_dependencies():
+    dependencies = DependencyGate(["core"])
+    dependencies.mark("core")
+    return dependencies

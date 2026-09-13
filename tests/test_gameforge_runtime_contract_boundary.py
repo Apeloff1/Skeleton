@@ -29,6 +29,12 @@ def test_runtime_contract_rejects_non_string_request_ids():
 
 def test_runtime_contract_version_rejects_bool():
     lifecycle = ServiceLifecycle()
-    deps = DependencyGate([])
+    deps = _ready_dependencies()
     with pytest.raises(ValueError):
         RuntimeContract(lifecycle, deps, version=True)
+
+
+def _ready_dependencies():
+    dependencies = DependencyGate(["core"])
+    dependencies.mark("core")
+    return dependencies

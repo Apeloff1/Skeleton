@@ -7,7 +7,7 @@ from skeleton.frontier.gameforge_runtime_contract import RuntimeContract
 def ready_contract():
     lifecycle = ServiceLifecycle()
     lifecycle.ready()
-    return RuntimeContract(lifecycle, DependencyGate())
+    return RuntimeContract(lifecycle, _ready_dependencies())
 
 
 def test_contract_rejects_missing_request_id():
@@ -19,3 +19,9 @@ def test_contract_rejects_missing_request_id():
 def test_contract_rejects_non_integer_limits():
     receipt = ready_contract().admit("r1", active=0.5)
     assert receipt.reason == "invalid_limits"
+
+
+def _ready_dependencies():
+    dependencies = DependencyGate(["core"])
+    dependencies.mark("core")
+    return dependencies

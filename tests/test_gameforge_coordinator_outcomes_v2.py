@@ -15,13 +15,13 @@ from skeleton.frontier.gameforge_retry_budget import RetryBudget
 def coordinator():
     lifecycle = ServiceLifecycle()
     lifecycle.ready()
-    return RuntimeCoordinator(lifecycle, DependencyGate(), RateWindow(4), Circuit(2),
+    return RuntimeCoordinator(lifecycle, _ready_dependencies(), RateWindow(4), Circuit(2),
                               Budget(2), Quota(2), BoundedQueue(2), RetryBudget(2), HealthScore(4))
 
 
 def test_terminal_failure_trips_circuit_but_nonterminal_does_not():
     runtime = coordinator()
-    assert runtime.record_outcome(ExecutionOutcomeV2("r1", False, terminal=False))
+    assert not runtime.record_outcome(ExecutionOutcomeV2("r1", False, terminal=False))
     assert runtime.circuit.allowed
     runtime.record_outcome(ExecutionOutcomeV2("r1", False, terminal=True))
     runtime.record_outcome(ExecutionOutcomeV2("r2", False, terminal=True))
@@ -33,3 +33,9 @@ def test_saturated_reports_any_bounded_resource():
     assert runtime.admit(0, 0, request_id="r1") is Admission.ACCEPT
     assert runtime.admit(1, 0, request_id="r2") is Admission.ACCEPT
     assert runtime.saturated
+
+
+def _ready_dependencies():
+    dependencies = DependencyGate(["core"])
+    dependencies.mark("core")
+    return dependencies
