@@ -60,7 +60,15 @@ jobs:
             skeleton/testing/test_swarm_ingress.py \
             skeleton/testing/test_swarm_tenant_broker.py \
             skeleton/testing/test_swarm_rate_limit_refund.py \
-            skeleton/testing/test_swarm_quota_validation.py
+            skeleton/testing/test_swarm_quota_validation.py \
+            skeleton/testing/test_swarm_checkpoint.py \
+            skeleton/testing/test_swarm_checkpoint_integrity.py \
+            skeleton/testing/test_swarm_recovery_manager.py \
+            skeleton/testing/test_swarm_recovery_tenants.py \
+            skeleton/testing/test_swarm_restore_validation.py \
+            skeleton/testing/test_swarm_restore_ordering.py \
+            skeleton/testing/test_swarm_forget_retention.py \
+            skeleton/testing/test_server_recovery_health.py
           python -m skeleton eras
           python -m skeleton plan "soulslike extraction with bonfire rest"
           python -m skeleton cockpit "BLEND ERA arcade_golden_age soulslike 0.5"
