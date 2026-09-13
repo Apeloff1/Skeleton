@@ -20,6 +20,7 @@ import os
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
+from core.exec_guard import code_execution_enabled, execution_disabled_response
 
 from routes.galaxy_studio_state import (
     load_build,
@@ -204,6 +205,9 @@ async def download_build_apk(build_id: str):
     """Download build as a REAL signed Android APK (sideload-able on
     Android 7+). Wires the galaxy_studio build into the new binary_builder
     APK pipeline (javac → d8 → aapt2 → apksigner v2+v3)."""
+    if not code_execution_enabled():
+        return execution_disabled_response("APK build")
+
     build = await load_build(build_id)
     if not build:
         raise HTTPException(404, "Build not found")

@@ -2303,6 +2303,9 @@ async def download_build_apk(build_id: str):
     """Download the Jeeves Master build as a REAL signed runnable APK
     (sideloadable on Android 7+). Wires through the new binary_builder
     pipeline (javac → d8 → aapt2 → apksigner v2+v3)."""
+    if not code_execution_enabled():
+        return execution_disabled_response("APK build")
+
     build = await _load_build(build_id)
     if not build:
         raise HTTPException(404, "Build not found")
