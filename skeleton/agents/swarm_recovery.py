@@ -21,6 +21,13 @@ from skeleton.agents.swarm_tenant_checkpoint import (
 
 RECOVERY_ARCHIVE_VERSION = 1
 MAX_RECOVERY_ARCHIVE_BYTES = 8 * 1024 * 1024
+_RECOVERY_ARCHIVE_FIELDS = frozenset({
+    "version",
+    "max_checkpoints",
+    "runtime",
+    "tenant",
+    "archive_checksum",
+})
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,6 +161,16 @@ class SwarmRecoveryManager:
         if not isinstance(archive, Mapping):
             raise ValueError("recovery archive must be a mapping")
         cls._enforce_archive_size(dict(archive))
+        fields = set(archive)
+        if fields != _RECOVERY_ARCHIVE_FIELDS:
+            unknown = sorted(fields - _RECOVERY_ARCHIVE_FIELDS)
+            missing = sorted(_RECOVERY_ARCHIVE_FIELDS - fields)
+            details = []
+            if unknown:
+                details.append(f"unknown={unknown}")
+            if missing:
+                details.append(f"missing={missing}")
+            raise ValueError(f"recovery archive fields mismatch: {', '.join(details)}")
         version = archive.get("version")
         if isinstance(version, bool) or not isinstance(version, int) or version != RECOVERY_ARCHIVE_VERSION:
             raise ValueError(f"unsupported recovery archive version: {version}")
