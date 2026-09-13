@@ -35,7 +35,8 @@ python-jose==3.5.0
 openai==2.37.0
 litellm==1.85.0
 google-genai==2.4.0
-emergentintegrations==0.1.2
+# The retired Emergent SDK is replaced by backend/emergentintegrations, a local
+# boot-safe compatibility layer. Do not reintroduce it as a registry dependency.
 tenacity==9.1.4
 tiktoken==0.12.0
 
