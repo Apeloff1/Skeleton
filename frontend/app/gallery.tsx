@@ -74,7 +74,7 @@ function BuildCard({ build }: { build: any }) {
     await playTrailer({
       pid: build.build_id || build.playable_id,
       title: build.title || 'Your Game',
-      genre: build.genre,
+      theme: build.genre,
       lore: build.description,
     });
     setTrailerBusy(false);
