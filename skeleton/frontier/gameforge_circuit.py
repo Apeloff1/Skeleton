@@ -1,4 +1,4 @@
-"""Circuit breaker with monotonic open/close transitions."""
+"""Circuit breaker with explicit recovery semantics."""
 from enum import Enum
 class CircuitState(str,Enum): CLOSED="closed"; OPEN="open"; HALF_OPEN="half_open"
 class Circuit:
@@ -9,7 +9,7 @@ class Circuit:
  def allowed(self): return self.state is not CircuitState.OPEN
  def failure(self):
   self.failures+=1
-  if self.failures>=self.threshold: self.state=CircuitState.OPEN
+  if self.state is CircuitState.HALF_OPEN or self.failures>=self.threshold: self.state=CircuitState.OPEN
  def probe(self):
   if self.state is CircuitState.OPEN: self.state=CircuitState.HALF_OPEN; return True
   return self.state is CircuitState.HALF_OPEN
