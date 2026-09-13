@@ -17,6 +17,11 @@ def _tenant_broker(runtime: HardenedSwarmRuntime) -> TenantSwarmBroker:
     )
 
 
+def _reseal(archive: dict[str, object]) -> None:
+    payload = {key: value for key, value in archive.items() if key != "archive_checksum"}
+    archive["archive_checksum"] = SwarmRecoveryManager._archive_checksum(payload)
+
+
 def test_recovery_archive_round_trip_restores_runtime_and_tenants() -> None:
     runtime = HardenedSwarmRuntime()
     tenant = _tenant_broker(runtime)
@@ -66,8 +71,7 @@ def test_recovery_archive_rejects_runtime_checkpoint_corruption_even_with_reseal
     manager.checkpoint(runtime)
     archive = manager.export_archive()
     archive["runtime"][0]["state"]["tasks"][0]["priority"] = 999
-    payload = {key: value for key, value in archive.items() if key != "archive_checksum"}
-    archive["archive_checksum"] = SwarmRecoveryManager._archive_checksum(payload)
+    _reseal(archive)
 
     with pytest.raises(ValueError, match="checkpoint checksum mismatch"):
         SwarmRecoveryManager.from_archive(archive)
@@ -80,8 +84,7 @@ def test_recovery_archive_rejects_orphan_tenant_sidecar() -> None:
     manager.checkpoint(runtime, tenant)
     archive = manager.export_archive()
     archive["runtime"] = []
-    payload = {key: value for key, value in archive.items() if key != "archive_checksum"}
-    archive["archive_checksum"] = SwarmRecoveryManager._archive_checksum(payload)
+    _reseal(archive)
 
     with pytest.raises(ValueError, match="no runtime checkpoint"):
         SwarmRecoveryManager.from_archive(archive)
@@ -130,6 +133,30 @@ def test_recovery_archive_rejects_missing_canonical_fields_before_restore() -> N
     archive.pop("tenant")
 
     with pytest.raises(ValueError, match="fields mismatch.*tenant"):
+        SwarmRecoveryManager.from_archive(archive)
+
+
+def test_recovery_archive_rejects_extended_runtime_record_even_when_resealed() -> None:
+    manager = SwarmRecoveryManager()
+    manager.checkpoint(HardenedSwarmRuntime())
+    archive = manager.export_archive()
+    archive["runtime"][0]["future_runtime_field"] = {"opaque": True}
+    _reseal(archive)
+
+    with pytest.raises(ValueError, match="runtime checkpoint archive record fields mismatch.*future_runtime_field"):
+        SwarmRecoveryManager.from_archive(archive)
+
+
+def test_recovery_archive_rejects_extended_tenant_record_even_when_resealed() -> None:
+    runtime = HardenedSwarmRuntime()
+    tenant = _tenant_broker(runtime)
+    manager = SwarmRecoveryManager()
+    manager.checkpoint(runtime, tenant)
+    archive = manager.export_archive()
+    archive["tenant"][0]["future_tenant_field"] = ["opaque"]
+    _reseal(archive)
+
+    with pytest.raises(ValueError, match="tenant checkpoint archive record fields mismatch.*future_tenant_field"):
         SwarmRecoveryManager.from_archive(archive)
 
 
