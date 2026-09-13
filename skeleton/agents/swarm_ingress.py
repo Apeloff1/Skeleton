@@ -161,13 +161,19 @@ class SwarmIngressGovernor:
             if phase is None:
                 raise ValueError(f"task is not accounted: {task_id}")
             payload_bytes = self._payload_by_task[key]
-            if phase == "queued":
-                self.quota.release(tenant, queued=1, payload_bytes=payload_bytes)
-            elif phase == "leased":
-                self.quota.release(tenant, leased=1, payload_bytes=payload_bytes)
-            else:
+            if phase not in {"queued", "leased"}:
                 raise ValueError(f"invalid ingress phase: {phase}")
+
             self.fairness.complete(tenant)
+            try:
+                if phase == "queued":
+                    self.quota.release(tenant, queued=1, payload_bytes=payload_bytes)
+                else:
+                    self.quota.release(tenant, leased=1, payload_bytes=payload_bytes)
+            except Exception:
+                self.fairness.rollback_complete(tenant)
+                raise
+
             del self._phase_by_task[key]
             del self._payload_by_task[key]
 
