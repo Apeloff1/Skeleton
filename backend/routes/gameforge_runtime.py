@@ -11,8 +11,8 @@ import time
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter
-from pydantic import BaseModel
+from fastapi import APIRouter, Query
+from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/api/gameforge/runtime", tags=["gameforge-runtime"])
 
@@ -61,9 +61,9 @@ def _role_for(category: str) -> dict:
 
 
 class SpawnBody(BaseModel):
-    category: str = "engineering"
-    room_id: Optional[str] = None
-    count: int = 1
+    category: str = Field("engineering", min_length=1, max_length=100)
+    room_id: Optional[str] = Field(None, max_length=200)
+    count: int = Field(1, ge=1, le=50)
 
 
 @router.post("/spawn")
@@ -80,7 +80,10 @@ async def spawn(b: SpawnBody):
 
 
 @router.get("/agents")
-async def agents(status: Optional[str] = None, limit: int = 100):
+async def agents(
+    status: Optional[str] = Query(None, max_length=50),
+    limit: int = Query(100, ge=1, le=500),
+):
     q = {"status": status} if status else {}
     rows = list(_agents().find(q, {"_id": 0}).sort("spawned_at", -1).limit(limit))
     counts = {"active": _agents().count_documents({"status": "active"}),
@@ -89,7 +92,7 @@ async def agents(status: Optional[str] = None, limit: int = 100):
 
 
 class TerminateBody(BaseModel):
-    agent_id: str
+    agent_id: str = Field(..., min_length=1, max_length=200)
 
 
 @router.post("/terminate")
@@ -99,10 +102,10 @@ async def terminate(b: TerminateBody):
 
 
 class MessageBody(BaseModel):
-    from_agent: str
-    to_agent: str
-    content: str
-    topic: str = "general"
+    from_agent: str = Field(..., min_length=1, max_length=200)
+    to_agent: str = Field(..., min_length=1, max_length=200)
+    content: str = Field(..., min_length=1, max_length=50000)
+    topic: str = Field("general", min_length=1, max_length=200)
 
 
 @router.post("/message")
@@ -116,17 +119,17 @@ async def message(b: MessageBody):
 
 
 @router.get("/inbox/{agent_id}")
-async def inbox(agent_id: str, limit: int = 50):
+async def inbox(agent_id: str, limit: int = Query(50, ge=1, le=500)):
     msgs = list(_messages().find({"to": agent_id}, {"_id": 0}).sort("ts", -1).limit(limit))
     _messages().update_many({"to": agent_id, "read": False}, {"$set": {"read": True}})
     return {"ok": True, "agent_id": agent_id, "messages": msgs}
 
 
 class DelegateBody(BaseModel):
-    from_agent: str = "jeeves"
-    to_category: str = "engineering"
-    task: str
-    room_id: Optional[str] = None
+    from_agent: str = Field("jeeves", min_length=1, max_length=200)
+    to_category: str = Field("engineering", min_length=1, max_length=100)
+    task: str = Field(..., min_length=1, max_length=50000)
+    room_id: Optional[str] = Field(None, max_length=200)
 
 
 @router.post("/delegate")
@@ -148,8 +151,8 @@ async def delegate(b: DelegateBody):
 
 
 class CompleteBody(BaseModel):
-    task_id: str
-    result: str
+    task_id: str = Field(..., min_length=1, max_length=200)
+    result: str = Field(..., min_length=1, max_length=50000)
 
 
 @router.post("/complete")
@@ -175,10 +178,10 @@ def _synth_result(task: str, role: dict) -> str:
 
 
 class ExecuteBody(BaseModel):
-    from_agent: str = "jeeves"
-    to_category: str = "engineering"
-    task: str
-    room_id: Optional[str] = None
+    from_agent: str = Field("jeeves", min_length=1, max_length=200)
+    to_category: str = Field("engineering", min_length=1, max_length=100)
+    task: str = Field(..., min_length=1, max_length=50000)
+    room_id: Optional[str] = Field(None, max_length=200)
 
 
 @router.post("/delegate/execute")
@@ -209,9 +212,9 @@ async def delegate_execute(b: ExecuteBody):
 
 
 class GroupPost(BaseModel):
-    agent_id: str = "jeeves"
-    content: str
-    channel: str = "general"
+    agent_id: str = Field("jeeves", min_length=1, max_length=200)
+    content: str = Field(..., min_length=1, max_length=50000)
+    channel: str = Field("general", min_length=1, max_length=200)
 
 
 @router.post("/groupchat")
@@ -227,7 +230,10 @@ async def groupchat_post(b: GroupPost):
 
 
 @router.get("/groupchat")
-async def groupchat_list(channel: str = "general", limit: int = 50):
+async def groupchat_list(
+    channel: str = Query("general", min_length=1, max_length=200),
+    limit: int = Query(50, ge=1, le=500),
+):
     rows = list(_groupchat().find({"channel": channel}, {"_id": 0}).sort("ts", -1).limit(limit))
     return {"ok": True, "channel": channel, "messages": rows}
 
@@ -304,8 +310,8 @@ async def positions(stale_seconds: int = 90):
 
 
 class PositionBody(BaseModel):
-    room_id: str
-    task: str = "working"
+    room_id: str = Field(..., min_length=1, max_length=200)
+    task: str = Field("working", max_length=1000)
 
 
 @router.post("/position/{agent_id}")
@@ -317,7 +323,10 @@ async def set_position(agent_id: str, b: PositionBody):
 
 
 @router.get("/tasks")
-async def tasks(status: Optional[str] = None, limit: int = 50):
+async def tasks(
+    status: Optional[str] = Query(None, max_length=50),
+    limit: int = Query(50, ge=1, le=500),
+):
     q = {"status": status} if status else {}
     return {"ok": True, "tasks": list(_tasks().find(q, {"_id": 0}).sort("ts", -1).limit(limit))}
 
