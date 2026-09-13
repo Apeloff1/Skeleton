@@ -4,8 +4,8 @@
 class DependencyGate:
     def __init__(self, dependencies):
         required = set(dependencies)
-        if any(not name for name in required):
-            raise ValueError("dependency names must be non-empty")
+        if not required or any(not isinstance(name, str) or not name.strip() for name in required):
+            raise ValueError("at least one non-empty dependency name is required")
         self._required = required
         self._ready = set()
 
