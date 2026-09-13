@@ -15,6 +15,7 @@ from __future__ import annotations
 import time
 from typing import Any, Dict, List, Optional
 
+from core.exec_guard import execution_disabled_message, require_execution_allowed
 from gameforge.workflow.autonomous_workflow import WorkflowRun
 from gameforge.workflow.internal_build_system import create_internal_build_system
 from gameforge.workflow.jeeves_vault import jeeves_vault
@@ -59,6 +60,15 @@ class ProjectOrchestrator:
 
     def create_full_game(self, user_prompt: str, time_budget_months: int = 6,
                          iterations_per_phase: int = 2, base_url: str = "") -> Dict:
+        if not require_execution_allowed("GameForge autonomous project creation"):
+            return {
+                "status": "disabled",
+                "ok": False,
+                "disabled": True,
+                "error": execution_disabled_message(
+                    "GameForge autonomous project creation"
+                ),
+            }
         self.total_estimated_months = max(1, min(int(time_budget_months), 36))
         plan = self._create_project_plan(user_prompt, self.total_estimated_months)
         self._break_into_phases(plan, self.total_estimated_months)

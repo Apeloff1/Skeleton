@@ -21,6 +21,7 @@ import math
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
+from core.exec_guard import execution_disabled_message, require_execution_allowed
 from gameforge.workflow.internal_build_system import create_internal_build_system
 from gameforge.workflow.jeeves_vault import jeeves_vault
 from gameforge.workflow.workflow_persistence import workflow_persistence
@@ -65,6 +66,13 @@ class AutonomousWorkflow:
     """Stateless orchestrator — all per-run state lives in a WorkflowRun."""
 
     def run(self, project_name: str, user_prompt: str, max_iterations: int = 4) -> Dict:
+        if not require_execution_allowed("GameForge autonomous workflow"):
+            return {
+                "status": "disabled",
+                "ok": False,
+                "disabled": True,
+                "error": execution_disabled_message("GameForge autonomous workflow"),
+            }
         run = WorkflowRun(project_name, user_prompt, max_iterations)
         result = run.execute()
         # persist run + register deployment package (if any) is done inside run
@@ -72,6 +80,13 @@ class AutonomousWorkflow:
         return result
 
     def resume(self, project_name: str) -> Optional[Dict]:
+        if not require_execution_allowed("GameForge autonomous workflow"):
+            return {
+                "status": "disabled",
+                "ok": False,
+                "disabled": True,
+                "error": execution_disabled_message("GameForge autonomous workflow"),
+            }
         state = workflow_persistence.load_latest_state(project_name)
         if not state:
             return None
