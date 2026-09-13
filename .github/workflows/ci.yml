@@ -22,11 +22,10 @@ jobs:
     timeout-minutes: 10
     defaults: {run: {working-directory: ./backend}}
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.1.0
-        with: {version: "latest-known"}
-      - uses: actions/setup-python@v7
-        with: {python-version: "${{ env.PYTHON_VERSION }}"}
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
       - name: Cross-surface toolchain contract
         run: python ../scripts/check_toolchain_contract.py
       - run: uv tool install "ruff==0.9.*"
@@ -38,9 +37,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with: {python-version: "${{ env.PYTHON_VERSION }}"}
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
       - env: {PYTHONPATH: "."}
         run: |
           set -euo pipefail
@@ -55,9 +54,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with: {python-version: "${{ env.PYTHON_VERSION }}"}
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
       - run: python -m pip install "pytest>=8,<9"
       - run: python -m compileall -q skeleton/school
       - env: {PYTHONPATH: "."}
@@ -67,9 +66,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with: {python-version: "${{ env.PYTHON_VERSION }}"}
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
       - env: {PYTHONPATH: "."}
         run: chmod +x scripts/cockpit-smoke.sh && ./scripts/cockpit-smoke.sh
   backend-test:
@@ -83,11 +82,10 @@ jobs:
         image: mongo:7.0
         ports: [27017:27017]
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.1.0
-        with: {version: "latest-known"}
-      - uses: actions/setup-python@v7
-        with: {python-version: "${{ env.PYTHON_VERSION }}"}
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
       - run: |
           uv venv
           uv pip install -r requirements.txt
@@ -103,11 +101,10 @@ jobs:
     needs: backend-lint
     defaults: {run: {working-directory: ./backend}}
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.1.0
-        with: {version: "latest-known"}
-      - uses: actions/setup-python@v7
-        with: {python-version: "${{ env.PYTHON_VERSION }}"}
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
       - run: |
           uv venv
           uv pip install -r requirements.txt
@@ -121,10 +118,10 @@ jobs:
     timeout-minutes: 15
     defaults: {run: {working-directory: ./frontend}}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: "${{ env.NODE_VERSION }}"
+          node-version: "24"
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
       - run: yarn install --frozen-lockfile
@@ -141,15 +138,15 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: docker/setup-buildx-action@v4.1.0
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - run: echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
-      - uses: docker/build-push-action@v7.2.0
+      - uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
@@ -164,7 +161,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha,scope=root
           cache-to: type=gha,mode=max,scope=root
-      - uses: docker/build-push-action@v7.2.0
+      - uses: docker/build-push-action@v5
         with:
           context: .
           file: ./backend/Dockerfile
@@ -179,7 +176,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
-      - uses: docker/build-push-action@v7.2.0
+      - uses: docker/build-push-action@v5
         with:
           context: ./frontend
           target: production
