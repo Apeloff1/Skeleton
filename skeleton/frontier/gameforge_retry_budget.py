@@ -12,6 +12,10 @@ class RetryBudget:
     def exhausted(self):
         return self.remaining == 0
 
+    @property
+    def consumed(self):
+        return self.capacity - self.remaining
+
     def consume(self):
         if self.remaining <= 0:
             return False
@@ -20,3 +24,4 @@ class RetryBudget:
 
     def reset(self):
         self.remaining = self.capacity
+        return self.remaining
