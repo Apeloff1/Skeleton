@@ -90,7 +90,7 @@ async def unfollow(cid: str, body: FollowBody):
 
 
 @router.get("/creators/{cid}")
-async def creator_profile(cid: str, follower_id: str = Query("")):
+async def creator_profile(cid: str, follower_id: str = Query("", max_length=200)):
     stats = await _creator_stats(cid)
     listings = await _db.marketplace_listings.find(
         {"creator_id": cid, "active": True}, {"_id": 0}).sort("created_at", -1).limit(50).to_list(50)
@@ -107,7 +107,7 @@ async def creator_profile(cid: str, follower_id: str = Query("")):
 
 
 @router.get("/creators")
-async def creators_leaderboard(limit: int = Query(25, le=50)):
+async def creators_leaderboard(limit: int = Query(25, ge=1, le=50)):
     rows = await _db.marketplace_listings.aggregate([
         {"$match": {"active": True}},
         {"$group": {"_id": "$creator_id", "sales": {"$sum": {"$ifNull": ["$sales", 0]}},
@@ -221,7 +221,7 @@ async def add_review(pid: str, body: ReviewBody):
 
 
 @router.get("/marketplace/{pid}/reviews")
-async def get_reviews(pid: str, limit: int = Query(30, le=100)):
+async def get_reviews(pid: str, limit: int = Query(30, ge=1, le=100)):
     rows = await _db.marketplace_reviews.find(
         {"playable_id": pid}, {"_id": 0}).sort("at", -1).limit(limit).to_list(limit)
     agg = await _db.marketplace_reviews.aggregate([
@@ -259,7 +259,7 @@ async def premium_plans():
 
 
 @router.get("/premium/status")
-async def premium_status(visitor_id: str = Query(...)):
+async def premium_status(visitor_id: str = Query(..., min_length=1, max_length=200)):
     ent = await _db.premium_entitlements.find_one(
         {"visitor_id": visitor_id}, {"_id": 0}, sort=[("expires_at", -1)])
     if not ent:
