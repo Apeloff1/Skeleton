@@ -10,8 +10,8 @@ from skeleton.frontier.gameforge_queue import BoundedQueue
 from skeleton.frontier.gameforge_rate import RateWindow
 from skeleton.frontier.gameforge_retry_budget import RetryBudget
 
-def make(queue_capacity=1,retries=0):
- s=ServiceLifecycle(); d=DependencyGate(("db",)); r=RateWindow(2,10); c=Circuit(2); b=Budget(1); q=Quota(1); queue=BoundedQueue(queue_capacity); rb=RetryBudget(retries); h=HealthScore(4); return RuntimeCoordinator(s,d,r,c,b,q,queue,rb,h),s,d
+def make(queue_capacity=1,retries=0,threshold=2):
+ s=ServiceLifecycle(); d=DependencyGate(("db",)); r=RateWindow(2,10); c=Circuit(threshold); b=Budget(1); q=Quota(1); queue=BoundedQueue(queue_capacity); rb=RetryBudget(retries); h=HealthScore(4); return RuntimeCoordinator(s,d,r,c,b,q,queue,rb,h),s,d
 
 def test_coordinator_fails_closed_until_ready():
  x,s,d=make(); assert x.admit(0,0,"x") is Admission.SHED; s.ready(); d.mark("db"); assert x.admit(0,0,request_id="x") is Admission.ACCEPT
@@ -36,3 +36,6 @@ def test_coordinator_snapshot_is_immutable_state():
 
 def test_coordinator_receipt_is_observable():
  x,s,d=make(); s.ready(); d.mark("db"); receipt=x.admit_receipt("x",0,0); assert receipt.accepted(); assert receipt.request_id=="x"; x.release()
+
+def test_coordinator_outcomes_drive_circuit_recovery():
+ x,s,d=make(threshold=2); s.ready(); d.mark("db"); x.record_outcome(False); assert x.circuit.allowed; x.record_outcome(False); assert not x.circuit.allowed; assert not x.record_outcome(False); assert not x.circuit.allowed; x.circuit.probe(); assert x.record_outcome(True); assert x.circuit.allowed
