@@ -28,7 +28,7 @@ class BufferPool:
     """Hard-capped reusable buffer classes; no unbounded retention."""
 
     def __init__(self, class_cap: int = 64) -> None:
-        if class_cap < 1:
+        if not isinstance(class_cap, int) or class_cap < 1:
             raise ValueError("class_cap must be >= 1")
         self._cap = class_cap
         self._free: Dict[BufferClass, list[bytearray]] = {c: [] for c in BufferClass}
@@ -37,6 +37,8 @@ class BufferPool:
 
     @staticmethod
     def classify(min_size: int) -> BufferClass:
+        if not isinstance(min_size, int) or min_size < 0:
+            raise ValueError("min_size must be a non-negative integer")
         if min_size <= 4096:
             return BufferClass.SMALL
         if min_size <= 65536:
@@ -44,8 +46,6 @@ class BufferPool:
         return BufferClass.LARGE
 
     def lease(self, min_size: int) -> BufferLease:
-        if min_size < 0:
-            raise ValueError("min_size must be non-negative")
         cls = self.classify(min_size)
         buf = self._free[cls].pop() if self._free[cls] else bytearray(cls.value)
         lease = BufferLease(buf, cls)
@@ -53,14 +53,23 @@ class BufferPool:
         self.leased += 1
         return lease
 
-    def reclaim(self, lease: BufferLease) -> None:
+    def reclaim(self, lease: BufferLease) -> bool:
         if id(lease) not in self._leased_ids:
-            return
+            return False
         self._leased_ids.remove(id(lease))
         lease.data.clear()
         if len(self._free[lease.buffer_class]) < self._cap:
             self._free[lease.buffer_class].append(lease.data)
         self.leased -= 1
+        return True
+
+    @property
+    def capacity(self) -> int:
+        return self._cap
+
+    @property
+    def available_total(self) -> int:
+        return sum(len(items) for items in self._free.values())
 
     def available(self, buffer_class: BufferClass) -> int:
         return len(self._free[buffer_class])
