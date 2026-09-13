@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from gameforge.enterprise.auth import Principal, get_principal
 from gameforge.math_exocortex.hub import MathExocortex
@@ -17,58 +17,58 @@ def _m(uid: str) -> MathExocortex:
 
 
 class CalcBody(BaseModel):
-    expr: str
+    expr: str = Field(..., min_length=1, max_length=10000)
 
 
 class SheetBody(BaseModel):
-    addr: str
+    addr: str = Field(..., min_length=1, max_length=200)
     value: Any
-    sheet: str = "default"
+    sheet: str = Field("default", min_length=1, max_length=200)
 
 
 class SymbolicBody(BaseModel):
-    action: str
-    expr: Optional[str] = None
-    names: Optional[str] = None
-    var: str = "x"
-    n: int = Query(1, ge=1, le=1000)
-    rows: Optional[List[List[Any]]] = None
+    action: str = Field(..., min_length=1, max_length=100)
+    expr: Optional[str] = Field(None, max_length=10000)
+    names: Optional[str] = Field(None, max_length=2000)
+    var: str = Field("x", min_length=1, max_length=100)
+    n: int = Field(1, ge=1, le=1000)
+    rows: Optional[List[List[Any]]] = Field(None, max_length=1000)
 
 
 class PowSumBody(BaseModel):
-    numbers: List[float]
-    chunk_size: int = Query(8, ge=1, le=1000)
+    numbers: List[float] = Field(..., min_length=1, max_length=10000)
+    chunk_size: int = Field(8, ge=1, le=1000)
 
 
 class PowMapBody(BaseModel):
-    items: List[Any]
-    map_expr: str
-    chunk_size: int = Query(5, ge=1, le=1000)
+    items: List[Any] = Field(..., min_length=1, max_length=10000)
+    map_expr: str = Field(..., min_length=1, max_length=10000)
+    chunk_size: int = Field(5, ge=1, le=1000)
 
 
 class BudgetBody(BaseModel):
-    side: str
-    category: str
+    side: str = Field(..., min_length=1, max_length=100)
+    category: str = Field(..., min_length=1, max_length=200)
     amount: float
-    note: str = ""
+    note: str = Field("", max_length=10000)
 
 
 class ForecastBody(BaseModel):
     progress_pct: float
     days_elapsed: float
-    historical_daily_rates: Optional[List[float]] = None
+    historical_daily_rates: Optional[List[float]] = Field(None, max_length=10000)
     weather_penalty: float = 0.0
     energy: float = 0.55
 
 
 class TaskBody(BaseModel):
-    task_id: str
+    task_id: str = Field(..., min_length=1, max_length=200)
     duration_days: float = 1.0
 
 
 class DepBody(BaseModel):
-    before: str
-    after: str
+    before: str = Field(..., min_length=1, max_length=200)
+    after: str = Field(..., min_length=1, max_length=200)
 
 
 @router.get("/status")
