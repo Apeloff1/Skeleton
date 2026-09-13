@@ -59,6 +59,7 @@ jobs:
           python -m pytest -q \
             skeleton/testing/test_swarm_ingress.py \
             skeleton/testing/test_swarm_policy_atomicity.py \
+            skeleton/testing/test_swarm_policy_snapshots.py \
             skeleton/testing/test_swarm_tenant_broker.py \
             skeleton/testing/test_swarm_tenant_revival_guard.py \
             skeleton/testing/test_swarm_lease_rollback.py \
@@ -71,6 +72,7 @@ jobs:
             skeleton/testing/test_swarm_tenant_checkpoint.py \
             skeleton/testing/test_swarm_recovery_manager.py \
             skeleton/testing/test_swarm_recovery_tenants.py \
+            skeleton/testing/test_swarm_recovery_archive.py \
             skeleton/testing/test_swarm_restore_validation.py \
             skeleton/testing/test_swarm_restore_ordering.py \
             skeleton/testing/test_swarm_forget_retention.py \
