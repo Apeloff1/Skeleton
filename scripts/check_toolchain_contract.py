@@ -35,10 +35,27 @@ def main() -> int:
     project = backend.get("project", {})
     tool = backend.get("tool", {})
     dev = project.get("optional-dependencies", {}).get("dev", [])
+    runtime_deps = project.get("dependencies", [])
+    requirements = read("backend/requirements.txt")
     require(project.get("requires-python") == ">=3.11", "backend requires Python >=3.11", failures)
     require(tool.get("ruff", {}).get("target-version") == "py311", "Ruff target must be py311", failures)
     require(str(tool.get("mypy", {}).get("python_version")) == "3.11", "mypy target must be 3.11", failures)
     require(any(re.fullmatch(r"ruff>=0\.9,<0\.10", item) for item in dev), "dev Ruff must be 0.9.x", failures)
+    require(
+        not any(str(item).lower().startswith("emergentintegrations") for item in runtime_deps),
+        "retired emergentintegrations SDK must not be a project dependency",
+        failures,
+    )
+    require(
+        re.search(r"^\s*emergentintegrations(?:[<>=!~].*)?$", requirements, re.MULTILINE | re.IGNORECASE) is None,
+        "retired emergentintegrations SDK must not be installed from requirements.txt",
+        failures,
+    )
+    require(
+        (ROOT / "backend/emergentintegrations/llm/chat.py").is_file(),
+        "local emergentintegrations compatibility boundary missing",
+        failures,
+    )
 
     frontend = json.loads(read("frontend/package.json"))
     require(frontend.get("engines", {}).get("node") == ">=24", "frontend must require Node >=24", failures)
@@ -122,7 +139,7 @@ def main() -> int:
         for failure in failures:
             print(f"  - {failure}", file=sys.stderr)
         return 1
-    print("Toolchain contract passed: proven CI actions, runtime, quality, security, destructuring/partial/namespace/getattribute coverage, self-enforcement, and fail-closed deployment gates aligned.")
+    print("Toolchain contract passed: proven CI actions, runtime, local SDK boundaries, quality, security, destructuring/partial/namespace/getattribute coverage, self-enforcement, and fail-closed deployment gates aligned.")
     return 0
 
 
