@@ -133,3 +133,54 @@ def test_exact_lease_commit_uses_one_clock_sample() -> None:
     assert worker.active == {"task"}
     assert worker.accepted == 1
     assert runtime.events()[-1] == (42.0, "task.leased", "task")
+
+
+def test_exact_lease_rollback_clock_failure_does_not_partially_commit() -> None:
+    runtime = SwarmRuntime(clock=lambda: 10.0)
+    worker = runtime.register_worker("w")
+    runtime.submit(SwarmTask("task", {}))
+    leased = lease_exact(runtime, "w", "task")
+    before_events = runtime.events()
+
+    def broken_clock() -> float:
+        raise RuntimeError("clock unavailable")
+
+    runtime._clock = broken_clock
+    with pytest.raises(RuntimeError, match="clock unavailable"):
+        rollback_exact_lease(runtime, "w", "task")
+
+    assert runtime.task("task") == leased
+    assert worker.active == {"task"}
+    assert worker.accepted == 1
+    assert runtime.snapshot().leased == 1
+    assert runtime.snapshot().queued == 0
+    assert runtime.events() == before_events
+
+
+def test_exact_lease_rollback_commit_uses_one_clock_sample() -> None:
+    runtime = SwarmRuntime(clock=lambda: 1.0)
+    worker = runtime.register_worker("w")
+    runtime.submit(SwarmTask("task", {}))
+    lease_exact(runtime, "w", "task")
+    calls = 0
+
+    def single_sample_clock() -> float:
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            raise RuntimeError("clock sampled twice")
+        return 84.0
+
+    runtime._clock = single_sample_clock
+    restored = rollback_exact_lease(runtime, "w", "task")
+
+    assert calls == 1
+    assert restored.state is TaskState.QUEUED
+    assert restored.attempts == 0
+    assert restored.leased_to is None
+    assert restored.lease_deadline is None
+    assert worker.active == set()
+    assert worker.accepted == 0
+    assert runtime.snapshot().queued == 1
+    assert runtime.snapshot().leased == 0
+    assert runtime.events()[-1] == (84.0, "task.lease_rolled_back", "task")
