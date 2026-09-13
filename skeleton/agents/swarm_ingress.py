@@ -95,6 +95,35 @@ class SwarmIngressGovernor:
             self._phase_by_task[key] = "queued"
             return IngressDecision(True, tenant, "admitted", payload_bytes, self.rate.remaining(tenant))
 
+    def restore_task(self, tenant: str, task_id: str, payload: object, *, phase: str) -> None:
+        """Rebuild quota/fair-share accounting without consuming ingress rate capacity."""
+        tenant = self._tenant(tenant)
+        task_id = self._task_id(task_id)
+        if phase not in {"queued", "leased"}:
+            raise ValueError(f"invalid ingress phase: {phase}")
+        key = (tenant, task_id)
+        payload_bytes = self.payload_size(payload)
+        with self._lock:
+            existing = self._phase_by_task.get(key)
+            if existing is not None:
+                if existing != phase:
+                    raise ValueError(f"task already accounted in phase {existing}: {task_id}")
+                return
+            if phase == "queued":
+                self.quota.reserve(tenant, queued=1, payload_bytes=payload_bytes)
+            else:
+                self.quota.reserve(tenant, leased=1, payload_bytes=payload_bytes)
+            try:
+                self.fairness.admit(tenant)
+            except Exception:
+                if phase == "queued":
+                    self.quota.release(tenant, queued=1, payload_bytes=payload_bytes)
+                else:
+                    self.quota.release(tenant, leased=1, payload_bytes=payload_bytes)
+                raise
+            self._payload_by_task[key] = payload_bytes
+            self._phase_by_task[key] = phase
+
     def phase(self, tenant: str, task_id: str) -> str | None:
         tenant = self._tenant(tenant)
         task_id = self._task_id(task_id)
