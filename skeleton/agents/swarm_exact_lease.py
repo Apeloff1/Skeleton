@@ -3,8 +3,28 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from dataclasses import replace
+from math import isfinite
 
 from skeleton.agents.swarm_runtime import LeaseError, SwarmRuntime, SwarmTask, TaskState
+
+
+def _identifier(value: object, label: str) -> str:
+    if not isinstance(value, str):
+        raise LeaseError(f"{label} must be a string")
+    value = value.strip()
+    if not value:
+        raise LeaseError(f"{label} must not be empty")
+    return value
+
+
+def _finite_number(value: object, label: str, *, positive: bool = False) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise LeaseError(f"{label} must be a finite number")
+    normalized = float(value)
+    if not isfinite(normalized) or (positive and normalized <= 0):
+        qualifier = "positive finite" if positive else "finite"
+        raise LeaseError(f"{label} must be a {qualifier} number")
+    return normalized
 
 
 def lease_exact(runtime: SwarmRuntime, worker_id: str, task_id: str) -> SwarmTask:
@@ -12,8 +32,8 @@ def lease_exact(runtime: SwarmRuntime, worker_id: str, task_id: str) -> SwarmTas
     lock = getattr(runtime, "_lock", None)
     context = lock if lock is not None else nullcontext()
     with context:
-        worker_id = worker_id.strip()
-        task_id = task_id.strip()
+        worker_id = _identifier(worker_id, "worker_id")
+        task_id = _identifier(task_id, "task_id")
         worker = runtime._workers.get(worker_id)
         if worker is None:
             raise LeaseError(f"unknown worker: {worker_id}")
@@ -25,14 +45,22 @@ def lease_exact(runtime: SwarmRuntime, worker_id: str, task_id: str) -> SwarmTas
         if not task.required_capabilities.issubset(worker.capabilities):
             raise LeaseError(f"worker lacks required capabilities: {worker_id}")
 
-        # Sample all fallible external state before mutating runtime accounting.
-        now = runtime._clock()
+        # Sample and validate all fallible external state before mutating accounting.
+        now = _finite_number(runtime._clock(), "clock")
+        lease_seconds = _finite_number(
+            runtime.default_lease_seconds,
+            "default_lease_seconds",
+            positive=True,
+        )
+        deadline = now + lease_seconds
+        if not isfinite(deadline):
+            raise LeaseError("lease deadline must be finite")
         updated = replace(
             task,
             state=TaskState.LEASED,
             attempts=task.attempts + 1,
             leased_to=worker.id,
-            lease_deadline=now + runtime.default_lease_seconds,
+            lease_deadline=deadline,
         )
 
         runtime._replace(task, updated)
