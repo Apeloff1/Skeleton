@@ -72,7 +72,7 @@ class CodeBlockCreate(BaseModel):
     description: Optional[str] = None
     code: str = Field(..., min_length=1)
     language: CodeLanguage = CodeLanguage.PYTHON
-    tags: List[str] = []
+    tags: List[str] = Field(default_factory=list, max_length=50)
     category: Optional[str] = None
     is_public: bool = False
     source: Optional[str] = None  # Where the code came from (course, project, etc.)
@@ -84,24 +84,24 @@ class AssetCreate(BaseModel):
     content_base64: Optional[str] = None
     url: Optional[str] = None
     tags: List[str] = []
-    metadata: Dict[str, Any] = {}
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 class DatabaseSchemaCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
     schema_type: str = "relational"  # relational, document, graph, key-value
-    tables: List[Dict[str, Any]] = []
-    relationships: List[Dict[str, Any]] = []
+    tables: List[Dict[str, Any]] = Field(default_factory=list, max_length=500)
+    relationships: List[Dict[str, Any]] = Field(default_factory=list, max_length=500)
     sql_script: Optional[str] = None
-    tags: List[str] = []
+    tags: List[str] = Field(default_factory=list, max_length=50)
 
 class LearningDataCreate(BaseModel):
     data_type: str  # note, bookmark, achievement, milestone
     title: str
     content: Optional[str] = None
     course_id: Optional[str] = None
-    related_items: List[str] = []
-    metadata: Dict[str, Any] = {}
+    related_items: List[str] = Field(default_factory=list, max_length=100)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 # ============================================================================
 # ACTIVITY LOGGING

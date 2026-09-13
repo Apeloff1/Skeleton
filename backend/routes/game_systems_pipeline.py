@@ -13,7 +13,7 @@
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, Field
 from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 from enum import Enum
@@ -65,39 +65,41 @@ class ProceduralAlgorithm(str, Enum):
 # ============================================================================
 
 class StateMachineRequest(BaseModel):
-    name: str
-    states: List[str]
-    initial_state: str
-    context_variables: List[str] = []
+    name: str = Field(..., min_length=1, max_length=200)
+    states: List[str] = Field(..., min_length=1, max_length=100)
+    initial_state: str = Field(..., min_length=1, max_length=100)
+    context_variables: List[str] = Field(default_factory=list, max_length=100)
     hierarchical: bool = False
 
 
 class EventSystemRequest(BaseModel):
-    event_types: List[str]
+    event_types: List[str] = Field(..., min_length=1, max_length=100)
     async_handling: bool = True
     priority_levels: int = 3
     include_replay: bool = False
 
 
 class SaveSystemRequest(BaseModel):
-    data_to_save: List[str]
+    data_to_save: List[str] = Field(..., min_length=1, max_length=100)
     save_format: Literal["json", "binary", "encrypted"] = "json"
     auto_save: bool = True
     cloud_sync: bool = False
-    max_slots: int = 10
+    max_slots: int = Field(10, ge=1, le=1000)
 
 
 class MultiplayerRequest(BaseModel):
     topology: NetworkTopology = NetworkTopology.CLIENT_SERVER
-    max_players: int = 16
-    tick_rate: int = 64
+    max_players: int = Field(16, ge=1, le=10000)
+    tick_rate: int = Field(64, ge=1, le=1000)
     include_matchmaking: bool = True
     include_lobby: bool = True
     lag_compensation: bool = True
 
 
 class AchievementSystemRequest(BaseModel):
-    categories: List[str] = ["progression", "combat", "exploration", "social"]
+    categories: List[str] = Field(
+        default_factory=lambda: ["progression", "combat", "exploration", "social"], max_length=100
+    )
     include_leaderboards: bool = True
     platform_integration: bool = True
     secret_achievements: bool = True
@@ -107,7 +109,7 @@ class ProceduralRequest(BaseModel):
     target: Literal["terrain", "dungeon", "city", "vegetation", "loot", "names"]
     algorithm: Optional[ProceduralAlgorithm] = None
     seed_based: bool = True
-    parameters: Dict[str, Any] = {}
+    parameters: Dict[str, Any] = Field(default_factory=dict)
 
 
 # ============================================================================
