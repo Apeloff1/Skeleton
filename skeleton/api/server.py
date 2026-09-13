@@ -242,6 +242,7 @@ def create_app() -> Any:
     from skeleton.api.swarm_batch_routes import router as swarm_batch_router
     from skeleton.api.swarm_ingress_routes import router as swarm_ingress_router
     from skeleton.api.swarm_tenant_broker_routes import router as swarm_tenant_broker_router
+    from skeleton.api.swarm_recovery_archive_routes import router as swarm_recovery_archive_router
     app.include_router(router, prefix="/api/v1")
     app.include_router(gameforge_router, prefix="/api/v1")
     app.include_router(swarm_router, prefix="/api/v1")
@@ -255,6 +256,7 @@ def create_app() -> Any:
     app.include_router(swarm_batch_router, prefix="/api/v1")
     app.include_router(swarm_ingress_router, prefix="/api/v1")
     app.include_router(swarm_tenant_broker_router, prefix="/api/v1")
+    app.include_router(swarm_recovery_archive_router, prefix="/api/v1")
     app.include_router(cockpit_router)
 
     from skeleton.api.middleware import DEFAULT_OPEN_PREFIXES, GatePolicy, install_gate
@@ -285,6 +287,7 @@ def create_app() -> Any:
             "swarm_batch": "/api/v1/swarm/batch/submit",
             "swarm_ingress": "/api/v1/swarm/ingress/status",
             "swarm_tenant_broker": "/api/v1/swarm/tenant-broker/status",
+            "swarm_recovery_archive": "/api/v1/swarm/recovery/archive",
         }
 
     @app.get("/cortex/status")
