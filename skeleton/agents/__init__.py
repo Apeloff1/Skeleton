@@ -12,42 +12,39 @@ from skeleton.agents.swarm_gc import GCResult, capacity, compact_runtime as gc_c
 from skeleton.agents.swarm_hardened import HardenedSwarmRuntime
 from skeleton.agents.swarm_idempotency import IdempotencyConflict, IdempotencyRecord, IdempotencyRegistry
 from skeleton.agents.swarm_invariants import InvariantReport, audit
+from skeleton.agents.swarm_janitor import JanitorResult, reap_stale_workers
+from skeleton.agents.swarm_load_shed import LoadShedPolicy, ShedDecision
 from skeleton.agents.swarm_maintenance import compact_runtime, compact_state
 from skeleton.agents.swarm_operator import SwarmOperator
 from skeleton.agents.swarm_pressure import PressureReport, classify_pressure
+from skeleton.agents.swarm_quarantine import QuarantineController, QuarantineRecord
 from skeleton.agents.swarm_queries import TaskPage, query_tasks
 from skeleton.agents.swarm_rate_limit import Bucket, TokenBucketLimiter
 from skeleton.agents.swarm_recovery import RecoveryStatus, SwarmRecoveryManager
 from skeleton.agents.swarm_resilient_scheduler import ResilientRanking, ResilientSwarmScheduler
 from skeleton.agents.swarm_restore import validate_restore_state
 from skeleton.agents.swarm_retention import PrunePlan, RetentionPolicy, TERMINAL_STATES
+from skeleton.agents.swarm_retry import RetryDecision, RetryPolicy
 from skeleton.agents.swarm_scheduler import SwarmScheduler, WorkerScore
 from skeleton.agents.swarm_slo import SLOPolicy
 from skeleton.agents.swarm_snapshot import CURRENT_VERSION, SnapshotError, normalize_snapshot, validate_snapshot
-from skeleton.agents.swarm_runtime import (
-    AdmissionError,
-    LeaseError,
-    RuntimeSnapshot,
-    SwarmRuntime,
-    SwarmTask,
-    TaskState,
-    WorkerState,
-)
+from skeleton.agents.swarm_supervisor import DispatchDecision, SwarmSupervisor
+from skeleton.agents.swarm_runtime import AdmissionError, LeaseError, RuntimeSnapshot, SwarmRuntime, SwarmTask, TaskState, WorkerState
 
 __all__ = [
     "Coordinator", "AgentPool", "Task", "TaskStatus", "MeshBridge",
-    "AdmissionError", "LeaseError", "RuntimeSnapshot", "SwarmRuntime",
-    "HardenedSwarmRuntime", "SwarmTask", "TaskState", "WorkerState",
-    "AdmissionDecision", "AdmissionPolicy", "capability_coverage", "AutoscalePolicy",
-    "ScaleRecommendation", "SubmitResult", "SwarmControlPlane", "DrainPlan",
-    "drain", "plan_drain", "FairShareLedger", "TenantShare", "LeaseFence",
-    "assert_fence", "fence_for", "fenced_fail", "fenced_renew", "fenced_succeed",
-    "GCResult", "capacity", "gc_compact_runtime", "IdempotencyConflict",
-    "IdempotencyRecord", "IdempotencyRegistry", "InvariantReport", "audit",
-    "compact_runtime", "compact_state", "SwarmOperator", "PressureReport",
-    "classify_pressure", "TaskPage", "query_tasks", "Bucket", "TokenBucketLimiter",
-    "RecoveryStatus", "SwarmRecoveryManager", "ResilientRanking", "ResilientSwarmScheduler",
-    "validate_restore_state", "PrunePlan", "RetentionPolicy", "TERMINAL_STATES",
-    "SwarmScheduler", "WorkerScore", "SLOPolicy", "CURRENT_VERSION", "SnapshotError",
-    "normalize_snapshot", "validate_snapshot",
+    "AdmissionError", "LeaseError", "RuntimeSnapshot", "SwarmRuntime", "HardenedSwarmRuntime",
+    "SwarmTask", "TaskState", "WorkerState", "AdmissionDecision", "AdmissionPolicy",
+    "capability_coverage", "AutoscalePolicy", "ScaleRecommendation", "SubmitResult",
+    "SwarmControlPlane", "DrainPlan", "drain", "plan_drain", "FairShareLedger", "TenantShare",
+    "LeaseFence", "assert_fence", "fence_for", "fenced_fail", "fenced_renew", "fenced_succeed",
+    "GCResult", "capacity", "gc_compact_runtime", "IdempotencyConflict", "IdempotencyRecord",
+    "IdempotencyRegistry", "InvariantReport", "audit", "JanitorResult", "reap_stale_workers",
+    "LoadShedPolicy", "ShedDecision", "compact_runtime", "compact_state", "SwarmOperator",
+    "PressureReport", "classify_pressure", "QuarantineController", "QuarantineRecord", "TaskPage",
+    "query_tasks", "Bucket", "TokenBucketLimiter", "RecoveryStatus", "SwarmRecoveryManager",
+    "ResilientRanking", "ResilientSwarmScheduler", "validate_restore_state", "PrunePlan",
+    "RetentionPolicy", "TERMINAL_STATES", "RetryDecision", "RetryPolicy", "SwarmScheduler",
+    "WorkerScore", "SLOPolicy", "CURRENT_VERSION", "SnapshotError", "normalize_snapshot",
+    "validate_snapshot", "DispatchDecision", "SwarmSupervisor",
 ]
