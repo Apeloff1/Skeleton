@@ -8,8 +8,10 @@ class HealthRouter:
   if healthy: self._healthy.add(target)
   else: self._healthy.discard(target)
  def next(self):
-  live=[x for x in self._targets if x in self._healthy]
-  if not live: return None
-  self._cursor=(self._cursor+1)%len(live); return live[self._cursor]
+  for _ in self._targets:
+   self._cursor=(self._cursor+1)%len(self._targets)
+   target=self._targets[self._cursor]
+   if target in self._healthy: return target
+  return None
  @property
  def healthy(self): return tuple(x for x in self._targets if x in self._healthy)
