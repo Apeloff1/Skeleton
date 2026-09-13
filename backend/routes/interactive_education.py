@@ -44,27 +44,27 @@ EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 # ============================================================================
 
 class ChallengeSubmission(BaseModel):
-    challenge_id: str
-    code: str
-    language: str = "python"
-    user_id: Optional[str] = None
+    challenge_id: str = Field(..., min_length=1, max_length=200)
+    code: str = Field(..., min_length=1, max_length=500000)
+    language: str = Field("python", max_length=100)
+    user_id: Optional[str] = Field(None, max_length=200)
 
 class SkillAssessmentRequest(BaseModel):
-    language: str = "python"
-    topics: List[str] = ["basics"]
+    language: str = Field("python", max_length=100)
+    topics: List[str] = Field(default_factory=lambda: ["basics"], max_length=50)
     difficulty: Literal["beginner", "intermediate", "advanced"] = "intermediate"
     question_count: int = Field(5, ge=1, le=20)
 
 class LearningPathRequest(BaseModel):
     current_level: Literal["beginner", "intermediate", "advanced"] = "beginner"
-    goals: List[str] = ["web_development"]
+    goals: List[str] = Field(default_factory=lambda: ["web_development"], max_length=50)
     time_commitment: Literal["light", "moderate", "intensive"] = "moderate"
-    preferred_languages: List[str] = ["python"]
+    preferred_languages: List[str] = Field(default_factory=lambda: ["python"], max_length=50)
 
 class CodeReviewRequest(BaseModel):
-    code: str = Field(..., min_length=10)
-    language: str = "python"
-    focus_areas: Optional[List[str]] = None
+    code: str = Field(..., min_length=10, max_length=500000)
+    language: str = Field("python", max_length=100)
+    focus_areas: Optional[List[str]] = Field(None, max_length=20)
     skill_level: Literal["beginner", "intermediate", "advanced"] = "intermediate"
 
 # ============================================================================

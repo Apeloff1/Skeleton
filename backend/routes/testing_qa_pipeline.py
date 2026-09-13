@@ -81,32 +81,36 @@ class UnitTestRequest(BaseModel):
 
 
 class IntegrationTestRequest(BaseModel):
-    system_name: str
-    components: List[str]
-    interactions: List[Dict[str, str]] = []
+    system_name: str = Field(..., min_length=1, max_length=200)
+    components: List[str] = Field(..., min_length=1, max_length=100)
+    interactions: List[Dict[str, str]] = Field(default_factory=list, max_length=200)
     mock_external: bool = True
 
 
 class PerformanceTestRequest(BaseModel):
-    target_system: str
-    metrics: List[str] = ["latency", "throughput", "memory"]
+    target_system: str = Field(..., min_length=1, max_length=200)
+    metrics: List[str] = Field(
+        default_factory=lambda: ["latency", "throughput", "memory"], max_length=50
+    )
     duration_seconds: int = Field(60, ge=10, le=3600)
     concurrent_users: int = Field(100, ge=1, le=10000)
 
 
 class BugReportRequest(BaseModel):
-    title: str
-    description: str
-    steps_to_reproduce: List[str]
-    expected_behavior: str
-    actual_behavior: str
+    title: str = Field(..., min_length=1, max_length=500)
+    description: str = Field(..., min_length=1, max_length=10000)
+    steps_to_reproduce: List[str] = Field(..., min_length=1, max_length=100)
+    expected_behavior: str = Field(..., min_length=1, max_length=10000)
+    actual_behavior: str = Field(..., min_length=1, max_length=10000)
     severity: BugSeverity = BugSeverity.MEDIUM
-    affected_version: Optional[str] = None
+    affected_version: Optional[str] = Field(None, max_length=100)
 
 
 class TestSuiteRequest(BaseModel):
-    suite_name: str
-    test_types: List[TestType] = [TestType.UNIT, TestType.INTEGRATION]
+    suite_name: str = Field(..., min_length=1, max_length=200)
+    test_types: List[TestType] = Field(
+        default_factory=lambda: [TestType.UNIT, TestType.INTEGRATION], max_length=50
+    )
     target_coverage: float = Field(0.8, ge=0.0, le=1.0)
     parallel_execution: bool = True
 
