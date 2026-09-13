@@ -9,6 +9,7 @@ import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 PROCESS_SAFETY_TEST = "test_process_safety_gate.py"
+PROCESS_DESTRUCTURING_TEST = "test_process_safety_destructuring.py"
 FULL_DEPLOY_NEEDS = "needs: [skeleton-test, school-jeeves-test, cockpit-smoke, backend-test, backend-import-smoke, frontend]"
 
 
@@ -61,7 +62,15 @@ def main() -> int:
 
     backend_quality = read(".github/workflows/backend-quality.yml")
     require('python-version: "3.11"' in backend_quality and '"ruff==0.9.*"' in backend_quality, "Backend Quality toolchain drifted", failures)
-    require(PROCESS_SAFETY_TEST in backend_quality and "test_exec_guard.py" in backend_quality and "--noconftest" in backend_quality and 'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in backend_quality, "Backend Quality security isolation drifted", failures)
+    require(
+        PROCESS_SAFETY_TEST in backend_quality
+        and PROCESS_DESTRUCTURING_TEST in backend_quality
+        and "test_exec_guard.py" in backend_quality
+        and "--noconftest" in backend_quality
+        and 'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in backend_quality,
+        "Backend Quality security isolation or regression coverage drifted",
+        failures,
+    )
     require(cancel_false(backend_quality), "Backend Quality concurrency drifted", failures)
 
     lint = read(".github/workflows/lint.yml")
@@ -69,18 +78,33 @@ def main() -> int:
     require(cancel_false(lint), "Lint concurrency drifted", failures)
 
     quality = read("scripts/quality-gates.sh")
-    require(PROCESS_SAFETY_TEST in quality and "test_exec_guard.py" in quality and "--noconftest" in quality, "local security gates drifted", failures)
+    require(
+        PROCESS_SAFETY_TEST in quality
+        and PROCESS_DESTRUCTURING_TEST in quality
+        and "test_exec_guard.py" in quality
+        and "--noconftest" in quality,
+        "local security gates drifted",
+        failures,
+    )
     precommit = read(".pre-commit-config.yaml")
-    require(PROCESS_SAFETY_TEST in precommit and "test_exec_guard.py" in precommit and "repo-toolchain-contract" in precommit, "pre-commit security/toolchain gates drifted", failures)
+    require(
+        PROCESS_SAFETY_TEST in precommit
+        and PROCESS_DESTRUCTURING_TEST in precommit
+        and "test_exec_guard.py" in precommit
+        and "repo-toolchain-contract" in precommit,
+        "pre-commit security/toolchain gates drifted",
+        failures,
+    )
     require("tests/test_process_safety.py" not in precommit, "superseded process test referenced", failures)
     require((ROOT / "backend/tests" / PROCESS_SAFETY_TEST).is_file(), "canonical process test missing", failures)
+    require((ROOT / "backend/tests" / PROCESS_DESTRUCTURING_TEST).is_file(), "destructuring process-safety regression test missing", failures)
 
     if failures:
         print("Toolchain contract violations:", file=sys.stderr)
         for failure in failures:
             print(f"  - {failure}", file=sys.stderr)
         return 1
-    print("Toolchain contract passed: proven CI actions, runtime, quality, security, self-enforcement, and fail-closed deployment gates aligned.")
+    print("Toolchain contract passed: proven CI actions, runtime, quality, security, destructuring coverage, self-enforcement, and fail-closed deployment gates aligned.")
     return 0
 
 
