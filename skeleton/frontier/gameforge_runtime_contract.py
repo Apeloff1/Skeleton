@@ -7,6 +7,6 @@ from .gameforge_lifecycle import Lifecycle,ServiceLifecycle
 class RuntimeContract:
  lifecycle:ServiceLifecycle
  dependencies:DependencyGate
- def admit(self,*,background=False,active=0,limit=1):
-  if self.lifecycle.state is not Lifecycle.READY or not self.dependencies.ready: return Admission.SHED
-  return decide(background_allowed=True,read_only=False,active=active,limit=limit,background=background)
+ def admit(self,*,background=False,active=0,limit=1,read_only=False):
+  if not self.lifecycle.can_accept or not self.dependencies.ready: return Admission.SHED
+  return decide(background_allowed=True,read_only=read_only,active=active,limit=limit,background=background)
