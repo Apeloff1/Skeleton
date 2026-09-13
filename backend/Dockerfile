@@ -5,12 +5,15 @@
 # skeleton/ alongside backend/.
 # ============================================================================
 
+ARG UV_VERSION=0.12.4
+
 # Stage 1: Builder with uv
 FROM python:3.11-slim AS builder
+ARG UV_VERSION
 
 WORKDIR /app
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:${UV_VERSION} /uv /usr/local/bin/uv
 COPY backend/pyproject.toml ./
 COPY backend/requirements.txt ./
 
@@ -48,7 +51,7 @@ CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001"]
 FROM production AS development
 
 USER root
-RUN pip install pytest pytest-cov ruff
+RUN pip install --no-cache-dir "pytest>=8,<9" pytest-cov "ruff==0.9.*"
 USER appuser
 
 CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
