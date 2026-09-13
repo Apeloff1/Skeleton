@@ -88,6 +88,11 @@ def import_aliases(tree: ast.AST) -> dict[str, str]:
 
 
 def namespace_mapping_owner(node: ast.AST, aliases: dict[str, str]) -> str | None:
+    if isinstance(node, ast.Name):
+        mapped = aliases.get(node.id)
+        if mapped and mapped.endswith(".__dict__"):
+            owner = mapped.removesuffix(".__dict__")
+            return owner if owner in TRACKED_MODULES else None
     if isinstance(node, ast.Attribute) and node.attr == "__dict__":
         owner = canonical_name(node.value, aliases)
         return owner if owner in TRACKED_MODULES else None
@@ -127,6 +132,11 @@ def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
             attribute = literal_string(node.args[1])
             if owner in TRACKED_MODULES and attribute is not None:
                 return f"{owner}.{attribute}"
+            return None
+        if wrapper == "vars" and len(node.args) == 1 and not node.keywords:
+            owner = canonical_name(node.args[0], aliases)
+            if owner in TRACKED_MODULES:
+                return f"{owner}.__dict__"
             return None
 
         direct_owner = module_getattribute_owner(node.func, aliases)
@@ -177,7 +187,7 @@ def destructured_assignments(target: ast.AST, value: ast.AST) -> list[tuple[str,
 
 
 def assignment_aliases(tree: ast.AST, aliases: dict[str, str]) -> dict[str, str]:
-    """Resolve aliases assigned from tracked process callables."""
+    """Resolve aliases assigned from tracked process callables or namespace mappings."""
     resolved = dict(aliases)
     assignments: list[tuple[str, ast.AST]] = []
     for node in ast.walk(tree):
@@ -188,7 +198,11 @@ def assignment_aliases(tree: ast.AST, aliases: dict[str, str]) -> dict[str, str]
             assignments.append((node.target.id, node.value))
         elif isinstance(node, ast.NamedExpr) and isinstance(node.target, ast.Name):
             assignments.append((node.target.id, node.value))
-    tracked_names = UNSAFE_CALLS.keys() | {f"subprocess.{call}" for call in SUBPROCESS_CALLS}
+    tracked_names = (
+        UNSAFE_CALLS.keys()
+        | {f"subprocess.{call}" for call in SUBPROCESS_CALLS}
+        | {f"{module}.__dict__" for module in TRACKED_MODULES}
+    )
     changed = True
     while changed:
         changed = False
