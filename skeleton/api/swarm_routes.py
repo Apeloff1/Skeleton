@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -91,8 +91,8 @@ def swarm_status(runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
 
 @router.get("/workers")
 def list_workers(
-    offset: int = Query(default=0, ge=0),
-    limit: int = Query(default=100, ge=1, le=1000),
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 100,
     runtime: SwarmRuntime = Depends(_runtime),
 ) -> dict[str, Any]:
     workers = runtime.workers()
@@ -126,7 +126,7 @@ def heartbeat(worker_id: str, runtime: SwarmRuntime = Depends(_runtime)) -> dict
 
 
 @router.delete("/workers/{worker_id}")
-def unregister_worker(worker_id: str, requeue: bool = Query(default=True), runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
+def unregister_worker(worker_id: str, requeue: bool = True, runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
     existed = runtime.worker(worker_id) is not None
     released = runtime.unregister_worker(worker_id, requeue=requeue)
     if not existed:
@@ -136,9 +136,9 @@ def unregister_worker(worker_id: str, requeue: bool = Query(default=True), runti
 
 @router.get("/tasks")
 def list_tasks(
-    state: TaskState | None = Query(default=None),
-    offset: int = Query(default=0, ge=0),
-    limit: int = Query(default=100, ge=1, le=1000),
+    state: Annotated[TaskState | None, Query()] = None,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 100,
     runtime: SwarmRuntime = Depends(_runtime),
 ) -> dict[str, Any]:
     tasks = runtime.tasks()
@@ -184,7 +184,11 @@ def revive_task(task_id: str, body: ReviveRequest, runtime: SwarmRuntime = Depen
 
 
 @router.post("/workers/{worker_id}/lease")
-def lease_tasks(worker_id: str, limit: int | None = Query(default=None, ge=0, le=1000), runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
+def lease_tasks(
+    worker_id: str,
+    limit: Annotated[int | None, Query(ge=0, le=1000)] = None,
+    runtime: SwarmRuntime = Depends(_runtime),
+) -> dict[str, Any]:
     try:
         tasks = runtime.lease(worker_id, limit=limit)
     except LeaseError as exc:
@@ -193,7 +197,12 @@ def lease_tasks(worker_id: str, limit: int | None = Query(default=None, ge=0, le
 
 
 @router.post("/workers/{worker_id}/tasks/{task_id}/renew")
-def renew_task(worker_id: str, task_id: str, seconds: float | None = Query(default=None, gt=0, le=86_400), runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
+def renew_task(
+    worker_id: str,
+    task_id: str,
+    seconds: Annotated[float | None, Query(gt=0, le=86_400)] = None,
+    runtime: SwarmRuntime = Depends(_runtime),
+) -> dict[str, Any]:
     try:
         return _task_dict(runtime.renew(worker_id, task_id, seconds=seconds))
     except LeaseError as exc:
@@ -224,7 +233,10 @@ def reap_expired(runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
 
 
 @router.get("/dead")
-def dead_letters(limit: int = Query(default=100, ge=1, le=1000), runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
+def dead_letters(
+    limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+    runtime: SwarmRuntime = Depends(_runtime),
+) -> dict[str, Any]:
     tasks = tuple(runtime.dead())
     return {"tasks": [_task_dict(task) for task in tasks[:limit]], "total": len(tasks), "limit": limit}
 
@@ -245,6 +257,9 @@ def restore_state(body: RestoreRequest) -> dict[str, Any]:
 
 
 @router.get("/events")
-def events(limit: int = Query(default=100, ge=1, le=1000), runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
+def events(
+    limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+    runtime: SwarmRuntime = Depends(_runtime),
+) -> dict[str, Any]:
     items = runtime.events()[-limit:]
     return {"events": [{"timestamp": timestamp, "kind": kind, "subject": subject} for timestamp, kind, subject in items]}
