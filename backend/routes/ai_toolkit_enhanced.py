@@ -56,51 +56,51 @@ ai_toolkit_db = mongo_client.codedock_ai_toolkit
 # ============================================================================
 
 class CodeReviewRequest(BaseModel):
-    code: str
-    language: str = "python"
+    code: str = Field(..., min_length=1, max_length=500000)
+    language: str = Field("python", min_length=1, max_length=100)
     review_depth: Literal["quick", "standard", "deep"] = "standard"
-    focus_areas: List[str] = []  # security, performance, readability, etc.
+    focus_areas: List[str] = Field(default_factory=list, max_length=20)  # security, performance, readability, etc.
 
 
 class TestGenerationRequest(BaseModel):
-    code: str
-    language: str = "python"
-    test_framework: str = "pytest"  # pytest, jest, mocha, junit
-    coverage_target: float = 0.8
-    test_types: List[str] = ["unit", "edge_cases"]
+    code: str = Field(..., min_length=1, max_length=500000)
+    language: str = Field("python", min_length=1, max_length=100)
+    test_framework: str = Field("pytest", min_length=1, max_length=100)  # pytest, jest, mocha, junit
+    coverage_target: float = Field(0.8, ge=0, le=1)
+    test_types: List[str] = Field(default_factory=lambda: ["unit", "edge_cases"], max_length=20)
 
 
 class RefactorRequest(BaseModel):
-    code: str
-    language: str = "python"
-    refactor_goals: List[str] = ["readability", "performance"]
+    code: str = Field(..., min_length=1, max_length=500000)
+    language: str = Field("python", min_length=1, max_length=100)
+    refactor_goals: List[str] = Field(default_factory=lambda: ["readability", "performance"], max_length=20)
     preserve_behavior: bool = True
 
 
 class DocGenerationRequest(BaseModel):
-    code: str
-    language: str = "python"
+    code: str = Field(..., min_length=1, max_length=500000)
+    language: str = Field("python", min_length=1, max_length=100)
     doc_style: Literal["google", "numpy", "sphinx", "jsdoc"] = "google"
     include_examples: bool = True
 
 
 class BugPredictionRequest(BaseModel):
-    code: str
-    language: str = "python"
-    context: Optional[str] = None
+    code: str = Field(..., min_length=1, max_length=500000)
+    language: str = Field("python", min_length=1, max_length=100)
+    context: Optional[str] = Field(None, max_length=100000)
 
 
 class ArchitectureAnalysisRequest(BaseModel):
-    code_files: Dict[str, str]  # filename -> content
-    project_type: str = "web"
+    code_files: Dict[str, str] = Field(..., min_length=1, max_length=100)  # filename -> content
+    project_type: str = Field("web", min_length=1, max_length=100)
 
 
 class PairProgrammingRequest(BaseModel):
-    user_id: str
-    code: str
-    language: str = "python"
-    task_description: str
-    session_id: Optional[str] = None
+    user_id: str = Field(..., min_length=1, max_length=200)
+    code: str = Field(..., min_length=1, max_length=500000)
+    language: str = Field("python", min_length=1, max_length=100)
+    task_description: str = Field(..., min_length=1, max_length=10000)
+    session_id: Optional[str] = Field(None, min_length=1, max_length=200)
 
 
 # ============================================================================

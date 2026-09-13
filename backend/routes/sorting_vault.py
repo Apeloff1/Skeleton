@@ -5,7 +5,7 @@ Connects to: Code Vault, Asset Vault, Template Vault, Snippet Vault, Project Vau
 """
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Literal
 from datetime import datetime
 from enum import Enum
@@ -31,11 +31,11 @@ class VaultItem(BaseModel):
     name: str
     vault_type: VaultType
     category: str
-    tags: List[str] = []
+    tags: List[str] = Field(default_factory=list, max_length=50)
     size_bytes: int
     created_at: str
     modified_at: str
-    metadata: Dict[str, Any] = {}
+    metadata: Dict[str, Any] = Field(default_factory=dict)
     preview: Optional[str] = None
     starred: bool = False
     archived: bool = False
