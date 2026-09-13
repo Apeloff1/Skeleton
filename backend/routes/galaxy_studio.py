@@ -1,7 +1,4 @@
 """
-if not code_execution_enabled():
-    return execution_disabled_response("Galaxy Studio APK build")
-
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  GALAXY STUDIO FACTORY v1.0                                                ║
 ║  ─────────────────────────────────────────────────────────────────────────  ║
@@ -40,7 +37,7 @@ running ``pytest`` + ``curl /api/galaxy-studio/*`` between each step.
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator, AliasChoices
-from core.exec_guard import code_execution_enabled, execution_disabled_response, ConfigDict, Field, field_validator, AliasChoices
+from core.exec_guard import code_execution_enabled, execution_disabled_response
 from typing import Optional, Union
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -951,8 +948,10 @@ def _run_batch_for_phase(build: dict, batch_num: int) -> int:
         new_count = len(batch_files)
     build["file_count"] = len(build["files"])
     # Stream this batch to the on-disk vault — keeps RAM bounded.
-    try: _flush_to_vault(build)
-    except Exception: pass
+    try:
+        _flush_to_vault(build)
+    except Exception as _flush_error:
+        print(f"[GALAXY] vault flush failed: {_flush_error}", flush=True)
 
     # ═══ SWARM DISCOURSE — 200 agents debate the batch's context ═══
     # Non-fatal: failures never block file generation.
@@ -2632,8 +2631,10 @@ async def _run_background_build_inner(build: dict, build_id: str,
                             build["file_count"] = len(build["files"])
                             # Stream this worker batch to vault immediately
                             # (off the event loop so /status & /health stay snappy).
-                            try: await asyncio.to_thread(_flush_to_vault, build)
-                            except Exception: pass
+                            try:
+                                await asyncio.to_thread(_flush_to_vault, build)
+                            except Exception as _flush_error:
+                                print(f"[GALAXY BG] vault flush failed: {_flush_error}", flush=True)
                             _builds[build_id] = build
                             print(f"[GALAXY BG] Batch {batch_num} harvested: +{len(w_files)} files → {build['file_count']} total", flush=True)
                             # Mark phases in this batch as completed
@@ -2757,8 +2758,10 @@ async def _run_background_build_inner(build: dict, build_id: str,
                             build["phases"][_idx]["status"] = "completed"
                             build["phases"][_idx]["completed_at"] = datetime.utcnow().isoformat()
                 build["current_phase"] = len(BUILD_PHASES)
-                try: await _save_build(build)
-                except Exception: pass
+                try:
+                    await _save_build(build)
+                except Exception as _save_error:
+                    print(f"[GALAXY BG] build save failed: {_save_error}", flush=True)
                 break
         except Exception as _bge:
             print(f"[GALAXY BG] budget enforcement check failed (non-fatal): {_bge}")
@@ -2948,7 +2951,8 @@ async def _run_background_build_inner(build: dict, build_id: str,
                 if now - last_save_ts > 3.0:
                     try:
                         await _save_build(build)
-                    except Exception: pass
+                    except Exception as _save_error:
+                        print(f"[GALAXY BG] floor progress save failed: {_save_error}", flush=True)
                     last_save_ts = now
             build["_bg_floor_in_progress"] = False
             print(f"[GALAXY BG] FLOOR PASS harvested {harvested}/{total_tasks} chunks, file_count={build['file_count']}")
@@ -3404,8 +3408,10 @@ async def start_background_build(req: StartBuildRequest):
         if clean_weights:
             build["phase_weights"] = clean_weights
             print(f"[GALAXY start-build] applied phase_weights for {req.build_id}: {clean_weights}")
-            try: await _save_build(build)
-            except Exception: pass
+            try:
+                await _save_build(build)
+            except Exception as _save_error:
+                print(f"[GALAXY] phase weight save failed: {_save_error}", flush=True)
 
     # Wrap the create_task itself in try/except so even a catastrophic
     # asyncio failure doesn't leave the user staring at a dead UI.
@@ -3419,8 +3425,10 @@ async def start_background_build(req: StartBuildRequest):
         build["_bg_status"] = "failed"
         build["status"] = "failed"
         build["_bg_error"] = f"task_creation_failed: {_tke}"
-        try: await _save_build(build)
-        except Exception: pass
+        try:
+            await _save_build(build)
+        except Exception as _save_error:
+            print(f"[GALAXY] failed-status save failed: {_save_error}", flush=True)
         raise HTTPException(500, f"Failed to launch build task: {_tke}")
 
     # ═══ AUTO-SCHEDULE THE SWARM DAG ═══
@@ -5082,8 +5090,10 @@ async def galaxy_compile_build(build_id: str, expo_token: Optional[str] = None):
     import subprocess as _sp, json as _json, os as _os, zipfile as _zf
     from datetime import datetime as _dt
     from dotenv import load_dotenv as _ld
-    try: _ld()
-    except Exception: pass
+    try:
+        _ld()
+    except Exception as _dotenv_error:
+        print(f"[GALAXY] dotenv load failed: {_dotenv_error}", flush=True)
 
     token = expo_token or _os.environ.get("EXPO_TOKEN", "")
     if not token:
@@ -5138,7 +5148,8 @@ async def galaxy_compile_build(build_id: str, expo_token: Optional[str] = None):
                     app_config["expo"]["extra"].get("eas", {}).pop("projectId", None)
                 with open(app_json_path, "w") as f:
                     _json.dump(app_config, f, indent=2)
-            except Exception: pass
+            except Exception as _app_config_error:
+                print(f"[GALAXY] app.json update failed: {_app_config_error}", flush=True)
         _sp.run(["eas", "init", "--non-interactive", "--force"],
                 cwd=actual_dir, env=env, capture_output=True, text=True, timeout=90)
         _sp.run(["git", "add", "."], cwd=actual_dir, capture_output=True, timeout=15)
