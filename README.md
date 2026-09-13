@@ -103,3 +103,18 @@ Layered (lowest → highest priority):
 ## License
 
 MIT
+# Integrated frontier execution
+
+The bounded frontier runtime now runs the existing GameForge NPC/game-logic
+pipelines and Jeeves code intelligence, with cancellation, scoped idempotency,
+sealed HTTP routes, and persistent SQLite memory.
+
+```bash
+python -m pip install -r requirements-frontier.txt
+python -m skeleton frontier agents
+python -m skeleton frontier run gameforge.npc "a loyal guardian"
+python scripts/test_frontier.py
+```
+
+See [the runtime guide](docs/FRONTIER_RUNTIME.md) for limits, memory commands,
+HTTP contracts, and validation scope.
