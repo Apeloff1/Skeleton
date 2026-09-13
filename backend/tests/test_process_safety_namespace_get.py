@@ -85,3 +85,43 @@ def test_rejects_vars_get_asyncio_shell(tmp_path: Path) -> None:
         "import asyncio\nvars(asyncio).get('create_subprocess_shell')('echo unsafe')\n",
     )
     assert any("asyncio.create_subprocess_shell()" in finding for finding in findings)
+
+
+def test_rejects_assigned_vars_mapping_subscript(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import os\nnamespace = vars(os)\nnamespace['system']('echo unsafe')\n",
+    )
+    assert any("os.system()" in finding for finding in findings)
+
+
+def test_rejects_assigned_dunder_mapping_get(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nnamespace = subprocess.__dict__\nnamespace.get('run')('echo unsafe', shell=True)\n",
+    )
+    assert any("subprocess.run" in finding and "shell=..." in finding for finding in findings)
+
+
+def test_rejects_transitive_namespace_mapping_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import os\nnamespace = vars(os)\nother = namespace\nother['popen']('echo unsafe')\n",
+    )
+    assert any("os.popen()" in finding for finding in findings)
+
+
+def test_rejects_dynamic_key_through_assigned_mapping(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nnamespace = vars(subprocess)\nname = 'run'\nnamespace[name](['python', '--version'])\n",
+    )
+    assert any("dynamic namespace lookup on subprocess" in finding for finding in findings)
+
+
+def test_allows_unrelated_mapping_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "namespace = {'run': lambda *args, **kwargs: None}\nnamespace['run']('safe', shell=True)\n",
+    )
+    assert findings == []
