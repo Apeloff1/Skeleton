@@ -8,13 +8,15 @@ import os
 import subprocess
 import time
 from typing import Optional, List, Dict
+from core.exec_guard import execution_disabled_message, require_execution_allowed
 from gameforge.boardroom.persistent_vault import boardroom_vault
 
 class GitGitHubIntegration:
     def __init__(self, repo_path: str = "/tmp/gameforge_repo"):
         self.repo_path = repo_path
         os.makedirs(repo_path, exist_ok=True)
-        self._ensure_git_repo()
+        if require_execution_allowed("Snowball Git operations"):
+            self._ensure_git_repo()
 
     def _ensure_git_repo(self):
         # Resilient to the repo dir being wiped (e.g. ephemeral /tmp cleared on
@@ -39,6 +41,9 @@ class GitGitHubIntegration:
 
     def commit_file_from_vault(self, file_id: str, version: int, commit_message: str) -> bool:
         """Take a file from Boardroom Vault and commit it to Git."""
+        if not require_execution_allowed("Snowball Git commit"):
+            print(f"[Git] {execution_disabled_message('Snowball Git commit')}")
+            return False
         self._ensure_git_repo()
         content = boardroom_vault.get_file(file_id, version)
         if not content:
@@ -77,6 +82,9 @@ class GitGitHubIntegration:
 
     def push_to_github(self, remote_url: str, branch: str = "main") -> bool:
         """Push current repo to GitHub."""
+        if not require_execution_allowed("Snowball Git push"):
+            print(f"[GitHub] {execution_disabled_message('Snowball Git push')}")
+            return False
         try:
             # Set remote if not exists
             result = subprocess.run(
