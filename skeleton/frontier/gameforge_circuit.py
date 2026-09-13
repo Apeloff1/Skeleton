@@ -10,8 +10,8 @@ class CircuitState(str, Enum):
 
 class Circuit:
     def __init__(self, threshold: int = 5):
-        if not isinstance(threshold, int) or threshold <= 0:
-            raise ValueError("threshold must be positive")
+        if not isinstance(threshold, int) or isinstance(threshold, bool) or threshold <= 0:
+            raise ValueError("threshold must be a positive integer")
         self.threshold = threshold
         self.failures = 0
         self.state = CircuitState.CLOSED
