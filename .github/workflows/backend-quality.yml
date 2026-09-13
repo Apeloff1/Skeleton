@@ -1,8 +1,8 @@
 name: Backend Quality
 
-# Fast, fail-closed backend gate: lint, syntax compilation, and critical
-# security-boundary regression tests. Keep this independent from the heavier
-# dependency-backed integration suite.
+# Fast, fail-closed backend gate: lint, syntax compilation, critical
+# security-boundary regression tests, and process invocation policy.
+# Keep this independent from the heavier dependency-backed integration suite.
 
 on:
   push:
@@ -46,6 +46,9 @@ jobs:
 
       - name: Syntax check (full backend)
         run: python -m compileall -q .
+
+      - name: Process invocation safety gate
+        run: python scripts/check_process_safety.py
 
       - name: Execution boundary regression tests
         run: python -m pytest -q tests/test_exec_guard.py
