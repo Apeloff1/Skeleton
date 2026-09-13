@@ -59,6 +59,7 @@ jobs:
           python -m pytest -q \
             skeleton/testing/test_swarm_ingress.py \
             skeleton/testing/test_swarm_tenant_broker.py \
+            skeleton/testing/test_swarm_tenant_revival_guard.py \
             skeleton/testing/test_swarm_rate_limit_refund.py \
             skeleton/testing/test_swarm_quota_validation.py \
             skeleton/testing/test_swarm_fairness_validation.py \
