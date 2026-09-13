@@ -90,13 +90,23 @@ def main() -> int:
 
     ci = read(".github/workflows/ci.yml")
     require(
+        re.search(r'^\s*PYTHON_VERSION:\s*"3\.11"\s*$', ci, re.MULTILINE) is not None,
+        "CI workflow PYTHON_VERSION must be 3.11",
+        failures,
+    )
+    require(
         re.search(r'^\s*NODE_VERSION:\s*"24"\s*$', ci, re.MULTILINE) is not None,
         "CI workflow NODE_VERSION must be 24",
         failures,
     )
     require(
-        'python-version: "3.11"' in ci,
-        "CI workflow must provision Python 3.11",
+        ci.count('python-version: "${{ env.PYTHON_VERSION }}"') >= 6,
+        "All CI Python jobs must consume the canonical PYTHON_VERSION",
+        failures,
+    )
+    require(
+        'node-version: "${{ env.NODE_VERSION }}"' in ci,
+        "CI frontend job must consume the canonical NODE_VERSION",
         failures,
     )
     require(
@@ -114,6 +124,19 @@ def main() -> int:
         "CI/CD must keep the active validation alive during rapid pushes",
         failures,
     )
+    for deploy_gate in (
+        "skeleton-test",
+        "school-jeeves-test",
+        "cockpit-smoke",
+        "backend-test",
+        "backend-import-smoke",
+        "frontend",
+    ):
+        require(
+            re.search(rf"^\s*-\s*{re.escape(deploy_gate)}\s*$", ci, re.MULTILINE) is not None,
+            f"Docker deployment must depend on {deploy_gate}",
+            failures,
+        )
 
     backend_quality = read(".github/workflows/backend-quality.yml")
     require(
@@ -187,6 +210,11 @@ def main() -> int:
         "Pre-commit must not reference the superseded process-safety test name",
         failures,
     )
+    require(
+        "repo-toolchain-contract" in precommit,
+        "Pre-commit must enforce the repository toolchain contract",
+        failures,
+    )
 
     require(
         (ROOT / "backend/tests" / PROCESS_SAFETY_TEST).is_file(),
@@ -201,8 +229,8 @@ def main() -> int:
         return 1
 
     print(
-        "Toolchain contract passed: Python 3.11 / Ruff 0.9 / Node 24, security gates, "
-        "and anti-starvation concurrency aligned."
+        "Toolchain contract passed: centralized Python 3.11 / Node 24, Ruff 0.9, "
+        "security gates, deployment gates, and anti-starvation concurrency aligned."
     )
     return 0
 
