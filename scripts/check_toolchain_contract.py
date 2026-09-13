@@ -28,37 +28,13 @@ def require(condition: bool, message: str, failures: list[str]) -> None:
 
 
 def workflow_cancel_in_progress_is_false(workflow: str) -> bool:
-    return (
-        re.search(
-            r"^\s*cancel-in-progress:\s*false\s*(?:#.*)?$",
-            workflow,
-            re.MULTILINE,
-        )
-        is not None
-    )
+    return re.search(r"^\s*cancel-in-progress:\s*false\s*(?:#.*)?$", workflow, re.MULTILINE) is not None
 
 
 def require_node24_actions(workflow: str, label: str, failures: list[str]) -> None:
-    require(
-        "actions/checkout@v4" not in workflow
-        and "actions/checkout@v5" not in workflow
-        and "actions/checkout@v6" not in workflow,
-        f"{label} must not use pre-v7 checkout actions",
-        failures,
-    )
-    require(
-        "actions/setup-python@v5" not in workflow
-        and "actions/setup-python@v6" not in workflow,
-        f"{label} must not use pre-v7 setup-python actions",
-        failures,
-    )
-    require(
-        "actions/setup-node@v4" not in workflow
-        and "actions/setup-node@v5" not in workflow
-        and "actions/setup-node@v6" not in workflow,
-        f"{label} must not use pre-v7 setup-node actions",
-        failures,
-    )
+    require("actions/checkout@v4" not in workflow and "actions/checkout@v5" not in workflow and "actions/checkout@v6" not in workflow, f"{label} must not use pre-v7 checkout actions", failures)
+    require("actions/setup-python@v5" not in workflow and "actions/setup-python@v6" not in workflow, f"{label} must not use pre-v7 setup-python actions", failures)
+    require("actions/setup-node@v4" not in workflow and "actions/setup-node@v5" not in workflow and "actions/setup-node@v6" not in workflow, f"{label} must not use pre-v7 setup-node actions", failures)
 
 
 def main() -> int:
@@ -69,7 +45,6 @@ def main() -> int:
     ruff = backend_toml.get("tool", {}).get("ruff", {})
     mypy = backend_toml.get("tool", {}).get("mypy", {})
     dev = project.get("optional-dependencies", {}).get("dev", [])
-
     require(project.get("requires-python") == ">=3.11", "backend/pyproject.toml must require Python >=3.11", failures)
     require(ruff.get("target-version") == "py311", "backend Ruff target-version must be py311", failures)
     require(str(mypy.get("python_version")) == "3.11", "backend mypy python_version must be 3.11", failures)
@@ -99,6 +74,7 @@ def main() -> int:
     require('version: "latest-known"' in ci, "CI/CD setup-uv must use checksum-known uv releases", failures)
     require("docker/setup-buildx-action@v4.1.0" in ci, "CI/CD must use setup-buildx 4.1.0", failures)
     require(ci.count("docker/build-push-action@v7.2.0") == 3, "CI/CD must use build-push 7.2.0 for all release images", failures)
+    require(ci.count("${{ github.sha }}") >= 3, "Every release image must publish an immutable commit-SHA tag", failures)
     for deploy_gate in ("skeleton-test", "school-jeeves-test", "cockpit-smoke", "backend-test", "backend-import-smoke", "frontend"):
         require(re.search(rf"^\s*-\s*{re.escape(deploy_gate)}\s*$", ci, re.MULTILINE) is not None, f"Docker deployment must depend on {deploy_gate}", failures)
 
@@ -125,7 +101,6 @@ def main() -> int:
     require(PROCESS_SAFETY_TEST in precommit and "test_exec_guard.py" in precommit, "Pre-commit execution-boundary hook must use canonical security tests", failures)
     require("tests/test_process_safety.py" not in precommit, "Pre-commit must not reference the superseded process-safety test name", failures)
     require("repo-toolchain-contract" in precommit, "Pre-commit must enforce the repository toolchain contract", failures)
-
     require((ROOT / "backend/tests" / PROCESS_SAFETY_TEST).is_file(), f"Canonical process-safety test missing: {PROCESS_SAFETY_TEST}", failures)
 
     if failures:
@@ -134,7 +109,7 @@ def main() -> int:
             print(f"  - {failure}", file=sys.stderr)
         return 1
 
-    print("Toolchain contract passed: Python 3.11 / Node 24, Ruff 0.9, modern actions, pinned container tooling, security gates, deployment gates, and anti-starvation concurrency aligned.")
+    print("Toolchain contract passed: Python 3.11 / Node 24, Ruff 0.9, modern actions, pinned container tooling, immutable release tags, security gates, deployment gates, and anti-starvation concurrency aligned.")
     return 0
 
 
