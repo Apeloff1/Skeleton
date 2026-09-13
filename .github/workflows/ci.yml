@@ -75,6 +75,7 @@ jobs:
             skeleton/testing/test_swarm_recovery_archive.py \
             skeleton/testing/test_swarm_recovery_archive_api.py \
             skeleton/testing/test_swarm_recovery_archive_publication.py \
+            skeleton/testing/test_swarm_recovery_activation.py \
             skeleton/testing/test_swarm_restore_validation.py \
             skeleton/testing/test_swarm_restore_ordering.py \
             skeleton/testing/test_swarm_forget_retention.py \
