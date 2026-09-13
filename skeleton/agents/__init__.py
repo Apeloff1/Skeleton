@@ -1,12 +1,10 @@
-"""
-Skeleton Agents Package
-
-Exports the coordination, mesh bridge, and bounded swarm runtime primitives used
-by API workers and embedded orchestration clients.
-"""
+"""Skeleton agent orchestration primitives."""
 
 from skeleton.agents.coordination import AgentPool, Coordinator, Task, TaskStatus
 from skeleton.agents.bridge import MeshBridge
+from skeleton.agents.swarm_admission import AdmissionDecision, AdmissionPolicy, capability_coverage
+from skeleton.agents.swarm_idempotency import IdempotencyConflict, IdempotencyRecord, IdempotencyRegistry
+from skeleton.agents.swarm_scheduler import SwarmScheduler, WorkerScore
 from skeleton.agents.swarm_runtime import (
     AdmissionError,
     LeaseError,
@@ -18,16 +16,9 @@ from skeleton.agents.swarm_runtime import (
 )
 
 __all__ = [
-    "Coordinator",
-    "AgentPool",
-    "Task",
-    "TaskStatus",
-    "MeshBridge",
-    "AdmissionError",
-    "LeaseError",
-    "RuntimeSnapshot",
-    "SwarmRuntime",
-    "SwarmTask",
-    "TaskState",
-    "WorkerState",
+    "Coordinator", "AgentPool", "Task", "TaskStatus", "MeshBridge",
+    "AdmissionError", "LeaseError", "RuntimeSnapshot", "SwarmRuntime",
+    "SwarmTask", "TaskState", "WorkerState", "AdmissionDecision",
+    "AdmissionPolicy", "capability_coverage", "IdempotencyConflict",
+    "IdempotencyRecord", "IdempotencyRegistry", "SwarmScheduler", "WorkerScore",
 ]
