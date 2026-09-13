@@ -7,6 +7,7 @@ export interface ThemeColors {
   background: string;
   surface: string;
   surfaceAlt: string;
+  card: string;
   text: string;
   textSecondary: string;
   textMuted: string;
@@ -30,6 +31,7 @@ export const darkTheme: ThemeColors = {
   background: '#0A0A0F',
   surface: '#12121A',
   surfaceAlt: '#1A1A24',
+  card: '#1A1A24',
   text: '#FFFFFF',
   textSecondary: '#A0A0B0',
   textMuted: '#606070',
@@ -53,6 +55,7 @@ export const lightTheme: ThemeColors = {
   background: '#F8FAFC',
   surface: '#FFFFFF',
   surfaceAlt: '#F1F5F9',
+  card: '#FFFFFF',
   text: '#0F172A',
   textSecondary: '#475569',
   textMuted: '#94A3B8',
