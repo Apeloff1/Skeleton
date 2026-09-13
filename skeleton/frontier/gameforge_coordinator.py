@@ -31,8 +31,16 @@ class RuntimeCoordinator:
         self._reservations = 0
         self._request_ids = set()
 
+    @staticmethod
+    def _validate_request_id(request_id):
+        if request_id is None:
+            return
+        if not isinstance(request_id, str) or not request_id.strip():
+            raise ValueError("request_id must be None or a non-empty string")
+
     def admit(self, now: int, active: int, limit: int = 1, background: bool = False,
               request_id=None, retry: bool = False, read_only: bool = False):
+        self._validate_request_id(request_id)
         if request_id is not None and request_id in self._request_ids:
             self.health.record(False)
             return Admission.SHED
@@ -101,6 +109,7 @@ class RuntimeCoordinator:
 
     def release(self, request_id=None):
         """Release one reservation, optionally targeting its request identity."""
+        self._validate_request_id(request_id)
         if self._reservations <= 0:
             return False
         if request_id is not None:
