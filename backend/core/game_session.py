@@ -6,7 +6,7 @@ runtime object suitable for Play pillar adapters.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from core.course_runtime import Course, CourseTracker
@@ -134,14 +134,5 @@ class GameSession:
             "total_rings": len(self.course.rings),
             "medal": int(_MEDAL_MAP[self.tracker.medal_band()]),
             "distance": self._distance,
-            "ghost": [sample.__dict__ if hasattr(sample, "__dict__") else {
-                "t": sample.t,
-                "x": sample.x,
-                "y": sample.y,
-                "z": sample.z,
-                "yaw": sample.yaw,
-                "pitch": sample.pitch,
-                "bank": sample.bank,
-                "speed": sample.speed,
-            } for sample in self._ghost],
+            "ghost": [asdict(sample) for sample in self._ghost],
         }
