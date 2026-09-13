@@ -95,12 +95,14 @@ class EmotionalModelRequest(BaseModel):
     persona_name: str
     base_mood: Literal["happy", "neutral", "melancholic", "anxious", "confident"] = "neutral"
     mood_volatility: float = Field(0.3, ge=0.0, le=1.0)
-    triggers: List[str] = []
+    triggers: List[str] = Field(default_factory=list, max_length=100)
 
 
 class KnowledgeBaseRequest(BaseModel):
     persona_name: str
-    domains: List[KnowledgeDomain] = [KnowledgeDomain.LORE]
+    domains: List[KnowledgeDomain] = Field(
+        default_factory=lambda: [KnowledgeDomain.LORE], max_length=100
+    )
     expertise_level: Literal["novice", "intermediate", "expert", "master"] = "intermediate"
     can_learn: bool = True
 

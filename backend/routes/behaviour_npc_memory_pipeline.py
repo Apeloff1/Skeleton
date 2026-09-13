@@ -75,7 +75,9 @@ class RelationshipType(str, Enum):
 class MemorySystemRequest(BaseModel):
     npc_name: str
     memory_capacity: int = Field(1000, ge=100, le=100000)
-    memory_types: List[MemoryType] = [MemoryType.EPISODIC, MemoryType.EMOTIONAL]
+    memory_types: List[MemoryType] = Field(
+        default_factory=lambda: [MemoryType.EPISODIC, MemoryType.EMOTIONAL], max_length=50
+    )
     decay_enabled: bool = True
     consolidation_enabled: bool = True
 
@@ -89,9 +91,11 @@ class BehaviourTreeRequest(BaseModel):
 
 class LearningSystemRequest(BaseModel):
     npc_name: str
-    learning_modes: List[LearningMode] = [LearningMode.REINFORCEMENT]
+    learning_modes: List[LearningMode] = Field(
+        default_factory=lambda: [LearningMode.REINFORCEMENT], max_length=50
+    )
     learning_rate: float = Field(0.1, ge=0.01, le=1.0)
-    skill_domains: List[str] = []
+    skill_domains: List[str] = Field(default_factory=list, max_length=100)
 
 
 class RelationshipSystemRequest(BaseModel):
@@ -103,7 +107,10 @@ class RelationshipSystemRequest(BaseModel):
 
 class EmotionalMemoryRequest(BaseModel):
     npc_name: str
-    emotional_range: List[str] = ["joy", "sadness", "anger", "fear", "surprise", "disgust"]
+    emotional_range: List[str] = Field(
+        default_factory=lambda: ["joy", "sadness", "anger", "fear", "surprise", "disgust"],
+        max_length=50,
+    )
     mood_system: bool = True
     trauma_system: bool = False
 
