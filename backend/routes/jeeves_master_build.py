@@ -21,6 +21,7 @@ import asyncio
 
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from core.exec_guard import code_execution_enabled, execution_disabled_response
 from datetime import datetime
 from typing import Optional
 import uuid
@@ -2071,6 +2072,9 @@ async def get_single_file(build_id: str, file_path: str):
 
 @router.post("/compile/{build_id}")
 async def compile_build(build_id: str, expo_token: Optional[str] = None):
+    if not code_execution_enabled():
+        return execution_disabled_response("Jeeves EAS compilation")
+
     """Trigger REAL EAS Build for APK compilation (Expo cloud).
 
     Previously this endpoint ran a ``[VEE SIMULATED]`` stub that always

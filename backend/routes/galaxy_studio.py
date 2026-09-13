@@ -1,4 +1,7 @@
 """
+if not code_execution_enabled():
+    return execution_disabled_response("Galaxy Studio APK build")
+
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  GALAXY STUDIO FACTORY v1.0                                                ║
 ║  ─────────────────────────────────────────────────────────────────────────  ║
@@ -37,6 +40,7 @@ running ``pytest`` + ``curl /api/galaxy-studio/*`` between each step.
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator, AliasChoices
+from core.exec_guard import code_execution_enabled, execution_disabled_response, ConfigDict, Field, field_validator, AliasChoices
 from typing import Optional, Union
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -3611,6 +3615,9 @@ async def get_status(build_id: str):
 @router.post("/deploy/{build_id}")
 async def deploy_build(build_id: str, expo_token: Optional[str] = None):
     """Deploy game — triggers EAS build or provides ZIP."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Galaxy Studio deployment")
+
     build = await _load_build(build_id)
     if not build:
         raise HTTPException(404, "Build not found")
@@ -5062,6 +5069,9 @@ async def galaxy_compile_build(build_id: str, expo_token: Optional[str] = None):
     (non-mocked) flow: git init → npm install → eas init → eas build
     --platform android --profile preview --non-interactive --no-wait.
     """
+    if not code_execution_enabled():
+        return execution_disabled_response("Galaxy Studio EAS compilation")
+
     build = await _load_build(build_id)
     if not build:
         raise HTTPException(404, "Build not found")

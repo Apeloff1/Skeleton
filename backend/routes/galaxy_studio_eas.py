@@ -19,6 +19,7 @@ import subprocess
 
 from fastapi import APIRouter
 from dotenv import load_dotenv
+from core.exec_guard import code_execution_enabled, execution_disabled_response
 
 # Sub-router — NO prefix so the parent's "/api/galaxy-studio" prefix applies.
 router = APIRouter(tags=["galaxy-studio"])
@@ -49,6 +50,9 @@ async def eas_whoami() -> dict:
     Returns ``{status, account, email, cli_version, mocked}`` so the frontend
     can show a green pill when the real cloud compile is available.
     """
+    if not code_execution_enabled():
+        return execution_disabled_response("EAS CLI execution")
+
     token = _read_eas_token()
     if not token:
         return {
@@ -117,6 +121,9 @@ async def eas_whoami() -> dict:
 async def eas_build_status(eas_build_id: str) -> dict:
     """Proxy to ``eas build:view --json`` so the frontend can poll a real EAS
     build without a dedicated Jeeves build record."""
+    if not code_execution_enabled():
+        return execution_disabled_response("EAS CLI execution")
+
     token = _read_eas_token()
     if not token:
         return {"status": "no_token", "message": "EXPO_TOKEN missing."}
