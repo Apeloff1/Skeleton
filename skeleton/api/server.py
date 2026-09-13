@@ -42,6 +42,7 @@ class ServerState:
         self.swarm_recovery: Optional[Any] = None
         self.swarm_supervisor: Optional[Any] = None
         self.swarm_broker: Optional[Any] = None
+        self.swarm_ingress: Optional[Any] = None
         self.health: Optional[Any] = None
         self.metrics: Optional[Any] = None
         self.cockpit: Optional[Any] = None
@@ -94,6 +95,11 @@ class ServerState:
                 checks["swarm_supervisor"] = self.swarm_supervisor.status()
             except Exception:
                 checks["swarm_supervisor"] = {"error": "supervisor status failed"}
+        if self.swarm_ingress is not None:
+            try:
+                checks["swarm_ingress"] = self.swarm_ingress.status()
+            except Exception:
+                checks["swarm_ingress"] = {"error": "ingress status failed"}
         has_error = any(isinstance(check, dict) and check.get("error") for check in checks.values())
         swarm_critical = isinstance(checks.get("swarm"), dict) and checks["swarm"].get("status") == "critical"
         overall = not has_error and not swarm_critical
@@ -124,10 +130,12 @@ class ServerState:
         self.cockpit = live.attach(genesis.bus)
 
         from skeleton.agents.swarm_hardened import HardenedSwarmRuntime
+        from skeleton.agents.swarm_ingress import SwarmIngressGovernor
         from skeleton.agents.swarm_recovery import SwarmRecoveryManager
         runtime = HardenedSwarmRuntime(max_tasks=100_000, max_workers=10_000, default_lease_seconds=30.0, max_lease_seconds=86_400.0)
         self.bind_swarm_runtime(runtime)
         self.swarm_recovery = SwarmRecoveryManager(max_checkpoints=16)
+        self.swarm_ingress = SwarmIngressGovernor()
 
         from skeleton.observability import MetricsCollector
         self.metrics = MetricsCollector()
@@ -166,6 +174,7 @@ def create_app() -> Any:
     from skeleton.api.swarm_supervisor_routes import router as swarm_supervisor_router
     from skeleton.api.swarm_broker_routes import router as swarm_broker_router
     from skeleton.api.swarm_batch_routes import router as swarm_batch_router
+    from skeleton.api.swarm_ingress_routes import router as swarm_ingress_router
     app.include_router(router, prefix="/api/v1")
     app.include_router(gameforge_router, prefix="/api/v1")
     app.include_router(swarm_router, prefix="/api/v1")
@@ -177,6 +186,7 @@ def create_app() -> Any:
     app.include_router(swarm_supervisor_router, prefix="/api/v1")
     app.include_router(swarm_broker_router, prefix="/api/v1")
     app.include_router(swarm_batch_router, prefix="/api/v1")
+    app.include_router(swarm_ingress_router, prefix="/api/v1")
     app.include_router(cockpit_router)
 
     from skeleton.api.middleware import DEFAULT_OPEN_PREFIXES, GatePolicy, install_gate
@@ -205,6 +215,7 @@ def create_app() -> Any:
             "swarm_supervisor": "/api/v1/swarm/supervisor/status",
             "swarm_broker": "/api/v1/swarm/broker/status",
             "swarm_batch": "/api/v1/swarm/batch/submit",
+            "swarm_ingress": "/api/v1/swarm/ingress/status",
         }
 
     @app.get("/cortex/status")
