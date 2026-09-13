@@ -1,5 +1,6 @@
 """Circuit breaker with explicit recovery semantics."""
 from enum import Enum
+from threading import Lock
 
 
 class CircuitState(str, Enum):
@@ -16,30 +17,36 @@ class Circuit:
         self.failures = 0
         self.state = CircuitState.CLOSED
         self._probe_in_flight = False
+        self._lock = Lock()
 
     @property
     def allowed(self):
-        return self.state is CircuitState.CLOSED
+        with self._lock:
+            return self.state is CircuitState.CLOSED
 
     @property
     def open(self):
-        return self.state is CircuitState.OPEN
+        with self._lock:
+            return self.state is CircuitState.OPEN
 
     def failure(self):
-        self.failures += 1
-        self._probe_in_flight = False
-        if self.state is CircuitState.HALF_OPEN or self.failures >= self.threshold:
-            self.state = CircuitState.OPEN
-        return self.state
+        with self._lock:
+            self.failures += 1
+            self._probe_in_flight = False
+            if self.state is CircuitState.HALF_OPEN or self.failures >= self.threshold:
+                self.state = CircuitState.OPEN
+            return self.state
 
     def probe(self):
-        if self.state is CircuitState.OPEN:
+        with self._lock:
+            if self.state is not CircuitState.OPEN or self._probe_in_flight:
+                return False
             self.state = CircuitState.HALF_OPEN
             self._probe_in_flight = True
             return True
-        return False
 
     def success(self):
-        self.failures = 0
-        self.state = CircuitState.CLOSED
-        self._probe_in_flight = False
+        with self._lock:
+            self.failures = 0
+            self.state = CircuitState.CLOSED
+            self._probe_in_flight = False
