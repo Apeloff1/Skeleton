@@ -1,23 +1,31 @@
 name: Backend Quality
 
-# Fast, fail-closed backend gate: lint + full Python syntax compilation.
-# Keep this independent from the heavier dependency-backed integration suite.
+# Fast, fail-closed backend gate: lint, syntax compilation, and critical
+# security-boundary regression tests. Keep this independent from the heavier
+# dependency-backed integration suite.
 
 on:
   push:
     branches: [main, master]
     paths:
       - "backend/**"
+      - ".github/workflows/backend-quality.yml"
   pull_request:
     paths:
       - "backend/**"
+      - ".github/workflows/backend-quality.yml"
 
 permissions:
   contents: read
 
+concurrency:
+  group: backend-quality-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ruff:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: backend
@@ -27,12 +35,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
 
-      - name: Install Ruff
-        run: pip install "ruff==0.9.*"
+      - name: Install quality dependencies
+        run: python -m pip install "ruff==0.9.*" "pytest>=8,<9"
 
       - name: Ruff lint
         run: ruff check . --output-format=github
 
       - name: Syntax check (full backend)
         run: python -m compileall -q .
+
+      - name: Execution boundary regression tests
+        run: python -m pytest -q tests/test_exec_guard.py
