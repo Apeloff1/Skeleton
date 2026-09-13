@@ -7,7 +7,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from enum import Enum
-from typing import Awaitable, Callable, Dict, Generic, Optional, TypeVar
+from typing import Awaitable, Callable, Dict, Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -80,7 +80,7 @@ class RequestCoalescer(Generic[T]):
                 leader = True
 
         if not leader:
-            return await future
+            return await asyncio.shield(future)
 
         try:
             value = await self._fetch(key)
