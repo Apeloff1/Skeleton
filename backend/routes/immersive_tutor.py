@@ -34,7 +34,7 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime, timedelta
@@ -711,17 +711,17 @@ async def analyze_zpd(request: LearningSessionRequest):
 
 @router.post("/scaffolding/generate")
 async def generate_scaffolding(
-    topic: str,
+    topic: str = Query(..., min_length=1, max_length=500),
     current_difficulty: float = 0.5,
     user_performance: float = 0.5,
-    error_patterns: List[str] = ["conceptual"]
+    error_patterns: Optional[List[str]] = Query(None, max_length=50)
 ):
     """Generate appropriate scaffolding for the user"""
     return LearningCurveEngine.generate_scaffolding(
         current_difficulty,
         user_performance,
         topic,
-        error_patterns
+        error_patterns or ["conceptual"]
     )
 
 @router.post("/progression/calculate")
@@ -735,14 +735,14 @@ async def calculate_progression(request: ProgressRequest):
 
 @router.post("/quest/daily")
 async def get_daily_quest(
-    user_level: int = 1,
-    recent_topics: List[str] = [],
-    streak_days: int = 0
+    user_level: int = Query(1, ge=1, le=10000),
+    recent_topics: Optional[List[str]] = Query(None, max_length=100),
+    streak_days: int = Query(0, ge=0, le=100000)
 ):
     """Generate daily quests for the user"""
     return ImmersiveExperienceEngine.generate_daily_quest(
         user_level,
-        recent_topics,
+        recent_topics or [],
         streak_days
     )
 

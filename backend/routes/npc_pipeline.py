@@ -149,14 +149,14 @@ class DialogueGenerationRequest(BaseModel):
     emotional_modifier: Optional[EmotionalState] = None
 
 class BehaviorTreeRequest(BaseModel):
-    npc_id: str
-    scenario: str
-    environmental_factors: List[str] = []
+    npc_id: str = Field(..., min_length=1, max_length=200)
+    scenario: str = Field(..., min_length=1, max_length=10000)
+    environmental_factors: List[str] = Field(default_factory=list, max_length=100)
 
 class NPCRelationshipRequest(BaseModel):
-    npc_id: str
-    target_npc_id: str
-    interaction_history: List[str] = []
+    npc_id: str = Field(..., min_length=1, max_length=200)
+    target_npc_id: str = Field(..., min_length=1, max_length=200)
+    interaction_history: List[str] = Field(default_factory=list, max_length=1000)
 
 # ============================================================================
 # NPC GENERATOR ENGINE

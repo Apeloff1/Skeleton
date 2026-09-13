@@ -103,8 +103,8 @@ class TensionCurveRequest(BaseModel):
 
 
 class DynamicEventRequest(BaseModel):
-    event_name: str
-    trigger_conditions: List[str] = []
+    event_name: str = Field(..., min_length=1, max_length=200)
+    trigger_conditions: List[str] = Field(default_factory=list, max_length=100)
     event_type: Literal["spawn", "ambient", "setpiece", "dialogue", "reward"] = "ambient"
     intensity: TensionLevel = TensionLevel.MEDIUM
 
