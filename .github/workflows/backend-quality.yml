@@ -60,3 +60,4 @@ jobs:
           tests/test_process_safety_destructuring.py
           tests/test_process_safety_partial.py
           tests/test_process_safety_namespace_get.py
+          tests/test_process_safety_getattribute.py
