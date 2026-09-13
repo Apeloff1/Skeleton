@@ -15,7 +15,7 @@ from threading import RLock
 from time import time
 from typing import Callable, Deque
 
-from skeleton.agents.swarm_tenant_broker import TenantRepairResult, TenantSwarmBroker
+from skeleton.agents.swarm_tenant_broker import TERMINAL_STATES, TenantRepairResult, TenantSwarmBroker
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +47,36 @@ class TenantCheckpointStore:
         ).encode("utf-8")
         return sha256(encoded).hexdigest()
 
+    @staticmethod
+    def _validate_pairs(label: str, pairs: tuple[tuple[str, str], ...]) -> None:
+        seen: set[str] = set()
+        for pair in pairs:
+            if not isinstance(pair, tuple) or len(pair) != 2:
+                raise ValueError(f"invalid {label} tenant checkpoint record")
+            task_id, tenant = pair
+            if not isinstance(task_id, str) or task_id.strip() != task_id or not task_id:
+                raise ValueError(f"invalid {label} task id")
+            if not isinstance(tenant, str) or tenant.strip() != tenant or not tenant:
+                raise ValueError(f"invalid {label} tenant id")
+            if task_id in seen:
+                raise ValueError(f"duplicate {label} task id: {task_id}")
+            seen.add(task_id)
+
+    @classmethod
+    def _validate_checkpoint(cls, checkpoint: TenantMetadataCheckpoint) -> None:
+        if checkpoint.sequence < 1:
+            raise ValueError("tenant checkpoint sequence must be positive")
+        if checkpoint.created_at < 0:
+            raise ValueError("tenant checkpoint created_at must be non-negative")
+        cls._validate_pairs("active", checkpoint.active)
+        cls._validate_pairs("terminal", checkpoint.terminal)
+        overlap = set(dict(checkpoint.active)).intersection(dict(checkpoint.terminal))
+        if overlap:
+            raise ValueError(f"tenant checkpoint task appears active and terminal: {sorted(overlap)[0]}")
+        expected = cls._checksum(checkpoint.sequence, checkpoint.active, checkpoint.terminal)
+        if expected != checkpoint.checksum:
+            raise ValueError("tenant checkpoint checksum mismatch")
+
     def capture(self, sequence: int, broker: TenantSwarmBroker) -> TenantMetadataCheckpoint:
         if sequence < 1:
             raise ValueError("sequence must be positive")
@@ -60,9 +90,11 @@ class TenantCheckpointStore:
             active=active,
             terminal=terminal,
         )
+        self._validate_checkpoint(checkpoint)
         with self._lock:
             existing = next((item for item in self._items if item.sequence == sequence), None)
             if existing is not None:
+                self._validate_checkpoint(existing)
                 if existing.checksum != checkpoint.checksum:
                     raise ValueError(f"tenant checkpoint sequence conflict: {sequence}")
                 return existing
@@ -90,13 +122,25 @@ class TenantCheckpointStore:
         checkpoint = self.latest() if sequence is None else self.get(sequence)
         if checkpoint is None:
             raise KeyError("tenant checkpoint not found")
-        expected = self._checksum(checkpoint.sequence, checkpoint.active, checkpoint.terminal)
-        if expected != checkpoint.checksum:
-            raise ValueError("tenant checkpoint checksum mismatch")
+        self._validate_checkpoint(checkpoint)
+        if len(checkpoint.terminal) > broker.max_terminal_records:
+            raise ValueError("tenant checkpoint exceeds target terminal record capacity")
 
         status = broker.status()
         if status["tracked_tasks"] or status["terminal_records"] or status["ingress"]["accounted_tasks"]:
             raise ValueError("tenant broker must be empty before metadata restore")
+
+        resident = {task.id: task for task in broker.broker.runtime.tasks()}
+        for task_id, _tenant in checkpoint.active:
+            task = resident.get(task_id)
+            if task is None:
+                raise ValueError(f"active tenant task missing from restored runtime: {task_id}")
+            if task.state in TERMINAL_STATES:
+                raise ValueError(f"active tenant task is terminal in restored runtime: {task_id}")
+        for task_id, _tenant in checkpoint.terminal:
+            task = resident.get(task_id)
+            if task is not None and task.state not in TERMINAL_STATES:
+                raise ValueError(f"terminal tenant task is active in restored runtime: {task_id}")
 
         with broker._lock:
             broker._tenant_by_task = dict(checkpoint.active)
