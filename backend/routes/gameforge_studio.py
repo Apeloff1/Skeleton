@@ -312,7 +312,7 @@ async def vault_list():
 
 
 @router.get("/vault/unified")
-async def vault_unified(limit: int = 60):
+async def vault_unified(limit: int = Query(60, ge=1, le=200)):
     """MIRROR — one aggregated view across every vault in the app.
 
     Canonical source is the Boardroom (encrypted, persisted) vault, listed
@@ -709,12 +709,12 @@ async def rooms_context(room_name: str = "any"):
 
 
 @router.get("/rooms/activity")
-async def rooms_activity(limit: int = 50):
+async def rooms_activity(limit: int = Query(50, ge=1, le=200)):
     return {"activity": _room_activity(limit), "total_rooms": len(_room_ids())}
 
 
 class ResearchBody(BaseModel):
-    topic: str
+    topic: str = Field(..., min_length=1, max_length=10000)
 
 
 @router.post("/rooms/research")
@@ -752,8 +752,8 @@ async def jeeves_oversight():
 
 
 class JeevesCmd(BaseModel):
-    message: str
-    game_name: str = "Untitled"
+    message: str = Field(..., min_length=1, max_length=10000)
+    game_name: str = Field("Untitled", min_length=1, max_length=200)
 
 
 def _jeeves_recall(query: str):
@@ -845,8 +845,8 @@ async def jeeves_command(c: JeevesCmd):
 # DEPLOYMENT
 # ══════════════════════════════════════════════════════════════════════════════
 class DeployBody(BaseModel):
-    game_name: str
-    platforms: Optional[list[str]] = None
+    game_name: str = Field(..., min_length=1, max_length=200)
+    platforms: Optional[list[str]] = Field(None, max_length=20)
     sign: bool = True
 
 
@@ -867,9 +867,9 @@ _git = _try("gameforge.snowball.git_github_integration", "git_github")
 
 
 class CommitBody(BaseModel):
-    file_id: str
-    version: int = 1
-    message: str = "CNS vault commit"
+    file_id: str = Field(..., min_length=1, max_length=200)
+    version: int = Field(1, ge=1, le=100000)
+    message: str = Field("CNS vault commit", min_length=1, max_length=1000)
 
 
 @router.get("/git/status")
@@ -934,7 +934,7 @@ def _audit(action: str, target: str, user: Any = None):
 
 
 @router.get("/audit")
-async def audit(limit: int = 50):
+async def audit(limit: int = Query(50, ge=1, le=200)):
     try:
         rows = list(_db()["gameforge_audit"].find({}, {"_id": 0}).sort("ts", -1).limit(limit))
     except Exception:  # noqa: BLE001
@@ -943,7 +943,11 @@ async def audit(limit: int = 50):
 
 
 @router.get("/logs")
-async def universal_logs(component: Optional[str] = None, severity: Optional[str] = None, limit: int = 60):
+async def universal_logs(
+    component: Optional[str] = Query(None, max_length=50),
+    severity: Optional[str] = Query(None, max_length=50),
+    limit: int = Query(60, ge=1, le=200),
+):
     """Universal Logging System — one structured, searchable feed aggregating
     every CNS component (audit, alarms, room activity)."""
     entries = []
@@ -976,9 +980,9 @@ async def universal_logs(component: Optional[str] = None, severity: Optional[str
 
 
 class ShipBody(BaseModel):
-    game_name: str
+    game_name: str = Field(..., min_length=1, max_length=200)
     push: bool = False
-    idempotency_key: Optional[str] = None
+    idempotency_key: Optional[str] = Field(None, max_length=200)
 
 
 @router.post("/ship")
