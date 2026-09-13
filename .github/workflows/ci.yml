@@ -82,7 +82,8 @@ jobs:
             skeleton/testing/test_server_recovery_health.py \
             skeleton/testing/test_server_swarm_bundle.py \
             skeleton/testing/test_swarm_operator_tenant_recovery.py \
-            skeleton/testing/test_swarm_operator_retention_api.py
+            skeleton/testing/test_swarm_operator_retention_api.py \
+            skeleton/testing/test_swarm_operator_cutover_fencing.py
           python -m skeleton eras
           python -m skeleton plan "soulslike extraction with bonfire rest"
           python -m skeleton cockpit "BLEND ERA arcade_golden_age soulslike 0.5"
