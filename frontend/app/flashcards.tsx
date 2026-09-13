@@ -12,7 +12,7 @@ import { api } from '../utils/apiController';
 import { bumpStat } from '../utils/userStore';
 import { openModalFromRoute } from '../utils/openModalFromRoute';
 import theme from '../theme/tokens';
-import { Screen, AppHeader } from '../components/ui';
+import { Screen, AppHeader } from '../components/UI';
 
 interface Card { id: string; term: string; definition: string; }
 

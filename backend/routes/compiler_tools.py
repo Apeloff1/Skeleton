@@ -22,6 +22,8 @@ from typing import Any, Dict
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from core.exec_guard import code_execution_enabled, execution_disabled_response
+
 router = APIRouter(tags=["compiler-tools"])
 
 
@@ -84,6 +86,8 @@ def _compiler():
 @router.post("/compiler/compile")
 async def compile_code(request: CompilationRequest):
     """Full compilation with sanitizers, optimizers, and analysis."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Compiler execution")
     return await _compiler().compile(request)
 
 
@@ -122,12 +126,16 @@ async def get_optimizers():
 @router.post("/compiler/analyze-structure")
 async def analyze_structure(request: CodeExecutionRequest):
     """Deep structural analysis."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Compiler analysis")
     return await _compiler().analyze_code_structure(request.code, request.language)
 
 
 @router.post("/compiler/generate-ir")
 async def generate_ir(request: CodeExecutionRequest):
     """Generate Intermediate Representation."""
+    if not code_execution_enabled():
+        return execution_disabled_response("IR generation")
     ir = await _compiler().generate_ir(request.code, request.language)
     return {"ir": ir}
 
@@ -135,6 +143,8 @@ async def generate_ir(request: CodeExecutionRequest):
 @router.post("/compiler/generate-assembly")
 async def generate_assembly(request: CodeExecutionRequest, arch: str = "x86_64"):
     """Generate assembly code."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Assembly generation")
     asm = await _compiler().generate_assembly(request.code, request.language, arch)
     return {"assembly": asm, "architecture": arch}
 

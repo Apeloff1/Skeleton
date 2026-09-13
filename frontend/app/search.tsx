@@ -9,7 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { api } from '../utils/apiController';
 import { openModalFromRoute } from '../utils/openModalFromRoute';
 import theme from '../theme/tokens';
-import { Screen, AppHeader, SearchBar, SectionHeader, EmptyState } from '../components/ui';
+import { Screen, AppHeader, SearchBar, SectionHeader, EmptyState } from '../components/UI';
 
 interface Hit { type: 'book' | 'bible' | 'track' | 'class' | 'feature' | 'capability' | 'dataset' | 'pipeline'; id: string; title: string; subtitle?: string; route?: string; }
 

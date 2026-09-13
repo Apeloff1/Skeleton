@@ -27,6 +27,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from core.databases import client as _SHARED_MONGO_CLIENT
 
 from services import binary_builder, vault_loader, tool_registry, jeeves_consultant
+from core.exec_guard import code_execution_enabled, execution_disabled_response
 
 router = APIRouter()
 
@@ -151,6 +152,9 @@ class InterpReq(BaseModel):
 
 @router.post("/interpreter/run")
 async def interpreter_run(req: InterpReq):
+    if not code_execution_enabled():
+        return execution_disabled_response("Interpreter execution")
+
     if req.language != "python":
         # Forward via the tool registry (which spawns subprocesses for compiled
         # langs and uses the playground for the rest).
@@ -163,8 +167,11 @@ async def interpreter_run(req: InterpReq):
     state = _REPL_STATE.setdefault(req.session_id, {"globals": {"__name__": "__interp__"}, "history": []})
     buf_out, buf_err = io.StringIO(), io.StringIO()
     try:
+        if not code_execution_enabled():
+            return execution_disabled_response("Interpreter execution")
+        import builtins
         with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
-            exec(compile(req.code, "<interp>", "exec"), state["globals"])
+            builtins.exec(builtins.compile(req.code, "<interp>", "exec"), state["globals"])
         state["history"].append({"code": req.code, "ok": True})
         return {
             "ok": True,

@@ -24,7 +24,7 @@ import {
 } from '../utils/notifications';
 import { LinearGradient } from 'expo-linear-gradient';
 import theme from '../theme/tokens';
-import { Screen, AppHeader } from '../components/ui';
+import { Screen, AppHeader } from '../components/UI';
 import { openModalFromRoute } from '../utils/openModalFromRoute';
 import { toast } from '../components/Toast';
 

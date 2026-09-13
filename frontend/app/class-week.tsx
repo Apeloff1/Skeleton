@@ -22,7 +22,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { api } from '../utils/apiController';
 import theme from '../theme/tokens';
-import { Screen, AppHeader } from '../components/ui';
+import { Screen, AppHeader } from '../components/UI';
 
 interface WeekContent {
   week: number;

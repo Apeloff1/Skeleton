@@ -14,8 +14,8 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import Skeleton from '../components/ui/Skeleton';
-import RetryBanner from '../components/ui/RetryBanner';
+import Skeleton from '../components/UI/Skeleton';
+import RetryBanner from '../components/UI/RetryBanner';
 
 const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 

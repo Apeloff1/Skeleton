@@ -25,6 +25,7 @@ from fastapi import FastAPI, APIRouter, HTTPException, BackgroundTasks, Depends,
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 from dotenv import load_dotenv
+from core.exec_guard import code_execution_enabled, execution_disabled_message
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
@@ -1967,7 +1968,13 @@ class PythonExecutor(CodeExecutor):
     async def execute(self, ctx: ExecutionContext) -> ExecutionResult:
         ctx.start()
         result = ExecutionResult(trace_id=ctx.trace_id)
-        
+
+        if not code_execution_enabled():
+            result.status = ExecutionStatus.SECURITY_VIOLATION
+            result.error = execution_disabled_message("Python code execution")
+            ctx.end()
+            return result
+
         is_valid, error_msg, security = self.validate(ctx.request.code, ctx.request.security_level)
         result.security = security
         
@@ -2057,7 +2064,13 @@ class CppExecutor(CodeExecutor):
     async def execute(self, ctx: ExecutionContext) -> ExecutionResult:
         ctx.start()
         result = ExecutionResult(trace_id=ctx.trace_id)
-        
+
+        if not code_execution_enabled():
+            result.status = ExecutionStatus.SECURITY_VIOLATION
+            result.error = execution_disabled_message("C++ code execution")
+            ctx.end()
+            return result
+
         is_valid, error_msg, security = self.validate(ctx.request.code, ctx.request.security_level)
         if not is_valid:
             result.status = ExecutionStatus.SECURITY_VIOLATION
@@ -2132,6 +2145,12 @@ class CExecutor(CppExecutor):
         # Similar to C++ but with gcc
         ctx.start()
         result = ExecutionResult(trace_id=ctx.trace_id)
+
+        if not code_execution_enabled():
+            result.status = ExecutionStatus.SECURITY_VIOLATION
+            result.error = execution_disabled_message("C code execution")
+            ctx.end()
+            return result
         
         temp_dir = None
         try:

@@ -9,7 +9,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-nati
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../../theme/tokens';
-import { Screen, AppHeader, SectionHeader } from '../../components/ui';
+import { Screen, AppHeader, SectionHeader } from '../../components/UI';
 import { withScreenGuard } from '../../components/withScreenGuard';
 import * as haptics from '../../utils/haptics';
 import type { HapticsLevel } from '../../utils/haptics';

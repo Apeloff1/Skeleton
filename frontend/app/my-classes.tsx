@@ -15,7 +15,7 @@ import {
   isClassCompleted, classCompletionPercent,
 } from '../utils/classStore';
 import theme from '../theme/tokens';
-import { Screen, AppHeader, Button, EmptyState, SectionHeader } from '../components/ui';
+import { Screen, AppHeader, Button, EmptyState, SectionHeader } from '../components/UI';
 import { toast } from '../components/Toast';
 
 export default function MyClassesScreen() {

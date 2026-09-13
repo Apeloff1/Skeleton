@@ -34,7 +34,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useAutosave } from '../utils/useAutosave';
 import { withScreenGuard } from '../components/withScreenGuard';
-import Skeleton from '../components/ui/Skeleton';
+import Skeleton from '../components/UI/Skeleton';
 import * as haptics from '../utils/haptics';
 import { toast } from '../components/Toast';
 import { actionSheet } from '../components/ActionSheet';

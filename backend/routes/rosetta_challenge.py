@@ -8,6 +8,8 @@ from pathlib import Path
 from datetime import datetime, timezone
 import os, random
 
+from core.exec_guard import code_execution_enabled, execution_disabled_message
+
 load_dotenv(Path(__file__).parent.parent / '.env')
 
 router = APIRouter(prefix="/api/rosetta-challenge", tags=["rosetta-challenge"])
@@ -76,6 +78,14 @@ async def submit_challenge(
     user_code: str = Query(...),
 ):
     """Submit a challenge solution — execute and grade."""
+    if not code_execution_enabled():
+        return {
+            "compiled": False,
+            "output": "",
+            "error": execution_disabled_message("Rosetta challenge execution"),
+            "score": 0,
+        }
+
     lang_key = LANG_MAP.get(target_language, target_language.lower())
 
     import subprocess, tempfile
@@ -144,7 +154,8 @@ async def submit_challenge(
         from routes.xp_helper import award_xp
         xp = 50 if score == 100 else 25 if score >= 70 else 10
         await award_xp(user_id, "rosetta_challenge", f"rosetta_{target_language.lower()}", xp)
-    except: pass
+    except (ImportError, OSError, RuntimeError):
+        pass
 
     # Save result
     await _db.rosetta_challenges.insert_one({

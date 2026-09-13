@@ -13,9 +13,9 @@ import { useUser, ACHIEVEMENT_CATALOG } from '../utils/userStore';
 import { api } from '../utils/apiController';
 import { openModalFromRoute } from '../utils/openModalFromRoute';
 import { jeevesSpeak } from '../features/Academy/jeevesTts';
-import { Screen, AppHeader } from '../components/ui';
-import Skeleton from '../components/ui/Skeleton';
-import RetryBanner from '../components/ui/RetryBanner';
+import { Screen, AppHeader } from '../components/UI';
+import Skeleton from '../components/UI/Skeleton';
+import RetryBanner from '../components/UI/RetryBanner';
 
 const greetings = ['Welcome back', 'Good to see you', 'Ready to learn', 'Let’s keep going'];
 

@@ -25,7 +25,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../theme/tokens';
 import { useModalLogger } from '../utils/modalLogger';
-import RetryBanner from '../components/ui/RetryBanner';
+import RetryBanner from '../components/UI/RetryBanner';
 
 const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 const { breathing, palette, radii } = theme;
@@ -517,7 +517,7 @@ const styles = StyleSheet.create({
   toolChip: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 12, paddingVertical: 0,
-    borderRadius: radii.pill, borderWidth: 1.5,
+    borderRadius: radii.full, borderWidth: 1.5,
     borderColor: palette.ink[700],
     marginRight: 8, height: 38,
   },
@@ -564,7 +564,7 @@ const styles = StyleSheet.create({
   help: { fontSize: 11, color: palette.ink[400], marginVertical: 4 },
 
   pill: {
-    paddingHorizontal: 12, paddingVertical: 8, borderRadius: radii.pill,
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: radii.full,
     backgroundColor: palette.ink[800], marginRight: 8, minHeight: 36,
     justifyContent: 'center',
   },

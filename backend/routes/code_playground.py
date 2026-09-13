@@ -5,6 +5,8 @@ from pydantic import BaseModel
 import subprocess, os, tempfile
 from dotenv import load_dotenv
 
+from core.exec_guard import code_execution_enabled, execution_disabled_response
+
 load_dotenv()
 router = APIRouter(prefix="/api/playground", tags=["playground"])
 
@@ -15,6 +17,9 @@ class CodeRequest(BaseModel):
 @router.post("/run")
 async def run_code(req: CodeRequest):
     """Execute code. Supports Python, JavaScript, TypeScript, Go, Rust, C/C++."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Code playground execution")
+
     lang = req.language.lower()
     code = req.code
     if len(code) > 10000:
@@ -42,8 +47,10 @@ async def run_code(req: CodeRequest):
                     return {"output": "", "error": comp.stderr, "exit_code": comp.returncode, "language": lang}
                 result = subprocess.run([out_bin], capture_output=True, text=True, timeout=10, cwd="/tmp", env=env)
                 os.unlink(fname)
-                try: os.unlink(out_bin)
-                except: pass
+                try:
+                    os.unlink(out_bin)
+                except OSError:
+                    pass
         elif lang in ("c", "cpp", "c++"):
             ext = ".c" if lang == "c" else ".cpp"
             compiler = "gcc" if lang == "c" else "g++"
@@ -56,8 +63,10 @@ async def run_code(req: CodeRequest):
                     return {"output": "", "error": comp.stderr, "exit_code": comp.returncode, "language": lang}
                 result = subprocess.run([out_bin], capture_output=True, text=True, timeout=10, cwd="/tmp", env=env)
                 os.unlink(fname)
-                try: os.unlink(out_bin)
-                except: pass
+                try:
+                    os.unlink(out_bin)
+                except OSError:
+                    pass
         else:
             return {"output": "", "error": f"Language '{lang}' not supported. Use python, javascript, typescript, go, rust, c, or cpp."}
         # Auto-award XP for code execution
@@ -75,7 +84,8 @@ async def run_code(req: CodeRequest):
                  "$setOnInsert": {"created_at": datetime.now(timezone.utc).isoformat()}},
                 upsert=True
             )
-        except: pass
+        except (ImportError, OSError, RuntimeError):
+            pass
         return {"output": result.stdout, "error": result.stderr if result.stderr else None, "exit_code": result.returncode, "language": lang, "xp_awarded": 15 if result.returncode == 0 else 10}
     except subprocess.TimeoutExpired:
         return {"output": "", "error": "Execution timed out (10s limit)", "exit_code": -1}

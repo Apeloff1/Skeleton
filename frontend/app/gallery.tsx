@@ -8,7 +8,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { api } from '../utils/apiController';
 import theme from '../theme/tokens';
-import { Screen, AppHeader, EmptyState } from '../components/ui';
+import { Screen, AppHeader, EmptyState } from '../components/UI';
 import { playTrailer } from '../src/utils/cinematicVoice';
 
 export default function GalleryScreen() {

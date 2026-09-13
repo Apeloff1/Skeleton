@@ -27,8 +27,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { ModalErrorBoundary } from '../components/ModalErrorBoundary';
 import { jeevesSpeak } from '../features/Academy/jeevesTts';
 import { useFeatureFlag } from '../utils/featureFlags';
-import Skeleton from '../components/ui/Skeleton';
-import RetryBanner from '../components/ui/RetryBanner';
+import Skeleton from '../components/UI/Skeleton';
+import RetryBanner from '../components/UI/RetryBanner';
 
 const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 const USER_ID = 'default_user';

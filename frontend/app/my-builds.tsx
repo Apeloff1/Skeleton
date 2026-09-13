@@ -22,7 +22,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Screen, AppHeader, EmptyState, Chip } from '../components/ui';
+import { Screen, AppHeader, EmptyState, Chip } from '../components/UI';
 import theme from '../theme/tokens';
 import { apiFetch } from '../utils/apiController';
 import { LinearGradient } from 'expo-linear-gradient';

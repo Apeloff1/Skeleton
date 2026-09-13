@@ -10,7 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useUser } from '../utils/userStore';
 import { openModalFromRoute } from '../utils/openModalFromRoute';
 import theme from '../theme/tokens';
-import { Screen, AppHeader } from '../components/ui';
+import { Screen, AppHeader } from '../components/UI';
 import { toast } from '../components/Toast';
 
 export default function CertificateScreen() {

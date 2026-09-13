@@ -24,6 +24,7 @@ from typing import Any, Callable, Coroutine
 from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
 from core.databases import client as _SHARED_MONGO_CLIENT
+from core.exec_guard import code_execution_enabled, execution_disabled_response, execution_disabled_message
 
 from . import vault_loader
 from . import jeeves_consultant
@@ -63,6 +64,9 @@ async def _tool_jeeves_consult(params: dict) -> dict:
 
 
 async def _tool_compile_code(params: dict) -> dict:
+    if not code_execution_enabled():
+        return execution_disabled_response("Tool compile execution")
+
     lang = params.get("language", "c")
     code = params.get("code", "")
     if not code:
@@ -100,15 +104,23 @@ async def _tool_compile_code(params: dict) -> dict:
 async def _tool_run_code(params: dict) -> dict:
     """Reuse the playground's run pipeline via local Python eval for python only;
     other langs go through the existing route."""
+    if not code_execution_enabled():
+        return {
+            "ok": False,
+            "disabled": True,
+            "error": execution_disabled_message("Tool run execution"),
+            "exit_code": 0,
+        }
+
     code = params.get("code", "")
     lang = params.get("language", "python")
     if lang != "python":
         return {"ok": False, "error": f"inline run only supports python; for {lang} call /api/playground/run"}
-    import io, contextlib
+    import io, contextlib, builtins
     buf_out, buf_err = io.StringIO(), io.StringIO()
     try:
         with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
-            exec(compile(code, "<tool_run>", "exec"), {"__name__": "__tool__"})
+            builtins.exec(builtins.compile(code, "<tool_run>", "exec"), {"__name__": "__tool__"})
         return {"ok": True, "stdout": buf_out.getvalue()[-4000:], "stderr": buf_err.getvalue()[-4000:], "exit_code": 0}
     except Exception as e:
         return {"ok": False, "stdout": buf_out.getvalue()[-4000:], "stderr": f"{buf_err.getvalue()}\n{type(e).__name__}: {e}"[-4000:], "exit_code": 1}

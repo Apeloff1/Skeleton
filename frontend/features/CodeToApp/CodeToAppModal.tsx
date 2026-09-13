@@ -13,8 +13,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { apiFetch } from '../../utils/apiController';
 import { toast } from '../../components/Toast';
-import Skeleton from '../../components/ui/Skeleton';
-import RetryBanner from '../../components/ui/RetryBanner';
+import Skeleton from '../../components/UI/Skeleton';
+import RetryBanner from '../../components/UI/RetryBanner';
 import DnaCockpit from '../Settings/DnaCockpit';
 import {
   useSettings, BUILDER_CATEGORIES, BUILDER_DNA_BY_CATEGORY,

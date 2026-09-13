@@ -11,7 +11,7 @@ import { useUser, setProfile, setGoals, setTheme, resetUser, getState, AVATAR_CO
 import { openModalFromRoute } from '../utils/openModalFromRoute';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import theme from '../theme/tokens';
-import { Screen, AppHeader } from '../components/ui';
+import { Screen, AppHeader } from '../components/UI';
 import { toast } from '../components/Toast';
 import { actionSheet, promptSheet } from '../components/ActionSheet';
 

@@ -12,8 +12,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouteHistory } from '../utils/routeHistory';
 import { shareResult, copyToClipboard } from '../utils/shareResult';
 import { jeevesSpeak } from '../features/Academy/jeevesTts';
-import Skeleton from '../components/ui/Skeleton';
-import RetryBanner from '../components/ui/RetryBanner';
+import Skeleton from '../components/UI/Skeleton';
+import RetryBanner from '../components/UI/RetryBanner';
 
 const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 

@@ -21,7 +21,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useModalStore, ModalType } from '../store/modalStore';
 import theme from '../theme/tokens';
-import { Screen, AppHeader, SearchBar, Chip, FeatureCard, SectionHeader } from '../components/ui';
+import { Screen, AppHeader, SearchBar, Chip, FeatureCard, SectionHeader } from '../components/UI';
 import { useNotesCount } from '../utils/useNotesCount';
 import * as haptics from '../utils/haptics';
 import { toast } from '../components/Toast';

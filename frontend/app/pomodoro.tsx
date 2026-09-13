@@ -13,7 +13,7 @@ import { bumpStat, useUser } from '../utils/userStore';
 import { jeevesSpeak } from '../features/Academy/jeevesTts';
 import { openModalFromRoute } from '../utils/openModalFromRoute';
 import theme from '../theme/tokens';
-import { Screen, AppHeader } from '../components/ui';
+import { Screen, AppHeader } from '../components/UI';
 import * as haptics from '../utils/haptics';
 import { toast } from '../components/Toast';
 

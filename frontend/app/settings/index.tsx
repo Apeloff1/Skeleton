@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '../../state/settingsStore';
 import theme from '../../theme/tokens';
-import { Screen, AppHeader, Button } from '../../components/ui';
+import { Screen, AppHeader, Button } from '../../components/UI';
 import { actionSheet } from '../../components/ActionSheet';
 import { toast } from '../../components/Toast';
 import { getHapticsLevel, setHapticsLevel } from '../../utils/haptics';

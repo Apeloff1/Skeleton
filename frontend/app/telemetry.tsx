@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
   sub: { fontSize: 11, color: palette.ink[400], marginTop: 2 },
 
   tabRow: { flexDirection: 'row', paddingHorizontal: breathing.gutter, paddingVertical: 10, gap: 6 },
-  tab: { flex: 1, height: 36, borderRadius: radii.pill, backgroundColor: palette.ink[800], alignItems: 'center', justifyContent: 'center' },
+  tab: { flex: 1, height: 36, borderRadius: radii.full, backgroundColor: palette.ink[800], alignItems: 'center', justifyContent: 'center' },
   tabActive: { backgroundColor: '#a78bfa' },
   tabText: { fontSize: 12, fontWeight: '600', color: palette.ink[300], textTransform: 'capitalize' },
   tabTextActive: { color: palette.ink[1000] },

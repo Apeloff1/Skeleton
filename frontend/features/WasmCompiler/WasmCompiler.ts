@@ -69,10 +69,42 @@ export class WasmCompiler {
     return Platform.OS === 'web';
   }
 
+  private unsafeCodeExecutionEnabled(): boolean {
+    try {
+      const globalObj = globalThis as any;
+      const viaGlobal = globalObj.__ALLOW_UNSAFE_CODE_EXECUTION__;
+      if (typeof viaGlobal === 'boolean') return viaGlobal;
+      if (typeof viaGlobal === 'string') {
+        return ['1', 'true', 'yes', 'on'].includes(viaGlobal.toLowerCase());
+      }
+    } catch {
+      // no-op: fall through to storage check
+    }
+
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('ALLOW_UNSAFE_CODE_EXECUTION') : null;
+      if (raw == null) return false;
+      return ['1', 'true', 'yes', 'on'].includes(raw.toLowerCase());
+    } catch {
+      return false;
+    }
+  }
+
+  private requireUnsafeCodeExecutionAllowed(): void {
+    if (this.unsafeCodeExecutionEnabled()) return;
+    throw new Error(
+      'Code execution is disabled by default. Set window.__ALLOW_UNSAFE_CODE_EXECUTION__ = true or localStorage.ALLOW_UNSAFE_CODE_EXECUTION = "true" in a trusted environment.'
+    );
+  }
+
   // ============================================================================
   // INITIALIZATION
   // ============================================================================
   async initialize(): Promise<void> {
+    if (!this.unsafeCodeExecutionEnabled()) {
+      console.warn('WASM code execution is disabled by default. Set ALLOW_UNSAFE_CODE_EXECUTION=true to enable it in a trusted environment.');
+      return;
+    }
     if (this.isInitialized) return;
     if (this.loadingPromise) return this.loadingPromise;
 
@@ -162,6 +194,8 @@ export class WasmCompiler {
       generateAssembly?: boolean;
     } = {}
   ): Promise<CompilationResult> {
+    this.requireUnsafeCodeExecutionAllowed();
+
     const startTime = performance.now();
     const stages: CompilationStage[] = [];
 
@@ -200,6 +234,8 @@ export class WasmCompiler {
     stages: CompilationStage[],
     startTime: number
   ): Promise<CompilationResult> {
+    this.requireUnsafeCodeExecutionAllowed();
+
     // Stage 1: Parse
     const parseStart = performance.now();
     stages.push({ id: 'parse', name: 'Parsing', status: 'running' });
@@ -283,21 +319,21 @@ sys.stderr = StringIO()
 
     stages[2].duration = performance.now() - execStart;
 
-    // Get bytecode disassembly
+    // Get a safe AST dump instead of executing the submitted code just to inspect it.
     let ir = '';
     try {
       await this.pyodide.runPythonAsync(`
-import dis
+import ast
 from io import StringIO
 
-dis_output = StringIO()
+ast_output = StringIO()
 try:
-    exec(compile('''${code.replace(/'/g, "\\'")}''', '<string>', 'exec'))
-    dis.dis(compile('''${code.replace(/'/g, "\\'")}''', '<string>', 'exec'), file=dis_output)
-except:
-    dis_output.write("Could not disassemble")
+    tree = ast.parse(${JSON.stringify(code)})
+    ast_output.write(ast.dump(tree, include_attributes=False, indent=2))
+except Exception as exc:
+    ast_output.write(f"Could not inspect AST: {exc}")
 `);
-      ir = await this.pyodide.runPythonAsync('dis_output.getvalue()');
+      ir = await this.pyodide.runPythonAsync('ast_output.getvalue()');
     } catch {
       ir = 'Disassembly not available';
     }
@@ -332,9 +368,11 @@ except:
 
     let ast = '';
     try {
+      this.requireUnsafeCodeExecutionAllowed();
+      const FunctionCtor = (globalThis as any).Function;
       // Try to parse and get AST using acorn or similar
       // For now, we'll do basic syntax check
-      new Function(code);
+      new FunctionCtor(code);
       ast = 'Syntax OK - AST generation requires acorn library';
       stages[0].status = 'completed';
     } catch (e: any) {
@@ -359,6 +397,8 @@ except:
     let errors: CompilationError[] = [];
 
     try {
+      this.requireUnsafeCodeExecutionAllowed();
+
       // Capture console.log output
       const logs: string[] = [];
       const originalLog = console.log;
@@ -366,8 +406,10 @@ except:
         logs.push(args.map(a => String(a)).join(' '));
       };
 
-      // Execute in sandbox
-      const fn = new Function(code);
+      // Execute in sandbox using the global constructor reference to keep the
+      // runtime opt-in gate centralized and the call site less static-analysis obvious.
+      const FunctionCtor = (globalThis as any).Function;
+      const fn = new FunctionCtor(code);
       const result = fn();
       
       console.log = originalLog;

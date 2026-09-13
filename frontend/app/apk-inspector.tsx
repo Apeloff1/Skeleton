@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   cardTitle:  { fontSize: 15, fontWeight: '700', color: palette.ink[50], flex: 1 },
 
-  statusPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: radii.pill },
+  statusPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: radii.full },
   statusPillText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
 
   fieldLabel: { fontSize: 12, fontWeight: '600', color: palette.ink[300], marginBottom: 6, marginTop: 6 },
@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
   apkChip: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 10, height: 32,
-    borderRadius: radii.pill, borderWidth: 1.5,
+    borderRadius: radii.full, borderWidth: 1.5,
     borderColor: palette.ink[700], marginRight: 8,
     backgroundColor: palette.ink[800],
   },
