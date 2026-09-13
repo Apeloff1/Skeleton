@@ -14,6 +14,7 @@ import random
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set
+from uuid import uuid4
 
 
 class SkeletonError(Exception):
@@ -40,6 +41,8 @@ class DomainEvent:
     payload: Dict[str, Any] = field(default_factory=dict)
     correlation_id: str = ""
     timestamp: float = field(default_factory=time.time)
+    event_id: str = field(default_factory=lambda: uuid4().hex)
+    causation_id: str = ""
 
 
 class EventBus:
@@ -65,9 +68,14 @@ class EventBus:
                         pass  # Subscribers should not crash the bus
         self._stats["published"] += 1
 
-    def emit(self, topic: str, payload: Dict[str, Any]) -> None:
-        """Convenience: create and publish a DomainEvent."""
-        self.publish(DomainEvent(topic=topic, payload=payload))
+    def emit(self, topic: str, payload: Dict[str, Any], *,
+             correlation_id: str = "", causation_id: str = "") -> DomainEvent:
+        """Publish and return an event so pipelines can link subsequent stages."""
+        event_id = uuid4().hex
+        event = DomainEvent(topic=topic, payload=dict(payload), event_id=event_id,
+                            correlation_id=correlation_id or event_id, causation_id=causation_id)
+        self.publish(event)
+        return event
 
     def stats(self) -> Dict[str, int]:
         return dict(self._stats)
