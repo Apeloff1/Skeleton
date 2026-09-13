@@ -69,9 +69,9 @@ def test_rejects_destructured_asyncio_shell_alias(tmp_path: Path) -> None:
     assert any("asyncio.create_subprocess_shell()" in finding for finding in findings)
 
 
-def test_does_not_guess_mismatched_destructuring(tmp_path: Path) -> None:
+def test_ignores_unresolvable_mismatched_destructuring(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
         "import subprocess\nrunner, marker = (subprocess.run,)\n",
     )
-    assert any("parse failure" not in finding for finding in findings) or findings == []
+    assert findings == []
