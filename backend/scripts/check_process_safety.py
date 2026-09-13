@@ -98,6 +98,11 @@ def violations(path: Path) -> list[str]:
 
         if name in {f"subprocess.{call}" for call in SUBPROCESS_CALLS}:
             for keyword in node.keywords:
+                if keyword.arg is None:
+                    findings.append(
+                        f"{label}:{node.lineno}: {name}(..., **kwargs) is forbidden because shell policy cannot be statically proven"
+                    )
+                    continue
                 if keyword.arg == "shell" and not literal_false(keyword.value):
                     findings.append(
                         f"{label}:{node.lineno}: {name}(..., shell=...) is forbidden unless shell=False is literal"
@@ -118,7 +123,7 @@ def main() -> int:
         return 1
 
     print(
-        "Process safety gate passed: no shell execution, os.system(), or os.popen() calls found."
+        "Process safety gate passed: no shell execution, opaque subprocess kwargs, os.system(), or os.popen() calls found."
     )
     return 0
 
