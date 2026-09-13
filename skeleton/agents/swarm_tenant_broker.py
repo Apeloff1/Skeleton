@@ -8,6 +8,7 @@ from threading import RLock
 
 from skeleton.agents.swarm_broker import CompletionResult, SwarmBroker
 from skeleton.agents.swarm_ingress import IngressDecision, SwarmIngressGovernor
+from skeleton.agents.swarm_lease_rollback import rollback_exact_lease
 from skeleton.agents.swarm_runtime import AdmissionError, SwarmTask, TaskState
 
 TERMINAL_STATES = {TaskState.SUCCEEDED, TaskState.DEAD, TaskState.CANCELLED, TaskState.FAILED}
@@ -36,7 +37,13 @@ class TenantRepairResult:
 class TenantSwarmBroker:
     """Keeps tenant policy accounting synchronized with broker/runtime transitions."""
 
-    def __init__(self, broker: SwarmBroker, ingress: SwarmIngressGovernor | None = None, *, max_terminal_records: int = 100_000) -> None:
+    def __init__(
+        self,
+        broker: SwarmBroker,
+        ingress: SwarmIngressGovernor | None = None,
+        *,
+        max_terminal_records: int = 100_000,
+    ) -> None:
         if max_terminal_records < 1:
             raise ValueError("max_terminal_records must be positive")
         self.broker = broker
@@ -100,9 +107,23 @@ class TenantSwarmBroker:
     def reconcile(self) -> dict[str, tuple[str, ...]]:
         with self._lock:
             resident = {task.id: task for task in self.broker.runtime.tasks()}
-            missing_active = tuple(sorted(task_id for task_id in self._tenant_by_task if task_id not in resident))
-            terminal_not_terminal = tuple(sorted(task_id for task_id in self._terminal_tenants if task_id in resident and resident[task_id].state not in TERMINAL_STATES))
-            active_terminal = tuple(sorted(task_id for task_id in self._tenant_by_task if task_id in resident and resident[task_id].state in TERMINAL_STATES))
+            missing_active = tuple(
+                sorted(task_id for task_id in self._tenant_by_task if task_id not in resident)
+            )
+            terminal_not_terminal = tuple(
+                sorted(
+                    task_id
+                    for task_id in self._terminal_tenants
+                    if task_id in resident and resident[task_id].state not in TERMINAL_STATES
+                )
+            )
+            active_terminal = tuple(
+                sorted(
+                    task_id
+                    for task_id in self._tenant_by_task
+                    if task_id in resident and resident[task_id].state in TERMINAL_STATES
+                )
+            )
             phase_mismatch: list[str] = []
             for task_id, tenant in self._tenant_by_task.items():
                 task = resident.get(task_id)
@@ -110,7 +131,12 @@ class TenantSwarmBroker:
                     continue
                 if self.ingress.phase(tenant, task_id) != self._expected_phase(task):
                     phase_mismatch.append(task_id)
-            return {"missing_active": missing_active, "terminal_not_terminal": terminal_not_terminal, "active_terminal": active_terminal, "phase_mismatch": tuple(sorted(phase_mismatch))}
+            return {
+                "missing_active": missing_active,
+                "terminal_not_terminal": terminal_not_terminal,
+                "active_terminal": active_terminal,
+                "phase_mismatch": tuple(sorted(phase_mismatch)),
+            }
 
     def repair(self) -> TenantRepairResult:
         """Reconcile tenant metadata/accounting against the live runtime as authority."""
@@ -149,14 +175,27 @@ class TenantSwarmBroker:
                 phase_repairs += repaired
                 reactivated += 1
 
-            return TenantRepairResult(removed_orphans, restored_accounting, phase_repairs, terminalized, reactivated)
+            return TenantRepairResult(
+                removed_orphans,
+                restored_accounting,
+                phase_repairs,
+                terminalized,
+                reactivated,
+            )
 
     def tenant_for(self, task_id: str) -> str | None:
         task_id = self._task_id(task_id)
         with self._lock:
             return self._tenant_by_task.get(task_id) or self._terminal_tenants.get(task_id)
 
-    def submit_and_dispatch(self, tenant: str, task: SwarmTask, *, idempotency_key: str | None = None, cost: float = 1.0) -> TenantBrokerResult:
+    def submit_and_dispatch(
+        self,
+        tenant: str,
+        task: SwarmTask,
+        *,
+        idempotency_key: str | None = None,
+        cost: float = 1.0,
+    ) -> TenantBrokerResult:
         tenant = self._tenant(tenant)
         task_id = self._task_id(task.id)
         with self._lock:
@@ -166,9 +205,13 @@ class TenantSwarmBroker:
                     raise AdmissionError(f"task already belongs to tenant: {active_tenant}")
                 resident = self.broker.runtime.task(task_id)
                 if resident is None:
-                    raise AdmissionError(f"active tenant task missing from runtime: {task_id}; repair required")
+                    raise AdmissionError(
+                        f"active tenant task missing from runtime: {task_id}; repair required"
+                    )
                 if resident.state in TERMINAL_STATES:
-                    raise AdmissionError(f"active tenant task is terminal: {task_id}; repair required")
+                    raise AdmissionError(
+                        f"active tenant task is terminal: {task_id}; repair required"
+                    )
                 return TenantBrokerResult(
                     tenant,
                     task_id,
@@ -178,18 +221,44 @@ class TenantSwarmBroker:
                     resident.state is TaskState.LEASED,
                     f"active task already accounted in state {resident.state.value}",
                 )
+
             terminal_tenant = self._terminal_tenants.get(task_id)
             if terminal_tenant is not None:
                 if terminal_tenant != tenant:
                     raise AdmissionError(f"task already belongs to tenant: {terminal_tenant}")
                 resident = self.broker.runtime.task(task_id)
                 if resident is not None and resident.state not in TERMINAL_STATES:
-                    raise AdmissionError(f"terminal tenant task is active: {task_id}; repair required")
+                    raise AdmissionError(
+                        f"terminal tenant task is active: {task_id}; repair required"
+                    )
                 self._terminal_tenants.move_to_end(task_id)
-                return TenantBrokerResult(tenant, task_id, True, True, None, False, "terminal task already accounted")
-            decision: IngressDecision = self.ingress.admit(tenant, task_id, task.payload, cost=cost)
+                return TenantBrokerResult(
+                    tenant,
+                    task_id,
+                    True,
+                    True,
+                    None,
+                    False,
+                    "terminal task already accounted",
+                )
+
+            decision: IngressDecision = self.ingress.admit(
+                tenant,
+                task_id,
+                task.payload,
+                cost=cost,
+            )
             if not decision.accepted:
-                return TenantBrokerResult(tenant, task_id, False, False, None, False, decision.reason)
+                return TenantBrokerResult(
+                    tenant,
+                    task_id,
+                    False,
+                    False,
+                    None,
+                    False,
+                    decision.reason,
+                )
+
             self._tenant_by_task[task_id] = tenant
             try:
                 result = self.broker.submit_and_dispatch(task, idempotency_key=idempotency_key)
@@ -197,11 +266,48 @@ class TenantSwarmBroker:
                 self.ingress.complete(tenant, task_id)
                 self._tenant_by_task.pop(task_id, None)
                 raise
-            if result.leased:
-                self.ingress.mark_leased(tenant, task_id)
-            return TenantBrokerResult(tenant, result.task_id, True, result.duplicate, result.worker_id, result.leased, result.reason)
 
-    def record_success(self, worker_id: str, task_id: str, *, completion_token: str | None = None) -> CompletionResult:
+            if result.leased:
+                try:
+                    self.ingress.mark_leased(tenant, task_id)
+                except Exception as exc:
+                    if result.worker_id is None:
+                        raise RuntimeError(
+                            f"leased task missing worker identity: {task_id}"
+                        ) from exc
+                    try:
+                        rollback_exact_lease(self.broker.runtime, result.worker_id, task_id)
+                    except Exception as rollback_exc:
+                        raise RuntimeError(
+                            f"lease accounting rejected and runtime rollback failed: {task_id}"
+                        ) from rollback_exc
+                    return TenantBrokerResult(
+                        tenant,
+                        task_id,
+                        True,
+                        result.duplicate,
+                        None,
+                        False,
+                        f"lease accounting rejected: {exc}",
+                    )
+
+            return TenantBrokerResult(
+                tenant,
+                result.task_id,
+                True,
+                result.duplicate,
+                result.worker_id,
+                result.leased,
+                result.reason,
+            )
+
+    def record_success(
+        self,
+        worker_id: str,
+        task_id: str,
+        *,
+        completion_token: str | None = None,
+    ) -> CompletionResult:
         task_id = self._task_id(task_id)
         with self._lock:
             duplicate = self._terminal_duplicate(task_id)
@@ -210,14 +316,25 @@ class TenantSwarmBroker:
             tenant = self._tenant_by_task.get(task_id) or self._terminal_tenants.get(task_id)
             if tenant is None:
                 raise AdmissionError(f"task has no tenant accounting: {task_id}")
-            result = self.broker.record_success(worker_id, task_id, completion_token=completion_token)
+            result = self.broker.record_success(
+                worker_id,
+                task_id,
+                completion_token=completion_token,
+            )
             if not result.duplicate and task_id in self._tenant_by_task:
                 self.ingress.complete(tenant, task_id)
                 self._tenant_by_task.pop(task_id, None)
                 self._remember_terminal(task_id, tenant)
             return result
 
-    def record_failure(self, worker_id: str, task_id: str, error: str, *, completion_token: str | None = None) -> CompletionResult:
+    def record_failure(
+        self,
+        worker_id: str,
+        task_id: str,
+        error: str,
+        *,
+        completion_token: str | None = None,
+    ) -> CompletionResult:
         task_id = self._task_id(task_id)
         with self._lock:
             duplicate = self._terminal_duplicate(task_id)
@@ -226,7 +343,12 @@ class TenantSwarmBroker:
             tenant = self._tenant_by_task.get(task_id) or self._terminal_tenants.get(task_id)
             if tenant is None:
                 raise AdmissionError(f"task has no tenant accounting: {task_id}")
-            result = self.broker.record_failure(worker_id, task_id, error, completion_token=completion_token)
+            result = self.broker.record_failure(
+                worker_id,
+                task_id,
+                error,
+                completion_token=completion_token,
+            )
             if result.duplicate:
                 return result
             if result.task.state is TaskState.QUEUED:
@@ -240,4 +362,11 @@ class TenantSwarmBroker:
 
     def status(self) -> dict[str, object]:
         with self._lock:
-            return {"tenants_by_task": dict(sorted(self._tenant_by_task.items())), "terminal_tenants": dict(self._terminal_tenants), "tracked_tasks": len(self._tenant_by_task), "terminal_records": len(self._terminal_tenants), "reconcile": self.reconcile(), "ingress": self.ingress.status()}
+            return {
+                "tenants_by_task": dict(sorted(self._tenant_by_task.items())),
+                "terminal_tenants": dict(self._terminal_tenants),
+                "tracked_tasks": len(self._tenant_by_task),
+                "terminal_records": len(self._terminal_tenants),
+                "reconcile": self.reconcile(),
+                "ingress": self.ingress.status(),
+            }
