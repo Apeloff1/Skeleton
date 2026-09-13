@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import inspect
+import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from types import MappingProxyType
@@ -22,6 +23,7 @@ from skeleton.frontier.execution import (
 )
 from skeleton.frontier.health import HealthState
 from skeleton.frontier.payloads import json_snapshot
+from skeleton.frontier.singleflight import SingleFlight
 
 
 class AgentFailure(RuntimeError):
@@ -82,6 +84,7 @@ class AgentRuntime:
         self._pending = self._active = 0
         self._tasks: dict[asyncio.Task, int] = {}
         self._closed = False
+        self._singleflight = SingleFlight(max_inflight=self.execution_policy.max_concurrency + self.execution_policy.max_queue)
         self._counts = {"completed": 0, "failed": 0, "timed_out": 0, "cancelled": 0, "rejected": 0, "retries": 0}
         for name, agent in (agents or {}).items():
             if name != agent.name:
@@ -138,7 +141,8 @@ class AgentRuntime:
 
     def stats(self) -> dict[str, Any]:
         return {**self._counts, "registered": len(self._agents), "active": self._active,
-                "queued": self._pending - self._active, "closed": self._closed}
+                "queued": self._pending - self._active, "closed": self._closed,
+                "idempotency": self._singleflight.stats()}
 
     async def aclose(self, *, grace_period: float = 5.0) -> None:
         """Stop admissions, drain accepted work, then cancel cooperative stragglers."""
@@ -148,7 +152,7 @@ class AgentRuntime:
         if self._pending and asyncio.get_running_loop() is not self._loop:
             raise RuntimeError("shutdown must run on the runtime's event loop")
         self._closed = True
-        pending = set(self._tasks)
+        pending = set(self._tasks) | set(self._singleflight.tasks)
         if not pending:
             return
         try:
@@ -168,6 +172,28 @@ class AgentRuntime:
         await self.aclose()
 
     async def execute(self, agent_name: str, task: str, *,
+                      context: Mapping[str, Any] | None = None,
+                      required_capability: str | None = None,
+                      source_repository: str = "Apeloff1/Skeleton",
+                      request_id: str | None = None,
+                      timeout: float | None = None,
+                      idempotency_key: str | None = None) -> ExecutionResult:
+        kwargs = dict(context=context, required_capability=required_capability,
+                      source_repository=source_repository, request_id=request_id, timeout=timeout)
+        if idempotency_key is None:
+            return await self._execute(agent_name, task, **kwargs)
+        self._authorize(agent_name, required_capability)
+        payload = json_snapshot({"agent": agent_name, "task": task, "context": dict(context or {}),
+                                 "required_capability": required_capability,
+                                 "source_repository": source_repository, "timeout": timeout},
+                                max_bytes=self.execution_policy.max_payload_bytes)
+        kwargs["context"] = payload["context"]
+        fingerprint = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+        return await self._singleflight.run(idempotency_key, fingerprint,
+                                            lambda: self._execute(agent_name, task, **kwargs),
+                                            cacheable=lambda result: result.succeeded)
+
+    async def _execute(self, agent_name: str, task: str, *,
                       context: Mapping[str, Any] | None = None,
                       required_capability: str | None = None,
                       source_repository: str = "Apeloff1/Skeleton",
