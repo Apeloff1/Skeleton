@@ -3,13 +3,15 @@
 
 class HealthScore:
     def __init__(self, window=16):
-        if not isinstance(window, int) or window <= 0:
-            raise ValueError("window must be positive")
+        if not isinstance(window, int) or isinstance(window, bool) or window <= 0:
+            raise ValueError("window must be a positive integer")
         self.window = window
         self._samples = []
 
     def record(self, ok):
-        self._samples.append(bool(ok))
+        if not isinstance(ok, bool):
+            raise TypeError("ok must be bool")
+        self._samples.append(ok)
         self._samples = self._samples[-self.window:]
         return self.value
 
