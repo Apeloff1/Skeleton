@@ -40,18 +40,23 @@ def activate_recovery(state: Any, recovery: SwarmRecoveryManager, sequence: int)
         state.bind_swarm_runtime(runtime)
         return RecoveryActivation(sequence, None, "none")
 
-    ingress, broker, tenant = _stage_tenant_bundle(state, runtime, current)
-    sidecar = recovery.tenant_store.get(sequence)
-    if sidecar is not None:
-        repair = recovery.restore_tenants(tenant, sequence)
-        if repair is None:
-            raise RuntimeError(f"tenant checkpoint disappeared during activation: {sequence}")
-        source = "checkpoint"
-    else:
-        transient = TenantCheckpointStore(max_checkpoints=1)
-        transient.capture(1, current)
-        repair = transient.restore(tenant, 1)
-        source = "live"
+    # Hold the old execution generation through staging and publication. Requests already
+    # running finish before this lock is acquired; requests waiting behind it wake only
+    # after commit_swarm_bundle() retires this generation and therefore fail closed.
+    with current._lock:
+        current._assert_active()
+        ingress, broker, tenant = _stage_tenant_bundle(state, runtime, current)
+        sidecar = recovery.tenant_store.get(sequence)
+        if sidecar is not None:
+            repair = recovery.restore_tenants(tenant, sequence)
+            if repair is None:
+                raise RuntimeError(f"tenant checkpoint disappeared during activation: {sequence}")
+            source = "checkpoint"
+        else:
+            transient = TenantCheckpointStore(max_checkpoints=1)
+            transient.capture(1, current)
+            repair = transient.restore(tenant, 1)
+            source = "live"
 
-    state.commit_swarm_bundle(runtime, broker, ingress, tenant)
-    return RecoveryActivation(sequence, asdict(repair), source)
+        state.commit_swarm_bundle(runtime, broker, ingress, tenant)
+        return RecoveryActivation(sequence, asdict(repair), source)
