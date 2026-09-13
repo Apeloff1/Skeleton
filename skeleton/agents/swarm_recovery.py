@@ -3,15 +3,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
+import json
 from threading import RLock
 from typing import Mapping
 
-from skeleton.agents.swarm_checkpoint import CheckpointStore
+from skeleton.agents.swarm_checkpoint import Checkpoint, CheckpointStore
 from skeleton.agents.swarm_failover import FailoverCoordinator, ReplicaState
 from skeleton.agents.swarm_hardened import HardenedSwarmRuntime
 from skeleton.agents.swarm_runtime import SwarmRuntime
 from skeleton.agents.swarm_tenant_broker import TenantRepairResult, TenantSwarmBroker
-from skeleton.agents.swarm_tenant_checkpoint import TenantCheckpointStore
+from skeleton.agents.swarm_tenant_checkpoint import (
+    TenantCheckpointStore,
+    TenantMetadataCheckpoint,
+)
+
+
+_ARCHIVE_VERSION = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +46,31 @@ class SwarmRecoveryManager:
         self._decision = self.failover.elect(self._replicas)
         self._lock = RLock()
 
+    @staticmethod
+    def _archive_checksum(payload: Mapping[str, object]) -> str:
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return sha256(encoded).hexdigest()
+
+    @staticmethod
+    def _record(mapping: object, label: str) -> Mapping[str, object]:
+        if not isinstance(mapping, Mapping):
+            raise ValueError(f"invalid {label} archive record")
+        return mapping
+
+    @staticmethod
+    def _pairs(value: object, label: str) -> tuple[tuple[str, str], ...]:
+        if not isinstance(value, list):
+            raise ValueError(f"invalid {label} archive pairs")
+        pairs: list[tuple[str, str]] = []
+        for item in value:
+            if not isinstance(item, (list, tuple)) or len(item) != 2:
+                raise ValueError(f"invalid {label} archive pair")
+            left, right = item
+            if not isinstance(left, str) or not isinstance(right, str):
+                raise ValueError(f"invalid {label} archive pair")
+            pairs.append((left, right))
+        return tuple(pairs)
+
     def checkpoint(self, runtime: SwarmRuntime, tenant_broker: TenantSwarmBroker | None = None) -> int:
         """Capture runtime and tenant ownership transactionally at one sequence."""
         with self._lock:
@@ -51,6 +84,110 @@ class SwarmRecoveryManager:
                 self.tenant_store.discard(checkpoint.sequence)
                 raise
             return checkpoint.sequence
+
+    def export_archive(self) -> dict[str, object]:
+        """Return a JSON-serializable, checksummed copy of bounded recovery history."""
+        with self._lock:
+            runtime_records = [
+                {
+                    "sequence": item.sequence,
+                    "created_at": item.created_at,
+                    "checksum": item.checksum,
+                    "state": item.state,
+                }
+                for item in self.store.history()
+            ]
+            tenant_records = [
+                {
+                    "sequence": item.sequence,
+                    "created_at": item.created_at,
+                    "checksum": item.checksum,
+                    "active": [list(pair) for pair in item.active],
+                    "terminal": [list(pair) for pair in item.terminal],
+                }
+                for item in self.tenant_store.history()
+            ]
+            payload: dict[str, object] = {
+                "version": _ARCHIVE_VERSION,
+                "max_checkpoints": self.store.max_checkpoints,
+                "runtime": runtime_records,
+                "tenant": tenant_records,
+            }
+            return {**payload, "archive_checksum": self._archive_checksum(payload)}
+
+    def export_archive_bytes(self) -> bytes:
+        return json.dumps(self.export_archive(), sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+    @classmethod
+    def from_archive(cls, archive: Mapping[str, object]) -> "SwarmRecoveryManager":
+        """Reconstruct bounded recovery history only after archive and record verification."""
+        if not isinstance(archive, Mapping):
+            raise ValueError("recovery archive must be a mapping")
+        version = archive.get("version")
+        if isinstance(version, bool) or not isinstance(version, int) or version != _ARCHIVE_VERSION:
+            raise ValueError(f"unsupported recovery archive version: {version}")
+        max_checkpoints = archive.get("max_checkpoints")
+        if isinstance(max_checkpoints, bool) or not isinstance(max_checkpoints, int) or max_checkpoints < 1:
+            raise ValueError("recovery archive max_checkpoints must be a positive integer")
+        runtime_raw = archive.get("runtime")
+        tenant_raw = archive.get("tenant")
+        if not isinstance(runtime_raw, list) or not isinstance(tenant_raw, list):
+            raise ValueError("recovery archive histories must be lists")
+        if len(runtime_raw) > max_checkpoints or len(tenant_raw) > max_checkpoints:
+            raise ValueError("recovery archive exceeds configured history capacity")
+        archive_checksum = archive.get("archive_checksum")
+        if not isinstance(archive_checksum, str) or not archive_checksum:
+            raise ValueError("recovery archive checksum must not be empty")
+        payload: dict[str, object] = {
+            "version": version,
+            "max_checkpoints": max_checkpoints,
+            "runtime": runtime_raw,
+            "tenant": tenant_raw,
+        }
+        if cls._archive_checksum(payload) != archive_checksum:
+            raise ValueError("recovery archive checksum mismatch")
+
+        manager = cls(max_checkpoints=max_checkpoints)
+        for raw in runtime_raw:
+            record = cls._record(raw, "runtime checkpoint")
+            state = record.get("state")
+            if not isinstance(state, dict):
+                raise ValueError("runtime checkpoint state must be a dictionary")
+            manager.store.load_verified(
+                Checkpoint(
+                    sequence=record.get("sequence"),
+                    created_at=record.get("created_at"),
+                    checksum=record.get("checksum"),
+                    state=state,
+                )
+            )
+
+        runtime_sequences = set(manager.store.sequences())
+        for raw in tenant_raw:
+            record = cls._record(raw, "tenant checkpoint")
+            checkpoint = TenantMetadataCheckpoint(
+                sequence=record.get("sequence"),
+                created_at=record.get("created_at"),
+                checksum=record.get("checksum"),
+                active=cls._pairs(record.get("active"), "active tenant"),
+                terminal=cls._pairs(record.get("terminal"), "terminal tenant"),
+            )
+            if checkpoint.sequence not in runtime_sequences:
+                raise ValueError(f"tenant checkpoint has no runtime checkpoint: {checkpoint.sequence}")
+            manager.tenant_store.load_verified(checkpoint)
+        return manager
+
+    @classmethod
+    def from_archive_bytes(cls, payload: bytes) -> "SwarmRecoveryManager":
+        if not isinstance(payload, (bytes, bytearray)):
+            raise TypeError("recovery archive payload must be bytes")
+        try:
+            archive = json.loads(bytes(payload).decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("invalid recovery archive payload") from exc
+        if not isinstance(archive, dict):
+            raise ValueError("recovery archive payload must contain an object")
+        return cls.from_archive(archive)
 
     def restore_latest(self) -> HardenedSwarmRuntime | None:
         with self._lock:
