@@ -12,7 +12,7 @@ Capabilities:
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List
 from datetime import datetime
 
@@ -33,26 +33,26 @@ class StoryGenerationRequest(BaseModel):
     branching_paths: int = 1  # Number of story branches
 
 class CharacterRequest(BaseModel):
-    description: str
-    role: str = "protagonist"  # protagonist, antagonist, ally, mentor, neutral
-    archetype: str = "hero"  # hero, villain, trickster, sage, innocent, etc.
-    personality_traits: List[str] = []
+    description: str = Field(..., min_length=1, max_length=10000)
+    role: str = Field("protagonist", max_length=100)  # protagonist, antagonist, ally, mentor, neutral
+    archetype: str = Field("hero", max_length=100)  # hero, villain, trickster, sage, innocent, etc.
+    personality_traits: List[str] = Field(default_factory=list, max_length=50)
     backstory_depth: str = "detailed"  # minimal, moderate, detailed, extensive
 
 class DialogueRequest(BaseModel):
-    context: str
-    characters: List[str]
-    mood: str = "neutral"  # neutral, tense, friendly, romantic, hostile, mysterious
+    context: str = Field(..., min_length=1, max_length=10000)
+    characters: List[str] = Field(..., min_length=1, max_length=50)
+    mood: str = Field("neutral", max_length=100)  # neutral, tense, friendly, romantic, hostile, mysterious
     purpose: str = "exposition"  # exposition, conflict, resolution, comic_relief, foreshadowing
-    length: int = 10  # Number of dialogue lines
+    length: int = Field(10, ge=1, le=100)  # Number of dialogue lines
     include_choices: bool = False
 
 class QuestRequest(BaseModel):
-    description: str
+    description: str = Field(..., min_length=1, max_length=10000)
     quest_type: str = "main"  # main, side, daily, hidden, legendary
     difficulty: str = "medium"  # easy, medium, hard, legendary
     estimated_time: str = "medium"  # short (5-15min), medium (30-60min), long (2-4hr)
-    rewards: List[str] = []
+    rewards: List[str] = Field(default_factory=list, max_length=100)
     include_subquests: bool = True
 
 class LoreRequest(BaseModel):

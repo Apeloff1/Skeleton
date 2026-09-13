@@ -667,13 +667,13 @@ class SocraticDialogueEngine:
 # ============================================================================
 
 class LearningSessionRequest(BaseModel):
-    user_id: str
-    topic: str
-    current_mastery: float = 0.5
-    recent_performance: List[float] = []
-    time_on_task_seconds: int = 0
-    errors_made: int = 0
-    hints_used: int = 0
+    user_id: str = Field(..., min_length=1, max_length=200)
+    topic: str = Field(..., min_length=1, max_length=500)
+    current_mastery: float = Field(0.5, ge=0, le=1)
+    recent_performance: List[float] = Field(default_factory=list, max_length=100)
+    time_on_task_seconds: int = Field(0, ge=0, le=86400)
+    errors_made: int = Field(0, ge=0, le=10000)
+    hints_used: int = Field(0, ge=0, le=10000)
 
 class ChallengeRequest(BaseModel):
     user_id: str
@@ -689,10 +689,10 @@ class DialogueRequest(BaseModel):
     confidence_level: float = 0.5
 
 class ProgressRequest(BaseModel):
-    user_id: str
-    completed_lessons: List[Dict[str, Any]] = []
-    current_level: int = 1
-    total_xp: int = 0
+    user_id: str = Field(..., min_length=1, max_length=200)
+    completed_lessons: List[Dict[str, Any]] = Field(default_factory=list, max_length=1000)
+    current_level: int = Field(1, ge=1, le=10000)
+    total_xp: int = Field(0, ge=0, le=1000000000)
 
 # ============================================================================
 # API ENDPOINTS
