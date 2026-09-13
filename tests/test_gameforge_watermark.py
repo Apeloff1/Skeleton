@@ -1,9 +1,22 @@
+import pytest
+
 from skeleton.frontier.gameforge_watermark import Watermark
 
+
 def test_watermark_only_moves_forward():
-    w=Watermark(); w.observe(4); w.observe(2); assert w.value==4
+    watermark = Watermark()
+    watermark.observe(4)
+    watermark.observe(2)
+    assert watermark.value == 4
+
 
 def test_watermark_rejects_negative_observation():
-    try: Watermark().observe(-1)
-    except ValueError: pass
-    else: raise AssertionError("expected ValueError")
+    with pytest.raises(ValueError):
+        Watermark().observe(-1)
+
+
+def test_watermark_rejects_boolean_values():
+    with pytest.raises(ValueError):
+        Watermark(True)
+    with pytest.raises(ValueError):
+        Watermark().observe(True)
