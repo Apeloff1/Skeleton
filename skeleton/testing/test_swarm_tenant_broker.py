@@ -8,7 +8,7 @@ from skeleton.agents.swarm_runtime import AdmissionError, SwarmTask, TaskState
 from skeleton.agents.swarm_tenant_broker import TenantSwarmBroker
 
 
-def _broker(*, max_attempts: int = 3):
+def _broker():
     runtime = HardenedSwarmRuntime()
     runtime.register_worker("w", capacity=4)
     ingress = SwarmIngressGovernor(rate_capacity=100, rate_refill_per_second=100)
@@ -24,8 +24,10 @@ def test_tenant_broker_tracks_lease_and_success() -> None:
 
     completion = broker.record_success("w", "task", completion_token="done-1")
     assert completion.task.state is TaskState.SUCCEEDED
-    assert broker.tenant_for("task") is None
+    assert broker.tenant_for("task") == "acme"
     assert ingress.phase("acme", "task") is None
+    assert broker.status()["tracked_tasks"] == 0
+    assert broker.status()["terminal_records"] == 1
 
 
 def test_tenant_broker_failure_requeues_accounting() -> None:
@@ -42,8 +44,9 @@ def test_tenant_broker_terminal_failure_releases_accounting() -> None:
     broker.submit_and_dispatch("acme", SwarmTask("task", {}, max_attempts=1))
     failed = broker.record_failure("w", "task", "fatal", completion_token="attempt-1")
     assert failed.task.state is TaskState.DEAD
-    assert broker.tenant_for("task") is None
+    assert broker.tenant_for("task") == "acme"
     assert ingress.phase("acme", "task") is None
+    assert broker.status()["tracked_tasks"] == 0
 
 
 def test_tenant_broker_rolls_back_ingress_when_runtime_rejects() -> None:
@@ -77,11 +80,12 @@ def test_tenant_broker_enforces_tenant_queue_quota() -> None:
     assert second.reason == "queued quota exceeded"
 
 
-def test_duplicate_completion_token_does_not_double_release_tenant() -> None:
+def test_duplicate_completion_token_is_idempotent_at_tenant_boundary() -> None:
     runtime, ingress, broker = _broker()
     broker.submit_and_dispatch("acme", SwarmTask("task", {}))
     first = broker.record_success("w", "task", completion_token="same")
+    second = broker.record_success("w", "task", completion_token="same")
     assert first.duplicate is False
-    # Once terminal accounting is removed, a second callback is rejected at the tenant boundary.
-    with pytest.raises(AdmissionError):
-        broker.record_success("w", "task", completion_token="same")
+    assert second.duplicate is True
+    assert ingress.phase("acme", "task") is None
+    assert broker.status()["terminal_records"] == 1
