@@ -23,6 +23,7 @@ import os, io, json, shutil, zipfile, tempfile, hashlib, asyncio, subprocess, pl
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from core.exec_guard import execution_disabled_message, require_execution_allowed
 
 ARTIFACTS_ROOT = Path("/app/backend/data/build_artifacts")
 ARTIFACTS_ROOT.mkdir(parents=True, exist_ok=True)
@@ -89,6 +90,19 @@ def _sanitize_path(p: str) -> str:
     return "/".join(parts) or "file.txt"
 
 
+def _safe_build_id(value: object) -> str:
+    build_id = str(value or "").strip()
+    if (
+        not build_id
+        or build_id in {".", ".."}
+        or ".." in build_id
+        or "/" in build_id
+        or "\\" in build_id
+    ):
+        raise ValueError("build_id must be a relative identifier")
+    return build_id
+
+
 def _safe_pkg_segment(seg: str) -> str:
     """Make a string a valid Android package segment.
     
@@ -131,7 +145,13 @@ def _build_files_iter(build: dict):
 # ZIP builder
 # ─────────────────────────────────────────────────────────────────
 def build_zip(build: dict) -> dict:
-    build_id = build.get("build_id", "unknown")
+    if not require_execution_allowed("Binary artifact packaging"):
+        return {
+            "ok": False,
+            "disabled": True,
+            "error": execution_disabled_message("Binary artifact packaging"),
+        }
+    build_id = _safe_build_id(build.get("build_id", "unknown"))
     out_path = ARTIFACTS_ROOT / f"{build_id}.zip"
     file_count = 0
     total_bytes = 0
@@ -783,7 +803,13 @@ def _build_real_apk(build: dict, out_path: Path) -> tuple[int, int, str, bool]:
 
 
 def build_apk(build: dict) -> dict:
-    build_id = build.get("build_id", "unknown")
+    if not require_execution_allowed("APK packaging"):
+        return {
+            "ok": False,
+            "disabled": True,
+            "error": execution_disabled_message("APK packaging"),
+        }
+    build_id = _safe_build_id(build.get("build_id", "unknown"))
     out_path = ARTIFACTS_ROOT / f"{build_id}.apk"
     is_real = False
     sig_info = ""
