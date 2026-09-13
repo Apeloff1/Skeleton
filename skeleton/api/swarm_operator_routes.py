@@ -15,7 +15,8 @@ from skeleton.agents.swarm_maintenance import compact_state
 from skeleton.agents.swarm_operator import SwarmOperator
 from skeleton.agents.swarm_queries import query_tasks
 from skeleton.agents.swarm_recovery import SwarmRecoveryManager
-from skeleton.agents.swarm_runtime import SwarmRuntime, TaskState
+from skeleton.agents.swarm_retention import RetentionPolicy, prune_terminal
+from skeleton.agents.swarm_runtime import AdmissionError, SwarmRuntime, TaskState
 from skeleton.agents.swarm_slo import SLOPolicy
 from skeleton.agents.swarm_snapshot import SnapshotError, normalize_snapshot
 
@@ -134,6 +135,27 @@ def normalized_snapshot(runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, 
 @router.get("/snapshot/compact")
 def compact_snapshot(max_terminal_tasks: int = Query(default=10_000, ge=0, le=1_000_000), runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
     return compact_state(runtime, max_terminal_tasks=max_terminal_tasks)
+
+
+@router.post("/prune-terminal")
+def prune_terminal_tasks(
+    keep_terminal: int = Query(default=10_000, ge=0, le=1_000_000),
+    runtime: SwarmRuntime = Depends(_runtime),
+) -> dict[str, Any]:
+    plan = RetentionPolicy(max_terminal_tasks=keep_terminal).plan(runtime)
+    before = capacity(runtime)
+    try:
+        removed = prune_terminal(runtime, plan.removable)
+    except (AdmissionError, RuntimeError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {
+        "removed": removed,
+        "planned": len(plan.removable),
+        "retained_terminal": plan.retained,
+        "terminal_before": plan.terminal,
+        "capacity_before": before,
+        "capacity_after": capacity(runtime),
+    }
 
 
 @router.post("/gc")
