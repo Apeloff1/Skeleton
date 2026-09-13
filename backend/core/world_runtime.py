@@ -148,7 +148,7 @@ class WorldRuntime:
     def dialogue_context(self, npc_id: str) -> DialogueContext:
         memory = self.relationship(npc_id)
         return DialogueContext(
-            relationship=memory.score,
+            relationship=memory.relationship,
             currency=self.wallet.balances.get("coins", 0),
             stats=dict(self.character.stats),
             inventory=dict(self.economy_inventory.items),
@@ -166,7 +166,7 @@ class WorldRuntime:
         outcome = dialogue.choose(node_id, choice_id, context)
         relationship_delta = context.relationship - before_relationship
         if relationship_delta:
-            memory.record("dialogue", relationship_delta, details={"choice": choice_id})
+            memory.record("dialogue", impact=relationship_delta, detail={"choice": choice_id})
         self.wallet.balances["coins"] = context.currency
         self.economy_inventory.items = dict(context.inventory)
         self.economy_inventory.unlocks = set(context.unlocks)
