@@ -18,7 +18,7 @@ const COLOR: Record<string, string> = {
 
 export default function GroupChat() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ game?: string }>();
+  const params = useLocalSearchParams<{ game?: string; stale?: string }>();
   const gameId = params?.game ? String(params.game) : '';
   const [job, setJob] = React.useState<any>(null);
   const [running, setRunning] = React.useState(false);
