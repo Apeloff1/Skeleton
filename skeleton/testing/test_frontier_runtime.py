@@ -64,7 +64,7 @@ async def test_runtime_rejects_when_unavailable():
 
 @pytest.mark.asyncio
 async def test_runtime_contains_failures_as_results():
-    runtime = AgentRuntime()
+    runtime = AgentRuntime(policy=CapabilityPolicy.from_names({"text.generate"}))
     runtime.register(BrokenAgent())
     result = await runtime.execute("broken", "fail safely")
     assert not result.succeeded
