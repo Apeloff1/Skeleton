@@ -36,13 +36,7 @@ class TenantRepairResult:
 class TenantSwarmBroker:
     """Keeps tenant policy accounting synchronized with broker/runtime transitions."""
 
-    def __init__(
-        self,
-        broker: SwarmBroker,
-        ingress: SwarmIngressGovernor | None = None,
-        *,
-        max_terminal_records: int = 100_000,
-    ) -> None:
+    def __init__(self, broker: SwarmBroker, ingress: SwarmIngressGovernor | None = None, *, max_terminal_records: int = 100_000) -> None:
         if max_terminal_records < 1:
             raise ValueError("max_terminal_records must be positive")
         self.broker = broker
@@ -76,38 +70,38 @@ class TenantSwarmBroker:
         with self._lock:
             self.broker = broker
 
+    @staticmethod
+    def _expected_phase(task: SwarmTask) -> str:
+        return "leased" if task.state is TaskState.LEASED else "queued"
+
+    def _repair_phase(self, tenant: str, task: SwarmTask) -> tuple[int, int]:
+        expected = self._expected_phase(task)
+        phase = self.ingress.phase(tenant, task.id)
+        if phase is None:
+            self.ingress.restore_task(tenant, task.id, task.payload, phase=expected)
+            return 1, 0
+        if phase == expected:
+            return 0, 0
+        if expected == "leased":
+            self.ingress.mark_leased(tenant, task.id)
+        else:
+            self.ingress.mark_requeued(tenant, task.id)
+        return 0, 1
+
     def reconcile(self) -> dict[str, tuple[str, ...]]:
         with self._lock:
             resident = {task.id: task for task in self.broker.runtime.tasks()}
             missing_active = tuple(sorted(task_id for task_id in self._tenant_by_task if task_id not in resident))
-            terminal_not_terminal = tuple(
-                sorted(
-                    task_id
-                    for task_id in self._terminal_tenants
-                    if task_id in resident and resident[task_id].state not in TERMINAL_STATES
-                )
-            )
-            active_terminal = tuple(
-                sorted(
-                    task_id
-                    for task_id in self._tenant_by_task
-                    if task_id in resident and resident[task_id].state in TERMINAL_STATES
-                )
-            )
+            terminal_not_terminal = tuple(sorted(task_id for task_id in self._terminal_tenants if task_id in resident and resident[task_id].state not in TERMINAL_STATES))
+            active_terminal = tuple(sorted(task_id for task_id in self._tenant_by_task if task_id in resident and resident[task_id].state in TERMINAL_STATES))
             phase_mismatch: list[str] = []
             for task_id, tenant in self._tenant_by_task.items():
                 task = resident.get(task_id)
                 if task is None or task.state in TERMINAL_STATES:
                     continue
-                expected = "leased" if task.state is TaskState.LEASED else "queued"
-                if self.ingress.phase(tenant, task_id) != expected:
+                if self.ingress.phase(tenant, task_id) != self._expected_phase(task):
                     phase_mismatch.append(task_id)
-            return {
-                "missing_active": missing_active,
-                "terminal_not_terminal": terminal_not_terminal,
-                "active_terminal": active_terminal,
-                "phase_mismatch": tuple(sorted(phase_mismatch)),
-            }
+            return {"missing_active": missing_active, "terminal_not_terminal": terminal_not_terminal, "active_terminal": active_terminal, "phase_mismatch": tuple(sorted(phase_mismatch))}
 
     def repair(self) -> TenantRepairResult:
         """Reconcile tenant metadata/accounting against the live runtime as authority."""
@@ -131,16 +125,9 @@ class TenantSwarmBroker:
                     self._remember_terminal(task_id, tenant)
                     terminalized += 1
                     continue
-                expected = "leased" if task.state is TaskState.LEASED else "queued"
-                if phase is None:
-                    self.ingress.restore_task(tenant, task_id, task.payload, phase=expected)
-                    restored_accounting += 1
-                elif phase != expected:
-                    if expected == "leased":
-                        self.ingress.mark_leased(tenant, task_id)
-                    else:
-                        self.ingress.mark_requeued(tenant, task_id)
-                    phase_repairs += 1
+                restored, repaired = self._repair_phase(tenant, task)
+                restored_accounting += restored
+                phase_repairs += repaired
 
             for task_id, tenant in list(self._terminal_tenants.items()):
                 task = resident.get(task_id)
@@ -148,33 +135,19 @@ class TenantSwarmBroker:
                     continue
                 self._terminal_tenants.pop(task_id, None)
                 self._tenant_by_task[task_id] = tenant
-                expected = "leased" if task.state is TaskState.LEASED else "queued"
-                if self.ingress.phase(tenant, task_id) is None:
-                    self.ingress.restore_task(tenant, task_id, task.payload, phase=expected)
-                    restored_accounting += 1
+                restored, repaired = self._repair_phase(tenant, task)
+                restored_accounting += restored
+                phase_repairs += repaired
                 reactivated += 1
 
-            return TenantRepairResult(
-                removed_orphans,
-                restored_accounting,
-                phase_repairs,
-                terminalized,
-                reactivated,
-            )
+            return TenantRepairResult(removed_orphans, restored_accounting, phase_repairs, terminalized, reactivated)
 
     def tenant_for(self, task_id: str) -> str | None:
         task_id = self._task_id(task_id)
         with self._lock:
             return self._tenant_by_task.get(task_id) or self._terminal_tenants.get(task_id)
 
-    def submit_and_dispatch(
-        self,
-        tenant: str,
-        task: SwarmTask,
-        *,
-        idempotency_key: str | None = None,
-        cost: float = 1.0,
-    ) -> TenantBrokerResult:
+    def submit_and_dispatch(self, tenant: str, task: SwarmTask, *, idempotency_key: str | None = None, cost: float = 1.0) -> TenantBrokerResult:
         tenant = self._tenant(tenant)
         task_id = self._task_id(task.id)
         with self._lock:
@@ -184,18 +157,15 @@ class TenantSwarmBroker:
                     raise AdmissionError(f"task already belongs to tenant: {active_tenant}")
                 result = self.broker.submit_and_dispatch(task, idempotency_key=idempotency_key)
                 return TenantBrokerResult(tenant, result.task_id, True, result.duplicate, result.worker_id, result.leased, result.reason)
-
             terminal_tenant = self._terminal_tenants.get(task_id)
             if terminal_tenant is not None:
                 if terminal_tenant != tenant:
                     raise AdmissionError(f"task already belongs to tenant: {terminal_tenant}")
                 self._terminal_tenants.move_to_end(task_id)
                 return TenantBrokerResult(tenant, task_id, True, True, None, False, "terminal task already accounted")
-
             decision: IngressDecision = self.ingress.admit(tenant, task_id, task.payload, cost=cost)
             if not decision.accepted:
                 return TenantBrokerResult(tenant, task_id, False, False, None, False, decision.reason)
-
             self._tenant_by_task[task_id] = tenant
             try:
                 result = self.broker.submit_and_dispatch(task, idempotency_key=idempotency_key)
@@ -203,7 +173,6 @@ class TenantSwarmBroker:
                 self.ingress.complete(tenant, task_id)
                 self._tenant_by_task.pop(task_id, None)
                 raise
-
             if result.leased:
                 self.ingress.mark_leased(tenant, task_id)
             return TenantBrokerResult(tenant, result.task_id, True, result.duplicate, result.worker_id, result.leased, result.reason)
@@ -241,11 +210,4 @@ class TenantSwarmBroker:
 
     def status(self) -> dict[str, object]:
         with self._lock:
-            return {
-                "tenants_by_task": dict(sorted(self._tenant_by_task.items())),
-                "terminal_tenants": dict(self._terminal_tenants),
-                "tracked_tasks": len(self._tenant_by_task),
-                "terminal_records": len(self._terminal_tenants),
-                "reconcile": self.reconcile(),
-                "ingress": self.ingress.status(),
-            }
+            return {"tenants_by_task": dict(sorted(self._tenant_by_task.items())), "terminal_tenants": dict(self._terminal_tenants), "tracked_tasks": len(self._tenant_by_task), "terminal_records": len(self._terminal_tenants), "reconcile": self.reconcile(), "ingress": self.ingress.status()}
