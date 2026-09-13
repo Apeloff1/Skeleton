@@ -6,7 +6,7 @@ audit all happen before an executor is allowed to see work.
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import UTC, datetime
 import json
 from pathlib import Path
