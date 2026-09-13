@@ -28,6 +28,13 @@ repos:
   # pre-commit mirrors and the versions declared by backend/frontend tooling.
   - repo: local
     hooks:
+      - id: repo-toolchain-contract
+        name: repository toolchain and quality-gate contract
+        entry: python scripts/check_toolchain_contract.py
+        language: system
+        pass_filenames: false
+        files: ^(backend/pyproject\.toml|frontend/(package\.json|Dockerfile)|\.github/workflows/(ci|lint|backend-quality)\.yml|scripts/(check_toolchain_contract\.py|quality-gates\.sh)|\.pre-commit-config\.yaml)$
+
       - id: backend-ruff
         name: backend ruff correctness gate
         entry: bash -c 'cd backend && python -m ruff check . --output-format=github'
@@ -112,5 +119,5 @@ ci:
   autoupdate_schedule: monthly
   # Local hooks depend on project environments unavailable to pre-commit.ci;
   # GitHub Actions enforces them authoritatively.
-  skip: [mypy, backend-ruff, backend-compile, backend-process-safety, backend-exec-guard, frontend-lint, frontend-typecheck]
+  skip: [mypy, repo-toolchain-contract, backend-ruff, backend-compile, backend-process-safety, backend-exec-guard, frontend-lint, frontend-typecheck]
   submodules: false
