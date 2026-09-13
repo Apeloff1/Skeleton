@@ -17,7 +17,7 @@ class Quota:
             raise ValueError("quota limits must be positive")
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class Usage:
     queued: int = 0
     leased: int = 0
@@ -59,28 +59,28 @@ class QuotaLedger:
     def usage(self, scope: str) -> Usage:
         scope = self._scope(scope)
         with self._lock:
-            return self._usage.setdefault(scope, Usage())
+            return self._usage.get(scope, Usage())
 
     def reserve(self, scope: str, *, queued: int = 0, leased: int = 0, payload_bytes: int = 0) -> Usage:
         scope = self._scope(scope)
         with self._lock:
-            usage = self._usage.setdefault(scope, Usage())
+            usage = self._usage.get(scope, Usage())
             quota = self._limits.get(scope, self.default)
-            next_queued = usage.queued + queued
-            next_leased = usage.leased + leased
-            next_payload = usage.payload_bytes + payload_bytes
-            if next_queued < 0 or next_leased < 0 or next_payload < 0:
+            next_usage = Usage(
+                queued=usage.queued + queued,
+                leased=usage.leased + leased,
+                payload_bytes=usage.payload_bytes + payload_bytes,
+            )
+            if min(next_usage.queued, next_usage.leased, next_usage.payload_bytes) < 0:
                 raise QuotaExceeded("quota accounting underflow")
-            if next_queued > quota.max_queued:
+            if next_usage.queued > quota.max_queued:
                 raise QuotaExceeded(f"queued quota exceeded: {scope}")
-            if next_leased > quota.max_leased:
+            if next_usage.leased > quota.max_leased:
                 raise QuotaExceeded(f"leased quota exceeded: {scope}")
-            if next_payload > quota.max_payload_bytes:
+            if next_usage.payload_bytes > quota.max_payload_bytes:
                 raise QuotaExceeded(f"payload quota exceeded: {scope}")
-            usage.queued = next_queued
-            usage.leased = next_leased
-            usage.payload_bytes = next_payload
-            return usage
+            self._usage[scope] = next_usage
+            return next_usage
 
     def release(self, scope: str, **amounts: int) -> Usage:
         return self.reserve(
