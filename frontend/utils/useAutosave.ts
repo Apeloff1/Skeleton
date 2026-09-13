@@ -12,6 +12,7 @@
  *     • Cached query parameters across sessions
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { safeGetItem, safeSetItem } from './safeStorage';
 import { safeJsonParse, safeJsonStringify } from './safeJson';
 
@@ -21,7 +22,7 @@ export function useAutosave<T>(
   key: string,
   initial: T,
   options: { debounceMs?: number; storageKey?: string } = {},
-): [T, (next: T) => void, { reset: () => void; ready: boolean }] {
+): [T, Dispatch<SetStateAction<T>>, { reset: () => void; ready: boolean }] {
   const debounceMs = options.debounceMs ?? 350;
   const storageKey = options.storageKey ?? (PREFIX + key);
   const [value, setValue] = useState<T>(initial);
