@@ -33,14 +33,20 @@ class TokenBucketLimiter:
             raise ValueError("rate-limit key must not be empty")
         return normalized
 
+    @staticmethod
+    def _cost(cost: float) -> float:
+        cost = float(cost)
+        if cost <= 0:
+            raise ValueError("cost must be positive")
+        return cost
+
     def _refill(self, bucket: Bucket, now: float) -> None:
         elapsed = max(0.0, now - bucket.updated_at)
         bucket.tokens = min(bucket.capacity, bucket.tokens + elapsed * bucket.refill_per_second)
         bucket.updated_at = now
 
     def allow(self, key: str, *, cost: float = 1.0) -> bool:
-        if cost <= 0:
-            raise ValueError("cost must be positive")
+        cost = self._cost(cost)
         key = self._key(key)
         with self._lock:
             now = self._clock()
@@ -53,6 +59,20 @@ class TokenBucketLimiter:
                 return False
             bucket.tokens -= cost
             return True
+
+    def refund(self, key: str, *, cost: float = 1.0) -> float:
+        """Return previously consumed capacity without exceeding bucket capacity."""
+        cost = self._cost(cost)
+        key = self._key(key)
+        with self._lock:
+            now = self._clock()
+            bucket = self._buckets.setdefault(
+                key,
+                Bucket(self.capacity, self.refill_per_second, self.capacity, now),
+            )
+            self._refill(bucket, now)
+            bucket.tokens = min(bucket.capacity, bucket.tokens + cost)
+            return bucket.tokens
 
     def remaining(self, key: str) -> float:
         key = self._key(key)
