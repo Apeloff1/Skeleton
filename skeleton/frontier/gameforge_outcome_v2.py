@@ -1,0 +1,30 @@
+"""Normalized terminal outcome for bounded runtime accounting."""
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class ExecutionOutcomeV2:
+    request_id: str
+    success: bool
+    terminal: bool = True
+    reason: str = ""
+
+    def __post_init__(self):
+        if not isinstance(self.request_id, str) or not self.request_id.strip():
+            raise ValueError("request_id must be a non-empty string")
+        if not isinstance(self.success, bool):
+            raise TypeError("success must be bool")
+        if not isinstance(self.terminal, bool):
+            raise TypeError("terminal must be bool")
+        if not isinstance(self.reason, str):
+            raise TypeError("reason must be str")
+        if self.success and not self.terminal:
+            raise ValueError("successful outcomes must be terminal")
+
+    @property
+    def recoverable(self):
+        return not self.success and not self.terminal
+
+    @property
+    def failed(self):
+        return not self.success
