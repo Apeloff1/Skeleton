@@ -85,13 +85,7 @@ class RuntimeSnapshot:
 
 
 class SwarmRuntime:
-    """In-memory control plane for bounded multi-agent task execution.
-
-    Queue ordering is stable: lower ``priority`` values win and ties preserve
-    submission order. Leases are explicit and expire deterministically when
-    ``reap_expired`` is invoked, which keeps tests and production behavior
-    predictable without implicit timers.
-    """
+    """In-memory control plane for bounded multi-agent task execution."""
 
     def __init__(
         self,
@@ -170,14 +164,7 @@ class SwarmRuntime:
             raise AdmissionError(f"duplicate task id: {task.id}")
         if task.max_attempts < 1:
             raise AdmissionError("max_attempts must be positive")
-        admitted = replace(
-            task,
-            state=TaskState.QUEUED,
-            attempts=0,
-            leased_to=None,
-            lease_deadline=None,
-            last_error=None,
-        )
+        admitted = replace(task, state=TaskState.QUEUED, attempts=0, leased_to=None, lease_deadline=None, last_error=None)
         self._tasks[admitted.id] = admitted
         self._state_counts[TaskState.QUEUED] += 1
         self._submitted += 1
@@ -193,7 +180,6 @@ class SwarmRuntime:
         budget = worker.available if limit is None else min(worker.available, max(0, limit))
         if budget == 0:
             return []
-
         leased: list[SwarmTask] = []
         deferred: list[tuple[int, int, str]] = []
         while self._queue and len(leased) < budget:
@@ -205,13 +191,12 @@ class SwarmRuntime:
             if not task.required_capabilities.issubset(worker.capabilities):
                 deferred.append(item)
                 continue
-            deadline = self._clock() + self.default_lease_seconds
             updated = replace(
                 task,
                 state=TaskState.LEASED,
                 attempts=task.attempts + 1,
                 leased_to=worker_id,
-                lease_deadline=deadline,
+                lease_deadline=self._clock() + self.default_lease_seconds,
             )
             self._replace(task, updated)
             worker.active.add(task_id)
@@ -248,10 +233,9 @@ class SwarmRuntime:
     def fail(self, worker_id: str, task_id: str, error: str) -> SwarmTask:
         task, worker = self._owned_lease(worker_id, task_id)
         retry = task.attempts < task.max_attempts
-        state = TaskState.QUEUED if retry else TaskState.DEAD
         updated = replace(
             task,
-            state=state,
+            state=TaskState.QUEUED if retry else TaskState.DEAD,
             leased_to=None,
             lease_deadline=None,
             last_error=error[:2_000],
@@ -278,13 +262,7 @@ class SwarmRuntime:
             worker = self._workers.get(task.leased_to)
             if worker is not None:
                 worker.active.discard(task_id)
-        updated = replace(
-            task,
-            state=TaskState.CANCELLED,
-            leased_to=None,
-            lease_deadline=None,
-            last_error=reason[:2_000],
-        )
+        updated = replace(task, state=TaskState.CANCELLED, leased_to=None, lease_deadline=None, last_error=reason[:2_000])
         self._replace(task, updated)
         self._event("task.cancelled", task_id)
         return updated
@@ -311,13 +289,7 @@ class SwarmRuntime:
 
     def reap_expired(self) -> int:
         now = self._clock()
-        expired = [
-            task
-            for task in self._tasks.values()
-            if task.state is TaskState.LEASED
-            and task.lease_deadline is not None
-            and task.lease_deadline <= now
-        ]
+        expired = [task for task in self._tasks.values() if task.state is TaskState.LEASED and task.lease_deadline is not None and task.lease_deadline <= now]
         for task in expired:
             worker = self._workers.get(task.leased_to or "")
             if worker is not None:
@@ -337,6 +309,33 @@ class SwarmRuntime:
             self._expired_leases += 1
             self._event("task.lease_expired", task.id)
         return len(expired)
+
+    def stale_workers(self, *, stale_after: float) -> tuple[WorkerState, ...]:
+        if stale_after <= 0:
+            raise ValueError("stale_after must be positive")
+        cutoff = self._clock() - stale_after
+        return tuple(worker for worker in self._workers.values() if worker.last_seen <= cutoff)
+
+    def health(self, *, stale_after: float = 90.0) -> dict[str, object]:
+        snapshot = self.snapshot()
+        stale = self.stale_workers(stale_after=stale_after)
+        saturation = 0.0
+        total_slots = snapshot.available_slots + snapshot.leased
+        if total_slots:
+            saturation = snapshot.leased / total_slots
+        queue_pressure = snapshot.queued / max(1, snapshot.available_slots)
+        status = "healthy"
+        if snapshot.dead > 0 or stale:
+            status = "degraded"
+        if snapshot.workers == 0 and snapshot.queued > 0:
+            status = "critical"
+        return {
+            "status": status,
+            "stale_workers": [worker.id for worker in stale],
+            "worker_saturation": round(saturation, 6),
+            "queue_pressure": round(queue_pressure, 6),
+            "snapshot": asdict(snapshot),
+        }
 
     def task(self, task_id: str) -> SwarmTask | None:
         return self._tasks.get(task_id)
@@ -362,10 +361,7 @@ class SwarmRuntime:
     def export_state(self) -> dict[str, object]:
         return {
             "version": 1,
-            "config": {
-                "max_tasks": self.max_tasks,
-                "default_lease_seconds": self.default_lease_seconds,
-            },
+            "config": {"max_tasks": self.max_tasks, "default_lease_seconds": self.default_lease_seconds},
             "tasks": [self._task_record(task) for task in self._tasks.values()],
             "workers": [self._worker_record(worker) for worker in self._workers.values()],
             "counters": {
@@ -418,7 +414,6 @@ class SwarmRuntime:
             runtime._state_counts[task.state] += 1
             if task.state is TaskState.QUEUED:
                 runtime._requeue(task.id)
-
         workers = state.get("workers", [])
         if isinstance(workers, list):
             for raw in workers:
@@ -437,7 +432,6 @@ class SwarmRuntime:
                     last_seen=float(raw.get("last_seen", clock())),
                 )
                 runtime._workers[worker.id] = worker
-
         counters = state.get("counters", {})
         if isinstance(counters, Mapping):
             runtime._submitted = int(counters.get("submitted", len(runtime._tasks)))
