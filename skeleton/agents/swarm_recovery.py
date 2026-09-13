@@ -39,11 +39,17 @@ class SwarmRecoveryManager:
         self._lock = RLock()
 
     def checkpoint(self, runtime: SwarmRuntime, tenant_broker: TenantSwarmBroker | None = None) -> int:
-        """Capture runtime state and, when provided, tenant ownership at the same sequence."""
+        """Capture runtime and tenant ownership transactionally at one sequence."""
         with self._lock:
             checkpoint = self.store.capture(runtime)
-            if tenant_broker is not None:
+            if tenant_broker is None:
+                return checkpoint.sequence
+            try:
                 self.tenant_store.capture(checkpoint.sequence, tenant_broker)
+            except Exception:
+                self.store.discard(checkpoint.sequence)
+                self.tenant_store.discard(checkpoint.sequence)
+                raise
             return checkpoint.sequence
 
     def restore_latest(self) -> HardenedSwarmRuntime | None:
@@ -68,6 +74,8 @@ class SwarmRecoveryManager:
                 target_sequence = latest.sequence
             if self.tenant_store.get(target_sequence) is None:
                 return None
+            if self.store.get(target_sequence) is None:
+                raise ValueError(f"tenant checkpoint has no runtime checkpoint: {target_sequence}")
             return self.tenant_store.restore(tenant_broker, target_sequence)
 
     def elect(self, replicas: Mapping[str, ReplicaState]) -> str | None:
