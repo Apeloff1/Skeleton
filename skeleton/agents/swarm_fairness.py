@@ -33,6 +33,11 @@ class FairShareLedger:
             raise ValueError(f"{name} must be a positive integer")
         return weight
 
+    @classmethod
+    def validate_weight(cls, weight: int, name: str = "weight") -> int:
+        """Validate and return a fair-share weight without mutating ledger state."""
+        return cls._weight(weight, name)
+
     @staticmethod
     def _tenant(tenant: str) -> str:
         tenant = tenant.strip()
