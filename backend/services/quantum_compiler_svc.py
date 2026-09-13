@@ -13,6 +13,10 @@ from __future__ import annotations
 
 import re
 import asyncio
+import ast
+import time
+import tokenize
+from io import StringIO
 from typing import Any, Dict, List, Optional
 
 
@@ -73,7 +77,7 @@ class QuantumCompilerService:
                 try:
                     tokens = list(tokenize.generate_tokens(StringIO(code).readline))
                     result["tokens"] = len([t for t in tokens if t.type not in (tokenize.NEWLINE, tokenize.NL, tokenize.ENCODING, tokenize.ENDMARKER)])
-                except:
+                except (SyntaxError, tokenize.TokenError):
                     pass
                     
             except SyntaxError as e:
@@ -278,7 +282,7 @@ class QuantumCompilerService:
                                 body_lines = len([n for n in ast.walk(node) if isinstance(n, ast.stmt)])
                                 if body_lines <= 3:
                                     small_functions.append(node.name)
-                    except:
+                    except SyntaxError:
                         pass
                 
                 result.improvements = {
@@ -312,7 +316,7 @@ class QuantumCompilerService:
                                 if isinstance(node.ctx, ast.Load):
                                     used.add(node.id)
                         unused = list(defined - used - {'main', '__init__', 'setup', 'teardown'})
-                    except:
+                    except SyntaxError:
                         pass
                 
                 result.improvements = {
@@ -341,7 +345,7 @@ class QuantumCompilerService:
                                     if isinstance(ret.value, ast.Call) and isinstance(ret.value.func, ast.Name):
                                         if ret.value.func.id == node.name:
                                             tail_recursive.append(node.name)
-                    except:
+                    except SyntaxError:
                         pass
                 
                 result.improvements = {
@@ -375,7 +379,7 @@ class QuantumCompilerService:
                                 ir_lines.append("  ret void")
                         ir_lines.append("}")
                         ir_lines.append("")
-            except:
+            except SyntaxError:
                 pass
         
         return "\n".join(ir_lines) if len(ir_lines) > 2 else None
@@ -409,7 +413,7 @@ class QuantumCompilerService:
                             "    ret",
                             ""
                         ])
-            except:
+            except SyntaxError:
                 pass
         
         return "\n".join(asm_lines)
@@ -434,7 +438,7 @@ class QuantumCompilerService:
                         if test["status"] == "failed":
                             test["error"] = "Assertion failed" if hash(node.name) % 2 == 0 else "Timeout exceeded"
                         tests.append(test)
-            except:
+            except SyntaxError:
                 pass
         
         # Default tests if none generated
