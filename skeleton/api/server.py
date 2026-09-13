@@ -57,6 +57,17 @@ class ServerState:
         self.jeeves_krem: Optional[Any] = None
         self.jeeves_memory: Optional[Any] = None
 
+    def bind_swarm_runtime(self, runtime: Any) -> Any:
+        """Replace the live swarm runtime and atomically rebind dependent control planes."""
+        from skeleton.agents.swarm_broker import SwarmBroker
+        from skeleton.agents.swarm_supervisor import SwarmSupervisor
+
+        self.swarm = runtime
+        if self.swarm_supervisor is None:
+            self.swarm_supervisor = SwarmSupervisor()
+        self.swarm_broker = SwarmBroker(runtime, supervisor=self.swarm_supervisor)
+        return runtime
+
     def is_healthy(self) -> Dict[str, Any]:
         checks = {}
         for attr in dir(self):
@@ -112,14 +123,11 @@ class ServerState:
         from skeleton.cortex import live
         self.cockpit = live.attach(genesis.bus)
 
-        from skeleton.agents.swarm_broker import SwarmBroker
         from skeleton.agents.swarm_hardened import HardenedSwarmRuntime
         from skeleton.agents.swarm_recovery import SwarmRecoveryManager
-        from skeleton.agents.swarm_supervisor import SwarmSupervisor
-        self.swarm = HardenedSwarmRuntime(max_tasks=100_000, max_workers=10_000, default_lease_seconds=30.0, max_lease_seconds=86_400.0)
+        runtime = HardenedSwarmRuntime(max_tasks=100_000, max_workers=10_000, default_lease_seconds=30.0, max_lease_seconds=86_400.0)
+        self.bind_swarm_runtime(runtime)
         self.swarm_recovery = SwarmRecoveryManager(max_checkpoints=16)
-        self.swarm_supervisor = SwarmSupervisor()
-        self.swarm_broker = SwarmBroker(self.swarm, supervisor=self.swarm_supervisor)
 
         from skeleton.observability import MetricsCollector
         self.metrics = MetricsCollector()
