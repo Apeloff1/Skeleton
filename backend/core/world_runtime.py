@@ -1,19 +1,24 @@
 """Unified world-runtime seam for generated RPG/adventure playables.
 
 Composes character progression, skill graph, weather contexts, NPC schedules,
-creature AI, and versioned save integrity behind one deterministic runtime. The
-frontend can render this state in Expo/web/native without owning domain rules.
+creature AI, relationships, travel/discovery, achievements, and versioned save
+integrity behind one deterministic runtime. Frontends render state; domain rules
+remain authoritative here.
 """
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Any, Mapping
 
+from core.achievement_engine import AchievementEngine, AchievementUnlock
 from core.character_profile import CharacterProfile
 from core.creature_ai import Creature, Stimulus
+from core.discovery_engine import DiscoveryEngine, DiscoveryResult
 from core.environment_runtime import EnvironmentRuntime
+from core.relationship_memory import RelationshipMemory
 from core.save_envelope import SaveCodec
 from core.skill_graph import SkillGraph, SkillProfile
+from core.travel_graph import TravelGraph, TravelPlan
 from core.world_agents import NavigationGraph, WorldAgent
 
 
@@ -36,6 +41,9 @@ class WorldRuntime:
         character: CharacterProfile | None = None,
         skill_graph: SkillGraph | None = None,
         environment: EnvironmentRuntime | None = None,
+        travel_graph: TravelGraph | None = None,
+        discovery_engine: DiscoveryEngine | None = None,
+        achievement_engine: AchievementEngine | None = None,
         save_version: int = 1,
     ) -> None:
         self.graph = graph
@@ -47,6 +55,10 @@ class WorldRuntime:
         self.skill_graph = skill_graph
         self.skill_profile = SkillProfile()
         self.environment = environment or EnvironmentRuntime()
+        self.travel_graph = travel_graph
+        self.discovery_engine = discovery_engine
+        self.achievement_engine = achievement_engine
+        self.relationships: dict[str, RelationshipMemory] = {}
         self.minute = 0
         self.save_codec = SaveCodec(save_version)
 
@@ -63,7 +75,7 @@ class WorldRuntime:
         if dt <= 0:
             raise ValueError("dt must be positive")
         self.minute = (self.minute + minutes) % (24 * 60)
-        weather = self.environment.step(dt, seed=seed)
+        self.environment.step(dt, seed=seed)
         contexts = self.environment.contexts()
 
         for agent in self.agents.values():
@@ -96,8 +108,65 @@ class WorldRuntime:
             player_level=self.character.level,
         )
 
+    def relationship(self, npc_id: str) -> RelationshipMemory:
+        if npc_id not in self.agents:
+            raise KeyError(f"unknown world agent: {npc_id}")
+        memory = self.relationships.get(npc_id)
+        if memory is None:
+            memory = RelationshipMemory(npc_id)
+            self.relationships[npc_id] = memory
+        return memory
+
+    def discover_location(self, location_id: str) -> bool:
+        if self.travel_graph is None:
+            raise ValueError("world runtime has no travel graph")
+        return self.travel_graph.discover(location_id)
+
+    def plan_travel(
+        self,
+        start: str,
+        end: str,
+        *,
+        tags: tuple[str, ...] = (),
+        danger_weight: float = 1.0,
+        discovered_only: bool = False,
+    ) -> TravelPlan:
+        if self.travel_graph is None:
+            raise ValueError("world runtime has no travel graph")
+        return self.travel_graph.plan(
+            start,
+            end,
+            level=self.character.level,
+            tags=tags,
+            danger_weight=danger_weight,
+            discovered_only=discovered_only,
+        )
+
+    def evaluate_discoveries(self, facts: Mapping[str, Any] | None = None) -> DiscoveryResult:
+        if self.discovery_engine is None:
+            raise ValueError("world runtime has no discovery engine")
+        merged: dict[str, Any] = {
+            "player": {
+                "level": self.character.level,
+                "experience": self.character.experience,
+                "currency": self.character.currency,
+            },
+            "world": {
+                "weather": self.environment.current_weather,
+                "minute": self.minute,
+            },
+        }
+        if facts:
+            merged.update(facts)
+        return self.discovery_engine.evaluate(merged)
+
+    def record_metric(self, metric: str, amount: float = 1.0) -> tuple[AchievementUnlock, ...]:
+        if self.achievement_engine is None:
+            raise ValueError("world runtime has no achievement engine")
+        return self.achievement_engine.increment(metric, amount)
+
     def snapshot(self) -> dict[str, Any]:
-        return {
+        result: dict[str, Any] = {
             "minute": self.minute,
             "environment": {
                 "current": self.environment.current_weather,
@@ -131,7 +200,17 @@ class WorldRuntime:
                 }
                 for creature_id, creature in self.creatures.items()
             },
+            "relationships": {
+                npc_id: memory.snapshot() for npc_id, memory in sorted(self.relationships.items())
+            },
         }
+        if self.travel_graph is not None:
+            result["travel"] = {"discovered": sorted(self.travel_graph.discovered)}
+        if self.discovery_engine is not None:
+            result["discoveries"] = self.discovery_engine.snapshot()
+        if self.achievement_engine is not None:
+            result["achievements"] = self.achievement_engine.snapshot()
+        return result
 
     def encode_save(self) -> str:
         return self.save_codec.encode(self.snapshot())
