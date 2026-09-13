@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+printf '\n== Toolchain contract ==\n'
+python scripts/check_toolchain_contract.py
+
 printf '\n== Skeleton core syntax ==\n'
 python -m compileall -q skeleton
 
