@@ -18,9 +18,9 @@ import time
 import zipfile
 from typing import Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core.exec_guard import code_execution_enabled, execution_disabled_response
 
@@ -130,7 +130,7 @@ async def toolchains():
 
 
 class DesktopBody(BaseModel):
-    game_name: str
+    game_name: str = Field(..., min_length=1, max_length=200)
 
 
 @router.post("/desktop")
@@ -248,7 +248,7 @@ async def build_godot(b: BuildBody):
 
 
 class BuildBody(BaseModel):
-    game_name: str
+    game_name: str = Field(..., min_length=1, max_length=200)
 
 
 @router.post("/web")
@@ -309,7 +309,7 @@ async def build_source(b: BuildBody):
 
 
 @router.get("/list")
-async def list_builds(game_name: Optional[str] = None):
+async def list_builds(game_name: Optional[str] = Query(None, max_length=200)):
     q = {"game_name": game_name} if game_name else {}
     try:
         rows = list(_db()["gameforge_builds"].find(q, {"_id": 0}).sort("built_at", -1).limit(50))
