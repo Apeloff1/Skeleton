@@ -3,7 +3,7 @@ import pytest
 from skeleton.agents.swarm_hardened import HardenedSwarmRuntime
 from skeleton.agents.swarm_ingress import SwarmIngressGovernor
 from skeleton.agents.swarm_recovery import SwarmRecoveryManager
-from skeleton.agents.swarm_runtime import SwarmTask
+from skeleton.agents.swarm_runtime import AdmissionError, SwarmTask
 from skeleton.api.server import ServerState
 from skeleton.api.swarm_recovery_service import activate_recovery
 
@@ -23,6 +23,7 @@ def test_activation_restores_selected_runtime_and_tenant_sidecar() -> None:
     state.swarm_tenant_broker.submit_and_dispatch("acme", SwarmTask("second", {}))
     seq2 = state.swarm_recovery.checkpoint(state.swarm, state.swarm_tenant_broker)
     assert (seq1, seq2) == (1, 2)
+    old_tenant = state.swarm_tenant_broker
 
     result = activate_recovery(state, state.swarm_recovery, 1)
 
@@ -32,18 +33,24 @@ def test_activation_restores_selected_runtime_and_tenant_sidecar() -> None:
     assert state.swarm.task("second") is None
     assert state.swarm_tenant_broker.tenant_for("first") == "acme"
     assert state.swarm_tenant_broker.tenant_for("second") is None
+    assert old_tenant.is_retired() is True
+    assert state.swarm_tenant_broker.is_retired() is False
+    with pytest.raises(AdmissionError, match="generation retired"):
+        old_tenant.submit_and_dispatch("acme", SwarmTask("late", {}))
 
 
 def test_activation_uses_live_metadata_when_selected_checkpoint_has_no_sidecar() -> None:
     state = _state()
     state.swarm_tenant_broker.submit_and_dispatch("acme", SwarmTask("task", {}))
     state.swarm_recovery.checkpoint(state.swarm)
+    old_tenant = state.swarm_tenant_broker
 
     result = activate_recovery(state, state.swarm_recovery, 1)
 
     assert result.tenant_source == "live"
     assert state.swarm_tenant_broker.tenant_for("task") == "acme"
     assert state.swarm_ingress.status()["accounted_tasks"] == 1
+    assert old_tenant.is_retired() is True
 
 
 def test_activation_rejects_live_metadata_newer_than_selected_runtime_atomically() -> None:
@@ -63,12 +70,15 @@ def test_activation_rejects_live_metadata_newer_than_selected_runtime_atomically
     assert state.swarm_broker is old_broker
     assert state.swarm_ingress is old_ingress
     assert state.swarm_tenant_broker is old_tenant
+    assert old_tenant.is_retired() is False
     assert state.swarm_tenant_broker.tenant_for("later") == "acme"
 
 
 def test_activation_rejects_missing_checkpoint_without_mutation() -> None:
     state = _state()
     old_runtime = state.swarm
+    old_tenant = state.swarm_tenant_broker
     with pytest.raises(KeyError, match="checkpoint not found"):
         activate_recovery(state, state.swarm_recovery, 99)
     assert state.swarm is old_runtime
+    assert old_tenant.is_retired() is False
