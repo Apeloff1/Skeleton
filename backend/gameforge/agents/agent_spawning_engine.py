@@ -5,8 +5,11 @@ Spawns agents, binds them to roles/seats, and initializes their state with full 
 """
 
 import json
+import logging
 from typing import Dict, List
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 class AgentSpawningEngine:
     def __init__(self, role_index_path: str, coherence_engine_path: str):
@@ -18,7 +21,8 @@ class AgentSpawningEngine:
         try:
             with open(path, "r") as f:
                 return json.load(f)
-        except:
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning("Unable to load agent spawning data from %s: %s", path, exc)
             return {}
 
     def spawn_agent(self, agent_id: str, room_id: str, seat_id: str, role_id: str, mastery_level: int) -> Dict:

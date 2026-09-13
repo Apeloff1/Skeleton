@@ -5,8 +5,11 @@ Extended Room Instantiation Engine that automatically adds one Jeeves Judge per 
 """
 
 import json
+import logging
 from typing import Dict, List
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 class RoomWithJudgeInstantiation:
     def __init__(self, judge_spawner_path: str):
@@ -16,7 +19,8 @@ class RoomWithJudgeInstantiation:
         try:
             with open(path, "r") as f:
                 return json.load(f)
-        except:
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning("Unable to load judge configuration from %s: %s", path, exc)
             return {}
 
     def instantiate_room_with_judge(self, room_id: str, category: str) -> Dict:

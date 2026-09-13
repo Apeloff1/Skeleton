@@ -5,8 +5,11 @@ from core.databases import client as _SHARED_MONGO_CLIENT
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 import os
+import logging
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 _client = _SHARED_MONGO_CLIENT  # consolidated → core.databases.client
 _db = _client[os.environ.get('DB_NAME', 'codedock')]
@@ -38,5 +41,10 @@ async def award_xp(user_id: str, activity: str, domain: str = None, amount: int 
         if domain:
             update["$inc"][f"domain_xp.{domain}"] = xp
         await _db.user_gamification.update_one({"user_id": user_id}, update, upsert=True)
-    except:
-        pass
+    except Exception as exc:
+        logger.warning(
+            "Unable to award XP for user %s and activity %s: %s",
+            user_id,
+            activity,
+            exc,
+        )

@@ -5,9 +5,12 @@ Central nervous system for the entire Zaibatsu game studio.
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Dict, List
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 class CNSExecutionOrchestrator:
     def __init__(self):
@@ -24,7 +27,8 @@ class CNSExecutionOrchestrator:
         try:
             with open(path, "r") as f:
                 return json.load(f)
-        except:
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning("Unable to load orchestration data from %s: %s", path, exc)
             return {}
 
     def run_full_orchestration_cycle(self) -> Dict:

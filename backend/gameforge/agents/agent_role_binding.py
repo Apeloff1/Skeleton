@@ -5,7 +5,10 @@ Binds spawned agents to specific roles with full context, prompts, and coherence
 """
 
 import json
+import logging
 from typing import Dict, List
+
+logger = logging.getLogger(__name__)
 
 class AgentRoleBinding:
     def __init__(self, enhanced_role_path: str, coherence_path: str):
@@ -16,7 +19,8 @@ class AgentRoleBinding:
         try:
             with open(path, "r") as f:
                 return json.load(f)
-        except:
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning("Unable to load agent role data from %s: %s", path, exc)
             return {}
 
     def bind_agent_to_role(self, agent: Dict, role_data: Dict) -> Dict:

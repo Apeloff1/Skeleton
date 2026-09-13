@@ -5,9 +5,12 @@ Creates fully initialized room instances with Bookshelf, indexes, RAG, and role 
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Dict, List
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 class RoomInstantiationEngine:
     def __init__(self, bookshelf_initializer_path: str, category_index_path: str):
@@ -19,7 +22,8 @@ class RoomInstantiationEngine:
         try:
             with open(path, "r") as f:
                 return json.load(f)
-        except:
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning("Unable to load room data from %s: %s", path, exc)
             return {}
 
     def instantiate_room(self, room_id: str, category: str, room_manifest: Dict) -> Dict:
