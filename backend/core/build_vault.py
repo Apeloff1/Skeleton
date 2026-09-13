@@ -29,10 +29,13 @@ import json
 import time
 import zipfile
 import threading
+import logging
 from pathlib import Path
 from typing import Iterator, Tuple
 
 import zstandard as zstd
+
+_log = logging.getLogger(__name__)
 
 
 # ── Paths ───────────────────────────────────────────────────────────────
@@ -215,8 +218,10 @@ def append_files(build_id: str, files: dict) -> dict:
                     manifest["path_index"][path] = next_idx
 
         if count == 0:
-            try: shard_path.unlink()
-            except Exception: pass
+            try:
+                shard_path.unlink()
+            except OSError as exc:
+                _log.warning("failed to remove empty vault shard %s: %s", shard_path, exc)
             return {"file_count": manifest["file_count"], "appended": 0}
 
         compressed = shard_path.stat().st_size
@@ -365,11 +370,13 @@ def clear_build(build_id: str) -> None:
         return
     try:
         for f in d.iterdir():
-            try: f.unlink()
-            except Exception: pass
+            try:
+                f.unlink()
+            except OSError as exc:
+                _log.warning("failed to remove vault shard %s: %s", f, exc)
         d.rmdir()
-    except Exception:
-        pass
+    except OSError as exc:
+        _log.warning("failed to clear vault directory %s: %s", d, exc)
 
 
 def preserve_on_failure(build_id: str) -> dict:

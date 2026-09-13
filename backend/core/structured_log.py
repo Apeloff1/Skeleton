@@ -83,8 +83,12 @@ def json_sink_factory():
             out.write(_truncate(json.dumps(payload, default=str)) + "\n")
             out.flush()
         except Exception as e:  # noqa: BLE001
-            try: out.write(f'{{"level":"ERROR","message":"json_sink_error: {e}"}}\n')
-            except Exception: pass
+            try:
+                out.write(f'{{"level":"ERROR","message":"json_sink_error: {e}"}}\n')
+            except OSError:
+                # The sink is already unavailable; there is no safe fallback
+                # write target from inside the formatter.
+                return
     return _sink
 
 

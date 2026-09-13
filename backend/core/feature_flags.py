@@ -29,11 +29,14 @@ The shape of a stored flag document::
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import time
 from typing import Any
 
 from core.databases import core_db
+
+_log = logging.getLogger(__name__)
 
 try:
     from core import feature_flags_metrics as _metrics
@@ -144,8 +147,10 @@ async def list_flags(user_id: str | None = None, *, include_admin_fields: bool =
         resolved = _resolve(doc, user_id)
         # Best-effort metric — never blocks.
         if _metrics:
-            try: _metrics.inc_resolved(doc.get("name") or "", ENVIRONMENT, resolved)
-            except Exception: pass
+            try:
+                _metrics.inc_resolved(doc.get("name") or "", ENVIRONMENT, resolved)
+            except Exception as exc:
+                _log.debug("feature flag metric failed: %s", exc)
         item = {
             "name": doc.get("name"),
             "description": doc.get("description") or "",
@@ -174,8 +179,10 @@ async def is_enabled(name: str, user_id: str | None = None) -> bool:
     if not doc: return False
     val = _resolve(doc, user_id)
     if _metrics:
-        try: _metrics.inc_resolved(name, ENVIRONMENT, val)
-        except Exception: pass
+        try:
+            _metrics.inc_resolved(name, ENVIRONMENT, val)
+        except Exception as exc:
+            _log.debug("feature flag metric failed: %s", exc)
     return val
 
 

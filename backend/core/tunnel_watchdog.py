@@ -76,8 +76,10 @@ async def stop() -> None:
     t: asyncio.Task | None = _state.get("task")
     if t and not t.done():
         t.cancel()
-        try: await t
-        except Exception: pass
+        try:
+            await t
+        except asyncio.CancelledError:
+            pass
     _state["task"] = None
 
 
