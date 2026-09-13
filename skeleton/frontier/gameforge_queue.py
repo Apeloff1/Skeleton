@@ -4,8 +4,8 @@ from collections import deque
 
 class BoundedQueue:
     def __init__(self, capacity):
-        if not isinstance(capacity, int) or capacity <= 0:
-            raise ValueError("capacity must be positive")
+        if not isinstance(capacity, int) or isinstance(capacity, bool) or capacity <= 0:
+            raise ValueError("capacity must be a positive integer")
         self.capacity = capacity
         self._items = deque()
 
@@ -28,6 +28,9 @@ class BoundedQueue:
 
     def peek(self):
         return self._items[0] if self._items else None
+
+    def clear(self):
+        self._items.clear()
 
     def __len__(self):
         return len(self._items)
