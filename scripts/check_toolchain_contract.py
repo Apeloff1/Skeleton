@@ -38,6 +38,29 @@ def workflow_cancel_in_progress_is_false(workflow: str) -> bool:
     )
 
 
+def require_node24_actions(workflow: str, label: str, failures: list[str]) -> None:
+    require(
+        "actions/checkout@v4" not in workflow
+        and "actions/checkout@v5" not in workflow
+        and "actions/checkout@v6" not in workflow,
+        f"{label} must not use pre-v7 checkout actions",
+        failures,
+    )
+    require(
+        "actions/setup-python@v5" not in workflow
+        and "actions/setup-python@v6" not in workflow,
+        f"{label} must not use pre-v7 setup-python actions",
+        failures,
+    )
+    require(
+        "actions/setup-node@v4" not in workflow
+        and "actions/setup-node@v5" not in workflow
+        and "actions/setup-node@v6" not in workflow,
+        f"{label} must not use pre-v7 setup-node actions",
+        failures,
+    )
+
+
 def main() -> int:
     failures: list[str] = []
 
@@ -124,6 +147,7 @@ def main() -> int:
         "CI/CD must keep the active validation alive during rapid pushes",
         failures,
     )
+    require_node24_actions(ci, "CI/CD", failures)
     for deploy_gate in (
         "skeleton-test",
         "school-jeeves-test",
@@ -169,6 +193,7 @@ def main() -> int:
         "Backend Quality must keep the active validation alive during rapid pushes",
         failures,
     )
+    require_node24_actions(backend_quality, "Backend Quality", failures)
 
     lint = read(".github/workflows/lint.yml")
     require(
@@ -186,6 +211,7 @@ def main() -> int:
         "Lint must keep the active validation alive during rapid pushes",
         failures,
     )
+    require_node24_actions(lint, "Lint", failures)
 
     quality_gates = read("scripts/quality-gates.sh")
     require(
@@ -230,7 +256,8 @@ def main() -> int:
 
     print(
         "Toolchain contract passed: centralized Python 3.11 / Node 24, Ruff 0.9, "
-        "security gates, deployment gates, and anti-starvation concurrency aligned."
+        "Node-24 action generations, security gates, deployment gates, and "
+        "anti-starvation concurrency aligned."
     )
     return 0
 
