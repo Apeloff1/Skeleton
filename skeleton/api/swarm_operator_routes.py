@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from skeleton.agents.swarm_autoscale import AutoscalePolicy
+from skeleton.agents.swarm_broker import SwarmBroker
 from skeleton.agents.swarm_failover import ReplicaState
 from skeleton.agents.swarm_gc import capacity, compact_runtime
 from skeleton.agents.swarm_maintenance import compact_state
@@ -19,6 +20,7 @@ from skeleton.agents.swarm_retention import RetentionPolicy, prune_terminal
 from skeleton.agents.swarm_runtime import AdmissionError, SwarmRuntime, TaskState
 from skeleton.agents.swarm_slo import SLOPolicy
 from skeleton.agents.swarm_snapshot import SnapshotError, normalize_snapshot
+from skeleton.agents.swarm_tenant_broker import TenantSwarmBroker
 
 router = APIRouter(prefix="/swarm/operator", tags=["swarm-operator"])
 
@@ -72,6 +74,31 @@ def _restore_or_repair_tenants(recovery: SwarmRecoveryManager, sequence: int) ->
         restored = recovery.restore_tenants(tenant_broker, sequence)
         return None if restored is None else asdict(restored)
     return asdict(tenant_broker.repair())
+
+
+def _stage_paired_restore(
+    recovery: SwarmRecoveryManager,
+    runtime: SwarmRuntime,
+    sequence: int,
+) -> dict[str, Any] | None:
+    """Validate a paired runtime/tenant restore completely before publishing it."""
+    state = _state()
+    current_tenant = getattr(state, "swarm_tenant_broker", None)
+    if current_tenant is None or recovery.tenant_store.get(sequence) is None:
+        return None
+
+    staged_ingress = current_tenant.ingress.fork_empty()
+    staged_broker = SwarmBroker(runtime, supervisor=state.swarm_supervisor)
+    staged_tenant = TenantSwarmBroker(
+        staged_broker,
+        staged_ingress,
+        max_terminal_records=current_tenant.max_terminal_records,
+    )
+    repair = recovery.restore_tenants(staged_tenant, sequence)
+    if repair is None:
+        raise RuntimeError(f"tenant checkpoint disappeared during staged restore: {sequence}")
+    state.commit_swarm_bundle(runtime, staged_broker, staged_ingress, staged_tenant)
+    return asdict(repair)
 
 
 def _task_record(task: Any) -> dict[str, Any]:
@@ -179,8 +206,17 @@ def restore_latest(recovery: SwarmRecoveryManager = Depends(_recovery)) -> dict[
     if runtime is None:
         raise HTTPException(status_code=404, detail="no checkpoint available")
     sequence = recovery.status().latest_sequence
-    _state().bind_swarm_runtime(runtime)
-    tenant_repair = None if sequence is None else _restore_or_repair_tenants(recovery, sequence)
+    if sequence is None:
+        raise HTTPException(status_code=409, detail="checkpoint sequence unavailable")
+
+    try:
+        tenant_repair = _stage_paired_restore(recovery, runtime, sequence)
+    except (KeyError, ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=409, detail=f"staged restore rejected: {exc}") from exc
+
+    if tenant_repair is None:
+        _state().bind_swarm_runtime(runtime)
+        tenant_repair = _restore_or_repair_tenants(recovery, sequence)
     return {"restored": True, "tenant_repair": tenant_repair, "status": asdict(recovery.status()), "snapshot": asdict(runtime.snapshot())}
 
 
