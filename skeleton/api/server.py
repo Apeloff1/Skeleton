@@ -107,9 +107,14 @@ class ServerState:
         from skeleton.cortex import live
         self.cockpit = live.attach(genesis.bus)
 
-        from skeleton.agents.swarm_runtime import SwarmRuntime
+        from skeleton.agents.swarm_hardened import HardenedSwarmRuntime
         from skeleton.agents.swarm_recovery import SwarmRecoveryManager
-        self.swarm = SwarmRuntime(max_tasks=100_000, default_lease_seconds=30.0)
+        self.swarm = HardenedSwarmRuntime(
+            max_tasks=100_000,
+            max_workers=10_000,
+            default_lease_seconds=30.0,
+            max_lease_seconds=86_400.0,
+        )
         self.swarm_recovery = SwarmRecoveryManager(max_checkpoints=16)
 
         from skeleton.observability import MetricsCollector
