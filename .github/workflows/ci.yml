@@ -154,7 +154,8 @@ jobs:
           cache-to: type=gha,mode=max
       - uses: docker/build-push-action@v5
         with:
-          context: ./backend
+          context: .
+          file: ./backend/Dockerfile
           push: true
           tags: ${{ env.IMAGE }}/backend:latest
       - uses: docker/build-push-action@v5
