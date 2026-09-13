@@ -30,6 +30,8 @@ jobs:
       - uses: astral-sh/setup-uv@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
+      - name: Repository toolchain contract
+        run: python ../scripts/check_toolchain_contract.py
       - name: Install pinned backend quality tools
         run: uv tool install "ruff==0.9.*"
       - name: Backend correctness lint
@@ -143,7 +145,7 @@ jobs:
     name: "Docker Build"
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    needs: [skeleton-test, backend-test, backend-import-smoke, frontend]
+    needs: [skeleton-test, school-jeeves-test, cockpit-smoke, backend-test, backend-import-smoke, frontend]
     if: github.ref == 'refs/heads/main'
     permissions: {contents: read, packages: write}
     steps:
