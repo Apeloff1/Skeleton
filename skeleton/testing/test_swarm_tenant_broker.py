@@ -119,3 +119,26 @@ def test_terminal_task_resubmission_preserves_cross_tenant_ownership() -> None:
 
     assert runtime.task("task").state is TaskState.SUCCEEDED
     assert ingress.phase("alpha", "task") is None
+
+
+def test_terminal_record_retention_is_bounded_and_duplicate_refreshes_lru() -> None:
+    runtime = HardenedSwarmRuntime()
+    runtime.register_worker("w", capacity=3)
+    ingress = SwarmIngressGovernor(rate_capacity=100, rate_refill_per_second=100)
+    broker = TenantSwarmBroker(SwarmBroker(runtime), ingress, max_terminal_records=2)
+
+    for task_id in ("one", "two"):
+        broker.submit_and_dispatch("acme", SwarmTask(task_id, {}))
+        broker.record_success("w", task_id, completion_token=f"done-{task_id}")
+
+    refreshed = broker.submit_and_dispatch("acme", SwarmTask("one", {"duplicate": True}))
+    assert refreshed.duplicate is True
+
+    broker.submit_and_dispatch("acme", SwarmTask("three", {}))
+    broker.record_success("w", "three", completion_token="done-three")
+
+    status = broker.status()
+    assert status["terminal_records"] == 2
+    assert broker.tenant_for("one") == "acme"
+    assert broker.tenant_for("two") is None
+    assert broker.tenant_for("three") == "acme"
