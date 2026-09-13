@@ -15,6 +15,9 @@ from typing import Callable, Iterable, Mapping
 from skeleton.agents.swarm_runtime import AdmissionError, LeaseError, SwarmRuntime, SwarmTask, TaskState, WorkerState
 
 
+_TERMINAL_STATES = frozenset({TaskState.SUCCEEDED, TaskState.DEAD, TaskState.CANCELLED, TaskState.FAILED})
+
+
 class HardenedSwarmRuntime(SwarmRuntime):
     def __init__(
         self,
@@ -131,6 +134,24 @@ class HardenedSwarmRuntime(SwarmRuntime):
             if task is not None and task.state is TaskState.DEAD and task.attempts >= task.max_attempts and not reset_attempts:
                 raise AdmissionError("dead task exhausted retry budget; reset_attempts is required")
             return super().revive(task_id, reset_attempts=reset_attempts)
+
+    def forget(self, task_id: str) -> bool:
+        """Remove one terminal task and reclaim resident task capacity.
+
+        Live queued or leased work is never silently discarded. Unknown task IDs are
+        idempotent and return False, which makes retention sweeps safe to retry.
+        """
+        task_id = self._id(task_id, "task id")
+        with self._lock:
+            task = self._tasks.get(task_id)
+            if task is None:
+                return False
+            if task.state not in _TERMINAL_STATES:
+                raise AdmissionError(f"cannot forget non-terminal task: {task_id}")
+            del self._tasks[task_id]
+            self._state_counts[task.state] -= 1
+            self._event("task.forgotten", task_id)
+            return True
 
     def reap_expired(self) -> int:
         with self._lock:
