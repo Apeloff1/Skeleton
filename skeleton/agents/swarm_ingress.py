@@ -64,6 +64,26 @@ class SwarmIngressGovernor:
             if weight is not None:
                 self.fairness.configure(tenant, weight=weight)
 
+    def fork_empty(self) -> "SwarmIngressGovernor":
+        """Clone admission policy without carrying live rate, quota, or task accounting."""
+        with self._lock, self.quota._lock, self.fairness._lock:
+            clone = SwarmIngressGovernor(
+                rate_capacity=self.rate.capacity,
+                rate_refill_per_second=self.rate.refill_per_second,
+                default_quota=self.quota.default,
+            )
+            clone.fairness.default_weight = self.fairness.default_weight
+            tenants = set(self.quota._limits) | set(self.fairness._tenants)
+            for tenant in sorted(tenants):
+                quota = self.quota._limits.get(tenant)
+                share = self.fairness._tenants.get(tenant)
+                clone.configure_tenant(
+                    tenant,
+                    quota=quota,
+                    weight=None if share is None else share.weight,
+                )
+            return clone
+
     def admit(self, tenant: str, task_id: str, payload: object, *, cost: float = 1.0) -> IngressDecision:
         tenant = self._tenant(tenant)
         task_id = self._task_id(task_id)
