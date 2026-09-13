@@ -1,8 +1,8 @@
 from __future__ import annotations
 import os
-from typing import Optional, Any, Dict
+from typing import Annotated, Optional, Any, Dict
 
-from fastapi import APIRouter, Header, HTTPException, Depends
+from fastapi import APIRouter, Header, HTTPException, Depends, Path, Query
 
 from gameforge.enterprise.scim_webhook import ScimWebhookProcessor
 from gameforge.enterprise.scim_users import ScimUserDirectory
@@ -73,10 +73,10 @@ async def scim_webhook(
 
 @router.get("/Users")
 async def scim_list_users(
-    startIndex: int = 1,
-    count: int = 100,
-    filter: Optional[str] = None,
-    tenant_id: Optional[str] = None,
+    startIndex: int = Query(1, ge=1, le=100000),
+    count: int = Query(100, ge=1, le=1000),
+    filter: Optional[str] = Query(None, max_length=1000),
+    tenant_id: Optional[str] = Query(None, min_length=1, max_length=200),
     x_scim_secret: Optional[str] = Header(default=None),
     principal: Principal = Depends(get_principal),
 ):
@@ -88,7 +88,7 @@ async def scim_list_users(
 
 @router.get("/Users/{user_id}")
 async def scim_get_user(
-    user_id: str,
+    user_id: Annotated[str, Path(min_length=1, max_length=200)],
     x_scim_secret: Optional[str] = Header(default=None),
     principal: Principal = Depends(get_principal),
 ):
@@ -114,7 +114,7 @@ async def scim_create_user(
 
 @router.patch("/Users/{user_id}")
 async def scim_patch_user(
-    user_id: str,
+    user_id: Annotated[str, Path(min_length=1, max_length=200)],
     payload: Dict[str, Any],
     x_scim_secret: Optional[str] = Header(default=None),
     principal: Principal = Depends(get_principal),
