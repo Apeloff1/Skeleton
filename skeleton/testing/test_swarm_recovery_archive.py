@@ -1,9 +1,11 @@
+import copy
+
 import pytest
 
 from skeleton.agents.swarm_broker import SwarmBroker
 from skeleton.agents.swarm_hardened import HardenedSwarmRuntime
 from skeleton.agents.swarm_ingress import SwarmIngressGovernor
-from skeleton.agents.swarm_recovery import SwarmRecoveryManager
+from skeleton.agents.swarm_recovery import MAX_RECOVERY_ARCHIVE_BYTES, SwarmRecoveryManager
 from skeleton.agents.swarm_runtime import SwarmTask
 from skeleton.agents.swarm_tenant_broker import TenantSwarmBroker
 
@@ -91,3 +93,38 @@ def test_recovery_archive_rejects_invalid_bytes() -> None:
 
     with pytest.raises(TypeError, match="must be bytes"):
         SwarmRecoveryManager.from_archive_bytes("not-bytes")
+
+
+def test_recovery_archive_rejects_non_finite_json_values() -> None:
+    manager = SwarmRecoveryManager()
+    manager.checkpoint(HardenedSwarmRuntime())
+    archive = manager.export_archive()
+    broken = copy.deepcopy(archive)
+    broken["runtime"][0]["created_at"] = float("nan")
+
+    with pytest.raises(ValueError, match="finite JSON values"):
+        SwarmRecoveryManager.from_archive(broken)
+
+    with pytest.raises(ValueError, match="invalid recovery archive payload"):
+        SwarmRecoveryManager.from_archive_bytes(b'{"version":1,"x":NaN}')
+
+
+def test_recovery_archive_rejects_oversized_byte_payload_before_decode(monkeypatch) -> None:
+    monkeypatch.setattr("skeleton.agents.swarm_recovery.MAX_RECOVERY_ARCHIVE_BYTES", 32)
+    with pytest.raises(ValueError, match="maximum size"):
+        SwarmRecoveryManager.from_archive_bytes(b"{" + b" " * 64 + b"}")
+
+
+def test_recovery_archive_export_enforces_core_size_bound(monkeypatch) -> None:
+    runtime = HardenedSwarmRuntime()
+    runtime.submit(SwarmTask("large", {"blob": "x" * 4096}))
+    manager = SwarmRecoveryManager()
+    manager.checkpoint(runtime)
+    monkeypatch.setattr("skeleton.agents.swarm_recovery.MAX_RECOVERY_ARCHIVE_BYTES", 512)
+
+    with pytest.raises(ValueError, match="maximum size"):
+        manager.export_archive()
+
+
+def test_recovery_archive_default_bound_is_eight_mib() -> None:
+    assert MAX_RECOVERY_ARCHIVE_BYTES == 8 * 1024 * 1024
