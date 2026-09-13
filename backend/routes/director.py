@@ -13,7 +13,7 @@ import asyncio
 import uuid
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core.director_agent import director
 
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/galaxy-studio/director", tags=["director"])
 
 
 class ValidateBody(BaseModel):
-    artifact: object = {}
+    artifact: object = Field(default_factory=dict)
 
 
 @router.post("/{build_id}/validate/{stage}")

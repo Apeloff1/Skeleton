@@ -30,9 +30,9 @@ _STOP = {"the", "a", "an", "and", "or", "of", "to", "for", "with", "build", "mak
 
 
 class SwarmReq(BaseModel):
-    directive: str = Field(..., min_length=3)
-    workers: int = 4              # parallel sub-agents (fan-out)
-    project: str = "swarm"
+    directive: str = Field(..., min_length=3, max_length=10000)
+    workers: int = Field(4, ge=1, le=32)              # parallel sub-agents (fan-out)
+    project: str = Field("swarm", min_length=1, max_length=200)
 
 
 def _subtasks(directive: str, n: int) -> List[str]:
