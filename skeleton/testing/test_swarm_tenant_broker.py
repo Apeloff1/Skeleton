@@ -96,7 +96,6 @@ def test_tokenless_success_callback_is_idempotent_after_terminalization() -> Non
     broker.submit_and_dispatch("acme", SwarmTask("task", {}))
     first = broker.record_success("w", "task")
     second = broker.record_success("w", "task")
-
     assert first.duplicate is False
     assert second.duplicate is True
     assert second.task.state is TaskState.SUCCEEDED
@@ -109,12 +108,53 @@ def test_tokenless_failure_callback_is_idempotent_after_terminalization() -> Non
     broker.submit_and_dispatch("acme", SwarmTask("task", {}, max_attempts=1))
     first = broker.record_failure("w", "task", "fatal")
     second = broker.record_failure("w", "task", "duplicate fatal")
-
     assert first.duplicate is False
     assert second.duplicate is True
     assert second.task.state is TaskState.DEAD
     assert runtime.task("task").state is TaskState.DEAD
     assert ingress.phase("acme", "task") is None
+
+
+def test_active_leased_task_resubmission_is_identity_idempotent() -> None:
+    runtime, ingress, broker = _broker()
+    first = broker.submit_and_dispatch("acme", SwarmTask("task", {"version": 1}))
+    resident = runtime.task("task")
+    duplicate = broker.submit_and_dispatch("acme", SwarmTask("task", {"version": 2}))
+
+    assert first.leased is True
+    assert duplicate.admitted is True
+    assert duplicate.duplicate is True
+    assert duplicate.leased is True
+    assert duplicate.worker_id == "w"
+    assert duplicate.reason == "active task already accounted in state leased"
+    assert runtime.task("task") == resident
+    assert ingress.phase("acme", "task") == "leased"
+
+
+def test_active_queued_task_resubmission_is_identity_idempotent() -> None:
+    runtime = HardenedSwarmRuntime()
+    ingress = SwarmIngressGovernor(rate_capacity=100, rate_refill_per_second=100)
+    broker = TenantSwarmBroker(SwarmBroker(runtime), ingress)
+    first = broker.submit_and_dispatch("acme", SwarmTask("task", {"version": 1}))
+    resident = runtime.task("task")
+    duplicate = broker.submit_and_dispatch("acme", SwarmTask("task", {"version": 2}))
+
+    assert first.leased is False
+    assert duplicate.duplicate is True
+    assert duplicate.leased is False
+    assert duplicate.worker_id is None
+    assert duplicate.reason == "active task already accounted in state queued"
+    assert runtime.task("task") == resident
+    assert ingress.phase("acme", "task") == "queued"
+
+
+def test_active_accounting_without_runtime_task_fails_closed() -> None:
+    runtime, ingress, broker = _broker()
+    broker.submit_and_dispatch("acme", SwarmTask("task", {}))
+    broker.rebind(SwarmBroker(HardenedSwarmRuntime()))
+
+    with pytest.raises(AdmissionError, match="repair required"):
+        broker.submit_and_dispatch("acme", SwarmTask("task", {}))
 
 
 def test_terminal_task_resubmission_is_stable_duplicate_without_runtime_mutation() -> None:
@@ -123,9 +163,7 @@ def test_terminal_task_resubmission_is_stable_duplicate_without_runtime_mutation
     broker.record_success("w", "task", completion_token="done")
     resident = runtime.task("task")
     assert resident is not None and resident.state is TaskState.SUCCEEDED
-
     duplicate = broker.submit_and_dispatch("acme", SwarmTask("task", {"version": 2}))
-
     assert duplicate.admitted is True
     assert duplicate.duplicate is True
     assert duplicate.leased is False
@@ -139,10 +177,8 @@ def test_terminal_task_resubmission_preserves_cross_tenant_ownership() -> None:
     runtime, ingress, broker = _broker()
     broker.submit_and_dispatch("alpha", SwarmTask("task", {}))
     broker.record_success("w", "task", completion_token="done")
-
     with pytest.raises(AdmissionError, match="task already belongs to tenant: alpha"):
         broker.submit_and_dispatch("beta", SwarmTask("task", {}))
-
     assert runtime.task("task").state is TaskState.SUCCEEDED
     assert ingress.phase("alpha", "task") is None
 
@@ -159,10 +195,8 @@ def test_terminal_record_retention_is_bounded_and_duplicate_refreshes_lru() -> N
 
     refreshed = broker.submit_and_dispatch("acme", SwarmTask("one", {"duplicate": True}))
     assert refreshed.duplicate is True
-
     broker.submit_and_dispatch("acme", SwarmTask("three", {}))
     broker.record_success("w", "three", completion_token="done-three")
-
     status = broker.status()
     assert status["terminal_records"] == 2
     assert broker.tenant_for("one") == "acme"
