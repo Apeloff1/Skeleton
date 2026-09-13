@@ -10,19 +10,37 @@ from dataclasses import dataclass
 from typing import Iterable
 
 
+def capability_names(names: Iterable[str], *, drop_empty: bool = False) -> frozenset[str]:
+    if isinstance(names, (str, bytes)):
+        raise TypeError("capabilities must be a collection of names, not a string")
+    normalized = set()
+    for name in names:
+        if not isinstance(name, str):
+            raise TypeError("capability names must be strings")
+        name = name.strip()
+        if not name:
+            if drop_empty:
+                continue
+            raise ValueError("capability names must not be empty")
+        normalized.add(name)
+    return frozenset(normalized)
+
+
 @dataclass(frozen=True, slots=True)
 class CapabilityPolicy:
     allowed: frozenset[str]
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "allowed", capability_names(self.allowed))
+
     @classmethod
     def from_names(cls, names: Iterable[str]) -> "CapabilityPolicy":
-        normalized = frozenset(name.strip() for name in names if name.strip())
-        return cls(normalized)
+        return cls(capability_names(names, drop_empty=True))
 
     def permits(self, required: Iterable[str]) -> bool:
-        return set(required).issubset(self.allowed)
+        return capability_names(required).issubset(self.allowed)
 
     def require(self, required: Iterable[str]) -> None:
-        missing = sorted(set(required) - self.allowed)
+        missing = sorted(capability_names(required) - self.allowed)
         if missing:
             raise PermissionError(f"missing capabilities: {', '.join(missing)}")
