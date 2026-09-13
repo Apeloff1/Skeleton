@@ -61,8 +61,8 @@ export default function RenderCompare() {
       <ScrollView contentContainerStyle={{ padding: 14 }}>
         <Text style={styles.hint}>All renders are upscaled to 4096px masters. Tap a mode to swap each pane.</Text>
         <View style={styles.panes}>
-          <Pane label="A" testID="pane-a" defaultMode="cartographic" seed={7} />
-          <Pane label="B" testID="pane-b" defaultMode="globe" seed={7} />
+          <Pane label="A" testID="pane-a" defaultMode="cartographic" seed={7} master={false} />
+          <Pane label="B" testID="pane-b" defaultMode="globe" seed={7} master={false} />
         </View>
       </ScrollView>
     </SafeAreaView>
