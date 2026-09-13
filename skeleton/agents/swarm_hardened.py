@@ -102,6 +102,10 @@ class HardenedSwarmRuntime(SwarmRuntime):
         with self._lock:
             return super().reap_expired()
 
+    def stale_workers(self, *, stale_after: float):
+        with self._lock:
+            return super().stale_workers(stale_after=stale_after)
+
     def task(self, task_id: str):
         with self._lock:
             return super().task(task_id.strip())
@@ -166,6 +170,7 @@ class HardenedSwarmRuntime(SwarmRuntime):
             clock=clock,
         )
         base = SwarmRuntime.from_state(validated, clock=clock, requeue_leased=requeue_leased)
+        runtime._sequence = base._sequence
         runtime._queue = base._queue
         runtime._tasks = base._tasks
         runtime._workers = base._workers
@@ -177,9 +182,9 @@ class HardenedSwarmRuntime(SwarmRuntime):
         runtime._lease_renewals = base._lease_renewals
         runtime._heartbeats = base._heartbeats
         runtime._revived = base._revived
-        if requeue_leased:
-            now = clock()
-            for worker in runtime._workers.values():
+        now = clock()
+        for worker in runtime._workers.values():
+            worker.last_seen = now
+            if requeue_leased:
                 worker.active.clear()
-                worker.last_seen = now
         return runtime
