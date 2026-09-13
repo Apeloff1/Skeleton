@@ -83,8 +83,14 @@ class SwarmIngressGovernor:
             try:
                 self.quota.reserve(tenant, queued=1, payload_bytes=payload_bytes)
             except QuotaExceeded as exc:
+                self.rate.refund(tenant, cost=cost)
                 return IngressDecision(False, tenant, str(exc), payload_bytes, self.rate.remaining(tenant))
-            self.fairness.admit(tenant)
+            try:
+                self.fairness.admit(tenant)
+            except Exception:
+                self.quota.release(tenant, queued=1, payload_bytes=payload_bytes)
+                self.rate.refund(tenant, cost=cost)
+                raise
             self._payload_by_task[key] = payload_bytes
             self._phase_by_task[key] = "queued"
             return IngressDecision(True, tenant, "admitted", payload_bytes, self.rate.remaining(tenant))
