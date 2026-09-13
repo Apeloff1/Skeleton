@@ -1,0 +1,51 @@
+name: Product Kernel
+
+on:
+  push:
+    paths:
+      - "backend/core/charter_policy.py"
+      - "backend/core/product_kernel.py"
+      - "backend/tests/test_charter_policy.py"
+      - "backend/tests/test_product_kernel.py"
+      - "frontend/src/product/productCatalog.ts"
+      - ".github/workflows/product-kernel.yml"
+  pull_request:
+    paths:
+      - "backend/core/charter_policy.py"
+      - "backend/core/product_kernel.py"
+      - "backend/tests/test_charter_policy.py"
+      - "backend/tests/test_product_kernel.py"
+      - "frontend/src/product/productCatalog.ts"
+      - ".github/workflows/product-kernel.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  backend-product-kernel:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install "pytest>=8,<9"
+      - run: python -m pytest -q tests/test_charter_policy.py tests/test_product_kernel.py
+
+  frontend-product-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+      - run: yarn install --frozen-lockfile
+      - run: yarn typecheck
