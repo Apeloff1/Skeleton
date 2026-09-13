@@ -43,6 +43,7 @@ class ServerState:
         self.swarm_supervisor: Optional[Any] = None
         self.swarm_broker: Optional[Any] = None
         self.swarm_ingress: Optional[Any] = None
+        self.swarm_tenant_broker: Optional[Any] = None
         self.health: Optional[Any] = None
         self.metrics: Optional[Any] = None
         self.cockpit: Optional[Any] = None
@@ -67,7 +68,22 @@ class ServerState:
         if self.swarm_supervisor is None:
             self.swarm_supervisor = SwarmSupervisor()
         self.swarm_broker = SwarmBroker(runtime, supervisor=self.swarm_supervisor)
+        if self.swarm_tenant_broker is not None:
+            self.swarm_tenant_broker.rebind(self.swarm_broker)
         return runtime
+
+    def bind_swarm_ingress(self, ingress: Any) -> Any:
+        """Bind ingress and tenant execution control to the current runtime broker."""
+        from skeleton.agents.swarm_tenant_broker import TenantSwarmBroker
+
+        self.swarm_ingress = ingress
+        if self.swarm_broker is not None:
+            if self.swarm_tenant_broker is None:
+                self.swarm_tenant_broker = TenantSwarmBroker(self.swarm_broker, ingress)
+            else:
+                self.swarm_tenant_broker.ingress = ingress
+                self.swarm_tenant_broker.rebind(self.swarm_broker)
+        return ingress
 
     def is_healthy(self) -> Dict[str, Any]:
         checks = {}
@@ -100,9 +116,20 @@ class ServerState:
                 checks["swarm_ingress"] = self.swarm_ingress.status()
             except Exception:
                 checks["swarm_ingress"] = {"error": "ingress status failed"}
+        if self.swarm_tenant_broker is not None:
+            try:
+                checks["swarm_tenant_broker"] = self.swarm_tenant_broker.status()
+            except Exception:
+                checks["swarm_tenant_broker"] = {"error": "tenant broker status failed"}
         has_error = any(isinstance(check, dict) and check.get("error") for check in checks.values())
         swarm_critical = isinstance(checks.get("swarm"), dict) and checks["swarm"].get("status") == "critical"
-        overall = not has_error and not swarm_critical
+        tenant_mismatch = False
+        tenant_check = checks.get("swarm_tenant_broker")
+        if isinstance(tenant_check, dict):
+            reconcile = tenant_check.get("reconcile")
+            if isinstance(reconcile, dict):
+                tenant_mismatch = bool(reconcile.get("missing_active") or reconcile.get("terminal_not_terminal"))
+        overall = not has_error and not swarm_critical and not tenant_mismatch
         return {"overall": overall, "checks": checks}
 
     def wire_from_genesis(self, genesis: Any) -> None:
@@ -135,7 +162,7 @@ class ServerState:
         runtime = HardenedSwarmRuntime(max_tasks=100_000, max_workers=10_000, default_lease_seconds=30.0, max_lease_seconds=86_400.0)
         self.bind_swarm_runtime(runtime)
         self.swarm_recovery = SwarmRecoveryManager(max_checkpoints=16)
-        self.swarm_ingress = SwarmIngressGovernor()
+        self.bind_swarm_ingress(SwarmIngressGovernor())
 
         from skeleton.observability import MetricsCollector
         self.metrics = MetricsCollector()
@@ -175,6 +202,7 @@ def create_app() -> Any:
     from skeleton.api.swarm_broker_routes import router as swarm_broker_router
     from skeleton.api.swarm_batch_routes import router as swarm_batch_router
     from skeleton.api.swarm_ingress_routes import router as swarm_ingress_router
+    from skeleton.api.swarm_tenant_broker_routes import router as swarm_tenant_broker_router
     app.include_router(router, prefix="/api/v1")
     app.include_router(gameforge_router, prefix="/api/v1")
     app.include_router(swarm_router, prefix="/api/v1")
@@ -187,6 +215,7 @@ def create_app() -> Any:
     app.include_router(swarm_broker_router, prefix="/api/v1")
     app.include_router(swarm_batch_router, prefix="/api/v1")
     app.include_router(swarm_ingress_router, prefix="/api/v1")
+    app.include_router(swarm_tenant_broker_router, prefix="/api/v1")
     app.include_router(cockpit_router)
 
     from skeleton.api.middleware import DEFAULT_OPEN_PREFIXES, GatePolicy, install_gate
@@ -216,6 +245,7 @@ def create_app() -> Any:
             "swarm_broker": "/api/v1/swarm/broker/status",
             "swarm_batch": "/api/v1/swarm/batch/submit",
             "swarm_ingress": "/api/v1/swarm/ingress/status",
+            "swarm_tenant_broker": "/api/v1/swarm/tenant-broker/status",
         }
 
     @app.get("/cortex/status")
