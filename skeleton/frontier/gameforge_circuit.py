@@ -5,6 +5,8 @@ class Circuit:
  def __init__(self,threshold:int=5):
   if threshold<=0: raise ValueError("threshold must be positive")
   self.threshold=threshold; self.failures=0; self.state=CircuitState.CLOSED
+ @property
+ def allowed(self): return self.state is not CircuitState.OPEN
  def failure(self):
   self.failures+=1
   if self.failures>=self.threshold: self.state=CircuitState.OPEN
