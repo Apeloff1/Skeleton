@@ -77,7 +77,9 @@ def test_fairness_failure_rolls_back_quota_and_rate(monkeypatch: pytest.MonkeyPa
     def fail_fairness(*args: object, **kwargs: object) -> object:
         raise RuntimeError("synthetic fairness failure")
 
-    monkeypatch.setattr(governor.fairness, "admit", fail_fairness)
+    # FairShareLedger is slotted, so its methods are intentionally read-only on
+    # instances. Patch the class seam instead of weakening production mutability.
+    monkeypatch.setattr(type(governor.fairness), "admit", fail_fairness)
     with pytest.raises(RuntimeError, match="synthetic fairness failure"):
         governor.admit("tenant", "task", {})
 
@@ -95,7 +97,9 @@ def test_completion_fairness_failure_leaves_quota_and_task_untouched(monkeypatch
     def fail_complete(*args: object, **kwargs: object) -> object:
         raise RuntimeError("synthetic fairness completion failure")
 
-    monkeypatch.setattr(governor.fairness, "complete", fail_complete)
+    # Keep the slotted ledger immutable at the instance level; class patching
+    # still exercises the governor rollback path and restores cleanly in pytest.
+    monkeypatch.setattr(type(governor.fairness), "complete", fail_complete)
     with pytest.raises(RuntimeError, match="synthetic fairness completion failure"):
         governor.complete("tenant", "task")
 
