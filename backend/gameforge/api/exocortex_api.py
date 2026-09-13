@@ -17,36 +17,36 @@ def _x(uid: str) -> Exocortex:
 
 
 class TextBody(BaseModel):
-    text: str
+    text: str = Field(..., min_length=1, max_length=100000)
 
 
 class ProgressBody(BaseModel):
-    scheduled_pct: float
-    actual_pct: float
-    project_id: str = ""
+    scheduled_pct: float = Field(..., ge=-100, le=100)
+    actual_pct: float = Field(..., ge=-100, le=100)
+    project_id: str = Field("", max_length=200)
 
 
 class RegulateBody(BaseModel):
-    energy: float
-    noise_db: float
-    valence: float = 0.0
+    energy: float = Field(..., ge=-1, le=1)
+    noise_db: float = Field(..., ge=0, le=200)
+    valence: float = Field(0.0, ge=-1, le=1)
 
 
 class FeedBody(BaseModel):
-    upcoming_weather: List[str]
-    planned_load: int
-    capacity: int
+    upcoming_weather: List[str] = Field(..., max_length=50)
+    planned_load: int = Field(..., ge=0, le=100000)
+    capacity: int = Field(..., ge=0, le=100000)
     plasticity_risk: bool = False
-    energy: float = 0.55
+    energy: float = Field(0.55, ge=-1, le=1)
 
 
 class RecallBody(BaseModel):
-    query: str
-    k: int = Query(5, ge=1, le=100)
+    query: str = Field(..., min_length=1, max_length=10000)
+    k: int = Field(5, ge=1, le=100)
 
 
 class PruneBody(BaseModel):
-    records: List[Dict[str, Any]]
+    records: List[Dict[str, Any]] = Field(..., max_length=1000)
 
 
 @router.post("/ingest")
@@ -97,32 +97,32 @@ async def tokens(principal: Principal = Depends(get_principal)):
 
 
 class TwinQuery(BaseModel):
-    stream: str = "transcript"
-    contains: Optional[str] = None
-    tag: Optional[str] = None
+    stream: str = Field("transcript", min_length=1, max_length=100)
+    contains: Optional[str] = Field(None, max_length=10000)
+    tag: Optional[str] = Field(None, max_length=200)
     only_filtered_originals: bool = False
-    n: int = Query(50, ge=1, le=200)
+    n: int = Field(50, ge=1, le=200)
 
 
 class PfcDecideBody(BaseModel):
-    goal: str
-    energy: float = 0.55
-    pain: float = 0.0
-    sleep_hours: float = 7.0
-    valence: float = 0.0
-    task_cost: float = 0.5
-    tools: Optional[List[str]] = None
+    goal: str = Field(..., min_length=1, max_length=10000)
+    energy: float = Field(0.55, ge=-1, le=1)
+    pain: float = Field(0.0, ge=0, le=10)
+    sleep_hours: float = Field(7.0, ge=0, le=24)
+    valence: float = Field(0.0, ge=-1, le=1)
+    task_cost: float = Field(0.5, ge=0, le=1)
+    tools: Optional[List[str]] = Field(None, max_length=100)
 
 
 class GoalBody(BaseModel):
-    title: str
-    horizon: str = "10y"
-    subgoals: Optional[List[str]] = None
+    title: str = Field(..., min_length=1, max_length=500)
+    horizon: str = Field("10y", max_length=100)
+    subgoals: Optional[List[str]] = Field(None, max_length=100)
 
 
 class LocationBody(BaseModel):
-    country: str
-    city: str
+    country: str = Field(..., min_length=2, max_length=100)
+    city: str = Field(..., min_length=1, max_length=200)
 
 
 @router.post("/twin/query")
