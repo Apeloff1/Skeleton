@@ -52,9 +52,9 @@ class VaultFolder(BaseModel):
 class SortingRule(BaseModel):
     id: str
     name: str
-    conditions: List[Dict[str, Any]]
-    action: str  # move_to_folder, tag, archive, star
-    target: str
+    conditions: List[Dict[str, Any]] = Field(..., min_length=1, max_length=100)
+    action: str = Field(..., min_length=1, max_length=50)  # move_to_folder, tag, archive, star
+    target: str = Field(..., min_length=1, max_length=200)
     enabled: bool = True
 
 class VaultConnection(BaseModel):

@@ -538,12 +538,12 @@ class ModuleRequest(BaseModel):
 
 class TopicRequest(BaseModel):
     module_id: int = Field(..., ge=1, le=12)
-    topic_index: int = Field(..., ge=0)
+    topic_index: int = Field(..., ge=0, le=1000)
 
 
 class ProgressRequest(BaseModel):
-    user_id: str
-    module_id: int
+    user_id: str = Field(..., min_length=1, max_length=200)
+    module_id: int = Field(..., ge=1, le=12)
     progress_percent: float = Field(..., ge=0.0, le=100.0)
 
 
@@ -988,4 +988,3 @@ Generate JSON with:
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Learning path generation failed: {str(e)}")
-
