@@ -54,3 +54,20 @@ def test_refund_rejects_non_finite_cost_without_poisoning_bucket(value: float) -
     with pytest.raises(ValueError, match="cost must be a positive finite number"):
         limiter.refund("tenant", cost=value)
     assert limiter.remaining("tenant") == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
+def test_allow_rejects_non_finite_clock_without_creating_bucket(value: float) -> None:
+    limiter = TokenBucketLimiter(capacity=2, refill_per_second=1, clock=lambda: value)
+    with pytest.raises(ValueError, match="clock must return a finite number"):
+        limiter.allow("tenant")
+    assert limiter.snapshot() == {}
+
+
+def test_existing_bucket_survives_transient_invalid_clock_reading() -> None:
+    readings = iter([0.0, math.nan, 1.0])
+    limiter = TokenBucketLimiter(capacity=2, refill_per_second=1, clock=lambda: next(readings))
+    assert limiter.allow("tenant") is True
+    with pytest.raises(ValueError, match="clock must return a finite number"):
+        limiter.remaining("tenant")
+    assert limiter.remaining("tenant") == pytest.approx(2.0)
