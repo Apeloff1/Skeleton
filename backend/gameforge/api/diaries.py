@@ -1,5 +1,5 @@
 from __future__ import annotations
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 
@@ -102,7 +102,7 @@ async def write_entry(req: DiaryWriteRequest, principal: Principal = Depends(get
 @router.get("/entries")
 async def list_entries(
     kind: Optional[str] = None,
-    limit: int = 50,
+    limit: int = Query(50, ge=1, le=200),
     tenant_id: Optional[str] = None,
     workspace_id: Optional[str] = None,
     principal: Principal = Depends(get_principal),
@@ -131,7 +131,7 @@ async def list_entries(
 
 @router.get("/context")
 async def diary_context(
-    n: int = 5,
+    n: int = Query(5, ge=1, le=100),
     tenant_id: Optional[str] = None,
     workspace_id: Optional[str] = None,
     principal: Principal = Depends(get_principal),

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
 from gameforge.enterprise.auth import Principal, get_principal
@@ -31,19 +31,19 @@ class SymbolicBody(BaseModel):
     expr: Optional[str] = None
     names: Optional[str] = None
     var: str = "x"
-    n: int = 1
+    n: int = Query(1, ge=1, le=1000)
     rows: Optional[List[List[Any]]] = None
 
 
 class PowSumBody(BaseModel):
     numbers: List[float]
-    chunk_size: int = 8
+    chunk_size: int = Query(8, ge=1, le=1000)
 
 
 class PowMapBody(BaseModel):
     items: List[Any]
     map_expr: str
-    chunk_size: int = 5
+    chunk_size: int = Query(5, ge=1, le=1000)
 
 
 class BudgetBody(BaseModel):

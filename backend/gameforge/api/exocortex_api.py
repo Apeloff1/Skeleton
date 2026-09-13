@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
 from gameforge.enterprise.auth import Principal, get_principal
@@ -42,7 +42,7 @@ class FeedBody(BaseModel):
 
 class RecallBody(BaseModel):
     query: str
-    k: int = 5
+    k: int = Query(5, ge=1, le=100)
 
 
 class PruneBody(BaseModel):
@@ -101,7 +101,7 @@ class TwinQuery(BaseModel):
     contains: Optional[str] = None
     tag: Optional[str] = None
     only_filtered_originals: bool = False
-    n: int = 50
+    n: int = Query(50, ge=1, le=200)
 
 
 class PfcDecideBody(BaseModel):
@@ -145,7 +145,11 @@ async def twin_overview(principal: Principal = Depends(get_principal)):
 
 
 @router.post("/twin/search")
-async def twin_search(contains: str, n: int = 20, principal: Principal = Depends(get_principal)):
+async def twin_search(
+    contains: str,
+    n: int = Query(20, ge=1, le=200),
+    principal: Principal = Depends(get_principal),
+):
     return _x(principal.user_id).twin_query_all(contains, n=n)
 
 
