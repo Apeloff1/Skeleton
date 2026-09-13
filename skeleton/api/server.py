@@ -97,6 +97,11 @@ class ServerState:
             raise ValueError("staged tenant broker mismatch")
         if getattr(tenant_broker, "ingress", None) is not ingress:
             raise ValueError("staged tenant ingress mismatch")
+        if self.swarm_supervisor is not None and getattr(broker, "supervisor", None) is not self.swarm_supervisor:
+            raise ValueError("staged broker supervisor mismatch")
+        reconcile = tenant_broker.reconcile()
+        if any(bool(values) for values in reconcile.values()):
+            raise ValueError("staged tenant bundle is not reconciled")
         with self._swarm_bind_lock:
             self.swarm = runtime
             self.swarm_broker = broker
@@ -114,30 +119,38 @@ class ServerState:
                         checks[attr] = val.stats()
                     except Exception:
                         checks[attr] = {"error": "stats failed"}
-        if self.swarm is not None and hasattr(self.swarm, "health"):
+
+        with self._swarm_bind_lock:
+            swarm = self.swarm
+            recovery = self.swarm_recovery
+            supervisor = self.swarm_supervisor
+            ingress = self.swarm_ingress
+            tenant_broker = self.swarm_tenant_broker
+
+        if swarm is not None and hasattr(swarm, "health"):
             try:
-                checks["swarm"] = self.swarm.health()
+                checks["swarm"] = swarm.health()
             except Exception:
                 checks["swarm"] = {"error": "health failed"}
-        if self.swarm_recovery is not None:
+        if recovery is not None:
             try:
-                recovery_status = self.swarm_recovery.status()
+                recovery_status = recovery.status()
                 checks["swarm_recovery"] = asdict(recovery_status) if is_dataclass(recovery_status) else recovery_status
             except Exception:
                 checks["swarm_recovery"] = {"error": "recovery status failed"}
-        if self.swarm_supervisor is not None:
+        if supervisor is not None:
             try:
-                checks["swarm_supervisor"] = self.swarm_supervisor.status()
+                checks["swarm_supervisor"] = supervisor.status()
             except Exception:
                 checks["swarm_supervisor"] = {"error": "supervisor status failed"}
-        if self.swarm_ingress is not None:
+        if ingress is not None:
             try:
-                checks["swarm_ingress"] = self.swarm_ingress.status()
+                checks["swarm_ingress"] = ingress.status()
             except Exception:
                 checks["swarm_ingress"] = {"error": "ingress status failed"}
-        if self.swarm_tenant_broker is not None:
+        if tenant_broker is not None:
             try:
-                checks["swarm_tenant_broker"] = self.swarm_tenant_broker.status()
+                checks["swarm_tenant_broker"] = tenant_broker.status()
             except Exception:
                 checks["swarm_tenant_broker"] = {"error": "tenant broker status failed"}
         has_error = any(isinstance(check, dict) and check.get("error") for check in checks.values())
