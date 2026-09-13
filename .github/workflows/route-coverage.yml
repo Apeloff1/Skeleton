@@ -7,20 +7,27 @@ on:
       - 'frontend/utils/routeRegistry.ts'
       - 'frontend/app/**'
       - 'scripts/route_coverage_check.py'
+      - 'scripts/test_route_coverage_check.py'
       - '.github/workflows/route-coverage.yml'
   pull_request:
     paths:
       - 'frontend/utils/routeRegistry.ts'
       - 'frontend/app/**'
       - 'scripts/route_coverage_check.py'
+      - 'scripts/test_route_coverage_check.py'
 
 permissions:
   contents: read
+
+concurrency:
+  group: route-coverage-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   route-coverage:
     name: Validate registry ↔ filesystem
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,6 +36,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: Run route coverage regression tests
+        run: python3 -m unittest -v scripts/test_route_coverage_check.py
 
       - name: Run route coverage check (static)
         run: python3 scripts/route_coverage_check.py
