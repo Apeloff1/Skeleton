@@ -1,8 +1,8 @@
 """Fail CI on unsafe process invocation patterns in backend Python code.
 
 Dependency-free by design so it can run before application imports. The scanner
-tracks common import, assignment, getattr, and namespace-mapping aliases to
-prevent trivial process policy bypasses.
+tracks common import, assignment, walrus, getattr, and namespace-mapping aliases
+to prevent trivial process policy bypasses.
 """
 
 from __future__ import annotations
@@ -145,6 +145,8 @@ def assignment_aliases(tree: ast.AST, aliases: dict[str, str]) -> dict[str, str]
                 if isinstance(target, ast.Name):
                     assignments.append((target.id, node.value))
         elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value:
+            assignments.append((node.target.id, node.value))
+        elif isinstance(node, ast.NamedExpr) and isinstance(node.target, ast.Name):
             assignments.append((node.target.id, node.value))
 
     tracked_names = UNSAFE_CALLS.keys() | {f"subprocess.{call}" for call in SUBPROCESS_CALLS}
