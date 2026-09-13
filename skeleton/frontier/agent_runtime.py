@@ -80,7 +80,7 @@ class AgentRuntime:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._semaphore: asyncio.Semaphore | None = None
         self._pending = self._active = 0
-        self._tasks: set[asyncio.Task] = set()
+        self._tasks: dict[asyncio.Task, int] = {}
         self._closed = False
         self._counts = {"completed": 0, "failed": 0, "timed_out": 0, "cancelled": 0, "rejected": 0, "retries": 0}
         for name, agent in (agents or {}).items():
@@ -117,8 +117,9 @@ class AgentRuntime:
         except KeyError as exc:
             raise KeyError(f"unknown agent: {name}") from exc
 
-    def _authorize(self, agent_name: str, required_capability: str | None) -> AgentLike:
-        if self._closed:
+    def _authorize(self, agent_name: str, required_capability: str | None,
+                   *, admitted: bool = False) -> AgentLike:
+        if self._closed and not admitted:
             raise RuntimeClosed("agent runtime is closed")
         if not isinstance(self.health, HealthState) or self.health is HealthState.UNAVAILABLE:
             raise RuntimeError("agent runtime unavailable")
@@ -138,6 +139,33 @@ class AgentRuntime:
     def stats(self) -> dict[str, Any]:
         return {**self._counts, "registered": len(self._agents), "active": self._active,
                 "queued": self._pending - self._active, "closed": self._closed}
+
+    async def aclose(self, *, grace_period: float = 5.0) -> None:
+        """Stop admissions, drain accepted work, then cancel cooperative stragglers."""
+        positive_seconds("grace_period", grace_period)
+        if asyncio.current_task() in self._tasks:
+            raise RuntimeError("an executing agent cannot shut down its own runtime")
+        if self._pending and asyncio.get_running_loop() is not self._loop:
+            raise RuntimeError("shutdown must run on the runtime's event loop")
+        self._closed = True
+        pending = set(self._tasks)
+        if not pending:
+            return
+        try:
+            _, pending = await asyncio.wait(pending, timeout=grace_period)
+        finally:
+            for task in pending:
+                task.cancel()
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
+
+    async def __aenter__(self) -> AgentRuntime:
+        if self._closed:
+            raise RuntimeClosed("agent runtime is closed")
+        return self
+
+    async def __aexit__(self, exc_type, exc, traceback) -> None:
+        await self.aclose()
 
     async def execute(self, agent_name: str, task: str, *,
                       context: Mapping[str, Any] | None = None,
@@ -173,7 +201,7 @@ class AgentRuntime:
             raise RuntimeBusy("agent runtime admission queue is full")
         caller = asyncio.current_task()
         self._pending += 1
-        self._tasks.add(caller)
+        self._tasks[caller] = self._tasks.get(caller, 0) + 1
         acquired = False
         try:
             try:
@@ -184,7 +212,7 @@ class AgentRuntime:
                 raise RuntimeBusy("agent runtime queue deadline expired") from exc
             acquired = True
             self._active += 1
-            agent = self._authorize(agent_name, required_capability)
+            agent = self._authorize(agent_name, required_capability, admitted=True)
             started = datetime.now(timezone.utc)
             tick = loop.time()
             output = error = None
@@ -202,7 +230,7 @@ class AgentRuntime:
                             if attempts < limits.max_attempts:
                                 self._counts["retries"] += 1
                                 await asyncio.sleep(limits.backoff(attempts))
-                                self._authorize(agent_name, required_capability)
+                                self._authorize(agent_name, required_capability, admitted=True)
                                 continue
                             error = f"agent execution failed ({type(exc).__name__})"
                             status = ExecutionStatus.FAILED
@@ -216,6 +244,8 @@ class AgentRuntime:
                 output = None
                 error = "agent execution deadline expired"
                 status = ExecutionStatus.TIMED_OUT
+            if status is not ExecutionStatus.COMPLETED:
+                output = None
             self._counts[status.value] += 1
             return ExecutionResult(
                 task=task, agent=agent_name, started_at=started,
@@ -235,4 +265,6 @@ class AgentRuntime:
                 self._active -= 1
                 self._semaphore.release()
             self._pending -= 1
-            self._tasks.discard(caller)
+            self._tasks[caller] -= 1
+            if self._tasks[caller] == 0:
+                del self._tasks[caller]
