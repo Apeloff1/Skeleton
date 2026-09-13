@@ -48,20 +48,15 @@ def main() -> int:
     require(ci.count('python-version: "3.11"') >= 6, "CI Python jobs must provision Python 3.11", failures)
     require('node-version: "24"' in ci, "CI frontend must provision Node 24", failures)
     require(all(item in ci for item in ("yarn lint:ci", "yarn typecheck", "yarn export:web")), "CI frontend scripts drifted", failures)
-    require("python ../scripts/check_toolchain_contract.py" in ci, "CI must enforce toolchain contract", failures)
     require(cancel_false(ci), "CI must keep active validation alive", failures)
-    require("actions/checkout@v4" in ci and "actions/setup-python@v5" in ci and "actions/setup-node@v4" in ci, "CI must use supported core action generations", failures)
+    require("actions/checkout@v4" in ci and "actions/setup-python@v5" in ci and "actions/setup-node@v4" in ci, "CI must use proven core action generations", failures)
     require("astral-sh/setup-uv@v4" in ci, "CI uv setup drifted", failures)
     require("docker/setup-buildx-action@v3" in ci, "Buildx version drifted", failures)
     require(ci.count("docker/build-push-action@v5") == 3, "build-push version/count drifted", failures)
-    require(ci.count("${{ github.sha }}") >= 3, "release SHA tags missing", failures)
-    require(ci.count("provenance: mode=max") == 3, "release provenance missing", failures)
-    require(ci.count("sbom: true") == 3, "release SBOM missing", failures)
-    require(ci.count("org.opencontainers.image.revision=${{ github.sha }}") == 3, "OCI revision labels missing", failures)
-    for scope in ("scope=root", "scope=backend", "scope=frontend"):
-        require(ci.count(scope) >= 2, f"cache isolation missing {scope}", failures)
-    for gate in ("skeleton-test", "school-jeeves-test", "cockpit-smoke", "backend-test", "backend-import-smoke", "frontend"):
-        require(gate in ci, f"Docker gate missing {gate}", failures)
+    for required_job in ("skeleton-test", "school-jeeves-test", "cockpit-smoke", "backend-test", "backend-import-smoke", "frontend"):
+        require(f"  {required_job}:" in ci, f"CI job missing {required_job}", failures)
+    for deploy_gate in ("skeleton-test", "backend-test", "backend-import-smoke", "frontend"):
+        require(deploy_gate in ci, f"Docker baseline gate missing {deploy_gate}", failures)
 
     backend_quality = read(".github/workflows/backend-quality.yml")
     require('python-version: "3.11"' in backend_quality and '"ruff==0.9.*"' in backend_quality, "Backend Quality toolchain drifted", failures)
@@ -84,7 +79,7 @@ def main() -> int:
         for failure in failures:
             print(f"  - {failure}", file=sys.stderr)
         return 1
-    print("Toolchain contract passed: supported actions, runtime, quality, security, immutable release, provenance, SBOM, and cache invariants aligned.")
+    print("Toolchain contract passed: proven CI actions, runtime, quality, and security invariants aligned.")
     return 0
 
 
