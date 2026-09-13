@@ -182,6 +182,9 @@ class TenantSwarmBroker:
             if terminal_tenant is not None:
                 if terminal_tenant != tenant:
                     raise AdmissionError(f"task already belongs to tenant: {terminal_tenant}")
+                resident = self.broker.runtime.task(task_id)
+                if resident is not None and resident.state not in TERMINAL_STATES:
+                    raise AdmissionError(f"terminal tenant task is active: {task_id}; repair required")
                 self._terminal_tenants.move_to_end(task_id)
                 return TenantBrokerResult(tenant, task_id, True, True, None, False, "terminal task already accounted")
             decision: IngressDecision = self.ingress.admit(tenant, task_id, task.payload, cost=cost)
