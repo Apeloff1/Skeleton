@@ -1,8 +1,9 @@
 """Fail CI on unsafe process invocation patterns in backend Python code.
 
 Dependency-free by design so it can run before application imports. The scanner
-tracks common import aliases to prevent trivial bypasses such as ``import
-subprocess as sp`` or ``from subprocess import run``.
+tracks common import and assignment aliases to prevent trivial bypasses such as
+``import subprocess as sp``, ``from subprocess import run``, or
+``runner = subprocess.run``.
 """
 
 from __future__ import annotations
@@ -77,6 +78,38 @@ def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
     return replacement + (f".{suffix}" if dot else "")
 
 
+def assignment_aliases(tree: ast.AST, aliases: dict[str, str]) -> dict[str, str]:
+    """Resolve simple aliases assigned from tracked process callables.
+
+    The pass is intentionally conservative: only direct ``name = callable``
+    assignments are tracked, and resolution iterates so chained aliases such as
+    ``runner2 = runner1 = subprocess.run`` or ``runner2 = runner1`` are covered.
+    """
+
+    resolved = dict(aliases)
+    assignments: list[tuple[str, ast.AST]] = []
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    assignments.append((target.id, node.value))
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value:
+            assignments.append((node.target.id, node.value))
+
+    tracked_names = UNSAFE_CALLS.keys() | {f"subprocess.{call}" for call in SUBPROCESS_CALLS}
+    changed = True
+    while changed:
+        changed = False
+        for target, value in assignments:
+            source = canonical_name(value, resolved)
+            if source in tracked_names and resolved.get(target) != source:
+                resolved[target] = source
+                changed = True
+
+    return resolved
+
+
 def violations(path: Path) -> list[str]:
     label = display_path(path)
     try:
@@ -84,7 +117,7 @@ def violations(path: Path) -> list[str]:
     except (OSError, UnicodeError, SyntaxError) as exc:
         return [f"{label}: parse failure: {exc}"]
 
-    aliases = import_aliases(tree)
+    aliases = assignment_aliases(tree, import_aliases(tree))
     findings: list[str] = []
 
     for node in ast.walk(tree):
