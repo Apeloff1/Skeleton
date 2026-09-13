@@ -5,13 +5,17 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  ViewStyle,
-  TextStyle,
 } from 'react-native';
+import type { ViewStyle, TextStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-export function Screen({ children, style, ...props }: any) {
-  return <View {...props} style={[styles.screen, style]}>{children}</View>;
+export function Screen({ children, style, edges = ['top', 'right', 'bottom', 'left'], ...props }: any) {
+  return (
+    <SafeAreaView {...props} edges={edges} style={[styles.screen, style]}>
+      {children}
+    </SafeAreaView>
+  );
 }
 
 export function AppHeader({ title, subtitle, onBack, right, style }: any) {
