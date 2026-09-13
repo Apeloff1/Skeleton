@@ -1,0 +1,23 @@
+"""Runtime coordinator composing lifecycle, dependencies, rate, circuit, and budget gates."""
+from dataclasses import dataclass
+from .gameforge_admission import Admission,decide
+from .gameforge_budget import Budget
+from .gameforge_circuit import Circuit
+from .gameforge_dependency import DependencyGate
+from .gameforge_lifecycle import ServiceLifecycle
+from .gameforge_rate import RateWindow
+@dataclass
+class RuntimeCoordinator:
+ lifecycle: ServiceLifecycle
+ dependencies: DependencyGate
+ rate: RateWindow
+ circuit: Circuit
+ budget: Budget
+ def admit(self,now:int,active:int,limit:int=1,background:bool=False):
+  if not self.lifecycle.can_accept or not self.dependencies.ready or not self.circuit.allowed:
+   return Admission.SHED
+  if not self.rate.allow(now): return Admission.SHED
+  decision=decide(background_allowed=True,read_only=False,active=active,limit=limit,background=background)
+  if decision is Admission.ACCEPT and not self.budget.reserve(): return Admission.SHED
+  return decision
+ def release(self): self.budget.release()
