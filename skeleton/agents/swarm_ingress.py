@@ -45,6 +45,13 @@ class SwarmIngressGovernor:
         return tenant
 
     @staticmethod
+    def _task_id(task_id: str) -> str:
+        task_id = task_id.strip()
+        if not task_id:
+            raise ValueError("task_id must not be empty")
+        return task_id
+
+    @staticmethod
     def payload_size(payload: object) -> int:
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
         return len(encoded)
@@ -59,9 +66,7 @@ class SwarmIngressGovernor:
 
     def admit(self, tenant: str, task_id: str, payload: object, *, cost: float = 1.0) -> IngressDecision:
         tenant = self._tenant(tenant)
-        task_id = task_id.strip()
-        if not task_id:
-            raise ValueError("task_id must not be empty")
+        task_id = self._task_id(task_id)
         key = (tenant, task_id)
         payload_bytes = self.payload_size(payload)
         with self._lock:
@@ -84,9 +89,16 @@ class SwarmIngressGovernor:
             self._phase_by_task[key] = "queued"
             return IngressDecision(True, tenant, "admitted", payload_bytes, self.rate.remaining(tenant))
 
+    def phase(self, tenant: str, task_id: str) -> str | None:
+        tenant = self._tenant(tenant)
+        task_id = self._task_id(task_id)
+        with self._lock:
+            return self._phase_by_task.get((tenant, task_id))
+
     def mark_leased(self, tenant: str, task_id: str) -> None:
         tenant = self._tenant(tenant)
-        key = (tenant, task_id.strip())
+        task_id = self._task_id(task_id)
+        key = (tenant, task_id)
         with self._lock:
             phase = self._phase_by_task.get(key)
             if phase != "queued":
@@ -94,9 +106,21 @@ class SwarmIngressGovernor:
             self.quota.reserve(tenant, queued=-1, leased=1)
             self._phase_by_task[key] = "leased"
 
+    def mark_requeued(self, tenant: str, task_id: str) -> None:
+        tenant = self._tenant(tenant)
+        task_id = self._task_id(task_id)
+        key = (tenant, task_id)
+        with self._lock:
+            phase = self._phase_by_task.get(key)
+            if phase != "leased":
+                raise ValueError(f"task is not leased: {task_id}")
+            self.quota.reserve(tenant, queued=1, leased=-1)
+            self._phase_by_task[key] = "queued"
+
     def complete(self, tenant: str, task_id: str) -> None:
         tenant = self._tenant(tenant)
-        key = (tenant, task_id.strip())
+        task_id = self._task_id(task_id)
+        key = (tenant, task_id)
         with self._lock:
             phase = self._phase_by_task.get(key)
             if phase is None:
@@ -122,4 +146,8 @@ class SwarmIngressGovernor:
                 "fairness": self.fairness.snapshot(),
                 "rate": self.rate.snapshot(),
                 "accounted_tasks": len(self._phase_by_task),
+                "phases": {
+                    f"{tenant}:{task_id}": phase
+                    for (tenant, task_id), phase in sorted(self._phase_by_task.items())
+                },
             }
