@@ -1,4 +1,4 @@
-.PHONY: install dev test smoke verify ci lint clean
+.PHONY: install dev test smoke verify quality ci lint clean
 
 install:
 	pip install -r requirements.txt
@@ -14,6 +14,9 @@ smoke:
 
 verify:
 	bash scripts/verify-forge.sh
+
+quality:
+	bash scripts/quality-gates.sh
 
 ci:
 	bash scripts/ci.sh
