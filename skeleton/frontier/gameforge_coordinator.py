@@ -21,8 +21,11 @@ class RuntimeCoordinator:
    return Admission.SHED
   if not self.rate.allow(now): return Admission.SHED
   decision=decide(background_allowed=True,read_only=False,active=active,limit=limit,background=background)
-  if decision is Admission.ACCEPT and (not self.budget.reserve() or not self.quota.reserve()):
-   return Admission.SHED
+  if decision is Admission.ACCEPT:
+   if not self.budget.reserve(): return Admission.SHED
+   if not self.quota.reserve():
+    self.budget.release()
+    return Admission.SHED
   return decision
  def release(self):
   self.budget.release()
