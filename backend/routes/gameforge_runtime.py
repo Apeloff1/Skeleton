@@ -11,7 +11,7 @@ import time
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Path, Query
 from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/api/gameforge/runtime", tags=["gameforge-runtime"])
@@ -119,7 +119,10 @@ async def message(b: MessageBody):
 
 
 @router.get("/inbox/{agent_id}")
-async def inbox(agent_id: str, limit: int = Query(50, ge=1, le=500)):
+async def inbox(
+    agent_id: str = Path(..., min_length=1, max_length=200),
+    limit: int = Query(50, ge=1, le=500),
+):
     msgs = list(_messages().find({"to": agent_id}, {"_id": 0}).sort("ts", -1).limit(limit))
     _messages().update_many({"to": agent_id, "read": False}, {"$set": {"read": True}})
     return {"ok": True, "agent_id": agent_id, "messages": msgs}
@@ -239,7 +242,7 @@ async def groupchat_list(
 
 
 @router.post("/heartbeat/{agent_id}")
-async def heartbeat(agent_id: str):
+async def heartbeat(agent_id: str = Path(..., min_length=1, max_length=200)):
     """Agent liveness ping (agent_heartbeat_system)."""
     res = _agents().update_one({"agent_id": agent_id}, {"$set": {"last_heartbeat": time.time()}})
     return {"ok": res.matched_count > 0, "agent_id": agent_id}
@@ -261,13 +264,16 @@ def _reap_dead(stale_seconds: int = 90) -> int:
 
 
 @router.post("/reap")
-async def reap(stale_seconds: int = 90):
+async def reap(stale_seconds: int = Query(90, ge=1, le=86400)):
     """Manually run the reaper — auto-restart every dead agent."""
     return {"ok": True, "reaped": _reap_dead(stale_seconds)}
 
 
 @router.get("/health")
-async def runtime_health(stale_seconds: int = 90, auto_heal: bool = True):
+async def runtime_health(
+    stale_seconds: int = Query(90, ge=1, le=86400),
+    auto_heal: bool = True,
+):
     """Classify active agents healthy / stale / dead by heartbeat freshness.
     With auto_heal (default) the reaper restarts dead agents so the runtime
     self-heals without any manual pings."""
@@ -290,7 +296,7 @@ async def runtime_health(stale_seconds: int = 90, auto_heal: bool = True):
 
 
 @router.get("/positions")
-async def positions(stale_seconds: int = 90):
+async def positions(stale_seconds: int = Query(90, ge=1, le=86400)):
     """Agent GPS registry (agent_gps_positioning): live room/task/health for
     every active agent so the MasterMap stays aware of where work is happening."""
     now = time.time()
@@ -315,7 +321,10 @@ class PositionBody(BaseModel):
 
 
 @router.post("/position/{agent_id}")
-async def set_position(agent_id: str, b: PositionBody):
+async def set_position(
+    agent_id: str = Path(..., min_length=1, max_length=200),
+    b: PositionBody = ...,
+):
     res = _agents().update_one({"agent_id": agent_id},
                                {"$set": {"room_id": b.room_id, "current_task": b.task,
                                          "last_heartbeat": time.time()}})
