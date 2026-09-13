@@ -28,6 +28,8 @@ def rollback_exact_lease(runtime: SwarmRuntime, worker_id: str, task_id: str) ->
         if worker.accepted < 1:
             raise LeaseError(f"worker has invalid accepted count: {worker_id}")
 
+        # Sample all fallible external state before mutating runtime accounting.
+        now = runtime._clock()
         updated = replace(
             task,
             state=TaskState.QUEUED,
@@ -39,5 +41,5 @@ def rollback_exact_lease(runtime: SwarmRuntime, worker_id: str, task_id: str) ->
         worker.active.discard(task_id)
         worker.accepted -= 1
         runtime._requeue(task_id)
-        runtime._event("task.lease_rolled_back", task_id)
+        runtime._events.append((now, "task.lease_rolled_back", task_id))
         return updated
