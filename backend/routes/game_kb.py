@@ -23,7 +23,7 @@ import asyncio
 from datetime import datetime, timezone
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from routes.playable import _db, _GAME_ENSEMBLE, _llm_in_thread, _run_job
 from core.director_agent import director  # SOTA Item 14 — Director facade wiring
@@ -722,7 +722,7 @@ async def forge_stage(pid: str, stage: str):
 
 # ── Iterate & Refine — chat-refine a stage (the flowchart's red feedback arrow) ──
 class RefineBody(BaseModel):
-    instruction: str = ""
+    instruction: str = Field(..., min_length=1, max_length=10000)
 
 
 @router.post("/{pid}/refine/{stage}/async")
@@ -752,7 +752,7 @@ async def refine_stage(pid: str, stage: str, body: RefineBody):
 # ── Iterate & Refine — human approval gate (the flowchart's chat/approvals loop) ──
 class ApproveBody(BaseModel):
     approved: bool = True
-    note: str = ""
+    note: str = Field("", max_length=2000)
 
 
 @router.post("/{pid}/approve/{stage}")
@@ -840,7 +840,7 @@ async def get_kb(pid: str):
 
 
 class KBEdit(BaseModel):
-    data: dict
+    data: dict = Field(..., min_length=1, max_length=100)
 
 
 @router.put("/{pid}/kb/{artifact}")

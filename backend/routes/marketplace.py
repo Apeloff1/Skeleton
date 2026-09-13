@@ -170,9 +170,9 @@ async def listing_detail(pid: str, buyer_id: str = Query("")):
 
 # ── Checkout ────────────────────────────────────────────────────────────────--
 class CheckoutBody(BaseModel):
-    playable_id: str = ""
-    buyer_id: str = ""
-    origin_url: str = ""
+    playable_id: str = Field("", max_length=200)
+    buyer_id: str = Field("", max_length=200)
+    origin_url: str = Field("", max_length=2000)
 
 
 @router.post("/marketplace/checkout")
