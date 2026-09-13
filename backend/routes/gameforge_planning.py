@@ -21,8 +21,8 @@ import time
 import uuid
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter
-from pydantic import BaseModel
+from fastapi import APIRouter, Query
+from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/api/gameforge/planning", tags=["gameforge-planning"])
 
@@ -119,11 +119,11 @@ def _simulate(base_risk: float, horizon_days: int, scenario: str, iterations: in
 
 
 class StrategicPlanBody(BaseModel):
-    objective: str
-    horizon_days: int = 30
-    base_risk: float = 0.2
-    scenario: str = "nominal"
-    milestones: Optional[List[str]] = None
+    objective: str = Field(..., min_length=1, max_length=10000)
+    horizon_days: int = Field(30, ge=1, le=3650)
+    base_risk: float = Field(0.2, ge=0, le=1)
+    scenario: str = Field("nominal", min_length=1, max_length=100)
+    milestones: Optional[List[str]] = Field(None, max_length=100)
 
 
 @router.post("/strategic-plan")
@@ -158,13 +158,13 @@ async def strategic_plan(b: StrategicPlanBody):
 
 
 @router.get("/plans")
-async def list_plans(limit: int = 20):
+async def list_plans(limit: int = Query(20, ge=1, le=200)):
     rows = list(_plans().find({}, {"_id": 0}).sort("created_at", -1).limit(limit))
     return {"ok": True, "plans": rows}
 
 
 class ForecastBody(BaseModel):
-    horizon_days: int = 30
+    horizon_days: int = Field(30, ge=1, le=3650)
 
 
 @router.post("/forecast")
@@ -173,8 +173,8 @@ async def forecast(b: ForecastBody):
 
 
 class RiskBody(BaseModel):
-    base_risk: float = 0.2
-    horizon_days: int = 30
+    base_risk: float = Field(0.2, ge=0, le=1)
+    horizon_days: int = Field(30, ge=1, le=3650)
 
 
 @router.post("/risk")
@@ -183,10 +183,10 @@ async def risk(b: RiskBody):
 
 
 class SimBody(BaseModel):
-    base_risk: float = 0.2
-    horizon_days: int = 30
-    scenario: str = "nominal"
-    iterations: int = 100
+    base_risk: float = Field(0.2, ge=0, le=1)
+    horizon_days: int = Field(30, ge=1, le=3650)
+    scenario: str = Field("nominal", min_length=1, max_length=100)
+    iterations: int = Field(100, ge=1, le=100000)
 
 
 @router.post("/simulate")
