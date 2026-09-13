@@ -45,6 +45,22 @@ def test_rejects_dynamic_shell_value(tmp_path: Path) -> None:
     assert any("shell=..." in finding for finding in findings)
 
 
+def test_rejects_opaque_subprocess_kwargs(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\noptions = {'shell': False}\nsubprocess.run('echo unsafe', **options)\n",
+    )
+    assert any("**kwargs" in finding for finding in findings)
+
+
+def test_rejects_opaque_kwargs_through_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "from subprocess import run as execute\noptions = {'check': True}\nexecute(['python', '--version'], **options)\n",
+    )
+    assert any("subprocess.run" in finding and "**kwargs" in finding for finding in findings)
+
+
 def test_rejects_subprocess_module_alias(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
