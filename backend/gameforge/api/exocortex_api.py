@@ -488,10 +488,10 @@ async def studio_features(
 
 
 class RoomLogBody(BaseModel):
-    room_id: str
-    event: str
+    room_id: str = Field(..., min_length=1, max_length=200)
+    event: str = Field(..., min_length=1, max_length=500)
     payload: Optional[Dict[str, Any]] = None
-    raw_text: str = ""
+    raw_text: str = Field("", max_length=100000)
 
 
 @router.post("/rooms/log")
@@ -518,7 +518,7 @@ async def training_idle(
 
 @router.get("/training/suggest")
 async def training_suggest(
-    context: str,
+    context: str = Query(..., min_length=1, max_length=10000),
     n: int = Query(8, ge=1, le=100),
     principal: Principal = Depends(get_principal),
 ):
@@ -548,8 +548,8 @@ async def boardroom_interconnect(principal: Principal = Depends(get_principal)):
 @router.get("/masterlog/tail")
 async def masterlog_tail(
     n: int = Query(50, ge=1, le=200),
-    source: Optional[str] = None,
-    category: Optional[str] = None,
+    source: Optional[str] = Query(None, max_length=200),
+    category: Optional[str] = Query(None, max_length=200),
     principal: Principal = Depends(get_principal),
 ):
     return {"entries": _x(principal.user_id).master_tail(n, source, category)}

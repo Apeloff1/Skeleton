@@ -1777,9 +1777,9 @@ class ExecutionMetrics(BaseModel):
 
 class SecurityReport(BaseModel):
     risk_level: str = "low"
-    issues_found: List[Dict[str, Any]] = []
-    blocked_operations: List[str] = []
-    recommendations: List[str] = []
+    issues_found: List[Dict[str, Any]] = Field(default_factory=list)
+    blocked_operations: List[str] = Field(default_factory=list)
+    recommendations: List[str] = Field(default_factory=list)
 
 class CodeAnalysis(BaseModel):
     complexity: CodeComplexity = CodeComplexity.TRIVIAL
@@ -1789,8 +1789,8 @@ class CodeAnalysis(BaseModel):
     classes_count: int = 0
     imports_count: int = 0
     comments_ratio: float = 0.0
-    issues: List[Dict[str, Any]] = []
-    suggestions: List[str] = []
+    issues: List[Dict[str, Any]] = Field(default_factory=list)
+    suggestions: List[str] = Field(default_factory=list)
 
 class ExecutionResult(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -3938,9 +3938,9 @@ class CompilerStage(BaseModel):
     short_name: str
     status: str = "pending"
     duration_ms: float = 0.0
-    metrics: Dict[str, Any] = {}
+    metrics: Dict[str, Any] = Field(default_factory=dict)
     output: Optional[str] = None
-    errors: List[Dict[str, Any]] = []
+    errors: List[Dict[str, Any]] = Field(default_factory=list)
 
 class CompilationRequest(BaseModel):
     code: str = Field(..., min_length=1, max_length=500000)
@@ -3958,16 +3958,16 @@ class SanitizerResult(BaseModel):
     type: str
     enabled: bool
     issues_found: int = 0
-    issues: List[Dict[str, Any]] = []
+    issues: List[Dict[str, Any]] = Field(default_factory=list)
     duration_ms: float = 0.0
 
 class OptimizerResult(BaseModel):
     type: str
     applied: bool
-    improvements: Dict[str, Any] = {}
-    before_metrics: Dict[str, Any] = {}
-    after_metrics: Dict[str, Any] = {}
-    suggestions: List[str] = []
+    improvements: Dict[str, Any] = Field(default_factory=dict)
+    before_metrics: Dict[str, Any] = Field(default_factory=dict)
+    after_metrics: Dict[str, Any] = Field(default_factory=dict)
+    suggestions: List[str] = Field(default_factory=list)
 
 class PipelineStage(BaseModel):
     id: str
@@ -3978,8 +3978,8 @@ class PipelineStage(BaseModel):
     color: str
     status: str = "pending"
     duration_ms: float = 0.0
-    metrics: Dict[str, Any] = {}
-    details: List[str] = []
+    metrics: Dict[str, Any] = Field(default_factory=dict)
+    details: List[str] = Field(default_factory=list)
 
 class CompilationResponse(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -3994,8 +3994,8 @@ class CompilationResponse(BaseModel):
     total_time_ms: float = 0.0
     agentic_analysis: Optional[Dict[str, Any]] = None
     micro_test_results: Optional[Dict[str, Any]] = None
-    performance_suggestions: List[Dict[str, Any]] = []
-    diagnostics: List[Dict[str, Any]] = []
+    performance_suggestions: List[Dict[str, Any]] = Field(default_factory=list)
+    diagnostics: List[Dict[str, Any]] = Field(default_factory=list)
 # ─── QuantumCompilerService extracted → services/quantum_compiler_svc.py (Phase-8, Feb 2026)
 #     Back-compat shim: singleton ``quantum_compiler`` and class re-exported here.
 from services.quantum_compiler_svc import QuantumCompilerService, quantum_compiler  # noqa: E402,F401
