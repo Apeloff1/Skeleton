@@ -135,7 +135,7 @@ def get_state() -> ServerState:
     return _state
 
 
-def create_app() -> Any:
+def create_app(*, frontier_runtime: Any = None) -> Any:
     """Create and configure the FastAPI application."""
     fastapi = _get_fastapi()
     app = fastapi.FastAPI(
@@ -147,9 +147,13 @@ def create_app() -> Any:
     from skeleton.api.routes import router
     from skeleton.api.gameforge_routes import router as gameforge_router
     from skeleton.api.cockpit import router as cockpit_router
+    from skeleton.api.frontier_routes import router as frontier_router
+    from skeleton.services.frontier import create_frontier_runtime
+    app.state.frontier_runtime = frontier_runtime if frontier_runtime is not None else create_frontier_runtime()
     app.include_router(router, prefix="/api/v1")
     app.include_router(gameforge_router, prefix="/api/v1")
     app.include_router(cockpit_router)
+    app.include_router(frontier_router, prefix="/api/v1")
 
     # Zaibatsu gate — sibling of gameforge-middleware / gf-server.
     # Live app previously left install_gate test-only; wire it here.
@@ -190,6 +194,10 @@ def create_app() -> Any:
     async def cortex_status():
         from skeleton.cortex import live
         return live.status()
+
+    @app.on_event("shutdown")
+    async def shutdown_frontier():
+        await app.state.frontier_runtime.aclose()
 
     return app
 

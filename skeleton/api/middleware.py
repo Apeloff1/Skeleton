@@ -94,6 +94,7 @@ DEFAULT_OPEN_PREFIXES: Tuple[str, ...] = (
 
 # Route prefix → governance domain (longest-prefix match).
 DEFAULT_DOMAIN_MAP: Tuple[Tuple[str, str], ...] = (
+    ("/api/v1/frontier", "intelligence"),
     ("/api/v1/forge", "forge"),
     ("/api/v1/gameforge", "forge"),
     ("/api/v1/swarm", "swarm"),
