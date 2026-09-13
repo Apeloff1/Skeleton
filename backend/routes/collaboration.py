@@ -6,7 +6,7 @@
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 from datetime import datetime
 import os
@@ -33,37 +33,37 @@ active_sessions: Dict[str, Dict] = {}
 # ============================================================================
 
 class PairProgramRequest(BaseModel):
-    code: str
-    language: str = "python"
-    task: str
-    ai_role: str = "copilot"  # copilot, driver, navigator, reviewer
-    session_id: Optional[str] = None
+    code: str = Field(..., min_length=1, max_length=500000)
+    language: str = Field("python", max_length=100)
+    task: str = Field(..., min_length=1, max_length=10000)
+    ai_role: str = Field("copilot", max_length=50)  # copilot, driver, navigator, reviewer
+    session_id: Optional[str] = Field(None, max_length=200)
 
 class LiveSuggestionRequest(BaseModel):
-    code: str
-    cursor_line: int
-    cursor_col: int
-    language: str = "python"
-    recent_changes: List[str] = []
-    session_id: Optional[str] = None
+    code: str = Field(..., min_length=1, max_length=500000)
+    cursor_line: int = Field(..., ge=0, le=500000)
+    cursor_col: int = Field(..., ge=0, le=10000)
+    language: str = Field("python", max_length=100)
+    recent_changes: List[str] = Field(default_factory=list, max_length=100)
+    session_id: Optional[str] = Field(None, max_length=200)
 
 class CollabDebugRequest(BaseModel):
-    code: str
-    error: str
-    language: str = "python"
-    session_id: Optional[str] = None
+    code: str = Field(..., min_length=1, max_length=500000)
+    error: str = Field(..., min_length=1, max_length=10000)
+    language: str = Field("python", max_length=100)
+    session_id: Optional[str] = Field(None, max_length=200)
     include_fix: bool = True
 
 class CodeExplainRequest(BaseModel):
-    code: str
-    language: str = "python"
-    explain_level: str = "detailed"  # brief, detailed, eli5
-    highlight_lines: List[int] = []
+    code: str = Field(..., min_length=1, max_length=500000)
+    language: str = Field("python", max_length=100)
+    explain_level: str = Field("detailed", max_length=50)  # brief, detailed, eli5
+    highlight_lines: List[int] = Field(default_factory=list, max_length=1000)
 
 class RefactorSuggestionRequest(BaseModel):
-    code: str
-    language: str = "python"
-    focus_areas: List[str] = []  # readability, performance, security, modern
+    code: str = Field(..., min_length=1, max_length=500000)
+    language: str = Field("python", max_length=100)
+    focus_areas: List[str] = Field(default_factory=list, max_length=20)  # readability, performance, security, modern
 
 # ============================================================================
 # HELPER

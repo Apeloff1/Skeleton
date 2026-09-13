@@ -12,7 +12,7 @@
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -34,13 +34,13 @@ class ProgressStatus(str, Enum):
     COMPLETED = "completed"
 
 class CourseProgress(BaseModel):
-    course_id: str
-    user_id: str
+    course_id: str = Field(..., min_length=1, max_length=200)
+    user_id: str = Field(..., min_length=1, max_length=200)
     status: ProgressStatus = ProgressStatus.NOT_STARTED
     current_week: int = 0
-    completed_weeks: List[int] = []
-    quiz_scores: Dict[int, float] = {}
-    assignments_completed: List[str] = []
+    completed_weeks: List[int] = Field(default_factory=list, max_length=100)
+    quiz_scores: Dict[int, float] = Field(default_factory=dict)
+    assignments_completed: List[str] = Field(default_factory=list, max_length=100)
     started_at: Optional[str] = None
     last_activity: Optional[str] = None
     completion_percentage: float = 0.0
