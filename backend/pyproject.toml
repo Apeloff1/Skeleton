@@ -50,6 +50,7 @@ dependencies = [
     "pydantic-settings>=2.1.0",
     # AI / LLM
     "openai>=1.10.0",
+    "emergentintegrations>=0.1.2",
     # Vector database / RAG
     "chromadb>=0.4.22",
     # HTTP client
@@ -124,26 +125,10 @@ indent-width = 4
 
 [tool.ruff.lint]
 select = [
-    "E",    # pycodestyle errors
-    "W",    # pycodestyle warnings
-    "F",    # Pyflakes
-    "I",    # isort
-    "B",    # flake8-bugbear
-    "C4",   # flake8-comprehensions
-    "UP",   # pyupgrade
-    "ARG",  # flake8-unused-arguments
-    "SIM",  # flake8-simplify
-    "TCH",  # flake8-type-checking
-    "PTH",  # flake8-use-pathlib
-    "PL",   # Pylint
-    "RUF",  # Ruff-specific rules
+    "E", "W", "F", "I", "B", "C4", "UP", "ARG", "SIM", "TCH", "PTH", "PL", "RUF",
 ]
 ignore = [
-    "E501",    # line too long (formatter owns this)
-    "B008",    # function calls in argument defaults (FastAPI Depends pattern)
-    "B904",    # raise-without-from inside except
-    "PLR0913", # too many arguments
-    "PLR2004", # magic value comparison
+    "E501", "B008", "B904", "PLR0913", "PLR2004",
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -175,14 +160,9 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-addopts = [
-    "-v",
-    "--tb=short",
-    "--strict-markers",
-    "-ra",
-]
+addopts = ["-v", "--tb=short", "--strict-markers", "-ra"]
 markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "slow: marks tests as slow (deselect with '-m not slow')",
     "unit: marks tests as unit tests",
     "integration: marks tests as integration tests",
 ]
@@ -194,13 +174,7 @@ filterwarnings = [
 [tool.coverage.run]
 branch = true
 source = ["."]
-omit = [
-    "tests/*",
-    "*/__pycache__/*",
-    "*.pyc",
-    ".venv/*",
-    "venv/*",
-]
+omit = ["tests/*", "*/__pycache__/*", "*.pyc", ".venv/*", "venv/*"]
 
 [tool.coverage.report]
 exclude_lines = [
