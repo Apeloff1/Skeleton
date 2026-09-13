@@ -1,5 +1,6 @@
 """Deterministic sliding-window rate limiter."""
 from collections import deque
+from threading import Lock
 
 
 class RateWindow:
@@ -12,6 +13,7 @@ class RateWindow:
         self.window = window
         self._times = deque()
         self._last_now = None
+        self._lock = Lock()
 
     def _validate_now(self, now: int) -> None:
         if not isinstance(now, int) or isinstance(now, bool):
@@ -26,16 +28,19 @@ class RateWindow:
             self._times.popleft()
 
     def allow(self, now: int) -> bool:
-        self._trim(now)
-        if len(self._times) >= self.limit:
-            return False
-        self._times.append(now)
-        return True
+        with self._lock:
+            self._trim(now)
+            if len(self._times) >= self.limit:
+                return False
+            self._times.append(now)
+            return True
 
     def remaining(self, now: int) -> int:
-        self._trim(now)
-        return max(0, self.limit - len(self._times))
+        with self._lock:
+            self._trim(now)
+            return max(0, self.limit - len(self._times))
 
     def retry_after(self, now: int) -> int:
-        self._trim(now)
-        return 0 if len(self._times) < self.limit else max(0, self._times[0] + self.window - now)
+        with self._lock:
+            self._trim(now)
+            return 0 if len(self._times) < self.limit else max(0, self._times[0] + self.window - now)
