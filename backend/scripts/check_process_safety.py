@@ -24,6 +24,13 @@ def python_files() -> Iterable[Path]:
         yield path
 
 
+def display_path(path: Path) -> Path:
+    try:
+        return path.relative_to(ROOT)
+    except ValueError:
+        return path
+
+
 def dotted_name(node: ast.AST) -> str | None:
     parts: list[str] = []
     current = node
@@ -65,14 +72,14 @@ def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
 
 
 def violations(path: Path) -> list[str]:
+    label = display_path(path)
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     except (OSError, UnicodeError, SyntaxError) as exc:
-        return [f"{path.relative_to(ROOT)}: parse failure: {exc}"]
+        return [f"{label}: parse failure: {exc}"]
 
     aliases = import_aliases(tree)
     findings: list[str] = []
-    relative = path.relative_to(ROOT)
 
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
@@ -80,14 +87,14 @@ def violations(path: Path) -> list[str]:
 
         name = canonical_name(node.func, aliases)
         if name == "os.system":
-            findings.append(f"{relative}:{node.lineno}: os.system() is forbidden")
+            findings.append(f"{label}:{node.lineno}: os.system() is forbidden")
             continue
 
         if name in {f"subprocess.{call}" for call in SUBPROCESS_CALLS}:
             for keyword in node.keywords:
                 if keyword.arg == "shell" and literal_true(keyword.value):
                     findings.append(
-                        f"{relative}:{node.lineno}: {name}(..., shell=True) is forbidden"
+                        f"{label}:{node.lineno}: {name}(..., shell=True) is forbidden"
                     )
 
     return findings
