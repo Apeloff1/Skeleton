@@ -19,6 +19,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Install frontier test dependencies
+        run: python -m pip install --disable-pip-version-check pytest pytest-asyncio
       - name: Compile frontier package
         run: python -m compileall -q skeleton/frontier
       - name: Run frontier contract tests
