@@ -165,7 +165,7 @@ async def earnings(cid: str):
 
 
 class PayoutBody(BaseModel):
-    amount: float = 0.0
+    amount: float = Field(0.0, ge=0, le=1000000)
 
 
 @router.post("/creators/{cid}/payout-request")
@@ -187,9 +187,9 @@ async def payout_request(cid: str, body: PayoutBody):
 
 # ════════════════════════ #9 REVIEWS + DISPUTES ════════════════════════
 class ReviewBody(BaseModel):
-    reviewer_id: str = ""
-    rating: int = 0
-    comment: str = ""
+    reviewer_id: str = Field("", max_length=200)
+    rating: int = Field(0, ge=0, le=5)
+    comment: str = Field("", max_length=500)
 
 
 @router.post("/marketplace/{pid}/reviews")
@@ -233,8 +233,8 @@ async def get_reviews(pid: str, limit: int = Query(30, le=100)):
 
 
 class DisputeBody(BaseModel):
-    buyer_id: str = ""
-    reason: str = ""
+    buyer_id: str = Field("", max_length=200)
+    reason: str = Field("", max_length=500)
 
 
 @router.post("/marketplace/purchase/{session_id}/dispute")
@@ -269,9 +269,9 @@ async def premium_status(visitor_id: str = Query(...)):
 
 
 class PremiumCheckoutBody(BaseModel):
-    visitor_id: str = ""
-    plan: str = "monthly"
-    origin_url: str = ""
+    visitor_id: str = Field("", max_length=200)
+    plan: str = Field("monthly", max_length=50)
+    origin_url: str = Field("", max_length=2000)
 
 
 @router.post("/premium/checkout")
