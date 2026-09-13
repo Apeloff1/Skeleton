@@ -144,3 +144,45 @@ def test_server_rejects_incoherent_staged_bundle() -> None:
     other_runtime = HardenedSwarmRuntime()
     with pytest.raises(ValueError, match="runtime mismatch"):
         state.commit_swarm_bundle(other_runtime, state.swarm_broker, state.swarm_ingress, state.swarm_tenant_broker)
+
+
+def test_runtime_only_restore_carries_compatible_live_tenant_metadata_atomically(monkeypatch) -> None:
+    state = _state()
+    state.swarm_tenant_broker.submit_and_dispatch("acme", SwarmTask("task", {}))
+    recovery = SwarmRecoveryManager()
+    recovery.checkpoint(state.swarm)
+    monkeypatch.setattr(routes, "_state", lambda: state)
+
+    old_runtime = state.swarm
+    old_tenant = state.swarm_tenant_broker
+    result = routes.restore_latest(recovery=recovery)
+
+    assert result["restored"] is True
+    assert state.swarm is not old_runtime
+    assert state.swarm_tenant_broker is not old_tenant
+    assert state.swarm_tenant_broker.tenant_for("task") == "acme"
+    assert state.swarm_ingress.phase("acme", "task") == "queued"
+    assert state.swarm_ingress.status()["accounted_tasks"] == 1
+
+
+def test_runtime_only_restore_rejects_metadata_newer_than_checkpoint_without_swap(monkeypatch) -> None:
+    state = _state()
+    recovery = SwarmRecoveryManager()
+    recovery.checkpoint(state.swarm)
+    state.swarm_tenant_broker.submit_and_dispatch("acme", SwarmTask("later", {}))
+    monkeypatch.setattr(routes, "_state", lambda: state)
+
+    old_runtime = state.swarm
+    old_broker = state.swarm_broker
+    old_ingress = state.swarm_ingress
+    old_tenant = state.swarm_tenant_broker
+
+    with pytest.raises(HTTPException) as exc:
+        routes.restore_latest(recovery=recovery)
+
+    assert exc.value.status_code == 409
+    assert state.swarm is old_runtime
+    assert state.swarm_broker is old_broker
+    assert state.swarm_ingress is old_ingress
+    assert state.swarm_tenant_broker is old_tenant
+    assert state.swarm_tenant_broker.tenant_for("later") == "acme"
