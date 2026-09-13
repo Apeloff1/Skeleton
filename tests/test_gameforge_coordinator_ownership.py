@@ -17,7 +17,7 @@ def coordinator():
     lifecycle = ServiceLifecycle()
     lifecycle.ready()
     deps = DependencyGate(["core"])
-    deps.mark_ready("core")
+    deps.mark("core")
     return RuntimeCoordinator(lifecycle, deps, RateWindow(10), Circuit(), Budget(4),
                               Quota(4), BoundedQueue(4), RetryBudget(4), HealthScore())
 
