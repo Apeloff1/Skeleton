@@ -34,7 +34,7 @@ from skeleton.agents.swarm_scheduler import SwarmScheduler, WorkerScore
 from skeleton.agents.swarm_slo import SLOPolicy
 from skeleton.agents.swarm_snapshot import CURRENT_VERSION, SnapshotError, normalize_snapshot, validate_snapshot
 from skeleton.agents.swarm_supervisor import DispatchDecision, SwarmSupervisor
-from skeleton.agents.swarm_tenant_broker import TenantBrokerResult, TenantSwarmBroker
+from skeleton.agents.swarm_tenant_broker import TenantBrokerResult, TenantRepairResult, TenantSwarmBroker
 from skeleton.agents.swarm_runtime import AdmissionError, LeaseError, RuntimeSnapshot, SwarmRuntime, SwarmTask, TaskState, WorkerState
 
 __all__ = [
@@ -53,5 +53,5 @@ __all__ = [
     "SwarmRecoveryManager", "ResilientRanking", "ResilientSwarmScheduler", "validate_restore_state",
     "PrunePlan", "RetentionPolicy", "TERMINAL_STATES", "RetryDecision", "RetryPolicy", "SwarmScheduler",
     "WorkerScore", "SLOPolicy", "CURRENT_VERSION", "SnapshotError", "normalize_snapshot",
-    "validate_snapshot", "DispatchDecision", "SwarmSupervisor", "TenantBrokerResult", "TenantSwarmBroker",
+    "validate_snapshot", "DispatchDecision", "SwarmSupervisor", "TenantBrokerResult", "TenantRepairResult", "TenantSwarmBroker",
 ]
