@@ -1,0 +1,56 @@
+"""Runtime coordinator composing lifecycle, dependencies, rate, circuit, and bounded budgets."""
+from dataclasses import dataclass
+from .gameforge_admission import Admission, decide
+from .gameforge_budget import Budget
+from .gameforge_circuit import Circuit
+from .gameforge_dependency import DependencyGate
+from .gameforge_lifecycle import ServiceLifecycle
+from .gameforge_rate import RateWindow
+from .gameforge_quota import Quota
+from .gameforge_queue import BoundedQueue
+from .gameforge_retry_budget import RetryBudget
+from .gameforge_health_score import HealthScore
+from .gameforge_snapshot import RuntimeSnapshot
+from .gameforge_receipt import Receipt
+
+@dataclass
+class RuntimeCoordinator:
+ lifecycle: ServiceLifecycle
+ dependencies: DependencyGate
+ rate: RateWindow
+ circuit: Circuit
+ budget: Budget
+ quota: Quota
+ queue: BoundedQueue
+ retry_budget: RetryBudget
+ health: HealthScore
+ def admit(self,now:int,active:int,limit:int=1,background:bool=False,request_id=None,retry:bool=False,read_only:bool=False):
+  if retry and not self.retry_budget.consume():
+   self.health.record(False); return Admission.SHED
+  if not self.lifecycle.can_accept or not self.dependencies.ready or not self.circuit.allowed:
+   self.health.record(False); return Admission.SHED
+  if not self.rate.allow(now):
+   self.health.record(False); return Admission.SHED
+  decision=decide(background_allowed=True,read_only=read_only,active=active,limit=limit,background=background)
+  if decision is Admission.ACCEPT:
+   if not self.budget.reserve(): self.health.record(False); return Admission.SHED
+   if not self.quota.reserve():
+    self.budget.release(); self.health.record(False); return Admission.SHED
+   if not self.queue.push(request_id):
+    self.quota.release(); self.budget.release(); self.health.record(False); return Admission.SHED
+  self.health.record(decision is not Admission.SHED)
+  return decision
+ def admit_receipt(self,request_id,now:int,active:int,limit:int=1,background:bool=False,retry:bool=False,read_only:bool=False):
+  decision=self.admit(now,active,limit,background,request_id,retry,read_only)
+  return Receipt(request_id,decision.value,decision.value)
+ def record_outcome(self,success:bool):
+  self.health.record(success)
+  if success: self.circuit.success()
+  else: self.circuit.failure()
+  return self.health.healthy
+ def release(self):
+  self.budget.release()
+  self.quota.release()
+  self.queue.pop()
+ def snapshot(self,active:int=0):
+  return RuntimeSnapshot(self.lifecycle.state.value,self.dependencies.ready,active,self.budget.used,self.budget.capacity,self.quota.used,len(self.queue),self.health.value)
