@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from dataclasses import dataclass
+from typing import ContextManager
 
 from skeleton.agents.swarm_runtime import LeaseError, SwarmRuntime, SwarmTask, TaskState
 
@@ -21,6 +23,11 @@ def fence_for(task: SwarmTask) -> LeaseFence:
     return LeaseFence(task.id, task.leased_to, task.attempts, task.lease_deadline)
 
 
+def _guard(runtime: SwarmRuntime) -> ContextManager[object]:
+    lock = getattr(runtime, "_lock", None)
+    return lock if lock is not None else nullcontext()
+
+
 def assert_fence(runtime: SwarmRuntime, fence: LeaseFence) -> SwarmTask:
     task = runtime.task(fence.task_id)
     if task is None or task.state is not TaskState.LEASED:
@@ -35,15 +42,18 @@ def assert_fence(runtime: SwarmRuntime, fence: LeaseFence) -> SwarmTask:
 
 
 def fenced_succeed(runtime: SwarmRuntime, fence: LeaseFence) -> SwarmTask:
-    assert_fence(runtime, fence)
-    return runtime.succeed(fence.worker_id, fence.task_id)
+    with _guard(runtime):
+        assert_fence(runtime, fence)
+        return runtime.succeed(fence.worker_id, fence.task_id)
 
 
 def fenced_fail(runtime: SwarmRuntime, fence: LeaseFence, error: str) -> SwarmTask:
-    assert_fence(runtime, fence)
-    return runtime.fail(fence.worker_id, fence.task_id, error)
+    with _guard(runtime):
+        assert_fence(runtime, fence)
+        return runtime.fail(fence.worker_id, fence.task_id, error)
 
 
 def fenced_renew(runtime: SwarmRuntime, fence: LeaseFence, *, seconds: float | None = None) -> SwarmTask:
-    assert_fence(runtime, fence)
-    return runtime.renew(fence.worker_id, fence.task_id, seconds=seconds)
+    with _guard(runtime):
+        assert_fence(runtime, fence)
+        return runtime.renew(fence.worker_id, fence.task_id, seconds=seconds)
