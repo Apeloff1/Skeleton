@@ -58,6 +58,7 @@ jobs:
           python tests/run_unit.py
           python -m pytest -q \
             skeleton/testing/test_swarm_ingress.py \
+            skeleton/testing/test_swarm_policy_atomicity.py \
             skeleton/testing/test_swarm_tenant_broker.py \
             skeleton/testing/test_swarm_tenant_revival_guard.py \
             skeleton/testing/test_swarm_rate_limit_refund.py \
