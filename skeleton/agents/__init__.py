@@ -26,7 +26,12 @@ from skeleton.agents.swarm_quarantine import QuarantineController, QuarantineRec
 from skeleton.agents.swarm_queries import TaskPage, query_tasks
 from skeleton.agents.swarm_quota import Quota, QuotaExceeded, QuotaLedger, Usage
 from skeleton.agents.swarm_rate_limit import Bucket, TokenBucketLimiter
-from skeleton.agents.swarm_recovery import RecoveryStatus, SwarmRecoveryManager
+from skeleton.agents.swarm_recovery import (
+    MAX_RECOVERY_ARCHIVE_BYTES,
+    RECOVERY_ARCHIVE_VERSION,
+    RecoveryStatus,
+    SwarmRecoveryManager,
+)
 from skeleton.agents.swarm_resilient_scheduler import ResilientRanking, ResilientSwarmScheduler
 from skeleton.agents.swarm_restore import validate_restore_state
 from skeleton.agents.swarm_retention import PrunePlan, RetentionPolicy, TERMINAL_STATES
@@ -52,7 +57,8 @@ __all__ = [
     "LoadShedPolicy", "ShedDecision", "compact_runtime", "compact_state", "SwarmOperator", "PressureReport",
     "classify_pressure", "QuarantineController", "QuarantineRecord", "TaskPage", "query_tasks", "Quota",
     "QuotaExceeded", "QuotaLedger", "Usage", "Bucket", "TokenBucketLimiter", "RecoveryStatus",
-    "SwarmRecoveryManager", "ResilientRanking", "ResilientSwarmScheduler", "validate_restore_state",
+    "SwarmRecoveryManager", "RECOVERY_ARCHIVE_VERSION", "MAX_RECOVERY_ARCHIVE_BYTES",
+    "ResilientRanking", "ResilientSwarmScheduler", "validate_restore_state",
     "PrunePlan", "RetentionPolicy", "TERMINAL_STATES", "RetryDecision", "RetryPolicy", "SwarmScheduler",
     "WorkerScore", "SLOPolicy", "CURRENT_VERSION", "SnapshotError", "normalize_snapshot",
     "validate_snapshot", "DispatchDecision", "SwarmSupervisor", "TenantBrokerResult", "TenantRepairResult",
