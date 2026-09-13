@@ -53,6 +53,13 @@ def _recovery() -> SwarmRecoveryManager:
     return state.swarm_recovery
 
 
+def _repair_tenants() -> dict[str, Any] | None:
+    tenant_broker = getattr(_state(), "swarm_tenant_broker", None)
+    if tenant_broker is None:
+        return None
+    return asdict(tenant_broker.repair())
+
+
 def _task_record(task: Any) -> dict[str, Any]:
     return {
         "id": task.id,
@@ -120,7 +127,8 @@ def compact_snapshot(max_terminal_tasks: int = Query(default=10_000, ge=0, le=1_
 def gc(keep_terminal: int = Query(default=10_000, ge=0, le=1_000_000), runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
     rebuilt, result = compact_runtime(runtime, keep_terminal=keep_terminal)
     _state().bind_swarm_runtime(rebuilt)
-    return {"result": asdict(result), "capacity": capacity(rebuilt), "snapshot": asdict(rebuilt.snapshot())}
+    tenant_repair = _repair_tenants()
+    return {"result": asdict(result), "tenant_repair": tenant_repair, "capacity": capacity(rebuilt), "snapshot": asdict(rebuilt.snapshot())}
 
 
 @router.post("/checkpoint")
@@ -135,7 +143,8 @@ def restore_latest(recovery: SwarmRecoveryManager = Depends(_recovery)) -> dict[
     if runtime is None:
         raise HTTPException(status_code=404, detail="no checkpoint available")
     _state().bind_swarm_runtime(runtime)
-    return {"restored": True, "status": asdict(recovery.status()), "snapshot": asdict(runtime.snapshot())}
+    tenant_repair = _repair_tenants()
+    return {"restored": True, "tenant_repair": tenant_repair, "status": asdict(recovery.status()), "snapshot": asdict(runtime.snapshot())}
 
 
 @router.post("/failover/elect")
