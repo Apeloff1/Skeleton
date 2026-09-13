@@ -19,7 +19,12 @@ interface State {
   remountKey: number;
 }
 
-export class ErrorBoundary extends React.Component<{ children: React.ReactNode }, State> {
+interface Props {
+  children: React.ReactNode;
+  onError?: (error: Error, info: { componentStack?: string }) => void;
+}
+
+export class ErrorBoundary extends React.Component<Props, State> {
   state: State = { error: null, info: null, remountKey: 0 };
 
   static getDerivedStateFromError(error: Error): Partial<State> {
@@ -28,6 +33,7 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
 
   componentDidCatch(error: Error, info: { componentStack?: string }) {
     this.setState({ info });
+    try { this.props.onError?.(error, info); } catch { /* observer callbacks never break recovery */ }
     // Universal crash funnel — route to Safe Mode (shows boot trace + recovery).
     try { navToSafeMode(`error_boundary:${(error.message || '').slice(0, 60)}`); } catch {}
     // Fire-and-forget telemetry — never throw from telemetry itself.
