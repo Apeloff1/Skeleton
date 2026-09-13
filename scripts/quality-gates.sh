@@ -17,9 +17,9 @@ printf '\n== Backend process safety ==\n'
 python backend/scripts/check_process_safety.py
 
 printf '\n== Backend execution boundary regressions ==\n'
-python -m pytest -q \
+python -m pytest -q --noconftest \
   backend/tests/test_exec_guard.py \
-  backend/tests/test_process_safety.py
+  backend/tests/test_process_safety_gate.py
 
 if command -v yarn >/dev/null 2>&1; then
   printf '\n== Frontend lint ==\n'
