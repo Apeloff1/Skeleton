@@ -10,6 +10,7 @@ from skeleton.agents.swarm_fairness import FairShareLedger, TenantShare
 from skeleton.agents.swarm_gc import GCResult, capacity, compact_runtime as gc_compact_runtime
 from skeleton.agents.swarm_hardened import HardenedSwarmRuntime
 from skeleton.agents.swarm_idempotency import IdempotencyConflict, IdempotencyRecord, IdempotencyRegistry
+from skeleton.agents.swarm_invariants import InvariantReport, audit
 from skeleton.agents.swarm_maintenance import compact_runtime, compact_state
 from skeleton.agents.swarm_operator import SwarmOperator
 from skeleton.agents.swarm_pressure import PressureReport, classify_pressure
@@ -39,10 +40,10 @@ __all__ = [
     "ScaleRecommendation", "SubmitResult", "SwarmControlPlane", "DrainPlan",
     "drain", "plan_drain", "FairShareLedger", "TenantShare", "GCResult",
     "capacity", "gc_compact_runtime", "IdempotencyConflict", "IdempotencyRecord",
-    "IdempotencyRegistry", "compact_runtime", "compact_state", "SwarmOperator",
-    "PressureReport", "classify_pressure", "TaskPage", "query_tasks", "Bucket",
-    "TokenBucketLimiter", "RecoveryStatus", "SwarmRecoveryManager", "validate_restore_state",
-    "PrunePlan", "RetentionPolicy", "TERMINAL_STATES", "SwarmScheduler", "WorkerScore",
-    "SLOPolicy", "CURRENT_VERSION", "SnapshotError", "normalize_snapshot",
-    "validate_snapshot",
+    "IdempotencyRegistry", "InvariantReport", "audit", "compact_runtime", "compact_state",
+    "SwarmOperator", "PressureReport", "classify_pressure", "TaskPage", "query_tasks",
+    "Bucket", "TokenBucketLimiter", "RecoveryStatus", "SwarmRecoveryManager",
+    "validate_restore_state", "PrunePlan", "RetentionPolicy", "TERMINAL_STATES",
+    "SwarmScheduler", "WorkerScore", "SLOPolicy", "CURRENT_VERSION", "SnapshotError",
+    "normalize_snapshot", "validate_snapshot",
 ]
