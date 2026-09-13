@@ -4,6 +4,7 @@ FastAPI middleware — app-wide Mishima Zaibatsu perimeter.
 """
 
 import json
+import logging
 from typing import Callable
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -11,6 +12,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from gameforge.enterprise.zaibatsu_security import SECURITY
+
+logger = logging.getLogger(__name__)
 
 
 class ZaibatsuSecurityMiddleware(BaseHTTPMiddleware):
@@ -42,7 +45,11 @@ class ZaibatsuSecurityMiddleware(BaseHTTPMiddleware):
                     return {"type": "http.request", "body": raw, "more_body": False}
 
                 request = Request(request.scope, receive)
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "Unable to read request body for perimeter inspection: %s",
+                    exc,
+                )
                 body_text = ""
 
         gate = SECURITY.gate_request(
