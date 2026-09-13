@@ -9,10 +9,10 @@ class Receipt:
     reason: str
 
     def __post_init__(self):
-        if not self.request_id:
-            raise ValueError("request_id is required")
-        if not self.decision:
-            raise ValueError("decision is required")
+        if not isinstance(self.request_id, str) or not self.request_id.strip():
+            raise ValueError("request_id must be a non-empty string")
+        if not isinstance(self.decision, str) or not self.decision:
+            raise ValueError("decision must be a non-empty string")
         if not isinstance(self.reason, str):
             raise TypeError("reason must be str")
 
