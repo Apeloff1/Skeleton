@@ -1,7 +1,7 @@
 name: Backend Quality
 
-# Mirrors the frontend ESLint guard for the FastAPI backend:
-# Ruff (lint) + py_compile (syntax) on every push / PR touching backend/**.
+# Fast, fail-closed backend gate: lint + full Python syntax compilation.
+# Keep this independent from the heavier dependency-backed integration suite.
 
 on:
   push:
@@ -31,9 +31,8 @@ jobs:
       - name: Install Ruff
         run: pip install "ruff==0.9.*"
 
-      # Scope is defined in backend/ruff.toml (high-signal real-bug rules only).
       - name: Ruff lint
         run: ruff check . --output-format=github
 
-      - name: Syntax check (py_compile)
-        run: python -m compileall -q core routes
+      - name: Syntax check (full backend)
+        run: python -m compileall -q .
