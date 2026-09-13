@@ -18,12 +18,14 @@ from uuid import uuid4
 
 from skeleton.frontier.capabilities import CapabilityPolicy, capability_names
 from skeleton.frontier.contracts import AgentContract, ProvenanceRecord
+from skeleton.frontier.events import DomainEvent, EventBus
 from skeleton.frontier.execution import (
     ExecutionPolicy, ExecutionStatus, RuntimeBusy, RuntimeClosed, TransientAgentError, positive_seconds,
 )
 from skeleton.frontier.health import HealthState
 from skeleton.frontier.payloads import json_snapshot
 from skeleton.frontier.singleflight import SingleFlight
+from skeleton.frontier.telemetry import MetricSample, TelemetryBuffer
 
 
 class AgentFailure(RuntimeError):
@@ -69,7 +71,8 @@ class AgentRuntime:
     def __init__(self, agents: Mapping[str, AgentLike] | None = None,
                  policy: CapabilityPolicy | None = None,
                  health: HealthState = HealthState.HEALTHY,
-                 *, execution_policy: ExecutionPolicy | None = None) -> None:
+                 *, execution_policy: ExecutionPolicy | None = None,
+                 events: EventBus | None = None, telemetry: TelemetryBuffer | None = None) -> None:
         self.policy = policy if policy is not None else CapabilityPolicy.from_names(())
         self.health = health
         self._execution_policy = execution_policy or ExecutionPolicy()
@@ -84,8 +87,10 @@ class AgentRuntime:
         self._pending = self._active = 0
         self._tasks: dict[asyncio.Task, int] = {}
         self._closed = False
+        self.events = events
+        self.telemetry = telemetry if telemetry is not None else TelemetryBuffer()
         self._singleflight = SingleFlight(max_inflight=self.execution_policy.max_concurrency + self.execution_policy.max_queue)
-        self._counts = {"completed": 0, "failed": 0, "timed_out": 0, "cancelled": 0, "rejected": 0, "retries": 0}
+        self._counts = {"completed": 0, "failed": 0, "timed_out": 0, "cancelled": 0, "rejected": 0, "retries": 0, "event_failures": 0}
         for name, agent in (agents or {}).items():
             if name != agent.name:
                 raise ValueError("agent registry key must match agent.name")
@@ -142,7 +147,21 @@ class AgentRuntime:
     def stats(self) -> dict[str, Any]:
         return {**self._counts, "registered": len(self._agents), "active": self._active,
                 "queued": self._pending - self._active, "closed": self._closed,
-                "idempotency": self._singleflight.stats()}
+                "idempotency": self._singleflight.stats(),
+                "latency_ms": self.telemetry.summary("execution.latency_ms"),
+                "telemetry_dropped": self.telemetry.dropped}
+
+    async def _emit(self, topic: str, payload: dict[str, Any], request_id: str,
+                    causation_id: str | None = None) -> str | None:
+        if self.events is None:
+            return None
+        event = DomainEvent.create(topic, payload, correlation_id=request_id, causation_id=causation_id)
+        try:
+            async with asyncio.timeout(self.execution_policy.event_timeout):
+                await self.events.publish(event)
+        except Exception:
+            self._counts["event_failures"] += 1
+        return event.event_id
 
     async def aclose(self, *, grace_period: float = 5.0) -> None:
         """Stop admissions, drain accepted work, then cancel cooperative stragglers."""
@@ -178,6 +197,17 @@ class AgentRuntime:
                       request_id: str | None = None,
                       timeout: float | None = None,
                       idempotency_key: str | None = None) -> ExecutionResult:
+        if not isinstance(task, str) or not task.strip():
+            raise ValueError("task must not be empty")
+        task.encode("utf-8")
+        if context is not None and not isinstance(context, Mapping):
+            raise ValueError("context must be a mapping")
+        if request_id is not None and (not isinstance(request_id, str) or not request_id.strip() or len(request_id) > 128):
+            raise ValueError("request_id must contain 1 to 128 characters")
+        if timeout is not None:
+            positive_seconds("timeout", timeout)
+        if not isinstance(source_repository, str) or not source_repository.strip() or len(source_repository) > 256:
+            raise ValueError("source_repository must contain 1 to 256 characters")
         kwargs = dict(context=context, required_capability=required_capability,
                       source_repository=source_repository, request_id=request_id, timeout=timeout)
         if idempotency_key is None:
@@ -244,6 +274,7 @@ class AgentRuntime:
             output = error = None
             status = ExecutionStatus.COMPLETED
             attempts = 0
+            start_event = await self._emit("agent.started", {"agent": agent_name}, request_id)
             try:
                 async with asyncio.timeout(timeout) as deadline:
                     while attempts < limits.max_attempts:
@@ -272,11 +303,16 @@ class AgentRuntime:
                 status = ExecutionStatus.TIMED_OUT
             if status is not ExecutionStatus.COMPLETED:
                 output = None
+            elapsed_ms = (loop.time() - tick) * 1000
+            self.telemetry.record(MetricSample("execution.latency_ms", elapsed_ms,
+                                               tags={"agent": agent_name, "status": status.value}))
+            await self._emit(f"agent.{status.value}", {"agent": agent_name, "attempts": attempts,
+                            "elapsed_ms": elapsed_ms}, request_id, start_event)
             self._counts[status.value] += 1
             return ExecutionResult(
                 task=task, agent=agent_name, started_at=started,
                 finished_at=datetime.now(timezone.utc), output=output, error=error,
-                request_id=request_id, status=status, attempts=attempts, elapsed_ms=(loop.time() - tick) * 1000,
+                request_id=request_id, status=status, attempts=attempts, elapsed_ms=elapsed_ms,
                 provenance=ProvenanceRecord(
                     source_repository=source_repository, operation=f"agent.execute.{status.value}",
                     metadata={"agent": agent_name, "request_id": request_id,
