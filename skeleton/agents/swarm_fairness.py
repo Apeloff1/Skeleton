@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from threading import RLock
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class TenantShare:
     weight: int = 1
     admitted: int = 0
@@ -40,26 +40,37 @@ class FairShareLedger:
         if weight < 1:
             raise ValueError("weight must be positive")
         with self._lock:
-            share = self._tenants.setdefault(tenant, TenantShare(weight=self.default_weight))
-            share.weight = weight
+            current = self._tenants.get(tenant, TenantShare(weight=self.default_weight))
+            share = TenantShare(weight=weight, admitted=current.admitted, completed=current.completed, inflight=current.inflight)
+            self._tenants[tenant] = share
             return share
 
     def admit(self, tenant: str) -> TenantShare:
         tenant = self._tenant(tenant)
         with self._lock:
-            share = self._tenants.setdefault(tenant, TenantShare(weight=self.default_weight))
-            share.admitted += 1
-            share.inflight += 1
+            current = self._tenants.get(tenant, TenantShare(weight=self.default_weight))
+            share = TenantShare(
+                weight=current.weight,
+                admitted=current.admitted + 1,
+                completed=current.completed,
+                inflight=current.inflight + 1,
+            )
+            self._tenants[tenant] = share
             return share
 
     def complete(self, tenant: str) -> TenantShare:
         tenant = self._tenant(tenant)
         with self._lock:
-            share = self._tenants.setdefault(tenant, TenantShare(weight=self.default_weight))
-            if share.inflight <= 0:
+            current = self._tenants.get(tenant, TenantShare(weight=self.default_weight))
+            if current.inflight <= 0:
                 raise ValueError(f"tenant has no inflight work: {tenant}")
-            share.inflight -= 1
-            share.completed += 1
+            share = TenantShare(
+                weight=current.weight,
+                admitted=current.admitted,
+                completed=current.completed + 1,
+                inflight=current.inflight - 1,
+            )
+            self._tenants[tenant] = share
             return share
 
     def preferred(self, tenants: list[str]) -> str | None:
@@ -68,7 +79,7 @@ class FairShareLedger:
         normalized = [self._tenant(tenant) for tenant in tenants]
         with self._lock:
             def score(tenant: str) -> tuple[float, str]:
-                share = self._tenants.setdefault(tenant, TenantShare(weight=self.default_weight))
+                share = self._tenants.get(tenant, TenantShare(weight=self.default_weight))
                 return share.virtual_load, tenant
             return min(normalized, key=score)
 
