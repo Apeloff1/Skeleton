@@ -37,10 +37,17 @@ function base64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
+/** Copy bytes into a concrete ArrayBuffer accepted by DOM BlobPart typing. */
+function bytesToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
 /** Turn a base64 mp3 into a playable URI (blob on web, cache file on native). */
 async function uriFromBase64(b64: string): Promise<string> {
   if (Platform.OS === 'web') {
-    const blob = new Blob([base64ToBytes(b64)], { type: 'audio/mpeg' });
+    const blob = new Blob([bytesToArrayBuffer(base64ToBytes(b64))], { type: 'audio/mpeg' });
     webUrl = URL.createObjectURL(blob);
     return webUrl;
   }
