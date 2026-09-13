@@ -7,6 +7,6 @@ def test_half_open_allows_only_one_probe():
     assert circuit.state is CircuitState.OPEN
     assert circuit.probe() is True
     assert circuit.probe() is False
-    assert circuit.allowed is True
+    assert circuit.allowed is False
     circuit.success()
     assert circuit.allowed is True
