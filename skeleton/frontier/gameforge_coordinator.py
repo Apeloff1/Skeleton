@@ -8,6 +8,7 @@ from .gameforge_lifecycle import ServiceLifecycle
 from .gameforge_rate import RateWindow
 from .gameforge_quota import Quota
 from .gameforge_queue import BoundedQueue
+from .gameforge_retry_budget import RetryBudget
 
 @dataclass
 class RuntimeCoordinator:
@@ -18,7 +19,9 @@ class RuntimeCoordinator:
  budget: Budget
  quota: Quota
  queue: BoundedQueue
- def admit(self,now:int,active:int,limit:int=1,background:bool=False,request_id=None):
+ retry_budget: RetryBudget
+ def admit(self,now:int,active:int,limit:int=1,background:bool=False,request_id=None,retry:bool=False):
+  if retry and not self.retry_budget.consume(): return Admission.SHED
   if not self.lifecycle.can_accept or not self.dependencies.ready or not self.circuit.allowed:
    return Admission.SHED
   if not self.rate.allow(now): return Admission.SHED
