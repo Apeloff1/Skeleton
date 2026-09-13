@@ -57,13 +57,6 @@ def _recovery() -> SwarmRecoveryManager:
     return state.swarm_recovery
 
 
-def _repair_tenants() -> dict[str, Any] | None:
-    tenant_broker = getattr(_state(), "swarm_tenant_broker", None)
-    if tenant_broker is None:
-        return None
-    return asdict(tenant_broker.repair())
-
-
 def _stage_tenant_bundle(
     runtime: SwarmRuntime,
     current_tenant: TenantSwarmBroker,
@@ -99,7 +92,7 @@ def _stage_paired_restore(
 
 
 def _stage_live_metadata_restore(runtime: SwarmRuntime) -> dict[str, Any] | None:
-    """Atomically carry current tenant ownership across a runtime-only checkpoint restore."""
+    """Atomically carry current tenant ownership across a runtime replacement."""
     state = _state()
     current_tenant = getattr(state, "swarm_tenant_broker", None)
     if current_tenant is None:
@@ -111,6 +104,14 @@ def _stage_live_metadata_restore(runtime: SwarmRuntime) -> dict[str, Any] | None
     repair = transient.restore(staged_tenant, 1)
     state.commit_swarm_bundle(runtime, staged_broker, staged_ingress, staged_tenant)
     return asdict(repair)
+
+
+def _publish_runtime(runtime: SwarmRuntime) -> dict[str, Any] | None:
+    """Publish a replacement runtime atomically with tenant metadata when present."""
+    tenant_repair = _stage_live_metadata_restore(runtime)
+    if tenant_repair is None:
+        _state().bind_swarm_runtime(runtime)
+    return tenant_repair
 
 
 def _task_record(task: Any) -> dict[str, Any]:
@@ -200,8 +201,10 @@ def prune_terminal_tasks(
 @router.post("/gc")
 def gc(keep_terminal: int = Query(default=10_000, ge=0, le=1_000_000), runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
     rebuilt, result = compact_runtime(runtime, keep_terminal=keep_terminal)
-    _state().bind_swarm_runtime(rebuilt)
-    tenant_repair = _repair_tenants()
+    try:
+        tenant_repair = _publish_runtime(rebuilt)
+    except (KeyError, ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=409, detail=f"staged compaction rejected: {exc}") from exc
     return {"result": asdict(result), "tenant_repair": tenant_repair, "capacity": capacity(rebuilt), "snapshot": asdict(rebuilt.snapshot())}
 
 
@@ -224,9 +227,7 @@ def restore_latest(recovery: SwarmRecoveryManager = Depends(_recovery)) -> dict[
     try:
         tenant_repair = _stage_paired_restore(recovery, runtime, sequence)
         if tenant_repair is None:
-            tenant_repair = _stage_live_metadata_restore(runtime)
-            if tenant_repair is None:
-                _state().bind_swarm_runtime(runtime)
+            tenant_repair = _publish_runtime(runtime)
     except (KeyError, ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=409, detail=f"staged restore rejected: {exc}") from exc
 
