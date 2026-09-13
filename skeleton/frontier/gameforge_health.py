@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from threading import Lock
-from typing import Callable, Generic, List, Optional, TypeVar
+from typing import Callable, Generic, List, TypeVar
 import time
 
 T = TypeVar("T")
@@ -52,7 +52,6 @@ class HealthPool(Generic[T]):
         self._max_age = float(max_age_seconds)
         self._clock = clock
         self._idle: List[tuple[T, float]] = []
-        self._idle_ids: set[int] = set()
         self._checked_out: set[int] = set()
         self._checkouts = 0
         self._rejected = 0
@@ -63,7 +62,6 @@ class HealthPool(Generic[T]):
         with self._lock:
             while self._idle:
                 value, born = self._idle.pop()
-                self._idle_ids.discard(id(value))
                 if now - born > self._max_age:
                     continue
                 try:
@@ -107,7 +105,6 @@ class HealthPool(Generic[T]):
                 return False
             self._checked_out.discard(value_id)
             self._idle.append((value, self._clock()))
-            self._idle_ids.add(value_id)
             return True
 
     def stats(self) -> PoolStats:
