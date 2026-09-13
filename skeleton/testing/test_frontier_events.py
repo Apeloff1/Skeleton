@@ -1,4 +1,5 @@
 import asyncio
+import pytest
 
 from skeleton.frontier.events import DomainEvent, EventBus
 
@@ -29,3 +30,42 @@ def test_unknown_topic_is_a_noop():
         assert await EventBus().publish(DomainEvent.create("missing", {})) == 0
 
     asyncio.run(scenario())
+
+
+@pytest.mark.asyncio
+async def test_failure_does_not_starve_later_handlers_or_mutate_their_payload():
+    bus = EventBus()
+    seen = []
+
+    async def broken(event):
+        event.payload["values"].append(2)
+        raise ValueError("first subscriber failed")
+
+    async def healthy(event):
+        seen.append(event.payload["values"])
+        assert event.correlation_id == "request"
+        assert event.causation_id == "parent"
+
+    await bus.subscribe("topic ", broken)
+    await bus.subscribe("topic", healthy)
+    event = DomainEvent.create(" topic", {"values": [1]}, correlation_id="request", causation_id="parent")
+    with pytest.raises(ExceptionGroup) as error:
+        await bus.publish(event)
+    assert len(error.value.exceptions) == 1
+    assert seen == [[1]]
+
+
+@pytest.mark.asyncio
+async def test_subscriptions_are_bounded_idempotent_and_removable():
+    bus = EventBus(max_subscriptions=1)
+
+    async def handler(event):
+        pass
+
+    await bus.subscribe("x", handler)
+    await bus.subscribe("x", handler)
+    with pytest.raises(OverflowError):
+        await bus.subscribe("y", handler)
+    assert await bus.unsubscribe("x", handler)
+    assert not await bus.unsubscribe("x", handler)
+    await bus.subscribe("y", handler)
