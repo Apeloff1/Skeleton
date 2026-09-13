@@ -3,46 +3,50 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Mapping
 
 from skeleton.agents.swarm_checkpoint import CheckpointStore
-from skeleton.agents.swarm_failover import FailoverCoordinator
+from skeleton.agents.swarm_failover import FailoverCoordinator, ReplicaState
 from skeleton.agents.swarm_runtime import SwarmRuntime
 
 
 @dataclass(frozen=True, slots=True)
 class RecoveryStatus:
     checkpoints: int
-    latest_revision: int | None
+    latest_sequence: int | None
+    latest_checksum: str | None
     leader: str | None
-    members: tuple[str, ...]
+    epoch: int
 
 
 class SwarmRecoveryManager:
-    """Owns bounded checkpoints plus deterministic control-plane leadership."""
+    """Own bounded checkpoints and deterministic failover decisions."""
 
-    def __init__(self, *, max_checkpoints: int = 8, node_id: str = "local") -> None:
+    def __init__(self, *, max_checkpoints: int = 8) -> None:
         self.store = CheckpointStore(max_checkpoints=max_checkpoints)
-        self.failover = FailoverCoordinator(node_id=node_id)
+        self.failover = FailoverCoordinator()
+        self._replicas: dict[str, ReplicaState] = {}
+        self._decision = self.failover.elect(self._replicas)
 
     def checkpoint(self, runtime: SwarmRuntime) -> int:
-        return self.store.save(runtime.export_state()).revision
+        return self.store.capture(runtime).sequence
 
     def restore_latest(self) -> SwarmRuntime | None:
-        item = self.store.latest()
-        if item is None:
+        if self.store.latest() is None:
             return None
-        return SwarmRuntime.from_state(item.state, requeue_leased=True)
+        return self.store.restore()
 
-    def set_members(self, members: Iterable[str]) -> str | None:
-        self.failover.set_members(members)
-        return self.failover.leader()
+    def elect(self, replicas: Mapping[str, ReplicaState]) -> str | None:
+        self._replicas = dict(replicas)
+        self._decision = self.failover.elect(self._replicas)
+        return self._decision.leader_id
 
     def status(self) -> RecoveryStatus:
         latest = self.store.latest()
         return RecoveryStatus(
             checkpoints=len(self.store),
-            latest_revision=None if latest is None else latest.revision,
-            leader=self.failover.leader(),
-            members=self.failover.members(),
+            latest_sequence=None if latest is None else latest.sequence,
+            latest_checksum=None if latest is None else latest.checksum,
+            leader=self._decision.leader_id,
+            epoch=self._decision.epoch,
         )
