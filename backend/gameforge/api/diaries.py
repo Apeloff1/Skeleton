@@ -43,10 +43,10 @@ class DiaryWriteRequest(BaseModel):
     kind: str = Field(description="memory|introspect|outrospect|retrospect")
     title: str
     body: str
-    tags: List[str] = []
+    tags: List[str] = Field(default_factory=list, max_length=50)
     mood: Optional[float] = None
     intensity: Optional[float] = None
-    metadata: Dict[str, Any] = {}
+    metadata: Dict[str, Any] = Field(default_factory=dict)
     tenant_id: Optional[str] = None
     workspace_id: Optional[str] = None
 

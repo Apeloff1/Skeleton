@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from gameforge.enterprise.auth import Principal, get_principal
 from gameforge.personal.calendar.decade_logs import DecadeLogHub
@@ -47,7 +47,7 @@ class CatchBody(BaseModel):
     title: str = "Catch of the day"
     importance: float = 0.8
     schedule_item_id: Optional[str] = None
-    tags: List[str] = []
+    tags: List[str] = Field(default_factory=list, max_length=50)
 
 
 class GuestBody(BaseModel):
