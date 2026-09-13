@@ -38,7 +38,14 @@ class BoundedQueue:
         return self._items[0] if self._items else None
 
     def clear(self):
+        """Empty the queue and return the number of discarded items."""
+        count = len(self._items)
         self._items.clear()
+        return count
+
+    def snapshot(self):
+        """Return an immutable point-in-time view of queued items."""
+        return tuple(self._items)
 
     def __len__(self):
         return len(self._items)
