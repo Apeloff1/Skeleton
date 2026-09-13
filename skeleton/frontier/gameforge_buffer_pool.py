@@ -4,24 +4,30 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from skeleton.frontier.gameforge_runtime import BufferClass, BufferPool
+from skeleton.frontier.gameforge_runtime import BufferClass, BufferLease, BufferPool
 
 
 @dataclass
 class BufferHandle:
-    data: bytearray
-    buffer_class: BufferClass
+    lease: BufferLease
     _returned: bool = False
+
+    @property
+    def data(self) -> bytearray:
+        return self.lease.data
+
+    @property
+    def buffer_class(self) -> BufferClass:
+        return self.lease.buffer_class
 
     def return_to(self, pool: BufferPool) -> bool:
         if self._returned:
             return False
+        if not pool.reclaim(self.lease):
+            return False
         self._returned = True
-        return pool.reclaim(self.data, self.buffer_class)
+        return True
 
 
 def lease(pool: BufferPool, minimum: int) -> Optional[BufferHandle]:
-    data, buffer_class = pool.lease(minimum)
-    if data is None:
-        return None
-    return BufferHandle(data, buffer_class)
+    return BufferHandle(pool.lease(minimum))
