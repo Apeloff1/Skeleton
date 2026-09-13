@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from threading import Lock
 from typing import Callable, Generic, List, TypeVar
 import time
+import math
 
 T = TypeVar("T")
 
@@ -44,6 +45,7 @@ class HealthPool(Generic[T]):
             not isinstance(max_age_seconds, (int, float))
             or isinstance(max_age_seconds, bool)
             or max_age_seconds <= 0
+            or not math.isfinite(max_age_seconds)
         ):
             raise ValueError("max_age_seconds must be a positive number")
         self._make = make
@@ -52,7 +54,7 @@ class HealthPool(Generic[T]):
         self._max_age = float(max_age_seconds)
         self._clock = clock
         self._idle: List[tuple[T, float]] = []
-        self._checked_out: set[int] = set()
+        self._checked_out: dict[int, tuple[T, float]] = {}
         self._checkouts = 0
         self._rejected = 0
         self._lock = Lock()
@@ -62,17 +64,20 @@ class HealthPool(Generic[T]):
         with self._lock:
             while self._idle:
                 value, born = self._idle.pop()
-                if now - born > self._max_age:
+                if now - born >= self._max_age:
                     continue
                 try:
                     healthy = self._healthy(value)
                 except Exception:
                     healthy = False
                 if healthy:
-                    self._checked_out.add(id(value))
+                    self._checked_out[id(value)] = (value, born)
                     self._checkouts += 1
                     return value
             value = self._make()
+            if id(value) in self._checked_out:
+                self._rejected += 1
+                raise RuntimeError("factory returned an already leased resource")
             try:
                 healthy = self._healthy(value)
             except Exception:
@@ -81,7 +86,7 @@ class HealthPool(Generic[T]):
             if not healthy:
                 self._rejected += 1
                 raise RuntimeError("newly created pooled resource is unhealthy")
-            self._checked_out.add(id(value))
+            self._checked_out[id(value)] = (value, now)
             self._checkouts += 1
             return value
 
@@ -92,20 +97,20 @@ class HealthPool(Generic[T]):
             if value_id not in self._checked_out:
                 self._rejected += 1
                 return False
+            _, born = self._checked_out.pop(value_id)
+            if self._clock() - born >= self._max_age:
+                self._rejected += 1
+                return False
             if len(self._idle) >= self._capacity:
-                self._checked_out.discard(value_id)
                 return False
             try:
                 if not self._healthy(value):
                     self._rejected += 1
-                    self._checked_out.discard(value_id)
                     return False
             except Exception:
                 self._rejected += 1
-                self._checked_out.discard(value_id)
                 return False
-            self._checked_out.discard(value_id)
-            self._idle.append((value, self._clock()))
+            self._idle.append((value, born))
             return True
 
     def stats(self) -> PoolStats:
