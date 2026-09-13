@@ -8,7 +8,21 @@ import os
 import time
 import zipfile
 from typing import Dict, Any, Optional
+from core.exec_guard import execution_disabled_message, require_execution_allowed
 from gameforge.snowball.snowball_step_logs import get_step_database, get_all_step_logs
+
+
+def _safe_game_name(game_name: str) -> str:
+    value = str(game_name or "").strip()
+    if (
+        not value
+        or value in {".", ".."}
+        or ".." in value
+        or "/" in value
+        or "\\" in value
+    ):
+        raise ValueError("game_name must be a relative path segment")
+    return value
 
 class FinalBuildExporter:
     def __init__(self, output_dir: str = "/tmp/snowball_builds"):
@@ -17,6 +31,10 @@ class FinalBuildExporter:
 
     def build_android_apk(self, game_name: str, build_config: Dict) -> Optional[str]:
         """Simulate building an Android APK."""
+        if not require_execution_allowed("Snowball Android export"):
+            print(f"[FinalBuild] {execution_disabled_message('Snowball Android export')}")
+            return None
+        game_name = _safe_game_name(game_name)
         print(f"[FinalBuild] Building Android APK for {game_name}...")
         
         # In real implementation: use buildozer, gradle, or Godot export
@@ -33,6 +51,10 @@ class FinalBuildExporter:
 
     def build_windows_exe(self, game_name: str, build_config: Dict) -> Optional[str]:
         """Simulate building a Windows EXE."""
+        if not require_execution_allowed("Snowball Windows export"):
+            print(f"[FinalBuild] {execution_disabled_message('Snowball Windows export')}")
+            return None
+        game_name = _safe_game_name(game_name)
         print(f"[FinalBuild] Building Windows EXE for {game_name}...")
         
         exe_filename = f"{game_name}_v1.0_{int(time.time())}.exe"
@@ -45,8 +67,16 @@ class FinalBuildExporter:
         print(f"[FinalBuild] EXE created: {exe_path}")
         return exe_path
 
-    def export_builds(self, game_name: str) -> Dict[str, str]:
+    def export_builds(self, game_name: str) -> Dict[str, Any]:
         """Final step of Snowball - export both mobile and PC versions."""
+        if not require_execution_allowed("Snowball build export"):
+            return {
+                "status": "disabled",
+                "ok": False,
+                "disabled": True,
+                "error": execution_disabled_message("Snowball build export"),
+            }
+        game_name = _safe_game_name(game_name)
         # Get all previous step logs to inform the build
         all_logs = get_all_step_logs()
         
