@@ -19,7 +19,8 @@ from skeleton.agents.swarm_tenant_checkpoint import (
 )
 
 
-_ARCHIVE_VERSION = 1
+RECOVERY_ARCHIVE_VERSION = 1
+MAX_RECOVERY_ARCHIVE_BYTES = 8 * 1024 * 1024
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,9 +48,27 @@ class SwarmRecoveryManager:
         self._lock = RLock()
 
     @staticmethod
-    def _archive_checksum(payload: Mapping[str, object]) -> str:
-        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        return sha256(encoded).hexdigest()
+    def _json_bytes(payload: object) -> bytes:
+        try:
+            return json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            ).encode("utf-8")
+        except (TypeError, ValueError) as exc:
+            raise ValueError("recovery archive must contain finite JSON values") from exc
+
+    @classmethod
+    def _archive_checksum(cls, payload: Mapping[str, object]) -> str:
+        return sha256(cls._json_bytes(payload)).hexdigest()
+
+    @classmethod
+    def _enforce_archive_size(cls, archive: object) -> int:
+        size = len(cls._json_bytes(archive))
+        if size > MAX_RECOVERY_ARCHIVE_BYTES:
+            raise ValueError("recovery archive exceeds maximum size")
+        return size
 
     @staticmethod
     def _record(mapping: object, label: str) -> Mapping[str, object]:
@@ -108,23 +127,29 @@ class SwarmRecoveryManager:
                 for item in self.tenant_store.history()
             ]
             payload: dict[str, object] = {
-                "version": _ARCHIVE_VERSION,
+                "version": RECOVERY_ARCHIVE_VERSION,
                 "max_checkpoints": self.store.max_checkpoints,
                 "runtime": runtime_records,
                 "tenant": tenant_records,
             }
-            return {**payload, "archive_checksum": self._archive_checksum(payload)}
+            archive = {**payload, "archive_checksum": self._archive_checksum(payload)}
+            self._enforce_archive_size(archive)
+            return archive
 
     def export_archive_bytes(self) -> bytes:
-        return json.dumps(self.export_archive(), sort_keys=True, separators=(",", ":")).encode("utf-8")
+        payload = self._json_bytes(self.export_archive())
+        if len(payload) > MAX_RECOVERY_ARCHIVE_BYTES:
+            raise ValueError("recovery archive exceeds maximum size")
+        return payload
 
     @classmethod
     def from_archive(cls, archive: Mapping[str, object]) -> "SwarmRecoveryManager":
         """Reconstruct bounded recovery history only after archive and record verification."""
         if not isinstance(archive, Mapping):
             raise ValueError("recovery archive must be a mapping")
+        cls._enforce_archive_size(dict(archive))
         version = archive.get("version")
-        if isinstance(version, bool) or not isinstance(version, int) or version != _ARCHIVE_VERSION:
+        if isinstance(version, bool) or not isinstance(version, int) or version != RECOVERY_ARCHIVE_VERSION:
             raise ValueError(f"unsupported recovery archive version: {version}")
         max_checkpoints = archive.get("max_checkpoints")
         if isinstance(max_checkpoints, bool) or not isinstance(max_checkpoints, int) or max_checkpoints < 1:
@@ -181,9 +206,12 @@ class SwarmRecoveryManager:
     def from_archive_bytes(cls, payload: bytes) -> "SwarmRecoveryManager":
         if not isinstance(payload, (bytes, bytearray)):
             raise TypeError("recovery archive payload must be bytes")
+        raw = bytes(payload)
+        if len(raw) > MAX_RECOVERY_ARCHIVE_BYTES:
+            raise ValueError("recovery archive exceeds maximum size")
         try:
-            archive = json.loads(bytes(payload).decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            archive = json.loads(raw.decode("utf-8"), parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)))
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
             raise ValueError("invalid recovery archive payload") from exc
         if not isinstance(archive, dict):
             raise ValueError("recovery archive payload must contain an object")
