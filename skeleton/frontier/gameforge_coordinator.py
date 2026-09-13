@@ -29,9 +29,13 @@ class RuntimeCoordinator:
 
     def __post_init__(self):
         self._reservations = 0
+        self._request_ids = set()
 
     def admit(self, now: int, active: int, limit: int = 1, background: bool = False,
               request_id=None, retry: bool = False, read_only: bool = False):
+        if request_id is not None and request_id in self._request_ids:
+            self.health.record(False)
+            return Admission.SHED
         if retry and not self.retry_budget.consume():
             self.health.record(False)
             return Admission.SHED
@@ -57,6 +61,8 @@ class RuntimeCoordinator:
                 self.health.record(False)
                 return Admission.SHED
             self._reservations += 1
+            if request_id is not None:
+                self._request_ids.add(request_id)
         self.health.record(decision is not Admission.SHED)
         return decision
 
@@ -86,6 +92,10 @@ class RuntimeCoordinator:
         return self._reservations
 
     @property
+    def owned_request_ids(self):
+        return frozenset(self._request_ids)
+
+    @property
     def saturated(self):
         return self.budget.exhausted or self.quota.exhausted or self.queue.full
 
@@ -93,10 +103,14 @@ class RuntimeCoordinator:
         """Release one reservation, optionally targeting its request identity."""
         if self._reservations <= 0:
             return False
-        if request_id is not None and not self.queue.remove(request_id):
-            return False
-        if request_id is None:
-            self.queue.pop()
+        if request_id is not None:
+            if request_id not in self._request_ids or not self.queue.remove(request_id):
+                return False
+            self._request_ids.remove(request_id)
+        else:
+            item = self.queue.pop()
+            if item is not None:
+                self._request_ids.discard(item)
         self.budget.release()
         self.quota.release()
         self._reservations -= 1
