@@ -33,3 +33,6 @@ def test_coordinator_health_records_admission_outcomes():
 
 def test_coordinator_snapshot_is_immutable_state():
  x,s,d=make(); s.ready(); d.mark("db"); x.admit(0,0,request_id="x"); snap=x.snapshot(active=1); assert snap.lifecycle=="ready"; assert snap.dependencies_ready; assert snap.budget_used==1; assert snap.saturated()
+
+def test_coordinator_receipt_is_observable():
+ x,s,d=make(); s.ready(); d.mark("db"); receipt=x.admit_receipt("x",0,0); assert receipt.accepted(); assert receipt.request_id=="x"; x.release()
