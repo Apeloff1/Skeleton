@@ -49,6 +49,11 @@ class FairShareLedger:
             self._tenants[tenant] = share
             return share
 
+    def configured_weights(self) -> dict[str, int]:
+        """Return configured tenant weights without exposing live accounting state."""
+        with self._lock:
+            return {tenant: share.weight for tenant, share in sorted(self._tenants.items())}
+
     def admit(self, tenant: str) -> TenantShare:
         tenant = self._tenant(tenant)
         with self._lock:
