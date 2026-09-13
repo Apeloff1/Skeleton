@@ -3232,7 +3232,9 @@ else:
     _cors_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
+    # Browsers reject wildcard origins with credentials; never advertise
+    # credentialed cross-origin access when the deployment uses "*".
+    allow_credentials=_cors_origins != ["*"],
     allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],

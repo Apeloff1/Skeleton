@@ -60,9 +60,15 @@ MONGO_POOL_CONFIG = {
 API_PREFIX = "/api"
 API_VERSION = "v10"
 
-# CORS Settings
-CORS_ORIGINS = ["*"]  # In production, restrict to specific domains
-CORS_ALLOW_CREDENTIALS = True
+# CORS Settings. Wildcard origins and credentialed requests are incompatible
+# in browsers, so credentials are enabled only for an explicit origin list.
+_cors_env = os.environ.get("CORS_ORIGINS", "*").strip()
+CORS_ORIGINS = (
+    [o.strip() for o in _cors_env.split(",") if o.strip()]
+    if _cors_env not in {"", "*"}
+    else ["*"]
+)
+CORS_ALLOW_CREDENTIALS = CORS_ORIGINS != ["*"]
 CORS_ALLOW_METHODS = ["*"]
 CORS_ALLOW_HEADERS = ["*"]
 
