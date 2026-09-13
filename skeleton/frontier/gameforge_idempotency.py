@@ -1,8 +1,9 @@
 """Provider-neutral idempotency contract inspired by GameForge service invariants."""
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Dict, Generic, Hashable, Optional, TypeVar
+from typing import Generic, Hashable, Optional, TypeVar
 
 T = TypeVar("T")
 
@@ -18,22 +19,24 @@ class IdempotencyWindow(Generic[T]):
     """Bounded first-writer-wins window for retry-safe command results."""
 
     def __init__(self, capacity: int = 1024) -> None:
-        if capacity < 1:
+        if not isinstance(capacity, int) or isinstance(capacity, bool) or capacity < 1:
             raise ValueError("capacity must be >= 1")
         self._capacity = capacity
-        self._values: Dict[Hashable, T] = {}
+        self._values: OrderedDict[Hashable, T] = OrderedDict()
         self._accepted = 0
         self._duplicates = 0
         self._evicted = 0
 
+    @property
+    def capacity(self) -> int:
+        return self._capacity
+
     def record(self, key: Hashable, value: T) -> tuple[bool, T]:
-        existing = self._values.get(key)
-        if existing is not None:
+        if key in self._values:
             self._duplicates += 1
-            return False, existing
+            return False, self._values[key]
         if len(self._values) >= self._capacity:
-            oldest = next(iter(self._values))
-            del self._values[oldest]
+            self._values.popitem(last=False)
             self._evicted += 1
         self._values[key] = value
         self._accepted += 1
