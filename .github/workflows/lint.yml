@@ -43,4 +43,4 @@ jobs:
       - name: Run ESLint (zero warnings allowed)
         env:
           CI: "true"
-        run: yarn lint --max-warnings=0
+        run: yarn lint:ci
