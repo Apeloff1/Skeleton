@@ -1,5 +1,6 @@
 """Small immutable runtime state snapshot for bounded observability."""
 from dataclasses import dataclass
+from math import isfinite
 
 
 @dataclass(frozen=True)
@@ -14,6 +15,10 @@ class RuntimeSnapshot:
     health: float = 1.0
 
     def __post_init__(self):
+        if not isinstance(self.lifecycle, str) or not self.lifecycle:
+            raise TypeError("lifecycle must be a non-empty string")
+        if not isinstance(self.dependencies_ready, bool):
+            raise TypeError("dependencies_ready must be a boolean")
         counters = (self.active, self.budget_used, self.budget_capacity,
                     self.quota_used, self.queue_depth)
         if any(not isinstance(value, int) or isinstance(value, bool) for value in counters):
@@ -26,8 +31,8 @@ class RuntimeSnapshot:
             raise ValueError("queue counters must be non-negative")
         if not isinstance(self.health, (int, float)) or isinstance(self.health, bool):
             raise TypeError("health must be numeric")
-        if not 0.0 <= self.health <= 1.0:
-            raise ValueError("health must be between zero and one")
+        if not isfinite(float(self.health)) or not 0.0 <= self.health <= 1.0:
+            raise ValueError("health must be finite and between zero and one")
 
     @property
     def saturated(self):
