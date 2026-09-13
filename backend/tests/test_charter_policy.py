@@ -73,3 +73,25 @@ def test_negative_actor_weight_never_passes():
     gate = CharterPolicy()
     gate.ratify("x", [Rule(id="a", action="x.run", min_weight=0)])
     assert gate.decide("x", "x.run", -1).permitted is False
+
+
+def test_snapshot_is_detached_from_live_charter_and_edict_state():
+    gate = CharterPolicy()
+    gate.ratify("runtime", [Rule(id="read", action="runtime.read")])
+    edict = gate.propose_edict(
+        "runtime",
+        Rule(id="deploy", action="runtime.deploy", min_weight=5),
+        "court",
+    )
+    assert edict is not None
+
+    snapshot = gate.snapshot()
+    snapshot.charters[0].rules.clear()
+    snapshot.charters[0].amendments = 999
+    snapshot.edicts[0].in_force = True
+
+    assert gate.decide("runtime", "runtime.read", 0).permitted is True
+    assert gate.decide("runtime", "runtime.deploy", 999).permitted is False
+    fresh = gate.snapshot()
+    assert fresh.charters[0].amendments == 0
+    assert fresh.edicts[0].in_force is False
