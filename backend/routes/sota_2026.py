@@ -6,7 +6,7 @@
 """
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 import os
@@ -27,35 +27,37 @@ EMERGENT_KEY = os.getenv("EMERGENT_LLM_KEY", "")
 # ============================================================================
 
 class PredictiveRequest(BaseModel):
-    code: str
-    language: str = "python"
+    code: str = Field(..., min_length=1, max_length=500000)
+    language: str = Field("python", max_length=100)
     cursor_position: Optional[int] = None
-    recent_actions: List[str] = []
+    recent_actions: List[str] = Field(default_factory=list, max_length=100)
 
 class RefactorRequest(BaseModel):
-    code: str
-    language: str = "python"
-    focus: str = "all"  # all, performance, readability, security, modern
+    code: str = Field(..., min_length=1, max_length=500000)
+    language: str = Field("python", max_length=100)
+    focus: str = Field("all", max_length=50)  # all, performance, readability, security, modern
     preserve_behavior: bool = True
 
 class MultiModelRequest(BaseModel):
-    task: str
-    code: Optional[str] = None
-    language: str = "python"
-    models: List[str] = ["gpt-4o"]  # Can include multiple models
-    consensus_mode: str = "best"  # best, merge, vote
+    task: str = Field(..., min_length=1, max_length=10000)
+    code: Optional[str] = Field(None, max_length=500000)
+    language: str = Field("python", max_length=100)
+    models: List[str] = Field(default_factory=lambda: ["gpt-4o"], max_length=20)  # Can include multiple models
+    consensus_mode: str = Field("best", max_length=50)  # best, merge, vote
 
 class CodeIntelRequest(BaseModel):
-    code: str
-    language: str = "python"
-    analysis_types: List[str] = ["complexity", "patterns", "suggestions"]
+    code: str = Field(..., min_length=1, max_length=500000)
+    language: str = Field("python", max_length=100)
+    analysis_types: List[str] = Field(
+        default_factory=lambda: ["complexity", "patterns", "suggestions"], max_length=50
+    )
 
 class AutoCompleteRequest(BaseModel):
-    code: str
-    language: str = "python"
-    cursor_line: int
-    cursor_column: int
-    trigger: str = "auto"  # auto, manual, import
+    code: str = Field(..., min_length=1, max_length=500000)
+    language: str = Field("python", max_length=100)
+    cursor_line: int = Field(..., ge=0, le=500000)
+    cursor_column: int = Field(..., ge=0, le=10000)
+    trigger: str = Field("auto", max_length=50)  # auto, manual, import
 
 # ============================================================================
 # PREDICTIVE ASSISTANCE

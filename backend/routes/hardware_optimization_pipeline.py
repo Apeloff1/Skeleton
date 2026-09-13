@@ -77,9 +77,13 @@ class PlatformOptimizationRequest(BaseModel):
 
 
 class PerformanceProfileRequest(BaseModel):
-    profile_name: str
-    target_platforms: List[Platform] = [Platform.PC]
-    metrics: List[str] = ["fps", "frame_time", "memory", "gpu_utilization"]
+    profile_name: str = Field(..., min_length=1, max_length=200)
+    target_platforms: List[Platform] = Field(
+        default_factory=lambda: [Platform.PC], max_length=20
+    )
+    metrics: List[str] = Field(
+        default_factory=lambda: ["fps", "frame_time", "memory", "gpu_utilization"], max_length=50
+    )
     sampling_rate_hz: int = Field(60, ge=1, le=1000)
 
 
