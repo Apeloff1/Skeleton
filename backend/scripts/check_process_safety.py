@@ -1,9 +1,9 @@
 """Fail CI on unsafe process invocation patterns in backend Python code.
 
 Dependency-free by design so it can run before application imports. The scanner
-tracks common import, assignment, destructuring, walrus, getattr, namespace-
-mapping, mapping-get, and functools.partial aliases to prevent trivial process
-policy bypasses.
+tracks common import, assignment, destructuring, walrus, getattr, module
+__getattribute__, namespace-mapping, mapping-get, and functools.partial aliases
+to prevent trivial process policy bypasses.
 """
 
 from __future__ import annotations
@@ -91,7 +91,6 @@ def namespace_mapping_owner(node: ast.AST, aliases: dict[str, str]) -> str | Non
     if isinstance(node, ast.Attribute) and node.attr == "__dict__":
         owner = canonical_name(node.value, aliases)
         return owner if owner in TRACKED_MODULES else None
-
     if (
         isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
@@ -101,7 +100,6 @@ def namespace_mapping_owner(node: ast.AST, aliases: dict[str, str]) -> str | Non
     ):
         owner = canonical_name(node.args[0], aliases)
         return owner if owner in TRACKED_MODULES else None
-
     return None
 
 
@@ -109,6 +107,13 @@ def namespace_mapping_get_owner(node: ast.AST, aliases: dict[str, str]) -> str |
     if not isinstance(node, ast.Attribute) or node.attr != "get":
         return None
     owner = namespace_mapping_owner(node.value, aliases)
+    return owner if owner in TRACKED_MODULES else None
+
+
+def module_getattribute_owner(node: ast.AST, aliases: dict[str, str]) -> str | None:
+    if not isinstance(node, ast.Attribute) or node.attr != "__getattribute__":
+        return None
+    owner = canonical_name(node.value, aliases)
     return owner if owner in TRACKED_MODULES else None
 
 
@@ -122,6 +127,13 @@ def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
             attribute = literal_string(node.args[1])
             if owner in TRACKED_MODULES and attribute is not None:
                 return f"{owner}.{attribute}"
+            return None
+
+        direct_owner = module_getattribute_owner(node.func, aliases)
+        if direct_owner is not None and node.args:
+            attribute = literal_string(node.args[0])
+            if attribute is not None:
+                return f"{direct_owner}.{attribute}"
             return None
 
         mapping_owner = namespace_mapping_get_owner(node.func, aliases)
@@ -150,7 +162,6 @@ def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
 
 def destructured_assignments(target: ast.AST, value: ast.AST) -> list[tuple[str, ast.AST]]:
     """Pair exact positional tuple/list destructuring targets with source nodes."""
-
     if isinstance(target, ast.Name):
         return [(target.id, value)]
     if isinstance(target, ast.Starred):
@@ -159,7 +170,6 @@ def destructured_assignments(target: ast.AST, value: ast.AST) -> list[tuple[str,
         return []
     if len(target.elts) != len(value.elts):
         return []
-
     pairs: list[tuple[str, ast.AST]] = []
     for target_item, value_item in zip(target.elts, value.elts):
         pairs.extend(destructured_assignments(target_item, value_item))
@@ -168,10 +178,8 @@ def destructured_assignments(target: ast.AST, value: ast.AST) -> list[tuple[str,
 
 def assignment_aliases(tree: ast.AST, aliases: dict[str, str]) -> dict[str, str]:
     """Resolve aliases assigned from tracked process callables."""
-
     resolved = dict(aliases)
     assignments: list[tuple[str, ast.AST]] = []
-
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign):
             for target in node.targets:
@@ -180,7 +188,6 @@ def assignment_aliases(tree: ast.AST, aliases: dict[str, str]) -> dict[str, str]
             assignments.append((node.target.id, node.value))
         elif isinstance(node, ast.NamedExpr) and isinstance(node.target, ast.Name):
             assignments.append((node.target.id, node.value))
-
     tracked_names = UNSAFE_CALLS.keys() | {f"subprocess.{call}" for call in SUBPROCESS_CALLS}
     changed = True
     while changed:
@@ -190,7 +197,6 @@ def assignment_aliases(tree: ast.AST, aliases: dict[str, str]) -> dict[str, str]
             if source in tracked_names and resolved.get(target) != source:
                 resolved[target] = source
                 changed = True
-
     return resolved
 
 
@@ -199,50 +205,47 @@ def dynamic_getattr_violation(node: ast.Call, aliases: dict[str, str]) -> str | 
         return None
     owner = canonical_name(node.args[0], aliases)
     attribute = node.args[1]
-    if owner not in TRACKED_MODULES:
-        return None
-    if literal_string(attribute) is not None:
+    if owner not in TRACKED_MODULES or literal_string(attribute) is not None:
         return None
     return f"dynamic getattr() on {owner} is forbidden because process policy cannot be statically proven"
 
 
+def dynamic_getattribute_violation(node: ast.Call, aliases: dict[str, str]) -> str | None:
+    owner = module_getattribute_owner(node.func, aliases)
+    if owner not in TRACKED_MODULES or not node.args:
+        return None
+    if literal_string(node.args[0]) is not None:
+        return None
+    return f"dynamic __getattribute__() on {owner} is forbidden because process policy cannot be statically proven"
+
+
 def dynamic_namespace_mapping_violation(node: ast.Subscript, aliases: dict[str, str]) -> str | None:
     owner = namespace_mapping_owner(node.value, aliases)
-    if owner not in TRACKED_MODULES:
-        return None
-    if literal_string(node.slice) is not None:
+    if owner not in TRACKED_MODULES or literal_string(node.slice) is not None:
         return None
     return f"dynamic namespace lookup on {owner} is forbidden because process policy cannot be statically proven"
 
 
 def dynamic_namespace_get_violation(node: ast.Call, aliases: dict[str, str]) -> str | None:
     owner = namespace_mapping_get_owner(node.func, aliases)
-    if owner not in TRACKED_MODULES or not node.args:
-        return None
-    if literal_string(node.args[0]) is not None:
+    if owner not in TRACKED_MODULES or not node.args or literal_string(node.args[0]) is not None:
         return None
     return f"dynamic namespace get() on {owner} is forbidden because process policy cannot be statically proven"
 
 
 def partial_policy_violations(node: ast.Call, aliases: dict[str, str]) -> list[str]:
     """Validate process-sensitive keywords pre-bound through functools.partial."""
-
     if canonical_name(node.func, aliases) != "functools.partial" or not node.args:
         return []
     target = canonical_name(node.args[0], aliases)
     if target not in {f"subprocess.{call}" for call in SUBPROCESS_CALLS}:
         return []
-
     findings: list[str] = []
     for keyword in node.keywords:
         if keyword.arg is None:
-            findings.append(
-                f"{target} partial(..., **kwargs) is forbidden because shell policy cannot be statically proven"
-            )
+            findings.append(f"{target} partial(..., **kwargs) is forbidden because shell policy cannot be statically proven")
         elif keyword.arg == "shell" and not literal_false(keyword.value):
-            findings.append(
-                f"{target} partial(..., shell=...) is forbidden unless shell=False is literal"
-            )
+            findings.append(f"{target} partial(..., shell=...) is forbidden unless shell=False is literal")
     return findings
 
 
@@ -255,45 +258,36 @@ def violations(path: Path) -> list[str]:
 
     aliases = assignment_aliases(tree, import_aliases(tree))
     findings = star_import_violations(tree, label)
-
     for node in ast.walk(tree):
         if isinstance(node, ast.Subscript):
             dynamic_mapping_violation = dynamic_namespace_mapping_violation(node, aliases)
             if dynamic_mapping_violation:
                 findings.append(f"{label}:{node.lineno}: {dynamic_mapping_violation}")
-
         if not isinstance(node, ast.Call):
             continue
 
-        dynamic_mapping_get = dynamic_namespace_get_violation(node, aliases)
-        if dynamic_mapping_get:
-            findings.append(f"{label}:{node.lineno}: {dynamic_mapping_get}")
+        for dynamic_check in (
+            dynamic_namespace_get_violation(node, aliases),
+            dynamic_getattribute_violation(node, aliases),
+            dynamic_getattr_violation(node, aliases),
+        ):
+            if dynamic_check:
+                findings.append(f"{label}:{node.lineno}: {dynamic_check}")
 
         for partial_violation in partial_policy_violations(node, aliases):
             findings.append(f"{label}:{node.lineno}: {partial_violation}")
-
-        dynamic_violation = dynamic_getattr_violation(node, aliases)
-        if dynamic_violation:
-            findings.append(f"{label}:{node.lineno}: {dynamic_violation}")
-            continue
 
         name = canonical_name(node.func, aliases)
         if name in UNSAFE_CALLS:
             findings.append(f"{label}:{node.lineno}: {UNSAFE_CALLS[name]}")
             continue
-
         if name in {f"subprocess.{call}" for call in SUBPROCESS_CALLS}:
             for keyword in node.keywords:
                 if keyword.arg is None:
-                    findings.append(
-                        f"{label}:{node.lineno}: {name}(..., **kwargs) is forbidden because shell policy cannot be statically proven"
-                    )
+                    findings.append(f"{label}:{node.lineno}: {name}(..., **kwargs) is forbidden because shell policy cannot be statically proven")
                     continue
                 if keyword.arg == "shell" and not literal_false(keyword.value):
-                    findings.append(
-                        f"{label}:{node.lineno}: {name}(..., shell=...) is forbidden unless shell=False is literal"
-                    )
-
+                    findings.append(f"{label}:{node.lineno}: {name}(..., shell=...) is forbidden unless shell=False is literal")
     return findings
 
 
@@ -301,17 +295,15 @@ def main() -> int:
     findings: list[str] = []
     for path in python_files():
         findings.extend(violations(path))
-
     if findings:
         print("Unsafe process invocation patterns detected:", file=sys.stderr)
         for finding in sorted(findings):
             print(f"  - {finding}", file=sys.stderr)
         return 1
-
     print(
         "Process safety gate passed: no unsafe shell execution, opaque subprocess kwargs, "
         "dynamic process lookup, process-sensitive star imports, unsafe process partials, "
-        "unsafe process namespace get(), os.system(), or os.popen() calls found."
+        "unsafe process namespace get()/__getattribute__(), os.system(), or os.popen() calls found."
     )
     return 0
 
