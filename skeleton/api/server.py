@@ -38,6 +38,7 @@ class ServerState:
         self.ledger: Optional[Any] = None
         self.scheduler: Optional[Any] = None
         self.swarm: Optional[Any] = None
+        self.swarm_recovery: Optional[Any] = None
         self.health: Optional[Any] = None
         self.metrics: Optional[Any] = None
         self.cockpit: Optional[Any] = None
@@ -68,6 +69,16 @@ class ServerState:
                 checks["swarm"] = self.swarm.health()
             except Exception:
                 checks["swarm"] = {"error": "health failed"}
+        if self.swarm_recovery is not None:
+            try:
+                checks["swarm_recovery"] = self.swarm_recovery.status().__dict__ if hasattr(self.swarm_recovery.status(), "__dict__") else {
+                    "checkpoints": self.swarm_recovery.status().checkpoints,
+                    "latest_sequence": self.swarm_recovery.status().latest_sequence,
+                    "leader": self.swarm_recovery.status().leader,
+                    "epoch": self.swarm_recovery.status().epoch,
+                }
+            except Exception:
+                checks["swarm_recovery"] = {"error": "recovery status failed"}
         overall = all(not isinstance(c, dict) or not c.get("error") for c in checks.values())
         return {"overall": overall, "checks": checks}
 
@@ -100,7 +111,9 @@ class ServerState:
         self.cockpit = live.attach(genesis.bus)
 
         from skeleton.agents.swarm_runtime import SwarmRuntime
+        from skeleton.agents.swarm_recovery import SwarmRecoveryManager
         self.swarm = SwarmRuntime(max_tasks=100_000, default_lease_seconds=30.0)
+        self.swarm_recovery = SwarmRecoveryManager(max_checkpoints=16)
 
         from skeleton.observability import MetricsCollector
         self.metrics = MetricsCollector()
