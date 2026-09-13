@@ -22,3 +22,17 @@ def decide(*, background_allowed: bool, read_only: bool, active: int, limit: int
     if active >= limit:
         return Admission.SHED
     return Admission.ACCEPT
+
+
+def accepted(decision: Admission) -> bool:
+    """Return whether an admission result permits normal execution."""
+    if not isinstance(decision, Admission):
+        raise TypeError("decision must be an Admission")
+    return decision is Admission.ACCEPT
+
+
+def degraded(decision: Admission) -> bool:
+    """Return whether an admission result intentionally avoids normal execution."""
+    if not isinstance(decision, Admission):
+        raise TypeError("decision must be an Admission")
+    return decision in (Admission.SHED, Admission.READ_ONLY)
