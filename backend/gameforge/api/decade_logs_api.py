@@ -16,6 +16,13 @@ _ERAS: Dict[str, EraLog] = {}
 _CALS: Dict[str, YearCalendar] = {}
 
 
+def _parse_day(value: str) -> date:
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise HTTPException(400, "day must be YYYY-MM-DD") from exc
+
+
 def _hub(uid: str) -> DecadeLogHub:
     if uid not in _HUBS:
         _HUBS[uid] = DecadeLogHub(uid)
@@ -61,7 +68,7 @@ class BuildingBody(BaseModel):
 
 @router.post("/fisherman/catch")
 async def catch(req: CatchBody, principal: Principal = Depends(get_principal)):
-    d = date.fromisoformat(req.day)
+    d = _parse_day(req.day)
     e = _hub(principal.user_id).fisherman.catch(
         d, req.body, title=req.title, importance=req.importance,
         schedule_item_id=req.schedule_item_id, tags=req.tags,
@@ -71,7 +78,7 @@ async def catch(req: CatchBody, principal: Principal = Depends(get_principal)):
 
 @router.post("/guest")
 async def guest(req: GuestBody, principal: Principal = Depends(get_principal)):
-    d = date.fromisoformat(req.day)
+    d = _parse_day(req.day)
     e = _hub(principal.user_id).guest.note_guest(
         d, req.person_label, req.body, relationship=req.relationship,
         schedule_item_id=req.schedule_item_id,
@@ -81,7 +88,7 @@ async def guest(req: GuestBody, principal: Principal = Depends(get_principal)):
 
 @router.post("/building")
 async def building(req: BuildingBody, principal: Principal = Depends(get_principal)):
-    d = date.fromisoformat(req.day)
+    d = _parse_day(req.day)
     e = _hub(principal.user_id).building.note_building(
         d, req.place, req.body, change_type=req.change_type,
         schedule_item_id=req.schedule_item_id,
@@ -91,7 +98,7 @@ async def building(req: BuildingBody, principal: Principal = Depends(get_princip
 
 @router.get("/day/{day}")
 async def day_bundle(day: str, principal: Principal = Depends(get_principal)):
-    d = date.fromisoformat(day)
+    d = _parse_day(day)
     return _hub(principal.user_id).linked_day(d)
 
 

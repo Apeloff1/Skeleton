@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from gameforge.enterprise.auth import Principal, get_principal
@@ -10,6 +10,13 @@ from gameforge.personal.synergy.triggers import trigger_matrix
 
 router = APIRouter(prefix="/coherence", tags=["coherence"])
 _ENGINES: Dict[str, CoherenceEngine] = {}
+
+
+def _parse_day(value: str) -> date:
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise HTTPException(400, "day must be YYYY-MM-DD") from exc
 
 
 def _eng(uid: str) -> CoherenceEngine:
@@ -77,7 +84,7 @@ async def sleep(req: SleepBody, principal: Principal = Depends(get_principal)):
 
 @router.post("/schedule")
 async def schedule(req: ScheduleBody, principal: Principal = Depends(get_principal)):
-    d = date.fromisoformat(req.day) if req.day else None
+    d = _parse_day(req.day) if req.day else None
     return _eng(principal.user_id).on_schedule_add(
         req.title, day=d, kind=req.kind, project_id=req.project_id
     ).to_dict()
@@ -85,7 +92,7 @@ async def schedule(req: ScheduleBody, principal: Principal = Depends(get_princip
 
 @router.post("/progress")
 async def progress(req: ProgressBody, principal: Principal = Depends(get_principal)):
-    d = date.fromisoformat(req.day) if req.day else None
+    d = _parse_day(req.day) if req.day else None
     return _eng(principal.user_id).on_progress(
         req.project_id, req.name, req.percent, day=d, note=req.note
     ).to_dict()
@@ -135,7 +142,7 @@ async def reliable_transcript(req: TranscriptBody, principal: Principal = Depend
 
 @router.post("/reliable/schedule")
 async def reliable_schedule(req: ScheduleBody, principal: Principal = Depends(get_principal)):
-    d = date.fromisoformat(req.day) if req.day else None
+    d = _parse_day(req.day) if req.day else None
     return _eng(principal.user_id).reliable_schedule(
         req.title, day=d, kind=req.kind, project_id=req.project_id
     )

@@ -11,6 +11,13 @@ router = APIRouter(prefix="/calendar", tags=["calendar"])
 _CALS: Dict[str, YearCalendar] = {}
 
 
+def _parse_day(value: str) -> date:
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise HTTPException(400, "day must be YYYY-MM-DD") from exc
+
+
 def _cal(user_id: str, country: str = "NO", city: str = "Lillestrøm") -> YearCalendar:
     if user_id not in _CALS:
         _CALS[user_id] = YearCalendar(user_id, country=country, city=city)
@@ -53,9 +60,9 @@ async def today(principal: Principal = Depends(get_principal)):
 @router.get("/day/{day}")
 async def get_day(day: str, principal: Principal = Depends(get_principal)):
     try:
-        d = date.fromisoformat(day)
-    except Exception:
-        raise HTTPException(400, "day must be YYYY-MM-DD")
+        d = _parse_day(day)
+    except HTTPException:
+        raise
     return _cal(principal.user_id).get_day(d, enrich=True).to_dict()
 
 
@@ -68,7 +75,7 @@ async def set_location(req: LocationBody, principal: Principal = Depends(get_pri
 
 @router.post("/schedule")
 async def add_schedule(req: ScheduleBody, principal: Principal = Depends(get_principal)):
-    d = date.fromisoformat(req.day)
+    d = _parse_day(req.day)
     daylog = _cal(principal.user_id).add_schedule(
         d, req.title, when=req.when, kind=req.kind, project_id=req.project_id, notes=req.notes
     )
@@ -77,7 +84,7 @@ async def add_schedule(req: ScheduleBody, principal: Principal = Depends(get_pri
 
 @router.post("/progress")
 async def project_progress(req: ProgressBody, principal: Principal = Depends(get_principal)):
-    d = date.fromisoformat(req.day)
+    d = _parse_day(req.day)
     daylog = _cal(principal.user_id).set_project_progress(
         d, req.project_id, req.name, req.percent, req.note
     )
@@ -86,7 +93,7 @@ async def project_progress(req: ProgressBody, principal: Principal = Depends(get
 
 @router.post("/note")
 async def day_note(req: NoteBody, principal: Principal = Depends(get_principal)):
-    d = date.fromisoformat(req.day)
+    d = _parse_day(req.day)
     return _cal(principal.user_id).add_day_note(d, req.note).to_dict()
 
 
@@ -98,7 +105,7 @@ async def jeeves_context(principal: Principal = Depends(get_principal)):
 @router.get("/yesteryear")
 async def yesteryear(day: Optional[str] = None, principal: Principal = Depends(get_principal)):
     c = _cal(principal.user_id)
-    d = date.fromisoformat(day) if day else date.today()
+    d = _parse_day(day) if day else date.today()
     mems = c.weather_log.memories_of_yesteryear(
         d, years_back=10, country=c.country, city=c.city, latitude=c.latitude
     )
