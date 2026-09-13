@@ -15,6 +15,11 @@ from typing import Iterable
 ROOT = Path(__file__).resolve().parents[1]
 SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", "node_modules"}
 SUBPROCESS_CALLS = {"run", "call", "check_call", "check_output", "Popen"}
+UNSAFE_CALLS = {
+    "os.system": "os.system() is forbidden",
+    "os.popen": "os.popen() is forbidden",
+    "asyncio.create_subprocess_shell": "asyncio.create_subprocess_shell() is forbidden",
+}
 
 
 def python_files() -> Iterable[Path]:
@@ -43,18 +48,19 @@ def dotted_name(node: ast.AST) -> str | None:
     return None
 
 
-def literal_true(node: ast.AST) -> bool:
-    return isinstance(node, ast.Constant) and node.value is True
+def literal_false(node: ast.AST) -> bool:
+    return isinstance(node, ast.Constant) and node.value is False
 
 
 def import_aliases(tree: ast.AST) -> dict[str, str]:
     aliases: dict[str, str] = {}
+    tracked_modules = {"asyncio", "os", "subprocess"}
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for item in node.names:
-                if item.name in {"os", "subprocess"}:
+                if item.name in tracked_modules:
                     aliases[item.asname or item.name] = item.name
-        elif isinstance(node, ast.ImportFrom) and node.module in {"os", "subprocess"}:
+        elif isinstance(node, ast.ImportFrom) and node.module in tracked_modules:
             for item in node.names:
                 aliases[item.asname or item.name] = f"{node.module}.{item.name}"
     return aliases
@@ -86,15 +92,15 @@ def violations(path: Path) -> list[str]:
             continue
 
         name = canonical_name(node.func, aliases)
-        if name == "os.system":
-            findings.append(f"{label}:{node.lineno}: os.system() is forbidden")
+        if name in UNSAFE_CALLS:
+            findings.append(f"{label}:{node.lineno}: {UNSAFE_CALLS[name]}")
             continue
 
         if name in {f"subprocess.{call}" for call in SUBPROCESS_CALLS}:
             for keyword in node.keywords:
-                if keyword.arg == "shell" and literal_true(keyword.value):
+                if keyword.arg == "shell" and not literal_false(keyword.value):
                     findings.append(
-                        f"{label}:{node.lineno}: {name}(..., shell=True) is forbidden"
+                        f"{label}:{node.lineno}: {name}(..., shell=...) is forbidden unless shell=False is literal"
                     )
 
     return findings
@@ -111,7 +117,9 @@ def main() -> int:
             print(f"  - {finding}", file=sys.stderr)
         return 1
 
-    print("Process safety gate passed: no shell=True or os.system() calls found.")
+    print(
+        "Process safety gate passed: no shell execution, os.system(), or os.popen() calls found."
+    )
     return 0
 
 
