@@ -21,7 +21,7 @@ from collections import Counter, OrderedDict
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Query, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core.databases import client as _MONGO
 from routes.llm_router import route_complete
@@ -158,11 +158,11 @@ async def list_presets(scale: str = Query("")):
 
 
 class RegionBody(BaseModel):
-    seed: int = 1337
-    size: int = 48
-    rx: int = 0
-    ry: int = 0
-    scale: float = 0.08
+    seed: int = Field(1337, ge=-2147483648, le=2147483647)
+    size: int = Field(48, ge=8, le=MAX_SIZE)
+    rx: int = Field(0, ge=-1000000, le=1000000)
+    ry: int = Field(0, ge=-1000000, le=1000000)
+    scale: float = Field(0.08, gt=0, le=0.5)
 
 
 @router.post("/region")
@@ -187,14 +187,14 @@ async def world_post(cfg: WorldConfig):
 
 
 class LoreBody(BaseModel):
-    seed: int = 1337
-    size: int = 40
-    rx: int = 0
-    ry: int = 0
-    scale: float = 0.07
-    world_scale: str = "region"
-    palette: str = "natural"
-    climate: str = "temperate"
+    seed: int = Field(1337, ge=-2147483648, le=2147483647)
+    size: int = Field(40, ge=8, le=MAX_SIZE)
+    rx: int = Field(0, ge=-1000000, le=1000000)
+    ry: int = Field(0, ge=-1000000, le=1000000)
+    scale: float = Field(0.07, gt=0, le=0.5)
+    world_scale: str = Field("region", max_length=50)
+    palette: str = Field("natural", max_length=100)
+    climate: str = Field("temperate", max_length=100)
 
 
 @router.post("/name-key")
@@ -716,6 +716,4 @@ async def simulate(body: SimBody):
                     "peak_pop": max(s["total_pop"] for s in series),
                     "founded": len([e for e in events if e["type"] == "settlement_founded"])},
     }
-
-
 

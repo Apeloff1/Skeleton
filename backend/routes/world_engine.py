@@ -22,10 +22,10 @@ router = APIRouter(prefix="/api/world-engine", tags=["World Engine"])
 # ============================================================================
 
 class WorldGenerationRequest(BaseModel):
-    prompt: str
-    style: str = "fantasy"  # fantasy, sci-fi, post-apocalyptic, historical, modern
-    scale: str = "medium"   # small (room), medium (area), large (region), massive (world)
-    detail_level: str = "high"  # low, medium, high, ultra
+    prompt: str = Field(..., min_length=1, max_length=20000)
+    style: str = Field("fantasy", max_length=100)  # fantasy, sci-fi, post-apocalyptic, historical, modern
+    scale: str = Field("medium", max_length=50)   # small (room), medium (area), large (region), massive (world)
+    detail_level: str = Field("high", max_length=50)  # low, medium, high, ultra
     include_terrain: bool = True
     include_structures: bool = True
     include_vegetation: bool = True
@@ -42,23 +42,23 @@ class TerrainRequest(BaseModel):
     features: List[str] = Field(default_factory=list, max_length=100)  # rivers, lakes, cliffs, canyons, beaches
 
 class BiomeRequest(BaseModel):
-    climate: str = "temperate"  # arctic, temperate, tropical, desert, volcanic
-    precipitation: str = "moderate"  # arid, dry, moderate, wet, monsoon
-    vegetation_density: float = 0.5
-    wildlife_density: float = 0.3
+    climate: str = Field("temperate", max_length=100)  # arctic, temperate, tropical, desert, volcanic
+    precipitation: str = Field("moderate", max_length=100)  # arid, dry, moderate, wet, monsoon
+    vegetation_density: float = Field(0.5, ge=0, le=1)
+    wildlife_density: float = Field(0.3, ge=0, le=1)
 
 class ArchitectureRequest(BaseModel):
-    description: str
-    style: str = "medieval"  # ancient, medieval, renaissance, victorian, modern, futuristic, alien
-    condition: str = "intact"  # ruins, damaged, intact, pristine, overgrown
-    scale: str = "building"  # room, building, complex, city, megastructure
+    description: str = Field(..., min_length=1, max_length=10000)
+    style: str = Field("medieval", max_length=100)  # ancient, medieval, renaissance, victorian, modern, futuristic, alien
+    condition: str = Field("intact", max_length=100)  # ruins, damaged, intact, pristine, overgrown
+    scale: str = Field("building", max_length=100)  # room, building, complex, city, megastructure
     interior: bool = True
 
 class AtmosphereRequest(BaseModel):
-    time_of_day: str = "day"  # dawn, morning, day, afternoon, dusk, night, midnight
-    weather: str = "clear"  # clear, cloudy, overcast, rain, storm, snow, fog, sandstorm
-    mood: str = "neutral"  # peaceful, mysterious, ominous, chaotic, magical, desolate
-    lighting_style: str = "natural"  # natural, dramatic, neon, bioluminescent, magical
+    time_of_day: str = Field("day", max_length=50)  # dawn, morning, day, afternoon, dusk, night, midnight
+    weather: str = Field("clear", max_length=100)  # clear, cloudy, overcast, rain, storm, snow, fog, sandstorm
+    mood: str = Field("neutral", max_length=100)  # peaceful, mysterious, ominous, chaotic, magical, desolate
+    lighting_style: str = Field("natural", max_length=100)  # natural, dramatic, neon, bioluminescent, magical
 
 # ============================================================================
 # WORLD GENERATION DATABASE
