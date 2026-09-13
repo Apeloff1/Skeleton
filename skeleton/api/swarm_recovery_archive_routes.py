@@ -6,10 +6,11 @@ import json
 from dataclasses import asdict
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Path
 from pydantic import BaseModel, Field
 
 from skeleton.agents.swarm_recovery import SwarmRecoveryManager
+from skeleton.api.swarm_recovery_service import activate_recovery
 
 router = APIRouter(prefix="/swarm/recovery", tags=["swarm-recovery"])
 
@@ -80,4 +81,36 @@ def import_recovery_archive(body: RecoveryArchiveImport) -> dict[str, Any]:
         "imported": True,
         "bytes": size,
         "status": asdict(staged.status()),
+    }
+
+
+@router.get("/catalog")
+def recovery_catalog() -> dict[str, Any]:
+    recovery = _recovery()
+    runtime = [
+        {"sequence": item.sequence, "created_at": item.created_at, "checksum": item.checksum}
+        for item in recovery.store.history()
+    ]
+    tenant = [
+        {"sequence": item.sequence, "created_at": item.created_at, "checksum": item.checksum}
+        for item in recovery.tenant_store.history()
+    ]
+    return {"runtime": runtime, "tenant": tenant, "status": asdict(recovery.status())}
+
+
+@router.post("/activate/{sequence}")
+def activate_recovery_checkpoint(sequence: int = Path(ge=1)) -> dict[str, Any]:
+    recovery = _recovery()
+    try:
+        result = activate_recovery(_state(), recovery, sequence)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=409, detail=f"recovery activation rejected: {exc}") from exc
+    return {
+        "activated": True,
+        "sequence": result.sequence,
+        "tenant_source": result.tenant_source,
+        "tenant_repair": result.tenant_repair,
+        "status": asdict(recovery.status()),
     }
