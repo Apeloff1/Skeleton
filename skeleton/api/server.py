@@ -4,6 +4,7 @@ Skeleton API Server — FastAPI application factory and state management.
 
 from __future__ import annotations
 
+from dataclasses import asdict, is_dataclass
 from typing import Any, Dict, Optional
 
 _fastapi = None
@@ -71,12 +72,8 @@ class ServerState:
                 checks["swarm"] = {"error": "health failed"}
         if self.swarm_recovery is not None:
             try:
-                checks["swarm_recovery"] = self.swarm_recovery.status().__dict__ if hasattr(self.swarm_recovery.status(), "__dict__") else {
-                    "checkpoints": self.swarm_recovery.status().checkpoints,
-                    "latest_sequence": self.swarm_recovery.status().latest_sequence,
-                    "leader": self.swarm_recovery.status().leader,
-                    "epoch": self.swarm_recovery.status().epoch,
-                }
+                recovery_status = self.swarm_recovery.status()
+                checks["swarm_recovery"] = asdict(recovery_status) if is_dataclass(recovery_status) else recovery_status
             except Exception:
                 checks["swarm_recovery"] = {"error": "recovery status failed"}
         overall = all(not isinstance(c, dict) or not c.get("error") for c in checks.values())
@@ -149,10 +146,12 @@ def create_app() -> Any:
     from skeleton.api.cockpit import router as cockpit_router
     from skeleton.api.swarm_routes import router as swarm_router
     from skeleton.api.swarm_operator_routes import router as swarm_operator_router
+    from skeleton.api.swarm_policy_routes import router as swarm_policy_router
     app.include_router(router, prefix="/api/v1")
     app.include_router(gameforge_router, prefix="/api/v1")
     app.include_router(swarm_router, prefix="/api/v1")
     app.include_router(swarm_operator_router, prefix="/api/v1")
+    app.include_router(swarm_policy_router, prefix="/api/v1")
     app.include_router(cockpit_router)
 
     from skeleton.api.middleware import DEFAULT_OPEN_PREFIXES, GatePolicy, install_gate
@@ -181,6 +180,7 @@ def create_app() -> Any:
             "cockpit": "/cockpit",
             "swarm": "/api/v1/swarm/status",
             "swarm_operator": "/api/v1/swarm/operator/overview",
+            "swarm_policy": "/api/v1/swarm/policy/admission-preview",
         }
 
     @app.get("/cortex/status")
