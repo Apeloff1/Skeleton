@@ -71,6 +71,36 @@ class HardenedSwarmRuntime(SwarmRuntime):
         with self._lock:
             return super().submit(task)
 
+    def submit_many(self, tasks: Iterable[SwarmTask]) -> tuple[SwarmTask, ...]:
+        """Atomically preflight and admit a complete task batch under one runtime lock."""
+        batch = tuple(tasks)
+        normalized: list[SwarmTask] = []
+        seen: set[str] = set()
+        with self._lock:
+            if len(self._tasks) + len(batch) > self.max_tasks:
+                raise AdmissionError("batch exceeds runtime task capacity")
+            for task in batch:
+                task_id = self._id(task.id, "task id")
+                if task_id in seen:
+                    raise AdmissionError(f"duplicate task id inside batch: {task_id}")
+                if task_id in self._tasks:
+                    raise AdmissionError(f"duplicate task id: {task_id}")
+                if task.max_attempts < 1:
+                    raise AdmissionError("max_attempts must be positive")
+                seen.add(task_id)
+                normalized.append(
+                    task
+                    if task_id == task.id
+                    else SwarmTask(
+                        id=task_id,
+                        payload=task.payload,
+                        priority=task.priority,
+                        max_attempts=task.max_attempts,
+                        required_capabilities=task.required_capabilities,
+                    )
+                )
+            return tuple(super(HardenedSwarmRuntime, self).submit(task) for task in normalized)
+
     def lease(self, worker_id: str, *, limit: int | None = None) -> list[SwarmTask]:
         with self._lock:
             return super().lease(worker_id.strip(), limit=limit)
