@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from enum import Enum
 from threading import Lock
 from time import monotonic
+import math
 
 
 @dataclass
@@ -60,6 +61,7 @@ class TieredCache:
     def put(self, key: str, value: object, now: float | None = None) -> None:
         now = monotonic() if now is None else now
         with self._lock:
+            self._l1.pop(key, None)
             self._put_l2(key, value, now)
 
     def invalidate(self, key: str) -> None:
@@ -94,23 +96,34 @@ class AdaptiveGate:
     """Bounded token admission with explicit shedding under saturation."""
 
     def __init__(self, capacity: int, refill_per_sec: int) -> None:
-        if capacity <= 0 or refill_per_sec < 0:
+        if (isinstance(capacity, bool) or not isinstance(capacity, int) or capacity <= 0
+                or isinstance(refill_per_sec, bool) or not isinstance(refill_per_sec, int)
+                or refill_per_sec < 0):
             raise ValueError("invalid gate bounds")
         self.capacity = capacity
         self.refill_per_sec = refill_per_sec
         self.tokens = capacity
         self.admitted = self.shed = 0
-        self._last = monotonic()
+        self._last: float | None = None
+        self._last_seen: float | None = None
         self._lock = Lock()
 
     def admit(self, priority: int = 1, now: float | None = None) -> Verdict:
         now = monotonic() if now is None else now
+        if isinstance(now, bool) or not isinstance(now, (int, float)) or not math.isfinite(now):
+            raise ValueError("now must be a finite number")
         with self._lock:
-            elapsed = max(0.0, now - self._last)
-            self.tokens = min(self.capacity,
-                              self.tokens + int(elapsed * self.refill_per_sec))
-            if elapsed * self.refill_per_sec >= 1:
+            if self._last is None:
                 self._last = now
+            if self._last_seen is not None and now < self._last_seen:
+                raise ValueError("gate time must be monotonic")
+            self._last_seen = now
+            elapsed = now - self._last
+            refill = int(elapsed * self.refill_per_sec)
+            self.tokens = min(self.capacity,
+                              self.tokens + refill)
+            if refill:
+                self._last += refill / self.refill_per_sec
             if self.tokens == 0 and priority > 0:
                 self.shed += 1
                 return Verdict.SHED
