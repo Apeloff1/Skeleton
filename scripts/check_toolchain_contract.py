@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PROCESS_SAFETY_TEST = "test_process_safety_gate.py"
 PROCESS_DESTRUCTURING_TEST = "test_process_safety_destructuring.py"
 PROCESS_PARTIAL_TEST = "test_process_safety_partial.py"
+PROCESS_NAMESPACE_GET_TEST = "test_process_safety_namespace_get.py"
 FULL_DEPLOY_NEEDS = "needs: [skeleton-test, school-jeeves-test, cockpit-smoke, backend-test, backend-import-smoke, frontend]"
 
 
@@ -67,6 +68,7 @@ def main() -> int:
         PROCESS_SAFETY_TEST in backend_quality
         and PROCESS_DESTRUCTURING_TEST in backend_quality
         and PROCESS_PARTIAL_TEST in backend_quality
+        and PROCESS_NAMESPACE_GET_TEST in backend_quality
         and "test_exec_guard.py" in backend_quality
         and "--noconftest" in backend_quality
         and 'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in backend_quality,
@@ -84,6 +86,7 @@ def main() -> int:
         PROCESS_SAFETY_TEST in quality
         and PROCESS_DESTRUCTURING_TEST in quality
         and PROCESS_PARTIAL_TEST in quality
+        and PROCESS_NAMESPACE_GET_TEST in quality
         and "test_exec_guard.py" in quality
         and "--noconftest" in quality,
         "local security gates drifted",
@@ -94,6 +97,7 @@ def main() -> int:
         PROCESS_SAFETY_TEST in precommit
         and PROCESS_DESTRUCTURING_TEST in precommit
         and PROCESS_PARTIAL_TEST in precommit
+        and PROCESS_NAMESPACE_GET_TEST in precommit
         and "test_exec_guard.py" in precommit
         and "repo-toolchain-contract" in precommit,
         "pre-commit security/toolchain gates drifted",
@@ -103,13 +107,14 @@ def main() -> int:
     require((ROOT / "backend/tests" / PROCESS_SAFETY_TEST).is_file(), "canonical process test missing", failures)
     require((ROOT / "backend/tests" / PROCESS_DESTRUCTURING_TEST).is_file(), "destructuring process-safety regression test missing", failures)
     require((ROOT / "backend/tests" / PROCESS_PARTIAL_TEST).is_file(), "partial process-safety regression test missing", failures)
+    require((ROOT / "backend/tests" / PROCESS_NAMESPACE_GET_TEST).is_file(), "namespace-get process-safety regression test missing", failures)
 
     if failures:
         print("Toolchain contract violations:", file=sys.stderr)
         for failure in failures:
             print(f"  - {failure}", file=sys.stderr)
         return 1
-    print("Toolchain contract passed: proven CI actions, runtime, quality, security, destructuring/partial coverage, self-enforcement, and fail-closed deployment gates aligned.")
+    print("Toolchain contract passed: proven CI actions, runtime, quality, security, destructuring/partial/namespace-get coverage, self-enforcement, and fail-closed deployment gates aligned.")
     return 0
 
 
