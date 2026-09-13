@@ -12,7 +12,7 @@ from threading import RLock
 from time import monotonic
 from typing import Callable, Iterable, Mapping
 
-from skeleton.agents.swarm_runtime import AdmissionError, LeaseError, SwarmRuntime, SwarmTask, WorkerState
+from skeleton.agents.swarm_runtime import AdmissionError, LeaseError, SwarmRuntime, SwarmTask, TaskState, WorkerState
 
 
 class HardenedSwarmRuntime(SwarmRuntime):
@@ -95,8 +95,12 @@ class HardenedSwarmRuntime(SwarmRuntime):
             return super().cancel(task_id.strip(), reason=reason)
 
     def revive(self, task_id: str, *, reset_attempts: bool = False) -> SwarmTask:
+        task_id = task_id.strip()
         with self._lock:
-            return super().revive(task_id.strip(), reset_attempts=reset_attempts)
+            task = super().task(task_id)
+            if task is not None and task.state is TaskState.DEAD and task.attempts >= task.max_attempts and not reset_attempts:
+                raise AdmissionError("dead task exhausted retry budget; reset_attempts is required")
+            return super().revive(task_id, reset_attempts=reset_attempts)
 
     def reap_expired(self) -> int:
         with self._lock:
