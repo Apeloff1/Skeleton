@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 from skeleton.agents.swarm_ingress import SwarmIngressGovernor
-from skeleton.agents.swarm_quota import Quota
+from skeleton.agents.swarm_quota import Quota, QuotaExceeded
 
 
 def test_ingress_tracks_queue_lease_and_completion() -> None:
@@ -54,6 +54,37 @@ def test_ingress_completion_requires_accounted_task() -> None:
     governor = SwarmIngressGovernor()
     with pytest.raises(ValueError):
         governor.complete("tenant", "missing")
+
+
+def test_quota_failure_refunds_rate_capacity(monkeypatch: pytest.MonkeyPatch) -> None:
+    governor = SwarmIngressGovernor(rate_capacity=1, rate_refill_per_second=0.000001)
+
+    def fail_reserve(*args: object, **kwargs: object) -> object:
+        raise QuotaExceeded("synthetic quota race")
+
+    monkeypatch.setattr(governor.quota, "reserve", fail_reserve)
+    decision = governor.admit("tenant", "task", {})
+
+    assert decision.accepted is False
+    assert decision.reason == "synthetic quota race"
+    assert governor.rate.remaining("tenant") == pytest.approx(1.0)
+    assert governor.status()["accounted_tasks"] == 0
+
+
+def test_fairness_failure_rolls_back_quota_and_rate(monkeypatch: pytest.MonkeyPatch) -> None:
+    governor = SwarmIngressGovernor(rate_capacity=1, rate_refill_per_second=0.000001)
+
+    def fail_fairness(*args: object, **kwargs: object) -> object:
+        raise RuntimeError("synthetic fairness failure")
+
+    monkeypatch.setattr(governor.fairness, "admit", fail_fairness)
+    with pytest.raises(RuntimeError, match="synthetic fairness failure"):
+        governor.admit("tenant", "task", {})
+
+    status = governor.status()
+    assert status["quota"]["tenant"] == {"queued": 0, "leased": 0, "payload_bytes": 0}
+    assert governor.rate.remaining("tenant") == pytest.approx(1.0)
+    assert status["accounted_tasks"] == 0
 
 
 def test_concurrent_ingress_never_exceeds_queue_quota() -> None:
