@@ -11,6 +11,7 @@ from .gameforge_queue import BoundedQueue
 from .gameforge_retry_budget import RetryBudget
 from .gameforge_health_score import HealthScore
 from .gameforge_snapshot import RuntimeSnapshot
+from .gameforge_receipt import Receipt
 
 @dataclass
 class RuntimeCoordinator:
@@ -39,6 +40,10 @@ class RuntimeCoordinator:
     self.quota.release(); self.budget.release(); self.health.record(False); return Admission.SHED
   self.health.record(decision is not Admission.SHED)
   return decision
+ def admit_receipt(self,request_id,now:int,active:int,limit:int=1,background:bool=False,retry:bool=False):
+  decision=self.admit(now,active,limit,background,request_id,retry)
+  reason=decision.value
+  return Receipt(request_id,decision.value,reason)
  def release(self):
   self.budget.release()
   self.quota.release()
