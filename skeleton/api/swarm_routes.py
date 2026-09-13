@@ -51,13 +51,13 @@ def _runtime() -> SwarmRuntime:
     runtime = getattr(state, "swarm", None)
     if runtime is None:
         runtime = HardenedSwarmRuntime()
-        state.swarm = runtime
+        state.bind_swarm_runtime(runtime)
     return runtime
 
 
 def _replace_runtime(runtime: SwarmRuntime) -> None:
     from skeleton.api.server import get_state
-    get_state().swarm = runtime
+    get_state().bind_swarm_runtime(runtime)
 
 
 def _task_dict(task: SwarmTask) -> dict[str, Any]:
