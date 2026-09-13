@@ -28,16 +28,16 @@ class BufferPool:
     """Hard-capped reusable buffer classes; no unbounded retention."""
 
     def __init__(self, class_cap: int = 64) -> None:
-        if not isinstance(class_cap, int) or class_cap < 1:
+        if not isinstance(class_cap, int) or isinstance(class_cap, bool) or class_cap < 1:
             raise ValueError("class_cap must be >= 1")
         self._cap = class_cap
         self._free: Dict[BufferClass, list[bytearray]] = {c: [] for c in BufferClass}
-        self._leased_ids: set[int] = set()
+        self._leases: Dict[int, BufferLease] = {}
         self.leased = 0
 
     @staticmethod
     def classify(min_size: int) -> BufferClass:
-        if not isinstance(min_size, int) or min_size < 0:
+        if not isinstance(min_size, int) or isinstance(min_size, bool) or min_size < 0:
             raise ValueError("min_size must be a non-negative integer")
         if min_size <= 4096:
             return BufferClass.SMALL
@@ -49,14 +49,19 @@ class BufferPool:
         cls = self.classify(min_size)
         buf = self._free[cls].pop() if self._free[cls] else bytearray(cls.value)
         lease = BufferLease(buf, cls)
-        self._leased_ids.add(id(lease))
+        self._leases[id(lease)] = lease
         self.leased += 1
         return lease
 
     def reclaim(self, lease: BufferLease) -> bool:
-        if id(lease) not in self._leased_ids:
+        if not isinstance(lease, BufferLease):
+            raise TypeError("lease must be BufferLease")
+        owned = self._leases.pop(id(lease), None)
+        if owned is not lease:
             return False
-        self._leased_ids.remove(id(lease))
+        if not isinstance(lease.buffer_class, BufferClass):
+            self.leased -= 1
+            raise TypeError("lease has invalid buffer class")
         lease.data.clear()
         if len(self._free[lease.buffer_class]) < self._cap:
             self._free[lease.buffer_class].append(lease.data)
@@ -72,6 +77,8 @@ class BufferPool:
         return sum(len(items) for items in self._free.values())
 
     def available(self, buffer_class: BufferClass) -> int:
+        if not isinstance(buffer_class, BufferClass):
+            raise TypeError("buffer_class must be BufferClass")
         return len(self._free[buffer_class])
 
 
@@ -84,6 +91,8 @@ class RequestCoalescer(Generic[T]):
         self._lock = asyncio.Lock()
 
     async def get(self, key: str) -> T:
+        if not isinstance(key, str) or not key:
+            raise ValueError("key is required")
         leader = False
         async with self._lock:
             future = self._in_flight.get(key)
