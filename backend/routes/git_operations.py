@@ -127,7 +127,7 @@ class GitRemoteRequest(BaseModel):
     url: str = Field(..., min_length=1, max_length=2000)
 
 class GitStashRequest(BaseModel):
-    message: Optional[str] = None
+    message: Optional[str] = Field(None, max_length=1000)
     include_untracked: bool = False
 
 
