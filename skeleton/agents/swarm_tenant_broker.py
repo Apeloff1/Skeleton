@@ -51,6 +51,7 @@ class TenantSwarmBroker:
         self.max_terminal_records = max_terminal_records
         self._tenant_by_task: dict[str, str] = {}
         self._terminal_tenants: OrderedDict[str, str] = OrderedDict()
+        self._retired = False
         self._lock = RLock()
 
     @staticmethod
@@ -66,6 +67,22 @@ class TenantSwarmBroker:
         if not task_id:
             raise ValueError("task_id must not be empty")
         return task_id
+
+    def _assert_active(self) -> None:
+        if self._retired:
+            raise AdmissionError("tenant broker generation retired")
+
+    def retire(self) -> bool:
+        """Fence this broker generation so queued callers cannot mutate detached state."""
+        with self._lock:
+            if self._retired:
+                return False
+            self._retired = True
+            return True
+
+    def is_retired(self) -> bool:
+        with self._lock:
+            return self._retired
 
     def _remember_terminal(self, task_id: str, tenant: str) -> None:
         self._terminal_tenants[task_id] = tenant
@@ -84,6 +101,7 @@ class TenantSwarmBroker:
 
     def rebind(self, broker: SwarmBroker) -> None:
         with self._lock:
+            self._assert_active()
             self.broker = broker
 
     @staticmethod
@@ -141,6 +159,7 @@ class TenantSwarmBroker:
     def repair(self) -> TenantRepairResult:
         """Reconcile tenant metadata/accounting against the live runtime as authority."""
         with self._lock:
+            self._assert_active()
             resident = {task.id: task for task in self.broker.runtime.tasks()}
             removed_orphans = restored_accounting = phase_repairs = terminalized = reactivated = 0
 
@@ -199,6 +218,7 @@ class TenantSwarmBroker:
         tenant = self._tenant(tenant)
         task_id = self._task_id(task.id)
         with self._lock:
+            self._assert_active()
             active_tenant = self._tenant_by_task.get(task_id)
             if active_tenant is not None:
                 if active_tenant != tenant:
@@ -310,6 +330,7 @@ class TenantSwarmBroker:
     ) -> CompletionResult:
         task_id = self._task_id(task_id)
         with self._lock:
+            self._assert_active()
             duplicate = self._terminal_duplicate(task_id)
             if duplicate is not None:
                 return duplicate
@@ -337,6 +358,7 @@ class TenantSwarmBroker:
     ) -> CompletionResult:
         task_id = self._task_id(task_id)
         with self._lock:
+            self._assert_active()
             duplicate = self._terminal_duplicate(task_id)
             if duplicate is not None:
                 return duplicate
@@ -367,6 +389,7 @@ class TenantSwarmBroker:
                 "terminal_tenants": dict(self._terminal_tenants),
                 "tracked_tasks": len(self._tenant_by_task),
                 "terminal_records": len(self._terminal_tenants),
+                "retired": self._retired,
                 "reconcile": self.reconcile(),
                 "ingress": self.ingress.status(),
             }
