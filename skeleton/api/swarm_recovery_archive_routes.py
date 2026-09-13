@@ -29,9 +29,18 @@ def _state():
 
 def _recovery() -> SwarmRecoveryManager:
     state = _state()
-    if state.swarm_recovery is None:
-        state.swarm_recovery = SwarmRecoveryManager(max_checkpoints=16)
-    return state.swarm_recovery
+    with state._swarm_bind_lock:
+        if state.swarm_recovery is None:
+            state.swarm_recovery = SwarmRecoveryManager(max_checkpoints=16)
+        return state.swarm_recovery
+
+
+def _publish_recovery(staged: SwarmRecoveryManager) -> SwarmRecoveryManager:
+    """Publish a fully verified recovery manager atomically with health readers."""
+    state = _state()
+    with state._swarm_bind_lock:
+        state.swarm_recovery = staged
+        return staged
 
 
 def _encoded_size(archive: dict[str, Any]) -> int:
@@ -66,8 +75,7 @@ def import_recovery_archive(body: RecoveryArchiveImport) -> dict[str, Any]:
     except (TypeError, ValueError, KeyError) as exc:
         raise HTTPException(status_code=422, detail=f"invalid recovery archive: {exc}") from exc
 
-    state = _state()
-    state.swarm_recovery = staged
+    staged = _publish_recovery(staged)
     return {
         "imported": True,
         "bytes": size,
