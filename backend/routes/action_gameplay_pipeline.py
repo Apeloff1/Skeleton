@@ -409,8 +409,8 @@ async def generate_gameplay_script(request: GameplayScriptRequest):
 
 class AIComboSystemRequest(BaseModel):
     """Request for AI-powered combo system design"""
-    game_style: str = Field(..., description="fighting, action_rpg, character_action, etc.")
-    complexity: str = Field(default="moderate", description="simple/moderate/complex")
+    game_style: str = Field(..., min_length=1, max_length=100, description="fighting, action_rpg, character_action, etc.")
+    complexity: str = Field(default="moderate", max_length=50, description="simple/moderate/complex")
 
 
 @router.post("/ai/combo/design")

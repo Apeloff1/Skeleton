@@ -119,11 +119,11 @@ AI_PROVIDERS = [
 
 
 class AIAssistRequest(BaseModel):
-    code: str = Field(..., description="Code to analyze")
-    language: str = Field(default="python", description="Programming language")
-    mode: str = Field(default="explain", description="AI assistance mode")
-    context: Optional[str] = Field(None, description="Additional context")
-    target_language: Optional[str] = Field(None, description="Target language for conversion")
+    code: str = Field(..., min_length=1, max_length=500000, description="Code to analyze")
+    language: str = Field(default="python", max_length=100, description="Programming language")
+    mode: str = Field(default="explain", max_length=100, description="AI assistance mode")
+    context: Optional[str] = Field(None, max_length=100000, description="Additional context")
+    target_language: Optional[str] = Field(None, max_length=100, description="Target language for conversion")
 
 
 class AIAssistResponse(BaseModel):
@@ -131,7 +131,7 @@ class AIAssistResponse(BaseModel):
     mode: str
     suggestion: str
     explanation: Optional[str] = None
-    code_blocks: List[Dict[str, str]] = []
+    code_blocks: List[Dict[str, str]] = Field(default_factory=list)
     confidence: float = 0.95
     model: str = "gpt-4o"
     ai_generated: bool = True
@@ -139,9 +139,11 @@ class AIAssistResponse(BaseModel):
 
 
 class AIChatRequest(BaseModel):
-    message: str = Field(..., description="User message")
-    context: Optional[str] = Field(None, description="Code context")
-    conversation_history: List[Dict[str, str]] = Field(default=[], description="Previous messages")
+    message: str = Field(..., min_length=1, max_length=100000, description="User message")
+    context: Optional[str] = Field(None, max_length=100000, description="Code context")
+    conversation_history: List[Dict[str, str]] = Field(
+        default_factory=list, max_length=100, description="Previous messages"
+    )
 
 
 async def call_llm(system_prompt: str, user_prompt: str) -> Dict[str, Any]:

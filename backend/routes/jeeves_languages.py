@@ -5,7 +5,7 @@ Teaches Jeeves every programming language with rich curriculum knowledge
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
@@ -16,18 +16,18 @@ router = APIRouter(prefix="/api/jeeves-languages", tags=["jeeves-languages"])
 # =============================================================================
 
 class LanguageKnowledge(BaseModel):
-    language_id: str
-    name: str
-    teaching_style: str
-    greeting: str
-    core_concepts: List[str]
-    common_mistakes: List[Dict[str, str]]
-    best_practices: List[str]
-    code_snippets: Dict[str, str]
-    difficulty_tips: Dict[str, str]
-    related_languages: List[str]
-    ecosystem: List[str]
-    history_note: str
+    language_id: str = Field(..., min_length=1, max_length=100)
+    name: str = Field(..., min_length=1, max_length=200)
+    teaching_style: str = Field(..., max_length=10000)
+    greeting: str = Field(..., max_length=10000)
+    core_concepts: List[str] = Field(..., max_length=100)
+    common_mistakes: List[Dict[str, str]] = Field(..., max_length=100)
+    best_practices: List[str] = Field(..., max_length=100)
+    code_snippets: Dict[str, str] = Field(..., max_length=100)
+    difficulty_tips: Dict[str, str] = Field(..., max_length=100)
+    related_languages: List[str] = Field(..., max_length=100)
+    ecosystem: List[str] = Field(..., max_length=100)
+    history_note: str = Field(..., max_length=10000)
 
 
 # Jeeves' complete knowledge base for all languages
