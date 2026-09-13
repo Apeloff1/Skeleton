@@ -1,8 +1,9 @@
-"""Weighted fair-share accounting for multi-tenant swarm admission."""
+"""Thread-safe weighted fair-share accounting for multi-tenant swarm admission."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from threading import RLock
 
 
 @dataclass(slots=True)
@@ -21,43 +22,65 @@ class TenantShare:
 class FairShareLedger:
     default_weight: int = 1
     _tenants: dict[str, TenantShare] = field(default_factory=dict)
+    _lock: RLock = field(default_factory=RLock, init=False, repr=False)
 
-    def configure(self, tenant: str, *, weight: int) -> TenantShare:
+    def __post_init__(self) -> None:
+        if self.default_weight < 1:
+            raise ValueError("default_weight must be positive")
+
+    @staticmethod
+    def _tenant(tenant: str) -> str:
         tenant = tenant.strip()
         if not tenant:
             raise ValueError("tenant must not be empty")
+        return tenant
+
+    def configure(self, tenant: str, *, weight: int) -> TenantShare:
+        tenant = self._tenant(tenant)
         if weight < 1:
             raise ValueError("weight must be positive")
-        share = self._tenants.setdefault(tenant, TenantShare())
-        share.weight = weight
-        return share
+        with self._lock:
+            share = self._tenants.setdefault(tenant, TenantShare(weight=self.default_weight))
+            share.weight = weight
+            return share
 
     def admit(self, tenant: str) -> TenantShare:
-        share = self._tenants.setdefault(tenant, TenantShare(weight=self.default_weight))
-        share.admitted += 1
-        share.inflight += 1
-        return share
+        tenant = self._tenant(tenant)
+        with self._lock:
+            share = self._tenants.setdefault(tenant, TenantShare(weight=self.default_weight))
+            share.admitted += 1
+            share.inflight += 1
+            return share
 
     def complete(self, tenant: str) -> TenantShare:
-        share = self._tenants.setdefault(tenant, TenantShare(weight=self.default_weight))
-        if share.inflight > 0:
+        tenant = self._tenant(tenant)
+        with self._lock:
+            share = self._tenants.setdefault(tenant, TenantShare(weight=self.default_weight))
+            if share.inflight <= 0:
+                raise ValueError(f"tenant has no inflight work: {tenant}")
             share.inflight -= 1
-        share.completed += 1
-        return share
+            share.completed += 1
+            return share
 
     def preferred(self, tenants: list[str]) -> str | None:
         if not tenants:
             return None
-        return min(tenants, key=lambda tenant: (self._tenants.setdefault(tenant, TenantShare(weight=self.default_weight)).virtual_load, tenant))
+        normalized = [self._tenant(tenant) for tenant in tenants]
+        with self._lock:
+            def score(tenant: str) -> tuple[float, str]:
+                share = self._tenants.setdefault(tenant, TenantShare(weight=self.default_weight))
+                return share.virtual_load, tenant
+            return min(normalized, key=score)
 
     def snapshot(self) -> dict[str, dict[str, float | int]]:
-        return {
-            tenant: {
-                "weight": share.weight,
-                "admitted": share.admitted,
-                "completed": share.completed,
-                "inflight": share.inflight,
-                "virtual_load": round(share.virtual_load, 6),
+        with self._lock:
+            return {
+                tenant: {
+                    "weight": share.weight,
+                    "admitted": share.admitted,
+                    "completed": share.completed,
+                    "inflight": share.inflight,
+                    "virtual_load": round(share.virtual_load, 6),
+                }
+                for tenant, share in sorted(self._tenants.items())
             }
-            for tenant, share in sorted(self._tenants.items())
-        }
