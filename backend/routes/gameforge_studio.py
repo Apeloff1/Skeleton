@@ -23,7 +23,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/api/gameforge/studio", tags=["gameforge-studio"])
 
@@ -185,10 +185,10 @@ def _ledger(limit: int = 50) -> list[dict]:
 # QUESTIONNAIRE
 # ══════════════════════════════════════════════════════════════════════════════
 class QBody(BaseModel):
-    question_id: str
-    question: str
+    question_id: str = Field(..., min_length=1, max_length=200)
+    question: str = Field(..., min_length=1, max_length=10000)
     answer: Any
-    confidence: float = 0.9
+    confidence: float = Field(0.9, ge=0, le=1)
 
 
 @router.post("/questionnaire/log")
@@ -224,7 +224,7 @@ async def questionnaire_questions():
 # SNOWBALL STEP LOGS (rooms connected to every step)
 # ══════════════════════════════════════════════════════════════════════════════
 class ChoiceBody(BaseModel):
-    key: str
+    key: str = Field(..., min_length=1, max_length=200)
     value: Any
 
 
@@ -263,7 +263,7 @@ async def step_complete(step_id: str):
 # FORGES
 # ══════════════════════════════════════════════════════════════════════════════
 class ForgeBody(BaseModel):
-    game_concept: dict = {}
+    game_concept: dict = Field(default_factory=dict, max_length=100)
 
 
 @router.get("/forges/logs")
@@ -298,10 +298,10 @@ async def forge_run(b: ForgeBody):
 # BOARDROOM VAULT — direct access (vault access in the board room)
 # ══════════════════════════════════════════════════════════════════════════════
 class VaultPut(BaseModel):
-    filename: str
-    content: str            # text or base64
+    filename: str = Field(..., min_length=1, max_length=255)
+    content: str = Field(..., min_length=1, max_length=500000)  # text or base64
     is_base64: bool = False
-    metadata: dict = {}
+    metadata: dict = Field(default_factory=dict, max_length=50)
 
 
 @router.get("/vault")
