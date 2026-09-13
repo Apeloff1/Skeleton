@@ -89,3 +89,33 @@ def test_duplicate_completion_token_is_idempotent_at_tenant_boundary() -> None:
     assert second.duplicate is True
     assert ingress.phase("acme", "task") is None
     assert broker.status()["terminal_records"] == 1
+
+
+def test_terminal_task_resubmission_is_stable_duplicate_without_runtime_mutation() -> None:
+    runtime, ingress, broker = _broker()
+    broker.submit_and_dispatch("acme", SwarmTask("task", {"version": 1}))
+    broker.record_success("w", "task", completion_token="done")
+    resident = runtime.task("task")
+    assert resident is not None and resident.state is TaskState.SUCCEEDED
+
+    duplicate = broker.submit_and_dispatch("acme", SwarmTask("task", {"version": 2}))
+
+    assert duplicate.admitted is True
+    assert duplicate.duplicate is True
+    assert duplicate.leased is False
+    assert duplicate.worker_id is None
+    assert duplicate.reason == "terminal task already accounted"
+    assert runtime.task("task") == resident
+    assert ingress.phase("acme", "task") is None
+
+
+def test_terminal_task_resubmission_preserves_cross_tenant_ownership() -> None:
+    runtime, ingress, broker = _broker()
+    broker.submit_and_dispatch("alpha", SwarmTask("task", {}))
+    broker.record_success("w", "task", completion_token="done")
+
+    with pytest.raises(AdmissionError, match="task already belongs to tenant: alpha"):
+        broker.submit_and_dispatch("beta", SwarmTask("task", {}))
+
+    assert runtime.task("task").state is TaskState.SUCCEEDED
+    assert ingress.phase("alpha", "task") is None
