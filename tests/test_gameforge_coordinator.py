@@ -30,3 +30,6 @@ def test_coordinator_retry_budget_bounds_retries():
 
 def test_coordinator_health_records_admission_outcomes():
  x,s,d=make(); s.ready(); d.mark("db"); assert x.admit(0,0,request_id="x") is Admission.ACCEPT; assert x.health.value==1.0; x.release(); x.lifecycle.drain(); assert x.admit(1,0,request_id="y") is Admission.SHED; assert x.health.value==0.5
+
+def test_coordinator_snapshot_is_immutable_state():
+ x,s,d=make(); s.ready(); d.mark("db"); x.admit(0,0,request_id="x"); snap=x.snapshot(active=1); assert snap.lifecycle=="ready"; assert snap.dependencies_ready; assert snap.budget_used==1; assert snap.saturated()
