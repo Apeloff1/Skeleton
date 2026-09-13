@@ -87,6 +87,43 @@ def test_fairness_failure_rolls_back_quota_and_rate(monkeypatch: pytest.MonkeyPa
     assert status["accounted_tasks"] == 0
 
 
+def test_completion_fairness_failure_leaves_quota_and_task_untouched(monkeypatch: pytest.MonkeyPatch) -> None:
+    governor = SwarmIngressGovernor()
+    assert governor.admit("tenant", "task", {"x": 1}).accepted is True
+    before = governor.status()
+
+    def fail_complete(*args: object, **kwargs: object) -> object:
+        raise RuntimeError("synthetic fairness completion failure")
+
+    monkeypatch.setattr(governor.fairness, "complete", fail_complete)
+    with pytest.raises(RuntimeError, match="synthetic fairness completion failure"):
+        governor.complete("tenant", "task")
+
+    after = governor.status()
+    assert after["quota"] == before["quota"]
+    assert after["accounted_tasks"] == 1
+    assert governor.phase("tenant", "task") == "queued"
+
+
+def test_completion_quota_failure_rolls_back_fairness(monkeypatch: pytest.MonkeyPatch) -> None:
+    governor = SwarmIngressGovernor()
+    assert governor.admit("tenant", "task", {"x": 1}).accepted is True
+    before = governor.status()
+
+    def fail_release(*args: object, **kwargs: object) -> object:
+        raise QuotaExceeded("synthetic completion quota failure")
+
+    monkeypatch.setattr(governor.quota, "release", fail_release)
+    with pytest.raises(QuotaExceeded, match="synthetic completion quota failure"):
+        governor.complete("tenant", "task")
+
+    after = governor.status()
+    assert after["quota"] == before["quota"]
+    assert after["fairness"] == before["fairness"]
+    assert after["accounted_tasks"] == 1
+    assert governor.phase("tenant", "task") == "queued"
+
+
 def test_concurrent_ingress_never_exceeds_queue_quota() -> None:
     governor = SwarmIngressGovernor(rate_capacity=1000, rate_refill_per_second=1000)
     governor.configure_tenant("tenant", quota=Quota(max_queued=8, max_leased=8, max_payload_bytes=1_000_000))
