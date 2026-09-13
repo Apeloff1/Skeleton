@@ -73,6 +73,22 @@ class FairShareLedger:
             self._tenants[tenant] = share
             return share
 
+    def rollback_complete(self, tenant: str) -> TenantShare:
+        """Undo one completion without changing the historical admission count."""
+        tenant = self._tenant(tenant)
+        with self._lock:
+            current = self._tenants.get(tenant, TenantShare(weight=self.default_weight))
+            if current.completed <= 0:
+                raise ValueError(f"tenant has no completed work to roll back: {tenant}")
+            share = TenantShare(
+                weight=current.weight,
+                admitted=current.admitted,
+                completed=current.completed - 1,
+                inflight=current.inflight + 1,
+            )
+            self._tenants[tenant] = share
+            return share
+
     def preferred(self, tenants: list[str]) -> str | None:
         if not tenants:
             return None
