@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Query
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from routes.playable import _db
 from routes.llm_router import EMERGENT_LLM_KEY
@@ -213,28 +213,28 @@ def _trim_jobs():
 
 # ── request models ───────────────────────────────────────────────────────────
 class GenBody(BaseModel):
-    description: str
-    kind: str = "character"
-    style: str = "flat_vector"
-    palette: str = "vibrant"
-    world_context: str = ""
-    narrative_context: str = ""
-    game_id: str | None = None  # optional playable to ground + (later) attach to
+    description: str = Field(..., min_length=1, max_length=10000)
+    kind: str = Field("character", max_length=100)
+    style: str = Field("flat_vector", max_length=100)
+    palette: str = Field("vibrant", max_length=100)
+    world_context: str = Field("", max_length=10000)
+    narrative_context: str = Field("", max_length=10000)
+    game_id: str | None = Field(None, max_length=200)  # optional playable to ground + (later) attach to
 
 
 class PackBody(BaseModel):
-    description: str
-    kinds: list[str] = []
-    style: str = "flat_vector"
-    palette: str = "vibrant"
-    world_context: str = ""
-    narrative_context: str = ""
-    game_id: str | None = None
+    description: str = Field(..., min_length=1, max_length=10000)
+    kinds: list[str] = Field(default_factory=list, max_length=50)
+    style: str = Field("flat_vector", max_length=100)
+    palette: str = Field("vibrant", max_length=100)
+    world_context: str = Field("", max_length=10000)
+    narrative_context: str = Field("", max_length=10000)
+    game_id: str | None = Field(None, max_length=200)
 
 
 class LinkBody(BaseModel):
-    game_id: str
-    asset_ids: list[str]
+    game_id: str = Field(..., min_length=1, max_length=200)
+    asset_ids: list[str] = Field(..., min_length=1, max_length=500)
 
 
 # ── routes ───────────────────────────────────────────────────────────────────

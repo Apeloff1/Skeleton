@@ -55,7 +55,7 @@ class CollectionCreate(BaseModel):
 
 
 class GameRef(BaseModel):
-    playable_id: str
+    playable_id: str = Field(..., min_length=1, max_length=200)
 
 
 @router.post("")
@@ -73,7 +73,7 @@ async def create_collection(body: CollectionCreate):
 
 
 @router.get("")
-async def list_collections(limit: int = Query(50, le=100)):
+async def list_collections(limit: int = Query(50, ge=1, le=100)):
     """List collections (newest first) with a small cover preview per bundle."""
     docs = await _db.collections.find({}, {"_id": 0}).sort("updated_at", -1).limit(limit).to_list(limit)
     preview_ids = [gid for d in docs for gid in (d.get("game_ids") or [])[:3]]

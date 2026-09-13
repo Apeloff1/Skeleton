@@ -11,9 +11,9 @@ router = APIRouter(prefix="/api/galaxy-studio/assets", tags=["asset-forge"])
 
 
 class ForgeAssetsReq(BaseModel):
-    build_id: str = Field(..., min_length=1)
-    seed: int = 0
-    era: str | None = None
+    build_id: str = Field(..., min_length=1, max_length=200)
+    seed: int = Field(0, ge=-2147483648, le=2147483647)
+    era: str | None = Field(None, max_length=100)
     persist: bool = True
 
 
