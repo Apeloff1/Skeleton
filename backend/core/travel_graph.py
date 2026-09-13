@@ -5,7 +5,7 @@ with discovery gates instead of route handlers and database coupling.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import heapq
 from math import hypot
 from typing import Any, Iterable
@@ -49,14 +49,22 @@ class TravelPlan:
 
 class TravelGraph:
     def __init__(self, regions: Iterable[Region], locations: Iterable[Location]) -> None:
-        self.regions = {r.id: r for r in regions}
-        self.locations = {p.id: p for p in locations}
+        region_items = tuple(regions)
+        location_items = tuple(locations)
+        self.regions = {r.id: r for r in region_items}
+        self.locations = {p.id: p for p in location_items}
         if not self.regions or not self.locations:
             raise ValueError("travel graph requires regions and locations")
+        if len(self.regions) != len(region_items) or len(self.locations) != len(location_items):
+            raise ValueError("duplicate travel id")
         if any(not key.strip() for key in self.regions | self.locations):
             raise ValueError("blank travel id")
+        if any(region.difficulty < 0 for region in self.regions.values()):
+            raise ValueError("region difficulty cannot be negative")
         if any(loc.region_id not in self.regions for loc in self.locations.values()):
             raise ValueError("location references unknown region")
+        if any(loc.min_level < 1 for loc in self.locations.values()):
+            raise ValueError("location min_level must be positive")
         self._edges: dict[str, list[Route]] = {key: [] for key in self.locations}
         self.discovered: set[str] = set()
 
@@ -81,6 +89,8 @@ class TravelGraph:
         if resolved <= 0 or danger < 0:
             raise ValueError("invalid route distance or danger")
         tags = tuple(sorted(set(required_tags)))
+        if any(not tag.strip() for tag in tags):
+            raise ValueError("route required tag cannot be blank")
         route = Route(a, b, resolved, float(danger), one_way, tags)
         self._edges[a].append(route)
         if not one_way:
@@ -93,13 +103,10 @@ class TravelGraph:
         self.discovered.add(location_id)
         return len(self.discovered) != before
 
-    def available_locations(self, *, level: int, tags: Iterable[str] = ()) -> tuple[Location, ...]:
-        owned = set(tags)
-        return tuple(
-            loc
-            for loc in self.locations.values()
-            if loc.min_level <= level and (not loc.tags or set(loc.tags).issubset(owned | set(loc.tags)))
-        )
+    def available_locations(self, *, level: int) -> tuple[Location, ...]:
+        if level < 1:
+            raise ValueError("level must be positive")
+        return tuple(loc for loc in self.locations.values() if loc.min_level <= level)
 
     def plan(
         self,
@@ -113,6 +120,8 @@ class TravelGraph:
     ) -> TravelPlan:
         if start not in self.locations or end not in self.locations:
             raise KeyError("unknown travel endpoint")
+        if level < 1:
+            raise ValueError("level must be positive")
         if danger_weight < 0:
             raise ValueError("danger_weight cannot be negative")
         owned = set(tags)
