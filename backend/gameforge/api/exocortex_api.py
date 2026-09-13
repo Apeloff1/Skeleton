@@ -217,15 +217,15 @@ async def conglomerate(principal: Principal = Depends(get_principal)):
 
 
 class UnitBody(BaseModel):
-    name: str
-    unit_type: str = "business_unit"
-    parent_id: str = "root"
+    name: str = Field(..., min_length=1, max_length=200)
+    unit_type: str = Field("business_unit", max_length=100)
+    parent_id: str = Field("root", max_length=200)
 
 
 class GrantBody(BaseModel):
-    from_unit: str
-    to_unit: str
-    surfaces: List[str]
+    from_unit: str = Field(..., min_length=1, max_length=200)
+    to_unit: str = Field(..., min_length=1, max_length=200)
+    surfaces: List[str] = Field(..., min_length=1, max_length=100)
 
 
 @router.get("/conglomerate/dashboard")
@@ -264,21 +264,21 @@ async def quality_scorecard(principal: Principal = Depends(get_principal)):
 
 
 class CounselBody(BaseModel):
-    text: str
-    energy: float = 0.55
+    text: str = Field(..., min_length=1, max_length=100000)
+    energy: float = Field(0.55, ge=-1, le=1)
     strain: bool = False
 
 
 class VoxBody(BaseModel):
-    agent_id: str = "agent_1"
-    subject: str
+    agent_id: str = Field("agent_1", min_length=1, max_length=200)
+    subject: str = Field(..., min_length=1, max_length=1000)
     body: Optional[Dict[str, Any]] = None
 
 
 class RepBody(BaseModel):
-    room_id: str
-    delta: float
-    reason: str = ""
+    room_id: str = Field(..., min_length=1, max_length=200)
+    delta: float = Field(..., ge=-1000, le=1000)
+    reason: str = Field("", max_length=1000)
 
 
 @router.post("/zaibatsu/counsel")

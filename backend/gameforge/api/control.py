@@ -96,16 +96,16 @@ def _get_or_spawn(agent_id: str) -> AgentRuntime:
 
 
 class SpawnRequest(BaseModel):
-    agent_id: str
-    tenant_id: Optional[str] = None
+    agent_id: str = Field(..., min_length=1, max_length=200)
+    tenant_id: Optional[str] = Field(None, min_length=1, max_length=200)
 
 
 class WorkRequest(BaseModel):
-    agent_id: str
-    room_id: str
-    prompt: str
-    priority: int = 50
-    tenant_id: Optional[str] = None
+    agent_id: str = Field(..., min_length=1, max_length=200)
+    room_id: str = Field(..., min_length=1, max_length=200)
+    prompt: str = Field(..., min_length=1, max_length=50000)
+    priority: int = Field(50, ge=0, le=100)
+    tenant_id: Optional[str] = Field(None, min_length=1, max_length=200)
 
 
 @app.get("/health")
@@ -407,4 +407,3 @@ async def export_compliance_pack(
         )
     )
     return pack
-

@@ -1804,9 +1804,9 @@ class ExecutionResult(BaseModel):
     trace_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:16])
 
 class CodeExecutionRequest(BaseModel):
-    code: str
+    code: str = Field(..., min_length=1, max_length=500000)
     language: LanguageType
-    input_data: Optional[str] = None
+    input_data: Optional[str] = Field(None, max_length=100000)
     timeout_seconds: int = Field(default=10, ge=1, le=60)
     memory_limit_mb: int = Field(default=256, ge=64, le=1024)
     security_level: SecurityLevel = SecurityLevel.STANDARD
@@ -1818,10 +1818,10 @@ class CodeExecutionResponse(BaseModel):
     language_info: Dict[str, Any]
 
 class AIAssistRequest(BaseModel):
-    code: str
+    code: str = Field(..., min_length=1, max_length=500000)
     language: LanguageType
     mode: AIAssistantMode
-    context: Optional[str] = None
+    context: Optional[str] = Field(None, max_length=100000)
     target_language: Optional[LanguageType] = None
 
 class AIAssistResponse(BaseModel):
@@ -1829,22 +1829,22 @@ class AIAssistResponse(BaseModel):
     mode: AIAssistantMode
     suggestion: str
     explanation: Optional[str] = None
-    code_blocks: List[Dict[str, str]] = []
+    code_blocks: List[Dict[str, str]] = Field(default_factory=list)
     confidence: float = 0.0
     model: str = ""
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 class CodeFile(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    name: str
+    name: str = Field(..., min_length=1, max_length=255)
     language: LanguageType
-    code: str
+    code: str = Field(..., min_length=1, max_length=500000)
     version: int = 1
     checksum: str = ""
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     is_favorite: bool = False
-    tags: List[str] = []
+    tags: List[str] = Field(default_factory=list, max_length=50)
 
 class UserPreferences(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -1860,7 +1860,7 @@ class UserPreferences(BaseModel):
     current_tutorial_step: Optional[str] = None
     tooltips_enabled: bool = True
     advanced_panel_unlocked: bool = False
-    advanced_settings: Dict[str, Any] = {}
+    advanced_settings: Dict[str, Any] = Field(default_factory=dict)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 class LanguageAddon(BaseModel):
@@ -1880,7 +1880,7 @@ class LanguageAddon(BaseModel):
 class TutorialProgress(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     current_step: TutorialStep = TutorialStep.WELCOME
-    completed_steps: List[str] = []
+    completed_steps: List[str] = Field(default_factory=list)
     started_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: Optional[datetime] = None
     skipped: bool = False
@@ -1892,7 +1892,7 @@ class AdvancedSettings(BaseModel):
     debug_mode: bool = False
     experimental_features: bool = False
     streaming_output: bool = False
-    custom_compiler_flags: Dict[str, List[str]] = {}
+    custom_compiler_flags: Dict[str, List[str]] = Field(default_factory=dict)
 
 #====================================================================================================
 # CODE EXECUTORS
@@ -3943,10 +3943,10 @@ class CompilerStage(BaseModel):
     errors: List[Dict[str, Any]] = []
 
 class CompilationRequest(BaseModel):
-    code: str
+    code: str = Field(..., min_length=1, max_length=500000)
     language: LanguageType
-    sanitizers: List[str] = []
-    optimizers: List[str] = []
+    sanitizers: List[str] = Field(default_factory=list, max_length=50)
+    optimizers: List[str] = Field(default_factory=list, max_length=50)
     optimization_level: int = Field(default=2, ge=0, le=3)
     target_arch: str = "x86_64"
     include_ir: bool = False
@@ -3985,9 +3985,9 @@ class CompilationResponse(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     success: bool
     language: str
-    stages: List[PipelineStage] = []
-    sanitizer_results: List[SanitizerResult] = []
-    optimizer_results: List[OptimizerResult] = []
+    stages: List[PipelineStage] = Field(default_factory=list)
+    sanitizer_results: List[SanitizerResult] = Field(default_factory=list)
+    optimizer_results: List[OptimizerResult] = Field(default_factory=list)
     ir_code: Optional[str] = None
     assembly_code: Optional[str] = None
     binary_size: Optional[int] = None
