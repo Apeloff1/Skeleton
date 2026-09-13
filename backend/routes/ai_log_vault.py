@@ -6,7 +6,7 @@
 """
 
 from fastapi import APIRouter, BackgroundTasks
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import os
@@ -33,10 +33,10 @@ logscraper_runs_collection = db.logscraper_runs
 # ============================================================================
 
 class AIQueryLog(BaseModel):
-    query_type: str  # chat, code_gen, debug, explain, etc.
-    user_input: str
-    ai_response: str
-    model_used: str = "gpt-4o"
+    query_type: str = Field(..., min_length=1, max_length=100)  # chat, code_gen, debug, explain, etc.
+    user_input: str = Field(..., min_length=1, max_length=100000)
+    ai_response: str = Field(..., min_length=1, max_length=100000)
+    model_used: str = Field("gpt-4o", max_length=100)
     context: Optional[Dict[str, Any]] = None
     language: Optional[str] = None
     success: bool = True
@@ -45,8 +45,8 @@ class AIQueryLog(BaseModel):
     session_id: Optional[str] = None
 
 class UserActionLog(BaseModel):
-    action_type: str  # code_written, file_saved, challenge_completed, lesson_viewed, etc.
-    action_data: Dict[str, Any]
+    action_type: str = Field(..., min_length=1, max_length=100)  # code_written, file_saved, challenge_completed, lesson_viewed, etc.
+    action_data: Dict[str, Any] = Field(..., max_length=100)
     context: Optional[Dict[str, Any]] = None
     session_id: Optional[str] = None
 
@@ -55,8 +55,8 @@ class LogscraperConfig(BaseModel):
     include_user_actions: bool = True
     include_vault_data: bool = True
     include_curriculum_progress: bool = True
-    time_range_hours: int = 24
-    max_records: int = 10000
+    time_range_hours: int = Field(24, ge=1, le=8760)
+    max_records: int = Field(10000, ge=1, le=100000)
 
 class JeevesTrainingData(BaseModel):
     patterns: List[Dict[str, Any]]

@@ -11,7 +11,7 @@
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from datetime import datetime
 from pathlib import Path
@@ -75,21 +75,21 @@ class GitHubPullRequest(BaseModel):
 
 
 class GitHubRepoRequest(BaseModel):
-    token: str
-    repo_name: str
-    description: Optional[str] = "Created with CodeDock"
+    token: str = Field(..., min_length=1, max_length=500)
+    repo_name: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = Field("Created with CodeDock", max_length=1000)
     private: bool = False
 
 
 class AIInteractionLog(BaseModel):
-    user_id: str
-    interaction_type: str  # code_generation, debugging, tutoring, etc.
-    prompt: str
-    response: str
-    model_used: Optional[str] = "gpt-4o"
-    tokens_used: Optional[int] = 0
+    user_id: str = Field(..., min_length=1, max_length=200)
+    interaction_type: str = Field(..., min_length=1, max_length=100)  # code_generation, debugging, tutoring, etc.
+    prompt: str = Field(..., min_length=1, max_length=100000)
+    response: str = Field(..., min_length=1, max_length=100000)
+    model_used: Optional[str] = Field("gpt-4o", max_length=100)
+    tokens_used: Optional[int] = Field(0, ge=0, le=1000000)
     was_helpful: Optional[bool] = None
-    context: Dict[str, Any] = {}
+    context: Dict[str, Any] = Field(default_factory=dict)
 
 
 # ============================================================================
