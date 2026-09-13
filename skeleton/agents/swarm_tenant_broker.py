@@ -164,8 +164,20 @@ class TenantSwarmBroker:
             if active_tenant is not None:
                 if active_tenant != tenant:
                     raise AdmissionError(f"task already belongs to tenant: {active_tenant}")
-                result = self.broker.submit_and_dispatch(task, idempotency_key=idempotency_key)
-                return TenantBrokerResult(tenant, result.task_id, True, result.duplicate, result.worker_id, result.leased, result.reason)
+                resident = self.broker.runtime.task(task_id)
+                if resident is None:
+                    raise AdmissionError(f"active tenant task missing from runtime: {task_id}; repair required")
+                if resident.state in TERMINAL_STATES:
+                    raise AdmissionError(f"active tenant task is terminal: {task_id}; repair required")
+                return TenantBrokerResult(
+                    tenant,
+                    task_id,
+                    True,
+                    True,
+                    resident.leased_to,
+                    resident.state is TaskState.LEASED,
+                    f"active task already accounted in state {resident.state.value}",
+                )
             terminal_tenant = self._terminal_tenants.get(task_id)
             if terminal_tenant is not None:
                 if terminal_tenant != tenant:
