@@ -21,7 +21,7 @@ import base64
 import time
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
@@ -406,7 +406,7 @@ async def vault_versions(file_id: str):
 
 
 class RollbackBody(BaseModel):
-    to_version: int
+    to_version: int = Field(..., ge=1, le=100000)
 
 
 @router.post("/vault/{file_id}/rollback")
@@ -449,8 +449,8 @@ async def vault_download(file_id: str, version: Optional[int] = None):
 
 
 class FetchToBody(BaseModel):
-    system: str            # "gamefiles" | "knowledge"
-    game_name: str = "Studio"
+    system: str = Field(..., min_length=1, max_length=50)  # "gamefiles" | "knowledge"
+    game_name: str = Field("Studio", min_length=1, max_length=200)
 
 
 @router.post("/vault/{file_id}/fetch-to")
@@ -535,9 +535,9 @@ def _auto_rollback_latest() -> dict:
 
 
 class AlarmBody(BaseModel):
-    kind: str
-    detail: str = ""
-    severity: str = "warning"
+    kind: str = Field(..., min_length=1, max_length=200)
+    detail: str = Field("", max_length=5000)
+    severity: str = Field("warning", min_length=1, max_length=50)
 
 
 @router.post("/alarm")
@@ -548,7 +548,7 @@ async def alarm_raise(b: AlarmBody, user=Depends(_editor)):
 
 
 @router.get("/alarms")
-async def alarms_list(limit: int = 30, unresolved_only: bool = False):
+async def alarms_list(limit: int = Query(30, ge=1, le=200), unresolved_only: bool = False):
     q = {"resolved": False} if unresolved_only else {}
     rows = list(_alarms().find(q, {"_id": 0}).sort("ts", -1).limit(limit))
     return {"ok": True, "alarms": rows,
@@ -556,7 +556,7 @@ async def alarms_list(limit: int = 30, unresolved_only: bool = False):
 
 
 class RecoverBody(BaseModel):
-    reason: str = "manual"
+    reason: str = Field("manual", max_length=1000)
 
 
 @router.post("/auto-recover")
@@ -576,12 +576,12 @@ async def auto_recover(b: RecoverBody, user=Depends(_editor)):
 # GOVERNANCE FLOW — Boardroom → Evaluation Room → Boardroom → Vault + gamefiles
 # ══════════════════════════════════════════════════════════════════════════════
 class SubmitBody(BaseModel):
-    game_name: str
-    filename: str
-    content: str
-    kind: str = "artifact"
-    step_id: Optional[str] = None
-    metadata: dict = {}
+    game_name: str = Field(..., min_length=1, max_length=200)
+    filename: str = Field(..., min_length=1, max_length=255)
+    content: str = Field(..., min_length=1, max_length=500000)
+    kind: str = Field("artifact", max_length=100)
+    step_id: Optional[str] = Field(None, max_length=200)
+    metadata: dict = Field(default_factory=dict, max_length=50)
     require_supermajority: bool = False
 
 
