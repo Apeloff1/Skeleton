@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
@@ -11,6 +12,7 @@ from gameforge.personal.diaries.service import DiaryService
 
 router = APIRouter(prefix="/diaries", tags=["diaries"])
 _DIARY_SERVICES: Dict[str, DiaryService] = {}
+logger = logging.getLogger(__name__)
 
 
 async def _service(
@@ -52,7 +54,8 @@ class DiaryWriteRequest(BaseModel):
 def _kind(value: str) -> DiaryKind:
     try:
         return DiaryKind(value.lower())
-    except Exception:
+    except (TypeError, ValueError) as exc:
+        logger.debug("Invalid diary kind %r: %s", value, exc)
         raise HTTPException(status_code=400, detail="kind must be memory|introspect|outrospect|retrospect")
 
 

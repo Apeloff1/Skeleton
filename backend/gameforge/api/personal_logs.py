@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
@@ -11,6 +12,7 @@ from gameforge.personal.logs.recording_ledger import RecordingLedgerService
 router = APIRouter(prefix="/logs", tags=["personal-logs"])
 _LOGS: Dict[str, PersonalLogService] = {}
 _LEDGERS: Dict[str, RecordingLedgerService] = {}
+logger = logging.getLogger(__name__)
 
 
 def _svc(user_id: str) -> PersonalLogService:
@@ -44,7 +46,8 @@ class ConsentBody(BaseModel):
 async def write_log(req: LogWrite, principal: Principal = Depends(get_principal)):
     try:
         kind = PersonalLogKind(req.kind)
-    except Exception:
+    except (TypeError, ValueError) as exc:
+        logger.debug("Invalid personal log kind %r: %s", req.kind, exc)
         raise HTTPException(400, detail=f"kind must be one of {[k.value for k in PersonalLogKind]}")
     svc = _svc(principal.user_id)
     e = await svc.add(
