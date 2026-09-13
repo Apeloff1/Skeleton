@@ -18,7 +18,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Path, Query
 from pydantic import BaseModel, Field
 
 from core.databases import client as _SHARED_MONGO_CLIENT
@@ -189,9 +189,9 @@ async def list_agents(limit: int = Query(50, ge=1, le=200)):
 
 
 @router.get("/{agent_id}/profile")
-async def agent_profile(agent_id: str):
+async def agent_profile(agent_id: str = Path(..., min_length=1, max_length=200)):
     """An agent's memory profile: counts, top tags, and recent reflections."""
-    agent_id = (agent_id or "").strip()
+    agent_id = agent_id.strip()
     all_mems = await _db.agent_memories.find({"agent_id": agent_id}, PROJ).to_list(1000)
     if not all_mems:
         return {"agent_id": agent_id, "memories": 0, "reflections": [], "top_tags": [], "by_kind": {}}
@@ -209,9 +209,9 @@ async def agent_profile(agent_id: str):
 
 
 @router.delete("/{agent_id}")
-async def clear_agent(agent_id: str):
+async def clear_agent(agent_id: str = Path(..., min_length=1, max_length=200)):
     """Forget all of an agent's memories (admin / reset)."""
-    res = await _db.agent_memories.delete_many({"agent_id": (agent_id or "").strip()})
+    res = await _db.agent_memories.delete_many({"agent_id": agent_id.strip()})
     return {"agent_id": agent_id, "deleted": res.deleted_count}
 
 
