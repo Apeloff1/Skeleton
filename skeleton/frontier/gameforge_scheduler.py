@@ -1,10 +1,7 @@
-"""Bounded weighted work scheduler."""
+"""Bounded weighted work scheduler with deterministic weighted round-robin."""
 class Scheduler:
  def __init__(self,weights):
   if not weights or any(v<=0 for v in weights.values()): raise ValueError("positive weights required")
-  self._schedule=tuple(name for name,weight in weights.items() for _ in range(weight))
-  self._cursor=0
+  self._schedule=tuple(name for name,weight in weights.items() for _ in range(weight)); self._cursor=0
  def next(self):
-  name=self._schedule[self._cursor]
-  self._cursor=(self._cursor+1)%len(self._schedule)
-  return name
+  name=self._schedule[self._cursor]; self._cursor=(self._cursor+1)%len(self._schedule); return name
