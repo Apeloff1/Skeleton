@@ -13,6 +13,7 @@ Commands:
     plan        Jeeves BuildPlan for a vision / era
     cockpit     Apply one cockpit command
     walk        Prove spawn→extract on the emitted door graph
+    frontier    Run bounded pipeline agents and manage persistent memory
     help        Show this help message
 """
 
@@ -176,6 +177,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     cmd = args[0]
     rest = args[1:]
+    if cmd == "frontier":
+        from skeleton.frontier.cli import main as frontier_main
+        return frontier_main(rest)
     if cmd == "run": return _cmd_gameforge_run(rest)
     if cmd == "forge":
         from skeleton.forge.universal import Forge
