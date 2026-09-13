@@ -32,7 +32,6 @@ class FailureReport(BaseModel):
 
 
 def _runtime() -> SwarmRuntime:
-    # Imported lazily to keep server/module initialization acyclic.
     from skeleton.api.server import get_state
 
     state = get_state()
@@ -72,6 +71,8 @@ def swarm_status(runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
 
 @router.post("/workers", status_code=status.HTTP_201_CREATED)
 def register_worker(body: WorkerRegistration, runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
+    if runtime.worker(body.worker_id) is not None:
+        raise HTTPException(status_code=409, detail="worker already registered")
     try:
         worker = runtime.register_worker(
             body.worker_id,
