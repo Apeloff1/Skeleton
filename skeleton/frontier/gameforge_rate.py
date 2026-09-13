@@ -4,15 +4,17 @@ from collections import deque
 
 class RateWindow:
     def __init__(self, limit: int, window: int = 60):
-        if limit <= 0 or window <= 0:
-            raise ValueError("invalid rate window")
+        if not isinstance(limit, int) or isinstance(limit, bool) or limit <= 0:
+            raise ValueError("limit must be a positive integer")
+        if not isinstance(window, int) or isinstance(window, bool) or window <= 0:
+            raise ValueError("window must be a positive integer")
         self.limit = limit
         self.window = window
         self._times = deque()
         self._last_now = None
 
     def _validate_now(self, now: int) -> None:
-        if not isinstance(now, int):
+        if not isinstance(now, int) or isinstance(now, bool):
             raise TypeError("now must be an integer")
         if self._last_now is not None and now < self._last_now:
             raise ValueError("rate window time must be monotonic")
