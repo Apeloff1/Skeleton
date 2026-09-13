@@ -3,8 +3,8 @@
 
 class Deadline:
     def __init__(self, budget: int):
-        if not isinstance(budget, int) or budget < 0:
-            raise ValueError("budget must be non-negative")
+        if not isinstance(budget, int) or isinstance(budget, bool) or budget < 0:
+            raise ValueError("budget must be a non-negative integer")
         self.capacity = budget
         self.remaining = budget
 
@@ -13,8 +13,8 @@ class Deadline:
         return self.remaining == 0
 
     def spend(self, cost: int) -> bool:
-        if not isinstance(cost, int) or cost < 0:
-            raise ValueError("cost must be non-negative")
+        if not isinstance(cost, int) or isinstance(cost, bool) or cost < 0:
+            raise ValueError("cost must be a non-negative integer")
         if cost > self.remaining:
             self.remaining = 0
             return False
