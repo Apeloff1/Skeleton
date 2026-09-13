@@ -1,11 +1,12 @@
 import pytest
 
 from skeleton.agents.swarm_broker import SwarmBroker
+from skeleton.agents.swarm_exact_lease import lease_exact
 from skeleton.agents.swarm_hardened import HardenedSwarmRuntime
 from skeleton.agents.swarm_ingress import SwarmIngressGovernor
 from skeleton.agents.swarm_lease_rollback import rollback_exact_lease
 from skeleton.agents.swarm_quota import Quota
-from skeleton.agents.swarm_runtime import LeaseError, SwarmTask, TaskState
+from skeleton.agents.swarm_runtime import LeaseError, SwarmRuntime, SwarmTask, TaskState
 from skeleton.agents.swarm_tenant_broker import TenantSwarmBroker
 
 
@@ -85,3 +86,50 @@ def test_tenant_broker_rolls_back_runtime_when_leased_quota_rejects() -> None:
         "active_terminal": (),
         "phase_mismatch": (),
     }
+
+
+def test_exact_lease_clock_failure_does_not_partially_commit() -> None:
+    runtime = SwarmRuntime(clock=lambda: 10.0)
+    worker = runtime.register_worker("w")
+    runtime.submit(SwarmTask("task", {}))
+    before_events = runtime.events()
+
+    def broken_clock() -> float:
+        raise RuntimeError("clock unavailable")
+
+    runtime._clock = broken_clock
+    with pytest.raises(RuntimeError, match="clock unavailable"):
+        lease_exact(runtime, "w", "task")
+
+    resident = runtime.task("task")
+    assert resident is not None and resident.state is TaskState.QUEUED
+    assert resident.attempts == 0
+    assert worker.active == set()
+    assert worker.accepted == 0
+    assert runtime.events() == before_events
+
+
+def test_exact_lease_commit_uses_one_clock_sample() -> None:
+    runtime = SwarmRuntime(clock=lambda: 1.0)
+    worker = runtime.register_worker("w")
+    runtime.submit(SwarmTask("task", {}))
+    calls = 0
+
+    def single_sample_clock() -> float:
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            raise RuntimeError("clock sampled twice")
+        return 42.0
+
+    runtime._clock = single_sample_clock
+    leased = lease_exact(runtime, "w", "task")
+
+    assert calls == 1
+    assert leased.state is TaskState.LEASED
+    assert leased.attempts == 1
+    assert leased.lease_deadline == 72.0
+    assert worker.last_seen == 42.0
+    assert worker.active == {"task"}
+    assert worker.accepted == 1
+    assert runtime.events()[-1] == (42.0, "task.leased", "task")
