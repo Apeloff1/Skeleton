@@ -233,3 +233,35 @@ def test_exact_lease_rejects_non_string_identifiers_before_lookup() -> None:
         lease_exact(runtime, 7, "task")
     with pytest.raises(LeaseError, match="task_id must be a string"):
         lease_exact(runtime, "w", None)
+
+
+@pytest.mark.parametrize("clock_value", [math.nan, math.inf, -math.inf])
+def test_exact_lease_rollback_rejects_non_finite_clock_without_mutation(clock_value: float) -> None:
+    runtime = SwarmRuntime(clock=lambda: 2.0)
+    worker = runtime.register_worker("w")
+    runtime.submit(SwarmTask("task", {}))
+    leased = lease_exact(runtime, "w", "task")
+    before_events = runtime.events()
+    runtime._clock = lambda: clock_value
+
+    with pytest.raises(LeaseError, match="clock must be a finite number"):
+        rollback_exact_lease(runtime, "w", "task")
+
+    assert runtime.task("task") == leased
+    assert worker.active == {"task"}
+    assert worker.accepted == 1
+    assert runtime.snapshot().leased == 1
+    assert runtime.snapshot().queued == 0
+    assert runtime.events() == before_events
+
+
+def test_exact_lease_rollback_rejects_non_string_identifiers_before_lookup() -> None:
+    runtime = SwarmRuntime(clock=lambda: 2.0)
+    runtime.register_worker("w")
+    runtime.submit(SwarmTask("task", {}))
+    lease_exact(runtime, "w", "task")
+
+    with pytest.raises(LeaseError, match="worker_id must be a string"):
+        rollback_exact_lease(runtime, object(), "task")
+    with pytest.raises(LeaseError, match="task_id must be a string"):
+        rollback_exact_lease(runtime, "w", None)
