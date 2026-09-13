@@ -43,6 +43,7 @@ class ServerState:
         self.registry: Optional[Any] = None
         self.ledger: Optional[Any] = None
         self.scheduler: Optional[Any] = None
+        self.swarm: Optional[Any] = None
         self.health: Optional[Any] = None
         self.metrics: Optional[Any] = None
         self.cockpit: Optional[Any] = None
@@ -111,6 +112,11 @@ class ServerState:
         from skeleton.cortex import live
         self.cockpit = live.attach(genesis.bus)
 
+        # Bounded swarm control plane. Keep this runtime independent from model
+        # execution so API workers can coordinate tasks without hidden threads.
+        from skeleton.agents.swarm_runtime import SwarmRuntime
+        self.swarm = SwarmRuntime(max_tasks=100_000, default_lease_seconds=30.0)
+
         # Health + metrics
         from skeleton.observability import MetricsCollector
         self.metrics = MetricsCollector()
@@ -147,8 +153,10 @@ def create_app() -> Any:
     from skeleton.api.routes import router
     from skeleton.api.gameforge_routes import router as gameforge_router
     from skeleton.api.cockpit import router as cockpit_router
+    from skeleton.api.swarm_routes import router as swarm_router
     app.include_router(router, prefix="/api/v1")
     app.include_router(gameforge_router, prefix="/api/v1")
+    app.include_router(swarm_router, prefix="/api/v1")
     app.include_router(cockpit_router)
 
     # Zaibatsu gate — sibling of gameforge-middleware / gf-server.
@@ -184,6 +192,7 @@ def create_app() -> Any:
             "status": "running",
             "jeeves_provider": state.jeeves.provider_name if state.jeeves else None,
             "cockpit": "/cockpit",
+            "swarm": "/api/v1/swarm/status",
         }
 
     @app.get("/cortex/status")
