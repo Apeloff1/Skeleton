@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Verify runtime/toolchain versions stay aligned across repo surfaces.
+"""Verify runtime/toolchain and canonical quality gates stay aligned.
 
-This is intentionally dependency-free on Python 3.11+: stdlib TOML/JSON plus
-small textual checks for workflow and Docker configuration. CI should fail when
-package metadata, containers, or workflows drift to incompatible runtimes.
+Dependency-free on Python 3.11+: stdlib TOML/JSON plus textual contract checks.
+CI fails when package metadata, containers, workflows, or local quality gates
+silently drift apart.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ import sys
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
+PROCESS_SAFETY_TEST = "test_process_safety_gate.py"
 
 
 def read(path: str) -> str:
@@ -92,6 +93,11 @@ def main() -> int:
         "CI frontend job must use canonical package scripts",
         failures,
     )
+    require(
+        "python ../scripts/check_toolchain_contract.py" in ci,
+        "CI backend-lint job must enforce this toolchain contract",
+        failures,
+    )
 
     backend_quality = read(".github/workflows/backend-quality.yml")
     require(
@@ -104,6 +110,46 @@ def main() -> int:
         "Backend Quality workflow must pin Ruff to 0.9.x",
         failures,
     )
+    require(
+        PROCESS_SAFETY_TEST in backend_quality and "test_exec_guard.py" in backend_quality,
+        "Backend Quality must run both execution-boundary security tests",
+        failures,
+    )
+    require(
+        "--noconftest" in backend_quality,
+        "Focused Backend Quality security tests must isolate global conftest",
+        failures,
+    )
+
+    quality_gates = read("scripts/quality-gates.sh")
+    require(
+        PROCESS_SAFETY_TEST in quality_gates and "test_exec_guard.py" in quality_gates,
+        "Local quality gates must run the canonical security regression tests",
+        failures,
+    )
+    require(
+        "--noconftest" in quality_gates,
+        "Local focused security tests must isolate global conftest",
+        failures,
+    )
+
+    precommit = read(".pre-commit-config.yaml")
+    require(
+        PROCESS_SAFETY_TEST in precommit and "test_exec_guard.py" in precommit,
+        "Pre-commit execution-boundary hook must use canonical security tests",
+        failures,
+    )
+    require(
+        "tests/test_process_safety.py" not in precommit,
+        "Pre-commit must not reference the superseded process-safety test name",
+        failures,
+    )
+
+    require(
+        (ROOT / "backend/tests" / PROCESS_SAFETY_TEST).is_file(),
+        f"Canonical process-safety test missing: {PROCESS_SAFETY_TEST}",
+        failures,
+    )
 
     if failures:
         print("Toolchain contract violations:", file=sys.stderr)
@@ -111,7 +157,9 @@ def main() -> int:
             print(f"  - {failure}", file=sys.stderr)
         return 1
 
-    print("Toolchain contract passed: Python 3.11 / Ruff 0.9 / Node 24 aligned.")
+    print(
+        "Toolchain contract passed: Python 3.11 / Ruff 0.9 / Node 24 and security gates aligned."
+    )
     return 0
 
 
