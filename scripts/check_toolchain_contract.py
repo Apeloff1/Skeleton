@@ -76,6 +76,8 @@ def main() -> int:
     require("astral-sh/setup-uv@v4" in ci, "CI uv setup drifted", failures)
     require("docker/setup-buildx-action@v3" in ci, "Buildx version drifted", failures)
     require(ci.count("docker/build-push-action@v5") == 3, "build-push version/count drifted", failures)
+    require(ci.count('"pydantic>=2.5,<3"') >= 3, "Skeleton/Jeeves/Cockpit CI jobs must install pydantic runtime slice", failures)
+    require(ci.count('"pydantic-settings>=2.1,<3"') >= 3, "Skeleton/Jeeves/Cockpit CI jobs must install pydantic-settings runtime slice", failures)
     for required_job in ("skeleton-test", "school-jeeves-test", "cockpit-smoke", "backend-test", "backend-import-smoke", "frontend"):
         require(f"  {required_job}:" in ci, f"CI job missing {required_job}", failures)
     require(FULL_DEPLOY_NEEDS in ci, "Docker publishing must fail closed on every critical test/smoke gate", failures)
