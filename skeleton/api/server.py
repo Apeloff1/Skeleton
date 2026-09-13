@@ -156,6 +156,7 @@ def create_app() -> Any:
     from skeleton.api.swarm_policy_routes import router as swarm_policy_router
     from skeleton.api.swarm_lifecycle_routes import router as swarm_lifecycle_router
     from skeleton.api.swarm_integrity_routes import router as swarm_integrity_router
+    from skeleton.api.swarm_fence_routes import router as swarm_fence_router
     app.include_router(router, prefix="/api/v1")
     app.include_router(gameforge_router, prefix="/api/v1")
     app.include_router(swarm_router, prefix="/api/v1")
@@ -163,6 +164,7 @@ def create_app() -> Any:
     app.include_router(swarm_policy_router, prefix="/api/v1")
     app.include_router(swarm_lifecycle_router, prefix="/api/v1")
     app.include_router(swarm_integrity_router, prefix="/api/v1")
+    app.include_router(swarm_fence_router, prefix="/api/v1")
     app.include_router(cockpit_router)
 
     from skeleton.api.middleware import DEFAULT_OPEN_PREFIXES, GatePolicy, install_gate
@@ -194,6 +196,7 @@ def create_app() -> Any:
             "swarm_policy": "/api/v1/swarm/policy/admission-preview",
             "swarm_lifecycle": "/api/v1/swarm/lifecycle/pressure",
             "swarm_integrity": "/api/v1/swarm/integrity/audit",
+            "swarm_fenced": "/api/v1/swarm/fenced/workers/{worker_id}/tasks/{task_id}/success",
         }
 
     @app.get("/cortex/status")
