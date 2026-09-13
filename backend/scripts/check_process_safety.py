@@ -1,8 +1,8 @@
 """Fail CI on unsafe process invocation patterns in backend Python code.
 
 Dependency-free by design so it can run before application imports. The scanner
-tracks common import, assignment, and getattr aliases to prevent trivial process
-policy bypasses.
+tracks common import, assignment, getattr, and namespace-mapping aliases to
+prevent trivial process policy bypasses.
 """
 
 from __future__ import annotations
@@ -53,6 +53,12 @@ def literal_false(node: ast.AST) -> bool:
     return isinstance(node, ast.Constant) and node.value is False
 
 
+def literal_string(node: ast.AST) -> str | None:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    return None
+
+
 def star_import_violations(tree: ast.AST, label: Path) -> list[str]:
     findings: list[str] = []
     for node in ast.walk(tree):
@@ -79,6 +85,24 @@ def import_aliases(tree: ast.AST) -> dict[str, str]:
     return aliases
 
 
+def namespace_mapping_owner(node: ast.AST, aliases: dict[str, str]) -> str | None:
+    if isinstance(node, ast.Attribute) and node.attr == "__dict__":
+        owner = canonical_name(node.value, aliases)
+        return owner if owner in TRACKED_MODULES else None
+
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "vars"
+        and len(node.args) == 1
+        and not node.keywords
+    ):
+        owner = canonical_name(node.args[0], aliases)
+        return owner if owner in TRACKED_MODULES else None
+
+    return None
+
+
 def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
     if (
         isinstance(node, ast.Call)
@@ -87,9 +111,16 @@ def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
         and len(node.args) >= 2
     ):
         owner = canonical_name(node.args[0], aliases)
-        attribute = node.args[1]
-        if owner in TRACKED_MODULES and isinstance(attribute, ast.Constant) and isinstance(attribute.value, str):
-            return f"{owner}.{attribute.value}"
+        attribute = literal_string(node.args[1])
+        if owner in TRACKED_MODULES and attribute is not None:
+            return f"{owner}.{attribute}"
+        return None
+
+    if isinstance(node, ast.Subscript):
+        owner = namespace_mapping_owner(node.value, aliases)
+        attribute = literal_string(node.slice)
+        if owner in TRACKED_MODULES and attribute is not None:
+            return f"{owner}.{attribute}"
         return None
 
     name = dotted_name(node)
@@ -136,9 +167,18 @@ def dynamic_getattr_violation(node: ast.Call, aliases: dict[str, str]) -> str | 
     attribute = node.args[1]
     if owner not in TRACKED_MODULES:
         return None
-    if isinstance(attribute, ast.Constant) and isinstance(attribute.value, str):
+    if literal_string(attribute) is not None:
         return None
     return f"dynamic getattr() on {owner} is forbidden because process policy cannot be statically proven"
+
+
+def dynamic_namespace_mapping_violation(node: ast.Subscript, aliases: dict[str, str]) -> str | None:
+    owner = namespace_mapping_owner(node.value, aliases)
+    if owner not in TRACKED_MODULES:
+        return None
+    if literal_string(node.slice) is not None:
+        return None
+    return f"dynamic namespace lookup on {owner} is forbidden because process policy cannot be statically proven"
 
 
 def violations(path: Path) -> list[str]:
@@ -152,6 +192,11 @@ def violations(path: Path) -> list[str]:
     findings = star_import_violations(tree, label)
 
     for node in ast.walk(tree):
+        if isinstance(node, ast.Subscript):
+            dynamic_mapping_violation = dynamic_namespace_mapping_violation(node, aliases)
+            if dynamic_mapping_violation:
+                findings.append(f"{label}:{node.lineno}: {dynamic_mapping_violation}")
+
         if not isinstance(node, ast.Call):
             continue
 
@@ -193,7 +238,7 @@ def main() -> int:
 
     print(
         "Process safety gate passed: no unsafe shell execution, opaque subprocess kwargs, "
-        "dynamic process getattr(), process-sensitive star imports, os.system(), or os.popen() calls found."
+        "dynamic process lookup, process-sensitive star imports, os.system(), or os.popen() calls found."
     )
     return 0
 
