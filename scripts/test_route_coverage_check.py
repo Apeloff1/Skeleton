@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import route_coverage_check as coverage
+from scripts import route_coverage_check as coverage
 
 
 class RouteCoverageContractTests(unittest.TestCase):
