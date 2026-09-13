@@ -8,7 +8,7 @@ ARG NODE_VERSION=24
 FROM node:${NODE_VERSION}-alpine AS deps
 WORKDIR /app
 COPY package.json yarn.lock* ./
-RUN yarn install --frozen-lockfile
+RUN yarn install --frozen-lockfile --non-interactive
 
 # Stage 2: Development
 FROM node:${NODE_VERSION}-alpine AS development
@@ -23,10 +23,15 @@ FROM node:${NODE_VERSION}-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npx expo export --platform web
+RUN yarn export:web
 
 # Stage 4: Production (Nginx)
 FROM nginx:alpine AS production
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget -qO- http://127.0.0.1/healthz >/dev/null || exit 1
+
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
