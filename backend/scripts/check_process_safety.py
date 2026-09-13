@@ -1,8 +1,8 @@
 """Fail CI on unsafe process invocation patterns in backend Python code.
 
 Dependency-free by design so it can run before application imports. The scanner
-tracks common import, assignment, walrus, getattr, and namespace-mapping aliases
-to prevent trivial process policy bypasses.
+tracks common import, assignment, destructuring, walrus, getattr, and namespace-
+mapping aliases to prevent trivial process policy bypasses.
 """
 
 from __future__ import annotations
@@ -133,8 +133,26 @@ def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
     return replacement + (f".{suffix}" if dot else "")
 
 
+def destructured_assignments(target: ast.AST, value: ast.AST) -> list[tuple[str, ast.AST]]:
+    """Pair exact positional tuple/list destructuring targets with source nodes."""
+
+    if isinstance(target, ast.Name):
+        return [(target.id, value)]
+    if isinstance(target, ast.Starred):
+        return []
+    if not isinstance(target, (ast.Tuple, ast.List)) or not isinstance(value, (ast.Tuple, ast.List)):
+        return []
+    if len(target.elts) != len(value.elts):
+        return []
+
+    pairs: list[tuple[str, ast.AST]] = []
+    for target_item, value_item in zip(target.elts, value.elts):
+        pairs.extend(destructured_assignments(target_item, value_item))
+    return pairs
+
+
 def assignment_aliases(tree: ast.AST, aliases: dict[str, str]) -> dict[str, str]:
-    """Resolve simple aliases assigned from tracked process callables."""
+    """Resolve aliases assigned from tracked process callables."""
 
     resolved = dict(aliases)
     assignments: list[tuple[str, ast.AST]] = []
@@ -142,8 +160,7 @@ def assignment_aliases(tree: ast.AST, aliases: dict[str, str]) -> dict[str, str]
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign):
             for target in node.targets:
-                if isinstance(target, ast.Name):
-                    assignments.append((target.id, node.value))
+                assignments.extend(destructured_assignments(target, node.value))
         elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value:
             assignments.append((node.target.id, node.value))
         elif isinstance(node, ast.NamedExpr) and isinstance(node.target, ast.Name):
