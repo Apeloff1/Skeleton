@@ -16,7 +16,7 @@ import { playClipsSequential, stopCinematic } from '../src/utils/cinematicVoice'
 
 const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
-type Rig = { id: string; type: string; label?: string; fov?: number; use?: string; notes?: string };
+type Rig = { id: string; type: string; label?: string; fov?: number; use?: string; notes?: string; easing?: string };
 type Shot = { shot_id?: string; rig?: string; movement?: string; target?: string; fov?: number; duration_s?: number; easing?: string; trigger?: string };
 type Scene = { scene?: string; description?: string; shots?: Shot[] };
 
