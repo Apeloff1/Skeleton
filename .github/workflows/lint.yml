@@ -1,23 +1,30 @@
 name: Lint
 
 # Guards against ESLint debt silently re-accumulating in the Expo frontend.
-# Runs the project's flat config (eslint.config.js -> eslint-config-expo) on every push / PR.
+# Keep the workflow itself in the path filter so CI changes validate themselves.
 
 on:
   push:
     branches: [main, master]
     paths:
       - "frontend/**"
+      - ".github/workflows/lint.yml"
   pull_request:
     paths:
       - "frontend/**"
+      - ".github/workflows/lint.yml"
 
 permissions:
   contents: read
 
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   eslint:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
@@ -26,12 +33,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: yarn install --frozen-lockfile --non-interactive
 
-      # `expo lint` auto-installs eslint + eslint-config-expo on first run (non-interactive in CI).
       - name: Run ESLint (zero warnings allowed)
         env:
           CI: "true"
