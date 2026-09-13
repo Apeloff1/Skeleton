@@ -5,6 +5,7 @@ from skeleton.agents.bridge import MeshBridge
 from skeleton.agents.swarm_admission import AdmissionDecision, AdmissionPolicy, capability_coverage
 from skeleton.agents.swarm_autoscale import AutoscalePolicy, ScaleRecommendation
 from skeleton.agents.swarm_broker import BrokerResult, CompletionResult, SwarmBroker
+from skeleton.agents.swarm_checkpoint import Checkpoint, CheckpointStore
 from skeleton.agents.swarm_control import SubmitResult, SwarmControlPlane
 from skeleton.agents.swarm_dedupe import Completion, CompletionCache
 from skeleton.agents.swarm_drain import DrainPlan, drain, plan_drain
@@ -35,6 +36,7 @@ from skeleton.agents.swarm_slo import SLOPolicy
 from skeleton.agents.swarm_snapshot import CURRENT_VERSION, SnapshotError, normalize_snapshot, validate_snapshot
 from skeleton.agents.swarm_supervisor import DispatchDecision, SwarmSupervisor
 from skeleton.agents.swarm_tenant_broker import TenantBrokerResult, TenantRepairResult, TenantSwarmBroker
+from skeleton.agents.swarm_tenant_checkpoint import TenantCheckpointStore, TenantMetadataCheckpoint
 from skeleton.agents.swarm_runtime import AdmissionError, LeaseError, RuntimeSnapshot, SwarmRuntime, SwarmTask, TaskState, WorkerState
 
 __all__ = [
@@ -42,9 +44,9 @@ __all__ = [
     "AdmissionError", "LeaseError", "RuntimeSnapshot", "SwarmRuntime", "HardenedSwarmRuntime",
     "SwarmTask", "TaskState", "WorkerState", "AdmissionDecision", "AdmissionPolicy",
     "capability_coverage", "AutoscalePolicy", "ScaleRecommendation", "BrokerResult", "CompletionResult",
-    "SwarmBroker", "SubmitResult", "SwarmControlPlane", "Completion", "CompletionCache", "DrainPlan",
-    "drain", "plan_drain", "lease_exact", "FairShareLedger", "TenantShare", "LeaseFence",
-    "assert_fence", "fence_for", "fenced_fail", "fenced_renew", "fenced_succeed", "GCResult",
+    "SwarmBroker", "Checkpoint", "CheckpointStore", "SubmitResult", "SwarmControlPlane", "Completion",
+    "CompletionCache", "DrainPlan", "drain", "plan_drain", "lease_exact", "FairShareLedger", "TenantShare",
+    "LeaseFence", "assert_fence", "fence_for", "fenced_fail", "fenced_renew", "fenced_succeed", "GCResult",
     "capacity", "gc_compact_runtime", "IdempotencyConflict", "IdempotencyRecord", "IdempotencyRegistry",
     "IngressDecision", "SwarmIngressGovernor", "InvariantReport", "audit", "JanitorResult", "reap_stale_workers",
     "LoadShedPolicy", "ShedDecision", "compact_runtime", "compact_state", "SwarmOperator", "PressureReport",
@@ -53,5 +55,6 @@ __all__ = [
     "SwarmRecoveryManager", "ResilientRanking", "ResilientSwarmScheduler", "validate_restore_state",
     "PrunePlan", "RetentionPolicy", "TERMINAL_STATES", "RetryDecision", "RetryPolicy", "SwarmScheduler",
     "WorkerScore", "SLOPolicy", "CURRENT_VERSION", "SnapshotError", "normalize_snapshot",
-    "validate_snapshot", "DispatchDecision", "SwarmSupervisor", "TenantBrokerResult", "TenantRepairResult", "TenantSwarmBroker",
+    "validate_snapshot", "DispatchDecision", "SwarmSupervisor", "TenantBrokerResult", "TenantRepairResult",
+    "TenantSwarmBroker", "TenantCheckpointStore", "TenantMetadataCheckpoint",
 ]
