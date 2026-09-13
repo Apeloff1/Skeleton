@@ -42,8 +42,12 @@ class RuntimeCoordinator:
   return decision
  def admit_receipt(self,request_id,now:int,active:int,limit:int=1,background:bool=False,retry:bool=False):
   decision=self.admit(now,active,limit,background,request_id,retry)
-  reason=decision.value
-  return Receipt(request_id,decision.value,reason)
+  return Receipt(request_id,decision.value,decision.value)
+ def record_outcome(self,success:bool):
+  self.health.record(success)
+  if success: self.circuit.success()
+  else: self.circuit.failure()
+  return self.health.healthy
  def release(self):
   self.budget.release()
   self.quota.release()
