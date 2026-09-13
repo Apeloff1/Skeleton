@@ -192,7 +192,8 @@ async def submit_daily_challenge(
         await award_xp(user_id, "daily_perfect" if is_perfect else "daily_challenge", "daily_challenges", xp_amt)
         if new_streak > 1:
             await award_xp(user_id, "streak_day", "streaks", 10)
-    except: pass
+    except (ImportError, RuntimeError):
+        pass
 
     return {
         "score": score,

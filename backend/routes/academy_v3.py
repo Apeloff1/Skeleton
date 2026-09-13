@@ -413,7 +413,8 @@ async def check_quiz_answer(quiz_id: str, answer: str = Query(...)):
     try:
         from routes.xp_helper import award_xp
         await award_xp("default_user", "quiz_correct" if is_correct else "quiz_wrong", quiz.get("domain", "general"), xp_amt)
-    except: pass
+    except (ImportError, RuntimeError):
+        pass
     return {
         "quiz_id": quiz_id,
         "your_answer": answer,

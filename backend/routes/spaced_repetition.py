@@ -90,7 +90,8 @@ async def submit_review(
     try:
         from routes.xp_helper import award_xp
         await award_xp(user_id, "srs_correct" if quality >= 3 else "srs_review", "srs", srs_xp)
-    except: pass
+    except (ImportError, RuntimeError):
+        pass
 
     return {
         "quiz_id": quiz_id,
