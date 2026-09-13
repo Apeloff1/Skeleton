@@ -1,0 +1,42 @@
+# Repository metadata
+.git
+.github
+.claude
+.emergent
+
+# Local environments and caches
+.venv
+venv
+env
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.coverage
+coverage.xml
+htmlcov
+
+# Frontend dependency/build trees are not needed by the root/backend images
+frontend/node_modules
+frontend/.expo
+frontend/web-build
+frontend/dist
+
+# Runtime-generated artifacts
+backend/data/godot_projects
+backend/data/godot_builds
+backend/data/build_artifacts
+backend/data/builds_vault
+backend/data/galaxy_vault
+backend/data/**/zips
+artifacts
+
+# Local editor/agent state
+.vscode
+.idea
+.git_workspaces
+backend/.git_workspaces
+*.log
+*.tmp
+*.bak
