@@ -5,6 +5,7 @@ Skeleton API Server — FastAPI application factory and state management.
 from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass
+from threading import RLock
 from typing import Any, Dict, Optional
 
 _fastapi = None
@@ -58,32 +59,50 @@ class ServerState:
         self.jeeves_clom: Optional[Any] = None
         self.jeeves_krem: Optional[Any] = None
         self.jeeves_memory: Optional[Any] = None
+        self._swarm_bind_lock = RLock()
 
     def bind_swarm_runtime(self, runtime: Any) -> Any:
         """Replace the live swarm runtime and atomically rebind dependent control planes."""
         from skeleton.agents.swarm_broker import SwarmBroker
         from skeleton.agents.swarm_supervisor import SwarmSupervisor
 
-        self.swarm = runtime
-        if self.swarm_supervisor is None:
-            self.swarm_supervisor = SwarmSupervisor()
-        self.swarm_broker = SwarmBroker(runtime, supervisor=self.swarm_supervisor)
-        if self.swarm_tenant_broker is not None:
-            self.swarm_tenant_broker.rebind(self.swarm_broker)
-        return runtime
+        with self._swarm_bind_lock:
+            self.swarm = runtime
+            if self.swarm_supervisor is None:
+                self.swarm_supervisor = SwarmSupervisor()
+            self.swarm_broker = SwarmBroker(runtime, supervisor=self.swarm_supervisor)
+            if self.swarm_tenant_broker is not None:
+                self.swarm_tenant_broker.rebind(self.swarm_broker)
+            return runtime
 
     def bind_swarm_ingress(self, ingress: Any) -> Any:
         """Bind ingress and tenant execution control to the current runtime broker."""
         from skeleton.agents.swarm_tenant_broker import TenantSwarmBroker
 
-        self.swarm_ingress = ingress
-        if self.swarm_broker is not None:
-            if self.swarm_tenant_broker is None:
-                self.swarm_tenant_broker = TenantSwarmBroker(self.swarm_broker, ingress)
-            else:
-                self.swarm_tenant_broker.ingress = ingress
-                self.swarm_tenant_broker.rebind(self.swarm_broker)
-        return ingress
+        with self._swarm_bind_lock:
+            self.swarm_ingress = ingress
+            if self.swarm_broker is not None:
+                if self.swarm_tenant_broker is None:
+                    self.swarm_tenant_broker = TenantSwarmBroker(self.swarm_broker, ingress)
+                else:
+                    self.swarm_tenant_broker.ingress = ingress
+                    self.swarm_tenant_broker.rebind(self.swarm_broker)
+            return ingress
+
+    def commit_swarm_bundle(self, runtime: Any, broker: Any, ingress: Any, tenant_broker: Any) -> Any:
+        """Publish a fully staged swarm recovery bundle under one server-state lock."""
+        if getattr(broker, "runtime", None) is not runtime:
+            raise ValueError("staged broker runtime mismatch")
+        if getattr(tenant_broker, "broker", None) is not broker:
+            raise ValueError("staged tenant broker mismatch")
+        if getattr(tenant_broker, "ingress", None) is not ingress:
+            raise ValueError("staged tenant ingress mismatch")
+        with self._swarm_bind_lock:
+            self.swarm = runtime
+            self.swarm_broker = broker
+            self.swarm_ingress = ingress
+            self.swarm_tenant_broker = tenant_broker
+            return runtime
 
     def is_healthy(self) -> Dict[str, Any]:
         checks = {}
