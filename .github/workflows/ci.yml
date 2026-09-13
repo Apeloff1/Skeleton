@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
       - uses: actions/setup-python@v5
-        with: {python-version: "3.11"}
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - name: Cross-surface toolchain contract
         run: python ../scripts/check_toolchain_contract.py
       - name: Install pinned backend quality tools
@@ -47,7 +47,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: "3.11"}
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - name: Test forge / jeeves / context
         env: {PYTHONPATH: "."}
         run: |
@@ -65,7 +65,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: "3.11"}
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - name: Install test runner
         run: python -m pip install "pytest>=8,<9"
       - name: Compile school package
@@ -80,7 +80,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: "3.11"}
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - env: {PYTHONPATH: "."}
         run: chmod +x scripts/cockpit-smoke.sh && ./scripts/cockpit-smoke.sh
   backend-test:
@@ -97,7 +97,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
       - uses: actions/setup-python@v5
-        with: {python-version: "3.11"}
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - run: |
           uv venv
           uv pip install -r requirements.txt
@@ -116,7 +116,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
       - uses: actions/setup-python@v5
-        with: {python-version: "3.11"}
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - run: |
           uv venv
           uv pip install -r requirements.txt
@@ -134,7 +134,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "${{ env.NODE_VERSION }}"
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
       - run: yarn install --frozen-lockfile
@@ -145,7 +145,13 @@ jobs:
     name: "Docker Build"
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    needs: [skeleton-test, backend-test, backend-import-smoke, frontend]
+    needs:
+      - skeleton-test
+      - school-jeeves-test
+      - cockpit-smoke
+      - backend-test
+      - backend-import-smoke
+      - frontend
     if: github.ref == 'refs/heads/main'
     permissions: {contents: read, packages: write}
     steps:
