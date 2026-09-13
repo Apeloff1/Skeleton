@@ -91,7 +91,8 @@ jobs:
         with: {python-version: "3.11"}
       - run: |
           uv venv
-          uv pip install -e ".[test]"
+          uv pip install -r requirements.txt
+          uv pip install pytest pytest-asyncio pytest-cov pytest-xdist
       - env: {MONGO_URL: mongodb://localhost:27017/test}
         run: uv run pytest tests/ -v --cov=. --cov-report=xml
       - uses: codecov/codecov-action@v4
@@ -109,7 +110,7 @@ jobs:
         with: {python-version: "3.11"}
       - run: |
           uv venv
-          uv pip install -e ".[test]"
+          uv pip install -r requirements.txt
       - env:
           MONGO_URL: mongodb://localhost:27017/test
           SKIP_HEAVY_SEED: "true"
