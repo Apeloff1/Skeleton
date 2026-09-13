@@ -74,12 +74,13 @@ class HealthPool(Generic[T]):
                     return value
             value = self._make()
             try:
-                if not self._healthy(value):
-                    self._rejected += 1
-                    raise RuntimeError("newly created pooled resource is unhealthy")
+                healthy = self._healthy(value)
             except Exception:
                 self._rejected += 1
                 raise
+            if not healthy:
+                self._rejected += 1
+                raise RuntimeError("newly created pooled resource is unhealthy")
             self._checked_out.add(id(value))
             self._checkouts += 1
             return value
