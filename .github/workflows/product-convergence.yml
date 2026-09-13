@@ -6,18 +6,30 @@ on:
       - "backend/core/content_store.py"
       - "backend/core/product_operations.py"
       - "backend/core/progression.py"
+      - "backend/core/flight_dynamics.py"
+      - "backend/core/terrain_field.py"
+      - "backend/core/playable_simulation.py"
+      - "backend/core/runtime_sessions.py"
       - "backend/tests/test_content_store.py"
       - "backend/tests/test_product_operations.py"
       - "backend/tests/test_progression.py"
+      - "backend/tests/test_playable_simulation.py"
+      - "backend/tests/test_runtime_sessions.py"
       - ".github/workflows/product-convergence.yml"
   pull_request:
     paths:
       - "backend/core/content_store.py"
       - "backend/core/product_operations.py"
       - "backend/core/progression.py"
+      - "backend/core/flight_dynamics.py"
+      - "backend/core/terrain_field.py"
+      - "backend/core/playable_simulation.py"
+      - "backend/core/runtime_sessions.py"
       - "backend/tests/test_content_store.py"
       - "backend/tests/test_product_operations.py"
       - "backend/tests/test_progression.py"
+      - "backend/tests/test_playable_simulation.py"
+      - "backend/tests/test_runtime_sessions.py"
       - ".github/workflows/product-convergence.yml"
 
 permissions:
@@ -42,6 +54,8 @@ jobs:
           tests/test_content_store.py
           tests/test_product_operations.py
           tests/test_progression.py
+          tests/test_playable_simulation.py
+          tests/test_runtime_sessions.py
           tests/test_charter_policy.py
           tests/test_durable_outbox.py
           tests/test_worm_audit.py
