@@ -23,7 +23,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core.databases import client as _SHARED_MONGO_CLIENT
 from core.anti_farm import rate_ok
@@ -59,10 +59,10 @@ def _checkout(host_url: str) -> StripeCheckout:
 
 # ── Listings ──────────────────────────────────────────────────────────────────
 class ListBody(BaseModel):
-    playable_id: str = ""
-    price_usd: float = 0.0
-    creator_id: str = ""
-    summary: str = ""
+    playable_id: str = Field("", max_length=200)
+    price_usd: float = Field(0.0, ge=0, le=500)
+    creator_id: str = Field("", max_length=200)
+    summary: str = Field("", max_length=5000)
 
 
 @router.post("/marketplace/list")
@@ -409,4 +409,3 @@ async def trending_creators(limit: int = Query(20, le=50)):
     for i, c in enumerate(out):
         c["rank"] = i + 1
     return {"creators": out[:limit], "count": len(out)}
-

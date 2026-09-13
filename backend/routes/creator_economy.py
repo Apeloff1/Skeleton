@@ -16,7 +16,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core.databases import client as _SHARED_MONGO_CLIENT
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
@@ -49,7 +49,7 @@ def _checkout(host_url: str) -> StripeCheckout:
 
 # ════════════════════════ #5 FOLLOW GRAPH + PROFILES + LEADERBOARD ════════════════════════
 class FollowBody(BaseModel):
-    follower_id: str = ""
+    follower_id: str = Field("", max_length=200)
 
 
 async def _creator_stats(cid: str) -> dict:
