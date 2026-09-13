@@ -8,14 +8,24 @@ validation.
 
 from __future__ import annotations
 
+from math import isfinite
 from threading import RLock
 from time import monotonic
 from typing import Callable, Iterable, Mapping
 
-from skeleton.agents.swarm_runtime import AdmissionError, LeaseError, SwarmRuntime, SwarmTask, TaskState, WorkerState
+from skeleton.agents.swarm_runtime import (
+    AdmissionError,
+    LeaseError,
+    SwarmRuntime,
+    SwarmTask,
+    TaskState,
+    WorkerState,
+)
 
 
-_TERMINAL_STATES = frozenset({TaskState.SUCCEEDED, TaskState.DEAD, TaskState.CANCELLED, TaskState.FAILED})
+_TERMINAL_STATES = frozenset(
+    {TaskState.SUCCEEDED, TaskState.DEAD, TaskState.CANCELLED, TaskState.FAILED}
+)
 
 
 class HardenedSwarmRuntime(SwarmRuntime):
@@ -28,16 +38,54 @@ class HardenedSwarmRuntime(SwarmRuntime):
         max_lease_seconds: float = 86_400.0,
         clock: Callable[[], float] = monotonic,
     ) -> None:
-        if max_workers < 1:
-            raise ValueError("max_workers must be positive")
-        if max_lease_seconds <= 0:
-            raise ValueError("max_lease_seconds must be positive")
+        max_tasks = self._positive_int(max_tasks, "max_tasks")
+        max_workers = self._positive_int(max_workers, "max_workers")
+        default_lease_seconds = self._positive_finite(
+            default_lease_seconds,
+            "default_lease_seconds",
+        )
+        max_lease_seconds = self._positive_finite(max_lease_seconds, "max_lease_seconds")
         if default_lease_seconds > max_lease_seconds:
             raise ValueError("default lease exceeds max_lease_seconds")
-        super().__init__(max_tasks=max_tasks, default_lease_seconds=default_lease_seconds, clock=clock)
+
+        def checked_clock() -> float:
+            value = clock()
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise RuntimeError("swarm clock must return a finite number")
+            value = float(value)
+            if not isfinite(value):
+                raise RuntimeError("swarm clock must return a finite number")
+            return value
+
+        super().__init__(
+            max_tasks=max_tasks,
+            default_lease_seconds=default_lease_seconds,
+            clock=checked_clock,
+        )
         self.max_workers = max_workers
         self.max_lease_seconds = max_lease_seconds
         self._lock = RLock()
+
+    @staticmethod
+    def _positive_int(value: int, label: str) -> int:
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise ValueError(f"{label} must be a positive integer")
+        return value
+
+    @staticmethod
+    def _nonnegative_int(value: int, label: str) -> int:
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"{label} must be a non-negative integer")
+        return value
+
+    @staticmethod
+    def _positive_finite(value: float, label: str) -> float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(f"{label} must be a positive finite number")
+        value = float(value)
+        if not isfinite(value) or value <= 0:
+            raise ValueError(f"{label} must be a positive finite number")
+        return value
 
     @staticmethod
     def _id(value: str, label: str) -> str:
@@ -46,12 +94,23 @@ class HardenedSwarmRuntime(SwarmRuntime):
             raise AdmissionError(f"{label} must not be empty")
         return normalized
 
-    def register_worker(self, worker_id: str, *, capabilities: Iterable[str] = (), capacity: int = 1) -> WorkerState:
+    def register_worker(
+        self,
+        worker_id: str,
+        *,
+        capabilities: Iterable[str] = (),
+        capacity: int = 1,
+    ) -> WorkerState:
         worker_id = self._id(worker_id, "worker_id")
+        capacity = self._positive_int(capacity, "capacity")
         with self._lock:
             if len(self._workers) >= self.max_workers:
                 raise AdmissionError("runtime worker capacity exhausted")
-            return super().register_worker(worker_id, capabilities=capabilities, capacity=capacity)
+            return super().register_worker(
+                worker_id,
+                capabilities=capabilities,
+                capacity=capacity,
+            )
 
     def heartbeat(self, worker_id: str) -> WorkerState:
         with self._lock:
@@ -63,6 +122,7 @@ class HardenedSwarmRuntime(SwarmRuntime):
 
     def submit(self, task: SwarmTask) -> SwarmTask:
         task_id = self._id(task.id, "task id")
+        self._positive_int(task.max_attempts, "max_attempts")
         if task_id != task.id:
             task = SwarmTask(
                 id=task_id,
@@ -84,12 +144,11 @@ class HardenedSwarmRuntime(SwarmRuntime):
                 raise AdmissionError("batch exceeds runtime task capacity")
             for task in batch:
                 task_id = self._id(task.id, "task id")
+                self._positive_int(task.max_attempts, "max_attempts")
                 if task_id in seen:
                     raise AdmissionError(f"duplicate task id inside batch: {task_id}")
                 if task_id in self._tasks:
                     raise AdmissionError(f"duplicate task id: {task_id}")
-                if task.max_attempts < 1:
-                    raise AdmissionError("max_attempts must be positive")
                 seen.add(task_id)
                 normalized.append(
                     task
@@ -102,18 +161,35 @@ class HardenedSwarmRuntime(SwarmRuntime):
                         required_capabilities=task.required_capabilities,
                     )
                 )
-            return tuple(super(HardenedSwarmRuntime, self).submit(task) for task in normalized)
+            return tuple(
+                super(HardenedSwarmRuntime, self).submit(task) for task in normalized
+            )
 
     def lease(self, worker_id: str, *, limit: int | None = None) -> list[SwarmTask]:
+        if limit is not None:
+            limit = self._nonnegative_int(limit, "limit")
         with self._lock:
             return super().lease(worker_id.strip(), limit=limit)
 
-    def renew(self, worker_id: str, task_id: str, *, seconds: float | None = None) -> SwarmTask:
-        duration = self.default_lease_seconds if seconds is None else seconds
+    def renew(
+        self,
+        worker_id: str,
+        task_id: str,
+        *,
+        seconds: float | None = None,
+    ) -> SwarmTask:
+        duration = self.default_lease_seconds if seconds is None else self._positive_finite(
+            seconds,
+            "lease renewal duration",
+        )
         if duration > self.max_lease_seconds:
             raise LeaseError("lease renewal exceeds max_lease_seconds")
         with self._lock:
-            return super().renew(worker_id.strip(), task_id.strip(), seconds=duration)
+            return super().renew(
+                worker_id.strip(),
+                task_id.strip(),
+                seconds=duration,
+            )
 
     def succeed(self, worker_id: str, task_id: str) -> SwarmTask:
         with self._lock:
@@ -131,8 +207,15 @@ class HardenedSwarmRuntime(SwarmRuntime):
         task_id = task_id.strip()
         with self._lock:
             task = super().task(task_id)
-            if task is not None and task.state is TaskState.DEAD and task.attempts >= task.max_attempts and not reset_attempts:
-                raise AdmissionError("dead task exhausted retry budget; reset_attempts is required")
+            if (
+                task is not None
+                and task.state is TaskState.DEAD
+                and task.attempts >= task.max_attempts
+                and not reset_attempts
+            ):
+                raise AdmissionError(
+                    "dead task exhausted retry budget; reset_attempts is required"
+                )
             return super().revive(task_id, reset_attempts=reset_attempts)
 
     def forget(self, task_id: str) -> bool:
@@ -158,6 +241,7 @@ class HardenedSwarmRuntime(SwarmRuntime):
             return super().reap_expired()
 
     def stale_workers(self, *, stale_after: float):
+        stale_after = self._positive_finite(stale_after, "stale_after")
         with self._lock:
             return super().stale_workers(stale_after=stale_after)
 
@@ -194,6 +278,7 @@ class HardenedSwarmRuntime(SwarmRuntime):
             return super().snapshot()
 
     def health(self, *, stale_after: float = 90.0):
+        stale_after = self._positive_finite(stale_after, "stale_after")
         with self._lock:
             return super().health(stale_after=stale_after)
 
@@ -201,7 +286,12 @@ class HardenedSwarmRuntime(SwarmRuntime):
         with self._lock:
             state = super().export_state()
             config = dict(state.get("config", {}))
-            config.update({"max_workers": self.max_workers, "max_lease_seconds": self.max_lease_seconds})
+            config.update(
+                {
+                    "max_workers": self.max_workers,
+                    "max_lease_seconds": self.max_lease_seconds,
+                }
+            )
             state["config"] = config
             return state
 
@@ -224,7 +314,11 @@ class HardenedSwarmRuntime(SwarmRuntime):
             max_lease_seconds=float(config.get("max_lease_seconds", 86_400.0)),
             clock=clock,
         )
-        base = SwarmRuntime.from_state(validated, clock=clock, requeue_leased=requeue_leased)
+        base = SwarmRuntime.from_state(
+            validated,
+            clock=runtime._clock,
+            requeue_leased=requeue_leased,
+        )
         runtime._sequence = base._sequence
         runtime._queue = base._queue
         runtime._tasks = base._tasks
@@ -237,7 +331,7 @@ class HardenedSwarmRuntime(SwarmRuntime):
         runtime._lease_renewals = base._lease_renewals
         runtime._heartbeats = base._heartbeats
         runtime._revived = base._revived
-        now = clock()
+        now = runtime._clock()
         for worker in runtime._workers.values():
             worker.last_seen = now
             if requeue_leased:
