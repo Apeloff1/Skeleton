@@ -1,15 +1,21 @@
 """
 Skeleton Agents Package
 
-Exports:
-- Coordinator: Central task coordinator
-- AgentPool: Agent lifecycle management
-- Task / TaskStatus: Typed task with status tracking
-- MeshBridge: Route coordinator tasks onto a live SwarmMesh
+Exports the coordination, mesh bridge, and bounded swarm runtime primitives used
+by API workers and embedded orchestration clients.
 """
 
 from skeleton.agents.coordination import AgentPool, Coordinator, Task, TaskStatus
 from skeleton.agents.bridge import MeshBridge
+from skeleton.agents.swarm_runtime import (
+    AdmissionError,
+    LeaseError,
+    RuntimeSnapshot,
+    SwarmRuntime,
+    SwarmTask,
+    TaskState,
+    WorkerState,
+)
 
 __all__ = [
     "Coordinator",
@@ -17,4 +23,11 @@ __all__ = [
     "Task",
     "TaskStatus",
     "MeshBridge",
+    "AdmissionError",
+    "LeaseError",
+    "RuntimeSnapshot",
+    "SwarmRuntime",
+    "SwarmTask",
+    "TaskState",
+    "WorkerState",
 ]
