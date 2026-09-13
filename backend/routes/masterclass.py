@@ -6,7 +6,7 @@
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 
@@ -371,12 +371,12 @@ async def get_certifications():
     }
 
 class LessonProgress(BaseModel):
-    track_key: str
-    module_id: str
-    lesson_id: str
+    track_key: str = Field(..., min_length=1, max_length=200)
+    module_id: str = Field(..., min_length=1, max_length=200)
+    lesson_id: str = Field(..., min_length=1, max_length=200)
     completed: bool = True
-    time_spent: int = 0  # minutes
-    notes: Optional[str] = None
+    time_spent: int = Field(0, ge=0, le=100000)  # minutes
+    notes: Optional[str] = Field(None, max_length=10000)
 
 @router.post("/progress")
 async def update_progress(progress: LessonProgress):
@@ -392,10 +392,10 @@ async def update_progress(progress: LessonProgress):
     }
 
 class PersonalizedPath(BaseModel):
-    goals: List[str]  # e.g., ["web_development", "game_development"]
-    current_level: str  # beginner, intermediate, advanced
-    weekly_hours: int  # hours per week available
-    preferred_languages: List[str] = []
+    goals: List[str] = Field(..., min_length=1, max_length=50)  # e.g., ["web_development", "game_development"]
+    current_level: str = Field(..., min_length=1, max_length=50)  # beginner, intermediate, advanced
+    weekly_hours: int = Field(..., ge=1, le=168)  # hours per week available
+    preferred_languages: List[str] = Field(default_factory=list, max_length=50)
 
 @router.post("/personalized-path")
 async def generate_personalized_path(request: PersonalizedPath):

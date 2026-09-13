@@ -676,17 +676,17 @@ class LearningSessionRequest(BaseModel):
     hints_used: int = Field(0, ge=0, le=10000)
 
 class ChallengeRequest(BaseModel):
-    user_id: str
-    topic: str
-    preferred_difficulty: float = 0.5
-    time_limit_minutes: int = 10
+    user_id: str = Field(..., min_length=1, max_length=200)
+    topic: str = Field(..., min_length=1, max_length=500)
+    preferred_difficulty: float = Field(0.5, ge=0, le=1)
+    time_limit_minutes: int = Field(10, ge=1, le=1440)
 
 class DialogueRequest(BaseModel):
-    user_id: str
-    topic: str
-    user_answer: str
+    user_id: str = Field(..., min_length=1, max_length=200)
+    topic: str = Field(..., min_length=1, max_length=500)
+    user_answer: str = Field(..., min_length=1, max_length=10000)
     is_correct: bool
-    confidence_level: float = 0.5
+    confidence_level: float = Field(0.5, ge=0, le=1)
 
 class ProgressRequest(BaseModel):
     user_id: str = Field(..., min_length=1, max_length=200)
