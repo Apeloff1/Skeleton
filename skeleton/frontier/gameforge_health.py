@@ -10,6 +10,7 @@ retention and max-age policy.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from threading import Lock
 from typing import Callable, Generic, List, Optional, TypeVar
 import time
 
@@ -35,64 +36,89 @@ class HealthPool(Generic[T]):
         max_age_seconds: float = 300.0,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
-        if capacity < 1:
-            raise ValueError("capacity must be >= 1")
-        if max_age_seconds <= 0:
-            raise ValueError("max_age_seconds must be > 0")
+        if not callable(make) or not callable(healthy) or not callable(clock):
+            raise TypeError("make, healthy, and clock must be callable")
+        if not isinstance(capacity, int) or isinstance(capacity, bool) or capacity < 1:
+            raise ValueError("capacity must be a positive integer")
+        if (
+            not isinstance(max_age_seconds, (int, float))
+            or isinstance(max_age_seconds, bool)
+            or max_age_seconds <= 0
+        ):
+            raise ValueError("max_age_seconds must be a positive number")
         self._make = make
         self._healthy = healthy
         self._capacity = capacity
-        self._max_age = max_age_seconds
+        self._max_age = float(max_age_seconds)
         self._clock = clock
         self._idle: List[tuple[T, float]] = []
+        self._idle_ids: set[int] = set()
+        self._checked_out: set[int] = set()
         self._checkouts = 0
         self._rejected = 0
+        self._lock = Lock()
 
     def checkout(self) -> T:
         now = self._clock()
-        while self._idle:
-            value, born = self._idle.pop()
-            if now - born > self._max_age:
-                continue
+        with self._lock:
+            while self._idle:
+                value, born = self._idle.pop()
+                self._idle_ids.discard(id(value))
+                if now - born > self._max_age:
+                    continue
+                try:
+                    healthy = self._healthy(value)
+                except Exception:
+                    healthy = False
+                if healthy:
+                    self._checked_out.add(id(value))
+                    self._checkouts += 1
+                    return value
+            value = self._make()
             try:
-                healthy = self._healthy(value)
+                if not self._healthy(value):
+                    self._rejected += 1
+                    raise RuntimeError("newly created pooled resource is unhealthy")
             except Exception:
-                healthy = False
-            if healthy:
-                self._checkouts += 1
-                return value
-        value = self._make()
-        try:
-            if not self._healthy(value):
                 self._rejected += 1
-                raise RuntimeError("newly created pooled resource is unhealthy")
-        except Exception:
-            self._rejected += 1
-            raise
-        self._checkouts += 1
-        return value
+                raise
+            self._checked_out.add(id(value))
+            self._checkouts += 1
+            return value
 
     def release(self, value: T) -> bool:
-        """Return a healthy resource if capacity permits; otherwise drop it."""
-        if len(self._idle) >= self._capacity:
-            return False
-        try:
-            if not self._healthy(value):
+        """Return a checked-out healthy resource if capacity permits."""
+        value_id = id(value)
+        with self._lock:
+            if value_id not in self._checked_out:
                 self._rejected += 1
                 return False
-        except Exception:
-            self._rejected += 1
-            return False
-        self._idle.append((value, self._clock()))
-        return True
+            if len(self._idle) >= self._capacity:
+                self._checked_out.discard(value_id)
+                return False
+            try:
+                if not self._healthy(value):
+                    self._rejected += 1
+                    self._checked_out.discard(value_id)
+                    return False
+            except Exception:
+                self._rejected += 1
+                self._checked_out.discard(value_id)
+                return False
+            self._checked_out.discard(value_id)
+            self._idle.append((value, self._clock()))
+            self._idle_ids.add(value_id)
+            return True
 
     def stats(self) -> PoolStats:
-        return PoolStats(
-            checkouts=self._checkouts,
-            rejected=self._rejected,
-            idle=len(self._idle),
-        )
+        with self._lock:
+            return PoolStats(
+                checkouts=self._checkouts,
+                rejected=self._rejected,
+                idle=len(self._idle),
+            )
 
     @property
     def idle(self) -> int:
-        return len(self._idle)
+        with self._lock:
+            return len(self._idle)
