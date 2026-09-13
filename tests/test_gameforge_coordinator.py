@@ -39,3 +39,6 @@ def test_coordinator_receipt_is_observable():
 
 def test_coordinator_outcomes_drive_circuit_recovery():
  x,s,d=make(threshold=2); s.ready(); d.mark("db"); x.record_outcome(False); assert x.circuit.allowed; x.record_outcome(False); assert not x.circuit.allowed; assert not x.record_outcome(False); assert not x.circuit.allowed; x.circuit.probe(); assert x.record_outcome(True); assert x.circuit.allowed
+
+def test_coordinator_preserves_read_only_path():
+ x,s,d=make(); s.ready(); d.mark("db"); assert x.admit(0,0,request_id="ro",read_only=True) is Admission.READ_ONLY
