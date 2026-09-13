@@ -123,13 +123,17 @@ class ServerState:
                 checks["swarm_tenant_broker"] = {"error": "tenant broker status failed"}
         has_error = any(isinstance(check, dict) and check.get("error") for check in checks.values())
         swarm_critical = isinstance(checks.get("swarm"), dict) and checks["swarm"].get("status") == "critical"
+        recovery_mismatch = False
+        recovery_check = checks.get("swarm_recovery")
+        if isinstance(recovery_check, dict) and recovery_check.get("tenant_aligned") is False:
+            recovery_mismatch = True
         tenant_mismatch = False
         tenant_check = checks.get("swarm_tenant_broker")
         if isinstance(tenant_check, dict):
             reconcile = tenant_check.get("reconcile")
             if isinstance(reconcile, dict):
                 tenant_mismatch = bool(reconcile.get("missing_active") or reconcile.get("terminal_not_terminal"))
-        overall = not has_error and not swarm_critical and not tenant_mismatch
+        overall = not has_error and not swarm_critical and not recovery_mismatch and not tenant_mismatch
         return {"overall": overall, "checks": checks}
 
     def wire_from_genesis(self, genesis: Any) -> None:
