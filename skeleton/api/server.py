@@ -1,17 +1,11 @@
 """
-Skeleton API Server — FastAPI application factory and state management
-
-Provides:
-- create_app: FastAPI application factory (mounts core + gameforge + cockpit routers)
-- get_state: Dependency injection for server state
-- ServerState: Shared runtime state container
+Skeleton API Server — FastAPI application factory and state management.
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-# Lazy imports to avoid heavy dependencies at module load time
 _fastapi = None
 _uvicorn = None
 
@@ -60,7 +54,6 @@ class ServerState:
         self.jeeves_memory: Optional[Any] = None
 
     def is_healthy(self) -> Dict[str, Any]:
-        """Run health checks on all subsystems."""
         checks = {}
         for attr in dir(self):
             if not attr.startswith("_") and not callable(getattr(self, attr)):
@@ -70,15 +63,15 @@ class ServerState:
                         checks[attr] = val.stats()
                     except Exception:
                         checks[attr] = {"error": "stats failed"}
-
-        overall = all(
-            not isinstance(c, dict) or not c.get("error")
-            for c in checks.values()
-        )
+        if self.swarm is not None and hasattr(self.swarm, "health"):
+            try:
+                checks["swarm"] = self.swarm.health()
+            except Exception:
+                checks["swarm"] = {"error": "health failed"}
+        overall = all(not isinstance(c, dict) or not c.get("error") for c in checks.values())
         return {"overall": overall, "checks": checks}
 
     def wire_from_genesis(self, genesis: Any) -> None:
-        """Populate state handles from a booted genesis."""
         self.genesis = genesis
         self.forge = genesis.handles.get("forge")
         self.mesh = genesis.handles.get("mesh")
@@ -86,38 +79,29 @@ class ServerState:
         self.intelligence = genesis.handles.get("orchestrator")
         self.resilience = genesis.handles.get("fortress")
 
-        # Pipelines
         from skeleton.pipelines import AnimationPipeline, GameForge, GameLogicPipeline, NPCPipeline
         self.npc_pipeline = NPCPipeline()
         self.game_logic_pipeline = GameLogicPipeline()
         self.animation_pipeline = AnimationPipeline()
         self.gameforge = GameForge(genesis=genesis, bus=genesis.bus)
 
-        # Jeeves with provider-backed responses, quad retriever context,
-        # and the genesis-wired ResponseCycle driving the context fabric
         from skeleton.jeeves import JeevesCore
         self.jeeves = JeevesCore(
             bus=genesis.bus,
             retriever=genesis.handles.get("quad"),
             cycle=genesis.handles.get("cycle"),
         )
-
-        # Jeeves memory matrices (served at /jeeves/matrices/{session_id})
         self.jeeves_sam = self.jeeves.sam
         self.jeeves_clom = self.jeeves.clom
         self.jeeves_krem = self.jeeves.krem
         self.jeeves_memory = self.jeeves._memory
 
-        # Live cortex attaches to the genesis bus
         from skeleton.cortex import live
         self.cockpit = live.attach(genesis.bus)
 
-        # Bounded swarm control plane. Keep this runtime independent from model
-        # execution so API workers can coordinate tasks without hidden threads.
         from skeleton.agents.swarm_runtime import SwarmRuntime
         self.swarm = SwarmRuntime(max_tasks=100_000, default_lease_seconds=30.0)
 
-        # Health + metrics
         from skeleton.observability import MetricsCollector
         self.metrics = MetricsCollector()
         self.health = type("Health", (), {
@@ -129,12 +113,10 @@ class ServerState:
         self.registry = genesis.handles.get("lattice")
 
 
-# Global state instance
 _state: Optional[ServerState] = None
 
 
 def get_state() -> ServerState:
-    """Get or create the global server state."""
     global _state
     if _state is None:
         _state = ServerState()
@@ -142,7 +124,6 @@ def get_state() -> ServerState:
 
 
 def create_app() -> Any:
-    """Create and configure the FastAPI application."""
     fastapi = _get_fastapi()
     app = fastapi.FastAPI(
         title="Skeleton API",
@@ -154,24 +135,17 @@ def create_app() -> Any:
     from skeleton.api.gameforge_routes import router as gameforge_router
     from skeleton.api.cockpit import router as cockpit_router
     from skeleton.api.swarm_routes import router as swarm_router
+    from skeleton.api.swarm_operator_routes import router as swarm_operator_router
     app.include_router(router, prefix="/api/v1")
     app.include_router(gameforge_router, prefix="/api/v1")
     app.include_router(swarm_router, prefix="/api/v1")
+    app.include_router(swarm_operator_router, prefix="/api/v1")
     app.include_router(cockpit_router)
 
-    # Zaibatsu gate — sibling of gameforge-middleware / gf-server.
-    # Live app previously left install_gate test-only; wire it here.
     from skeleton.api.middleware import DEFAULT_OPEN_PREFIXES, GatePolicy, install_gate
-
     gate_policy = GatePolicy(
-        open_prefixes=DEFAULT_OPEN_PREFIXES
-        + (
-            "/",
-            "/cortex/status",
-            "/cockpit",
-            "/docs",
-            "/openapi.json",
-            "/redoc",
+        open_prefixes=DEFAULT_OPEN_PREFIXES + (
+            "/", "/cortex/status", "/cockpit", "/docs", "/openapi.json", "/redoc",
         )
     )
     install_gate(app, policy=gate_policy)
@@ -193,6 +167,7 @@ def create_app() -> Any:
             "jeeves_provider": state.jeeves.provider_name if state.jeeves else None,
             "cockpit": "/cockpit",
             "swarm": "/api/v1/swarm/status",
+            "swarm_operator": "/api/v1/swarm/operator/overview",
         }
 
     @app.get("/cortex/status")
@@ -204,7 +179,6 @@ def create_app() -> Any:
 
 
 def run_server(host: str = "0.0.0.0", port: int = 8000) -> None:
-    """Run the API server with uvicorn."""
     uvicorn = _get_uvicorn()
     app = create_app()
     uvicorn.run(app, host=host, port=port)
