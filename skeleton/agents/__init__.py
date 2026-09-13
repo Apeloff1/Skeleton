@@ -14,6 +14,7 @@ from skeleton.agents.swarm_fencing import LeaseFence, assert_fence, fence_for, f
 from skeleton.agents.swarm_gc import GCResult, capacity, compact_runtime as gc_compact_runtime
 from skeleton.agents.swarm_hardened import HardenedSwarmRuntime
 from skeleton.agents.swarm_idempotency import IdempotencyConflict, IdempotencyRecord, IdempotencyRegistry
+from skeleton.agents.swarm_ingress import IngressDecision, SwarmIngressGovernor
 from skeleton.agents.swarm_invariants import InvariantReport, audit
 from skeleton.agents.swarm_janitor import JanitorResult, reap_stale_workers
 from skeleton.agents.swarm_load_shed import LoadShedPolicy, ShedDecision
@@ -22,6 +23,7 @@ from skeleton.agents.swarm_operator import SwarmOperator
 from skeleton.agents.swarm_pressure import PressureReport, classify_pressure
 from skeleton.agents.swarm_quarantine import QuarantineController, QuarantineRecord
 from skeleton.agents.swarm_queries import TaskPage, query_tasks
+from skeleton.agents.swarm_quota import Quota, QuotaExceeded, QuotaLedger, Usage
 from skeleton.agents.swarm_rate_limit import Bucket, TokenBucketLimiter
 from skeleton.agents.swarm_recovery import RecoveryStatus, SwarmRecoveryManager
 from skeleton.agents.swarm_resilient_scheduler import ResilientRanking, ResilientSwarmScheduler
@@ -43,11 +45,12 @@ __all__ = [
     "drain", "plan_drain", "lease_exact", "FairShareLedger", "TenantShare", "LeaseFence",
     "assert_fence", "fence_for", "fenced_fail", "fenced_renew", "fenced_succeed", "GCResult",
     "capacity", "gc_compact_runtime", "IdempotencyConflict", "IdempotencyRecord", "IdempotencyRegistry",
-    "InvariantReport", "audit", "JanitorResult", "reap_stale_workers", "LoadShedPolicy", "ShedDecision",
-    "compact_runtime", "compact_state", "SwarmOperator", "PressureReport", "classify_pressure",
-    "QuarantineController", "QuarantineRecord", "TaskPage", "query_tasks", "Bucket", "TokenBucketLimiter",
-    "RecoveryStatus", "SwarmRecoveryManager", "ResilientRanking", "ResilientSwarmScheduler",
-    "validate_restore_state", "PrunePlan", "RetentionPolicy", "TERMINAL_STATES", "RetryDecision",
-    "RetryPolicy", "SwarmScheduler", "WorkerScore", "SLOPolicy", "CURRENT_VERSION", "SnapshotError",
-    "normalize_snapshot", "validate_snapshot", "DispatchDecision", "SwarmSupervisor",
+    "IngressDecision", "SwarmIngressGovernor", "InvariantReport", "audit", "JanitorResult", "reap_stale_workers",
+    "LoadShedPolicy", "ShedDecision", "compact_runtime", "compact_state", "SwarmOperator", "PressureReport",
+    "classify_pressure", "QuarantineController", "QuarantineRecord", "TaskPage", "query_tasks", "Quota",
+    "QuotaExceeded", "QuotaLedger", "Usage", "Bucket", "TokenBucketLimiter", "RecoveryStatus",
+    "SwarmRecoveryManager", "ResilientRanking", "ResilientSwarmScheduler", "validate_restore_state",
+    "PrunePlan", "RetentionPolicy", "TERMINAL_STATES", "RetryDecision", "RetryPolicy", "SwarmScheduler",
+    "WorkerScore", "SLOPolicy", "CURRENT_VERSION", "SnapshotError", "normalize_snapshot",
+    "validate_snapshot", "DispatchDecision", "SwarmSupervisor",
 ]
