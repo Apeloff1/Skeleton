@@ -10,8 +10,8 @@ class ExecutionOutcomeV2:
     reason: str = ""
 
     def __post_init__(self):
-        if not isinstance(self.request_id, str) or not self.request_id:
-            raise ValueError("request_id is required")
+        if not isinstance(self.request_id, str) or not self.request_id.strip():
+            raise ValueError("request_id must be a non-empty string")
         if not isinstance(self.success, bool):
             raise TypeError("success must be bool")
         if not isinstance(self.terminal, bool):
