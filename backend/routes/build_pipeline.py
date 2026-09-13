@@ -51,6 +51,9 @@ class PackageReq(BaseModel):
 
 @router.post("/binary/package")
 async def binary_package(req: PackageReq):
+    if not code_execution_enabled():
+        return execution_disabled_response("Binary packaging")
+
     db = _db()
     build = await db.galaxy_builds.find_one({"build_id": req.build_id}, {"_id": 0})
     if not build:

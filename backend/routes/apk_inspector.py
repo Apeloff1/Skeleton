@@ -344,6 +344,9 @@ async def rebuild_apk(build_id: str):
     Falls back to a synthesized minimal build dict if galaxy_builds is missing
     the source doc — useful for APKs that were created via the direct
     binary_builder path (test harness, ad-hoc builds)."""
+    if not code_execution_enabled():
+        return execution_disabled_response("APK rebuild")
+
     db = _db()
     build = await db.galaxy_builds.find_one({"build_id": build_id}, {"_id": 0})
     if not build:

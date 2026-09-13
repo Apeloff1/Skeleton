@@ -127,6 +127,9 @@ async def _tool_run_code(params: dict) -> dict:
 
 
 async def _tool_package_build(params: dict) -> dict:
+    if not code_execution_enabled():
+        return execution_disabled_response("Tool binary packaging")
+
     build_id = params.get("build_id")
     if not build_id:
         return {"ok": False, "error": "build_id required"}
