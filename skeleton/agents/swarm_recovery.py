@@ -28,6 +28,8 @@ _RECOVERY_ARCHIVE_FIELDS = frozenset({
     "tenant",
     "archive_checksum",
 })
+_RUNTIME_RECORD_FIELDS = frozenset({"sequence", "created_at", "checksum", "state"})
+_TENANT_RECORD_FIELDS = frozenset({"sequence", "created_at", "checksum", "active", "terminal"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,9 +80,23 @@ class SwarmRecoveryManager:
         return size
 
     @staticmethod
-    def _record(mapping: object, label: str) -> Mapping[str, object]:
+    def _record(
+        mapping: object,
+        label: str,
+        expected_fields: frozenset[str],
+    ) -> Mapping[str, object]:
         if not isinstance(mapping, Mapping):
             raise ValueError(f"invalid {label} archive record")
+        fields = set(mapping)
+        if fields != expected_fields:
+            unknown = sorted(fields - expected_fields)
+            missing = sorted(expected_fields - fields)
+            details = []
+            if unknown:
+                details.append(f"unknown={unknown}")
+            if missing:
+                details.append(f"missing={missing}")
+            raise ValueError(f"{label} archive record fields mismatch: {', '.join(details)}")
         return mapping
 
     @staticmethod
@@ -197,7 +213,7 @@ class SwarmRecoveryManager:
 
         manager = cls(max_checkpoints=max_checkpoints)
         for raw in runtime_raw:
-            record = cls._record(raw, "runtime checkpoint")
+            record = cls._record(raw, "runtime checkpoint", _RUNTIME_RECORD_FIELDS)
             state = record.get("state")
             if not isinstance(state, dict):
                 raise ValueError("runtime checkpoint state must be a dictionary")
@@ -212,7 +228,7 @@ class SwarmRecoveryManager:
 
         runtime_sequences = set(manager.store.sequences())
         for raw in tenant_raw:
-            record = cls._record(raw, "tenant checkpoint")
+            record = cls._record(raw, "tenant checkpoint", _TENANT_RECORD_FIELDS)
             checkpoint = TenantMetadataCheckpoint(
                 sequence=record.get("sequence"),
                 created_at=record.get("created_at"),
