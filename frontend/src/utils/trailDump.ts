@@ -15,8 +15,8 @@ export interface DumpOpts {
 }
 
 export async function dumpTrail(opts: DumpOpts = {}): Promise<{ ok: boolean; buffered?: number; error?: string }> {
-  const crumbs = trail.list ? trail.list() : (trail as any)._crumbs || [];
-  if (!Array.isArray(crumbs) || crumbs.length === 0) {
+  const crumbs = trail.snapshot();
+  if (crumbs.length === 0) {
     return { ok: true, buffered: 0 };
   }
   try {
@@ -25,7 +25,7 @@ export async function dumpTrail(opts: DumpOpts = {}): Promise<{ ok: boolean; buf
       { rid: opts.rid || null, user_agent: opts.userAgent || '', crumbs: crumbs.slice(-100) },
       { timeoutMs: 5_000, retries: 1 },
     );
-    return { ok: !!r.ok, buffered: (r.data as any)?.buffered, error: r.error || undefined };
+    return { ok: !!r.ok, buffered: r.data?.buffered, error: r.error || undefined };
   } catch (e: any) {
     return { ok: false, error: e?.message || 'dump_failed' };
   }
