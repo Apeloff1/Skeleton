@@ -29,6 +29,14 @@ def test_allows_explicit_shell_false(tmp_path: Path) -> None:
     assert findings == []
 
 
+def test_allows_assigned_subprocess_alias_with_literal_shell_false(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nrunner = subprocess.run\nrunner(['python', '--version'], shell=False)\n",
+    )
+    assert findings == []
+
+
 def test_rejects_shell_true(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
@@ -61,6 +69,30 @@ def test_rejects_opaque_kwargs_through_alias(tmp_path: Path) -> None:
     assert any("subprocess.run" in finding and "**kwargs" in finding for finding in findings)
 
 
+def test_rejects_assigned_subprocess_callable_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nrunner = subprocess.run\nrunner('echo unsafe', shell=True)\n",
+    )
+    assert any("subprocess.run" in finding and "shell=..." in finding for finding in findings)
+
+
+def test_rejects_chained_assigned_subprocess_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nrunner = subprocess.run\nexecute = runner\nexecute('echo unsafe', shell=True)\n",
+    )
+    assert any("subprocess.run" in finding and "shell=..." in finding for finding in findings)
+
+
+def test_rejects_annotated_assigned_subprocess_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nrunner: object = subprocess.run\nrunner('echo unsafe', shell=True)\n",
+    )
+    assert any("subprocess.run" in finding and "shell=..." in finding for finding in findings)
+
+
 def test_rejects_subprocess_module_alias(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
@@ -86,6 +118,14 @@ def test_rejects_os_alias_system(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
         "import os as operating_system\noperating_system.system('echo unsafe')\n",
+    )
+    assert any("os.system()" in finding for finding in findings)
+
+
+def test_rejects_assigned_os_system_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import os\nexecute = os.system\nexecute('echo unsafe')\n",
     )
     assert any("os.system()" in finding for finding in findings)
 
@@ -123,5 +163,13 @@ def test_rejects_direct_asyncio_shell_import(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
         "from asyncio import create_subprocess_shell as execute\nexecute('echo unsafe')\n",
+    )
+    assert any("asyncio.create_subprocess_shell()" in finding for finding in findings)
+
+
+def test_rejects_assigned_asyncio_shell_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import asyncio\nspawn = asyncio.create_subprocess_shell\nspawn('echo unsafe')\n",
     )
     assert any("asyncio.create_subprocess_shell()" in finding for finding in findings)
