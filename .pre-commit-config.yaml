@@ -58,10 +58,10 @@ repos:
 
       - id: backend-exec-guard
         name: backend execution boundary regressions
-        entry: bash -c 'cd backend && python -m pytest -q --noconftest tests/test_exec_guard.py tests/test_process_safety_gate.py'
+        entry: bash -c 'cd backend && python -m pytest -q --noconftest tests/test_exec_guard.py tests/test_process_safety_gate.py tests/test_process_safety_destructuring.py'
         language: system
         pass_filenames: false
-        files: ^backend/(core/exec_guard\.py|scripts/check_process_safety\.py|tests/test_(exec_guard|process_safety_gate)\.py)$
+        files: ^backend/(core/exec_guard\.py|scripts/check_process_safety\.py|tests/test_(exec_guard|process_safety_gate|process_safety_destructuring)\.py)$
 
       - id: frontend-lint
         name: frontend canonical lint gate
