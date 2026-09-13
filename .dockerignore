@@ -17,7 +17,24 @@ __pycache__
 coverage.xml
 htmlcov
 
+# Never send local credentials or runtime configuration to Docker builders.
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+credentials*.json
+service-account*.json
+
 # Frontend dependency/build trees are not needed by the root/backend images
+node_modules
 frontend/node_modules
 frontend/.expo
 frontend/web-build
