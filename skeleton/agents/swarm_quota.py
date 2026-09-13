@@ -6,6 +6,14 @@ from dataclasses import dataclass
 from threading import RLock
 
 
+def _integer(value: int, name: str, *, positive: bool = False) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError(f"{name} must be an integer")
+    if positive and value < 1:
+        raise ValueError(f"{name} must be positive")
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class Quota:
     max_queued: int = 10_000
@@ -13,8 +21,9 @@ class Quota:
     max_payload_bytes: int = 1_048_576
 
     def __post_init__(self) -> None:
-        if min(self.max_queued, self.max_leased, self.max_payload_bytes) < 1:
-            raise ValueError("quota limits must be positive")
+        _integer(self.max_queued, "max_queued", positive=True)
+        _integer(self.max_leased, "max_leased", positive=True)
+        _integer(self.max_payload_bytes, "max_payload_bytes", positive=True)
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +51,10 @@ class QuotaLedger:
             raise ValueError("quota scope must not be empty")
         return scope
 
+    @staticmethod
+    def _delta(value: int, name: str) -> int:
+        return _integer(value, name)
+
     def configure(self, scope: str, quota: Quota) -> None:
         scope = self._scope(scope)
         with self._lock:
@@ -63,6 +76,9 @@ class QuotaLedger:
 
     def reserve(self, scope: str, *, queued: int = 0, leased: int = 0, payload_bytes: int = 0) -> Usage:
         scope = self._scope(scope)
+        queued = self._delta(queued, "queued")
+        leased = self._delta(leased, "leased")
+        payload_bytes = self._delta(payload_bytes, "payload_bytes")
         with self._lock:
             usage = self._usage.get(scope, Usage())
             quota = self._limits.get(scope, self.default)
@@ -83,11 +99,15 @@ class QuotaLedger:
             return next_usage
 
     def release(self, scope: str, **amounts: int) -> Usage:
+        normalized = {name: self._delta(value, name) for name, value in amounts.items()}
+        unknown = set(normalized) - {"queued", "leased", "payload_bytes"}
+        if unknown:
+            raise TypeError(f"unknown quota release fields: {', '.join(sorted(unknown))}")
         return self.reserve(
             scope,
-            queued=-amounts.get("queued", 0),
-            leased=-amounts.get("leased", 0),
-            payload_bytes=-amounts.get("payload_bytes", 0),
+            queued=-normalized.get("queued", 0),
+            leased=-normalized.get("leased", 0),
+            payload_bytes=-normalized.get("payload_bytes", 0),
         )
 
     def snapshot(self) -> dict[str, dict[str, int]]:
