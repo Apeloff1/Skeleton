@@ -1,0 +1,125 @@
+"""Transactional multi-tenant ingress governance for swarm workloads."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+import json
+from threading import RLock
+
+from skeleton.agents.swarm_fairness import FairShareLedger
+from skeleton.agents.swarm_quota import Quota, QuotaExceeded, QuotaLedger
+from skeleton.agents.swarm_rate_limit import TokenBucketLimiter
+
+
+@dataclass(frozen=True, slots=True)
+class IngressDecision:
+    accepted: bool
+    tenant: str
+    reason: str
+    payload_bytes: int
+    rate_remaining: float
+
+
+class SwarmIngressGovernor:
+    """Coordinates rate, quota and fair-share state under one transaction boundary."""
+
+    def __init__(
+        self,
+        *,
+        rate_capacity: float = 100.0,
+        rate_refill_per_second: float = 10.0,
+        default_quota: Quota | None = None,
+    ) -> None:
+        self.rate = TokenBucketLimiter(capacity=rate_capacity, refill_per_second=rate_refill_per_second)
+        self.quota = QuotaLedger(default_quota)
+        self.fairness = FairShareLedger()
+        self._lock = RLock()
+        self._payload_by_task: dict[tuple[str, str], int] = {}
+        self._phase_by_task: dict[tuple[str, str], str] = {}
+
+    @staticmethod
+    def _tenant(tenant: str) -> str:
+        tenant = tenant.strip()
+        if not tenant:
+            raise ValueError("tenant must not be empty")
+        return tenant
+
+    @staticmethod
+    def payload_size(payload: object) -> int:
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+        return len(encoded)
+
+    def configure_tenant(self, tenant: str, *, quota: Quota | None = None, weight: int | None = None) -> None:
+        tenant = self._tenant(tenant)
+        with self._lock:
+            if quota is not None:
+                self.quota.configure(tenant, quota)
+            if weight is not None:
+                self.fairness.configure(tenant, weight=weight)
+
+    def admit(self, tenant: str, task_id: str, payload: object, *, cost: float = 1.0) -> IngressDecision:
+        tenant = self._tenant(tenant)
+        task_id = task_id.strip()
+        if not task_id:
+            raise ValueError("task_id must not be empty")
+        key = (tenant, task_id)
+        payload_bytes = self.payload_size(payload)
+        with self._lock:
+            if key in self._phase_by_task:
+                return IngressDecision(False, tenant, "task already accounted", payload_bytes, self.rate.remaining(tenant))
+            usage = self.quota.snapshot().get(tenant, {"queued": 0, "leased": 0, "payload_bytes": 0})
+            limit = self.quota.limit(tenant)
+            if usage["queued"] + 1 > limit.max_queued:
+                return IngressDecision(False, tenant, "queued quota exceeded", payload_bytes, self.rate.remaining(tenant))
+            if usage["payload_bytes"] + payload_bytes > limit.max_payload_bytes:
+                return IngressDecision(False, tenant, "payload quota exceeded", payload_bytes, self.rate.remaining(tenant))
+            if not self.rate.allow(tenant, cost=cost):
+                return IngressDecision(False, tenant, "rate limit exceeded", payload_bytes, self.rate.remaining(tenant))
+            try:
+                self.quota.reserve(tenant, queued=1, payload_bytes=payload_bytes)
+            except QuotaExceeded as exc:
+                return IngressDecision(False, tenant, str(exc), payload_bytes, self.rate.remaining(tenant))
+            self.fairness.admit(tenant)
+            self._payload_by_task[key] = payload_bytes
+            self._phase_by_task[key] = "queued"
+            return IngressDecision(True, tenant, "admitted", payload_bytes, self.rate.remaining(tenant))
+
+    def mark_leased(self, tenant: str, task_id: str) -> None:
+        tenant = self._tenant(tenant)
+        key = (tenant, task_id.strip())
+        with self._lock:
+            phase = self._phase_by_task.get(key)
+            if phase != "queued":
+                raise ValueError(f"task is not queued: {task_id}")
+            self.quota.reserve(tenant, queued=-1, leased=1)
+            self._phase_by_task[key] = "leased"
+
+    def complete(self, tenant: str, task_id: str) -> None:
+        tenant = self._tenant(tenant)
+        key = (tenant, task_id.strip())
+        with self._lock:
+            phase = self._phase_by_task.get(key)
+            if phase is None:
+                raise ValueError(f"task is not accounted: {task_id}")
+            payload_bytes = self._payload_by_task[key]
+            if phase == "queued":
+                self.quota.release(tenant, queued=1, payload_bytes=payload_bytes)
+            elif phase == "leased":
+                self.quota.release(tenant, leased=1, payload_bytes=payload_bytes)
+            else:
+                raise ValueError(f"invalid ingress phase: {phase}")
+            self.fairness.complete(tenant)
+            del self._phase_by_task[key]
+            del self._payload_by_task[key]
+
+    def preferred_tenant(self, tenants: list[str]) -> str | None:
+        return self.fairness.preferred(tenants)
+
+    def status(self) -> dict[str, object]:
+        with self._lock:
+            return {
+                "quota": self.quota.snapshot(),
+                "fairness": self.fairness.snapshot(),
+                "rate": self.rate.snapshot(),
+                "accounted_tasks": len(self._phase_by_task),
+            }
