@@ -1,4 +1,5 @@
 """Composition boundary for evolving runtime admission contracts."""
+
 from dataclasses import dataclass
 
 from .gameforge_admission import Admission, decide
@@ -25,9 +26,14 @@ class RuntimeContract:
             return Receipt("invalid-request", Admission.SHED.value, "missing_request_id")
         if not isinstance(background, bool) or not isinstance(read_only, bool):
             return Receipt(request_id, Admission.SHED.value, "invalid_flags")
-        if (not isinstance(active, int) or isinstance(active, bool)
-                or not isinstance(limit, int) or isinstance(limit, bool)
-                or active < 0 or limit <= 0):
+        if (
+            not isinstance(active, int)
+            or isinstance(active, bool)
+            or not isinstance(limit, int)
+            or isinstance(limit, bool)
+            or active < 0
+            or limit <= 0
+        ):
             return Receipt(request_id, Admission.SHED.value, "invalid_limits")
         if not self.lifecycle.can_accept:
             return Receipt(request_id, Admission.SHED.value, "lifecycle")

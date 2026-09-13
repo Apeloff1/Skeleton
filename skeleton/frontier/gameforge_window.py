@@ -1,4 +1,5 @@
 """Bounded sliding-window counter."""
+
 from collections import deque
 
 

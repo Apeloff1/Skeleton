@@ -1,4 +1,5 @@
 """Bounded outbox contract for durable handoff without a persistence dependency."""
+
 from __future__ import annotations
 
 from collections import deque

@@ -1,5 +1,3 @@
-import asyncio
-
 import pytest
 
 from skeleton.frontier.agent_runtime import AgentRuntime
@@ -27,7 +25,9 @@ class FlakyAgent:
 @pytest.mark.asyncio
 async def test_explicit_transient_retries_are_bounded_and_context_is_fresh():
     agent = FlakyAgent()
-    runtime = AgentRuntime({agent.name: agent}, execution_policy=ExecutionPolicy(max_attempts=3, retry_delay=0.001))
+    runtime = AgentRuntime(
+        {agent.name: agent}, execution_policy=ExecutionPolicy(max_attempts=3, retry_delay=0.001)
+    )
     result = await runtime.execute(agent.name, "work", context={"values": []})
     assert result.succeeded and result.attempts == 3
     assert agent.seen == [[], [], []]
@@ -47,8 +47,10 @@ async def test_unknown_failures_are_not_retried_or_exposed():
 @pytest.mark.asyncio
 async def test_total_deadline_covers_retry_backoff():
     agent = FlakyAgent()
-    runtime = AgentRuntime({agent.name: agent}, execution_policy=ExecutionPolicy(
-        max_attempts=3, execution_timeout=0.01, retry_delay=0.1))
+    runtime = AgentRuntime(
+        {agent.name: agent},
+        execution_policy=ExecutionPolicy(max_attempts=3, execution_timeout=0.01, retry_delay=0.1),
+    )
     result = await runtime.execute(agent.name, "work", context={"values": []})
     assert result.status is ExecutionStatus.TIMED_OUT
     assert agent.calls == 1
@@ -59,4 +61,6 @@ async def test_total_deadline_covers_retry_backoff():
 async def test_provider_timeout_is_a_failure_without_claiming_runtime_expiry():
     agent = FlakyAgent(TimeoutError)
     runtime = AgentRuntime({agent.name: agent})
-    assert (await runtime.execute(agent.name, "work", context={"values": []})).status is ExecutionStatus.FAILED
+    assert (
+        await runtime.execute(agent.name, "work", context={"values": []})
+    ).status is ExecutionStatus.FAILED

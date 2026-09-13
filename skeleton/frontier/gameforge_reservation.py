@@ -1,4 +1,5 @@
 """Explicit immutable reservation identity for bounded runtime resources."""
+
 from dataclasses import dataclass
 
 

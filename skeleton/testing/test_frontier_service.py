@@ -34,20 +34,24 @@ async def test_worker_process_is_reaped_when_runtime_deadline_expires(tmp_path, 
         return process
 
     monkeypatch.setattr(asyncio, "create_subprocess_exec", slow_worker)
-    async with create_frontier_runtime(state_root=tmp_path,
-                                       execution_policy=ExecutionPolicy(execution_timeout=0.05)) as runtime:
+    async with create_frontier_runtime(
+        state_root=tmp_path, execution_policy=ExecutionPolicy(execution_timeout=0.05)
+    ) as runtime:
         result = await runtime.execute("gameforge.npc", "guardian")
         assert result.status is ExecutionStatus.TIMED_OUT
         assert len(processes) == 1 and processes[0].returncode is not None
         assert runtime.stats()["active"] == 0
 
 
-@pytest.mark.parametrize("operation,context", [
-    ("gameforge.npc", {"dialogue_beats": True}),
-    ("gameforge.logic", {"max_level": 1.5}),
-    ("jeeves.review", {"language": []}),
-    ("gameforge.npc", {"state_root": "/unexpected"}),
-])
+@pytest.mark.parametrize(
+    "operation,context",
+    [
+        ("gameforge.npc", {"dialogue_beats": True}),
+        ("gameforge.logic", {"max_level": 1.5}),
+        ("jeeves.review", {"language": []}),
+        ("gameforge.npc", {"state_root": "/unexpected"}),
+    ],
+)
 def test_worker_rejects_invalid_or_unrecognized_options(tmp_path, operation, context):
     with pytest.raises(ValueError):
         run_operation(operation, "task", context, tmp_path)

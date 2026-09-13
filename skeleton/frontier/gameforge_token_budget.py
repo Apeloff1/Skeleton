@@ -1,4 +1,6 @@
 """Small deterministic token budget for bounded execution work."""
+
+
 class TokenBudget:
     def __init__(self, capacity: int):
         if capacity <= 0:

@@ -17,7 +17,10 @@ def test_emit_returns_published_event_with_linkable_identity():
 
 
 def test_npc_and_game_logic_emit_complete_correlated_event_chains(tmp_path):
-    for pipeline, description in [(NpcPipeline, "a loyal guardian"), (GameLogicPipeline, "combat and exploration")]:
+    for pipeline, description in [
+        (NpcPipeline, "a loyal guardian"),
+        (GameLogicPipeline, "combat and exploration"),
+    ]:
         bus = EventBus()
         events = []
         bus.subscribe("*", events.append)

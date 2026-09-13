@@ -1,4 +1,5 @@
 """Fixed-operation worker used by the frontier application service."""
+
 from __future__ import annotations
 
 import argparse
@@ -28,8 +29,11 @@ def run_operation(operation: str, task: str, context: dict[str, Any], state_root
             if key in context and (not isinstance(context[key], str) or not context[key].strip()):
                 raise ValueError(f"{key} must be a non-empty string")
         params = {"archetype": context["archetype"]} if "archetype" in context else {}
-        return NpcPipeline(root=state_root).run(task, name=context.get("name"), dialogue_beats=beats,
-                                              params=params).to_dict()
+        return (
+            NpcPipeline(root=state_root)
+            .run(task, name=context.get("name"), dialogue_beats=beats, params=params)
+            .to_dict()
+        )
     if operation == "gameforge.logic":
         from skeleton.pipelines.game_logic import GameLogicPipeline
 
@@ -67,7 +71,9 @@ def main(argv: list[str] | None = None) -> int:
         if not isinstance(payload, dict) or not isinstance(payload.get("context", {}), dict):
             raise ValueError("invalid worker request")
         with contextlib.redirect_stdout(sys.stderr):
-            output = run_operation(args.operation, payload.get("task"), payload.get("context", {}), args.state_root)
+            output = run_operation(
+                args.operation, payload.get("task"), payload.get("context", {}), args.state_root
+            )
         encoded = json.dumps(output, allow_nan=False).encode("utf-8")
         if len(encoded) > 1_048_576:
             raise ValueError("result exceeds worker byte budget")

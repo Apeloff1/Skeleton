@@ -37,15 +37,29 @@ async def test_api_requires_seal_and_keeps_idempotency_scoped_to_attester(monkey
     runtime = AgentRuntime({"echo": agent})
     headers = {"x-gf-seal": mint_seal("one"), "Idempotency-Key": "same"}
     async with client_for(runtime) as client:
-        assert (await client.post("/api/v1/frontier/execute", json={"agent": "echo", "task": "work"})).status_code == 401
-        first = await client.post("/api/v1/frontier/execute", headers=headers, json={"agent": "echo", "task": "work"})
-        replay = await client.post("/api/v1/frontier/execute", headers=headers, json={"agent": "echo", "task": "work"})
+        assert (
+            await client.post("/api/v1/frontier/execute", json={"agent": "echo", "task": "work"})
+        ).status_code == 401
+        first = await client.post(
+            "/api/v1/frontier/execute", headers=headers, json={"agent": "echo", "task": "work"}
+        )
+        replay = await client.post(
+            "/api/v1/frontier/execute", headers=headers, json={"agent": "echo", "task": "work"}
+        )
         assert first.status_code == replay.status_code == 200
         assert first.json() == replay.json() and agent.calls == 1
         assert first.headers["X-Request-Id"] == first.json()["request_id"]
-        assert (await client.post("/api/v1/frontier/execute", headers=headers, json={"agent": "echo", "task": "changed"})).status_code == 409
+        assert (
+            await client.post(
+                "/api/v1/frontier/execute", headers=headers, json={"agent": "echo", "task": "changed"}
+            )
+        ).status_code == 409
         headers["x-gf-seal"] = mint_seal("two")
-        assert (await client.post("/api/v1/frontier/execute", headers=headers, json={"agent": "echo", "task": "work"})).status_code == 200
+        assert (
+            await client.post(
+                "/api/v1/frontier/execute", headers=headers, json={"agent": "echo", "task": "work"}
+            )
+        ).status_code == 200
         assert agent.calls == 2
 
 
@@ -55,12 +69,27 @@ async def test_api_maps_unknown_closed_and_invalid_requests(monkeypatch):
     runtime = AgentRuntime({"echo": Echo()})
     headers = {"x-gf-seal": mint_seal("operator")}
     async with client_for(runtime) as client:
-        assert (await client.get("/api/v1/frontier/agents", headers=headers)).json()["agents"][0]["name"] == "echo"
-        assert (await client.post("/api/v1/frontier/execute", headers=headers, json={"agent": "missing", "task": "work"})).status_code == 404
-        for body in [{"agent": "echo", "task": "work", "timeout": True}, {"agent": "echo", "task": "work", "extra": 1}]:
-            assert (await client.post("/api/v1/frontier/execute", headers=headers, json=body)).status_code == 422
+        assert (await client.get("/api/v1/frontier/agents", headers=headers)).json()["agents"][0][
+            "name"
+        ] == "echo"
+        assert (
+            await client.post(
+                "/api/v1/frontier/execute", headers=headers, json={"agent": "missing", "task": "work"}
+            )
+        ).status_code == 404
+        for body in [
+            {"agent": "echo", "task": "work", "timeout": True},
+            {"agent": "echo", "task": "work", "extra": 1},
+        ]:
+            assert (
+                await client.post("/api/v1/frontier/execute", headers=headers, json=body)
+            ).status_code == 422
         await runtime.aclose()
-        assert (await client.post("/api/v1/frontier/execute", headers=headers, json={"agent": "echo", "task": "work"})).status_code == 503
+        assert (
+            await client.post(
+                "/api/v1/frontier/execute", headers=headers, json={"agent": "echo", "task": "work"}
+            )
+        ).status_code == 503
 
 
 @pytest.mark.asyncio
@@ -73,8 +102,11 @@ async def test_timeout_result_has_504_status(monkeypatch):
 
     runtime = AgentRuntime({"echo": Blocked()}, execution_policy=ExecutionPolicy(execution_timeout=0.01))
     async with client_for(runtime) as client:
-        response = await client.post("/api/v1/frontier/execute", headers={"x-gf-seal": mint_seal("operator")},
-                                     json={"agent": "echo", "task": "work"})
+        response = await client.post(
+            "/api/v1/frontier/execute",
+            headers={"x-gf-seal": mint_seal("operator")},
+            json={"agent": "echo", "task": "work"},
+        )
     assert response.status_code == 504
     assert response.json()["status"] == "timed_out"
 

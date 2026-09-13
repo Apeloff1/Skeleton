@@ -1,4 +1,5 @@
 """Normalized, validated outcome values for frontier execution."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

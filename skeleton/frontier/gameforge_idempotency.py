@@ -1,10 +1,12 @@
 """Provider-neutral idempotency contract inspired by GameForge service invariants."""
+
 from __future__ import annotations
 
 from collections import OrderedDict
+from collections.abc import Hashable
 from dataclasses import dataclass
 from threading import Lock
-from typing import Generic, Hashable, Optional, TypeVar
+from typing import Generic, TypeVar
 
 T = TypeVar("T")
 _MISSING = object()
@@ -47,7 +49,7 @@ class IdempotencyWindow(Generic[T]):
             self._accepted += 1
             return True, value
 
-    def lookup(self, key: Hashable) -> Optional[T]:
+    def lookup(self, key: Hashable) -> T | None:
         with self._lock:
             return self._values.get(key)
 

@@ -12,7 +12,7 @@ class HealthScore:
         if not isinstance(ok, bool):
             raise TypeError("ok must be bool")
         self._samples.append(ok)
-        self._samples = self._samples[-self.window:]
+        self._samples = self._samples[-self.window :]
         return self.value
 
     @property

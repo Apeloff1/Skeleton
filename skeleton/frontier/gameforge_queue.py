@@ -1,4 +1,5 @@
 """Bounded FIFO queue with explicit backpressure."""
+
 from collections import deque
 from threading import Lock
 

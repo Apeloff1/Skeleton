@@ -1,4 +1,5 @@
 """Circuit breaker with explicit recovery semantics."""
+
 from enum import Enum
 from threading import Lock
 

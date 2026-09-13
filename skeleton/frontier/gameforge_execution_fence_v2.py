@@ -1,4 +1,6 @@
 """One-shot fence preventing duplicate terminal application."""
+
+
 class ExecutionFenceV2:
     def __init__(self):
         self._closed = False

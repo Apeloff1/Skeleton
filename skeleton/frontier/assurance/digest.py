@@ -1,4 +1,5 @@
 """Canonical state hashing for deterministic replay and provenance."""
+
 import hashlib
 import json
 from typing import Any

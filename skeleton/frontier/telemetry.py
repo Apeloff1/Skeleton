@@ -1,13 +1,14 @@
 """Bounded, dependency-free telemetry for runtime observability."""
+
 from __future__ import annotations
 
 import math
 from collections import deque
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from threading import Lock
 from types import MappingProxyType
-from typing import Iterable, Mapping
 
 from skeleton.frontier.execution import positive_int
 
@@ -16,19 +17,25 @@ from skeleton.frontier.execution import positive_int
 class MetricSample:
     name: str
     value: float
-    observed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    observed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     tags: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not isinstance(self.name, str) or not self.name.strip() or len(self.name) > 128:
             raise ValueError("metric name must contain 1 to 128 characters")
-        if isinstance(self.value, bool) or not isinstance(self.value, (int, float)) or not math.isfinite(self.value):
+        if (
+            isinstance(self.value, bool)
+            or not isinstance(self.value, (int, float))
+            or not math.isfinite(self.value)
+        ):
             raise ValueError("metric value must be finite")
         if self.observed_at.tzinfo is None or self.observed_at.utcoffset() is None:
             raise ValueError("observed_at must be timezone-aware")
         tags = dict(self.tags)
-        if len(tags) > 16 or any(not isinstance(k, str) or not isinstance(v, str)
-                                 or len(k) > 128 or len(v) > 256 for k, v in tags.items()):
+        if len(tags) > 16 or any(
+            not isinstance(k, str) or not isinstance(v, str) or len(k) > 128 or len(v) > 256
+            for k, v in tags.items()
+        ):
             raise ValueError("metric tags exceed the string label limits")
         object.__setattr__(self, "tags", MappingProxyType(tags))
 
@@ -72,5 +79,11 @@ class TelemetryBuffer:
             upper = min(lower + 1, len(values) - 1)
             return values[lower] + (values[upper] - values[lower]) * (position - lower)
 
-        return {"count": len(values), "min": values[0], "max": values[-1],
-                "mean": sum(values) / len(values), "p50": percentile(0.5), "p95": percentile(0.95)}
+        return {
+            "count": len(values),
+            "min": values[0],
+            "max": values[-1],
+            "mean": sum(values) / len(values),
+            "p50": percentile(0.5),
+            "p95": percentile(0.95),
+        }

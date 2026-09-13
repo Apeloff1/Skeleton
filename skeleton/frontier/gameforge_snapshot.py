@@ -1,4 +1,5 @@
 """Small immutable runtime state snapshot for bounded observability."""
+
 from dataclasses import dataclass
 from math import isfinite
 
@@ -19,8 +20,7 @@ class RuntimeSnapshot:
             raise TypeError("lifecycle must be a non-empty string")
         if not isinstance(self.dependencies_ready, bool):
             raise TypeError("dependencies_ready must be a boolean")
-        counters = (self.active, self.budget_used, self.budget_capacity,
-                    self.quota_used, self.queue_depth)
+        counters = (self.active, self.budget_used, self.budget_capacity, self.quota_used, self.queue_depth)
         if any(not isinstance(value, int) or isinstance(value, bool) for value in counters):
             raise TypeError("runtime counters must be integers")
         if self.active < 0 or self.budget_used < 0 or self.budget_capacity <= 0:

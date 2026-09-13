@@ -1,4 +1,5 @@
 """Small immutable bounds primitive used by runtime policies."""
+
 from dataclasses import dataclass
 
 from .invariant import require

@@ -1,10 +1,13 @@
 """Executable invariants for bounded frontier components."""
+
 from dataclasses import dataclass
+
 
 @dataclass(frozen=True)
 class InvariantReport:
     valid: bool
     violations: tuple[str, ...] = ()
+
 
 def check_bounds(*, used: int, capacity: int, name: str = "resource") -> InvariantReport:
     violations = []

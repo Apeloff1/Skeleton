@@ -1,4 +1,5 @@
 """Bounded recovery state for frontier execution."""
+
 from dataclasses import dataclass
 
 

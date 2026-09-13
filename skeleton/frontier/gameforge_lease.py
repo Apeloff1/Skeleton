@@ -4,11 +4,12 @@ Leases are single-owner tokens with fail-closed release semantics.  The backing
 set serializes capacity accounting so concurrent acquire/release operations
 cannot create phantom capacity or drive the counter below zero.
 """
+
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from threading import Lock
-from typing import Callable
 
 
 @dataclass

@@ -47,8 +47,9 @@ async def test_observer_failure_or_timeout_does_not_change_agent_success():
 
     await events.subscribe("agent.started", broken)
     await events.subscribe("agent.completed", blocked)
-    runtime = AgentRuntime({"echo": Echo()}, events=events,
-                           execution_policy=ExecutionPolicy(event_timeout=0.005))
+    runtime = AgentRuntime(
+        {"echo": Echo()}, events=events, execution_policy=ExecutionPolicy(event_timeout=0.005)
+    )
     result = await runtime.execute("echo", "work")
     assert result.succeeded
     assert runtime.stats()["event_failures"] == 2

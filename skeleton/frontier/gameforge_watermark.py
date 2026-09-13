@@ -1,4 +1,5 @@
 """Monotonic high-water mark contract."""
+
 from threading import Lock
 
 

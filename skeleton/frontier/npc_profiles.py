@@ -7,8 +7,8 @@ remain outside the frontier kernel.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,11 +21,41 @@ class ArchetypeProfile:
 
 
 PROFILES: dict[str, ArchetypeProfile] = {
-    "merchant": ArchetypeProfile("merchant", {"charisma": 14, "intelligence": 12, "wisdom": 10}, ("persuasion", "appraisal", "negotiation"), ("haggle", "showcase_goods", "gossip"), ("prices", "goods", "rumors", "trade_routes")),
-    "warrior": ArchetypeProfile("warrior", {"strength": 16, "constitution": 14, "dexterity": 12}, ("combat", "tactics", "weapon_mastery"), ("patrol", "challenge", "protect"), ("battles", "honor", "training", "enemies")),
-    "mage": ArchetypeProfile("mage", {"intelligence": 18, "wisdom": 14, "charisma": 10}, ("arcana", "spellcasting", "alchemy"), ("study", "experiment", "lecture"), ("magic", "research", "mysteries", "artifacts")),
-    "mentor": ArchetypeProfile("mentor", {"wisdom": 18, "intelligence": 16, "charisma": 14}, ("teaching", "guidance", "insight"), ("observe", "advise", "test", "encourage"), ("lessons", "growth", "challenges", "wisdom")),
-    "villain": ArchetypeProfile("villain", {"intelligence": 16, "charisma": 14, "wisdom": 12}, ("manipulation", "intimidation", "deception"), ("scheme", "threaten", "manipulate"), ("power", "revenge", "control", "superiority")),
+    "merchant": ArchetypeProfile(
+        "merchant",
+        {"charisma": 14, "intelligence": 12, "wisdom": 10},
+        ("persuasion", "appraisal", "negotiation"),
+        ("haggle", "showcase_goods", "gossip"),
+        ("prices", "goods", "rumors", "trade_routes"),
+    ),
+    "warrior": ArchetypeProfile(
+        "warrior",
+        {"strength": 16, "constitution": 14, "dexterity": 12},
+        ("combat", "tactics", "weapon_mastery"),
+        ("patrol", "challenge", "protect"),
+        ("battles", "honor", "training", "enemies"),
+    ),
+    "mage": ArchetypeProfile(
+        "mage",
+        {"intelligence": 18, "wisdom": 14, "charisma": 10},
+        ("arcana", "spellcasting", "alchemy"),
+        ("study", "experiment", "lecture"),
+        ("magic", "research", "mysteries", "artifacts"),
+    ),
+    "mentor": ArchetypeProfile(
+        "mentor",
+        {"wisdom": 18, "intelligence": 16, "charisma": 14},
+        ("teaching", "guidance", "insight"),
+        ("observe", "advise", "test", "encourage"),
+        ("lessons", "growth", "challenges", "wisdom"),
+    ),
+    "villain": ArchetypeProfile(
+        "villain",
+        {"intelligence": 16, "charisma": 14, "wisdom": 12},
+        ("manipulation", "intimidation", "deception"),
+        ("scheme", "threaten", "manipulate"),
+        ("power", "revenge", "control", "superiority"),
+    ),
 }
 
 

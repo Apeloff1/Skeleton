@@ -1,18 +1,20 @@
 """Runtime coordinator composing lifecycle, dependencies, rate, circuit, and bounded budgets."""
+
 from dataclasses import dataclass
+
 from .gameforge_admission import Admission, decide
 from .gameforge_budget import Budget
 from .gameforge_circuit import Circuit
 from .gameforge_dependency import DependencyGate
-from .gameforge_lifecycle import ServiceLifecycle
-from .gameforge_rate import RateWindow
-from .gameforge_quota import Quota
-from .gameforge_queue import BoundedQueue
-from .gameforge_retry_budget import RetryBudget
 from .gameforge_health_score import HealthScore
-from .gameforge_snapshot import RuntimeSnapshot
-from .gameforge_receipt import Receipt
+from .gameforge_lifecycle import ServiceLifecycle
 from .gameforge_outcome_v2 import ExecutionOutcomeV2
+from .gameforge_queue import BoundedQueue
+from .gameforge_quota import Quota
+from .gameforge_rate import RateWindow
+from .gameforge_receipt import Receipt
+from .gameforge_retry_budget import RetryBudget
+from .gameforge_snapshot import RuntimeSnapshot
 
 
 @dataclass
@@ -51,8 +53,16 @@ class RuntimeCoordinator:
             if not isinstance(value, bool):
                 raise TypeError(f"{name} must be bool")
 
-    def admit(self, now: int, active: int, limit: int = 1, background: bool = False,
-              request_id=None, retry: bool = False, read_only: bool = False):
+    def admit(
+        self,
+        now: int,
+        active: int,
+        limit: int = 1,
+        background: bool = False,
+        request_id=None,
+        retry: bool = False,
+        read_only: bool = False,
+    ):
         self._validate_request_id(request_id)
         self._validate_admission_inputs(now, active, limit, background, retry, read_only)
         if request_id is not None and request_id in self._request_ids:
@@ -67,8 +77,9 @@ class RuntimeCoordinator:
         if not self.rate.allow(now):
             self.health.record(False)
             return Admission.SHED
-        decision = decide(background_allowed=True, read_only=read_only, active=active,
-                          limit=limit, background=background)
+        decision = decide(
+            background_allowed=True, read_only=read_only, active=active, limit=limit, background=background
+        )
         if decision is Admission.ACCEPT:
             if not self.budget.reserve():
                 self.health.record(False)
@@ -88,8 +99,16 @@ class RuntimeCoordinator:
         self.health.record(decision is not Admission.SHED)
         return decision
 
-    def admit_receipt(self, request_id, now: int, active: int, limit: int = 1,
-                      background: bool = False, retry: bool = False, read_only: bool = False):
+    def admit_receipt(
+        self,
+        request_id,
+        now: int,
+        active: int,
+        limit: int = 1,
+        background: bool = False,
+        retry: bool = False,
+        read_only: bool = False,
+    ):
         if not isinstance(request_id, str) or not request_id.strip():
             raise ValueError("request_id must be a non-empty string")
         decision = self.admit(now, active, limit, background, request_id, retry, read_only)
@@ -142,6 +161,13 @@ class RuntimeCoordinator:
     def snapshot(self, active: int = 0):
         if not isinstance(active, int) or isinstance(active, bool) or active < 0:
             raise ValueError("active must be a non-negative integer")
-        return RuntimeSnapshot(self.lifecycle.state.value, self.dependencies.ready, active,
-                               self.budget.used, self.budget.capacity, self.quota.used,
-                               len(self.queue), self.health.value)
+        return RuntimeSnapshot(
+            self.lifecycle.state.value,
+            self.dependencies.ready,
+            active,
+            self.budget.used,
+            self.budget.capacity,
+            self.quota.used,
+            len(self.queue),
+            self.health.value,
+        )

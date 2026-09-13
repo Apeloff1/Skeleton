@@ -1,5 +1,6 @@
 """Fail-closed invariant checks with a stable exception type."""
 
+
 class InvariantViolation(ValueError):
     """Raised when a frontier contract invariant is violated."""
 

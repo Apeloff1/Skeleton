@@ -1,5 +1,6 @@
 """Monotonic sequence primitive for receipts, events, and replay."""
 
+
 class MonotonicCounter:
     def __init__(self, start: int = 0):
         if start < 0:

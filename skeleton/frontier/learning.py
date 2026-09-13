@@ -29,7 +29,7 @@ class LearningState:
     def success_rate(self) -> float:
         return self.successes / self.attempts if self.attempts else 0.0
 
-    def record(self, success: bool) -> "LearningState":
+    def record(self, success: bool) -> LearningState:
         attempts = self.attempts + 1
         successes = self.successes + int(success)
         mastery = self.mastery

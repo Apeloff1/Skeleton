@@ -7,14 +7,16 @@ Database operations run on worker threads. Writes use BEGIN IMMEDIATE so the
 capacity check and upsert are atomic across processes. Cancellation stops the
 waiter; a transaction already running in a worker may still commit.
 """
+
 from __future__ import annotations
 
 import asyncio
 import json
 import sqlite3
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from threading import RLock
-from typing import Any, Callable, Mapping, TypeVar
+from typing import Any, TypeVar
 from uuid import uuid4
 
 from skeleton.frontier.execution import positive_int
@@ -24,8 +26,14 @@ T = TypeVar("T")
 
 
 class SQLiteMemoryStore:
-    def __init__(self, path: str | Path, *, namespace: str = "default",
-                 capacity: int = 10_000, max_payload_bytes: int = 1_048_576) -> None:
+    def __init__(
+        self,
+        path: str | Path,
+        *,
+        namespace: str = "default",
+        capacity: int = 10_000,
+        max_payload_bytes: int = 1_048_576,
+    ) -> None:
         if not isinstance(namespace, str) or not namespace.strip() or len(namespace) > 128:
             raise ValueError("namespace must contain 1 to 128 characters")
         self.namespace = namespace
@@ -79,18 +87,22 @@ class SQLiteMemoryStore:
                     ).fetchone()[0]
                     if count >= self.capacity:
                         raise OverflowError("memory store capacity reached")
-                self._connection.execute("""
+                self._connection.execute(
+                    """
                     INSERT INTO frontier_memory(namespace, item_id, payload, search_text)
                     VALUES (?, ?, ?, ?)
                     ON CONFLICT(namespace, item_id) DO UPDATE SET
                         payload=excluded.payload, search_text=excluded.search_text
-                """, (self.namespace, item_id, encoded, search_text))
+                """,
+                    (self.namespace, item_id, encoded, search_text),
+                )
             return item_id
 
         return await self._run(write)
 
-    async def search(self, query: str, *, limit: int = 10,
-                     filters: Mapping[str, Any] | None = None) -> list[Mapping[str, Any]]:
+    async def search(
+        self, query: str, *, limit: int = 10, filters: Mapping[str, Any] | None = None
+    ) -> list[Mapping[str, Any]]:
         positive_int("limit", limit, minimum=0)
         if not isinstance(query, str):
             raise ValueError("query must be a string")
@@ -101,10 +113,13 @@ class SQLiteMemoryStore:
             if limit == 0:
                 return []
             hits = []
-            cursor = self._connection.execute("""
+            cursor = self._connection.execute(
+                """
                 SELECT payload FROM frontier_memory
                 WHERE namespace=? AND instr(search_text, ?) > 0 ORDER BY item_id
-            """, (self.namespace, needle))
+            """,
+                (self.namespace, needle),
+            )
             try:
                 for (encoded,) in cursor:
                     payload = json.loads(encoded)
@@ -129,9 +144,11 @@ class SQLiteMemoryStore:
         await self._run(remove)
 
     async def count(self) -> int:
-        return await self._run(lambda: self._connection.execute(
-            "SELECT COUNT(*) FROM frontier_memory WHERE namespace=?", (self.namespace,)
-        ).fetchone()[0])
+        return await self._run(
+            lambda: self._connection.execute(
+                "SELECT COUNT(*) FROM frontier_memory WHERE namespace=?", (self.namespace,)
+            ).fetchone()[0]
+        )
 
     async def aclose(self) -> None:
         def close() -> None:

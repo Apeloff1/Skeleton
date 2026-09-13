@@ -1,4 +1,5 @@
 """Verification record for promotion and integration gates."""
+
 from dataclasses import dataclass
 
 

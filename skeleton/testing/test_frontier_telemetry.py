@@ -1,4 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 import pytest
 
 from skeleton.frontier.telemetry import MetricSample, TelemetryBuffer
@@ -21,7 +22,7 @@ def test_metric_sample_requires_timezone_aware_timestamp():
     else:
         raise AssertionError("naive timestamps must fail")
 
-    assert MetricSample("x", 1.0, datetime.now(timezone.utc)).name == "x"
+    assert MetricSample("x", 1.0, datetime.now(UTC)).name == "x"
 
 
 def test_telemetry_evicts_old_samples_and_summarizes_retained_window():

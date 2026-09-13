@@ -1,5 +1,7 @@
 """Deterministic bounded sliding window v2."""
+
 from collections import deque
+
 
 class SlidingWindowV2:
     def __init__(self, capacity: int):

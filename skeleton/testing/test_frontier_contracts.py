@@ -1,4 +1,4 @@
-from datetime import timezone
+from datetime import UTC
 
 from skeleton.frontier.contracts import ProvenanceRecord
 
@@ -16,4 +16,4 @@ def test_provenance_record_is_json_friendly():
     assert data["source_repository"] == "Apeloff1/Tutolage"
     assert data["source_revision"] == "abc123"
     assert data["metadata"] == {"role": "candidate"}
-    assert record.timestamp.tzinfo == timezone.utc
+    assert record.timestamp.tzinfo == UTC

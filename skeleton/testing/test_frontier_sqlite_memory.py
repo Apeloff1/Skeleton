@@ -41,7 +41,10 @@ async def test_memory_survives_close_and_reopen_with_original_id(tmp_path):
 @pytest.mark.asyncio
 async def test_namespaces_isolate_identical_ids_and_deletions(tmp_path):
     path = tmp_path / "memory.db"
-    async with SQLiteMemoryStore(path, namespace="one") as one, SQLiteMemoryStore(path, namespace="two") as two:
+    async with (
+        SQLiteMemoryStore(path, namespace="one") as one,
+        SQLiteMemoryStore(path, namespace="two") as two,
+    ):
         await one.put({"id": "same", "text": "one"})
         await two.put({"id": "same", "text": "two"})
         assert await one.search("two") == []

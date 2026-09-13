@@ -4,14 +4,15 @@ Source: Apeloff1/gameforge-rs, crates/gf-services/src/lib.rs
 Revision: 8f0a107e5cac31fbfe39fee07daad415fd453aca
 Disposition: selective promotion; Python contract layer, no Rust/vendor coupling.
 """
+
 from __future__ import annotations
 
+import math
 from collections import OrderedDict
 from dataclasses import dataclass
 from enum import Enum
 from threading import Lock
 from time import monotonic
-import math
 
 
 @dataclass
@@ -24,8 +25,9 @@ class _Entry:
 class TieredCache:
     """Bounded L1/L2 cache with TTL and hot-entry promotion."""
 
-    def __init__(self, l1_cap: int = 512, l2_cap: int = 4096,
-                 l1_ttl: float = 60.0, l2_ttl: float = 300.0) -> None:
+    def __init__(
+        self, l1_cap: int = 512, l2_cap: int = 4096, l1_ttl: float = 60.0, l2_ttl: float = 300.0
+    ) -> None:
         if min(l1_cap, l2_cap) <= 0 or min(l1_ttl, l2_ttl) <= 0:
             raise ValueError("cache bounds must be positive")
         self.l1_cap, self.l2_cap = l1_cap, l2_cap
@@ -83,8 +85,12 @@ class TieredCache:
 
     def stats(self) -> dict[str, int]:
         with self._lock:
-            return {"l1_entries": len(self._l1), "l2_entries": len(self._l2),
-                    "hits": self.hits, "misses": self.misses}
+            return {
+                "l1_entries": len(self._l1),
+                "l2_entries": len(self._l2),
+                "hits": self.hits,
+                "misses": self.misses,
+            }
 
 
 class Verdict(str, Enum):
@@ -96,9 +102,14 @@ class AdaptiveGate:
     """Bounded token admission with explicit shedding under saturation."""
 
     def __init__(self, capacity: int, refill_per_sec: int) -> None:
-        if (isinstance(capacity, bool) or not isinstance(capacity, int) or capacity <= 0
-                or isinstance(refill_per_sec, bool) or not isinstance(refill_per_sec, int)
-                or refill_per_sec < 0):
+        if (
+            isinstance(capacity, bool)
+            or not isinstance(capacity, int)
+            or capacity <= 0
+            or isinstance(refill_per_sec, bool)
+            or not isinstance(refill_per_sec, int)
+            or refill_per_sec < 0
+        ):
             raise ValueError("invalid gate bounds")
         self.capacity = capacity
         self.refill_per_sec = refill_per_sec
@@ -120,8 +131,7 @@ class AdaptiveGate:
             self._last_seen = now
             elapsed = now - self._last
             refill = int(elapsed * self.refill_per_sec)
-            self.tokens = min(self.capacity,
-                              self.tokens + refill)
+            self.tokens = min(self.capacity, self.tokens + refill)
             if refill:
                 self._last += refill / self.refill_per_sec
             if self.tokens == 0 and priority > 0:
@@ -132,8 +142,12 @@ class AdaptiveGate:
             return Verdict.ADMITTED
 
     def stats(self) -> dict[str, int]:
-        return {"tokens_available": self.tokens, "capacity": self.capacity,
-                "admitted": self.admitted, "shed": self.shed}
+        return {
+            "tokens_available": self.tokens,
+            "capacity": self.capacity,
+            "admitted": self.admitted,
+            "shed": self.shed,
+        }
 
 
 class ChaosState(str, Enum):
@@ -147,9 +161,13 @@ class ChaosState(str, Enum):
 class ChaosGovernor:
     """Monotonic degradation state machine for failure cascades."""
 
-    _ORDER = (ChaosState.NORMAL, ChaosState.REDUCED_CACHING,
-              ChaosState.SHED_BACKGROUND, ChaosState.STALE_READS,
-              ChaosState.EMERGENCY_READ_ONLY)
+    _ORDER = (
+        ChaosState.NORMAL,
+        ChaosState.REDUCED_CACHING,
+        ChaosState.SHED_BACKGROUND,
+        ChaosState.STALE_READS,
+        ChaosState.EMERGENCY_READ_ONLY,
+    )
 
     def __init__(self) -> None:
         self.state = ChaosState.NORMAL

@@ -1,12 +1,13 @@
 """Correlated events with ordered, isolated subscriber delivery."""
+
 from __future__ import annotations
 
 import asyncio
 import inspect
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import MappingProxyType
-from typing import Awaitable, Callable, Mapping
 from uuid import uuid4
 
 from skeleton.frontier.execution import positive_int
@@ -41,10 +42,17 @@ class DomainEvent:
         object.__setattr__(self, "payload", MappingProxyType(json_snapshot(dict(self.payload))))
 
     @classmethod
-    def create(cls, topic: str, payload: Mapping[str, object], *,
-               correlation_id: str | None = None, causation_id: str | None = None) -> DomainEvent:
-        return cls(topic, payload, datetime.now(timezone.utc),
-                   correlation_id=correlation_id, causation_id=causation_id)
+    def create(
+        cls,
+        topic: str,
+        payload: Mapping[str, object],
+        *,
+        correlation_id: str | None = None,
+        causation_id: str | None = None,
+    ) -> DomainEvent:
+        return cls(
+            topic, payload, datetime.now(UTC), correlation_id=correlation_id, causation_id=causation_id
+        )
 
 
 Handler = Callable[[DomainEvent], Awaitable[None]]

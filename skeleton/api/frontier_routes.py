@@ -1,4 +1,5 @@
 """Sealed HTTP surface for provider-neutral frontier execution."""
+
 from __future__ import annotations
 
 import hashlib
@@ -44,8 +45,12 @@ def _runtime(request: Request) -> AgentRuntime:
 
 @router.get("/agents")
 async def agents(runtime: AgentRuntime = Depends(_runtime), attester: str = Depends(_attester)):
-    return {"agents": [{"name": name, "capabilities": sorted(agent.capabilities)}
-                       for name, agent in sorted(runtime.agents.items())]}
+    return {
+        "agents": [
+            {"name": name, "capabilities": sorted(agent.capabilities)}
+            for name, agent in sorted(runtime.agents.items())
+        ]
+    }
 
 
 @router.get("/status")
@@ -54,22 +59,33 @@ async def status(runtime: AgentRuntime = Depends(_runtime), attester: str = Depe
 
 
 @router.post("/execute")
-async def execute(body: ExecuteRequest, response: Response,
-                  runtime: AgentRuntime = Depends(_runtime), attester: str = Depends(_attester),
-                  idempotency_key: str | None = Header(default=None, alias="Idempotency-Key")):
+async def execute(
+    body: ExecuteRequest,
+    response: Response,
+    runtime: AgentRuntime = Depends(_runtime),
+    attester: str = Depends(_attester),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+):
     key = None
     if idempotency_key is not None:
         if not idempotency_key.strip() or len(idempotency_key) > 128:
             raise HTTPException(status_code=422, detail="invalid idempotency key")
         key = hashlib.sha256(json.dumps([attester, body.agent, idempotency_key]).encode()).hexdigest()
     try:
-        result = await runtime.execute(body.agent, body.task, context=body.context,
-                                       request_id=body.request_id, timeout=body.timeout,
-                                       idempotency_key=key)
+        result = await runtime.execute(
+            body.agent,
+            body.task,
+            context=body.context,
+            request_id=body.request_id,
+            timeout=body.timeout,
+            idempotency_key=key,
+        )
     except IdempotencyConflict as exc:
         raise HTTPException(status_code=409, detail="idempotency key conflicts with prior request") from exc
     except RuntimeBusy as exc:
-        raise HTTPException(status_code=429, detail="runtime capacity unavailable", headers={"Retry-After": "1"}) from exc
+        raise HTTPException(
+            status_code=429, detail="runtime capacity unavailable", headers={"Retry-After": "1"}
+        ) from exc
     except RuntimeClosed as exc:
         raise HTTPException(status_code=503, detail="runtime is closed") from exc
     except PermissionError as exc:

@@ -1,4 +1,5 @@
 """Monotonic checkpoint contract for replay-safe consumers."""
+
 from threading import Lock
 
 

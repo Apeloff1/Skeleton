@@ -1,4 +1,5 @@
 """Immutable provenance attached to promoted frontier artifacts."""
+
 from dataclasses import dataclass
 
 

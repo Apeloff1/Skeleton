@@ -1,5 +1,7 @@
 """Explicit budget policy for bounded admission."""
+
 from dataclasses import dataclass
+
 
 @dataclass(frozen=True)
 class BudgetPolicy:

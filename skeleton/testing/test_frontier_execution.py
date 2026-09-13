@@ -5,12 +5,21 @@ import pytest
 from skeleton.frontier.execution import ExecutionPolicy
 
 
-@pytest.mark.parametrize("field,value", [
-    ("max_concurrency", 0), ("max_concurrency", True), ("max_queue", -1),
-    ("max_queue", 1.5), ("execution_timeout", math.nan),
-    ("queue_timeout", math.inf), ("event_timeout", 0),
-    ("max_payload_bytes", False), ("max_attempts", 11), ("retry_delay", "1"),
-])
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("max_concurrency", 0),
+        ("max_concurrency", True),
+        ("max_queue", -1),
+        ("max_queue", 1.5),
+        ("execution_timeout", math.nan),
+        ("queue_timeout", math.inf),
+        ("event_timeout", 0),
+        ("max_payload_bytes", False),
+        ("max_attempts", 11),
+        ("retry_delay", "1"),
+    ],
+)
 def test_limits_reject_invalid_values(field, value):
     with pytest.raises(ValueError):
         ExecutionPolicy(**{field: value})

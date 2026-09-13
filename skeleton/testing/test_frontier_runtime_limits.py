@@ -24,8 +24,9 @@ class BlockingAgent:
 
 
 def runtime(agent, **limits):
-    instance = AgentRuntime(policy=CapabilityPolicy.from_names({"work"}),
-                            execution_policy=ExecutionPolicy(**limits))
+    instance = AgentRuntime(
+        policy=CapabilityPolicy.from_names({"work"}), execution_policy=ExecutionPolicy(**limits)
+    )
     instance.register(agent)
     return instance
 

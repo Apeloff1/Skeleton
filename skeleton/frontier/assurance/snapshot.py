@@ -1,6 +1,8 @@
 """Immutable snapshots suitable for deterministic replay boundaries."""
+
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
 from .digest import state_digest
 

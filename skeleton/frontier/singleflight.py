@@ -1,12 +1,14 @@
 """Bounded idempotent execution with shared work and isolated waiters."""
+
 from __future__ import annotations
 
 import asyncio
 import copy
 import time
 from collections import OrderedDict
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from skeleton.frontier.execution import RuntimeBusy, positive_int, positive_seconds
 
@@ -29,9 +31,15 @@ class SingleFlight:
     Retention is an in-process retry window, not durable exactly-once delivery.
     """
 
-    def __init__(self, *, capacity: int = 1024, ttl: float = 60,
-                 max_inflight: int = 72, max_waiters: int = 128,
-                 clock: Callable[[], float] = time.monotonic) -> None:
+    def __init__(
+        self,
+        *,
+        capacity: int = 1024,
+        ttl: float = 60,
+        max_inflight: int = 72,
+        max_waiters: int = 128,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
         self.capacity = positive_int("capacity", capacity)
         self.ttl = positive_seconds("ttl", ttl)
         self.max_inflight = positive_int("max_inflight", max_inflight)
@@ -55,8 +63,14 @@ class SingleFlight:
         self._expire()
         return {"inflight": len(self._pending), "cached": len(self._completed), "reused": self.reused}
 
-    async def run(self, key: str, fingerprint: str, factory: Callable[[], Awaitable[Any]],
-                  *, cacheable: Callable[[Any], bool] = lambda _: True) -> Any:
+    async def run(
+        self,
+        key: str,
+        fingerprint: str,
+        factory: Callable[[], Awaitable[Any]],
+        *,
+        cacheable: Callable[[Any], bool] = lambda _: True,
+    ) -> Any:
         if not isinstance(key, str) or not key.strip() or len(key) > 256:
             raise ValueError("idempotency key must contain 1 to 256 characters")
         loop = asyncio.get_running_loop()
@@ -97,7 +111,11 @@ class SingleFlight:
                     if not entry.task.cancelled() and entry.task.exception() is None:
                         result = entry.task.result()
                         if cacheable(result):
-                            self._completed[key] = (fingerprint, copy.deepcopy(result), self._clock() + self.ttl)
+                            self._completed[key] = (
+                                fingerprint,
+                                copy.deepcopy(result),
+                                self._clock() + self.ttl,
+                            )
                             while len(self._completed) > self.capacity:
                                 self._completed.popitem(last=False)
                 finally:

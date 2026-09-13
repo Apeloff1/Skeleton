@@ -1,4 +1,5 @@
 import asyncio
+
 import pytest
 
 from skeleton.frontier.events import DomainEvent, EventBus

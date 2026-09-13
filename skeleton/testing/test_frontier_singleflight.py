@@ -10,9 +10,13 @@ from skeleton.testing.test_frontier_runtime_limits import BlockingAgent, runtime
 async def test_duplicate_requests_share_work_and_results_are_detached():
     agent = BlockingAgent()
     instance = runtime(agent)
-    first = asyncio.create_task(instance.execute(agent.name, "same", context={"x": []}, idempotency_key="key"))
+    first = asyncio.create_task(
+        instance.execute(agent.name, "same", context={"x": []}, idempotency_key="key")
+    )
     await agent.started.wait()
-    second = asyncio.create_task(instance.execute(agent.name, "same", context={"x": []}, idempotency_key="key"))
+    second = asyncio.create_task(
+        instance.execute(agent.name, "same", context={"x": []}, idempotency_key="key")
+    )
     await asyncio.sleep(0)
     agent.release.set()
     a, b = await asyncio.gather(first, second)

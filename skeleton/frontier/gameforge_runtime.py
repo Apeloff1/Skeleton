@@ -2,12 +2,14 @@
 
 Source revision: 8f0a107e5cac31fbfe39fee07daad415fd453aca.
 """
+
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Awaitable, Callable, Dict, Generic, TypeVar
+from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -31,8 +33,8 @@ class BufferPool:
         if not isinstance(class_cap, int) or isinstance(class_cap, bool) or class_cap < 1:
             raise ValueError("class_cap must be >= 1")
         self._cap = class_cap
-        self._free: Dict[BufferClass, list[bytearray]] = {c: [] for c in BufferClass}
-        self._leases: Dict[int, BufferLease] = {}
+        self._free: dict[BufferClass, list[bytearray]] = {c: [] for c in BufferClass}
+        self._leases: dict[int, BufferLease] = {}
         self.leased = 0
 
     @staticmethod
@@ -87,7 +89,7 @@ class RequestCoalescer(Generic[T]):
 
     def __init__(self, fetch: Callable[[str], Awaitable[T]]) -> None:
         self._fetch = fetch
-        self._in_flight: Dict[str, asyncio.Future[T]] = {}
+        self._in_flight: dict[str, asyncio.Future[T]] = {}
         self._lock = asyncio.Lock()
 
     async def get(self, key: str) -> T:

@@ -31,5 +31,8 @@ def test_cli_runs_real_npc_pipeline_and_reports_failures(tmp_path, capsys):
 
 
 def test_cli_invalid_context_returns_nonzero_without_dispatch(tmp_path, capsys):
-    assert main(["frontier", "--state-root", str(tmp_path), "run", "jeeves.review", "code", "--context", "[]"]) == 2
+    assert (
+        main(["frontier", "--state-root", str(tmp_path), "run", "jeeves.review", "code", "--context", "[]"])
+        == 2
+    )
     assert "JSON options" in capsys.readouterr().err

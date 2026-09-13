@@ -1,4 +1,5 @@
 """Normalized terminal outcome for bounded runtime accounting."""
+
 from dataclasses import dataclass
 
 

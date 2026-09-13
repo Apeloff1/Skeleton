@@ -6,8 +6,8 @@ more named capabilities before dispatching promoted implementations.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 
 def capability_names(names: Iterable[str], *, drop_empty: bool = False) -> frozenset[str]:
@@ -34,7 +34,7 @@ class CapabilityPolicy:
         object.__setattr__(self, "allowed", capability_names(self.allowed))
 
     @classmethod
-    def from_names(cls, names: Iterable[str]) -> "CapabilityPolicy":
+    def from_names(cls, names: Iterable[str]) -> CapabilityPolicy:
         return cls(capability_names(names, drop_empty=True))
 
     def permits(self, required: Iterable[str]) -> bool:

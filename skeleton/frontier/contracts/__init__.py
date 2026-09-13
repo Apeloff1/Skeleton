@@ -6,9 +6,10 @@ implementations can evolve without forcing application code to depend on them.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Mapping, Protocol, Sequence
+from datetime import UTC, datetime
+from typing import Any, Protocol
 
 
 class AgentContract(Protocol):
@@ -17,15 +18,13 @@ class AgentContract(Protocol):
     name: str
     capabilities: set[str]
 
-    async def run(self, task: str, context: Mapping[str, Any] | None = None) -> Any:
-        ...
+    async def run(self, task: str, context: Mapping[str, Any] | None = None) -> Any: ...
 
 
 class MemoryContract(Protocol):
     """Minimal asynchronous memory contract for RAG/CAG/MAG adapters."""
 
-    async def put(self, item: Mapping[str, Any]) -> str:
-        ...
+    async def put(self, item: Mapping[str, Any]) -> str: ...
 
     async def search(
         self,
@@ -33,11 +32,9 @@ class MemoryContract(Protocol):
         *,
         limit: int = 10,
         filters: Mapping[str, Any] | None = None,
-    ) -> Sequence[Mapping[str, Any]]:
-        ...
+    ) -> Sequence[Mapping[str, Any]]: ...
 
-    async def delete(self, item_id: str) -> None:
-        ...
+    async def delete(self, item_id: str) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,7 +46,7 @@ class ProvenanceRecord:
     source_path: str | None = None
     operation: str = "consolidation"
     actor: str = "frontier"
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:

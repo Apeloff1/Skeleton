@@ -4,23 +4,30 @@ One runtime belongs to one event loop while work is pending. Adapters must be
 cooperative async functions; blocking CPU work belongs in a managed worker.
 Capability checks restrict dispatch, and do not sandbox arbitrary adapter code.
 """
+
 from __future__ import annotations
 
 import asyncio
 import hashlib
 import inspect
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import MappingProxyType
-from typing import Any, Mapping, Protocol
+from typing import Any, Protocol
 from uuid import uuid4
 
 from skeleton.frontier.capabilities import CapabilityPolicy, capability_names
 from skeleton.frontier.contracts import AgentContract, ProvenanceRecord
 from skeleton.frontier.events import DomainEvent, EventBus
 from skeleton.frontier.execution import (
-    ExecutionPolicy, ExecutionStatus, RuntimeBusy, RuntimeClosed, TransientAgentError, positive_seconds,
+    ExecutionPolicy,
+    ExecutionStatus,
+    RuntimeBusy,
+    RuntimeClosed,
+    TransientAgentError,
+    positive_seconds,
 )
 from skeleton.frontier.health import HealthState
 from skeleton.frontier.payloads import json_snapshot
@@ -56,10 +63,16 @@ class ExecutionResult:
 
     def as_dict(self) -> dict[str, Any]:
         return {
-            "request_id": self.request_id, "task": self.task, "agent": self.agent,
-            "status": self.status.value, "succeeded": self.succeeded,
-            "started_at": self.started_at.isoformat(), "finished_at": self.finished_at.isoformat(),
-            "output": self.output, "error": self.error, "attempts": self.attempts,
+            "request_id": self.request_id,
+            "task": self.task,
+            "agent": self.agent,
+            "status": self.status.value,
+            "succeeded": self.succeeded,
+            "started_at": self.started_at.isoformat(),
+            "finished_at": self.finished_at.isoformat(),
+            "output": self.output,
+            "error": self.error,
+            "attempts": self.attempts,
             "elapsed_ms": self.elapsed_ms,
             "provenance": self.provenance.as_dict() if self.provenance else None,
         }
@@ -68,11 +81,16 @@ class ExecutionResult:
 class AgentRuntime:
     """Execute registered adapters within explicit capabilities and budgets."""
 
-    def __init__(self, agents: Mapping[str, AgentLike] | None = None,
-                 policy: CapabilityPolicy | None = None,
-                 health: HealthState = HealthState.HEALTHY,
-                 *, execution_policy: ExecutionPolicy | None = None,
-                 events: EventBus | None = None, telemetry: TelemetryBuffer | None = None) -> None:
+    def __init__(
+        self,
+        agents: Mapping[str, AgentLike] | None = None,
+        policy: CapabilityPolicy | None = None,
+        health: HealthState = HealthState.HEALTHY,
+        *,
+        execution_policy: ExecutionPolicy | None = None,
+        events: EventBus | None = None,
+        telemetry: TelemetryBuffer | None = None,
+    ) -> None:
         self.policy = policy if policy is not None else CapabilityPolicy.from_names(())
         self.health = health
         self._execution_policy = execution_policy or ExecutionPolicy()
@@ -89,8 +107,18 @@ class AgentRuntime:
         self._closed = False
         self.events = events
         self.telemetry = telemetry if telemetry is not None else TelemetryBuffer()
-        self._singleflight = SingleFlight(max_inflight=self.execution_policy.max_concurrency + self.execution_policy.max_queue)
-        self._counts = {"completed": 0, "failed": 0, "timed_out": 0, "cancelled": 0, "rejected": 0, "retries": 0, "event_failures": 0}
+        self._singleflight = SingleFlight(
+            max_inflight=self.execution_policy.max_concurrency + self.execution_policy.max_queue
+        )
+        self._counts = {
+            "completed": 0,
+            "failed": 0,
+            "timed_out": 0,
+            "cancelled": 0,
+            "rejected": 0,
+            "retries": 0,
+            "event_failures": 0,
+        }
         for name, agent in (agents or {}).items():
             if name != agent.name:
                 raise ValueError("agent registry key must match agent.name")
@@ -125,8 +153,9 @@ class AgentRuntime:
         except KeyError as exc:
             raise KeyError(f"unknown agent: {name}") from exc
 
-    def _authorize(self, agent_name: str, required_capability: str | None,
-                   *, admitted: bool = False) -> AgentLike:
+    def _authorize(
+        self, agent_name: str, required_capability: str | None, *, admitted: bool = False
+    ) -> AgentLike:
         if self._closed and not admitted:
             raise RuntimeClosed("agent runtime is closed")
         if not isinstance(self.health, HealthState) or self.health is HealthState.UNAVAILABLE:
@@ -145,14 +174,20 @@ class AgentRuntime:
         return agent
 
     def stats(self) -> dict[str, Any]:
-        return {**self._counts, "registered": len(self._agents), "active": self._active,
-                "queued": self._pending - self._active, "closed": self._closed,
-                "idempotency": self._singleflight.stats(),
-                "latency_ms": self.telemetry.summary("execution.latency_ms"),
-                "telemetry_dropped": self.telemetry.dropped}
+        return {
+            **self._counts,
+            "registered": len(self._agents),
+            "active": self._active,
+            "queued": self._pending - self._active,
+            "closed": self._closed,
+            "idempotency": self._singleflight.stats(),
+            "latency_ms": self.telemetry.summary("execution.latency_ms"),
+            "telemetry_dropped": self.telemetry.dropped,
+        }
 
-    async def _emit(self, topic: str, payload: dict[str, Any], request_id: str,
-                    causation_id: str | None = None) -> str | None:
+    async def _emit(
+        self, topic: str, payload: dict[str, Any], request_id: str, causation_id: str | None = None
+    ) -> str | None:
         if self.events is None:
             return None
         event = DomainEvent.create(topic, payload, correlation_id=request_id, causation_id=causation_id)
@@ -190,49 +225,84 @@ class AgentRuntime:
     async def __aexit__(self, exc_type, exc, traceback) -> None:
         await self.aclose()
 
-    async def execute(self, agent_name: str, task: str, *,
-                      context: Mapping[str, Any] | None = None,
-                      required_capability: str | None = None,
-                      source_repository: str = "Apeloff1/Skeleton",
-                      request_id: str | None = None,
-                      timeout: float | None = None,
-                      idempotency_key: str | None = None) -> ExecutionResult:
+    async def execute(
+        self,
+        agent_name: str,
+        task: str,
+        *,
+        context: Mapping[str, Any] | None = None,
+        required_capability: str | None = None,
+        source_repository: str = "Apeloff1/Skeleton",
+        request_id: str | None = None,
+        timeout: float | None = None,
+        idempotency_key: str | None = None,
+    ) -> ExecutionResult:
         if not isinstance(task, str) or not task.strip():
             raise ValueError("task must not be empty")
         task.encode("utf-8")
         if context is not None and not isinstance(context, Mapping):
             raise ValueError("context must be a mapping")
-        if request_id is not None and (not isinstance(request_id, str) or not request_id.strip() or len(request_id) > 128):
+        if request_id is not None and (
+            not isinstance(request_id, str) or not request_id.strip() or len(request_id) > 128
+        ):
             raise ValueError("request_id must contain 1 to 128 characters")
         if timeout is not None:
             positive_seconds("timeout", timeout)
-        if not isinstance(source_repository, str) or not source_repository.strip() or len(source_repository) > 256:
+        if (
+            not isinstance(source_repository, str)
+            or not source_repository.strip()
+            or len(source_repository) > 256
+        ):
             raise ValueError("source_repository must contain 1 to 256 characters")
-        kwargs = dict(context=context, required_capability=required_capability,
-                      source_repository=source_repository, request_id=request_id, timeout=timeout)
+        kwargs = dict(
+            context=context,
+            required_capability=required_capability,
+            source_repository=source_repository,
+            request_id=request_id,
+            timeout=timeout,
+        )
         if idempotency_key is None:
             return await self._execute(agent_name, task, **kwargs)
         self._authorize(agent_name, required_capability)
-        payload = json_snapshot({"agent": agent_name, "task": task, "context": dict(context or {}),
-                                 "required_capability": required_capability,
-                                 "source_repository": source_repository, "timeout": timeout},
-                                max_bytes=self.execution_policy.max_payload_bytes)
+        payload = json_snapshot(
+            {
+                "agent": agent_name,
+                "task": task,
+                "context": dict(context or {}),
+                "required_capability": required_capability,
+                "source_repository": source_repository,
+                "timeout": timeout,
+            },
+            max_bytes=self.execution_policy.max_payload_bytes,
+        )
         kwargs["context"] = payload["context"]
         fingerprint = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
-        return await self._singleflight.run(idempotency_key, fingerprint,
-                                            lambda: self._execute(agent_name, task, **kwargs),
-                                            cacheable=lambda result: result.succeeded)
+        return await self._singleflight.run(
+            idempotency_key,
+            fingerprint,
+            lambda: self._execute(agent_name, task, **kwargs),
+            cacheable=lambda result: result.succeeded,
+        )
 
-    async def _execute(self, agent_name: str, task: str, *,
-                      context: Mapping[str, Any] | None = None,
-                      required_capability: str | None = None,
-                      source_repository: str = "Apeloff1/Skeleton",
-                      request_id: str | None = None,
-                      timeout: float | None = None) -> ExecutionResult:
+    async def _execute(
+        self,
+        agent_name: str,
+        task: str,
+        *,
+        context: Mapping[str, Any] | None = None,
+        required_capability: str | None = None,
+        source_repository: str = "Apeloff1/Skeleton",
+        request_id: str | None = None,
+        timeout: float | None = None,
+    ) -> ExecutionResult:
         if not isinstance(task, str) or not task.strip():
             raise ValueError("task must not be empty")
         task_digest = hashlib.sha256(task.encode("utf-8")).hexdigest()
-        if not isinstance(source_repository, str) or not source_repository.strip() or len(source_repository) > 256:
+        if (
+            not isinstance(source_repository, str)
+            or not source_repository.strip()
+            or len(source_repository) > 256
+        ):
             raise ValueError("source_repository must contain 1 to 256 characters")
         if context is not None and not isinstance(context, Mapping):
             raise ValueError("context must be a mapping")
@@ -241,10 +311,14 @@ class AgentRuntime:
         if not isinstance(request_id, str) or not request_id.strip() or len(request_id) > 128:
             raise ValueError("request_id must contain 1 to 128 characters")
         limits = self.execution_policy
-        timeout = limits.execution_timeout if timeout is None else min(
-            positive_seconds("timeout", timeout), limits.execution_timeout)
-        snapshot = json_snapshot({"task": task, "context": dict(context or {})},
-                                 max_bytes=limits.max_payload_bytes)
+        timeout = (
+            limits.execution_timeout
+            if timeout is None
+            else min(positive_seconds("timeout", timeout), limits.execution_timeout)
+        )
+        snapshot = json_snapshot(
+            {"task": task, "context": dict(context or {})}, max_bytes=limits.max_payload_bytes
+        )
         self._authorize(agent_name, required_capability)
         loop = asyncio.get_running_loop()
         if self._loop is not loop:
@@ -269,7 +343,7 @@ class AgentRuntime:
             acquired = True
             self._active += 1
             agent = self._authorize(agent_name, required_capability, admitted=True)
-            started = datetime.now(timezone.utc)
+            started = datetime.now(UTC)
             tick = loop.time()
             output = error = None
             status = ExecutionStatus.COMPLETED
@@ -280,7 +354,9 @@ class AgentRuntime:
                     while attempts < limits.max_attempts:
                         attempts += 1
                         try:
-                            attempt_context = json_snapshot(snapshot["context"], max_bytes=limits.max_payload_bytes)
+                            attempt_context = json_snapshot(
+                                snapshot["context"], max_bytes=limits.max_payload_bytes
+                            )
                             output = await agent.run(task, attempt_context)
                             output = json_snapshot(output, max_bytes=limits.max_payload_bytes)
                         except TransientAgentError as exc:
@@ -304,19 +380,33 @@ class AgentRuntime:
             if status is not ExecutionStatus.COMPLETED:
                 output = None
             elapsed_ms = (loop.time() - tick) * 1000
-            self.telemetry.record(MetricSample("execution.latency_ms", elapsed_ms,
-                                               tags={"agent": agent_name, "status": status.value}))
-            await self._emit(f"agent.{status.value}", {"agent": agent_name, "attempts": attempts,
-                            "elapsed_ms": elapsed_ms}, request_id, start_event)
+            self.telemetry.record(
+                MetricSample(
+                    "execution.latency_ms", elapsed_ms, tags={"agent": agent_name, "status": status.value}
+                )
+            )
+            await self._emit(
+                f"agent.{status.value}",
+                {"agent": agent_name, "attempts": attempts, "elapsed_ms": elapsed_ms},
+                request_id,
+                start_event,
+            )
             self._counts[status.value] += 1
             return ExecutionResult(
-                task=task, agent=agent_name, started_at=started,
-                finished_at=datetime.now(timezone.utc), output=output, error=error,
-                request_id=request_id, status=status, attempts=attempts, elapsed_ms=elapsed_ms,
+                task=task,
+                agent=agent_name,
+                started_at=started,
+                finished_at=datetime.now(UTC),
+                output=output,
+                error=error,
+                request_id=request_id,
+                status=status,
+                attempts=attempts,
+                elapsed_ms=elapsed_ms,
                 provenance=ProvenanceRecord(
-                    source_repository=source_repository, operation=f"agent.execute.{status.value}",
-                    metadata={"agent": agent_name, "request_id": request_id,
-                              "task_sha256": task_digest},
+                    source_repository=source_repository,
+                    operation=f"agent.execute.{status.value}",
+                    metadata={"agent": agent_name, "request_id": request_id, "task_sha256": task_digest},
                 ),
             )
         except asyncio.CancelledError:

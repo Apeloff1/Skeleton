@@ -1,5 +1,7 @@
 """Recovery contract with bounded retry semantics."""
+
 from dataclasses import dataclass
+
 
 @dataclass(frozen=True)
 class RecoveryContract:

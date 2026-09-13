@@ -1,4 +1,5 @@
 """Run frontier pipelines and inspect persistent memory from the Skeleton CLI."""
+
 from __future__ import annotations
 
 import argparse
@@ -47,22 +48,30 @@ async def _dispatch(args) -> tuple[object, int]:
         from skeleton.frontier.sqlite_memory import SQLiteMemoryStore
 
         args.state_root.mkdir(parents=True, exist_ok=True)
-        async with SQLiteMemoryStore(args.state_root / "frontier-memory.sqlite3", namespace=args.namespace) as store:
+        async with SQLiteMemoryStore(
+            args.state_root / "frontier-memory.sqlite3", namespace=args.namespace
+        ) as store:
             if args.operation == "put":
                 item = {**_object(args.metadata), "text": args.text}
                 if args.id is not None:
                     item["id"] = args.id
                 return {"id": await store.put(item)}, 0
             if args.operation == "search":
-                return {"items": await store.search(args.query, limit=args.limit, filters=_object(args.filters))}, 0
+                return {
+                    "items": await store.search(args.query, limit=args.limit, filters=_object(args.filters))
+                }, 0
             await store.delete(args.id)
             return {"id": args.id, "deleted": True}, 0
     from skeleton.services.frontier import create_frontier_runtime
 
     async with create_frontier_runtime(state_root=args.state_root) as runtime:
         if args.command == "agents":
-            return {"agents": [{"name": name, "capabilities": sorted(agent.capabilities)}
-                               for name, agent in runtime.agents.items()]}, 0
+            return {
+                "agents": [
+                    {"name": name, "capabilities": sorted(agent.capabilities)}
+                    for name, agent in runtime.agents.items()
+                ]
+            }, 0
         if (args.task is None) == (args.task_file is None):
             raise ValueError("supply exactly one task argument or --task-file")
         if args.task_file is not None:

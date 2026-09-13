@@ -1,4 +1,5 @@
 """Explicit service lifecycle with fail-safe stop semantics."""
+
 from enum import Enum
 
 

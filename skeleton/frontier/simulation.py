@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from hashlib import sha256
-from typing import Mapping
 
 
 @dataclass(frozen=True, slots=True)
@@ -13,7 +13,7 @@ class SimulationTick:
     seed: int
     state: Mapping[str, int] = field(default_factory=dict)
 
-    def next(self, *, delta: Mapping[str, int] | None = None) -> "SimulationTick":
+    def next(self, *, delta: Mapping[str, int] | None = None) -> SimulationTick:
         if self.tick < 0:
             raise ValueError("tick must not be negative")
         updates = dict(self.state)

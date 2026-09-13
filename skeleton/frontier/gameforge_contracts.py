@@ -1,5 +1,7 @@
 """Stable names for composed frontier contracts."""
+
 from dataclasses import dataclass
+
 
 @dataclass(frozen=True)
 class ContractVersion:

@@ -1,8 +1,8 @@
 """Typed lease wrapper over the bounded GameForge buffer contract."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 from skeleton.frontier.gameforge_runtime import BufferClass, BufferLease, BufferPool
 
@@ -29,5 +29,5 @@ class BufferHandle:
         return True
 
 
-def lease(pool: BufferPool, minimum: int) -> Optional[BufferHandle]:
+def lease(pool: BufferPool, minimum: int) -> BufferHandle | None:
     return BufferHandle(pool.lease(minimum))

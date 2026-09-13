@@ -6,8 +6,8 @@ source, confidence, and tags explicit so downstream agents can audit facts.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Mapping
 
 from skeleton.frontier.contracts import ProvenanceRecord
 

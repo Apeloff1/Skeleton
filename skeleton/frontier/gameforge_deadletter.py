@@ -1,4 +1,5 @@
 """Bounded dead-letter queue for fail-safe rejection handling."""
+
 from collections import deque
 from threading import Lock
 

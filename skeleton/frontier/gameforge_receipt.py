@@ -1,4 +1,5 @@
 """Immutable execution receipt for observable admission outcomes."""
+
 from dataclasses import dataclass
 
 

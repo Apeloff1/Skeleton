@@ -7,13 +7,15 @@ The contract deliberately avoids concrete database/client dependencies. Callers
 provide construction and health predicates; the pool owns only bounded idle
 retention and max-age policy.
 """
+
 from __future__ import annotations
 
+import math
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from threading import Lock
-from typing import Callable, Generic, List, TypeVar
-import time
-import math
+from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -53,7 +55,7 @@ class HealthPool(Generic[T]):
         self._capacity = capacity
         self._max_age = float(max_age_seconds)
         self._clock = clock
-        self._idle: List[tuple[T, float]] = []
+        self._idle: list[tuple[T, float]] = []
         self._checked_out: dict[int, tuple[T, float]] = {}
         self._checkouts = 0
         self._rejected = 0
