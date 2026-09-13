@@ -45,6 +45,12 @@ class TokenBucketLimiter:
     def _cost(cls, cost: float) -> float:
         return cls._positive_finite(cost, "cost")
 
+    def _now(self) -> float:
+        now = float(self._clock())
+        if not isfinite(now):
+            raise ValueError("clock must return a finite number")
+        return now
+
     def _refill(self, bucket: Bucket, now: float) -> None:
         elapsed = max(0.0, now - bucket.updated_at)
         bucket.tokens = min(bucket.capacity, bucket.tokens + elapsed * bucket.refill_per_second)
@@ -54,7 +60,7 @@ class TokenBucketLimiter:
         cost = self._cost(cost)
         key = self._key(key)
         with self._lock:
-            now = self._clock()
+            now = self._now()
             bucket = self._buckets.setdefault(
                 key,
                 Bucket(self.capacity, self.refill_per_second, self.capacity, now),
@@ -70,7 +76,7 @@ class TokenBucketLimiter:
         cost = self._cost(cost)
         key = self._key(key)
         with self._lock:
-            now = self._clock()
+            now = self._now()
             bucket = self._buckets.setdefault(
                 key,
                 Bucket(self.capacity, self.refill_per_second, self.capacity, now),
@@ -85,7 +91,7 @@ class TokenBucketLimiter:
             bucket = self._buckets.get(key)
             if bucket is None:
                 return self.capacity
-            self._refill(bucket, self._clock())
+            self._refill(bucket, self._now())
             return bucket.tokens
 
     def reset(self, key: str) -> bool:
@@ -95,7 +101,7 @@ class TokenBucketLimiter:
 
     def snapshot(self) -> dict[str, dict[str, float]]:
         with self._lock:
-            now = self._clock()
+            now = self._now()
             result: dict[str, dict[str, float]] = {}
             for key, bucket in sorted(self._buckets.items()):
                 self._refill(bucket, now)
