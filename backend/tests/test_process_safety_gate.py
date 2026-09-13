@@ -33,6 +33,16 @@ def test_allows_literal_getattr_with_shell_false(tmp_path: Path) -> None:
     assert findings == []
 
 
+def test_allows_literal_vars_lookup_with_shell_false(tmp_path: Path) -> None:
+    findings = _scan(tmp_path, "import subprocess\nvars(subprocess)['run'](['python', '--version'], shell=False)\n")
+    assert findings == []
+
+
+def test_allows_literal_dunder_dict_lookup_with_shell_false(tmp_path: Path) -> None:
+    findings = _scan(tmp_path, "import subprocess\nsubprocess.__dict__['run'](['python', '--version'], shell=False)\n")
+    assert findings == []
+
+
 def test_rejects_shell_true(tmp_path: Path) -> None:
     findings = _scan(tmp_path, "import subprocess\nsubprocess.run('echo unsafe', shell=True)\n")
     assert any("shell=..." in finding for finding in findings)
@@ -76,6 +86,31 @@ def test_rejects_literal_getattr_shell_true(tmp_path: Path) -> None:
 def test_rejects_assigned_literal_getattr_alias(tmp_path: Path) -> None:
     findings = _scan(tmp_path, "import subprocess\nrunner = getattr(subprocess, 'run')\nrunner('echo unsafe', shell=True)\n")
     assert any("subprocess.run" in finding and "shell=..." in finding for finding in findings)
+
+
+def test_rejects_literal_vars_lookup_shell_true(tmp_path: Path) -> None:
+    findings = _scan(tmp_path, "import subprocess\nvars(subprocess)['run']('echo unsafe', shell=True)\n")
+    assert any("subprocess.run" in finding and "shell=..." in finding for finding in findings)
+
+
+def test_rejects_assigned_literal_vars_lookup_alias(tmp_path: Path) -> None:
+    findings = _scan(tmp_path, "import subprocess\nrunner = vars(subprocess)['run']\nrunner('echo unsafe', shell=True)\n")
+    assert any("subprocess.run" in finding and "shell=..." in finding for finding in findings)
+
+
+def test_rejects_literal_dunder_dict_lookup_shell_true(tmp_path: Path) -> None:
+    findings = _scan(tmp_path, "import subprocess\nsubprocess.__dict__['run']('echo unsafe', shell=True)\n")
+    assert any("subprocess.run" in finding and "shell=..." in finding for finding in findings)
+
+
+def test_rejects_dynamic_vars_lookup_on_subprocess(tmp_path: Path) -> None:
+    findings = _scan(tmp_path, "import subprocess\nname = 'run'\nvars(subprocess)[name](['python', '--version'])\n")
+    assert any("dynamic namespace lookup on subprocess" in finding for finding in findings)
+
+
+def test_rejects_dynamic_dunder_dict_lookup_on_subprocess(tmp_path: Path) -> None:
+    findings = _scan(tmp_path, "import subprocess\nname = 'run'\nsubprocess.__dict__[name](['python', '--version'])\n")
+    assert any("dynamic namespace lookup on subprocess" in finding for finding in findings)
 
 
 def test_rejects_dynamic_getattr_on_subprocess(tmp_path: Path) -> None:
@@ -123,6 +158,11 @@ def test_rejects_literal_getattr_os_system(tmp_path: Path) -> None:
     assert any("os.system()" in finding for finding in findings)
 
 
+def test_rejects_literal_vars_os_system(tmp_path: Path) -> None:
+    findings = _scan(tmp_path, "import os\nvars(os)['system']('echo unsafe')\n")
+    assert any("os.system()" in finding for finding in findings)
+
+
 def test_rejects_os_popen(tmp_path: Path) -> None:
     findings = _scan(tmp_path, "import os\nos.popen('echo unsafe')\n")
     assert any("os.popen()" in finding for finding in findings)
@@ -160,6 +200,11 @@ def test_rejects_assigned_asyncio_shell_alias(tmp_path: Path) -> None:
 
 def test_rejects_literal_getattr_asyncio_shell(tmp_path: Path) -> None:
     findings = _scan(tmp_path, "import asyncio\ngetattr(asyncio, 'create_subprocess_shell')('echo unsafe')\n")
+    assert any("asyncio.create_subprocess_shell()" in finding for finding in findings)
+
+
+def test_rejects_literal_dunder_dict_asyncio_shell(tmp_path: Path) -> None:
+    findings = _scan(tmp_path, "import asyncio\nasyncio.__dict__['create_subprocess_shell']('echo unsafe')\n")
     assert any("asyncio.create_subprocess_shell()" in finding for finding in findings)
 
 
