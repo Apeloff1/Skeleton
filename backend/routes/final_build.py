@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from core import final_build
+from core.exec_guard import code_execution_enabled, execution_disabled_response
 
 router = APIRouter(prefix="/api/galaxy-studio/final-build", tags=["final-build"])
 
@@ -43,6 +44,9 @@ class BuildReq(BaseModel):
 @router.post("/package")
 def package(req: BuildReq) -> dict:
     """Run the 7-stage Final Build & Packaging pipeline (verification-gated)."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Final build packaging")
+
     return final_build.build_package(
         build_id=req.build_id, genre=req.genre, era=req.era,
         platforms=req.platforms, config=req.config, seed=req.seed, persist=req.persist)
@@ -91,6 +95,9 @@ def _run_job(job_id: str, req: BuildReq) -> None:
 def package_async(req: BuildReq) -> dict:
     """Kick the 7-stage pipeline in a background thread; returns a job_id to
     poll for a live, CI-pipeline-style stream of each stage + gate verdict."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Final build packaging")
+
     job_id = uuid.uuid4().hex[:16]
     with _JOBS_LOCK:
         _JOBS[job_id] = {

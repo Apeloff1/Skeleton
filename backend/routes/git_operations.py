@@ -14,6 +14,7 @@ from pathlib import Path
 import asyncio
 import os
 import re
+from core.exec_guard import code_execution_enabled, execution_disabled_response
 
 router = APIRouter(prefix="/api/git", tags=["git"])
 
@@ -137,6 +138,9 @@ class GitStashRequest(BaseModel):
 @router.post("/init")
 async def git_init(request: GitInitRequest):
     """Initialize a REAL Git repository for the project."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Git repository mutation")
+
     _active["project"] = request.project_name
     repo = _repo_dir(request.project_name)
     repo.mkdir(parents=True, exist_ok=True)
@@ -191,6 +195,9 @@ async def git_status():
 @router.post("/add")
 async def git_add(files: List[str] = []):
     """Stage files for commit (real)."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Git repository mutation")
+
     await _require_repo()
     targets = files if files else ["-A"]
     r = await _git(["add", *targets])
@@ -203,6 +210,9 @@ async def git_add(files: List[str] = []):
 @router.post("/commit")
 async def git_commit(request: GitCommitRequest):
     """Commit staged changes (real)."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Git repository mutation")
+
     await _require_repo()
     args = ["commit", "-m", request.message]
     if request.amend:
@@ -251,6 +261,9 @@ async def git_branches():
 @router.post("/branch")
 async def git_branch(request: GitBranchRequest):
     """Create a new branch (real)."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Git repository mutation")
+
     await _require_repo()
     args = ["branch", request.name]
     if request.from_branch:
@@ -266,6 +279,9 @@ async def git_branch(request: GitBranchRequest):
 @router.post("/checkout/{branch_name}")
 async def git_checkout(branch_name: str, create: bool = False):
     """Switch to a branch (real)."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Git repository mutation")
+
     await _require_repo()
     args = ["checkout"] + (["-B"] if create else []) + [branch_name]
     r = await _git(args)
@@ -277,6 +293,9 @@ async def git_checkout(branch_name: str, create: bool = False):
 @router.post("/merge")
 async def git_merge(request: GitMergeRequest):
     """Merge branches (real)."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Git repository mutation")
+
     await _require_repo()
     await _git(["checkout", request.target_branch])
     args = ["merge"]
@@ -296,6 +315,9 @@ async def git_merge(request: GitMergeRequest):
 @router.delete("/branch/{branch_name}")
 async def delete_branch(branch_name: str, force: bool = False):
     """Delete a branch (real)."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Git repository mutation")
+
     await _require_repo()
     if branch_name == await _current_branch():
         raise HTTPException(status_code=400, detail="Cannot delete current branch")
@@ -308,6 +330,9 @@ async def delete_branch(branch_name: str, force: bool = False):
 @router.post("/stash")
 async def git_stash(request: GitStashRequest):
     """Stash changes (real)."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Git repository mutation")
+
     await _require_repo()
     args = ["stash", "push"]
     if request.include_untracked:
@@ -336,6 +361,9 @@ async def git_stash_list():
 @router.post("/stash/pop")
 async def git_stash_pop(index: int = 0):
     """Apply and remove a stash (real)."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Git repository mutation")
+
     await _require_repo()
     r = await _git(["stash", "pop", f"stash@{{{index}}}"])
     if r["code"] != 0:
@@ -346,6 +374,9 @@ async def git_stash_pop(index: int = 0):
 @router.post("/remote/add")
 async def add_remote(request: GitRemoteRequest):
     """Add a remote repository (real)."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Git repository mutation")
+
     await _require_repo()
     r = await _git(["remote", "add", request.name, request.url])
     if r["code"] != 0:
@@ -371,6 +402,9 @@ async def list_remotes():
 @router.post("/push")
 async def git_push(remote: str = "origin", branch: Optional[str] = None, force: bool = False):
     """Push commits to a remote (real — requires a configured, reachable remote)."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Git repository mutation")
+
     await _require_repo()
     target = branch or await _current_branch()
     args = ["push", remote, target] + (["--force"] if force else [])
@@ -382,6 +416,9 @@ async def git_push(remote: str = "origin", branch: Optional[str] = None, force: 
 @router.post("/pull")
 async def git_pull(remote: str = "origin", branch: Optional[str] = None, rebase: bool = False):
     """Pull commits from a remote (real — requires a configured, reachable remote)."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Git repository mutation")
+
     await _require_repo()
     target = branch or await _current_branch()
     args = ["pull"] + (["--rebase"] if rebase else []) + [remote, target]
@@ -413,6 +450,9 @@ async def git_diff(staged: bool = False):
 @router.post("/reset")
 async def git_reset(mode: str = "mixed", target: str = "HEAD~1"):
     """Reset current HEAD to a specified state (real)."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Git repository mutation")
+
     await _require_repo()
     if mode not in ["soft", "mixed", "hard"]:
         raise HTTPException(status_code=400, detail="Mode must be soft, mixed, or hard")

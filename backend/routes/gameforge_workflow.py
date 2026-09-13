@@ -17,6 +17,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from core.exec_guard import code_execution_enabled, execution_disabled_response
 from gameforge.workflow.autonomous_workflow import autonomous_workflow
 from gameforge.workflow.jeeves_vault import jeeves_vault
 from gameforge.workflow.project_orchestrator import create_project_orchestrator
@@ -48,6 +49,9 @@ class ProjectRequest(BaseModel):
 async def run_workflow(req: RunRequest):
     """Run the full autonomous pipeline and (when quality allows) deploy a
     packaged build to the JeevesVault."""
+    if not code_execution_enabled():
+        return execution_disabled_response("GameForge workflow execution")
+
     try:
         result = autonomous_workflow.run(req.project_name, req.prompt, req.max_iterations)
         return {"ok": True, **result}
@@ -58,6 +62,9 @@ async def run_workflow(req: RunRequest):
 @router.post("/resume")
 async def resume_workflow(req: ResumeRequest):
     """Resume the latest in-flight workflow for a project (if any)."""
+    if not code_execution_enabled():
+        return execution_disabled_response("GameForge workflow execution")
+
     result = autonomous_workflow.resume(req.project_name)
     if result is None:
         raise HTTPException(status_code=404, detail="no_resumable_state")
@@ -67,6 +74,9 @@ async def resume_workflow(req: ResumeRequest):
 @router.post("/project")
 async def run_project(req: ProjectRequest):
     """Long-horizon full-game creation via the ProjectOrchestrator."""
+    if not code_execution_enabled():
+        return execution_disabled_response("GameForge project execution")
+
     try:
         orch = create_project_orchestrator(req.project_name)
         result = orch.create_full_game(
