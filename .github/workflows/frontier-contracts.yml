@@ -1,0 +1,29 @@
+name: Frontier Contracts
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - 'frontier/**'
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install frontier test dependencies
+        run: python -m pip install --disable-pip-version-check pytest pytest-asyncio
+      - name: Compile frontier package
+        run: python -m compileall -q skeleton/frontier
+      - name: Run frontier contract tests
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q skeleton/testing/test_frontier_contracts.py skeleton/testing/test_frontier_npc.py skeleton/testing/test_frontier_runtime.py
