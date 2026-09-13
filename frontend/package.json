@@ -9,7 +9,13 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "lint:ci": "expo lint --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "export:web": "expo export --platform web"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "dependencies": {
     "@babel/runtime": "^7.20.6",
