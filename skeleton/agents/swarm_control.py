@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from threading import RLock
 
 from skeleton.agents.swarm_admission import AdmissionDecision, AdmissionPolicy
 from skeleton.agents.swarm_idempotency import IdempotencyRegistry
@@ -32,24 +33,28 @@ class SwarmControlPlane:
         self.admission = admission or AdmissionPolicy()
         self.idempotency = idempotency or IdempotencyRegistry()
         self.scheduler = scheduler or SwarmScheduler()
+        self._submit_lock = RLock()
 
     def submit(self, task: SwarmTask, *, idempotency_key: str | None = None) -> SubmitResult:
         decision = self.admission.evaluate(self.runtime, task)
         if not decision.accepted:
             raise AdmissionError(decision.reason)
 
-        duplicate = False
-        if idempotency_key:
+        if not idempotency_key:
+            return SubmitResult(self.runtime.submit(task), decision, False)
+
+        with self._submit_lock:
             existing = self.idempotency.get(idempotency_key)
-            self.idempotency.resolve(idempotency_key, task.id, task.payload)
             if existing is not None:
+                self.idempotency.resolve(idempotency_key, task.id, task.payload)
                 resident = self.runtime.task(existing.task_id)
                 if resident is None:
                     raise AdmissionError("idempotent task record exists but resident task is missing")
                 return SubmitResult(resident, decision, True)
 
-        admitted = self.runtime.submit(task)
-        return SubmitResult(admitted, decision, duplicate)
+            admitted = self.runtime.submit(task)
+            self.idempotency.resolve(idempotency_key, admitted.id, admitted.payload)
+            return SubmitResult(admitted, decision, False)
 
     def rank_workers(self, task_id: str) -> tuple[WorkerScore, ...]:
         task = self.runtime.task(task_id)
