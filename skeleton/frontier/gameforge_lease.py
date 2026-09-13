@@ -1,4 +1,9 @@
-"""Exclusive lease contract for bounded ownership transfer."""
+"""Exclusive lease contract for bounded ownership transfer.
+
+Leases are single-owner tokens with fail-closed release semantics.  The backing
+set serializes capacity accounting so concurrent acquire/release operations
+cannot create phantom capacity or drive the counter below zero.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -11,11 +16,13 @@ class Lease:
     token: str
     _released: bool = False
     _on_release: Callable[[], None] | None = field(default=None, repr=False, compare=False)
+    _lock: Lock = field(default_factory=Lock, repr=False, compare=False)
 
     def release(self) -> None:
-        if self._released:
-            raise RuntimeError("lease already released")
-        self._released = True
+        with self._lock:
+            if self._released:
+                raise RuntimeError("lease already released")
+            self._released = True
         if self._on_release is not None:
             self._on_release()
 
@@ -48,3 +55,12 @@ class LeaseSet:
     def active(self) -> int:
         with self._lock:
             return self._active
+
+    @property
+    def capacity(self) -> int:
+        return self._cap
+
+    @property
+    def remaining(self) -> int:
+        with self._lock:
+            return self._cap - self._active
