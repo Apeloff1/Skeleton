@@ -12,6 +12,8 @@ from .gameforge_retry_budget import RetryBudget
 from .gameforge_health_score import HealthScore
 from .gameforge_snapshot import RuntimeSnapshot
 from .gameforge_receipt import Receipt
+from .gameforge_outcome_v2 import ExecutionOutcomeV2
+
 
 @dataclass
 class RuntimeCoordinator:
@@ -63,17 +65,25 @@ class RuntimeCoordinator:
         decision = self.admit(now, active, limit, background, request_id, retry, read_only)
         return Receipt(request_id, decision.value, decision.value)
 
-    def record_outcome(self, success: bool):
-        self.health.record(success)
-        if success:
-            self.circuit.success()
+    def record_outcome(self, success: bool, request_id: str = ""):
+        if isinstance(success, ExecutionOutcomeV2):
+            outcome = success
         else:
+            outcome = ExecutionOutcomeV2(request_id or "anonymous", bool(success))
+        self.health.record(outcome.success)
+        if outcome.success:
+            self.circuit.success()
+        elif outcome.terminal:
             self.circuit.failure()
         return self.health.healthy
 
     @property
     def reservations(self):
         return self._reservations
+
+    @property
+    def saturated(self):
+        return self.budget.exhausted or self.quota.exhausted or self.queue.full
 
     def release(self):
         if self._reservations <= 0:
