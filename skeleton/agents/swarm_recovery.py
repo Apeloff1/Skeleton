@@ -7,6 +7,7 @@ from typing import Mapping
 
 from skeleton.agents.swarm_checkpoint import CheckpointStore
 from skeleton.agents.swarm_failover import FailoverCoordinator, ReplicaState
+from skeleton.agents.swarm_hardened import HardenedSwarmRuntime
 from skeleton.agents.swarm_runtime import SwarmRuntime
 
 
@@ -31,10 +32,11 @@ class SwarmRecoveryManager:
     def checkpoint(self, runtime: SwarmRuntime) -> int:
         return self.store.capture(runtime).sequence
 
-    def restore_latest(self) -> SwarmRuntime | None:
-        if self.store.latest() is None:
+    def restore_latest(self) -> HardenedSwarmRuntime | None:
+        latest = self.store.latest()
+        if latest is None:
             return None
-        return self.store.restore()
+        return HardenedSwarmRuntime.from_state(latest.state, requeue_leased=True)
 
     def elect(self, replicas: Mapping[str, ReplicaState]) -> str | None:
         self._replicas = dict(replicas)
