@@ -76,7 +76,9 @@ class ServerState:
                 checks["swarm_recovery"] = asdict(recovery_status) if is_dataclass(recovery_status) else recovery_status
             except Exception:
                 checks["swarm_recovery"] = {"error": "recovery status failed"}
-        overall = all(not isinstance(c, dict) or not c.get("error") for c in checks.values())
+        has_error = any(isinstance(check, dict) and check.get("error") for check in checks.values())
+        swarm_critical = isinstance(checks.get("swarm"), dict) and checks["swarm"].get("status") == "critical"
+        overall = not has_error and not swarm_critical
         return {"overall": overall, "checks": checks}
 
     def wire_from_genesis(self, genesis: Any) -> None:
