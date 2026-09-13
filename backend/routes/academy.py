@@ -4,7 +4,7 @@ Version: 2.0.0 | Extended Curriculum
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
@@ -21,8 +21,8 @@ class LessonContent(BaseModel):
     duration_minutes: int
     difficulty: str  # beginner, intermediate, advanced, expert
     topics: List[str]
-    prerequisites: List[str] = []
-    resources: List[Dict[str, str]] = []
+    prerequisites: List[str] = Field(default_factory=list, max_length=50)
+    resources: List[Dict[str, str]] = Field(default_factory=list, max_length=100)
 
 class CourseModule(BaseModel):
     id: str
@@ -39,7 +39,7 @@ class AcademyTopic(BaseModel):
     color: str
     total_hours: int
     modules: List[CourseModule]
-    certifications: List[str] = []
+    certifications: List[str] = Field(default_factory=list, max_length=50)
 
 # =============================================================================
 # KNOWLEDGE BIBLES DATA

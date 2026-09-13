@@ -3,7 +3,7 @@ Quantum Compiler Suite Routes
 """
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Dict, Any
 import ast
 import hashlib
@@ -71,11 +71,11 @@ OPTIMIZERS = {
 
 
 class CompileRequest(BaseModel):
-    code: str
-    language: str = "python"
-    sanitizers: List[str] = []
-    optimizers: List[str] = []
-    options: Dict[str, Any] = {}
+    code: str = Field(..., min_length=1, max_length=500000)
+    language: str = Field("python", min_length=1, max_length=100)
+    sanitizers: List[str] = Field(default_factory=list, max_length=50)
+    optimizers: List[str] = Field(default_factory=list, max_length=50)
+    options: Dict[str, Any] = Field(default_factory=dict)
 
 
 def analyze_python_code(code: str) -> Dict[str, Any]:
