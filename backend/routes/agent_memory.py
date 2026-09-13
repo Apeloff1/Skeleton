@@ -19,7 +19,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core.databases import client as _SHARED_MONGO_CLIENT
 from routes.llm_router import route_complete
@@ -52,11 +52,11 @@ def _guard(content: str) -> str:
 
 
 class RememberBody(BaseModel):
-    agent_id: str = ""
-    content: str = ""
-    kind: str = "episode"          # episode | observation | outcome | reflection
-    importance: float = 0.5         # 0..1
-    tags: list[str] = []
+    agent_id: str = Field("", max_length=200)
+    content: str = Field("", max_length=100000)
+    kind: str = Field("episode", max_length=50)          # episode | observation | outcome | reflection
+    importance: float = Field(0.5, ge=0, le=1)         # 0..1
+    tags: list[str] = Field(default_factory=list, max_length=50)
 
 
 @router.post("/remember")

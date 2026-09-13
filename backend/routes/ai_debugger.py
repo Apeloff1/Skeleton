@@ -37,21 +37,21 @@ EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 # ============================================================================
 
 class DebugRequest(BaseModel):
-    code: str = Field(..., min_length=1, description="Code to debug")
-    error_message: Optional[str] = Field(None, description="Error message or stack trace")
-    language: str = Field("python", description="Programming language")
-    context: Optional[str] = Field(None, description="Additional context about the issue")
+    code: str = Field(..., min_length=1, max_length=500000, description="Code to debug")
+    error_message: Optional[str] = Field(None, max_length=100000, description="Error message or stack trace")
+    language: str = Field("python", max_length=100, description="Programming language")
+    context: Optional[str] = Field(None, max_length=100000, description="Additional context about the issue")
     debug_level: Literal["quick", "standard", "deep"] = "standard"
 
 class SecurityScanRequest(BaseModel):
-    code: str = Field(..., min_length=1)
-    language: str = "python"
+    code: str = Field(..., min_length=1, max_length=500000)
+    language: str = Field("python", max_length=100)
     scan_type: Literal["quick", "full", "owasp"] = "full"
 
 class PerformanceAnalysisRequest(BaseModel):
-    code: str = Field(..., min_length=1)
-    language: str = "python"
-    focus: Optional[List[str]] = Field(default=["time", "memory", "cpu"])
+    code: str = Field(..., min_length=1, max_length=500000)
+    language: str = Field("python", max_length=100)
+    focus: Optional[List[str]] = Field(default_factory=lambda: ["time", "memory", "cpu"], max_length=20)
 
 class BugFix(BaseModel):
     line: Optional[int]
