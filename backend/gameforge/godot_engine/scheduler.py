@@ -4,7 +4,39 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Awaitable, Callable
+
+
+class JobStatus(str, Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    TIMED_OUT = "timed_out"
+    CANCELLED = "cancelled"
+
+
+@dataclass
+class ScheduledJob:
+    id: str
+    kind: str
+    payload: dict[str, Any]
+    status: JobStatus = JobStatus.QUEUED
+    result: dict[str, Any] | None = None
+    error: str | None = None
+    created_at: float = field(default_factory=time.time)
+    _proc: Any = field(default=None, repr=False)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "kind": self.kind,
+            "status": self.status.value,
+            "result": self.result,
+            "error": self.error,
+            "created_at": self.created_at,
+        }
 
 
 @dataclass
@@ -42,6 +74,7 @@ class JobScheduler:
         self._spawn_lock = asyncio.Lock()
         self._tasks: dict[str, asyncio.Task] = {}
         self._queued_at: dict[str, float] = {}
+        self._runners: dict[str, Callable[[ScheduledJob], Awaitable[Any]]] = {}
         self.stats = SchedulerStats()
 
     @property
@@ -90,6 +123,22 @@ class JobScheduler:
         self._tasks[job_id] = task
         return task  # caller awaits or fire-and-forgets
 
+    def register_runner(
+        self,
+        kind: str,
+        runner: Callable[[ScheduledJob], Awaitable[Any]],
+    ) -> None:
+        self._runners[kind] = runner
+
+    def runner_for(
+        self,
+        kind: str,
+    ) -> Callable[[ScheduledJob], Awaitable[Any]]:
+        try:
+            return self._runners[kind]
+        except KeyError as exc:
+            raise ValueError(f"unknown job kind {kind!r}") from exc
+
     def cancel(self, job_id: str) -> bool:
         task = self._tasks.get(job_id)
         if task and not task.done():
@@ -107,3 +156,4 @@ class JobScheduler:
 
 
 engine_scheduler = JobScheduler(max_concurrent=2, stagger_s=0.5)
+scheduler = engine_scheduler

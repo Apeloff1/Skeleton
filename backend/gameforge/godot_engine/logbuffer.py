@@ -88,3 +88,8 @@ class LogBufferPool:
 
 
 log_pool = LogBufferPool()
+
+
+def get_buffer(job_id: str) -> LogBuffer:
+    """Return the bounded log buffer for a job."""
+    return log_pool.get(job_id)

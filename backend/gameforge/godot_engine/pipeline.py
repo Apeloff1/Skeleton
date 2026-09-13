@@ -7,6 +7,7 @@ staggering, concurrency, and cancellation.
 from __future__ import annotations
 
 import asyncio
+import uuid
 from pathlib import Path
 
 from core.exec_guard import execution_disabled_message, require_execution_allowed
@@ -92,3 +93,67 @@ for _kind in ("import", "check", "export", "dump_gdextension", "script"):
 
 def get_scheduler() -> JobScheduler:
     return scheduler
+
+
+class GodotPipeline:
+    """Job registry and submission facade for the Godot execution scheduler."""
+
+    def __init__(self) -> None:
+        self._jobs: dict[str, ScheduledJob] = {}
+
+    async def submit(
+        self,
+        kind: str,
+        project_dir: Path | None,
+        *,
+        timeout: int = DEFAULT_TIMEOUT,
+        **payload,
+    ) -> ScheduledJob:
+        job_id = uuid.uuid4().hex
+        job = ScheduledJob(
+            id=job_id,
+            kind=kind,
+            payload={
+                **payload,
+                "project_dir": str(project_dir) if project_dir else None,
+                "timeout": timeout,
+            },
+        )
+        self._jobs[job_id] = job
+        runner = scheduler.runner_for(kind)
+
+        async def execute() -> None:
+            job.status = JobStatus.RUNNING
+            try:
+                await runner(job)
+                if job.status == JobStatus.RUNNING:
+                    job.status = (
+                        JobStatus.COMPLETED
+                        if not job.error
+                        else JobStatus.FAILED
+                    )
+            except asyncio.CancelledError:
+                job.status = JobStatus.CANCELLED
+                raise
+            except Exception as exc:
+                job.status = JobStatus.FAILED
+                job.error = f"{type(exc).__name__}: {exc}"
+
+        await scheduler.run(job_id, execute)
+        return job
+
+    def get(self, job_id: str) -> ScheduledJob | None:
+        return self._jobs.get(job_id)
+
+    def list(self, limit: int = 50) -> list[ScheduledJob]:
+        return list(self._jobs.values())[-max(1, min(limit, 200)):]
+
+    def stats(self) -> dict:
+        return scheduler.snapshot()
+
+
+_pipeline = GodotPipeline()
+
+
+def get_pipeline() -> GodotPipeline:
+    return _pipeline
