@@ -21,6 +21,7 @@ from skeleton.agents.swarm_runtime import AdmissionError, SwarmRuntime, TaskStat
 from skeleton.agents.swarm_slo import SLOPolicy
 from skeleton.agents.swarm_snapshot import SnapshotError, normalize_snapshot
 from skeleton.agents.swarm_tenant_broker import TenantSwarmBroker
+from skeleton.agents.swarm_tenant_checkpoint import TenantCheckpointStore
 
 router = APIRouter(prefix="/swarm/operator", tags=["swarm-operator"])
 
@@ -63,17 +64,19 @@ def _repair_tenants() -> dict[str, Any] | None:
     return asdict(tenant_broker.repair())
 
 
-def _restore_or_repair_tenants(recovery: SwarmRecoveryManager, sequence: int) -> dict[str, Any] | None:
-    """Restore sidecar metadata into an empty broker; otherwise reconcile live metadata."""
-    tenant_broker = getattr(_state(), "swarm_tenant_broker", None)
-    if tenant_broker is None:
-        return None
-    status = tenant_broker.status()
-    empty = not status["tracked_tasks"] and not status["terminal_records"] and not status["ingress"]["accounted_tasks"]
-    if empty:
-        restored = recovery.restore_tenants(tenant_broker, sequence)
-        return None if restored is None else asdict(restored)
-    return asdict(tenant_broker.repair())
+def _stage_tenant_bundle(
+    runtime: SwarmRuntime,
+    current_tenant: TenantSwarmBroker,
+) -> tuple[Any, SwarmBroker, TenantSwarmBroker]:
+    state = _state()
+    staged_ingress = current_tenant.ingress.fork_empty()
+    staged_broker = SwarmBroker(runtime, supervisor=state.swarm_supervisor)
+    staged_tenant = TenantSwarmBroker(
+        staged_broker,
+        staged_ingress,
+        max_terminal_records=current_tenant.max_terminal_records,
+    )
+    return staged_ingress, staged_broker, staged_tenant
 
 
 def _stage_paired_restore(
@@ -87,16 +90,25 @@ def _stage_paired_restore(
     if current_tenant is None or recovery.tenant_store.get(sequence) is None:
         return None
 
-    staged_ingress = current_tenant.ingress.fork_empty()
-    staged_broker = SwarmBroker(runtime, supervisor=state.swarm_supervisor)
-    staged_tenant = TenantSwarmBroker(
-        staged_broker,
-        staged_ingress,
-        max_terminal_records=current_tenant.max_terminal_records,
-    )
+    staged_ingress, staged_broker, staged_tenant = _stage_tenant_bundle(runtime, current_tenant)
     repair = recovery.restore_tenants(staged_tenant, sequence)
     if repair is None:
         raise RuntimeError(f"tenant checkpoint disappeared during staged restore: {sequence}")
+    state.commit_swarm_bundle(runtime, staged_broker, staged_ingress, staged_tenant)
+    return asdict(repair)
+
+
+def _stage_live_metadata_restore(runtime: SwarmRuntime) -> dict[str, Any] | None:
+    """Atomically carry current tenant ownership across a runtime-only checkpoint restore."""
+    state = _state()
+    current_tenant = getattr(state, "swarm_tenant_broker", None)
+    if current_tenant is None:
+        return None
+
+    staged_ingress, staged_broker, staged_tenant = _stage_tenant_bundle(runtime, current_tenant)
+    transient = TenantCheckpointStore(max_checkpoints=1)
+    transient.capture(1, current_tenant)
+    repair = transient.restore(staged_tenant, 1)
     state.commit_swarm_bundle(runtime, staged_broker, staged_ingress, staged_tenant)
     return asdict(repair)
 
@@ -211,12 +223,13 @@ def restore_latest(recovery: SwarmRecoveryManager = Depends(_recovery)) -> dict[
 
     try:
         tenant_repair = _stage_paired_restore(recovery, runtime, sequence)
+        if tenant_repair is None:
+            tenant_repair = _stage_live_metadata_restore(runtime)
+            if tenant_repair is None:
+                _state().bind_swarm_runtime(runtime)
     except (KeyError, ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=409, detail=f"staged restore rejected: {exc}") from exc
 
-    if tenant_repair is None:
-        _state().bind_swarm_runtime(runtime)
-        tenant_repair = _restore_or_repair_tenants(recovery, sequence)
     return {"restored": True, "tenant_repair": tenant_repair, "status": asdict(recovery.status()), "snapshot": asdict(runtime.snapshot())}
 
 
