@@ -27,6 +27,17 @@ def require(condition: bool, message: str, failures: list[str]) -> None:
         failures.append(message)
 
 
+def workflow_cancel_in_progress_is_false(workflow: str) -> bool:
+    return (
+        re.search(
+            r"^\s*cancel-in-progress:\s*false\s*(?:#.*)?$",
+            workflow,
+            re.MULTILINE,
+        )
+        is not None
+    )
+
+
 def main() -> int:
     failures: list[str] = []
 
@@ -98,6 +109,11 @@ def main() -> int:
         "CI backend-lint job must enforce this toolchain contract",
         failures,
     )
+    require(
+        workflow_cancel_in_progress_is_false(ci),
+        "CI/CD must keep the active validation alive during rapid pushes",
+        failures,
+    )
 
     backend_quality = read(".github/workflows/backend-quality.yml")
     require(
@@ -118,6 +134,33 @@ def main() -> int:
     require(
         "--noconftest" in backend_quality,
         "Focused Backend Quality security tests must isolate global conftest",
+        failures,
+    )
+    require(
+        'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in backend_quality,
+        "Backend Quality must disable external pytest plugin autoload",
+        failures,
+    )
+    require(
+        workflow_cancel_in_progress_is_false(backend_quality),
+        "Backend Quality must keep the active validation alive during rapid pushes",
+        failures,
+    )
+
+    lint = read(".github/workflows/lint.yml")
+    require(
+        re.search(r"^\s*node-version:\s*24\s*$", lint, re.MULTILINE) is not None,
+        "Lint workflow must provision Node 24",
+        failures,
+    )
+    require(
+        "yarn lint:ci" in lint,
+        "Lint workflow must use the zero-warning canonical lint script",
+        failures,
+    )
+    require(
+        workflow_cancel_in_progress_is_false(lint),
+        "Lint must keep the active validation alive during rapid pushes",
         failures,
     )
 
@@ -158,7 +201,8 @@ def main() -> int:
         return 1
 
     print(
-        "Toolchain contract passed: Python 3.11 / Ruff 0.9 / Node 24 and security gates aligned."
+        "Toolchain contract passed: Python 3.11 / Ruff 0.9 / Node 24, security gates, "
+        "and anti-starvation concurrency aligned."
     )
     return 0
 
