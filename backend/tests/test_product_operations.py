@@ -3,17 +3,27 @@ import json
 import pytest
 
 from core.charter_policy import CharterPolicy, Rule
+from core.durable_outbox import OutboxFullError
 from core.product_kernel import PRODUCT_KERNEL
-from core.product_operations import OperationRejected, ProductOperationCoordinator
+from core.product_operations import (
+    OperationExecutionError,
+    OperationRejected,
+    ProductOperationCoordinator,
+)
 
 
-def coordinator(tmp_path, *, quorum=False):
+def coordinator(tmp_path, *, quorum=False, outbox_cap=4096):
     policy = CharterPolicy()
     policy.ratify(
         "builds",
         [Rule("build-submit", "build.submit", min_weight=2, requires_quorum=quorum)],
     )
-    return ProductOperationCoordinator(tmp_path, kernel=PRODUCT_KERNEL, policy=policy)
+    return ProductOperationCoordinator(
+        tmp_path,
+        kernel=PRODUCT_KERNEL,
+        policy=policy,
+        outbox_cap=outbox_cap,
+    )
 
 
 def test_admission_stages_payload_journals_intent_and_audits(tmp_path):
@@ -33,6 +43,7 @@ def test_admission_stages_payload_journals_intent_and_audits(tmp_path):
     assert ops.load_payload(admitted) == {"title": "A", "spec": {"genre": "rpg"}}
     snapshot = ops.snapshot()
     assert snapshot["pending_operations"] == 1
+    assert snapshot["outbox_capacity_remaining"] == 4095
     assert snapshot["content_store"]["manifests"] == 1
     assert snapshot["audit_sequence"] == 1
 
@@ -116,3 +127,132 @@ def test_restart_restores_pending_intent_and_audit_chain(tmp_path):
     assert restored.outbox.pending_count == 1
     assert restored.audit.sequence == 1
     assert restored.load_payload(admitted)["title"] == "restart-safe"
+
+
+def test_outbox_capacity_preflight_prevents_orphan_artifact(tmp_path):
+    ops = coordinator(tmp_path, outbox_cap=1)
+    ops.admit(
+        capability_id="studio",
+        domain="builds",
+        action="build.submit",
+        principal="creator",
+        actor_weight=2,
+        payload={"title": "first"},
+    )
+    before = ops.store.stats()
+    with pytest.raises(OutboxFullError, match="was not staged"):
+        ops.admit(
+            capability_id="studio",
+            domain="builds",
+            action="build.submit",
+            principal="creator",
+            actor_weight=2,
+            payload={"title": "second"},
+        )
+    assert ops.store.stats() == before
+    assert ops.outbox.pending_count == 1
+
+
+def test_idempotency_key_returns_original_operation_without_duplicate_work(tmp_path):
+    ops = coordinator(tmp_path)
+    kwargs = dict(
+        capability_id="studio",
+        domain="builds",
+        action="build.submit",
+        principal="creator",
+        actor_weight=2,
+        payload={"title": "retry-safe"},
+        idempotency_key="client-request-42",
+    )
+    first = ops.admit(**kwargs)
+    second = ops.admit(**kwargs)
+    assert second == first
+    assert ops.outbox.pending_count == 1
+    assert ops.store.stats()["manifests"] == 1
+    assert ops.snapshot()["idempotency_records"] == 1
+
+    restored = coordinator(tmp_path)
+    third = restored.admit(**kwargs)
+    assert third == first
+    assert restored.outbox.pending_count == 1
+
+
+@pytest.mark.asyncio
+async def test_executor_success_confirms_only_after_side_effect(tmp_path):
+    ops = coordinator(tmp_path)
+    admitted = ops.admit(
+        capability_id="studio",
+        domain="builds",
+        action="build.submit",
+        principal="creator",
+        actor_weight=2,
+        payload={"title": "execute-me"},
+    )
+    seen = []
+
+    async def executor(operation, payload):
+        seen.append((operation.id, payload["title"], ops.outbox.pending_count))
+        return True
+
+    result = await ops.execute_one(admitted.outbox_seq, executor)
+    assert result.executed is True
+    assert result.confirmed is True
+    assert seen == [(admitted.id, "execute-me", 1)]
+    assert ops.outbox.pending_count == 0
+    assert ops.audit.latest.kind == "operation_executed"
+
+
+@pytest.mark.asyncio
+async def test_executor_false_defers_and_keeps_pending(tmp_path):
+    ops = coordinator(tmp_path)
+    admitted = ops.admit(
+        capability_id="studio",
+        domain="builds",
+        action="build.submit",
+        principal="creator",
+        actor_weight=2,
+        payload={"title": "later"},
+    )
+    result = await ops.execute_one(admitted.outbox_seq, lambda operation, payload: False)
+    assert result.executed is False
+    assert result.confirmed is False
+    assert ops.outbox.pending_count == 1
+    assert ops.audit.latest.kind == "operation_execution_deferred"
+
+
+@pytest.mark.asyncio
+async def test_executor_exception_is_audited_and_pending_work_survives(tmp_path):
+    ops = coordinator(tmp_path)
+    admitted = ops.admit(
+        capability_id="studio",
+        domain="builds",
+        action="build.submit",
+        principal="creator",
+        actor_weight=2,
+        payload={"title": "explode"},
+    )
+
+    def explode(operation, payload):
+        raise RuntimeError("boom")
+
+    with pytest.raises(OperationExecutionError, match="executor raised"):
+        await ops.execute_one(admitted.outbox_seq, explode)
+    assert ops.outbox.pending_count == 1
+    assert ops.audit.latest.kind == "operation_execution_failed"
+
+
+def test_pending_operations_rehydrate_execution_contract(tmp_path):
+    ops = coordinator(tmp_path)
+    admitted = ops.admit(
+        capability_id="studio",
+        domain="builds",
+        action="build.submit",
+        principal="creator",
+        actor_weight=2,
+        payload={"title": "pending"},
+        idempotency_key="pending-1",
+    )
+    pending = ops.pending_operations()
+    assert len(pending) == 1
+    assert pending[0].id == admitted.id
+    assert pending[0].idempotency_key == "pending-1"
