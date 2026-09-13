@@ -60,6 +60,19 @@ def _repair_tenants() -> dict[str, Any] | None:
     return asdict(tenant_broker.repair())
 
 
+def _restore_or_repair_tenants(recovery: SwarmRecoveryManager, sequence: int) -> dict[str, Any] | None:
+    """Restore sidecar metadata into an empty broker; otherwise reconcile live metadata."""
+    tenant_broker = getattr(_state(), "swarm_tenant_broker", None)
+    if tenant_broker is None:
+        return None
+    status = tenant_broker.status()
+    empty = not status["tracked_tasks"] and not status["terminal_records"] and not status["ingress"]["accounted_tasks"]
+    if empty:
+        restored = recovery.restore_tenants(tenant_broker, sequence)
+        return None if restored is None else asdict(restored)
+    return asdict(tenant_broker.repair())
+
+
 def _task_record(task: Any) -> dict[str, Any]:
     return {
         "id": task.id,
@@ -133,7 +146,8 @@ def gc(keep_terminal: int = Query(default=10_000, ge=0, le=1_000_000), runtime: 
 
 @router.post("/checkpoint")
 def checkpoint(runtime: SwarmRuntime = Depends(_runtime), recovery: SwarmRecoveryManager = Depends(_recovery)) -> dict[str, Any]:
-    sequence = recovery.checkpoint(runtime)
+    tenant_broker = getattr(_state(), "swarm_tenant_broker", None)
+    sequence = recovery.checkpoint(runtime, tenant_broker)
     return {"sequence": sequence, "status": asdict(recovery.status())}
 
 
@@ -142,8 +156,9 @@ def restore_latest(recovery: SwarmRecoveryManager = Depends(_recovery)) -> dict[
     runtime = recovery.restore_latest()
     if runtime is None:
         raise HTTPException(status_code=404, detail="no checkpoint available")
+    sequence = recovery.status().latest_sequence
     _state().bind_swarm_runtime(runtime)
-    tenant_repair = _repair_tenants()
+    tenant_repair = None if sequence is None else _restore_or_repair_tenants(recovery, sequence)
     return {"restored": True, "tenant_repair": tenant_repair, "status": asdict(recovery.status()), "snapshot": asdict(runtime.snapshot())}
 
 
