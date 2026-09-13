@@ -1,0 +1,84 @@
+import pytest
+
+from skeleton.agents.swarm_broker import SwarmBroker
+from skeleton.agents.swarm_hardened import HardenedSwarmRuntime
+from skeleton.agents.swarm_ingress import SwarmIngressGovernor
+from skeleton.agents.swarm_runtime import SwarmTask
+from skeleton.agents.swarm_tenant_broker import TenantSwarmBroker
+from skeleton.agents.swarm_tenant_checkpoint import TenantCheckpointStore
+
+
+def _broker(runtime: HardenedSwarmRuntime) -> TenantSwarmBroker:
+    return TenantSwarmBroker(
+        SwarmBroker(runtime),
+        SwarmIngressGovernor(rate_capacity=100, rate_refill_per_second=100),
+    )
+
+
+def test_tenant_checkpoint_round_trip_rebuilds_active_accounting() -> None:
+    runtime = HardenedSwarmRuntime()
+    source = _broker(runtime)
+    source.submit_and_dispatch("acme", SwarmTask("task", {"x": 1}))
+
+    store = TenantCheckpointStore(max_checkpoints=4)
+    captured = store.capture(7, source)
+    restored_runtime = HardenedSwarmRuntime.from_state(runtime.export_state(), requeue_leased=True)
+    target = _broker(restored_runtime)
+    repair = store.restore(target, 7)
+
+    assert captured.sequence == 7
+    assert target.tenant_for("task") == "acme"
+    assert target.ingress.phase("acme", "task") == "queued"
+    assert repair.restored_accounting == 1
+
+
+def test_tenant_checkpoint_preserves_terminal_identity() -> None:
+    runtime = HardenedSwarmRuntime()
+    runtime.register_worker("w")
+    source = _broker(runtime)
+    source.submit_and_dispatch("acme", SwarmTask("task", {}))
+    source.record_success("w", "task", completion_token="done")
+
+    store = TenantCheckpointStore()
+    store.capture(1, source)
+    target = _broker(HardenedSwarmRuntime.from_state(runtime.export_state()))
+    store.restore(target, 1)
+    assert target.tenant_for("task") == "acme"
+    assert target.status()["terminal_records"] == 1
+
+
+def test_tenant_checkpoint_rejects_sequence_collision() -> None:
+    first_runtime = HardenedSwarmRuntime()
+    first = _broker(first_runtime)
+    first.submit_and_dispatch("alpha", SwarmTask("a", {}))
+    second_runtime = HardenedSwarmRuntime()
+    second = _broker(second_runtime)
+    second.submit_and_dispatch("beta", SwarmTask("b", {}))
+
+    store = TenantCheckpointStore()
+    store.capture(1, first)
+    with pytest.raises(ValueError):
+        store.capture(1, second)
+
+
+def test_tenant_checkpoint_is_bounded() -> None:
+    runtime = HardenedSwarmRuntime()
+    broker = _broker(runtime)
+    store = TenantCheckpointStore(max_checkpoints=2)
+    store.capture(1, broker)
+    store.capture(2, broker)
+    store.capture(3, broker)
+    assert store.sequences() == (2, 3)
+
+
+def test_tenant_restore_requires_empty_target() -> None:
+    runtime = HardenedSwarmRuntime()
+    source = _broker(runtime)
+    store = TenantCheckpointStore()
+    store.capture(1, source)
+
+    target_runtime = HardenedSwarmRuntime()
+    target = _broker(target_runtime)
+    target.submit_and_dispatch("busy", SwarmTask("existing", {}))
+    with pytest.raises(ValueError):
+        store.restore(target, 1)
