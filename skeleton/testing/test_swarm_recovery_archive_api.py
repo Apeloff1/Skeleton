@@ -84,3 +84,45 @@ def test_archive_export_rejects_oversize_history(monkeypatch) -> None:
         routes.export_recovery_archive()
 
     assert exc.value.status_code == 413
+
+
+def test_recovery_catalog_lists_runtime_and_tenant_sequences(monkeypatch) -> None:
+    state = _state()
+    state.swarm_tenant_broker.submit_and_dispatch("acme", SwarmTask("first", {}))
+    state.swarm_recovery.checkpoint(state.swarm, state.swarm_tenant_broker)
+    state.swarm_tenant_broker.submit_and_dispatch("acme", SwarmTask("second", {}))
+    state.swarm_recovery.checkpoint(state.swarm, state.swarm_tenant_broker)
+    monkeypatch.setattr(routes, "_state", lambda: state)
+
+    catalog = routes.recovery_catalog()
+
+    assert [item["sequence"] for item in catalog["runtime"]] == [1, 2]
+    assert [item["sequence"] for item in catalog["tenant"]] == [1, 2]
+    assert all(item["checksum"] for item in catalog["runtime"])
+
+
+def test_activate_checkpoint_route_rolls_back_to_selected_sequence(monkeypatch) -> None:
+    state = _state()
+    state.swarm_tenant_broker.submit_and_dispatch("acme", SwarmTask("first", {}))
+    state.swarm_recovery.checkpoint(state.swarm, state.swarm_tenant_broker)
+    state.swarm_tenant_broker.submit_and_dispatch("acme", SwarmTask("second", {}))
+    state.swarm_recovery.checkpoint(state.swarm, state.swarm_tenant_broker)
+    monkeypatch.setattr(routes, "_state", lambda: state)
+
+    result = routes.activate_recovery_checkpoint(1)
+
+    assert result["activated"] is True
+    assert result["sequence"] == 1
+    assert result["tenant_source"] == "checkpoint"
+    assert state.swarm.task("first") is not None
+    assert state.swarm.task("second") is None
+
+
+def test_activate_checkpoint_route_returns_404_for_missing_sequence(monkeypatch) -> None:
+    state = _state()
+    monkeypatch.setattr(routes, "_state", lambda: state)
+
+    with pytest.raises(HTTPException) as exc:
+        routes.activate_recovery_checkpoint(99)
+
+    assert exc.value.status_code == 404
