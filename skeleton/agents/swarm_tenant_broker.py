@@ -101,10 +101,10 @@ class TenantSwarmBroker:
         tenant = self._tenant(tenant)
         task_id = self._task_id(task.id)
         with self._lock:
-            existing_tenant = self._tenant_by_task.get(task_id) or self._terminal_tenants.get(task_id)
-            if existing_tenant is not None:
-                if existing_tenant != tenant:
-                    raise AdmissionError(f"task already belongs to tenant: {existing_tenant}")
+            active_tenant = self._tenant_by_task.get(task_id)
+            if active_tenant is not None:
+                if active_tenant != tenant:
+                    raise AdmissionError(f"task already belongs to tenant: {active_tenant}")
                 result = self.broker.submit_and_dispatch(task, idempotency_key=idempotency_key)
                 return TenantBrokerResult(
                     tenant,
@@ -114,6 +114,21 @@ class TenantSwarmBroker:
                     result.worker_id,
                     result.leased,
                     result.reason,
+                )
+
+            terminal_tenant = self._terminal_tenants.get(task_id)
+            if terminal_tenant is not None:
+                if terminal_tenant != tenant:
+                    raise AdmissionError(f"task already belongs to tenant: {terminal_tenant}")
+                self._terminal_tenants.move_to_end(task_id)
+                return TenantBrokerResult(
+                    tenant,
+                    task_id,
+                    True,
+                    True,
+                    None,
+                    False,
+                    "terminal task already accounted",
                 )
 
             decision: IngressDecision = self.ingress.admit(tenant, task_id, task.payload, cost=cost)
