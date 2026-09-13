@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from gameforge.enterprise.auth import Principal, get_principal
 from gameforge.exocortex.core import Exocortex
@@ -323,8 +323,8 @@ async def self_heal(principal: Principal = Depends(get_principal)):
 
 class DNADirectionsBody(BaseModel):
     room_id: str
-    directions: List[Any]  # 3 x {title, brief} or [title, brief]
-    tier_hints: Optional[List[str]] = None
+    directions: List[Any] = Field(..., min_length=1, max_length=3)  # 3 x {title, brief} or [title, brief]
+    tier_hints: Optional[List[str]] = Field(None, max_length=3)
 
 
 class DNACompleteBody(BaseModel):
@@ -347,8 +347,8 @@ class DNAAdvanceBody(BaseModel):
 
 class DNAVoteOpenBody(BaseModel):
     subject: str
-    options: List[str]
-    room_ids: List[str]
+    options: List[str] = Field(..., min_length=1, max_length=20)
+    room_ids: List[str] = Field(..., min_length=1, max_length=50)
 
 
 class DNAVoteCastBody(BaseModel):
@@ -358,7 +358,7 @@ class DNAVoteCastBody(BaseModel):
 
 
 class DNASandboxBody(BaseModel):
-    room_ids: List[str]
+    room_ids: List[str] = Field(..., min_length=1, max_length=50)
 
 
 class DNAProposeBody(BaseModel):
@@ -441,7 +441,7 @@ class StudioVoteBody(BaseModel):
 
 class StudioRunBody(BaseModel):
     goal: str
-    notes_list: List[str]
+    notes_list: List[str] = Field(..., max_length=50)
 
 
 @router.post("/studio/bootstrap")
