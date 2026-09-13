@@ -21,7 +21,8 @@ python -m pytest -q --noconftest \
   backend/tests/test_exec_guard.py \
   backend/tests/test_process_safety_gate.py \
   backend/tests/test_process_safety_destructuring.py \
-  backend/tests/test_process_safety_partial.py
+  backend/tests/test_process_safety_partial.py \
+  backend/tests/test_process_safety_namespace_get.py
 
 if command -v yarn >/dev/null 2>&1; then
   printf '\n== Frontend lint ==\n'
