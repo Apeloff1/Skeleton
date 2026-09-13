@@ -69,7 +69,9 @@ class RuntimeCoordinator:
         if isinstance(success, ExecutionOutcomeV2):
             outcome = success
         else:
-            outcome = ExecutionOutcomeV2(request_id or "anonymous", bool(success))
+            if not isinstance(success, bool):
+                raise TypeError("success must be bool or ExecutionOutcomeV2")
+            outcome = ExecutionOutcomeV2(request_id or "anonymous", success)
         self.health.record(outcome.success)
         if outcome.success:
             self.circuit.success()
