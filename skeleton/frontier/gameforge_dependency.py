@@ -3,6 +3,8 @@
 
 class DependencyGate:
     def __init__(self, dependencies):
+        if isinstance(dependencies, (str, bytes)):
+            raise TypeError("dependencies must be an iterable of names")
         required = set(dependencies)
         if not required or any(not isinstance(name, str) or not name.strip() for name in required):
             raise ValueError("at least one non-empty dependency name is required")
