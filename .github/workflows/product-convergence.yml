@@ -27,6 +27,8 @@ on:
       - "backend/core/skill_graph.py"
       - "backend/core/save_envelope.py"
       - "backend/core/character_profile.py"
+      - "backend/core/environment_runtime.py"
+      - "backend/core/world_runtime.py"
       - "backend/tests/test_content_store.py"
       - "backend/tests/test_product_operations.py"
       - "backend/tests/test_progression.py"
@@ -41,6 +43,7 @@ on:
       - "backend/tests/test_runtime_resilience.py"
       - "backend/tests/test_newmove_agents_and_ai.py"
       - "backend/tests/test_skill_save_character.py"
+      - "backend/tests/test_environment_world_runtime.py"
       - ".github/workflows/product-convergence.yml"
   pull_request:
     paths:
@@ -68,6 +71,8 @@ on:
       - "backend/core/skill_graph.py"
       - "backend/core/save_envelope.py"
       - "backend/core/character_profile.py"
+      - "backend/core/environment_runtime.py"
+      - "backend/core/world_runtime.py"
       - "backend/tests/test_content_store.py"
       - "backend/tests/test_product_operations.py"
       - "backend/tests/test_progression.py"
@@ -82,6 +87,7 @@ on:
       - "backend/tests/test_runtime_resilience.py"
       - "backend/tests/test_newmove_agents_and_ai.py"
       - "backend/tests/test_skill_save_character.py"
+      - "backend/tests/test_environment_world_runtime.py"
       - ".github/workflows/product-convergence.yml"
 
 permissions:
@@ -117,6 +123,7 @@ jobs:
           tests/test_runtime_resilience.py
           tests/test_newmove_agents_and_ai.py
           tests/test_skill_save_character.py
+          tests/test_environment_world_runtime.py
           tests/test_charter_policy.py
           tests/test_durable_outbox.py
           tests/test_worm_audit.py
