@@ -17,3 +17,12 @@ def test_dependency_gate_rejects_non_boolean_state():
     gate = DependencyGate(["db"])
     with pytest.raises(TypeError):
         gate.mark("db", 1)
+
+
+def test_dependency_gate_requires_a_real_dependency_set():
+    with pytest.raises(ValueError):
+        DependencyGate([])
+    with pytest.raises(ValueError):
+        DependencyGate([" "])
+    with pytest.raises(ValueError):
+        DependencyGate(["db", ""])
