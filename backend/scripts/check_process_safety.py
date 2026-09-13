@@ -1,9 +1,8 @@
 """Fail CI on unsafe process invocation patterns in backend Python code.
 
 Dependency-free by design so it can run before application imports. The scanner
-tracks common import and assignment aliases to prevent trivial bypasses such as
-``import subprocess as sp``, ``from subprocess import run``, or
-``runner = subprocess.run``.
+tracks common import, assignment, and getattr aliases to prevent trivial process
+policy bypasses.
 """
 
 from __future__ import annotations
@@ -16,6 +15,7 @@ from typing import Iterable
 ROOT = Path(__file__).resolve().parents[1]
 SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", "node_modules"}
 SUBPROCESS_CALLS = {"run", "call", "check_call", "check_output", "Popen"}
+TRACKED_MODULES = {"asyncio", "os", "subprocess"}
 UNSAFE_CALLS = {
     "os.system": "os.system() is forbidden",
     "os.popen": "os.popen() is forbidden",
@@ -55,19 +55,30 @@ def literal_false(node: ast.AST) -> bool:
 
 def import_aliases(tree: ast.AST) -> dict[str, str]:
     aliases: dict[str, str] = {}
-    tracked_modules = {"asyncio", "os", "subprocess"}
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for item in node.names:
-                if item.name in tracked_modules:
+                if item.name in TRACKED_MODULES:
                     aliases[item.asname or item.name] = item.name
-        elif isinstance(node, ast.ImportFrom) and node.module in tracked_modules:
+        elif isinstance(node, ast.ImportFrom) and node.module in TRACKED_MODULES:
             for item in node.names:
                 aliases[item.asname or item.name] = f"{node.module}.{item.name}"
     return aliases
 
 
 def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
+    if (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "getattr"
+        and len(node.args) >= 2
+    ):
+        owner = canonical_name(node.args[0], aliases)
+        attribute = node.args[1]
+        if owner in TRACKED_MODULES and isinstance(attribute, ast.Constant) and isinstance(attribute.value, str):
+            return f"{owner}.{attribute.value}"
+        return None
+
     name = dotted_name(node)
     if not name:
         return None
@@ -79,12 +90,7 @@ def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
 
 
 def assignment_aliases(tree: ast.AST, aliases: dict[str, str]) -> dict[str, str]:
-    """Resolve simple aliases assigned from tracked process callables.
-
-    The pass is intentionally conservative: only direct ``name = callable``
-    assignments are tracked, and resolution iterates so chained aliases such as
-    ``runner2 = runner1 = subprocess.run`` or ``runner2 = runner1`` are covered.
-    """
+    """Resolve simple aliases assigned from tracked process callables."""
 
     resolved = dict(aliases)
     assignments: list[tuple[str, ast.AST]] = []
@@ -110,6 +116,18 @@ def assignment_aliases(tree: ast.AST, aliases: dict[str, str]) -> dict[str, str]
     return resolved
 
 
+def dynamic_getattr_violation(node: ast.Call, aliases: dict[str, str]) -> str | None:
+    if not (isinstance(node.func, ast.Name) and node.func.id == "getattr" and len(node.args) >= 2):
+        return None
+    owner = canonical_name(node.args[0], aliases)
+    attribute = node.args[1]
+    if owner not in TRACKED_MODULES:
+        return None
+    if isinstance(attribute, ast.Constant) and isinstance(attribute.value, str):
+        return None
+    return f"dynamic getattr() on {owner} is forbidden because process policy cannot be statically proven"
+
+
 def violations(path: Path) -> list[str]:
     label = display_path(path)
     try:
@@ -122,6 +140,11 @@ def violations(path: Path) -> list[str]:
 
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
+            continue
+
+        dynamic_violation = dynamic_getattr_violation(node, aliases)
+        if dynamic_violation:
+            findings.append(f"{label}:{node.lineno}: {dynamic_violation}")
             continue
 
         name = canonical_name(node.func, aliases)
@@ -156,7 +179,8 @@ def main() -> int:
         return 1
 
     print(
-        "Process safety gate passed: no shell execution, opaque subprocess kwargs, os.system(), or os.popen() calls found."
+        "Process safety gate passed: no unsafe shell execution, opaque subprocess kwargs, "
+        "dynamic process getattr(), os.system(), or os.popen() calls found."
     )
     return 0
 
