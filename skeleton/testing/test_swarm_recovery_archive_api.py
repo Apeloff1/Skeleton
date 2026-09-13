@@ -62,6 +62,7 @@ def test_archive_import_rejects_tamper_without_replacing_manager(monkeypatch) ->
 
 def test_archive_import_honors_body_size_limit(monkeypatch) -> None:
     state = _state()
+    state.swarm.submit(SwarmTask("large", {"blob": "x" * 4096}))
     state.swarm_recovery.checkpoint(state.swarm)
     archive = state.swarm_recovery.export_archive()
     monkeypatch.setattr(routes, "_state", lambda: state)
