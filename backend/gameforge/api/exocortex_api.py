@@ -424,7 +424,7 @@ async def dna_progress(principal: Principal = Depends(get_principal)):
 
 class StudioStartBody(BaseModel):
     goal: str
-    max_iterations: int = 8
+    max_iterations: int = Field(8, ge=1, le=20)
 
 
 class StudioBuildBody(BaseModel):
@@ -509,7 +509,10 @@ async def rooms_logs(
 
 
 @router.post("/training/idle")
-async def training_idle(recursive_depth: int = 2, principal: Principal = Depends(get_principal)):
+async def training_idle(
+    recursive_depth: int = Query(2, ge=1, le=8),
+    principal: Principal = Depends(get_principal),
+):
     return _x(principal.user_id).idle_train(recursive_depth=recursive_depth)
 
 
