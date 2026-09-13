@@ -8,8 +8,6 @@ on:
   pull_request:
     branches: [main]
 
-# Prevent stale PR runs from piling up and spamming failure notifications.
-# A newer commit supersedes the older run for the same PR/ref.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -32,7 +30,7 @@ jobs:
         with: {python-version: "3.11"}
       - run: uv tool install ruff
       - run: uvx ruff check .
-      - run: uvx ruff format --check . || true
+      - run: uvx ruff format --check .
   skeleton-test:
     name: "Skeleton GameForge"
     runs-on: ubuntu-latest
@@ -81,7 +79,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: backend-lint
-    continue-on-error: true
     defaults: {run: {working-directory: ./backend}}
     services:
       mongodb:
@@ -96,38 +93,33 @@ jobs:
           uv venv
           uv pip install -e ".[test]"
       - env: {MONGO_URL: mongodb://localhost:27017/test}
-        run: uv run pytest tests/ -v --cov=. --cov-report=xml || true
+        run: uv run pytest tests/ -v --cov=. --cov-report=xml
       - uses: codecov/codecov-action@v4
         with: {files: ./backend/coverage.xml, fail_ci_if_error: false}
   frontend:
     name: "Frontend"
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    continue-on-error: true
     defaults: {run: {working-directory: ./frontend}}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: {node-version: "20"}
-      - run: yarn install --frozen-lockfile || yarn install
-      - run: yarn lint || true
-      - run: npx tsc --noEmit || true
-      - run: npx expo export --platform web || true
+      - run: yarn install --frozen-lockfile
+      - run: yarn lint
+      - run: npx tsc --noEmit
+      - run: npx expo export --platform web
   docker:
     name: "Docker Build"
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    needs: [skeleton-test]
+    needs: [skeleton-test, backend-test, frontend]
     if: github.ref == 'refs/heads/main'
     permissions: {contents: read, packages: write}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
       - run: echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
       - uses: docker/build-push-action@v5
         with:
@@ -138,13 +130,11 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - uses: docker/build-push-action@v5
-        continue-on-error: true
         with:
           context: ./backend
           push: true
           tags: ${{ env.IMAGE }}/backend:latest
       - uses: docker/build-push-action@v5
-        continue-on-error: true
         with:
           context: ./frontend
           target: production
