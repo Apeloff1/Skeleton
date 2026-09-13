@@ -61,6 +61,7 @@ jobs:
             skeleton/testing/test_swarm_policy_atomicity.py \
             skeleton/testing/test_swarm_tenant_broker.py \
             skeleton/testing/test_swarm_tenant_revival_guard.py \
+            skeleton/testing/test_swarm_lease_rollback.py \
             skeleton/testing/test_swarm_rate_limit_refund.py \
             skeleton/testing/test_swarm_quota_validation.py \
             skeleton/testing/test_swarm_fairness_validation.py \
