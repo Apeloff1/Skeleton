@@ -37,6 +37,14 @@ def test_allows_assigned_subprocess_alias_with_literal_shell_false(tmp_path: Pat
     assert findings == []
 
 
+def test_allows_literal_getattr_with_shell_false(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\ngetattr(subprocess, 'run')(['python', '--version'], shell=False)\n",
+    )
+    assert findings == []
+
+
 def test_rejects_shell_true(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
@@ -93,6 +101,38 @@ def test_rejects_annotated_assigned_subprocess_alias(tmp_path: Path) -> None:
     assert any("subprocess.run" in finding and "shell=..." in finding for finding in findings)
 
 
+def test_rejects_literal_getattr_shell_true(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\ngetattr(subprocess, 'run')('echo unsafe', shell=True)\n",
+    )
+    assert any("subprocess.run" in finding and "shell=..." in finding for finding in findings)
+
+
+def test_rejects_assigned_literal_getattr_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nrunner = getattr(subprocess, 'run')\nrunner('echo unsafe', shell=True)\n",
+    )
+    assert any("subprocess.run" in finding and "shell=..." in finding for finding in findings)
+
+
+def test_rejects_dynamic_getattr_on_subprocess(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nname = 'run'\ngetattr(subprocess, name)('echo unsafe', shell=True)\n",
+    )
+    assert any("dynamic getattr() on subprocess" in finding for finding in findings)
+
+
+def test_rejects_dynamic_getattr_on_module_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess as sp\nname = 'run'\ngetattr(sp, name)(['python', '--version'])\n",
+    )
+    assert any("dynamic getattr() on subprocess" in finding for finding in findings)
+
+
 def test_rejects_subprocess_module_alias(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
@@ -127,6 +167,11 @@ def test_rejects_assigned_os_system_alias(tmp_path: Path) -> None:
         tmp_path,
         "import os\nexecute = os.system\nexecute('echo unsafe')\n",
     )
+    assert any("os.system()" in finding for finding in findings)
+
+
+def test_rejects_literal_getattr_os_system(tmp_path: Path) -> None:
+    findings = _scan(tmp_path, "import os\ngetattr(os, 'system')('echo unsafe')\n")
     assert any("os.system()" in finding for finding in findings)
 
 
@@ -171,5 +216,13 @@ def test_rejects_assigned_asyncio_shell_alias(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
         "import asyncio\nspawn = asyncio.create_subprocess_shell\nspawn('echo unsafe')\n",
+    )
+    assert any("asyncio.create_subprocess_shell()" in finding for finding in findings)
+
+
+def test_rejects_literal_getattr_asyncio_shell(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import asyncio\ngetattr(asyncio, 'create_subprocess_shell')('echo unsafe')\n",
     )
     assert any("asyncio.create_subprocess_shell()" in finding for finding in findings)
