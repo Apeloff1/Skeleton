@@ -90,6 +90,12 @@ class SwarmRecoveryManager:
             pairs.append((left, right))
         return tuple(pairs)
 
+    @staticmethod
+    def _sequence(sequence: int) -> int:
+        if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 1:
+            raise ValueError("checkpoint sequence must be a positive integer")
+        return sequence
+
     def checkpoint(self, runtime: SwarmRuntime, tenant_broker: TenantSwarmBroker | None = None) -> int:
         """Capture runtime and tenant ownership transactionally at one sequence."""
         with self._lock:
@@ -217,12 +223,16 @@ class SwarmRecoveryManager:
             raise ValueError("recovery archive payload must contain an object")
         return cls.from_archive(archive)
 
-    def restore_latest(self) -> HardenedSwarmRuntime | None:
+    def restore(self, sequence: int | None = None) -> HardenedSwarmRuntime | None:
+        """Restore one retained runtime checkpoint, requeuing any persisted leases."""
         with self._lock:
-            latest = self.store.latest()
-            if latest is None:
+            checkpoint = self.store.latest() if sequence is None else self.store.get(self._sequence(sequence))
+            if checkpoint is None:
                 return None
-            return HardenedSwarmRuntime.from_state(latest.state, requeue_leased=True)
+            return HardenedSwarmRuntime.from_state(checkpoint.state, requeue_leased=True)
+
+    def restore_latest(self) -> HardenedSwarmRuntime | None:
+        return self.restore()
 
     def restore_tenants(
         self,
@@ -237,6 +247,8 @@ class SwarmRecoveryManager:
                 if latest is None:
                     return None
                 target_sequence = latest.sequence
+            else:
+                target_sequence = self._sequence(target_sequence)
             if self.tenant_store.get(target_sequence) is None:
                 return None
             if self.store.get(target_sequence) is None:
