@@ -24,14 +24,14 @@ class RuntimeCoordinator:
  queue: BoundedQueue
  retry_budget: RetryBudget
  health: HealthScore
- def admit(self,now:int,active:int,limit:int=1,background:bool=False,request_id=None,retry:bool=False):
+ def admit(self,now:int,active:int,limit:int=1,background:bool=False,request_id=None,retry:bool=False,read_only:bool=False):
   if retry and not self.retry_budget.consume():
    self.health.record(False); return Admission.SHED
   if not self.lifecycle.can_accept or not self.dependencies.ready or not self.circuit.allowed:
    self.health.record(False); return Admission.SHED
   if not self.rate.allow(now):
    self.health.record(False); return Admission.SHED
-  decision=decide(background_allowed=True,read_only=False,active=active,limit=limit,background=background)
+  decision=decide(background_allowed=True,read_only=read_only,active=active,limit=limit,background=background)
   if decision is Admission.ACCEPT:
    if not self.budget.reserve(): self.health.record(False); return Admission.SHED
    if not self.quota.reserve():
@@ -40,8 +40,8 @@ class RuntimeCoordinator:
     self.quota.release(); self.budget.release(); self.health.record(False); return Admission.SHED
   self.health.record(decision is not Admission.SHED)
   return decision
- def admit_receipt(self,request_id,now:int,active:int,limit:int=1,background:bool=False,retry:bool=False):
-  decision=self.admit(now,active,limit,background,request_id,retry)
+ def admit_receipt(self,request_id,now:int,active:int,limit:int=1,background:bool=False,retry:bool=False,read_only:bool=False):
+  decision=self.admit(now,active,limit,background,request_id,retry,read_only)
   return Receipt(request_id,decision.value,decision.value)
  def record_outcome(self,success:bool):
   self.health.record(success)
