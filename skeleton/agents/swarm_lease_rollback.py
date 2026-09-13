@@ -4,8 +4,27 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from dataclasses import replace
+from math import isfinite
 
 from skeleton.agents.swarm_runtime import LeaseError, SwarmRuntime, SwarmTask, TaskState
+
+
+def _identifier(value: object, label: str) -> str:
+    if not isinstance(value, str):
+        raise LeaseError(f"{label} must be a string")
+    value = value.strip()
+    if not value:
+        raise LeaseError(f"{label} must not be empty")
+    return value
+
+
+def _finite_clock(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise LeaseError("clock must be a finite number")
+    normalized = float(value)
+    if not isfinite(normalized):
+        raise LeaseError("clock must be a finite number")
+    return normalized
 
 
 def rollback_exact_lease(runtime: SwarmRuntime, worker_id: str, task_id: str) -> SwarmTask:
@@ -13,8 +32,8 @@ def rollback_exact_lease(runtime: SwarmRuntime, worker_id: str, task_id: str) ->
     lock = getattr(runtime, "_lock", None)
     context = lock if lock is not None else nullcontext()
     with context:
-        worker_id = worker_id.strip()
-        task_id = task_id.strip()
+        worker_id = _identifier(worker_id, "worker_id")
+        task_id = _identifier(task_id, "task_id")
         worker = runtime._workers.get(worker_id)
         if worker is None:
             raise LeaseError(f"unknown worker: {worker_id}")
@@ -28,8 +47,8 @@ def rollback_exact_lease(runtime: SwarmRuntime, worker_id: str, task_id: str) ->
         if worker.accepted < 1:
             raise LeaseError(f"worker has invalid accepted count: {worker_id}")
 
-        # Sample all fallible external state before mutating runtime accounting.
-        now = runtime._clock()
+        # Sample and validate all fallible external state before mutating accounting.
+        now = _finite_clock(runtime._clock())
         updated = replace(
             task,
             state=TaskState.QUEUED,
