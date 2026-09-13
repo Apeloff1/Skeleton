@@ -15,10 +15,13 @@ class Circuit:
         self.threshold = threshold
         self.failures = 0
         self.state = CircuitState.CLOSED
+        self._probe_in_flight = False
 
     @property
     def allowed(self):
-        return self.state is not CircuitState.OPEN
+        return self.state is CircuitState.CLOSED or (
+            self.state is CircuitState.HALF_OPEN and self._probe_in_flight
+        )
 
     @property
     def open(self):
@@ -26,6 +29,7 @@ class Circuit:
 
     def failure(self):
         self.failures += 1
+        self._probe_in_flight = False
         if self.state is CircuitState.HALF_OPEN or self.failures >= self.threshold:
             self.state = CircuitState.OPEN
         return self.state
@@ -33,9 +37,11 @@ class Circuit:
     def probe(self):
         if self.state is CircuitState.OPEN:
             self.state = CircuitState.HALF_OPEN
+            self._probe_in_flight = True
             return True
-        return self.state is CircuitState.HALF_OPEN
+        return False
 
     def success(self):
         self.failures = 0
         self.state = CircuitState.CLOSED
+        self._probe_in_flight = False
