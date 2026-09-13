@@ -19,9 +19,7 @@ class Circuit:
 
     @property
     def allowed(self):
-        return self.state is CircuitState.CLOSED or (
-            self.state is CircuitState.HALF_OPEN and self._probe_in_flight
-        )
+        return self.state is CircuitState.CLOSED
 
     @property
     def open(self):
