@@ -11,7 +11,9 @@ class Admission(str, Enum):
 def decide(*, background_allowed: bool, read_only: bool, active: int, limit: int, background: bool) -> Admission:
     if not isinstance(background_allowed, bool) or not isinstance(read_only, bool) or not isinstance(background, bool):
         raise TypeError("admission flags must be bool")
-    if not isinstance(active, int) or not isinstance(limit, int) or active < 0 or limit <= 0:
+    if (not isinstance(active, int) or isinstance(active, bool)
+            or not isinstance(limit, int) or isinstance(limit, bool)
+            or active < 0 or limit <= 0):
         raise ValueError("invalid concurrency bounds")
     if read_only:
         return Admission.READ_ONLY
