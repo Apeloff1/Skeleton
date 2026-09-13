@@ -137,3 +137,38 @@ def test_concurrent_ingress_never_exceeds_queue_quota() -> None:
     assert sum(accepted) == 8
     assert governor.status()["quota"]["tenant"]["queued"] == 8
     assert governor.status()["accounted_tasks"] == 8
+
+
+def test_empty_fork_preserves_policy_without_live_accounting() -> None:
+    governor = SwarmIngressGovernor(
+        rate_capacity=17,
+        rate_refill_per_second=3,
+        default_quota=Quota(max_queued=50, max_leased=20, max_payload_bytes=5000),
+    )
+    governor.configure_tenant(
+        "gold",
+        quota=Quota(max_queued=7, max_leased=4, max_payload_bytes=700),
+        weight=5,
+    )
+    governor.admit("gold", "live", {"payload": "x"})
+
+    clone = governor.fork_empty()
+
+    assert clone.rate.capacity == 17
+    assert clone.rate.refill_per_second == 3
+    assert clone.quota.default == governor.quota.default
+    assert clone.quota.limit("gold") == governor.quota.limit("gold")
+    assert clone.fairness.snapshot()["gold"]["weight"] == 5
+    assert clone.status()["accounted_tasks"] == 0
+    assert clone.status()["quota"] == {}
+    assert clone.status()["rate"] == {}
+
+
+def test_empty_fork_does_not_alias_policy_mutations() -> None:
+    governor = SwarmIngressGovernor()
+    governor.configure_tenant("gold", weight=4)
+    clone = governor.fork_empty()
+    clone.configure_tenant("gold", weight=9)
+
+    assert governor.fairness.snapshot()["gold"]["weight"] == 4
+    assert clone.fairness.snapshot()["gold"]["weight"] == 9
