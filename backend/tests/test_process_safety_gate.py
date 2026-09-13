@@ -28,6 +28,11 @@ def test_allows_assigned_subprocess_alias_with_literal_shell_false(tmp_path: Pat
     assert findings == []
 
 
+def test_allows_walrus_subprocess_alias_with_literal_shell_false(tmp_path: Path) -> None:
+    findings = _scan(tmp_path, "import subprocess\nif (runner := subprocess.run):\n    runner(['python', '--version'], shell=False)\n")
+    assert findings == []
+
+
 def test_allows_literal_getattr_with_shell_false(tmp_path: Path) -> None:
     findings = _scan(tmp_path, "import subprocess\ngetattr(subprocess, 'run')(['python', '--version'], shell=False)\n")
     assert findings == []
@@ -66,6 +71,26 @@ def test_rejects_opaque_kwargs_through_alias(tmp_path: Path) -> None:
 def test_rejects_assigned_subprocess_callable_alias(tmp_path: Path) -> None:
     findings = _scan(tmp_path, "import subprocess\nrunner = subprocess.run\nrunner('echo unsafe', shell=True)\n")
     assert any("subprocess.run" in finding and "shell=..." in finding for finding in findings)
+
+
+def test_rejects_walrus_subprocess_callable_alias(tmp_path: Path) -> None:
+    findings = _scan(tmp_path, "import subprocess\nif (runner := subprocess.run):\n    runner('echo unsafe', shell=True)\n")
+    assert any("subprocess.run" in finding and "shell=..." in finding for finding in findings)
+
+
+def test_rejects_chained_walrus_subprocess_alias(tmp_path: Path) -> None:
+    findings = _scan(tmp_path, "import subprocess\nif (runner := subprocess.run):\n    if (execute := runner):\n        execute('echo unsafe', shell=True)\n")
+    assert any("subprocess.run" in finding and "shell=..." in finding for finding in findings)
+
+
+def test_rejects_walrus_os_system_alias(tmp_path: Path) -> None:
+    findings = _scan(tmp_path, "import os\nif (execute := os.system):\n    execute('echo unsafe')\n")
+    assert any("os.system()" in finding for finding in findings)
+
+
+def test_rejects_walrus_asyncio_shell_alias(tmp_path: Path) -> None:
+    findings = _scan(tmp_path, "import asyncio\nif (spawn := asyncio.create_subprocess_shell):\n    spawn('echo unsafe')\n")
+    assert any("asyncio.create_subprocess_shell()" in finding for finding in findings)
 
 
 def test_rejects_chained_assigned_subprocess_alias(tmp_path: Path) -> None:
