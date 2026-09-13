@@ -23,7 +23,7 @@ def test_coordinator_quota_rejects_without_leaking_budget():
  x,s,d=make(); x.quota.limit=0; s.ready(); d.mark("db"); assert x.admit(0,0,request_id="x") is Admission.SHED; assert x.budget.used==0
 
 def test_coordinator_queue_rejects_without_leaking_reservations():
- x,s,d=make(0); s.ready(); d.mark("db"); assert x.admit(0,0,request_id="x") is Admission.SHED; assert x.budget.used==0; assert x.quota.used==0
+ x,s,d=make(); x.queue.capacity=0; s.ready(); d.mark("db"); assert x.admit(0,0,request_id="x") is Admission.SHED; assert x.budget.used==0; assert x.quota.used==0
 
 def test_coordinator_retry_budget_bounds_retries():
  x,s,d=make(retries=1); s.ready(); d.mark("db"); assert x.admit(0,0,request_id="x",retry=True) is Admission.ACCEPT; x.release(); assert x.admit(1,0,request_id="y",retry=True) is Admission.SHED
