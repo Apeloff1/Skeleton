@@ -6,7 +6,7 @@
 """
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import os
@@ -95,18 +95,18 @@ class Sprite2DRequest(BaseModel):
     game_context: Optional[str] = None
 
 class Model3DRequest(BaseModel):
-    description: str
-    category: str  # characters, environment, props, vehicles, weapons
-    asset_type: str
-    style: str = "stylized"  # realistic, stylized, low_poly, cartoon
-    poly_count: str = "mid_poly"  # low_poly, mid_poly, high_poly
+    description: str = Field(..., min_length=1, max_length=10000)
+    category: str = Field(..., min_length=1, max_length=100)  # characters, environment, props, vehicles, weapons
+    asset_type: str = Field(..., min_length=1, max_length=100)
+    style: str = Field("stylized", max_length=100)  # realistic, stylized, low_poly, cartoon
+    poly_count: str = Field("mid_poly", max_length=100)  # low_poly, mid_poly, high_poly
     textures: bool = True
     texture_resolution: str = "1024"  # 512, 1024, 2048, 4096
     rigging: str = "none"  # none, basic, full
-    animations: List[str] = []
-    export_format: str = "glb"
-    game_engine: Optional[str] = None  # unity, unreal, godot
-    lod_levels: int = 1  # Level of Detail variants
+    animations: List[str] = Field(default_factory=list, max_length=50)
+    export_format: str = Field("glb", max_length=20)
+    game_engine: Optional[str] = Field(None, max_length=50)  # unity, unreal, godot
+    lod_levels: int = Field(1, ge=1, le=10)  # Level of Detail variants
 
 class AssetBatchRequest(BaseModel):
     project_name: str
@@ -122,7 +122,9 @@ class TilesetRequest(BaseModel):
     tile_count: int = 48  # Standard tileset size
     include_autotile: bool = True
     include_animated: bool = False
-    terrain_types: List[str] = ["ground", "wall", "decoration"]
+    terrain_types: List[str] = Field(
+        default_factory=lambda: ["ground", "wall", "decoration"], max_length=50
+    )
 
 # ============================================================================
 # API ENDPOINTS

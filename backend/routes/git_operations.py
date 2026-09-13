@@ -8,7 +8,7 @@ actual repository state (no simulation).
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from pathlib import Path
 import asyncio
@@ -105,26 +105,26 @@ async def _current_branch() -> str:
 # =============================================================================
 
 class GitInitRequest(BaseModel):
-    project_name: str
-    default_branch: str = "main"
+    project_name: str = Field(..., min_length=1, max_length=200)
+    default_branch: str = Field("main", min_length=1, max_length=100)
 
 class GitCommitRequest(BaseModel):
-    message: str
-    files: List[str] = []   # Empty = all staged files
+    message: str = Field(..., min_length=1, max_length=1000)
+    files: List[str] = Field(default_factory=list, max_length=500)   # Empty = all staged files
     amend: bool = False
 
 class GitBranchRequest(BaseModel):
-    name: str
-    from_branch: Optional[str] = None
+    name: str = Field(..., min_length=1, max_length=100)
+    from_branch: Optional[str] = Field(None, min_length=1, max_length=100)
 
 class GitMergeRequest(BaseModel):
-    source_branch: str
-    target_branch: str = "main"
-    strategy: str = "merge"  # merge, rebase, squash
+    source_branch: str = Field(..., min_length=1, max_length=100)
+    target_branch: str = Field("main", min_length=1, max_length=100)
+    strategy: str = Field("merge", min_length=1, max_length=20)  # merge, rebase, squash
 
 class GitRemoteRequest(BaseModel):
-    name: str = "origin"
-    url: str
+    name: str = Field("origin", min_length=1, max_length=100)
+    url: str = Field(..., min_length=1, max_length=2000)
 
 class GitStashRequest(BaseModel):
     message: Optional[str] = None
@@ -193,7 +193,7 @@ async def git_status():
 
 
 @router.post("/add")
-async def git_add(files: List[str] = []):
+async def git_add(files: Optional[List[str]] = None):
     """Stage files for commit (real)."""
     if not code_execution_enabled():
         return execution_disabled_response("Git repository mutation")

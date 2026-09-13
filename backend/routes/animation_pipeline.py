@@ -217,11 +217,11 @@ ANIMATION_TEMPLATES = {
 # ============================================================================
 
 class RigGenerationRequest(BaseModel):
-    description: str = Field(..., description="Natural language description of the character")
+    description: str = Field(..., min_length=1, max_length=10000, description="Natural language description of the character")
     rig_type: Optional[RigType] = None
     include_face_rig: bool = False
     include_fingers: bool = True
-    custom_bones: List[str] = []
+    custom_bones: List[str] = Field(default_factory=list, max_length=200)
 
 class AnimationGenerationRequest(BaseModel):
     description: str = Field(..., description="Natural language description of the animation")
@@ -232,19 +232,19 @@ class AnimationGenerationRequest(BaseModel):
     include_root_motion: bool = False
 
 class BlendTreeRequest(BaseModel):
-    animations: List[str]
-    blend_parameter: str = "speed"
+    animations: List[str] = Field(..., min_length=1, max_length=100)
+    blend_parameter: str = Field("speed", max_length=100)
     blend_type: Literal["1d", "2d", "direct"] = "1d"
 
 class StateMachineRequest(BaseModel):
-    states: List[str]
-    default_state: str
-    transitions: List[Dict[str, Any]] = []
+    states: List[str] = Field(..., min_length=1, max_length=100)
+    default_state: str = Field(..., min_length=1, max_length=100)
+    transitions: List[Dict[str, Any]] = Field(default_factory=list, max_length=200)
 
 class ProceduralAnimationRequest(BaseModel):
-    animation_type: str
-    parameters: Dict[str, float] = {}
-    constraints: List[str] = []
+    animation_type: str = Field(..., min_length=1, max_length=100)
+    parameters: Dict[str, float] = Field(default_factory=dict)
+    constraints: List[str] = Field(default_factory=list, max_length=100)
 
 # ============================================================================
 # ANIMATION GENERATOR ENGINE
