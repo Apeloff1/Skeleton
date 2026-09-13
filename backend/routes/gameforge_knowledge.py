@@ -13,7 +13,7 @@ import time
 from typing import Optional
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from gameforge.knowledge import free_apis as FA
 
@@ -59,8 +59,8 @@ async def api_detail(key: str):
 
 
 class QueryBody(BaseModel):
-    api: str
-    params: dict = {}
+    api: str = Field(..., min_length=1, max_length=100)
+    params: dict = Field(default_factory=dict, max_length=50)
 
 
 @router.post("/query")
@@ -71,7 +71,7 @@ async def query(b: QueryBody):
 
 
 class LearnBody(BaseModel):
-    query: str
+    query: str = Field(..., min_length=1, max_length=10000)
     store: bool = True
 
 
@@ -105,10 +105,10 @@ async def learn(b: LearnBody):
 
 # ── Self-learning lessons ─────────────────────────────────────────────────────
 class LessonBody(BaseModel):
-    source: str
-    pattern: str
-    action: str
-    weight: float = 1.0
+    source: str = Field(..., min_length=1, max_length=200)
+    pattern: str = Field(..., min_length=1, max_length=10000)
+    action: str = Field(..., min_length=1, max_length=200)
+    weight: float = Field(1.0, ge=0, le=10)
 
 
 @router.get("/lessons")
@@ -127,10 +127,10 @@ async def add_lesson(b: LessonBody):
 
 # ── Self-improvement loop ─────────────────────────────────────────────────────
 class ImproveBody(BaseModel):
-    agent_id: str = "jeeves"
-    quality: float = 0.9
-    coherence: float = 0.9
-    synergy: float = 0.7
+    agent_id: str = Field("jeeves", min_length=1, max_length=200)
+    quality: float = Field(0.9, ge=0, le=1)
+    coherence: float = Field(0.9, ge=0, le=1)
+    synergy: float = Field(0.7, ge=0, le=1)
 
 
 @router.post("/self-improve")
