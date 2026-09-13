@@ -8,7 +8,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from skeleton.agents.swarm_runtime import AdmissionError, LeaseError, SwarmRuntime, SwarmTask
+from skeleton.agents.swarm_hardened import HardenedSwarmRuntime
+from skeleton.agents.swarm_runtime import AdmissionError, LeaseError, SwarmRuntime, SwarmTask, TaskState
 
 router = APIRouter(prefix="/swarm", tags=["swarm"])
 
@@ -46,18 +47,16 @@ class RestoreRequest(BaseModel):
 
 def _runtime() -> SwarmRuntime:
     from skeleton.api.server import get_state
-
     state = get_state()
     runtime = getattr(state, "swarm", None)
     if runtime is None:
-        runtime = SwarmRuntime()
+        runtime = HardenedSwarmRuntime()
         state.swarm = runtime
     return runtime
 
 
 def _replace_runtime(runtime: SwarmRuntime) -> None:
     from skeleton.api.server import get_state
-
     get_state().swarm = runtime
 
 
@@ -91,18 +90,20 @@ def swarm_status(runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
 
 
 @router.get("/workers")
-def list_workers(runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
-    return {"workers": [_worker_dict(worker) for worker in runtime.workers()]}
+def list_workers(
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=1000),
+    runtime: SwarmRuntime = Depends(_runtime),
+) -> dict[str, Any]:
+    workers = runtime.workers()
+    page = workers[offset : offset + limit]
+    return {"workers": [_worker_dict(worker) for worker in page], "total": len(workers), "offset": offset, "limit": limit}
 
 
 @router.post("/workers", status_code=status.HTTP_201_CREATED)
 def register_worker(body: WorkerRegistration, runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
     try:
-        worker = runtime.register_worker(
-            body.worker_id,
-            capabilities=body.capabilities,
-            capacity=body.capacity,
-        )
+        worker = runtime.register_worker(body.worker_id, capabilities=body.capabilities, capacity=body.capacity)
     except AdmissionError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return _worker_dict(worker)
@@ -125,11 +126,7 @@ def heartbeat(worker_id: str, runtime: SwarmRuntime = Depends(_runtime)) -> dict
 
 
 @router.delete("/workers/{worker_id}")
-def unregister_worker(
-    worker_id: str,
-    requeue: bool = Query(default=True),
-    runtime: SwarmRuntime = Depends(_runtime),
-) -> dict[str, Any]:
+def unregister_worker(worker_id: str, requeue: bool = Query(default=True), runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
     existed = runtime.worker(worker_id) is not None
     released = runtime.unregister_worker(worker_id, requeue=requeue)
     if not existed:
@@ -139,27 +136,22 @@ def unregister_worker(
 
 @router.get("/tasks")
 def list_tasks(
-    state: str | None = Query(default=None),
+    state: TaskState | None = Query(default=None),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=1000),
     runtime: SwarmRuntime = Depends(_runtime),
 ) -> dict[str, Any]:
     tasks = runtime.tasks()
     if state is not None:
-        tasks = tuple(task for task in tasks if task.state.value == state)
-    return {"tasks": [_task_dict(task) for task in tasks]}
+        tasks = tuple(task for task in tasks if task.state is state)
+    page = tasks[offset : offset + limit]
+    return {"tasks": [_task_dict(task) for task in page], "total": len(tasks), "offset": offset, "limit": limit}
 
 
 @router.post("/tasks", status_code=status.HTTP_201_CREATED)
 def submit_task(body: TaskSubmission, runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
     try:
-        task = runtime.submit(
-            SwarmTask(
-                id=body.task_id,
-                payload=body.payload,
-                priority=body.priority,
-                max_attempts=body.max_attempts,
-                required_capabilities=frozenset(body.required_capabilities),
-            )
-        )
+        task = runtime.submit(SwarmTask(id=body.task_id, payload=body.payload, priority=body.priority, max_attempts=body.max_attempts, required_capabilities=frozenset(body.required_capabilities)))
     except AdmissionError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return _task_dict(task)
@@ -174,11 +166,7 @@ def get_task(task_id: str, runtime: SwarmRuntime = Depends(_runtime)) -> dict[st
 
 
 @router.post("/tasks/{task_id}/cancel")
-def cancel_task(
-    task_id: str,
-    body: CancelRequest,
-    runtime: SwarmRuntime = Depends(_runtime),
-) -> dict[str, Any]:
+def cancel_task(task_id: str, body: CancelRequest, runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
     try:
         return _task_dict(runtime.cancel(task_id, reason=body.reason))
     except AdmissionError as exc:
@@ -186,23 +174,17 @@ def cancel_task(
 
 
 @router.post("/tasks/{task_id}/revive")
-def revive_task(
-    task_id: str,
-    body: ReviveRequest,
-    runtime: SwarmRuntime = Depends(_runtime),
-) -> dict[str, Any]:
+def revive_task(task_id: str, body: ReviveRequest, runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
     try:
         return _task_dict(runtime.revive(task_id, reset_attempts=body.reset_attempts))
     except AdmissionError as exc:
+        if "unknown task" in str(exc):
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.post("/workers/{worker_id}/lease")
-def lease_tasks(
-    worker_id: str,
-    limit: int | None = Query(default=None, ge=0, le=10_000),
-    runtime: SwarmRuntime = Depends(_runtime),
-) -> dict[str, Any]:
+def lease_tasks(worker_id: str, limit: int | None = Query(default=None, ge=0, le=1000), runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
     try:
         tasks = runtime.lease(worker_id, limit=limit)
     except LeaseError as exc:
@@ -211,16 +193,12 @@ def lease_tasks(
 
 
 @router.post("/workers/{worker_id}/tasks/{task_id}/renew")
-def renew_task(
-    worker_id: str,
-    task_id: str,
-    seconds: float | None = Query(default=None, gt=0, le=86_400),
-    runtime: SwarmRuntime = Depends(_runtime),
-) -> dict[str, Any]:
+def renew_task(worker_id: str, task_id: str, seconds: float | None = Query(default=None, gt=0, le=86_400), runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
     try:
         return _task_dict(runtime.renew(worker_id, task_id, seconds=seconds))
     except LeaseError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        code = 404 if "unknown worker" in str(exc) else 409
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
 
 
 @router.post("/workers/{worker_id}/tasks/{task_id}/success")
@@ -232,12 +210,7 @@ def complete_task(worker_id: str, task_id: str, runtime: SwarmRuntime = Depends(
 
 
 @router.post("/workers/{worker_id}/tasks/{task_id}/failure")
-def fail_task(
-    worker_id: str,
-    task_id: str,
-    body: FailureReport,
-    runtime: SwarmRuntime = Depends(_runtime),
-) -> dict[str, Any]:
+def fail_task(worker_id: str, task_id: str, body: FailureReport, runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
     try:
         return _task_dict(runtime.fail(worker_id, task_id, body.error))
     except LeaseError as exc:
@@ -251,8 +224,9 @@ def reap_expired(runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
 
 
 @router.get("/dead")
-def dead_letters(runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
-    return {"tasks": [_task_dict(task) for task in runtime.dead()]}
+def dead_letters(limit: int = Query(default=100, ge=1, le=1000), runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
+    tasks = tuple(runtime.dead())
+    return {"tasks": [_task_dict(task) for task in tasks[:limit]], "total": len(tasks), "limit": limit}
 
 
 @router.get("/state")
@@ -263,7 +237,7 @@ def export_state(runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
 @router.post("/state/restore")
 def restore_state(body: RestoreRequest) -> dict[str, Any]:
     try:
-        runtime = SwarmRuntime.from_state(body.state, requeue_leased=body.requeue_leased)
+        runtime = HardenedSwarmRuntime.from_state(body.state, requeue_leased=body.requeue_leased)
     except (KeyError, TypeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=f"invalid swarm state: {exc}") from exc
     _replace_runtime(runtime)
@@ -271,14 +245,6 @@ def restore_state(body: RestoreRequest) -> dict[str, Any]:
 
 
 @router.get("/events")
-def events(
-    limit: int = Query(default=100, ge=1, le=10_000),
-    runtime: SwarmRuntime = Depends(_runtime),
-) -> dict[str, Any]:
+def events(limit: int = Query(default=100, ge=1, le=1000), runtime: SwarmRuntime = Depends(_runtime)) -> dict[str, Any]:
     items = runtime.events()[-limit:]
-    return {
-        "events": [
-            {"timestamp": timestamp, "kind": kind, "subject": subject}
-            for timestamp, kind, subject in items
-        ]
-    }
+    return {"events": [{"timestamp": timestamp, "kind": kind, "subject": subject} for timestamp, kind, subject in items]}
