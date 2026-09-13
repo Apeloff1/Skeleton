@@ -26,9 +26,9 @@ PROJECTION = {"_id": 0}
 
 @router.get("/tracks")
 async def get_all_tracks(
-    category: Optional[str] = None,
+    category: Optional[str] = Query(None, max_length=200),
     page: int = Query(1, ge=1),
-    limit: int = Query(50, le=500)
+    limit: int = Query(50, ge=1, le=500)
 ):
     """Get all language/gamedev tracks from MongoDB with pagination."""
     query = {}
