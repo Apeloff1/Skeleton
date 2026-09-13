@@ -32,6 +32,7 @@ class BufferPool:
             raise ValueError("class_cap must be >= 1")
         self._cap = class_cap
         self._free: Dict[BufferClass, list[bytearray]] = {c: [] for c in BufferClass}
+        self._leased_ids: set[int] = set()
         self.leased = 0
 
     @staticmethod
@@ -47,12 +48,15 @@ class BufferPool:
             raise ValueError("min_size must be non-negative")
         cls = self.classify(min_size)
         buf = self._free[cls].pop() if self._free[cls] else bytearray(cls.value)
+        lease = BufferLease(buf, cls)
+        self._leased_ids.add(id(lease))
         self.leased += 1
-        return BufferLease(buf, cls)
+        return lease
 
     def reclaim(self, lease: BufferLease) -> None:
-        if self.leased <= 0:
+        if id(lease) not in self._leased_ids:
             return
+        self._leased_ids.remove(id(lease))
         lease.data.clear()
         if len(self._free[lease.buffer_class]) < self._cap:
             self._free[lease.buffer_class].append(lease.data)
