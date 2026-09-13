@@ -96,11 +96,7 @@ class ServerState:
         self.gameforge = GameForge(genesis=genesis, bus=genesis.bus)
 
         from skeleton.jeeves import JeevesCore
-        self.jeeves = JeevesCore(
-            bus=genesis.bus,
-            retriever=genesis.handles.get("quad"),
-            cycle=genesis.handles.get("cycle"),
-        )
+        self.jeeves = JeevesCore(bus=genesis.bus, retriever=genesis.handles.get("quad"), cycle=genesis.handles.get("cycle"))
         self.jeeves_sam = self.jeeves.sam
         self.jeeves_clom = self.jeeves.clom
         self.jeeves_krem = self.jeeves.krem
@@ -111,12 +107,7 @@ class ServerState:
 
         from skeleton.agents.swarm_hardened import HardenedSwarmRuntime
         from skeleton.agents.swarm_recovery import SwarmRecoveryManager
-        self.swarm = HardenedSwarmRuntime(
-            max_tasks=100_000,
-            max_workers=10_000,
-            default_lease_seconds=30.0,
-            max_lease_seconds=86_400.0,
-        )
+        self.swarm = HardenedSwarmRuntime(max_tasks=100_000, max_workers=10_000, default_lease_seconds=30.0, max_lease_seconds=86_400.0)
         self.swarm_recovery = SwarmRecoveryManager(max_checkpoints=16)
 
         from skeleton.observability import MetricsCollector
@@ -142,11 +133,7 @@ def get_state() -> ServerState:
 
 def create_app() -> Any:
     fastapi = _get_fastapi()
-    app = fastapi.FastAPI(
-        title="Skeleton API",
-        version="16.0.0",
-        description="AI game engine / agent orchestration framework",
-    )
+    app = fastapi.FastAPI(title="Skeleton API", version="16.0.0", description="AI game engine / agent orchestration framework")
 
     from skeleton.api.routes import router
     from skeleton.api.gameforge_routes import router as gameforge_router
@@ -157,6 +144,7 @@ def create_app() -> Any:
     from skeleton.api.swarm_lifecycle_routes import router as swarm_lifecycle_router
     from skeleton.api.swarm_integrity_routes import router as swarm_integrity_router
     from skeleton.api.swarm_fence_routes import router as swarm_fence_router
+    from skeleton.api.swarm_supervisor_routes import router as swarm_supervisor_router
     app.include_router(router, prefix="/api/v1")
     app.include_router(gameforge_router, prefix="/api/v1")
     app.include_router(swarm_router, prefix="/api/v1")
@@ -165,14 +153,11 @@ def create_app() -> Any:
     app.include_router(swarm_lifecycle_router, prefix="/api/v1")
     app.include_router(swarm_integrity_router, prefix="/api/v1")
     app.include_router(swarm_fence_router, prefix="/api/v1")
+    app.include_router(swarm_supervisor_router, prefix="/api/v1")
     app.include_router(cockpit_router)
 
     from skeleton.api.middleware import DEFAULT_OPEN_PREFIXES, GatePolicy, install_gate
-    gate_policy = GatePolicy(
-        open_prefixes=DEFAULT_OPEN_PREFIXES + (
-            "/", "/cortex/status", "/cockpit", "/docs", "/openapi.json", "/redoc",
-        )
-    )
+    gate_policy = GatePolicy(open_prefixes=DEFAULT_OPEN_PREFIXES + ("/", "/cortex/status", "/cockpit", "/docs", "/openapi.json", "/redoc"))
     install_gate(app, policy=gate_policy)
 
     @app.on_event("startup")
@@ -186,17 +171,15 @@ def create_app() -> Any:
     async def root():
         state = get_state()
         return {
-            "name": "Skeleton",
-            "version": "16.0.0",
-            "status": "running",
+            "name": "Skeleton", "version": "16.0.0", "status": "running",
             "jeeves_provider": state.jeeves.provider_name if state.jeeves else None,
-            "cockpit": "/cockpit",
-            "swarm": "/api/v1/swarm/status",
+            "cockpit": "/cockpit", "swarm": "/api/v1/swarm/status",
             "swarm_operator": "/api/v1/swarm/operator/overview",
             "swarm_policy": "/api/v1/swarm/policy/admission-preview",
             "swarm_lifecycle": "/api/v1/swarm/lifecycle/pressure",
             "swarm_integrity": "/api/v1/swarm/integrity/audit",
             "swarm_fenced": "/api/v1/swarm/fenced/workers/{worker_id}/tasks/{task_id}/success",
+            "swarm_supervisor": "/api/v1/swarm/supervisor/status",
         }
 
     @app.get("/cortex/status")
@@ -208,6 +191,4 @@ def create_app() -> Any:
 
 
 def run_server(host: str = "0.0.0.0", port: int = 8000) -> None:
-    uvicorn = _get_uvicorn()
-    app = create_app()
-    uvicorn.run(app, host=host, port=port)
+    uvicorn = _get_uvicorn(); app = create_app(); uvicorn.run(app, host=host, port=port)
