@@ -62,6 +62,8 @@ class RuntimeCoordinator:
 
     def admit_receipt(self, request_id, now: int, active: int, limit: int = 1,
                       background: bool = False, retry: bool = False, read_only: bool = False):
+        if not isinstance(request_id, str) or not request_id.strip():
+            raise ValueError("request_id must be a non-empty string")
         decision = self.admit(now, active, limit, background, request_id, retry, read_only)
         return Receipt(request_id, decision.value, decision.value)
 
