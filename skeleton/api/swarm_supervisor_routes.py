@@ -47,9 +47,13 @@ def _supervisor() -> SwarmSupervisor:
     return supervisor
 
 
+def _resolve_supervisor(value: object) -> SwarmSupervisor:
+    return value if isinstance(value, SwarmSupervisor) else _supervisor()
+
+
 @router.get("/status")
 def status(supervisor: SwarmSupervisor = Depends(_supervisor)) -> dict[str, object]:
-    return supervisor.status()
+    return _resolve_supervisor(supervisor).status()
 
 
 @router.post("/dispatch-preview")
@@ -58,6 +62,7 @@ def dispatch_preview(
     runtime: SwarmRuntime = Depends(_runtime),
     supervisor: SwarmSupervisor = Depends(_supervisor),
 ) -> dict[str, object]:
+    supervisor = _resolve_supervisor(supervisor)
     task = SwarmTask(
         body.task_id,
         {},
@@ -74,6 +79,7 @@ def quarantine(
     runtime: SwarmRuntime = Depends(_runtime),
     supervisor: SwarmSupervisor = Depends(_supervisor),
 ) -> dict[str, object]:
+    supervisor = _resolve_supervisor(supervisor)
     if runtime.worker(worker_id) is None:
         raise HTTPException(status_code=404, detail="worker not found")
     supervisor.quarantine_worker(worker_id, reason=body.reason, seconds=body.seconds)
@@ -85,6 +91,7 @@ def release(
     worker_id: str,
     supervisor: SwarmSupervisor = Depends(_supervisor),
 ) -> dict[str, object]:
+    supervisor = _resolve_supervisor(supervisor)
     released = supervisor.release_worker(worker_id)
     if not released:
         raise HTTPException(status_code=404, detail="worker not quarantined")
@@ -96,6 +103,7 @@ def record_failure(
     worker_id: str,
     supervisor: SwarmSupervisor = Depends(_supervisor),
 ) -> dict[str, object]:
+    supervisor = _resolve_supervisor(supervisor)
     supervisor.record_failure(worker_id)
     return {"worker_id": worker_id, "status": supervisor.status()}
 
@@ -105,5 +113,6 @@ def record_success(
     worker_id: str,
     supervisor: SwarmSupervisor = Depends(_supervisor),
 ) -> dict[str, object]:
+    supervisor = _resolve_supervisor(supervisor)
     supervisor.record_success(worker_id)
     return {"worker_id": worker_id, "status": supervisor.status()}
