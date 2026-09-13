@@ -53,6 +53,18 @@ def literal_false(node: ast.AST) -> bool:
     return isinstance(node, ast.Constant) and node.value is False
 
 
+def star_import_violations(tree: ast.AST, label: Path) -> list[str]:
+    findings: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom) or node.module not in TRACKED_MODULES:
+            continue
+        if any(item.name == "*" for item in node.names):
+            findings.append(
+                f"{label}:{node.lineno}: star import from {node.module} is forbidden because process call provenance cannot be statically proven"
+            )
+    return findings
+
+
 def import_aliases(tree: ast.AST) -> dict[str, str]:
     aliases: dict[str, str] = {}
     for node in ast.walk(tree):
@@ -62,7 +74,8 @@ def import_aliases(tree: ast.AST) -> dict[str, str]:
                     aliases[item.asname or item.name] = item.name
         elif isinstance(node, ast.ImportFrom) and node.module in TRACKED_MODULES:
             for item in node.names:
-                aliases[item.asname or item.name] = f"{node.module}.{item.name}"
+                if item.name != "*":
+                    aliases[item.asname or item.name] = f"{node.module}.{item.name}"
     return aliases
 
 
@@ -136,7 +149,7 @@ def violations(path: Path) -> list[str]:
         return [f"{label}: parse failure: {exc}"]
 
     aliases = assignment_aliases(tree, import_aliases(tree))
-    findings: list[str] = []
+    findings = star_import_violations(tree, label)
 
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
@@ -180,7 +193,7 @@ def main() -> int:
 
     print(
         "Process safety gate passed: no unsafe shell execution, opaque subprocess kwargs, "
-        "dynamic process getattr(), os.system(), or os.popen() calls found."
+        "dynamic process getattr(), process-sensitive star imports, os.system(), or os.popen() calls found."
     )
     return 0
 
