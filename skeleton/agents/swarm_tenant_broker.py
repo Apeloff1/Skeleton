@@ -66,6 +66,15 @@ class TenantSwarmBroker:
         while len(self._terminal_tenants) > self.max_terminal_records:
             self._terminal_tenants.popitem(last=False)
 
+    def _terminal_duplicate(self, task_id: str) -> CompletionResult | None:
+        if task_id not in self._terminal_tenants:
+            return None
+        resident = self.broker.runtime.task(task_id)
+        if resident is None or resident.state not in TERMINAL_STATES:
+            return None
+        self._terminal_tenants.move_to_end(task_id)
+        return CompletionResult(resident, True)
+
     def rebind(self, broker: SwarmBroker) -> None:
         with self._lock:
             self.broker = broker
@@ -180,6 +189,9 @@ class TenantSwarmBroker:
     def record_success(self, worker_id: str, task_id: str, *, completion_token: str | None = None) -> CompletionResult:
         task_id = self._task_id(task_id)
         with self._lock:
+            duplicate = self._terminal_duplicate(task_id)
+            if duplicate is not None:
+                return duplicate
             tenant = self._tenant_by_task.get(task_id) or self._terminal_tenants.get(task_id)
             if tenant is None:
                 raise AdmissionError(f"task has no tenant accounting: {task_id}")
@@ -193,6 +205,9 @@ class TenantSwarmBroker:
     def record_failure(self, worker_id: str, task_id: str, error: str, *, completion_token: str | None = None) -> CompletionResult:
         task_id = self._task_id(task_id)
         with self._lock:
+            duplicate = self._terminal_duplicate(task_id)
+            if duplicate is not None:
+                return duplicate
             tenant = self._tenant_by_task.get(task_id) or self._terminal_tenants.get(task_id)
             if tenant is None:
                 raise AdmissionError(f"task has no tenant accounting: {task_id}")
