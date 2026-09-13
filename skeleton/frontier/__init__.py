@@ -5,6 +5,7 @@ from skeleton.frontier.capabilities import CapabilityPolicy
 from skeleton.frontier.contracts import AgentContract, MemoryContract, ProvenanceRecord
 from skeleton.frontier.events import DomainEvent, EventBus
 from skeleton.frontier.health import HealthReport, HealthState, evaluate_health
+from skeleton.frontier.learning import LearningState, Mastery, assess
 from skeleton.frontier.memory import InMemoryStore, MemoryItem
 from skeleton.frontier.npc import NPCGenerator, NPCSpec
 from skeleton.frontier.npc_profiles import ArchetypeProfile, get_profile, infer_archetype
@@ -22,6 +23,8 @@ __all__ = [
     "HealthReport",
     "HealthState",
     "InMemoryStore",
+    "LearningState",
+    "Mastery",
     "MemoryContract",
     "MemoryItem",
     "NPCGenerator",
@@ -29,6 +32,7 @@ __all__ = [
     "ProvenanceRecord",
     "ResilienceController",
     "ResilienceDecision",
+    "assess",
     "evaluate_health",
     "get_profile",
     "infer_archetype",
