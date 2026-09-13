@@ -19,6 +19,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+from core.exec_guard import code_execution_enabled, execution_disabled_response
 from gameforge.media.studio import (
     GameWorld, render_image_set, produce_video, VIDEO_TYPES,
     produce_presskit, _MEDIA_DIR,
@@ -110,6 +111,9 @@ async def _run_job(job_id: str, game_name: str, vtype: str):
 async def video(req: VideoReq):
     """Start a background render of an ACTUAL-gameplay video (30s/120s/trailer/
     showcase/letsplay). Poll /video/{job_id} for progress + download."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Media video rendering")
+
     if req.type not in VIDEO_TYPES:
         raise HTTPException(status_code=400, detail=f"unknown type; choose {list(VIDEO_TYPES)}")
     job_id = f"{req.game_name}-{req.type}-{uuid.uuid4().hex[:8]}".replace(" ", "_")
@@ -151,6 +155,9 @@ async def _run_presskit(job_id: str, game_name: str):
 @router.post("/presskit")
 async def presskit(req: MediaReq):
     """Assemble a store-ready press kit ZIP in the background."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Media press-kit rendering")
+
     job_id = f"{req.game_name}-presskit-{uuid.uuid4().hex[:8]}".replace(" ", "_")
     _JOBS[job_id] = {"status": "rendering", "kind": "presskit",
                      "game_name": req.game_name, "percent": 0.0, "stage": "queued"}

@@ -22,6 +22,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from core.exec_guard import code_execution_enabled, execution_disabled_response
 from gameforge.godot_engine.binary import binary_status, get_binary
 from gameforge.godot_engine.pipeline import get_pipeline
 from gameforge.godot_engine.project import (
@@ -184,6 +185,9 @@ async def create_project(req: ProjectCreateRequest) -> dict:
 @router.post("/jobs", status_code=202)
 async def submit_job(req: JobSubmitRequest) -> dict:
     """Submit a headless Godot job; returns immediately with a job id."""
+    if not code_execution_enabled():
+        return execution_disabled_response("Godot engine execution")
+
     project_dir = _project_dir_for(req.project_slug) if req.project_slug else None
     kwargs: dict = {}
     if req.kind == "export":
