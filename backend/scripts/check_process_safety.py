@@ -2,7 +2,8 @@
 
 Dependency-free by design so it can run before application imports. The scanner
 tracks common import, assignment, destructuring, walrus, getattr, namespace-
-mapping, and functools.partial aliases to prevent trivial process policy bypasses.
+mapping, mapping-get, and functools.partial aliases to prevent trivial process
+policy bypasses.
 """
 
 from __future__ import annotations
@@ -104,19 +105,30 @@ def namespace_mapping_owner(node: ast.AST, aliases: dict[str, str]) -> str | Non
     return None
 
 
+def namespace_mapping_get_owner(node: ast.AST, aliases: dict[str, str]) -> str | None:
+    if not isinstance(node, ast.Attribute) or node.attr != "get":
+        return None
+    owner = namespace_mapping_owner(node.value, aliases)
+    return owner if owner in TRACKED_MODULES else None
+
+
 def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
     if isinstance(node, ast.Call):
         wrapper = canonical_name(node.func, aliases)
         if wrapper == "functools.partial" and node.args:
             return canonical_name(node.args[0], aliases)
-        if (
-            wrapper == "getattr"
-            and len(node.args) >= 2
-        ):
+        if wrapper == "getattr" and len(node.args) >= 2:
             owner = canonical_name(node.args[0], aliases)
             attribute = literal_string(node.args[1])
             if owner in TRACKED_MODULES and attribute is not None:
                 return f"{owner}.{attribute}"
+            return None
+
+        mapping_owner = namespace_mapping_get_owner(node.func, aliases)
+        if mapping_owner is not None and node.args:
+            attribute = literal_string(node.args[0])
+            if attribute is not None:
+                return f"{mapping_owner}.{attribute}"
             return None
 
     if isinstance(node, ast.Subscript):
@@ -203,6 +215,15 @@ def dynamic_namespace_mapping_violation(node: ast.Subscript, aliases: dict[str, 
     return f"dynamic namespace lookup on {owner} is forbidden because process policy cannot be statically proven"
 
 
+def dynamic_namespace_get_violation(node: ast.Call, aliases: dict[str, str]) -> str | None:
+    owner = namespace_mapping_get_owner(node.func, aliases)
+    if owner not in TRACKED_MODULES or not node.args:
+        return None
+    if literal_string(node.args[0]) is not None:
+        return None
+    return f"dynamic namespace get() on {owner} is forbidden because process policy cannot be statically proven"
+
+
 def partial_policy_violations(node: ast.Call, aliases: dict[str, str]) -> list[str]:
     """Validate process-sensitive keywords pre-bound through functools.partial."""
 
@@ -243,6 +264,10 @@ def violations(path: Path) -> list[str]:
 
         if not isinstance(node, ast.Call):
             continue
+
+        dynamic_mapping_get = dynamic_namespace_get_violation(node, aliases)
+        if dynamic_mapping_get:
+            findings.append(f"{label}:{node.lineno}: {dynamic_mapping_get}")
 
         for partial_violation in partial_policy_violations(node, aliases):
             findings.append(f"{label}:{node.lineno}: {partial_violation}")
@@ -286,7 +311,7 @@ def main() -> int:
     print(
         "Process safety gate passed: no unsafe shell execution, opaque subprocess kwargs, "
         "dynamic process lookup, process-sensitive star imports, unsafe process partials, "
-        "os.system(), or os.popen() calls found."
+        "unsafe process namespace get(), os.system(), or os.popen() calls found."
     )
     return 0
 
