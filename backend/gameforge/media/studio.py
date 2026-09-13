@@ -22,6 +22,7 @@ import imageio.v2 as iio
 import imageio_ffmpeg
 import numpy as np
 
+from core.exec_guard import execution_disabled_message, require_execution_allowed
 from gameforge.media.renderer import GameWorld
 
 _MEDIA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "artifacts_media")
@@ -170,6 +171,14 @@ def _tts_mp3(text: str, path: str) -> bool:
 
 def produce_video(world: GameWorld, vtype: str, job_id: str,
                   progress: Optional[Dict] = None) -> Dict:
+    if not require_execution_allowed("GameForge media rendering"):
+        return {
+            "ok": False,
+            "disabled": True,
+            "error": execution_disabled_message("GameForge media rendering"),
+            "job_id": job_id,
+            "type": vtype,
+        }
     dur, fps, mode, label = VIDEO_TYPES[vtype]
     W, H = (_VW, _VH)
     raw_path = os.path.join(_MEDIA_DIR, f"{job_id}.mp4")

@@ -18,6 +18,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from core.exec_guard import execution_disabled_message, require_execution_allowed
+
 
 @dataclass
 class ProofObligation:
@@ -125,6 +127,13 @@ class Lean4Verifier:
         obl = self.obligations.get(obligation_id)
         if not obl:
             raise KeyError(obligation_id)
+
+        if not require_execution_allowed("Lean proof execution"):
+            obl.status = "unavailable"
+            obl.result_message = execution_disabled_message("Lean proof execution")
+            obl.finished_at = datetime.utcnow().isoformat()
+            self.log.add("proof_disabled", id=obligation_id)
+            return obl
 
         path = self.work / f"{obligation_id}.lean"
         if replace_sorry_with:
