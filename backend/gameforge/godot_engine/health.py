@@ -9,10 +9,13 @@ from __future__ import annotations
 import shutil
 import tempfile
 import time
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from gameforge.godot_engine.binary import binary_status, get_binary
+
+logger = logging.getLogger(__name__)
 
 _BACKEND_DIR = Path(__file__).resolve().parents[2]
 PROJECTS_DIR = _BACKEND_DIR / "data" / "godot_projects"
@@ -74,8 +77,10 @@ async def deep_health(probe_timeout: int = 45) -> HealthReport:
         report.disk_free_mb = usage.free // (1 << 20)
         if usage.free < LOW_DISK_BYTES:
             report.problems.append("low disk headroom (<500 MiB free)")
-    except Exception:
-        pass
+    except OSError as exc:
+        logger.warning("Unable to inspect disk headroom for %s: %s", _BACKEND_DIR, exc)
+        report.problems.append(f"disk headroom check failed: {type(exc).__name__}")
+        report.ok = False
 
     try:
         PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
