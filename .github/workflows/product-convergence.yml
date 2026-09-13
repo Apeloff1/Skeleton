@@ -12,6 +12,12 @@ on:
       - "backend/core/runtime_sessions.py"
       - "backend/core/course_runtime.py"
       - "backend/core/game_session.py"
+      - "backend/core/input_fusion.py"
+      - "backend/core/sensory_cues.py"
+      - "backend/core/vfx_cues.py"
+      - "backend/core/quest_graph.py"
+      - "backend/core/reputation.py"
+      - "backend/core/player_runtime.py"
       - "backend/tests/test_content_store.py"
       - "backend/tests/test_product_operations.py"
       - "backend/tests/test_progression.py"
@@ -19,6 +25,9 @@ on:
       - "backend/tests/test_runtime_sessions.py"
       - "backend/tests/test_course_runtime.py"
       - "backend/tests/test_game_session.py"
+      - "backend/tests/test_input_sensory_vfx.py"
+      - "backend/tests/test_quest_reputation.py"
+      - "backend/tests/test_player_runtime.py"
       - ".github/workflows/product-convergence.yml"
   pull_request:
     paths:
@@ -31,6 +40,12 @@ on:
       - "backend/core/runtime_sessions.py"
       - "backend/core/course_runtime.py"
       - "backend/core/game_session.py"
+      - "backend/core/input_fusion.py"
+      - "backend/core/sensory_cues.py"
+      - "backend/core/vfx_cues.py"
+      - "backend/core/quest_graph.py"
+      - "backend/core/reputation.py"
+      - "backend/core/player_runtime.py"
       - "backend/tests/test_content_store.py"
       - "backend/tests/test_product_operations.py"
       - "backend/tests/test_progression.py"
@@ -38,6 +53,9 @@ on:
       - "backend/tests/test_runtime_sessions.py"
       - "backend/tests/test_course_runtime.py"
       - "backend/tests/test_game_session.py"
+      - "backend/tests/test_input_sensory_vfx.py"
+      - "backend/tests/test_quest_reputation.py"
+      - "backend/tests/test_player_runtime.py"
       - ".github/workflows/product-convergence.yml"
 
 permissions:
@@ -66,6 +84,9 @@ jobs:
           tests/test_runtime_sessions.py
           tests/test_course_runtime.py
           tests/test_game_session.py
+          tests/test_input_sensory_vfx.py
+          tests/test_quest_reputation.py
+          tests/test_player_runtime.py
           tests/test_charter_policy.py
           tests/test_durable_outbox.py
           tests/test_worm_audit.py
