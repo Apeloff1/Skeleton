@@ -1,9 +1,9 @@
 """Unified world-runtime seam for generated RPG/adventure playables.
 
 Composes character progression, skill graph, weather contexts, NPC schedules,
-creature AI, relationships, travel/discovery, achievements, and versioned save
-integrity behind one deterministic runtime. Frontends render state; domain rules
-remain authoritative here.
+creature AI, relationships, travel/discovery, achievements, economy, dialogue,
+and versioned save integrity behind one deterministic runtime. Frontends render
+state; domain rules remain authoritative here.
 """
 from __future__ import annotations
 
@@ -13,7 +13,9 @@ from typing import Any, Mapping
 from core.achievement_engine import AchievementEngine, AchievementUnlock
 from core.character_profile import CharacterProfile
 from core.creature_ai import Creature, Stimulus
+from core.dialogue_runtime import DialogueContext, DialogueRuntime
 from core.discovery_engine import DiscoveryEngine, DiscoveryResult
+from core.economy_runtime import EconomyRuntime, Inventory, PurchaseReceipt, Wallet
 from core.environment_runtime import EnvironmentRuntime
 from core.relationship_memory import RelationshipMemory
 from core.save_envelope import SaveCodec
@@ -44,6 +46,10 @@ class WorldRuntime:
         travel_graph: TravelGraph | None = None,
         discovery_engine: DiscoveryEngine | None = None,
         achievement_engine: AchievementEngine | None = None,
+        economy: EconomyRuntime | None = None,
+        wallet: Wallet | None = None,
+        economy_inventory: Inventory | None = None,
+        dialogues: dict[str, DialogueRuntime] | None = None,
         save_version: int = 1,
     ) -> None:
         self.graph = graph
@@ -58,6 +64,10 @@ class WorldRuntime:
         self.travel_graph = travel_graph
         self.discovery_engine = discovery_engine
         self.achievement_engine = achievement_engine
+        self.economy = economy
+        self.wallet = wallet or Wallet()
+        self.economy_inventory = economy_inventory or Inventory()
+        self.dialogues = dict(dialogues or {})
         self.relationships: dict[str, RelationshipMemory] = {}
         self.minute = 0
         self.save_codec = SaveCodec(save_version)
@@ -108,6 +118,24 @@ class WorldRuntime:
             player_level=self.character.level,
         )
 
+    def purchase_item(
+        self,
+        item_id: str,
+        *,
+        quantity: int = 1,
+        price_multiplier: float = 1.0,
+    ) -> PurchaseReceipt:
+        if self.economy is None:
+            raise ValueError("world runtime has no economy")
+        return self.economy.purchase(
+            item_id=item_id,
+            quantity=quantity,
+            player_level=self.character.level,
+            wallet=self.wallet,
+            inventory=self.economy_inventory,
+            price_multiplier=price_multiplier,
+        )
+
     def relationship(self, npc_id: str) -> RelationshipMemory:
         if npc_id not in self.agents:
             raise KeyError(f"unknown world agent: {npc_id}")
@@ -116,6 +144,33 @@ class WorldRuntime:
             memory = RelationshipMemory(npc_id)
             self.relationships[npc_id] = memory
         return memory
+
+    def dialogue_context(self, npc_id: str) -> DialogueContext:
+        memory = self.relationship(npc_id)
+        return DialogueContext(
+            relationship=memory.score,
+            currency=self.wallet.balances.get("coins", 0),
+            stats=dict(self.character.stats),
+            inventory=dict(self.economy_inventory.items),
+            unlocks=set(self.economy_inventory.unlocks),
+        )
+
+    def choose_dialogue(self, npc_id: str, node_id: str, choice_id: str):
+        try:
+            dialogue = self.dialogues[npc_id]
+        except KeyError as exc:
+            raise ValueError(f"world runtime has no dialogue for {npc_id}") from exc
+        context = self.dialogue_context(npc_id)
+        memory = self.relationship(npc_id)
+        before_relationship = context.relationship
+        outcome = dialogue.choose(node_id, choice_id, context)
+        relationship_delta = context.relationship - before_relationship
+        if relationship_delta:
+            memory.record("dialogue", relationship_delta, details={"choice": choice_id})
+        self.wallet.balances["coins"] = context.currency
+        self.economy_inventory.items = dict(context.inventory)
+        self.economy_inventory.unlocks = set(context.unlocks)
+        return outcome
 
     def discover_location(self, location_id: str) -> bool:
         if self.travel_graph is None:
@@ -187,6 +242,7 @@ class WorldRuntime:
                 "points": self.skill_profile.points,
                 "levels": dict(self.skill_profile.levels),
             },
+            "economy": EconomyRuntime.snapshot(self.wallet, self.economy_inventory),
             "agents": {agent_id: agent.node_id for agent_id, agent in self.agents.items()},
             "creatures": {
                 creature_id: {
