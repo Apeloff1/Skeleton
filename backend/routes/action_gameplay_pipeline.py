@@ -85,8 +85,8 @@ class ComboSystemRequest(BaseModel):
 
 
 class AbilityChainRequest(BaseModel):
-    ability_name: str
-    elements: List[str] = []
+    ability_name: str = Field(..., min_length=1, max_length=200)
+    elements: List[str] = Field(default_factory=list, max_length=20)
     chain_length: int = Field(3, ge=1, le=10)
     cooldown_seconds: float = Field(5.0, ge=0.5, le=300.0)
     resource_cost: int = Field(50, ge=0, le=1000)
@@ -101,9 +101,9 @@ class QTESequenceRequest(BaseModel):
 
 
 class GameplayScriptRequest(BaseModel):
-    script_name: str
+    script_name: str = Field(..., min_length=1, max_length=200)
     trigger: Literal["area", "interaction", "combat", "time", "quest"]
-    actions: List[str] = []
+    actions: List[str] = Field(default_factory=list, max_length=100)
     interruptible: bool = True
     repeatable: bool = False
 

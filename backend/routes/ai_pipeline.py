@@ -59,10 +59,10 @@ class PipelineType(str, Enum):
 
 class TextToCodeRequest(BaseModel):
     description: str = Field(..., min_length=10, max_length=5000)
-    language: str = "python"
-    framework: Optional[str] = None
-    requirements: Optional[List[str]] = []
-    context: Optional[str] = None
+    language: str = Field("python", min_length=1, max_length=100)
+    framework: Optional[str] = Field(None, max_length=100)
+    requirements: Optional[List[str]] = Field(default_factory=list, max_length=50)
+    context: Optional[str] = Field(None, max_length=100000)
     provider: AIProvider = AIProvider.AUTO
 
 class TextToImageRequest(BaseModel):
@@ -74,18 +74,18 @@ class TextToImageRequest(BaseModel):
     count: int = Field(1, ge=1, le=4)
 
 class CodeToAppRequest(BaseModel):
-    code: str = Field(..., min_length=10)
-    language: str = "python"
+    code: str = Field(..., min_length=10, max_length=500000)
+    language: str = Field("python", min_length=1, max_length=100)
     app_type: Literal["cli", "web", "api", "mobile", "game", "desktop"] = "web"
-    target_platform: Optional[str] = None
+    target_platform: Optional[str] = Field(None, max_length=100)
     include_tests: bool = True
     include_docs: bool = True
     include_deployment: bool = True
 
 class CodeAnalysisRequest(BaseModel):
-    code: str = Field(..., min_length=10)
+    code: str = Field(..., min_length=10, max_length=500000)
     analysis_type: Literal["explain", "test", "document", "debug", "optimize", "refactor"] = "explain"
-    language: str = "python"
+    language: str = Field("python", min_length=1, max_length=100)
     detail_level: Literal["brief", "standard", "comprehensive"] = "standard"
 
 class PipelineResponse(BaseModel):
