@@ -53,4 +53,4 @@ class RuntimeCoordinator:
   self.quota.release()
   self.queue.pop()
  def snapshot(self,active:int=0):
-  return RuntimeSnapshot(self.lifecycle.state.value,self.dependencies.ready,active,self.budget.used,self.budget.capacity)
+  return RuntimeSnapshot(self.lifecycle.state.value,self.dependencies.ready,active,self.budget.used,self.budget.capacity,self.quota.used,len(self.queue),self.health.value)
