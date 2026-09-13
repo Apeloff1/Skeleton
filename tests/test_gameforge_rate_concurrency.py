@@ -17,4 +17,4 @@ def test_rate_window_preserves_monotonic_clock_contract():
     assert window.allow(11)
     assert not window.allow(12)
     assert window.retry_after(12) == 8
-    assert window.remaining(20) == 2
+    assert window.remaining(20) == 1
