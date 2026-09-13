@@ -25,8 +25,13 @@ class FairShareLedger:
     _lock: RLock = field(default_factory=RLock, init=False, repr=False)
 
     def __post_init__(self) -> None:
-        if self.default_weight < 1:
-            raise ValueError("default_weight must be positive")
+        self.default_weight = self._weight(self.default_weight, "default_weight")
+
+    @staticmethod
+    def _weight(weight: int, name: str = "weight") -> int:
+        if isinstance(weight, bool) or not isinstance(weight, int) or weight < 1:
+            raise ValueError(f"{name} must be a positive integer")
+        return weight
 
     @staticmethod
     def _tenant(tenant: str) -> str:
@@ -37,8 +42,7 @@ class FairShareLedger:
 
     def configure(self, tenant: str, *, weight: int) -> TenantShare:
         tenant = self._tenant(tenant)
-        if weight < 1:
-            raise ValueError("weight must be positive")
+        weight = self._weight(weight)
         with self._lock:
             current = self._tenants.get(tenant, TenantShare(weight=self.default_weight))
             share = TenantShare(weight=weight, admitted=current.admitted, completed=current.completed, inflight=current.inflight)
