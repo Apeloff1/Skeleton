@@ -1,14 +1,18 @@
 """Fail-closed assurance over externally witnessed deployment checkpoints.
 
 The runtime summary is not trusted as an authorization oracle. This module recomputes
-policy capability, current-head quorum, continuity readiness, and summary coherence
-from primitive typed fields. Optional witnessing remains observational; required modes
-become hard deployment-assurance requirements.
+policy capability, current-head quorum, continuity readiness, policy-manifest identity,
+and summary coherence from primitive typed fields. Optional witnessing remains
+observational; required modes become hard deployment-assurance requirements.
 """
 from __future__ import annotations
 
 from typing import Any, Mapping
 
+from core.deployment_checkpoint_trust_policy import (
+    DeploymentCheckpointTrustPolicyManifest,
+    decode_deployment_checkpoint_trust_policy_manifest,
+)
 from core.system_assurance import AssuranceInvariant
 
 
@@ -29,6 +33,54 @@ def _sha256(value: Any) -> bool:
         isinstance(value, str)
         and len(value) == 64
         and all(ch in "0123456789abcdef" for ch in value)
+    )
+
+
+def _policy_identity(
+    status: Mapping[str, Any],
+    policy: Mapping[str, Any],
+) -> tuple[bool, str]:
+    try:
+        manifest = decode_deployment_checkpoint_trust_policy_manifest(status.get("policy_manifest"))
+    except (TypeError, ValueError):
+        return False, "portable policy manifest missing or malformed"
+    if not isinstance(manifest, DeploymentCheckpointTrustPolicyManifest):
+        return False, "portable policy manifest type mismatch"
+
+    manifest_sha = policy.get("manifest_sha256")
+    required = policy.get("required")
+    continuity = policy.get("continuity_required")
+    required_groups = policy.get("required_groups")
+    max_age = policy.get("max_age_seconds")
+    witness_count = policy.get("trusted_witnesses")
+    configured_groups = policy.get("configured_independence_groups")
+    deploy_kinds = policy.get("deploy_authority_proof_kinds")
+    audit_kinds = policy.get("audit_only_proof_kinds")
+
+    manifest_groups = {row.independence_group for row in manifest.witnesses}
+    if not manifest.required:
+        expected_deploy_kinds = ["none-required", "pin", "witnessed_continuity"]
+    elif manifest.continuity_required:
+        expected_deploy_kinds = ["witnessed_continuity"]
+    else:
+        expected_deploy_kinds = ["pin", "witnessed_continuity"]
+
+    coherent = (
+        _sha256(manifest_sha)
+        and manifest_sha == manifest.manifest_sha256
+        and required is manifest.required
+        and continuity is manifest.continuity_required
+        and required_groups == manifest.required_groups
+        and max_age == manifest.max_age_seconds
+        and witness_count == len(manifest.witnesses)
+        and configured_groups == len(manifest_groups)
+        and deploy_kinds == expected_deploy_kinds
+        and audit_kinds == ["trust_advance"]
+    )
+    return coherent, (
+        f"manifest={manifest.manifest_sha256}, summary={manifest_sha}, "
+        f"witnesses={witness_count}/{len(manifest.witnesses)}, "
+        f"groups={configured_groups}/{len(manifest_groups)}, deploy_proofs={deploy_kinds}"
     )
 
 
@@ -66,6 +118,7 @@ def deployment_checkpoint_witness_invariants(status: Mapping[str, Any]) -> tuple
     )
     required = required_raw is True
     continuity_required = continuity_raw is True
+    policy_identity_ok, policy_identity_detail = _policy_identity(status, policy)
 
     runtime_ok = (
         status.get("verified") is True
@@ -76,6 +129,7 @@ def deployment_checkpoint_witness_invariants(status: Mapping[str, Any]) -> tuple
 
     capability_ok = (
         policy_shape
+        and policy_identity_ok
         and (
             not required
             or (
@@ -155,6 +209,7 @@ def deployment_checkpoint_witness_invariants(status: Mapping[str, Any]) -> tuple
 
     policy_satisfied = (
         policy_shape
+        and policy_identity_ok
         and (
             not required
             or (
@@ -178,6 +233,12 @@ def deployment_checkpoint_witness_invariants(status: Mapping[str, Any]) -> tuple
             "hard",
             policy_shape and frontier_shape,
             f"required={required_raw}, continuity_required={continuity_raw}, groups={configured_groups}/{required_groups}",
+        ),
+        AssuranceInvariant(
+            "deployment.checkpoint-witness-policy-identity",
+            "hard",
+            policy_identity_ok,
+            policy_identity_detail,
         ),
         AssuranceInvariant(
             "deployment.checkpoint-witness-policy-capable",
