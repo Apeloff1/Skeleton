@@ -16,10 +16,12 @@ from core.transparency_witness import TrustedWitness
 
 @dataclass(frozen=True, slots=True)
 class WitnessPolicyConfig:
+    # Preserve the original positional contract: witnesses, required_groups,
+    # finality_required. Freshness is appended as an optional policy dimension.
     witnesses: tuple[TrustedWitness, ...]
     required_groups: int
-    max_age_seconds: int
-    finality_required: bool
+    finality_required: bool = False
+    max_age_seconds: int = 3600
 
 
 def _bool(value: str | None, default: bool = False) -> bool:
@@ -55,4 +57,4 @@ def load_witness_policy(*, raw_json: str | None = None, required_groups: int | N
     required = _bool(os.environ.get("TRANSPARENCY_FINALITY_REQUIRED"), False) if finality_required is None else bool(finality_required)
     if required and configured_groups < required_groups:
         raise ValueError("finality is required but configured independent witness groups cannot satisfy quorum")
-    return WitnessPolicyConfig(tuple(witnesses), required_groups, max_age_seconds, required)
+    return WitnessPolicyConfig(tuple(witnesses), required_groups, required, max_age_seconds)
