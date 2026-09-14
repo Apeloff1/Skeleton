@@ -10,7 +10,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import os
-from typing import Any
 
 from core.transparency_witness import TrustedWitness
 
@@ -19,6 +18,7 @@ from core.transparency_witness import TrustedWitness
 class WitnessPolicyConfig:
     witnesses: tuple[TrustedWitness, ...]
     required_groups: int
+    max_age_seconds: int
     finality_required: bool
 
 
@@ -28,6 +28,7 @@ def _bool(value: str | None, default: bool = False) -> bool:
 
 
 def load_witness_policy(*, raw_json: str | None = None, required_groups: int | None = None,
+                        max_age_seconds: int | None = None,
                         finality_required: bool | None = None) -> WitnessPolicyConfig:
     raw = raw_json if raw_json is not None else os.environ.get("TRANSPARENCY_TRUSTED_WITNESSES_JSON", "[]")
     try: parsed = json.loads(raw or "[]")
@@ -46,7 +47,12 @@ def load_witness_policy(*, raw_json: str | None = None, required_groups: int | N
         required_groups = int(os.environ.get("TRANSPARENCY_WITNESS_QUORUM", "3"))
     required_groups = int(required_groups)
     if required_groups < 1 or required_groups > 64: raise ValueError("TRANSPARENCY_WITNESS_QUORUM must be between 1 and 64")
+    if max_age_seconds is None:
+        max_age_seconds = int(os.environ.get("TRANSPARENCY_WITNESS_MAX_AGE_SECONDS", "3600"))
+    max_age_seconds = int(max_age_seconds)
+    if max_age_seconds < 1 or max_age_seconds > 604800:
+        raise ValueError("TRANSPARENCY_WITNESS_MAX_AGE_SECONDS must be between 1 and 604800")
     required = _bool(os.environ.get("TRANSPARENCY_FINALITY_REQUIRED"), False) if finality_required is None else bool(finality_required)
     if required and configured_groups < required_groups:
         raise ValueError("finality is required but configured independent witness groups cannot satisfy quorum")
-    return WitnessPolicyConfig(tuple(witnesses), required_groups, required)
+    return WitnessPolicyConfig(tuple(witnesses), required_groups, max_age_seconds, required)
