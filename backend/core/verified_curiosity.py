@@ -2,8 +2,9 @@
 
 The knowledge fabric is append-preserving historical memory. Authoritative context
 is a separate derived view governed by current empirical evidence, source lineage,
-claim expiry, contradiction status and re-verification. Retractions never erase
-history; they revoke current authority and trigger deterministic re-evaluation.
+claim expiry, contradiction status, source independence and re-verification.
+Retractions never erase history; they revoke current authority and trigger
+deterministic re-evaluation.
 """
 from __future__ import annotations
 
@@ -17,6 +18,7 @@ from core.curiosity_engine import CuriosityEngine, Inquiry
 from core.evidence_registry import EvidenceRegistry
 from core.epistemic_gate import EpistemicDecision, EpistemicGate
 from core.knowledge_fabric import EvidenceRef, KnowledgeFabric, KnowledgeRecord
+from core.source_independence import LEGACY_UNRESOLVED_PREFIX, SourceIndependenceAnalyzer
 from core.source_lineage import SourceLineageGraph
 from core.truth_verifier import TruthVerifier, VerificationPolicy, VerificationState, effective_evidence_quality
 
@@ -34,10 +36,12 @@ class VerifiedCuriosityEngine(CuriosityEngine):
         super().__init__(root, fabric=fabric)
         self.evidence_registry = EvidenceRegistry(self.root / "evidence")
         self.source_lineage = SourceLineageGraph(self.root / "source-lineage")
+        self.independence = SourceIndependenceAnalyzer(self.source_lineage)
         self.truth_ledger = ClaimTruthLedger(self.root / "truth-state", default_valid_days=truth_valid_days)
         self.verifier = verifier or TruthVerifier(policy)
-        self.epistemic_gate = EpistemicGate(self.verifier, self.evidence_registry)
+        self.epistemic_gate = EpistemicGate(self.verifier, self.evidence_registry, self.independence)
         self.contradictions = ContradictionResolver()
+        self._lineage_backfill = self.backfill_source_lineage()
 
     @staticmethod
     def _orientation_summary(decision: EpistemicDecision) -> str:
@@ -47,6 +51,28 @@ class VerifiedCuriosityEngine(CuriosityEngine):
             "No claim in this research cycle met the empirical verification standard. "
             "Material is retained only as research gaps/hypotheses and must not be used as verified fact."
         )
+
+    def backfill_source_lineage(self) -> dict[str, int]:
+        """Register legacy evidence sources without inventing ancestry.
+
+        Missing legacy sources are explicitly marked ancestry-unknown. The
+        independence analyzer collapses such sources together per claim until real
+        parent lineage is supplied, preventing migration from manufacturing support.
+        """
+        created = 0; existing = 0
+        for record in self.evidence_registry.snapshot(include_retracted=True):
+            item = record.item
+            if not item.source_id:
+                continue
+            if self.source_lineage.get(item.source_id) is not None:
+                existing += 1; continue
+            self.source_lineage.register(
+                item.source_id,
+                source_kind=f"{LEGACY_UNRESOLVED_PREFIX}{item.kind.value}",
+                locator=item.locator,
+            )
+            created += 1
+        return {"created": created, "existing": existing}
 
     def _register_lineage(self, finding: dict[str, Any]) -> None:
         claim_evidence = finding.get("claim_evidence") or {}
@@ -58,20 +84,28 @@ class VerifiedCuriosityEngine(CuriosityEngine):
                 if not isinstance(raw, dict): continue
                 source_id = str(raw.get("source_id") or raw.get("source") or "").strip()
                 if source_id and source_id not in rows: rows[source_id] = raw
-        # Register roots first, then derivatives. Bounded passes fail closed on
-        # unresolved parents rather than inventing ancestry.
         pending = dict(rows)
         for _ in range(len(pending) + 1):
             progressed = False
             for source_id, raw in list(pending.items()):
                 parents = tuple(str(x).strip() for x in (raw.get("parent_source_ids") or ()) if str(x).strip())
                 if any(self.source_lineage.get(parent) is None for parent in parents): continue
+                existing = self.source_lineage.get(source_id)
+                if existing is not None and existing.source_kind.startswith(LEGACY_UNRESOLVED_PREFIX):
+                    # Legacy unresolved nodes are immutable by design; a new explicit
+                    # source id should be used if stronger lineage metadata arrives.
+                    pending.pop(source_id); progressed = True; continue
                 self.source_lineage.register(
                     source_id, source_kind=str(raw.get("kind") or "unknown"), locator=str(raw.get("locator") or ""),
                     parent_ids=parents, content_sha256=str(raw.get("content_sha256") or ""),
                 )
                 pending.pop(source_id); progressed = True
             if not pending or not progressed: break
+
+    def _active_evidence(self, claim: str):
+        rows = self.evidence_registry.evidence_for(claim)
+        collapsed, _ = self.independence.collapse(rows)
+        return collapsed
 
     def _verified_evidence(self, decision: EpistemicDecision) -> tuple[EvidenceRef, ...]:
         rows: list[EvidenceRef] = []; seen: set[tuple[str, str]] = set()
@@ -89,10 +123,8 @@ class VerifiedCuriosityEngine(CuriosityEngine):
 
     def _update_truth_states(self, decision: EpistemicDecision) -> None:
         verified = set(decision.verified_claims)
-        all_nonverified = (
-            *decision.provisional_claims, *decision.contradicted_claims,
-            *decision.unverified_claims, *decision.irrelevant_speculation,
-        )
+        all_nonverified = (*decision.provisional_claims, *decision.contradicted_claims,
+                           *decision.unverified_claims, *decision.irrelevant_speculation)
         for claim in verified:
             verification = decision.verification[claim]
             evidence_ids = [r.id for r in self.evidence_registry.records_for(claim) if not r.retracted]
@@ -120,7 +152,7 @@ class VerifiedCuriosityEngine(CuriosityEngine):
         if verified_count:
             confidence = min(
                 self.verifier.verify_claim(
-                    claim, self.evidence_registry.evidence_for(claim),
+                    claim, self._active_evidence(claim),
                     falsifiable=(finding.get("falsifiable") or {}).get(claim) if isinstance(finding.get("falsifiable"), dict) else None,
                 ).mean_quality
                 for claim in decision.verified_claims
@@ -146,7 +178,8 @@ class VerifiedCuriosityEngine(CuriosityEngine):
         return record
 
     def reverify_claim(self, claim: str) -> dict[str, Any]:
-        result = self.verifier.verify_claim(claim, self.evidence_registry.evidence_for(claim))
+        evidence, independence = self.independence.collapse(self.evidence_registry.evidence_for(claim))
+        result = self.verifier.verify_claim(claim, evidence)
         evidence_ids = [r.id for r in self.evidence_registry.records_for(claim) if not r.retracted]
         if result.state == VerificationState.VERIFIED:
             self.truth_ledger.record(
@@ -155,10 +188,16 @@ class VerifiedCuriosityEngine(CuriosityEngine):
             )
         elif self.truth_ledger.get(claim) is not None:
             self.truth_ledger.revoke(claim, f"reverification state: {result.state.value}; reasons={','.join(result.reasons)}")
-        contradiction = self.contradictions.resolve(claim, self.evidence_registry.evidence_for(claim))
+        contradiction = self.contradictions.resolve(claim, evidence)
         return {
             "claim": claim, "state": result.state.value, "authoritative": self.truth_ledger.authoritative(claim),
             "reasons": list(result.reasons), "verification_attestation_sha256": result.attestation_sha256,
+            "independence": {
+                "raw_sources": independence.raw_sources,
+                "effective_independent_sources": independence.effective_independent_sources,
+                "unresolved_sources": list(independence.unresolved_sources),
+                "attestation_sha256": independence.attestation_sha256,
+            },
             "contradiction": {"state": contradiction.state, "required_actions": list(contradiction.required_actions),
                               "attestation_sha256": contradiction.attestation_sha256},
         }
@@ -178,16 +217,17 @@ class VerifiedCuriosityEngine(CuriosityEngine):
         }
 
     def contradiction_status(self, claim: str) -> dict[str, Any]:
-        report = self.contradictions.resolve(claim, self.evidence_registry.evidence_for(claim))
+        evidence, independence = self.independence.collapse(self.evidence_registry.evidence_for(claim))
+        report = self.contradictions.resolve(claim, evidence)
         return {
             "claim": report.claim, "state": report.state, "support_groups": list(report.support_groups),
             "contradiction_groups": list(report.contradiction_groups), "support_quality": report.support_quality,
             "contradiction_quality": report.contradiction_quality, "methodological_conflict": report.methodological_conflict,
             "required_actions": list(report.required_actions), "attestation_sha256": report.attestation_sha256,
+            "effective_independent_sources": independence.effective_independent_sources,
         }
 
     def orientation_pack(self, query: str, *, limit: int = 6) -> dict[str, Any]:
-        # Expiry never silently promotes stale knowledge; reverify before projection.
         self.reverify_expired()
         records = self.fabric.search(query, limit=limit)
         active_claims: list[str] = []; unresolved: list[str] = []; record_ids: list[str] = []
@@ -203,9 +243,7 @@ class VerifiedCuriosityEngine(CuriosityEngine):
                 if gap not in unresolved: unresolved.append(gap)
         states = [self.truth_ledger.get(claim) for claim in active_claims]
         working = [f"Verified claims: {' '.join(active_claims[:12])}"] if active_claims else []
-        confidences: list[float] = []
-        for record in records:
-            if any(claim in active_claims for claim in record.claims): confidences.append(record.confidence)
+        confidences = [record.confidence for record in records if any(claim in active_claims for claim in record.claims)]
         return {
             "query": query, "record_ids": record_ids, "working_context": working,
             "claims": active_claims[:24], "unresolved": unresolved[:24],
@@ -218,6 +256,7 @@ class VerifiedCuriosityEngine(CuriosityEngine):
         return {
             "truth_gated": True, "speculation_authoritative": False, "model_consensus_is_empirical_evidence": False,
             "evidence_registry": evidence, "source_lineage": self.source_lineage.stats(),
+            "lineage_backfill": self._lineage_backfill,
             "truth_ledger": self.truth_ledger.stats(), "knowledge": knowledge,
             "verification_policy": {
                 "minimum_independent_support": self.verifier.policy.minimum_independent_support,
