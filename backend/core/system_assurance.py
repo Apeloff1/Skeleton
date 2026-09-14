@@ -143,6 +143,28 @@ def evaluate_assurance(*, lifecycle: Iterable[dict[str, Any]], operations: dict[
                                f"contradiction_blocks={policy.get('contradiction_blocks', False)}"),
         ]
 
+    transparency = operations.get("epistemic_transparency") if isinstance(operations.get("epistemic_transparency"), dict) else {}
+    gossip = operations.get("epistemic_gossip") if isinstance(operations.get("epistemic_gossip"), dict) else {}
+    if transparency or gossip:
+        checkpoint_health = transparency.get("checkpoint") if isinstance(transparency.get("checkpoint"), dict) else {}
+        log_health = transparency.get("transparency") if isinstance(transparency.get("transparency"), dict) else {}
+        prefix_ok = transparency.get("verified") is True and transparency.get("prefix_aligned") is True
+        process_safe_transparency = checkpoint_health.get("cross_process_locking") is True and log_health.get("cross_process_locking") is True
+        tree_size = int(log_health.get("tree_size", 0) or 0)
+        gossip_healthy = gossip.get("healthy") is True and int(gossip.get("split_views", 0) or 0) == 0 and int(gossip.get("rollbacks", 0) or 0) == 0
+        invariants += [
+            AssuranceInvariant("truth.transparency-prefix-aligned", "hard", prefix_ok,
+                               f"verified={transparency.get('verified', False)}, prefix_aligned={transparency.get('prefix_aligned', False)}"),
+            AssuranceInvariant("truth.transparency-process-safe", "hard", process_safe_transparency,
+                               f"checkpoint_lock={checkpoint_health.get('lock_backend', 'missing')}, log_lock={log_health.get('lock_backend', 'missing')}"),
+            AssuranceInvariant("truth.transparency-checkpoint-present", "warning", tree_size > 0,
+                               f"tree_size={tree_size}"),
+            AssuranceInvariant("truth.gossip-no-equivocation", "hard", gossip_healthy,
+                               f"split_views={gossip.get('split_views', 0)}, rollbacks={gossip.get('rollbacks', 0)}"),
+            AssuranceInvariant("truth.gossip-process-safe", "hard", gossip.get("cross_process_locking") is True,
+                               f"locking={gossip.get('lock_backend', 'missing')}"),
+        ]
+
     coverage = float(executor_coverage.get("coverage_pct", 0.0) or 0.0)
     readiness_pct = float((readiness or {}).get("ready_pct", coverage) or 0.0)
     policy_gaps = int((readiness or {}).get("policy_gaps", 0) or 0); unsafe_actions = int((readiness or {}).get("unsafe_actions", 0) or 0)
