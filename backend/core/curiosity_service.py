@@ -6,8 +6,10 @@ from pathlib import Path
 import threading
 from typing import Any
 
+from core.claim_proof import claim_proof_dict
 from core.curiosity_engine import Researcher
 from core.curiosity_research_pipeline import default_ensemble_researcher
+from core.epistemic_attestation import epistemic_root_dict
 from core.idle_curiosity_runtime import IdleCuriosityRuntime
 from core.truth_watch import TruthEventKind, TruthWatchFeed
 from core.verified_curiosity import VerifiedCuriosityEngine
@@ -125,6 +127,12 @@ class CuriosityService:
     def calibration_metrics(self, *, bins: int = 10, forecaster: str | None = None) -> dict[str, Any]:
         return self.engine.calibration.metrics(bins=bins, forecaster=forecaster)
 
+    def epistemic_root(self) -> dict[str, Any]:
+        return epistemic_root_dict(self.engine.verification_status())
+
+    def claim_proof(self, claim: str) -> dict[str, Any]:
+        return claim_proof_dict(self.engine, claim)
+
     async def run_now(self) -> dict[str, Any]:
         return await self.engine.run_once(self.researcher, minimum_score=self.runtime.minimum_score)
 
@@ -133,7 +141,8 @@ class CuriosityService:
 
     def status(self) -> dict[str, Any]:
         return {"enabled": self.enabled, "runtime": self.runtime.snapshot(), "engine": self.engine.stats(),
-                "verification": self.engine.verification_status(), "frontier": self.frontier(limit=10),
+                "verification": self.engine.verification_status(), "epistemic_root": self.epistemic_root(),
+                "frontier": self.frontier(limit=10),
                 "truth_watch": {**self.watch.stats(), "enabled": self.watch_enabled,
                                 "worker_alive": bool(self._watch_thread and self._watch_thread.is_alive())}}
 
