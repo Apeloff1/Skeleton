@@ -59,6 +59,9 @@ jobs:
       - name: High-confidence Python and JavaScript SAST gate
         run: python scripts/check_sast_security.py
 
+      - name: JavaScript child_process alias safety gate
+        run: python scripts/check_js_process_alias_safety.py
+
       - name: GitHub Actions workflow security gate
         run: python scripts/check_workflow_security.py
 
@@ -78,5 +81,6 @@ jobs:
           tests/test_process_safety_getattribute.py
           tests/test_deserialization_safety_gate.py
           tests/test_sast_security_gate.py
+          tests/test_js_process_alias_safety.py
           tests/test_workflow_security_gate.py
           tests/test_secret_hygiene_gate.py
