@@ -6,20 +6,28 @@ on:
       - "backend/core/sparse_merkle.py"
       - "backend/core/epistemic_claim_index.py"
       - "backend/core/epistemic_checkpoint.py"
+      - "backend/core/epistemic_transparency.py"
+      - "backend/core/transparency_log.py"
       - "backend/core/portable_claim_proof.py"
       - "backend/core/claim_proof.py"
       - "backend/core/epistemic_attestation.py"
       - "backend/tests/test_portable_claim_proof.py"
+      - "backend/tests/test_claim_proof_attestation.py"
+      - "backend/tests/test_transparency_log.py"
       - ".github/workflows/portable-truth-proofs.yml"
   pull_request:
     paths:
       - "backend/core/sparse_merkle.py"
       - "backend/core/epistemic_claim_index.py"
       - "backend/core/epistemic_checkpoint.py"
+      - "backend/core/epistemic_transparency.py"
+      - "backend/core/transparency_log.py"
       - "backend/core/portable_claim_proof.py"
       - "backend/core/claim_proof.py"
       - "backend/core/epistemic_attestation.py"
       - "backend/tests/test_portable_claim_proof.py"
+      - "backend/tests/test_claim_proof_attestation.py"
+      - "backend/tests/test_transparency_log.py"
       - ".github/workflows/portable-truth-proofs.yml"
 
 permissions:
@@ -38,5 +46,9 @@ jobs:
           python-version: "3.11"
       - name: Install focused dependencies
         run: python -m pip install "pytest>=8,<9"
-      - name: Verify sparse membership, absence, checkpoints and freshness
-        run: python -m pytest -q tests/test_portable_claim_proof.py tests/test_claim_proof_attestation.py
+      - name: Verify membership, checkpoints, transparency and freshness
+        run: >-
+          python -m pytest -q
+          tests/test_portable_claim_proof.py
+          tests/test_claim_proof_attestation.py
+          tests/test_transparency_log.py
