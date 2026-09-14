@@ -62,5 +62,7 @@ jobs:
           tests/test_process_safety_namespace_get.py
           tests/test_process_safety_getattribute.py
           tests/test_security_middleware_hardening.py
+          tests/test_client_ip_security.py
+          tests/test_size_limit_security.py
           tests/test_import_export_security.py
           tests/test_live_scraper_security.py
