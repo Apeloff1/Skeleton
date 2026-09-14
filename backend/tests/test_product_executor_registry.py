@@ -62,8 +62,8 @@ def test_default_control_plane_reports_expanded_native_coverage(tmp_path):
     plane = ProductControlPlane(tmp_path)
     coverage = plane.executor_coverage()
     assert coverage["canonical_actions"] == sum(len(item.actions) for item in CANONICAL_PRODUCT_POLICY)
-    assert coverage["bound_actions"] == 10
-    assert coverage["coverage_pct"] == 47.6
+    assert coverage["bound_actions"] == 12
+    assert coverage["coverage_pct"] == 57.1
     missing = {item["action"] for item in coverage["missing"]}
     assert {"build.submit", "jeeves.reason", "academy.continue"} <= missing
 
@@ -79,6 +79,22 @@ def test_injected_query_executors_return_real_control_plane_state(tmp_path):
     assert result["receipts"]["version"] == 2
 
 
+def test_progress_and_deployment_executors_are_real_attested_transforms(tmp_path):
+    plane = ProductControlPlane(tmp_path)
+    progress = plane.admit(capability_id="playables", domain="playables", action="progress.inspect",
+        principal="player", actor_weight=0,
+        payload={"progression": {"medals": {"a": 4}}, "known_stages": ["a", "b"]})
+    deploy = plane.admit(capability_id="operations", domain="operations", action="ops.deployments",
+        principal="operator", actor_weight=0,
+        payload={"environment": "staging", "artifact": "sha256:abc", "target": "api"})
+    assert asyncio.run(plane.execute_registered(progress.outbox_seq)) is True
+    assert asyncio.run(plane.execute_registered(deploy.outbox_seq)) is True
+    progress_result = plane.receipt_result(progress.id)["progression"]
+    deploy_result = plane.receipt_result(deploy.id)["deployment_plan"]
+    assert len(progress_result["attestation_sha256"]) == 64
+    assert len(deploy_result["plan_sha256"]) == 64
+
+
 def test_governance_query_executor_is_policy_backed(tmp_path):
     plane = ProductControlPlane(tmp_path)
     operation = plane.admit(capability_id="governance", domain="governance", action="governance.policy",
@@ -89,17 +105,17 @@ def test_governance_query_executor_is_policy_backed(tmp_path):
     assert len(result["policy"]["charters"]) == len(CANONICAL_PRODUCT_POLICY)
 
 
-def test_governance_safety_executor_inspects_live_integrity_posture(tmp_path):
+def test_governance_safety_executor_uses_attested_assurance_and_readiness(tmp_path):
     plane = ProductControlPlane(tmp_path)
     operation = plane.admit(capability_id="governance", domain="governance", action="governance.safety",
                             principal="auditor", actor_weight=0, payload={})
     assert asyncio.run(plane.execute_registered(operation.outbox_seq)) is True
     result = plane.receipt_result(operation.id)["safety"]
     assert result["posture"] in {"healthy", "degraded", "blocked"}
-    assert result["canonical_actions"] == 21
-    assert result["native_bound_actions"] == 10
-    assert result["native_coverage_pct"] == 47.6
-    assert result["audit_sequence"] >= 1
+    assert result["readiness_pct"] == 57.1
+    assert len(result["attestation_sha256"]) == 64
+    assert len(result["readiness_attestation_sha256"]) == 64
+    assert result["invariants"]
 
 
 def test_canonical_policy_has_no_implicit_executor_requirement():
