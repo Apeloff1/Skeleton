@@ -329,6 +329,8 @@ class JeevesControlPlane:
         """
         if not isinstance(canonical, WorldGraph):
             raise TypeError("canonical must be a WorldGraph")
+        operations = tuple(operations)
+        evidence_ids = tuple(str(item).strip() for item in evidence_ids if str(item).strip())
         agent_id = str(agent_id).strip() or "jeeves"
         mode = ChangeMode(mode)
         run_id = uuid.uuid4().hex[:16]
@@ -372,7 +374,7 @@ class JeevesControlPlane:
                     "session_id": session.session_id,
                     "before_hash": patch_result.before_hash,
                     "after_hash": patch_result.after_hash,
-                    "operations": len(tuple(operations)),
+                    "operations": len(operations),
                 },
             )
 
@@ -413,7 +415,7 @@ class JeevesControlPlane:
                                 mode=mode,
                                 agent_id=agent_id,
                                 route=route,
-                                evidence_ids=tuple(evidence_ids),
+                                evidence_ids=evidence_ids,
                                 created_at=time.time(),
                             )
                         )
@@ -447,7 +449,7 @@ class JeevesControlPlane:
                             mode=mode,
                             agent_id=agent_id,
                             route=route,
-                            evidence_ids=tuple(evidence_ids),
+                            evidence_ids=evidence_ids,
                             created_at=time.time(),
                         )
                     )
@@ -472,9 +474,10 @@ class JeevesControlPlane:
                     ok=False,
                 )
 
-            execution_snapshot = execution.snapshot()
-            evidence = tuple(execution.evidence())
-
+        # Capture only after the execution context exits so callers receive the
+        # final state, including execution.finish and governor bookkeeping.
+        execution_snapshot = execution.snapshot()
+        evidence = tuple(execution.evidence())
         return WorldEvolutionOutcome(
             run_id=run_id,
             status=status,
@@ -549,9 +552,9 @@ class JeevesControlPlane:
                     {"error_type": type(exc).__name__, "error": str(exc)[:300]},
                     ok=False,
                 )
-            execution_snapshot = execution.snapshot()
-            evidence = tuple(execution.evidence())
 
+        execution_snapshot = execution.snapshot()
+        evidence = tuple(execution.evidence())
         return PendingAdoptionOutcome(
             run_id=run_id,
             session_id=session_id,
