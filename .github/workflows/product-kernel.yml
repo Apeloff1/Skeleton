@@ -61,8 +61,9 @@ jobs:
         with:
           python-version: "3.11"
       - run: python -m pip install "pytest>=8,<9"
-      - run: >-
-          python -m pytest -q
+      - name: Verify framework-free product kernel contracts
+        run: >-
+          python -m pytest -q --noconftest
           tests/test_charter_policy.py
           tests/test_product_kernel.py
           tests/test_product_executor_registry.py
