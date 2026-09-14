@@ -1,0 +1,47 @@
+name: Execution Evidence Gates
+
+on:
+  push:
+    paths:
+      - "backend/core/execution_evidence.py"
+      - "backend/core/execution_receipts.py"
+      - "backend/core/product_control_plane.py"
+      - "backend/core/product_operations.py"
+      - "backend/routes/ops.py"
+      - "backend/tests/test_execution_evidence.py"
+      - "backend/tests/test_control_plane_evidence_integration.py"
+      - ".github/workflows/execution-evidence.yml"
+  pull_request:
+    paths:
+      - "backend/core/execution_evidence.py"
+      - "backend/core/execution_receipts.py"
+      - "backend/core/product_control_plane.py"
+      - "backend/core/product_operations.py"
+      - "backend/routes/ops.py"
+      - "backend/tests/test_execution_evidence.py"
+      - "backend/tests/test_control_plane_evidence_integration.py"
+      - ".github/workflows/execution-evidence.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-lifecycle:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install "pytest>=8,<9"
+      - name: Verify execution evidence reconstruction
+        run: >-
+          python -m pytest -q
+          tests/test_execution_evidence.py
+          tests/test_control_plane_evidence_integration.py
+          tests/test_execution_receipts.py
+          tests/test_native_product_executors.py
+          tests/test_product_executor_registry.py
