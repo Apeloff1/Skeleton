@@ -10,6 +10,7 @@ import {
   closeActiveSession,
   coinsForSeconds,
   durationSeconds,
+  emptyWorkforceSnapshot,
   formatDuration,
   getNextMilestone,
   loadWorkforce,
@@ -25,13 +26,7 @@ const STATE_META: Record<WorkState, { label: string; icon: string; color: string
   smoke: { label: 'Smoke', icon: 'cloud', color: theme.colors.textMuted },
 };
 
-const EMPTY: WorkforceSnapshot = {
-  activeSince: null,
-  activeState: 'idle',
-  sessions: [],
-  totalSeconds: 0,
-  coinsEarned: 0,
-};
+const EMPTY: WorkforceSnapshot = emptyWorkforceSnapshot();
 
 export default function WorkforceScreen() {
   const router = useRouter();
@@ -57,8 +52,11 @@ export default function WorkforceScreen() {
     () => durationSeconds(snapshot.activeSince, now),
     [snapshot.activeSince, now],
   );
+  const activeIsProductive = snapshot.activeState === 'working';
   const projectedTotal = snapshot.totalSeconds + activeSeconds;
-  const projectedCoins = coinsForSeconds(projectedTotal);
+  const projectedProductive = snapshot.productiveSeconds + (activeIsProductive ? activeSeconds : 0);
+  const projectedPause = snapshot.pauseSeconds + (snapshot.activeState !== 'idle' && !activeIsProductive ? activeSeconds : 0);
+  const projectedCoins = Math.max(snapshot.coinsEarned, coinsForSeconds(projectedProductive));
   const nextMilestone = getNextMilestone(projectedCoins);
   const milestoneProgress = nextMilestone
     ? Math.min(1, projectedCoins / nextMilestone)
@@ -81,6 +79,7 @@ export default function WorkforceScreen() {
   }, [persist, snapshot]);
 
   const currentMeta = STATE_META[snapshot.activeState];
+  const isClockedIn = snapshot.activeState !== 'idle';
 
   return (
     <Screen edges={['top', 'left', 'right']}>
@@ -101,7 +100,7 @@ export default function WorkforceScreen() {
           </Text>
 
           <View style={styles.primaryActions}>
-            {snapshot.activeState !== 'working' ? (
+            {!isClockedIn ? (
               <Button title="Clock In" icon="play" onPress={() => transition('working')} style={styles.flexButton} />
             ) : (
               <Button title="Clock Out" icon="stop" onPress={stop} style={styles.flexButton} />
@@ -109,20 +108,23 @@ export default function WorkforceScreen() {
           </View>
 
           <View style={styles.breakRow}>
-            <StateButton state="break" current={snapshot.activeState} onPress={transition} />
-            <StateButton state="food" current={snapshot.activeState} onPress={transition} />
-            <StateButton state="smoke" current={snapshot.activeState} onPress={transition} />
+            <StateButton state="break" current={snapshot.activeState} onPress={transition} disabled={!isClockedIn} />
+            <StateButton state="food" current={snapshot.activeState} onPress={transition} disabled={!isClockedIn} />
+            <StateButton state="smoke" current={snapshot.activeState} onPress={transition} disabled={!isClockedIn} />
           </View>
+          <Text style={styles.breakHint}>
+            {isClockedIn ? 'Pause states stop productive-time coin accrual until you resume work.' : 'Clock in before starting a pause state.'}
+          </Text>
         </View>
 
         <View style={styles.metricGrid}>
-          <Metric icon="time" label="Tracked" value={formatDuration(projectedTotal)} color={theme.colors.info} />
+          <Metric icon="briefcase" label="Productive" value={formatDuration(projectedProductive)} color={theme.colors.success} />
+          <Metric icon="pause-circle" label="Paused" value={formatDuration(projectedPause)} color={theme.colors.info} />
+          <Metric icon="time" label="Tracked" value={formatDuration(projectedTotal)} color={theme.colors.primaryHover} />
           <Metric icon="diamond" label="Coins" value={projectedCoins.toLocaleString()} color={theme.colors.warning} />
-          <Metric icon="albums" label="Sessions" value={String(snapshot.sessions.length)} color={theme.colors.primaryHover} />
-          <Metric icon="speedometer" label="Rate" value="200/h" color={theme.colors.success} />
         </View>
 
-        <SectionHeader title="Value Progression" subtitle="Original fantasy-coin system, rebuilt as a durable work metric" />
+        <SectionHeader title="Value Progression" subtitle="200 coins per productive hour · pause time excluded" />
         <View style={styles.progressCard}>
           <View style={styles.progressHeader}>
             <Text style={styles.progressValue}>{projectedCoins.toLocaleString()} coins</Text>
@@ -138,7 +140,7 @@ export default function WorkforceScreen() {
           </Text>
         </View>
 
-        <SectionHeader title="Recent Sessions" subtitle="Newest first · local-first persistence" />
+        <SectionHeader title="Recent Sessions" subtitle="Newest first · local-first persistence · schema v3" />
         <View style={styles.ledger}>
           {snapshot.sessions.length === 0 ? (
             <View style={styles.emptyLedger}>
@@ -148,6 +150,7 @@ export default function WorkforceScreen() {
             </View>
           ) : snapshot.sessions.slice(0, 20).map(session => {
             const meta = STATE_META[session.state];
+            const productive = session.state === 'working';
             return (
               <View key={session.id} style={styles.sessionRow}>
                 <View style={[styles.sessionIcon, { backgroundColor: `${meta.color}22` }]}>
@@ -159,7 +162,9 @@ export default function WorkforceScreen() {
                     {new Date(session.startedAt).toLocaleString()} · {formatDuration(session.seconds)}
                   </Text>
                 </View>
-                <Text style={styles.sessionCoins}>+{coinsForSeconds(session.seconds)}</Text>
+                <Text style={[styles.sessionCoins, !productive && styles.pauseSessionLabel]}>
+                  {productive ? `+${coinsForSeconds(session.seconds)}` : 'pause'}
+                </Text>
               </View>
             );
           })}
@@ -169,13 +174,30 @@ export default function WorkforceScreen() {
   );
 }
 
-function StateButton({ state, current, onPress }: { state: WorkState; current: WorkState; onPress: (state: WorkState) => void }) {
+function StateButton({
+  state,
+  current,
+  onPress,
+  disabled,
+}: {
+  state: WorkState;
+  current: WorkState;
+  onPress: (state: WorkState) => void;
+  disabled: boolean;
+}) {
   const meta = STATE_META[state];
   const active = current === state;
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled, selected: active }}
+      disabled={disabled}
       onPress={() => onPress(active ? 'working' : state)}
-      style={[styles.stateButton, active && { borderColor: meta.color, backgroundColor: `${meta.color}18` }]}
+      style={[
+        styles.stateButton,
+        active && { borderColor: meta.color, backgroundColor: `${meta.color}18` },
+        disabled && styles.stateButtonDisabled,
+      ]}
     >
       <Ionicons name={meta.icon as any} size={16} color={active ? meta.color : theme.colors.textMuted} />
       <Text style={[styles.stateButtonText, active && { color: meta.color }]}>{meta.label}</Text>
@@ -211,6 +233,7 @@ const styles = StyleSheet.create({
   primaryActions: { flexDirection: 'row', width: '100%', marginTop: theme.spacing.xl },
   flexButton: { flex: 1, minHeight: 48 },
   breakRow: { flexDirection: 'row', width: '100%', gap: 8, marginTop: 10 },
+  breakHint: { ...theme.typography.caption, color: theme.colors.textDim, textAlign: 'center', marginTop: 8 },
   stateButton: {
     flex: 1,
     minHeight: 42,
@@ -223,6 +246,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 5,
   },
+  stateButtonDisabled: { opacity: 0.4 },
   stateButtonText: { ...theme.typography.buttonSm, color: theme.colors.textMuted },
   metricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
   metric: {
@@ -263,6 +287,7 @@ const styles = StyleSheet.create({
   sessionTitle: { ...theme.typography.body, color: theme.colors.text },
   sessionSub: { ...theme.typography.caption, color: theme.colors.textMuted, marginTop: 2 },
   sessionCoins: { ...theme.typography.monoSm, color: theme.colors.warning },
+  pauseSessionLabel: { color: theme.colors.textDim },
   emptyLedger: { padding: theme.spacing.xl, alignItems: 'center' },
   emptyTitle: { ...theme.typography.h4, color: theme.colors.text, marginTop: 10 },
   emptyText: { ...theme.typography.body, color: theme.colors.textMuted, textAlign: 'center', marginTop: 6 },
