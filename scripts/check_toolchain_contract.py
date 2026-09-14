@@ -22,6 +22,7 @@ SECURITY_SCRIPTS = (
     "check_process_safety.py",
     "check_deserialization_safety.py",
     "check_sast_security.py",
+    "check_js_process_alias_safety.py",
     "check_workflow_security.py",
     "check_secret_hygiene.py",
 )
@@ -30,6 +31,7 @@ SECURITY_TESTS = (
     *PROCESS_TESTS,
     "test_deserialization_safety_gate.py",
     "test_sast_security_gate.py",
+    "test_js_process_alias_safety.py",
     "test_workflow_security_gate.py",
     "test_secret_hygiene_gate.py",
 )
@@ -37,6 +39,7 @@ SECURITY_HOOKS = (
     "backend-process-safety",
     "backend-deserialization-safety",
     "repository-sast-safety",
+    "javascript-process-alias-safety",
     "workflow-security",
     "repository-secret-hygiene",
     "backend-security-regressions",
