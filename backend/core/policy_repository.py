@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 import hashlib
+import hmac
 import json
 import os
 from pathlib import Path
@@ -69,7 +70,7 @@ class PolicyRepository:
             raise PolicyIntegrityError("policy repository envelope is malformed")
         if payload.get("version") != self.VERSION:
             raise PolicyIntegrityError("unsupported policy repository version")
-        if not hashlib.compare_digest(self._digest(payload), digest):
+        if not hmac.compare_digest(self._digest(payload), digest):
             raise PolicyIntegrityError("policy repository checksum mismatch")
         try:
             snapshot = self._decode_snapshot(payload)
