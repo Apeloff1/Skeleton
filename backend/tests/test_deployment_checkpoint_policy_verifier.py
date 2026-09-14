@@ -103,7 +103,7 @@ def test_manifest_freshness_is_used_instead_of_parallel_caller_policy(tmp_path):
     ) is True
 
 
-def test_trust_advance_cannot_downgrade_continuity_required_policy(tmp_path):
+def test_trust_advance_is_audit_only_when_current_witnessing_is_required(tmp_path):
     gateway = _gateway(tmp_path)
     _deploy(gateway, "artifact-v1")
     anchor = gateway.checkpoints.latest()
@@ -117,7 +117,10 @@ def test_trust_advance_cannot_downgrade_continuity_required_policy(tmp_path):
         checkpoint_ledger=gateway.checkpoints,
     )
 
-    normal = build_deployment_checkpoint_trust_policy_manifest(
+    optional = build_deployment_checkpoint_trust_policy_manifest(
+        DeploymentCheckpointPinPolicy(witnesses, 3, 300, False, False)
+    )
+    required = build_deployment_checkpoint_trust_policy_manifest(
         DeploymentCheckpointPinPolicy(witnesses, 3, 300, True, False)
     )
     continuity = build_deployment_checkpoint_trust_policy_manifest(
@@ -130,10 +133,16 @@ def test_trust_advance_cannot_downgrade_continuity_required_policy(tmp_path):
     )
     assert verify_policy_bound_trust_advance(
         packet,
-        manifest=normal,
-        expected_manifest_sha256=normal.manifest_sha256,
+        manifest=optional,
+        expected_manifest_sha256=optional.manifest_sha256,
         **common,
     ) is True
+    assert verify_policy_bound_trust_advance(
+        packet,
+        manifest=required,
+        expected_manifest_sha256=required.manifest_sha256,
+        **common,
+    ) is False
     assert verify_policy_bound_trust_advance(
         packet,
         manifest=continuity,
@@ -171,12 +180,15 @@ def test_single_pin_uses_manifest_quorum_and_freshness(tmp_path):
     ) is False
 
 
-def test_proof_kind_capability_prevents_continuity_downgrade():
+def test_proof_kind_capability_requires_fresh_current_witness_for_mandatory_policy():
     _, public_a = _keypair()
     _, public_b = _keypair()
     witnesses = (
         TrustedWitness("a", "org-a", True, public_a),
         TrustedWitness("b", "org-b", True, public_b),
+    )
+    required = build_deployment_checkpoint_trust_policy_manifest(
+        DeploymentCheckpointPinPolicy(witnesses, 2, 300, True, False)
     )
     continuity = build_deployment_checkpoint_trust_policy_manifest(
         DeploymentCheckpointPinPolicy(witnesses, 2, 300, True, True)
@@ -185,8 +197,11 @@ def test_proof_kind_capability_prevents_continuity_downgrade():
         DeploymentCheckpointPinPolicy(witnesses, 2, 300, False, False)
     )
 
+    assert policy_satisfied_by_proof_kind(required, "pin") is True
+    assert policy_satisfied_by_proof_kind(required, "trust_advance") is False
+    assert policy_satisfied_by_proof_kind(required, "witnessed_continuity") is True
     assert policy_satisfied_by_proof_kind(continuity, "witnessed_continuity") is True
     assert policy_satisfied_by_proof_kind(continuity, "trust_advance") is False
     assert policy_satisfied_by_proof_kind(continuity, "pin") is False
-    assert policy_satisfied_by_proof_kind(optional, "pin") is True
+    assert policy_satisfied_by_proof_kind(optional, "trust_advance") is True
     assert policy_satisfied_by_proof_kind(optional, "unknown") is False
