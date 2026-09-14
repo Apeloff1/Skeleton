@@ -2,9 +2,9 @@
 
 Witnesses may read the current canonical signing target and submit already-signed
 Ed25519 receipts. The server never accepts witness private keys and never signs on a
-witness's behalf. Operator-only endpoints expose quorum status, diagnostics, and
-portable trust advancement/continuity proofs from the same runtime used by deployment
-assurance.
+witness's behalf. Operator-only endpoints expose quorum status, diagnostics, a
+pinnable policy identity, and portable trust advancement/continuity proofs from the
+same runtime used by deployment assurance.
 """
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ from core.deployment_checkpoint_pin_ledger import (
     DeploymentCheckpointPinRejected,
 )
 from core.deployment_checkpoint_pin_wire import decode_deployment_checkpoint_pin_receipt
+from core.deployment_checkpoint_trust_policy import build_deployment_checkpoint_trust_policy_manifest
 from routes.ops import _control_plane, _require_ops
 
 router = APIRouter(
@@ -101,6 +102,18 @@ async def checkpoint_witness_diagnostics(token: str = Query("")):
         return asdict(diagnose_deployment_checkpoint_pins(_runtime()))
     except (DeploymentCheckpointPinLedgerError, ValueError) as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/policy")
+async def checkpoint_witness_policy(token: str = Query("")):
+    """Export policy identity; authority still requires pinning its digest out-of-band."""
+    _require_ops(token)
+    manifest = build_deployment_checkpoint_trust_policy_manifest(_runtime().policy)
+    return {
+        "manifest": asdict(manifest),
+        "pin_this_policy_sha256": manifest.manifest_sha256,
+        "authority": "out-of-band-digest-required",
+    }
 
 
 @router.get("/bundle")
