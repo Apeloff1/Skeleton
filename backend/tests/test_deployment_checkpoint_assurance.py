@@ -5,8 +5,27 @@ from copy import deepcopy
 import pytest
 
 from core.assurance_composition import extend_assurance
+from core.canonical_json import canonical_json_sha256
 from core.deployment_checkpoint_assurance import deployment_checkpoint_witness_invariants
 from core.system_assurance import AssuranceInvariant, AssuranceReport, verify_assurance
+
+
+def _policy_manifest(*, required: bool, continuity: bool):
+    payload = {
+        "version": 1,
+        "required_groups": 1,
+        "max_age_seconds": 300,
+        "required": required,
+        "continuity_required": continuity,
+        "witnesses": [
+            {
+                "id": "w0",
+                "independence_group": "org-a",
+                "public_key_fingerprint": "c" * 64,
+            }
+        ],
+    }
+    return {**payload, "manifest_sha256": canonical_json_sha256(payload)}
 
 
 def _status(*, required=False, continuity=False, reached=False, current=1, latest=0, prior=0):
@@ -16,6 +35,13 @@ def _status(*, required=False, continuity=False, reached=False, current=1, lates
     behind = max(0, current - latest) if latest else current
     continuity_ready = reached and (current <= 1 or (prior > 0 and prior < current))
     satisfied = (not required) or (reached and (not continuity or continuity_ready))
+    manifest = _policy_manifest(required=required, continuity=continuity)
+    if not required:
+        deploy_kinds = ["none-required", "pin", "witnessed_continuity"]
+    elif continuity:
+        deploy_kinds = ["witnessed_continuity"]
+    else:
+        deploy_kinds = ["pin", "witnessed_continuity"]
     return {
         "version": 1,
         "policy": {
@@ -25,7 +51,11 @@ def _status(*, required=False, continuity=False, reached=False, current=1, lates
             "max_age_seconds": 300,
             "trusted_witnesses": 1,
             "configured_independence_groups": 1,
+            "manifest_sha256": manifest["manifest_sha256"],
+            "deploy_authority_proof_kinds": deploy_kinds,
+            "audit_only_proof_kinds": ["trust_advance"],
         },
+        "policy_manifest": manifest,
         "ledger": {
             "verified": True,
             "cross_process_locking": True,
@@ -122,6 +152,32 @@ def test_continuity_policy_requires_prior_witnessed_epoch_after_genesis():
     valid = _status(required=True, continuity=True, reached=True, current=2, latest=2, prior=1)
     rows = _by_id(deployment_checkpoint_witness_invariants(valid))
     assert all(row.passed for row in rows.values())
+
+
+def test_policy_manifest_digest_flags_and_fingerprint_are_hard_bound():
+    for mutate in (
+        lambda status: status["policy"].__setitem__("manifest_sha256", "f" * 64),
+        lambda status: status["policy_manifest"].__setitem__("max_age_seconds", 301),
+        lambda status: status["policy_manifest"]["witnesses"][0].__setitem__(
+            "public_key_fingerprint", "d" * 64
+        ),
+        lambda status: status["policy"].__setitem__(
+            "deploy_authority_proof_kinds", ["trust_advance"]
+        ),
+    ):
+        status = _status(required=True, reached=True, latest=1)
+        mutate(status)
+        rows = _by_id(deployment_checkpoint_witness_invariants(status))
+        assert rows["deployment.checkpoint-witness-policy-identity"].passed is False
+        assert rows["deployment.checkpoint-witness-policy-capable"].passed is False
+
+
+def test_missing_portable_policy_manifest_fails_closed_even_if_summary_looks_valid():
+    status = _status(required=True, reached=True, latest=1)
+    status.pop("policy_manifest")
+    rows = _by_id(deployment_checkpoint_witness_invariants(status))
+    assert rows["deployment.checkpoint-witness-policy-identity"].passed is False
+    assert rows["deployment.checkpoint-witness-summary-coherent"].passed is False
 
 
 def test_frontier_bool_integer_confusion_and_false_lag_claims_fail_closed():
