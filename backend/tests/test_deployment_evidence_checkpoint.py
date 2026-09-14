@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import replace
 import hashlib
 
+import pytest
+
 from core.deployment_evidence_checkpoint import (
     build_deployment_evidence_checkpoint,
     verify_deployment_evidence_checkpoint,
@@ -156,3 +158,23 @@ def test_checkpoint_with_evidence_gap_is_not_authority_for_proof(tmp_path, monke
         checkpoint,
         expected_checkpoint_root_sha256=checkpoint.root_sha256,
     ) is False
+
+
+def test_checkpoint_builder_rejects_coerced_portability_counts(tmp_path, monkeypatch):
+    gateway = _gateway(tmp_path)
+    _deploy(gateway, artifact="artifact-v1")
+    real = gateway.portability_status()
+    monkeypatch.setattr(gateway, "portability_status", lambda: {**real, "completed_releases": "1"})
+
+    with pytest.raises(ValueError, match="completed_releases"):
+        build_deployment_evidence_checkpoint(gateway)
+
+
+def test_checkpoint_builder_refuses_unverified_ledger_status(tmp_path, monkeypatch):
+    gateway = _gateway(tmp_path)
+    _deploy(gateway, artifact="artifact-v1")
+    real_status = gateway.authorizations.status
+    monkeypatch.setattr(gateway.authorizations, "status", lambda: {**real_status(), "verified": False})
+
+    with pytest.raises(ValueError, match="authorization ledger is not verified"):
+        build_deployment_evidence_checkpoint(gateway)
