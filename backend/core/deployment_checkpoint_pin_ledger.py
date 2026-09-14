@@ -30,7 +30,7 @@ from core.deployment_checkpoint_witness import (
     verify_deployment_checkpoint_pin,
 )
 from core.file_lease import FileLease
-from core.signed_transparency_witness import SignedWitnessStatement
+from core.signed_transparency_witness import SignedWitnessStatement, public_key_fingerprint
 from core.transparency_witness import TrustedWitness
 
 DEPLOYMENT_CHECKPOINT_PIN_LEDGER_VERSION = 1
@@ -90,12 +90,22 @@ def _parse_utc(value: Any) -> datetime:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError as exc:
         raise ValueError("checkpoint pin timestamp is malformed") from exc
-    if parsed.tzinfo is None:
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ValueError("checkpoint pin timestamp must be timezone-aware")
     normalized = parsed.astimezone(UTC).isoformat()
     if value.replace("Z", "+00:00") != normalized:
         raise ValueError("checkpoint pin timestamp must be normalized to UTC")
     return parsed.astimezone(UTC)
+
+
+def _normalize_now(value: datetime | None) -> datetime:
+    if value is None:
+        return datetime.now(UTC)
+    if not isinstance(value, datetime):
+        raise ValueError("checkpoint pin quorum time must be a datetime")
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("checkpoint pin quorum time must be timezone-aware")
+    return value.astimezone(UTC)
 
 
 def _strict_json_loads(text: str) -> Any:
@@ -207,6 +217,10 @@ class DeploymentCheckpointPinLedger:
             if row.enabled:
                 if not isinstance(row.public_key_b64, str) or not row.public_key_b64:
                     raise ValueError("enabled checkpoint witness requires pinned Ed25519 public key")
+                try:
+                    public_key_fingerprint(row.public_key_b64)
+                except ValueError as exc:
+                    raise ValueError("enabled checkpoint witness has malformed Ed25519 public key") from exc
                 registry[witness_id] = TrustedWitness(witness_id, group, True, row.public_key_b64)
         return registry
 
@@ -325,9 +339,7 @@ class DeploymentCheckpointPinLedger:
             publication = next((row for row in publications if row.sequence == publication_sequence), None)
             if publication is None:
                 raise KeyError(publication_sequence)
-        when = (now or datetime.now(UTC)).astimezone(UTC)
-        if when.tzinfo is None:
-            raise ValueError("checkpoint pin quorum time must be timezone-aware")
+        when = _normalize_now(now)
         earliest = when - timedelta(seconds=self.max_age_seconds)
         events = [row for row in self.snapshot() if hmac.compare_digest(row.receipt.publication.sha256, publication.sha256)]
         trusted = len(events)
@@ -379,14 +391,14 @@ class DeploymentCheckpointPinLedger:
         publication_sequence: int | None = None,
         now: datetime | None = None,
     ) -> DeploymentCheckpointPinBundle:
-        quorum = self.quorum(publication_sequence=publication_sequence, now=now)
+        when = _normalize_now(now)
+        quorum = self.quorum(publication_sequence=publication_sequence, now=when)
         if quorum is None or not quorum.reached:
             raise DeploymentCheckpointPinRejected("checkpoint pin quorum has not been reached")
         publication = next(
             row for row in self.checkpoint_ledger.history()
             if row.sequence == quorum.publication_sequence
         )
-        when = (now or datetime.now(UTC)).astimezone(UTC)
         earliest = when - timedelta(seconds=self.max_age_seconds)
         receipts = []
         for event in self.snapshot():
