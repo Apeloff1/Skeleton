@@ -1,19 +1,21 @@
 """
-Admin / Ops observability — read-only at-a-glance dashboard data.
-
-Surfaces counts for the platform's key collections plus headline KPIs (GMV, paid
-transactions, active listings, live tournaments) and the most recent payment
-transactions / listings. Optional gate: if OPS_TOKEN is set in env, callers must
-pass ?token=<OPS_TOKEN>; otherwise the endpoint is open (read-only aggregates only).
+Admin / Ops observability — read-only at-a-glance dashboard data plus the
+canonical governed product-control seam.
 """
 from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 
+from core.charter_policy import Rule
 from core.databases import client as _SHARED_MONGO_CLIENT
+from core.durable_outbox import OutboxFullError
+from core.product_control_plane import ProductControlPlane
+from core.product_operations import OperationRejected
 
 router = APIRouter(prefix="/api/admin/ops", tags=["ops"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
@@ -24,10 +26,54 @@ _COLLECTIONS = [
 ]
 
 
+def _authorized(token: str) -> bool:
+    gate = os.environ.get("OPS_TOKEN", "")
+    return not gate or token == gate
+
+
+def _require_ops(token: str) -> None:
+    if not _authorized(token):
+        raise HTTPException(status_code=403, detail="unauthorized")
+
+
+_CONTROL_PLANE: ProductControlPlane | None = None
+
+
+def _control_plane() -> ProductControlPlane:
+    global _CONTROL_PLANE
+    if _CONTROL_PLANE is None:
+        root = Path(os.environ.get("PRODUCT_CONTROL_ROOT", "data/product-control"))
+        cap = int(os.environ.get("PRODUCT_CONTROL_OUTBOX_CAP", "4096"))
+        _CONTROL_PLANE = ProductControlPlane(root, outbox_cap=cap)
+    return _CONTROL_PLANE
+
+
+class RuleInput(BaseModel):
+    id: str = Field(min_length=1, max_length=128)
+    action: str = Field(min_length=1, max_length=256)
+    min_weight: int = Field(default=0, ge=0)
+    requires_quorum: bool = False
+
+
+class RatifyInput(BaseModel):
+    domain: str = Field(min_length=1, max_length=128)
+    rules: list[RuleInput] = Field(min_length=1, max_length=256)
+
+
+class AdmitInput(BaseModel):
+    capability_id: str = Field(min_length=1, max_length=128)
+    domain: str = Field(min_length=1, max_length=128)
+    action: str = Field(min_length=1, max_length=256)
+    principal: str = Field(min_length=1, max_length=256)
+    actor_weight: int = Field(ge=0)
+    payload: dict = Field(default_factory=dict)
+    quorum_approved: bool = False
+    idempotency_key: str | None = Field(default=None, max_length=256)
+
+
 @router.get("/overview")
 async def overview(token: str = Query("")):
-    gate = os.environ.get("OPS_TOKEN", "")
-    if gate and token != gate:
+    if not _authorized(token):
         return {"error": "unauthorized"}
 
     counts = {}
@@ -79,10 +125,7 @@ async def overview(token: str = Query("")):
 
 @router.get("/metrics")
 async def metrics(token: str = Query("")):
-    """#13 Structured metrics + threshold alerts for the Ops Console. Lightweight
-    health signals derived from the live collections."""
-    gate = os.environ.get("OPS_TOKEN", "")
-    if gate and token != gate:
+    if not _authorized(token):
         return {"error": "unauthorized"}
 
     games = await _db.playables.estimated_document_count()
@@ -101,7 +144,6 @@ async def metrics(token: str = Query("")):
         "open_disputes": open_disputes, "pending_payouts": pending_payouts,
         "active_premium": active_premium,
     }
-    # Threshold alerts (severity: warn/critical).
     alerts = []
     if fail_rate >= 25:
         alerts.append({"level": "critical", "metric": "fail_rate_pct", "value": fail_rate,
@@ -123,3 +165,52 @@ async def metrics(token: str = Query("")):
             "gauges": gauges, "alerts": alerts,
             "status": "critical" if any(a["level"] == "critical" for a in alerts)
                       else ("warn" if alerts else "ok")}
+
+
+@router.get("/product-control/status")
+async def product_control_status(token: str = Query("")):
+    _require_ops(token)
+    return _control_plane().status()
+
+
+@router.post("/product-control/policy/ratify")
+async def product_control_ratify(body: RatifyInput, token: str = Query("")):
+    _require_ops(token)
+    try:
+        charter = _control_plane().ratify(
+            body.domain,
+            [Rule(r.id, r.action, r.min_weight, r.requires_quorum) for r in body.rules],
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"charter_id": charter.id, "domain": charter.domain, "rules": len(charter.rules)}
+
+
+@router.post("/product-control/admit")
+async def product_control_admit(body: AdmitInput, token: str = Query("")):
+    _require_ops(token)
+    try:
+        admitted = _control_plane().admit(
+            capability_id=body.capability_id,
+            domain=body.domain,
+            action=body.action,
+            principal=body.principal,
+            actor_weight=body.actor_weight,
+            payload=body.payload,
+            quorum_approved=body.quorum_approved,
+            idempotency_key=body.idempotency_key,
+        )
+    except OutboxFullError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except OperationRejected as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "operation_id": admitted.id,
+        "capability_id": admitted.capability_id,
+        "pillar": admitted.pillar,
+        "outbox_seq": admitted.outbox_seq,
+        "admitted_at": admitted.admitted_at,
+        "audit_hash": admitted.audit_hash,
+    }
