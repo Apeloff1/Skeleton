@@ -86,6 +86,7 @@ jobs:
           tests/test_world_runtime_social_travel.py
           tests/test_economy_dialogue_runtime.py
           tests/test_world_economy_dialogue.py
+          tests/test_witness_policy_config_strict.py
           tests/test_control_plane_deployment.py
           tests/test_deployment_authorization.py
           tests/test_deployment_plan_integrity.py
