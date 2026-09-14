@@ -4,6 +4,7 @@ canonical governed product-control seam.
 """
 from __future__ import annotations
 
+from dataclasses import asdict
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,6 +12,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from core.atomic_release_deployer import ReleaseDeploymentError
 from core.charter_policy import Rule
 from core.control_plane_deployment import control_plane_preflight_dict
 from core.databases import client as _SHARED_MONGO_CLIENT
@@ -97,7 +99,7 @@ async def overview(token: str = Query("")):
     ]).to_list(1)
     gmv = round((paid[0]["gmv"] if paid else 0) or 0, 2)
     paid_count = paid[0]["n"] if paid else 0
-    active_listings = await _db.marketplace_listings.count_documents({"active": True)
+    active_listings = await _db.marketplace_listings.count_documents({"active": True})
     live_tournaments = await _db.tournaments.count_documents({"status": "live"})
     creators = len(await _db.marketplace_listings.distinct("creator_id"))
     recent_tx = await _db.payment_transactions.find({}, {"_id": 0, "session_id": 1, "playable_id": 1,
@@ -185,16 +187,11 @@ async def product_control_current_release(target: str = Query(min_length=1, max_
                                           environment: str = Query(min_length=1, max_length=64),
                                           token: str = Query("")):
     _require_ops(token)
-    try: release = _control_plane().deployments.releases.current(target=target, environment=environment)
-    except Exception as exc: raise HTTPException(status_code=500, detail=str(exc)) from exc
-    return {"release": None if release is None else release.__dict__ if hasattr(release, "__dict__") else {
-        "version": release.version, "sequence": release.sequence, "release_id": release.release_id,
-        "authorization_id": release.authorization_id, "target": release.target, "environment": release.environment,
-        "artifact": release.artifact, "plan_sha256": release.plan_sha256,
-        "system_root_sha256": release.system_root_sha256, "activated_at": release.activated_at,
-        "previous_release_id": release.previous_release_id, "previous_sha256": release.previous_sha256,
-        "sha256": release.sha256,
-    }}
+    try:
+        release = _control_plane().deployments.releases.current(target=target, environment=environment)
+    except ReleaseDeploymentError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {"release": None if release is None else asdict(release)}
 
 
 @router.get("/product-control/pending")
