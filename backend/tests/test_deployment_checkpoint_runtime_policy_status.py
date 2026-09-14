@@ -16,17 +16,25 @@ def _status(tmp_path, policy):
     return runtime.status(), build_deployment_checkpoint_trust_policy_manifest(policy)
 
 
+def _assert_manifest(status, manifest):
+    assert status["policy"]["manifest_sha256"] == manifest.manifest_sha256
+    assert status["policy_manifest"]["manifest_sha256"] == manifest.manifest_sha256
+    assert status["policy_manifest"]["required_groups"] == manifest.required_groups
+    assert status["policy_manifest"]["max_age_seconds"] == manifest.max_age_seconds
+    assert isinstance(status["policy_manifest"]["witnesses"], list)
+
+
 def test_required_policy_status_separates_deploy_authority_from_audit_bridge(tmp_path):
     _, witnesses = _trusted()
     policy = DeploymentCheckpointPinPolicy(witnesses, 2, 300, True, False)
     status, manifest = _status(tmp_path, policy)
 
-    assert status["policy"]["manifest_sha256"] == manifest.manifest_sha256
-    assert status["policy"]["deploy_authority_proof_kinds"] == (
+    _assert_manifest(status, manifest)
+    assert status["policy"]["deploy_authority_proof_kinds"] == [
         "pin",
         "witnessed_continuity",
-    )
-    assert status["policy"]["audit_only_proof_kinds"] == ("trust_advance",)
+    ]
+    assert status["policy"]["audit_only_proof_kinds"] == ["trust_advance"]
     assert "trust_advance" not in status["policy"]["deploy_authority_proof_kinds"]
 
 
@@ -35,19 +43,19 @@ def test_continuity_required_status_only_advertises_two_endpoint_authority(tmp_p
     policy = DeploymentCheckpointPinPolicy(witnesses, 2, 300, True, True)
     status, manifest = _status(tmp_path, policy)
 
-    assert status["policy"]["manifest_sha256"] == manifest.manifest_sha256
-    assert status["policy"]["deploy_authority_proof_kinds"] == ("witnessed_continuity",)
-    assert status["policy"]["audit_only_proof_kinds"] == ("trust_advance",)
+    _assert_manifest(status, manifest)
+    assert status["policy"]["deploy_authority_proof_kinds"] == ["witnessed_continuity"]
+    assert status["policy"]["audit_only_proof_kinds"] == ["trust_advance"]
 
 
 def test_optional_policy_marks_no_external_proof_as_required(tmp_path):
     policy = DeploymentCheckpointPinPolicy((), 1, 300, False, False)
     status, manifest = _status(tmp_path, policy)
 
-    assert status["policy"]["manifest_sha256"] == manifest.manifest_sha256
-    assert status["policy"]["deploy_authority_proof_kinds"] == (
+    _assert_manifest(status, manifest)
+    assert status["policy"]["deploy_authority_proof_kinds"] == [
         "none-required",
         "pin",
         "witnessed_continuity",
-    )
-    assert status["policy"]["audit_only_proof_kinds"] == ("trust_advance",)
+    ]
+    assert status["policy"]["audit_only_proof_kinds"] == ["trust_advance"]
