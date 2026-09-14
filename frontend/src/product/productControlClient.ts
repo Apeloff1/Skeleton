@@ -36,7 +36,37 @@ export type DeploymentPreflightReport = {
 export type ControlPlaneDeploymentPreflight = {
   version: number; allowed: boolean; stable: boolean; attempts: number;
   root_before_sha256: string; root_after_sha256: string; evaluated_at: string;
-  unstable_reason: string; report: DeploymentPreflightReport; attestation_sha256: string; self_verified: boolean;
+  unstable_reason: string; report: DeploymentPreflightReport; attestation_sha256: string; self_verified?: boolean;
+};
+export type DeploymentAuthorization = {
+  id: string; system_root_sha256: string; preflight_sha256: string; plan_sha256: string;
+  issued_at: string; expires_at: string; issue_event_sha256: string;
+};
+export type ReleaseRecord = {
+  version: number; sequence: number; release_id: string; authorization_id: string;
+  target: string; environment: string; artifact: string; plan_sha256: string;
+  system_root_sha256: string; activated_at: string; previous_release_id: string;
+  previous_sha256: string; sha256: string;
+};
+export type DeploymentTrustStatus = {
+  authorization: { version: number; issued: number; consumed: number; outstanding: number; head_sha256: string; cross_process_locking: boolean; lock_backend: string; verified: boolean };
+  release_backend: { version: number; channels: number; releases: number; head_set_sha256: string; cross_process_locking: boolean; lock_backend: string; verified: boolean };
+  verified: boolean;
+};
+export type PreparedDeployment = {
+  plan: Record<string, unknown>;
+  preflight: ControlPlaneDeploymentPreflight;
+  authorization: DeploymentAuthorization;
+};
+export type DeploymentExecution = {
+  authorization_id: string; resumed: boolean; preflight: ControlPlaneDeploymentPreflight | null;
+  consumption: { authorization_id: string; consumed_at: string; system_root_sha256: string; plan_sha256: string; consume_event_sha256: string };
+  release: ReleaseRecord;
+};
+export type DeploymentInput = {
+  target: string; environment: 'development' | 'staging' | 'production'; artifact: string;
+  strategy?: 'rolling' | 'canary' | 'blue-green'; canary_percent?: number;
+  max_error_rate_pct?: number; max_p95_latency_ms?: number; min_success_rate_pct?: number;
 };
 export type ControlPlaneStatus = {
   policy_version: number;
@@ -48,6 +78,7 @@ export type ControlPlaneStatus = {
   assurance: AssuranceReport;
   system_root: SystemRootAttestation;
   receipts: ReceiptVaultStats;
+  deployments: DeploymentTrustStatus;
   lifecycle: { operations: number; states: Record<string, number>; evidence_gaps: number; anomalies: number };
   operations: { capabilities: number; pending_operations: number; outbox_capacity_remaining: number; idempotency_records: number; audit_sequence: number; audit_head: string | null };
 };
@@ -81,6 +112,21 @@ export function getProductControlStatus(token = '', signal?: AbortSignal): Promi
 export function getDeploymentPreflight(token = '', maxAttempts = 3, signal?: AbortSignal): Promise<ApiResult<ControlPlaneDeploymentPreflight>> {
   return api.get<ControlPlaneDeploymentPreflight>(`${ROOT}/deployment-preflight${tokenQueryWith(token, { max_attempts: maxAttempts })}`,
     { signal, cacheKey: 'product-control-deployment-preflight', cacheTtlMs: 2_000 });
+}
+export function getDeploymentTrustStatus(token = '', signal?: AbortSignal): Promise<ApiResult<DeploymentTrustStatus>> {
+  return api.get<DeploymentTrustStatus>(`${ROOT}/deployments${tokenQuery(token)}`, { signal, cacheKey: 'product-control-deployments', cacheTtlMs: 2_000 });
+}
+export function prepareProductDeployment(input: DeploymentInput, token = '', ttlSeconds = 300, maxAttempts = 3, signal?: AbortSignal): Promise<ApiResult<PreparedDeployment>> {
+  return api.post<PreparedDeployment>(`${ROOT}/deployments/prepare${tokenQuery(token)}`,
+    { deployment: input, ttl_seconds: ttlSeconds, max_attempts: maxAttempts }, { signal, retries: 0 });
+}
+export function executeProductDeployment(authorizationId: string, deployment: Record<string, unknown>, token = '', maxAttempts = 3, signal?: AbortSignal): Promise<ApiResult<DeploymentExecution>> {
+  return api.post<DeploymentExecution>(`${ROOT}/deployments/execute${tokenQuery(token)}`,
+    { authorization_id: authorizationId, deployment, max_attempts: maxAttempts }, { signal, retries: 0 });
+}
+export function getCurrentRelease(target: string, environment: string, token = '', signal?: AbortSignal): Promise<ApiResult<{ release: ReleaseRecord | null }>> {
+  return api.get<{ release: ReleaseRecord | null }>(`${ROOT}/deployments/current${tokenQueryWith(token, { target, environment })}`,
+    { signal, cacheKey: `product-control-release-${environment}-${target}`, cacheTtlMs: 2_000 });
 }
 export function getPendingProductOperations(token = '', signal?: AbortSignal): Promise<ApiResult<PendingOperationResponse>> {
   return api.get<PendingOperationResponse>(`${ROOT}/pending${tokenQuery(token)}`, { signal, cacheKey: 'product-control-pending', cacheTtlMs: 2_000 });
