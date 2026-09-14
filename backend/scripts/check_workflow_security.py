@@ -13,15 +13,32 @@ import sys
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 SHA40_RE = re.compile(r"^[0-9a-fA-F]{40}$")
-USES_RE = re.compile(r"^\s*-\s+uses:\s*([^\s#]+)")
+SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+# Match both ordinary step syntax (`- uses:`), job-level reusable workflows
+# (`uses:`), and the common single-line mapping form (`- {uses: ...}`).
+USES_RE = re.compile(
+    r"^\s*(?:-\s*)?(?:\{\s*)?uses\s*:\s*[\"']?([^\"'\s,}#]+)"
+)
 
 
 def workflow_files() -> list[Path]:
     return sorted([*WORKFLOW_DIR.glob("*.yml"), *WORKFLOW_DIR.glob("*.yaml")])
 
 
-def _is_local_or_container(reference: str) -> bool:
-    return reference.startswith("./") or reference.startswith("docker://")
+def _is_local(reference: str) -> bool:
+    return reference.startswith("./")
+
+
+def _container_violation(reference: str) -> str | None:
+    if not reference.startswith("docker://"):
+        return None
+    target = reference.removeprefix("docker://")
+    if "@sha256:" not in target:
+        return "container action must be pinned to an immutable sha256 digest"
+    image, digest = target.rsplit("@sha256:", 1)
+    if not image or not SHA256_RE.fullmatch(digest):
+        return "container action has an invalid sha256 digest pin"
+    return None
 
 
 def violations(path: Path) -> list[str]:
@@ -51,14 +68,25 @@ def violations(path: Path) -> list[str]:
         if not match:
             continue
         reference = match.group(1).strip("\"'")
-        if _is_local_or_container(reference):
+        if _is_local(reference):
+            continue
+        if reference.startswith("docker://"):
+            container_violation = _container_violation(reference)
+            if container_violation:
+                findings.append(
+                    f"{path.name}:{number}: {container_violation}: {reference}"
+                )
             continue
         if "@" not in reference:
-            findings.append(f"{path.name}:{number}: action reference must be pinned to an immutable commit SHA: {reference}")
+            findings.append(
+                f"{path.name}:{number}: action reference must be pinned to an immutable commit SHA: {reference}"
+            )
             continue
         _action, revision = reference.rsplit("@", 1)
         if not SHA40_RE.fullmatch(revision):
-            findings.append(f"{path.name}:{number}: action reference is not pinned to a 40-character commit SHA: {reference}")
+            findings.append(
+                f"{path.name}:{number}: action reference is not pinned to a 40-character commit SHA: {reference}"
+            )
 
     if not has_top_level_permissions:
         findings.append(f"{path.name}: missing explicit top-level permissions block")
