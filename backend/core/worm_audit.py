@@ -99,15 +99,19 @@ class WormAuditLog:
     def sequence(self) -> int:
         return self._seq
 
-    def _restore(self) -> AuditEntry | None:
+    def _read_entries(self) -> list[AuditEntry]:
         if not self.path.exists():
-            return None
+            return []
         entries: list[AuditEntry] = []
         with self.path.open("r", encoding="utf-8") as handle:
             for line_number, raw in enumerate(handle, start=1):
                 raw = raw.strip()
                 if raw:
                     entries.append(_decode_entry(raw, line_number))
+        return entries
+
+    def _restore(self) -> AuditEntry | None:
+        entries = self._read_entries()
         return verify_entries(entries)
 
     def append(
@@ -120,6 +124,8 @@ class WormAuditLog:
         detail: str,
         ts: datetime | None = None,
     ) -> AuditEntry:
+        if ts is not None and ts.tzinfo is None:
+            raise ValueError("audit timestamp must be timezone-aware")
         with self._lock:
             seq = self._seq + 1
             stamp = (ts or datetime.now(UTC)).astimezone(UTC).isoformat()
@@ -144,6 +150,17 @@ class WormAuditLog:
             self._latest = entry
             self._seq = seq
             return entry
+
+    def entries(self, *, limit: int | None = None) -> tuple[AuditEntry, ...]:
+        """Return a verified history snapshot, optionally limited to the newest N."""
+        if limit is not None and limit < 0:
+            raise ValueError("limit cannot be negative")
+        with self._lock:
+            entries = self._read_entries()
+            verify_entries(entries)
+            if limit is not None:
+                entries = entries[-limit:] if limit else []
+            return tuple(entries)
 
     def verify(self) -> AuditEntry | None:
         """Re-read and verify the on-disk chain, returning its current head."""
