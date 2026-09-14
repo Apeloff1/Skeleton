@@ -163,6 +163,13 @@ async def product_control_receipt_result(operation_id: str, token: str = Query("
         raise HTTPException(status_code=status, detail=str(exc)) from exc
 
 
+@router.get("/product-control/operation/{operation_id}/lifecycle")
+async def product_control_operation_lifecycle(operation_id: str, token: str = Query("")):
+    _require_ops(token)
+    try: return _control_plane().operation_lifecycle(operation_id)
+    except (ValueError, ReceiptIntegrityError) as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.post("/product-control/execute/{seq}")
 async def product_control_execute(seq: int, token: str = Query("")):
     _require_ops(token)
