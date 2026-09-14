@@ -379,7 +379,7 @@ export default function UniversalForge() {
               <Construct3DView geometry={spec.geometry || []} palette={palette}
                 partColors={partColors} selectedPart={selectedPart}
                 surface={spec.surface} vfx={spec.vfx}
-                onSelectPart={(i) => setSelectedPart(i)} height={300} />
+                onSelectPart={(i: number) => setSelectedPart(i)} height={300} />
             </LazyMount>
             {selectedPart !== null && (
               <View style={styles.partRow}>
@@ -728,6 +728,16 @@ const styles = StyleSheet.create({
   vaultBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.alt, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: C.border },
   vaultTxt: { color: C.text, fontSize: 12, fontWeight: '700' },
   status: { fontSize: 13, fontWeight: '700', marginTop: 12, textAlign: 'center' },
+  dnaCard: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 12, marginTop: 12 },
+  dnaHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  dnaTitle: { color: C.text, fontSize: 13, fontWeight: '900', flex: 1 },
+  dnaCopy: { borderWidth: 1, borderColor: C.accent, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 6 },
+  dnaCopyTxt: { color: C.accent, fontSize: 10, fontWeight: '900' },
+  dnaHex: { color: C.muted, fontSize: 10, fontFamily: 'monospace', marginTop: 8 },
+  ecsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
+  ecsChip: { backgroundColor: C.alt, borderWidth: 1, borderColor: C.border, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4 },
+  ecsChipTxt: { color: C.text, fontSize: 10, fontWeight: '700' },
+  dnaPruned: { color: '#F59E0B', fontSize: 10, fontWeight: '700', marginTop: 8 },
   capacity: { color: C.muted, fontSize: 11, textAlign: 'center', marginTop: 14 },
   partRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, backgroundColor: C.alt, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 7 },
   partTxt: { color: C.text, fontSize: 12, fontWeight: '700' },
