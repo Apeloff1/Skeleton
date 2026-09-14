@@ -5,6 +5,9 @@ on:
     paths:
       - "backend/core/content_store.py"
       - "backend/core/product_operations.py"
+      - "backend/core/policy_repository.py"
+      - "backend/core/product_control_plane.py"
+      - "backend/core/charter_policy.py"
       - "backend/core/progression.py"
       - "backend/core/flight_dynamics.py"
       - "backend/core/terrain_field.py"
@@ -37,6 +40,8 @@ on:
       - "backend/core/dialogue_runtime.py"
       - "backend/tests/test_content_store.py"
       - "backend/tests/test_product_operations.py"
+      - "backend/tests/test_policy_repository.py"
+      - "backend/tests/test_product_control_plane.py"
       - "backend/tests/test_progression.py"
       - "backend/tests/test_playable_simulation.py"
       - "backend/tests/test_runtime_sessions.py"
@@ -59,6 +64,9 @@ on:
     paths:
       - "backend/core/content_store.py"
       - "backend/core/product_operations.py"
+      - "backend/core/policy_repository.py"
+      - "backend/core/product_control_plane.py"
+      - "backend/core/charter_policy.py"
       - "backend/core/progression.py"
       - "backend/core/flight_dynamics.py"
       - "backend/core/terrain_field.py"
@@ -91,6 +99,8 @@ on:
       - "backend/core/dialogue_runtime.py"
       - "backend/tests/test_content_store.py"
       - "backend/tests/test_product_operations.py"
+      - "backend/tests/test_policy_repository.py"
+      - "backend/tests/test_product_control_plane.py"
       - "backend/tests/test_progression.py"
       - "backend/tests/test_playable_simulation.py"
       - "backend/tests/test_runtime_sessions.py"
@@ -131,6 +141,8 @@ jobs:
           python -m pytest -q
           tests/test_content_store.py
           tests/test_product_operations.py
+          tests/test_policy_repository.py
+          tests/test_product_control_plane.py
           tests/test_progression.py
           tests/test_playable_simulation.py
           tests/test_runtime_sessions.py
