@@ -32,6 +32,7 @@ def test_witness_route_keeps_read_signing_target_and_external_receipt_ingestion(
         '@router.get("/target")',
         '@router.post("/receipts")',
         '@router.get("/status")',
+        '@router.get("/diagnostics")',
         '@router.get("/bundle")',
         '@router.get("/trust-advance")',
         '@router.get("/continuity")',
