@@ -1,7 +1,7 @@
 name: Backend Quality
 
 # Fast, fail-closed backend gate: lint, syntax compilation, critical
-# security-boundary regression tests, and process invocation policy.
+# security-boundary regression tests, and process/deserialization policy.
 
 on:
   push:
@@ -50,6 +50,9 @@ jobs:
       - name: Process invocation safety gate
         run: python scripts/check_process_safety.py
 
+      - name: Deserialization safety gate
+        run: python scripts/check_deserialization_safety.py
+
       - name: Security boundary regression tests
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
@@ -61,6 +64,7 @@ jobs:
           tests/test_process_safety_partial.py
           tests/test_process_safety_namespace_get.py
           tests/test_process_safety_getattribute.py
+          tests/test_deserialization_safety_gate.py
           tests/test_security_middleware_hardening.py
           tests/test_client_ip_security.py
           tests/test_size_limit_security.py
