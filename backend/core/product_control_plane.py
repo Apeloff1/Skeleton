@@ -41,6 +41,7 @@ class ProductControlPlane:
                 operations_provider=self.operations.snapshot,
                 policy_provider=self._policy_projection,
                 audit_provider=self._audit_projection,
+                safety_provider=self._safety_projection,
             )
         else:
             self.executors = ProductExecutorRegistry()
@@ -59,6 +60,45 @@ class ProductControlPlane:
 
     def _audit_projection(self) -> list[dict[str, Any]]:
         return [asdict(entry) for entry in self.operations.audit.entries(limit=50)]
+
+    def _safety_projection(self) -> dict[str, Any]:
+        ledger = self.execution_ledger()
+        anomaly_count = sum(len(item.get("anomalies", ())) for item in ledger)
+        evidence_gaps = sum(item.get("state") in {"evidence_gap", "receipt_unattested"} for item in ledger)
+        low_confidence = sum(item.get("confidence") == "low" for item in ledger)
+        op = self.operations.snapshot()
+        coverage = self.executor_coverage()
+        audit_head = op.get("audit_head")
+        posture = "healthy"
+        reasons: list[str] = []
+        if evidence_gaps:
+            posture = "degraded"
+            reasons.append(f"{evidence_gaps} lifecycle evidence gap(s)")
+        if anomaly_count:
+            posture = "degraded"
+            reasons.append(f"{anomaly_count} lifecycle anomaly signal(s)")
+        if op.get("outbox_capacity_remaining", 0) <= 0:
+            posture = "blocked"
+            reasons.append("operation outbox has no remaining capacity")
+        elif op.get("outbox_capacity_remaining", 0) < 32:
+            posture = "degraded" if posture == "healthy" else posture
+            reasons.append("operation outbox capacity is low")
+        return {
+            "posture": posture,
+            "reasons": reasons,
+            "policy_version": POLICY_VERSION,
+            "audit_sequence": op.get("audit_sequence", 0),
+            "audit_head": audit_head,
+            "native_coverage_pct": coverage["coverage_pct"],
+            "native_bound_actions": coverage["bound_actions"],
+            "canonical_actions": coverage["canonical_actions"],
+            "pending_operations": op.get("pending_operations", 0),
+            "outbox_capacity_remaining": op.get("outbox_capacity_remaining", 0),
+            "lifecycle_operations": len(ledger),
+            "lifecycle_anomalies": anomaly_count,
+            "evidence_gaps": evidence_gaps,
+            "low_confidence_lifecycles": low_confidence,
+        }
 
     def ratify(self, domain: str, rules: list[Rule]) -> Charter:
         charter = self.policy.ratify(domain, rules)
@@ -196,8 +236,10 @@ class ProductControlPlane:
         governance = self.policy.snapshot()
         ledger = self.execution_ledger()
         lifecycle_counts: dict[str, int] = {}
+        anomaly_count = 0
         for item in ledger:
             lifecycle_counts[item["state"]] = lifecycle_counts.get(item["state"], 0) + 1
+            anomaly_count += len(item.get("anomalies", ()))
         return {"policy_version": POLICY_VERSION, "policy_bootstrap_enabled": self.bootstrap_policy,
                 "kernel": {"capabilities": [{"id": capability.id, "pillar": capability.pillar.value,
                                                "critical": capability.critical}
@@ -209,5 +251,7 @@ class ProductControlPlane:
                               "coverage": self.executor_coverage()},
                 "receipts": self.receipts.stats(),
                 "lifecycle": {"operations": len(ledger), "states": lifecycle_counts,
-                              "evidence_gaps": lifecycle_counts.get("evidence_gap", 0)},
+                              "evidence_gaps": lifecycle_counts.get("evidence_gap", 0) + lifecycle_counts.get("receipt_unattested", 0),
+                              "anomalies": anomaly_count},
+                "safety": self._safety_projection(),
                 "operations": self.operations.snapshot()}
