@@ -4,9 +4,9 @@ hardening middleware — additional safety nets for the FastAPI backend.
   • RequestTimeoutMiddleware — kills any /api/* request running longer
     than DEFAULT_TIMEOUT_S, returning 504 instead of letting the worker
     hang. Configurable per-path via the PATH_TIMEOUTS map.
-  • ProcessHealthRouter — adds GET /api/health/detailed with CPU /
-    memory / disk numbers so the frontend (or external monitoring)
-    can detect resource exhaustion before requests start failing.
+  • ProcessHealthRouter — adds GET /api/health/detailed with a deliberately
+    low-information health payload. Sensitive process details are emitted only
+    when HEALTH_DIAGNOSTICS_VERBOSE is explicitly enabled by the deployment.
 
 Wired into server.py via:
     from middleware.hardening import RequestTimeoutMiddleware, hardening_router
@@ -14,6 +14,7 @@ Wired into server.py via:
     app.include_router(hardening_router, prefix="/api")
 """
 from __future__ import annotations
+
 import asyncio
 import logging
 import os
@@ -30,26 +31,33 @@ log = logging.getLogger("api.hardening")
 # Per-path overrides (longest-prefix match). Paths NOT listed use the
 # middleware-level default_timeout_s. Tune for known slow endpoints.
 PATH_TIMEOUTS: dict[str, float] = {
-    "/api/binary/build":      120.0,   # APK compile may take a while
-    "/api/binary/rebuild":    120.0,
-    "/api/agents":             60.0,
-    "/api/imagine":            90.0,
-    "/api/music":              90.0,
-    "/api/galaxy/build":      180.0,
-    "/api/discourse/deliberate": 180.0,  # multi-model debate + critique + judge
-    "/api/design-spec/compile":  90.0,   # reasoning-model GDD synthesis
-    "/api/playable/generate":   180.0,   # full HTML5 game codegen (large output)
-    "/api/llm-router/complete":  90.0,   # may route to slow reasoning models
-    "/api/llm-router/game":      90.0,
+    "/api/binary/build": 120.0,
+    "/api/binary/rebuild": 120.0,
+    "/api/agents": 60.0,
+    "/api/imagine": 90.0,
+    "/api/music": 90.0,
+    "/api/galaxy/build": 180.0,
+    "/api/discourse/deliberate": 180.0,
+    "/api/design-spec/compile": 90.0,
+    "/api/playable/generate": 180.0,
+    "/api/llm-router/complete": 90.0,
+    "/api/llm-router/game": 90.0,
 }
 
 
 def _resolve_timeout(path: str, default: float) -> float:
     best_key = ""
-    for k in PATH_TIMEOUTS:
-        if path.startswith(k) and len(k) > len(best_key):
-            best_key = k
+    for key in PATH_TIMEOUTS:
+        if path.startswith(key) and len(key) > len(best_key):
+            best_key = key
     return PATH_TIMEOUTS.get(best_key, default)
+
+
+def _env_truthy(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 class RequestTimeoutMiddleware(BaseHTTPMiddleware):
@@ -57,10 +65,9 @@ class RequestTimeoutMiddleware(BaseHTTPMiddleware):
 
     def __init__(self, app, default_timeout_s: float = 30.0):
         super().__init__(app)
-        self.default = float(default_timeout_s)
+        self.default = max(0.1, float(default_timeout_s))
 
     async def dispatch(self, request: Request, call_next: Callable):
-        # Skip non-API paths (Metro / docs / etc.)
         if not request.url.path.startswith("/api/"):
             return await call_next(request)
         timeout = _resolve_timeout(request.url.path, self.default)
@@ -68,14 +75,12 @@ class RequestTimeoutMiddleware(BaseHTTPMiddleware):
             return await asyncio.wait_for(call_next(request), timeout=timeout)
         except asyncio.TimeoutError:
             log.warning("request_timeout path=%s timeout_s=%.1f", request.url.path, timeout)
+            # Do not reflect endpoint-specific internal timeout configuration to
+            # unauthenticated clients; it provides no recovery value.
             return JSONResponse(
                 status_code=504,
-                content={
-                    "detail":     "Request timed out",
-                    "path":       request.url.path,
-                    "timeout_s":  timeout,
-                },
-                headers={"X-Timeout-Cause": "RequestTimeoutMiddleware"},
+                content={"detail": "Request timed out"},
+                headers={"Cache-Control": "no-store"},
             )
 
 
@@ -84,39 +89,53 @@ hardening_router = APIRouter(tags=["hardening"])
 
 @hardening_router.get("/health/detailed")
 def health_detailed():
-    """Resource-level health: CPU%, memory, disk, uptime, process info.
+    """Resource health with information-minimising defaults.
 
-    Falls back to a minimal payload if psutil isn't available so we
-    never break the endpoint in environments without it.
+    By default the endpoint returns only status/degraded and coarse percentage
+    metrics. Set HEALTH_DIAGNOSTICS_VERBOSE=true only on deployments where the
+    endpoint is protected by an authenticated/internal ingress; verbose mode
+    adds PID, process RSS/thread count, uptime, and capacity figures.
     """
+    verbose = _env_truthy("HEALTH_DIAGNOSTICS_VERBOSE", False)
     out: dict = {
         "status": "ok",
-        "ts":     time.time(),
-        "pid":    os.getpid(),
+        "ts": time.time(),
+        "degraded": False,
     }
     try:
         import psutil  # type: ignore
+
         proc = psutil.Process(os.getpid())
-        mem  = psutil.virtual_memory()
+        mem = psutil.virtual_memory()
         disk = psutil.disk_usage("/")
-        with proc.oneshot():
-            out["cpu_percent"]   = psutil.cpu_percent(interval=None)
-            out["memory_total"]  = mem.total
-            out["memory_used"]   = mem.used
-            out["memory_pct"]    = mem.percent
-            out["disk_total"]    = disk.total
-            out["disk_used"]     = disk.used
-            out["disk_pct"]      = disk.percent
-            out["proc_rss"]      = proc.memory_info().rss
-            out["proc_threads"]  = proc.num_threads()
-            out["proc_uptime_s"] = time.time() - proc.create_time()
-        # Surface a degraded flag the frontend can react to.
-        out["degraded"] = (
-            out["memory_pct"] > 92.0 or
-            out["disk_pct"]   > 95.0 or
-            out.get("cpu_percent", 0) > 95.0
+        cpu_pct = psutil.cpu_percent(interval=None)
+        out.update(
+            {
+                "cpu_percent": round(float(cpu_pct), 1),
+                "memory_percent": round(float(mem.percent), 1),
+                "disk_percent": round(float(disk.percent), 1),
+            }
         )
-    except Exception as e:
-        out["psutil_error"] = str(e)[:120]
-        out["degraded"] = False
-    return out
+        out["degraded"] = mem.percent > 92.0 or disk.percent > 95.0 or cpu_pct > 95.0
+
+        if verbose:
+            with proc.oneshot():
+                out.update(
+                    {
+                        "pid": os.getpid(),
+                        "memory_total": mem.total,
+                        "memory_used": mem.used,
+                        "disk_total": disk.total,
+                        "disk_used": disk.used,
+                        "process_rss": proc.memory_info().rss,
+                        "process_threads": proc.num_threads(),
+                        "process_uptime_seconds": round(time.time() - proc.create_time(), 1),
+                    }
+                )
+    except Exception:
+        # Health checks should remain available even when optional telemetry is
+        # unavailable. Do not echo exception text: paths/module names may leak
+        # deployment details.
+        out["telemetry_available"] = False
+
+    return JSONResponse(out, headers={"Cache-Control": "no-store"})
