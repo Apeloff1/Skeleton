@@ -25,8 +25,11 @@ on:
       - "backend/core/deployment_checkpoint_pin_config.py"
       - "backend/core/deployment_checkpoint_pin_ledger.py"
       - "backend/core/deployment_checkpoint_pin_runtime.py"
+      - "backend/core/deployment_checkpoint_pin_wire.py"
+      - "backend/core/deployment_checkpoint_assurance.py"
       - "backend/core/deployment_checkpoint_trust_advance.py"
       - "backend/core/deployment_checkpoint_witnessed_continuity.py"
+      - "backend/core/assurance_composition.py"
       - "backend/core/deployment_gateway.py"
       - "backend/core/deployment_planner.py"
       - "backend/core/system_assurance.py"
@@ -34,10 +37,13 @@ on:
       - "backend/core/product_control_plane.py"
       - "backend/core/portable_claim_proof.py"
       - "backend/routes/ops.py"
+      - "backend/routes/deployment_checkpoint_trust.py"
       - "backend/tests/test_witness_freshness_migration.py"
       - "backend/tests/test_signed_witness_finality.py"
       - "backend/tests/test_witness_policy_config_strict.py"
       - "backend/tests/test_deployment_checkpoint_pin_config.py"
+      - "backend/tests/test_deployment_checkpoint_pin_wire.py"
+      - "backend/tests/test_deployment_checkpoint_assurance.py"
       - "backend/tests/test_deployment_preflight.py"
       - "backend/tests/test_control_plane_deployment.py"
       - "backend/tests/test_deployment_authorization.py"
@@ -93,8 +99,11 @@ on:
       - "backend/core/deployment_checkpoint_pin_config.py"
       - "backend/core/deployment_checkpoint_pin_ledger.py"
       - "backend/core/deployment_checkpoint_pin_runtime.py"
+      - "backend/core/deployment_checkpoint_pin_wire.py"
+      - "backend/core/deployment_checkpoint_assurance.py"
       - "backend/core/deployment_checkpoint_trust_advance.py"
       - "backend/core/deployment_checkpoint_witnessed_continuity.py"
+      - "backend/core/assurance_composition.py"
       - "backend/core/deployment_gateway.py"
       - "backend/core/deployment_planner.py"
       - "backend/core/system_assurance.py"
@@ -102,10 +111,13 @@ on:
       - "backend/core/product_control_plane.py"
       - "backend/core/portable_claim_proof.py"
       - "backend/routes/ops.py"
+      - "backend/routes/deployment_checkpoint_trust.py"
       - "backend/tests/test_witness_freshness_migration.py"
       - "backend/tests/test_signed_witness_finality.py"
       - "backend/tests/test_witness_policy_config_strict.py"
       - "backend/tests/test_deployment_checkpoint_pin_config.py"
+      - "backend/tests/test_deployment_checkpoint_pin_wire.py"
+      - "backend/tests/test_deployment_checkpoint_assurance.py"
       - "backend/tests/test_deployment_preflight.py"
       - "backend/tests/test_control_plane_deployment.py"
       - "backend/tests/test_deployment_authorization.py"
@@ -165,6 +177,8 @@ jobs:
           tests/test_signed_witness_finality.py
           tests/test_witness_policy_config_strict.py
           tests/test_deployment_checkpoint_pin_config.py
+          tests/test_deployment_checkpoint_pin_wire.py
+          tests/test_deployment_checkpoint_assurance.py
           tests/test_deployment_preflight.py
           tests/test_control_plane_deployment.py
           tests/test_deployment_authorization.py
