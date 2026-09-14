@@ -175,9 +175,7 @@ async def product_control_execute(seq: int, token: str = Query("")):
 @router.post("/product-control/execute-pending")
 async def product_control_execute_pending(limit: int = Query(32, ge=0, le=256), token: str = Query("")):
     _require_ops(token)
-    try: confirmed = await _control_plane().execute_registered_pending(limit=limit)
-    except OperationExecutionError as exc: raise HTTPException(status_code=502, detail=str(exc)) from exc
-    return {"confirmed": confirmed, "remaining": len(_control_plane().pending())}
+    return await _control_plane().dispatch_pending(limit=limit)
 
 
 @router.post("/product-control/policy/ratify")
