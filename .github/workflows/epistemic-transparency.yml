@@ -1,0 +1,52 @@
+name: Epistemic Transparency
+
+on:
+  push:
+    paths:
+      - "backend/core/transparency_log.py"
+      - "backend/core/epistemic_transparency.py"
+      - "backend/core/transparency_gossip.py"
+      - "backend/core/curiosity_service.py"
+      - "backend/core/product_control_plane.py"
+      - "backend/core/system_assurance.py"
+      - "backend/routes/nexus.py"
+      - "backend/tests/test_transparency_log.py"
+      - "backend/tests/test_epistemic_transparency_gossip.py"
+      - "backend/tests/test_control_plane_transparency.py"
+      - ".github/workflows/epistemic-transparency.yml"
+  pull_request:
+    paths:
+      - "backend/core/transparency_log.py"
+      - "backend/core/epistemic_transparency.py"
+      - "backend/core/transparency_gossip.py"
+      - "backend/core/curiosity_service.py"
+      - "backend/core/product_control_plane.py"
+      - "backend/core/system_assurance.py"
+      - "backend/routes/nexus.py"
+      - "backend/tests/test_transparency_log.py"
+      - "backend/tests/test_epistemic_transparency_gossip.py"
+      - "backend/tests/test_control_plane_transparency.py"
+      - ".github/workflows/epistemic-transparency.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  transparency:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install focused dependencies
+        run: python -m pip install "pytest>=8,<9"
+      - name: Verify transparency and equivocation defenses
+        run: >-
+          python -m pytest -q
+          tests/test_transparency_log.py
+          tests/test_epistemic_transparency_gossip.py
+          tests/test_control_plane_transparency.py
