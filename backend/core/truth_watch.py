@@ -1,8 +1,11 @@
-"""Provenance-gated watch feed for retractions and re-verification events.
+"""Provenance-gated watch feed for truth lifecycle events.
 
 External alerts are not truth merely because they arrive over a feed. Events are
 stored durably and idempotently, but only provenance-verified events may mutate
-truth state. Unverified alerts remain visible as held evidence for operator review.
+truth state. Unverified alerts remain visible for operator review.
+
+The feed can also resolve legacy unknown source lineage. A provenance-resolution
+event changes ancestry metadata only; it does not itself make any claim true.
 """
 from __future__ import annotations
 
@@ -28,6 +31,7 @@ class TruthWatchIntegrityError(RuntimeError):
 
 class TruthEventKind(StrEnum):
     SOURCE_RETRACTED = "source_retracted"
+    SOURCE_LINEAGE_RESOLVED = "source_lineage_resolved"
     CLAIM_REVERIFY = "claim_reverify"
     CLAIM_CHALLENGED = "claim_challenged"
 
@@ -47,6 +51,7 @@ class TruthWatchEvent:
     disposition: str = "pending"
     result_sha256: str = ""
     error: str = ""
+    payload_json: str = ""
 
 
 def _canonical(value: Any) -> bytes:
@@ -97,20 +102,26 @@ class TruthWatchFeed:
 
     def ingest(self, *, kind: str | TruthEventKind, target: str, reason: str, provider: str,
                provider_cursor: str = "", provenance_verified: bool = False,
-               event_id: str | None = None, observed_at: str | None = None) -> TruthWatchEvent:
+               event_id: str | None = None, observed_at: str | None = None,
+               payload: dict[str, Any] | None = None) -> TruthWatchEvent:
         kind = TruthEventKind(kind); target = " ".join(str(target).split()).strip(); provider = str(provider).strip()
-        reason = " ".join(str(reason).split()).strip()
+        reason = " ".join(str(reason).split()).strip(); payload = dict(payload or {})
         if not target or not provider: raise ValueError("truth watch target and provider are required")
         if kind == TruthEventKind.SOURCE_RETRACTED and not reason: raise ValueError("source retraction requires a reason")
+        if kind == TruthEventKind.SOURCE_LINEAGE_RESOLVED and not payload:
+            raise ValueError("source lineage resolution requires provenance payload")
         stamp = observed_at or datetime.now(UTC).isoformat()
+        payload_json = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")) if payload else ""
         identity = event_id or _sha({"kind": kind.value, "target": target, "reason": reason,
-                                     "provider": provider, "cursor": provider_cursor, "observed_at": stamp})[:32]
+                                     "provider": provider, "cursor": provider_cursor, "observed_at": stamp,
+                                     "payload": payload_json})[:32]
         with self._lease.acquire():
             events, checkpoints, next_sequence = self._load()
             for raw in events:
                 if raw.get("event_id") == identity: return self._restore(raw)
             event = TruthWatchEvent(next_sequence, identity, kind, target, reason[:2000], provider[:300],
-                                    str(provider_cursor)[:1000], bool(provenance_verified), stamp)
+                                    str(provider_cursor)[:1000], bool(provenance_verified), stamp,
+                                    payload_json=payload_json[:12000])
             events.append({**asdict(event), "kind": event.kind.value}); self._write(events, checkpoints, next_sequence + 1)
             return event
 
@@ -131,6 +142,18 @@ class TruthWatchFeed:
             try:
                 if event.kind == TruthEventKind.SOURCE_RETRACTED:
                     result = engine.retract_source(event.target, event.reason)
+                elif event.kind == TruthEventKind.SOURCE_LINEAGE_RESOLVED:
+                    try:
+                        payload = json.loads(event.payload_json or "{}")
+                    except json.JSONDecodeError as exc:
+                        raise ValueError("lineage resolution payload is invalid JSON") from exc
+                    result = engine.resolve_source_lineage(
+                        event.target,
+                        source_kind=str(payload.get("source_kind") or "unknown"),
+                        locator=str(payload.get("locator") or ""),
+                        parent_ids=tuple(payload.get("parent_source_ids") or ()),
+                        content_sha256=str(payload.get("content_sha256") or ""),
+                    )
                 else:
                     # A challenge is a trigger to re-check evidence, not evidence by itself.
                     result = engine.reverify_claim(event.target)
