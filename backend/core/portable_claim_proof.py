@@ -1,9 +1,11 @@
-"""Portable, freshness-bounded claim proofs with sparse-Merkle membership.
+"""Portable, freshness-bounded claim proofs with layered external trust.
 
-Portable proofs can be verified against externally pinned authority roots,
-checkpoint hashes, or transparency-log roots. A transparency anchor binds the
-checkpoint into an append-only Merkle history, so rewriting prior checkpoints is
-detectable even when an attacker can manufacture a self-consistent packet.
+Portable proofs separate three questions that must never be conflated:
+1) Is the packet internally intact and claim-state membership valid?
+2) Was the checkpoint published into an append-only transparency history?
+3) Was that exact published root independently witnessed and finalized?
+
+The verifier can require/pin any layer without trusting the live producer.
 """
 from __future__ import annotations
 
@@ -21,9 +23,11 @@ from core.epistemic_checkpoint import CHECKPOINT_VERSION, EpistemicCheckpointLed
 from core.epistemic_claim_index import EpistemicClaimIndex
 from core.epistemic_transparency import EpistemicTransparency
 from core.sparse_merkle import TREE_VERSION, proof_from_dict, verify_sparse_proof
+from core.transparency_finality import TransparencyFinality
+from core.transparency_finality_proof import verify_finality_record
 from core.transparency_log import InclusionProof, leaf_hash, verify_inclusion
 
-PORTABLE_PROOF_VERSION = 2
+PORTABLE_PROOF_VERSION = 3
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -37,6 +41,7 @@ class PortableClaimProof:
     epistemic_root_sha256: str
     checkpoint: dict[str, Any] | None
     transparency_anchor: dict[str, Any] | None
+    finality_anchor: dict[str, Any] | None
     generated_at: str
     valid_until: str
     revocation_witness_sha256: str
@@ -87,7 +92,8 @@ def _revocation_witness(claim_proof: ClaimProof) -> str:
 def _packet_payload(*, claim: str, claim_proof: dict[str, Any], authority_proof: dict[str, Any],
                     authority_root_sha256: str, epistemic_root_sha256: str,
                     checkpoint: dict[str, Any] | None, transparency_anchor: dict[str, Any] | None,
-                    generated_at: str, valid_until: str, revocation_witness_sha256: str) -> dict[str, Any]:
+                    finality_anchor: dict[str, Any] | None, generated_at: str, valid_until: str,
+                    revocation_witness_sha256: str) -> dict[str, Any]:
     return {
         "version": PORTABLE_PROOF_VERSION,
         "claim": claim,
@@ -97,6 +103,7 @@ def _packet_payload(*, claim: str, claim_proof: dict[str, Any], authority_proof:
         "epistemic_root_sha256": epistemic_root_sha256,
         "checkpoint": checkpoint,
         "transparency_anchor": transparency_anchor,
+        "finality_anchor": finality_anchor,
         "generated_at": generated_at,
         "valid_until": valid_until,
         "revocation_witness_sha256": revocation_witness_sha256,
@@ -105,11 +112,18 @@ def _packet_payload(*, claim: str, claim_proof: dict[str, Any], authority_proof:
 
 def build_portable_claim_proof(engine, claim: str, *, checkpoint_ledger: EpistemicCheckpointLedger | None = None,
                                transparency: EpistemicTransparency | None = None,
+                               finality: TransparencyFinality | None = None,
                                generated_at: str | None = None, max_age_seconds: int = 900) -> PortableClaimProof:
     if max_age_seconds < 1 or max_age_seconds > 86400:
         raise ValueError("max_age_seconds must be between 1 and 86400")
+    if finality is not None:
+        if transparency is None:
+            transparency = finality.transparency
+        elif finality.transparency is not transparency:
+            raise ValueError("finality and transparency must refer to the same publication history")
     if transparency is not None and checkpoint_ledger is not None and checkpoint_ledger is not transparency.checkpoints:
         raise ValueError("provide either transparency or its checkpoint ledger, not two independent ledgers")
+
     stamp = generated_at or datetime.now(UTC).isoformat(); issued = _parse(stamp)
     compatibility = build_claim_proof(engine, claim, generated_at=stamp)
     index = EpistemicClaimIndex(engine); authority_proof = index.proof(compatibility.claim)
@@ -121,7 +135,9 @@ def build_portable_claim_proof(engine, claim: str, *, checkpoint_ledger: Epistem
     if compatibility.authoritative and truth_valid_until:
         expiry = min(expiry, _parse(truth_valid_until))
 
-    checkpoint_raw: dict[str, Any] | None = None; transparency_anchor: dict[str, Any] | None = None
+    checkpoint_raw: dict[str, Any] | None = None
+    transparency_anchor: dict[str, Any] | None = None
+    finality_anchor: dict[str, Any] | None = None
     if transparency is not None:
         published = transparency.publish(
             authority_root_sha256=authority_root,
@@ -129,10 +145,11 @@ def build_portable_claim_proof(engine, claim: str, *, checkpoint_ledger: Epistem
             observed_at=stamp,
         )
         checkpoint_raw = dict(published["checkpoint"])
-        transparency_anchor = {
-            "descriptor": dict(published["transparency"]),
-            "inclusion": dict(published["inclusion"]),
-        }
+        transparency_anchor = {"descriptor": dict(published["transparency"]), "inclusion": dict(published["inclusion"])}
+        if finality is not None:
+            latest = finality.latest(); descriptor = published["transparency"]
+            if latest is not None and latest.tree_size == descriptor["tree_size"] and latest.root_sha256 == descriptor["root_sha256"]:
+                finality_anchor = asdict(latest)
     elif checkpoint_ledger is not None:
         checkpoint = checkpoint_ledger.record(
             authority_root_sha256=authority_root,
@@ -145,7 +162,7 @@ def build_portable_claim_proof(engine, claim: str, *, checkpoint_ledger: Epistem
     payload = _packet_payload(
         claim=compatibility.claim, claim_proof=compatibility_raw, authority_proof=authority_proof,
         authority_root_sha256=authority_root, epistemic_root_sha256=epistemic_root.root_sha256,
-        checkpoint=checkpoint_raw, transparency_anchor=transparency_anchor,
+        checkpoint=checkpoint_raw, transparency_anchor=transparency_anchor, finality_anchor=finality_anchor,
         generated_at=stamp, valid_until=expiry.isoformat(), revocation_witness_sha256=revocation,
     )
     return PortableClaimProof(**payload, packet_sha256=_sha(payload))
@@ -155,8 +172,10 @@ def verify_portable_claim_proof(packet: PortableClaimProof, *, now: datetime | N
                                 expected_authority_root: str | None = None,
                                 expected_checkpoint_sha256: str | None = None,
                                 expected_transparency_root: str | None = None,
+                                expected_finality_sha256: str | None = None,
                                 require_checkpoint: bool = False,
-                                require_transparency: bool = False) -> bool:
+                                require_transparency: bool = False,
+                                require_finality: bool = False) -> bool:
     if packet.version != PORTABLE_PROOF_VERSION:
         return False
     if not _SHA256.fullmatch(str(packet.authority_root_sha256)) or not _SHA256.fullmatch(str(packet.epistemic_root_sha256)):
@@ -202,6 +221,7 @@ def verify_portable_claim_proof(packet: PortableClaimProof, *, now: datetime | N
         return False
 
     if require_transparency and packet.transparency_anchor is None: return False
+    descriptor: dict[str, Any] | None = None
     if packet.transparency_anchor is not None:
         if packet.checkpoint is None: return False
         descriptor = packet.transparency_anchor.get("descriptor") if isinstance(packet.transparency_anchor, dict) else None
@@ -225,10 +245,23 @@ def verify_portable_claim_proof(packet: PortableClaimProof, *, now: datetime | N
     elif expected_transparency_root is not None:
         return False
 
+    if require_finality and packet.finality_anchor is None: return False
+    if packet.finality_anchor is not None:
+        if descriptor is None or not verify_finality_record(packet.finality_anchor): return False
+        finality = packet.finality_anchor
+        if finality.get("log_id") != descriptor.get("log_id"): return False
+        if int(finality.get("tree_size", -1)) != int(descriptor.get("tree_size", -2)): return False
+        if finality.get("root_sha256") != descriptor.get("root_sha256"): return False
+        claimed_finality = str(finality.get("sha256", ""))
+        if expected_finality_sha256 is not None and not hmac.compare_digest(claimed_finality, str(expected_finality_sha256)):
+            return False
+    elif expected_finality_sha256 is not None:
+        return False
+
     payload = _packet_payload(
         claim=packet.claim, claim_proof=packet.claim_proof, authority_proof=packet.authority_proof,
         authority_root_sha256=packet.authority_root_sha256, epistemic_root_sha256=packet.epistemic_root_sha256,
-        checkpoint=packet.checkpoint, transparency_anchor=packet.transparency_anchor,
+        checkpoint=packet.checkpoint, transparency_anchor=packet.transparency_anchor, finality_anchor=packet.finality_anchor,
         generated_at=packet.generated_at, valid_until=packet.valid_until,
         revocation_witness_sha256=packet.revocation_witness_sha256,
     )
@@ -237,14 +270,16 @@ def verify_portable_claim_proof(packet: PortableClaimProof, *, now: datetime | N
 
 def portable_claim_proof_dict(engine, claim: str, *, checkpoint_ledger: EpistemicCheckpointLedger | None = None,
                               transparency: EpistemicTransparency | None = None,
+                              finality: TransparencyFinality | None = None,
                               max_age_seconds: int = 900) -> dict[str, Any]:
     packet = build_portable_claim_proof(
         engine, claim, checkpoint_ledger=checkpoint_ledger, transparency=transparency,
-        max_age_seconds=max_age_seconds,
+        finality=finality, max_age_seconds=max_age_seconds,
     )
     payload = asdict(packet); payload["self_verified"] = verify_portable_claim_proof(packet)
+    payload["trust_level"] = "finalized" if packet.finality_anchor else ("published" if packet.transparency_anchor else "self_attested")
     payload["trust_note"] = (
-        "For independent trust, pin authority_root_sha256, checkpoint.sha256, or preferably "
-        "transparency_anchor.descriptor.root_sha256 outside this packet."
+        "For independent trust, pin the authority root, transparency root, or strongest: "
+        "a quorum-finality record SHA outside this packet."
     )
     return payload
