@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 import hashlib
+import hmac
 import inspect
 import json
 import os
@@ -112,7 +113,7 @@ class ProductOperationCoordinator:
         normalized = {str(key): dict(value) for key, value in records.items() if isinstance(value, dict)}
         if len(normalized) != len(records):
             raise OperationRejected("operation idempotency index contains invalid records")
-        if not hashlib.compare_digest(self._index_digest(normalized), digest):
+        if not hmac.compare_digest(self._index_digest(normalized), digest):
             raise OperationRejected("operation idempotency index checksum mismatch")
         for raw in normalized.values():
             try:
