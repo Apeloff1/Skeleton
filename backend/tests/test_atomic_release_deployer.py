@@ -5,6 +5,7 @@ import json
 
 import pytest
 
+from core.canonical_json import canonical_json_sha256, canonical_json_text
 from core.atomic_release_deployer import AtomicReleaseDeployer, ReleaseDeploymentError
 from core.deployment_authorization import DeploymentConsumption, plan_digest
 from core.deployment_planner import compile_deployment_plan
@@ -103,6 +104,14 @@ def test_activation_cannot_precede_consumption(tmp_path):
     assert deployer.snapshot() == ()
 
 
+def test_explicit_empty_activation_timestamp_is_not_replaced_with_now(tmp_path):
+    deployer = AtomicReleaseDeployer(tmp_path)
+    plan = compile_deployment_plan({"artifact": "sha256:a", "environment": "staging"})
+    with pytest.raises(ReleaseDeploymentError, match="timestamp"):
+        deployer.activate(plan, _consumption(plan), activated_at="")
+    assert deployer.snapshot() == ()
+
+
 @pytest.mark.parametrize(
     "consumption",
     [
@@ -161,6 +170,18 @@ def test_rehashed_boolean_sequence_is_not_coerced_to_one(tmp_path):
         AtomicReleaseDeployer(tmp_path).snapshot()
 
 
+def test_rehashed_boolean_version_is_not_coerced_to_one(tmp_path):
+    _, _, _, history_path, _ = _activated(tmp_path)
+    row = json.loads(history_path.read_text(encoding="utf-8"))
+    row["version"] = True
+    payload = {key: value for key, value in row.items() if key != "sha256"}
+    row["sha256"] = canonical_json_sha256(payload)
+    history_path.write_text(canonical_json_text(row) + "\n", encoding="utf-8")
+
+    with pytest.raises(ReleaseDeploymentError, match="version malformed"):
+        AtomicReleaseDeployer(tmp_path).snapshot()
+
+
 def test_rehashed_nonfinite_release_value_is_rejected(tmp_path):
     _, _, _, history_path, _ = _activated(tmp_path)
     row = json.loads(history_path.read_text(encoding="utf-8"))
@@ -182,3 +203,23 @@ def test_resealed_current_envelope_extension_is_rejected(tmp_path):
 
     with pytest.raises(ReleaseDeploymentError, match="envelope schema mismatch"):
         deployer.current(target="runtime", environment="staging")
+
+
+def test_boolean_current_envelope_version_is_rejected_even_if_resealed(tmp_path):
+    deployer, _, _, _, current_path = _activated(tmp_path)
+    envelope = json.loads(current_path.read_text(encoding="utf-8"))
+    envelope["version"] = True
+    payload = {"version": envelope["version"], "release": envelope["release"]}
+    envelope["sha256"] = canonical_json_sha256(payload)
+    current_path.write_text(canonical_json_text(envelope), encoding="utf-8")
+
+    with pytest.raises(ReleaseDeploymentError, match="version malformed"):
+        deployer.current(target="runtime", environment="staging")
+
+
+def test_current_lookup_rejects_whitespace_aliases(tmp_path):
+    deployer, _, _, _, _ = _activated(tmp_path)
+    with pytest.raises(ValueError, match="canonical"):
+        deployer.current(target=" runtime", environment="staging")
+    with pytest.raises(ValueError, match="canonical"):
+        deployer.current(target="runtime", environment="staging ")
