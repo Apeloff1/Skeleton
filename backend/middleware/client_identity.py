@@ -24,14 +24,28 @@ IPNetwork = IPv4Network | IPv6Network
 _DEFAULT_TRUSTED_PROXY_CIDRS = ""
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,64}$")
 
+# Forwarded headers are attacker-influenced even when they arrive through a
+# trusted proxy. Bound both total work and chain depth to avoid turning client
+# identity extraction into a CPU/memory amplification primitive.
+_MAX_FORWARDED_FOR_CHARS = 4096
+_MAX_FORWARDED_HOPS = 32
 
-def _parse_ip(value: str | None) -> IPAddress | None:
+
+def _parse_ip(value: str | None, *, allow_zone: bool = False) -> IPAddress | None:
     if not value:
         return None
     value = value.strip().strip("[]")
-    # ASGI servers expose host and port separately, but tolerate an IPv6 zone
-    # identifier if a platform passes one through.
-    value = value.split("%", 1)[0]
+    if not value:
+        return None
+
+    # ASGI peer addresses may legitimately contain an IPv6 zone identifier.
+    # Forwarded values may not: accepting zones there creates multiple textual
+    # identities for the same address and can weaken per-client controls.
+    if "%" in value:
+        if not allow_zone:
+            return None
+        value = value.split("%", 1)[0]
+
     try:
         return ipaddress.ip_address(value)
     except ValueError:
@@ -67,11 +81,14 @@ def extract_client_ip(
     """Return the defensible client IP for a request.
 
     X-Forwarded-For is considered only when the immediate ASGI peer belongs to
-    TRUSTED_PROXY_CIDRS. The chain is then walked right-to-left, discarding
-    trusted hops until the nearest untrusted address is found. Malformed
-    forwarded entries are ignored rather than accepted as identity strings.
+    TRUSTED_PROXY_CIDRS. The chain is walked right-to-left, discarding trusted
+    hops until the nearest untrusted address is found.
+
+    Oversized, over-deep, or malformed forwarding data fails closed to the
+    immediate peer rather than consuming unbounded work or becoming an
+    attacker-controlled identity string.
     """
-    peer = _parse_ip(peer_host)
+    peer = _parse_ip(peer_host, allow_zone=True)
     if peer is None:
         return "unknown"
 
@@ -79,11 +96,22 @@ def extract_client_ip(
     if not forwarded_for or not _is_trusted(peer, networks):
         return peer.compressed
 
+    if len(forwarded_for) > _MAX_FORWARDED_FOR_CHARS:
+        return peer.compressed
+
+    raw_hops = forwarded_for.split(",")
+    if len(raw_hops) > _MAX_FORWARDED_HOPS:
+        return peer.compressed
+
     chain: list[IPAddress] = []
-    for raw_hop in forwarded_for.split(","):
+    for raw_hop in raw_hops:
         hop = _parse_ip(raw_hop)
-        if hop is not None:
-            chain.append(hop)
+        if hop is None:
+            # Do not silently delete malformed elements from a trusted chain:
+            # doing so can alter hop ordering and make a different address look
+            # authoritative. Treat the entire header as untrusted instead.
+            return peer.compressed
+        chain.append(hop)
 
     # Include the immediate peer so the algorithm is explicit about the full
     # proxy chain, then select the nearest hop outside our trust boundary.
