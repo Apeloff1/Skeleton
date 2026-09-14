@@ -9,8 +9,10 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from core import autonomous_orchestrator as orch
+from routes.jeeves_evolution import router as jeeves_evolution_router
 
 router = APIRouter(prefix="/api/orchestrator", tags=["orchestrator"])
+router.include_router(jeeves_evolution_router)
 
 
 class PlanReq(BaseModel):
