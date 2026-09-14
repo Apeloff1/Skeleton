@@ -12,6 +12,48 @@ export type ExecutorBinding = {
 export type ContentStoreStats = { chunks: number; bytes: number; manifests: number };
 export type ReceiptVaultStats = { receipts: number; results: ContentStoreStats; version: number };
 
+export type ActionReadiness = {
+  capability_id: string;
+  action: string;
+  state: 'native_ready' | 'governed_unbound' | 'unsafe' | 'policy_gap';
+  policy_present: boolean;
+  executor_bound: boolean;
+  replay_safe: boolean;
+  effect_class: 'query' | 'state' | 'external' | null;
+  executor_name: string | null;
+  executor_version: number | null;
+  provenance_ready: boolean;
+  blockers: string[];
+};
+
+export type ReadinessReport = {
+  canonical_actions: number;
+  ready_actions: number;
+  ready_pct: number;
+  governed_unbound: number;
+  unsafe_actions: number;
+  policy_gaps: number;
+  actions: ActionReadiness[];
+  attestation_sha256: string;
+};
+
+export type AssuranceInvariant = {
+  id: string;
+  severity: 'hard' | 'warning';
+  passed: boolean;
+  detail: string;
+};
+
+export type AssuranceReport = {
+  posture: 'healthy' | 'degraded' | 'blocked';
+  hard_failures: number;
+  warnings: number;
+  native_coverage_pct: number;
+  readiness_pct: number;
+  invariants: AssuranceInvariant[];
+  attestation_sha256: string;
+};
+
 export type ControlPlaneStatus = {
   policy_version: number;
   policy_bootstrap_enabled: boolean;
@@ -22,7 +64,10 @@ export type ControlPlaneStatus = {
     bindings: ExecutorBinding[];
     coverage: { canonical_actions: number; bound_actions: number; coverage_pct: number; missing: Array<{ capability_id: string; action: string }> };
   };
+  readiness: ReadinessReport;
+  assurance: AssuranceReport;
   receipts: ReceiptVaultStats;
+  lifecycle: { operations: number; states: Record<string, number>; evidence_gaps: number; anomalies: number };
   operations: { capabilities: number; pending_operations: number; outbox_capacity_remaining: number; idempotency_records: number; audit_sequence: number; audit_head: string | null };
 };
 
