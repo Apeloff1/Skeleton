@@ -20,8 +20,10 @@ import json
 import re
 from typing import Any, Mapping, Sequence
 
-from core.deployment_authorization import plan_digest, restore_preflight_snapshot
+from core.atomic_release_deployer import RELEASE_LEDGER_VERSION
+from core.deployment_authorization import AUTH_VERSION, plan_digest, restore_preflight_snapshot
 from core.deployment_planner import verify_deployment_plan
+from core.deployment_receipts import DEPLOYMENT_RECEIPT_VERSION
 
 DEPLOYMENT_PROOF_VERSION = 3
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -71,6 +73,67 @@ def _record_hash(record: Mapping[str, Any]) -> str:
     return _sha(payload)
 
 
+def _expected_release_id(*, authorization_id: str, plan_sha256: str, system_root_sha256: str) -> str:
+    return hashlib.sha256(
+        f"{authorization_id}\0{plan_sha256}\0{system_root_sha256}".encode("utf-8")
+    ).hexdigest()
+
+
+def _release_record_semantics(row: Mapping[str, Any]) -> bool:
+    try:
+        if row.get("version") != RELEASE_LEDGER_VERSION:
+            return False
+        sequence = int(row.get("sequence", 0))
+        if sequence < 1 or not str(row.get("authorization_id") or ""):
+            return False
+        if not all(_is_sha(row.get(field)) for field in (
+            "release_id", "plan_sha256", "system_root_sha256", "sha256",
+        )):
+            return False
+        expected_release_id = _expected_release_id(
+            authorization_id=str(row["authorization_id"]),
+            plan_sha256=str(row["plan_sha256"]),
+            system_root_sha256=str(row["system_root_sha256"]),
+        )
+        if not hmac.compare_digest(str(row["release_id"]), expected_release_id):
+            return False
+        if not all(str(row.get(field) or "").strip() for field in ("target", "environment", "artifact")):
+            return False
+        _parse_time(row.get("activated_at"))
+        previous_id = str(row.get("previous_release_id") or "")
+        previous_sha = str(row.get("previous_sha256") or "")
+        if sequence == 1:
+            return not previous_id and not previous_sha
+        return _is_sha(previous_id) and _is_sha(previous_sha)
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def _receipt_record_semantics(row: Mapping[str, Any]) -> bool:
+    try:
+        if row.get("version") != DEPLOYMENT_RECEIPT_VERSION:
+            return False
+        sequence = int(row.get("sequence", 0))
+        if sequence < 1:
+            return False
+        if not all(str(row.get(field) or "").strip() for field in (
+            "authorization_id", "release_id", "target", "environment", "artifact",
+        )):
+            return False
+        if not all(_is_sha(row.get(field)) for field in (
+            "plan_sha256", "release_sha256", "pre_system_root_sha256",
+            "post_system_root_sha256", "sha256",
+        )):
+            return False
+        if hmac.compare_digest(str(row["pre_system_root_sha256"]), str(row["post_system_root_sha256"])):
+            return False
+        _parse_time(row.get("executed_at"))
+        previous_sha = str(row.get("previous_sha256") or "")
+        return (not previous_sha) if sequence == 1 else _is_sha(previous_sha)
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
 def _proof_payload(proof: PortableDeploymentProof | Mapping[str, Any]) -> dict[str, Any]:
     raw = asdict(proof) if isinstance(proof, PortableDeploymentProof) else dict(proof)
     return {key: value for key, value in raw.items() if key != "proof_sha256"}
@@ -116,6 +179,9 @@ def build_portable_deployment_proof(gateway, authorization_id: str) -> PortableD
     release = gateway.releases.find_by_authorization(authorization_id)
     if release is None:
         raise ValueError("deployment authorization has no activated release")
+    release_raw = asdict(release)
+    if not _release_record_semantics(release_raw):
+        raise ValueError("activated release failed semantic verification")
     release_rows = [row for row in gateway.releases.snapshot()
                     if row.target == release.target and row.environment == release.environment]
     release_rows.sort(key=lambda row: row.sequence)
@@ -127,6 +193,9 @@ def build_portable_deployment_proof(gateway, authorization_id: str) -> PortableD
     receipt = gateway.receipts.by_authorization(authorization_id)
     if receipt is None:
         raise ValueError("deployment transition receipt is missing")
+    receipt_raw = asdict(receipt)
+    if not _receipt_record_semantics(receipt_raw):
+        raise ValueError("deployment transition receipt failed semantic verification")
     receipt_rows = list(gateway.receipts.snapshot())
     receipt_index = next((i for i, row in enumerate(receipt_rows) if row.authorization_id == authorization_id), None)
     if receipt_index is None:
@@ -148,10 +217,10 @@ def build_portable_deployment_proof(gateway, authorization_id: str) -> PortableD
         "preflight": dict(preflight_raw),
         "authorization_suffix": authorization_suffix,
         "authorization_head_sha256": authorization_events[-1]["sha256"],
-        "release": asdict(release),
+        "release": release_raw,
         "release_suffix": release_suffix,
         "release_channel_head_sha256": release_rows[-1].sha256,
-        "transition_receipt": asdict(receipt),
+        "transition_receipt": receipt_raw,
         "receipt_suffix": receipt_suffix,
         "receipt_head_sha256": receipt_rows[-1].sha256,
     }
@@ -182,6 +251,25 @@ def _verify_chain_suffix(rows: Sequence[Mapping[str, Any]], *, expected_head: st
         previous_hash = claimed
         previous_sequence = sequence
     return hmac.compare_digest(previous_hash, expected_head)
+
+
+def _verify_release_suffix(rows: Sequence[Mapping[str, Any]], *, expected_head: str) -> bool:
+    if not _verify_chain_suffix(rows, expected_head=expected_head):
+        return False
+    previous_release_id = ""
+    for index, row in enumerate(rows):
+        if not _release_record_semantics(row):
+            return False
+        if index > 0 and row.get("previous_release_id") != previous_release_id:
+            return False
+        previous_release_id = str(row.get("release_id") or "")
+    return True
+
+
+def _verify_receipt_suffix(rows: Sequence[Mapping[str, Any]], *, expected_head: str) -> bool:
+    return _verify_chain_suffix(rows, expected_head=expected_head) and all(
+        _receipt_record_semantics(row) for row in rows
+    )
 
 
 def verify_portable_deployment_proof(
@@ -241,6 +329,8 @@ def verify_portable_deployment_proof(
         auth_suffix = tuple(dict(row) for row in raw.get("authorization_suffix") or ())
         if not _verify_chain_suffix(auth_suffix, expected_head=expected_authorization_head_sha256):
             return False
+        if any(row.get("version") != AUTH_VERSION for row in auth_suffix):
+            return False
         issue = auth_suffix[0] if auth_suffix else None
         if issue is None or issue.get("kind") != "issue" or issue.get("authorization_id") != authorization_id:
             return False
@@ -265,7 +355,9 @@ def verify_portable_deployment_proof(
             return False
 
         release = dict(raw.get("release") or {})
-        if not _is_sha(release.get("sha256")) or not hmac.compare_digest(_record_hash(release), str(release.get("sha256"))):
+        if not _release_record_semantics(release):
+            return False
+        if not hmac.compare_digest(_record_hash(release), str(release.get("sha256"))):
             return False
         if release.get("authorization_id") != authorization_id or release.get("plan_sha256") != plan_sha:
             return False
@@ -281,11 +373,13 @@ def verify_portable_deployment_proof(
             return False
         if any(row.get("target") != release.get("target") or row.get("environment") != release.get("environment") for row in release_suffix):
             return False
-        if not _verify_chain_suffix(release_suffix, expected_head=expected_release_channel_head_sha256):
+        if not _verify_release_suffix(release_suffix, expected_head=expected_release_channel_head_sha256):
             return False
 
         receipt = dict(raw.get("transition_receipt") or {})
-        if not _is_sha(receipt.get("sha256")) or not hmac.compare_digest(_record_hash(receipt), str(receipt.get("sha256"))):
+        if not _receipt_record_semantics(receipt):
+            return False
+        if not hmac.compare_digest(_record_hash(receipt), str(receipt.get("sha256"))):
             return False
         if receipt.get("authorization_id") != authorization_id or receipt.get("plan_sha256") != plan_sha:
             return False
@@ -302,7 +396,7 @@ def verify_portable_deployment_proof(
         receipt_suffix = tuple(dict(row) for row in raw.get("receipt_suffix") or ())
         if not receipt_suffix or receipt_suffix[0].get("sha256") != receipt.get("sha256"):
             return False
-        if not _verify_chain_suffix(receipt_suffix, expected_head=expected_receipt_head_sha256):
+        if not _verify_receipt_suffix(receipt_suffix, expected_head=expected_receipt_head_sha256):
             return False
         return True
     except (KeyError, TypeError, ValueError):
