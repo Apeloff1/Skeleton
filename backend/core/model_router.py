@@ -1,13 +1,12 @@
-"""Provider-neutral model routing policy for Jeeves.
+"""Provider-neutral, evidence-bearing model routing for Jeeves.
 
-Legacy pipelines selected providers by brand name and often substituted a fallback
-silently.  This router instead treats a model as a capability endpoint. Hard
-requirements (tools, modalities, context, privacy, cost/latency ceilings) filter
-the pool first; observed reliability/quality/latency/cost rank the survivors.
-Fallback order is explicit and returned as evidence.
+The router treats providers as interchangeable capability endpoints rather than
+hard-coded brands. Hard constraints filter candidates first; observed reliability,
+quality, latency, cost, and explicit provider preference rank the survivors.
 
-The router never calls a provider. It is pure policy + telemetry and can therefore
-be used by local models, hosted APIs, image/audio models or future backends.
+No provider call happens in this module. Routing is deterministic policy over a
+registry plus immutable telemetry snapshots, which keeps it reusable for hosted
+APIs, local models, image/audio backends, tests, and future engines.
 """
 from __future__ import annotations
 
@@ -16,15 +15,15 @@ import threading
 import time
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Iterable, Mapping
 
 
 class RoutingError(RuntimeError):
-    pass
+    """Base routing failure."""
 
 
 class NoRoute(RoutingError):
-    pass
+    """Raised when no registered endpoint satisfies hard route constraints."""
 
 
 class PrivacyLevel(IntEnum):
@@ -38,8 +37,9 @@ class PrivacyLevel(IntEnum):
         if isinstance(value, cls):
             return value
         if isinstance(value, str):
+            key = value.strip().upper().replace("-", "_")
             try:
-                return cls[value.strip().upper().replace("-", "_")]
+                return cls[key]
             except KeyError as exc:
                 raise ValueError(f"unknown privacy level: {value!r}") from exc
         return cls(int(value))
@@ -52,11 +52,18 @@ def _finite_nonnegative(value: float, name: str) -> float:
     return value
 
 
+def _unit_interval(value: float, name: str) -> float:
+    value = float(value)
+    if not math.isfinite(value) or not 0.0 <= value <= 1.0:
+        raise ValueError(f"{name} must be within [0, 1]")
+    return value
+
+
 def _names(values: Iterable[str]) -> frozenset[str]:
     return frozenset(
-        str(value).strip().lower()
-        for value in values
-        if str(value).strip()
+        text
+        for raw in values
+        if (text := str(raw).strip().lower())
     )
 
 
@@ -84,6 +91,7 @@ class ModelEndpoint:
             raise ValueError("endpoint_id, provider and model are required")
         if isinstance(self.max_context_tokens, bool) or self.max_context_tokens < 0:
             raise ValueError("max_context_tokens must be >= 0")
+
         object.__setattr__(self, "endpoint_id", endpoint_id)
         object.__setattr__(self, "provider", provider)
         object.__setattr__(self, "model", model)
@@ -104,15 +112,16 @@ class ModelEndpoint:
             "nominal_latency_ms",
             _finite_nonnegative(self.nominal_latency_ms, "nominal_latency_ms"),
         )
-        object.__setattr__(self, "privacy_ceiling", PrivacyLevel.parse(self.privacy_ceiling))
+        ceiling = PrivacyLevel.parse(self.privacy_ceiling)
+        if self.local and ceiling < PrivacyLevel.LOCAL_ONLY:
+            ceiling = PrivacyLevel.LOCAL_ONLY
+        object.__setattr__(self, "privacy_ceiling", ceiling)
         object.__setattr__(self, "metadata", dict(self.metadata))
-        if self.local and self.privacy_ceiling < PrivacyLevel.LOCAL_ONLY:
-            object.__setattr__(self, "privacy_ceiling", PrivacyLevel.LOCAL_ONLY)
 
     def estimated_cost(self, input_tokens: int, output_tokens: int) -> float:
         return (
-            max(0, input_tokens) * self.input_cost_per_million
-            + max(0, output_tokens) * self.output_cost_per_million
+            max(0, int(input_tokens)) * self.input_cost_per_million
+            + max(0, int(output_tokens)) * self.output_cost_per_million
         ) / 1_000_000.0
 
 
@@ -139,6 +148,7 @@ class RouteRequest:
             raise ValueError("context_tokens must be >= 0")
         if isinstance(self.expected_output_tokens, bool) or self.expected_output_tokens < 0:
             raise ValueError("expected_output_tokens must be >= 0")
+
         object.__setattr__(self, "task_type", task_type)
         object.__setattr__(self, "required_capabilities", _names(self.required_capabilities))
         object.__setattr__(self, "required_modalities", _names(self.required_modalities))
@@ -146,7 +156,13 @@ class RouteRequest:
         object.__setattr__(
             self,
             "preferred_providers",
-            tuple(dict.fromkeys(str(x).strip().lower() for x in self.preferred_providers if str(x).strip())),
+            tuple(
+                dict.fromkeys(
+                    str(value).strip().lower()
+                    for value in self.preferred_providers
+                    if str(value).strip()
+                )
+            ),
         )
         object.__setattr__(self, "excluded_endpoints", _names(self.excluded_endpoints))
         if self.latency_budget_ms is not None:
@@ -156,15 +172,24 @@ class RouteRequest:
                 _finite_nonnegative(self.latency_budget_ms, "latency_budget_ms"),
             )
         if self.cost_budget is not None:
-            object.__setattr__(self, "cost_budget", _finite_nonnegative(self.cost_budget, "cost_budget"))
-        for field_name in ("minimum_reliability", "minimum_quality"):
-            value = float(getattr(self, field_name))
-            if not math.isfinite(value) or not 0.0 <= value <= 1.0:
-                raise ValueError(f"{field_name} must be within [0, 1]")
-            object.__setattr__(self, field_name, value)
+            object.__setattr__(
+                self,
+                "cost_budget",
+                _finite_nonnegative(self.cost_budget, "cost_budget"),
+            )
+        object.__setattr__(
+            self,
+            "minimum_reliability",
+            _unit_interval(self.minimum_reliability, "minimum_reliability"),
+        )
+        object.__setattr__(
+            self,
+            "minimum_quality",
+            _unit_interval(self.minimum_quality, "minimum_quality"),
+        )
 
 
-@dataclass
+@dataclass(frozen=True)
 class EndpointTelemetry:
     observations: int = 0
     successes: int = 0
@@ -178,7 +203,7 @@ class EndpointTelemetry:
     def _ewma(old: float | None, value: float, alpha: float) -> float:
         return value if old is None else alpha * value + (1.0 - alpha) * old
 
-    def observe(
+    def updated(
         self,
         *,
         ok: bool,
@@ -187,21 +212,40 @@ class EndpointTelemetry:
         cost: float | None,
         alpha: float,
         observed_at: float,
-    ) -> None:
-        self.observations += 1
-        self.successes += int(bool(ok))
-        self.reliability_ewma = self._ewma(self.reliability_ewma, 1.0 if ok else 0.0, alpha)
+    ) -> "EndpointTelemetry":
+        """Return a validated new sample; never partially mutate on bad input."""
         if quality is not None:
-            if not math.isfinite(quality) or not 0.0 <= quality <= 1.0:
-                raise ValueError("quality must be within [0, 1]")
-            self.quality_ewma = self._ewma(self.quality_ewma, quality, alpha)
+            quality = _unit_interval(quality, "quality")
         if latency_ms is not None:
             latency_ms = _finite_nonnegative(latency_ms, "latency_ms")
-            self.latency_ewma_ms = self._ewma(self.latency_ewma_ms, latency_ms, alpha)
         if cost is not None:
             cost = _finite_nonnegative(cost, "cost")
-            self.cost_ewma = self._ewma(self.cost_ewma, cost, alpha)
-        self.last_observed_at = observed_at
+        if not math.isfinite(observed_at) or observed_at < 0:
+            raise ValueError("observed_at must be a finite non-negative timestamp")
+
+        return EndpointTelemetry(
+            observations=self.observations + 1,
+            successes=self.successes + int(bool(ok)),
+            reliability_ewma=self._ewma(
+                self.reliability_ewma, 1.0 if ok else 0.0, alpha
+            ),
+            quality_ewma=(
+                self.quality_ewma
+                if quality is None
+                else self._ewma(self.quality_ewma, quality, alpha)
+            ),
+            latency_ewma_ms=(
+                self.latency_ewma_ms
+                if latency_ms is None
+                else self._ewma(self.latency_ewma_ms, latency_ms, alpha)
+            ),
+            cost_ewma=(
+                self.cost_ewma
+                if cost is None
+                else self._ewma(self.cost_ewma, cost, alpha)
+            ),
+            last_observed_at=observed_at,
+        )
 
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -209,7 +253,11 @@ class EndpointTelemetry:
             "successes": self.successes,
             "reliability_ewma": round(self.reliability_ewma, 8),
             "quality_ewma": round(self.quality_ewma, 8),
-            "latency_ewma_ms": None if self.latency_ewma_ms is None else round(self.latency_ewma_ms, 4),
+            "latency_ewma_ms": (
+                None
+                if self.latency_ewma_ms is None
+                else round(self.latency_ewma_ms, 4)
+            ),
             "cost_ewma": None if self.cost_ewma is None else round(self.cost_ewma, 8),
             "last_observed_at": self.last_observed_at,
         }
@@ -247,20 +295,22 @@ class RouteDecision:
 
     @property
     def fallback_endpoint_ids(self) -> tuple[str, ...]:
-        return tuple(row.endpoint_id for row in self.candidates[1:])
+        return tuple(candidate.endpoint_id for candidate in self.candidates[1:])
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "task_type": self.request.task_type,
             "selected": self.selected.endpoint_id,
             "fallbacks": list(self.fallback_endpoint_ids),
-            "candidates": [row.as_dict() for row in self.candidates],
+            "candidates": [candidate.as_dict() for candidate in self.candidates],
             "rejected": {key: list(value) for key, value in self.rejected.items()},
             "routed_at": self.routed_at,
         }
 
 
 class ModelRouter:
+    """Thread-safe registry and deterministic policy scorer."""
+
     def __init__(
         self,
         *,
@@ -273,11 +323,20 @@ class ModelRouter:
     ) -> None:
         if not 0.0 < telemetry_alpha <= 1.0:
             raise ValueError("telemetry_alpha must be within (0, 1]")
-        weights = [reliability_weight, quality_weight, latency_weight, cost_weight, preference_weight]
-        if any(not math.isfinite(value) or value < 0 for value in weights) or sum(weights) <= 0:
-            raise ValueError("routing weights must be finite/non-negative with positive sum")
+        weights = (
+            float(reliability_weight),
+            float(quality_weight),
+            float(latency_weight),
+            float(cost_weight),
+            float(preference_weight),
+        )
+        if any(not math.isfinite(value) or value < 0 for value in weights):
+            raise ValueError("routing weights must be finite and non-negative")
         total = sum(weights)
-        self.telemetry_alpha = telemetry_alpha
+        if total <= 0:
+            raise ValueError("at least one routing weight must be positive")
+
+        self.telemetry_alpha = float(telemetry_alpha)
         self.weights = tuple(value / total for value in weights)
         self._lock = threading.RLock()
         self._endpoints: dict[str, ModelEndpoint] = {}
@@ -287,14 +346,22 @@ class ModelRouter:
         if not isinstance(endpoint, ModelEndpoint):
             raise TypeError("endpoint must be a ModelEndpoint")
         with self._lock:
-            if endpoint.endpoint_id in self._endpoints and not replace:
+            exists = endpoint.endpoint_id in self._endpoints
+            if exists and not replace:
                 raise ValueError(f"endpoint already registered: {endpoint.endpoint_id}")
             self._endpoints[endpoint.endpoint_id] = endpoint
-            self._telemetry.setdefault(endpoint.endpoint_id, EndpointTelemetry())
+            # A replacement may point at a different model/provider/configuration.
+            # Never let historical measurements silently cross that identity boundary.
+            if exists and replace:
+                self._telemetry[endpoint.endpoint_id] = EndpointTelemetry()
+            else:
+                self._telemetry.setdefault(endpoint.endpoint_id, EndpointTelemetry())
 
     def unregister(self, endpoint_id: str) -> bool:
+        endpoint_id = str(endpoint_id).strip()
         with self._lock:
             removed = self._endpoints.pop(endpoint_id, None)
+            self._telemetry.pop(endpoint_id, None)
             return removed is not None
 
     def observe(
@@ -307,21 +374,30 @@ class ModelRouter:
         cost: float | None = None,
         observed_at: float | None = None,
     ) -> None:
+        endpoint_id = str(endpoint_id).strip()
+        timestamp = time.time() if observed_at is None else float(observed_at)
         with self._lock:
             if endpoint_id not in self._endpoints:
                 raise KeyError(f"unknown endpoint: {endpoint_id}")
-            telemetry = self._telemetry.setdefault(endpoint_id, EndpointTelemetry())
-            telemetry.observe(
-                ok=ok,
+            current = self._telemetry.setdefault(endpoint_id, EndpointTelemetry())
+            # Assignment happens only after all validation succeeds.
+            self._telemetry[endpoint_id] = current.updated(
+                ok=bool(ok),
                 quality=quality,
                 latency_ms=latency_ms,
                 cost=cost,
                 alpha=self.telemetry_alpha,
-                observed_at=time.time() if observed_at is None else float(observed_at),
+                observed_at=timestamp,
             )
 
+    @staticmethod
+    def _inverse_ratio(value: float, reference: float) -> float:
+        if reference <= 0:
+            return 1.0 if value <= 0 else 0.0
+        return max(0.0, min(1.0, 1.0 - value / reference))
+
+    @staticmethod
     def _hard_rejections(
-        self,
         endpoint: ModelEndpoint,
         telemetry: EndpointTelemetry,
         request: RouteRequest,
@@ -331,32 +407,45 @@ class ModelRouter:
             reasons.append("disabled")
         if endpoint.endpoint_id.lower() in request.excluded_endpoints:
             reasons.append("excluded")
-        missing_caps = request.required_capabilities - endpoint.capabilities
-        if missing_caps:
-            reasons.append("missing capabilities: " + ",".join(sorted(missing_caps)))
+
+        missing_capabilities = request.required_capabilities - endpoint.capabilities
+        if missing_capabilities:
+            reasons.append(
+                "missing capabilities: " + ",".join(sorted(missing_capabilities))
+            )
         missing_modalities = request.required_modalities - endpoint.modalities
         if missing_modalities:
-            reasons.append("missing modalities: " + ",".join(sorted(missing_modalities)))
+            reasons.append(
+                "missing modalities: " + ",".join(sorted(missing_modalities))
+            )
+
         total_context = request.context_tokens + request.expected_output_tokens
         if endpoint.max_context_tokens and total_context > endpoint.max_context_tokens:
-            reasons.append(
-                f"context {total_context} exceeds {endpoint.max_context_tokens}"
-            )
+            reasons.append(f"context {total_context} exceeds {endpoint.max_context_tokens}")
         if request.privacy > endpoint.privacy_ceiling:
             reasons.append(
                 f"privacy {request.privacy.name.lower()} exceeds endpoint ceiling "
                 f"{endpoint.privacy_ceiling.name.lower()}"
             )
-        latency = telemetry.latency_ewma_ms or endpoint.nominal_latency_ms
+
+        latency = (
+            endpoint.nominal_latency_ms
+            if telemetry.latency_ewma_ms is None
+            else telemetry.latency_ewma_ms
+        )
         if request.latency_budget_ms is not None and latency > request.latency_budget_ms:
             reasons.append(
                 f"latency {latency:.2f} exceeds budget {request.latency_budget_ms:.2f}"
             )
-        cost = endpoint.estimated_cost(request.context_tokens, request.expected_output_tokens)
+
+        cost = endpoint.estimated_cost(
+            request.context_tokens, request.expected_output_tokens
+        )
         if telemetry.cost_ewma is not None:
             cost = max(cost, telemetry.cost_ewma)
         if request.cost_budget is not None and cost > request.cost_budget:
             reasons.append(f"cost {cost:.8f} exceeds budget {request.cost_budget:.8f}")
+
         if telemetry.reliability_ewma < request.minimum_reliability:
             reasons.append(
                 f"reliability {telemetry.reliability_ewma:.4f} below minimum "
@@ -369,100 +458,107 @@ class ModelRouter:
             )
         return reasons
 
-    @staticmethod
-    def _inverse_ratio(value: float, budget_or_reference: float) -> float:
-        if budget_or_reference <= 0:
-            return 1.0 if value <= 0 else 0.0
-        return max(0.0, min(1.0, 1.0 - value / budget_or_reference))
-
     def route(self, request: RouteRequest) -> RouteDecision:
         if not isinstance(request, RouteRequest):
             raise TypeError("request must be a RouteRequest")
+
+        # Endpoints and telemetry are immutable values. Copying both registries under
+        # the same lock gives this route one coherent view while allowing later
+        # observations/register/unregister calls to proceed independently.
         with self._lock:
-            endpoints = list(self._endpoints.values())
+            endpoints = dict(self._endpoints)
             telemetry = {
-                endpoint.endpoint_id: self._telemetry.setdefault(
-                    endpoint.endpoint_id, EndpointTelemetry()
-                )
-                for endpoint in endpoints
+                endpoint_id: self._telemetry.get(endpoint_id, EndpointTelemetry())
+                for endpoint_id in endpoints
             }
 
         rejected: dict[str, tuple[str, ...]] = {}
         candidates: list[RouteCandidate] = []
-        wr, wq, wl, wc, wp = self.weights
-        preferred = {name: idx for idx, name in enumerate(request.preferred_providers)}
+        reliability_weight, quality_weight, latency_weight, cost_weight, preference_weight = self.weights
+        preferred = {
+            provider: index
+            for index, provider in enumerate(request.preferred_providers)
+        }
 
-        for endpoint in endpoints:
-            stats = telemetry[endpoint.endpoint_id]
+        for endpoint_id, endpoint in endpoints.items():
+            stats = telemetry[endpoint_id]
             reasons = self._hard_rejections(endpoint, stats, request)
             if reasons:
-                rejected[endpoint.endpoint_id] = tuple(reasons)
+                rejected[endpoint_id] = tuple(reasons)
                 continue
-            latency = stats.latency_ewma_ms or endpoint.nominal_latency_ms
+
+            latency = (
+                endpoint.nominal_latency_ms
+                if stats.latency_ewma_ms is None
+                else stats.latency_ewma_ms
+            )
             estimated_cost = endpoint.estimated_cost(
                 request.context_tokens, request.expected_output_tokens
             )
             if stats.cost_ewma is not None:
                 estimated_cost = max(estimated_cost, stats.cost_ewma)
 
-            latency_reference = request.latency_budget_ms or max(endpoint.nominal_latency_ms * 2.0, 1.0)
+            latency_reference = request.latency_budget_ms
+            if latency_reference is None:
+                latency_reference = max(endpoint.nominal_latency_ms * 2.0, 1.0)
             if request.cost_budget is not None:
                 cost_reference = max(request.cost_budget, 1e-12)
             else:
-                nominal = endpoint.estimated_cost(
-                    max(request.context_tokens, 1), max(request.expected_output_tokens, 1)
+                nominal_cost = endpoint.estimated_cost(
+                    max(request.context_tokens, 1),
+                    max(request.expected_output_tokens, 1),
                 )
-                cost_reference = max(nominal * 2.0, 1e-6)
+                cost_reference = max(nominal_cost * 2.0, 1e-6)
+
             latency_score = self._inverse_ratio(latency, latency_reference)
             cost_score = self._inverse_ratio(estimated_cost, cost_reference)
-
             provider_key = endpoint.provider.lower()
-            pref_index = preferred.get(provider_key)
-            if pref_index is None:
+            preference_index = preferred.get(provider_key)
+            if preference_index is None:
                 preference_score = 0.0
-                pref_rank = len(preferred) + 1
+                preference_rank = len(preferred) + 1
             else:
-                preference_score = 1.0 / (pref_index + 1)
-                pref_rank = pref_index
+                preference_score = 1.0 / (preference_index + 1)
+                preference_rank = preference_index
 
             score = (
-                stats.reliability_ewma * wr
-                + stats.quality_ewma * wq
-                + latency_score * wl
-                + cost_score * wc
-                + preference_score * wp
+                stats.reliability_ewma * reliability_weight
+                + stats.quality_ewma * quality_weight
+                + latency_score * latency_weight
+                + cost_score * cost_weight
+                + preference_score * preference_weight
             )
             candidates.append(
                 RouteCandidate(
-                    endpoint_id=endpoint.endpoint_id,
+                    endpoint_id=endpoint_id,
                     score=score,
                     reliability=stats.reliability_ewma,
                     quality=stats.quality_ewma,
                     estimated_latency_ms=latency,
                     estimated_cost=estimated_cost,
-                    provider_preference=pref_rank,
+                    provider_preference=preference_rank,
                 )
             )
 
         candidates.sort(
-            key=lambda row: (
-                -row.score,
-                row.provider_preference,
-                row.estimated_latency_ms,
-                row.estimated_cost,
-                row.endpoint_id,
+            key=lambda candidate: (
+                -candidate.score,
+                candidate.provider_preference,
+                candidate.estimated_latency_ms,
+                candidate.estimated_cost,
+                candidate.endpoint_id,
             )
         )
         if not candidates:
             detail = "; ".join(
-                f"{endpoint}: {', '.join(reasons)}"
-                for endpoint, reasons in sorted(rejected.items())
+                f"{endpoint_id}: {', '.join(reasons)}"
+                for endpoint_id, reasons in sorted(rejected.items())
             )
             raise NoRoute(f"no endpoint satisfies route request ({detail})")
-        selected = self._endpoints[candidates[0].endpoint_id]
+
         return RouteDecision(
             request=request,
-            selected=selected,
+            selected=endpoints[candidates[0].endpoint_id],
             candidates=tuple(candidates),
             rejected=rejected,
             routed_at=time.time(),
@@ -471,22 +567,24 @@ class ModelRouter:
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
             endpoints = sorted(self._endpoints.values(), key=lambda row: row.endpoint_id)
-            return {
-                "endpoints": [
-                    {
-                        "endpoint_id": endpoint.endpoint_id,
-                        "provider": endpoint.provider,
-                        "model": endpoint.model,
-                        "capabilities": sorted(endpoint.capabilities),
-                        "modalities": sorted(endpoint.modalities),
-                        "max_context_tokens": endpoint.max_context_tokens,
-                        "privacy_ceiling": endpoint.privacy_ceiling.name.lower(),
-                        "local": endpoint.local,
-                        "enabled": endpoint.enabled,
-                        "telemetry": self._telemetry.setdefault(
-                            endpoint.endpoint_id, EndpointTelemetry()
-                        ).snapshot(),
-                    }
-                    for endpoint in endpoints
-                ]
-            }
+            telemetry = dict(self._telemetry)
+
+        return {
+            "endpoints": [
+                {
+                    "endpoint_id": endpoint.endpoint_id,
+                    "provider": endpoint.provider,
+                    "model": endpoint.model,
+                    "capabilities": sorted(endpoint.capabilities),
+                    "modalities": sorted(endpoint.modalities),
+                    "max_context_tokens": endpoint.max_context_tokens,
+                    "privacy_ceiling": endpoint.privacy_ceiling.name.lower(),
+                    "local": endpoint.local,
+                    "enabled": endpoint.enabled,
+                    "telemetry": telemetry.get(
+                        endpoint.endpoint_id, EndpointTelemetry()
+                    ).snapshot(),
+                }
+                for endpoint in endpoints
+            ]
+        }
