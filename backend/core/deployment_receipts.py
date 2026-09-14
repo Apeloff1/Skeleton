@@ -149,6 +149,8 @@ class DeploymentReceiptLedger:
                 _parse_time(row.executed_at)
             except ValueError as exc:
                 raise DeploymentReceiptIntegrityError(str(exc)) from exc
+            if hmac.compare_digest(pre, post):
+                raise DeploymentReceiptIntegrityError("deployment receipt must attest a system-root transition")
             if row.previous_sha256 != previous:
                 raise DeploymentReceiptIntegrityError("deployment receipt ancestry mismatch")
             expected = _receipt_hash(
@@ -179,6 +181,8 @@ class DeploymentReceiptLedger:
         release = _digest(release_sha256, "release")
         pre = _digest(pre_system_root_sha256, "pre-system root")
         post = _digest(post_system_root_sha256, "post-system root")
+        if hmac.compare_digest(pre, post):
+            raise ValueError("deployment receipt must attest a system-root transition")
         stamp = executed_at or datetime.now(UTC).isoformat()
         _parse_time(stamp)
         with self._lease.acquire():
