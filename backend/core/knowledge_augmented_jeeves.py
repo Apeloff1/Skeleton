@@ -32,16 +32,38 @@ class KnowledgeAugmentedJeeves:
     def __init__(self, curiosity: CuriosityEngine) -> None:
         self.curiosity = curiosity
 
-    def _context(self, prompt: str, *, user_scope: str = "default") -> dict[str, Any]:
-        signal = self.curiosity.observe_prompt(prompt, user_scope=user_scope)
+    def _context(
+        self,
+        prompt: str,
+        *,
+        user_scope: str = "default",
+        signal_key: str | None = None,
+        observed_at: str | None = None,
+    ) -> dict[str, Any]:
+        signal = self.curiosity.observe_prompt(
+            prompt,
+            user_scope=user_scope,
+            signal_key=signal_key,
+            observed_at=observed_at,
+        )
         pack = self.curiosity.fabric.orientation_pack(prompt, limit=8)
         return {"signal_id": signal.id, "subject": signal.subject, "orientation": pack}
+
+    @staticmethod
+    def _signal_args(payload: dict[str, Any]) -> dict[str, Any]:
+        key = str(payload.get("_curiosity_signal_key") or "").strip() or None
+        observed_at = str(payload.get("_curiosity_observed_at") or "").strip() or None
+        return {
+            "user_scope": str(payload.get("user_scope") or "default"),
+            "signal_key": key,
+            "observed_at": observed_at,
+        }
 
     def reason(self, payload: dict[str, Any]) -> dict[str, Any]:
         prompt = str(payload.get("prompt") or payload.get("question") or payload.get("task") or "").strip()
         if not prompt:
             raise ValueError("reasoning prompt is required")
-        ctx = self._context(prompt, user_scope=str(payload.get("user_scope") or "default"))
+        ctx = self._context(prompt, **self._signal_args(payload))
         orientation = ctx["orientation"]
         known = list(orientation["claims"])
         unresolved = list(orientation["unresolved"])
@@ -101,7 +123,7 @@ class KnowledgeAugmentedJeeves:
         candidate = str(payload.get("candidate") or payload.get("answer") or payload.get("output") or "").strip()
         if not subject_prompt or not candidate:
             raise ValueError("review requires prompt/subject and candidate output")
-        ctx = self._context(subject_prompt, user_scope=str(payload.get("user_scope") or "default"))
+        ctx = self._context(subject_prompt, **self._signal_args(payload))
         pack = ctx["orientation"]
         candidate_lc = candidate.casefold()
         matched = [claim for claim in pack["claims"] if any(token in candidate_lc for token in re.findall(r"[a-z0-9]{4,}", claim.casefold())[:6])]
