@@ -1,0 +1,109 @@
+"""Operational runtime for externally witnessed deployment checkpoint publications.
+
+This composes strict deployment-specific witness policy, the verified local checkpoint
+publication ledger, durable signed-pin ingestion, canonical witness targets, and
+freshness-bounded quorum into one runtime. It deliberately does not alter the system
+root it observes, avoiding self-reference.
+"""
+from __future__ import annotations
+
+from dataclasses import asdict
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+from core.deployment_checkpoint_ledger import DeploymentCheckpointLedger
+from core.deployment_checkpoint_pin_config import (
+    DeploymentCheckpointPinPolicy,
+    load_deployment_checkpoint_pin_policy,
+)
+from core.deployment_checkpoint_pin_ledger import (
+    DeploymentCheckpointPinEvent,
+    DeploymentCheckpointPinLedger,
+    DeploymentCheckpointPinQuorum,
+)
+from core.deployment_checkpoint_target import (
+    DeploymentCheckpointWitnessTarget,
+    build_deployment_checkpoint_witness_target,
+)
+from core.deployment_checkpoint_witness import DeploymentCheckpointPinBundle, DeploymentCheckpointPinReceipt
+
+
+class DeploymentCheckpointPinRuntime:
+    def __init__(
+        self,
+        root: str | Path,
+        *,
+        checkpoint_ledger: DeploymentCheckpointLedger,
+        policy: DeploymentCheckpointPinPolicy | None = None,
+    ) -> None:
+        if not isinstance(checkpoint_ledger, DeploymentCheckpointLedger):
+            raise ValueError("checkpoint_ledger must be a DeploymentCheckpointLedger")
+        self.root = Path(root)
+        self.root.mkdir(parents=True, exist_ok=True)
+        self.checkpoints = checkpoint_ledger
+        self.policy = policy if policy is not None else load_deployment_checkpoint_pin_policy()
+        if not isinstance(self.policy, DeploymentCheckpointPinPolicy):
+            raise ValueError("deployment checkpoint pin policy type mismatch")
+        self.ledger = DeploymentCheckpointPinLedger(
+            self.root / "ledger",
+            checkpoint_ledger=self.checkpoints,
+            trusted_witnesses=self.policy.witnesses,
+            required_groups=self.policy.required_groups,
+            max_age_seconds=self.policy.max_age_seconds,
+        )
+
+    def current_target(self) -> DeploymentCheckpointWitnessTarget | None:
+        publication = self.checkpoints.latest()
+        if publication is None:
+            return None
+        return build_deployment_checkpoint_witness_target(publication)
+
+    def observe(self, receipt: DeploymentCheckpointPinReceipt) -> DeploymentCheckpointPinEvent:
+        return self.ledger.observe(receipt)
+
+    def quorum(
+        self,
+        *,
+        publication_sequence: int | None = None,
+        now: datetime | None = None,
+    ) -> DeploymentCheckpointPinQuorum | None:
+        return self.ledger.quorum(publication_sequence=publication_sequence, now=now)
+
+    def portable_bundle(
+        self,
+        *,
+        publication_sequence: int | None = None,
+        now: datetime | None = None,
+    ) -> DeploymentCheckpointPinBundle:
+        return self.ledger.portable_bundle(publication_sequence=publication_sequence, now=now)
+
+    def requirement_satisfied(self, *, now: datetime | None = None) -> bool:
+        if not self.policy.required:
+            return True
+        quorum = self.quorum(now=now)
+        return quorum is not None and quorum.reached
+
+    def status(self, *, now: datetime | None = None) -> dict[str, Any]:
+        ledger = self.ledger.status(now=now)
+        target = self.current_target()
+        quorum = self.quorum(now=now)
+        satisfied = not self.policy.required or (quorum is not None and quorum.reached)
+        return {
+            "version": 1,
+            "policy": {
+                "required": self.policy.required,
+                "required_groups": self.policy.required_groups,
+                "max_age_seconds": self.policy.max_age_seconds,
+                "trusted_witnesses": len(tuple(row for row in self.policy.witnesses if row.enabled)),
+                "configured_independence_groups": len({
+                    row.independence_group for row in self.policy.witnesses if row.enabled
+                }),
+            },
+            "ledger": ledger,
+            "current_target": None if target is None else asdict(target),
+            "current_quorum": None if quorum is None else asdict(quorum),
+            "requirement_satisfied": satisfied,
+            "verified": ledger.get("verified") is True,
+            "cross_process_locking": ledger.get("cross_process_locking") is True,
+        }
