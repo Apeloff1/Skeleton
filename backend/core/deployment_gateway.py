@@ -9,7 +9,8 @@ post-activation transition receipt binding the observed pre/post system roots.
 Authorization and completed-transition evidence is automatically anchored into the
 append-only deployment checkpoint ledger. The checkpoint ledger is deliberately
 excluded from the system root it summarizes, avoiding self-reference while giving
-external verifiers a durable publication history.
+external verifiers a durable publication history. A genesis checkpoint is published
+on construction so a healthy empty deployment state is externally pinnable too.
 
 Transition receipts are deliberately excluded from the system root they attest to.
 If a process dies after release activation but before receipt persistence, the gap is
@@ -104,6 +105,7 @@ class DeploymentGateway:
         self.releases = AtomicReleaseDeployer(self.root / "releases")
         self.receipts = DeploymentReceiptLedger(self.root / "transition-receipts")
         self.checkpoints = DeploymentCheckpointLedger(self.root / "evidence-checkpoints")
+        self.publish_evidence_checkpoint()
 
     @staticmethod
     def _plan(value: dict[str, Any]) -> dict[str, Any]:
