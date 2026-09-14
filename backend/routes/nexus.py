@@ -2,13 +2,14 @@
 routes/nexus.py — Knowledge Nexus integration + Curiosity epistemic service.
 
 The vendored Nexus remains isolation-guarded. Curiosity, empirical verification,
-truth-state and provenance-gated watch feeds share the live /api/nexus surface.
+truth-state, calibration and provenance-gated watch feeds share /api/nexus.
 """
 from __future__ import annotations
 
 from dataclasses import asdict
 import sys
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
@@ -102,6 +103,19 @@ class ReverifyClaimBody(BaseModel):
     claim: str = Field(min_length=1, max_length=10000)
 
 
+class ClaimCompareBody(BaseModel):
+    left: str = Field(min_length=1, max_length=10000)
+    right: str = Field(min_length=1, max_length=10000)
+
+
+class CalibrationForecastBody(BaseModel):
+    claim: str = Field(min_length=1, max_length=10000)
+    probability: float = Field(ge=0.0, le=1.0)
+    forecaster: str = Field(min_length=1, max_length=300)
+    context_sha256: str = Field(default="", max_length=64)
+    forecast_id: str | None = Field(default=None, max_length=128)
+
+
 class TruthWatchEventBody(BaseModel):
     kind: str
     target: str = Field(min_length=1, max_length=10000)
@@ -110,6 +124,7 @@ class TruthWatchEventBody(BaseModel):
     provider_cursor: str = Field(default="", max_length=1000)
     provenance_verified: bool = False
     event_id: str | None = Field(default=None, max_length=128)
+    payload: dict[str, Any] = Field(default_factory=dict)
 
 
 class TruthEvidenceBody(BaseModel):
@@ -170,6 +185,24 @@ async def curiosity_truth_state(claim: str = Query(min_length=1, max_length=1000
             "dependents": list(engine.claim_dependencies.dependents(claim, recursive=True))}
 
 
+@router.post("/curiosity/claim-identity")
+async def curiosity_claim_identity(body: ClaimCompareBody):
+    return curiosity_service().compare_claims(body.left, body.right)
+
+
+@router.post("/curiosity/calibration/forecast")
+async def curiosity_calibration_forecast(body: CalibrationForecastBody):
+    return curiosity_service().record_forecast(
+        claim=body.claim, probability=body.probability, forecaster=body.forecaster,
+        context_sha256=body.context_sha256, forecast_id=body.forecast_id,
+    )
+
+
+@router.get("/curiosity/calibration")
+async def curiosity_calibration_metrics(bins: int = Query(default=10, ge=2, le=100), forecaster: str | None = Query(default=None, max_length=300)):
+    return curiosity_service().calibration_metrics(bins=bins, forecaster=forecaster)
+
+
 @router.post("/curiosity/reverify")
 async def curiosity_reverify_claim(body: ReverifyClaimBody): return curiosity_service().engine.reverify_claim(body.claim)
 
@@ -192,9 +225,12 @@ async def curiosity_watch_status(limit: int = Query(default=100, ge=1, le=1000))
 async def curiosity_watch_ingest(body: TruthWatchEventBody):
     try: TruthEventKind(body.kind)
     except ValueError as exc: raise HTTPException(status_code=422, detail=f"unsupported truth watch event kind: {body.kind}") from exc
-    return curiosity_service().ingest_watch(kind=body.kind, target=body.target, reason=body.reason,
+    return curiosity_service().ingest_watch(
+        kind=body.kind, target=body.target, reason=body.reason,
         provider=body.provider, provider_cursor=body.provider_cursor,
-        provenance_verified=body.provenance_verified, event_id=body.event_id)
+        provenance_verified=body.provenance_verified, event_id=body.event_id,
+        payload=body.payload,
+    )
 
 
 @router.post("/curiosity/watch/apply")
