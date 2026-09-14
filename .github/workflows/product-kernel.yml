@@ -12,6 +12,7 @@ on:
       - "frontend/app/product.tsx"
       - "frontend/app/capability.tsx"
       - "frontend/app/operation.tsx"
+      - "frontend/app/control-plane.tsx"
       - "frontend/components/LaunchCascade.tsx"
       - ".github/workflows/product-kernel.yml"
   pull_request:
@@ -25,6 +26,7 @@ on:
       - "frontend/app/product.tsx"
       - "frontend/app/capability.tsx"
       - "frontend/app/operation.tsx"
+      - "frontend/app/control-plane.tsx"
       - "frontend/components/LaunchCascade.tsx"
       - ".github/workflows/product-kernel.yml"
 
