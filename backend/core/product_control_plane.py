@@ -8,6 +8,7 @@ from typing import Any
 from core.capability_readiness import ReadinessReport, evaluate_readiness
 from core.canonical_product_policy import CANONICAL_PRODUCT_POLICY, POLICY_VERSION
 from core.charter_policy import Charter, CharterPolicy, Edict, Rule
+from core.epistemic_attestation import epistemic_root_dict
 from core.execution_evidence import derive_ledger, derive_lifecycle
 from core.execution_receipts import ExecutionReceiptStore
 from core.policy_repository import PolicyRepository
@@ -53,10 +54,14 @@ class ProductControlPlane:
     def _audit_projection(self) -> list[dict[str, Any]]:
         return [asdict(x) for x in self.operations.audit.entries(limit=50)]
 
+    def _epistemic_root(self) -> dict[str, Any]:
+        return epistemic_root_dict(self.curiosity.verification_status())
+
     def _operations_projection(self) -> dict[str, Any]:
         projection = dict(self.operations.snapshot())
         projection["outbox_health"] = self.operations.outbox.health()
         projection["curiosity"] = self.curiosity.stats()
+        projection["epistemic_root"] = self._epistemic_root()
         return projection
 
     def _readiness_model(self) -> ReadinessReport:
@@ -85,23 +90,25 @@ class ProductControlPlane:
 
     def system_root(self) -> dict[str, Any]:
         operations = self._operations_projection()
+        epistemic = self._epistemic_root()
         att = build_root_attestation({
             "policy": self._policy_projection(), "executors": list(self.executors.snapshot()),
             "readiness": self.readiness_report(), "lifecycle": self.execution_ledger(),
             "audit": {"sequence": operations.get("audit_sequence"), "head": operations.get("audit_head"), "health": operations.get("audit_health")},
             "outbox": operations.get("outbox_health"), "receipts": self.receipts.stats(),
-            "curiosity": self.curiosity.stats(), "verification": self.curiosity.verification_status(),
+            "curiosity_runtime": self.curiosity.stats(), "epistemic_root": epistemic,
             "kernel": [{"id": c.id, "pillar": c.pillar.value, "critical": c.critical} for c in self.operations.kernel.all()],
         })
         return {"schema_version": att.schema_version, "components": [{"name": n, "sha256": d} for n, d in att.components], "root_sha256": att.root_sha256}
 
     def _safety_projection(self) -> dict[str, Any]:
-        assurance = self.assurance_report(); readiness = self.readiness_report()
+        assurance = self.assurance_report(); readiness = self.readiness_report(); epistemic = self._epistemic_root()
         return {"posture": assurance["posture"], "hard_failures": assurance["hard_failures"], "warnings": assurance["warnings"],
             "native_coverage_pct": assurance["native_coverage_pct"], "readiness_pct": assurance["readiness_pct"],
             "attestation_sha256": assurance["attestation_sha256"], "readiness_attestation_sha256": readiness["attestation_sha256"],
-            "system_root_sha256": self.system_root()["root_sha256"], "curiosity": self.curiosity.stats(),
-            "verification": self.curiosity.verification_status(), "invariants": assurance["invariants"]}
+            "system_root_sha256": self.system_root()["root_sha256"], "epistemic_root_sha256": epistemic["root_sha256"],
+            "curiosity": self.curiosity.stats(), "verification": self.curiosity.verification_status(),
+            "invariants": assurance["invariants"]}
 
     def ratify(self, domain: str, rules: list[Rule]) -> Charter:
         charter = self.policy.ratify(domain, rules); self.policy_repository.save(self.policy); return charter
@@ -168,12 +175,12 @@ class ProductControlPlane:
     def status(self) -> dict[str, Any]:
         governance = self.policy.snapshot(); ledger = self.execution_ledger(); counts: dict[str, int] = {}; anomalies = 0
         for item in ledger: counts[item["state"]] = counts.get(item["state"], 0) + 1; anomalies += len(item.get("anomalies", ()))
-        readiness = self.readiness_report(); assurance = self.assurance_report(); root = self.system_root(); operations = self._operations_projection()
+        readiness = self.readiness_report(); assurance = self.assurance_report(); root = self.system_root(); operations = self._operations_projection(); epistemic = self._epistemic_root()
         return {"policy_version": POLICY_VERSION, "policy_bootstrap_enabled": self.bootstrap_policy,
             "kernel": {"capabilities": [{"id": c.id, "pillar": c.pillar.value, "critical": c.critical} for c in self.operations.kernel.all()], "critical_ids": list(self.operations.kernel.critical_ids())},
             "governance": {"charters": [asdict(x) for x in governance.charters], "edicts": [asdict(x) for x in governance.edicts]},
             "executors": {"bound": len(self.executors), "bindings": list(self.executors.snapshot()), "coverage": self.executor_coverage()},
             "readiness": readiness, "receipts": self.receipts.stats(), "curiosity": self.curiosity.stats(),
-            "verification": self.curiosity.verification_status(),
+            "verification": self.curiosity.verification_status(), "epistemic_root": epistemic,
             "lifecycle": {"operations": len(ledger), "states": counts, "evidence_gaps": counts.get("evidence_gap", 0) + counts.get("receipt_unattested", 0), "anomalies": anomalies},
             "assurance": assurance, "system_root": root, "safety": self._safety_projection(), "operations": operations}
