@@ -94,18 +94,20 @@ def verify_policy_bound_trust_advance(
     anchor_verified_at: str,
     expected_current_publication_sha256: str,
 ) -> bool:
-    """Verify an anchored append-only advance when continuity is not mandatory.
+    """Verify an anchored append-only audit advance under a pinned optional policy.
 
-    A trust-advance packet authenticates the old anchor but does not independently
-    witness the new endpoint. It therefore cannot satisfy a policy that explicitly
-    requires witnessed continuity at both endpoints.
+    A trust-advance packet authenticates an older witnessed anchor and proves an
+    append-only extension to an externally supplied current head. It does *not* place
+    a fresh witness signature on that current head. Therefore it is useful as audit
+    evidence only and cannot satisfy a policy whose ``required`` flag demands fresh
+    current-head witness quorum.
     """
     registry = _policy_ready(
         manifest,
         expected_manifest_sha256=expected_manifest_sha256,
         trusted_witnesses=trusted_witnesses,
     )
-    if registry is None or manifest.continuity_required:
+    if registry is None or manifest.required:
         return False
     return verify_deployment_checkpoint_trust_advance(
         packet,
@@ -154,7 +156,10 @@ def policy_satisfied_by_proof_kind(
 ) -> bool:
     """Return whether a proof family can satisfy the pinned deployment policy.
 
-    This is capability classification only; it does not verify a proof packet.
+    ``trust_advance`` is deliberately excluded from mandatory witness policies: it
+    authenticates ancestry from an older witnessed head, not a fresh quorum on the
+    current head. A required non-continuity policy accepts a current pin or the stronger
+    two-endpoint continuity proof; a continuity-required policy accepts only the latter.
     """
     if proof_kind not in {PROOF_PIN, PROOF_TRUST_ADVANCE, PROOF_WITNESSED_CONTINUITY}:
         return False
@@ -162,7 +167,7 @@ def policy_satisfied_by_proof_kind(
         return True
     if manifest.continuity_required:
         return proof_kind == PROOF_WITNESSED_CONTINUITY
-    return proof_kind in {PROOF_PIN, PROOF_TRUST_ADVANCE, PROOF_WITNESSED_CONTINUITY}
+    return proof_kind in {PROOF_PIN, PROOF_WITNESSED_CONTINUITY}
 
 
 def verify_policy_bound_verification_package(
@@ -182,7 +187,7 @@ def verify_policy_bound_verification_package(
     Exact proof-specific context is mandatory:
 
     * ``pin``: ``pin_verified_at`` only.
-    * ``trust_advance``: ``anchor_verified_at`` only.
+    * ``trust_advance``: ``anchor_verified_at`` only, and only when witnessing is optional.
     * ``witnessed_continuity``: previous head plus previous/current verification times.
 
     Supplying extra context fails closed. This makes the dispatcher a single
