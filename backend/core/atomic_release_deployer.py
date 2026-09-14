@@ -61,6 +61,10 @@ def _sha(value: Any) -> str:
     return canonical_json_sha256(value)
 
 
+def _is_sha(value: Any) -> bool:
+    return isinstance(value, str) and bool(_SHA256.fullmatch(value))
+
+
 def _channel_key(target: str, environment: str) -> str:
     return hashlib.sha256(f"{environment}\0{target}".encode("utf-8")).hexdigest()[:32]
 
@@ -83,14 +87,15 @@ def _validate_raw_record(raw: Any) -> dict[str, Any]:
         raise ReleaseDeploymentError("release history sequence malformed")
     if any(not isinstance(raw.get(field), str) for field in _STRING_FIELDS):
         raise ReleaseDeploymentError("release history field type mismatch")
-    if not all(raw[field] for field in ("release_id", "authorization_id", "target", "environment", "artifact")):
-        raise ReleaseDeploymentError("release history identity fields are incomplete")
+    if not all(raw[field] and raw[field] == raw[field].strip()
+               for field in ("authorization_id", "target", "environment", "artifact", "activated_at")):
+        raise ReleaseDeploymentError("release history identity fields are incomplete or noncanonical")
     for field in ("release_id", "plan_sha256", "system_root_sha256", "sha256"):
-        if not _SHA256.fullmatch(raw[field]):
+        if not _is_sha(raw[field]):
             raise ReleaseDeploymentError(f"release history {field} malformed")
-    if raw["previous_release_id"] and not _SHA256.fullmatch(raw["previous_release_id"]):
+    if raw["previous_release_id"] and not _is_sha(raw["previous_release_id"]):
         raise ReleaseDeploymentError("release history previous release id malformed")
-    if raw["previous_sha256"] and not _SHA256.fullmatch(raw["previous_sha256"]):
+    if raw["previous_sha256"] and not _is_sha(raw["previous_sha256"]):
         raise ReleaseDeploymentError("release history previous digest malformed")
     try:
         _parse_time(raw["activated_at"])
@@ -111,7 +116,9 @@ class AtomicReleaseDeployer:
         environment = plan.get("environment")
         if not isinstance(target, str) or not target.strip() or not isinstance(environment, str) or not environment.strip():
             raise ReleaseDeploymentError("deployment plan target/environment missing")
-        channel = self.root / _channel_key(target.strip(), environment.strip())
+        if target != target.strip() or environment != environment.strip():
+            raise ReleaseDeploymentError("deployment plan target/environment must be canonical strings")
+        channel = self.root / _channel_key(target, environment)
         channel.mkdir(parents=True, exist_ok=True)
         return channel, FileLease(channel / ".release.lock")
 
@@ -178,9 +185,11 @@ class AtomicReleaseDeployer:
             temp.unlink(missing_ok=True)
 
     def current(self, *, target: str, environment: str) -> ReleaseRecord | None:
-        if not isinstance(target, str) or not target.strip() or not isinstance(environment, str) or not environment.strip():
-            raise ValueError("target and environment must be non-empty strings")
-        channel = self.root / _channel_key(target.strip(), environment.strip())
+        if not isinstance(target, str) or not target or target != target.strip():
+            raise ValueError("target must be a canonical non-empty string")
+        if not isinstance(environment, str) or not environment or environment != environment.strip():
+            raise ValueError("environment must be a canonical non-empty string")
+        channel = self.root / _channel_key(target, environment)
         path = channel / "current.json"
         if not path.exists():
             return None
@@ -192,9 +201,11 @@ class AtomicReleaseDeployer:
                 raise ReleaseDeploymentError("current release unreadable") from exc
             if not isinstance(envelope, dict) or set(envelope) != _CURRENT_KEYS:
                 raise ReleaseDeploymentError("current release envelope schema mismatch")
-            if envelope.get("version") != RELEASE_LEDGER_VERSION or not isinstance(envelope.get("release"), dict):
+            if type(envelope.get("version")) is not int or envelope["version"] != RELEASE_LEDGER_VERSION:
+                raise ReleaseDeploymentError("current release version malformed")
+            if not isinstance(envelope.get("release"), dict):
                 raise ReleaseDeploymentError("current release malformed")
-            if not isinstance(envelope.get("sha256"), str) or not _SHA256.fullmatch(envelope["sha256"]):
+            if not _is_sha(envelope.get("sha256")):
                 raise ReleaseDeploymentError("current release checksum malformed")
             try:
                 canonical_json_bytes(envelope)
@@ -214,22 +225,21 @@ class AtomicReleaseDeployer:
         if not verify_deployment_plan(plan):
             raise ReleaseDeploymentError("deployment plan integrity verification failed")
         authorization_id = consumption.authorization_id
-        if not isinstance(authorization_id, str) or not authorization_id.strip():
-            raise ReleaseDeploymentError("authorization consumption identity is missing")
-        authorization_id = authorization_id.strip()
-        if not isinstance(consumption.consume_event_sha256, str) or not _SHA256.fullmatch(consumption.consume_event_sha256):
+        if not isinstance(authorization_id, str) or not authorization_id or authorization_id != authorization_id.strip():
+            raise ReleaseDeploymentError("authorization consumption identity is missing or noncanonical")
+        if not _is_sha(consumption.consume_event_sha256):
             raise ReleaseDeploymentError("authorization consume event digest is invalid")
         bound_plan = plan_digest(plan)
-        if not isinstance(consumption.plan_sha256, str) or not hmac.compare_digest(bound_plan, consumption.plan_sha256):
+        if not _is_sha(consumption.plan_sha256) or not hmac.compare_digest(bound_plan, consumption.plan_sha256):
             raise ReleaseDeploymentError("authorization consumption is bound to a different deployment plan")
-        if not isinstance(consumption.system_root_sha256, str) or not _SHA256.fullmatch(consumption.system_root_sha256):
+        if not _is_sha(consumption.system_root_sha256):
             raise ReleaseDeploymentError("authorization system root is invalid")
         try:
             consumed_at = _parse_time(consumption.consumed_at)
         except ValueError as exc:
             raise ReleaseDeploymentError("authorization consumption timestamp is invalid") from exc
 
-        stamp = activated_at or datetime.now(UTC).isoformat()
+        stamp = datetime.now(UTC).isoformat() if activated_at is None else activated_at
         try:
             activation_time = _parse_time(stamp)
         except ValueError as exc:
@@ -286,6 +296,8 @@ class AtomicReleaseDeployer:
         return tuple(sorted(rows, key=lambda row: (row.activated_at, row.environment, row.target, row.release_id)))
 
     def find_by_authorization(self, authorization_id: str) -> ReleaseRecord | None:
+        if not isinstance(authorization_id, str) or not authorization_id:
+            return None
         return next((row for row in self.snapshot() if row.authorization_id == authorization_id), None)
 
     def status(self) -> dict[str, Any]:
