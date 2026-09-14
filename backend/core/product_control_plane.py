@@ -16,6 +16,7 @@ from core.product_executor_registry import ExecutorNotRegistered, ProductExecuto
 from core.product_kernel import PRODUCT_KERNEL, ProductKernel
 from core.product_operations import AdmittedOperation, OperationExecutionError, ProductOperationCoordinator
 from core.system_assurance import evaluate_assurance
+from core.system_root_attestation import build_root_attestation
 
 
 class ProductControlPlane:
@@ -93,15 +94,36 @@ class ProductControlPlane:
         }
 
     def assurance_report(self) -> dict[str, Any]:
-        report = evaluate_assurance(
+        return asdict(evaluate_assurance(
             lifecycle=self.execution_ledger(),
             operations=self.operations.snapshot(),
             executor_bindings=self.executors.snapshot(),
             executor_coverage=self.executor_coverage(),
             receipt_stats=self.receipts.stats(),
             readiness=self.readiness_report(),
-        )
-        return asdict(report)
+        ))
+
+    def system_root(self) -> dict[str, Any]:
+        operations = self.operations.snapshot()
+        attestation = build_root_attestation({
+            "policy": self._policy_projection(),
+            "executors": list(self.executors.snapshot()),
+            "readiness": self.readiness_report(),
+            "lifecycle": self.execution_ledger(),
+            "audit": {"sequence": operations.get("audit_sequence"), "head": operations.get("audit_head")},
+            "receipts": self.receipts.stats(),
+            "kernel": [
+                {"id": capability.id, "pillar": capability.pillar.value, "critical": capability.critical}
+                for capability in self.operations.kernel.all()
+            ],
+        })
+        return {
+            "schema_version": attestation.schema_version,
+            "components": [
+                {"name": name, "sha256": digest} for name, digest in attestation.components
+            ],
+            "root_sha256": attestation.root_sha256,
+        }
 
     def _safety_projection(self) -> dict[str, Any]:
         assurance = self.assurance_report()
@@ -114,6 +136,7 @@ class ProductControlPlane:
             "readiness_pct": assurance["readiness_pct"],
             "attestation_sha256": assurance["attestation_sha256"],
             "readiness_attestation_sha256": readiness["attestation_sha256"],
+            "system_root_sha256": self.system_root()["root_sha256"],
             "invariants": assurance["invariants"],
         }
 
@@ -185,24 +208,19 @@ class ProductControlPlane:
             **asdict(evidence),
             "pending_operation": pending_item,
             "executor": (
-                {
-                    "name": binding.name,
-                    "version": binding.version,
-                    "effect_class": binding.effect_class,
-                    "replay_safe": binding.replay_safe,
-                }
+                {"name": binding.name, "version": binding.version,
+                 "effect_class": binding.effect_class, "replay_safe": binding.replay_safe}
                 if binding is not None else None
             ),
             "receipt": receipt_item,
         }
 
     def execution_ledger(self) -> list[dict[str, Any]]:
-        evidence = derive_ledger(
+        return [asdict(item) for item in derive_ledger(
             pending_operations=self.pending(),
             receipts=self.receipt_history(limit=500),
             audit_entries=self.audit_history(limit=500),
-        )
-        return [asdict(item) for item in evidence]
+        )]
 
     async def execute_registered(self, seq: int, registry: ProductExecutorRegistry | None = None) -> bool:
         active_registry = registry or self.executors
@@ -213,8 +231,7 @@ class ProductControlPlane:
             executor = active_registry.executor_for(operation)
         except ExecutorNotRegistered:
             return False
-        result = await self.operations.execute_one(seq, executor)
-        return result.confirmed
+        return (await self.operations.execute_one(seq, executor)).confirmed
 
     async def dispatch_pending(self, registry: ProductExecutorRegistry | None = None,
                                *, limit: int | None = None) -> dict[str, Any]:
@@ -260,6 +277,7 @@ class ProductControlPlane:
             anomaly_count += len(item.get("anomalies", ()))
         readiness = self.readiness_report()
         assurance = self.assurance_report()
+        root = self.system_root()
         return {
             "policy_version": POLICY_VERSION,
             "policy_bootstrap_enabled": self.bootstrap_policy,
@@ -275,19 +293,18 @@ class ProductControlPlane:
                 "edicts": [asdict(edict) for edict in governance.edicts],
             },
             "executors": {
-                "bound": len(self.executors),
-                "bindings": list(self.executors.snapshot()),
+                "bound": len(self.executors), "bindings": list(self.executors.snapshot()),
                 "coverage": self.executor_coverage(),
             },
             "readiness": readiness,
             "receipts": self.receipts.stats(),
             "lifecycle": {
-                "operations": len(ledger),
-                "states": lifecycle_counts,
+                "operations": len(ledger), "states": lifecycle_counts,
                 "evidence_gaps": lifecycle_counts.get("evidence_gap", 0) + lifecycle_counts.get("receipt_unattested", 0),
                 "anomalies": anomaly_count,
             },
             "assurance": assurance,
+            "system_root": root,
             "safety": self._safety_projection(),
             "operations": self.operations.snapshot(),
         }
