@@ -44,7 +44,8 @@ def _control_plane() -> ProductControlPlane:
     if _CONTROL_PLANE is None:
         root = Path(os.environ.get("PRODUCT_CONTROL_ROOT", "data/product-control"))
         cap = int(os.environ.get("PRODUCT_CONTROL_OUTBOX_CAP", "4096"))
-        _CONTROL_PLANE = ProductControlPlane(root, outbox_cap=cap)
+        bootstrap = os.environ.get("PRODUCT_CONTROL_BOOTSTRAP_POLICY", "1") not in {"0", "false", "False"}
+        _CONTROL_PLANE = ProductControlPlane(root, outbox_cap=cap, bootstrap_policy=bootstrap)
     return _CONTROL_PLANE
 
 
@@ -171,6 +172,13 @@ async def metrics(token: str = Query("")):
 async def product_control_status(token: str = Query("")):
     _require_ops(token)
     return _control_plane().status()
+
+
+@router.get("/product-control/pending")
+async def product_control_pending(token: str = Query("")):
+    _require_ops(token)
+    pending = _control_plane().pending()
+    return {"count": len(pending), "operations": pending}
 
 
 @router.post("/product-control/policy/ratify")
