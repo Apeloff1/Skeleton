@@ -2,7 +2,8 @@
 
 Research may be exploratory; Orientation Room is not. Raw evidence metadata is
 normalized into TruthVerifier evidence contracts, including provenance and
-methodology signals. Only VERIFIED claims are eligible for authoritative context.
+methodology signals. Correlated sources are conservatively collapsed before
+independent-support counting. Only VERIFIED claims enter authoritative context.
 """
 from __future__ import annotations
 
@@ -12,6 +13,7 @@ import json
 from typing import Any
 
 from core.evidence_registry import EvidenceRegistry
+from core.source_independence import SourceIndependenceAnalyzer
 from core.truth_verifier import EvidenceItem, EvidenceKind, TruthVerifier, VerificationBatch
 
 
@@ -78,29 +80,51 @@ def evidence_item_from_dict(raw: dict[str, Any]) -> EvidenceItem:
 
 
 class EpistemicGate:
-    def __init__(self, verifier: TruthVerifier | None = None, registry: EvidenceRegistry | None = None) -> None:
+    def __init__(
+        self,
+        verifier: TruthVerifier | None = None,
+        registry: EvidenceRegistry | None = None,
+        independence: SourceIndependenceAnalyzer | None = None,
+    ) -> None:
         self.verifier = verifier or TruthVerifier()
         self.registry = registry
+        self.independence = independence
+
+    @staticmethod
+    def _independence_payload(report: Any | None) -> dict[str, Any] | None:
+        if report is None:
+            return None
+        return {
+            "raw_sources": report.raw_sources,
+            "effective_independent_sources": report.effective_independent_sources,
+            "unresolved_sources": list(report.unresolved_sources),
+            "clusters": [
+                {
+                    "id": row.id,
+                    "source_ids": list(row.source_ids),
+                    "reasons": list(row.reasons),
+                    "shared_roots": list(row.shared_roots),
+                    "shared_content_sha256": list(row.shared_content_sha256),
+                }
+                for row in report.clusters
+            ],
+            "attestation_sha256": report.attestation_sha256,
+        }
 
     def evaluate(self, finding: dict[str, Any]) -> EpistemicDecision:
         claims = tuple(" ".join(str(x).split()).strip() for x in (finding.get("claims") or ()) if str(x).strip())
         claim_evidence_raw = finding.get("claim_evidence") or {}
         if not isinstance(claim_evidence_raw, dict):
             raise ValueError("claim_evidence must be an object mapping claims to evidence arrays")
-
         generic_raw = finding.get("evidence") or ()
         if not isinstance(generic_raw, (list, tuple)):
             generic_raw = ()
 
         evidence_by_claim: dict[str, tuple[EvidenceItem, ...]] = {}
+        independence_by_claim: dict[str, Any] = {}
         for claim in claims:
             explicit = claim_evidence_raw.get(claim)
-            if explicit is None:
-                # A citation attached to a paragraph is not claim evidence unless
-                # the producer explicitly binds it to all candidate claims.
-                source_rows = generic_raw if finding.get("evidence_applies_to_all") is True else ()
-            else:
-                source_rows = explicit
+            source_rows = generic_raw if explicit is None and finding.get("evidence_applies_to_all") is True else explicit
             if not isinstance(source_rows, (list, tuple)):
                 source_rows = ()
             items = tuple(evidence_item_from_dict(x) for x in source_rows if isinstance(x, dict))
@@ -108,7 +132,11 @@ class EpistemicGate:
                 for item in items:
                     self.registry.register(claim, item)
                 items = self.registry.evidence_for(claim)
+            report = None
+            if self.independence is not None:
+                items, report = self.independence.collapse(items)
             evidence_by_claim[claim] = items
+            independence_by_claim[claim] = report
 
         falsifiability = finding.get("falsifiable") or {}
         if not isinstance(falsifiability, dict):
@@ -130,6 +158,7 @@ class EpistemicGate:
                     "independent_replication": item.independent_replication,
                     "falsifiable": item.falsifiable,
                     "reasons": list(item.reasons),
+                    "independence": self._independence_payload(independence_by_claim.get(item.claim)),
                     "attestation_sha256": item.attestation_sha256,
                 }
         payload = {**projection, "verification": verification}
