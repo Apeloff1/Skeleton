@@ -63,7 +63,7 @@ export default function ControlPlaneRoute() {
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>OPERATE · CONTROL PLANE</Text>
           <Text style={styles.title}>Governed execution fabric</Text>
-          <Text style={styles.description}>Versioned executor contracts, durable admissions, replay-safe side effects, immutable receipts and verified audit continuity.</Text>
+          <Text style={styles.description}>Versioned executor contracts, durable admissions, replay-safe side effects, compact proof receipts and content-addressed results.</Text>
         </View>
 
         <View style={styles.field}>
@@ -80,8 +80,8 @@ export default function ControlPlaneRoute() {
           <View style={styles.metrics}>
             <Metric label="Pending" value={String(status.operations.pending_operations)} />
             <Metric label="Native" value={`${status.executors.coverage.coverage_pct}%`} />
-            <Metric label="Receipts" value={String(status.receipts.count)} />
-            <Metric label="Audit seq" value={String(status.operations.audit_sequence)} />
+            <Metric label="Receipts" value={String(status.receipts.receipts)} />
+            <Metric label="Result MB" value={(status.receipts.results.bytes / (1024 * 1024)).toFixed(2)} />
           </View>
 
           <View style={styles.card}>
@@ -116,8 +116,13 @@ export default function ControlPlaneRoute() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Durable execution receipts</Text><Text style={styles.muted}>{receipts.length} newest write-once results.</Text>
-          {receipts.map((receipt) => <View key={receipt.operation_id} style={styles.row}><View style={{ flex: 1 }}><Text style={styles.rowTitle}>{receipt.action}</Text><Text style={styles.muted}>{receipt.executor} · {receipt.completed_at}</Text><Text style={styles.mono}>{receipt.operation_id.slice(0, 24)}…</Text></View></View>)}
+          <Text style={styles.cardTitle}>Durable execution receipts</Text><Text style={styles.muted}>{receipts.length} newest compact proofs; result payloads live in verified CAS.</Text>
+          {receipts.map((receipt) => <View key={receipt.operation_id} style={styles.row}><View style={{ flex: 1 }}>
+            <Text style={styles.rowTitle}>{receipt.action}</Text>
+            <Text style={styles.muted}>{receipt.executor} v{receipt.executor_version} · {receipt.effect_class} · {receipt.replay_safe ? 'replay-safe' : 'not replay-safe'}</Text>
+            <Text style={styles.muted}>result {String(receipt.result_summary.bytes ?? 0)} B · artifact {receipt.result_artifact_id.slice(0, 12)}…</Text>
+            <Text style={styles.mono}>sha256 {receipt.result_sha256.slice(0, 24)}…</Text>
+          </View></View>)}
         </View>
 
         <View style={styles.card}>
