@@ -1,13 +1,13 @@
 """Single-use deployment authorizations bound to stable preflight and plan identity.
 
-The ledger is a cross-process, append-only authorization state machine. Issue and
-consume events are hash-chained and semantically replay-verified: consumes must
-reference a prior issue, match its immutable root/plan identity, occur at most once,
-and fall inside the authorization validity window.
+The ledger is a cross-process, append-only authorization state machine. New issue
+events persist the complete self-verifying preflight snapshot so a later portable
+proof can independently reconstruct the decision that authorized deployment. Legacy
+hash-only issue rows remain readable but are explicitly reported as such.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 import hashlib
 import hmac
@@ -16,12 +16,13 @@ import os
 from pathlib import Path
 import re
 import uuid
-from typing import Any
+from typing import Any, Mapping
 
 from core.control_plane_deployment import (
     ControlPlaneDeploymentPreflight,
     verify_control_plane_deployment_preflight,
 )
+from core.deployment_preflight import DeploymentPreflight, PreflightFinding
 from core.file_lease import FileLease
 
 AUTH_VERSION = 1
@@ -71,6 +72,49 @@ def _parse(value: str) -> datetime:
     if stamp.tzinfo is None:
         raise ValueError("authorization timestamps must be timezone-aware")
     return stamp.astimezone(UTC)
+
+
+def serialize_preflight_snapshot(preflight: ControlPlaneDeploymentPreflight) -> dict[str, Any]:
+    if not verify_control_plane_deployment_preflight(preflight):
+        raise ValueError("deployment preflight snapshot is not self-verifying")
+    return asdict(preflight)
+
+
+def restore_preflight_snapshot(raw: Mapping[str, Any]) -> ControlPlaneDeploymentPreflight:
+    try:
+        report_raw = raw["report"]
+        if not isinstance(report_raw, Mapping):
+            raise TypeError("preflight report must be an object")
+        report = DeploymentPreflight(
+            version=int(report_raw["version"]),
+            allowed=bool(report_raw["allowed"]),
+            posture=str(report_raw["posture"]),
+            blockers=tuple(PreflightFinding(**dict(item)) for item in report_raw.get("blockers", ())),
+            warnings=tuple(PreflightFinding(**dict(item)) for item in report_raw.get("warnings", ())),
+            assurance_attestation_sha256=str(report_raw["assurance_attestation_sha256"]),
+            system_root_sha256=str(report_raw["system_root_sha256"]),
+            trust_state_sha256=str(report_raw["trust_state_sha256"]),
+            finality_required=bool(report_raw["finality_required"]),
+            finality_satisfied=bool(report_raw["finality_satisfied"]),
+            attestation_sha256=str(report_raw["attestation_sha256"]),
+        )
+        preflight = ControlPlaneDeploymentPreflight(
+            version=int(raw["version"]),
+            allowed=bool(raw["allowed"]),
+            stable=bool(raw["stable"]),
+            attempts=int(raw["attempts"]),
+            root_before_sha256=str(raw["root_before_sha256"]),
+            root_after_sha256=str(raw["root_after_sha256"]),
+            evaluated_at=str(raw["evaluated_at"]),
+            unstable_reason=str(raw.get("unstable_reason", "")),
+            report=report,
+            attestation_sha256=str(raw["attestation_sha256"]),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("deployment preflight snapshot is malformed") from exc
+    if not verify_control_plane_deployment_preflight(preflight):
+        raise ValueError("deployment preflight snapshot failed verification")
+    return preflight
 
 
 class DeploymentAuthorizationLedger:
@@ -125,6 +169,17 @@ class DeploymentAuthorizationLedger:
                     raise DeploymentAuthorizationError("authorization issue timestamps malformed") from exc
                 if expires <= issued:
                     raise DeploymentAuthorizationError("authorization expiry must follow issue time")
+                if "preflight" in row:
+                    try:
+                        preflight = restore_preflight_snapshot(row["preflight"])
+                    except ValueError as exc:
+                        raise DeploymentAuthorizationError(str(exc)) from exc
+                    if not preflight.allowed or not preflight.stable:
+                        raise DeploymentAuthorizationError("persisted preflight is not authorizing/stable")
+                    if preflight.attestation_sha256 != row["preflight_sha256"]:
+                        raise DeploymentAuthorizationError("persisted preflight digest diverges from issue event")
+                    if preflight.root_after_sha256 != row["system_root_sha256"]:
+                        raise DeploymentAuthorizationError("persisted preflight root diverges from issue event")
                 issues[auth_id] = row
             else:
                 issue = issues.get(auth_id)
@@ -187,6 +242,7 @@ class DeploymentAuthorizationLedger:
                 "authorization_id": auth_id,
                 "system_root_sha256": preflight.root_after_sha256,
                 "preflight_sha256": preflight.attestation_sha256,
+                "preflight": serialize_preflight_snapshot(preflight),
                 "plan_sha256": digest,
                 "issued_at": stamp,
                 "expires_at": expires,
@@ -251,12 +307,6 @@ class DeploymentAuthorizationLedger:
         )
 
     def proof_events(self, authorization_id: str) -> dict[str, Any]:
-        """Export verified issue/consume events plus the current ledger head.
-
-        The raw events are required for independent hash recomputation. Returning
-        them through this method guarantees the full local ledger has already passed
-        sequence, ancestry, semantic, timestamp, and digest verification.
-        """
         authorization_id = str(authorization_id).strip()
         if not authorization_id:
             raise ValueError("authorization_id is required")
@@ -270,6 +320,7 @@ class DeploymentAuthorizationLedger:
             "consume": dict(consume) if consume is not None else None,
             "ledger_head_sha256": str(rows[-1]["sha256"]) if rows else "",
             "ledger_events": len(rows),
+            "portable_preflight": isinstance(issue.get("preflight"), dict),
             "verified": True,
         }
 
@@ -283,11 +334,14 @@ class DeploymentAuthorizationLedger:
             rows = self._load_verified()
         issues = [x for x in rows if x.get("kind") == "issue"]
         consumed = {x.get("authorization_id") for x in rows if x.get("kind") == "consume"}
+        portable = sum(isinstance(row.get("preflight"), dict) for row in issues)
         return {
             "version": AUTH_VERSION,
             "issued": len(issues),
             "consumed": len(consumed),
             "outstanding": sum(x.get("authorization_id") not in consumed for x in issues),
+            "preflight_snapshots": portable,
+            "legacy_preflight_hash_only": len(issues) - portable,
             "head_sha256": rows[-1]["sha256"] if rows else "",
             "cross_process_locking": True,
             "lock_backend": self._lease.backend,
