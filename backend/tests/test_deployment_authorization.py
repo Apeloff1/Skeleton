@@ -9,6 +9,7 @@ from core.control_plane_deployment import evaluate_control_plane_deployment
 from core.deployment_authorization import (
     DeploymentAuthorizationError,
     DeploymentAuthorizationLedger,
+    plan_digest,
     restore_preflight_snapshot,
 )
 
@@ -139,4 +140,50 @@ def test_authorization_ledger_tamper_fails_closed(tmp_path):
     rows[0] = json.dumps(raw, sort_keys=True, separators=(",", ":"))
     ledger.path.write_text("\n".join(rows) + "\n")
     with pytest.raises(DeploymentAuthorizationError, match="hash mismatch"):
+        DeploymentAuthorizationLedger(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "plan",
+    [
+        {"release": "r1", "threshold": float("nan")},
+        {"release": "r1", "threshold": float("inf")},
+        {"release": "r1", "opaque": object()},
+        {1: "non-string-key"},
+    ],
+)
+def test_plan_digest_rejects_nonportable_json_values(plan):
+    with pytest.raises(ValueError, match="finite canonical JSON"):
+        plan_digest(plan)
+
+
+def test_issue_detaches_persisted_plan_from_caller_mutation(tmp_path):
+    ledger = DeploymentAuthorizationLedger(tmp_path)
+    plan = {"release": "r1", "rollout": {"weights": [5, 25, 100]}}
+    auth = ledger.issue(
+        preflight=_preflight(),
+        plan=plan,
+        issued_at="2026-09-14T17:00:00+00:00",
+    )
+    plan["rollout"]["weights"].append(999)
+
+    persisted = ledger.proof_events(auth.id)["issue"]["plan"]
+    assert persisted == {"release": "r1", "rollout": {"weights": [5, 25, 100]}}
+    assert plan_digest(persisted) == auth.plan_sha256
+
+
+def test_nonfinite_ledger_payload_is_rejected_even_with_permissive_rehash(tmp_path):
+    ledger = DeploymentAuthorizationLedger(tmp_path)
+    ledger.issue(
+        preflight=_preflight(),
+        plan={"release": "r1"},
+        issued_at="2026-09-14T17:00:00+00:00",
+    )
+    raw = json.loads(ledger.path.read_text(encoding="utf-8").strip())
+    raw["forged_metric"] = float("nan")
+    ledger.path.write_text(
+        json.dumps(_rehash(raw), sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(DeploymentAuthorizationError, match="not canonical JSON"):
         DeploymentAuthorizationLedger(tmp_path)
