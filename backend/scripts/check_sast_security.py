@@ -88,6 +88,11 @@ CHILD_PROCESS_IMPORT_RE = re.compile(
     r"(?:import\s*\{(?P<esm>[^}]*)\}\s*from\s*['\"](?:node:)?child_process['\"]"
     r"|(?:const|let|var)\s*\{(?P<cjs>[^}]*)\}\s*=\s*require\s*\(\s*['\"](?:node:)?child_process['\"]\s*\))"
 )
+CHILD_PROCESS_REFERENCE_RE = re.compile(
+    r"(?:\bimport\b[^\n;]*\bfrom\s*['\"](?:node:)?child_process['\"]"
+    r"|\brequire\s*\(\s*['\"](?:node:)?child_process['\"]\s*\)"
+    r"|\bchild_process\b)"
+)
 
 
 def python_files() -> Iterable[Path]:
@@ -311,12 +316,7 @@ def _line_number(text: str, offset: int) -> int:
 
 
 def _mask_js_comments(text: str) -> str:
-    """Replace JS/TS comment bytes with spaces while preserving offsets/newlines.
-
-    Regex rules can then inspect executable source without matching documentation
-    such as ``module-eval (which...)``. String and template contents are kept
-    intact so module specifiers used by child-process rules remain discoverable.
-    """
+    """Replace JS/TS comment bytes with spaces while preserving offsets/newlines."""
     chars = list(text)
     out = list(text)
     state = "code"
@@ -385,9 +385,118 @@ def _mask_js_comments(text: str) -> str:
     return "".join(out)
 
 
-def _destructured_child_process_names(text: str) -> set[str]:
+def _js_code_positions(text: str) -> list[bool]:
+    """Mark executable JS/TS positions, including `${...}` template bodies."""
+    positions = [False] * len(text)
+    state = "code"
+    escaped = False
+    template_expr_depths: list[int] = []
+    i = 0
+
+    while i < len(text):
+        ch = text[i]
+        nxt = text[i + 1] if i + 1 < len(text) else ""
+
+        if state == "line-comment":
+            if ch == "\n":
+                state = "code"
+            i += 1
+            continue
+
+        if state == "block-comment":
+            if ch == "*" and nxt == "/":
+                state = "code"
+                i += 2
+            else:
+                i += 1
+            continue
+
+        if state in {"single", "double"}:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif (state == "single" and ch == "'") or (state == "double" and ch == '"'):
+                state = "code"
+            i += 1
+            continue
+
+        if state == "template":
+            if escaped:
+                escaped = False
+                i += 1
+                continue
+            if ch == "\\":
+                escaped = True
+                i += 1
+                continue
+            if ch == "`":
+                state = "code"
+                i += 1
+                continue
+            if ch == "$" and nxt == "{":
+                template_expr_depths.append(1)
+                state = "code"
+                i += 2
+                continue
+            i += 1
+            continue
+
+        positions[i] = True
+        if ch == "/" and nxt == "/":
+            positions[i] = False
+            if i + 1 < len(text):
+                positions[i + 1] = False
+            state = "line-comment"
+            i += 2
+            continue
+        if ch == "/" and nxt == "*":
+            positions[i] = False
+            if i + 1 < len(text):
+                positions[i + 1] = False
+            state = "block-comment"
+            i += 2
+            continue
+        if ch == "'":
+            positions[i] = False
+            state = "single"
+            escaped = False
+            i += 1
+            continue
+        if ch == '"':
+            positions[i] = False
+            state = "double"
+            escaped = False
+            i += 1
+            continue
+        if ch == "`":
+            positions[i] = False
+            state = "template"
+            escaped = False
+            i += 1
+            continue
+        if template_expr_depths:
+            if ch == "{":
+                template_expr_depths[-1] += 1
+            elif ch == "}":
+                template_expr_depths[-1] -= 1
+                if template_expr_depths[-1] == 0:
+                    template_expr_depths.pop()
+                    state = "template"
+        i += 1
+
+    return positions
+
+
+def _starts_in_js_code(code_positions: list[bool], start: int) -> bool:
+    return 0 <= start < len(code_positions) and code_positions[start]
+
+
+def _destructured_child_process_names(text: str, code_positions: list[bool]) -> set[str]:
     names: set[str] = set()
     for match in CHILD_PROCESS_IMPORT_RE.finditer(text):
+        if not _starts_in_js_code(code_positions, match.start()):
+            continue
         declaration = match.group("esm") or match.group("cjs") or ""
         for raw_item in declaration.split(","):
             item = raw_item.strip()
@@ -414,24 +523,32 @@ def javascript_violations(path: Path) -> list[str]:
         return [f"{label}: read failure: {exc}"]
 
     scan_text = _mask_js_comments(text)
+    code_positions = _js_code_positions(text)
     findings: list[str] = []
     for message, pattern in JS_PATTERNS:
         for match in pattern.finditer(scan_text):
+            if not _starts_in_js_code(code_positions, match.start()):
+                continue
             findings.append(f"{label}:{_line_number(text, match.start())}: {message}")
 
-    for local_name in sorted(_destructured_child_process_names(scan_text)):
+    for local_name in sorted(_destructured_child_process_names(scan_text, code_positions)):
         call_re = re.compile(rf"(?<![A-Za-z0-9_$\.]){re.escape(local_name)}\s*\(")
         for match in call_re.finditer(scan_text):
+            if not _starts_in_js_code(code_positions, match.start()):
+                continue
             findings.append(
                 f"{label}:{_line_number(text, match.start())}: imported child_process {local_name}() is forbidden"
             )
 
-    # A shell-enabled spawn crosses the same command-interpreter trust boundary
-    # as exec. Restrict this rule to files that actually reference child_process
-    # to avoid flagging unrelated configuration objects with `shell: true`.
-    if re.search(r"['\"](?:node:)?child_process['\"]|\bchild_process\b", scan_text):
+    has_child_process_reference = any(
+        _starts_in_js_code(code_positions, match.start())
+        for match in CHILD_PROCESS_REFERENCE_RE.finditer(scan_text)
+    )
+    if has_child_process_reference:
         shell_true = re.compile(r"\bshell\s*:\s*true\b")
         for match in shell_true.finditer(scan_text):
+            if not _starts_in_js_code(code_positions, match.start()):
+                continue
             findings.append(
                 f"{label}:{_line_number(text, match.start())}: child_process shell:true is forbidden"
             )
