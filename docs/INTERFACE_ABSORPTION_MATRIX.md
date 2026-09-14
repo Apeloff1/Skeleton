@@ -15,8 +15,8 @@ The executable ledger lives in `frontend/src/workspaces/legacyMap.ts`. The UI vi
 | Collaboration | `/collab` | worker/admin messaging, freelancer scheduling, task status |
 | Vault | `/vault` | bookmarks, durable references, secure-link boundary |
 | Learning | `/dashboard` | booklets, reading, curriculum, tutoring experiments |
-| Creation Studio | `/gameforge-studio` | games, WordPress tooling, desktop builders, media generation |
-| System Control | `/command-center` | admin dashboards, API/runtime panels, diagnostics |
+| Creation Studio | `/gameforge-studio` | games, desktop builders, media generation, HyperForge preview cockpit |
+| System Control | `/command-center` | admin dashboards, API/runtime panels, diagnostics, GameForge gate primitives |
 
 ## Migration states
 
@@ -52,7 +52,7 @@ Risk is not a completion score. It determines the validation and approval burden
 6. **No ad-hoc credential system.** The historical shared-password-folder idea is retired. Vault may hold secure references, but secrets require trusted secure storage and explicit authorization boundaries.
 7. **Preserve provenance.** Research, market evidence, generated assets, and imported references retain source metadata where available.
 8. **Typed mutation.** High-risk actions declare required approval, scope, evidence, and rollback behavior before they are exposed to operator automation.
-9. **Shared primitives first.** Timers, ledgers, tasks, messages, references, projects, telemetry, and model routing should be implemented once and reused.
+9. **Shared primitives first.** Timers, ledgers, tasks, messages, references, projects, telemetry, model routing, preview control and audit gates should be implemented once and reused.
 10. **Migration state stays explicit.** A screen or route is not called live merely because a placeholder renders.
 
 ## Historical interface mapping
@@ -62,10 +62,10 @@ Risk is not a completion score. It determines the validation and approval burden
 | Jeeves desktop assistant | conversation, analysis, assistant orchestration | Jeeves Operator | evolve |
 | OpenAI/API key switcher experiments | provider selection | Jeeves Operator + System Control | replace with policy-driven routing |
 | Stock assistant | watchlists, analysis, source-backed decisions | Market Intelligence | evolve |
-| RSS market analyzer | source ingestion | Market Intelligence | queue behind provenance ledger |
+| RSS market analyzer | source ingestion | Market Intelligence | evolve behind provenance ledger |
 | Tick predictor experiments | tick visualization and historical comparison | Market Intelligence | migrate visualization; reject unsupported prediction certainty |
-| Clock-in/out desktop app | work sessions | Work OS | evolve into session ledger |
-| Pause menu | break state | Work OS | normalize into typed pause intervals |
+| Clock-in/out desktop app | work sessions | Work OS | absorbed into versioned session ledger |
+| Pause menu | break state | Work OS | absorbed into typed persisted pause intervals |
 | Worker/admin tracker | role-scoped team visibility | Collaboration | migrate only with authorization boundaries |
 | Worker status messages | execution communication | Collaboration | absorbed |
 | Freelancer scheduler | tasks, schedules, deadlines | Collaboration | evolve |
@@ -78,8 +78,20 @@ Risk is not a completion score. It determines the validation and approval burden
 | Tamagotchi dinosaur game | lifecycle simulation | Creation Studio | queue as reusable game template |
 | WordPress utilities | content/site/build tooling | Creation Studio | decompose into explicit tools |
 | Desktop GUI builders | app project generation | Creation Studio | evolve |
+| HyperForge cockpit | secure host/guest preview navigation, route publication and history sync | Creation Studio + System Control | preview bridge absorbed; capability commands and evidence evolving |
+| GameForge middleware gate | fail-closed audit and request-governance boundary | System Control | verified WORM audit absorbed; remaining edge admission primitives evolve natively |
 | Admin dashboards | system oversight | System Control | absorbed |
 | Runtime diagnostics | logs, health, telemetry | System Control | absorbed |
+
+## Newly promoted primitives
+
+### HyperForge cockpit
+
+The useful host/guest contract from `Apeloff1/hyperforge-cockpit-sota` is now represented by `frontend/src/cockpit/previewBridge.ts` and wired through the Expo root layout. The Skeleton version removes vendor branding and Vite/TanStack coupling, uses the canonical route registry, validates parent origin/source, rejects unsafe navigation, bounds browser Back at the preview root, and supports deterministic cleanup. See `docs/HYPERFORGE_COCKPIT_ABSORPTION.md` for provenance and invariants.
+
+### GameForge gate
+
+The strongest durable-audit primitive from `Apeloff1/gameforge-middleware` already has a native Skeleton implementation in `backend/core/worm_audit.py`: append-only hash ancestry, cross-process locking, complete-chain re-verification, fsync-before-return, verified health state, and fail-closed tamper detection. This is selective promotion rather than a C#/YARP dependency. Principal authentication, route-policy admission and request-body bounds should converge on existing Skeleton security/control-plane contracts instead of introducing a second gateway stack.
 
 ## Definition of absorbed
 
@@ -96,9 +108,9 @@ A capability can move to `absorbed` only when all of the following are true:
 
 ## Next mining priorities
 
-1. Finish Work OS persistence for clock/pause/session behavior.
-2. Move market ingestion to a provenance-first source ledger before expanding analysis automation.
-3. Consolidate provider/model controls behind Jeeves policy routing and System Control observability.
+1. Extend the cockpit bridge with capability-scoped commands, execution evidence and WorldGraph revision/hash synchronization rather than importing the old cockpit shell.
+2. Close remaining GameForge edge-gate parity by mapping request bounds, verified principal identity and fail-closed route policy into existing Skeleton security primitives.
+3. Move automated market ingestion behind the provenance-first source ledger before expanding analysis automation.
 4. Expand Collaboration with role-scoped task and schedule primitives before porting broader admin views.
-5. Convert Creation Studio legacy projects into project templates instead of dedicated legacy screens.
+5. Convert remaining Creation Studio legacy projects into project templates instead of dedicated legacy screens.
 6. Continue retiring duplicate navigation and specialist dashboards after their capabilities have canonical replacements.
