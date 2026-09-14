@@ -5,15 +5,15 @@ from core.truth_verifier import EvidenceItem, EvidenceKind
 from core.verified_curiosity import VerifiedCuriosityEngine
 
 
-def _item(source="study-a", *, quality=1.0, supports=True):
+def _item(source="study-a", *, quality=1.0, supports=True, replication=False, group=None):
     return EvidenceItem(
         source_id=source,
         locator=f"doi:{source}#result",
-        kind=EvidenceKind.PRIMARY_EMPIRICAL,
+        kind=EvidenceKind.REPLICATION if replication else EvidenceKind.PRIMARY_EMPIRICAL,
         supports=supports,
-        independence_group="lab-a",
+        independence_group=group or ("lab-b" if replication else "lab-a"),
         quality=quality,
-        reproducible=True,
+        reproducible=replication,
         peer_reviewed=True,
         primary=True,
         provenance_verified=True,
@@ -49,9 +49,6 @@ def test_exact_legacy_record_can_be_upgraded_once_with_citation_attestation(tmp_
     assert upgraded.citation_bound is True
     assert upgraded.citation_binding_attestation_sha256 == "a" * 64
     assert registry.evidence_for(claim) == (item,)
-
-    # Once the immutable evidence record is citation-bound, another attestation
-    # cannot silently rewrite the provenance proof.
     with pytest.raises(EvidenceRegistryIntegrityError):
         registry.register(claim, item, citation_binding_attestation_sha256="b" * 64)
 
@@ -92,14 +89,7 @@ def test_reverification_does_not_consume_unbound_registry_records(tmp_path):
     registry = EvidenceRegistry(tmp_path / "evidence")
     claim = "System C decreases measured latency by 7 percent."
     registry.register(claim, _item("legacy-a"))
-    registry.register(claim, EvidenceItem(
-        **{**_item("legacy-b").__dict__} if hasattr(_item("legacy-b"), "__dict__") else {
-            "source_id": "legacy-b", "locator": "doi:legacy-b#result", "kind": EvidenceKind.REPLICATION,
-            "supports": True, "independence_group": "lab-b", "quality": 1.0, "reproducible": True,
-            "peer_reviewed": True, "primary": True, "provenance_verified": True, "preregistered": True,
-            "data_available": True, "code_available": True, "sample_size": 500, "uncertainty_reported": True,
-        }
-    ))
+    registry.register(claim, _item("legacy-b", replication=True))
     engine = VerifiedCuriosityEngine(tmp_path)
     result = engine.reverify_claim(claim)
     assert result["authoritative"] is False
