@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/product/**/*.ts",
+    "app/product.tsx",
+    "app/capability.tsx",
+    "app/operation.tsx",
+    "components/LaunchCascade.tsx",
+    "expo-env.d.ts"
+  ],
+  "exclude": [
+    "app/hub.tsx",
+    "app/forge.tsx",
+    "app/menu.tsx",
+    "app/playable.tsx",
+    "features/**"
+  ]
+}
