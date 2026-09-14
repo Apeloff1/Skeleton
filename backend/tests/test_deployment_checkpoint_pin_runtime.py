@@ -9,6 +9,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from core.deployment_checkpoint_pin_config import DeploymentCheckpointPinPolicy
 from core.deployment_checkpoint_pin_runtime import DeploymentCheckpointPinRuntime
+from core.deployment_checkpoint_trust_advance import verify_deployment_checkpoint_trust_advance
 from core.deployment_checkpoint_witness import sign_deployment_checkpoint_pin
 from core.deployment_gateway import DeploymentGateway
 from core.transparency_witness import TrustedWitness
@@ -141,6 +142,64 @@ def test_required_policy_needs_fresh_independent_quorum_for_current_publication(
     newer = gateway.checkpoints.latest(); assert newer is not None
     assert newer.sha256 != publication.sha256
     assert runtime.requirement_satisfied(now=now) is False
+
+
+def test_witnessed_anchor_can_advance_history_without_satisfying_current_quorum(tmp_path):
+    gateway = _gateway(tmp_path)
+    keys, witnesses = _trusted()
+    runtime = DeploymentCheckpointPinRuntime(
+        tmp_path / "pins",
+        checkpoint_ledger=gateway.checkpoints,
+        policy=DeploymentCheckpointPinPolicy(witnesses, 2, 300, True),
+    )
+    now = datetime(2026, 9, 14, 20, 1, tzinfo=UTC)
+    anchor = gateway.checkpoints.latest(); assert anchor is not None
+    runtime.observe(_sign(anchor, keys[0], witnesses[0], "anchor-a"))
+    runtime.observe(_sign(anchor, keys[1], witnesses[1], "anchor-b"))
+    assert runtime.requirement_satisfied(now=now) is True
+
+    gateway.prepare({
+        "target": "runtime",
+        "environment": "staging",
+        "strategy": "rolling",
+        "artifact": "artifact-v2",
+    })
+    current = gateway.checkpoints.latest(); assert current is not None
+    assert current.sha256 != anchor.sha256
+    assert runtime.requirement_satisfied(now=now) is False
+
+    packet = runtime.trust_advance(publication_sequence=anchor.sequence, now=now)
+    assert packet.anchor_publication_sha256 == anchor.sha256
+    assert packet.current_publication_sha256 == current.sha256
+    assert verify_deployment_checkpoint_trust_advance(
+        packet,
+        trusted_witnesses=witnesses,
+        expected_required_groups=2,
+        anchor_verified_at="2026-09-14T20:01:00+00:00",
+        expected_current_publication_sha256=current.sha256,
+        witness_max_age_seconds=300,
+    ) is True
+    assert runtime.requirement_satisfied(now=now) is False
+
+
+def test_trust_advance_rejects_unwitnessed_anchor(tmp_path):
+    gateway = _gateway(tmp_path)
+    _, witnesses = _trusted()
+    runtime = DeploymentCheckpointPinRuntime(
+        tmp_path / "pins",
+        checkpoint_ledger=gateway.checkpoints,
+        policy=DeploymentCheckpointPinPolicy(witnesses, 2, 300, True),
+    )
+    anchor = gateway.checkpoints.latest(); assert anchor is not None
+    try:
+        runtime.trust_advance(
+            publication_sequence=anchor.sequence,
+            now=datetime(2026, 9, 14, 20, 1, tzinfo=UTC),
+        )
+    except ValueError as exc:
+        assert "quorum" in str(exc)
+    else:
+        raise AssertionError("unwitnessed anchor unexpectedly produced a trust-advance packet")
 
 
 def test_witness_target_rotates_with_publication_history(tmp_path):
