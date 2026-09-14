@@ -158,7 +158,8 @@ def make_policy():
 
 
 def verified_principal():
-    return codec().verify(codec().issue("operator", "control", now=NOW), now=NOW + 1)
+    issuer = codec()
+    return issuer.verify(issuer.issue("operator", "control", now=NOW), now=NOW + 1)
 
 
 def test_route_policy_allows_only_explicit_open_prefixes_without_identity():
@@ -190,10 +191,11 @@ def test_longest_route_prefix_selects_more_specific_governance_domain():
 def test_protected_written_route_requires_verified_principal():
     policy = make_policy()
     denied = policy.admit("/api/jeeves/run", None)
-    assert denied == pytest.approx(denied)  # dataclass remains stable/readable to pytest
     assert denied.allowed is False
     assert denied.status_code == 401
     assert denied.domain == "jeeves"
+    assert denied.principal_id is None
+    assert denied.attester_id is None
 
     principal = verified_principal()
     admitted = policy.admit("/api/jeeves/run", principal)
