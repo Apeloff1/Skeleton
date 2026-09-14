@@ -19,6 +19,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from core.canonical_json import canonical_json_clone
 from core.deployment_checkpoint_ledger import DeploymentCheckpointLedger
 from core.deployment_checkpoint_pin_config import (
     DeploymentCheckpointPinPolicy,
@@ -195,12 +196,13 @@ class DeploymentCheckpointPinRuntime:
         )
         satisfied = self.requirement_satisfied(now=now)
         manifest = build_deployment_checkpoint_trust_policy_manifest(self.policy)
+        portable_manifest = canonical_json_clone(asdict(manifest))
         if not self.policy.required:
-            deploy_authority_proofs = ("none-required", "pin", "witnessed_continuity")
+            deploy_authority_proofs = ["none-required", "pin", "witnessed_continuity"]
         elif self.policy.continuity_required:
-            deploy_authority_proofs = ("witnessed_continuity",)
+            deploy_authority_proofs = ["witnessed_continuity"]
         else:
-            deploy_authority_proofs = ("pin", "witnessed_continuity")
+            deploy_authority_proofs = ["pin", "witnessed_continuity"]
         return {
             "version": 1,
             "policy": {
@@ -214,8 +216,9 @@ class DeploymentCheckpointPinRuntime:
                 }),
                 "manifest_sha256": manifest.manifest_sha256,
                 "deploy_authority_proof_kinds": deploy_authority_proofs,
-                "audit_only_proof_kinds": ("trust_advance",),
+                "audit_only_proof_kinds": ["trust_advance"],
             },
+            "policy_manifest": portable_manifest,
             "ledger": ledger,
             "current_target": None if target is None else asdict(target),
             "current_quorum": None if quorum is None else asdict(quorum),
