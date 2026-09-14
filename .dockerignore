@@ -17,6 +17,12 @@ __pycache__
 coverage.xml
 htmlcov
 
+# Test and development-only sources should not enter production build contexts.
+tests
+backend/tests
+skeleton/testing
+**/__snapshots__
+
 # Never send local credentials or runtime configuration to Docker builders.
 .env
 .env.*
