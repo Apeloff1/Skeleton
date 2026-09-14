@@ -7,13 +7,46 @@ import pytest
 from starlette.requests import Request
 from starlette.responses import Response
 
-from api_middleware import RateLimiterMiddleware
+from api_middleware import OriginGuardMiddleware, RateLimiterMiddleware, SecurityHeadersMiddleware
+from core.security_v2 import SecurityHeadersMiddleware as CoreSecurityHeadersMiddleware
+from core.security_v2 import _password_bytes
 from middleware.client_identity import (
     extract_client_ip,
     parse_trusted_proxy_cidrs,
     sanitize_request_id,
 )
 from middleware.security import AuditMiddleware, SizeLimitMiddleware, safe_relative_path
+
+
+def _request_scope(
+    *,
+    path: str = "/api/private",
+    scheme: str = "https",
+    host: str = "example.test",
+    origin: str | None = None,
+    client: tuple[str, int] | None = ("198.51.100.7", 53000),
+) -> dict:
+    headers = [(b"host", host.encode("ascii"))]
+    if origin is not None:
+        headers.append((b"origin", origin.encode("ascii")))
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "method": "GET",
+        "scheme": scheme,
+        "path": path,
+        "raw_path": path.encode("ascii"),
+        "query_string": b"",
+        "headers": headers,
+        "server": (host, 443 if scheme == "https" else 80),
+    }
+    if client is not None:
+        scope["client"] = client
+    return scope
+
+
+async def _ok(_request: Request) -> Response:
+    return Response("ok", status_code=200)
 
 
 def test_proxy_trust_is_fail_closed_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -73,24 +106,10 @@ def test_unknown_client_does_not_bypass_rate_limit() -> None:
         burst=1,
         max_buckets=4,
     )
-    scope = {
-        "type": "http",
-        "asgi": {"version": "3.0"},
-        "method": "GET",
-        "scheme": "https",
-        "path": "/api/private",
-        "raw_path": b"/api/private",
-        "query_string": b"",
-        "headers": [],
-        "server": ("example.test", 443),
-    }
-    request = Request(scope)
+    scope = _request_scope(client=None)
 
-    async def call_next(_request: Request) -> Response:
-        return Response("ok", status_code=200)
-
-    first = asyncio.run(middleware.dispatch(request, call_next))
-    second = asyncio.run(middleware.dispatch(Request(scope), call_next))
+    first = asyncio.run(middleware.dispatch(Request(scope), _ok))
+    second = asyncio.run(middleware.dispatch(Request(scope), _ok))
 
     assert first.status_code == 200
     assert second.status_code == 429
@@ -104,27 +123,110 @@ def test_loopback_client_is_not_implicitly_exempt() -> None:
         burst=1,
         max_buckets=4,
     )
-    scope = {
-        "type": "http",
-        "asgi": {"version": "3.0"},
-        "method": "GET",
-        "scheme": "http",
-        "path": "/api/private",
-        "raw_path": b"/api/private",
-        "query_string": b"",
-        "headers": [],
-        "server": ("127.0.0.1", 8000),
-        "client": ("127.0.0.1", 53000),
-    }
+    scope = _request_scope(
+        scheme="http",
+        host="127.0.0.1:8000",
+        client=("127.0.0.1", 53000),
+    )
 
-    async def call_next(_request: Request) -> Response:
-        return Response("ok", status_code=200)
-
-    first = asyncio.run(middleware.dispatch(Request(scope), call_next))
-    second = asyncio.run(middleware.dispatch(Request(scope), call_next))
+    first = asyncio.run(middleware.dispatch(Request(scope), _ok))
+    second = asyncio.run(middleware.dispatch(Request(scope), _ok))
 
     assert first.status_code == 200
     assert second.status_code == 429
+
+
+def test_cross_origin_api_access_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("CORS_ORIGINS", raising=False)
+    middleware = OriginGuardMiddleware(lambda scope, receive, send: None)
+    response = asyncio.run(
+        middleware.dispatch(
+            Request(_request_scope(origin="https://evil.example")),
+            _ok,
+        )
+    )
+    assert response.status_code == 403
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_same_origin_api_access_allowed_without_cors_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("CORS_ORIGINS", raising=False)
+    middleware = OriginGuardMiddleware(lambda scope, receive, send: None)
+    response = asyncio.run(
+        middleware.dispatch(
+            Request(_request_scope(origin="https://example.test")),
+            _ok,
+        )
+    )
+    assert response.status_code == 200
+
+
+def test_explicit_cors_origin_is_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CORS_ORIGINS", "https://app.example,https://admin.example")
+    middleware = OriginGuardMiddleware(lambda scope, receive, send: None)
+    response = asyncio.run(
+        middleware.dispatch(
+            Request(_request_scope(origin="https://app.example")),
+            _ok,
+        )
+    )
+    assert response.status_code == 200
+
+
+def test_api_security_headers_are_strict() -> None:
+    middleware = SecurityHeadersMiddleware(lambda scope, receive, send: None)
+    response = asyncio.run(middleware.dispatch(Request(_request_scope()), _ok))
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["content-security-policy"].startswith("default-src 'none'")
+    assert response.headers["strict-transport-security"].startswith("max-age=")
+
+
+def test_core_security_preserves_playable_sandbox_policy() -> None:
+    middleware = CoreSecurityHeadersMiddleware(
+        lambda scope, receive, send: None,
+        csp="default-src 'none'; frame-ancestors 'none'",
+    )
+
+    async def inner(_request: Request) -> Response:
+        return Response(
+            "<html></html>",
+            media_type="text/html",
+            headers={
+                "Content-Security-Policy": "default-src 'none'",
+                "X-Frame-Options": "DENY",
+            },
+        )
+
+    response = asyncio.run(
+        middleware.dispatch(
+            Request(_request_scope(path="/api/playable/demo/raw")),
+            inner,
+        )
+    )
+    assert response.headers["content-security-policy"].startswith("sandbox allow-scripts")
+    assert "x-frame-options" not in response.headers
+
+
+def test_core_hsts_not_emitted_for_plain_http_without_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FORCE_HSTS", raising=False)
+    middleware = CoreSecurityHeadersMiddleware(lambda scope, receive, send: None)
+    response = asyncio.run(
+        middleware.dispatch(
+            Request(_request_scope(scheme="http", host="example.test")),
+            _ok,
+        )
+    )
+    assert "strict-transport-security" not in response.headers
+
+
+def test_bcrypt_inputs_reject_empty_and_overlong_passwords() -> None:
+    with pytest.raises(ValueError):
+        _password_bytes("")
+    with pytest.raises(ValueError):
+        _password_bytes("a" * 73)
+    assert _password_bytes("correct horse battery staple")
 
 
 def test_audit_snapshot_redacts_client_metadata_by_default() -> None:
@@ -161,23 +263,7 @@ def test_audit_snapshot_redacts_client_metadata_by_default() -> None:
 
 def test_audit_middleware_applies_security_header_baseline() -> None:
     middleware = AuditMiddleware(lambda scope, receive, send: None)
-    scope = {
-        "type": "http",
-        "asgi": {"version": "3.0"},
-        "method": "GET",
-        "scheme": "https",
-        "path": "/api/private",
-        "raw_path": b"/api/private",
-        "query_string": b"",
-        "headers": [],
-        "server": ("example.test", 443),
-        "client": ("198.51.100.7", 53000),
-    }
-
-    async def call_next(_request: Request) -> Response:
-        return Response("ok", status_code=200)
-
-    response = asyncio.run(middleware.dispatch(Request(scope), call_next))
+    response = asyncio.run(middleware.dispatch(Request(_request_scope()), _ok))
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["x-frame-options"] == "DENY"
     assert response.headers["strict-transport-security"].startswith("max-age=")
