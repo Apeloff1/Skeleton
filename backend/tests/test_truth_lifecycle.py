@@ -8,21 +8,22 @@ from core.truth_verifier import EvidenceItem, EvidenceKind
 from core.verified_curiosity import VerifiedCuriosityEngine
 
 
-def _evidence(source: str, group: str, *, kind=EvidenceKind.PRIMARY_EMPIRICAL, supports=True, parents=()):
+def _evidence(source: str, group: str, claim: str, *, kind=EvidenceKind.PRIMARY_EMPIRICAL, supports=True, parents=()):
     return {
         "source_id": source, "source": source, "locator": f"doi:{source}", "kind": kind.value,
         "independence_group": group, "quality": 1.0, "supports": supports,
         "reproducible": kind == EvidenceKind.REPLICATION, "peer_reviewed": True, "primary": True,
         "provenance_verified": True, "preregistered": True, "data_available": True, "code_available": True,
         "sample_size": 500, "uncertainty_reported": True, "parent_source_ids": list(parents),
+        "citation_binding": {"binding_method": "direct_quote", "evidence_span": claim, "mapping_rationale": ""},
     }
 
 
 def _promote(engine: VerifiedCuriosityEngine, claim: str, *, derivative=False):
     engine.observe_prompt("empirical latency research")
     inquiry = engine.next_inquiry(); assert inquiry is not None
-    primary = _evidence("study-primary", "lab-a")
-    replication = _evidence("study-replication", "lab-b", kind=EvidenceKind.REPLICATION,
+    primary = _evidence("study-primary", "lab-a", claim)
+    replication = _evidence("study-replication", "lab-b", claim, kind=EvidenceKind.REPLICATION,
                             parents=("study-primary",) if derivative else ())
     record = engine.accept_finding(inquiry, {
         "summary": "Two provenance-verified empirical sources evaluate latency.",
