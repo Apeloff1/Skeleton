@@ -7,9 +7,11 @@ def _operations(**overrides):
     value = {
         "audit_sequence": 0,
         "audit_head": None,
+        "audit_health": {"cross_process_locking": True, "verified": True, "lock_backend": "fcntl"},
         "outbox_capacity_remaining": 128,
         "outbox_health": {
             "cross_process_locking": True,
+            "leased_intent_factory": True,
             "lock_backend": "fcntl",
             "sequence_meta_version": 1,
             "next_sequence": 1,
@@ -57,6 +59,14 @@ def test_evidence_gap_is_hard_failure():
     assert report.hard_failures >= 1
 
 
+def test_unverified_or_thread_only_audit_blocks_assurance():
+    report = evaluate_assurance(**_base(operations=_operations(
+        audit_health={"cross_process_locking": False, "verified": False, "lock_backend": "thread"},
+    )))
+    assert report.posture == "blocked"
+    assert any(item.id == "audit.cross-process-coherence" and not item.passed for item in report.invariants)
+
+
 def test_zero_queue_capacity_blocks_assurance():
     report = evaluate_assurance(**_base(operations=_operations(outbox_capacity_remaining=0)))
     assert report.posture == "blocked"
@@ -64,16 +74,21 @@ def test_zero_queue_capacity_blocks_assurance():
 
 
 def test_thread_only_outbox_blocks_assurance():
-    health = dict(_operations()["outbox_health"])
-    health["cross_process_locking"] = False
+    health = dict(_operations()["outbox_health"]); health["cross_process_locking"] = False
     report = evaluate_assurance(**_base(operations=_operations(outbox_health=health)))
     assert report.posture == "blocked"
     assert any(item.id == "queue.cross-process-coherence" and not item.passed for item in report.invariants)
 
 
+def test_nonatomic_intent_staging_blocks_assurance():
+    health = dict(_operations()["outbox_health"]); health["leased_intent_factory"] = False
+    report = evaluate_assurance(**_base(operations=_operations(outbox_health=health)))
+    assert report.posture == "blocked"
+    assert any(item.id == "queue.atomic-intent-staging" and not item.passed for item in report.invariants)
+
+
 def test_missing_sequence_metadata_blocks_assurance():
-    health = dict(_operations()["outbox_health"])
-    health["sequence_meta_version"] = 0
+    health = dict(_operations()["outbox_health"]); health["sequence_meta_version"] = 0
     report = evaluate_assurance(**_base(operations=_operations(outbox_health=health)))
     assert report.posture == "blocked"
     assert any(item.id == "queue.monotonic-sequence" and not item.passed for item in report.invariants)
