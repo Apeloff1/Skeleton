@@ -1,8 +1,8 @@
 """Core security primitives for the backend.
 
 This module augments middleware/security.py with browser response hardening,
-secret scrubbing, strict production CORS defaults, safe request correlation,
-password hashing helpers, and strict validation helpers.
+secret scrubbing, strict CORS defaults, safe request correlation, password
+hashing helpers, and strict validation helpers.
 """
 from __future__ import annotations
 
@@ -21,6 +21,21 @@ except ImportError:
 logger = logging.getLogger("SecurityV2")
 
 
+def _env_truthy(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+_PLAYABLE_CSP = (
+    "sandbox allow-scripts; default-src 'self' data: blob:; "
+    "img-src 'self' data: blob:; media-src 'self' data: blob:; "
+    "style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' blob:; "
+    "connect-src 'self'"
+)
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Set defensive browser/security headers on every response."""
 
@@ -35,7 +50,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     ):
         super().__init__(app)
         self.frame_options = frame_options
-        self.hsts_max_age = hsts_max_age
+        self.hsts_max_age = max(0, int(hsts_max_age))
         self.csp = csp
         self.referrer_policy = referrer_policy
 
@@ -44,32 +59,36 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         headers = resp.headers
         headers.setdefault("X-Content-Type-Options", "nosniff")
         headers.setdefault("Referrer-Policy", self.referrer_policy)
-        headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=(), usb=()")
+        headers.setdefault(
+            "Permissions-Policy",
+            "geolocation=(), microphone=(), camera=(), payment=(), usb=(), browsing-topics=()",
+        )
         headers.setdefault("X-Permitted-Cross-Domain-Policies", "none")
         headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
 
         path = request.url.path
         embeddable = path.startswith("/api/playable/") and path.endswith("/raw")
         if embeddable:
-            headers.setdefault(
-                "Content-Security-Policy",
-                "sandbox allow-scripts; default-src 'self' data: blob:; "
-                "img-src 'self' data: blob:; media-src 'self' data: blob:; "
-                "style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' blob:; "
-                "connect-src 'self'",
-            )
+            # This route intentionally renders generated HTML in a sandbox.
+            # Override any generic inner CSP/XFO so middleware ordering cannot
+            # accidentally disable the sandbox contract.
+            headers["Content-Security-Policy"] = _PLAYABLE_CSP
+            if "x-frame-options" in headers:
+                del headers["x-frame-options"]
         else:
             headers.setdefault("X-Frame-Options", self.frame_options)
             if self.csp:
                 headers.setdefault("Content-Security-Policy", self.csp)
 
-        if self.hsts_max_age:
+        # HSTS must only be emitted for an HTTPS authority. TLS-terminating
+        # deployments may explicitly opt in when the ASGI scheme remains http.
+        if self.hsts_max_age and (request.url.scheme == "https" or _env_truthy("FORCE_HSTS")):
             headers.setdefault(
                 "Strict-Transport-Security",
                 f"max-age={self.hsts_max_age}; includeSubDomains",
             )
 
-        if path.startswith(("/api/auth", "/api/security", "/api/admin")):
+        if path.startswith(("/api/auth", "/api/security", "/api/admin", "/api/_telemetry", "/api/metrics")):
             headers.setdefault("Cache-Control", "no-store, max-age=0")
             headers.setdefault("Pragma", "no-cache")
         return resp
@@ -111,7 +130,6 @@ class SecretsScrubFilter(logging.Filter):
         return True
 
 
-# Backward compatibility for callers using the original singular public name.
 SecretScrubFilter = SecretsScrubFilter
 
 
@@ -127,10 +145,17 @@ def install_secrets_scrub() -> None:
 
 
 def cors_allowlist() -> list[str]:
-    """Return an explicit CORS allowlist; production defaults closed."""
-    raw = os.environ.get("CORS_ALLOW_ORIGINS", "").strip()
+    """Return the explicit browser-origin allowlist.
+
+    CORS_ORIGINS is the canonical setting used by the server and origin guard.
+    CORS_ALLOW_ORIGINS remains a compatibility fallback only.
+    """
+    raw = os.environ.get("CORS_ORIGINS")
+    if raw is None:
+        raw = os.environ.get("CORS_ALLOW_ORIGINS", "")
+    raw = raw.strip()
     if raw:
-        return [origin.strip() for origin in raw.split(",") if origin.strip()]
+        return [origin.strip().rstrip("/") for origin in raw.split(",") if origin.strip()]
 
     environment = os.environ.get("ENVIRONMENT", os.environ.get("ENV", "development")).lower()
     if environment in {"production", "prod"}:
@@ -156,28 +181,44 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         return resp
 
 
+def _password_bytes(password: str) -> bytes:
+    if not isinstance(password, str) or not password:
+        raise ValueError("password must be a non-empty string")
+    encoded = password.encode("utf-8")
+    # bcrypt's historical input limit is 72 bytes. Reject rather than silently
+    # truncating two distinct long passwords to the same effective secret.
+    if len(encoded) > 72:
+        raise ValueError("password exceeds bcrypt 72-byte limit")
+    return encoded
+
+
 def bcrypt_hash(password: str, *, rounds: int = 12) -> str:
-    """Hash a password with bcrypt with a minimum cost of 12."""
+    """Hash a password with bcrypt, rejecting ambiguous overlong inputs."""
     try:
         import bcrypt
     except ImportError as exc:
         raise RuntimeError("bcrypt not installed") from exc
 
     safe_rounds = min(max(int(rounds), 12), 16)
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=safe_rounds)).decode("utf-8")
+    return bcrypt.hashpw(_password_bytes(password), bcrypt.gensalt(rounds=safe_rounds)).decode("utf-8")
 
 
 def bcrypt_verify(password: str, hashed: str) -> tuple[bool, bool]:
-    """Verify a password and indicate whether the hash should be upgraded."""
+    """Verify a password and indicate whether the bcrypt cost should upgrade."""
     try:
         import bcrypt
 
-        ok = bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
+        encoded = _password_bytes(password)
+        if not isinstance(hashed, str) or not re.fullmatch(r"\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}", hashed):
+            return False, False
+        ok = bcrypt.checkpw(encoded, hashed.encode("utf-8"))
         try:
             rounds = int(hashed.split("$")[2])
-        except Exception:
+        except (IndexError, ValueError):
             rounds = 0
         return ok, ok and rounds < 12
+    except (ValueError, TypeError):
+        return False, False
     except Exception:
         return False, False
 
@@ -189,7 +230,7 @@ def strict_validator(model_cls):
     def dec(fn):
         @functools.wraps(fn)
         async def wrapper(*args, **kwargs):
-            body = kwargs.get("body") or next((a for a in args if isinstance(a, model_cls)), None)
+            body = kwargs.get("body") or next((arg for arg in args if isinstance(arg, model_cls)), None)
             if body is not None:
                 try:
                     body_dict = body.model_dump(exclude_unset=False)
