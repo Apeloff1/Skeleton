@@ -247,19 +247,72 @@ class DeploymentGateway:
 
         return sorted(gaps, key=lambda row: (row["authorization_id"], row["kind"], row["release_id"]))
 
+    def portability_status(self) -> dict[str, Any]:
+        """Classify completed releases by independent proof reconstructability.
+
+        Old ledgers may contain only preflight/plan digests. Those records remain
+        hash-chain verified, but an external verifier cannot reconstruct the exact
+        authorized decision and rollout body from repository-independent evidence.
+        """
+        from core.deployment_proof import DEPLOYMENT_PROOF_VERSION
+
+        issues = {
+            str(row.get("authorization_id") or ""): row
+            for row in self.authorizations.snapshot_events()
+            if row.get("kind") == "issue"
+        }
+        releases = self.releases.snapshot()
+        receipts = {row.authorization_id: row for row in self.receipts.snapshot()}
+        fully_portable = 0
+        legacy_preflight_hash_only = 0
+        legacy_plan_hash_only = 0
+        incomplete_transition_evidence = 0
+
+        for release in releases:
+            issue = issues.get(release.authorization_id)
+            receipt = receipts.get(release.authorization_id)
+            if issue is None or receipt is None:
+                incomplete_transition_evidence += 1
+                continue
+            has_preflight = isinstance(issue.get("preflight"), dict)
+            has_plan = isinstance(issue.get("plan"), dict)
+            if has_preflight and has_plan:
+                fully_portable += 1
+            else:
+                if not has_preflight:
+                    legacy_preflight_hash_only += 1
+                if not has_plan:
+                    legacy_plan_hash_only += 1
+
+        completed = len(releases)
+        legacy_or_incomplete = completed - fully_portable
+        return {
+            "proof_version": DEPLOYMENT_PROOF_VERSION,
+            "completed_releases": completed,
+            "fully_portable": fully_portable,
+            "legacy_or_incomplete": legacy_or_incomplete,
+            "legacy_preflight_hash_only": legacy_preflight_hash_only,
+            "legacy_plan_hash_only": legacy_plan_hash_only,
+            "incomplete_transition_evidence": incomplete_transition_evidence,
+            "all_completed_releases_portable": completed == fully_portable,
+        }
+
     def portable_proof(self, authorization_id: str):
         from core.deployment_proof import build_portable_deployment_proof
         return build_portable_deployment_proof(self, authorization_id)
 
     def status(self) -> dict[str, Any]:
         gaps = self.evidence_gaps()
+        portability = self.portability_status()
         return {
             "authorization": self.authorizations.status(),
             "release_backend": self.releases.status(),
             "transition_receipts": self.receipts.status(),
             "evidence_gaps": gaps,
             "evidence_gap_count": len(gaps),
+            "portability": portability,
             "verified": len(gaps) == 0,
+            "independently_verifiable": len(gaps) == 0 and portability["all_completed_releases_portable"],
         }
 
     def root_component(self) -> dict[str, Any]:
