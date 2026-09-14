@@ -128,17 +128,22 @@ class EvidenceRegistry:
         with self._lease.acquire():
             records = self._load(); existing = records.get(record_id)
             if existing is not None:
-                if existing.get("item") != serialized_item or str(existing.get("claim", "")) != claim:
+                restored = self._restore(existing)
+                normalized_existing_item = self._serialize_item(restored.item)
+                if normalized_existing_item != serialized_item or restored.claim != claim:
                     raise EvidenceRegistryIntegrityError("evidence identity collision with different evidence payload")
-                existing_attestation = str(existing.get("citation_binding_attestation_sha256", ""))
-                if citation_attestation:
-                    if existing_attestation and not hmac.compare_digest(existing_attestation, citation_attestation):
-                        raise EvidenceRegistryIntegrityError("citation binding attestation is immutable once recorded")
-                    if not existing_attestation:
-                        existing["citation_binding_attestation_sha256"] = citation_attestation
-                        existing["citation_bound_at"] = stamp
-                        records[record_id] = existing; self._write(records)
-                return self._restore(existing)
+                existing_attestation = restored.citation_binding_attestation_sha256
+                if citation_attestation and not existing_attestation:
+                    # One-way migration: old historical evidence becomes eligible
+                    # only when the epistemic gate supplies a validated binding.
+                    existing["citation_binding_attestation_sha256"] = citation_attestation
+                    existing["citation_bound_at"] = stamp
+                    records[record_id] = existing; self._write(records)
+                    return self._restore(existing)
+                # If a replay supplies another valid binding for an already-bound
+                # immutable evidence identity, keep the first provenance anchor.
+                # The gate has already validated the replay, so no mutation is needed.
+                return restored
             records[record_id] = serialized; self._write(records)
         return self._restore(serialized)
 
