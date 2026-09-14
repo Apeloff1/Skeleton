@@ -267,8 +267,19 @@ def evaluate_deployment_preflight(
         finality_satisfied,
         "",
     )
+    attestation = _sha(_payload(draft))
     return DeploymentPreflight(
-        **{**asdict(draft), "attestation_sha256": _sha(_payload(draft))}
+        draft.version,
+        draft.allowed,
+        draft.posture,
+        draft.blockers,
+        draft.warnings,
+        draft.assurance_attestation_sha256,
+        draft.system_root_sha256,
+        draft.trust_state_sha256,
+        draft.finality_required,
+        draft.finality_satisfied,
+        attestation,
     )
 
 
