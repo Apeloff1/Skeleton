@@ -23,7 +23,7 @@ export type AssuranceReport = {
 };
 export type SystemRootAttestation = {
   schema_version: number;
-  components: Array<{ name: string; sha256: string }>;
+  components: { name: string; sha256: string }[];
   root_sha256: string;
 };
 export type PreflightFinding = { id: string; severity: 'hard' | 'warning'; detail: string };
@@ -71,9 +71,9 @@ export type DeploymentInput = {
 export type ControlPlaneStatus = {
   policy_version: number;
   policy_bootstrap_enabled: boolean;
-  kernel: { capabilities: Array<{ id: string; pillar: string; critical: boolean }>; critical_ids: string[] };
-  governance: { charters: Array<{ id: string; domain: string; amendments: number; rules: Array<{ id: string; action: string; min_weight: number; requires_quorum: boolean }> }>; edicts: unknown[] };
-  executors: { bound: number; bindings: ExecutorBinding[]; coverage: { canonical_actions: number; bound_actions: number; coverage_pct: number; missing: Array<{ capability_id: string; action: string }> } };
+  kernel: { capabilities: { id: string; pillar: string; critical: boolean }[]; critical_ids: string[] };
+  governance: { charters: { id: string; domain: string; amendments: number; rules: { id: string; action: string; min_weight: number; requires_quorum: boolean }[] }[]; edicts: unknown[] };
+  executors: { bound: number; bindings: ExecutorBinding[]; coverage: { canonical_actions: number; bound_actions: number; coverage_pct: number; missing: { capability_id: string; action: string }[] } };
   readiness: ReadinessReport;
   assurance: AssuranceReport;
   system_root: SystemRootAttestation;
