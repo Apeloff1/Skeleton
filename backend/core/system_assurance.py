@@ -1,8 +1,9 @@
 """Deterministic assurance evaluation for the converged product runtime.
 
 Assurance is invariant-driven, not a vanity average. Hard failures block the
-posture; warnings degrade it. The report is canonical and SHA-256 attested so
-operators can compare identical evidence across processes/restarts.
+posture; warnings degrade it. Native binding coverage remains observable for
+compatibility, but convergence assurance is driven by evidence-backed action
+readiness: policy + exact executor contract + replay safety + provenance.
 """
 from __future__ import annotations
 
@@ -26,6 +27,7 @@ class AssuranceReport:
     hard_failures: int
     warnings: int
     native_coverage_pct: float
+    readiness_pct: float
     invariants: tuple[AssuranceInvariant, ...]
     attestation_sha256: str
 
@@ -45,6 +47,7 @@ def evaluate_assurance(
     executor_bindings: Iterable[dict[str, Any]],
     executor_coverage: dict[str, Any],
     receipt_stats: dict[str, Any],
+    readiness: dict[str, Any] | None = None,
 ) -> AssuranceReport:
     ledger = list(lifecycle)
     bindings = list(executor_bindings)
@@ -92,9 +95,20 @@ def evaluate_assurance(
     ))
 
     coverage = float(executor_coverage.get("coverage_pct", 0.0) or 0.0)
+    readiness_pct = float((readiness or {}).get("ready_pct", coverage) or 0.0)
+    policy_gaps = int((readiness or {}).get("policy_gaps", 0) or 0)
+    unsafe_actions = int((readiness or {}).get("unsafe_actions", 0) or 0)
     invariants.append(AssuranceInvariant(
-        "convergence.native-majority", "warning", coverage >= 50.0,
-        f"{coverage:.1f}% canonical actions are native",
+        "convergence.policy-complete", "hard", policy_gaps == 0,
+        f"{policy_gaps} canonical policy gap(s)",
+    ))
+    invariants.append(AssuranceInvariant(
+        "convergence.no-unsafe-actions", "hard", unsafe_actions == 0,
+        f"{unsafe_actions} canonical action(s) violate readiness safety contracts",
+    ))
+    invariants.append(AssuranceInvariant(
+        "convergence.native-ready-majority", "warning", readiness_pct >= 50.0,
+        f"{readiness_pct:.1f}% canonical actions are evidence-backed native-ready",
     ))
 
     hard_failures = sum(not item.passed for item in invariants if item.severity == "hard")
@@ -105,6 +119,7 @@ def evaluate_assurance(
         "hard_failures": hard_failures,
         "warnings": warnings,
         "native_coverage_pct": coverage,
+        "readiness_pct": readiness_pct,
         "invariants": [asdict(item) for item in invariants],
     }
     return AssuranceReport(
@@ -112,6 +127,7 @@ def evaluate_assurance(
         hard_failures=hard_failures,
         warnings=warnings,
         native_coverage_pct=coverage,
+        readiness_pct=readiness_pct,
         invariants=tuple(invariants),
         attestation_sha256=_digest(payload),
     )
@@ -123,6 +139,7 @@ def verify_assurance(report: AssuranceReport) -> bool:
         "hard_failures": report.hard_failures,
         "warnings": report.warnings,
         "native_coverage_pct": report.native_coverage_pct,
+        "readiness_pct": report.readiness_pct,
         "invariants": [asdict(item) for item in report.invariants],
     }
     return _digest(payload) == report.attestation_sha256
