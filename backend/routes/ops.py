@@ -17,6 +17,10 @@ from core.charter_policy import Rule
 from core.control_plane_deployment import control_plane_preflight_dict
 from core.databases import client as _SHARED_MONGO_CLIENT
 from core.deployment_checkpoint_ledger import DeploymentCheckpointLedgerError
+from core.deployment_checkpoint_proof import (
+    build_deployment_checkpoint_publication_proof,
+    verify_deployment_checkpoint_publication_proof,
+)
 from core.deployment_evidence_checkpoint import verify_deployment_proof_against_checkpoint
 from core.deployment_gateway import DeploymentGatewayError
 from core.durable_outbox import OutboxFullError
@@ -192,6 +196,28 @@ async def product_control_deployment_checkpoint(sequence: int, token: str = Quer
     return asdict(publication)
 
 
+@router.get("/product-control/deployments/checkpoints/{sequence}/proof")
+async def product_control_deployment_checkpoint_proof(sequence: int, token: str = Query("")):
+    _require_ops(token)
+    try:
+        gateway = _control_plane().deployments
+        proof = build_deployment_checkpoint_publication_proof(gateway.checkpoints, sequence)
+        head = gateway.checkpoints.status()["head_sha256"]
+        verified = verify_deployment_checkpoint_publication_proof(
+            proof,
+            expected_ledger_head_sha256=head,
+        )
+        return {
+            "verified": verified,
+            "externally_pin_this_ledger_head_sha256": head,
+            "proof": asdict(proof),
+        }
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="deployment checkpoint not found") from exc
+    except (DeploymentCheckpointLedgerError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @router.get("/product-control/deployments/proof/{authorization_id}")
 async def product_control_deployment_proof(authorization_id: str,
                                              checkpoint_sequence: int | None = Query(default=None, ge=1),
@@ -212,10 +238,23 @@ async def product_control_deployment_proof(authorization_id: str,
             publication.checkpoint,
             expected_checkpoint_root_sha256=publication.checkpoint_root_sha256,
         )
+        publication_proof = build_deployment_checkpoint_publication_proof(
+            gateway.checkpoints,
+            publication.sequence,
+        )
+        publication_head = gateway.checkpoints.status()["head_sha256"]
+        publication_membership_verified = verify_deployment_checkpoint_publication_proof(
+            publication_proof,
+            expected_ledger_head_sha256=publication_head,
+            expected_start_checkpoint_root_sha256=publication.checkpoint_root_sha256,
+        )
         return {
             "verified": verified,
+            "checkpoint_membership_verified": publication_membership_verified,
+            "externally_pin_this_ledger_head_sha256": publication_head,
             "proof": asdict(proof),
             "checkpoint_publication": asdict(publication),
+            "checkpoint_membership_proof": asdict(publication_proof),
         }
     except HTTPException:
         raise
