@@ -1,15 +1,14 @@
 """Native executors for the first canonical product actions.
 
-These adapters deliberately target framework-free runtime primitives instead of
-calling HTTP routes. Every successful adapter writes a durable execution receipt
-before returning True; failures raise and therefore leave the outbox intent
-pending for retry.
+Adapters target framework-free runtime primitives instead of calling HTTP routes.
+A matching existing receipt is treated as already complete, preventing duplicate
+side effects when execution is retried after a later audit/confirmation failure.
 """
 from __future__ import annotations
 
 from typing import Any
 
-from core.execution_receipts import ExecutionReceiptStore
+from core.execution_receipts import ExecutionReceiptStore, ReceiptIntegrityError
 from core.product_executor_registry import ProductExecutorRegistry
 from core.product_operations import AdmittedOperation
 from core.runtime_sessions import RuntimeSessionManager
@@ -25,6 +24,18 @@ class NativeProductExecutors:
         self.receipts = receipt_store
         self.sessions = sessions or RuntimeSessionManager()
 
+    def _already_complete(self, operation: AdmittedOperation, executor: str) -> bool:
+        existing = self.receipts.read(operation.id)
+        if existing is None:
+            return False
+        if (
+            existing.capability_id != operation.capability_id
+            or existing.action != operation.action
+            or existing.executor != executor
+        ):
+            raise ReceiptIntegrityError("existing receipt does not match executor contract")
+        return True
+
     def _write(self, operation: AdmittedOperation, executor: str, result: dict[str, Any]) -> bool:
         self.receipts.write(
             operation_id=operation.id,
@@ -36,6 +47,9 @@ class NativeProductExecutors:
         return True
 
     def create_project(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
+        executor = "native.studio.project.create"
+        if self._already_complete(operation, executor):
+            return True
         title = str(payload.get("title") or payload.get("name") or "Untitled project").strip()
         if not title:
             raise ValueError("project title cannot be blank")
@@ -48,9 +62,12 @@ class NativeProductExecutors:
             "owner": operation.principal,
             "state": "created",
         }
-        return self._write(operation, "native.studio.project.create", descriptor)
+        return self._write(operation, executor, descriptor)
 
     def create_world(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
+        executor = "native.worldforge.world.create"
+        if self._already_complete(operation, executor):
+            return True
         # Import lazily so product-control boot stays independent of WorldForge's
         # optional presentation modules. worldforge_core itself is pure/seedable.
         from routes.worldforge_core import WorldConfig, build_world
@@ -63,9 +80,12 @@ class NativeProductExecutors:
             "seed": getattr(cfg, "seed", None),
             "scale": getattr(cfg, "scale", None),
         }
-        return self._write(operation, "native.worldforge.world.create", result)
+        return self._write(operation, executor, result)
 
     def launch_playable(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
+        executor = "native.playables.playable.launch"
+        if self._already_complete(operation, executor):
+            return True
         seed = int(payload.get("seed", 1))
         terrain_size = float(payload.get("terrain_size", 720.0))
         resolution = int(payload.get("resolution", 96))
@@ -83,14 +103,13 @@ class NativeProductExecutors:
             "runtime": self.sessions.snapshot(),
             "seed": seed,
         }
-        return self._write(operation, "native.playables.playable.launch", result)
+        return self._write(operation, executor, result)
 
     def runtime_sessions(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
-        return self._write(
-            operation,
-            "native.playables.runtime.sessions",
-            {"runtime": self.sessions.snapshot()},
-        )
+        executor = "native.playables.runtime.sessions"
+        if self._already_complete(operation, executor):
+            return True
+        return self._write(operation, executor, {"runtime": self.sessions.snapshot()})
 
     def register_into(self, registry: ProductExecutorRegistry) -> ProductExecutorRegistry:
         registry.register("studio", "project.create", self.create_project, name="native.studio.project.create")
