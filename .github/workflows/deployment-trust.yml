@@ -9,6 +9,8 @@ on:
       - "backend/core/epistemic_trust_runtime.py"
       - "backend/core/deployment_preflight.py"
       - "backend/core/control_plane_deployment.py"
+      - "backend/core/system_assurance.py"
+      - "backend/core/product_control_plane.py"
       - "backend/core/portable_claim_proof.py"
       - "backend/routes/ops.py"
       - "backend/tests/test_witness_freshness_migration.py"
@@ -16,6 +18,8 @@ on:
       - "backend/tests/test_control_plane_deployment.py"
       - "backend/tests/test_epistemic_trust_runtime.py"
       - "backend/tests/test_portable_finality_proof.py"
+      - "backend/tests/test_system_assurance_trust.py"
+      - "backend/tests/test_control_plane_transparency.py"
       - ".github/workflows/deployment-trust.yml"
   pull_request:
     paths:
@@ -25,6 +29,8 @@ on:
       - "backend/core/epistemic_trust_runtime.py"
       - "backend/core/deployment_preflight.py"
       - "backend/core/control_plane_deployment.py"
+      - "backend/core/system_assurance.py"
+      - "backend/core/product_control_plane.py"
       - "backend/core/portable_claim_proof.py"
       - "backend/routes/ops.py"
       - "backend/tests/test_witness_freshness_migration.py"
@@ -32,6 +38,8 @@ on:
       - "backend/tests/test_control_plane_deployment.py"
       - "backend/tests/test_epistemic_trust_runtime.py"
       - "backend/tests/test_portable_finality_proof.py"
+      - "backend/tests/test_system_assurance_trust.py"
+      - "backend/tests/test_control_plane_transparency.py"
       - ".github/workflows/deployment-trust.yml"
 
 permissions:
@@ -50,7 +58,7 @@ jobs:
           python-version: "3.11"
       - name: Install focused dependencies
         run: python -m pip install "pytest>=8,<9"
-      - name: Verify freshness, finality and stable-root deployment decisions
+      - name: Verify freshness, finality, assurance and stable-root deployment decisions
         run: >-
           python -m pytest -q
           tests/test_witness_freshness_migration.py
@@ -58,3 +66,5 @@ jobs:
           tests/test_control_plane_deployment.py
           tests/test_epistemic_trust_runtime.py
           tests/test_portable_finality_proof.py
+          tests/test_system_assurance_trust.py
+          tests/test_control_plane_transparency.py
