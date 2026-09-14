@@ -30,7 +30,9 @@ def key_digest(key: str) -> str:
     normalized = " ".join(str(key).split()).strip()
     if not normalized:
         raise ValueError("merkle key is required")
-    return _hash(normalized.casefold().encode("utf-8"))
+    # Cryptographic identity must preserve exact normalized claim text. Semantic
+    # equivalence/case folding belongs to ClaimIdentityEngine, never the address layer.
+    return _hash(normalized.encode("utf-8"))
 
 
 def _value_digest(value: Any) -> str:
