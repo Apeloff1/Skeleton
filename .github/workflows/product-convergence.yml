@@ -107,6 +107,7 @@ jobs:
           tests/test_deployment_checkpoint_route_architecture.py
           tests/test_deployment_checkpoint_trust_advance.py
           tests/test_deployment_checkpoint_trust_wire.py
+          tests/test_deployment_checkpoint_trust_policy.py
           tests/test_deployment_checkpoint_witnessed_continuity.py
           tests/test_deployment_checkpoint_pin_runtime_continuity.py
           tests/test_control_plane_release_integration.py
