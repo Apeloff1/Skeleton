@@ -7,6 +7,10 @@ from core.product_control_plane import ProductControlPlane
 from core.product_executor_registry import ExecutorNotRegistered, ProductExecutorRegistry
 
 
+MIN_NATIVE_READY_ACTIONS = 15
+MIN_NATIVE_READY_PCT = 71.4
+
+
 def test_registry_requires_exact_capability_action_binding(tmp_path):
     registry = ProductExecutorRegistry()
     with pytest.raises(ExecutorNotRegistered, match="no executor registered"):
@@ -58,14 +62,15 @@ def test_registry_snapshot_is_deterministic_and_introspectable():
     assert snapshot[0]["version"] == 1
 
 
-def test_default_control_plane_reports_expanded_native_coverage(tmp_path):
+def test_default_control_plane_enforces_native_readiness_floor(tmp_path):
     plane = ProductControlPlane(tmp_path)
     coverage = plane.executor_coverage()
     assert coverage["canonical_actions"] == sum(len(item.actions) for item in CANONICAL_PRODUCT_POLICY)
-    assert coverage["bound_actions"] == 12
-    assert coverage["coverage_pct"] == 57.1
+    assert coverage["bound_actions"] >= MIN_NATIVE_READY_ACTIONS
+    assert coverage["coverage_pct"] >= MIN_NATIVE_READY_PCT
     missing = {item["action"] for item in coverage["missing"]}
-    assert {"build.submit", "jeeves.reason", "academy.continue"} <= missing
+    assert {"build.submit", "asset.forge", "academy.continue", "ops.agents"} <= missing
+    assert {"jeeves.reason", "jeeves.plan", "agents.review"}.isdisjoint(missing)
 
 
 def test_injected_query_executors_return_real_control_plane_state(tmp_path):
@@ -112,7 +117,7 @@ def test_governance_safety_executor_uses_attested_assurance_and_readiness(tmp_pa
     assert asyncio.run(plane.execute_registered(operation.outbox_seq)) is True
     result = plane.receipt_result(operation.id)["safety"]
     assert result["posture"] in {"healthy", "degraded", "blocked"}
-    assert result["readiness_pct"] == 57.1
+    assert result["readiness_pct"] >= MIN_NATIVE_READY_PCT
     assert len(result["attestation_sha256"]) == 64
     assert len(result["readiness_attestation_sha256"]) == 64
     assert result["invariants"]
