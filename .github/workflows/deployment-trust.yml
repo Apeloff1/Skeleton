@@ -22,7 +22,9 @@ on:
       - "backend/core/deployment_checkpoint_proof.py"
       - "backend/core/deployment_checkpoint_witness.py"
       - "backend/core/deployment_checkpoint_target.py"
+      - "backend/core/deployment_checkpoint_pin_config.py"
       - "backend/core/deployment_checkpoint_pin_ledger.py"
+      - "backend/core/deployment_checkpoint_pin_runtime.py"
       - "backend/core/deployment_gateway.py"
       - "backend/core/deployment_planner.py"
       - "backend/core/system_assurance.py"
@@ -33,6 +35,7 @@ on:
       - "backend/tests/test_witness_freshness_migration.py"
       - "backend/tests/test_signed_witness_finality.py"
       - "backend/tests/test_witness_policy_config_strict.py"
+      - "backend/tests/test_deployment_checkpoint_pin_config.py"
       - "backend/tests/test_deployment_preflight.py"
       - "backend/tests/test_control_plane_deployment.py"
       - "backend/tests/test_deployment_authorization.py"
@@ -50,6 +53,7 @@ on:
       - "backend/tests/test_deployment_checkpoint_target.py"
       - "backend/tests/test_deployment_checkpoint_pin_ledger.py"
       - "backend/tests/test_deployment_checkpoint_pin_hardening.py"
+      - "backend/tests/test_deployment_checkpoint_pin_runtime.py"
       - "backend/tests/test_system_assurance_deployment.py"
       - "backend/tests/test_control_plane_release_integration.py"
       - "backend/tests/test_epistemic_trust_runtime.py"
@@ -81,7 +85,9 @@ on:
       - "backend/core/deployment_checkpoint_proof.py"
       - "backend/core/deployment_checkpoint_witness.py"
       - "backend/core/deployment_checkpoint_target.py"
+      - "backend/core/deployment_checkpoint_pin_config.py"
       - "backend/core/deployment_checkpoint_pin_ledger.py"
+      - "backend/core/deployment_checkpoint_pin_runtime.py"
       - "backend/core/deployment_gateway.py"
       - "backend/core/deployment_planner.py"
       - "backend/core/system_assurance.py"
@@ -92,6 +98,7 @@ on:
       - "backend/tests/test_witness_freshness_migration.py"
       - "backend/tests/test_signed_witness_finality.py"
       - "backend/tests/test_witness_policy_config_strict.py"
+      - "backend/tests/test_deployment_checkpoint_pin_config.py"
       - "backend/tests/test_deployment_preflight.py"
       - "backend/tests/test_control_plane_deployment.py"
       - "backend/tests/test_deployment_authorization.py"
@@ -109,6 +116,7 @@ on:
       - "backend/tests/test_deployment_checkpoint_target.py"
       - "backend/tests/test_deployment_checkpoint_pin_ledger.py"
       - "backend/tests/test_deployment_checkpoint_pin_hardening.py"
+      - "backend/tests/test_deployment_checkpoint_pin_runtime.py"
       - "backend/tests/test_system_assurance_deployment.py"
       - "backend/tests/test_control_plane_release_integration.py"
       - "backend/tests/test_epistemic_trust_runtime.py"
@@ -146,6 +154,7 @@ jobs:
           tests/test_witness_freshness_migration.py
           tests/test_signed_witness_finality.py
           tests/test_witness_policy_config_strict.py
+          tests/test_deployment_checkpoint_pin_config.py
           tests/test_deployment_preflight.py
           tests/test_control_plane_deployment.py
           tests/test_deployment_authorization.py
@@ -163,6 +172,7 @@ jobs:
           tests/test_deployment_checkpoint_target.py
           tests/test_deployment_checkpoint_pin_ledger.py
           tests/test_deployment_checkpoint_pin_hardening.py
+          tests/test_deployment_checkpoint_pin_runtime.py
           tests/test_system_assurance_deployment.py
           tests/test_control_plane_release_integration.py
           tests/test_epistemic_trust_runtime.py
