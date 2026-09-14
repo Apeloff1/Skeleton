@@ -5,7 +5,7 @@ name: Backend Quality
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, "security/**"]
     paths:
       - "backend/**"
       - ".github/workflows/backend-quality.yml"
