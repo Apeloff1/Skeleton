@@ -47,11 +47,42 @@ def _payload(*, allowed: bool, stable: bool, attempts: int, root_before_sha256: 
              report: DeploymentPreflight) -> dict[str, Any]:
     return {
         "version": CONTROL_PLANE_PREFLIGHT_VERSION,
-        "allowed": allowed, "stable": stable, "attempts": attempts,
-        "root_before_sha256": root_before_sha256, "root_after_sha256": root_after_sha256,
-        "evaluated_at": evaluated_at, "unstable_reason": unstable_reason,
+        "allowed": allowed,
+        "stable": stable,
+        "attempts": attempts,
+        "root_before_sha256": root_before_sha256,
+        "root_after_sha256": root_after_sha256,
+        "evaluated_at": evaluated_at,
+        "unstable_reason": unstable_reason,
         "report": asdict(report),
     }
+
+
+def _build(*, allowed: bool, stable: bool, attempts: int, root_before_sha256: str,
+           root_after_sha256: str, evaluated_at: str, unstable_reason: str,
+           report: DeploymentPreflight) -> ControlPlaneDeploymentPreflight:
+    payload = _payload(
+        allowed=allowed,
+        stable=stable,
+        attempts=attempts,
+        root_before_sha256=root_before_sha256,
+        root_after_sha256=root_after_sha256,
+        evaluated_at=evaluated_at,
+        unstable_reason=unstable_reason,
+        report=report,
+    )
+    return ControlPlaneDeploymentPreflight(
+        CONTROL_PLANE_PREFLIGHT_VERSION,
+        allowed,
+        stable,
+        attempts,
+        root_before_sha256,
+        root_after_sha256,
+        evaluated_at,
+        unstable_reason,
+        report,
+        _sha(payload),
+    )
 
 
 def evaluate_control_plane_deployment(plane, *, max_attempts: int = 3,
@@ -67,23 +98,33 @@ def evaluate_control_plane_deployment(plane, *, max_attempts: int = 3,
         after = str(plane.system_root()["root_sha256"])
         last_before, last_after = before, after
         last_report = evaluate_deployment_preflight(
-            assurance=assurance, trust=trust, system_root_sha256=after,
+            assurance=assurance,
+            trust=trust,
+            system_root_sha256=after,
         )
         if before == after:
-            payload = _payload(
-                allowed=last_report.allowed, stable=True, attempts=attempt,
-                root_before_sha256=before, root_after_sha256=after,
-                evaluated_at=stamp, unstable_reason="", report=last_report,
+            return _build(
+                allowed=last_report.allowed,
+                stable=True,
+                attempts=attempt,
+                root_before_sha256=before,
+                root_after_sha256=after,
+                evaluated_at=stamp,
+                unstable_reason="",
+                report=last_report,
             )
-            return ControlPlaneDeploymentPreflight(**payload, attestation_sha256=_sha(payload))
     assert last_report is not None
     reason = f"whole-system root changed during {max_attempts} consecutive preflight attempt(s)"
-    payload = _payload(
-        allowed=False, stable=False, attempts=max_attempts,
-        root_before_sha256=last_before, root_after_sha256=last_after,
-        evaluated_at=stamp, unstable_reason=reason, report=last_report,
+    return _build(
+        allowed=False,
+        stable=False,
+        attempts=max_attempts,
+        root_before_sha256=last_before,
+        root_after_sha256=last_after,
+        evaluated_at=stamp,
+        unstable_reason=reason,
+        report=last_report,
     )
-    return ControlPlaneDeploymentPreflight(**payload, attestation_sha256=_sha(payload))
 
 
 def verify_control_plane_deployment_preflight(report: ControlPlaneDeploymentPreflight) -> bool:
@@ -96,9 +137,14 @@ def verify_control_plane_deployment_preflight(report: ControlPlaneDeploymentPref
     if not report.stable and not report.unstable_reason:
         return False
     payload = _payload(
-        allowed=report.allowed, stable=report.stable, attempts=report.attempts,
-        root_before_sha256=report.root_before_sha256, root_after_sha256=report.root_after_sha256,
-        evaluated_at=report.evaluated_at, unstable_reason=report.unstable_reason, report=report.report,
+        allowed=report.allowed,
+        stable=report.stable,
+        attempts=report.attempts,
+        root_before_sha256=report.root_before_sha256,
+        root_after_sha256=report.root_after_sha256,
+        evaluated_at=report.evaluated_at,
+        unstable_reason=report.unstable_reason,
+        report=report.report,
     )
     return hmac.compare_digest(_sha(payload), report.attestation_sha256)
 
