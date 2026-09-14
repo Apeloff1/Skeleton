@@ -13,8 +13,11 @@ export const COCKPIT_BRIDGE_VERSION = 1 as const;
 
 const HISTORY_ROOT_KEY = '__skeletonCockpitBridgeRoot';
 const FALLBACK_ORIGIN = 'https://skeleton.invalid';
+const MAX_REQUEST_ID_LENGTH = 128;
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]+$/;
 
 type BridgeRecord = Record<string, unknown>;
+type CommandStatus = 'accepted' | 'rejected';
 
 type LocationWithAncestors = Location & {
   ancestorOrigins?: {
@@ -41,6 +44,19 @@ function normalizeOrigin(value: string): string | null {
   } catch {
     return null;
   }
+}
+
+function readRequestId(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (
+    trimmed.length === 0 ||
+    trimmed.length > MAX_REQUEST_ID_LENGTH ||
+    !REQUEST_ID_PATTERN.test(trimmed)
+  ) {
+    return null;
+  }
+  return trimmed;
 }
 
 /**
@@ -136,8 +152,11 @@ function historyStateWithRoot(state: unknown, isRoot: boolean): BridgeRecord {
  * - `navigate` + safe relative `path` -> guest navigation.
  * - `history` + delta -1/1 -> bounded browser history movement.
  *
+ * Trusted commands may carry a bounded `requestId`. When present, the guest
+ * emits a `command-result` receipt with accepted/rejected status and reason.
+ *
  * Protocol from guest:
- * - `location`, `routes`, `ready`.
+ * - `location`, `routes`, `ready`, `command-result`.
  */
 export function installCockpitPreviewBridge(
   options: CockpitBridgeOptions = {},
@@ -180,6 +199,23 @@ export function installCockpitPreviewBridge(
     );
   };
 
+  const postCommandResult = (
+    request: BridgeRecord,
+    command: 'navigate' | 'history',
+    status: CommandStatus,
+    reason?: string,
+  ) => {
+    const requestId = readRequestId(request.requestId);
+    if (requestId === null) return;
+    post({
+      type: 'command-result',
+      requestId,
+      command,
+      status,
+      ...(reason ? { reason } : {}),
+    });
+  };
+
   const reportLocation = () => {
     post({
       type: 'location',
@@ -203,26 +239,31 @@ export function installCockpitPreviewBridge(
     post({ type: 'ready' });
   };
 
-  const defaultNavigate = (path: string) => {
-    if (!isSafeCockpitPath(path)) return;
+  const defaultNavigate = (path: string): boolean => {
+    if (!isSafeCockpitPath(path)) return false;
     try {
       const url = new URL(path, window.location.origin);
-      if (url.origin !== window.location.origin) return;
+      if (url.origin !== window.location.origin) return false;
       const next = `${url.pathname}${url.search}${url.hash}`;
       window.history.pushState(window.history.state, '', next);
       window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }));
+      return true;
     } catch {
-      // Malformed or unsupported navigation is deliberately ignored.
+      return false;
     }
   };
 
-  const navigate = (path: string) => {
-    if (!isSafeCockpitPath(path)) return;
+  const navigate = (path: string): boolean => {
+    if (!isSafeCockpitPath(path)) return false;
     if (options.navigate) {
-      options.navigate(path);
-      return;
+      try {
+        options.navigate(path);
+        return true;
+      } catch {
+        return false;
+      }
     }
-    defaultNavigate(path);
+    return defaultNavigate(path);
   };
 
   const onMessage = (event: MessageEvent) => {
@@ -235,16 +276,30 @@ export function installCockpitPreviewBridge(
     }
 
     if (event.data.type === 'navigate') {
-      if (typeof event.data.path !== 'string') return;
-      navigate(event.data.path);
+      if (typeof event.data.path !== 'string' || !isSafeCockpitPath(event.data.path)) {
+        postCommandResult(event.data, 'navigate', 'rejected', 'invalid_path');
+        return;
+      }
+      if (!navigate(event.data.path)) {
+        postCommandResult(event.data, 'navigate', 'rejected', 'navigation_failed');
+        return;
+      }
+      postCommandResult(event.data, 'navigate', 'accepted');
       queueMicrotask(reportLocation);
       return;
     }
 
     if (event.data.type === 'history') {
-      if (event.data.delta !== -1 && event.data.delta !== 1) return;
-      if (event.data.delta === -1 && isAtHistoryRoot()) return;
+      if (event.data.delta !== -1 && event.data.delta !== 1) {
+        postCommandResult(event.data, 'history', 'rejected', 'invalid_delta');
+        return;
+      }
+      if (event.data.delta === -1 && isAtHistoryRoot()) {
+        postCommandResult(event.data, 'history', 'rejected', 'history_floor');
+        return;
+      }
       window.history.go(event.data.delta);
+      postCommandResult(event.data, 'history', 'accepted');
     }
   };
 
