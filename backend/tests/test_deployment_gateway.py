@@ -1,8 +1,8 @@
+import hashlib
 import json
 
 import pytest
 
-from core.deployment_authorization import DeploymentAuthorizationError
 from core.deployment_gateway import DeploymentGateway, DeploymentGatewayError
 
 
@@ -34,12 +34,20 @@ def _trust():
 
 
 class StablePlane:
+    """Minimal control plane whose root includes activated release state."""
+
     def __init__(self):
-        self.root = "c" * 64
+        self.root_seed = "c" * 64
         self.allowed = True
+        self.gateway: DeploymentGateway | None = None
+
+    def bind(self, gateway: DeploymentGateway) -> None:
+        self.gateway = gateway
 
     def system_root(self):
-        return {"root_sha256": self.root}
+        release_head = self.gateway.releases.status()["head_set_sha256"] if self.gateway is not None else ""
+        digest = hashlib.sha256(f"{self.root_seed}\0{release_head}".encode("utf-8")).hexdigest()
+        return {"root_sha256": digest}
 
     def assurance_report(self):
         if self.allowed:
@@ -50,12 +58,19 @@ class StablePlane:
         return _trust()
 
 
+def _gateway(tmp_path):
+    plane = StablePlane()
+    gateway = DeploymentGateway(tmp_path, control_plane=plane)
+    plane.bind(gateway)
+    return plane, gateway
+
+
 def _payload(artifact="artifact-v1"):
     return {"target": "product-runtime", "environment": "staging", "strategy": "rolling", "artifact": artifact}
 
 
 def test_prepare_execute_and_idempotent_release_replay(tmp_path):
-    plane = StablePlane(); gateway = DeploymentGateway(tmp_path, control_plane=plane)
+    plane, gateway = _gateway(tmp_path)
     prepared = gateway.prepare(_payload())
     first = gateway.execute(prepared.authorization.id, prepared.plan)
     second = gateway.execute(prepared.authorization.id, prepared.plan)
@@ -63,21 +78,24 @@ def test_prepare_execute_and_idempotent_release_replay(tmp_path):
     assert first.resumed is False
     assert second.resumed is True
     assert first.release == second.release
+    assert first.transition_receipt == second.transition_receipt
+    assert first.transition_receipt.pre_system_root_sha256 != first.transition_receipt.post_system_root_sha256
     assert gateway.authorizations.status()["consumed"] == 1
     assert gateway.releases.status()["releases"] == 1
+    assert gateway.receipts.status()["receipts"] == 1
     current = gateway.releases.current(target="product-runtime", environment="staging")
     assert current is not None and current.release_id == first.release.release_id
 
 
 def test_root_or_plan_mutation_blocks_before_release_side_effect(tmp_path):
-    plane = StablePlane(); gateway = DeploymentGateway(tmp_path, control_plane=plane)
+    plane, gateway = _gateway(tmp_path)
     prepared = gateway.prepare(_payload())
-    plane.root = "e" * 64
+    plane.root_seed = "e" * 64
     with pytest.raises(DeploymentGatewayError, match="root changed"):
         gateway.execute(prepared.authorization.id, prepared.plan)
     assert gateway.releases.status()["releases"] == 0
 
-    plane.root = "c" * 64
+    plane.root_seed = "c" * 64
     second = gateway.prepare(_payload())
     with pytest.raises(DeploymentGatewayError, match="authorized plan"):
         gateway.execute(second.authorization.id, _payload("artifact-v2"))
@@ -85,7 +103,7 @@ def test_root_or_plan_mutation_blocks_before_release_side_effect(tmp_path):
 
 
 def test_consumed_but_not_activated_authorization_can_resume_only_under_same_safe_root(tmp_path):
-    plane = StablePlane(); gateway = DeploymentGateway(tmp_path, control_plane=plane)
+    plane, gateway = _gateway(tmp_path)
     prepared = gateway.prepare(_payload())
     consumption = gateway.authorizations.consume(
         prepared.authorization.id,
@@ -105,13 +123,13 @@ def test_consumed_but_not_activated_authorization_can_resume_only_under_same_saf
         current_system_root_sha256=prepared2.authorization.system_root_sha256,
         plan=prepared2.plan,
     )
-    plane.root = "f" * 64
+    plane.root_seed = "f" * 64
     with pytest.raises(DeploymentGatewayError, match="root changed"):
         gateway.execute(prepared2.authorization.id, prepared2.plan)
 
 
 def test_fresh_assurance_failure_blocks_execution_even_when_root_is_unchanged(tmp_path):
-    plane = StablePlane(); gateway = DeploymentGateway(tmp_path, control_plane=plane)
+    plane, gateway = _gateway(tmp_path)
     prepared = gateway.prepare(_payload())
     plane.allowed = False
     with pytest.raises(DeploymentGatewayError, match="no longer authorizes"):
@@ -120,7 +138,7 @@ def test_fresh_assurance_failure_blocks_execution_even_when_root_is_unchanged(tm
 
 
 def test_release_history_tamper_fails_closed(tmp_path):
-    plane = StablePlane(); gateway = DeploymentGateway(tmp_path, control_plane=plane)
+    plane, gateway = _gateway(tmp_path)
     prepared = gateway.prepare(_payload())
     executed = gateway.execute(prepared.authorization.id, prepared.plan)
     channel = next(path for path in (tmp_path / "releases").iterdir() if path.is_dir())
