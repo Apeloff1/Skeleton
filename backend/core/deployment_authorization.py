@@ -27,6 +27,7 @@ from core.control_plane_deployment import (
     ControlPlaneDeploymentPreflight,
     verify_control_plane_deployment_preflight,
 )
+from core.deployment_planner import verify_deployment_plan
 from core.deployment_preflight import DeploymentPreflight, PreflightFinding
 from core.file_lease import FileLease
 
@@ -71,6 +72,8 @@ def _snapshot_plan(plan: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("deployment plan must contain only finite canonical JSON values") from exc
     if not isinstance(snapshot, dict) or not snapshot:
         raise ValueError("deployment plan must be a non-empty object")
+    if not verify_deployment_plan(snapshot):
+        raise ValueError("deployment plan failed semantic verification")
     return snapshot
 
 
@@ -202,7 +205,7 @@ class DeploymentAuthorizationLedger:
                     try:
                         persisted_digest = plan_digest(plan)
                     except ValueError as exc:
-                        raise DeploymentAuthorizationError("persisted deployment plan snapshot is not canonical JSON") from exc
+                        raise DeploymentAuthorizationError("persisted deployment plan snapshot failed verification") from exc
                     if not hmac.compare_digest(persisted_digest, str(row["plan_sha256"])):
                         raise DeploymentAuthorizationError("persisted deployment plan digest diverges from issue event")
                 issues[auth_id] = row
