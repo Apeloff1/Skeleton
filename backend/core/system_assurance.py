@@ -87,12 +87,14 @@ def evaluate_assurance(*, lifecycle: Iterable[dict[str, Any]], operations: dict[
         lineage = verification.get("source_lineage") if isinstance(verification.get("source_lineage"), dict) else {}
         truth = verification.get("truth_ledger") if isinstance(verification.get("truth_ledger"), dict) else {}
         dependencies = verification.get("claim_dependencies") if isinstance(verification.get("claim_dependencies"), dict) else {}
+        calibration = verification.get("calibration") if isinstance(verification.get("calibration"), dict) else {}
         knowledge = verification.get("knowledge") if isinstance(verification.get("knowledge"), dict) else {}
         policy = verification.get("verification_policy") if isinstance(verification.get("verification_policy"), dict) else {}
         truth_claims = int(truth.get("claims", 0) or 0); truth_authoritative = int(truth.get("authoritative", 0) or 0)
         truth_revoked = int(truth.get("revoked", 0) or 0); truth_expired = int(truth.get("expired", 0) or 0)
         unresolved_lineage = int(lineage.get("unresolved_lineage", 0) or 0)
         truth_counts_sane = all(x >= 0 for x in (truth_claims, truth_authoritative, truth_revoked, truth_expired)) and truth_authoritative <= truth_claims
+        calibration_version = int(calibration.get("version", 0) or 0)
         invariants += [
             AssuranceInvariant("truth.gated-promotion", "hard", verification.get("truth_gated") is True,
                                f"truth_gated={verification.get('truth_gated', False)}"),
@@ -100,6 +102,8 @@ def evaluate_assurance(*, lifecycle: Iterable[dict[str, Any]], operations: dict[
                                f"speculation_authoritative={verification.get('speculation_authoritative', True)}"),
             AssuranceInvariant("truth.model-consensus-not-evidence", "hard", verification.get("model_consensus_is_empirical_evidence") is False,
                                f"model_consensus_is_empirical_evidence={verification.get('model_consensus_is_empirical_evidence', True)}"),
+            AssuranceInvariant("truth.semantic-similarity-not-identity", "hard", verification.get("semantic_similarity_is_truth_identity") is False,
+                               f"semantic_similarity_is_truth_identity={verification.get('semantic_similarity_is_truth_identity', True)}"),
             AssuranceInvariant("truth.evidence-registry-coherent", "hard", registry.get("cross_process_locking") is True,
                                f"locking={registry.get('lock_backend', 'missing')}"),
             AssuranceInvariant("truth.source-lineage-coherent", "hard", lineage.get("cross_process_locking") is True,
@@ -110,6 +114,8 @@ def evaluate_assurance(*, lifecycle: Iterable[dict[str, Any]], operations: dict[
                                f"claims={truth_claims}, authoritative={truth_authoritative}, revoked={truth_revoked}, expired={truth_expired}"),
             AssuranceInvariant("truth.claim-dependency-coherent", "hard", dependencies.get("cross_process_locking") is True,
                                f"claims={dependencies.get('claims', 0)}, edges={dependencies.get('edges', 0)}, locking={dependencies.get('lock_backend', 'missing')}"),
+            AssuranceInvariant("truth.calibration-ledger-coherent", "hard", calibration_version >= 1 and calibration.get("cross_process_locking") is True,
+                               f"calibration=v{calibration_version}, locking={calibration.get('lock_backend', 'missing')}"),
             AssuranceInvariant("truth.claims-current", "warning", truth_expired == 0,
                                f"{truth_expired} verified claim(s) awaiting re-verification"),
             AssuranceInvariant("truth.four-surface-knowledge", "hard", int(knowledge.get("surface_count", 0) or 0) == 4,
