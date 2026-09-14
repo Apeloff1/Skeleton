@@ -8,6 +8,7 @@ from typing import Any
 from core.capability_readiness import ReadinessReport, evaluate_readiness
 from core.canonical_product_policy import CANONICAL_PRODUCT_POLICY, POLICY_VERSION
 from core.charter_policy import Charter, CharterPolicy, Edict, Rule
+from core.curiosity_engine import CuriosityEngine
 from core.execution_evidence import derive_ledger, derive_lifecycle
 from core.execution_receipts import ExecutionReceiptStore
 from core.policy_repository import PolicyRepository
@@ -30,9 +31,11 @@ class ProductControlPlane:
         if bootstrap_policy and not self.policy.snapshot().charters: self._bootstrap_canonical_policy()
         self.operations = ProductOperationCoordinator(self.root / "operations", kernel=kernel, policy=self.policy, outbox_cap=outbox_cap)
         self.receipts = ExecutionReceiptStore(self.root / "receipts")
+        self.curiosity = CuriosityEngine(self.root / "curiosity")
         if bind_native_executors:
             self.executors, self.native_executors = build_default_executor_registry(
-                self.receipts, operations_provider=self._operations_projection,
+                self.receipts, curiosity=self.curiosity,
+                operations_provider=self._operations_projection,
                 policy_provider=self._policy_projection, audit_provider=self._audit_projection,
                 safety_provider=self._safety_projection,
             )
@@ -53,6 +56,7 @@ class ProductControlPlane:
     def _operations_projection(self) -> dict[str, Any]:
         projection = dict(self.operations.snapshot())
         projection["outbox_health"] = self.operations.outbox.health()
+        projection["curiosity"] = self.curiosity.stats()
         return projection
 
     def _readiness_model(self) -> ReadinessReport:
@@ -86,6 +90,7 @@ class ProductControlPlane:
             "readiness": self.readiness_report(), "lifecycle": self.execution_ledger(),
             "audit": {"sequence": operations.get("audit_sequence"), "head": operations.get("audit_head"), "health": operations.get("audit_health")},
             "outbox": operations.get("outbox_health"), "receipts": self.receipts.stats(),
+            "curiosity": self.curiosity.stats(),
             "kernel": [{"id": c.id, "pillar": c.pillar.value, "critical": c.critical} for c in self.operations.kernel.all()],
         })
         return {"schema_version": att.schema_version, "components": [{"name": n, "sha256": d} for n, d in att.components], "root_sha256": att.root_sha256}
@@ -95,7 +100,8 @@ class ProductControlPlane:
         return {"posture": assurance["posture"], "hard_failures": assurance["hard_failures"], "warnings": assurance["warnings"],
             "native_coverage_pct": assurance["native_coverage_pct"], "readiness_pct": assurance["readiness_pct"],
             "attestation_sha256": assurance["attestation_sha256"], "readiness_attestation_sha256": readiness["attestation_sha256"],
-            "system_root_sha256": self.system_root()["root_sha256"], "invariants": assurance["invariants"]}
+            "system_root_sha256": self.system_root()["root_sha256"], "curiosity": self.curiosity.stats(),
+            "invariants": assurance["invariants"]}
 
     def ratify(self, domain: str, rules: list[Rule]) -> Charter:
         charter = self.policy.ratify(domain, rules); self.policy_repository.save(self.policy); return charter
@@ -167,6 +173,6 @@ class ProductControlPlane:
             "kernel": {"capabilities": [{"id": c.id, "pillar": c.pillar.value, "critical": c.critical} for c in self.operations.kernel.all()], "critical_ids": list(self.operations.kernel.critical_ids())},
             "governance": {"charters": [asdict(x) for x in governance.charters], "edicts": [asdict(x) for x in governance.edicts]},
             "executors": {"bound": len(self.executors), "bindings": list(self.executors.snapshot()), "coverage": self.executor_coverage()},
-            "readiness": readiness, "receipts": self.receipts.stats(),
+            "readiness": readiness, "receipts": self.receipts.stats(), "curiosity": self.curiosity.stats(),
             "lifecycle": {"operations": len(ledger), "states": counts, "evidence_gaps": counts.get("evidence_gap", 0) + counts.get("receipt_unattested", 0), "anomalies": anomalies},
             "assurance": assurance, "system_root": root, "safety": self._safety_projection(), "operations": operations}
