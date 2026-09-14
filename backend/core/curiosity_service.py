@@ -49,9 +49,11 @@ class CuriosityService:
                 continue
 
     def _start_watch(self) -> bool:
-        if not self.watch_enabled: return False
+        if not self.watch_enabled:
+            return False
         with self._watch_lock:
-            if self._watch_thread is not None and self._watch_thread.is_alive(): return False
+            if self._watch_thread is not None and self._watch_thread.is_alive():
+                return False
             self._watch_stop.clear()
             self._watch_thread = threading.Thread(target=self._watch_loop, name="truth-watch", daemon=True)
             self._watch_thread.start(); return True
@@ -59,7 +61,8 @@ class CuriosityService:
     def _stop_watch(self) -> bool:
         with self._watch_lock:
             thread = self._watch_thread
-            if thread is None: return False
+            if thread is None:
+                return False
             self._watch_stop.set(); thread.join(timeout=2.0); self._watch_thread = None; return True
 
     def start(self) -> bool:
@@ -96,10 +99,12 @@ class CuriosityService:
 
     def ingest_watch(self, *, kind: str, target: str, reason: str, provider: str,
                      provider_cursor: str = "", provenance_verified: bool = False,
-                     event_id: str | None = None) -> dict[str, Any]:
-        event = self.watch.ingest(kind=TruthEventKind(kind), target=target, reason=reason, provider=provider,
-                                  provider_cursor=provider_cursor, provenance_verified=provenance_verified,
-                                  event_id=event_id)
+                     event_id: str | None = None, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        event = self.watch.ingest(
+            kind=TruthEventKind(kind), target=target, reason=reason, provider=provider,
+            provider_cursor=provider_cursor, provenance_verified=provenance_verified,
+            event_id=event_id, payload=payload,
+        )
         return {"sequence": event.sequence, "event_id": event.event_id, "kind": event.kind.value,
                 "target": event.target, "provenance_verified": event.provenance_verified,
                 "disposition": event.disposition}
@@ -107,8 +112,24 @@ class CuriosityService:
     def apply_watch_now(self, *, limit: int = 100) -> dict[str, Any]:
         return self.watch.apply_pending(self.engine, limit=limit)
 
-    async def run_now(self) -> dict[str, Any]: return await self.engine.run_once(self.researcher, minimum_score=self.runtime.minimum_score)
-    def run_now_sync(self) -> dict[str, Any]: return self.runtime.run_cycle_now()
+    def compare_claims(self, left: str, right: str) -> dict[str, Any]:
+        return self.engine.compare_claims(left, right)
+
+    def record_forecast(self, *, claim: str, probability: float, forecaster: str,
+                        context_sha256: str = "", forecast_id: str | None = None) -> dict[str, Any]:
+        return self.engine.record_forecast(
+            claim=claim, probability=probability, forecaster=forecaster,
+            context_sha256=context_sha256, forecast_id=forecast_id,
+        )
+
+    def calibration_metrics(self, *, bins: int = 10, forecaster: str | None = None) -> dict[str, Any]:
+        return self.engine.calibration.metrics(bins=bins, forecaster=forecaster)
+
+    async def run_now(self) -> dict[str, Any]:
+        return await self.engine.run_once(self.researcher, minimum_score=self.runtime.minimum_score)
+
+    def run_now_sync(self) -> dict[str, Any]:
+        return self.runtime.run_cycle_now()
 
     def status(self) -> dict[str, Any]:
         return {"enabled": self.enabled, "runtime": self.runtime.snapshot(), "engine": self.engine.stats(),
@@ -134,5 +155,6 @@ def curiosity_service(root: str | Path | None = None) -> CuriosityService:
 def reset_curiosity_service_for_tests() -> None:
     global _SINGLETON
     with _SINGLETON_LOCK:
-        if _SINGLETON is not None: _SINGLETON.stop()
+        if _SINGLETON is not None:
+            _SINGLETON.stop()
         _SINGLETON = None
