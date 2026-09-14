@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Verify runtime/toolchain and canonical quality gates stay aligned."""
+"""Verify runtime/toolchain and canonical quality/security gates stay aligned."""
 from __future__ import annotations
+
 import json
 from pathlib import Path
 import re
@@ -8,12 +9,38 @@ import sys
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
-PROCESS_SAFETY_TEST = "test_process_safety_gate.py"
-PROCESS_DESTRUCTURING_TEST = "test_process_safety_destructuring.py"
-PROCESS_PARTIAL_TEST = "test_process_safety_partial.py"
-PROCESS_NAMESPACE_GET_TEST = "test_process_safety_namespace_get.py"
-PROCESS_GETATTRIBUTE_TEST = "test_process_safety_getattribute.py"
 FULL_DEPLOY_NEEDS = "needs: [skeleton-test, school-jeeves-test, cockpit-smoke, backend-test, backend-import-smoke, frontend]"
+
+PROCESS_TESTS = (
+    "test_process_safety_gate.py",
+    "test_process_safety_destructuring.py",
+    "test_process_safety_partial.py",
+    "test_process_safety_namespace_get.py",
+    "test_process_safety_getattribute.py",
+)
+SECURITY_SCRIPTS = (
+    "check_process_safety.py",
+    "check_deserialization_safety.py",
+    "check_sast_security.py",
+    "check_workflow_security.py",
+    "check_secret_hygiene.py",
+)
+SECURITY_TESTS = (
+    "test_exec_guard.py",
+    *PROCESS_TESTS,
+    "test_deserialization_safety_gate.py",
+    "test_sast_security_gate.py",
+    "test_workflow_security_gate.py",
+    "test_secret_hygiene_gate.py",
+)
+SECURITY_HOOKS = (
+    "backend-process-safety",
+    "backend-deserialization-safety",
+    "repository-sast-safety",
+    "workflow-security",
+    "repository-secret-hygiene",
+    "backend-security-regressions",
+)
 
 
 def read(path: str) -> str:
@@ -25,12 +52,25 @@ def require(ok: bool, message: str, failures: list[str]) -> None:
         failures.append(message)
 
 
+def require_all(text: str, needles: tuple[str, ...], message: str, failures: list[str]) -> None:
+    missing = [needle for needle in needles if needle not in text]
+    if missing:
+        failures.append(f"{message}: missing {', '.join(missing)}")
+
+
 def cancel_false(workflow: str) -> bool:
     return re.search(r"^\s*cancel-in-progress:\s*false\s*(?:#.*)?$", workflow, re.MULTILINE) is not None
 
 
+def pinned_action_count(workflow: str, action: str, generation: str) -> int:
+    """Count immutable action pins carrying the expected human-readable generation."""
+    pattern = re.compile(rf"{re.escape(action)}@[0-9a-fA-F]{{40}}\s+#\s*{re.escape(generation)}\b")
+    return len(pattern.findall(workflow))
+
+
 def main() -> int:
     failures: list[str] = []
+
     backend = tomllib.loads(read("backend/pyproject.toml"))
     project = backend.get("project", {})
     tool = backend.get("tool", {})
@@ -52,11 +92,7 @@ def main() -> int:
         "backend dev/test dependencies must include pytest-timeout",
         failures,
     )
-    require(
-        any(str(marker).startswith("timeout(") for marker in pytest_markers),
-        "pytest strict-marker contract must register timeout(seconds)",
-        failures,
-    )
+    require(any(str(marker).startswith("timeout(") for marker in pytest_markers), "pytest strict-marker contract must register timeout(seconds)", failures)
     require(
         "pytest_ignore_collect" in conftest
         and "EXPO_PUBLIC_BACKEND_URL" in conftest
@@ -65,21 +101,13 @@ def main() -> int:
         "backend hermetic collection boundary for live Expo suites drifted",
         failures,
     )
-    require(
-        not any(str(item).lower().startswith("emergentintegrations") for item in runtime_deps),
-        "retired emergentintegrations SDK must not be a project dependency",
-        failures,
-    )
+    require(not any(str(item).lower().startswith("emergentintegrations") for item in runtime_deps), "retired emergentintegrations SDK must not be a project dependency", failures)
     require(
         re.search(r"^\s*emergentintegrations(?:[<>=!~].*)?$", requirements, re.MULTILINE | re.IGNORECASE) is None,
         "retired emergentintegrations SDK must not be installed from requirements.txt",
         failures,
     )
-    require(
-        (ROOT / "backend/emergentintegrations/llm/chat.py").is_file(),
-        "local emergentintegrations compatibility boundary missing",
-        failures,
-    )
+    require((ROOT / "backend/emergentintegrations/llm/chat.py").is_file(), "local emergentintegrations compatibility boundary missing", failures)
 
     frontend = json.loads(read("frontend/package.json"))
     require(frontend.get("engines", {}).get("node") == ">=24", "frontend must require Node >=24", failures)
@@ -93,13 +121,19 @@ def main() -> int:
     require(re.search(r'^\s*NODE_VERSION:\s*"24"\s*$', ci, re.MULTILINE) is not None, "CI Node must be 24", failures)
     require(ci.count('python-version: "3.11"') >= 6, "CI Python jobs must provision Python 3.11", failures)
     require('node-version: "24"' in ci, "CI frontend must provision Node 24", failures)
-    require(all(item in ci for item in ("yarn lint:ci", "yarn typecheck", "yarn export:web")), "CI frontend scripts drifted", failures)
+    require_all(ci, ("yarn lint:ci", "yarn typecheck", "yarn export:web"), "CI frontend scripts drifted", failures)
     require("python ../scripts/check_toolchain_contract.py" in ci, "CI backend lint must execute the repository toolchain contract", failures)
     require(cancel_false(ci), "CI must keep active validation alive", failures)
-    require("actions/checkout@v4" in ci and "actions/setup-python@v5" in ci and "actions/setup-node@v4" in ci, "CI must use proven core action generations", failures)
-    require("astral-sh/setup-uv@v4" in ci, "CI uv setup drifted", failures)
-    require("docker/setup-buildx-action@v3" in ci, "Buildx version drifted", failures)
-    require(ci.count("docker/build-push-action@v5") == 3, "build-push version/count drifted", failures)
+    require(
+        pinned_action_count(ci, "actions/checkout", "v4") > 0
+        and pinned_action_count(ci, "actions/setup-python", "v5") > 0
+        and pinned_action_count(ci, "actions/setup-node", "v4") > 0,
+        "CI must use immutable proven core action generations",
+        failures,
+    )
+    require(pinned_action_count(ci, "astral-sh/setup-uv", "v4") > 0, "CI uv setup drifted", failures)
+    require(pinned_action_count(ci, "docker/setup-buildx-action", "v3") == 1, "Buildx version/count drifted", failures)
+    require(pinned_action_count(ci, "docker/build-push-action", "v5") == 3, "build-push version/count drifted", failures)
     require(ci.count('"pydantic>=2.5,<3"') >= 3, "Skeleton/Jeeves/Cockpit CI jobs must install pydantic runtime slice", failures)
     require(ci.count('"pydantic-settings>=2.1,<3"') >= 3, "Skeleton/Jeeves/Cockpit CI jobs must install pydantic-settings runtime slice", failures)
     for required_job in ("skeleton-test", "school-jeeves-test", "cockpit-smoke", "backend-test", "backend-import-smoke", "frontend"):
@@ -108,18 +142,9 @@ def main() -> int:
 
     backend_quality = read(".github/workflows/backend-quality.yml")
     require('python-version: "3.11"' in backend_quality and '"ruff==0.9.*"' in backend_quality, "Backend Quality toolchain drifted", failures)
-    require(
-        PROCESS_SAFETY_TEST in backend_quality
-        and PROCESS_DESTRUCTURING_TEST in backend_quality
-        and PROCESS_PARTIAL_TEST in backend_quality
-        and PROCESS_NAMESPACE_GET_TEST in backend_quality
-        and PROCESS_GETATTRIBUTE_TEST in backend_quality
-        and "test_exec_guard.py" in backend_quality
-        and "--noconftest" in backend_quality
-        and 'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in backend_quality,
-        "Backend Quality security isolation or regression coverage drifted",
-        failures,
-    )
+    require_all(backend_quality, SECURITY_SCRIPTS, "Backend Quality scanner coverage drifted", failures)
+    require_all(backend_quality, SECURITY_TESTS, "Backend Quality security regression coverage drifted", failures)
+    require("--noconftest" in backend_quality and 'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in backend_quality, "Backend Quality security isolation drifted", failures)
     require(cancel_false(backend_quality), "Backend Quality concurrency drifted", failures)
 
     lint = read(".github/workflows/lint.yml")
@@ -127,45 +152,33 @@ def main() -> int:
     require(cancel_false(lint), "Lint concurrency drifted", failures)
 
     quality = read("scripts/quality-gates.sh")
-    require(
-        PROCESS_SAFETY_TEST in quality
-        and PROCESS_DESTRUCTURING_TEST in quality
-        and PROCESS_PARTIAL_TEST in quality
-        and PROCESS_NAMESPACE_GET_TEST in quality
-        and PROCESS_GETATTRIBUTE_TEST in quality
-        and "test_exec_guard.py" in quality
-        and "--noconftest" in quality,
-        "local security gates drifted",
-        failures,
-    )
+    require_all(quality, SECURITY_SCRIPTS, "local scanner coverage drifted", failures)
+    require_all(quality, SECURITY_TESTS, "local security regression coverage drifted", failures)
+    require("--noconftest" in quality and "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1" in quality, "local security isolation drifted", failures)
+
     precommit = read(".pre-commit-config.yaml")
-    require(
-        PROCESS_SAFETY_TEST in precommit
-        and PROCESS_DESTRUCTURING_TEST in precommit
-        and PROCESS_PARTIAL_TEST in precommit
-        and PROCESS_NAMESPACE_GET_TEST in precommit
-        and PROCESS_GETATTRIBUTE_TEST in precommit
-        and "test_exec_guard.py" in precommit
-        and "repo-toolchain-contract" in precommit,
-        "pre-commit security/toolchain gates drifted",
-        failures,
-    )
+    require_all(precommit, SECURITY_SCRIPTS, "pre-commit scanner coverage drifted", failures)
+    require_all(precommit, SECURITY_TESTS, "pre-commit security regression coverage drifted", failures)
+    require_all(precommit, SECURITY_HOOKS, "pre-commit security hook coverage drifted", failures)
+    require("repo-toolchain-contract" in precommit, "pre-commit toolchain self-enforcement missing", failures)
+    require("PYTEST_DISABLE_PLUGIN_AUTOLOAD=1" in precommit and "--noconftest" in precommit, "pre-commit security isolation drifted", failures)
     require("tests/test_process_safety.py" not in precommit, "superseded process test referenced", failures)
-    for test_name, message in (
-        (PROCESS_SAFETY_TEST, "canonical process test missing"),
-        (PROCESS_DESTRUCTURING_TEST, "destructuring process-safety regression test missing"),
-        (PROCESS_PARTIAL_TEST, "partial process-safety regression test missing"),
-        (PROCESS_NAMESPACE_GET_TEST, "namespace-get process-safety regression test missing"),
-        (PROCESS_GETATTRIBUTE_TEST, "getattribute process-safety regression test missing"),
-    ):
-        require((ROOT / "backend/tests" / test_name).is_file(), message, failures)
+
+    for script_name in SECURITY_SCRIPTS:
+        require((ROOT / "backend/scripts" / script_name).is_file(), f"security scanner missing: {script_name}", failures)
+    for test_name in SECURITY_TESTS:
+        require((ROOT / "backend/tests" / test_name).is_file(), f"security regression test missing: {test_name}", failures)
 
     if failures:
         print("Toolchain contract violations:", file=sys.stderr)
         for failure in failures:
             print(f"  - {failure}", file=sys.stderr)
         return 1
-    print("Toolchain contract passed: proven CI actions, runtime, hermetic/live test isolation, timeout support, local SDK boundaries, quality, security, destructuring/partial/namespace/getattribute coverage, self-enforcement, and fail-closed deployment gates aligned.")
+
+    print(
+        "Toolchain contract passed: immutable CI actions, runtime/tooling, hermetic test boundaries, "
+        "full local/CI/pre-commit security parity, regression isolation, self-enforcement, and fail-closed deployment gates aligned."
+    )
     return 0
 
 

@@ -1,19 +1,20 @@
 name: Backend Quality
 
-# Fast, fail-closed backend gate: lint, syntax compilation, critical
-# security-boundary regression tests, and process invocation policy.
-# Keep this independent from the heavier dependency-backed integration suite.
+# Fast, fail-closed backend/security gate: lint, syntax compilation,
+# security-policy scanners, and focused regression tests.
 
 on:
   push:
     branches: [main, master]
     paths:
       - "backend/**"
-      - ".github/workflows/backend-quality.yml"
+      - "frontend/**"
+      - ".github/workflows/**"
   pull_request:
     paths:
       - "backend/**"
-      - ".github/workflows/backend-quality.yml"
+      - "frontend/**"
+      - ".github/workflows/**"
 
 permissions:
   contents: read
@@ -25,16 +26,16 @@ concurrency:
 jobs:
   ruff:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.11"
 
@@ -52,7 +53,22 @@ jobs:
       - name: Process invocation safety gate
         run: python scripts/check_process_safety.py
 
-      - name: Security boundary regression tests
+      - name: Unsafe deserialization safety gate
+        run: python scripts/check_deserialization_safety.py
+
+      - name: High-confidence Python and JavaScript SAST gate
+        run: python scripts/check_sast_security.py
+
+      - name: JavaScript child_process alias safety gate
+        run: python scripts/check_js_process_alias_safety.py
+
+      - name: GitHub Actions workflow security gate
+        run: python scripts/check_workflow_security.py
+
+      - name: Repository secret hygiene gate
+        run: python scripts/check_secret_hygiene.py
+
+      - name: Security scanner regression tests
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: >-
@@ -63,3 +79,8 @@ jobs:
           tests/test_process_safety_partial.py
           tests/test_process_safety_namespace_get.py
           tests/test_process_safety_getattribute.py
+          tests/test_deserialization_safety_gate.py
+          tests/test_sast_security_gate.py
+          tests/test_js_process_alias_safety.py
+          tests/test_workflow_security_gate.py
+          tests/test_secret_hygiene_gate.py
