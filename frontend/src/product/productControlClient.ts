@@ -1,127 +1,65 @@
 import api, { ApiResult } from '../utils/apiClient';
 
+export type ExecutorBinding = {
+  capability_id: string;
+  action: string;
+  name: string;
+  version: number;
+  effect_class: 'query' | 'state' | 'external';
+  replay_safe: boolean;
+};
+
 export type ControlPlaneStatus = {
   policy_version: number;
   policy_bootstrap_enabled: boolean;
-  kernel: {
-    capabilities: Array<{ id: string; pillar: string; critical: boolean }>;
-    critical_ids: string[];
+  kernel: { capabilities: Array<{ id: string; pillar: string; critical: boolean }>; critical_ids: string[] };
+  governance: { charters: Array<{ id: string; domain: string; amendments: number; rules: Array<{ id: string; action: string; min_weight: number; requires_quorum: boolean }> }>; edicts: unknown[] };
+  executors: {
+    bound: number;
+    bindings: ExecutorBinding[];
+    coverage: { canonical_actions: number; bound_actions: number; coverage_pct: number; missing: Array<{ capability_id: string; action: string }> };
   };
-  governance: {
-    charters: Array<{
-      id: string;
-      domain: string;
-      amendments: number;
-      rules: Array<{ id: string; action: string; min_weight: number; requires_quorum: boolean }>;
-    }>;
-    edicts: unknown[];
-  };
-  operations: {
-    capabilities: number;
-    pending_operations: number;
-    outbox_capacity_remaining: number;
-    idempotency_records: number;
-    audit_sequence: number;
-    audit_head: string | null;
-  };
+  receipts: { count: number };
+  operations: { capabilities: number; pending_operations: number; outbox_capacity_remaining: number; idempotency_records: number; audit_sequence: number; audit_head: string | null };
 };
 
 export type PendingOperation = {
-  operation_id: string;
-  capability_id: string;
-  pillar: string;
-  domain: string;
-  action: string;
-  principal: string;
-  outbox_seq: number;
-  admitted_at: string;
-  idempotency_key: string | null;
+  operation_id: string; capability_id: string; pillar: string; domain: string; action: string; principal: string;
+  outbox_seq: number; admitted_at: string; idempotency_key: string | null; executor_bound: boolean;
 };
-
-export type PendingOperationResponse = {
-  count: number;
-  operations: PendingOperation[];
-};
-
-export type AuditEntry = {
-  seq: number;
-  ts: string;
-  kind: string;
-  seal: string;
-  principal: string;
-  route: string;
-  detail: string;
-  prev_hash: string;
-  hash: string;
-};
-
-export type OperationAdmission = {
-  operation_id: string;
-  capability_id: string;
-  pillar: string;
-  outbox_seq: number;
-  admitted_at: string;
-  audit_hash: string;
-};
-
-export type AdmitOperationInput = {
-  capability_id: string;
-  domain: string;
-  action: string;
-  principal: string;
-  actor_weight: number;
-  payload: Record<string, unknown>;
-  quorum_approved?: boolean;
-  idempotency_key?: string;
-};
+export type PendingOperationResponse = { count: number; operations: PendingOperation[] };
+export type AuditEntry = { seq: number; ts: string; kind: string; seal: string; principal: string; route: string; detail: string; prev_hash: string; hash: string };
+export type ExecutionReceipt = { operation_id: string; capability_id: string; action: string; executor: string; completed_at: string; result: Record<string, unknown> };
+export type OperationAdmission = { operation_id: string; capability_id: string; pillar: string; outbox_seq: number; admitted_at: string; audit_hash: string };
+export type AdmitOperationInput = { capability_id: string; domain: string; action: string; principal: string; actor_weight: number; payload: Record<string, unknown>; quorum_approved?: boolean; idempotency_key?: string };
 
 const ROOT = '/api/admin/ops/product-control';
-
-function tokenQuery(token: string): string {
-  return token ? `?token=${encodeURIComponent(token)}` : '';
-}
-
+function tokenQuery(token: string): string { return token ? `?token=${encodeURIComponent(token)}` : ''; }
 function tokenQueryWith(token: string, params: Record<string, string | number>): string {
-  const query = new URLSearchParams();
-  if (token) query.set('token', token);
+  const query = new URLSearchParams(); if (token) query.set('token', token);
   Object.entries(params).forEach(([key, value]) => query.set(key, String(value)));
-  const encoded = query.toString();
-  return encoded ? `?${encoded}` : '';
+  const encoded = query.toString(); return encoded ? `?${encoded}` : '';
 }
 
 export function getProductControlStatus(token = '', signal?: AbortSignal): Promise<ApiResult<ControlPlaneStatus>> {
-  return api.get<ControlPlaneStatus>(`${ROOT}/status${tokenQuery(token)}`, {
-    signal,
-    cacheKey: 'product-control-status',
-    cacheTtlMs: 5_000,
-  });
+  return api.get<ControlPlaneStatus>(`${ROOT}/status${tokenQuery(token)}`, { signal, cacheKey: 'product-control-status', cacheTtlMs: 5_000 });
 }
-
 export function getPendingProductOperations(token = '', signal?: AbortSignal): Promise<ApiResult<PendingOperationResponse>> {
-  return api.get<PendingOperationResponse>(`${ROOT}/pending${tokenQuery(token)}`, {
-    signal,
-    cacheKey: 'product-control-pending',
-    cacheTtlMs: 2_000,
-  });
+  return api.get<PendingOperationResponse>(`${ROOT}/pending${tokenQuery(token)}`, { signal, cacheKey: 'product-control-pending', cacheTtlMs: 2_000 });
 }
-
 export function getProductAuditHistory(token = '', limit = 50, signal?: AbortSignal): Promise<ApiResult<{ entries: AuditEntry[] }>> {
-  return api.get<{ entries: AuditEntry[] }>(`${ROOT}/audit${tokenQueryWith(token, { limit })}`, {
-    signal,
-    cacheKey: `product-control-audit-${limit}`,
-    cacheTtlMs: 2_000,
-  });
+  return api.get<{ entries: AuditEntry[] }>(`${ROOT}/audit${tokenQueryWith(token, { limit })}`, { signal, cacheKey: `product-control-audit-${limit}`, cacheTtlMs: 2_000 });
 }
-
-export function admitProductOperation(
-  input: AdmitOperationInput,
-  token = '',
-  signal?: AbortSignal,
-): Promise<ApiResult<OperationAdmission>> {
+export function getExecutionReceipts(token = '', limit = 50, signal?: AbortSignal): Promise<ApiResult<{ receipts: ExecutionReceipt[] }>> {
+  return api.get<{ receipts: ExecutionReceipt[] }>(`${ROOT}/receipts${tokenQueryWith(token, { limit })}`, { signal, cacheKey: `product-control-receipts-${limit}`, cacheTtlMs: 2_000 });
+}
+export function executeProductOperation(seq: number, token = '', signal?: AbortSignal): Promise<ApiResult<{ outbox_seq: number; confirmed: boolean; status: string }>> {
+  return api.post(`${ROOT}/execute/${seq}${tokenQuery(token)}`, {}, { signal, retries: 0 });
+}
+export function executePendingProductOperations(token = '', limit = 32, signal?: AbortSignal): Promise<ApiResult<{ confirmed: number; remaining: number }>> {
+  return api.post(`${ROOT}/execute-pending${tokenQueryWith(token, { limit })}`, {}, { signal, retries: 0 });
+}
+export function admitProductOperation(input: AdmitOperationInput, token = '', signal?: AbortSignal): Promise<ApiResult<OperationAdmission>> {
   const idempotencyKey = input.idempotency_key || `${input.capability_id}:${input.action}:${Date.now()}`;
-  return api.post<OperationAdmission>(
-    `${ROOT}/admit${tokenQuery(token)}`,
-    { ...input, idempotency_key: idempotencyKey },
-    { signal, idempotencyKey, retries: 2 },
-  );
+  return api.post<OperationAdmission>(`${ROOT}/admit${tokenQuery(token)}`, { ...input, idempotency_key: idempotencyKey }, { signal, idempotencyKey, retries: 2 });
 }
