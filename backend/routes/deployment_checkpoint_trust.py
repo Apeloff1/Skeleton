@@ -22,6 +22,12 @@ from core.deployment_checkpoint_pin_ledger import (
 )
 from core.deployment_checkpoint_pin_wire import decode_deployment_checkpoint_pin_receipt
 from core.deployment_checkpoint_trust_policy import build_deployment_checkpoint_trust_policy_manifest
+from core.deployment_checkpoint_verification_package import (
+    PROOF_PIN,
+    PROOF_TRUST_ADVANCE,
+    PROOF_WITNESSED_CONTINUITY,
+    build_deployment_checkpoint_verification_package,
+)
 from routes.ops import _control_plane, _require_ops
 
 router = APIRouter(
@@ -173,6 +179,62 @@ async def checkpoint_witness_continuity(
             )
         )
         return asdict(packet)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="deployment checkpoint publication not found") from exc
+    except DeploymentCheckpointPinRejected as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except (DeploymentCheckpointPinLedgerError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/verification-package")
+async def checkpoint_witness_verification_package(
+    proof_kind: str = Query(default=PROOF_WITNESSED_CONTINUITY),
+    publication_sequence: int | None = Query(default=None, ge=1),
+    previous_publication_sequence: int | None = Query(default=None, ge=1),
+    token: str = Query(""),
+):
+    """Export one digest-bound policy+proof package for offline verification.
+
+    The included manifest remains non-authoritative until its digest is pinned through
+    an independent channel. This endpoint never returns private witness key material.
+    """
+    _require_ops(token)
+    if proof_kind not in {PROOF_PIN, PROOF_TRUST_ADVANCE, PROOF_WITNESSED_CONTINUITY}:
+        raise HTTPException(status_code=400, detail="unsupported checkpoint verification proof kind")
+    if proof_kind == PROOF_WITNESSED_CONTINUITY and publication_sequence is not None:
+        raise HTTPException(status_code=400, detail="publication_sequence is not valid for continuity proof")
+    if proof_kind != PROOF_WITNESSED_CONTINUITY and previous_publication_sequence is not None:
+        raise HTTPException(status_code=400, detail="previous_publication_sequence is only valid for continuity proof")
+    try:
+        runtime = _runtime()
+        manifest = build_deployment_checkpoint_trust_policy_manifest(runtime.policy)
+        if proof_kind == PROOF_PIN:
+            proof = runtime.portable_bundle(publication_sequence=publication_sequence)
+        elif proof_kind == PROOF_TRUST_ADVANCE:
+            proof = (
+                runtime.advance_latest_witnessed()
+                if publication_sequence is None
+                else runtime.trust_advance(publication_sequence=publication_sequence)
+            )
+        else:
+            proof = (
+                runtime.latest_witnessed_continuity()
+                if previous_publication_sequence is None
+                else runtime.witnessed_continuity(
+                    previous_publication_sequence=previous_publication_sequence,
+                )
+            )
+        package = build_deployment_checkpoint_verification_package(
+            policy_manifest=manifest,
+            proof_kind=proof_kind,
+            proof=proof,
+        )
+        return {
+            "package": asdict(package),
+            "pin_this_policy_sha256": manifest.manifest_sha256,
+            "authority": "out-of-band-policy-digest-required",
+        }
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="deployment checkpoint publication not found") from exc
     except DeploymentCheckpointPinRejected as exc:
