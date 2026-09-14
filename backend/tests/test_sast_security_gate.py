@@ -37,6 +37,38 @@ def test_rejects_requests_verify_false(tmp_path: Path) -> None:
     assert any("verify=False" in finding for finding in findings)
 
 
+def test_rejects_constructed_requests_session_request_verify_false(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\nrequests.Session().request('GET', url, verify=False)\n",
+    )
+    assert any("requests.Session.request" in finding and "verify=False" in finding for finding in findings)
+
+
+def test_rejects_constructed_requests_session_method_verify_false(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\nrequests.Session().get(url, verify=False)\n",
+    )
+    assert any("requests.Session.get" in finding and "verify=False" in finding for finding in findings)
+
+
+def test_rejects_imported_requests_session_verify_false(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "from requests import Session\nSession().post(url, verify=False)\n",
+    )
+    assert any("requests.Session.post" in finding and "verify=False" in finding for finding in findings)
+
+
+def test_allows_constructed_requests_session_with_verification(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\nrequests.Session().get(url, timeout=10)\n",
+    )
+    assert findings == []
+
+
 def test_rejects_aliased_httpx_verify_false(tmp_path: Path) -> None:
     findings = _scan(tmp_path, "import httpx as hx\nhx.post(url, verify=False)\n")
     assert any("verify=False" in finding for finding in findings)
