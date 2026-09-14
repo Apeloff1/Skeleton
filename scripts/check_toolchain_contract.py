@@ -29,6 +29,14 @@ def cancel_false(workflow: str) -> bool:
     return re.search(r"^\s*cancel-in-progress:\s*false\s*(?:#.*)?$", workflow, re.MULTILINE) is not None
 
 
+def pinned_action_count(workflow: str, action: str, generation: str) -> int:
+    """Count immutable action pins carrying the expected human-readable generation."""
+    pattern = re.compile(
+        rf"{re.escape(action)}@[0-9a-fA-F]{{40}}\s+#\s*{re.escape(generation)}\b"
+    )
+    return len(pattern.findall(workflow))
+
+
 def main() -> int:
     failures: list[str] = []
     backend = tomllib.loads(read("backend/pyproject.toml"))
@@ -96,10 +104,28 @@ def main() -> int:
     require(all(item in ci for item in ("yarn lint:ci", "yarn typecheck", "yarn export:web")), "CI frontend scripts drifted", failures)
     require("python ../scripts/check_toolchain_contract.py" in ci, "CI backend lint must execute the repository toolchain contract", failures)
     require(cancel_false(ci), "CI must keep active validation alive", failures)
-    require("actions/checkout@v4" in ci and "actions/setup-python@v5" in ci and "actions/setup-node@v4" in ci, "CI must use proven core action generations", failures)
-    require("astral-sh/setup-uv@v4" in ci, "CI uv setup drifted", failures)
-    require("docker/setup-buildx-action@v3" in ci, "Buildx version drifted", failures)
-    require(ci.count("docker/build-push-action@v5") == 3, "build-push version/count drifted", failures)
+    require(
+        pinned_action_count(ci, "actions/checkout", "v4") > 0
+        and pinned_action_count(ci, "actions/setup-python", "v5") > 0
+        and pinned_action_count(ci, "actions/setup-node", "v4") > 0,
+        "CI must use immutable proven core action generations",
+        failures,
+    )
+    require(
+        pinned_action_count(ci, "astral-sh/setup-uv", "v4") > 0,
+        "CI uv setup drifted",
+        failures,
+    )
+    require(
+        pinned_action_count(ci, "docker/setup-buildx-action", "v3") == 1,
+        "Buildx version/count drifted",
+        failures,
+    )
+    require(
+        pinned_action_count(ci, "docker/build-push-action", "v5") == 3,
+        "build-push version/count drifted",
+        failures,
+    )
     require(ci.count('"pydantic>=2.5,<3"') >= 3, "Skeleton/Jeeves/Cockpit CI jobs must install pydantic runtime slice", failures)
     require(ci.count('"pydantic-settings>=2.1,<3"') >= 3, "Skeleton/Jeeves/Cockpit CI jobs must install pydantic-settings runtime slice", failures)
     for required_job in ("skeleton-test", "school-jeeves-test", "cockpit-smoke", "backend-test", "backend-import-smoke", "frontend"):
@@ -165,7 +191,7 @@ def main() -> int:
         for failure in failures:
             print(f"  - {failure}", file=sys.stderr)
         return 1
-    print("Toolchain contract passed: proven CI actions, runtime, hermetic/live test isolation, timeout support, local SDK boundaries, quality, security, destructuring/partial/namespace/getattribute coverage, self-enforcement, and fail-closed deployment gates aligned.")
+    print("Toolchain contract passed: immutable proven CI actions, runtime, hermetic/live test isolation, timeout support, local SDK boundaries, quality, security, destructuring/partial/namespace/getattribute coverage, self-enforcement, and fail-closed deployment gates aligned.")
     return 0
 
 
