@@ -78,11 +78,23 @@ jobs:
       - name: Generate deterministic CycloneDX SBOM
         run: python scripts/generate_sbom.py --output ../artifacts/sbom.cdx.json
 
-      - name: Upload security SBOM
+      - name: Generate build provenance
+        run: >-
+          python scripts/generate_build_provenance.py
+          --sbom ../artifacts/sbom.cdx.json
+          --output ../artifacts/build-provenance.json
+
+      - name: Generate evidence checksums
+        run: cd ../artifacts && sha256sum sbom.cdx.json build-provenance.json > SHA256SUMS
+
+      - name: Upload security build evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: security-sbom
-          path: artifacts/sbom.cdx.json
+          name: security-build-evidence
+          path: |
+            artifacts/sbom.cdx.json
+            artifacts/build-provenance.json
+            artifacts/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
 
@@ -103,6 +115,7 @@ jobs:
           tests/test_secret_hygiene_gate.py
           tests/test_dependency_policy.py
           tests/test_sbom_generator.py
+          tests/test_build_provenance.py
           tests/test_security_config.py
           tests/test_security_middleware_config.py
           tests/test_security_parser_fuzz.py
