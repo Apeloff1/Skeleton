@@ -19,24 +19,13 @@ def coordinator(tmp_path, *, quorum=False, outbox_cap=4096):
         "builds",
         [Rule("build-submit", "build.submit", min_weight=2, requires_quorum=quorum)],
     )
-    return ProductOperationCoordinator(
-        tmp_path,
-        kernel=PRODUCT_KERNEL,
-        policy=policy,
-        outbox_cap=outbox_cap,
-    )
+    return ProductOperationCoordinator(tmp_path, kernel=PRODUCT_KERNEL, policy=policy, outbox_cap=outbox_cap)
 
 
 def test_admission_stages_payload_journals_intent_and_audits(tmp_path):
     ops = coordinator(tmp_path)
-    admitted = ops.admit(
-        capability_id="studio",
-        domain="builds",
-        action="build.submit",
-        principal="creator-1",
-        actor_weight=2,
-        payload={"title": "A", "spec": {"genre": "rpg"}},
-    )
+    admitted = ops.admit(capability_id="studio", domain="builds", action="build.submit", principal="creator-1",
+                         actor_weight=2, payload={"title": "A", "spec": {"genre": "rpg"}})
     assert admitted.capability_id == "studio"
     assert admitted.pillar == "create"
     assert admitted.outbox_seq == 1
@@ -52,14 +41,8 @@ def test_admission_stages_payload_journals_intent_and_audits(tmp_path):
 def test_unknown_capability_rejected_before_side_effects(tmp_path):
     ops = coordinator(tmp_path)
     with pytest.raises(OperationRejected, match="unknown product capability"):
-        ops.admit(
-            capability_id="legacy-random-router",
-            domain="builds",
-            action="build.submit",
-            principal="x",
-            actor_weight=99,
-            payload={"x": 1},
-        )
+        ops.admit(capability_id="legacy-random-router", domain="builds", action="build.submit", principal="x",
+                  actor_weight=99, payload={"x": 1})
     assert ops.snapshot()["pending_operations"] == 0
     assert ops.snapshot()["audit_sequence"] == 0
 
@@ -67,14 +50,8 @@ def test_unknown_capability_rejected_before_side_effects(tmp_path):
 def test_policy_denial_is_worm_audited_but_not_journaled(tmp_path):
     ops = coordinator(tmp_path)
     with pytest.raises(OperationRejected, match="below required"):
-        ops.admit(
-            capability_id="studio",
-            domain="builds",
-            action="build.submit",
-            principal="creator-low-rank",
-            actor_weight=1,
-            payload={"title": "denied"},
-        )
+        ops.admit(capability_id="studio", domain="builds", action="build.submit", principal="creator-low-rank",
+                  actor_weight=1, payload={"title": "denied"})
     assert ops.outbox.pending_count == 0
     assert ops.store.stats()["manifests"] == 0
     assert ops.audit.latest.kind == "operation_rejected"
@@ -83,27 +60,15 @@ def test_policy_denial_is_worm_audited_but_not_journaled(tmp_path):
 def test_unchartered_action_fails_closed(tmp_path):
     ops = coordinator(tmp_path)
     with pytest.raises(OperationRejected, match="not chartered"):
-        ops.admit(
-            capability_id="studio",
-            domain="builds",
-            action="build.delete_everything",
-            principal="creator",
-            actor_weight=100,
-            payload={},
-        )
+        ops.admit(capability_id="studio", domain="builds", action="build.delete_everything", principal="creator",
+                  actor_weight=100, payload={})
     assert ops.outbox.pending_count == 0
 
 
 def test_quorum_rule_requires_explicit_approval(tmp_path):
     ops = coordinator(tmp_path, quorum=True)
-    kwargs = dict(
-        capability_id="studio",
-        domain="builds",
-        action="build.submit",
-        principal="creator",
-        actor_weight=2,
-        payload={"title": "governed"},
-    )
+    kwargs = dict(capability_id="studio", domain="builds", action="build.submit", principal="creator",
+                  actor_weight=2, payload={"title": "governed"})
     with pytest.raises(OperationRejected, match="quorum approval required"):
         ops.admit(**kwargs)
     admitted = ops.admit(**kwargs, quorum_approved=True)
@@ -113,18 +78,9 @@ def test_quorum_rule_requires_explicit_approval(tmp_path):
 
 def test_restart_restores_pending_intent_and_audit_chain(tmp_path):
     ops = coordinator(tmp_path)
-    admitted = ops.admit(
-        capability_id="studio",
-        domain="builds",
-        action="build.submit",
-        principal="creator",
-        actor_weight=2,
-        payload={"title": "restart-safe"},
-    )
-
-    policy = CharterPolicy()
-    policy.ratify("builds", [Rule("build-submit", "build.submit", min_weight=2)])
-    restored = ProductOperationCoordinator(tmp_path, kernel=PRODUCT_KERNEL, policy=policy)
+    admitted = ops.admit(capability_id="studio", domain="builds", action="build.submit", principal="creator",
+                         actor_weight=2, payload={"title": "restart-safe"})
+    restored = coordinator(tmp_path)
     assert restored.outbox.pending_count == 1
     assert restored.audit.sequence == 1
     assert restored.load_payload(admitted)["title"] == "restart-safe"
@@ -132,71 +88,66 @@ def test_restart_restores_pending_intent_and_audit_chain(tmp_path):
 
 def test_outbox_capacity_preflight_prevents_orphan_artifact(tmp_path):
     ops = coordinator(tmp_path, outbox_cap=1)
-    ops.admit(
-        capability_id="studio",
-        domain="builds",
-        action="build.submit",
-        principal="creator",
-        actor_weight=2,
-        payload={"title": "first"},
-    )
+    ops.admit(capability_id="studio", domain="builds", action="build.submit", principal="creator",
+              actor_weight=2, payload={"title": "first"})
     before = ops.store.stats()
     with pytest.raises(OutboxFullError, match="was not staged"):
-        ops.admit(
-            capability_id="studio",
-            domain="builds",
-            action="build.submit",
-            principal="creator",
-            actor_weight=2,
-            payload={"title": "second"},
-        )
+        ops.admit(capability_id="studio", domain="builds", action="build.submit", principal="creator",
+                  actor_weight=2, payload={"title": "second"})
     assert ops.store.stats() == before
     assert ops.outbox.pending_count == 1
 
 
 def test_idempotency_key_returns_original_operation_without_duplicate_work(tmp_path):
     ops = coordinator(tmp_path)
-    kwargs = dict(
-        capability_id="studio",
-        domain="builds",
-        action="build.submit",
-        principal="creator",
-        actor_weight=2,
-        payload={"title": "retry-safe"},
-        idempotency_key="client-request-42",
-    )
+    kwargs = dict(capability_id="studio", domain="builds", action="build.submit", principal="creator",
+                  actor_weight=2, payload={"title": "retry-safe"}, idempotency_key="client-request-42")
     first = ops.admit(**kwargs)
     second = ops.admit(**kwargs)
     assert second == first
     assert ops.outbox.pending_count == 1
     assert ops.store.stats()["manifests"] == 1
     assert ops.snapshot()["idempotency_records"] == 1
-
     restored = coordinator(tmp_path)
     third = restored.admit(**kwargs)
     assert third == first
     assert restored.outbox.pending_count == 1
 
 
+def test_idempotency_index_checksum_tampering_fails_closed(tmp_path):
+    ops = coordinator(tmp_path)
+    ops.admit(capability_id="studio", domain="builds", action="build.submit", principal="creator",
+              actor_weight=2, payload={"title": "safe"}, idempotency_key="safe-key")
+    path = tmp_path / "operation-index.json"
+    envelope = json.loads(path.read_text())
+    envelope["records"]["safe-key"]["principal"] = "attacker"
+    path.write_text(json.dumps(envelope), encoding="utf-8")
+    with pytest.raises(OperationRejected, match="checksum mismatch"):
+        coordinator(tmp_path)
+
+
+def test_idempotency_index_version_mismatch_fails_closed(tmp_path):
+    ops = coordinator(tmp_path)
+    ops.admit(capability_id="studio", domain="builds", action="build.submit", principal="creator",
+              actor_weight=2, payload={"title": "safe"}, idempotency_key="safe-key")
+    path = tmp_path / "operation-index.json"
+    envelope = json.loads(path.read_text())
+    envelope["version"] = 999
+    path.write_text(json.dumps(envelope), encoding="utf-8")
+    with pytest.raises(OperationRejected, match="unsupported"):
+        coordinator(tmp_path)
+
+
 def test_executor_success_confirms_only_after_side_effect(tmp_path):
     ops = coordinator(tmp_path)
-    admitted = ops.admit(
-        capability_id="studio",
-        domain="builds",
-        action="build.submit",
-        principal="creator",
-        actor_weight=2,
-        payload={"title": "execute-me"},
-    )
+    admitted = ops.admit(capability_id="studio", domain="builds", action="build.submit", principal="creator",
+                         actor_weight=2, payload={"title": "execute-me"})
     seen = []
-
     async def executor(operation, payload):
         seen.append((operation.id, payload["title"], ops.outbox.pending_count))
         return True
-
     result = asyncio.run(ops.execute_one(admitted.outbox_seq, executor))
-    assert result.executed is True
-    assert result.confirmed is True
+    assert result.executed is True and result.confirmed is True
     assert seen == [(admitted.id, "execute-me", 1)]
     assert ops.outbox.pending_count == 0
     assert ops.audit.latest.kind == "operation_executed"
@@ -204,37 +155,20 @@ def test_executor_success_confirms_only_after_side_effect(tmp_path):
 
 def test_executor_false_defers_and_keeps_pending(tmp_path):
     ops = coordinator(tmp_path)
-    admitted = ops.admit(
-        capability_id="studio",
-        domain="builds",
-        action="build.submit",
-        principal="creator",
-        actor_weight=2,
-        payload={"title": "later"},
-    )
-    result = asyncio.run(
-        ops.execute_one(admitted.outbox_seq, lambda operation, payload: False)
-    )
-    assert result.executed is False
-    assert result.confirmed is False
+    admitted = ops.admit(capability_id="studio", domain="builds", action="build.submit", principal="creator",
+                         actor_weight=2, payload={"title": "later"})
+    result = asyncio.run(ops.execute_one(admitted.outbox_seq, lambda operation, payload: False))
+    assert result.executed is False and result.confirmed is False
     assert ops.outbox.pending_count == 1
     assert ops.audit.latest.kind == "operation_execution_deferred"
 
 
 def test_executor_exception_is_audited_and_pending_work_survives(tmp_path):
     ops = coordinator(tmp_path)
-    admitted = ops.admit(
-        capability_id="studio",
-        domain="builds",
-        action="build.submit",
-        principal="creator",
-        actor_weight=2,
-        payload={"title": "explode"},
-    )
-
+    admitted = ops.admit(capability_id="studio", domain="builds", action="build.submit", principal="creator",
+                         actor_weight=2, payload={"title": "explode"})
     def explode(operation, payload):
         raise RuntimeError("boom")
-
     with pytest.raises(OperationExecutionError, match="executor raised"):
         asyncio.run(ops.execute_one(admitted.outbox_seq, explode))
     assert ops.outbox.pending_count == 1
@@ -243,15 +177,8 @@ def test_executor_exception_is_audited_and_pending_work_survives(tmp_path):
 
 def test_pending_operations_rehydrate_execution_contract(tmp_path):
     ops = coordinator(tmp_path)
-    admitted = ops.admit(
-        capability_id="studio",
-        domain="builds",
-        action="build.submit",
-        principal="creator",
-        actor_weight=2,
-        payload={"title": "pending"},
-        idempotency_key="pending-1",
-    )
+    admitted = ops.admit(capability_id="studio", domain="builds", action="build.submit", principal="creator",
+                         actor_weight=2, payload={"title": "pending"}, idempotency_key="pending-1")
     pending = ops.pending_operations()
     assert len(pending) == 1
     assert pending[0].id == admitted.id
