@@ -20,7 +20,7 @@ def test_enabled_checkpoint_witness_key_is_validated_at_construction(tmp_path):
         )
 
 
-def test_naive_datetime_fails_before_local_timezone_conversion(tmp_path):
+def test_naive_datetime_is_rejected_before_portable_bundle_evaluation(tmp_path):
     checkpoints = DeploymentCheckpointLedger(tmp_path / "checkpoints")
     ledger = DeploymentCheckpointPinLedger(
         tmp_path / "pins",
@@ -29,7 +29,9 @@ def test_naive_datetime_fails_before_local_timezone_conversion(tmp_path):
         required_groups=1,
     )
     naive = datetime(2026, 9, 14, 20, 0)
-    with pytest.raises(ValueError, match="timezone-aware"):
-        ledger.quorum(now=naive)
+    # Empty-history quorum is intentionally a no-op: there is no publication whose
+    # freshness could be evaluated. Portable proof construction still validates the
+    # supplied clock before attempting any proof/quorum work.
+    assert ledger.quorum(now=naive) is None
     with pytest.raises(ValueError, match="timezone-aware"):
         ledger.portable_bundle(now=naive)
