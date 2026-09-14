@@ -99,6 +99,7 @@ jobs:
           tests/test_deployment_evidence_checkpoint.py
           tests/test_deployment_checkpoint_ledger.py
           tests/test_deployment_checkpoint_proof.py
+          tests/test_deployment_checkpoint_trust_advance.py
           tests/test_charter_policy.py
           tests/test_durable_outbox.py
           tests/test_worm_audit.py
