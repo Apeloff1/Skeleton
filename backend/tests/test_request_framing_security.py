@@ -87,7 +87,7 @@ def test_actual_body_cannot_exceed_declared_length() -> None:
     assert payload["error"] == "payload_too_large"
 
 
-def test_pathological_chunk_count_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_pathological_chunk_count_is_bounded() -> None:
     sent: list[dict] = []
     queue = [
         {"type": "http.request", "body": b"x", "more_body": True},
