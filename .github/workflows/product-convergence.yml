@@ -57,6 +57,7 @@ on:
       - "backend/tests/test_deployment_receipts.py"
       - "backend/tests/test_deployment_gateway.py"
       - "backend/tests/test_deployment_proof.py"
+      - "backend/tests/test_deployment_proof_semantics.py"
       - "frontend/src/product/productCatalog.ts"
       - ".github/workflows/product-convergence.yml"
   pull_request:
@@ -115,6 +116,7 @@ on:
       - "backend/tests/test_deployment_receipts.py"
       - "backend/tests/test_deployment_gateway.py"
       - "backend/tests/test_deployment_proof.py"
+      - "backend/tests/test_deployment_proof_semantics.py"
       - "frontend/src/product/productCatalog.ts"
       - ".github/workflows/product-convergence.yml"
 
@@ -188,6 +190,7 @@ jobs:
           tests/test_deployment_receipts.py
           tests/test_deployment_gateway.py
           tests/test_deployment_proof.py
+          tests/test_deployment_proof_semantics.py
           tests/test_charter_policy.py
           tests/test_durable_outbox.py
           tests/test_worm_audit.py
