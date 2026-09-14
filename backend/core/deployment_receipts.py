@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
-import hashlib
 import hmac
 import json
 import os
@@ -18,10 +17,18 @@ from pathlib import Path
 import re
 from typing import Any
 
+from core.canonical_json import CanonicalJSONError, canonical_json_bytes, canonical_json_sha256, canonical_json_text
 from core.file_lease import FileLease
 
 DEPLOYMENT_RECEIPT_VERSION = 1
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_RECEIPT_KEYS = {
+    "version", "sequence", "authorization_id", "plan_sha256", "release_id",
+    "release_sha256", "target", "environment", "artifact",
+    "pre_system_root_sha256", "post_system_root_sha256", "executed_at",
+    "previous_sha256", "sha256",
+}
+_STRING_FIELDS = _RECEIPT_KEYS - {"version", "sequence"}
 
 
 class DeploymentReceiptIntegrityError(RuntimeError):
@@ -46,23 +53,32 @@ class DeploymentTransitionReceipt:
     sha256: str
 
 
-def _canonical(value: Any) -> bytes:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
-
-
 def _sha(value: Any) -> str:
-    return hashlib.sha256(_canonical(value)).hexdigest()
+    return canonical_json_sha256(value)
 
 
-def _digest(value: str, field: str) -> str:
-    value = str(value or "").lower().strip()
+def _digest(value: Any, field: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field} must be sha256")
+    value = value.strip()
     if not _SHA256.fullmatch(value):
         raise ValueError(f"{field} must be sha256")
     return value
 
 
-def _parse_time(value: str) -> datetime:
-    stamp = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+def _text(value: Any, field: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field} must be a string")
+    value = value.strip()
+    if not value:
+        raise ValueError(f"{field} must be non-empty")
+    return value
+
+
+def _parse_time(value: Any) -> datetime:
+    if not isinstance(value, str) or not value:
+        raise ValueError("deployment receipt timestamp must be a non-empty string")
+    stamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if stamp.tzinfo is None:
         raise ValueError("deployment receipt timestamp must be timezone-aware")
     return stamp.astimezone(UTC)
@@ -90,6 +106,24 @@ def _receipt_hash(*, sequence: int, authorization_id: str, plan_sha256: str,
     })
 
 
+def _validate_raw_receipt(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, dict) or set(raw) != _RECEIPT_KEYS:
+        raise DeploymentReceiptIntegrityError("deployment receipt schema mismatch")
+    if type(raw.get("version")) is not int or raw["version"] != DEPLOYMENT_RECEIPT_VERSION:
+        raise DeploymentReceiptIntegrityError("deployment receipt version malformed")
+    if type(raw.get("sequence")) is not int or raw["sequence"] < 1:
+        raise DeploymentReceiptIntegrityError("deployment receipt sequence malformed")
+    if any(not isinstance(raw.get(field), str) for field in _STRING_FIELDS):
+        raise DeploymentReceiptIntegrityError("deployment receipt field type mismatch")
+    if not all(raw[field] for field in ("authorization_id", "release_id", "target", "environment", "artifact")):
+        raise DeploymentReceiptIntegrityError("deployment receipt identity fields are incomplete")
+    try:
+        canonical_json_bytes(raw)
+    except CanonicalJSONError as exc:
+        raise DeploymentReceiptIntegrityError("deployment receipt is not canonical JSON") from exc
+    return raw
+
+
 class DeploymentReceiptLedger:
     def __init__(self, root: str | Path) -> None:
         self.root = Path(root)
@@ -103,16 +137,7 @@ class DeploymentReceiptLedger:
 
     @staticmethod
     def _restore(raw: dict[str, Any]) -> DeploymentTransitionReceipt:
-        return DeploymentTransitionReceipt(
-            version=int(raw["version"]), sequence=int(raw["sequence"]),
-            authorization_id=str(raw["authorization_id"]), plan_sha256=str(raw["plan_sha256"]),
-            release_id=str(raw["release_id"]), release_sha256=str(raw["release_sha256"]),
-            target=str(raw["target"]), environment=str(raw["environment"]), artifact=str(raw["artifact"]),
-            pre_system_root_sha256=str(raw["pre_system_root_sha256"]),
-            post_system_root_sha256=str(raw["post_system_root_sha256"]),
-            executed_at=str(raw["executed_at"]), previous_sha256=str(raw.get("previous_sha256", "")),
-            sha256=str(raw["sha256"]),
-        )
+        return DeploymentTransitionReceipt(**_validate_raw_receipt(raw))
 
     def _load_verified(self) -> tuple[DeploymentTransitionReceipt, ...]:
         try:
@@ -127,13 +152,12 @@ class DeploymentReceiptLedger:
             if not line.strip():
                 continue
             try:
-                row = self._restore(json.loads(line))
-            except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+                decoded = json.loads(line)
+            except json.JSONDecodeError as exc:
                 raise DeploymentReceiptIntegrityError("deployment receipt ledger malformed") from exc
-            if row.version != DEPLOYMENT_RECEIPT_VERSION or row.sequence != index:
+            row = self._restore(decoded)
+            if row.sequence != index:
                 raise DeploymentReceiptIntegrityError("deployment receipt sequence/version mismatch")
-            if not row.authorization_id or not row.release_id or not row.target or not row.environment or not row.artifact:
-                raise DeploymentReceiptIntegrityError("deployment receipt identity fields are incomplete")
             if row.authorization_id in authorizations:
                 raise DeploymentReceiptIntegrityError("duplicate deployment authorization receipt")
             if row.release_id in releases:
@@ -172,11 +196,11 @@ class DeploymentReceiptLedger:
                release_sha256: str, target: str, environment: str, artifact: str,
                pre_system_root_sha256: str, post_system_root_sha256: str,
                executed_at: str | None = None) -> DeploymentTransitionReceipt:
-        authorization_id = str(authorization_id).strip()
-        release_id = str(release_id).strip()
-        target = str(target).strip(); environment = str(environment).strip(); artifact = str(artifact).strip()
-        if not all((authorization_id, release_id, target, environment, artifact)):
-            raise ValueError("deployment receipt identity fields are required")
+        authorization_id = _text(authorization_id, "authorization_id")
+        release_id = _text(release_id, "release_id")
+        target = _text(target, "target")
+        environment = _text(environment, "environment")
+        artifact = _text(artifact, "artifact")
         plan = _digest(plan_sha256, "plan")
         release = _digest(release_sha256, "release")
         pre = _digest(pre_system_root_sha256, "pre-system root")
@@ -214,11 +238,14 @@ class DeploymentReceiptLedger:
                 target, environment, artifact, pre, post, stamp, previous, digest,
             )
             with self.path.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps(asdict(row), ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n")
-                handle.flush(); os.fsync(handle.fileno())
+                handle.write(canonical_json_text(asdict(row)) + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
             return row
 
     def by_authorization(self, authorization_id: str) -> DeploymentTransitionReceipt | None:
+        if not isinstance(authorization_id, str):
+            raise ValueError("authorization_id must be a string")
         with self._lease.acquire():
             rows = self._load_verified()
         return next((row for row in rows if row.authorization_id == authorization_id), None)
