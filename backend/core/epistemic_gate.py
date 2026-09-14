@@ -1,9 +1,14 @@
 """Epistemic promotion gate between research findings and durable knowledge.
 
-Research may be exploratory; Orientation Room is not. Raw evidence metadata is
-normalized into TruthVerifier evidence contracts, including provenance and
-methodology signals. Correlated sources are conservatively collapsed before
-independent-support counting. Only VERIFIED claims enter authoritative context.
+Research may be exploratory; Orientation Room is not. Raw evidence must satisfy
+three independent constraints before TruthVerifier can consider it:
+
+1. an inspectable claim-level citation binding;
+2. provenance/methodology normalization;
+3. conservative source-independence collapse.
+
+A caller cannot bypass citation integrity by constructing EvidenceItem metadata
+directly inside a research finding.
 """
 from __future__ import annotations
 
@@ -12,6 +17,7 @@ import hashlib
 import json
 from typing import Any
 
+from core.citation_integrity import CitationBinding, CitationIntegrityEngine
 from core.evidence_registry import EvidenceRegistry
 from core.source_independence import SourceIndependenceAnalyzer
 from core.truth_verifier import EvidenceItem, EvidenceKind, TruthVerifier, VerificationBatch
@@ -89,6 +95,7 @@ class EpistemicGate:
         self.verifier = verifier or TruthVerifier()
         self.registry = registry
         self.independence = independence
+        self.citation_integrity = CitationIntegrityEngine()
 
     @staticmethod
     def _independence_payload(report: Any | None) -> dict[str, Any] | None:
@@ -99,17 +106,45 @@ class EpistemicGate:
             "effective_independent_sources": report.effective_independent_sources,
             "unresolved_sources": list(report.unresolved_sources),
             "clusters": [
-                {
-                    "id": row.id,
-                    "source_ids": list(row.source_ids),
-                    "reasons": list(row.reasons),
-                    "shared_roots": list(row.shared_roots),
-                    "shared_content_sha256": list(row.shared_content_sha256),
-                }
+                {"id": row.id, "source_ids": list(row.source_ids), "reasons": list(row.reasons),
+                 "shared_roots": list(row.shared_roots), "shared_content_sha256": list(row.shared_content_sha256)}
                 for row in report.clusters
             ],
             "attestation_sha256": report.attestation_sha256,
         }
+
+    def _validated_rows(self, claim: str, source_rows: Any) -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...]]:
+        if not isinstance(source_rows, (list, tuple)):
+            return (), ()
+        accepted: list[dict[str, Any]] = []
+        rejected: list[dict[str, Any]] = []
+        for raw in source_rows:
+            if not isinstance(raw, dict):
+                continue
+            binding = raw.get("citation_binding")
+            if not isinstance(binding, dict):
+                rejected.append({"source_id": str(raw.get("source_id") or raw.get("source") or ""),
+                                 "reasons": ["citation_binding_missing"], "laundering_risk": "critical"})
+                continue
+            report = self.citation_integrity.validate(CitationBinding(
+                claim=claim,
+                source_id=str(raw.get("source_id") or raw.get("source") or ""),
+                locator=str(raw.get("locator") or ""),
+                binding_method=str(binding.get("binding_method") or ""),
+                evidence_span=str(binding.get("evidence_span") or ""),
+                supports=bool(raw.get("supports", True)),
+                provenance_verified=bool(raw.get("provenance_verified", raw.get("verified_locator", False))),
+                source_content_sha256=str(raw.get("content_sha256") or ""),
+                mapping_rationale=str(binding.get("mapping_rationale") or ""),
+            ))
+            diagnostic = {"source_id": str(raw.get("source_id") or raw.get("source") or ""),
+                          "accepted": report.accepted, "laundering_risk": report.laundering_risk,
+                          "reasons": list(report.reasons), "attestation_sha256": report.attestation_sha256}
+            if report.accepted:
+                accepted.append(raw)
+            else:
+                rejected.append(diagnostic)
+        return tuple(accepted), tuple(rejected)
 
     def evaluate(self, finding: dict[str, Any]) -> EpistemicDecision:
         claims = tuple(" ".join(str(x).split()).strip() for x in (finding.get("claims") or ()) if str(x).strip())
@@ -122,12 +157,13 @@ class EpistemicGate:
 
         evidence_by_claim: dict[str, tuple[EvidenceItem, ...]] = {}
         independence_by_claim: dict[str, Any] = {}
+        citation_rejections: dict[str, tuple[dict[str, Any], ...]] = {}
         for claim in claims:
             explicit = claim_evidence_raw.get(claim)
             source_rows = generic_raw if explicit is None and finding.get("evidence_applies_to_all") is True else explicit
-            if not isinstance(source_rows, (list, tuple)):
-                source_rows = ()
-            items = tuple(evidence_item_from_dict(x) for x in source_rows if isinstance(x, dict))
+            validated_rows, rejected = self._validated_rows(claim, source_rows)
+            citation_rejections[claim] = rejected
+            items = tuple(evidence_item_from_dict(x) for x in validated_rows)
             if self.registry is not None:
                 for item in items:
                     self.registry.register(claim, item)
@@ -146,6 +182,10 @@ class EpistemicGate:
         verification: dict[str, dict[str, Any]] = {}
         for group in (batch.verified, batch.provisional, batch.contradicted, batch.unverified, batch.irrelevant_speculation):
             for item in group:
+                rejected = citation_rejections.get(item.claim, ())
+                reasons = list(item.reasons)
+                if rejected:
+                    reasons = list(dict.fromkeys([*reasons, "citation_binding_rejected"]))
                 verification[item.claim] = {
                     "state": item.state.value,
                     "empirical_support": item.empirical_support,
@@ -157,7 +197,8 @@ class EpistemicGate:
                     "reproducibility_signal": item.reproducibility_signal,
                     "independent_replication": item.independent_replication,
                     "falsifiable": item.falsifiable,
-                    "reasons": list(item.reasons),
+                    "reasons": reasons,
+                    "citation_rejections": list(rejected),
                     "independence": self._independence_payload(independence_by_claim.get(item.claim)),
                     "attestation_sha256": item.attestation_sha256,
                 }
