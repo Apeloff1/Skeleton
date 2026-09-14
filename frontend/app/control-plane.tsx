@@ -13,9 +13,11 @@ import {
 import { useRouter } from 'expo-router';
 
 import {
+  AuditEntry,
   ControlPlaneStatus,
   PendingOperationResponse,
   getPendingProductOperations,
+  getProductAuditHistory,
   getProductControlStatus,
 } from '../src/product/productControlClient';
 
@@ -24,6 +26,7 @@ export default function ControlPlaneRoute() {
   const [token, setToken] = useState('');
   const [status, setStatus] = useState<ControlPlaneStatus | null>(null);
   const [pending, setPending] = useState<PendingOperationResponse | null>(null);
+  const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,9 +34,10 @@ export default function ControlPlaneRoute() {
     setLoading(true);
     setError(null);
     const cleanToken = token.trim();
-    const [statusResult, pendingResult] = await Promise.all([
+    const [statusResult, pendingResult, auditResult] = await Promise.all([
       getProductControlStatus(cleanToken),
       getPendingProductOperations(cleanToken),
+      getProductAuditHistory(cleanToken, 25),
     ]);
     if (!statusResult.ok || !statusResult.data) {
       setError(statusResult.error || `Status unavailable (${statusResult.status})`);
@@ -41,10 +45,11 @@ export default function ControlPlaneRoute() {
       setStatus(statusResult.data);
     }
     if (pendingResult.ok && pendingResult.data) setPending(pendingResult.data);
+    if (auditResult.ok && auditResult.data) setAudit(auditResult.data.entries);
     setLoading(false);
   }, [token]);
 
-  useEffect(() => { void refresh(); }, []); // intentionally first-load only; token is user-triggered below
+  useEffect(() => { void refresh(); }, []); // first load only; token refresh is explicit
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -56,7 +61,7 @@ export default function ControlPlaneRoute() {
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>OPERATE · CONTROL PLANE</Text>
           <Text style={styles.title}>Governed runtime</Text>
-          <Text style={styles.description}>Policy, durable admissions, audit continuity and queue pressure for the canonical product surface.</Text>
+          <Text style={styles.description}>Policy, durable admissions, verified audit continuity and queue pressure for the canonical product surface.</Text>
         </View>
 
         <View style={styles.field}>
@@ -89,10 +94,6 @@ export default function ControlPlaneRoute() {
                 </View>
               ))}
             </View>
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Audit head</Text>
-              <Text style={styles.mono}>{status.operations.audit_head || 'No audited operations yet'}</Text>
-            </View>
           </>
         ) : null}
 
@@ -105,6 +106,20 @@ export default function ControlPlaneRoute() {
                 <Text style={styles.rowTitle}>{operation.action}</Text>
                 <Text style={styles.muted}>{operation.capability_id} · queue #{operation.outbox_seq}</Text>
                 <Text style={styles.mono}>{operation.operation_id.slice(0, 20)}…</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Verified audit history</Text>
+          <Text style={styles.muted}>{audit.length} newest entries, re-verified against the on-disk hash chain on every read.</Text>
+          {[...audit].reverse().map((entry) => (
+            <View key={entry.seq} style={styles.row}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle}>#{entry.seq} · {entry.kind}</Text>
+                <Text style={styles.muted}>{entry.principal} · {entry.route}</Text>
+                <Text style={styles.mono}>{entry.hash.slice(0, 24)}…</Text>
               </View>
             </View>
           ))}
