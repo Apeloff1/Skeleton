@@ -19,6 +19,7 @@ class DeploymentCheckpointPinPolicy:
     required_groups: int
     max_age_seconds: int
     required: bool
+    continuity_required: bool = False
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -50,6 +51,7 @@ def load_deployment_checkpoint_pin_policy(
     required_groups: int | None = None,
     max_age_seconds: int | None = None,
     required: bool | None = None,
+    continuity_required: bool | None = None,
 ) -> DeploymentCheckpointPinPolicy:
     raw = (
         raw_json
@@ -71,13 +73,24 @@ def load_deployment_checkpoint_pin_policy(
         )
     elif type(max_age_seconds) is not int or not 1 <= max_age_seconds <= 604800:
         raise ValueError("deployment checkpoint witness max age must be an integer between 1 and 604800")
+
+    required_explicit = required is not None
     if required is None:
         required = _env_bool("DEPLOYMENT_CHECKPOINT_SIGNED_PINS_REQUIRED", False)
     elif type(required) is not bool:
         raise ValueError("deployment checkpoint signed pin requirement must be boolean")
 
+    if continuity_required is None:
+        continuity_required = _env_bool("DEPLOYMENT_CHECKPOINT_CONTINUITY_REQUIRED", False)
+    elif type(continuity_required) is not bool:
+        raise ValueError("deployment checkpoint continuity requirement must be boolean")
+    if continuity_required and required_explicit and required is False:
+        raise ValueError("deployment checkpoint continuity requires signed pins")
+    if continuity_required:
+        required = True
+
     # Reuse the strict witness schema/key validation, but keep finality semantics local
-    # to this policy. When required, this also proves configured signed groups can meet
+    # to this policy. Any required witness mode proves configured signed groups can meet
     # the requested deployment quorum.
     parsed = load_witness_policy(
         raw_json=raw,
@@ -91,4 +104,5 @@ def load_deployment_checkpoint_pin_policy(
         required_groups=required_groups,
         max_age_seconds=max_age_seconds,
         required=required,
+        continuity_required=continuity_required,
     )
