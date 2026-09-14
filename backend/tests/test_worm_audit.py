@@ -45,6 +45,33 @@ def test_append_is_chained_and_restores(tmp_path):
     assert restored.latest == second
 
 
+def test_history_projection_is_verified_and_tail_limited(tmp_path):
+    ledger = WormAuditLog(tmp_path)
+    entries = [
+        ledger.append(kind="event", seal="s", principal="p", route="/x", detail=str(index))
+        for index in range(4)
+    ]
+    assert ledger.entries() == tuple(entries)
+    assert ledger.entries(limit=2) == tuple(entries[-2:])
+    assert ledger.entries(limit=0) == ()
+    with pytest.raises(ValueError, match="limit"):
+        ledger.entries(limit=-1)
+
+
+def test_naive_timestamp_is_rejected(tmp_path):
+    ledger = WormAuditLog(tmp_path)
+    with pytest.raises(ValueError, match="timezone-aware"):
+        ledger.append(
+            kind="request",
+            seal="s",
+            principal="p",
+            route="/x",
+            detail="bad-time",
+            ts=datetime(2026, 9, 14, 0, 0),
+        )
+    assert ledger.sequence == 0
+
+
 def test_tampered_detail_fails_closed_on_restore(tmp_path):
     ledger = WormAuditLog(tmp_path)
     ledger.append(
@@ -60,6 +87,16 @@ def test_tampered_detail_fails_closed_on_restore(tmp_path):
 
     with pytest.raises(AuditIntegrityError, match="audit hash broken at seq 1"):
         WormAuditLog(tmp_path)
+
+
+def test_history_projection_fails_closed_if_disk_is_tampered_after_open(tmp_path):
+    ledger = WormAuditLog(tmp_path)
+    ledger.append(kind="decision", seal="seal", principal="p", route="/x", detail="ok")
+    record = json.loads(ledger.path.read_text(encoding="utf-8"))
+    record["principal"] = "attacker"
+    ledger.path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+    with pytest.raises(AuditIntegrityError, match="audit hash broken"):
+        ledger.entries()
 
 
 def test_broken_predecessor_fails_closed(tmp_path):
