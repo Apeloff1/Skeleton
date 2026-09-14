@@ -3,8 +3,12 @@
 Portable deployment proofs historically require three independent heads:
 authorization journal, release channel, and transition receipts. This module binds
 those heads into one deterministic checkpoint while retaining every channel head for
-selective verification. The checkpoint is an attestation, not a replacement for the
-underlying chain proofs; external consumers still need to pin its root out of band.
+selective verification. Version 2 also binds exact authorization/receipt event counts,
+which lets a publication ledger distinguish legitimate head advancement from stale
+or equivocated heads under concurrent writers.
+
+The checkpoint is an attestation, not a replacement for the underlying chain proofs;
+external consumers still need to pin its root out of band.
 """
 from __future__ import annotations
 
@@ -16,7 +20,7 @@ from typing import Any, Mapping
 from core.canonical_json import CanonicalJSONError, canonical_json_sha256
 from core.deployment_proof import PortableDeploymentProof, verify_portable_deployment_proof
 
-DEPLOYMENT_EVIDENCE_CHECKPOINT_VERSION = 1
+DEPLOYMENT_EVIDENCE_CHECKPOINT_VERSION = 2
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -32,7 +36,9 @@ class ReleaseChannelCheckpoint:
 class DeploymentEvidenceCheckpoint:
     version: int
     authorization_head_sha256: str
+    authorization_events: int
     receipt_head_sha256: str
+    receipt_events: int
     release_channels: tuple[ReleaseChannelCheckpoint, ...]
     completed_releases: int
     fully_portable_releases: int
@@ -50,7 +56,9 @@ def _payload(checkpoint: DeploymentEvidenceCheckpoint, *, include_root: bool) ->
     payload: dict[str, Any] = {
         "version": checkpoint.version,
         "authorization_head_sha256": checkpoint.authorization_head_sha256,
+        "authorization_events": checkpoint.authorization_events,
         "receipt_head_sha256": checkpoint.receipt_head_sha256,
+        "receipt_events": checkpoint.receipt_events,
         "release_channels": [asdict(item) for item in checkpoint.release_channels],
         "completed_releases": checkpoint.completed_releases,
         "fully_portable_releases": checkpoint.fully_portable_releases,
@@ -116,11 +124,15 @@ def build_deployment_evidence_checkpoint(gateway) -> DeploymentEvidenceCheckpoin
         raise ValueError("authorization head is malformed")
     if receipt_head and not _is_sha(receipt_head):
         raise ValueError("receipt head is malformed")
-    # Empty ledgers are represented by the SHA-256 of an explicit empty-domain marker,
-    # never by an ambiguous blank root.
+    # Empty ledgers are represented by hashes of explicit empty-domain markers,
+    # never ambiguous blank roots.
     authorization_head = authorization_head or canonical_json_sha256({"ledger": "authorization", "empty": True})
     receipt_head = receipt_head or canonical_json_sha256({"ledger": "receipt", "empty": True})
 
+    issued = _status_count(authorization, "issued")
+    consumed = _status_count(authorization, "consumed")
+    authorization_events = issued + consumed
+    receipt_events = _status_count(receipts, "receipts")
     completed = _status_count(portability, "completed_releases")
     fully_portable = _status_count(portability, "fully_portable")
     if fully_portable > completed:
@@ -130,7 +142,9 @@ def build_deployment_evidence_checkpoint(gateway) -> DeploymentEvidenceCheckpoin
     draft = DeploymentEvidenceCheckpoint(
         version=DEPLOYMENT_EVIDENCE_CHECKPOINT_VERSION,
         authorization_head_sha256=authorization_head,
+        authorization_events=authorization_events,
         receipt_head_sha256=receipt_head,
+        receipt_events=receipt_events,
         release_channels=channels,
         completed_releases=completed,
         fully_portable_releases=fully_portable,
@@ -142,16 +156,18 @@ def build_deployment_evidence_checkpoint(gateway) -> DeploymentEvidenceCheckpoin
     root = canonical_json_sha256(_payload(draft, include_root=False))
     attestation = canonical_json_sha256({**_payload(draft, include_root=False), "root_sha256": root})
     return DeploymentEvidenceCheckpoint(
-        draft.version,
-        draft.authorization_head_sha256,
-        draft.receipt_head_sha256,
-        draft.release_channels,
-        draft.completed_releases,
-        draft.fully_portable_releases,
-        draft.evidence_gap_count,
-        draft.release_channels_sha256,
-        root,
-        attestation,
+        version=draft.version,
+        authorization_head_sha256=draft.authorization_head_sha256,
+        authorization_events=draft.authorization_events,
+        receipt_head_sha256=draft.receipt_head_sha256,
+        receipt_events=draft.receipt_events,
+        release_channels=draft.release_channels,
+        completed_releases=draft.completed_releases,
+        fully_portable_releases=draft.fully_portable_releases,
+        evidence_gap_count=draft.evidence_gap_count,
+        release_channels_sha256=draft.release_channels_sha256,
+        root_sha256=root,
+        attestation_sha256=attestation,
     )
 
 
@@ -170,6 +186,8 @@ def verify_deployment_evidence_checkpoint(checkpoint: DeploymentEvidenceCheckpoi
         )):
             return False
         if not all(_exact_nonnegative_int(value) for value in (
+            checkpoint.authorization_events,
+            checkpoint.receipt_events,
             checkpoint.completed_releases,
             checkpoint.fully_portable_releases,
             checkpoint.evidence_gap_count,
