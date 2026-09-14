@@ -35,6 +35,14 @@ def _env_int(name: str, default: int, *, minimum: int, maximum: int) -> int:
     return max(minimum, min(maximum, value))
 
 
+def _bounded_int(value: object, default: int, *, minimum: int, maximum: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError, OverflowError):
+        parsed = default
+    return max(minimum, min(maximum, parsed))
+
+
 def _env_float(name: str, default: float, *, minimum: float, maximum: float) -> float:
     raw = os.environ.get(name, str(default)).strip()
     try:
@@ -106,9 +114,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             minimum=0.01,
             maximum=10_000.0,
         )
-        RateLimitMiddleware._burst = max(
-            1,
-            min(100_000, int(burst) if burst is not None else configured_burst),
+        RateLimitMiddleware._burst = _bounded_int(
+            burst if burst is not None else configured_burst,
+            configured_burst,
+            minimum=1,
+            maximum=100_000,
         )
         RateLimitMiddleware._max_buckets = _env_int(
             "CODEDOCK_RATE_LIMIT_MAX_BUCKETS", 20_000, minimum=256, maximum=1_000_000
@@ -117,8 +127,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             "CODEDOCK_RATE_LIMIT_BUCKET_TTL_SECONDS", 900, minimum=60, maximum=86_400
         )
         self.prefix = prefix
-        # Only endpoints that are intentionally safe and extremely cheap are
-        # exempt. Security/audit and telemetry ingestion remain rate limited.
         self._whitelist = ("/api/health",)
 
     @classmethod
@@ -230,8 +238,6 @@ class AuditMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
             status = response.status_code
         except Exception as exc:
-            # Store only the exception class. Raw exception messages can contain
-            # tokens, paths, query fragments, or other sensitive input.
             error = type(exc).__name__
             status = 500
             raise
@@ -315,13 +321,15 @@ class SizeLimitMiddleware:
 
     Content-Length is treated only as an early rejection hint. Every ASGI
     ``http.request`` body chunk is counted, so omitting or lying about the
-    header cannot bypass the configured limit.
+    header cannot bypass the configured limit. Ambiguous HTTP framing is
+    rejected before the application sees the request.
     """
 
     def __init__(self, app, max_mb: int | None = None):
         self.app = app
-        configured = max_mb or _env_int("CODEDOCK_MAX_BODY_MB", 25, minimum=1, maximum=1024)
-        self.max_bytes = int(configured) * 1024 * 1024
+        env_max = _env_int("CODEDOCK_MAX_BODY_MB", 25, minimum=1, maximum=1024)
+        configured = _bounded_int(max_mb, env_max, minimum=1, maximum=1024) if max_mb is not None else env_max
+        self.max_bytes = configured * 1024 * 1024
 
     async def __call__(self, scope, receive, send):
         if scope.get("type") != "http":
@@ -334,8 +342,15 @@ class SizeLimitMiddleware:
             await self.app(scope, receive, send)
             return
 
-        headers = {key.lower(): value for key, value in scope.get("headers", [])}
-        raw_length = headers.get(b"content-length")
+        raw_headers = scope.get("headers", [])
+        content_lengths = [value for key, value in raw_headers if key.lower() == b"content-length"]
+        transfer_encodings = [value for key, value in raw_headers if key.lower() == b"transfer-encoding"]
+
+        if len(content_lengths) > 1 or (content_lengths and transfer_encodings):
+            await self._reject_framing(scope, receive, send)
+            return
+
+        raw_length = content_lengths[0] if content_lengths else None
         try:
             length_text = raw_length.decode("ascii", "strict") if raw_length is not None else None
         except UnicodeDecodeError:
@@ -376,6 +391,16 @@ class SizeLimitMiddleware:
             if response_started:
                 raise
             await self._reject(scope, receive, send, seen)
+
+    async def _reject_framing(self, scope, receive, send) -> None:
+        response = JSONResponse(
+            status_code=400,
+            content={
+                "error": "ambiguous_request_framing",
+                "detail": "ambiguous HTTP request framing rejected",
+            },
+        )
+        await response(scope, receive, send)
 
     async def _reject(self, scope, receive, send, got_bytes: int) -> None:
         response = JSONResponse(
