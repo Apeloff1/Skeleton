@@ -73,8 +73,11 @@ def test_world_save_contains_integrated_economy_and_relationship_state():
     world.choose_dialogue("merchant", "hello", "accept")
 
     encoded = world.encode_save()
-    decoded = world.save_codec.decode(encoded)
+    envelope = world.save_codec.decode(encoded)
+    decoded = envelope.payload
 
+    assert envelope.version == world.save_codec.current_version
+    assert envelope.checksum == world.save_codec.checksum(envelope.version, decoded)
     assert decoded["economy"]["balances"]["coins"] == 15
     assert decoded["economy"]["items"]["merchant_token"] == 1
     assert decoded["relationships"]["merchant"]["tier"] == "acquaintance"
