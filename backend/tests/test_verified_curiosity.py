@@ -2,7 +2,7 @@ from core.truth_verifier import EvidenceItem, EvidenceKind
 from core.verified_curiosity import VerifiedCuriosityEngine
 
 
-def _verified_evidence(source, group, *, replication=False, supports=True, quality=0.95):
+def _verified_evidence(source, group, claim, *, replication=False, supports=True, quality=0.95):
     return {
         "source_id": source,
         "source": source,
@@ -20,6 +20,11 @@ def _verified_evidence(source, group, *, replication=False, supports=True, quali
         "code_available": True,
         "sample_size": 240,
         "uncertainty_reported": True,
+        "citation_binding": {
+            "binding_method": "direct_quote",
+            "evidence_span": claim,
+            "mapping_rationale": "",
+        },
     }
 
 
@@ -37,8 +42,8 @@ def test_only_verified_claims_enter_authoritative_orientation(tmp_path):
         "falsifiable": {verified: True, speculation: False},
         "claim_evidence": {
             verified: [
-                _verified_evidence("study-a", "lab-a"),
-                _verified_evidence("study-b", "lab-b", replication=True),
+                _verified_evidence("study-a", "lab-a", verified),
+                _verified_evidence("study-b", "lab-b", verified, replication=True),
             ],
             speculation: [],
         },
@@ -47,7 +52,7 @@ def test_only_verified_claims_enter_authoritative_orientation(tmp_path):
     assert record.claims == (verified,)
     assert speculation not in record.summary
     assert any("IRRELEVANT SPECULATION" in gap for gap in record.questions)
-    pack = engine.fabric.orientation_pack("recovery measurement")
+    pack = engine.orientation_pack("recovery measurement")
     assert verified in pack["claims"]
     assert speculation not in pack["claims"]
     assert pack["confidence_floor"] > 0
@@ -86,9 +91,9 @@ def test_contradicted_claim_is_quarantined_from_orientation(tmp_path):
         "claims": [claim],
         "falsifiable": {claim: True},
         "claim_evidence": {claim: [
-            _verified_evidence("bench-a", "lab-a"),
-            _verified_evidence("bench-b", "lab-b", replication=True),
-            _verified_evidence("bench-c", "lab-c", supports=False, replication=True),
+            _verified_evidence("bench-a", "lab-a", claim),
+            _verified_evidence("bench-b", "lab-b", claim, replication=True),
+            _verified_evidence("bench-c", "lab-c", claim, supports=False, replication=True),
         ]},
     })
     assert claim not in record.claims
@@ -128,6 +133,8 @@ def test_truth_gate_status_is_explicit(tmp_path):
     assert status["truth_gated"] is True
     assert status["speculation_authoritative"] is False
     assert status["model_consensus_is_empirical_evidence"] is False
+    assert status["semantic_similarity_is_truth_identity"] is False
+    assert status["calibration"]["cross_process_locking"] is True
     assert status["verification_policy"]["minimum_independent_support"] == 2
     assert status["verification_policy"]["require_provenance_verified"] is True
     assert status["verification_policy"]["require_independent_replication_for_experiments"] is True
