@@ -83,6 +83,7 @@ def test_prepare_execute_and_idempotent_release_replay(tmp_path):
     assert gateway.authorizations.status()["consumed"] == 1
     assert gateway.releases.status()["releases"] == 1
     assert gateway.receipts.status()["receipts"] == 1
+    assert gateway.status()["verified"] is True
     current = gateway.releases.current(target="product-runtime", environment="staging")
     assert current is not None and current.release_id == first.release.release_id
 
@@ -102,7 +103,7 @@ def test_root_or_plan_mutation_blocks_before_release_side_effect(tmp_path):
     assert gateway.releases.status()["releases"] == 0
 
 
-def test_consumed_but_not_activated_authorization_can_resume_only_under_same_safe_root(tmp_path):
+def test_consumed_but_not_activated_authorization_is_explicit_evidence_gap_until_recovered(tmp_path):
     plane, gateway = _gateway(tmp_path)
     prepared = gateway.prepare(_payload())
     consumption = gateway.authorizations.consume(
@@ -112,10 +113,14 @@ def test_consumed_but_not_activated_authorization_can_resume_only_under_same_saf
     )
     assert consumption.authorization_id == prepared.authorization.id
     assert gateway.releases.status()["releases"] == 0
+    incomplete = gateway.status()
+    assert incomplete["verified"] is False
+    assert {row["kind"] for row in incomplete["evidence_gaps"]} == {"consumption_without_release"}
 
     resumed = gateway.execute(prepared.authorization.id, prepared.plan)
     assert resumed.resumed is True
     assert gateway.releases.status()["releases"] == 1
+    assert gateway.status()["verified"] is True
 
     prepared2 = gateway.prepare(_payload("artifact-v2"))
     gateway.authorizations.consume(
@@ -126,6 +131,7 @@ def test_consumed_but_not_activated_authorization_can_resume_only_under_same_saf
     plane.root_seed = "f" * 64
     with pytest.raises(DeploymentGatewayError, match="root changed"):
         gateway.execute(prepared2.authorization.id, prepared2.plan)
+    assert any(row["kind"] == "consumption_without_release" for row in gateway.status()["evidence_gaps"])
 
 
 def test_fresh_assurance_failure_blocks_execution_even_when_root_is_unchanged(tmp_path):
