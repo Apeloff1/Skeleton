@@ -34,7 +34,12 @@ class ProductControlPlane:
                                                       policy=self.policy, outbox_cap=outbox_cap)
         self.receipts = ExecutionReceiptStore(self.root / "receipts")
         if bind_native_executors:
-            self.executors, self.native_executors = build_default_executor_registry(self.receipts)
+            self.executors, self.native_executors = build_default_executor_registry(
+                self.receipts,
+                operations_provider=self.operations.snapshot,
+                policy_provider=self._policy_projection,
+                audit_provider=self._audit_projection,
+            )
         else:
             self.executors = ProductExecutorRegistry()
             self.native_executors = None
@@ -43,6 +48,17 @@ class ProductControlPlane:
         for domain_policy in CANONICAL_PRODUCT_POLICY:
             self.policy.ratify(domain_policy.domain, domain_policy.rules())
         self.policy_repository.save(self.policy)
+
+    def _policy_projection(self) -> dict[str, Any]:
+        snapshot = self.policy.snapshot()
+        return {
+            "policy_version": POLICY_VERSION,
+            "charters": [asdict(charter) for charter in snapshot.charters],
+            "edicts": [asdict(edict) for edict in snapshot.edicts],
+        }
+
+    def _audit_projection(self) -> list[dict[str, Any]]:
+        return [asdict(entry) for entry in self.operations.audit.entries(limit=50)]
 
     def ratify(self, domain: str, rules: list[Rule]) -> Charter:
         charter = self.policy.ratify(domain, rules)
