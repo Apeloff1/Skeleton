@@ -57,6 +57,9 @@ jobs:
       - name: GitHub Actions workflow security gate
         run: python scripts/check_workflow_security.py
 
+      - name: Repository secret hygiene gate
+        run: python scripts/check_secret_hygiene.py
+
       - name: Security boundary regression tests
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
@@ -70,6 +73,7 @@ jobs:
           tests/test_process_safety_getattribute.py
           tests/test_deserialization_safety_gate.py
           tests/test_workflow_security_gate.py
+          tests/test_secret_hygiene_gate.py
           tests/test_security_middleware_hardening.py
           tests/test_client_ip_security.py
           tests/test_size_limit_security.py
