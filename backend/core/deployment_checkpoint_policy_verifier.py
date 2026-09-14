@@ -5,6 +5,10 @@ arguments. This module closes the higher-level policy-binding seam: once an audi
 pins a trust-policy manifest digest, proof verification derives quorum, freshness,
 continuity mode, and witness-registry identity from that manifest instead of accepting
 parallel caller-supplied policy values that could drift from the pinned authority.
+
+The package dispatcher additionally enforces an exact context contract per proof kind,
+so callers cannot accidentally verify a continuity packet with pin semantics or leave
+unused trust inputs dangling beside the authoritative verification path.
 """
 from __future__ import annotations
 
@@ -18,6 +22,13 @@ from core.deployment_checkpoint_trust_policy import (
     DeploymentCheckpointTrustPolicyManifest,
     verify_deployment_checkpoint_trust_policy_manifest,
     verify_deployment_checkpoint_trust_registry,
+)
+from core.deployment_checkpoint_verification_package import (
+    PROOF_PIN,
+    PROOF_TRUST_ADVANCE,
+    PROOF_WITNESSED_CONTINUITY,
+    DeploymentCheckpointVerificationPackage,
+    verify_deployment_checkpoint_verification_package,
 )
 from core.deployment_checkpoint_witness import (
     DeploymentCheckpointPinBundle,
@@ -145,10 +156,105 @@ def policy_satisfied_by_proof_kind(
 
     This is capability classification only; it does not verify a proof packet.
     """
-    if proof_kind not in {"pin", "trust_advance", "witnessed_continuity"}:
+    if proof_kind not in {PROOF_PIN, PROOF_TRUST_ADVANCE, PROOF_WITNESSED_CONTINUITY}:
         return False
     if not manifest.required:
         return True
     if manifest.continuity_required:
-        return proof_kind == "witnessed_continuity"
-    return proof_kind in {"pin", "trust_advance", "witnessed_continuity"}
+        return proof_kind == PROOF_WITNESSED_CONTINUITY
+    return proof_kind in {PROOF_PIN, PROOF_TRUST_ADVANCE, PROOF_WITNESSED_CONTINUITY}
+
+
+def verify_policy_bound_verification_package(
+    package: DeploymentCheckpointVerificationPackage,
+    *,
+    expected_manifest_sha256: str,
+    trusted_witnesses: Iterable[TrustedWitness],
+    expected_current_publication_sha256: str,
+    pin_verified_at: str | None = None,
+    anchor_verified_at: str | None = None,
+    expected_previous_publication_sha256: str | None = None,
+    previous_verified_at: str | None = None,
+    current_verified_at: str | None = None,
+) -> bool:
+    """Verify one canonical package under an externally pinned trust policy.
+
+    Exact proof-specific context is mandatory:
+
+    * ``pin``: ``pin_verified_at`` only.
+    * ``trust_advance``: ``anchor_verified_at`` only.
+    * ``witnessed_continuity``: previous head plus previous/current verification times.
+
+    Supplying extra context fails closed. This makes the dispatcher a single
+    unambiguous offline-verification boundary instead of a convenience wrapper that
+    could silently ignore security-relevant caller inputs.
+    """
+    if not verify_deployment_checkpoint_verification_package(package):
+        return False
+    if not policy_satisfied_by_proof_kind(package.policy_manifest, package.proof_kind):
+        return False
+
+    manifest = package.policy_manifest
+    common = {
+        "manifest": manifest,
+        "expected_manifest_sha256": expected_manifest_sha256,
+        "trusted_witnesses": trusted_witnesses,
+    }
+
+    if package.proof_kind == PROOF_PIN:
+        if (
+            pin_verified_at is None
+            or anchor_verified_at is not None
+            or expected_previous_publication_sha256 is not None
+            or previous_verified_at is not None
+            or current_verified_at is not None
+        ):
+            return False
+        if not isinstance(package.proof, DeploymentCheckpointPinBundle):
+            return False
+        return verify_policy_bound_checkpoint_pin(
+            package.proof,
+            expected_publication_sha256=expected_current_publication_sha256,
+            verified_at=pin_verified_at,
+            **common,
+        )
+
+    if package.proof_kind == PROOF_TRUST_ADVANCE:
+        if (
+            anchor_verified_at is None
+            or pin_verified_at is not None
+            or expected_previous_publication_sha256 is not None
+            or previous_verified_at is not None
+            or current_verified_at is not None
+        ):
+            return False
+        if not isinstance(package.proof, DeploymentCheckpointTrustAdvance):
+            return False
+        return verify_policy_bound_trust_advance(
+            package.proof,
+            anchor_verified_at=anchor_verified_at,
+            expected_current_publication_sha256=expected_current_publication_sha256,
+            **common,
+        )
+
+    if package.proof_kind == PROOF_WITNESSED_CONTINUITY:
+        if (
+            expected_previous_publication_sha256 is None
+            or previous_verified_at is None
+            or current_verified_at is None
+            or pin_verified_at is not None
+            or anchor_verified_at is not None
+        ):
+            return False
+        if not isinstance(package.proof, DeploymentCheckpointWitnessedContinuity):
+            return False
+        return verify_policy_bound_witnessed_continuity(
+            package.proof,
+            previous_verified_at=previous_verified_at,
+            current_verified_at=current_verified_at,
+            expected_previous_publication_sha256=expected_previous_publication_sha256,
+            expected_current_publication_sha256=expected_current_publication_sha256,
+            **common,
+        )
+
+    return False
