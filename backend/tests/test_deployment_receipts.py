@@ -5,6 +5,7 @@ import json
 
 import pytest
 
+from core.canonical_json import canonical_json_sha256, canonical_json_text
 from core.deployment_receipts import DeploymentReceiptIntegrityError, DeploymentReceiptLedger
 
 
@@ -12,12 +13,16 @@ def _canonical(value) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
 
 
+def _release_id(label: str) -> str:
+    return hashlib.sha256(label.encode("utf-8")).hexdigest()
+
+
 def _record(ledger: DeploymentReceiptLedger, *, authorization_id: str = "auth-1", release_id: str = "release-1",
             pre: str = "a", post: str = "b", executed_at: str = "2026-09-14T12:00:00+00:00"):
     return ledger.record(
         authorization_id=authorization_id,
         plan_sha256="1" * 64,
-        release_id=release_id,
+        release_id=_release_id(release_id),
         release_sha256="2" * 64,
         target="runtime",
         environment="production",
@@ -32,6 +37,13 @@ def _rehash(row: dict) -> dict:
     candidate = dict(row)
     payload = {key: value for key, value in candidate.items() if key != "sha256"}
     candidate["sha256"] = hashlib.sha256(_canonical(payload)).hexdigest()
+    return candidate
+
+
+def _strict_rehash(row: dict) -> dict:
+    candidate = dict(row)
+    payload = {key: value for key, value in candidate.items() if key != "sha256"}
+    candidate["sha256"] = canonical_json_sha256(payload)
     return candidate
 
 
@@ -113,6 +125,13 @@ def test_naive_timestamp_is_rejected(tmp_path):
         _record(ledger, executed_at="2026-09-14T12:00:00")
 
 
+def test_explicit_empty_timestamp_is_not_replaced_with_now(tmp_path):
+    ledger = DeploymentReceiptLedger(tmp_path)
+    with pytest.raises(ValueError, match="timestamp"):
+        _record(ledger, executed_at="")
+    assert ledger.snapshot() == ()
+
+
 def test_rehashed_receipt_schema_extension_is_rejected(tmp_path):
     ledger = DeploymentReceiptLedger(tmp_path)
     _record(ledger)
@@ -137,13 +156,25 @@ def test_rehashed_boolean_sequence_is_rejected(tmp_path):
         DeploymentReceiptLedger(tmp_path)
 
 
+def test_rehashed_boolean_version_is_rejected(tmp_path):
+    ledger = DeploymentReceiptLedger(tmp_path)
+    _record(ledger)
+    row = json.loads(ledger.path.read_text(encoding="utf-8"))
+    row["version"] = True
+    row = _strict_rehash(row)
+    ledger.path.write_text(canonical_json_text(row) + "\n", encoding="utf-8")
+
+    with pytest.raises(DeploymentReceiptIntegrityError, match="version malformed"):
+        DeploymentReceiptLedger(tmp_path)
+
+
 def test_non_string_identity_input_is_not_silently_coerced(tmp_path):
     ledger = DeploymentReceiptLedger(tmp_path)
-    with pytest.raises(ValueError, match="authorization_id must be a string"):
+    with pytest.raises(ValueError, match="authorization_id must be a canonical non-empty string"):
         ledger.record(
             authorization_id=123,
             plan_sha256="1" * 64,
-            release_id="release-1",
+            release_id=_release_id("release-1"),
             release_sha256="2" * 64,
             target="runtime",
             environment="production",
@@ -155,11 +186,11 @@ def test_non_string_identity_input_is_not_silently_coerced(tmp_path):
 
 def test_uppercase_digest_is_rejected_instead_of_normalized(tmp_path):
     ledger = DeploymentReceiptLedger(tmp_path)
-    with pytest.raises(ValueError, match="plan must be sha256"):
+    with pytest.raises(ValueError, match="canonical lowercase sha256"):
         ledger.record(
             authorization_id="auth-1",
             plan_sha256="A" * 64,
-            release_id="release-1",
+            release_id=_release_id("release-1"),
             release_sha256="2" * 64,
             target="runtime",
             environment="production",
@@ -167,3 +198,31 @@ def test_uppercase_digest_is_rejected_instead_of_normalized(tmp_path):
             pre_system_root_sha256="a" * 64,
             post_system_root_sha256="b" * 64,
         )
+
+
+def test_digest_whitespace_is_rejected_instead_of_normalized(tmp_path):
+    ledger = DeploymentReceiptLedger(tmp_path)
+    with pytest.raises(ValueError, match="canonical lowercase sha256"):
+        ledger.record(
+            authorization_id="auth-1",
+            plan_sha256=("1" * 64) + " ",
+            release_id=_release_id("release-1"),
+            release_sha256="2" * 64,
+            target="runtime",
+            environment="production",
+            artifact="sha256:artifact",
+            pre_system_root_sha256="a" * 64,
+            post_system_root_sha256="b" * 64,
+        )
+
+
+def test_rehashed_persisted_digest_whitespace_is_rejected(tmp_path):
+    ledger = DeploymentReceiptLedger(tmp_path)
+    _record(ledger)
+    row = json.loads(ledger.path.read_text(encoding="utf-8"))
+    row["plan_sha256"] += " "
+    row = _strict_rehash(row)
+    ledger.path.write_text(canonical_json_text(row) + "\n", encoding="utf-8")
+
+    with pytest.raises(DeploymentReceiptIntegrityError, match="canonical lowercase sha256"):
+        DeploymentReceiptLedger(tmp_path)
