@@ -82,6 +82,11 @@ class ProductControlPlane:
             for operation in self.operations.pending_operations()
         ]
 
+    def audit_history(self, *, limit: int = 50) -> list[dict[str, Any]]:
+        if limit < 0 or limit > 500:
+            raise ValueError("audit limit must be between 0 and 500")
+        return [asdict(entry) for entry in self.operations.audit.entries(limit=limit)]
+
     async def execute_registered(self, seq: int, registry: ProductExecutorRegistry) -> bool:
         operation = next((item for item in self.operations.pending_operations() if item.outbox_seq == seq), None)
         if operation is None:
