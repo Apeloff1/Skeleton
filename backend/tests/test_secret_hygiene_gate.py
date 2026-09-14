@@ -54,7 +54,9 @@ def test_detects_google_api_key(tmp_path: Path) -> None:
 
 
 def test_detects_database_uri_credentials(tmp_path: Path) -> None:
-    uri = "postgresql://realuser:realpass123@db.internal/app"
+    scheme = "postgresql://"
+    credentials = "realuser:" + "realpass123"
+    uri = f"{scheme}{credentials}@db.internal/app"
     findings = _scan(tmp_path, f"DATABASE_URL={uri}\n")
     assert any("database URI" in finding for finding in findings)
 
@@ -62,6 +64,12 @@ def test_detects_database_uri_credentials(tmp_path: Path) -> None:
 def test_allows_placeholder_marker_inside_candidate_value(tmp_path: Path) -> None:
     key = "sk-placeholder_example_placeholder_12345"
     findings = _scan(tmp_path, f"OPENAI_API_KEY={key}\n")
+    assert findings == []
+
+
+def test_allows_canonical_database_placeholder_credentials(tmp_path: Path) -> None:
+    uri = "postgres://" + "user:pass" + "@db:5432/app"
+    findings = _scan(tmp_path, f"DATABASE_URL={uri}\n")
     assert findings == []
 
 
