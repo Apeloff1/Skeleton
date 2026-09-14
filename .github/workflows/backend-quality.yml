@@ -74,6 +74,7 @@ jobs:
           tests/test_deserialization_safety_gate.py
           tests/test_workflow_security_gate.py
           tests/test_secret_hygiene_gate.py
+          tests/test_security_config.py
           tests/test_security_middleware_hardening.py
           tests/test_client_ip_security.py
           tests/test_size_limit_security.py
