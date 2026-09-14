@@ -13,6 +13,8 @@ on:
       - "backend/core/control_plane_deployment.py"
       - "backend/core/deployment_authorization.py"
       - "backend/core/atomic_release_deployer.py"
+      - "backend/core/deployment_receipts.py"
+      - "backend/core/deployment_proof.py"
       - "backend/core/deployment_gateway.py"
       - "backend/core/deployment_planner.py"
       - "backend/core/system_assurance.py"
@@ -26,6 +28,7 @@ on:
       - "backend/tests/test_control_plane_deployment.py"
       - "backend/tests/test_deployment_authorization.py"
       - "backend/tests/test_deployment_gateway.py"
+      - "backend/tests/test_deployment_proof.py"
       - "backend/tests/test_control_plane_release_integration.py"
       - "backend/tests/test_epistemic_trust_runtime.py"
       - "backend/tests/test_portable_finality_proof.py"
@@ -45,6 +48,8 @@ on:
       - "backend/core/control_plane_deployment.py"
       - "backend/core/deployment_authorization.py"
       - "backend/core/atomic_release_deployer.py"
+      - "backend/core/deployment_receipts.py"
+      - "backend/core/deployment_proof.py"
       - "backend/core/deployment_gateway.py"
       - "backend/core/deployment_planner.py"
       - "backend/core/system_assurance.py"
@@ -58,6 +63,7 @@ on:
       - "backend/tests/test_control_plane_deployment.py"
       - "backend/tests/test_deployment_authorization.py"
       - "backend/tests/test_deployment_gateway.py"
+      - "backend/tests/test_deployment_proof.py"
       - "backend/tests/test_control_plane_release_integration.py"
       - "backend/tests/test_epistemic_trust_runtime.py"
       - "backend/tests/test_portable_finality_proof.py"
@@ -82,7 +88,7 @@ jobs:
           python-version: "3.11"
       - name: Install focused dependencies
         run: python -m pip install "pytest>=8,<9" "cryptography>=46.0.4,<47"
-      - name: Verify finality, authorization, release activation and stable-root deployment
+      - name: Verify finality, authorization, release activation and portable transition proofs
         run: >-
           python -m pytest -q --noconftest
           tests/test_witness_freshness_migration.py
@@ -91,6 +97,7 @@ jobs:
           tests/test_control_plane_deployment.py
           tests/test_deployment_authorization.py
           tests/test_deployment_gateway.py
+          tests/test_deployment_proof.py
           tests/test_control_plane_release_integration.py
           tests/test_epistemic_trust_runtime.py
           tests/test_portable_finality_proof.py
