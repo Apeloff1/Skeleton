@@ -66,10 +66,8 @@ class CharterPolicy:
     def _now() -> str:
         return datetime.now(UTC).isoformat()
 
-    def ratify(self, domain: str, rules: list[Rule]) -> Charter:
-        domain = domain.strip()
-        if not domain:
-            raise ValueError("domain is required")
+    @staticmethod
+    def _validate_rules(rules: list[Rule]) -> list[Rule]:
         normalized: list[Rule] = []
         seen_actions: set[str] = set()
         for rule in rules:
@@ -81,6 +79,13 @@ class CharterPolicy:
                 raise ValueError(f"duplicate action in charter: {rule.action}")
             seen_actions.add(rule.action)
             normalized.append(rule)
+        return normalized
+
+    def ratify(self, domain: str, rules: list[Rule]) -> Charter:
+        domain = domain.strip()
+        if not domain:
+            raise ValueError("domain is required")
+        normalized = self._validate_rules(rules)
         charter = Charter(
             id=uuid.uuid4().hex,
             domain=domain,
@@ -96,6 +101,7 @@ class CharterPolicy:
             charter = self._charters.get(domain)
             if charter is None:
                 return None
+            self._validate_rules([rule])
             edict = Edict(
                 id=uuid.uuid4().hex,
                 charter_id=charter.id,
@@ -119,8 +125,6 @@ class CharterPolicy:
             )
             if charter is None:
                 return False
-            # An amendment replaces an earlier rule for the same action so the
-            # policy surface stays deterministic rather than first-match-wins.
             charter.rules = [r for r in charter.rules if r.action != edict.rule.action]
             charter.rules.append(edict.rule)
             charter.amendments += 1
@@ -178,3 +182,42 @@ class CharterPolicy:
                 for edict in self._edicts.values()
             ]
             return GovernanceSnapshot(charters=charters, edicts=edicts)
+
+    def restore(self, snapshot: GovernanceSnapshot) -> None:
+        """Atomically replace policy state from a validated detached snapshot."""
+        charters: dict[str, Charter] = {}
+        charter_ids: set[str] = set()
+        for source in snapshot.charters:
+            domain = source.domain.strip()
+            if not source.id or not domain or source.amendments < 0:
+                raise ValueError("invalid charter snapshot")
+            if domain in charters or source.id in charter_ids:
+                raise ValueError("duplicate charter in snapshot")
+            rules = self._validate_rules(list(source.rules))
+            charters[domain] = Charter(
+                id=source.id,
+                domain=domain,
+                rules=rules,
+                ratified_at=source.ratified_at,
+                amendments=source.amendments,
+            )
+            charter_ids.add(source.id)
+
+        edicts: dict[str, Edict] = {}
+        for source in snapshot.edicts:
+            if not source.id or source.id in edicts:
+                raise ValueError("duplicate edict in snapshot")
+            if source.charter_id not in charter_ids:
+                raise ValueError("edict references unknown charter")
+            self._validate_rules([source.rule])
+            edicts[source.id] = Edict(
+                id=source.id,
+                charter_id=source.charter_id,
+                rule=source.rule,
+                proposed_by=source.proposed_by,
+                proposed_at=source.proposed_at,
+                in_force=bool(source.in_force),
+            )
+        with self._lock:
+            self._charters = charters
+            self._edicts = edicts
