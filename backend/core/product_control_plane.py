@@ -1,8 +1,8 @@
 """Restart-safe control plane for canonical product operations.
 
 Owns durable policy persistence and the operation coordinator as one service
-boundary. Mutating governance methods save immediately; admission always uses
-the currently persisted policy state.
+boundary. New installations receive an explicit versioned allow-list matching
+the canonical product shell; persisted policy always wins on restart.
 """
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from core.canonical_product_policy import CANONICAL_PRODUCT_POLICY, POLICY_VERSION
 from core.charter_policy import Charter, CharterPolicy, Edict, Rule
 from core.policy_repository import PolicyRepository
 from core.product_kernel import PRODUCT_KERNEL, ProductKernel
@@ -23,17 +24,26 @@ class ProductControlPlane:
         *,
         kernel: ProductKernel = PRODUCT_KERNEL,
         outbox_cap: int = 4096,
+        bootstrap_policy: bool = True,
     ) -> None:
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
         self.policy_repository = PolicyRepository(self.root / "policy")
         self.policy: CharterPolicy = self.policy_repository.load()
+        self.bootstrap_policy = bootstrap_policy
+        if bootstrap_policy and not self.policy.snapshot().charters:
+            self._bootstrap_canonical_policy()
         self.operations = ProductOperationCoordinator(
             self.root / "operations",
             kernel=kernel,
             policy=self.policy,
             outbox_cap=outbox_cap,
         )
+
+    def _bootstrap_canonical_policy(self) -> None:
+        for domain_policy in CANONICAL_PRODUCT_POLICY:
+            self.policy.ratify(domain_policy.domain, domain_policy.rules())
+        self.policy_repository.save(self.policy)
 
     def ratify(self, domain: str, rules: list[Rule]) -> Charter:
         charter = self.policy.ratify(domain, rules)
@@ -55,9 +65,27 @@ class ProductControlPlane:
     def admit(self, **kwargs: Any) -> AdmittedOperation:
         return self.operations.admit(**kwargs)
 
+    def pending(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "operation_id": operation.id,
+                "capability_id": operation.capability_id,
+                "pillar": operation.pillar,
+                "domain": operation.domain,
+                "action": operation.action,
+                "principal": operation.principal,
+                "outbox_seq": operation.outbox_seq,
+                "admitted_at": operation.admitted_at,
+                "idempotency_key": operation.idempotency_key,
+            }
+            for operation in self.operations.pending_operations()
+        ]
+
     def status(self) -> dict[str, Any]:
         governance = self.policy.snapshot()
         return {
+            "policy_version": POLICY_VERSION,
+            "policy_bootstrap_enabled": self.bootstrap_policy,
             "kernel": {
                 "capabilities": [
                     {
