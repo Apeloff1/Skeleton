@@ -87,3 +87,44 @@ def test_preflight_attestation_detects_mutation():
     )
     assert verify_deployment_preflight(report) is True
     assert verify_deployment_preflight(replace(report, allowed=False)) is False
+    assert verify_deployment_preflight(replace(report, allowed=1)) is False
+
+
+def test_numeric_strings_and_booleans_cannot_masquerade_as_counters():
+    assurance = _assurance(hard_failures="0")
+    trust = _trust(split_views=True, tree_size="4")
+    report = evaluate_deployment_preflight(
+        assurance=assurance,
+        trust=trust,
+        system_root_sha256="c" * 64,
+    )
+    blocker_ids = {item.id for item in report.blockers}
+    assert "assurance.hard-failures-type" in blocker_ids
+    assert "trust.split-view-type" in blocker_ids
+    assert "transparency.tree-size-type" in blocker_ids
+    assert report.allowed is False
+    assert verify_deployment_preflight(report) is True
+
+
+def test_noncanonical_trust_state_is_a_hard_blocker_not_hash_coercion():
+    trust = _trust(finality=True)
+    trust["opaque"] = object()
+    report = evaluate_deployment_preflight(
+        assurance=_assurance(), trust=trust, system_root_sha256="c" * 64,
+    )
+    assert report.allowed is False
+    assert "trust.state-noncanonical" in {item.id for item in report.blockers}
+    assert verify_deployment_preflight(report) is True
+
+
+def test_malformed_system_root_and_assurance_attestation_fail_closed():
+    assurance = _assurance()
+    assurance["attestation_sha256"] = "NOT-A-DIGEST"
+    report = evaluate_deployment_preflight(
+        assurance=assurance, trust=_trust(finality=True), system_root_sha256="not-a-root",
+    )
+    blocker_ids = {item.id for item in report.blockers}
+    assert "assurance.attestation" in blocker_ids
+    assert "system-root.invalid" in blocker_ids
+    assert report.allowed is False
+    assert verify_deployment_preflight(report) is True
