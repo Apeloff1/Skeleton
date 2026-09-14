@@ -5,8 +5,16 @@ on:
     paths:
       - "backend/core/charter_policy.py"
       - "backend/core/product_kernel.py"
+      - "backend/core/product_control_plane.py"
+      - "backend/core/product_executor_registry.py"
+      - "backend/core/product_default_executors.py"
+      - "backend/core/execution_receipts.py"
+      - "backend/core/product_operations.py"
       - "backend/tests/test_charter_policy.py"
       - "backend/tests/test_product_kernel.py"
+      - "backend/tests/test_product_executor_registry.py"
+      - "backend/tests/test_execution_receipts.py"
+      - "backend/tests/test_native_product_executors.py"
       - "frontend/src/product/productCatalog.ts"
       - "frontend/src/product/productControlClient.ts"
       - "frontend/app/product.tsx"
@@ -19,8 +27,16 @@ on:
     paths:
       - "backend/core/charter_policy.py"
       - "backend/core/product_kernel.py"
+      - "backend/core/product_control_plane.py"
+      - "backend/core/product_executor_registry.py"
+      - "backend/core/product_default_executors.py"
+      - "backend/core/execution_receipts.py"
+      - "backend/core/product_operations.py"
       - "backend/tests/test_charter_policy.py"
       - "backend/tests/test_product_kernel.py"
+      - "backend/tests/test_product_executor_registry.py"
+      - "backend/tests/test_execution_receipts.py"
+      - "backend/tests/test_native_product_executors.py"
       - "frontend/src/product/productCatalog.ts"
       - "frontend/src/product/productControlClient.ts"
       - "frontend/app/product.tsx"
@@ -45,7 +61,13 @@ jobs:
         with:
           python-version: "3.11"
       - run: python -m pip install "pytest>=8,<9"
-      - run: python -m pytest -q tests/test_charter_policy.py tests/test_product_kernel.py
+      - run: >-
+          python -m pytest -q
+          tests/test_charter_policy.py
+          tests/test_product_kernel.py
+          tests/test_product_executor_registry.py
+          tests/test_execution_receipts.py
+          tests/test_native_product_executors.py
 
   frontend-product-contract:
     runs-on: ubuntu-latest
