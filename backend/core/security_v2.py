@@ -51,9 +51,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         embeddable = path.startswith("/api/playable/") and path.endswith("/raw")
         if embeddable:
-            # Generated/playable HTML is intentionally frameable. CSP sandbox
-            # keeps its script execution out of the application's same-origin
-            # authority even if the generated content is attacker-influenced.
             headers.setdefault(
                 "Content-Security-Policy",
                 "sandbox allow-scripts; default-src 'self' data: blob:; "
@@ -110,9 +107,12 @@ class SecretsScrubFilter(logging.Filter):
             record.msg = msg
             record.args = ()
         except Exception:
-            # Scrubbing must never crash the application or logging pipeline.
             pass
         return True
+
+
+# Backward compatibility for callers using the original singular public name.
+SecretScrubFilter = SecretsScrubFilter
 
 
 def install_secrets_scrub() -> None:
@@ -216,6 +216,7 @@ def install_security_headers(app, *, csp: str | None = None) -> None:
 __all__ = [
     "SecurityHeadersMiddleware",
     "SecretsScrubFilter",
+    "SecretScrubFilter",
     "install_secrets_scrub",
     "cors_allowlist",
     "RequestIdMiddleware",
