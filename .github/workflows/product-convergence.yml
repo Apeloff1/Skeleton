@@ -138,3 +138,4 @@ jobs:
           tests/test_worm_audit.py
           tests/test_principal_seal.py
           tests/test_route_policy_coverage.py
+          tests/test_auth_security.py
