@@ -1,0 +1,21 @@
+# Default owner for repository changes.
+* @Apeloff1
+
+# Security-sensitive surfaces: require explicit owner review when branch
+# protection/rulesets enforce CODEOWNERS.
+/.github/workflows/ @Apeloff1
+/.github/dependabot.yml @Apeloff1
+/SECURITY.md @Apeloff1
+/Dockerfile @Apeloff1
+/.dockerignore @Apeloff1
+/backend/Dockerfile @Apeloff1
+/backend/api_middleware.py @Apeloff1
+/backend/middleware/ @Apeloff1
+/backend/core/ @Apeloff1
+/backend/requirements.txt @Apeloff1
+/backend/pyproject.toml @Apeloff1
+/backend/scripts/check_process_safety.py @Apeloff1
+/frontend/package.json @Apeloff1
+/frontend/yarn.lock @Apeloff1
+/frontend/scripts/ @Apeloff1
+/skeleton/ @Apeloff1
