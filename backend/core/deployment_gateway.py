@@ -6,6 +6,11 @@ Execution re-evaluates safety immediately before the side effect, consumes the
 authorization exactly once, activates the release atomically, then records a
 post-activation transition receipt binding the observed pre/post system roots.
 
+Authorization and completed-transition evidence is automatically anchored into the
+append-only deployment checkpoint ledger. The checkpoint ledger is deliberately
+excluded from the system root it summarizes, avoiding self-reference while giving
+external verifiers a durable publication history.
+
 Transition receipts are deliberately excluded from the system root they attest to.
 If a process dies after release activation but before receipt persistence, the gap is
 not silently reconstructed from later state: status exposes a hard evidence gap and
@@ -35,6 +40,15 @@ from core.deployment_authorization import (
     DeploymentAuthorizationLedger,
     DeploymentConsumption,
     plan_digest,
+)
+from core.deployment_checkpoint_ledger import (
+    DeploymentCheckpointLedger,
+    DeploymentCheckpointLedgerError,
+    DeploymentCheckpointPublication,
+)
+from core.deployment_evidence_checkpoint import (
+    DeploymentEvidenceCheckpoint,
+    build_deployment_evidence_checkpoint,
 )
 from core.deployment_planner import compile_deployment_plan, verify_deployment_plan
 from core.deployment_receipts import DeploymentReceiptLedger, DeploymentTransitionReceipt
@@ -89,6 +103,7 @@ class DeploymentGateway:
         self.authorizations = DeploymentAuthorizationLedger(self.root / "authorizations")
         self.releases = AtomicReleaseDeployer(self.root / "releases")
         self.receipts = DeploymentReceiptLedger(self.root / "transition-receipts")
+        self.checkpoints = DeploymentCheckpointLedger(self.root / "evidence-checkpoints")
 
     @staticmethod
     def _plan(value: dict[str, Any]) -> dict[str, Any]:
@@ -109,6 +124,24 @@ class DeploymentGateway:
         except ValueError as exc:
             raise DeploymentGatewayError(str(exc)) from exc
 
+    def evidence_checkpoint(self) -> DeploymentEvidenceCheckpoint:
+        return build_deployment_evidence_checkpoint(self)
+
+    def publish_evidence_checkpoint(self) -> DeploymentCheckpointPublication:
+        """Publish current verified evidence, retrying only to converge concurrent writers."""
+        last_error: DeploymentCheckpointLedgerError | None = None
+        for _ in range(3):
+            checkpoint = self.evidence_checkpoint()
+            try:
+                return self.checkpoints.publish(checkpoint)
+            except DeploymentCheckpointLedgerError as exc:
+                last_error = exc
+                # Another process may have advanced the underlying ledgers between our
+                # snapshot and checkpoint publication. Rebuild from current verified
+                # state; persistent ledger corruption or real regression will fail again.
+                continue
+        raise DeploymentGatewayError(f"deployment checkpoint publication failed: {last_error}") from last_error
+
     def prepare(self, deployment_input: dict[str, Any], *, ttl_seconds: int = 300,
                 max_attempts: int = 3) -> PreparedDeployment:
         _bounded_int(ttl_seconds, "authorization ttl", minimum=1, maximum=3600)
@@ -120,6 +153,7 @@ class DeploymentGateway:
         if not preflight.allowed or not preflight.stable:
             raise DeploymentGatewayError("deployment preflight blocked authorization")
         authorization = self.authorizations.issue(preflight=preflight, plan=plan, ttl_seconds=ttl_seconds)
+        self.publish_evidence_checkpoint()
         return PreparedDeployment(plan, preflight, authorization)
 
     def _fresh_preflight(self, *, expected_root: str, max_attempts: int) -> ControlPlaneDeploymentPreflight:
@@ -180,6 +214,7 @@ class DeploymentGateway:
                     or existing_receipt.plan_sha256 != existing_consumption.plan_sha256
                     or existing_receipt.pre_system_root_sha256 != existing_consumption.system_root_sha256):
                 raise DeploymentGatewayError("release/authorization/transition evidence mismatch")
+            self.publish_evidence_checkpoint()
             return DeploymentExecution(authorization_id, True, None, existing_consumption,
                                        existing_release, existing_receipt)
 
@@ -199,6 +234,7 @@ class DeploymentGateway:
                 consumption=existing_consumption,
                 pre_system_root_sha256=existing_consumption.system_root_sha256,
             )
+            self.publish_evidence_checkpoint()
             return DeploymentExecution(authorization_id, True, preflight, existing_consumption,
                                        release, receipt)
 
@@ -220,6 +256,7 @@ class DeploymentGateway:
             consumption=consumption,
             pre_system_root_sha256=preflight.root_after_sha256,
         )
+        self.publish_evidence_checkpoint()
         return DeploymentExecution(authorization_id, False, preflight, consumption, release, receipt)
 
     def evidence_gaps(self) -> list[dict[str, str]]:
@@ -354,6 +391,14 @@ class DeploymentGateway:
     def status(self) -> dict[str, Any]:
         gaps = self.evidence_gaps()
         portability = self.portability_status()
+        current_checkpoint = self.evidence_checkpoint()
+        latest_publication = self.checkpoints.latest()
+        checkpoint_current = (
+            latest_publication is not None
+            and hmac.compare_digest(latest_publication.checkpoint_root_sha256, current_checkpoint.root_sha256)
+        )
+        internally_verified = len(gaps) == 0
+        independently_verifiable = internally_verified and portability["all_completed_releases_portable"]
         return {
             "authorization": self.authorizations.status(),
             "release_backend": self.releases.status(),
@@ -361,16 +406,21 @@ class DeploymentGateway:
             "evidence_gaps": gaps,
             "evidence_gap_count": len(gaps),
             "portability": portability,
-            "verified": len(gaps) == 0,
-            "independently_verifiable": len(gaps) == 0 and portability["all_completed_releases_portable"],
+            "evidence_checkpoint": asdict(current_checkpoint),
+            "checkpoint_publication": self.checkpoints.status(),
+            "checkpoint_current": checkpoint_current,
+            "verified": internally_verified,
+            "independently_verifiable": independently_verifiable,
+            "externally_pinnable": independently_verifiable and checkpoint_current,
         }
 
     def root_component(self) -> dict[str, Any]:
         """Product-state projection safe to include in the system root.
 
-        Outstanding permissions and transition receipts are intentionally excluded:
-        issuing permission must not mutate the root it authorizes, and a receipt
-        cannot be part of the root it attests. Activated release state is
+        Outstanding permissions, transition receipts, and checkpoint publications are
+        intentionally excluded: issuing permission must not mutate the root it
+authorizes; a receipt cannot be part of the root it attests; and a checkpoint cannot
+        become part of the state it summarizes. Activated release state remains
         consequential product state and therefore rotates the root in the canonical
         ProductControlPlane, where this component is included in system_root().
         """
