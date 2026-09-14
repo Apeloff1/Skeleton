@@ -40,5 +40,5 @@ def test_system_root_includes_all_critical_evidence_domains(tmp_path):
     names = {item["name"] for item in root["components"]}
     assert names == {
         "policy", "executors", "readiness", "lifecycle", "audit", "outbox", "receipts", "kernel",
-        "curiosity_runtime", "epistemic_root", "epistemic_transparency", "epistemic_gossip",
+        "curiosity_runtime", "epistemic_root", "epistemic_trust",
     }
