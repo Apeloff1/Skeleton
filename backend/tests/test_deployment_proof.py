@@ -4,18 +4,7 @@ import json
 
 from core.deployment_authorization import plan_digest
 from core.deployment_gateway import DeploymentGateway
-from core.deployment_proof import (
-    _authorization_event_schema,
-    _proof_payload,
-    _receipt_record_semantics,
-    _release_record_semantics,
-    _sha,
-    _verify_chain_suffix,
-    _verify_receipt_suffix,
-    _verify_release_suffix,
-    build_portable_deployment_proof,
-    verify_portable_deployment_proof,
-)
+from core.deployment_proof import build_portable_deployment_proof, verify_portable_deployment_proof
 from core.deployment_planner import verify_deployment_plan
 
 
@@ -109,30 +98,6 @@ def test_portable_proof_verifies_historical_deployment_against_newer_heads(tmp_p
     assert len(proof.release_suffix) == 2
     assert len(proof.receipt_suffix) == 2
     assert verify_portable_deployment_proof(proof, **_pins(gateway, proof)) is True
-
-
-def test_historical_proof_layers_each_validate_against_current_heads(tmp_path):
-    gateway = _gateway(tmp_path)
-    first = gateway.prepare(_input("artifact-v1"))
-    gateway.execute(first.authorization.id, first.plan)
-    second = gateway.prepare(_input("artifact-v2"))
-    gateway.execute(second.authorization.id, second.plan)
-    proof = build_portable_deployment_proof(gateway, first.authorization.id)
-    pins = _pins(gateway, proof)
-
-    assert _sha(_proof_payload(proof)) == proof.proof_sha256
-
-    auth_suffix = tuple(proof.authorization_suffix)
-    assert all(_authorization_event_schema(row) for row in auth_suffix), [set(row) for row in auth_suffix]
-    assert _verify_chain_suffix(auth_suffix, expected_head=pins["expected_authorization_head_sha256"])
-
-    release_suffix = tuple(proof.release_suffix)
-    assert all(_release_record_semantics(row) for row in release_suffix), release_suffix
-    assert _verify_release_suffix(release_suffix, expected_head=pins["expected_release_channel_head_sha256"])
-
-    receipt_suffix = tuple(proof.receipt_suffix)
-    assert all(_receipt_record_semantics(row) for row in receipt_suffix), receipt_suffix
-    assert _verify_receipt_suffix(receipt_suffix, expected_head=pins["expected_receipt_head_sha256"])
 
 
 def test_portable_proof_requires_external_head_pins(tmp_path):

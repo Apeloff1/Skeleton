@@ -8,10 +8,8 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import math
+import json
 from typing import Any
-
-from core.canonical_json import canonical_json_bytes
 
 _ALLOWED_ENVS = {"development", "staging", "production"}
 _ALLOWED_STRATEGIES = {"rolling", "canary", "blue-green"}
@@ -31,51 +29,16 @@ _HEALTH_KEYS = {"max_error_rate_pct", "max_p95_latency_ms", "min_success_rate_pc
 
 
 def _canonical(value: Any) -> bytes:
-    return canonical_json_bytes(value)
-
-
-def _text(value: Any, *, field: str, default: str | None = None) -> str:
-    if value is None or value == "":
-        if default is None:
-            return ""
-        return default
-    if not isinstance(value, str):
-        raise ValueError(f"{field} must be a string")
-    return value.strip()
-
-
-def _finite_float(value: Any, *, field: str) -> float:
-    if isinstance(value, bool):
-        raise ValueError(f"{field} must be numeric")
-    try:
-        number = float(value)
-    except (TypeError, ValueError, OverflowError) as exc:
-        raise ValueError(f"{field} must be numeric") from exc
-    if not math.isfinite(number):
-        raise ValueError(f"{field} must be finite")
-    return number
-
-
-def _whole_number(value: Any, *, field: str) -> int:
-    number = _finite_float(value, field=field)
-    if not number.is_integer():
-        raise ValueError(f"{field} must be a whole number")
-    return int(number)
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
 def compile_deployment_plan(payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("deployment payload must be an object")
-
-    environment = _text(payload.get("environment"), field="environment", default="staging").lower()
-    strategy_default = "canary" if environment == "production" else "rolling"
-    strategy = _text(payload.get("strategy"), field="strategy", default=strategy_default).lower()
-    target = _text(payload.get("target"), field="target", default="product-runtime")
-    artifact_raw = payload.get("artifact")
-    if artifact_raw is None or artifact_raw == "":
-        artifact_raw = payload.get("artifact_id")
-    artifact = _text(artifact_raw, field="artifact")
-
+    environment = str(payload.get("environment") or "staging").strip().lower()
+    strategy = str(payload.get("strategy") or ("canary" if environment == "production" else "rolling")).strip().lower()
+    target = str(payload.get("target") or "product-runtime").strip()
+    artifact = str(payload.get("artifact") or payload.get("artifact_id") or "").strip()
     if environment not in _ALLOWED_ENVS:
         raise ValueError("unsupported deployment environment")
     if strategy not in _ALLOWED_STRATEGIES:
@@ -86,10 +49,7 @@ def compile_deployment_plan(payload: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("deployment artifact is required")
 
     production = environment == "production"
-    requested_pct = _whole_number(
-        payload.get("canary_percent", 5 if production else 100),
-        field="canary_percent",
-    )
+    requested_pct = int(payload.get("canary_percent", 5 if production else 100))
     if requested_pct < 1 or requested_pct > 100:
         raise ValueError("canary_percent must be between 1 and 100")
     canary_pct = min(requested_pct, 25) if strategy == "canary" and production else requested_pct
@@ -120,18 +80,9 @@ def compile_deployment_plan(payload: dict[str, Any]) -> dict[str, Any]:
         ]
 
     health = {
-        "max_error_rate_pct": _finite_float(
-            payload.get("max_error_rate_pct", 1.0 if production else 5.0),
-            field="max_error_rate_pct",
-        ),
-        "max_p95_latency_ms": _whole_number(
-            payload.get("max_p95_latency_ms", 750),
-            field="max_p95_latency_ms",
-        ),
-        "min_success_rate_pct": _finite_float(
-            payload.get("min_success_rate_pct", 99.0 if production else 95.0),
-            field="min_success_rate_pct",
-        ),
+        "max_error_rate_pct": float(payload.get("max_error_rate_pct", 1.0 if production else 5.0)),
+        "max_p95_latency_ms": int(payload.get("max_p95_latency_ms", 750)),
+        "min_success_rate_pct": float(payload.get("min_success_rate_pct", 99.0 if production else 95.0)),
     }
     if not (0 <= health["max_error_rate_pct"] <= 100 and 0 <= health["min_success_rate_pct"] <= 100):
         raise ValueError("health percentages must be between 0 and 100")

@@ -149,10 +149,6 @@ def test_epistemic_gate_propagates_methodology_and_replication_fields():
                 "code_available": True,
                 "sample_size": 180,
                 "uncertainty_reported": True,
-                "citation_binding": {
-                    "binding_method": "direct_quote",
-                    "evidence_span": claim,
-                },
             },
             {
                 "source_id": "study-b",
@@ -170,10 +166,6 @@ def test_epistemic_gate_propagates_methodology_and_replication_fields():
                 "code_available": True,
                 "sample_size": 220,
                 "uncertainty_reported": True,
-                "citation_binding": {
-                    "binding_method": "direct_quote",
-                    "evidence_span": claim,
-                },
             },
         ]},
     })

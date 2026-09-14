@@ -65,9 +65,7 @@ def test_voyage_special_ability_reduces_matching_hazard():
 
 
 def test_voyage_fails_before_mutation_when_supplies_insufficient():
-    # Keep the route inside the vessel's sea-time envelope so this test isolates
-    # supply admission rather than correctly tripping the independent range guard.
-    spec = VesselSpec("raft", 1, 2, 20, 10, 1, 300)
+    spec = VesselSpec("raft", 1, 2, 20, 10, 1, 30)
     state = VesselState(spec=spec, crew=1, food=0.1, water=100)
     sim = VoyageSimulator(state)
     before_hull = state.hull

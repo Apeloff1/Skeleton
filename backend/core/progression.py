@@ -90,10 +90,8 @@ class ProgressionState:
     ) -> FinishResult:
         if not stage_id:
             raise ValueError("stage_id is required")
-        if not math.isfinite(score) or not math.isfinite(distance):
-            raise ValueError("score and distance must be finite")
-        if score < 0 or distance < 0:
-            raise ValueError("score and distance cannot be negative")
+        if not math.isfinite(score) or not math.isfinite(distance) or score < 0 or distance < 0:
+            raise ValueError("score and distance must be finite and non-negative")
         previous = self.best.get(stage_id)
         improved = previous is None or score < previous
         current_medal = self.medals.get(stage_id, Medal.NONE)

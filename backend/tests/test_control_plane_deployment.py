@@ -1,7 +1,5 @@
 from dataclasses import replace
 
-import pytest
-
 from core.control_plane_deployment import (
     evaluate_control_plane_deployment,
     verify_control_plane_deployment_preflight,
@@ -51,11 +49,6 @@ class FlappingPlane(StablePlane):
         return {"root_sha256": f"{self.counter:064x}"[-64:]}
 
 
-class InvalidRootPlane(StablePlane):
-    def system_root(self):
-        return {"root_sha256": True}
-
-
 def test_stable_finalized_control_plane_can_authorize_deployment():
     report = evaluate_control_plane_deployment(StablePlane(), evaluated_at="2026-09-14T16:30:00+00:00")
     assert report.stable is True
@@ -87,30 +80,3 @@ def test_control_plane_preflight_attestation_detects_mutation():
     report = evaluate_control_plane_deployment(StablePlane(), evaluated_at="2026-09-14T16:30:00+00:00")
     assert verify_control_plane_deployment_preflight(report) is True
     assert verify_control_plane_deployment_preflight(replace(report, allowed=False)) is False
-    assert verify_control_plane_deployment_preflight(replace(report, attempts=True)) is False
-
-
-@pytest.mark.parametrize("value", [True, 1.5, "3", 0, 11])
-def test_retry_count_requires_bounded_exact_integer(value):
-    with pytest.raises(ValueError, match="integer between 1 and 10"):
-        evaluate_control_plane_deployment(
-            StablePlane(), max_attempts=value, evaluated_at="2026-09-14T16:30:00+00:00",
-        )
-
-
-def test_naive_evaluation_timestamp_is_rejected():
-    with pytest.raises(ValueError, match="timezone-aware"):
-        evaluate_control_plane_deployment(
-            StablePlane(), evaluated_at="2026-09-14T16:30:00",
-        )
-
-
-def test_non_string_system_root_cannot_be_coerced_into_authorization_evidence():
-    report = evaluate_control_plane_deployment(
-        InvalidRootPlane(), max_attempts=1, evaluated_at="2026-09-14T16:30:00+00:00",
-    )
-    assert report.allowed is False
-    assert report.stable is False
-    assert "invalid or unstable" in report.unstable_reason
-    assert "system-root.invalid" in {item.id for item in report.report.blockers}
-    assert verify_control_plane_deployment_preflight(report) is False

@@ -10,18 +10,13 @@ Transition receipts are deliberately excluded from the system root they attest t
 If a process dies after release activation but before receipt persistence, the gap is
 not silently reconstructed from later state: status exposes a hard evidence gap and
 replay fails closed until an explicit forensic reconciliation path handles it.
-
-Trust decisions in this module never rely on Python's implicit coercion rules. IDs,
-roots, retry counts, and persisted evidence must already have their canonical JSON
-types and representations before they cross the gateway boundary.
 """
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 import hmac
 from pathlib import Path
-import re
-from typing import Any, Mapping
+from typing import Any
 
 from core.atomic_release_deployer import AtomicReleaseDeployer, ReleaseRecord
 from core.control_plane_deployment import (
@@ -38,8 +33,6 @@ from core.deployment_authorization import (
 )
 from core.deployment_planner import compile_deployment_plan, verify_deployment_plan
 from core.deployment_receipts import DeploymentReceiptLedger, DeploymentTransitionReceipt
-
-_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
 class DeploymentGatewayError(RuntimeError):
@@ -63,24 +56,6 @@ class DeploymentExecution:
     transition_receipt: DeploymentTransitionReceipt
 
 
-def _canonical_text(value: Any, field: str) -> str:
-    if not isinstance(value, str) or not value or value != value.strip():
-        raise ValueError(f"{field} must be a canonical non-empty string")
-    return value
-
-
-def _canonical_sha256(value: Any, field: str) -> str:
-    if not isinstance(value, str) or not _SHA256.fullmatch(value):
-        raise ValueError(f"{field} must be lowercase sha256")
-    return value
-
-
-def _bounded_int(value: Any, field: str, *, minimum: int, maximum: int) -> int:
-    if type(value) is not int or value < minimum or value > maximum:
-        raise ValueError(f"{field} must be an integer between {minimum} and {maximum}")
-    return value
-
-
 class DeploymentGateway:
     def __init__(self, root: str | Path, *, control_plane) -> None:
         self.root = Path(root)
@@ -100,19 +75,8 @@ class DeploymentGateway:
             return dict(value)
         return compile_deployment_plan(value)
 
-    def _system_root_sha256(self) -> str:
-        raw = self.control_plane.system_root()
-        if not isinstance(raw, Mapping):
-            raise DeploymentGatewayError("control-plane system root must be an object")
-        try:
-            return _canonical_sha256(raw.get("root_sha256"), "control-plane system root")
-        except ValueError as exc:
-            raise DeploymentGatewayError(str(exc)) from exc
-
     def prepare(self, deployment_input: dict[str, Any], *, ttl_seconds: int = 300,
                 max_attempts: int = 3) -> PreparedDeployment:
-        _bounded_int(ttl_seconds, "authorization ttl", minimum=1, maximum=3600)
-        _bounded_int(max_attempts, "max_attempts", minimum=1, maximum=10)
         plan = self._plan(deployment_input)
         preflight = evaluate_control_plane_deployment(self.control_plane, max_attempts=max_attempts)
         if not verify_control_plane_deployment_preflight(preflight):
@@ -123,8 +87,6 @@ class DeploymentGateway:
         return PreparedDeployment(plan, preflight, authorization)
 
     def _fresh_preflight(self, *, expected_root: str, max_attempts: int) -> ControlPlaneDeploymentPreflight:
-        expected_root = _canonical_sha256(expected_root, "expected system root")
-        _bounded_int(max_attempts, "max_attempts", minimum=1, maximum=10)
         preflight = evaluate_control_plane_deployment(self.control_plane, max_attempts=max_attempts)
         if not verify_control_plane_deployment_preflight(preflight):
             raise DeploymentGatewayError("fresh deployment preflight attestation failed verification")
@@ -136,8 +98,7 @@ class DeploymentGateway:
 
     def _record_transition(self, *, release: ReleaseRecord, consumption: DeploymentConsumption,
                            pre_system_root_sha256: str) -> DeploymentTransitionReceipt:
-        pre_system_root_sha256 = _canonical_sha256(pre_system_root_sha256, "pre-system root")
-        post_root = self._system_root_sha256()
+        post_root = str(self.control_plane.system_root()["root_sha256"])
         if hmac.compare_digest(pre_system_root_sha256, post_root):
             raise DeploymentGatewayError("release activation did not rotate the whole-system root")
         return self.receipts.record(
@@ -155,8 +116,9 @@ class DeploymentGateway:
 
     def execute(self, authorization_id: str, deployment_input: dict[str, Any], *,
                 max_attempts: int = 3) -> DeploymentExecution:
-        authorization_id = _canonical_text(authorization_id, "authorization_id")
-        _bounded_int(max_attempts, "max_attempts", minimum=1, maximum=10)
+        authorization_id = str(authorization_id).strip()
+        if not authorization_id:
+            raise ValueError("authorization_id is required")
         plan = self._plan(deployment_input)
         expected_plan = plan_digest(plan)
 
@@ -226,16 +188,13 @@ class DeploymentGateway:
         releases = {row.authorization_id: row for row in self.releases.snapshot()}
         receipts = {row.authorization_id: row for row in self.receipts.snapshot()}
         authorization_events = self.authorizations.snapshot_events()
-        consumes: dict[str, dict[str, Any]] = {}
-        for row in authorization_events:
-            if row.get("kind") != "consume":
-                continue
-            authorization_id = row.get("authorization_id")
-            if not isinstance(authorization_id, str) or not authorization_id:
-                raise DeploymentGatewayError("verified authorization event has malformed identity")
-            consumes[authorization_id] = row
-
+        consumes = {
+            str(row["authorization_id"]): row
+            for row in authorization_events
+            if row.get("kind") == "consume"
+        }
         gaps: list[dict[str, str]] = []
+
         for authorization_id, consume in consumes.items():
             release = releases.get(authorization_id)
             if release is None:
@@ -245,11 +204,8 @@ class DeploymentGateway:
                     "kind": "consumption_without_release",
                 })
                 continue
-            plan_sha = consume.get("plan_sha256")
-            system_root = consume.get("system_root_sha256")
-            if not isinstance(plan_sha, str) or not isinstance(system_root, str):
-                raise DeploymentGatewayError("verified authorization consumption has malformed evidence types")
-            if release.plan_sha256 != plan_sha or release.system_root_sha256 != system_root:
+            if (release.plan_sha256 != str(consume.get("plan_sha256") or "")
+                    or release.system_root_sha256 != str(consume.get("system_root_sha256") or "")):
                 gaps.append({
                     "authorization_id": authorization_id,
                     "release_id": release.release_id,
@@ -302,14 +258,11 @@ class DeploymentGateway:
         """
         from core.deployment_proof import DEPLOYMENT_PROOF_VERSION
 
-        issues: dict[str, dict[str, Any]] = {}
-        for row in self.authorizations.snapshot_events():
-            if row.get("kind") != "issue":
-                continue
-            authorization_id = row.get("authorization_id")
-            if not isinstance(authorization_id, str) or not authorization_id:
-                raise DeploymentGatewayError("verified authorization issue has malformed identity")
-            issues[authorization_id] = row
+        issues = {
+            str(row.get("authorization_id") or ""): row
+            for row in self.authorizations.snapshot_events()
+            if row.get("kind") == "issue"
+        }
         releases = self.releases.snapshot()
         receipts = {row.authorization_id: row for row in self.receipts.snapshot()}
         fully_portable = 0
@@ -348,7 +301,6 @@ class DeploymentGateway:
 
     def portable_proof(self, authorization_id: str):
         from core.deployment_proof import build_portable_deployment_proof
-        authorization_id = _canonical_text(authorization_id, "authorization_id")
         return build_portable_deployment_proof(self, authorization_id)
 
     def status(self) -> dict[str, Any]:

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
+import hashlib
 import hmac
 import json
 import os
@@ -17,17 +18,10 @@ import re
 import uuid
 from typing import Any, Mapping
 
-from core.canonical_json import (
-    CanonicalJSONError,
-    canonical_json_clone,
-    canonical_json_sha256,
-    canonical_json_text,
-)
 from core.control_plane_deployment import (
     ControlPlaneDeploymentPreflight,
     verify_control_plane_deployment_preflight,
 )
-from core.deployment_planner import verify_deployment_plan
 from core.deployment_preflight import DeploymentPreflight, PreflightFinding
 from core.file_lease import FileLease
 
@@ -59,53 +53,22 @@ class DeploymentConsumption:
     consume_event_sha256: str
 
 
+def _canonical(value: Any) -> bytes:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+
+
 def _sha(value: Any) -> str:
-    return canonical_json_sha256(value)
-
-
-def _is_sha(value: Any) -> bool:
-    return isinstance(value, str) and bool(_SHA256.fullmatch(value))
-
-
-def _exact_int(value: Any, field: str) -> int:
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise ValueError(f"{field} must be an integer")
-    return value
-
-
-def _exact_bool(value: Any, field: str) -> bool:
-    if not isinstance(value, bool):
-        raise ValueError(f"{field} must be a boolean")
-    return value
-
-
-def _exact_str(value: Any, field: str, *, allow_empty: bool = False) -> str:
-    if not isinstance(value, str) or (not allow_empty and not value):
-        raise ValueError(f"{field} must be a string")
-    return value
-
-
-def _snapshot_plan(plan: dict[str, Any]) -> dict[str, Any]:
-    if not isinstance(plan, dict) or not plan:
-        raise ValueError("deployment plan must be a non-empty object")
-    try:
-        snapshot = canonical_json_clone(plan)
-    except CanonicalJSONError as exc:
-        raise ValueError("deployment plan must contain only finite canonical JSON values") from exc
-    if not isinstance(snapshot, dict) or not snapshot:
-        raise ValueError("deployment plan must be a non-empty object")
-    if not verify_deployment_plan(snapshot):
-        raise ValueError("deployment plan failed semantic verification")
-    return snapshot
+    return hashlib.sha256(_canonical(value)).hexdigest()
 
 
 def plan_digest(plan: dict[str, Any]) -> str:
-    return _sha(_snapshot_plan(plan))
+    if not isinstance(plan, dict) or not plan:
+        raise ValueError("deployment plan must be a non-empty object")
+    return _sha(plan)
 
 
-def _parse(value: Any) -> datetime:
-    value = _exact_str(value, "authorization timestamp")
-    stamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+def _parse(value: str) -> datetime:
+    stamp = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     if stamp.tzinfo is None:
         raise ValueError("authorization timestamps must be timezone-aware")
     return stamp.astimezone(UTC)
@@ -117,51 +80,35 @@ def serialize_preflight_snapshot(preflight: ControlPlaneDeploymentPreflight) -> 
     return asdict(preflight)
 
 
-def _restore_finding(raw: Any, *, field: str) -> PreflightFinding:
-    if not isinstance(raw, Mapping) or set(raw) != {"id", "severity", "detail"}:
-        raise ValueError(f"{field} finding is malformed")
-    return PreflightFinding(
-        _exact_str(raw["id"], f"{field}.id"),
-        _exact_str(raw["severity"], f"{field}.severity"),
-        _exact_str(raw["detail"], f"{field}.detail"),
-    )
-
-
 def restore_preflight_snapshot(raw: Mapping[str, Any]) -> ControlPlaneDeploymentPreflight:
     try:
-        if not isinstance(raw, Mapping):
-            raise TypeError("preflight snapshot must be an object")
         report_raw = raw["report"]
         if not isinstance(report_raw, Mapping):
             raise TypeError("preflight report must be an object")
-        blockers_raw = report_raw.get("blockers", ())
-        warnings_raw = report_raw.get("warnings", ())
-        if not isinstance(blockers_raw, (list, tuple)) or not isinstance(warnings_raw, (list, tuple)):
-            raise TypeError("preflight findings must be arrays")
         report = DeploymentPreflight(
-            version=_exact_int(report_raw["version"], "report.version"),
-            allowed=_exact_bool(report_raw["allowed"], "report.allowed"),
-            posture=_exact_str(report_raw["posture"], "report.posture"),
-            blockers=tuple(_restore_finding(item, field="report.blockers") for item in blockers_raw),
-            warnings=tuple(_restore_finding(item, field="report.warnings") for item in warnings_raw),
-            assurance_attestation_sha256=_exact_str(report_raw["assurance_attestation_sha256"], "report.assurance_attestation_sha256"),
-            system_root_sha256=_exact_str(report_raw["system_root_sha256"], "report.system_root_sha256"),
-            trust_state_sha256=_exact_str(report_raw["trust_state_sha256"], "report.trust_state_sha256"),
-            finality_required=_exact_bool(report_raw["finality_required"], "report.finality_required"),
-            finality_satisfied=_exact_bool(report_raw["finality_satisfied"], "report.finality_satisfied"),
-            attestation_sha256=_exact_str(report_raw["attestation_sha256"], "report.attestation_sha256"),
+            version=int(report_raw["version"]),
+            allowed=bool(report_raw["allowed"]),
+            posture=str(report_raw["posture"]),
+            blockers=tuple(PreflightFinding(**dict(item)) for item in report_raw.get("blockers", ())),
+            warnings=tuple(PreflightFinding(**dict(item)) for item in report_raw.get("warnings", ())),
+            assurance_attestation_sha256=str(report_raw["assurance_attestation_sha256"]),
+            system_root_sha256=str(report_raw["system_root_sha256"]),
+            trust_state_sha256=str(report_raw["trust_state_sha256"]),
+            finality_required=bool(report_raw["finality_required"]),
+            finality_satisfied=bool(report_raw["finality_satisfied"]),
+            attestation_sha256=str(report_raw["attestation_sha256"]),
         )
         preflight = ControlPlaneDeploymentPreflight(
-            version=_exact_int(raw["version"], "preflight.version"),
-            allowed=_exact_bool(raw["allowed"], "preflight.allowed"),
-            stable=_exact_bool(raw["stable"], "preflight.stable"),
-            attempts=_exact_int(raw["attempts"], "preflight.attempts"),
-            root_before_sha256=_exact_str(raw["root_before_sha256"], "preflight.root_before_sha256"),
-            root_after_sha256=_exact_str(raw["root_after_sha256"], "preflight.root_after_sha256"),
-            evaluated_at=_exact_str(raw["evaluated_at"], "preflight.evaluated_at"),
-            unstable_reason=_exact_str(raw.get("unstable_reason", ""), "preflight.unstable_reason", allow_empty=True),
+            version=int(raw["version"]),
+            allowed=bool(raw["allowed"]),
+            stable=bool(raw["stable"]),
+            attempts=int(raw["attempts"]),
+            root_before_sha256=str(raw["root_before_sha256"]),
+            root_after_sha256=str(raw["root_after_sha256"]),
+            evaluated_at=str(raw["evaluated_at"]),
+            unstable_reason=str(raw.get("unstable_reason", "")),
             report=report,
-            attestation_sha256=_exact_str(raw["attestation_sha256"], "preflight.attestation_sha256"),
+            attestation_sha256=str(raw["attestation_sha256"]),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise ValueError("deployment preflight snapshot is malformed") from exc
@@ -197,42 +144,27 @@ class DeploymentAuthorizationLedger:
                 row = json.loads(line)
             except json.JSONDecodeError as exc:
                 raise DeploymentAuthorizationError("authorization ledger malformed") from exc
-            raw_version = row.get("version")
-            raw_sequence = row.get("sequence")
-            if (
-                isinstance(raw_version, bool)
-                or raw_version != AUTH_VERSION
-                or isinstance(raw_sequence, bool)
-                or not isinstance(raw_sequence, int)
-                or raw_sequence != sequence
-                or row.get("previous_sha256", "") != previous
-            ):
+            if row.get("version") != AUTH_VERSION or int(row.get("sequence", 0)) != sequence or row.get("previous_sha256", "") != previous:
                 raise DeploymentAuthorizationError("authorization ledger ancestry/version mismatch")
-            claimed = row.get("sha256")
-            if not _is_sha(claimed):
-                raise DeploymentAuthorizationError("authorization event hash malformed")
+            claimed = str(row.get("sha256") or "")
             payload = {k: v for k, v in row.items() if k != "sha256"}
-            try:
-                hash_valid = hmac.compare_digest(_sha(payload), claimed)
-            except CanonicalJSONError as exc:
-                raise DeploymentAuthorizationError("authorization event is not canonical JSON") from exc
-            if not hash_valid:
+            if not _SHA256.fullmatch(claimed) or not hmac.compare_digest(_sha(payload), claimed):
                 raise DeploymentAuthorizationError("authorization event hash mismatch")
             kind = row.get("kind")
-            auth_id = row.get("authorization_id")
-            if kind not in {"issue", "consume"} or not isinstance(auth_id, str) or not auth_id:
+            auth_id = str(row.get("authorization_id") or "")
+            if kind not in {"issue", "consume"} or not auth_id:
                 raise DeploymentAuthorizationError("authorization event malformed")
             for field in ("system_root_sha256", "plan_sha256"):
-                if not _is_sha(row.get(field)):
+                if not _SHA256.fullmatch(str(row.get(field) or "")):
                     raise DeploymentAuthorizationError(f"authorization {field} malformed")
             if kind == "issue":
                 if auth_id in issues:
                     raise DeploymentAuthorizationError("duplicate authorization issue")
-                if not _is_sha(row.get("preflight_sha256")):
+                if not _SHA256.fullmatch(str(row.get("preflight_sha256") or "")):
                     raise DeploymentAuthorizationError("authorization preflight digest malformed")
                 try:
-                    issued = _parse(row["issued_at"])
-                    expires = _parse(row["expires_at"])
+                    issued = _parse(str(row["issued_at"]))
+                    expires = _parse(str(row["expires_at"]))
                 except (KeyError, ValueError) as exc:
                     raise DeploymentAuthorizationError("authorization issue timestamps malformed") from exc
                 if expires <= issued:
@@ -252,11 +184,7 @@ class DeploymentAuthorizationLedger:
                     plan = row["plan"]
                     if not isinstance(plan, dict) or not plan:
                         raise DeploymentAuthorizationError("persisted deployment plan snapshot is malformed")
-                    try:
-                        persisted_digest = plan_digest(plan)
-                    except ValueError as exc:
-                        raise DeploymentAuthorizationError("persisted deployment plan snapshot failed verification") from exc
-                    if not hmac.compare_digest(persisted_digest, row["plan_sha256"]):
+                    if not hmac.compare_digest(plan_digest(plan), str(row["plan_sha256"])):
                         raise DeploymentAuthorizationError("persisted deployment plan digest diverges from issue event")
                 issues[auth_id] = row
             else:
@@ -270,9 +198,9 @@ class DeploymentAuthorizationLedger:
                 if row.get("system_root_sha256") != issue.get("system_root_sha256") or row.get("plan_sha256") != issue.get("plan_sha256"):
                     raise DeploymentAuthorizationError("authorization consume identity diverges from issue")
                 try:
-                    consumed_at = _parse(row["consumed_at"])
-                    issued = _parse(issue["issued_at"])
-                    expires = _parse(issue["expires_at"])
+                    consumed_at = _parse(str(row["consumed_at"]))
+                    issued = _parse(str(issue["issued_at"]))
+                    expires = _parse(str(issue["expires_at"]))
                 except (KeyError, ValueError) as exc:
                     raise DeploymentAuthorizationError("authorization consume timestamp malformed") from exc
                 if consumed_at < issued or consumed_at > expires:
@@ -291,7 +219,7 @@ class DeploymentAuthorizationLedger:
         }
         event["sha256"] = _sha(event)
         with self.path.open("a", encoding="utf-8") as handle:
-            handle.write(canonical_json_text(event) + "\n")
+            handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n")
             handle.flush()
             os.fsync(handle.fileno())
         return event
@@ -306,13 +234,12 @@ class DeploymentAuthorizationLedger:
               ttl_seconds: int = 300, issued_at: str | None = None) -> DeploymentAuthorization:
         if not verify_control_plane_deployment_preflight(preflight) or not preflight.allowed or not preflight.stable:
             raise DeploymentAuthorizationError("deployment preflight is not authorizing/stable")
-        if isinstance(ttl_seconds, bool) or not isinstance(ttl_seconds, int) or ttl_seconds < 1 or ttl_seconds > 3600:
-            raise ValueError("authorization ttl must be an integer between 1 and 3600 seconds")
-        snapshot = _snapshot_plan(plan)
-        digest = _sha(snapshot)
-        stamp = issued_at if issued_at is not None else datetime.now(UTC).isoformat()
+        if ttl_seconds < 1 or ttl_seconds > 3600:
+            raise ValueError("authorization ttl must be between 1 and 3600 seconds")
+        stamp = issued_at or datetime.now(UTC).isoformat()
         issued = _parse(stamp)
         expires = (issued + timedelta(seconds=ttl_seconds)).isoformat()
+        digest = plan_digest(plan)
         auth_id = uuid.uuid4().hex
         with self._lease.acquire():
             rows = self._load_verified()
@@ -323,7 +250,7 @@ class DeploymentAuthorizationLedger:
                 "preflight_sha256": preflight.attestation_sha256,
                 "preflight": serialize_preflight_snapshot(preflight),
                 "plan_sha256": digest,
-                "plan": snapshot,
+                "plan": dict(plan),
                 "issued_at": stamp,
                 "expires_at": expires,
             }, rows)
@@ -334,11 +261,7 @@ class DeploymentAuthorizationLedger:
 
     def consume(self, authorization_id: str, *, current_system_root_sha256: str, plan: dict[str, Any],
                 consumed_at: str | None = None) -> DeploymentConsumption:
-        if not isinstance(authorization_id, str) or not authorization_id:
-            raise ValueError("authorization_id must be a non-empty string")
-        if not _is_sha(current_system_root_sha256):
-            raise ValueError("current_system_root_sha256 must be sha256")
-        stamp = consumed_at if consumed_at is not None else datetime.now(UTC).isoformat()
+        stamp = consumed_at or datetime.now(UTC).isoformat()
         now = _parse(stamp)
         digest = plan_digest(plan)
         with self._lease.acquire():
@@ -348,13 +271,13 @@ class DeploymentAuthorizationLedger:
                 raise DeploymentAuthorizationError("authorization not found")
             if prior is not None:
                 raise DeploymentAuthorizationError("authorization already consumed")
-            if now > _parse(issue["expires_at"]):
+            if now > _parse(str(issue["expires_at"])):
                 raise DeploymentAuthorizationError("authorization expired")
-            if now < _parse(issue["issued_at"]):
+            if now < _parse(str(issue["issued_at"])):
                 raise DeploymentAuthorizationError("authorization cannot be consumed before issue")
-            if not hmac.compare_digest(issue["system_root_sha256"], current_system_root_sha256):
+            if not hmac.compare_digest(str(issue["system_root_sha256"]), str(current_system_root_sha256)):
                 raise DeploymentAuthorizationError("system root changed after preflight")
-            if not hmac.compare_digest(issue["plan_sha256"], digest):
+            if not hmac.compare_digest(str(issue["plan_sha256"]), digest):
                 raise DeploymentAuthorizationError("deployment plan changed after authorization")
             event = self._append({
                 "kind": "consume",
@@ -369,35 +292,31 @@ class DeploymentAuthorizationLedger:
         )
 
     def authorization(self, authorization_id: str) -> DeploymentAuthorization | None:
-        if not isinstance(authorization_id, str) or not authorization_id:
-            return None
         with self._lease.acquire():
             rows = self._load_verified()
             issue, _ = self._state(authorization_id, rows)
         if issue is None:
             return None
         return DeploymentAuthorization(
-            issue["authorization_id"], issue["system_root_sha256"], issue["preflight_sha256"],
-            issue["plan_sha256"], issue["issued_at"], issue["expires_at"], issue["sha256"],
+            str(issue["authorization_id"]), str(issue["system_root_sha256"]), str(issue["preflight_sha256"]),
+            str(issue["plan_sha256"]), str(issue["issued_at"]), str(issue["expires_at"]), str(issue["sha256"]),
         )
 
     def consumption(self, authorization_id: str) -> DeploymentConsumption | None:
-        if not isinstance(authorization_id, str) or not authorization_id:
-            return None
         with self._lease.acquire():
             rows = self._load_verified()
             _, consume = self._state(authorization_id, rows)
         if consume is None:
             return None
         return DeploymentConsumption(
-            authorization_id, consume["consumed_at"], consume["system_root_sha256"],
-            consume["plan_sha256"], consume["sha256"],
+            authorization_id, str(consume["consumed_at"]), str(consume["system_root_sha256"]),
+            str(consume["plan_sha256"]), str(consume["sha256"]),
         )
 
     def proof_events(self, authorization_id: str) -> dict[str, Any]:
-        if not isinstance(authorization_id, str) or not authorization_id.strip():
+        authorization_id = str(authorization_id).strip()
+        if not authorization_id:
             raise ValueError("authorization_id is required")
-        authorization_id = authorization_id.strip()
         with self._lease.acquire():
             rows = self._load_verified()
             issue, consume = self._state(authorization_id, rows)
@@ -406,7 +325,7 @@ class DeploymentAuthorizationLedger:
         return {
             "issue": dict(issue),
             "consume": dict(consume) if consume is not None else None,
-            "ledger_head_sha256": rows[-1]["sha256"] if rows else "",
+            "ledger_head_sha256": str(rows[-1]["sha256"]) if rows else "",
             "ledger_events": len(rows),
             "portable_preflight": isinstance(issue.get("preflight"), dict),
             "portable_plan": isinstance(issue.get("plan"), dict),
