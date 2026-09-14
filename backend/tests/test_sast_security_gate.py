@@ -61,6 +61,54 @@ def test_rejects_imported_requests_session_verify_false(tmp_path: Path) -> None:
     assert any("requests.Session.post" in finding and "verify=False" in finding for finding in findings)
 
 
+def test_rejects_uniquely_bound_requests_session_verify_false(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\nsession = requests.Session()\nsession.get(url, verify=False)\n",
+    )
+    assert any("requests.Session.get" in finding and "verify=False" in finding for finding in findings)
+
+
+def test_rejects_aliased_constructor_bound_requests_session(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "from requests import Session as SecureSession\n"
+        "client = SecureSession()\n"
+        "client.delete(url, verify=False)\n",
+    )
+    assert any("requests.Session.delete" in finding and "verify=False" in finding for finding in findings)
+
+
+def test_allows_reassigned_session_name_to_avoid_unsafe_inference(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\n"
+        "session = requests.Session()\n"
+        "session = custom_client\n"
+        "session.get(url, verify=False)\n",
+    )
+    assert findings == []
+
+
+def test_allows_parameter_shadowing_of_session_name(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\n"
+        "session = requests.Session()\n"
+        "def fetch(session):\n"
+        "    return session.get(url, verify=False)\n",
+    )
+    assert findings == []
+
+
+def test_allows_bound_requests_session_with_verification(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import requests\nsession = requests.Session()\nsession.get(url, timeout=10)\n",
+    )
+    assert findings == []
+
+
 def test_allows_constructed_requests_session_with_verification(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
