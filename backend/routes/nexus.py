@@ -118,6 +118,16 @@ class CuriosityBoost(BaseModel):
     delta: float = Field(default=0.15, ge=-0.5, le=0.75)
 
 
+class SourceRetractionBody(BaseModel):
+    source_id: str = Field(min_length=1, max_length=1000)
+    reason: str = Field(min_length=3, max_length=2000)
+    cascade: bool = True
+
+
+class ReverifyClaimBody(BaseModel):
+    claim: str = Field(min_length=1, max_length=10000)
+
+
 class TruthEvidenceBody(BaseModel):
     source_id: str = Field(min_length=1, max_length=1000)
     locator: str = Field(default="", max_length=2000)
@@ -168,6 +178,31 @@ async def curiosity_knowledge(q: str = Query(min_length=1, max_length=1000), lim
 @router.get("/curiosity/verification")
 async def curiosity_verification_status():
     return curiosity_service().engine.verification_status()
+
+
+@router.get("/curiosity/truth")
+async def curiosity_truth_state(claim: str = Query(min_length=1, max_length=10000)):
+    engine = curiosity_service().engine
+    state = engine.truth_ledger.get(claim)
+    return {
+        "claim": claim,
+        "state": asdict(state) if state is not None else None,
+        "authoritative": engine.truth_ledger.authoritative(claim),
+        "contradiction": engine.contradiction_status(claim),
+    }
+
+
+@router.post("/curiosity/reverify")
+async def curiosity_reverify_claim(body: ReverifyClaimBody):
+    return curiosity_service().engine.reverify_claim(body.claim)
+
+
+@router.post("/curiosity/retract-source")
+async def curiosity_retract_source(body: SourceRetractionBody):
+    engine = curiosity_service().engine
+    if engine.source_lineage.get(body.source_id) is None:
+        raise HTTPException(status_code=404, detail="source not found in lineage registry")
+    return engine.retract_source(body.source_id, body.reason, cascade=body.cascade)
 
 
 @router.post("/curiosity/verify")
