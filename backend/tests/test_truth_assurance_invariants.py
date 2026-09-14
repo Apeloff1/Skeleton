@@ -51,7 +51,7 @@ def _verification():
     }
 
 
-def _operations(verification):
+def _operations(verification, *, epistemic_root=None):
     return {
         "audit_sequence": 0,
         "audit_head": None,
@@ -65,13 +65,14 @@ def _operations(verification):
             "next_sequence": 1,
         },
         "curiosity": {"verification": verification},
+        "epistemic_root": epistemic_root or {"verified": True, "root_sha256": "a" * 64},
     }
 
 
-def _report(verification):
+def _report(verification, *, epistemic_root=None):
     return evaluate_assurance(
         lifecycle=[],
-        operations=_operations(verification),
+        operations=_operations(verification, epistemic_root=epistemic_root),
         executor_bindings=[{"effect_class": "query", "replay_safe": True}],
         executor_coverage={"coverage_pct": 71.4},
         receipt_stats={"version": 2},
@@ -84,6 +85,18 @@ def test_truth_assurance_accepts_safe_epistemic_contract():
     assert report.hard_failures == 0
     failed = [row.id for row in report.invariants if row.severity == "hard" and not row.passed]
     assert failed == []
+
+
+def test_unverifiable_epistemic_root_blocks_deployment():
+    report = _report(_verification(), epistemic_root={"verified": False, "root_sha256": "b" * 64})
+    assert report.posture == "blocked"
+    assert any(row.id == "truth.epistemic-root-verifiable" and not row.passed for row in report.invariants)
+
+
+def test_missing_epistemic_root_digest_blocks_deployment():
+    report = _report(_verification(), epistemic_root={"verified": True, "root_sha256": "short"})
+    assert report.posture == "blocked"
+    assert any(row.id == "truth.epistemic-root-verifiable" and not row.passed for row in report.invariants)
 
 
 def test_unbound_evidence_default_blocks_deployment():
