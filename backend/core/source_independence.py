@@ -1,9 +1,9 @@
 """Evidence-independence analyzer for empirical verification.
 
 A verifier must not count five papers derived from one dataset as five independent
-confirmations. This module derives conservative dependence clusters from explicit
-source lineage, shared content digests and declared independence groups. It never
-invents independence: uncertain lineage is collapsed rather than upgraded.
+confirmations. Independence is derived from source lineage, shared content digests
+and declared groups. Unknown ancestry is never allowed to increase the effective
+replication count.
 """
 from __future__ import annotations
 
@@ -81,7 +81,6 @@ class SourceIndependenceAnalyzer:
         parent = {source_id: source_id for source_id in source_ids}
         ancestry: dict[str, set[str]] = {}; roots: dict[str, set[str]] = {}; nodes: dict[str, SourceNode | None] = {}
         unresolved: list[str] = []; by_group: dict[str, list[str]] = {}; by_digest: dict[str, list[str]] = {}
-        legacy_unknown: list[str] = []
 
         for item in rows:
             if not item.source_id: continue
@@ -89,21 +88,15 @@ class SourceIndependenceAnalyzer:
             ancestry[item.source_id] = ancestors; roots[item.source_id] = source_roots; nodes[item.source_id] = node
             if node is None or node.source_kind.startswith(LEGACY_UNRESOLVED_PREFIX):
                 unresolved.append(item.source_id)
-            if node is not None and node.source_kind.startswith(LEGACY_UNRESOLVED_PREFIX):
-                legacy_unknown.append(item.source_id)
             if item.independence_group:
                 by_group.setdefault(item.independence_group, []).append(item.source_id)
             if node is not None and node.content_sha256:
                 by_digest.setdefault(node.content_sha256, []).append(item.source_id)
 
-        # Unknown legacy ancestry is explicitly non-independent until backfilled
-        # with real lineage. This is intentionally conservative.
-        if legacy_unknown:
-            by_group["__legacy_unknown_ancestry__"] = list(dict.fromkeys(legacy_unknown))
-
         for members in (*by_group.values(), *by_digest.values()):
             unique = tuple(dict.fromkeys(members))
-            for other in unique[1:]: self._union(parent, unique[0], other)
+            for other in unique[1:]:
+                self._union(parent, unique[0], other)
 
         ids = list(source_ids)
         for i, a in enumerate(ids):
@@ -113,13 +106,26 @@ class SourceIndependenceAnalyzer:
                 if roots.get(a, set()) & roots.get(b, set()):
                     self._union(parent, a, b)
 
+        # An ancestry-unknown source may secretly derive from any known source in
+        # this claim's evidence set. Therefore it is attached to one existing
+        # resolved cluster and contributes zero additional independent support. If
+        # every source is unresolved, all unresolved sources collapse together.
+        unresolved_ids = tuple(sorted(set(unresolved)))
+        resolved_ids = tuple(sorted(set(source_ids) - set(unresolved_ids)))
+        if unresolved_ids:
+            anchor = resolved_ids[0] if resolved_ids else unresolved_ids[0]
+            for source_id in unresolved_ids:
+                if source_id != anchor:
+                    self._union(parent, anchor, source_id)
+
         def find(x: str) -> str:
             while parent[x] != x:
                 parent[x] = parent[parent[x]]; x = parent[x]
             return x
 
         grouped: dict[str, list[str]] = {}
-        for source_id in source_ids: grouped.setdefault(find(source_id), []).append(source_id)
+        for source_id in source_ids:
+            grouped.setdefault(find(source_id), []).append(source_id)
 
         clusters: list[IndependenceCluster] = []
         for members in sorted((tuple(sorted(v)) for v in grouped.values()), key=lambda x: x):
@@ -130,24 +136,36 @@ class SourceIndependenceAnalyzer:
                 member_items = [item for item in rows if item.source_id in members]
                 groups = {item.independence_group for item in member_items if item.independence_group}
                 if len(groups) == 1 and groups: reasons.append("declared_independence_group_shared")
-                if any(x in legacy_unknown for x in members): reasons.append("legacy_ancestry_unresolved")
+                if any(x in unresolved_ids for x in members): reasons.append("ancestry_unresolved_contributes_no_independence")
                 if shared_roots: reasons.append("shared_upstream_source")
                 if len(digests) == 1 and digests: reasons.append("identical_content_digest")
                 if any(a in ancestry.get(b, set()) or b in ancestry.get(a, set()) for a in members for b in members if a != b):
                     reasons.append("direct_source_derivation")
             cluster_id = "ind-" + _sha({"sources": members, "roots": sorted(shared_roots), "digests": sorted(digests)})[:20]
-            clusters.append(IndependenceCluster(cluster_id, members, tuple(dict.fromkeys(reasons)), tuple(sorted(shared_roots)), tuple(sorted(digests))))
+            clusters.append(IndependenceCluster(
+                cluster_id, members, tuple(dict.fromkeys(reasons)),
+                tuple(sorted(shared_roots)), tuple(sorted(digests)),
+            ))
 
         payload = {
-            "raw_sources": len(source_ids), "effective_independent_sources": len(clusters),
-            "clusters": [{"id": c.id, "source_ids": c.source_ids, "reasons": c.reasons, "shared_roots": c.shared_roots,
-                          "shared_content_sha256": c.shared_content_sha256} for c in clusters],
-            "unresolved_sources": tuple(sorted(set(unresolved))),
+            "raw_sources": len(source_ids),
+            "effective_independent_sources": len(clusters),
+            "clusters": [{"id": c.id, "source_ids": c.source_ids, "reasons": c.reasons,
+                          "shared_roots": c.shared_roots, "shared_content_sha256": c.shared_content_sha256}
+                         for c in clusters],
+            "unresolved_sources": unresolved_ids,
         }
-        return IndependenceReport(len(source_ids), len(clusters), tuple(clusters), tuple(sorted(set(unresolved))), _sha(payload))
+        return IndependenceReport(
+            len(source_ids), len(clusters), tuple(clusters), unresolved_ids, _sha(payload),
+        )
 
     def collapse(self, evidence: Iterable[EvidenceItem]) -> tuple[tuple[EvidenceItem, ...], IndependenceReport]:
         rows = tuple(evidence); report = self.analyze(rows); cluster_for: dict[str, str] = {}
         for cluster in report.clusters:
-            for source_id in cluster.source_ids: cluster_for[source_id] = cluster.id
-        return tuple(replace(item, independence_group=cluster_for.get(item.source_id, item.independence_group)) for item in rows), report
+            for source_id in cluster.source_ids:
+                cluster_for[source_id] = cluster.id
+        collapsed = tuple(
+            replace(item, independence_group=cluster_for.get(item.source_id, item.independence_group))
+            for item in rows
+        )
+        return collapsed, report
