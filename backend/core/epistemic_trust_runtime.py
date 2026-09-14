@@ -62,16 +62,30 @@ class EpistemicTrustRuntime:
             observed_at=observed_at,
         )
         after = published["transparency"]
-        consistency = None
-        if before["tree_size"] and after["tree_size"] > before["tree_size"]:
-            consistency = self.transparency.log.consistency(before["tree_size"])
-        gossip_result = self.gossip.observe(
-            log_id=after["log_id"],
-            tree_size=after["tree_size"],
-            root_sha256=after["root_sha256"],
-            source=source,
-            consistency=consistency,
+        unchanged = (
+            before.get("tree_size") == after.get("tree_size")
+            and before.get("root_sha256") == after.get("root_sha256")
+            and int(after.get("tree_size", 0) or 0) > 0
         )
+        if unchanged:
+            gossip_result = {
+                "disposition": "unchanged",
+                "log_id": after.get("log_id"),
+                "tree_size": after.get("tree_size"),
+                "root_sha256": after.get("root_sha256"),
+                "source": source,
+            }
+        else:
+            consistency = None
+            if before["tree_size"] and after["tree_size"] > before["tree_size"]:
+                consistency = self.transparency.log.consistency(before["tree_size"])
+            gossip_result = self.gossip.observe(
+                log_id=after["log_id"],
+                tree_size=after["tree_size"],
+                root_sha256=after["root_sha256"],
+                source=source,
+                consistency=consistency,
+            )
         return {**published, "gossip": gossip_result, "trust": self.status()}
 
     def observe_peer_head(
