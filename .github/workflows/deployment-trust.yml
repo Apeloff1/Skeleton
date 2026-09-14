@@ -3,6 +3,7 @@ name: Deployment Trust
 on:
   push:
     paths:
+      - "backend/core/canonical_json.py"
       - "backend/core/transparency_witness.py"
       - "backend/core/transparency_witness_config.py"
       - "backend/core/signed_transparency_witness.py"
@@ -15,6 +16,7 @@ on:
       - "backend/core/atomic_release_deployer.py"
       - "backend/core/deployment_receipts.py"
       - "backend/core/deployment_proof.py"
+      - "backend/core/deployment_proof_diagnostics.py"
       - "backend/core/deployment_gateway.py"
       - "backend/core/deployment_planner.py"
       - "backend/core/system_assurance.py"
@@ -33,7 +35,7 @@ on:
       - "backend/tests/test_deployment_gateway.py"
       - "backend/tests/test_deployment_proof.py"
       - "backend/tests/test_deployment_proof_semantics.py"
-      - "backend/tests/test_deployment_proof_history_invariants.py"
+      - "backend/tests/test_deployment_proof_diagnostics.py"
       - "backend/tests/test_system_assurance_deployment.py"
       - "backend/tests/test_control_plane_release_integration.py"
       - "backend/tests/test_epistemic_trust_runtime.py"
@@ -46,6 +48,7 @@ on:
       - ".github/workflows/product-convergence.yml"
   pull_request:
     paths:
+      - "backend/core/canonical_json.py"
       - "backend/core/transparency_witness.py"
       - "backend/core/transparency_witness_config.py"
       - "backend/core/signed_transparency_witness.py"
@@ -58,6 +61,7 @@ on:
       - "backend/core/atomic_release_deployer.py"
       - "backend/core/deployment_receipts.py"
       - "backend/core/deployment_proof.py"
+      - "backend/core/deployment_proof_diagnostics.py"
       - "backend/core/deployment_gateway.py"
       - "backend/core/deployment_planner.py"
       - "backend/core/system_assurance.py"
@@ -76,7 +80,7 @@ on:
       - "backend/tests/test_deployment_gateway.py"
       - "backend/tests/test_deployment_proof.py"
       - "backend/tests/test_deployment_proof_semantics.py"
-      - "backend/tests/test_deployment_proof_history_invariants.py"
+      - "backend/tests/test_deployment_proof_diagnostics.py"
       - "backend/tests/test_system_assurance_deployment.py"
       - "backend/tests/test_control_plane_release_integration.py"
       - "backend/tests/test_epistemic_trust_runtime.py"
@@ -120,7 +124,7 @@ jobs:
           tests/test_deployment_gateway.py
           tests/test_deployment_proof.py
           tests/test_deployment_proof_semantics.py
-          tests/test_deployment_proof_history_invariants.py
+          tests/test_deployment_proof_diagnostics.py
           tests/test_system_assurance_deployment.py
           tests/test_control_plane_release_integration.py
           tests/test_epistemic_trust_runtime.py
