@@ -67,6 +67,7 @@ def test_accepted_evolution_auto_adopts_and_records_memory():
     assert profile["count"] == 2
     assert profile["reflection_count"] == 1
     assert any(row["kind"] == "jeeves.session.adopted" for row in outcome.evidence)
+    assert any(row["kind"] == "execution.finish" for row in outcome.evidence)
 
 
 def test_rejected_candidate_never_mutates_canonical_world():
@@ -89,6 +90,7 @@ def test_rejected_candidate_never_mutates_canonical_world():
     assert graph.revision == 0
     assert plane.pending() == ()
     assert any("quality" in item for item in outcome.evaluation.decision.violations)
+    assert any(row["kind"] == "execution.finish" for row in outcome.evidence)
 
 
 def test_mutation_is_held_for_explicit_approval_then_can_be_adopted():
@@ -121,6 +123,7 @@ def test_mutation_is_held_for_explicit_approval_then_can_be_adopted():
     assert graph.revision == 1
     assert graph.get_node("player").properties["quality"] == 130
     assert adopted.adoption.evaluation.decision.mode is ChangeMode.MUTATE
+    assert any(row["kind"] == "execution.finish" for row in adopted.evidence)
     assert plane.pending() == ()
 
 
