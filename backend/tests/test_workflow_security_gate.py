@@ -109,3 +109,35 @@ def test_rejects_write_all_permissions(tmp_path: Path) -> None:
         "name: test\non: [push]\npermissions: write-all\njobs: {}\n",
     )
     assert any("write permissions are forbidden" in finding or "write-all" in finding for finding in findings)
+
+
+def test_rejects_direct_pr_title_interpolation_in_inline_run(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [pull_request]\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - run: echo '${{ github.event.pull_request.title }}'\n",
+    )
+    assert any("direct pull request title/body interpolation" in finding for finding in findings)
+
+
+def test_rejects_direct_comment_interpolation_in_block_run(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [issues]\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - name: unsafe\n        run: |\n          printf '%s\\n' '${{ github.event.comment.body }}'\n          echo done\n",
+    )
+    assert any("direct issue comment body interpolation" in finding for finding in findings)
+
+
+def test_allows_untrusted_context_via_environment_boundary(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [pull_request]\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - name: safe\n        env:\n          PR_TITLE: ${{ github.event.pull_request.title }}\n        run: printf '%s\\n' \"$PR_TITLE\"\n",
+    )
+    assert findings == []
+
+
+def test_allows_trusted_expression_in_run(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - run: echo '${{ github.repository }}'\n",
+    )
+    assert findings == []
