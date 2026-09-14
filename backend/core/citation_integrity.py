@@ -1,9 +1,9 @@
 """Claim-level citation integrity and laundering defenses.
 
-A citation is not evidence merely because it is nearby. Promotion requires an
-inspectable binding between one exact claim and one source location. Extractive
-bindings must preserve the claim's material structure: polarity, relation family,
-quantities and units. This module validates bindings; it does not decide truth.
+A citation is not evidence merely because it is nearby. Supporting extractive
+evidence must preserve a claim's material structure. Contradicting extractive
+evidence must contain an explicit opposition signal. Both paths require inspectable
+provenance, locators, quantities/units and sufficient claim anchoring.
 """
 from __future__ import annotations
 
@@ -74,8 +74,7 @@ class CitationIntegrityEngine:
     def validate(self, binding: CitationBinding) -> CitationIntegrityReport:
         reasons: list[str] = []
         method = binding.binding_method.strip().casefold()
-        claim = " ".join(binding.claim.split()).strip()
-        span = " ".join(binding.evidence_span.split()).strip()
+        claim = " ".join(binding.claim.split()).strip(); span = " ".join(binding.evidence_span.split()).strip()
         locator = binding.locator.strip(); source = binding.source_id.strip()
         if not claim or not source: reasons.append("claim_or_source_missing")
         if not binding.provenance_verified: reasons.append("source_provenance_unverified")
@@ -90,32 +89,31 @@ class CitationIntegrityEngine:
         if claim_numbers and any(value not in span_numbers for value in claim_numbers):
             reasons.append("claim_quantity_not_present_in_evidence_span")
 
-        claim_fp = fingerprint_claim(claim) if claim else None
-        span_fp = fingerprint_claim(span) if span else None
+        claim_fp = fingerprint_claim(claim) if claim else None; span_fp = fingerprint_claim(span) if span else None
         if claim_fp is not None and span_fp is not None:
-            if claim_fp.polarity != span_fp.polarity:
-                reasons.append("evidence_polarity_conflict")
             if claim_fp.units and any(unit not in span_fp.units for unit in claim_fp.units):
                 reasons.append("claim_unit_not_present_in_evidence_span")
-            # Extractive evidence should state the same empirical relation. For
-            # structured/analyst mappings a rationale may explain the derivation.
-            if method in _EXTRACTIVE and claim_fp.relation != "unspecified" and span_fp.relation != "unspecified" and claim_fp.relation != span_fp.relation:
-                reasons.append("evidence_relation_conflict")
+            polarity_differs = claim_fp.polarity != span_fp.polarity
+            relation_differs = (claim_fp.relation != "unspecified" and span_fp.relation != "unspecified"
+                                and claim_fp.relation != span_fp.relation)
+            if method in _EXTRACTIVE:
+                if binding.supports:
+                    if polarity_differs: reasons.append("evidence_polarity_conflict")
+                    if relation_differs: reasons.append("evidence_relation_conflict")
+                elif not (polarity_differs or relation_differs):
+                    reasons.append("contradiction_binding_lacks_opposition_signal")
 
-        if method in _EXTRACTIVE and overlap < 0.30:
-            reasons.append("insufficient_claim_anchor_overlap")
+        if method in _EXTRACTIVE and overlap < 0.30: reasons.append("insufficient_claim_anchor_overlap")
         if method in _STRUCTURED and not binding.mapping_rationale.strip():
             reasons.append("structured_evidence_mapping_rationale_missing")
         if method == "analyst_mapping":
-            if len(binding.mapping_rationale.strip()) < 20:
-                reasons.append("analyst_mapping_rationale_insufficient")
-            if overlap < 0.10:
-                reasons.append("analyst_mapping_has_no_claim_anchor")
+            if len(binding.mapping_rationale.strip()) < 20: reasons.append("analyst_mapping_rationale_insufficient")
+            if overlap < 0.10: reasons.append("analyst_mapping_has_no_claim_anchor")
 
         reasons = list(dict.fromkeys(reasons)); accepted = not reasons
         critical = {"source_provenance_unverified", "source_locator_missing", "evidence_span_missing"}
         high = {"claim_quantity_not_present_in_evidence_span", "claim_unit_not_present_in_evidence_span",
-                "evidence_polarity_conflict", "evidence_relation_conflict"}
+                "evidence_polarity_conflict", "evidence_relation_conflict", "contradiction_binding_lacks_opposition_signal"}
         if accepted: risk = "low"
         elif critical.intersection(reasons): risk = "critical"
         elif high.intersection(reasons): risk = "high"
@@ -123,8 +121,7 @@ class CitationIntegrityEngine:
         identity = claim_fp.identity_sha256 if claim_fp is not None else _sha("")
         span_sha = hashlib.sha256(span.encode("utf-8")).hexdigest()
         payload = {"accepted": accepted, "laundering_risk": risk, "reasons": tuple(reasons),
-                   "claim_identity_sha256": identity, "evidence_span_sha256": span_sha,
-                   "anchor_overlap": overlap}
+                   "claim_identity_sha256": identity, "evidence_span_sha256": span_sha, "anchor_overlap": overlap}
         return CitationIntegrityReport(accepted, risk, tuple(reasons), identity, span_sha, overlap, _sha(payload))
 
     @staticmethod
