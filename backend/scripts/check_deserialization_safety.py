@@ -1,10 +1,11 @@
 """Fail CI on unsafe Python deserialization primitives.
 
 The scanner is dependency-free and intentionally conservative. It rejects
-pickle/dill/marshal object loading, unsafe PyYAML loaders, NumPy pickle-enabled
-loads, and torch.load calls that do not explicitly request weights-only mode.
-These formats may execute constructors or code when fed attacker-controlled
-bytes and therefore must not appear in production backend paths by accident.
+pickle/dill/marshal/joblib/pandas pickle loading, unsafe PyYAML loaders, NumPy
+pickle-enabled loads, and torch.load calls that do not explicitly request
+weights-only mode. These formats may execute constructors or code when fed
+attacker-controlled bytes and therefore must not appear in production backend
+paths by accident.
 """
 from __future__ import annotations
 
@@ -24,10 +25,23 @@ UNSAFE_OBJECT_LOADERS = {
     "dill.loads",
     "marshal.load",
     "marshal.loads",
+    "joblib.load",
+    "joblib.numpy_pickle.load",
+    "pandas.read_pickle",
     "yaml.unsafe_load",
     "yaml.unsafe_load_all",
 }
-TRACKED_MODULES = {"pickle", "_pickle", "dill", "marshal", "yaml", "numpy", "torch"}
+TRACKED_MODULES = {
+    "pickle",
+    "_pickle",
+    "dill",
+    "marshal",
+    "joblib",
+    "pandas",
+    "yaml",
+    "numpy",
+    "torch",
+}
 
 
 def python_files() -> Iterable[Path]:
@@ -92,8 +106,16 @@ def keyword_value(node: ast.Call, name: str) -> ast.AST | None:
     return None
 
 
+def has_keyword(node: ast.Call, name: str) -> bool:
+    return any(keyword.arg == name for keyword in node.keywords)
+
+
 def is_literal_true(node: ast.AST | None) -> bool:
     return isinstance(node, ast.Constant) and node.value is True
+
+
+def is_literal_false(node: ast.AST | None) -> bool:
+    return isinstance(node, ast.Constant) and node.value is False
 
 
 def is_safe_yaml_loader(node: ast.AST | None, aliases: dict[str, str]) -> bool:
@@ -114,9 +136,13 @@ def call_violation(node: ast.Call, aliases: dict[str, str]) -> str | None:
             return f"{name}() requires literal SafeLoader/CSafeLoader"
 
     if name == "numpy.load":
-        allow_pickle = keyword_value(node, "allow_pickle")
-        if is_literal_true(allow_pickle):
-            return "numpy.load(..., allow_pickle=True) is forbidden"
+        # NumPy defaults allow_pickle=False. Preserve the safe default, but if
+        # callers explicitly override it they must prove it remains disabled;
+        # dynamic expressions are fail-open otherwise.
+        if has_keyword(node, "allow_pickle"):
+            allow_pickle = keyword_value(node, "allow_pickle")
+            if not is_literal_false(allow_pickle):
+                return "numpy.load() allow_pickle override must be literal False"
 
     if name == "torch.load":
         weights_only = keyword_value(node, "weights_only")
