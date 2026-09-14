@@ -222,6 +222,81 @@ def _line_number(text: str, offset: int) -> int:
     return text.count("\n", 0, offset) + 1
 
 
+def _mask_js_comments(text: str) -> str:
+    """Replace JS/TS comment bytes with spaces while preserving offsets/newlines.
+
+    Regex rules can then inspect executable source without matching documentation
+    such as ``module-eval (which...)``. String and template contents are kept
+    intact so module specifiers used by child-process rules remain discoverable.
+    """
+    chars = list(text)
+    out = list(text)
+    state = "code"
+    quote = ""
+    escaped = False
+    i = 0
+
+    while i < len(chars):
+        ch = chars[i]
+        nxt = chars[i + 1] if i + 1 < len(chars) else ""
+
+        if state == "line-comment":
+            if ch == "\n":
+                state = "code"
+            else:
+                out[i] = " "
+            i += 1
+            continue
+
+        if state == "block-comment":
+            if ch == "*" and nxt == "/":
+                out[i] = " "
+                out[i + 1] = " "
+                state = "code"
+                i += 2
+                continue
+            if ch != "\n":
+                out[i] = " "
+            i += 1
+            continue
+
+        if state == "quoted":
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == quote:
+                state = "code"
+                quote = ""
+            i += 1
+            continue
+
+        if ch in {"'", '"', "`"}:
+            state = "quoted"
+            quote = ch
+            escaped = False
+            i += 1
+            continue
+
+        if ch == "/" and nxt == "/":
+            out[i] = " "
+            out[i + 1] = " "
+            state = "line-comment"
+            i += 2
+            continue
+
+        if ch == "/" and nxt == "*":
+            out[i] = " "
+            out[i + 1] = " "
+            state = "block-comment"
+            i += 2
+            continue
+
+        i += 1
+
+    return "".join(out)
+
+
 def _destructured_child_process_names(text: str) -> set[str]:
     names: set[str] = set()
     for match in CHILD_PROCESS_IMPORT_RE.finditer(text):
@@ -250,14 +325,15 @@ def javascript_violations(path: Path) -> list[str]:
     except (OSError, UnicodeError) as exc:
         return [f"{label}: read failure: {exc}"]
 
+    scan_text = _mask_js_comments(text)
     findings: list[str] = []
     for message, pattern in JS_PATTERNS:
-        for match in pattern.finditer(text):
+        for match in pattern.finditer(scan_text):
             findings.append(f"{label}:{_line_number(text, match.start())}: {message}")
 
-    for local_name in sorted(_destructured_child_process_names(text)):
+    for local_name in sorted(_destructured_child_process_names(scan_text)):
         call_re = re.compile(rf"(?<![A-Za-z0-9_$\.]){re.escape(local_name)}\s*\(")
-        for match in call_re.finditer(text):
+        for match in call_re.finditer(scan_text):
             findings.append(
                 f"{label}:{_line_number(text, match.start())}: imported child_process {local_name}() is forbidden"
             )
@@ -265,9 +341,9 @@ def javascript_violations(path: Path) -> list[str]:
     # A shell-enabled spawn crosses the same command-interpreter trust boundary
     # as exec. Restrict this rule to files that actually reference child_process
     # to avoid flagging unrelated configuration objects with `shell: true`.
-    if re.search(r"['\"](?:node:)?child_process['\"]|\bchild_process\b", text):
+    if re.search(r"['\"](?:node:)?child_process['\"]|\bchild_process\b", scan_text):
         shell_true = re.compile(r"\bshell\s*:\s*true\b")
-        for match in shell_true.finditer(text):
+        for match in shell_true.finditer(scan_text):
             findings.append(
                 f"{label}:{_line_number(text, match.start())}: child_process shell:true is forbidden"
             )
