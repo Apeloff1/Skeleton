@@ -12,7 +12,10 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { actionById, capabilityById } from '../src/product/productCatalog';
-import { admitProductOperation } from '../src/product/productControlClient';
+import {
+  admitProductOperation,
+  getPendingProductOperations,
+} from '../src/product/productControlClient';
 
 export default function OperationRoute() {
   const router = useRouter();
@@ -27,6 +30,7 @@ export default function OperationRoute() {
   const [token, setToken] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const [queueCount, setQueueCount] = useState<number | null>(null);
 
   if (!capability || !action) {
     return <SafeAreaView style={styles.safe}><View style={styles.center}><Text style={styles.title}>Unknown operation</Text></View></SafeAreaView>;
@@ -49,6 +53,7 @@ export default function OperationRoute() {
     }
     setSubmitting(true);
     setResult(null);
+    const cleanToken = token.trim();
     const response = await admitProductOperation({
       capability_id: capability.id,
       domain: capability.id,
@@ -56,12 +61,15 @@ export default function OperationRoute() {
       principal: principal.trim() || 'product-user',
       actor_weight: actorWeight,
       payload: decoded,
-    }, token.trim());
-    setSubmitting(false);
+    }, cleanToken);
     if (!response.ok || !response.data) {
+      setSubmitting(false);
       setResult(response.error || `Admission failed (${response.status})`);
       return;
     }
+    const pending = await getPendingProductOperations(cleanToken);
+    setQueueCount(pending.ok && pending.data ? pending.data.count : null);
+    setSubmitting(false);
     setResult(`Admitted ${response.data.operation_id}\nQueue #${response.data.outbox_seq}\nAudit ${response.data.audit_hash.slice(0, 16)}…`);
   };
 
@@ -74,6 +82,7 @@ export default function OperationRoute() {
           <Text style={styles.title}>{action.title}</Text>
           <Text style={styles.description}>{action.description}</Text>
           <Text style={styles.operation}>{action.operation}</Text>
+          {queueCount !== null ? <Text style={styles.queue}>Durable queue: {queueCount} pending</Text> : null}
         </View>
         <Field label="Principal" value={principal} onChangeText={setPrincipal} />
         <Field label="Actor weight" value={weight} onChangeText={setWeight} keyboardType="number-pad" />
@@ -86,7 +95,7 @@ export default function OperationRoute() {
           {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>Submit governed operation</Text>}
         </TouchableOpacity>
         {result ? <View style={styles.result}><Text style={styles.resultText}>{result}</Text></View> : null}
-        <Text style={styles.hint}>Admission is fail-closed. The backend charter must explicitly permit this capability domain and operation.</Text>
+        <Text style={styles.hint}>Canonical actions are explicitly chartered on a fresh install. Any action outside that allow-list still fails closed.</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -106,6 +115,7 @@ const styles = StyleSheet.create({
   title: { color: '#F8FAFC', fontSize: 26, fontWeight: '900', marginTop: 7 },
   description: { color: '#AAB3C5', lineHeight: 20, marginTop: 7 },
   operation: { color: '#8F9DFF', fontFamily: 'monospace', fontSize: 11, marginTop: 14 },
+  queue: { color: '#8BD3A7', fontSize: 10, fontWeight: '800', marginTop: 9 },
   field: { gap: 6 },
   label: { color: '#8B96A8', fontSize: 11, fontWeight: '800' },
   input: { color: '#F8FAFC', borderWidth: 1, borderColor: '#283044', borderRadius: 12, backgroundColor: '#0F141F', paddingHorizontal: 12, paddingVertical: 11 },
