@@ -50,14 +50,15 @@ def _validated_scraper_url(url: str) -> tuple[str, str] | None:
     """Return ``(url, host)`` only for an explicitly approved HTTPS host."""
     try:
         parsed = urlsplit(url)
+        host = (parsed.hostname or "").lower().rstrip(".")
+        port = parsed.port
     except ValueError:
         return None
-    host = (parsed.hostname or "").lower().rstrip(".")
     if parsed.scheme != "https" or not host or host not in ALLOWED_SCRAPER_HOSTS:
         return None
     if parsed.username or parsed.password:
         return None
-    if parsed.port not in (None, 443):
+    if port not in (None, 443):
         return None
     return url, host
 
