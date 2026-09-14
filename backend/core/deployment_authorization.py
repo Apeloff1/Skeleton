@@ -1,7 +1,7 @@
 """Single-use deployment authorizations bound to stable preflight and plan identity.
 
 The ledger is a cross-process, append-only authorization state machine. Issue and
-consume events are hash-chained *and* semantically replay-verified: consumes must
+consume events are hash-chained and semantically replay-verified: consumes must
 reference a prior issue, match its immutable root/plan identity, occur at most once,
 and fall inside the authorization validity window.
 """
@@ -75,27 +75,39 @@ def _parse(value: str) -> datetime:
 
 class DeploymentAuthorizationLedger:
     def __init__(self, root: str | Path) -> None:
-        self.root = Path(root); self.root.mkdir(parents=True, exist_ok=True)
+        self.root = Path(root)
+        self.root.mkdir(parents=True, exist_ok=True)
         self.path = self.root / "deployment-authorizations.jsonl"
         self._lease = FileLease(self.root / ".deployment-authorizations.lock")
         with self._lease.acquire():
-            if not self.path.exists(): self.path.touch()
+            if not self.path.exists():
+                self.path.touch()
             self._load_verified()
 
     def _load_verified(self) -> list[dict[str, Any]]:
-        try: lines = self.path.read_text(encoding="utf-8").splitlines()
-        except OSError as exc: raise DeploymentAuthorizationError("authorization ledger unreadable") from exc
-        rows: list[dict[str, Any]] = []; previous = ""; issues: dict[str, dict[str, Any]] = {}; consumed: set[str] = set()
+        try:
+            lines = self.path.read_text(encoding="utf-8").splitlines()
+        except OSError as exc:
+            raise DeploymentAuthorizationError("authorization ledger unreadable") from exc
+        rows: list[dict[str, Any]] = []
+        previous = ""
+        issues: dict[str, dict[str, Any]] = {}
+        consumed: set[str] = set()
         for sequence, line in enumerate(lines, start=1):
-            if not line.strip(): continue
-            try: row = json.loads(line)
-            except json.JSONDecodeError as exc: raise DeploymentAuthorizationError("authorization ledger malformed") from exc
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise DeploymentAuthorizationError("authorization ledger malformed") from exc
             if row.get("version") != AUTH_VERSION or int(row.get("sequence", 0)) != sequence or row.get("previous_sha256", "") != previous:
                 raise DeploymentAuthorizationError("authorization ledger ancestry/version mismatch")
-            claimed = str(row.get("sha256") or ""); payload = {k: v for k, v in row.items() if k != "sha256"}
+            claimed = str(row.get("sha256") or "")
+            payload = {k: v for k, v in row.items() if k != "sha256"}
             if not _SHA256.fullmatch(claimed) or not hmac.compare_digest(_sha(payload), claimed):
                 raise DeploymentAuthorizationError("authorization event hash mismatch")
-            kind = row.get("kind"); auth_id = str(row.get("authorization_id") or "")
+            kind = row.get("kind")
+            auth_id = str(row.get("authorization_id") or "")
             if kind not in {"issue", "consume"} or not auth_id:
                 raise DeploymentAuthorizationError("authorization event malformed")
             for field in ("system_root_sha256", "plan_sha256"):
@@ -106,8 +118,11 @@ class DeploymentAuthorizationLedger:
                     raise DeploymentAuthorizationError("duplicate authorization issue")
                 if not _SHA256.fullmatch(str(row.get("preflight_sha256") or "")):
                     raise DeploymentAuthorizationError("authorization preflight digest malformed")
-                try: issued = _parse(str(row["issued_at"])); expires = _parse(str(row["expires_at"]))
-                except (KeyError, ValueError) as exc: raise DeploymentAuthorizationError("authorization issue timestamps malformed") from exc
+                try:
+                    issued = _parse(str(row["issued_at"]))
+                    expires = _parse(str(row["expires_at"]))
+                except (KeyError, ValueError) as exc:
+                    raise DeploymentAuthorizationError("authorization issue timestamps malformed") from exc
                 if expires <= issued:
                     raise DeploymentAuthorizationError("authorization expiry must follow issue time")
                 issues[auth_id] = row
@@ -121,21 +136,31 @@ class DeploymentAuthorizationLedger:
                     raise DeploymentAuthorizationError("authorization consume does not reference its issue event")
                 if row.get("system_root_sha256") != issue.get("system_root_sha256") or row.get("plan_sha256") != issue.get("plan_sha256"):
                     raise DeploymentAuthorizationError("authorization consume identity diverges from issue")
-                try: consumed_at = _parse(str(row["consumed_at"])); issued = _parse(str(issue["issued_at"])); expires = _parse(str(issue["expires_at"]))
-                except (KeyError, ValueError) as exc: raise DeploymentAuthorizationError("authorization consume timestamp malformed") from exc
+                try:
+                    consumed_at = _parse(str(row["consumed_at"]))
+                    issued = _parse(str(issue["issued_at"]))
+                    expires = _parse(str(issue["expires_at"]))
+                except (KeyError, ValueError) as exc:
+                    raise DeploymentAuthorizationError("authorization consume timestamp malformed") from exc
                 if consumed_at < issued or consumed_at > expires:
                     raise DeploymentAuthorizationError("authorization consumed outside validity window")
                 consumed.add(auth_id)
-            previous = claimed; rows.append(row)
+            previous = claimed
+            rows.append(row)
         return rows
 
     def _append(self, payload: dict[str, Any], rows: list[dict[str, Any]]) -> dict[str, Any]:
-        event = {"version": AUTH_VERSION, "sequence": len(rows) + 1, **payload,
-                 "previous_sha256": rows[-1]["sha256"] if rows else ""}
+        event = {
+            "version": AUTH_VERSION,
+            "sequence": len(rows) + 1,
+            **payload,
+            "previous_sha256": rows[-1]["sha256"] if rows else "",
+        }
         event["sha256"] = _sha(event)
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n")
-            handle.flush(); os.fsync(handle.fileno())
+            handle.flush()
+            os.fsync(handle.fileno())
         return event
 
     @staticmethod
@@ -150,60 +175,121 @@ class DeploymentAuthorizationLedger:
             raise DeploymentAuthorizationError("deployment preflight is not authorizing/stable")
         if ttl_seconds < 1 or ttl_seconds > 3600:
             raise ValueError("authorization ttl must be between 1 and 3600 seconds")
-        stamp = issued_at or datetime.now(UTC).isoformat(); issued = _parse(stamp)
-        expires = (issued + timedelta(seconds=ttl_seconds)).isoformat(); digest = plan_digest(plan); auth_id = uuid.uuid4().hex
+        stamp = issued_at or datetime.now(UTC).isoformat()
+        issued = _parse(stamp)
+        expires = (issued + timedelta(seconds=ttl_seconds)).isoformat()
+        digest = plan_digest(plan)
+        auth_id = uuid.uuid4().hex
         with self._lease.acquire():
             rows = self._load_verified()
             event = self._append({
-                "kind": "issue", "authorization_id": auth_id,
+                "kind": "issue",
+                "authorization_id": auth_id,
                 "system_root_sha256": preflight.root_after_sha256,
                 "preflight_sha256": preflight.attestation_sha256,
-                "plan_sha256": digest, "issued_at": stamp, "expires_at": expires,
+                "plan_sha256": digest,
+                "issued_at": stamp,
+                "expires_at": expires,
             }, rows)
-        return DeploymentAuthorization(auth_id, preflight.root_after_sha256, preflight.attestation_sha256,
-                                       digest, stamp, expires, event["sha256"])
+        return DeploymentAuthorization(
+            auth_id, preflight.root_after_sha256, preflight.attestation_sha256,
+            digest, stamp, expires, event["sha256"],
+        )
 
     def consume(self, authorization_id: str, *, current_system_root_sha256: str, plan: dict[str, Any],
                 consumed_at: str | None = None) -> DeploymentConsumption:
-        stamp = consumed_at or datetime.now(UTC).isoformat(); now = _parse(stamp); digest = plan_digest(plan)
+        stamp = consumed_at or datetime.now(UTC).isoformat()
+        now = _parse(stamp)
+        digest = plan_digest(plan)
         with self._lease.acquire():
-            rows = self._load_verified(); issue, prior = self._state(authorization_id, rows)
-            if issue is None: raise DeploymentAuthorizationError("authorization not found")
-            if prior is not None: raise DeploymentAuthorizationError("authorization already consumed")
-            if now > _parse(str(issue["expires_at"])): raise DeploymentAuthorizationError("authorization expired")
-            if now < _parse(str(issue["issued_at"])): raise DeploymentAuthorizationError("authorization cannot be consumed before issue")
+            rows = self._load_verified()
+            issue, prior = self._state(authorization_id, rows)
+            if issue is None:
+                raise DeploymentAuthorizationError("authorization not found")
+            if prior is not None:
+                raise DeploymentAuthorizationError("authorization already consumed")
+            if now > _parse(str(issue["expires_at"])):
+                raise DeploymentAuthorizationError("authorization expired")
+            if now < _parse(str(issue["issued_at"])):
+                raise DeploymentAuthorizationError("authorization cannot be consumed before issue")
             if not hmac.compare_digest(str(issue["system_root_sha256"]), str(current_system_root_sha256)):
                 raise DeploymentAuthorizationError("system root changed after preflight")
             if not hmac.compare_digest(str(issue["plan_sha256"]), digest):
                 raise DeploymentAuthorizationError("deployment plan changed after authorization")
             event = self._append({
-                "kind": "consume", "authorization_id": authorization_id,
-                "system_root_sha256": current_system_root_sha256, "plan_sha256": digest,
-                "consumed_at": stamp, "issue_event_sha256": issue["sha256"],
+                "kind": "consume",
+                "authorization_id": authorization_id,
+                "system_root_sha256": current_system_root_sha256,
+                "plan_sha256": digest,
+                "consumed_at": stamp,
+                "issue_event_sha256": issue["sha256"],
             }, rows)
-        return DeploymentConsumption(authorization_id, stamp, current_system_root_sha256, digest, event["sha256"])
+        return DeploymentConsumption(
+            authorization_id, stamp, current_system_root_sha256, digest, event["sha256"],
+        )
 
     def authorization(self, authorization_id: str) -> DeploymentAuthorization | None:
-        with self._lease.acquire(): rows = self._load_verified(); issue, _ = self._state(authorization_id, rows)
-        if issue is None: return None
+        with self._lease.acquire():
+            rows = self._load_verified()
+            issue, _ = self._state(authorization_id, rows)
+        if issue is None:
+            return None
         return DeploymentAuthorization(
             str(issue["authorization_id"]), str(issue["system_root_sha256"]), str(issue["preflight_sha256"]),
             str(issue["plan_sha256"]), str(issue["issued_at"]), str(issue["expires_at"]), str(issue["sha256"]),
         )
 
     def consumption(self, authorization_id: str) -> DeploymentConsumption | None:
-        with self._lease.acquire(): rows = self._load_verified(); _, consume = self._state(authorization_id, rows)
-        if consume is None: return None
+        with self._lease.acquire():
+            rows = self._load_verified()
+            _, consume = self._state(authorization_id, rows)
+        if consume is None:
+            return None
         return DeploymentConsumption(
             authorization_id, str(consume["consumed_at"]), str(consume["system_root_sha256"]),
             str(consume["plan_sha256"]), str(consume["sha256"]),
         )
 
+    def proof_events(self, authorization_id: str) -> dict[str, Any]:
+        """Export verified issue/consume events plus the current ledger head.
+
+        The raw events are required for independent hash recomputation. Returning
+        them through this method guarantees the full local ledger has already passed
+        sequence, ancestry, semantic, timestamp, and digest verification.
+        """
+        authorization_id = str(authorization_id).strip()
+        if not authorization_id:
+            raise ValueError("authorization_id is required")
+        with self._lease.acquire():
+            rows = self._load_verified()
+            issue, consume = self._state(authorization_id, rows)
+        if issue is None:
+            raise KeyError(authorization_id)
+        return {
+            "issue": dict(issue),
+            "consume": dict(consume) if consume is not None else None,
+            "ledger_head_sha256": str(rows[-1]["sha256"]) if rows else "",
+            "ledger_events": len(rows),
+            "verified": True,
+        }
+
+    def snapshot_events(self) -> tuple[dict[str, Any], ...]:
+        with self._lease.acquire():
+            rows = self._load_verified()
+        return tuple(dict(row) for row in rows)
+
     def status(self) -> dict[str, Any]:
-        with self._lease.acquire(): rows = self._load_verified()
+        with self._lease.acquire():
+            rows = self._load_verified()
         issues = [x for x in rows if x.get("kind") == "issue"]
         consumed = {x.get("authorization_id") for x in rows if x.get("kind") == "consume"}
-        return {"version": AUTH_VERSION, "issued": len(issues), "consumed": len(consumed),
-                "outstanding": sum(x.get("authorization_id") not in consumed for x in issues),
-                "head_sha256": rows[-1]["sha256"] if rows else "", "cross_process_locking": True,
-                "lock_backend": self._lease.backend, "verified": True}
+        return {
+            "version": AUTH_VERSION,
+            "issued": len(issues),
+            "consumed": len(consumed),
+            "outstanding": sum(x.get("authorization_id") not in consumed for x in issues),
+            "head_sha256": rows[-1]["sha256"] if rows else "",
+            "cross_process_locking": True,
+            "lock_backend": self._lease.backend,
+            "verified": True,
+        }
