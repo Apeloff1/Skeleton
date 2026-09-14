@@ -9,7 +9,8 @@ Trust advancement is an audit/update primitive, not a substitute for current-hea
 quorum. A previously witnessed publication can prove append-only ancestry to the
 current publication, while a policy that requires external witnesses still requires a
 fresh independent quorum on the current publication before deployment trust is
-satisfied.
+satisfied. Witnessed continuity is stronger again: both endpoints must have fresh
+independent quorums and the complete append-only bridge must verify.
 """
 from __future__ import annotations
 
@@ -37,6 +38,10 @@ from core.deployment_checkpoint_trust_advance import (
     build_deployment_checkpoint_trust_advance,
 )
 from core.deployment_checkpoint_witness import DeploymentCheckpointPinBundle, DeploymentCheckpointPinReceipt
+from core.deployment_checkpoint_witnessed_continuity import (
+    DeploymentCheckpointWitnessedContinuity,
+    build_deployment_checkpoint_witnessed_continuity,
+)
 
 
 class DeploymentCheckpointPinRuntime:
@@ -89,6 +94,17 @@ class DeploymentCheckpointPinRuntime:
                 return quorum
         return None
 
+    def latest_prior_witnessed_quorum(self, *, now: datetime | None = None) -> DeploymentCheckpointPinQuorum | None:
+        """Return the newest fresh witnessed publication strictly before the current head."""
+        history = self.checkpoints.history()
+        if len(history) < 2:
+            return None
+        for publication in reversed(history[:-1]):
+            quorum = self.quorum(publication_sequence=publication.sequence, now=now)
+            if quorum is not None and quorum.reached:
+                return quorum
+        return None
+
     def portable_bundle(
         self,
         *,
@@ -103,13 +119,6 @@ class DeploymentCheckpointPinRuntime:
         publication_sequence: int,
         now: datetime | None = None,
     ) -> DeploymentCheckpointTrustAdvance:
-        """Advance a fresh witnessed anchor to the current append-only checkpoint head.
-
-        The anchor bundle is constructed only after the configured independent-witness
-        quorum is reached at ``now``. The returned packet remains independently
-        verifiable against externally supplied witness keys, quorum policy, anchor
-        verification time, and current publication head.
-        """
         if type(publication_sequence) is not int or publication_sequence < 1:
             raise ValueError("publication_sequence must be a positive integer")
         bundle = self.portable_bundle(publication_sequence=publication_sequence, now=now)
@@ -119,11 +128,50 @@ class DeploymentCheckpointPinRuntime:
         )
 
     def advance_latest_witnessed(self, *, now: datetime | None = None) -> DeploymentCheckpointTrustAdvance:
-        """Build a trust-advance packet from the newest fresh witnessed publication."""
         quorum = self.latest_witnessed_quorum(now=now)
         if quorum is None:
             raise ValueError("no checkpoint publication has a fresh witness quorum")
         return self.trust_advance(publication_sequence=quorum.publication_sequence, now=now)
+
+    def witnessed_continuity(
+        self,
+        *,
+        previous_publication_sequence: int,
+        now: datetime | None = None,
+    ) -> DeploymentCheckpointWitnessedContinuity:
+        """Prove continuity from a fresh witnessed prior epoch to a fresh witnessed head."""
+        if type(previous_publication_sequence) is not int or previous_publication_sequence < 1:
+            raise ValueError("previous_publication_sequence must be a positive integer")
+        latest = self.checkpoints.latest()
+        if latest is None:
+            raise ValueError("checkpoint publication history is empty")
+        if previous_publication_sequence >= latest.sequence:
+            raise ValueError("previous witnessed publication must precede the current head")
+        previous_bundle = self.portable_bundle(
+            publication_sequence=previous_publication_sequence,
+            now=now,
+        )
+        current_bundle = self.portable_bundle(
+            publication_sequence=latest.sequence,
+            now=now,
+        )
+        return build_deployment_checkpoint_witnessed_continuity(
+            previous_bundle=previous_bundle,
+            current_bundle=current_bundle,
+            checkpoint_ledger=self.checkpoints,
+        )
+
+    def latest_witnessed_continuity(self, *, now: datetime | None = None) -> DeploymentCheckpointWitnessedContinuity:
+        previous = self.latest_prior_witnessed_quorum(now=now)
+        if previous is None:
+            raise ValueError("no prior checkpoint publication has a fresh witness quorum")
+        current = self.quorum(now=now)
+        if current is None or not current.reached:
+            raise ValueError("current checkpoint publication lacks a fresh witness quorum")
+        return self.witnessed_continuity(
+            previous_publication_sequence=previous.publication_sequence,
+            now=now,
+        )
 
     def requirement_satisfied(self, *, now: datetime | None = None) -> bool:
         if not self.policy.required:
@@ -136,10 +184,16 @@ class DeploymentCheckpointPinRuntime:
         target = self.current_target()
         quorum = self.quorum(now=now)
         latest_witnessed = self.latest_witnessed_quorum(now=now)
+        prior_witnessed = self.latest_prior_witnessed_quorum(now=now)
         satisfied = not self.policy.required or (quorum is not None and quorum.reached)
         current_sequence = target.tree_size if target is not None else 0
         witnessed_sequence = latest_witnessed.publication_sequence if latest_witnessed is not None else 0
         publications_behind = max(0, current_sequence - witnessed_sequence) if witnessed_sequence else current_sequence
+        continuity_ready = (
+            quorum is not None and quorum.reached
+            and prior_witnessed is not None
+            and prior_witnessed.publication_sequence < current_sequence
+        )
         return {
             "version": 1,
             "policy": {
@@ -158,8 +212,12 @@ class DeploymentCheckpointPinRuntime:
             "trust_frontier": {
                 "current_publication_sequence": current_sequence,
                 "latest_witnessed_publication_sequence": witnessed_sequence,
+                "latest_prior_witnessed_publication_sequence": (
+                    prior_witnessed.publication_sequence if prior_witnessed is not None else 0
+                ),
                 "publications_behind": publications_behind,
                 "advance_available": latest_witnessed is not None and publications_behind > 0,
+                "continuity_ready": continuity_ready,
             },
             "requirement_satisfied": satisfied,
             "verified": ledger.get("verified") is True,
