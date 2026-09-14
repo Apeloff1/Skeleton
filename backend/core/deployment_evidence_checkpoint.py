@@ -66,9 +66,22 @@ def _exact_nonnegative_int(value: Any) -> bool:
     return type(value) is int and value >= 0
 
 
+def _status_count(status: Mapping[str, Any], key: str) -> int:
+    value = status.get(key)
+    if not _exact_nonnegative_int(value):
+        raise ValueError(f"deployment evidence status {key} must be a non-negative integer")
+    return value
+
+
 def _channel_rows(gateway) -> tuple[ReleaseChannelCheckpoint, ...]:
     grouped: dict[tuple[str, str], list[Any]] = {}
     for release in gateway.releases.snapshot():
+        if not isinstance(release.target, str) or not release.target or release.target != release.target.strip():
+            raise ValueError("release target is noncanonical")
+        if not isinstance(release.environment, str) or not release.environment or release.environment != release.environment.strip():
+            raise ValueError("release environment is noncanonical")
+        if not _is_sha(release.sha256):
+            raise ValueError("release head is malformed")
         grouped.setdefault((release.environment, release.target), []).append(release)
     rows: list[ReleaseChannelCheckpoint] = []
     for (environment, target), releases in sorted(grouped.items()):
@@ -87,6 +100,14 @@ def build_deployment_evidence_checkpoint(gateway) -> DeploymentEvidenceCheckpoin
     receipts = gateway.receipts.status()
     portability = gateway.portability_status()
     gaps = gateway.evidence_gaps()
+    if not isinstance(authorization, Mapping) or authorization.get("verified") is not True:
+        raise ValueError("authorization ledger is not verified")
+    if not isinstance(receipts, Mapping) or receipts.get("verified") is not True:
+        raise ValueError("deployment receipt ledger is not verified")
+    if not isinstance(portability, Mapping):
+        raise ValueError("deployment portability status is malformed")
+    if not isinstance(gaps, list):
+        raise ValueError("deployment evidence gaps must be a list")
     channels = _channel_rows(gateway)
 
     authorization_head = authorization.get("head_sha256")
@@ -100,6 +121,10 @@ def build_deployment_evidence_checkpoint(gateway) -> DeploymentEvidenceCheckpoin
     authorization_head = authorization_head or canonical_json_sha256({"ledger": "authorization", "empty": True})
     receipt_head = receipt_head or canonical_json_sha256({"ledger": "receipt", "empty": True})
 
+    completed = _status_count(portability, "completed_releases")
+    fully_portable = _status_count(portability, "fully_portable")
+    if fully_portable > completed:
+        raise ValueError("fully portable release count exceeds completed releases")
     channel_payload = [asdict(item) for item in channels]
     channels_sha = canonical_json_sha256(channel_payload)
     draft = DeploymentEvidenceCheckpoint(
@@ -107,8 +132,8 @@ def build_deployment_evidence_checkpoint(gateway) -> DeploymentEvidenceCheckpoin
         authorization_head_sha256=authorization_head,
         receipt_head_sha256=receipt_head,
         release_channels=channels,
-        completed_releases=int(portability["completed_releases"]),
-        fully_portable_releases=int(portability["fully_portable"]),
+        completed_releases=completed,
+        fully_portable_releases=fully_portable,
         evidence_gap_count=len(gaps),
         release_channels_sha256=channels_sha,
         root_sha256="",
@@ -188,13 +213,18 @@ def verify_deployment_evidence_checkpoint(checkpoint: DeploymentEvidenceCheckpoi
 
 
 def _proof_release_identity(proof: PortableDeploymentProof | Mapping[str, Any]) -> tuple[str, str] | None:
-    raw = asdict(proof) if isinstance(proof, PortableDeploymentProof) else dict(proof)
+    try:
+        raw = asdict(proof) if isinstance(proof, PortableDeploymentProof) else dict(proof)
+    except (TypeError, ValueError):
+        return None
     release = raw.get("release")
     if not isinstance(release, Mapping):
         return None
     target = release.get("target")
     environment = release.get("environment")
-    if not isinstance(target, str) or not target or not isinstance(environment, str) or not environment:
+    if not isinstance(target, str) or not target or target != target.strip():
+        return None
+    if not isinstance(environment, str) or not environment or environment != environment.strip():
         return None
     return target, environment
 
