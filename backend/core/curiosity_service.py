@@ -13,6 +13,7 @@ from core.epistemic_attestation import epistemic_root_dict
 from core.epistemic_claim_index import EpistemicClaimIndex
 from core.epistemic_trust_runtime import EpistemicTrustRuntime
 from core.idle_curiosity_runtime import IdleCuriosityRuntime
+from core.signed_portable_claim import signed_portable_claim_envelope_dict
 from core.truth_watch import TruthEventKind, TruthWatchFeed
 from core.verified_curiosity import VerifiedCuriosityEngine
 
@@ -145,6 +146,14 @@ class CuriosityService:
 
     def claim_proof(self, claim: str) -> dict[str, Any]:
         return claim_proof_dict(self.engine, claim)
+
+    def signed_claim_proof(self, claim: str, *, max_age_seconds: int = 900) -> dict[str, Any]:
+        return signed_portable_claim_envelope_dict(
+            self.engine,
+            claim,
+            trust_runtime=self.trust,
+            max_age_seconds=max_age_seconds,
+        )
 
     def checkpoint_truth(self, *, observed_at: str | None = None) -> dict[str, Any]:
         authority_root = EpistemicClaimIndex(self.engine).root_sha256()
