@@ -6,12 +6,12 @@
 # --- Web framework ---
 fastapi==0.136.1
 uvicorn[standard]==0.25.0
-python-multipart==0.0.22
+python-multipart==0.0.32
 websockets==15.0.1
 orjson==3.11.7
 aiofiles==25.1.0
 httpx==0.28.1
-requests==2.32.5
+requests==2.34.2
 
 # --- Database ---
 motor==3.7.1
@@ -20,19 +20,20 @@ aiosqlite==0.22.1
 
 # --- Validation / config ---
 pydantic==2.12.5
-pydantic-settings==2.13.1
+pydantic-settings==2.15.0
 email-validator==2.3.0
-python-dotenv==1.2.1
+python-dotenv==1.2.3
 
 # --- Auth / security ---
 # bcrypt is pinned below 4.1: passlib 1.7.4 crashes on bcrypt>=4.1
 passlib==1.7.4
 bcrypt==4.0.1
-PyJWT==2.11.0
-python-jose==3.5.0
+PyJWT==2.14.0
+# python-jose was unused and pulled python-ecdsa, whose Minerva timing issue has
+# no planned upstream fix. PyJWT is the maintained JWT boundary in this image.
 # Direct dependency: epistemic transparency witnesses use Ed25519 verification.
 # Do not rely on an optional/transitive crypto backend for trust-critical code.
-cryptography>=46.0.4,<47
+cryptography==50.0.1
 
 # --- AI / LLM ---
 openai==2.37.0
@@ -42,9 +43,6 @@ google-genai==2.4.0
 # boot-safe compatibility layer. Do not reintroduce it as a registry dependency.
 tenacity==9.1.4
 tiktoken==0.12.0
-
-# --- RAG / vector store ---
-chromadb==1.5.5
 
 # --- Search ---
 ddgs==9.14.4
@@ -57,7 +55,7 @@ stripe==15.1.0
 
 # --- Documents / media ---
 reportlab==5.0.0
-pillow==12.2.0
+pillow==12.3.0
 numpy==2.4.4
 
 # --- Logging ---
