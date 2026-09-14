@@ -53,7 +53,7 @@ class CuriosityService:
                               "evidence": [{"source": e.source, "locator": e.locator, "confidence": e.confidence, "observed_at": e.observed_at} for e in r.evidence],
                               "tags": list(r.tags), "confidence": r.confidence, "novelty": r.novelty,
                               "created_at": r.created_at, "digest": r.digest} for r in records],
-                "orientation": self.engine.fabric.orientation_pack(query, limit=min(limit, 8))}
+                "orientation": self.engine.orientation_pack(query, limit=min(limit, 8))}
 
     async def run_now(self) -> dict[str, Any]: return await self.engine.run_once(self.researcher, minimum_score=self.runtime.minimum_score)
     def run_now_sync(self) -> dict[str, Any]: return self.runtime.run_cycle_now()
