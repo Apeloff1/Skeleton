@@ -1,12 +1,14 @@
 """
-api_middleware — request ID injection, structured logging, and an in-memory
-token-bucket rate limiter.
+api_middleware — request identity, access logging, origin enforcement, response
+hardening, and an in-memory token-bucket rate limiter.
 
 Security properties:
   • forwarding headers are trusted only from explicitly configured proxy CIDRs
   • request IDs are bounded and validated before logging/echoing
   • token-bucket state is LRU-bounded to resist memory exhaustion
   • unknown clients and loopback peers are rate limited unless explicitly exempted
+  • browser cross-origin API reads fail closed unless CORS_ORIGINS is configured
+  • API responses receive defensive browser/security headers by default
 
 Tunable via env:
   RATE_LIMIT_PER_MIN       default 600
@@ -14,6 +16,8 @@ Tunable via env:
   RATE_LIMIT_MAX_BUCKETS   default 10000
   RATE_LIMIT_EXEMPT        default "" (no implicit exemptions)
   TRUSTED_PROXY_CIDRS      default "" (no implicit trusted proxies)
+  CORS_ORIGINS             default "" (same-origin only; use explicit CSV or *)
+  FORCE_HSTS               default 0 (set 1 only when HTTPS is guaranteed)
   ACCESS_LOG               default 1
 """
 from __future__ import annotations
@@ -24,6 +28,7 @@ import os
 import time
 from collections import OrderedDict, defaultdict, deque
 from typing import Callable, Deque, Dict, Tuple
+from urllib.parse import urlsplit
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -45,12 +50,44 @@ def _positive_int_env(name: str, default: int, *, maximum: int) -> int:
     return max(1, min(value, maximum))
 
 
+def _env_truthy(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _configured_origins() -> frozenset[str]:
+    """Return explicitly trusted browser origins.
+
+    Absence of CORS_ORIGINS intentionally means no cross-origin API access.
+    This protects deployments that forget to configure CORS. A literal '*'
+    remains available as an explicit operator choice for local/dev use.
+    """
+    raw = os.environ.get("CORS_ORIGINS", "").strip()
+    if not raw:
+        return frozenset()
+    if raw == "*":
+        return frozenset({"*"})
+    return frozenset(origin.strip().rstrip("/") for origin in raw.split(",") if origin.strip())
+
+
+def _same_origin(request: Request, origin: str) -> bool:
+    """Conservatively compare an Origin header to the request authority."""
+    try:
+        parsed = urlsplit(origin)
+    except ValueError:
+        return False
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.path not in {"", "/"}:
+        return False
+    request_origin = f"{request.url.scheme}://{request.headers.get('host', '')}".rstrip("/")
+    return origin.rstrip("/") == request_origin
+
+
 # ── Configuration ─────────────────────────────────────────────────────
 _RATE_PER_MIN = _positive_int_env("RATE_LIMIT_PER_MIN", 600, maximum=1_000_000)
 _RATE_BURST = _positive_int_env("RATE_LIMIT_BURST", 60, maximum=100_000)
 _MAX_BUCKETS = _positive_int_env("RATE_LIMIT_MAX_BUCKETS", 10_000, maximum=1_000_000)
-# Exemptions are an explicit deployment decision. In particular, loopback is
-# not exempt by default because reverse proxies commonly connect over loopback.
 _EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "")
 _EXEMPT_IPS = {ip.strip() for ip in _EXEMPT_RAW.split(",") if ip.strip()}
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
@@ -93,6 +130,7 @@ def get_stats() -> dict:
         "requests_4xx": _counts.get("4xx", 0),
         "requests_5xx": _counts.get("5xx", 0),
         "rate_limited_total": _counts.get("rate_limited", 0),
+        "origin_blocked_total": _counts.get("origin_blocked", 0),
         "samples": len(vals),
         "latency_ms": {
             "p50": round(_percentile(vals, 50), 2),
@@ -128,6 +166,70 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
                 return resp
             raise
         response.headers["X-Request-Id"] = rid
+        return response
+
+
+# ── Browser origin policy ─────────────────────────────────────────────
+class OriginGuardMiddleware(BaseHTTPMiddleware):
+    """Fail closed for browser cross-origin API requests.
+
+    Starlette CORS configuration in legacy server bootstrap historically
+    defaulted to '*'. This guard independently prevents response-data exposure
+    unless CORS_ORIGINS explicitly authorizes an origin. Requests without an
+    Origin header (CLI/service-to-service) are unaffected.
+    """
+
+    async def dispatch(self, request: Request, call_next: Callable):
+        if not request.url.path.startswith("/api"):
+            return await call_next(request)
+
+        origin = request.headers.get("origin")
+        if not origin:
+            return await call_next(request)
+
+        origin = origin.strip().rstrip("/")
+        allowed = _configured_origins()
+        if "*" in allowed or origin in allowed or _same_origin(request, origin):
+            return await call_next(request)
+
+        _counts["origin_blocked"] += 1
+        rid = getattr(request.state, "request_id", "-")
+        log.warning("origin_blocked origin=%r path=%s rid=%s", origin[:200], request.url.path, rid)
+        return JSONResponse(
+            status_code=403,
+            content={"error": "origin_not_allowed", "request_id": rid},
+            headers={"Cache-Control": "no-store", "X-Request-Id": rid},
+        )
+
+
+# ── Defensive response headers ────────────────────────────────────────
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Attach defense-in-depth browser headers to API responses."""
+
+    async def dispatch(self, request: Request, call_next: Callable):
+        response: Response = await call_next(request)
+        if not request.url.path.startswith("/api"):
+            return response
+
+        headers = response.headers
+        headers.setdefault("Cache-Control", "no-store")
+        headers.setdefault("X-Content-Type-Options", "nosniff")
+        headers.setdefault("X-Frame-Options", "DENY")
+        headers.setdefault("Referrer-Policy", "no-referrer")
+        headers.setdefault(
+            "Permissions-Policy",
+            "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+        )
+        headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+        )
+        # HSTS is safe only when clients reach this authority exclusively over
+        # HTTPS. Operators behind TLS-terminating proxies can force it on.
+        if request.url.scheme == "https" or _env_truthy("FORCE_HSTS"):
+            headers.setdefault("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+        if "server" in headers:
+            del headers["server"]
         return response
 
 
@@ -249,8 +351,6 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         ip = _client_ip(request)
         if ip in _EXEMPT_IPS:
             return await call_next(request)
-        # Unknown identity is intentionally *not* exempt. All such requests
-        # share a bounded bucket rather than gaining an unlimited bypass.
         ok, retry = self._bucket_for(ip).take(1)
         if not ok:
             _counts["rate_limited"] += 1
@@ -280,7 +380,13 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
 
 
 def install_middleware(app) -> None:
-    """Install logging, request identity, and rate limiting in safe order."""
+    """Install security middleware in Starlette's reverse-add (LIFO) order.
+
+    The origin guard is added last so it sits outermost within this stack and
+    rejects untrusted browser origins before expensive handlers execute.
+    """
     app.add_middleware(AccessLogMiddleware)
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(RateLimiterMiddleware)
+    app.add_middleware(OriginGuardMiddleware)
