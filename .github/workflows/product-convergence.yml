@@ -136,3 +136,4 @@ jobs:
           tests/test_charter_policy.py
           tests/test_durable_outbox.py
           tests/test_worm_audit.py
+          tests/test_principal_seal.py
