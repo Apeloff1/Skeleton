@@ -16,6 +16,8 @@ from core.atomic_release_deployer import ReleaseDeploymentError
 from core.charter_policy import Rule
 from core.control_plane_deployment import control_plane_preflight_dict
 from core.databases import client as _SHARED_MONGO_CLIENT
+from core.deployment_checkpoint_ledger import DeploymentCheckpointLedgerError
+from core.deployment_evidence_checkpoint import verify_deployment_proof_against_checkpoint
 from core.deployment_gateway import DeploymentGatewayError
 from core.durable_outbox import OutboxFullError
 from core.execution_receipts import ReceiptIntegrityError
@@ -156,6 +158,71 @@ async def product_control_deployment_preflight(max_attempts: int = Query(3, ge=1
 @router.get("/product-control/deployments")
 async def product_control_deployments(token: str = Query("")):
     _require_ops(token); return _control_plane().deployments.status()
+
+
+@router.get("/product-control/deployments/checkpoints")
+async def product_control_deployment_checkpoints(limit: int = Query(50, ge=1, le=500), token: str = Query("")):
+    _require_ops(token)
+    try:
+        gateway = _control_plane().deployments
+        history = gateway.checkpoints.history()
+        selected = history[-limit:]
+        return {
+            "status": gateway.checkpoints.status(),
+            "count": len(history),
+            "returned": len(selected),
+            "publications": [asdict(row) for row in selected],
+        }
+    except DeploymentCheckpointLedgerError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/product-control/deployments/checkpoints/{sequence}")
+async def product_control_deployment_checkpoint(sequence: int, token: str = Query("")):
+    _require_ops(token)
+    if sequence < 1:
+        raise HTTPException(status_code=400, detail="checkpoint sequence must be positive")
+    try:
+        publication = next((row for row in _control_plane().deployments.checkpoints.history()
+                            if row.sequence == sequence), None)
+    except DeploymentCheckpointLedgerError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    if publication is None:
+        raise HTTPException(status_code=404, detail="deployment checkpoint not found")
+    return asdict(publication)
+
+
+@router.get("/product-control/deployments/proof/{authorization_id}")
+async def product_control_deployment_proof(authorization_id: str,
+                                             checkpoint_sequence: int | None = Query(default=None, ge=1),
+                                             token: str = Query("")):
+    _require_ops(token)
+    try:
+        gateway = _control_plane().deployments
+        history = gateway.checkpoints.history()
+        publication = (
+            history[-1] if checkpoint_sequence is None and history
+            else next((row for row in history if row.sequence == checkpoint_sequence), None)
+        )
+        if publication is None:
+            raise HTTPException(status_code=404, detail="deployment checkpoint not found")
+        proof = gateway.portable_proof(authorization_id)
+        verified = verify_deployment_proof_against_checkpoint(
+            proof,
+            publication.checkpoint,
+            expected_checkpoint_root_sha256=publication.checkpoint_root_sha256,
+        )
+        return {
+            "verified": verified,
+            "proof": asdict(proof),
+            "checkpoint_publication": asdict(publication),
+        }
+    except HTTPException:
+        raise
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="deployment authorization proof not found") from exc
+    except (DeploymentCheckpointLedgerError, DeploymentGatewayError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.post("/product-control/deployments/prepare")
