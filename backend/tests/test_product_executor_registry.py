@@ -62,8 +62,8 @@ def test_default_control_plane_reports_expanded_native_coverage(tmp_path):
     plane = ProductControlPlane(tmp_path)
     coverage = plane.executor_coverage()
     assert coverage["canonical_actions"] == sum(len(item.actions) for item in CANONICAL_PRODUCT_POLICY)
-    assert coverage["bound_actions"] == 8
-    assert coverage["coverage_pct"] == 38.1
+    assert coverage["bound_actions"] == 10
+    assert coverage["coverage_pct"] == 47.6
     missing = {item["action"] for item in coverage["missing"]}
     assert {"build.submit", "jeeves.reason", "academy.continue"} <= missing
 
@@ -87,6 +87,19 @@ def test_governance_query_executor_is_policy_backed(tmp_path):
     result = plane.receipt_result(operation.id)
     assert result["policy"]["policy_version"] >= 1
     assert len(result["policy"]["charters"]) == len(CANONICAL_PRODUCT_POLICY)
+
+
+def test_governance_safety_executor_inspects_live_integrity_posture(tmp_path):
+    plane = ProductControlPlane(tmp_path)
+    operation = plane.admit(capability_id="governance", domain="governance", action="governance.safety",
+                            principal="auditor", actor_weight=0, payload={})
+    assert asyncio.run(plane.execute_registered(operation.outbox_seq)) is True
+    result = plane.receipt_result(operation.id)["safety"]
+    assert result["posture"] in {"healthy", "degraded", "blocked"}
+    assert result["canonical_actions"] == 21
+    assert result["native_bound_actions"] == 10
+    assert result["native_coverage_pct"] == 47.6
+    assert result["audit_sequence"] >= 1
 
 
 def test_canonical_policy_has_no_implicit_executor_requirement():
