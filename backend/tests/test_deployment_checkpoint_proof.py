@@ -6,6 +6,7 @@ import hashlib
 import pytest
 
 from core.deployment_checkpoint_proof import (
+    build_deployment_checkpoint_publication_extension,
     build_deployment_checkpoint_publication_proof,
     verify_deployment_checkpoint_publication_extension,
     verify_deployment_checkpoint_publication_proof,
@@ -166,6 +167,50 @@ def test_old_pinned_publication_head_can_advance_trust_without_genesis_replay(tm
         expected_previous_ledger_head_sha256=anchor.sha256,
         expected_current_ledger_head_sha256=new_head,
     ) is True
+
+
+def test_head_based_extension_builder_needs_only_the_external_pin(tmp_path):
+    gateway = _gateway(tmp_path)
+    _deploy(gateway, "artifact-v1")
+    pinned = gateway.checkpoints.latest()
+    assert pinned is not None
+
+    _deploy(gateway, "artifact-v2")
+    proof = build_deployment_checkpoint_publication_extension(gateway.checkpoints, pinned.sha256)
+
+    assert proof.start_sequence == pinned.sequence
+    assert proof.publications[0] == pinned
+    assert proof.ledger_head_sha256 == gateway.checkpoints.status()["head_sha256"]
+    assert verify_deployment_checkpoint_publication_extension(
+        proof,
+        expected_previous_ledger_head_sha256=pinned.sha256,
+        expected_current_ledger_head_sha256=proof.ledger_head_sha256,
+    ) is True
+
+
+def test_head_based_extension_builder_is_idempotent_at_current_head(tmp_path):
+    gateway = _gateway(tmp_path)
+    _deploy(gateway, "artifact-v1")
+    current = gateway.checkpoints.latest()
+    assert current is not None
+
+    proof = build_deployment_checkpoint_publication_extension(gateway.checkpoints, current.sha256)
+
+    assert proof.start_sequence == proof.end_sequence == current.sequence
+    assert proof.publications == (current,)
+    assert verify_deployment_checkpoint_publication_extension(
+        proof,
+        expected_previous_ledger_head_sha256=current.sha256,
+        expected_current_ledger_head_sha256=current.sha256,
+    ) is True
+
+
+def test_head_based_extension_builder_rejects_unknown_and_malformed_pins(tmp_path):
+    gateway = _gateway(tmp_path)
+    with pytest.raises(ValueError, match="lowercase sha256"):
+        build_deployment_checkpoint_publication_extension(gateway.checkpoints, "not-a-sha")
+    with pytest.raises(KeyError):
+        build_deployment_checkpoint_publication_extension(gateway.checkpoints, "f" * 64)
 
 
 def test_checkpoint_extension_rejects_wrong_old_pin_and_forked_anchor(tmp_path):
