@@ -50,6 +50,12 @@ on:
       - "backend/tests/test_world_runtime_social_travel.py"
       - "backend/tests/test_economy_dialogue_runtime.py"
       - "backend/tests/test_world_economy_dialogue.py"
+      - "backend/tests/test_control_plane_deployment.py"
+      - "backend/tests/test_deployment_authorization.py"
+      - "backend/tests/test_atomic_release_deployer.py"
+      - "backend/tests/test_deployment_receipts.py"
+      - "backend/tests/test_deployment_gateway.py"
+      - "backend/tests/test_deployment_proof.py"
       - "frontend/src/product/productCatalog.ts"
       - ".github/workflows/product-convergence.yml"
   pull_request:
@@ -101,6 +107,12 @@ on:
       - "backend/tests/test_world_runtime_social_travel.py"
       - "backend/tests/test_economy_dialogue_runtime.py"
       - "backend/tests/test_world_economy_dialogue.py"
+      - "backend/tests/test_control_plane_deployment.py"
+      - "backend/tests/test_deployment_authorization.py"
+      - "backend/tests/test_atomic_release_deployer.py"
+      - "backend/tests/test_deployment_receipts.py"
+      - "backend/tests/test_deployment_gateway.py"
+      - "backend/tests/test_deployment_proof.py"
       - "frontend/src/product/productCatalog.ts"
       - ".github/workflows/product-convergence.yml"
 
@@ -167,6 +179,12 @@ jobs:
           tests/test_world_runtime_social_travel.py
           tests/test_economy_dialogue_runtime.py
           tests/test_world_economy_dialogue.py
+          tests/test_control_plane_deployment.py
+          tests/test_deployment_authorization.py
+          tests/test_atomic_release_deployer.py
+          tests/test_deployment_receipts.py
+          tests/test_deployment_gateway.py
+          tests/test_deployment_proof.py
           tests/test_charter_policy.py
           tests/test_durable_outbox.py
           tests/test_worm_audit.py
