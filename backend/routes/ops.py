@@ -127,6 +127,12 @@ async def product_control_status(token: str = Query("")):
     _require_ops(token); return _control_plane().status()
 
 
+@router.get("/product-control/assurance")
+async def product_control_assurance(token: str = Query("")):
+    _require_ops(token)
+    return _control_plane().assurance_report()
+
+
 @router.get("/product-control/pending")
 async def product_control_pending(token: str = Query("")):
     _require_ops(token); pending = _control_plane().pending(); return {"count": len(pending), "operations": pending}
