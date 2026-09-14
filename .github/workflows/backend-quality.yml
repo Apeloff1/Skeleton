@@ -65,5 +65,6 @@ jobs:
           tests/test_client_ip_security.py
           tests/test_size_limit_security.py
           tests/test_rate_limit_state_security.py
+          tests/test_request_id_security.py
           tests/test_import_export_security.py
           tests/test_live_scraper_security.py
