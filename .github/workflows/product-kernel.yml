@@ -8,8 +8,10 @@ on:
       - "backend/tests/test_charter_policy.py"
       - "backend/tests/test_product_kernel.py"
       - "frontend/src/product/productCatalog.ts"
+      - "frontend/src/product/productControlClient.ts"
       - "frontend/app/product.tsx"
       - "frontend/app/capability.tsx"
+      - "frontend/app/operation.tsx"
       - "frontend/components/LaunchCascade.tsx"
       - ".github/workflows/product-kernel.yml"
   pull_request:
@@ -19,8 +21,10 @@ on:
       - "backend/tests/test_charter_policy.py"
       - "backend/tests/test_product_kernel.py"
       - "frontend/src/product/productCatalog.ts"
+      - "frontend/src/product/productControlClient.ts"
       - "frontend/app/product.tsx"
       - "frontend/app/capability.tsx"
+      - "frontend/app/operation.tsx"
       - "frontend/components/LaunchCascade.tsx"
       - ".github/workflows/product-kernel.yml"
 
