@@ -4,58 +4,58 @@
 # ============================================================================
 
 # --- Web framework ---
-fastapi==0.136.1
-uvicorn[standard]==0.25.0
-python-multipart==0.0.22
-websockets==15.0.1
-orjson==3.11.7
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+python-multipart==0.0.32
+websockets==17.1
+orjson==3.12.0
 aiofiles==25.1.0
 httpx==0.28.1
-requests==2.32.5
+requests==2.34.2
 
 # --- Database ---
 motor==3.7.1
-pymongo==4.13.0
+pymongo==4.18.1
 aiosqlite==0.22.1
 
 # --- Validation / config ---
-pydantic==2.12.5
-pydantic-settings==2.13.1
+pydantic==2.13.5
+pydantic-settings==2.15.0
 email-validator==2.3.0
-python-dotenv==1.2.1
+python-dotenv==1.2.3
 
 # --- Auth / security ---
 # bcrypt is pinned below 4.1: passlib 1.7.4 crashes on bcrypt>=4.1
 passlib==1.7.4
-bcrypt==4.0.1
-PyJWT==2.11.0
+bcrypt==5.0.0
+PyJWT==2.13.0
 python-jose==3.5.0
 
 # --- AI / LLM ---
-openai==2.37.0
-litellm==1.85.0
-google-genai==2.4.0
+openai==3.13.0
+litellm==1.100.1
+google-genai==2.23.0
 # The retired Emergent SDK is replaced by backend/emergentintegrations, a local
 # boot-safe compatibility layer. Do not reintroduce it as a registry dependency.
 tenacity==9.1.4
-tiktoken==0.12.0
+tiktoken==0.14.0
 
 # --- RAG / vector store ---
-chromadb==1.5.5
+chromadb==1.5.9
 
 # --- Search ---
-ddgs==9.14.4
+ddgs==9.16.0
 
 # --- Scheduling ---
 APScheduler==3.11.3
 
 # --- Payments ---
-stripe==15.1.0
+stripe==15.6.1
 
 # --- Documents / media ---
-reportlab==5.0.0
-pillow==12.2.0
-numpy==2.4.4
+reportlab==5.0.1
+pillow==12.3.0
+numpy==2.4.6
 
 # --- Logging ---
 loguru==0.7.3
