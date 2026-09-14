@@ -3,7 +3,7 @@
 The primary SAST gate catches direct ``child_process.exec`` calls and destructured
 ``exec``/``execSync`` imports. This companion gate closes namespace-alias bypasses
 while keeping false positives low by distinguishing executable code from comments
-and string/template contents.
+and string/template literal data. Expressions inside template literals remain code.
 """
 from __future__ import annotations
 
@@ -56,13 +56,14 @@ def _line_number(text: str, offset: int) -> int:
     return text.count("\n", 0, offset) + 1
 
 
-def _mask_non_code(text: str, *, mask_strings: bool) -> str:
-    """Mask comments and optionally strings while preserving offsets/newlines."""
+def _mask_comments(text: str) -> str:
+    """Mask comments while preserving strings, offsets, and newlines."""
     chars = list(text)
     out = list(text)
     state = "code"
     quote = ""
     escaped = False
+    template_expr_depths: list[int] = []
     i = 0
 
     while i < len(chars):
@@ -79,8 +80,7 @@ def _mask_non_code(text: str, *, mask_strings: bool) -> str:
 
         if state == "block-comment":
             if ch == "*" and nxt == "/":
-                out[i] = " "
-                out[i + 1] = " "
+                out[i] = out[i + 1] = " "
                 state = "code"
                 i += 2
                 continue
@@ -89,47 +89,186 @@ def _mask_non_code(text: str, *, mask_strings: bool) -> str:
             i += 1
             continue
 
-        if state == "quoted":
-            if mask_strings and ch != "\n":
-                out[i] = " "
+        if state in {"single", "double"}:
             if escaped:
                 escaped = False
             elif ch == "\\":
                 escaped = True
-            elif ch == quote:
+            elif (state == "single" and ch == "'") or (state == "double" and ch == '"'):
                 state = "code"
-                quote = ""
             i += 1
             continue
 
-        if ch in {"'", '"', "`"}:
-            state = "quoted"
-            quote = ch
-            escaped = False
-            if mask_strings:
-                out[i] = " "
+        if state == "template":
+            if escaped:
+                escaped = False
+                i += 1
+                continue
+            if ch == "\\":
+                escaped = True
+                i += 1
+                continue
+            if ch == "`":
+                state = "code"
+                i += 1
+                continue
+            if ch == "$" and nxt == "{":
+                template_expr_depths.append(1)
+                state = "code"
+                i += 2
+                continue
             i += 1
             continue
 
+        # Executable code, including the body of ${...} template expressions.
         if ch == "/" and nxt == "/":
             out[i] = out[i + 1] = " "
             state = "line-comment"
             i += 2
             continue
-
         if ch == "/" and nxt == "*":
             out[i] = out[i + 1] = " "
             state = "block-comment"
             i += 2
             continue
-
+        if ch == "'":
+            state = "single"
+            escaped = False
+            i += 1
+            continue
+        if ch == '"':
+            state = "double"
+            escaped = False
+            i += 1
+            continue
+        if ch == "`":
+            state = "template"
+            escaped = False
+            i += 1
+            continue
+        if template_expr_depths:
+            if ch == "{":
+                template_expr_depths[-1] += 1
+            elif ch == "}":
+                template_expr_depths[-1] -= 1
+                if template_expr_depths[-1] == 0:
+                    template_expr_depths.pop()
+                    state = "template"
         i += 1
 
     return "".join(out)
 
 
-def _match_starts_in_code(code_text: str, start: int, alias: str) -> bool:
-    return code_text[start : start + len(alias)] == alias
+def _code_positions(text: str) -> list[bool]:
+    """Mark positions that belong to executable JS/TS code.
+
+    Literal template text is non-code, but `${...}` bodies are executable and
+    therefore remain marked as code, including nested template expressions.
+    """
+    positions = [False] * len(text)
+    state = "code"
+    escaped = False
+    template_expr_depths: list[int] = []
+    i = 0
+
+    while i < len(text):
+        ch = text[i]
+        nxt = text[i + 1] if i + 1 < len(text) else ""
+
+        if state == "line-comment":
+            if ch == "\n":
+                state = "code"
+            i += 1
+            continue
+
+        if state == "block-comment":
+            if ch == "*" and nxt == "/":
+                i += 2
+                state = "code"
+            else:
+                i += 1
+            continue
+
+        if state in {"single", "double"}:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif (state == "single" and ch == "'") or (state == "double" and ch == '"'):
+                state = "code"
+            i += 1
+            continue
+
+        if state == "template":
+            if escaped:
+                escaped = False
+                i += 1
+                continue
+            if ch == "\\":
+                escaped = True
+                i += 1
+                continue
+            if ch == "`":
+                state = "code"
+                i += 1
+                continue
+            if ch == "$" and nxt == "{":
+                template_expr_depths.append(1)
+                state = "code"
+                i += 2
+                continue
+            i += 1
+            continue
+
+        # Executable code.
+        positions[i] = True
+        if ch == "/" and nxt == "/":
+            positions[i] = False
+            if i + 1 < len(text):
+                positions[i + 1] = False
+            state = "line-comment"
+            i += 2
+            continue
+        if ch == "/" and nxt == "*":
+            positions[i] = False
+            if i + 1 < len(text):
+                positions[i + 1] = False
+            state = "block-comment"
+            i += 2
+            continue
+        if ch == "'":
+            positions[i] = False
+            state = "single"
+            escaped = False
+            i += 1
+            continue
+        if ch == '"':
+            positions[i] = False
+            state = "double"
+            escaped = False
+            i += 1
+            continue
+        if ch == "`":
+            positions[i] = False
+            state = "template"
+            escaped = False
+            i += 1
+            continue
+        if template_expr_depths:
+            if ch == "{":
+                template_expr_depths[-1] += 1
+            elif ch == "}":
+                template_expr_depths[-1] -= 1
+                if template_expr_depths[-1] == 0:
+                    template_expr_depths.pop()
+                    state = "template"
+        i += 1
+
+    return positions
+
+
+def _starts_in_code(code_positions: list[bool], start: int) -> bool:
+    return 0 <= start < len(code_positions) and code_positions[start]
 
 
 def violations(path: Path) -> list[str]:
@@ -139,14 +278,13 @@ def violations(path: Path) -> list[str]:
     except (OSError, UnicodeError) as exc:
         return [f"{label}: read failure: {exc}"]
 
-    # Imports need their module-specifier strings preserved; executable-call
-    # matching does not. Keeping separate masks prevents code-like string data
-    # from becoming a false positive while still recognizing real imports.
-    import_text = _mask_non_code(text, mask_strings=False)
-    code_text = _mask_non_code(text, mask_strings=True)
+    scan_text = _mask_comments(text)
+    code_positions = _code_positions(text)
 
     aliases: set[str] = set()
-    for match in NAMESPACE_IMPORT_RE.finditer(import_text):
+    for match in NAMESPACE_IMPORT_RE.finditer(scan_text):
+        if not _starts_in_code(code_positions, match.start()):
+            continue
         alias = match.group("esm") or match.group("cjs")
         if alias:
             aliases.add(alias)
@@ -157,32 +295,22 @@ def violations(path: Path) -> list[str]:
         dot_call_re = re.compile(
             rf"\b{re.escape(alias)}\s*(?:\?\.|\.)\s*exec(?:Sync)?\s*\("
         )
-        for match in dot_call_re.finditer(code_text):
-            key = (match.start(), alias)
-            if key in seen:
-                continue
-            seen.add(key)
-            findings.append(
-                f"{label}:{_line_number(text, match.start())}: "
-                f"child_process namespace alias {alias}.exec()/execSync() is forbidden"
-            )
-
-        # Bracket notation contains a real string token (cp['exec']()), so scan
-        # the comment-masked source and prove the alias itself starts in code.
         bracket_call_re = re.compile(
             rf"\b{re.escape(alias)}\s*\[\s*['\"]exec(?:Sync)?['\"]\s*\]\s*\("
         )
-        for match in bracket_call_re.finditer(import_text):
-            if not _match_starts_in_code(code_text, match.start(), alias):
-                continue
-            key = (match.start(), alias)
-            if key in seen:
-                continue
-            seen.add(key)
-            findings.append(
-                f"{label}:{_line_number(text, match.start())}: "
-                f"child_process namespace alias {alias} bracket exec()/execSync() is forbidden"
-            )
+        for call_kind, pattern in (("dot", dot_call_re), ("bracket", bracket_call_re)):
+            for match in pattern.finditer(scan_text):
+                if not _starts_in_code(code_positions, match.start()):
+                    continue
+                key = (match.start(), alias)
+                if key in seen:
+                    continue
+                seen.add(key)
+                notation = " bracket" if call_kind == "bracket" else ""
+                findings.append(
+                    f"{label}:{_line_number(text, match.start())}: "
+                    f"child_process namespace alias {alias}{notation} exec()/execSync() is forbidden"
+                )
 
     return findings
 
