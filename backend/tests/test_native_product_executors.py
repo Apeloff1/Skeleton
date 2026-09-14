@@ -3,13 +3,19 @@ import asyncio
 from core.product_control_plane import ProductControlPlane
 
 
-def test_default_executor_registry_binds_first_native_actions(tmp_path):
+def test_default_executor_registry_binds_native_actions(tmp_path):
     plane = ProductControlPlane(tmp_path)
     bindings = {(item["capability_id"], item["action"]) for item in plane.executors.snapshot()}
     assert ("studio", "project.create") in bindings
+    assert ("studio", "pipeline.inspect") in bindings
     assert ("world-forge", "world.create") in bindings
+    assert ("world-forge", "world.systems.compose") in bindings
     assert ("playables", "playable.launch") in bindings
     assert ("playables", "runtime.sessions") in bindings
+    assert ("operations", "ops.runtime") in bindings
+    assert ("governance", "governance.policy") in bindings
+    assert ("governance", "governance.audit") in bindings
+    assert ("governance", "governance.safety") in bindings
     assert ("studio", "build.submit") not in bindings
 
 
@@ -31,6 +37,29 @@ def test_studio_project_executes_and_writes_provenance_receipt(tmp_path):
     result = plane.receipts.load_result(admitted.id)
     assert result["title"] == "Native project"
     assert result["state"] == "created"
+
+
+def test_world_system_compiler_executes_through_governed_queue(tmp_path):
+    plane = ProductControlPlane(tmp_path)
+    admitted = plane.admit(
+        capability_id="world-forge",
+        domain="world-forge",
+        action="world.systems.compose",
+        principal="world-architect",
+        actor_weight=0,
+        payload={"world": {"name": "Atlas", "stats": {"river_tiles": 4, "settlements": 2}, "entities": [1]}},
+        idempotency_key="compose-atlas-1",
+    )
+    assert asyncio.run(plane.execute_registered(admitted.outbox_seq)) is True
+    result = plane.receipt_result(admitted.id)
+    blueprint = result["blueprint"]
+    assert len(blueprint["blueprint_sha256"]) == 64
+    assert len(blueprint["world_signature"]) == 64
+    assert "environment.hydrology" in blueprint["execution_order"]
+    assert "population.settlements" in blueprint["execution_order"]
+    receipt = plane.receipt(admitted.id)
+    assert receipt["executor"] == "native.worldforge.world.systems.compose"
+    assert receipt["replay_safe"] is True
 
 
 def test_playable_launch_executes_real_runtime_session(tmp_path):
