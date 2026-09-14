@@ -2,8 +2,9 @@
 
 Witnesses may read the current canonical signing target and submit already-signed
 Ed25519 receipts. The server never accepts witness private keys and never signs on a
-witness's behalf. Operator-only endpoints expose quorum status and portable trust
-advancement/continuity proofs from the same runtime used by deployment assurance.
+witness's behalf. Operator-only endpoints expose quorum status, diagnostics, and
+portable trust advancement/continuity proofs from the same runtime used by deployment
+assurance.
 """
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ import os
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from core.deployment_checkpoint_pin_diagnostics import diagnose_deployment_checkpoint_pins
 from core.deployment_checkpoint_pin_ledger import (
     DeploymentCheckpointPinLedgerError,
     DeploymentCheckpointPinRejected,
@@ -88,6 +90,15 @@ async def checkpoint_witness_status(token: str = Query("")):
     _require_ops(token)
     try:
         return _runtime().status()
+    except (DeploymentCheckpointPinLedgerError, ValueError) as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/diagnostics")
+async def checkpoint_witness_diagnostics(token: str = Query("")):
+    _require_ops(token)
+    try:
+        return asdict(diagnose_deployment_checkpoint_pins(_runtime()))
     except (DeploymentCheckpointPinLedgerError, ValueError) as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
