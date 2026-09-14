@@ -7,6 +7,7 @@ never silently enter production code.
 from __future__ import annotations
 
 import ast
+from collections import Counter
 from pathlib import Path
 import re
 import sys
@@ -51,6 +52,7 @@ NETWORK_CALLS = {
     "httpx.options",
     "httpx.request",
 }
+PYTHON_SCOPES = (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
 JS_SUFFIXES = {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"}
 JS_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
@@ -144,14 +146,7 @@ def import_aliases(tree: ast.AST) -> dict[str, str]:
 
 
 def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
-    """Resolve tracked imports and methods invoked on inline constructors.
-
-    ``dotted_name`` intentionally handles only Name/Attribute chains. Security
-    rules also need to recognize calls such as ``requests.Session().get(...)``;
-    the owner of that final attribute is an ``ast.Call`` rather than a Name.
-    Resolving only the constructor function keeps this high-confidence without
-    attempting general data-flow inference.
-    """
+    """Resolve tracked imports, stable bindings, and inline constructors."""
     if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Call):
         owner = canonical_name(node.value.func, aliases)
         if owner:
@@ -165,6 +160,79 @@ def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
     if replacement is None:
         return name
     return replacement + (f".{suffix}" if dot else "")
+
+
+def _scope_nodes(scope: ast.AST) -> Iterable[ast.AST]:
+    """Yield nodes owned by ``scope`` without descending into nested scopes."""
+
+    def descend(node: ast.AST) -> Iterable[ast.AST]:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, PYTHON_SCOPES):
+                continue
+            yield child
+            yield from descend(child)
+
+    yield from descend(scope)
+
+
+def _parameter_names(scope: ast.AST) -> set[str]:
+    if not isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+        return set()
+    args = scope.args
+    names = {arg.arg for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs)}
+    if args.vararg:
+        names.add(args.vararg.arg)
+    if args.kwarg:
+        names.add(args.kwarg.arg)
+    return names
+
+
+def _assigned_names(node: ast.AST) -> list[str]:
+    if isinstance(node, ast.Assign):
+        return [target.id for target in node.targets if isinstance(target, ast.Name)]
+    if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+        return [node.target.id]
+    return []
+
+
+def _assignment_value(node: ast.AST) -> ast.AST | None:
+    if isinstance(node, ast.Assign):
+        return node.value
+    if isinstance(node, ast.AnnAssign):
+        return node.value
+    return None
+
+
+def _requests_session_bindings(scope: ast.AST, aliases: dict[str, str]) -> dict[str, str]:
+    """Infer only unambiguous, single-assignment Session variables in a scope.
+
+    A candidate is discarded if the name is a parameter or has any second store
+    in the same lexical scope. This intentionally prefers false negatives over
+    false positives while closing the common ``session = requests.Session()``
+    scanner bypass.
+    """
+    nodes = list(_scope_nodes(scope))
+    stores = Counter(
+        node.id
+        for node in nodes
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+    )
+    parameters = _parameter_names(scope)
+    candidates: set[str] = set()
+
+    for node in nodes:
+        value = _assignment_value(node)
+        if not isinstance(value, ast.Call):
+            continue
+        if canonical_name(value.func, aliases) != "requests.Session":
+            continue
+        candidates.update(_assigned_names(node))
+
+    return {
+        name: "requests.Session"
+        for name in candidates
+        if stores[name] == 1 and name not in parameters
+    }
 
 
 def _keyword(node: ast.Call, name: str) -> ast.AST | None:
@@ -224,14 +292,17 @@ def violations(path: Path) -> list[str]:
     except (OSError, UnicodeError, SyntaxError) as exc:
         return [f"{label}: parse failure: {exc}"]
 
-    aliases = import_aliases(tree)
+    import_map = import_aliases(tree)
     findings: list[str] = []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        violation = call_violation(node, aliases)
-        if violation:
-            findings.append(f"{label}:{node.lineno}: {violation}")
+    scopes = [node for node in ast.walk(tree) if isinstance(node, PYTHON_SCOPES)]
+    for scope in scopes:
+        aliases = {**import_map, **_requests_session_bindings(scope, import_map)}
+        for node in _scope_nodes(scope):
+            if not isinstance(node, ast.Call):
+                continue
+            violation = call_violation(node, aliases)
+            if violation:
+                findings.append(f"{label}:{node.lineno}: {violation}")
     return findings
 
 
