@@ -41,7 +41,7 @@ jobs:
       - name: Install quality dependencies
         run: >-
           python -m pip install --disable-pip-version-check
-          "ruff==0.9.*" "pytest>=8,<9"
+          "ruff==0.9.*" "pytest>=8,<9" "fastapi==0.110.1"
 
       - name: Ruff lint
         run: ruff check . --output-format=github
@@ -65,3 +65,5 @@ jobs:
           tests/test_process_safety_getattribute.py
           tests/test_security_hardening.py
           tests/test_security_identity_limits.py
+          tests/test_request_framing_security.py
+          tests/test_api_middleware_envelope.py
