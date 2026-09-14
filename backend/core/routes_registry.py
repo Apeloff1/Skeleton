@@ -195,6 +195,7 @@ KNOWN_ROUTES: List[RouteEntry] = [
     ("routes.tournaments",                      "router"),
     ("routes.liveops",                          "router"),
     ("routes.ops",                              "router"),
+    ("routes.deployment_checkpoint_trust",      "router"),
     ("routes.governance",                       "router"),
     ("routes.creator_prefs",                    "router"),
     ("routes.creator_economy",                  "router"),
@@ -355,7 +356,8 @@ ROUTE_GROUPS: List[Tuple[str, Tuple[str, ...]]] = [
     ("academy",   ("routes.academy", "routes.curriculum", "routes.reading", "routes.language",
                    "routes.math_academy", "routes.class_")),
     ("infra",     ("routes.health", "routes.boot", "routes.telemetry", "routes.observability",
-                   "routes.feature_flags", "routes.ops", "routes.governance", "routes.storage")),
+                   "routes.feature_flags", "routes.ops", "routes.deployment_checkpoint_trust",
+                   "routes.governance", "routes.storage")),
 ]
 
 
