@@ -6,6 +6,7 @@ import hashlib
 import pytest
 
 from core.deployment_evidence_checkpoint import (
+    DEPLOYMENT_EVIDENCE_CHECKPOINT_VERSION,
     build_deployment_evidence_checkpoint,
     verify_deployment_evidence_checkpoint,
     verify_deployment_proof_against_checkpoint,
@@ -81,7 +82,10 @@ def test_checkpoint_binds_all_current_deployment_evidence_heads(tmp_path):
     _deploy(gateway, artifact="artifact-b", target="worker-runtime")
 
     checkpoint = build_deployment_evidence_checkpoint(gateway)
+    assert checkpoint.version == DEPLOYMENT_EVIDENCE_CHECKPOINT_VERSION == 2
     assert verify_deployment_evidence_checkpoint(checkpoint) is True
+    assert checkpoint.authorization_events == 4
+    assert checkpoint.receipt_events == 2
     assert checkpoint.completed_releases == 2
     assert checkpoint.fully_portable_releases == 2
     assert checkpoint.evidence_gap_count == 0
@@ -123,6 +127,15 @@ def test_checkpoint_tamper_fails_even_when_counts_still_look_plausible(tmp_path)
 
     tampered = replace(checkpoint, fully_portable_releases=0)
     assert verify_deployment_evidence_checkpoint(tampered) is False
+
+
+def test_checkpoint_rejects_boolean_event_count_type_confusion(tmp_path):
+    gateway = _gateway(tmp_path)
+    _deploy(gateway, artifact="artifact-v1")
+    checkpoint = build_deployment_evidence_checkpoint(gateway)
+
+    assert verify_deployment_evidence_checkpoint(replace(checkpoint, authorization_events=True)) is False
+    assert verify_deployment_evidence_checkpoint(replace(checkpoint, receipt_events=False)) is False
 
 
 def test_proof_cannot_borrow_head_from_another_release_channel(tmp_path):
@@ -167,6 +180,26 @@ def test_checkpoint_builder_rejects_coerced_portability_counts(tmp_path, monkeyp
     monkeypatch.setattr(gateway, "portability_status", lambda: {**real, "completed_releases": "1"})
 
     with pytest.raises(ValueError, match="completed_releases"):
+        build_deployment_evidence_checkpoint(gateway)
+
+
+def test_checkpoint_builder_rejects_coerced_authorization_event_counts(tmp_path, monkeypatch):
+    gateway = _gateway(tmp_path)
+    _deploy(gateway, artifact="artifact-v1")
+    real_status = gateway.authorizations.status
+    monkeypatch.setattr(gateway.authorizations, "status", lambda: {**real_status(), "issued": "1"})
+
+    with pytest.raises(ValueError, match="issued"):
+        build_deployment_evidence_checkpoint(gateway)
+
+
+def test_checkpoint_builder_rejects_coerced_receipt_event_counts(tmp_path, monkeypatch):
+    gateway = _gateway(tmp_path)
+    _deploy(gateway, artifact="artifact-v1")
+    real_status = gateway.receipts.status
+    monkeypatch.setattr(gateway.receipts, "status", lambda: {**real_status(), "receipts": True})
+
+    with pytest.raises(ValueError, match="receipts"):
         build_deployment_evidence_checkpoint(gateway)
 
 
