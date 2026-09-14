@@ -5,6 +5,7 @@ export type ProductAction = {
   title: string;
   description: string;
   operation: string;
+  href?: string;
   legacyHref?: string;
 };
 
@@ -21,13 +22,7 @@ export type ProductCapability = {
 
 const capabilityHref = (id: string) => `/capability?id=${encodeURIComponent(id)}`;
 
-/**
- * Canonical user-facing capability map.
- *
- * Skeleton has accumulated hundreds of backend surfaces. This catalog is the
- * redesign boundary: the UI exposes a small product vocabulary while legacy
- * and mined systems remain implementation details behind those experiences.
- */
+/** Canonical user-facing capability map. */
 export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
   {
     id: 'studio',
@@ -103,7 +98,7 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
     backendSurface: '/api/ops',
     actions: [
       { id: 'agents', title: 'Agents', description: 'Inspect active workers, tasks and health.', operation: 'ops.agents', legacyHref: '/agents' },
-      { id: 'runtime', title: 'Runtime health', description: 'Inspect sessions, queues, failures and resource pressure.', operation: 'ops.runtime' },
+      { id: 'runtime', title: 'Runtime health', description: 'Inspect governed queues, policy, audit and resource pressure.', operation: 'ops.runtime', href: '/control-plane' },
       { id: 'deployments', title: 'Deployments', description: 'Review build and deployment state.', operation: 'ops.deployments' },
     ],
   },
@@ -115,8 +110,8 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
     href: capabilityHref('governance'),
     backendSurface: '/api/governance',
     actions: [
-      { id: 'policy', title: 'Execution policy', description: 'Inspect chartered actions, quorum rules and amendments.', operation: 'governance.policy' },
-      { id: 'audit', title: 'Audit trail', description: 'Review immutable consequential-operation history.', operation: 'governance.audit', legacyHref: '/ai-interactions' },
+      { id: 'policy', title: 'Execution policy', description: 'Inspect chartered actions, quorum rules and amendments.', operation: 'governance.policy', href: '/control-plane' },
+      { id: 'audit', title: 'Audit trail', description: 'Review immutable consequential-operation history.', operation: 'governance.audit', href: '/control-plane' },
       { id: 'safety', title: 'Safety controls', description: 'Review moderation and runtime safety controls.', operation: 'governance.safety', legacyHref: '/anti-cheat' },
     ],
   },
