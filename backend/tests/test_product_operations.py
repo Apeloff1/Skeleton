@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 import pytest
@@ -177,8 +178,7 @@ def test_idempotency_key_returns_original_operation_without_duplicate_work(tmp_p
     assert restored.outbox.pending_count == 1
 
 
-@pytest.mark.asyncio
-async def test_executor_success_confirms_only_after_side_effect(tmp_path):
+def test_executor_success_confirms_only_after_side_effect(tmp_path):
     ops = coordinator(tmp_path)
     admitted = ops.admit(
         capability_id="studio",
@@ -194,7 +194,7 @@ async def test_executor_success_confirms_only_after_side_effect(tmp_path):
         seen.append((operation.id, payload["title"], ops.outbox.pending_count))
         return True
 
-    result = await ops.execute_one(admitted.outbox_seq, executor)
+    result = asyncio.run(ops.execute_one(admitted.outbox_seq, executor))
     assert result.executed is True
     assert result.confirmed is True
     assert seen == [(admitted.id, "execute-me", 1)]
@@ -202,8 +202,7 @@ async def test_executor_success_confirms_only_after_side_effect(tmp_path):
     assert ops.audit.latest.kind == "operation_executed"
 
 
-@pytest.mark.asyncio
-async def test_executor_false_defers_and_keeps_pending(tmp_path):
+def test_executor_false_defers_and_keeps_pending(tmp_path):
     ops = coordinator(tmp_path)
     admitted = ops.admit(
         capability_id="studio",
@@ -213,15 +212,16 @@ async def test_executor_false_defers_and_keeps_pending(tmp_path):
         actor_weight=2,
         payload={"title": "later"},
     )
-    result = await ops.execute_one(admitted.outbox_seq, lambda operation, payload: False)
+    result = asyncio.run(
+        ops.execute_one(admitted.outbox_seq, lambda operation, payload: False)
+    )
     assert result.executed is False
     assert result.confirmed is False
     assert ops.outbox.pending_count == 1
     assert ops.audit.latest.kind == "operation_execution_deferred"
 
 
-@pytest.mark.asyncio
-async def test_executor_exception_is_audited_and_pending_work_survives(tmp_path):
+def test_executor_exception_is_audited_and_pending_work_survives(tmp_path):
     ops = coordinator(tmp_path)
     admitted = ops.admit(
         capability_id="studio",
@@ -236,7 +236,7 @@ async def test_executor_exception_is_audited_and_pending_work_survives(tmp_path)
         raise RuntimeError("boom")
 
     with pytest.raises(OperationExecutionError, match="executor raised"):
-        await ops.execute_one(admitted.outbox_seq, explode)
+        asyncio.run(ops.execute_one(admitted.outbox_seq, explode))
     assert ops.outbox.pending_count == 1
     assert ops.audit.latest.kind == "operation_execution_failed"
 
