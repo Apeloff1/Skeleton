@@ -52,6 +52,7 @@ on:
       - "backend/tests/test_world_economy_dialogue.py"
       - "backend/tests/test_control_plane_deployment.py"
       - "backend/tests/test_deployment_authorization.py"
+      - "backend/tests/test_deployment_plan_integrity.py"
       - "backend/tests/test_atomic_release_deployer.py"
       - "backend/tests/test_deployment_receipts.py"
       - "backend/tests/test_deployment_gateway.py"
@@ -109,6 +110,7 @@ on:
       - "backend/tests/test_world_economy_dialogue.py"
       - "backend/tests/test_control_plane_deployment.py"
       - "backend/tests/test_deployment_authorization.py"
+      - "backend/tests/test_deployment_plan_integrity.py"
       - "backend/tests/test_atomic_release_deployer.py"
       - "backend/tests/test_deployment_receipts.py"
       - "backend/tests/test_deployment_gateway.py"
@@ -181,6 +183,7 @@ jobs:
           tests/test_world_economy_dialogue.py
           tests/test_control_plane_deployment.py
           tests/test_deployment_authorization.py
+          tests/test_deployment_plan_integrity.py
           tests/test_atomic_release_deployer.py
           tests/test_deployment_receipts.py
           tests/test_deployment_gateway.py
