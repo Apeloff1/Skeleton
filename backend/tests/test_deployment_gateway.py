@@ -58,8 +58,17 @@ class StablePlane:
         return _trust()
 
 
-def _gateway(tmp_path):
-    plane = StablePlane()
+class MalformedPostActivationRootPlane(StablePlane):
+    """Returns a valid preflight root, then a non-canonical root after activation."""
+
+    def system_root(self):
+        if self.gateway is not None and self.gateway.releases.status()["releases"]:
+            return {"root_sha256": True}
+        return super().system_root()
+
+
+def _gateway(tmp_path, *, plane=None):
+    plane = plane or StablePlane()
     gateway = DeploymentGateway(tmp_path, control_plane=plane)
     plane.bind(gateway)
     return plane, gateway
@@ -192,3 +201,41 @@ def test_release_history_tamper_fails_closed(tmp_path):
     history.write_text(json.dumps(row) + "\n", encoding="utf-8")
     with pytest.raises(Exception, match="release history hash mismatch"):
         gateway.releases.current(target=executed.release.target, environment=executed.release.environment)
+
+
+def test_gateway_rejects_python_type_coercion_at_public_boundary(tmp_path):
+    _, gateway = _gateway(tmp_path)
+
+    with pytest.raises(ValueError, match="authorization ttl"):
+        gateway.prepare(_payload(), ttl_seconds=True)
+    with pytest.raises(ValueError, match="max_attempts"):
+        gateway.prepare(_payload(), max_attempts=True)
+
+    prepared = gateway.prepare(_payload())
+    with pytest.raises(ValueError, match="authorization_id"):
+        gateway.execute(123, prepared.plan)
+    with pytest.raises(ValueError, match="authorization_id"):
+        gateway.execute(f" {prepared.authorization.id}", prepared.plan)
+    with pytest.raises(ValueError, match="max_attempts"):
+        gateway.execute(prepared.authorization.id, prepared.plan, max_attempts="3")
+    with pytest.raises(ValueError, match="authorization_id"):
+        gateway.portable_proof(123)
+
+    assert gateway.authorizations.consumption(prepared.authorization.id) is None
+    assert gateway.releases.status()["releases"] == 0
+
+
+def test_malformed_post_activation_root_creates_explicit_evidence_gap(tmp_path):
+    plane = MalformedPostActivationRootPlane()
+    _, gateway = _gateway(tmp_path, plane=plane)
+    prepared = gateway.prepare(_payload())
+
+    with pytest.raises(DeploymentGatewayError, match="lowercase sha256"):
+        gateway.execute(prepared.authorization.id, prepared.plan)
+
+    assert gateway.authorizations.consumption(prepared.authorization.id) is not None
+    assert gateway.releases.status()["releases"] == 1
+    assert gateway.receipts.status()["receipts"] == 0
+    status = gateway.status()
+    assert status["verified"] is False
+    assert {gap["kind"] for gap in status["evidence_gaps"]} == {"release_without_transition_receipt"}
