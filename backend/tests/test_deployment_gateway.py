@@ -89,8 +89,24 @@ def _rehash(plan):
 def test_prepare_execute_and_idempotent_release_replay(tmp_path):
     plane, gateway = _gateway(tmp_path)
     prepared = gateway.prepare(_payload())
+    after_prepare = gateway.checkpoints.latest()
+    assert after_prepare is not None
+    assert after_prepare.checkpoint.authorization_events == 1
+    assert after_prepare.checkpoint.receipt_events == 0
+    assert after_prepare.checkpoint.completed_releases == 0
+
     first = gateway.execute(prepared.authorization.id, prepared.plan)
+    after_execute = gateway.checkpoints.latest()
+    assert after_execute is not None
+    assert after_execute.sequence == 2
+    assert after_execute.checkpoint.authorization_events == 2
+    assert after_execute.checkpoint.receipt_events == 1
+    assert after_execute.checkpoint.completed_releases == 1
+    assert after_execute.previous_checkpoint_root_sha256 == after_prepare.checkpoint_root_sha256
+
     second = gateway.execute(prepared.authorization.id, prepared.plan)
+    assert gateway.checkpoints.latest() == after_execute
+    assert len(gateway.checkpoints.history()) == 2
 
     assert first.resumed is False
     assert second.resumed is True
@@ -103,6 +119,11 @@ def test_prepare_execute_and_idempotent_release_replay(tmp_path):
     status = gateway.status()
     assert status["verified"] is True
     assert status["independently_verifiable"] is True
+    assert status["checkpoint_current"] is True
+    assert status["externally_pinnable"] is True
+    assert status["checkpoint_publication"]["publications"] == 2
+    assert status["evidence_checkpoint"]["authorization_events"] == 2
+    assert status["evidence_checkpoint"]["receipt_events"] == 1
     assert status["portability"] == {
         "proof_version": 3,
         "completed_releases": 1,
@@ -151,6 +172,7 @@ def test_self_consistent_but_semantically_forged_compiled_plan_is_rejected(tmp_p
 def test_consumed_but_not_activated_authorization_is_explicit_evidence_gap_until_recovered(tmp_path):
     plane, gateway = _gateway(tmp_path)
     prepared = gateway.prepare(_payload())
+    prepared_checkpoint = gateway.checkpoints.latest()
     consumption = gateway.authorizations.consume(
         prepared.authorization.id,
         current_system_root_sha256=prepared.authorization.system_root_sha256,
@@ -161,13 +183,19 @@ def test_consumed_but_not_activated_authorization_is_explicit_evidence_gap_until
     incomplete = gateway.status()
     assert incomplete["verified"] is False
     assert incomplete["independently_verifiable"] is False
+    assert incomplete["checkpoint_current"] is False
+    assert incomplete["externally_pinnable"] is False
+    assert gateway.checkpoints.latest() == prepared_checkpoint
     assert {row["kind"] for row in incomplete["evidence_gaps"]} == {"consumption_without_release"}
 
     resumed = gateway.execute(prepared.authorization.id, prepared.plan)
     assert resumed.resumed is True
     assert gateway.releases.status()["releases"] == 1
-    assert gateway.status()["verified"] is True
-    assert gateway.status()["independently_verifiable"] is True
+    recovered = gateway.status()
+    assert recovered["verified"] is True
+    assert recovered["independently_verifiable"] is True
+    assert recovered["checkpoint_current"] is True
+    assert recovered["externally_pinnable"] is True
 
     prepared2 = gateway.prepare(_payload("artifact-v2"))
     gateway.authorizations.consume(
@@ -178,7 +206,9 @@ def test_consumed_but_not_activated_authorization_is_explicit_evidence_gap_until
     plane.root_seed = "f" * 64
     with pytest.raises(DeploymentGatewayError, match="root changed"):
         gateway.execute(prepared2.authorization.id, prepared2.plan)
-    assert any(row["kind"] == "consumption_without_release" for row in gateway.status()["evidence_gaps"])
+    status = gateway.status()
+    assert any(row["kind"] == "consumption_without_release" for row in status["evidence_gaps"])
+    assert status["checkpoint_current"] is False
 
 
 def test_fresh_assurance_failure_blocks_execution_even_when_root_is_unchanged(tmp_path):
@@ -229,6 +259,7 @@ def test_malformed_post_activation_root_creates_explicit_evidence_gap(tmp_path):
     plane = MalformedPostActivationRootPlane()
     _, gateway = _gateway(tmp_path, plane=plane)
     prepared = gateway.prepare(_payload())
+    before = gateway.checkpoints.latest()
 
     with pytest.raises(DeploymentGatewayError, match="lowercase sha256"):
         gateway.execute(prepared.authorization.id, prepared.plan)
@@ -236,6 +267,9 @@ def test_malformed_post_activation_root_creates_explicit_evidence_gap(tmp_path):
     assert gateway.authorizations.consumption(prepared.authorization.id) is not None
     assert gateway.releases.status()["releases"] == 1
     assert gateway.receipts.status()["receipts"] == 0
+    assert gateway.checkpoints.latest() == before
     status = gateway.status()
     assert status["verified"] is False
+    assert status["checkpoint_current"] is False
+    assert status["externally_pinnable"] is False
     assert {gap["kind"] for gap in status["evidence_gaps"]} == {"release_without_transition_receipt"}
