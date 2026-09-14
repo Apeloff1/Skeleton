@@ -31,6 +31,7 @@ on:
       - "backend/routes/ops.py"
       - "backend/tests/test_witness_freshness_migration.py"
       - "backend/tests/test_signed_witness_finality.py"
+      - "backend/tests/test_witness_policy_config_strict.py"
       - "backend/tests/test_deployment_preflight.py"
       - "backend/tests/test_control_plane_deployment.py"
       - "backend/tests/test_deployment_authorization.py"
@@ -86,6 +87,7 @@ on:
       - "backend/routes/ops.py"
       - "backend/tests/test_witness_freshness_migration.py"
       - "backend/tests/test_signed_witness_finality.py"
+      - "backend/tests/test_witness_policy_config_strict.py"
       - "backend/tests/test_deployment_preflight.py"
       - "backend/tests/test_control_plane_deployment.py"
       - "backend/tests/test_deployment_authorization.py"
@@ -137,6 +139,7 @@ jobs:
           python -m pytest -q --noconftest
           tests/test_witness_freshness_migration.py
           tests/test_signed_witness_finality.py
+          tests/test_witness_policy_config_strict.py
           tests/test_deployment_preflight.py
           tests/test_control_plane_deployment.py
           tests/test_deployment_authorization.py
