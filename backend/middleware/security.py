@@ -1,32 +1,32 @@
 """
-security.py — Lightweight security middleware for the FastAPI app.
+security.py — defensive middleware for the FastAPI app.
 
-Provides three independent layers, each is opt-in via wire-up in server.py:
-
-  1. RateLimitMiddleware       — Per-IP+route token bucket (in-memory)
-  2. AuditMiddleware           — Bounded ring buffer of every /api/* request
-  3. SizeLimitMiddleware       — Hard cap on inbound request body
-  4. safe_relative_path()      — Path-traversal protection helper
-
-The audit buffer is also exposed via /api/security/audit (see telemetry router).
-None of these layers persist data outside RAM — they're zero-overhead at idle.
+Provides:
+  1. RateLimitMiddleware — bounded per-client+route token bucket
+  2. AuditMiddleware     — bounded, sanitized in-memory request audit
+  3. SizeLimitMiddleware — streaming request-body cap
+  4. safe_relative_path  — strict path traversal protection
 """
 from __future__ import annotations
-import os
-import time
+
 import asyncio
-from collections import deque
-from typing import Deque, Dict, Tuple
+import os
+import re
+import time
+from collections import OrderedDict, deque
 from pathlib import Path
+from typing import Deque, Dict, Tuple
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
+try:
+    from .client_identity import client_ip, sanitize_request_id
+except ImportError:
+    from middleware.client_identity import client_ip, sanitize_request_id
 
-# ─────────────────────────────────────────────────────────────────
-# Rate limiter — token bucket per (ip, route_prefix)
-# ─────────────────────────────────────────────────────────────────
+
 class _Bucket:
     __slots__ = ("tokens", "last_refill")
 
@@ -36,14 +36,13 @@ class _Bucket:
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Per-IP, per-route-prefix token bucket. State is module-level so all
-    middleware instances share it (FastAPI may construct multiple)."""
+    """Per-client, per-route-prefix token bucket with bounded LRU state."""
 
-    # Shared across all instances (module-level singletons)
-    _buckets: Dict[Tuple[str, str], _Bucket] = {}
+    _buckets: OrderedDict[Tuple[str, str], _Bucket] = OrderedDict()
     _lock = asyncio.Lock()
     _rps: float = 2.0
     _burst: int = 120
+    _max_buckets: int = 20_000
 
     def __init__(
         self,
@@ -53,53 +52,70 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         prefix: str = "/api",
     ):
         super().__init__(app)
-        RateLimitMiddleware._rps = rps or float(os.environ.get("CODEDOCK_RATE_LIMIT_RPS", "2"))
-        RateLimitMiddleware._burst = burst or int(os.environ.get("CODEDOCK_RATE_LIMIT_BURST", "120"))
+        try:
+            env_rps = float(os.environ.get("CODEDOCK_RATE_LIMIT_RPS", "2"))
+        except ValueError:
+            env_rps = 2.0
+        try:
+            env_burst = int(os.environ.get("CODEDOCK_RATE_LIMIT_BURST", "120"))
+        except ValueError:
+            env_burst = 120
+        try:
+            env_max = int(os.environ.get("CODEDOCK_RATE_LIMIT_MAX_BUCKETS", "20000"))
+        except ValueError:
+            env_max = 20_000
+
+        RateLimitMiddleware._rps = min(max(rps or env_rps, 0.01), 100_000.0)
+        RateLimitMiddleware._burst = min(max(burst or env_burst, 1), 1_000_000)
+        RateLimitMiddleware._max_buckets = min(max(env_max, 100), 1_000_000)
         self.prefix = prefix
-        self._whitelist = (
-            "/api/health",
-            "/api/binary/download",
-            "/api/binary/inspect",         # cheap GET, called by inspector UI
-            "/api/binary/toolchain",       # cheap GET
-            "/api/binary/list",            # cheap GET
-            "/api/security/",              # security endpoints exempt
-            "/api/telemetry/event",        # ingest endpoint exempt (batched)
-            "/api/telemetry/batch",
-        )
+
+    @staticmethod
+    def _is_exempt(path: str) -> bool:
+        # Health checks are intentionally cheap and commonly called by ingress.
+        return path == "/api/health" or path.startswith("/api/health/")
 
     def _key(self, request: Request) -> Tuple[str, str]:
-        ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-        if not ip:
-            ip = request.client.host if request.client else "unknown"
+        ip = client_ip(request)
         parts = request.url.path.split("/", 4)
         route = "/".join(parts[:4]) if len(parts) >= 4 else request.url.path
         return ip, route
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-        if not path.startswith(self.prefix) or any(path.startswith(w) for w in self._whitelist):
+        if not path.startswith(self.prefix) or self._is_exempt(path):
             return await call_next(request)
 
-        now = time.time()
+        now = time.monotonic()
         ip, route = self._key(request)
         async with RateLimitMiddleware._lock:
-            bucket = RateLimitMiddleware._buckets.get((ip, route))
+            key = (ip, route)
+            bucket = RateLimitMiddleware._buckets.get(key)
             if bucket is None:
+                if len(RateLimitMiddleware._buckets) >= RateLimitMiddleware._max_buckets:
+                    RateLimitMiddleware._buckets.popitem(last=False)
                 bucket = _Bucket(tokens=float(RateLimitMiddleware._burst), last_refill=now)
-                RateLimitMiddleware._buckets[(ip, route)] = bucket
-            elapsed = now - bucket.last_refill
-            bucket.tokens = min(float(RateLimitMiddleware._burst), bucket.tokens + elapsed * RateLimitMiddleware._rps)
+                RateLimitMiddleware._buckets[key] = bucket
+            else:
+                RateLimitMiddleware._buckets.move_to_end(key)
+
+            elapsed = max(0.0, now - bucket.last_refill)
+            bucket.tokens = min(
+                float(RateLimitMiddleware._burst),
+                bucket.tokens + elapsed * RateLimitMiddleware._rps,
+            )
             bucket.last_refill = now
             if bucket.tokens < 1.0:
-                retry_after = max(1, int((1.0 - bucket.tokens) / max(RateLimitMiddleware._rps, 0.01)))
+                retry_after = max(
+                    1,
+                    int((1.0 - bucket.tokens) / max(RateLimitMiddleware._rps, 0.01)),
+                )
                 return JSONResponse(
                     status_code=429,
                     content={
                         "error": "rate_limited",
-                        "detail": f"too many requests on {route}",
+                        "detail": "too many requests",
                         "retry_after_seconds": retry_after,
-                        "burst": RateLimitMiddleware._burst,
-                        "rps": RateLimitMiddleware._rps,
                     },
                     headers={"Retry-After": str(retry_after)},
                 )
@@ -109,76 +125,77 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     @classmethod
     def snapshot(cls) -> dict:
-        """Read-only view of current bucket state."""
+        """Return limiter health without disclosing client addresses."""
         return {
             "rps": cls._rps,
             "burst": cls._burst,
             "active_buckets": len(cls._buckets),
-            "top": [
-                {"ip": k[0], "route": k[1], "tokens_remaining": round(v.tokens, 2)}
+            "max_buckets": cls._max_buckets,
+            "lowest_tokens": [
+                {"route": k[1], "tokens_remaining": round(v.tokens, 2)}
                 for k, v in sorted(cls._buckets.items(), key=lambda kv: kv[1].tokens)[:20]
             ],
         }
 
 
-# ─────────────────────────────────────────────────────────────────
-# Audit — bounded ring buffer of every /api/* request
-# ─────────────────────────────────────────────────────────────────
 class AuditMiddleware(BaseHTTPMiddleware):
-    """Records the last N /api/* requests in a ring buffer (module-level
-    shared state so all middleware instances contribute to the same log)."""
+    """Record bounded, sanitized metadata for recent API requests."""
 
-    # Module-level shared buffer
     _buf: Deque[dict] = deque(maxlen=5000)
     _max_entries: int = 5000
 
     def __init__(self, app, max_entries: int = 5000):
         super().__init__(app)
-        if max_entries > AuditMiddleware._max_entries:
+        max_entries = min(max(int(max_entries), 100), 50_000)
+        if max_entries != AuditMiddleware._max_entries:
             AuditMiddleware._max_entries = max_entries
-            # Replace deque preserving existing entries
-            old = list(AuditMiddleware._buf)
-            AuditMiddleware._buf = deque(old, maxlen=max_entries)
+            AuditMiddleware._buf = deque(AuditMiddleware._buf, maxlen=max_entries)
 
     async def dispatch(self, request: Request, call_next):
         if not request.url.path.startswith("/api"):
             return await call_next(request)
 
         start = time.perf_counter()
-        ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
-            request.client.host if request.client else "unknown"
-        )
-        ua = request.headers.get("user-agent", "")[:200]
-        rid = request.headers.get("x-request-id") or os.urandom(4).hex()
-        body_size = int(request.headers.get("content-length", "0") or 0)
+        ip = client_ip(request)
+        ua = request.headers.get("user-agent", "")[:200].replace("\r", " ").replace("\n", " ")
+        rid = sanitize_request_id(request.headers.get("x-request-id"))
+        try:
+            body_size = max(0, int(request.headers.get("content-length", "0") or 0))
+        except ValueError:
+            body_size = 0
         error = None
         status = 0
         response: Response | None = None
         try:
             response = await call_next(request)
             status = response.status_code
-        except Exception as e:
-            error = f"{type(e).__name__}: {e}"
+        except Exception as exc:
+            # Exception messages can contain tokens, paths, SQL fragments, or
+            # user data. Keep only the class for operational correlation.
+            error = type(exc).__name__
             status = 500
             raise
         finally:
             dur_ms = round((time.perf_counter() - start) * 1000, 2)
-            AuditMiddleware._buf.append({
-                "ts":          time.time(),
-                "method":      request.method,
-                "path":        request.url.path,
-                "status":      status,
-                "duration_ms": dur_ms,
-                "ip":          ip,
-                "ua":          ua,
-                "rid":         rid,
-                "req_bytes":   body_size,
-                "error":       error,
-            })
+            AuditMiddleware._buf.append(
+                {
+                    "ts": time.time(),
+                    "method": request.method,
+                    "path": request.url.path[:512],
+                    "status": status,
+                    "duration_ms": dur_ms,
+                    "ip": ip,
+                    "ua": ua,
+                    "rid": rid,
+                    "req_bytes": body_size,
+                    "error": error,
+                }
+            )
         return response
 
     @classmethod
     def snapshot(cls, limit: int = 200, since_ts: float | None = None) -> dict:
+        limit = min(max(int(limit), 1), 1000)
         rows = list(cls._buf)
         if since_ts:
             rows = [r for r in rows if r["ts"] >= since_ts]
@@ -200,15 +217,15 @@ class AuditMiddleware(BaseHTTPMiddleware):
         path_times: Dict[str, list] = {}
         errors = 0
         total_ms = 0.0
-        for r in cls._buf:
-            statuses[r["status"]] = statuses.get(r["status"], 0) + 1
-            methods[r["method"]] = methods.get(r["method"], 0) + 1
-            p = r["path"]
-            path_counts[p] = path_counts.get(p, 0) + 1
-            path_times.setdefault(p, []).append(r["duration_ms"])
-            if r["status"] >= 500 or r["error"]:
+        for row in cls._buf:
+            statuses[row["status"]] = statuses.get(row["status"], 0) + 1
+            methods[row["method"]] = methods.get(row["method"], 0) + 1
+            path = row["path"]
+            path_counts[path] = path_counts.get(path, 0) + 1
+            path_times.setdefault(path, []).append(row["duration_ms"])
+            if row["status"] >= 500 or row["error"]:
                 errors += 1
-            total_ms += r["duration_ms"]
+            total_ms += row["duration_ms"]
         top_paths = sorted(path_counts.items(), key=lambda kv: -kv[1])[:15]
         slowest = sorted(
             [(p, max(t), sum(t) / len(t)) for p, t in path_times.items()],
@@ -216,71 +233,123 @@ class AuditMiddleware(BaseHTTPMiddleware):
         )[:10]
         return {
             "total_requests": len(cls._buf),
-            "errors":         errors,
-            "error_rate":     round(errors / max(len(cls._buf), 1), 4),
-            "avg_ms":         round(total_ms / len(cls._buf), 2),
-            "statuses":       dict(sorted(statuses.items())),
-            "methods":        methods,
-            "top_paths":      [{"path": p, "count": c} for p, c in top_paths],
-            "slowest":        [
+            "errors": errors,
+            "error_rate": round(errors / max(len(cls._buf), 1), 4),
+            "avg_ms": round(total_ms / len(cls._buf), 2),
+            "statuses": dict(sorted(statuses.items())),
+            "methods": methods,
+            "top_paths": [{"path": p, "count": c} for p, c in top_paths],
+            "slowest": [
                 {"path": p, "p_max_ms": round(mx, 1), "p_avg_ms": round(av, 1)}
                 for p, mx, av in slowest
             ],
         }
 
 
-# ─────────────────────────────────────────────────────────────────
-# Body-size cap
-# ─────────────────────────────────────────────────────────────────
-class SizeLimitMiddleware(BaseHTTPMiddleware):
-    """Reject any /api/* request whose Content-Length exceeds the cap.
-    Defaults to 25 MB (covers chunked file uploads). Configurable via env
-    CODEDOCK_MAX_BODY_MB."""
+class _BodyTooLarge(Exception):
+    pass
+
+
+class SizeLimitMiddleware:
+    """Enforce the body cap from both Content-Length and actual ASGI chunks."""
 
     def __init__(self, app, max_mb: int | None = None):
-        super().__init__(app)
-        self.max_bytes = (max_mb or int(os.environ.get("CODEDOCK_MAX_BODY_MB", "25"))) * 1024 * 1024
+        self.app = app
+        try:
+            configured = int(os.environ.get("CODEDOCK_MAX_BODY_MB", "25"))
+        except ValueError:
+            configured = 25
+        selected = max_mb if max_mb is not None else configured
+        self.max_bytes = min(max(int(selected), 1), 1024) * 1024 * 1024
 
-    async def dispatch(self, request: Request, call_next):
-        if request.url.path.startswith("/api") and request.method in ("POST", "PUT", "PATCH"):
-            cl = request.headers.get("content-length")
-            if cl and int(cl) > self.max_bytes:
-                return JSONResponse(
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+
+        method = str(scope.get("method", "GET")).upper()
+        path = str(scope.get("path", ""))
+        if not path.startswith("/api") or method not in {"POST", "PUT", "PATCH"}:
+            await self.app(scope, receive, send)
+            return
+
+        headers = {
+            key.decode("latin-1").lower(): value.decode("latin-1")
+            for key, value in scope.get("headers", [])
+        }
+        raw_length = headers.get("content-length")
+        if raw_length is not None:
+            try:
+                declared = int(raw_length)
+            except ValueError:
+                response = JSONResponse(status_code=400, content={"error": "invalid_content_length"})
+                await response(scope, receive, send)
+                return
+            if declared < 0:
+                response = JSONResponse(status_code=400, content={"error": "invalid_content_length"})
+                await response(scope, receive, send)
+                return
+            if declared > self.max_bytes:
+                response = JSONResponse(
                     status_code=413,
-                    content={
-                        "error": "payload_too_large",
-                        "detail": f"body exceeds {self.max_bytes // 1024 // 1024} MB",
-                        "limit_bytes": self.max_bytes,
-                        "got_bytes":   int(cl),
-                    },
+                    content={"error": "payload_too_large", "limit_bytes": self.max_bytes},
                 )
-        return await call_next(request)
+                await response(scope, receive, send)
+                return
+
+        seen = 0
+        response_started = False
+
+        async def limited_receive():
+            nonlocal seen
+            message = await receive()
+            if message.get("type") == "http.request":
+                seen += len(message.get("body", b""))
+                if seen > self.max_bytes:
+                    raise _BodyTooLarge
+            return message
+
+        async def tracking_send(message):
+            nonlocal response_started
+            if message.get("type") == "http.response.start":
+                response_started = True
+            await send(message)
+
+        try:
+            await self.app(scope, limited_receive, tracking_send)
+        except _BodyTooLarge:
+            if response_started:
+                # The downstream application started a response before fully
+                # consuming an oversized body; terminate instead of emitting an
+                # invalid second response.
+                return
+            response = JSONResponse(
+                status_code=413,
+                content={"error": "payload_too_large", "limit_bytes": self.max_bytes},
+            )
+            await response(scope, receive, send)
 
 
-# ─────────────────────────────────────────────────────────────────
-# Path traversal helper
-# ─────────────────────────────────────────────────────────────────
 def safe_relative_path(base: Path | str, candidate: str) -> Path:
-    """
-    Resolve `candidate` (a user-supplied filename / relative path) against
-    `base`, raising ValueError if the result escapes `base`. Use this
-    anywhere a path-like value comes from JSON / query params.
+    """Resolve a strictly relative user path beneath *base*."""
+    if not isinstance(candidate, str) or not candidate or "\x00" in candidate:
+        raise ValueError("unsafe path")
 
-        safe_relative_path("/app/uploads", request_json["filename"])
-    """
-    base = Path(base).resolve()
-    candidate = candidate.replace("\\", "/")
-    if candidate.startswith("/"):
-        candidate = candidate.lstrip("/")
-    target = (base / candidate).resolve()
-    if base != target and base not in target.parents:
-        raise ValueError(f"path traversal blocked: {candidate}")
+    normalized = candidate.replace("\\", "/")
+    # Reject POSIX absolute paths and Windows drive/UNC forms rather than
+    # silently rewriting them as relative input.
+    if normalized.startswith("/") or normalized.startswith("//") or re.match(r"^[A-Za-z]:", normalized):
+        raise ValueError("unsafe path")
+
+    base_path = Path(base).resolve()
+    target = (base_path / normalized).resolve()
+    if base_path != target and base_path not in target.parents:
+        raise ValueError("unsafe path")
     return target
 
 
-# Singletons exposed so server.py and the telemetry router can reach them.
 _audit_mw: AuditMiddleware | None = None
-_rate_mw:  RateLimitMiddleware | None = None
+_rate_mw: RateLimitMiddleware | None = None
 
 
 def register(audit: AuditMiddleware, rate: RateLimitMiddleware) -> None:
