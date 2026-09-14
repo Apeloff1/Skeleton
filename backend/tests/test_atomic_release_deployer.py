@@ -20,13 +20,31 @@ def _consumption(plan: dict, *, authorization_id: str = "auth-1", consumed_at: s
     )
 
 
+def _canonical(value) -> bytes:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+
+
 def _rehash(plan: dict) -> dict:
     forged = dict(plan)
     forged.pop("plan_sha256", None)
-    forged["plan_sha256"] = hashlib.sha256(
-        json.dumps(forged, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    ).hexdigest()
+    forged["plan_sha256"] = hashlib.sha256(_canonical(forged)).hexdigest()
     return forged
+
+
+def _rehash_record(row: dict) -> dict:
+    forged = dict(row)
+    payload = {key: value for key, value in forged.items() if key != "sha256"}
+    forged["sha256"] = hashlib.sha256(_canonical(payload)).hexdigest()
+    return forged
+
+
+def _activated(tmp_path):
+    deployer = AtomicReleaseDeployer(tmp_path)
+    plan = compile_deployment_plan({"artifact": "sha256:a", "target": "runtime", "environment": "staging"})
+    record = deployer.activate(plan, _consumption(plan), activated_at="2026-09-14T12:00:01+00:00")
+    history_path = next(tmp_path.glob("*/releases.jsonl"))
+    current_path = next(tmp_path.glob("*/current.json"))
+    return deployer, plan, record, history_path, current_path
 
 
 def test_activation_is_atomic_persistent_and_replay_safe(tmp_path):
@@ -112,14 +130,55 @@ def test_malformed_consumption_evidence_fails_before_append(tmp_path, consumptio
 
 
 def test_current_pointer_tampering_is_detected(tmp_path):
-    deployer = AtomicReleaseDeployer(tmp_path)
-    plan = compile_deployment_plan({"artifact": "sha256:a", "target": "runtime", "environment": "staging"})
-    deployer.activate(plan, _consumption(plan), activated_at="2026-09-14T12:00:01+00:00")
-
-    current_path = next(tmp_path.glob("*/current.json"))
+    deployer, _, _, _, current_path = _activated(tmp_path)
     envelope = json.loads(current_path.read_text(encoding="utf-8"))
     envelope["release"]["artifact"] = "sha256:tampered"
     current_path.write_text(json.dumps(envelope), encoding="utf-8")
 
     with pytest.raises(ReleaseDeploymentError, match="checksum"):
+        deployer.current(target="runtime", environment="staging")
+
+
+def test_rehashed_extra_release_field_is_rejected(tmp_path):
+    _, _, _, history_path, _ = _activated(tmp_path)
+    row = json.loads(history_path.read_text(encoding="utf-8"))
+    row["operator_override"] = True
+    row = _rehash_record(row)
+    history_path.write_text(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+
+    with pytest.raises(ReleaseDeploymentError, match="schema mismatch"):
+        AtomicReleaseDeployer(tmp_path).snapshot()
+
+
+def test_rehashed_boolean_sequence_is_not_coerced_to_one(tmp_path):
+    _, _, _, history_path, _ = _activated(tmp_path)
+    row = json.loads(history_path.read_text(encoding="utf-8"))
+    row["sequence"] = True
+    row = _rehash_record(row)
+    history_path.write_text(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+
+    with pytest.raises(ReleaseDeploymentError, match="sequence malformed"):
+        AtomicReleaseDeployer(tmp_path).snapshot()
+
+
+def test_rehashed_nonfinite_release_value_is_rejected(tmp_path):
+    _, _, _, history_path, _ = _activated(tmp_path)
+    row = json.loads(history_path.read_text(encoding="utf-8"))
+    row["forged_metric"] = float("nan")
+    row = _rehash_record(row)
+    history_path.write_text(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+
+    with pytest.raises(ReleaseDeploymentError, match="schema mismatch"):
+        AtomicReleaseDeployer(tmp_path).snapshot()
+
+
+def test_resealed_current_envelope_extension_is_rejected(tmp_path):
+    deployer, _, _, _, current_path = _activated(tmp_path)
+    envelope = json.loads(current_path.read_text(encoding="utf-8"))
+    envelope["operator_override"] = "force"
+    payload = {"version": envelope["version"], "release": envelope["release"]}
+    envelope["sha256"] = hashlib.sha256(_canonical(payload)).hexdigest()
+    current_path.write_text(json.dumps(envelope, sort_keys=True, separators=(",", ":")), encoding="utf-8")
+
+    with pytest.raises(ReleaseDeploymentError, match="envelope schema mismatch"):
         deployer.current(target="runtime", environment="staging")
