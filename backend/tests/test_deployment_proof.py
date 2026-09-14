@@ -71,6 +71,10 @@ def test_portable_proof_verifies_historical_deployment_against_newer_heads(tmp_p
     gateway.execute(second.authorization.id, second.plan)
 
     proof = build_portable_deployment_proof(gateway, first.authorization.id)
+    assert proof.version == 2
+    assert proof.preflight["allowed"] is True
+    assert proof.preflight["stable"] is True
+    assert proof.preflight["root_after_sha256"] == proof.pre_system_root_sha256
     assert len(proof.authorization_suffix) >= 4
     assert len(proof.release_suffix) == 2
     assert len(proof.receipt_suffix) == 2
@@ -95,7 +99,7 @@ def test_portable_proof_requires_external_head_pins(tmp_path):
     ) is False
 
 
-def test_cross_link_or_packet_tampering_fails_closed(tmp_path):
+def test_cross_link_preflight_or_packet_tampering_fails_closed(tmp_path):
     gateway = _gateway(tmp_path)
     prepared = gateway.prepare(_input("artifact-v1"))
     gateway.execute(prepared.authorization.id, prepared.plan)
@@ -103,6 +107,14 @@ def test_cross_link_or_packet_tampering_fails_closed(tmp_path):
     pins = _pins(gateway, proof)
 
     assert verify_portable_deployment_proof(replace(proof, post_system_root_sha256="f" * 64), **pins) is False
+
+    preflight = dict(proof.preflight)
+    preflight["stable"] = False
+    assert verify_portable_deployment_proof(replace(proof, preflight=preflight), **pins) is False
+
+    preflight = dict(proof.preflight)
+    preflight["root_after_sha256"] = "e" * 64
+    assert verify_portable_deployment_proof(replace(proof, preflight=preflight), **pins) is False
 
     receipt = dict(proof.transition_receipt)
     receipt["artifact"] = "substituted"
