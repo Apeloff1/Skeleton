@@ -27,6 +27,9 @@ on:
       - "backend/tests/test_deployment_preflight.py"
       - "backend/tests/test_control_plane_deployment.py"
       - "backend/tests/test_deployment_authorization.py"
+      - "backend/tests/test_deployment_plan_integrity.py"
+      - "backend/tests/test_atomic_release_deployer.py"
+      - "backend/tests/test_deployment_receipts.py"
       - "backend/tests/test_deployment_gateway.py"
       - "backend/tests/test_deployment_proof.py"
       - "backend/tests/test_system_assurance_deployment.py"
@@ -63,6 +66,9 @@ on:
       - "backend/tests/test_deployment_preflight.py"
       - "backend/tests/test_control_plane_deployment.py"
       - "backend/tests/test_deployment_authorization.py"
+      - "backend/tests/test_deployment_plan_integrity.py"
+      - "backend/tests/test_atomic_release_deployer.py"
+      - "backend/tests/test_deployment_receipts.py"
       - "backend/tests/test_deployment_gateway.py"
       - "backend/tests/test_deployment_proof.py"
       - "backend/tests/test_system_assurance_deployment.py"
@@ -98,6 +104,9 @@ jobs:
           tests/test_deployment_preflight.py
           tests/test_control_plane_deployment.py
           tests/test_deployment_authorization.py
+          tests/test_deployment_plan_integrity.py
+          tests/test_atomic_release_deployer.py
+          tests/test_deployment_receipts.py
           tests/test_deployment_gateway.py
           tests/test_deployment_proof.py
           tests/test_system_assurance_deployment.py
