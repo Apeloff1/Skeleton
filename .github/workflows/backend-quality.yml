@@ -104,6 +104,7 @@ jobs:
           tests/test_dependency_policy.py
           tests/test_sbom_generator.py
           tests/test_security_config.py
+          tests/test_security_middleware_config.py
           tests/test_security_parser_fuzz.py
           tests/test_security_middleware_hardening.py
           tests/test_client_ip_security.py
