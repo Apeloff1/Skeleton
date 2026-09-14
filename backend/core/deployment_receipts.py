@@ -58,26 +58,20 @@ def _sha(value: Any) -> str:
 
 
 def _digest(value: Any, field: str) -> str:
-    if not isinstance(value, str):
-        raise ValueError(f"{field} must be sha256")
-    value = value.strip()
-    if not _SHA256.fullmatch(value):
-        raise ValueError(f"{field} must be sha256")
+    if not isinstance(value, str) or not _SHA256.fullmatch(value):
+        raise ValueError(f"{field} must be canonical lowercase sha256")
     return value
 
 
 def _text(value: Any, field: str) -> str:
-    if not isinstance(value, str):
-        raise ValueError(f"{field} must be a string")
-    value = value.strip()
-    if not value:
-        raise ValueError(f"{field} must be non-empty")
+    if not isinstance(value, str) or not value or value != value.strip():
+        raise ValueError(f"{field} must be a canonical non-empty string")
     return value
 
 
 def _parse_time(value: Any) -> datetime:
-    if not isinstance(value, str) or not value:
-        raise ValueError("deployment receipt timestamp must be a non-empty string")
+    if not isinstance(value, str) or not value or value != value.strip():
+        raise ValueError("deployment receipt timestamp must be a canonical non-empty string")
     stamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if stamp.tzinfo is None:
         raise ValueError("deployment receipt timestamp must be timezone-aware")
@@ -115,12 +109,20 @@ def _validate_raw_receipt(raw: Any) -> dict[str, Any]:
         raise DeploymentReceiptIntegrityError("deployment receipt sequence malformed")
     if any(not isinstance(raw.get(field), str) for field in _STRING_FIELDS):
         raise DeploymentReceiptIntegrityError("deployment receipt field type mismatch")
-    if not all(raw[field] for field in ("authorization_id", "release_id", "target", "environment", "artifact")):
-        raise DeploymentReceiptIntegrityError("deployment receipt identity fields are incomplete")
     try:
+        for field in ("authorization_id", "release_id", "target", "environment", "artifact"):
+            _text(raw[field], field)
+        for field in (
+            "plan_sha256", "release_id", "release_sha256",
+            "pre_system_root_sha256", "post_system_root_sha256", "sha256",
+        ):
+            _digest(raw[field], field)
+        if raw["previous_sha256"]:
+            _digest(raw["previous_sha256"], "previous receipt")
+        _parse_time(raw["executed_at"])
         canonical_json_bytes(raw)
-    except CanonicalJSONError as exc:
-        raise DeploymentReceiptIntegrityError("deployment receipt is not canonical JSON") from exc
+    except (ValueError, CanonicalJSONError) as exc:
+        raise DeploymentReceiptIntegrityError(str(exc)) from exc
     return raw
 
 
@@ -162,17 +164,11 @@ class DeploymentReceiptLedger:
                 raise DeploymentReceiptIntegrityError("duplicate deployment authorization receipt")
             if row.release_id in releases:
                 raise DeploymentReceiptIntegrityError("duplicate deployment release receipt")
-            try:
-                plan = _digest(row.plan_sha256, "plan")
-                release = _digest(row.release_sha256, "release")
-                pre = _digest(row.pre_system_root_sha256, "pre-system root")
-                post = _digest(row.post_system_root_sha256, "post-system root")
-                claimed = _digest(row.sha256, "receipt")
-                if row.previous_sha256:
-                    _digest(row.previous_sha256, "previous receipt")
-                _parse_time(row.executed_at)
-            except ValueError as exc:
-                raise DeploymentReceiptIntegrityError(str(exc)) from exc
+            plan = row.plan_sha256
+            release = row.release_sha256
+            pre = row.pre_system_root_sha256
+            post = row.post_system_root_sha256
+            claimed = row.sha256
             if hmac.compare_digest(pre, post):
                 raise DeploymentReceiptIntegrityError("deployment receipt must attest a system-root transition")
             if row.previous_sha256 != previous:
@@ -197,7 +193,7 @@ class DeploymentReceiptLedger:
                pre_system_root_sha256: str, post_system_root_sha256: str,
                executed_at: str | None = None) -> DeploymentTransitionReceipt:
         authorization_id = _text(authorization_id, "authorization_id")
-        release_id = _text(release_id, "release_id")
+        release_id = _digest(release_id, "release_id")
         target = _text(target, "target")
         environment = _text(environment, "environment")
         artifact = _text(artifact, "artifact")
@@ -207,7 +203,7 @@ class DeploymentReceiptLedger:
         post = _digest(post_system_root_sha256, "post-system root")
         if hmac.compare_digest(pre, post):
             raise ValueError("deployment receipt must attest a system-root transition")
-        stamp = executed_at or datetime.now(UTC).isoformat()
+        stamp = datetime.now(UTC).isoformat() if executed_at is None else executed_at
         _parse_time(stamp)
         with self._lease.acquire():
             rows = self._load_verified()
@@ -244,8 +240,8 @@ class DeploymentReceiptLedger:
             return row
 
     def by_authorization(self, authorization_id: str) -> DeploymentTransitionReceipt | None:
-        if not isinstance(authorization_id, str):
-            raise ValueError("authorization_id must be a string")
+        if not isinstance(authorization_id, str) or not authorization_id or authorization_id != authorization_id.strip():
+            raise ValueError("authorization_id must be a canonical non-empty string")
         with self._lease.acquire():
             rows = self._load_verified()
         return next((row for row in rows if row.authorization_id == authorization_id), None)
