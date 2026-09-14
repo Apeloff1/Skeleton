@@ -1,10 +1,9 @@
-"""Evidence-aware research adapters for the Curiosity Engine.
+"""Evidence-aware research adapters for Curiosity.
 
-Model output creates hypotheses, never empirical facts. Source evidence enters the
-truth pipeline only through an explicit claim-level citation binding with verified
-provenance, an inspectable locator and evidence span. Topic-adjacent citations and
-legacy ``supports_claims`` metadata remain useful for research discovery but cannot
-silently promote a claim.
+Model output generates hypotheses, never empirical facts. A source can enter the
+promotion gate only through an explicit claim-level citation binding with verified
+provenance, locator, evidence span and binding method. Legacy topic-adjacent
+citations are retained as diagnostics but never promoted.
 """
 from __future__ import annotations
 
@@ -93,8 +92,7 @@ def _texts(value: Any, *, limit: int = 32) -> tuple[str, ...]:
         text = " ".join(str(item).split()).strip()
         key = text.casefold()
         if text and key not in seen:
-            seen.add(key)
-            out.append(text[:3000])
+            seen.add(key); out.append(text[:3000])
         if len(out) >= limit:
             break
     return tuple(out)
@@ -111,32 +109,25 @@ def _positive_int(value: Any) -> int | None:
 def _bindings(raw: Any, *, excerpt: str) -> tuple[SourceClaimBinding, ...]:
     if not isinstance(raw, (list, tuple)):
         return ()
-    out: list[SourceClaimBinding] = []
-    for row in raw[:64]:
-        if not isinstance(row, dict):
+    rows: list[SourceClaimBinding] = []
+    for item in raw[:64]:
+        if not isinstance(item, dict):
             continue
-        claim = " ".join(str(row.get("claim") or "").split()).strip()
+        claim = " ".join(str(item.get("claim") or "").split()).strip()
         if not claim:
             continue
-        out.append(SourceClaimBinding(
-            claim=claim[:3000],
-            supports=bool(row.get("supports", True)),
-            binding_method=str(row.get("binding_method") or "").strip()[:80],
-            evidence_span=str(row.get("evidence_span") or excerpt or "")[:6000],
-            mapping_rationale=str(row.get("mapping_rationale") or "")[:4000],
+        rows.append(SourceClaimBinding(
+            claim=claim[:3000], supports=bool(item.get("supports", True)),
+            binding_method=str(item.get("binding_method") or "").strip()[:80],
+            evidence_span=str(item.get("evidence_span") or excerpt or "")[:6000],
+            mapping_rationale=str(item.get("mapping_rationale") or "")[:4000],
         ))
-    return tuple(out)
+    return tuple(rows)
 
 
 class EnsembleCuriosityResearcher:
-    def __init__(
-        self,
-        completion: Completion,
-        *,
-        models: tuple[str, ...] = ("reasoning", "balanced", "creative"),
-        source_search: SourceSearch | None = None,
-        max_sources: int = 12,
-    ) -> None:
+    def __init__(self, completion: Completion, *, models: tuple[str, ...] = ("reasoning", "balanced", "creative"),
+                 source_search: SourceSearch | None = None, max_sources: int = 12) -> None:
         if not models:
             raise ValueError("at least one research model is required")
         self.completion = completion
@@ -171,10 +162,8 @@ class EnsembleCuriosityResearcher:
         return ModelObservation(
             model=model,
             summary=" ".join(str(data.get("summary") or "").split())[:8000],
-            claims=_texts(data.get("claims")),
-            questions=_texts(data.get("questions")),
-            contradictions=_texts(data.get("contradictions")),
-            tags=_texts(data.get("tags"), limit=16),
+            claims=_texts(data.get("claims")), questions=_texts(data.get("questions")),
+            contradictions=_texts(data.get("contradictions")), tags=_texts(data.get("tags"), limit=16),
         )
 
     @staticmethod
@@ -182,51 +171,35 @@ class EnsembleCuriosityResearcher:
         source = str(raw.get("source") or raw.get("source_id") or "").strip()
         if not source:
             return None
-        group = str(raw.get("independence_group") or source).strip()
-        quality = max(0.0, min(1.0, float(raw.get("quality", raw.get("confidence", 0.0)) or 0.0)))
         excerpt = str(raw.get("excerpt") or "")[:6000]
+        quality = max(0.0, min(1.0, float(raw.get("quality", raw.get("confidence", 0.0)) or 0.0)))
         return ResearchSource(
-            source=source[:1000],
-            locator=str(raw.get("locator") or "")[:2000],
-            excerpt=excerpt,
-            quality=quality,
-            kind=str(raw.get("kind") or "unsourced"),
-            independence_group=group[:500],
+            source=source[:1000], locator=str(raw.get("locator") or "")[:2000], excerpt=excerpt,
+            quality=quality, kind=str(raw.get("kind") or "unsourced"),
+            independence_group=str(raw.get("independence_group") or source)[:500],
             claim_bindings=_bindings(raw.get("claim_bindings"), excerpt=excerpt),
-            supports_claims=_texts(raw.get("supports_claims"), limit=32),
-            contradicts_claims=_texts(raw.get("contradicts_claims"), limit=32),
-            observed_at=str(raw.get("observed_at") or "")[:100],
-            reproducible=bool(raw.get("reproducible", False)),
-            peer_reviewed=bool(raw.get("peer_reviewed", False)),
-            primary=bool(raw.get("primary", False)),
+            supports_claims=_texts(raw.get("supports_claims")), contradicts_claims=_texts(raw.get("contradicts_claims")),
+            observed_at=str(raw.get("observed_at") or "")[:100], reproducible=bool(raw.get("reproducible", False)),
+            peer_reviewed=bool(raw.get("peer_reviewed", False)), primary=bool(raw.get("primary", False)),
             provenance_verified=bool(raw.get("provenance_verified", raw.get("verified_locator", False))),
-            preregistered=bool(raw.get("preregistered", False)),
-            data_available=bool(raw.get("data_available", False)),
-            code_available=bool(raw.get("code_available", False)),
-            sample_size=_positive_int(raw.get("sample_size")),
+            preregistered=bool(raw.get("preregistered", False)), data_available=bool(raw.get("data_available", False)),
+            code_available=bool(raw.get("code_available", False)), sample_size=_positive_int(raw.get("sample_size")),
             uncertainty_reported=bool(raw.get("uncertainty_reported", False)),
             content_sha256=str(raw.get("content_sha256") or "")[:64].lower(),
-            parent_source_ids=_texts(raw.get("parent_source_ids"), limit=32),
+            parent_source_ids=_texts(raw.get("parent_source_ids")),
         )
 
     async def __call__(self, inquiry: Inquiry, context: dict[str, Any]) -> dict[str, Any]:
         observations = await asyncio.gather(
-            *(self._observe(model, inquiry, context) for model in self.models),
-            return_exceptions=True,
+            *(self._observe(model, inquiry, context) for model in self.models), return_exceptions=True,
         )
         valid = [x for x in observations if isinstance(x, ModelObservation) and (x.summary or x.claims)]
         if not valid:
             errors = [type(x).__name__ for x in observations if isinstance(x, Exception)]
             raise RuntimeError(f"curiosity research ensemble produced no usable observations: {errors}")
 
-        # Structurally identical propositions share one candidate identity. Similar
-        # wording alone never merges; ClaimIdentityEngine only emits the same id for
-        # equivalent polarity/relation/quantity/unit/content fingerprints.
         claim_votes: dict[str, tuple[str, int, set[str]]] = {}
-        questions: list[str] = []
-        contradictions: list[str] = []
-        tags: list[str] = []
-        summaries: list[str] = []
+        questions: list[str] = []; contradictions: list[str] = []; tags: list[str] = []; summaries: list[str] = []
         for obs in valid:
             if obs.summary:
                 summaries.append(obs.summary)
@@ -235,16 +208,11 @@ class EnsembleCuriosityResearcher:
                 original, votes, variants = claim_votes.get(identity, (claim, 0, set()))
                 variants = set(variants); variants.add(claim)
                 claim_votes[identity] = (original, votes + 1, variants)
-            questions.extend(obs.questions)
-            contradictions.extend(obs.contradictions)
-            tags.extend(obs.tags)
+            questions.extend(obs.questions); contradictions.extend(obs.contradictions); tags.extend(obs.tags)
+
         candidate_claims = [claim for claim, _, _ in claim_votes.values()]
         canonical_by_identity = {identity: claim for identity, (claim, _, _) in claim_votes.items()}
-        semantic_variants = {
-            claim: sorted(variants)
-            for claim, _, variants in claim_votes.values()
-            if len(variants) > 1
-        }
+        semantic_variants = {claim: sorted(variants) for claim, _, variants in claim_votes.values() if len(variants) > 1}
         single_model = [claim for claim, votes, _ in claim_votes.values() if votes == 1 and len(valid) > 1]
         contradictions.extend(
             f"MODEL PANEL DISAGREEMENT — candidate not independently established: {claim}"
@@ -265,89 +233,64 @@ class EnsembleCuriosityResearcher:
         citation_reports: list[dict[str, Any]] = []
         for source in sources:
             common = {
-                "source_id": source.source,
-                "source": source.source,
-                "locator": source.locator,
-                "kind": source.kind,
-                "independence_group": source.independence_group,
-                "quality": source.quality,
-                "observed_at": source.observed_at,
-                "reproducible": source.reproducible,
-                "peer_reviewed": source.peer_reviewed,
-                "primary": source.primary,
-                "provenance_verified": source.provenance_verified,
-                "preregistered": source.preregistered,
-                "data_available": source.data_available,
-                "code_available": source.code_available,
-                "sample_size": source.sample_size,
-                "uncertainty_reported": source.uncertainty_reported,
-                "content_sha256": source.content_sha256,
-                "parent_source_ids": list(source.parent_source_ids),
+                "source_id": source.source, "source": source.source, "locator": source.locator,
+                "kind": source.kind, "independence_group": source.independence_group, "quality": source.quality,
+                "observed_at": source.observed_at, "reproducible": source.reproducible,
+                "peer_reviewed": source.peer_reviewed, "primary": source.primary,
+                "provenance_verified": source.provenance_verified, "preregistered": source.preregistered,
+                "data_available": source.data_available, "code_available": source.code_available,
+                "sample_size": source.sample_size, "uncertainty_reported": source.uncertainty_reported,
+                "content_sha256": source.content_sha256, "parent_source_ids": list(source.parent_source_ids),
             }
             for binding in source.claim_bindings:
-                identity = self.claim_identity.canonical_id(binding.claim)
-                claim = canonical_by_identity.get(identity)
+                claim = canonical_by_identity.get(self.claim_identity.canonical_id(binding.claim))
                 if claim is None:
-                    citation_reports.append({
-                        "source_id": source.source, "claim": binding.claim,
-                        "accepted": False, "laundering_risk": "high",
-                        "reasons": ["binding_claim_not_in_candidate_set"],
-                    })
+                    citation_reports.append({"source_id": source.source, "claim": binding.claim, "accepted": False,
+                                             "laundering_risk": "high", "reasons": ["binding_claim_not_in_candidate_set"]})
                     continue
                 report = self.citation_integrity.validate(CitationBinding(
-                    claim=claim,
-                    source_id=source.source,
-                    locator=source.locator,
-                    binding_method=binding.binding_method,
-                    evidence_span=binding.evidence_span,
-                    supports=binding.supports,
-                    provenance_verified=source.provenance_verified,
-                    source_content_sha256=source.content_sha256,
-                    mapping_rationale=binding.mapping_rationale,
+                    claim=claim, source_id=source.source, locator=source.locator,
+                    binding_method=binding.binding_method, evidence_span=binding.evidence_span,
+                    supports=binding.supports, provenance_verified=source.provenance_verified,
+                    source_content_sha256=source.content_sha256, mapping_rationale=binding.mapping_rationale,
                 ))
-                citation_reports.append({
-                    "source_id": source.source, "claim": claim,
-                    "accepted": report.accepted, "laundering_risk": report.laundering_risk,
-                    "reasons": list(report.reasons), "attestation_sha256": report.attestation_sha256,
-                })
+                citation_reports.append({"source_id": source.source, "claim": claim, "accepted": report.accepted,
+                                         "laundering_risk": report.laundering_risk, "reasons": list(report.reasons),
+                                         "attestation_sha256": report.attestation_sha256})
                 if report.accepted:
                     claim_evidence[claim].append({
-                        **common, "supports": binding.supports,
+                        **common,
+                        "supports": binding.supports,
+                        "citation_binding": {
+                            "binding_method": binding.binding_method,
+                            "evidence_span": binding.evidence_span,
+                            "mapping_rationale": binding.mapping_rationale,
+                        },
                         "citation_binding_attestation_sha256": report.attestation_sha256,
                     })
 
             legacy_claims = (*source.supports_claims, *source.contradicts_claims)
-            bound_identities = {self.claim_identity.canonical_id(b.claim) for b in source.claim_bindings}
+            bound_ids = {self.claim_identity.canonical_id(binding.claim) for binding in source.claim_bindings}
             for raw_claim in legacy_claims:
-                if self.claim_identity.canonical_id(raw_claim) not in bound_identities:
-                    citation_reports.append({
-                        "source_id": source.source, "claim": raw_claim,
-                        "accepted": False, "laundering_risk": "critical",
-                        "reasons": ["legacy_claim_label_without_inspectable_binding"],
-                    })
+                if self.claim_identity.canonical_id(raw_claim) not in bound_ids:
+                    citation_reports.append({"source_id": source.source, "claim": raw_claim, "accepted": False,
+                                             "laundering_risk": "critical",
+                                             "reasons": ["legacy_claim_label_without_inspectable_binding"]})
 
         summary = summaries[0] if summaries else f"Research panel generated {len(candidate_claims)} candidate claims."
         if sources:
             summary += f" {len(sources)} source record(s) were examined; claim promotion remains verifier-controlled."
         return {
-            "title": f"Curiosity research: {inquiry.subject}",
-            "summary": summary,
-            "claims": candidate_claims,
-            "questions": list(dict.fromkeys(questions))[:24],
-            "contradictions": list(dict.fromkeys(contradictions))[:24],
-            "tags": list(dict.fromkeys(tags))[:24],
-            "claim_evidence": claim_evidence,
-            "falsifiable": {claim: True for claim in candidate_claims},
-            "panel": [asdict(obs) for obs in valid],
-            "semantic_variants": semantic_variants,
-            "source_count": len(sources),
-            "provenance_verified_source_count": sum(source.provenance_verified for source in sources),
+            "title": f"Curiosity research: {inquiry.subject}", "summary": summary,
+            "claims": candidate_claims, "questions": list(dict.fromkeys(questions))[:24],
+            "contradictions": list(dict.fromkeys(contradictions))[:24], "tags": list(dict.fromkeys(tags))[:24],
+            "claim_evidence": claim_evidence, "falsifiable": {claim: True for claim in candidate_claims},
+            "panel": [asdict(obs) for obs in valid], "semantic_variants": semantic_variants,
+            "source_count": len(sources), "provenance_verified_source_count": sum(source.provenance_verified for source in sources),
             "claim_bound_evidence_count": sum(len(v) for v in claim_evidence.values()),
-            "citation_integrity": {
-                "accepted": sum(bool(row.get("accepted")) for row in citation_reports),
-                "rejected": sum(not bool(row.get("accepted")) for row in citation_reports),
-                "reports": citation_reports[:128],
-            },
+            "citation_integrity": {"accepted": sum(bool(row.get("accepted")) for row in citation_reports),
+                                   "rejected": sum(not bool(row.get("accepted")) for row in citation_reports),
+                                   "reports": citation_reports[:128]},
         }
 
 
