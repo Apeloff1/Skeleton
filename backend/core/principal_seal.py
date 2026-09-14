@@ -2,7 +2,7 @@
 
 This module selectively promotes the strongest identity/policy ideas from the
 GameForge middleware gate without importing ASP.NET, YARP, or a second HTTP
-stack.  It is deliberately framework-free so FastAPI middleware, workers, the
+stack. It is deliberately framework-free so FastAPI middleware, workers, the
 Jeeves control plane, and future gateways can share one verification contract.
 
 Design goals
@@ -23,12 +23,12 @@ Design goals
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import hmac
 import re
 import time
-from typing import Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 
 SEAL_VERSION = "v1"
 SEAL_ALGORITHM = "hmac-sha256"
@@ -176,9 +176,9 @@ class PrincipalSealCodec:
 
         v1.key_id.principal_id.attester_id.issued_at.expires_at.signature_hex
 
-    ``key_id`` is signed as part of the payload.  Verification therefore does
+    ``key_id`` is signed as part of the payload. Verification therefore does
     one explicit key lookup instead of accepting a credential after trialing
-    every configured secret.  Existing keys can remain verification-only by
+    every configured secret. Existing keys can remain verification-only by
     keeping them in ``keys`` while issuing with a newer ``signing_key_id``.
     """
 
