@@ -3,8 +3,12 @@
 Preparation compiles the deployment plan, samples a stable control-plane preflight,
 and issues a short-lived authorization bound to both plan and whole-system root.
 Execution re-evaluates deployment safety immediately before the side effect, consumes
-the authorization exactly once, then activates the release atomically. A crash after
-consumption can resume only while the consumed root is still current and a fresh
+the authorization exactly once, then activates the release atomically.
+
+A completed activation is itself the durable product-state proof. Replaying an
+already-completed authorization returns that proof without demanding the *old*
+pre-deploy system root still be current; a consumed-but-not-activated authorization,
+by contrast, may resume only while its original root is still current and a fresh
 preflight remains authorizing.
 """
 from __future__ import annotations
@@ -45,7 +49,7 @@ class PreparedDeployment:
 class DeploymentExecution:
     authorization_id: str
     resumed: bool
-    preflight: ControlPlaneDeploymentPreflight
+    preflight: ControlPlaneDeploymentPreflight | None
     consumption: DeploymentConsumption
     release: ReleaseRecord
 
@@ -105,13 +109,16 @@ class DeploymentGateway:
         if existing_release is not None:
             if existing_consumption is None:
                 raise DeploymentGatewayError("release exists without authorization consumption evidence")
-            if existing_release.plan_sha256 != existing_consumption.plan_sha256:
+            if (existing_release.plan_sha256 != existing_consumption.plan_sha256 or
+                    existing_release.system_root_sha256 != existing_consumption.system_root_sha256):
                 raise DeploymentGatewayError("release/authorization evidence mismatch")
-            preflight = self._fresh_preflight(expected_root=existing_consumption.system_root_sha256, max_attempts=max_attempts)
-            return DeploymentExecution(authorization_id, True, preflight, existing_consumption, existing_release)
+            return DeploymentExecution(authorization_id, True, None, existing_consumption, existing_release)
 
         if existing_consumption is not None:
-            preflight = self._fresh_preflight(expected_root=existing_consumption.system_root_sha256, max_attempts=max_attempts)
+            preflight = self._fresh_preflight(
+                expected_root=existing_consumption.system_root_sha256,
+                max_attempts=max_attempts,
+            )
             if not hmac.compare_digest(existing_consumption.plan_sha256, expected_plan):
                 raise DeploymentGatewayError("consumed authorization is bound to a different deployment plan")
             release = self.releases.activate(plan, existing_consumption)
@@ -136,13 +143,29 @@ class DeploymentGateway:
             "verified": True,
         }
 
+    def root_component(self) -> dict[str, Any]:
+        """Product-state projection safe to include in the system root.
+
+        Outstanding permissions are intentionally excluded: issuing an authorization
+        must not mutate the root that authorization is bound to. Activated releases
+        are consequential product state and therefore rotate the root.
+        """
+        return {"release_backend": self.releases.status()}
+
     @staticmethod
     def prepared_dict(prepared: PreparedDeployment) -> dict[str, Any]:
-        return {"plan": prepared.plan, "preflight": asdict(prepared.preflight),
-                "authorization": asdict(prepared.authorization)}
+        return {
+            "plan": prepared.plan,
+            "preflight": asdict(prepared.preflight),
+            "authorization": asdict(prepared.authorization),
+        }
 
     @staticmethod
     def execution_dict(execution: DeploymentExecution) -> dict[str, Any]:
-        return {"authorization_id": execution.authorization_id, "resumed": execution.resumed,
-                "preflight": asdict(execution.preflight), "consumption": asdict(execution.consumption),
-                "release": asdict(execution.release)}
+        return {
+            "authorization_id": execution.authorization_id,
+            "resumed": execution.resumed,
+            "preflight": asdict(execution.preflight) if execution.preflight is not None else None,
+            "consumption": asdict(execution.consumption),
+            "release": asdict(execution.release),
+        }
