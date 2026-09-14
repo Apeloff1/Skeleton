@@ -115,7 +115,7 @@ def _authorization_event_schema(row: Mapping[str, Any]) -> bool:
     kind = row.get("kind")
     keys = set(row)
     if kind == "issue":
-        if keys not in {_ISSUE_KEYS, _LEGACY_ISSUE_KEYS}:
+        if keys != _ISSUE_KEYS and keys != _LEGACY_ISSUE_KEYS:
             return False
         if not _is_sha(row.get("preflight_sha256")):
             return False
