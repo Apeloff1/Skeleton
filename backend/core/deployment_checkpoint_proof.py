@@ -149,8 +149,15 @@ def verify_deployment_checkpoint_publication_proof(
     *,
     expected_ledger_head_sha256: str,
     expected_start_checkpoint_root_sha256: str | None = None,
+    expected_start_publication_sha256: str | None = None,
 ) -> bool:
-    """Verify publication membership against an externally supplied ledger head."""
+    """Verify membership against externally supplied current and optional prior pins.
+
+    ``expected_ledger_head_sha256`` authenticates the current end of the publication
+    history. Supplying ``expected_start_publication_sha256`` additionally turns the
+    suffix into an append-only extension proof from a previously pinned publication
+    head, allowing an auditor to advance trust without replaying ledger genesis.
+    """
     try:
         if not isinstance(proof, DeploymentCheckpointPublicationProof):
             return False
@@ -170,12 +177,9 @@ def verify_deployment_checkpoint_publication_proof(
             return False
         if expected_start_checkpoint_root_sha256 is not None and not _is_sha(expected_start_checkpoint_root_sha256):
             return False
-        if not hmac.compare_digest(proof.ledger_head_sha256, expected_ledger_head_sha256):
+        if expected_start_publication_sha256 is not None and not _is_sha(expected_start_publication_sha256):
             return False
-        if expected_start_checkpoint_root_sha256 is not None and not hmac.compare_digest(
-            proof.start_checkpoint_root_sha256,
-            expected_start_checkpoint_root_sha256,
-        ):
+        if not hmac.compare_digest(proof.ledger_head_sha256, expected_ledger_head_sha256):
             return False
         if not isinstance(proof.publications, tuple) or not proof.publications:
             return False
@@ -184,6 +188,16 @@ def verify_deployment_checkpoint_publication_proof(
         first = proof.publications[0]
         last = proof.publications[-1]
         if first.sequence != proof.start_sequence or last.sequence != proof.end_sequence:
+            return False
+        if expected_start_checkpoint_root_sha256 is not None and not hmac.compare_digest(
+            first.checkpoint_root_sha256,
+            expected_start_checkpoint_root_sha256,
+        ):
+            return False
+        if expected_start_publication_sha256 is not None and not hmac.compare_digest(
+            first.sha256,
+            expected_start_publication_sha256,
+        ):
             return False
         if not hmac.compare_digest(first.checkpoint_root_sha256, proof.start_checkpoint_root_sha256):
             return False
@@ -197,3 +211,17 @@ def verify_deployment_checkpoint_publication_proof(
         return hmac.compare_digest(expected_proof, proof.proof_sha256)
     except (CanonicalJSONError, DeploymentCheckpointLedgerError, TypeError, ValueError):
         return False
+
+
+def verify_deployment_checkpoint_publication_extension(
+    proof: DeploymentCheckpointPublicationProof,
+    *,
+    expected_previous_ledger_head_sha256: str,
+    expected_current_ledger_head_sha256: str,
+) -> bool:
+    """Verify an append-only extension from one externally pinned head to another."""
+    return verify_deployment_checkpoint_publication_proof(
+        proof,
+        expected_ledger_head_sha256=expected_current_ledger_head_sha256,
+        expected_start_publication_sha256=expected_previous_ledger_head_sha256,
+    )
