@@ -1,24 +1,23 @@
 """
-routes/nexus.py — Knowledge Nexus integration (vendored knowledge_nexus/).
+routes/nexus.py — Knowledge Nexus integration + Curiosity epistemic service.
 
-The vendored package uses bare top-level imports (``from engines.X``) and ships
-dirs (utils/, security/, testing/) that would SHADOW the backend's own modules
-if placed on sys.path permanently. So every access runs inside an isolation
-guard that snapshots ``sys.path`` + ``sys.modules``, adds the nexus root only for
-the duration of the call, then restores state and evicts any nexus-loaded modules.
-This lets us use the Nexus without ever corrupting the live backend imports.
+The vendored Nexus remains isolation-guarded. Curiosity is a native subsystem
+mounted under the already-live /api/nexus surface, avoiding another boot-time
+router while making prompt observation, frontier inspection, knowledge retrieval
+and idle research operational.
 """
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from core.curiosity_service import curiosity_service
 
 router = APIRouter(prefix="/api/nexus", tags=["knowledge-nexus"])
-
 _NX = str(Path(__file__).resolve().parent.parent / "knowledge_nexus")
 
 
@@ -49,17 +48,27 @@ def _capabilities() -> dict:
     return caps
 
 
+@router.on_event("startup")
+async def _start_curiosity() -> None:
+    curiosity_service().start()
+
+
+@router.on_event("shutdown")
+async def _stop_curiosity() -> None:
+    curiosity_service().stop()
+
+
 @router.get("/status")
 async def nexus_status():
-    """Vendored Knowledge Nexus inventory — always safe (no live import)."""
     caps = _capabilities()
+    curiosity = curiosity_service().status()
     return {"vendored": bool(caps), "domains": list(caps),
-            "module_count": sum(len(v) for v in caps.values()), "capabilities": caps}
+            "module_count": sum(len(v) for v in caps.values()), "capabilities": caps,
+            "curiosity": {"enabled": curiosity["enabled"], "engine": curiosity["engine"], "runtime": curiosity["runtime"]}}
 
 
 @router.get("/orchestrator")
 async def nexus_orchestrator():
-    """Instantiate the NexusOrchestrator inside the isolation guard and report readiness."""
     def _load():
         from orchestration.nexus_orchestration_layer import NexusOrchestrator
         o = NexusOrchestrator()
@@ -78,7 +87,6 @@ class NexusEvent(BaseModel):
 
 @router.post("/event")
 async def nexus_event(body: NexusEvent):
-    """Route an important event through the Nexus orchestrator (isolation-guarded)."""
     def _run():
         from orchestration.nexus_orchestration_layer import NexusOrchestrator
         return NexusOrchestrator().process_important_event(body.event, body.source)
@@ -87,3 +95,53 @@ async def nexus_event(body: NexusEvent):
         return {"ok": True, "result": result}
     except Exception as e:  # noqa: BLE001
         return JSONResponse({"ok": False, "error": f"{type(e).__name__}: {e}"[:200]}, status_code=207)
+
+
+class CuriosityPrompt(BaseModel):
+    prompt: str = Field(min_length=1, max_length=20000)
+    user_scope: str = Field(default="default", max_length=120)
+    signal_key: str | None = Field(default=None, max_length=300)
+
+
+class CuriosityBoost(BaseModel):
+    subject: str = Field(min_length=1, max_length=240)
+    delta: float = Field(default=0.15, ge=-0.5, le=0.75)
+
+
+@router.post("/curiosity/observe")
+async def curiosity_observe(body: CuriosityPrompt):
+    """Feed any user prompt into the durable curiosity frontier."""
+    return curiosity_service().observe(body.prompt, user_scope=body.user_scope, signal_key=body.signal_key)
+
+
+@router.get("/curiosity/status")
+async def curiosity_status():
+    return curiosity_service().status()
+
+
+@router.get("/curiosity/frontier")
+async def curiosity_frontier(limit: int = Query(default=20, ge=1, le=100)):
+    rows = curiosity_service().frontier(limit=limit)
+    return {"count": len(rows), "topics": rows}
+
+
+@router.get("/curiosity/knowledge")
+async def curiosity_knowledge(q: str = Query(min_length=1, max_length=1000), limit: int = Query(default=8, ge=1, le=50)):
+    return curiosity_service().search(q, limit=limit)
+
+
+@router.post("/curiosity/research")
+async def curiosity_research_now():
+    """Run one evidence-aware research cycle immediately."""
+    try:
+        return await curiosity_service().run_now()
+    except Exception as exc:  # provider failure is surfaced, not swallowed
+        raise HTTPException(status_code=503, detail=f"curiosity research unavailable: {type(exc).__name__}: {exc}"[:1000]) from exc
+
+
+@router.post("/curiosity/boost")
+async def curiosity_boost(body: CuriosityBoost):
+    changed = curiosity_service().engine.boost(body.subject, body.delta)
+    if not changed:
+        raise HTTPException(status_code=404, detail="subject not found in curiosity frontier")
+    return {"subject": body.subject, "boosted": True, "delta": body.delta}
