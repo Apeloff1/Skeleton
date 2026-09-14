@@ -3,6 +3,7 @@ name: Deployment Trust
 on:
   push:
     paths:
+      - "backend/core/canonical_json.py"
       - "backend/core/transparency_witness.py"
       - "backend/core/transparency_witness_config.py"
       - "backend/core/signed_transparency_witness.py"
@@ -15,6 +16,8 @@ on:
       - "backend/core/atomic_release_deployer.py"
       - "backend/core/deployment_receipts.py"
       - "backend/core/deployment_proof.py"
+      - "backend/core/deployment_proof_diagnostics.py"
+      - "backend/core/deployment_evidence_checkpoint.py"
       - "backend/core/deployment_gateway.py"
       - "backend/core/deployment_planner.py"
       - "backend/core/system_assurance.py"
@@ -33,6 +36,8 @@ on:
       - "backend/tests/test_deployment_gateway.py"
       - "backend/tests/test_deployment_proof.py"
       - "backend/tests/test_deployment_proof_semantics.py"
+      - "backend/tests/test_deployment_proof_diagnostics.py"
+      - "backend/tests/test_deployment_evidence_checkpoint.py"
       - "backend/tests/test_system_assurance_deployment.py"
       - "backend/tests/test_control_plane_release_integration.py"
       - "backend/tests/test_epistemic_trust_runtime.py"
@@ -40,9 +45,12 @@ on:
       - "backend/tests/test_system_assurance_trust.py"
       - "backend/tests/test_control_plane_transparency.py"
       - "backend/tests/test_system_root_attestation.py"
+      - "backend/tests/test_ci_manifest_integrity.py"
       - ".github/workflows/deployment-trust.yml"
+      - ".github/workflows/product-convergence.yml"
   pull_request:
     paths:
+      - "backend/core/canonical_json.py"
       - "backend/core/transparency_witness.py"
       - "backend/core/transparency_witness_config.py"
       - "backend/core/signed_transparency_witness.py"
@@ -55,6 +63,8 @@ on:
       - "backend/core/atomic_release_deployer.py"
       - "backend/core/deployment_receipts.py"
       - "backend/core/deployment_proof.py"
+      - "backend/core/deployment_proof_diagnostics.py"
+      - "backend/core/deployment_evidence_checkpoint.py"
       - "backend/core/deployment_gateway.py"
       - "backend/core/deployment_planner.py"
       - "backend/core/system_assurance.py"
@@ -73,6 +83,8 @@ on:
       - "backend/tests/test_deployment_gateway.py"
       - "backend/tests/test_deployment_proof.py"
       - "backend/tests/test_deployment_proof_semantics.py"
+      - "backend/tests/test_deployment_proof_diagnostics.py"
+      - "backend/tests/test_deployment_evidence_checkpoint.py"
       - "backend/tests/test_system_assurance_deployment.py"
       - "backend/tests/test_control_plane_release_integration.py"
       - "backend/tests/test_epistemic_trust_runtime.py"
@@ -80,7 +92,9 @@ on:
       - "backend/tests/test_system_assurance_trust.py"
       - "backend/tests/test_control_plane_transparency.py"
       - "backend/tests/test_system_root_attestation.py"
+      - "backend/tests/test_ci_manifest_integrity.py"
       - ".github/workflows/deployment-trust.yml"
+      - ".github/workflows/product-convergence.yml"
 
 permissions:
   contents: read
@@ -93,11 +107,15 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.11"
       - name: Install focused dependencies
         run: python -m pip install "pytest>=8,<9" "cryptography>=46.0.4,<47"
+      - name: Validate focused test manifest
+        run: python -m pytest -q --noconftest tests/test_ci_manifest_integrity.py
       - name: Verify finality, authorization, release activation and portable transition proofs
         run: >-
           python -m pytest -q --noconftest
@@ -112,6 +130,8 @@ jobs:
           tests/test_deployment_gateway.py
           tests/test_deployment_proof.py
           tests/test_deployment_proof_semantics.py
+          tests/test_deployment_proof_diagnostics.py
+          tests/test_deployment_evidence_checkpoint.py
           tests/test_system_assurance_deployment.py
           tests/test_control_plane_release_integration.py
           tests/test_epistemic_trust_runtime.py
