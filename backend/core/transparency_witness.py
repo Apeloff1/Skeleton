@@ -6,8 +6,8 @@ group. Multiple witnesses from the same group count once. Equivocation by a trus
 witness freezes finality for the affected log until an operator resolves it.
 
 Quorum is freshness-bounded: authenticated receipts age out and can no longer
-contribute to finality. This prevents an old quorum from permanently blessing a
-newly resumed or replayed deployment state.
+contribute to finality. Historical v1 ledgers/receipts remain verifiable while new
+writes use v2, so a schema upgrade never erases or silently re-trusts history.
 """
 from __future__ import annotations
 
@@ -24,6 +24,7 @@ from typing import Any, Iterable
 from core.file_lease import FileLease
 
 WITNESS_LEDGER_VERSION = 2
+_SUPPORTED_VERSIONS = {1, 2}
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -88,10 +89,10 @@ def _parse_time(value: str) -> datetime:
     return stamp.astimezone(UTC)
 
 
-def _receipt_payload(*, log_id: str, tree_size: int, root_sha256: str, witness_id: str,
+def _receipt_payload(*, version: int, log_id: str, tree_size: int, root_sha256: str, witness_id: str,
                      independence_group: str, observed_at: str, transport_authenticated: bool) -> dict[str, Any]:
     return {
-        "version": WITNESS_LEDGER_VERSION,
+        "version": version,
         "log_id": log_id,
         "tree_size": tree_size,
         "root_sha256": root_sha256,
@@ -137,35 +138,41 @@ class TransparencyWitnessLedger:
             self._trusted = registry
 
     @staticmethod
-    def _checksum(receipts: list[dict[str, Any]], incidents: list[dict[str, Any]]) -> str:
-        return _sha({"version": WITNESS_LEDGER_VERSION, "receipts": receipts, "incidents": incidents})
+    def _checksum(receipts: list[dict[str, Any]], incidents: list[dict[str, Any]], *, version: int) -> str:
+        return _sha({"version": version, "receipts": receipts, "incidents": incidents})
 
     def _load(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         try: env = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc: raise WitnessIntegrityError("witness ledger unreadable") from exc
         receipts = env.get("receipts"); incidents = env.get("incidents"); checksum = env.get("sha256")
-        if env.get("version") != WITNESS_LEDGER_VERSION or not isinstance(receipts, list) or not isinstance(incidents, list) or not isinstance(checksum, str):
+        try: envelope_version = int(env.get("version", 0))
+        except (TypeError, ValueError) as exc: raise WitnessIntegrityError("witness ledger malformed") from exc
+        if envelope_version not in _SUPPORTED_VERSIONS or not isinstance(receipts, list) or not isinstance(incidents, list) or not isinstance(checksum, str):
             raise WitnessIntegrityError("witness ledger malformed")
-        if not hmac.compare_digest(checksum, self._checksum(receipts, incidents)):
+        if not hmac.compare_digest(checksum, self._checksum(receipts, incidents, version=envelope_version)):
             raise WitnessIntegrityError("witness ledger checksum mismatch")
         for raw in receipts:
             if not isinstance(raw, dict) or not _SHA256.fullmatch(str(raw.get("receipt_sha256", ""))):
                 raise WitnessIntegrityError("witness receipt malformed")
-            payload = {key: raw[key] for key in (
-                "version", "log_id", "tree_size", "root_sha256", "witness_id",
-                "independence_group", "observed_at", "transport_authenticated",
-            )}
+            try: receipt_version = int(raw.get("version", 0))
+            except (TypeError, ValueError) as exc: raise WitnessIntegrityError("witness receipt malformed") from exc
+            if receipt_version not in _SUPPORTED_VERSIONS:
+                raise WitnessIntegrityError("unsupported witness receipt version")
             try:
+                payload = {key: raw[key] for key in (
+                    "version", "log_id", "tree_size", "root_sha256", "witness_id",
+                    "independence_group", "observed_at", "transport_authenticated",
+                )}
                 _parse_time(str(payload["observed_at"]))
-            except ValueError as exc:
-                raise WitnessIntegrityError("witness timestamp malformed") from exc
+            except (KeyError, ValueError) as exc:
+                raise WitnessIntegrityError("witness receipt malformed") from exc
             if not hmac.compare_digest(_sha(payload), str(raw["receipt_sha256"])):
                 raise WitnessIntegrityError("witness receipt hash mismatch")
         return [dict(x) for x in receipts], [dict(x) for x in incidents]
 
     def _write(self, receipts: list[dict[str, Any]], incidents: list[dict[str, Any]]) -> None:
         env = {"version": WITNESS_LEDGER_VERSION, "receipts": receipts, "incidents": incidents,
-               "sha256": self._checksum(receipts, incidents)}
+               "sha256": self._checksum(receipts, incidents, version=WITNESS_LEDGER_VERSION)}
         temp = self.path.with_suffix(f".{os.getpid()}.tmp")
         try:
             with temp.open("wb") as handle:
@@ -186,7 +193,7 @@ class TransparencyWitnessLedger:
         stamp = observed_at or datetime.now(UTC).isoformat()
         try: _parse_time(stamp)
         except ValueError as exc: raise WitnessRejected(str(exc)) from exc
-        payload = _receipt_payload(log_id=log_id, tree_size=tree_size, root_sha256=root_sha256,
+        payload = _receipt_payload(version=WITNESS_LEDGER_VERSION, log_id=log_id, tree_size=tree_size, root_sha256=root_sha256,
                                    witness_id=witness_id, independence_group=witness.independence_group,
                                    observed_at=stamp, transport_authenticated=True)
         receipt = WitnessReceipt(**payload, receipt_sha256=_sha(payload))
@@ -242,11 +249,13 @@ class TransparencyWitnessLedger:
     def status(self) -> dict[str, Any]:
         with self._lease.acquire(): receipts, incidents = self._load()
         equivocations = sum(i.get("kind") == "witness_equivocation" for i in incidents)
-        return {"version": WITNESS_LEDGER_VERSION, "trusted_witnesses": len(self._trusted),
+        versions = sorted({int(r.get("version", 0)) for r in receipts})
+        return {"version": WITNESS_LEDGER_VERSION, "historical_receipt_versions": versions,
+                "trusted_witnesses": len(self._trusted),
                 "enabled_witnesses": sum(w.enabled for w in self._trusted.values()),
                 "independence_groups": len({w.independence_group for w in self._trusted.values() if w.enabled}),
                 "required_groups": self.required_groups, "max_age_seconds": self.max_age_seconds,
                 "receipts": len(receipts), "incidents": len(incidents),
                 "equivocations": equivocations, "healthy": equivocations == 0,
                 "cross_process_locking": True, "lock_backend": self._lease.backend,
-                "sha256": self._checksum(receipts, incidents)}
+                "sha256": self._checksum(receipts, incidents, version=WITNESS_LEDGER_VERSION)}
