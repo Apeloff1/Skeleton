@@ -10,6 +10,7 @@ on:
       - "backend/core/deployment_preflight.py"
       - "backend/core/control_plane_deployment.py"
       - "backend/core/system_assurance.py"
+      - "backend/core/system_root_attestation.py"
       - "backend/core/product_control_plane.py"
       - "backend/core/portable_claim_proof.py"
       - "backend/routes/ops.py"
@@ -20,6 +21,7 @@ on:
       - "backend/tests/test_portable_finality_proof.py"
       - "backend/tests/test_system_assurance_trust.py"
       - "backend/tests/test_control_plane_transparency.py"
+      - "backend/tests/test_system_root_attestation.py"
       - ".github/workflows/deployment-trust.yml"
   pull_request:
     paths:
@@ -30,6 +32,7 @@ on:
       - "backend/core/deployment_preflight.py"
       - "backend/core/control_plane_deployment.py"
       - "backend/core/system_assurance.py"
+      - "backend/core/system_root_attestation.py"
       - "backend/core/product_control_plane.py"
       - "backend/core/portable_claim_proof.py"
       - "backend/routes/ops.py"
@@ -40,6 +43,7 @@ on:
       - "backend/tests/test_portable_finality_proof.py"
       - "backend/tests/test_system_assurance_trust.py"
       - "backend/tests/test_control_plane_transparency.py"
+      - "backend/tests/test_system_root_attestation.py"
       - ".github/workflows/deployment-trust.yml"
 
 permissions:
@@ -68,3 +72,4 @@ jobs:
           tests/test_portable_finality_proof.py
           tests/test_system_assurance_trust.py
           tests/test_control_plane_transparency.py
+          tests/test_system_root_attestation.py
