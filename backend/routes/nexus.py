@@ -2,7 +2,8 @@
 routes/nexus.py — Knowledge Nexus integration + Curiosity epistemic service.
 
 The vendored Nexus remains isolation-guarded. Curiosity, empirical verification,
-truth-state, calibration and provenance-gated watch feeds share /api/nexus.
+truth-state, calibration, provenance-gated watch feeds, and transparency proofs
+share /api/nexus.
 """
 from __future__ import annotations
 
@@ -127,6 +128,13 @@ class TruthWatchEventBody(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
+class TransparencyHeadBody(BaseModel):
+    log_id: str = Field(min_length=1, max_length=300)
+    tree_size: int = Field(ge=0)
+    root_sha256: str = Field(min_length=64, max_length=64)
+    source: str = Field(min_length=1, max_length=300)
+
+
 class TruthEvidenceBody(BaseModel):
     source_id: str = Field(min_length=1, max_length=1000)
     locator: str = Field(default="", max_length=2000)
@@ -177,13 +185,41 @@ async def curiosity_verification_status(): return curiosity_service().engine.ver
 
 
 @router.get("/curiosity/epistemic-root")
-async def curiosity_epistemic_root():
-    return curiosity_service().epistemic_root()
+async def curiosity_epistemic_root(): return curiosity_service().epistemic_root()
 
 
 @router.get("/curiosity/proof")
 async def curiosity_claim_proof(claim: str = Query(min_length=1, max_length=10000)):
     return curiosity_service().claim_proof(claim)
+
+
+@router.get("/curiosity/transparency")
+async def curiosity_transparency_status(): return curiosity_service().transparency_status()
+
+
+@router.post("/curiosity/transparency/checkpoint")
+async def curiosity_transparency_checkpoint(): return curiosity_service().checkpoint_truth()
+
+
+@router.get("/curiosity/transparency/inclusion")
+async def curiosity_transparency_inclusion(checkpoint_sha256: str = Query(min_length=64, max_length=64)):
+    try: return curiosity_service().transparency_inclusion(checkpoint_sha256)
+    except KeyError as exc: raise HTTPException(status_code=404, detail="checkpoint not found in transparency log") from exc
+
+
+@router.get("/curiosity/transparency/consistency")
+async def curiosity_transparency_consistency(old_size: int = Query(ge=0)):
+    try: return curiosity_service().transparency_consistency(old_size)
+    except ValueError as exc: raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/curiosity/transparency/gossip")
+async def curiosity_transparency_gossip(body: TransparencyHeadBody):
+    try:
+        return curiosity_service().observe_transparency_head(
+            log_id=body.log_id, tree_size=body.tree_size, root_sha256=body.root_sha256, source=body.source,
+        )
+    except ValueError as exc: raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get("/curiosity/truth")
@@ -196,8 +232,7 @@ async def curiosity_truth_state(claim: str = Query(min_length=1, max_length=1000
 
 
 @router.post("/curiosity/claim-identity")
-async def curiosity_claim_identity(body: ClaimCompareBody):
-    return curiosity_service().compare_claims(body.left, body.right)
+async def curiosity_claim_identity(body: ClaimCompareBody): return curiosity_service().compare_claims(body.left, body.right)
 
 
 @router.post("/curiosity/calibration/forecast")
