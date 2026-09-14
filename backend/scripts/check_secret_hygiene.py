@@ -50,12 +50,27 @@ PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"),
     ),
     (
+        "AWS secret access key",
+        re.compile(
+            r"\bAWS_SECRET_ACCESS_KEY\s*[:=]\s*[\"']?[A-Za-z0-9/+=]{40}[\"']?",
+            re.IGNORECASE,
+        ),
+    ),
+    (
         "Slack token",
         re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{20,}\b"),
     ),
     (
         "OpenAI-style API key",
         re.compile(r"\bsk-[A-Za-z0-9_-]{24,}\b"),
+    ),
+    (
+        "Stripe live secret key",
+        re.compile(r"\b(?:sk|rk)_live_[A-Za-z0-9]{16,}\b"),
+    ),
+    (
+        "Google API key",
+        re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b"),
     ),
     (
         "credential-bearing database URI",
@@ -91,8 +106,8 @@ def candidate_files() -> Iterable[Path]:
             yield path
 
 
-def _is_placeholder(line: str) -> bool:
-    lowered = line.lower()
+def _is_placeholder(candidate: str) -> bool:
+    lowered = candidate.lower()
     return any(marker in lowered for marker in PLACEHOLDER_MARKERS)
 
 
@@ -109,11 +124,15 @@ def violations(path: Path) -> list[str]:
 
     findings: list[str] = []
     for number, line in enumerate(text.splitlines(), 1):
-        if _is_placeholder(line):
-            continue
         for name, pattern in PATTERNS:
-            if pattern.search(line):
+            for match in pattern.finditer(line):
+                # Suppress only an explicitly placeholder-shaped credential,
+                # never an entire source line. Otherwise a real credential can
+                # evade scanning simply by appending "# example" or similar.
+                if _is_placeholder(match.group(0)):
+                    continue
                 findings.append(f"{label}:{number}: possible {name}")
+                break
     return findings
 
 
