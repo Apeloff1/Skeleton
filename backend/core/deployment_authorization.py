@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
-import hashlib
 import hmac
 import json
 import os
@@ -18,6 +17,12 @@ import re
 import uuid
 from typing import Any, Mapping
 
+from core.canonical_json import (
+    CanonicalJSONError,
+    canonical_json_clone,
+    canonical_json_sha256,
+    canonical_json_text,
+)
 from core.control_plane_deployment import (
     ControlPlaneDeploymentPreflight,
     verify_control_plane_deployment_preflight,
@@ -53,18 +58,24 @@ class DeploymentConsumption:
     consume_event_sha256: str
 
 
-def _canonical(value: Any) -> bytes:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
-
-
 def _sha(value: Any) -> str:
-    return hashlib.sha256(_canonical(value)).hexdigest()
+    return canonical_json_sha256(value)
+
+
+def _snapshot_plan(plan: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(plan, dict) or not plan:
+        raise ValueError("deployment plan must be a non-empty object")
+    try:
+        snapshot = canonical_json_clone(plan)
+    except CanonicalJSONError as exc:
+        raise ValueError("deployment plan must contain only finite canonical JSON values") from exc
+    if not isinstance(snapshot, dict) or not snapshot:
+        raise ValueError("deployment plan must be a non-empty object")
+    return snapshot
 
 
 def plan_digest(plan: dict[str, Any]) -> str:
-    if not isinstance(plan, dict) or not plan:
-        raise ValueError("deployment plan must be a non-empty object")
-    return _sha(plan)
+    return _sha(_snapshot_plan(plan))
 
 
 def _parse(value: str) -> datetime:
@@ -148,7 +159,11 @@ class DeploymentAuthorizationLedger:
                 raise DeploymentAuthorizationError("authorization ledger ancestry/version mismatch")
             claimed = str(row.get("sha256") or "")
             payload = {k: v for k, v in row.items() if k != "sha256"}
-            if not _SHA256.fullmatch(claimed) or not hmac.compare_digest(_sha(payload), claimed):
+            try:
+                hash_valid = _SHA256.fullmatch(claimed) and hmac.compare_digest(_sha(payload), claimed)
+            except CanonicalJSONError as exc:
+                raise DeploymentAuthorizationError("authorization event is not canonical JSON") from exc
+            if not hash_valid:
                 raise DeploymentAuthorizationError("authorization event hash mismatch")
             kind = row.get("kind")
             auth_id = str(row.get("authorization_id") or "")
@@ -184,7 +199,11 @@ class DeploymentAuthorizationLedger:
                     plan = row["plan"]
                     if not isinstance(plan, dict) or not plan:
                         raise DeploymentAuthorizationError("persisted deployment plan snapshot is malformed")
-                    if not hmac.compare_digest(plan_digest(plan), str(row["plan_sha256"])):
+                    try:
+                        persisted_digest = plan_digest(plan)
+                    except ValueError as exc:
+                        raise DeploymentAuthorizationError("persisted deployment plan snapshot is not canonical JSON") from exc
+                    if not hmac.compare_digest(persisted_digest, str(row["plan_sha256"])):
                         raise DeploymentAuthorizationError("persisted deployment plan digest diverges from issue event")
                 issues[auth_id] = row
             else:
@@ -219,7 +238,7 @@ class DeploymentAuthorizationLedger:
         }
         event["sha256"] = _sha(event)
         with self.path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n")
+            handle.write(canonical_json_text(event) + "\n")
             handle.flush()
             os.fsync(handle.fileno())
         return event
@@ -236,10 +255,11 @@ class DeploymentAuthorizationLedger:
             raise DeploymentAuthorizationError("deployment preflight is not authorizing/stable")
         if ttl_seconds < 1 or ttl_seconds > 3600:
             raise ValueError("authorization ttl must be between 1 and 3600 seconds")
+        snapshot = _snapshot_plan(plan)
+        digest = _sha(snapshot)
         stamp = issued_at or datetime.now(UTC).isoformat()
         issued = _parse(stamp)
         expires = (issued + timedelta(seconds=ttl_seconds)).isoformat()
-        digest = plan_digest(plan)
         auth_id = uuid.uuid4().hex
         with self._lease.acquire():
             rows = self._load_verified()
@@ -250,7 +270,7 @@ class DeploymentAuthorizationLedger:
                 "preflight_sha256": preflight.attestation_sha256,
                 "preflight": serialize_preflight_snapshot(preflight),
                 "plan_sha256": digest,
-                "plan": dict(plan),
+                "plan": snapshot,
                 "issued_at": stamp,
                 "expires_at": expires,
             }, rows)
