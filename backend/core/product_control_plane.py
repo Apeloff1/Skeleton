@@ -2,6 +2,7 @@
 
 Owns durable policy persistence, admission, native executor bindings, compact
 execution receipts and content-addressed result payloads as one service boundary.
+Lifecycle is derived from durable evidence rather than mutable status flags.
 """
 from __future__ import annotations
 
@@ -11,6 +12,7 @@ from typing import Any
 
 from core.canonical_product_policy import CANONICAL_PRODUCT_POLICY, POLICY_VERSION
 from core.charter_policy import Charter, CharterPolicy, Edict, Rule
+from core.execution_evidence import derive_ledger, derive_lifecycle
 from core.execution_receipts import ExecutionReceiptStore
 from core.policy_repository import PolicyRepository
 from core.product_default_executors import build_default_executor_registry
@@ -102,31 +104,36 @@ class ProductControlPlane:
         return self.receipts.load_result(operation_id)
 
     def operation_lifecycle(self, operation_id: str) -> dict[str, Any]:
-        pending = next((item for item in self.operations.pending_operations() if item.id == operation_id), None)
-        receipt = self.receipts.read(operation_id)
-        binding = self.executors.resolve(pending.capability_id, pending.action) if pending is not None else None
-        if pending is not None and receipt is not None:
-            state = "executed_unconfirmed"
-        elif pending is not None and binding is not None:
-            state = "pending_bound"
-        elif pending is not None:
-            state = "pending_unbound"
-        elif receipt is not None:
-            state = "confirmed"
-        else:
-            state = "unknown"
-        audit_events = [asdict(entry) for entry in self.operations.audit.entries(limit=500)
-                        if operation_id in entry.detail]
+        pending = self.pending()
+        receipts = self.receipt_history(limit=500)
+        audit = self.audit_history(limit=500)
+        evidence = derive_lifecycle(
+            operation_id,
+            pending_operations=pending,
+            receipts=receipts,
+            audit_entries=audit,
+        )
+        pending_item = next((item for item in pending if item["operation_id"] == operation_id), None)
+        receipt_item = next((item for item in receipts if item["operation_id"] == operation_id), None)
+        binding = None
+        if pending_item is not None:
+            binding = self.executors.resolve(pending_item["capability_id"], pending_item["action"])
         return {
-            "operation_id": operation_id,
-            "state": state,
-            "pending": asdict(pending) if pending is not None else None,
+            **asdict(evidence),
+            "pending_operation": pending_item,
             "executor": ({"name": binding.name, "version": binding.version,
                           "effect_class": binding.effect_class, "replay_safe": binding.replay_safe}
                          if binding is not None else None),
-            "receipt": asdict(receipt) if receipt is not None else None,
-            "audit_events": audit_events,
+            "receipt": receipt_item,
         }
+
+    def execution_ledger(self) -> list[dict[str, Any]]:
+        evidence = derive_ledger(
+            pending_operations=self.pending(),
+            receipts=self.receipt_history(limit=500),
+            audit_entries=self.audit_history(limit=500),
+        )
+        return [asdict(item) for item in evidence]
 
     def executor_coverage(self) -> dict[str, Any]:
         canonical = [(domain.domain, action) for domain in CANONICAL_PRODUCT_POLICY for action in domain.actions]
@@ -187,6 +194,10 @@ class ProductControlPlane:
 
     def status(self) -> dict[str, Any]:
         governance = self.policy.snapshot()
+        ledger = self.execution_ledger()
+        lifecycle_counts: dict[str, int] = {}
+        for item in ledger:
+            lifecycle_counts[item["state"]] = lifecycle_counts.get(item["state"], 0) + 1
         return {"policy_version": POLICY_VERSION, "policy_bootstrap_enabled": self.bootstrap_policy,
                 "kernel": {"capabilities": [{"id": capability.id, "pillar": capability.pillar.value,
                                                "critical": capability.critical}
@@ -197,4 +208,6 @@ class ProductControlPlane:
                 "executors": {"bound": len(self.executors), "bindings": list(self.executors.snapshot()),
                               "coverage": self.executor_coverage()},
                 "receipts": self.receipts.stats(),
+                "lifecycle": {"operations": len(ledger), "states": lifecycle_counts,
+                              "evidence_gaps": lifecycle_counts.get("evidence_gap", 0)},
                 "operations": self.operations.snapshot()}
