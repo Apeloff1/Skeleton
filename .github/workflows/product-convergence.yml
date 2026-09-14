@@ -30,6 +30,7 @@ on:
       - "backend/tests/test_citation_gate_adversarial.py"
       - "backend/tests/test_citation_structural_laundering.py"
       - "backend/tests/test_truth_assurance_invariants.py"
+      - "backend/tests/test_claim_proof_attestation.py"
       - "backend/tests/test_curiosity_engine.py"
       - "backend/tests/test_idle_curiosity_runtime.py"
       - "backend/tests/test_progression.py"
@@ -80,6 +81,7 @@ on:
       - "backend/tests/test_citation_gate_adversarial.py"
       - "backend/tests/test_citation_structural_laundering.py"
       - "backend/tests/test_truth_assurance_invariants.py"
+      - "backend/tests/test_claim_proof_attestation.py"
       - "backend/tests/test_curiosity_engine.py"
       - "backend/tests/test_idle_curiosity_runtime.py"
       - "backend/tests/test_progression.py"
@@ -145,6 +147,7 @@ jobs:
           tests/test_citation_gate_adversarial.py
           tests/test_citation_structural_laundering.py
           tests/test_truth_assurance_invariants.py
+          tests/test_claim_proof_attestation.py
           tests/test_curiosity_engine.py
           tests/test_idle_curiosity_runtime.py
           tests/test_progression.py
