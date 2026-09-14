@@ -19,7 +19,7 @@ def _item(source, group, *, replication=False):
     )
 
 
-def _row(source, group, *, replication=False, parents=()):
+def _row(source, group, claim, *, replication=False, parents=()):
     return {
         "source_id": source, "source": source, "locator": f"doi:{source}",
         "kind": "replication" if replication else "primary_empirical",
@@ -28,6 +28,11 @@ def _row(source, group, *, replication=False, parents=()):
         "provenance_verified": True, "preregistered": True, "data_available": True,
         "code_available": True, "sample_size": 500, "uncertainty_reported": True,
         "parent_source_ids": list(parents),
+        "citation_binding": {
+            "binding_method": "direct_quote",
+            "evidence_span": claim,
+            "mapping_rationale": "",
+        },
     }
 
 
@@ -39,8 +44,8 @@ def _promote(engine, claim, prefix, *, dependencies=()):
         "claims": [claim], "falsifiable": {claim: True},
         "claim_dependencies": {claim: list(dependencies)},
         "claim_evidence": {claim: [
-            _row(f"{prefix}-primary", f"{prefix}-lab-a"),
-            _row(f"{prefix}-replication", f"{prefix}-lab-b", replication=True),
+            _row(f"{prefix}-primary", f"{prefix}-lab-a", claim),
+            _row(f"{prefix}-replication", f"{prefix}-lab-b", claim, replication=True),
         ]},
     })
     return record
@@ -62,8 +67,8 @@ def test_shared_upstream_dataset_collapses_nominally_independent_papers(tmp_path
 def test_legacy_unknown_ancestry_cannot_manufacture_replication(tmp_path):
     registry = EvidenceRegistry(tmp_path / "evidence")
     claim = "System X decreases measured error rate by 5 percent."
-    registry.register(claim, _item("legacy-a", "claimed-lab-a"))
-    registry.register(claim, _item("legacy-b", "claimed-lab-b", replication=True))
+    registry.register(claim, _item("legacy-a", "claimed-lab-a"), citation_binding_attestation_sha256="a" * 64)
+    registry.register(claim, _item("legacy-b", "claimed-lab-b", replication=True), citation_binding_attestation_sha256="b" * 64)
     engine = VerifiedCuriosityEngine(tmp_path)
     result = engine.reverify_claim(claim)
     assert result["independence"]["raw_sources"] == 2
