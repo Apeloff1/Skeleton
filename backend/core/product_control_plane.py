@@ -9,6 +9,8 @@ from core.capability_readiness import ReadinessReport, evaluate_readiness
 from core.canonical_product_policy import CANONICAL_PRODUCT_POLICY, POLICY_VERSION
 from core.charter_policy import Charter, CharterPolicy, Edict, Rule
 from core.epistemic_attestation import epistemic_root_dict
+from core.epistemic_claim_index import EpistemicClaimIndex
+from core.epistemic_transparency import EpistemicTransparency
 from core.execution_evidence import derive_ledger, derive_lifecycle
 from core.execution_receipts import ExecutionReceiptStore
 from core.policy_repository import PolicyRepository
@@ -18,6 +20,7 @@ from core.product_kernel import PRODUCT_KERNEL, ProductKernel
 from core.product_operations import AdmittedOperation, OperationExecutionError, ProductOperationCoordinator
 from core.system_assurance import evaluate_assurance
 from core.system_root_attestation import build_root_attestation
+from core.transparency_gossip import TransparencyGossip
 from core.verified_curiosity import VerifiedCuriosityEngine
 
 
@@ -33,6 +36,8 @@ class ProductControlPlane:
         self.operations = ProductOperationCoordinator(self.root / "operations", kernel=kernel, policy=self.policy, outbox_cap=outbox_cap)
         self.receipts = ExecutionReceiptStore(self.root / "receipts")
         self.curiosity = VerifiedCuriosityEngine(self.root / "curiosity")
+        self.epistemic_transparency = EpistemicTransparency(self.root / "epistemic-transparency")
+        self.epistemic_gossip = TransparencyGossip(self.root / "epistemic-gossip")
         if bind_native_executors:
             self.executors, self.native_executors = build_default_executor_registry(
                 self.receipts, curiosity=self.curiosity,
@@ -57,11 +62,35 @@ class ProductControlPlane:
     def _epistemic_root(self) -> dict[str, Any]:
         return epistemic_root_dict(self.curiosity.verification_status())
 
+    def _ensure_epistemic_transparency(self) -> dict[str, Any]:
+        before = self.epistemic_transparency.log.descriptor()
+        authority_root = EpistemicClaimIndex(self.curiosity).root_sha256()
+        epistemic = self._epistemic_root()
+        published = self.epistemic_transparency.publish(
+            authority_root_sha256=authority_root,
+            epistemic_root_sha256=epistemic["root_sha256"],
+        )
+        after = published["transparency"]
+        gossip_before = self.epistemic_gossip.status()
+        gossip_result: dict[str, Any] | None = None
+        if after["tree_size"] > before["tree_size"] or gossip_before["observations"] == 0:
+            consistency = None
+            if before["tree_size"] and after["tree_size"] > before["tree_size"]:
+                consistency = self.epistemic_transparency.log.consistency(before["tree_size"])
+            gossip_result = self.epistemic_gossip.observe(
+                log_id=after["log_id"], tree_size=after["tree_size"], root_sha256=after["root_sha256"],
+                source="product-control-plane", consistency=consistency,
+            )
+        return {"published": published, "health": self.epistemic_transparency.health(),
+                "gossip": self.epistemic_gossip.status(), "gossip_observation": gossip_result}
+
     def _operations_projection(self) -> dict[str, Any]:
         projection = dict(self.operations.snapshot())
         projection["outbox_health"] = self.operations.outbox.health()
         projection["curiosity"] = self.curiosity.stats()
         projection["epistemic_root"] = self._epistemic_root()
+        projection["epistemic_transparency"] = self.epistemic_transparency.health()
+        projection["epistemic_gossip"] = self.epistemic_gossip.status()
         return projection
 
     def _readiness_model(self) -> ReadinessReport:
@@ -82,6 +111,7 @@ class ProductControlPlane:
         return {"canonical_actions": total, "bound_actions": ready, "coverage_pct": round(ready / total * 100, 1) if total else 100.0, "missing": missing}
 
     def assurance_report(self) -> dict[str, Any]:
+        self._ensure_epistemic_transparency()
         return asdict(evaluate_assurance(
             lifecycle=self.execution_ledger(), operations=self._operations_projection(),
             executor_bindings=self.executors.snapshot(), executor_coverage=self.executor_coverage(),
@@ -89,14 +119,15 @@ class ProductControlPlane:
         ))
 
     def system_root(self) -> dict[str, Any]:
-        operations = self._operations_projection()
-        epistemic = self._epistemic_root()
+        transparency = self._ensure_epistemic_transparency()
+        operations = self._operations_projection(); epistemic = self._epistemic_root()
         att = build_root_attestation({
             "policy": self._policy_projection(), "executors": list(self.executors.snapshot()),
             "readiness": self.readiness_report(), "lifecycle": self.execution_ledger(),
             "audit": {"sequence": operations.get("audit_sequence"), "head": operations.get("audit_head"), "health": operations.get("audit_health")},
             "outbox": operations.get("outbox_health"), "receipts": self.receipts.stats(),
             "curiosity_runtime": self.curiosity.stats(), "epistemic_root": epistemic,
+            "epistemic_transparency": transparency["health"], "epistemic_gossip": transparency["gossip"],
             "kernel": [{"id": c.id, "pillar": c.pillar.value, "critical": c.critical} for c in self.operations.kernel.all()],
         })
         return {"schema_version": att.schema_version, "components": [{"name": n, "sha256": d} for n, d in att.components], "root_sha256": att.root_sha256}
@@ -107,6 +138,7 @@ class ProductControlPlane:
             "native_coverage_pct": assurance["native_coverage_pct"], "readiness_pct": assurance["readiness_pct"],
             "attestation_sha256": assurance["attestation_sha256"], "readiness_attestation_sha256": readiness["attestation_sha256"],
             "system_root_sha256": self.system_root()["root_sha256"], "epistemic_root_sha256": epistemic["root_sha256"],
+            "epistemic_transparency": self.epistemic_transparency.health(), "epistemic_gossip": self.epistemic_gossip.status(),
             "curiosity": self.curiosity.stats(), "verification": self.curiosity.verification_status(),
             "invariants": assurance["invariants"]}
 
@@ -182,5 +214,6 @@ class ProductControlPlane:
             "executors": {"bound": len(self.executors), "bindings": list(self.executors.snapshot()), "coverage": self.executor_coverage()},
             "readiness": readiness, "receipts": self.receipts.stats(), "curiosity": self.curiosity.stats(),
             "verification": self.curiosity.verification_status(), "epistemic_root": epistemic,
+            "epistemic_transparency": self.epistemic_transparency.health(), "epistemic_gossip": self.epistemic_gossip.status(),
             "lifecycle": {"operations": len(ledger), "states": counts, "evidence_gaps": counts.get("evidence_gap", 0) + counts.get("receipt_unattested", 0), "anomalies": anomalies},
             "assurance": assurance, "system_root": root, "safety": self._safety_projection(), "operations": operations}
