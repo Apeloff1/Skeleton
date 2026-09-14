@@ -6,16 +6,18 @@ immediate TCP peer belongs to an explicitly trusted proxy network.
 
 Configure trusted ingress/load-balancer networks with ``TRUSTED_PROXY_CIDRS``.
 The conservative default trusts loopback only, which is appropriate for local
-reverse proxies and fails closed everywhere else.
+reverse proxies and fails closed everywhere else. Invalid production proxy
+configuration raises during use rather than silently widening or changing trust.
 """
 from __future__ import annotations
 
 import ipaddress
-import os
 from functools import lru_cache
 from typing import Iterable, TypeAlias
 
 from starlette.requests import Request
+
+from core.security_config import env_cidrs
 
 IPAddress: TypeAlias = ipaddress.IPv4Address | ipaddress.IPv6Address
 IPNetwork: TypeAlias = ipaddress.IPv4Network | ipaddress.IPv6Network
@@ -24,6 +26,7 @@ _DEFAULT_TRUSTED_PROXY_CIDRS = "127.0.0.0/8,::1/128"
 
 
 def _split_cidrs(raw: str) -> Iterable[str]:
+    """Compatibility helper used by older focused tests."""
     for value in raw.split(","):
         value = value.strip()
         if value:
@@ -32,19 +35,22 @@ def _split_cidrs(raw: str) -> Iterable[str]:
 
 @lru_cache(maxsize=8)
 def _trusted_networks(raw: str) -> tuple[IPNetwork, ...]:
+    """Parse explicit CIDR text without ever widening trust.
+
+    Production configuration does not use this helper directly; it remains for
+    compatibility with focused tests and callers that parse already-trusted text.
+    """
     networks: list[IPNetwork] = []
     for value in _split_cidrs(raw):
         try:
             networks.append(ipaddress.ip_network(value, strict=False))
         except ValueError:
-            # Invalid configuration must never widen trust.
             continue
     return tuple(networks)
 
 
 def trusted_proxy_networks() -> tuple[IPNetwork, ...]:
-    raw = os.environ.get("TRUSTED_PROXY_CIDRS", _DEFAULT_TRUSTED_PROXY_CIDRS)
-    return _trusted_networks(raw)
+    return env_cidrs("TRUSTED_PROXY_CIDRS", _DEFAULT_TRUSTED_PROXY_CIDRS)
 
 
 def _parse_ip(value: str) -> IPAddress | None:
