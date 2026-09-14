@@ -20,7 +20,7 @@ def test_html_export_escapes_language_metadata_and_code():
 
     assert "<script>" not in body
     assert "</div><script>" not in body
-    assert "&lt;script&gt;alert&quot; in body
+    assert '&lt;script&gt;alert(&quot;code&quot;)' in body
     assert "pythondivscriptalertlangscript" in body
     assert "Content-Security-Policy" in body
 
