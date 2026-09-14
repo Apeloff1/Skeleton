@@ -27,8 +27,8 @@ def _item(source: str, group: str, *, replication: bool = False) -> EvidenceItem
 def test_provenance_resolution_restores_independence_only_after_both_sources_resolved(tmp_path):
     claim = "System R decreases measured latency by 9 percent."
     registry = EvidenceRegistry(tmp_path / "evidence")
-    registry.register(claim, _item("study-primary", "lab-a"))
-    registry.register(claim, _item("study-replication", "lab-b", replication=True))
+    registry.register(claim, _item("study-primary", "lab-a"), citation_binding_attestation_sha256="a" * 64)
+    registry.register(claim, _item("study-replication", "lab-b", replication=True), citation_binding_attestation_sha256="b" * 64)
 
     engine = VerifiedCuriosityEngine(tmp_path)
     initial = engine.reverify_claim(claim)
