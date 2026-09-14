@@ -22,6 +22,7 @@ on:
       - "backend/core/deployment_checkpoint_proof.py"
       - "backend/core/deployment_checkpoint_witness.py"
       - "backend/core/deployment_checkpoint_target.py"
+      - "backend/core/deployment_checkpoint_pin_ledger.py"
       - "backend/core/deployment_gateway.py"
       - "backend/core/deployment_planner.py"
       - "backend/core/system_assurance.py"
@@ -47,6 +48,8 @@ on:
       - "backend/tests/test_deployment_checkpoint_proof.py"
       - "backend/tests/test_deployment_checkpoint_witness.py"
       - "backend/tests/test_deployment_checkpoint_target.py"
+      - "backend/tests/test_deployment_checkpoint_pin_ledger.py"
+      - "backend/tests/test_deployment_checkpoint_pin_hardening.py"
       - "backend/tests/test_system_assurance_deployment.py"
       - "backend/tests/test_control_plane_release_integration.py"
       - "backend/tests/test_epistemic_trust_runtime.py"
@@ -78,6 +81,7 @@ on:
       - "backend/core/deployment_checkpoint_proof.py"
       - "backend/core/deployment_checkpoint_witness.py"
       - "backend/core/deployment_checkpoint_target.py"
+      - "backend/core/deployment_checkpoint_pin_ledger.py"
       - "backend/core/deployment_gateway.py"
       - "backend/core/deployment_planner.py"
       - "backend/core/system_assurance.py"
@@ -103,6 +107,8 @@ on:
       - "backend/tests/test_deployment_checkpoint_proof.py"
       - "backend/tests/test_deployment_checkpoint_witness.py"
       - "backend/tests/test_deployment_checkpoint_target.py"
+      - "backend/tests/test_deployment_checkpoint_pin_ledger.py"
+      - "backend/tests/test_deployment_checkpoint_pin_hardening.py"
       - "backend/tests/test_system_assurance_deployment.py"
       - "backend/tests/test_control_plane_release_integration.py"
       - "backend/tests/test_epistemic_trust_runtime.py"
@@ -155,6 +161,8 @@ jobs:
           tests/test_deployment_checkpoint_proof.py
           tests/test_deployment_checkpoint_witness.py
           tests/test_deployment_checkpoint_target.py
+          tests/test_deployment_checkpoint_pin_ledger.py
+          tests/test_deployment_checkpoint_pin_hardening.py
           tests/test_system_assurance_deployment.py
           tests/test_control_plane_release_integration.py
           tests/test_epistemic_trust_runtime.py
