@@ -9,6 +9,7 @@ on:
       - "backend/tests/test_product_kernel.py"
       - "frontend/src/product/productCatalog.ts"
       - "frontend/app/product.tsx"
+      - "frontend/app/capability.tsx"
       - "frontend/components/LaunchCascade.tsx"
       - ".github/workflows/product-kernel.yml"
   pull_request:
@@ -19,6 +20,7 @@ on:
       - "backend/tests/test_product_kernel.py"
       - "frontend/src/product/productCatalog.ts"
       - "frontend/app/product.tsx"
+      - "frontend/app/capability.tsx"
       - "frontend/components/LaunchCascade.tsx"
       - ".github/workflows/product-kernel.yml"
 
