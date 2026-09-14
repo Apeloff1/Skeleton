@@ -21,6 +21,7 @@ from core.deployment_checkpoint_pin_ledger import (
     DeploymentCheckpointPinRejected,
 )
 from core.deployment_checkpoint_pin_wire import decode_deployment_checkpoint_pin_receipt
+from core.deployment_checkpoint_policy_verifier import policy_satisfied_by_proof_kind
 from core.deployment_checkpoint_trust_policy import build_deployment_checkpoint_trust_policy_manifest
 from core.deployment_checkpoint_verification_package import (
     PROOF_PIN,
@@ -56,6 +57,16 @@ def _runtime():
     assurance and deployment preflight.
     """
     return _control_plane().deployment_checkpoint_pins
+
+
+def _proof_role(manifest, proof_kind: str) -> str:
+    if proof_kind == PROOF_TRUST_ADVANCE:
+        return "audit-only"
+    if not manifest.required:
+        return "optional-evidence"
+    if policy_satisfied_by_proof_kind(manifest, proof_kind):
+        return "deploy-authority-capable"
+    return "insufficient-for-active-policy"
 
 
 @router.get("/target")
@@ -144,7 +155,7 @@ async def checkpoint_witness_trust_advance(
     publication_sequence: int | None = Query(default=None, ge=1),
     token: str = Query(""),
 ):
-    """Export a portable append-only bridge from a fresh witnessed anchor to current head."""
+    """Export audit-only append-only ancestry from a witnessed anchor to current head."""
     _require_ops(token)
     try:
         runtime = _runtime()
@@ -153,7 +164,11 @@ async def checkpoint_witness_trust_advance(
             if publication_sequence is None
             else runtime.trust_advance(publication_sequence=publication_sequence)
         )
-        return asdict(packet)
+        return {
+            "proof": asdict(packet),
+            "proof_role": "audit-only",
+            "current_head_freshly_witnessed": False,
+        }
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="deployment checkpoint publication not found") from exc
     except DeploymentCheckpointPinRejected as exc:
@@ -178,7 +193,11 @@ async def checkpoint_witness_continuity(
                 previous_publication_sequence=previous_publication_sequence,
             )
         )
-        return asdict(packet)
+        return {
+            "proof": asdict(packet),
+            "proof_role": "deploy-authority-capable",
+            "current_head_freshly_witnessed": True,
+        }
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="deployment checkpoint publication not found") from exc
     except DeploymentCheckpointPinRejected as exc:
@@ -232,6 +251,8 @@ async def checkpoint_witness_verification_package(
         )
         return {
             "package": asdict(package),
+            "proof_role": _proof_role(manifest, proof_kind),
+            "active_policy_requires_external_proof": manifest.required,
             "pin_this_policy_sha256": manifest.manifest_sha256,
             "authority": "out-of-band-policy-digest-required",
         }
