@@ -1,7 +1,12 @@
+import base64
+
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from core.canonical_product_policy import CANONICAL_PRODUCT_POLICY, POLICY_VERSION
 from core.charter_policy import Rule
+from core.deployment_checkpoint_witness import sign_deployment_checkpoint_pin
 from core.product_control_plane import ProductControlPlane
 from core.product_operations import OperationRejected
 
@@ -85,3 +90,50 @@ def test_status_exposes_truth_gated_assurance_root_and_durability(tmp_path):
     assert len(status["assurance"]["attestation_sha256"]) == 64
     assert len(status["system_root"]["root_sha256"]) == 64
     assert status["receipts"]["version"] == 2
+    witness = status["deployments"]["checkpoint_witness"]
+    assert witness["verified"] is True
+    assert witness["cross_process_locking"] is True
+    assert witness["policy"]["required"] is False
+
+
+def _checkpoint_signer():
+    private = Ed25519PrivateKey.generate()
+    private_raw = private.private_bytes(
+        serialization.Encoding.Raw,
+        serialization.PrivateFormat.Raw,
+        serialization.NoEncryption(),
+    )
+    public_raw = private.public_key().public_bytes(
+        serialization.Encoding.Raw,
+        serialization.PublicFormat.Raw,
+    )
+    return base64.b64encode(private_raw).decode(), base64.b64encode(public_raw).decode()
+
+
+def test_external_checkpoint_pin_does_not_mutate_system_root(tmp_path, monkeypatch):
+    private_key, public_key = _checkpoint_signer()
+    monkeypatch.setenv(
+        "DEPLOYMENT_CHECKPOINT_TRUSTED_WITNESSES_JSON",
+        '[{"id":"ops-a","independence_group":"org-a","enabled":true,"public_key_b64":"'
+        + public_key + '"}]',
+    )
+    monkeypatch.setenv("DEPLOYMENT_CHECKPOINT_WITNESS_QUORUM", "1")
+    plane = ProductControlPlane(tmp_path)
+    publication = plane.deployments.checkpoints.latest()
+    assert publication is not None
+    root_before = plane.system_root()["root_sha256"]
+
+    receipt = sign_deployment_checkpoint_pin(
+        publication,
+        private_key_b64=private_key,
+        public_key_b64=public_key,
+        witness_id="ops-a",
+        independence_group="org-a",
+        observed_at=publication.published_at,
+        nonce="control-plane-pin",
+    )
+    plane.deployment_checkpoint_pins.observe(receipt)
+    witness = plane.deployment_checkpoint_pins.status()
+    assert witness["current_quorum"]["reached"] is True
+    assert witness["requirement_satisfied"] is True
+    assert plane.system_root()["root_sha256"] == root_before
