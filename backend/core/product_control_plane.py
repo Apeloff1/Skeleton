@@ -16,7 +16,7 @@ from core.policy_repository import PolicyRepository
 from core.product_default_executors import build_default_executor_registry
 from core.product_executor_registry import ExecutorNotRegistered, ProductExecutorRegistry
 from core.product_kernel import PRODUCT_KERNEL, ProductKernel
-from core.product_operations import AdmittedOperation, ProductOperationCoordinator
+from core.product_operations import AdmittedOperation, OperationExecutionError, ProductOperationCoordinator
 
 
 class ProductControlPlane:
@@ -51,11 +51,9 @@ class ProductControlPlane:
 
     def _policy_projection(self) -> dict[str, Any]:
         snapshot = self.policy.snapshot()
-        return {
-            "policy_version": POLICY_VERSION,
-            "charters": [asdict(charter) for charter in snapshot.charters],
-            "edicts": [asdict(edict) for edict in snapshot.edicts],
-        }
+        return {"policy_version": POLICY_VERSION,
+                "charters": [asdict(charter) for charter in snapshot.charters],
+                "edicts": [asdict(edict) for edict in snapshot.edicts]}
 
     def _audit_projection(self) -> list[dict[str, Any]]:
         return [asdict(entry) for entry in self.operations.audit.entries(limit=50)]
@@ -126,18 +124,39 @@ class ProductControlPlane:
         result = await self.operations.execute_one(seq, executor)
         return result.confirmed
 
-    async def execute_registered_pending(self, registry: ProductExecutorRegistry | None = None,
-                                         *, limit: int | None = None) -> int:
+    async def dispatch_pending(self, registry: ProductExecutorRegistry | None = None,
+                               *, limit: int | None = None) -> dict[str, Any]:
+        active_registry = registry or self.executors
         pending = self.operations.pending_operations()
         if limit is not None:
             if limit < 0:
                 raise ValueError("limit cannot be negative")
             pending = pending[:limit]
-        confirmed = 0
+        report: dict[str, Any] = {
+            "attempted": len(pending), "confirmed": [], "deferred": [], "unbound": [], "failed": []
+        }
         for operation in pending:
-            if await self.execute_registered(operation.outbox_seq, registry):
-                confirmed += 1
-        return confirmed
+            binding = active_registry.resolve(operation.capability_id, operation.action)
+            if binding is None:
+                report["unbound"].append(operation.outbox_seq)
+                continue
+            try:
+                result = await self.operations.execute_one(operation.outbox_seq, binding.executor)
+            except OperationExecutionError as exc:
+                report["failed"].append({"outbox_seq": operation.outbox_seq,
+                                         "operation_id": operation.id,
+                                         "executor": binding.name,
+                                         "error": str(exc)})
+                continue
+            bucket = "confirmed" if result.confirmed else "deferred"
+            report[bucket].append(operation.outbox_seq)
+        report["remaining"] = self.operations.outbox.pending_count
+        return report
+
+    async def execute_registered_pending(self, registry: ProductExecutorRegistry | None = None,
+                                         *, limit: int | None = None) -> int:
+        report = await self.dispatch_pending(registry, limit=limit)
+        return len(report["confirmed"])
 
     def status(self) -> dict[str, Any]:
         governance = self.policy.snapshot()
