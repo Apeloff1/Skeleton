@@ -84,7 +84,7 @@ class ProductControlPlane:
         att = build_root_attestation({
             "policy": self._policy_projection(), "executors": list(self.executors.snapshot()),
             "readiness": self.readiness_report(), "lifecycle": self.execution_ledger(),
-            "audit": {"sequence": operations.get("audit_sequence"), "head": operations.get("audit_head")},
+            "audit": {"sequence": operations.get("audit_sequence"), "head": operations.get("audit_head"), "health": operations.get("audit_health")},
             "outbox": operations.get("outbox_health"), "receipts": self.receipts.stats(),
             "kernel": [{"id": c.id, "pillar": c.pillar.value, "critical": c.critical} for c in self.operations.kernel.all()],
         })
@@ -92,12 +92,10 @@ class ProductControlPlane:
 
     def _safety_projection(self) -> dict[str, Any]:
         assurance = self.assurance_report(); readiness = self.readiness_report()
-        return {
-            "posture": assurance["posture"], "hard_failures": assurance["hard_failures"], "warnings": assurance["warnings"],
+        return {"posture": assurance["posture"], "hard_failures": assurance["hard_failures"], "warnings": assurance["warnings"],
             "native_coverage_pct": assurance["native_coverage_pct"], "readiness_pct": assurance["readiness_pct"],
             "attestation_sha256": assurance["attestation_sha256"], "readiness_attestation_sha256": readiness["attestation_sha256"],
-            "system_root_sha256": self.system_root()["root_sha256"], "invariants": assurance["invariants"],
-        }
+            "system_root_sha256": self.system_root()["root_sha256"], "invariants": assurance["invariants"]}
 
     def ratify(self, domain: str, rules: list[Rule]) -> Charter:
         charter = self.policy.ratify(domain, rules); self.policy_repository.save(self.policy); return charter
@@ -165,12 +163,10 @@ class ProductControlPlane:
         governance = self.policy.snapshot(); ledger = self.execution_ledger(); counts: dict[str, int] = {}; anomalies = 0
         for item in ledger: counts[item["state"]] = counts.get(item["state"], 0) + 1; anomalies += len(item.get("anomalies", ()))
         readiness = self.readiness_report(); assurance = self.assurance_report(); root = self.system_root(); operations = self._operations_projection()
-        return {
-            "policy_version": POLICY_VERSION, "policy_bootstrap_enabled": self.bootstrap_policy,
+        return {"policy_version": POLICY_VERSION, "policy_bootstrap_enabled": self.bootstrap_policy,
             "kernel": {"capabilities": [{"id": c.id, "pillar": c.pillar.value, "critical": c.critical} for c in self.operations.kernel.all()], "critical_ids": list(self.operations.kernel.critical_ids())},
             "governance": {"charters": [asdict(x) for x in governance.charters], "edicts": [asdict(x) for x in governance.edicts]},
             "executors": {"bound": len(self.executors), "bindings": list(self.executors.snapshot()), "coverage": self.executor_coverage()},
             "readiness": readiness, "receipts": self.receipts.stats(),
             "lifecycle": {"operations": len(ledger), "states": counts, "evidence_gaps": counts.get("evidence_gap", 0) + counts.get("receipt_unattested", 0), "anomalies": anomalies},
-            "assurance": assurance, "system_root": root, "safety": self._safety_projection(), "operations": operations,
-        }
+            "assurance": assurance, "system_root": root, "safety": self._safety_projection(), "operations": operations}
