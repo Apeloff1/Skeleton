@@ -5,9 +5,11 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from core.assurance_composition import extend_assurance
 from core.capability_readiness import ReadinessReport, evaluate_readiness
 from core.canonical_product_policy import CANONICAL_PRODUCT_POLICY, POLICY_VERSION
 from core.charter_policy import Charter, CharterPolicy, Edict, Rule
+from core.deployment_checkpoint_assurance import deployment_checkpoint_witness_invariants
 from core.deployment_checkpoint_pin_runtime import DeploymentCheckpointPinRuntime
 from core.deployment_gateway import DeploymentGateway
 from core.epistemic_attestation import epistemic_root_dict
@@ -126,11 +128,16 @@ class ProductControlPlane:
 
     def assurance_report(self) -> dict[str, Any]:
         self._ensure_epistemic_transparency()
-        return asdict(evaluate_assurance(
+        base = evaluate_assurance(
             lifecycle=self.execution_ledger(), operations=self._operations_projection(),
             executor_bindings=self.executors.snapshot(), executor_coverage=self.executor_coverage(),
             receipt_stats=self.receipts.stats(), readiness=self.readiness_report(),
-        ))
+        )
+        extended = extend_assurance(
+            base,
+            deployment_checkpoint_witness_invariants(self.deployment_checkpoint_pins.status()),
+        )
+        return asdict(extended)
 
     def system_root(self) -> dict[str, Any]:
         trust_projection = self._ensure_epistemic_transparency()["trust"]
