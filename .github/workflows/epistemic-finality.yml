@@ -44,7 +44,7 @@ jobs:
         run: python -m pip install "pytest>=8,<9"
       - name: Verify witness diversity finality and trust runtime
         run: >-
-          python -m pytest -q
+          python -m pytest -q --noconftest
           tests/test_transparency_finality.py
           tests/test_epistemic_trust_runtime.py
           tests/test_portable_finality_proof.py
