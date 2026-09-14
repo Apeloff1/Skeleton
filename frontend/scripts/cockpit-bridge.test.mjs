@@ -69,6 +69,12 @@ function makeBrowser({ parentOrigin = 'https://cockpit.example' } = {}) {
   return { window, document, parent, history, listeners, posts, historyMoves };
 }
 
+function receipts(browser) {
+  return browser.posts
+    .map(({ message }) => message)
+    .filter((message) => message.type === 'command-result');
+}
+
 test('cockpit path validation rejects cross-origin and protocol-relative paths', () => {
   assert.equal(isSafeCockpitPath('/galaxy?mode=preview#scene'), true);
   assert.equal(isSafeCockpitPath('/gate/[stage]'), true);
@@ -108,7 +114,7 @@ test('external cockpit parent fails closed when it is not allowlisted', () => {
   }
 });
 
-test('trusted cockpit parent receives readiness and can issue bounded commands', async () => {
+test('trusted cockpit parent receives readiness, bounded commands, and execution receipts', async () => {
   const browser = makeBrowser();
   const restoreWindow = withGlobal('window', browser.window);
   const restoreDocument = withGlobal('document', browser.document);
@@ -140,10 +146,12 @@ test('trusted cockpit parent receives readiness and can issue bounded commands',
         channel: COCKPIT_BRIDGE_CHANNEL,
         version: COCKPIT_BRIDGE_VERSION,
         type: 'navigate',
+        requestId: 'attacker-1',
         path: '/galaxy',
       },
     });
     assert.deepEqual(navigations, []);
+    assert.deepEqual(receipts(browser), []);
 
     onMessage({
       source: browser.parent,
@@ -152,10 +160,20 @@ test('trusted cockpit parent receives readiness and can issue bounded commands',
         channel: COCKPIT_BRIDGE_CHANNEL,
         version: COCKPIT_BRIDGE_VERSION,
         type: 'navigate',
+        requestId: 'nav-bad',
         path: 'https://attacker.example/',
       },
     });
     assert.deepEqual(navigations, []);
+    assert.deepEqual(receipts(browser).at(-1), {
+      channel: COCKPIT_BRIDGE_CHANNEL,
+      version: COCKPIT_BRIDGE_VERSION,
+      type: 'command-result',
+      requestId: 'nav-bad',
+      command: 'navigate',
+      status: 'rejected',
+      reason: 'invalid_path',
+    });
 
     onMessage({
       source: browser.parent,
@@ -164,11 +182,20 @@ test('trusted cockpit parent receives readiness and can issue bounded commands',
         channel: COCKPIT_BRIDGE_CHANNEL,
         version: COCKPIT_BRIDGE_VERSION,
         type: 'navigate',
+        requestId: 'nav-1',
         path: '/galaxy?project=alpha',
       },
     });
     await Promise.resolve();
     assert.deepEqual(navigations, ['/galaxy?project=alpha']);
+    assert.deepEqual(receipts(browser).at(-1), {
+      channel: COCKPIT_BRIDGE_CHANNEL,
+      version: COCKPIT_BRIDGE_VERSION,
+      type: 'command-result',
+      requestId: 'nav-1',
+      command: 'navigate',
+      status: 'accepted',
+    });
 
     onMessage({
       source: browser.parent,
@@ -177,10 +204,20 @@ test('trusted cockpit parent receives readiness and can issue bounded commands',
         channel: COCKPIT_BRIDGE_CHANNEL,
         version: COCKPIT_BRIDGE_VERSION,
         type: 'history',
+        requestId: 'history-back',
         delta: -1,
       },
     });
     assert.deepEqual(browser.historyMoves, [], 'history root must not escape preview');
+    assert.deepEqual(receipts(browser).at(-1), {
+      channel: COCKPIT_BRIDGE_CHANNEL,
+      version: COCKPIT_BRIDGE_VERSION,
+      type: 'command-result',
+      requestId: 'history-back',
+      command: 'history',
+      status: 'rejected',
+      reason: 'history_floor',
+    });
 
     onMessage({
       source: browser.parent,
@@ -189,10 +226,19 @@ test('trusted cockpit parent receives readiness and can issue bounded commands',
         channel: COCKPIT_BRIDGE_CHANNEL,
         version: COCKPIT_BRIDGE_VERSION,
         type: 'history',
+        requestId: 'history-forward',
         delta: 1,
       },
     });
     assert.deepEqual(browser.historyMoves, [1]);
+    assert.deepEqual(receipts(browser).at(-1), {
+      channel: COCKPIT_BRIDGE_CHANNEL,
+      version: COCKPIT_BRIDGE_VERSION,
+      type: 'command-result',
+      requestId: 'history-forward',
+      command: 'history',
+      status: 'accepted',
+    });
 
     dispose();
     assert.equal(browser.listeners.size, 0);
