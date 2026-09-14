@@ -24,6 +24,7 @@ on:
       - "backend/tests/test_truth_verifier_scientific.py"
       - "backend/tests/test_verified_curiosity.py"
       - "backend/tests/test_truth_lifecycle.py"
+      - "backend/tests/test_truth_independence_dependencies_watch.py"
       - "backend/tests/test_curiosity_engine.py"
       - "backend/tests/test_idle_curiosity_runtime.py"
       - "backend/tests/test_progression.py"
@@ -68,6 +69,7 @@ on:
       - "backend/tests/test_truth_verifier_scientific.py"
       - "backend/tests/test_verified_curiosity.py"
       - "backend/tests/test_truth_lifecycle.py"
+      - "backend/tests/test_truth_independence_dependencies_watch.py"
       - "backend/tests/test_curiosity_engine.py"
       - "backend/tests/test_idle_curiosity_runtime.py"
       - "backend/tests/test_progression.py"
@@ -127,6 +129,7 @@ jobs:
           tests/test_truth_verifier_scientific.py
           tests/test_verified_curiosity.py
           tests/test_truth_lifecycle.py
+          tests/test_truth_independence_dependencies_watch.py
           tests/test_curiosity_engine.py
           tests/test_idle_curiosity_runtime.py
           tests/test_progression.py
