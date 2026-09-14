@@ -22,17 +22,14 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 from core.client_ip import resolve_client_ip
+from core.security_config import env_float, env_int
 
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]+")
 
 
 def _env_int(name: str, default: int, *, minimum: int, maximum: int) -> int:
-    raw = os.environ.get(name, str(default)).strip()
-    try:
-        value = int(raw)
-    except ValueError:
-        value = default
-    return max(minimum, min(maximum, value))
+    """Compatibility wrapper around fail-closed security configuration parsing."""
+    return env_int(name, default, minimum=minimum, maximum=maximum)
 
 
 def _bounded_int(value: object, default: int, *, minimum: int, maximum: int) -> int:
@@ -44,14 +41,8 @@ def _bounded_int(value: object, default: int, *, minimum: int, maximum: int) -> 
 
 
 def _env_float(name: str, default: float, *, minimum: float, maximum: float) -> float:
-    raw = os.environ.get(name, str(default)).strip()
-    try:
-        value = float(raw)
-    except ValueError:
-        value = default
-    if not math.isfinite(value):
-        value = default
-    return max(minimum, min(maximum, value))
+    """Compatibility wrapper around fail-closed security configuration parsing."""
+    return env_float(name, default, minimum=minimum, maximum=maximum)
 
 
 def _bounded_float(value: object, default: float, *, minimum: float, maximum: float) -> float:
