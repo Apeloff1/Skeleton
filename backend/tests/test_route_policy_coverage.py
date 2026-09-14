@@ -76,8 +76,9 @@ def test_incomplete_report_fails_closed_with_bounded_route_sample():
     message = str(caught.value)
     assert "12/13 unwritten" in message
     assert "/unwritten/0" in message
-    assert "/unwritten/7" in message
-    assert "/unwritten/8" not in message
+    assert "/unwritten/10" in message
+    assert "/unwritten/5" in message
+    assert "/unwritten/6" not in message
     assert message.endswith(", ...")
 
 
