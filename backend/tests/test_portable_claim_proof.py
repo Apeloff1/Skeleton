@@ -6,6 +6,7 @@ import pytest
 
 from core.epistemic_checkpoint import EpistemicCheckpointIntegrityError, EpistemicCheckpointLedger
 from core.epistemic_claim_index import EpistemicClaimIndex
+from core.epistemic_transparency import EpistemicTransparency
 from core.portable_claim_proof import build_portable_claim_proof, verify_portable_claim_proof
 from core.sparse_merkle import build_sparse_proof, sparse_merkle_root, verify_sparse_proof
 from core.verified_curiosity import VerifiedCuriosityEngine
@@ -80,6 +81,7 @@ def test_portable_proof_requires_external_root_for_independent_trust(tmp_path):
     )
     assert packet.authority_proof["present"] is True
     assert packet.checkpoint is not None
+    assert packet.transparency_anchor is None
     assert verify_portable_claim_proof(packet, now=issued + timedelta(minutes=1)) is True
     assert verify_portable_claim_proof(
         packet, now=issued + timedelta(minutes=1),
@@ -91,6 +93,31 @@ def test_portable_proof_requires_external_root_for_independent_trust(tmp_path):
     ) is False
     assert verify_portable_claim_proof(
         packet, now=issued + timedelta(minutes=1), expected_checkpoint_sha256="f" * 64,
+    ) is False
+    assert verify_portable_claim_proof(packet, now=issued + timedelta(minutes=1), require_transparency=True) is False
+
+
+def test_portable_proof_can_be_pinned_to_transparency_log_root(tmp_path):
+    engine = VerifiedCuriosityEngine(tmp_path / "engine")
+    claim = "Protocol T decreases measured tail latency by 17 percent."
+    _promote(engine, claim)
+    transparency = EpistemicTransparency(tmp_path / "transparency")
+    issued = datetime(2026, 9, 14, 16, 10, tzinfo=UTC)
+    packet = build_portable_claim_proof(
+        engine, claim, transparency=transparency,
+        generated_at=issued.isoformat(), max_age_seconds=900,
+    )
+    assert packet.checkpoint is not None
+    assert packet.transparency_anchor is not None
+    descriptor = packet.transparency_anchor["descriptor"]
+    assert descriptor["tree_size"] == 1
+    assert verify_portable_claim_proof(
+        packet, now=issued + timedelta(minutes=1),
+        expected_transparency_root=descriptor["root_sha256"], require_transparency=True,
+    ) is True
+    wrong_root = "0" * 64 if descriptor["root_sha256"] != "0" * 64 else "f" * 64
+    assert verify_portable_claim_proof(
+        packet, now=issued + timedelta(minutes=1), expected_transparency_root=wrong_root,
     ) is False
 
 
