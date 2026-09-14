@@ -2,7 +2,7 @@
 
 Owns durable policy persistence, admission, native executor bindings, compact
 execution receipts and content-addressed result payloads as one service boundary.
-Lifecycle is derived from durable evidence rather than mutable status flags.
+Lifecycle and assurance are derived from durable evidence, never mutable flags.
 """
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from core.product_default_executors import build_default_executor_registry
 from core.product_executor_registry import ExecutorNotRegistered, ProductExecutorRegistry
 from core.product_kernel import PRODUCT_KERNEL, ProductKernel
 from core.product_operations import AdmittedOperation, OperationExecutionError, ProductOperationCoordinator
+from core.system_assurance import evaluate_assurance
 
 
 class ProductControlPlane:
@@ -61,43 +62,25 @@ class ProductControlPlane:
     def _audit_projection(self) -> list[dict[str, Any]]:
         return [asdict(entry) for entry in self.operations.audit.entries(limit=50)]
 
+    def assurance_report(self) -> dict[str, Any]:
+        report = evaluate_assurance(
+            lifecycle=self.execution_ledger(),
+            operations=self.operations.snapshot(),
+            executor_bindings=self.executors.snapshot(),
+            executor_coverage=self.executor_coverage(),
+            receipt_stats=self.receipts.stats(),
+        )
+        return asdict(report)
+
     def _safety_projection(self) -> dict[str, Any]:
-        ledger = self.execution_ledger()
-        anomaly_count = sum(len(item.get("anomalies", ())) for item in ledger)
-        evidence_gaps = sum(item.get("state") in {"evidence_gap", "receipt_unattested"} for item in ledger)
-        low_confidence = sum(item.get("confidence") == "low" for item in ledger)
-        op = self.operations.snapshot()
-        coverage = self.executor_coverage()
-        audit_head = op.get("audit_head")
-        posture = "healthy"
-        reasons: list[str] = []
-        if evidence_gaps:
-            posture = "degraded"
-            reasons.append(f"{evidence_gaps} lifecycle evidence gap(s)")
-        if anomaly_count:
-            posture = "degraded"
-            reasons.append(f"{anomaly_count} lifecycle anomaly signal(s)")
-        if op.get("outbox_capacity_remaining", 0) <= 0:
-            posture = "blocked"
-            reasons.append("operation outbox has no remaining capacity")
-        elif op.get("outbox_capacity_remaining", 0) < 32:
-            posture = "degraded" if posture == "healthy" else posture
-            reasons.append("operation outbox capacity is low")
+        assurance = self.assurance_report()
         return {
-            "posture": posture,
-            "reasons": reasons,
-            "policy_version": POLICY_VERSION,
-            "audit_sequence": op.get("audit_sequence", 0),
-            "audit_head": audit_head,
-            "native_coverage_pct": coverage["coverage_pct"],
-            "native_bound_actions": coverage["bound_actions"],
-            "canonical_actions": coverage["canonical_actions"],
-            "pending_operations": op.get("pending_operations", 0),
-            "outbox_capacity_remaining": op.get("outbox_capacity_remaining", 0),
-            "lifecycle_operations": len(ledger),
-            "lifecycle_anomalies": anomaly_count,
-            "evidence_gaps": evidence_gaps,
-            "low_confidence_lifecycles": low_confidence,
+            "posture": assurance["posture"],
+            "hard_failures": assurance["hard_failures"],
+            "warnings": assurance["warnings"],
+            "native_coverage_pct": assurance["native_coverage_pct"],
+            "attestation_sha256": assurance["attestation_sha256"],
+            "invariants": assurance["invariants"],
         }
 
     def ratify(self, domain: str, rules: list[Rule]) -> Charter:
@@ -240,6 +223,7 @@ class ProductControlPlane:
         for item in ledger:
             lifecycle_counts[item["state"]] = lifecycle_counts.get(item["state"], 0) + 1
             anomaly_count += len(item.get("anomalies", ()))
+        assurance = self.assurance_report()
         return {"policy_version": POLICY_VERSION, "policy_bootstrap_enabled": self.bootstrap_policy,
                 "kernel": {"capabilities": [{"id": capability.id, "pillar": capability.pillar.value,
                                                "critical": capability.critical}
@@ -253,5 +237,6 @@ class ProductControlPlane:
                 "lifecycle": {"operations": len(ledger), "states": lifecycle_counts,
                               "evidence_gaps": lifecycle_counts.get("evidence_gap", 0) + lifecycle_counts.get("receipt_unattested", 0),
                               "anomalies": anomaly_count},
+                "assurance": assurance,
                 "safety": self._safety_projection(),
                 "operations": self.operations.snapshot()}
