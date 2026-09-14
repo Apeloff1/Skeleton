@@ -24,6 +24,7 @@ import theme from '../theme/tokens';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import ScreenGuard from '../components/withScreenGuard';
 import OfflineBanner from '../components/OfflineBanner';
+import WorkspaceDock from '../components/WorkspaceDock';
 import { ToastHost } from '../components/Toast';
 import { ActionSheetHost } from '../components/ActionSheet';
 import { traceStep, traceStepSync, installCrashTrace } from '../utils/bootTracer';
@@ -38,9 +39,6 @@ import { startTunnelHeartbeat } from '../src/utils/tunnelHeartbeat';
 import { initSkin, useActiveSkin } from '../src/utils/skinStore';
 import DevLogOverlay from '../components/DevLogOverlay';
 
-// Module-eval marker — proves the root layout module was reached on the JS
-// thread (fires before React even renders). Install the durable crash trap
-// here, the earliest reliable point in app startup.
 installCrashTrace();
 installMemoryGuard();
 traceStepSync('layout_module_eval');
@@ -51,17 +49,11 @@ export default function RootLayout() {
   traceStepSync('layout_render');
 
   useEffect(() => {
-    // Silence a deprecation warning emitted by a 3rd-party RN/Expo internal shim
-    // (props.pointerEvents). All in-app code already uses style.pointerEvents.
     LogBox.ignoreLogs(['props.pointerEvents is deprecated. Use style.pointerEvents']);
     installGlobalGuards();
     installAppStateGuard();
-    // Stability hardening — JS error catcher + tunnel heartbeat.
     installGlobalErrorHandlers();
     startTunnelHeartbeat();
-    // Hydrate the feature-flag mirror from AsyncStorage before any screen
-    // reads via useFeatureFlag(). Non-blocking — defaults serve as a
-    // fallback for the first ~50ms while AsyncStorage resolves.
     loadFeatureFlags().catch(() => {});
     initSkin().catch(() => {});
     traceStep('layout_mounted').catch(() => {});
@@ -82,14 +74,11 @@ export default function RootLayout() {
               <Slot />
             </ScreenGuard>
           </ErrorBoundary>
-          {/* Unified offline/degraded/down banner (replaces NetworkBanner
-              when active — both can coexist safely). */}
           <StabilityBanner />
           <OfflineBanner />
+          <WorkspaceDock />
           <ToastHost />
           <ActionSheetHost />
-          {/* Always-on visual boot/diagnostics log — overlays EVERY page so
-              the live trace is visible on-device without a cable. */}
           <DevLogOverlay />
         </View>
       </FeatureFlagProvider>
