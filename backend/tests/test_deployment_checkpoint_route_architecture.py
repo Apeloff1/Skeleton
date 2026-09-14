@@ -33,6 +33,7 @@ def test_witness_route_keeps_read_signing_target_and_external_receipt_ingestion(
         '@router.post("/receipts")',
         '@router.get("/status")',
         '@router.get("/diagnostics")',
+        '@router.get("/policy")',
         '@router.get("/bundle")',
         '@router.get("/trust-advance")',
         '@router.get("/continuity")',
@@ -40,6 +41,7 @@ def test_witness_route_keeps_read_signing_target_and_external_receipt_ingestion(
         assert contract in source
     assert "private_key" not in source
     assert "sign_deployment_checkpoint_pin" not in source
+    assert '"authority": "out-of-band-digest-required"' in source
 
 
 def test_witness_route_remains_registered_for_server_boot():
