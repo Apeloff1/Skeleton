@@ -1,0 +1,60 @@
+name: Deployment Trust
+
+on:
+  push:
+    paths:
+      - "backend/core/transparency_witness.py"
+      - "backend/core/transparency_witness_config.py"
+      - "backend/core/transparency_finality.py"
+      - "backend/core/epistemic_trust_runtime.py"
+      - "backend/core/deployment_preflight.py"
+      - "backend/core/control_plane_deployment.py"
+      - "backend/core/portable_claim_proof.py"
+      - "backend/routes/ops.py"
+      - "backend/tests/test_witness_freshness_migration.py"
+      - "backend/tests/test_deployment_preflight.py"
+      - "backend/tests/test_control_plane_deployment.py"
+      - "backend/tests/test_epistemic_trust_runtime.py"
+      - "backend/tests/test_portable_finality_proof.py"
+      - ".github/workflows/deployment-trust.yml"
+  pull_request:
+    paths:
+      - "backend/core/transparency_witness.py"
+      - "backend/core/transparency_witness_config.py"
+      - "backend/core/transparency_finality.py"
+      - "backend/core/epistemic_trust_runtime.py"
+      - "backend/core/deployment_preflight.py"
+      - "backend/core/control_plane_deployment.py"
+      - "backend/core/portable_claim_proof.py"
+      - "backend/routes/ops.py"
+      - "backend/tests/test_witness_freshness_migration.py"
+      - "backend/tests/test_deployment_preflight.py"
+      - "backend/tests/test_control_plane_deployment.py"
+      - "backend/tests/test_epistemic_trust_runtime.py"
+      - "backend/tests/test_portable_finality_proof.py"
+      - ".github/workflows/deployment-trust.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  deployment-trust:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install focused dependencies
+        run: python -m pip install "pytest>=8,<9"
+      - name: Verify freshness, finality and stable-root deployment decisions
+        run: >-
+          python -m pytest -q
+          tests/test_witness_freshness_migration.py
+          tests/test_deployment_preflight.py
+          tests/test_control_plane_deployment.py
+          tests/test_epistemic_trust_runtime.py
+          tests/test_portable_finality_proof.py
