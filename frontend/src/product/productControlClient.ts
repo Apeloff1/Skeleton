@@ -9,6 +9,9 @@ export type ExecutorBinding = {
   replay_safe: boolean;
 };
 
+export type ContentStoreStats = { chunks: number; bytes: number; manifests: number };
+export type ReceiptVaultStats = { receipts: number; results: ContentStoreStats; version: number };
+
 export type ControlPlaneStatus = {
   policy_version: number;
   policy_bootstrap_enabled: boolean;
@@ -19,7 +22,7 @@ export type ControlPlaneStatus = {
     bindings: ExecutorBinding[];
     coverage: { canonical_actions: number; bound_actions: number; coverage_pct: number; missing: Array<{ capability_id: string; action: string }> };
   };
-  receipts: { count: number };
+  receipts: ReceiptVaultStats;
   operations: { capabilities: number; pending_operations: number; outbox_capacity_remaining: number; idempotency_records: number; audit_sequence: number; audit_head: string | null };
 };
 
@@ -29,7 +32,12 @@ export type PendingOperation = {
 };
 export type PendingOperationResponse = { count: number; operations: PendingOperation[] };
 export type AuditEntry = { seq: number; ts: string; kind: string; seal: string; principal: string; route: string; detail: string; prev_hash: string; hash: string };
-export type ExecutionReceipt = { operation_id: string; capability_id: string; action: string; executor: string; completed_at: string; result: Record<string, unknown> };
+export type ExecutionReceipt = {
+  operation_id: string; capability_id: string; action: string; executor: string; executor_version: number;
+  effect_class: 'query' | 'state' | 'external'; replay_safe: boolean; input_artifact_manifest_id: string;
+  completed_at: string; result_artifact_id: string; result_sha256: string; result_summary: Record<string, unknown>;
+  legacy_inline_result: Record<string, unknown> | null;
+};
 export type OperationAdmission = { operation_id: string; capability_id: string; pillar: string; outbox_seq: number; admitted_at: string; audit_hash: string };
 export type AdmitOperationInput = { capability_id: string; domain: string; action: string; principal: string; actor_weight: number; payload: Record<string, unknown>; quorum_approved?: boolean; idempotency_key?: string };
 
@@ -52,6 +60,9 @@ export function getProductAuditHistory(token = '', limit = 50, signal?: AbortSig
 }
 export function getExecutionReceipts(token = '', limit = 50, signal?: AbortSignal): Promise<ApiResult<{ receipts: ExecutionReceipt[] }>> {
   return api.get<{ receipts: ExecutionReceipt[] }>(`${ROOT}/receipts${tokenQueryWith(token, { limit })}`, { signal, cacheKey: `product-control-receipts-${limit}`, cacheTtlMs: 2_000 });
+}
+export function getExecutionResult(operationId: string, token = '', signal?: AbortSignal): Promise<ApiResult<Record<string, unknown>>> {
+  return api.get<Record<string, unknown>>(`${ROOT}/receipt/${encodeURIComponent(operationId)}/result${tokenQuery(token)}`, { signal, cacheKey: `product-control-result-${operationId}`, cacheTtlMs: 30_000 });
 }
 export function executeProductOperation(seq: number, token = '', signal?: AbortSignal): Promise<ApiResult<{ outbox_seq: number; confirmed: boolean; status: string }>> {
   return api.post(`${ROOT}/execute/${seq}${tokenQuery(token)}`, {}, { signal, retries: 0 });
