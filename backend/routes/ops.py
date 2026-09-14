@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from core.charter_policy import Rule
+from core.control_plane_deployment import control_plane_preflight_dict
 from core.databases import client as _SHARED_MONGO_CLIENT
 from core.durable_outbox import OutboxFullError
 from core.execution_receipts import ReceiptIntegrityError
@@ -131,6 +132,12 @@ async def product_control_status(token: str = Query("")):
 async def product_control_assurance(token: str = Query("")):
     _require_ops(token)
     return _control_plane().assurance_report()
+
+
+@router.get("/product-control/deployment-preflight")
+async def product_control_deployment_preflight(max_attempts: int = Query(3, ge=1, le=10), token: str = Query("")):
+    _require_ops(token)
+    return control_plane_preflight_dict(_control_plane(), max_attempts=max_attempts)
 
 
 @router.get("/product-control/pending")
