@@ -25,6 +25,10 @@ on:
       - "backend/tests/test_verified_curiosity.py"
       - "backend/tests/test_truth_lifecycle.py"
       - "backend/tests/test_truth_independence_dependencies_watch.py"
+      - "backend/tests/test_claim_identity_citation_calibration.py"
+      - "backend/tests/test_provenance_resolution_calibration.py"
+      - "backend/tests/test_citation_gate_adversarial.py"
+      - "backend/tests/test_truth_assurance_invariants.py"
       - "backend/tests/test_curiosity_engine.py"
       - "backend/tests/test_idle_curiosity_runtime.py"
       - "backend/tests/test_progression.py"
@@ -70,6 +74,10 @@ on:
       - "backend/tests/test_verified_curiosity.py"
       - "backend/tests/test_truth_lifecycle.py"
       - "backend/tests/test_truth_independence_dependencies_watch.py"
+      - "backend/tests/test_claim_identity_citation_calibration.py"
+      - "backend/tests/test_provenance_resolution_calibration.py"
+      - "backend/tests/test_citation_gate_adversarial.py"
+      - "backend/tests/test_truth_assurance_invariants.py"
       - "backend/tests/test_curiosity_engine.py"
       - "backend/tests/test_idle_curiosity_runtime.py"
       - "backend/tests/test_progression.py"
@@ -130,6 +138,10 @@ jobs:
           tests/test_verified_curiosity.py
           tests/test_truth_lifecycle.py
           tests/test_truth_independence_dependencies_watch.py
+          tests/test_claim_identity_citation_calibration.py
+          tests/test_provenance_resolution_calibration.py
+          tests/test_citation_gate_adversarial.py
+          tests/test_truth_assurance_invariants.py
           tests/test_curiosity_engine.py
           tests/test_idle_curiosity_runtime.py
           tests/test_progression.py
