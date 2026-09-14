@@ -32,9 +32,10 @@ def test_control_plane_root_changes_when_durable_evidence_changes(tmp_path):
     assert before_map["policy"] == after_map["policy"]
     assert before_map["lifecycle"] != after_map["lifecycle"]
     assert before_map["audit"] != after_map["audit"]
+    assert before_map["outbox"] != after_map["outbox"]
 
 
 def test_system_root_includes_all_critical_evidence_domains(tmp_path):
     root = ProductControlPlane(tmp_path).system_root()
     names = {item["name"] for item in root["components"]}
-    assert names == {"policy", "executors", "readiness", "lifecycle", "audit", "receipts", "kernel"}
+    assert names == {"policy", "executors", "readiness", "lifecycle", "audit", "outbox", "receipts", "kernel"}
