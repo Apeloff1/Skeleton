@@ -164,6 +164,14 @@ class EvidenceRegistry:
             if include_retracted or not record.retracted: out.append(record)
         return tuple(out)
 
+    def snapshot(self, *, include_retracted: bool = True) -> tuple[EvidenceRecord, ...]:
+        """Return a detached, deterministic registry snapshot for migration/audit."""
+        with self._lease.acquire(): records = self._load()
+        rows = [self._restore(raw) for raw in records.values()]
+        if not include_retracted:
+            rows = [row for row in rows if not row.retracted]
+        return tuple(sorted(rows, key=lambda row: (row.claim.casefold(), row.item.source_id, row.id)))
+
     def all_claims(self, *, include_only_active: bool = False) -> tuple[str, ...]:
         with self._lease.acquire(): records = self._load()
         claims = {
