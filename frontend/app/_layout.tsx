@@ -17,7 +17,7 @@
  */
 import { useEffect } from 'react';
 import { View, StyleSheet, LogBox } from 'react-native';
-import { Slot, usePathname } from 'expo-router';
+import { Slot, usePathname, useRouter, type Href } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import theme from '../theme/tokens';
@@ -32,8 +32,13 @@ import { installMemoryGuard } from '../utils/memoryGuard';
 import { installGlobalGuards } from '../utils/globalGuards';
 import { installAppStateGuard } from '../utils/safeTimers';
 import { loadFeatureFlags } from '../utils/featureFlags';
+import { ROUTE_REGISTRY } from '../utils/routeRegistry';
 import { FeatureFlagProvider } from '../src/feature-flags';
 import { StabilityBanner } from '../src/components/StabilityBanner';
+import {
+  getConfiguredCockpitOrigins,
+  installCockpitPreviewBridge,
+} from '../src/cockpit/previewBridge';
 import { installGlobalErrorHandlers } from '../src/utils/globalErrors';
 import { startTunnelHeartbeat } from '../src/utils/tunnelHeartbeat';
 import { initSkin, useActiveSkin } from '../src/utils/skinStore';
@@ -45,6 +50,7 @@ traceStepSync('layout_module_eval');
 
 export default function RootLayout() {
   const pathname = usePathname();
+  const router = useRouter();
   const { version: skinVersion } = useActiveSkin();
   traceStepSync('layout_render');
 
@@ -58,6 +64,15 @@ export default function RootLayout() {
     initSkin().catch(() => {});
     traceStep('layout_mounted').catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const dispose = installCockpitPreviewBridge({
+      allowedParentOrigins: getConfiguredCockpitOrigins(),
+      getRoutePaths: () => ROUTE_REGISTRY.map((entry) => entry.path),
+      navigate: (path) => router.push(path as Href),
+    });
+    return dispose;
+  }, [router]);
 
   useEffect(() => {
     try { (globalThis as any).__lastPathname = pathname || '/'; } catch {}
