@@ -16,10 +16,12 @@ export const ROUTE_REGISTRY: ReadonlyArray<RouteEntry> = [
   { path: '/welcome', title: 'Welcome / Starfall', category: 'core' },
   { path: '/hub', title: 'Ultimate Hub', category: 'core', heavy: true },
   { path: '/menu', title: 'Menu', category: 'core' },
+  { path: '/workspaces', title: 'Unified Workspaces', category: 'core' },
   { path: '/safe-mode', title: 'Safe Mode', category: 'system' },
   { path: '/audit-routes', title: 'Audit Routes', category: 'system' },
   { path: '/perf', title: 'Performance', category: 'system' },
   { path: '/telemetry', title: 'Telemetry', category: 'system' },
+  { path: '/migration-map', title: 'Legacy Migration Map', category: 'system' },
 
   { path: '/my-classes', title: 'My Classes', category: 'learn' },
   { path: '/class-week', title: 'Class Week', category: 'learn' },
@@ -78,6 +80,8 @@ export const ROUTE_REGISTRY: ReadonlyArray<RouteEntry> = [
 
   { path: '/jeeves', title: 'Jeeves', category: 'ai' },
   { path: '/jeeves-hub', title: 'Jeeves Hub', category: 'ai' },
+  { path: '/jeeves-control', title: 'Jeeves Operator', category: 'ai' },
+  { path: '/market-intelligence', title: 'Market Intelligence', category: 'ai' },
   { path: '/jeeves-eq', title: 'Jeeves EQ', category: 'ai' },
   { path: '/jeeves-level', title: 'Jeeves Level', category: 'ai' },
   { path: '/jeeves-audio-test', title: 'Jeeves Audio', category: 'ai' },
@@ -95,6 +99,7 @@ export const ROUTE_REGISTRY: ReadonlyArray<RouteEntry> = [
   { path: '/advanced', title: 'Advanced Features', category: 'tools' },
   { path: '/offline-sync', title: 'Offline Sync', category: 'tools' },
   { path: '/thermal', title: 'Thermal Monitor', category: 'tools' },
+  { path: '/workforce', title: 'Work OS', category: 'tools' },
 
   { path: '/dashboard', title: 'Dashboard', category: 'progress' },
   { path: '/profile', title: 'Profile', category: 'progress' },
@@ -103,6 +108,7 @@ export const ROUTE_REGISTRY: ReadonlyArray<RouteEntry> = [
   { path: '/gamification', title: 'Gamification', category: 'progress' },
   { path: '/leaderboard', title: 'Leaderboard', category: 'progress' },
   { path: '/certificate', title: 'Certificate', category: 'progress' },
+  { path: '/wealth', title: 'Wealth & Progress', category: 'progress' },
 
   { path: '/settings', title: 'All Settings', category: 'settings' },
   { path: '/settings/academy', title: 'Academy Settings', category: 'settings' },
