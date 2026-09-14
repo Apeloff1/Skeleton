@@ -176,6 +176,16 @@ async def curiosity_knowledge(q: str = Query(min_length=1, max_length=1000), lim
 async def curiosity_verification_status(): return curiosity_service().engine.verification_status()
 
 
+@router.get("/curiosity/epistemic-root")
+async def curiosity_epistemic_root():
+    return curiosity_service().epistemic_root()
+
+
+@router.get("/curiosity/proof")
+async def curiosity_claim_proof(claim: str = Query(min_length=1, max_length=10000)):
+    return curiosity_service().claim_proof(claim)
+
+
 @router.get("/curiosity/truth")
 async def curiosity_truth_state(claim: str = Query(min_length=1, max_length=10000)):
     engine = curiosity_service().engine; state = engine.truth_ledger.get(claim)
