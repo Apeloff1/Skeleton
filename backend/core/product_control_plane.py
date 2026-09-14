@@ -1,15 +1,11 @@
-"""Restart-safe control plane for canonical product operations.
-
-Owns durable policy persistence, admission, native executor bindings, compact
-execution receipts and content-addressed result payloads as one service boundary.
-Lifecycle and assurance are derived from durable evidence, never mutable flags.
-"""
+"""Restart-safe, evidence-derived control plane for canonical product operations."""
 from __future__ import annotations
 
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from core.capability_readiness import ReadinessReport, evaluate_readiness
 from core.canonical_product_policy import CANONICAL_PRODUCT_POLICY, POLICY_VERSION
 from core.charter_policy import Charter, CharterPolicy, Edict, Rule
 from core.execution_evidence import derive_ledger, derive_lifecycle
@@ -33,8 +29,9 @@ class ProductControlPlane:
         self.bootstrap_policy = bootstrap_policy
         if bootstrap_policy and not self.policy.snapshot().charters:
             self._bootstrap_canonical_policy()
-        self.operations = ProductOperationCoordinator(self.root / "operations", kernel=kernel,
-                                                      policy=self.policy, outbox_cap=outbox_cap)
+        self.operations = ProductOperationCoordinator(
+            self.root / "operations", kernel=kernel, policy=self.policy, outbox_cap=outbox_cap,
+        )
         self.receipts = ExecutionReceiptStore(self.root / "receipts")
         if bind_native_executors:
             self.executors, self.native_executors = build_default_executor_registry(
@@ -55,12 +52,45 @@ class ProductControlPlane:
 
     def _policy_projection(self) -> dict[str, Any]:
         snapshot = self.policy.snapshot()
-        return {"policy_version": POLICY_VERSION,
-                "charters": [asdict(charter) for charter in snapshot.charters],
-                "edicts": [asdict(edict) for edict in snapshot.edicts]}
+        return {
+            "policy_version": POLICY_VERSION,
+            "charters": [asdict(charter) for charter in snapshot.charters],
+            "edicts": [asdict(edict) for edict in snapshot.edicts],
+        }
 
     def _audit_projection(self) -> list[dict[str, Any]]:
         return [asdict(entry) for entry in self.operations.audit.entries(limit=50)]
+
+    def _readiness_model(self) -> ReadinessReport:
+        policy = self.policy.snapshot()
+        return evaluate_readiness(
+            canonical_policy=CANONICAL_PRODUCT_POLICY,
+            policy_domains=[
+                {"domain": charter.domain, "rules": [asdict(rule) for rule in charter.rules]}
+                for charter in policy.charters
+            ],
+            executor_bindings=self.executors.snapshot(),
+            receipt_stats=self.receipts.stats(),
+        )
+
+    def readiness_report(self) -> dict[str, Any]:
+        return asdict(self._readiness_model())
+
+    def executor_coverage(self) -> dict[str, Any]:
+        canonical = [(domain.domain, action) for domain in CANONICAL_PRODUCT_POLICY for action in domain.actions]
+        bound = {(item["capability_id"], item["action"]) for item in self.executors.snapshot()}
+        covered = [(domain, action) for domain, action in canonical if (domain, action) in bound]
+        missing = [
+            {"capability_id": domain, "action": action}
+            for domain, action in canonical if (domain, action) not in bound
+        ]
+        total = len(canonical)
+        return {
+            "canonical_actions": total,
+            "bound_actions": len(covered),
+            "coverage_pct": round((len(covered) / total) * 100, 1) if total else 100.0,
+            "missing": missing,
+        }
 
     def assurance_report(self) -> dict[str, Any]:
         report = evaluate_assurance(
@@ -69,17 +99,21 @@ class ProductControlPlane:
             executor_bindings=self.executors.snapshot(),
             executor_coverage=self.executor_coverage(),
             receipt_stats=self.receipts.stats(),
+            readiness=self.readiness_report(),
         )
         return asdict(report)
 
     def _safety_projection(self) -> dict[str, Any]:
         assurance = self.assurance_report()
+        readiness = self.readiness_report()
         return {
             "posture": assurance["posture"],
             "hard_failures": assurance["hard_failures"],
             "warnings": assurance["warnings"],
             "native_coverage_pct": assurance["native_coverage_pct"],
+            "readiness_pct": assurance["readiness_pct"],
             "attestation_sha256": assurance["attestation_sha256"],
+            "readiness_attestation_sha256": readiness["attestation_sha256"],
             "invariants": assurance["invariants"],
         }
 
@@ -104,12 +138,21 @@ class ProductControlPlane:
         return self.operations.admit(**kwargs)
 
     def pending(self) -> list[dict[str, Any]]:
-        return [{"operation_id": operation.id, "capability_id": operation.capability_id,
-                 "pillar": operation.pillar, "domain": operation.domain, "action": operation.action,
-                 "principal": operation.principal, "outbox_seq": operation.outbox_seq,
-                 "admitted_at": operation.admitted_at, "idempotency_key": operation.idempotency_key,
-                 "executor_bound": self.executors.resolve(operation.capability_id, operation.action) is not None}
-                for operation in self.operations.pending_operations()]
+        return [
+            {
+                "operation_id": operation.id,
+                "capability_id": operation.capability_id,
+                "pillar": operation.pillar,
+                "domain": operation.domain,
+                "action": operation.action,
+                "principal": operation.principal,
+                "outbox_seq": operation.outbox_seq,
+                "admitted_at": operation.admitted_at,
+                "idempotency_key": operation.idempotency_key,
+                "executor_bound": self.executors.resolve(operation.capability_id, operation.action) is not None,
+            }
+            for operation in self.operations.pending_operations()
+        ]
 
     def audit_history(self, *, limit: int = 50) -> list[dict[str, Any]]:
         if limit < 0 or limit > 500:
@@ -131,10 +174,7 @@ class ProductControlPlane:
         receipts = self.receipt_history(limit=500)
         audit = self.audit_history(limit=500)
         evidence = derive_lifecycle(
-            operation_id,
-            pending_operations=pending,
-            receipts=receipts,
-            audit_entries=audit,
+            operation_id, pending_operations=pending, receipts=receipts, audit_entries=audit,
         )
         pending_item = next((item for item in pending if item["operation_id"] == operation_id), None)
         receipt_item = next((item for item in receipts if item["operation_id"] == operation_id), None)
@@ -144,9 +184,15 @@ class ProductControlPlane:
         return {
             **asdict(evidence),
             "pending_operation": pending_item,
-            "executor": ({"name": binding.name, "version": binding.version,
-                          "effect_class": binding.effect_class, "replay_safe": binding.replay_safe}
-                         if binding is not None else None),
+            "executor": (
+                {
+                    "name": binding.name,
+                    "version": binding.version,
+                    "effect_class": binding.effect_class,
+                    "replay_safe": binding.replay_safe,
+                }
+                if binding is not None else None
+            ),
             "receipt": receipt_item,
         }
 
@@ -157,17 +203,6 @@ class ProductControlPlane:
             audit_entries=self.audit_history(limit=500),
         )
         return [asdict(item) for item in evidence]
-
-    def executor_coverage(self) -> dict[str, Any]:
-        canonical = [(domain.domain, action) for domain in CANONICAL_PRODUCT_POLICY for action in domain.actions]
-        bound = {(item["capability_id"], item["action"]) for item in self.executors.snapshot()}
-        covered = [(domain, action) for domain, action in canonical if (domain, action) in bound]
-        missing = [{"capability_id": domain, "action": action} for domain, action in canonical
-                   if (domain, action) not in bound]
-        total = len(canonical)
-        return {"canonical_actions": total, "bound_actions": len(covered),
-                "coverage_pct": round((len(covered) / total) * 100, 1) if total else 100.0,
-                "missing": missing}
 
     async def execute_registered(self, seq: int, registry: ProductExecutorRegistry | None = None) -> bool:
         active_registry = registry or self.executors
@@ -190,7 +225,7 @@ class ProductControlPlane:
                 raise ValueError("limit cannot be negative")
             pending = pending[:limit]
         report: dict[str, Any] = {
-            "attempted": len(pending), "confirmed": [], "deferred": [], "unbound": [], "failed": []
+            "attempted": len(pending), "confirmed": [], "deferred": [], "unbound": [], "failed": [],
         }
         for operation in pending:
             binding = active_registry.resolve(operation.capability_id, operation.action)
@@ -200,20 +235,20 @@ class ProductControlPlane:
             try:
                 result = await self.operations.execute_one(operation.outbox_seq, binding.executor)
             except OperationExecutionError as exc:
-                report["failed"].append({"outbox_seq": operation.outbox_seq,
-                                         "operation_id": operation.id,
-                                         "executor": binding.name,
-                                         "error": str(exc)})
+                report["failed"].append({
+                    "outbox_seq": operation.outbox_seq,
+                    "operation_id": operation.id,
+                    "executor": binding.name,
+                    "error": str(exc),
+                })
                 continue
-            bucket = "confirmed" if result.confirmed else "deferred"
-            report[bucket].append(operation.outbox_seq)
+            report["confirmed" if result.confirmed else "deferred"].append(operation.outbox_seq)
         report["remaining"] = self.operations.outbox.pending_count
         return report
 
     async def execute_registered_pending(self, registry: ProductExecutorRegistry | None = None,
                                          *, limit: int | None = None) -> int:
-        report = await self.dispatch_pending(registry, limit=limit)
-        return len(report["confirmed"])
+        return len((await self.dispatch_pending(registry, limit=limit))["confirmed"])
 
     def status(self) -> dict[str, Any]:
         governance = self.policy.snapshot()
@@ -223,20 +258,36 @@ class ProductControlPlane:
         for item in ledger:
             lifecycle_counts[item["state"]] = lifecycle_counts.get(item["state"], 0) + 1
             anomaly_count += len(item.get("anomalies", ()))
+        readiness = self.readiness_report()
         assurance = self.assurance_report()
-        return {"policy_version": POLICY_VERSION, "policy_bootstrap_enabled": self.bootstrap_policy,
-                "kernel": {"capabilities": [{"id": capability.id, "pillar": capability.pillar.value,
-                                               "critical": capability.critical}
-                                              for capability in self.operations.kernel.all()],
-                           "critical_ids": list(self.operations.kernel.critical_ids())},
-                "governance": {"charters": [asdict(charter) for charter in governance.charters],
-                               "edicts": [asdict(edict) for edict in governance.edicts]},
-                "executors": {"bound": len(self.executors), "bindings": list(self.executors.snapshot()),
-                              "coverage": self.executor_coverage()},
-                "receipts": self.receipts.stats(),
-                "lifecycle": {"operations": len(ledger), "states": lifecycle_counts,
-                              "evidence_gaps": lifecycle_counts.get("evidence_gap", 0) + lifecycle_counts.get("receipt_unattested", 0),
-                              "anomalies": anomaly_count},
-                "assurance": assurance,
-                "safety": self._safety_projection(),
-                "operations": self.operations.snapshot()}
+        return {
+            "policy_version": POLICY_VERSION,
+            "policy_bootstrap_enabled": self.bootstrap_policy,
+            "kernel": {
+                "capabilities": [
+                    {"id": capability.id, "pillar": capability.pillar.value, "critical": capability.critical}
+                    for capability in self.operations.kernel.all()
+                ],
+                "critical_ids": list(self.operations.kernel.critical_ids()),
+            },
+            "governance": {
+                "charters": [asdict(charter) for charter in governance.charters],
+                "edicts": [asdict(edict) for edict in governance.edicts],
+            },
+            "executors": {
+                "bound": len(self.executors),
+                "bindings": list(self.executors.snapshot()),
+                "coverage": self.executor_coverage(),
+            },
+            "readiness": readiness,
+            "receipts": self.receipts.stats(),
+            "lifecycle": {
+                "operations": len(ledger),
+                "states": lifecycle_counts,
+                "evidence_gaps": lifecycle_counts.get("evidence_gap", 0) + lifecycle_counts.get("receipt_unattested", 0),
+                "anomalies": anomaly_count,
+            },
+            "assurance": assurance,
+            "safety": self._safety_projection(),
+            "operations": self.operations.snapshot(),
+        }
