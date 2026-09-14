@@ -2,7 +2,8 @@
 
 Witnesses may read the current canonical signing target and submit already-signed
 Ed25519 receipts. The server never accepts witness private keys and never signs on a
-witness's behalf. Operator-only endpoints expose quorum status and portable bundles.
+witness's behalf. Operator-only endpoints expose quorum status and portable trust
+advancement/continuity proofs from the same runtime used by deployment assurance.
 """
 from __future__ import annotations
 
@@ -17,7 +18,6 @@ from core.deployment_checkpoint_pin_ledger import (
     DeploymentCheckpointPinLedgerError,
     DeploymentCheckpointPinRejected,
 )
-from core.deployment_checkpoint_pin_runtime import DeploymentCheckpointPinRuntime
 from core.deployment_checkpoint_pin_wire import decode_deployment_checkpoint_pin_receipt
 from routes.ops import _control_plane, _require_ops
 
@@ -25,9 +25,6 @@ router = APIRouter(
     prefix="/api/admin/deployment-checkpoint-trust",
     tags=["deployment-checkpoint-trust"],
 )
-
-_RUNTIME: DeploymentCheckpointPinRuntime | None = None
-_RUNTIME_CHECKPOINTS_ID: int | None = None
 
 
 class WitnessReceiptInput(BaseModel):
@@ -42,18 +39,14 @@ def _witness_token_required(provided: str) -> None:
         raise HTTPException(status_code=403, detail="unauthorized deployment checkpoint witness")
 
 
-def _runtime() -> DeploymentCheckpointPinRuntime:
-    global _RUNTIME, _RUNTIME_CHECKPOINTS_ID
-    plane = _control_plane()
-    checkpoints = plane.deployments.checkpoints
-    identity = id(checkpoints)
-    if _RUNTIME is None or _RUNTIME_CHECKPOINTS_ID != identity:
-        _RUNTIME = DeploymentCheckpointPinRuntime(
-            plane.deployments.root / "external-checkpoint-pins",
-            checkpoint_ledger=checkpoints,
-        )
-        _RUNTIME_CHECKPOINTS_ID = identity
-    return _RUNTIME
+def _runtime():
+    """Return the deployment-authoritative witness runtime.
+
+    There must be exactly one pin ledger/runtime per ProductControlPlane. Creating a
+    route-local runtime would split submitted evidence from the state consumed by
+    assurance and deployment preflight.
+    """
+    return _control_plane().deployment_checkpoint_pins
 
 
 @router.get("/target")
@@ -82,6 +75,7 @@ async def ingest_checkpoint_witness_receipt(
             "accepted": True,
             "event": asdict(event),
             "quorum": None if quorum is None else asdict(quorum),
+            "requirement_satisfied": runtime.requirement_satisfied(),
         }
     except DeploymentCheckpointPinRejected as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
@@ -113,3 +107,51 @@ async def checkpoint_witness_bundle(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except (DeploymentCheckpointPinLedgerError, ValueError) as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/trust-advance")
+async def checkpoint_witness_trust_advance(
+    publication_sequence: int | None = Query(default=None, ge=1),
+    token: str = Query(""),
+):
+    """Export a portable append-only bridge from a fresh witnessed anchor to current head."""
+    _require_ops(token)
+    try:
+        runtime = _runtime()
+        packet = (
+            runtime.advance_latest_witnessed()
+            if publication_sequence is None
+            else runtime.trust_advance(publication_sequence=publication_sequence)
+        )
+        return asdict(packet)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="deployment checkpoint publication not found") from exc
+    except DeploymentCheckpointPinRejected as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except (DeploymentCheckpointPinLedgerError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/continuity")
+async def checkpoint_witness_continuity(
+    previous_publication_sequence: int | None = Query(default=None, ge=1),
+    token: str = Query(""),
+):
+    """Export a portable proof with fresh independent witness quorums at both endpoints."""
+    _require_ops(token)
+    try:
+        runtime = _runtime()
+        packet = (
+            runtime.latest_witnessed_continuity()
+            if previous_publication_sequence is None
+            else runtime.witnessed_continuity(
+                previous_publication_sequence=previous_publication_sequence,
+            )
+        )
+        return asdict(packet)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="deployment checkpoint publication not found") from exc
+    except DeploymentCheckpointPinRejected as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except (DeploymentCheckpointPinLedgerError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
