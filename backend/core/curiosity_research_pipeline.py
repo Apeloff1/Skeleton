@@ -15,6 +15,7 @@ import re
 from typing import Any, Awaitable, Callable, Iterable
 
 from core.citation_integrity import CitationBinding, CitationIntegrityEngine
+from core.claim_identity import ClaimIdentityEngine
 from core.curiosity_engine import Inquiry
 
 Completion = Callable[[str, str, str], Awaitable[str | dict[str, Any]]]
@@ -143,6 +144,7 @@ class EnsembleCuriosityResearcher:
         self.source_search = source_search
         self.max_sources = max(1, int(max_sources))
         self.citation_integrity = CitationIntegrityEngine()
+        self.claim_identity = ClaimIdentityEngine()
 
     @staticmethod
     def _system_prompt() -> str:
@@ -217,7 +219,10 @@ class EnsembleCuriosityResearcher:
             errors = [type(x).__name__ for x in observations if isinstance(x, Exception)]
             raise RuntimeError(f"curiosity research ensemble produced no usable observations: {errors}")
 
-        claim_votes: dict[str, tuple[str, int]] = {}
+        # Structurally identical propositions share one candidate identity. Similar
+        # wording alone never merges; ClaimIdentityEngine only emits the same id for
+        # equivalent polarity/relation/quantity/unit/content fingerprints.
+        claim_votes: dict[str, tuple[str, int, set[str]]] = {}
         questions: list[str] = []
         contradictions: list[str] = []
         tags: list[str] = []
@@ -226,14 +231,21 @@ class EnsembleCuriosityResearcher:
             if obs.summary:
                 summaries.append(obs.summary)
             for claim in obs.claims:
-                key = claim.casefold()
-                original, votes = claim_votes.get(key, (claim, 0))
-                claim_votes[key] = (original, votes + 1)
+                identity = self.claim_identity.canonical_id(claim)
+                original, votes, variants = claim_votes.get(identity, (claim, 0, set()))
+                variants = set(variants); variants.add(claim)
+                claim_votes[identity] = (original, votes + 1, variants)
             questions.extend(obs.questions)
             contradictions.extend(obs.contradictions)
             tags.extend(obs.tags)
-        candidate_claims = [claim for claim, _ in claim_votes.values()]
-        single_model = [claim for claim, votes in claim_votes.values() if votes == 1 and len(valid) > 1]
+        candidate_claims = [claim for claim, _, _ in claim_votes.values()]
+        canonical_by_identity = {identity: claim for identity, (claim, _, _) in claim_votes.items()}
+        semantic_variants = {
+            claim: sorted(variants)
+            for claim, _, variants in claim_votes.values()
+            if len(variants) > 1
+        }
+        single_model = [claim for claim, votes, _ in claim_votes.values() if votes == 1 and len(valid) > 1]
         contradictions.extend(
             f"MODEL PANEL DISAGREEMENT — candidate not independently established: {claim}"
             for claim in single_model[:16]
@@ -249,7 +261,6 @@ class EnsembleCuriosityResearcher:
                 if len(sources) >= self.max_sources:
                     break
 
-        canonical_claims = {claim.casefold(): claim for claim in candidate_claims}
         claim_evidence: dict[str, list[dict[str, Any]]] = {claim: [] for claim in candidate_claims}
         citation_reports: list[dict[str, Any]] = []
         for source in sources:
@@ -274,7 +285,8 @@ class EnsembleCuriosityResearcher:
                 "parent_source_ids": list(source.parent_source_ids),
             }
             for binding in source.claim_bindings:
-                claim = canonical_claims.get(binding.claim.casefold())
+                identity = self.claim_identity.canonical_id(binding.claim)
+                claim = canonical_by_identity.get(identity)
                 if claim is None:
                     citation_reports.append({
                         "source_id": source.source, "claim": binding.claim,
@@ -304,11 +316,10 @@ class EnsembleCuriosityResearcher:
                         "citation_binding_attestation_sha256": report.attestation_sha256,
                     })
 
-            # Legacy claim labels are deliberately not promotion evidence. Record a
-            # laundering diagnostic so providers can migrate instead of failing silently.
             legacy_claims = (*source.supports_claims, *source.contradicts_claims)
+            bound_identities = {self.claim_identity.canonical_id(b.claim) for b in source.claim_bindings}
             for raw_claim in legacy_claims:
-                if not any(b.claim.casefold() == raw_claim.casefold() for b in source.claim_bindings):
+                if self.claim_identity.canonical_id(raw_claim) not in bound_identities:
                     citation_reports.append({
                         "source_id": source.source, "claim": raw_claim,
                         "accepted": False, "laundering_risk": "critical",
@@ -328,6 +339,7 @@ class EnsembleCuriosityResearcher:
             "claim_evidence": claim_evidence,
             "falsifiable": {claim: True for claim in candidate_claims},
             "panel": [asdict(obs) for obs in valid],
+            "semantic_variants": semantic_variants,
             "source_count": len(sources),
             "provenance_verified_source_count": sum(source.provenance_verified for source in sources),
             "claim_bound_evidence_count": sum(len(v) for v in claim_evidence.values()),
