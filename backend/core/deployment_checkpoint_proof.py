@@ -12,7 +12,7 @@ import hmac
 import re
 from typing import Any
 
-from core.canonical_json import CanonicalJSONError, canonical_json_sha256
+from core.canonical_json import CanonicalJSONError, canonical_json_clone, canonical_json_sha256
 from core.deployment_checkpoint_ledger import (
     DeploymentCheckpointLedger,
     DeploymentCheckpointLedgerError,
@@ -55,9 +55,21 @@ def _payload(proof: DeploymentCheckpointPublicationProof) -> dict[str, Any]:
 
 
 def _verified_publication(value: Any) -> DeploymentCheckpointPublication:
+    """Round-trip a publication through the portable JSON representation.
+
+    ``dataclasses.asdict`` preserves tuple containers. Durable publication JSON does
+    not: tuple-valued fields such as ``release_channels`` are represented as arrays.
+    Verification must therefore validate exactly the representation an external
+    verifier receives instead of feeding Python-only container types into the strict
+    persisted-schema parser.
+    """
     if not isinstance(value, DeploymentCheckpointPublication):
         raise DeploymentCheckpointLedgerError("checkpoint proof publication type mismatch")
-    restored = _restore_publication(asdict(value))
+    try:
+        portable = canonical_json_clone(asdict(value))
+    except CanonicalJSONError as exc:
+        raise DeploymentCheckpointLedgerError("checkpoint proof publication is not portable JSON") from exc
+    restored = _restore_publication(portable)
     if restored != value:
         raise DeploymentCheckpointLedgerError("checkpoint proof publication round-trip mismatch")
     return restored
