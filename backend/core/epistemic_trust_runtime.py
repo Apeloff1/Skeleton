@@ -1,10 +1,9 @@
 """Unified epistemic publication/trust runtime.
 
-This replaces duplicated transparency wiring across product surfaces. One runtime
-owns append-only publication, gossip/fork detection, trusted witness quorum, and
-hash-chained finality. Scientific truth and publication finality remain distinct:
-finality proves a committed state was consistently witnessed, not that its claims
-are scientifically correct.
+One runtime owns append-only publication, gossip/fork detection, trusted witness
+quorum, freshness policy, and hash-chained finality. Scientific truth and
+publication finality remain distinct: finality proves a committed state was
+consistently witnessed, not that its claims are scientifically correct.
 """
 from __future__ import annotations
 
@@ -28,6 +27,7 @@ class EpistemicTrustRuntime:
         self.witnesses = TransparencyWitnessLedger(
             self.root / "witnesses", trusted_witnesses=self.policy.witnesses,
             required_groups=self.policy.required_groups,
+            max_age_seconds=self.policy.max_age_seconds,
         )
         self.finality = TransparencyFinality(
             self.root / "finality", transparency=self.transparency,
@@ -81,9 +81,15 @@ class EpistemicTrustRuntime:
         current = self.finality_for_current_head()
         configured_groups = witnesses["independence_groups"]
         configured = witnesses["trusted_witnesses"] > 0
-        healthy = bool(transparency.get("verified") and gossip.get("healthy") and witnesses.get("healthy") and finality.get("verified"))
-        if self.policy.finality_required:
-            healthy = healthy and current["finalized"]
+        integrity_healthy = bool(
+            transparency.get("verified") and transparency.get("prefix_aligned") and
+            gossip.get("healthy") and gossip.get("cross_process_locking") and
+            witnesses.get("healthy") and witnesses.get("cross_process_locking") and
+            finality.get("verified") and finality.get("cross_process_locking")
+        )
+        quorum_capable = configured_groups >= self.policy.required_groups
+        finality_satisfied = bool(current["finalized"])
+        deploy_ready = integrity_healthy and (finality_satisfied if self.policy.finality_required else True)
         return {
             "transparency": transparency,
             "gossip": gossip,
@@ -92,8 +98,13 @@ class EpistemicTrustRuntime:
             "current_head": current,
             "policy": {"configured": configured, "configured_independence_groups": configured_groups,
                        "required_groups": self.policy.required_groups,
+                       "max_age_seconds": self.policy.max_age_seconds,
+                       "quorum_capable": quorum_capable,
                        "finality_required": self.policy.finality_required},
-            "healthy": healthy,
+            "integrity_healthy": integrity_healthy,
+            "finality_satisfied": finality_satisfied,
+            "deploy_ready": deploy_ready,
+            "healthy": deploy_ready,
         }
 
     def maybe_finalize(self) -> dict[str, Any]:
