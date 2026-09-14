@@ -56,21 +56,23 @@ export default function ControlPlaneRoute() {
     await refresh(); setExecuting(null);
   }, [refresh, token]);
 
+  const blocked = status?.readiness.actions.filter((item) => item.state !== 'native_ready') ?? [];
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.page} refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} />}>
         <TouchableOpacity onPress={() => router.back()}><Text style={styles.back}>‹ Product</Text></TouchableOpacity>
         <View style={styles.hero}>
-          <Text style={styles.eyebrow}>OPERATE · CONTROL PLANE</Text>
+          <Text style={styles.eyebrow}>OPERATE · SELF-VERIFYING CONTROL PLANE</Text>
           <Text style={styles.title}>Governed execution fabric</Text>
-          <Text style={styles.description}>Versioned executor contracts, durable admissions, replay-safe side effects, compact proof receipts and content-addressed results.</Text>
+          <Text style={styles.description}>Evidence-derived lifecycle, attested readiness, replay-safe native executors, immutable receipts and content-addressed result provenance.</Text>
         </View>
 
         <View style={styles.field}>
           <Text style={styles.label}>Ops token (when configured)</Text>
           <TextInput value={token} onChangeText={setToken} secureTextEntry autoCapitalize="none" style={styles.input} />
           <TouchableOpacity style={styles.refreshButton} onPress={refresh} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.refreshText}>Refresh control plane</Text>}
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.refreshText}>Re-evaluate evidence</Text>}
           </TouchableOpacity>
         </View>
 
@@ -78,20 +80,45 @@ export default function ControlPlaneRoute() {
 
         {status ? <>
           <View style={styles.metrics}>
-            <Metric label="Pending" value={String(status.operations.pending_operations)} />
-            <Metric label="Native" value={`${status.executors.coverage.coverage_pct}%`} />
-            <Metric label="Receipts" value={String(status.receipts.receipts)} />
-            <Metric label="Result MB" value={(status.receipts.results.bytes / (1024 * 1024)).toFixed(2)} />
+            <Metric label="Posture" value={status.assurance.posture.toUpperCase()} />
+            <Metric label="Ready" value={`${status.readiness.ready_pct}%`} />
+            <Metric label="Hard fails" value={String(status.assurance.hard_failures)} />
+            <Metric label="Evidence gaps" value={String(status.lifecycle.evidence_gaps)} />
+          </View>
+
+          <View style={[styles.card, status.assurance.posture === 'blocked' ? styles.blockedCard : status.assurance.posture === 'healthy' ? styles.healthyCard : undefined]}>
+            <Text style={styles.cardTitle}>System assurance attestation</Text>
+            <Text style={styles.muted}>Hard invariants dominate posture; warnings only degrade. Readiness replaces raw binding count as the convergence signal.</Text>
+            {status.assurance.invariants.map((item) => <View key={item.id} style={styles.row}>
+              <View style={{ flex: 1 }}>
+                <Text style={item.passed ? styles.good : item.severity === 'hard' ? styles.danger : styles.warn}>{item.passed ? 'PASS' : item.severity === 'hard' ? 'HARD FAIL' : 'WARN'} · {item.id}</Text>
+                <Text style={styles.muted}>{item.detail}</Text>
+              </View>
+            </View>)}
+            <Text style={styles.mono}>assurance sha256 {status.assurance.attestation_sha256}</Text>
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Executor contract coverage</Text>
-            <Text style={styles.muted}>{status.executors.coverage.bound_actions}/{status.executors.coverage.canonical_actions} canonical actions have native executors.</Text>
+            <Text style={styles.cardTitle}>Evidence-backed action readiness</Text>
+            <Text style={styles.muted}>{status.readiness.ready_actions}/{status.readiness.canonical_actions} canonical actions are native-ready · {status.readiness.governed_unbound} governed but unbound · {status.readiness.unsafe_actions} unsafe · {status.readiness.policy_gaps} policy gaps.</Text>
+            <Text style={styles.mono}>readiness sha256 {status.readiness.attestation_sha256}</Text>
+            {blocked.map((item) => <View key={`${item.capability_id}:${item.action}`} style={styles.row}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle}>{item.action}</Text>
+                <Text style={styles.muted}>{item.capability_id} · {item.state}</Text>
+                <Text style={item.state === 'governed_unbound' ? styles.warn : styles.danger}>{item.blockers.join(' · ') || 'no blockers'}</Text>
+              </View>
+            </View>)}
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Native executor contracts</Text>
+            <Text style={styles.muted}>{status.executors.bindings.length} exact bindings. Raw coverage {status.executors.coverage.coverage_pct}%; readiness {status.readiness.ready_pct}%.</Text>
             {status.executors.bindings.map((binding) => <View key={`${binding.capability_id}:${binding.action}`} style={styles.row}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.rowTitle}>{binding.action}</Text>
-                <Text style={styles.muted}>{binding.capability_id} · {binding.effect_class} · v{binding.version}</Text>
-                <Text style={binding.replay_safe ? styles.good : styles.warn}>{binding.replay_safe ? 'replay-safe' : 'non-replay-safe'}</Text>
+                <Text style={styles.muted}>{binding.capability_id} · {binding.effect_class} · contract v{binding.version}</Text>
+                <Text style={binding.replay_safe ? styles.good : styles.danger}>{binding.replay_safe ? 'replay-safe' : 'non-replay-safe'}</Text>
               </View>
             </View>)}
           </View>
@@ -107,7 +134,7 @@ export default function ControlPlaneRoute() {
 
         <View style={styles.card}>
           <View style={styles.sectionHead}><View style={{ flex: 1 }}><Text style={styles.cardTitle}>Pending operations</Text><Text style={styles.muted}>{pending?.count ?? 0} durable intents.</Text></View>
-            <TouchableOpacity style={styles.smallButton} onPress={executeAll} disabled={executing !== null}><Text style={styles.smallButtonText}>{executing === 'all' ? 'Running…' : 'Run bound'}</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.smallButton} onPress={executeAll} disabled={executing !== null}><Text style={styles.smallButtonText}>{executing === 'all' ? 'Running…' : 'Run ready'}</Text></TouchableOpacity>
           </View>
           {(pending?.operations ?? []).map((operation) => <View key={operation.operation_id} style={styles.row}>
             <View style={{ flex: 1 }}><Text style={styles.rowTitle}>{operation.action}</Text><Text style={styles.muted}>{operation.capability_id} · queue #{operation.outbox_seq}</Text><Text style={operation.executor_bound ? styles.good : styles.warn}>{operation.executor_bound ? 'native executor bound' : 'unbound · remains durable'}</Text><Text style={styles.mono}>{operation.operation_id.slice(0, 20)}…</Text></View>
@@ -116,7 +143,7 @@ export default function ControlPlaneRoute() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Durable execution receipts</Text><Text style={styles.muted}>{receipts.length} newest compact proofs; result payloads live in verified CAS.</Text>
+          <Text style={styles.cardTitle}>Durable execution proofs</Text><Text style={styles.muted}>{receipts.length} newest compact receipts; payloads live in verified content-addressed storage.</Text>
           {receipts.map((receipt) => <View key={receipt.operation_id} style={styles.row}><View style={{ flex: 1 }}>
             <Text style={styles.rowTitle}>{receipt.action}</Text>
             <Text style={styles.muted}>{receipt.executor} v{receipt.executor_version} · {receipt.effect_class} · {receipt.replay_safe ? 'replay-safe' : 'not replay-safe'}</Text>
@@ -126,7 +153,7 @@ export default function ControlPlaneRoute() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Verified audit history</Text><Text style={styles.muted}>{audit.length} newest entries, re-verified against the hash chain.</Text>
+          <Text style={styles.cardTitle}>Verified audit history</Text><Text style={styles.muted}>{audit.length} newest entries, re-verified against the append-only hash chain.</Text>
           {[...audit].reverse().map((entry) => <View key={entry.seq} style={styles.row}><View style={{ flex: 1 }}><Text style={styles.rowTitle}>#{entry.seq} · {entry.kind}</Text><Text style={styles.muted}>{entry.principal} · {entry.route}</Text><Text style={styles.mono}>{entry.hash.slice(0, 24)}…</Text></View></View>)}
         </View>
       </ScrollView>
@@ -145,10 +172,10 @@ const styles = StyleSheet.create({
   errorCard: { borderWidth: 1, borderColor: '#5A2D36', borderRadius: 12, backgroundColor: '#241116', padding: 13 }, errorText: { color: '#F3A7B5', fontSize: 12 },
   metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, metric: { minWidth: '47%', flexGrow: 1, borderRadius: 14, backgroundColor: '#101724', padding: 13 },
   metricValue: { color: '#F8FAFC', fontSize: 18, fontWeight: '900' }, metricLabel: { color: '#748096', fontSize: 10, textTransform: 'uppercase', marginTop: 3 },
-  card: { borderWidth: 1, borderColor: '#202737', borderRadius: 17, backgroundColor: '#0F141F', padding: 15, gap: 9 }, cardTitle: { color: '#F1F5F9', fontSize: 15, fontWeight: '900' },
-  sectionHead: { flexDirection: 'row', gap: 10, alignItems: 'center' }, row: { borderTopWidth: 1, borderTopColor: '#1E2635', paddingTop: 10, flexDirection: 'row', gap: 10, alignItems: 'center' },
-  rowTitle: { color: '#DDE5F0', fontSize: 12, fontWeight: '850' }, muted: { color: '#77849A', fontSize: 10, lineHeight: 15 }, mono: { color: '#8F9DFF', fontSize: 9, fontFamily: 'monospace', marginTop: 4 },
-  good: { color: '#7FD9A1', fontSize: 9, fontWeight: '800', marginTop: 3 }, warn: { color: '#E7BA74', fontSize: 9, fontWeight: '800', marginTop: 3 },
-  smallButton: { backgroundColor: '#25325E', borderRadius: 9, paddingHorizontal: 11, paddingVertical: 8 }, execButton: { backgroundColor: '#304B3D', borderRadius: 9, paddingHorizontal: 10, paddingVertical: 8 },
-  smallButtonText: { color: '#F7FAFC', fontSize: 10, fontWeight: '900' },
+  card: { borderWidth: 1, borderColor: '#202737', borderRadius: 17, backgroundColor: '#0F141F', padding: 15, gap: 9 }, healthyCard: { borderColor: '#274D3A' }, blockedCard: { borderColor: '#65323B' },
+  cardTitle: { color: '#F1F5F9', fontSize: 15, fontWeight: '900' }, sectionHead: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  row: { borderTopWidth: 1, borderTopColor: '#1E2635', paddingTop: 10, flexDirection: 'row', gap: 10, alignItems: 'center' }, rowTitle: { color: '#DDE5F0', fontSize: 12, fontWeight: '850' },
+  muted: { color: '#77849A', fontSize: 10, lineHeight: 15 }, mono: { color: '#8F9DFF', fontSize: 9, fontFamily: 'monospace', marginTop: 4 },
+  good: { color: '#7FD9A1', fontSize: 9, fontWeight: '800', marginTop: 3 }, warn: { color: '#E7BA74', fontSize: 9, fontWeight: '800', marginTop: 3 }, danger: { color: '#F08A9A', fontSize: 9, fontWeight: '900', marginTop: 3 },
+  smallButton: { backgroundColor: '#25325E', borderRadius: 9, paddingHorizontal: 11, paddingVertical: 8 }, execButton: { backgroundColor: '#304B3D', borderRadius: 9, paddingHorizontal: 10, paddingVertical: 8 }, smallButtonText: { color: '#F7FAFC', fontSize: 10, fontWeight: '900' },
 });
