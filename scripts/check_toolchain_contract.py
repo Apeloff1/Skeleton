@@ -44,6 +44,17 @@ SECURITY_HOOKS = (
     "repository-secret-hygiene",
     "backend-security-regressions",
 )
+DEPENDENCY_SECURITY_MARKERS = (
+    '"pip-audit==2.10.1"',
+    "--strict",
+    "--format cyclonedx-json",
+    "python-sbom.cdx.json",
+    "Enforce Python vulnerability policy",
+    "yarn audit --groups dependencies --level high --json",
+    "@cyclonedx/cyclonedx-npm@6.0.1",
+    "frontend-sbom.cdx.json",
+    "Enforce JavaScript vulnerability policy",
+)
 
 
 def read(path: str) -> str:
@@ -154,6 +165,18 @@ def main() -> int:
     require(re.search(r"^\s*node-version:\s*24\s*$", lint, re.MULTILINE) is not None and "yarn lint:ci" in lint, "Lint toolchain drifted", failures)
     require(cancel_false(lint), "Lint concurrency drifted", failures)
 
+    dependency_security = read(".github/workflows/dependency-security.yml")
+    require_all(dependency_security, DEPENDENCY_SECURITY_MARKERS, "dependency audit/SBOM contract drifted", failures)
+    require(cancel_false(dependency_security), "Dependency Security concurrency drifted", failures)
+    require("pip-audit" in dependency_security and "yarn audit" in dependency_security, "Dependency Security must audit both ecosystems", failures)
+    require(dependency_security.count("persist-credentials: false") >= 2, "Dependency Security checkouts must not persist credentials", failures)
+    require(
+        "if: steps.python-audit.outputs.status != '0'" in dependency_security
+        and "if: steps.yarn-audit.outputs.status != '0'" in dependency_security,
+        "Dependency Security audits must fail closed after artifact capture",
+        failures,
+    )
+
     quality = read("scripts/quality-gates.sh")
     require_all(quality, SECURITY_SCRIPTS, "local scanner coverage drifted", failures)
     require_all(quality, SECURITY_TESTS, "local security regression coverage drifted", failures)
@@ -164,6 +187,7 @@ def main() -> int:
     require_all(precommit, SECURITY_TESTS, "pre-commit security regression coverage drifted", failures)
     require_all(precommit, SECURITY_HOOKS, "pre-commit security hook coverage drifted", failures)
     require("repo-toolchain-contract" in precommit, "pre-commit toolchain self-enforcement missing", failures)
+    require("dependency-security" in precommit, "pre-commit toolchain hook must watch dependency-security workflow", failures)
     require("PYTEST_DISABLE_PLUGIN_AUTOLOAD=1" in precommit and "--noconftest" in precommit, "pre-commit security isolation drifted", failures)
     require("tests/test_process_safety.py" not in precommit, "superseded process test referenced", failures)
 
@@ -180,7 +204,8 @@ def main() -> int:
 
     print(
         "Toolchain contract passed: immutable CI actions, runtime/tooling, hermetic test boundaries, "
-        "full local/CI/pre-commit security parity, regression isolation, self-enforcement, and fail-closed deployment gates aligned."
+        "local/CI/pre-commit security parity, dependency audits/SBOMs, regression isolation, self-enforcement, "
+        "and fail-closed deployment gates aligned."
     )
     return 0
 
