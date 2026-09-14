@@ -64,3 +64,4 @@ jobs:
           tests/test_process_safety_namespace_get.py
           tests/test_process_safety_getattribute.py
           tests/test_security_hardening.py
+          tests/test_security_identity_limits.py
