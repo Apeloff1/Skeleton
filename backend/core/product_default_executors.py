@@ -1,17 +1,18 @@
 """Native executors for canonical product actions.
 
 Adapters target framework-free runtime primitives instead of calling HTTP routes.
-Receipts capture exact input provenance and executor contracts. Introspection
-adapters receive narrow providers from the control plane, avoiding circular
-imports while turning product state/policy/audit/safety into governed actions.
+Receipts capture exact input provenance and executor contracts. Transform/query
+executors are deterministic and attested; effectful executors must be replay-safe.
 """
 from __future__ import annotations
 
 from typing import Any, Callable
 
+from core.deployment_planner import compile_deployment_plan
 from core.execution_receipts import ExecutionReceiptStore, ReceiptIntegrityError
 from core.product_executor_registry import ProductExecutorRegistry
 from core.product_operations import AdmittedOperation
+from core.progression_intelligence import inspect_progression
 from core.runtime_sessions import RuntimeSessionManager
 from core.world_system_composer import blueprint_dict, compose_world_systems
 
@@ -24,7 +25,9 @@ _CONTRACTS = {
     "native.worldforge.world.systems.compose": (1, "state", True),
     "native.playables.playable.launch": (1, "state", True),
     "native.playables.runtime.sessions": (1, "query", True),
+    "native.playables.progress.inspect": (1, "query", True),
     "native.operations.ops.runtime": (1, "query", True),
+    "native.operations.ops.deployments": (1, "query", True),
     "native.governance.policy": (1, "query", True),
     "native.governance.audit": (1, "query", True),
     "native.governance.safety": (1, "query", True),
@@ -85,16 +88,13 @@ class NativeProductExecutors:
     def _provider_result(provider: Provider | None, name: str) -> dict[str, Any]:
         if provider is None:
             raise RuntimeError(f"{name} provider unavailable")
-        value = provider()
-        return {name: value}
+        return {name: provider()}
 
     def create_project(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
         executor = "native.studio.project.create"
-        if self._already_complete(operation, executor):
-            return True
+        if self._already_complete(operation, executor): return True
         title = str(payload.get("title") or payload.get("name") or "Untitled project").strip()
-        if not title:
-            raise ValueError("project title cannot be blank")
+        if not title: raise ValueError("project title cannot be blank")
         return self._write(operation, executor, {
             "project_id": operation.id,
             "title": title[:200],
@@ -107,27 +107,22 @@ class NativeProductExecutors:
 
     def pipeline_inspect(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
         executor = "native.studio.pipeline.inspect"
-        if self._already_complete(operation, executor):
-            return True
+        if self._already_complete(operation, executor): return True
         return self._write(operation, executor, self._provider_result(self.operations_provider, "pipeline"))
 
     @staticmethod
     def _generate_world(payload: dict[str, Any]) -> dict[str, Any]:
         from routes.worldforge_core import WorldConfig, build_world
-        cfg = WorldConfig(**dict(payload.get("config") or payload))
-        return build_world(cfg)
+        return build_world(WorldConfig(**dict(payload.get("config") or payload)))
 
     def create_world(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
         executor = "native.worldforge.world.create"
-        if self._already_complete(operation, executor):
-            return True
-        world = self._generate_world(payload)
-        return self._write(operation, executor, {"world": world})
+        if self._already_complete(operation, executor): return True
+        return self._write(operation, executor, {"world": self._generate_world(payload)})
 
     def compose_world_systems(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
         executor = "native.worldforge.world.systems.compose"
-        if self._already_complete(operation, executor):
-            return True
+        if self._already_complete(operation, executor): return True
         supplied = payload.get("world")
         if supplied is not None and not isinstance(supplied, dict):
             raise ValueError("world must be an object when supplied")
@@ -140,8 +135,7 @@ class NativeProductExecutors:
 
     def launch_playable(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
         executor = "native.playables.playable.launch"
-        if self._already_complete(operation, executor):
-            return True
+        if self._already_complete(operation, executor): return True
         seed = int(payload.get("seed", 1))
         session = self.sessions.create(
             seed=seed,
@@ -159,35 +153,46 @@ class NativeProductExecutors:
 
     def runtime_sessions(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
         executor = "native.playables.runtime.sessions"
-        if self._already_complete(operation, executor):
-            return True
+        if self._already_complete(operation, executor): return True
         return self._write(operation, executor, {"runtime": self.sessions.snapshot()})
+
+    def progress_inspect(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
+        executor = "native.playables.progress.inspect"
+        if self._already_complete(operation, executor): return True
+        raw = payload.get("progression") or payload.get("state") or {}
+        if not isinstance(raw, dict):
+            raise ValueError("progression must be an object")
+        stages = payload.get("known_stages") or ()
+        if not isinstance(stages, (list, tuple)):
+            raise ValueError("known_stages must be an array")
+        return self._write(operation, executor, {"progression": inspect_progression(raw, known_stages=stages)})
 
     def ops_runtime(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
         executor = "native.operations.ops.runtime"
-        if self._already_complete(operation, executor):
-            return True
+        if self._already_complete(operation, executor): return True
         result = self._provider_result(self.operations_provider, "operations")
         result["sessions"] = self.sessions.snapshot()
         result["receipts"] = self.receipts.stats()
         return self._write(operation, executor, result)
 
+    def ops_deployments(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
+        executor = "native.operations.ops.deployments"
+        if self._already_complete(operation, executor): return True
+        return self._write(operation, executor, {"deployment_plan": compile_deployment_plan(payload)})
+
     def governance_policy(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
         executor = "native.governance.policy"
-        if self._already_complete(operation, executor):
-            return True
+        if self._already_complete(operation, executor): return True
         return self._write(operation, executor, self._provider_result(self.policy_provider, "policy"))
 
     def governance_audit(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
         executor = "native.governance.audit"
-        if self._already_complete(operation, executor):
-            return True
+        if self._already_complete(operation, executor): return True
         return self._write(operation, executor, self._provider_result(self.audit_provider, "audit"))
 
     def governance_safety(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
         executor = "native.governance.safety"
-        if self._already_complete(operation, executor):
-            return True
+        if self._already_complete(operation, executor): return True
         return self._write(operation, executor, self._provider_result(self.safety_provider, "safety"))
 
     def register_into(self, registry: ProductExecutorRegistry) -> ProductExecutorRegistry:
@@ -198,8 +203,10 @@ class NativeProductExecutors:
         registry.register("world-forge", "world.systems.compose", self.compose_world_systems, name="native.worldforge.world.systems.compose", version=1, effect_class="state", replay_safe=True)
         registry.register("playables", "playable.launch", self.launch_playable, name="native.playables.playable.launch", version=1, effect_class="state", replay_safe=True)
         registry.register("playables", "runtime.sessions", self.runtime_sessions, name="native.playables.runtime.sessions", version=1, effect_class="query", replay_safe=True)
+        registry.register("playables", "progress.inspect", self.progress_inspect, name="native.playables.progress.inspect", version=1, effect_class="query", replay_safe=True)
         if self.operations_provider is not None:
             registry.register("operations", "ops.runtime", self.ops_runtime, name="native.operations.ops.runtime", version=1, effect_class="query", replay_safe=True)
+        registry.register("operations", "ops.deployments", self.ops_deployments, name="native.operations.ops.deployments", version=1, effect_class="query", replay_safe=True)
         if self.policy_provider is not None:
             registry.register("governance", "governance.policy", self.governance_policy, name="native.governance.policy", version=1, effect_class="query", replay_safe=True)
         if self.audit_provider is not None:
