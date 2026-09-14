@@ -51,7 +51,8 @@ DEPENDENCY_SECURITY_MARKERS = (
     "python-sbom.cdx.json",
     "Enforce Python vulnerability policy",
     "yarn audit --groups dependencies --level high --json",
-    "@cyclonedx/cyclonedx-npm@6.0.1",
+    "anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610",
+    "format: cyclonedx-json",
     "frontend-sbom.cdx.json",
     "Enforce JavaScript vulnerability policy",
 )
