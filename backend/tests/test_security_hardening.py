@@ -4,6 +4,8 @@ import asyncio
 from pathlib import Path
 
 import pytest
+from starlette.requests import Request
+from starlette.responses import Response
 
 from api_middleware import RateLimiterMiddleware
 from middleware.client_identity import (
@@ -12,6 +14,14 @@ from middleware.client_identity import (
     sanitize_request_id,
 )
 from middleware.security import SizeLimitMiddleware, safe_relative_path
+
+
+def test_proxy_trust_is_fail_closed_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("TRUSTED_PROXY_CIDRS", raising=False)
+    assert parse_trusted_proxy_cidrs() == ()
+    # Even a loopback peer cannot make a forwarding header authoritative until
+    # the deployment explicitly declares that peer/network as trusted.
+    assert extract_client_ip("127.0.0.1", "203.0.113.99") == "127.0.0.1"
 
 
 def test_untrusted_peer_cannot_spoof_forwarded_for() -> None:
@@ -56,6 +66,68 @@ def test_rate_limiter_bucket_cache_is_bounded_lru() -> None:
     assert len(middleware._buckets) == 2
     assert "192.0.2.1" not in middleware._buckets
     assert set(middleware._buckets) == {"192.0.2.2", "192.0.2.3"}
+
+
+def test_unknown_client_does_not_bypass_rate_limit() -> None:
+    middleware = RateLimiterMiddleware(
+        lambda scope, receive, send: None,
+        per_minute=1,
+        burst=1,
+        max_buckets=4,
+    )
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "method": "GET",
+        "scheme": "https",
+        "path": "/api/private",
+        "raw_path": b"/api/private",
+        "query_string": b"",
+        "headers": [],
+        "server": ("example.test", 443),
+        # Intentionally no client tuple: identity resolves to "unknown".
+    }
+    request = Request(scope)
+
+    async def call_next(_request: Request) -> Response:
+        return Response("ok", status_code=200)
+
+    first = asyncio.run(middleware.dispatch(request, call_next))
+    second = asyncio.run(middleware.dispatch(Request(scope), call_next))
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+    assert "unknown" in middleware._buckets
+
+
+def test_loopback_client_is_not_implicitly_exempt() -> None:
+    middleware = RateLimiterMiddleware(
+        lambda scope, receive, send: None,
+        per_minute=1,
+        burst=1,
+        max_buckets=4,
+    )
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "method": "GET",
+        "scheme": "http",
+        "path": "/api/private",
+        "raw_path": b"/api/private",
+        "query_string": b"",
+        "headers": [],
+        "server": ("127.0.0.1", 8000),
+        "client": ("127.0.0.1", 53000),
+    }
+
+    async def call_next(_request: Request) -> Response:
+        return Response("ok", status_code=200)
+
+    first = asyncio.run(middleware.dispatch(Request(scope), call_next))
+    second = asyncio.run(middleware.dispatch(Request(scope), call_next))
+
+    assert first.status_code == 200
+    assert second.status_code == 429
 
 
 def test_safe_relative_path_rejects_escape_and_absolute_paths(tmp_path: Path) -> None:
