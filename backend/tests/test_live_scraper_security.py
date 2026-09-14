@@ -20,6 +20,15 @@ def test_scraper_url_blocks_non_https_and_non_curated_hosts():
     assert _validated_scraper_url("https://example.com/feed") is None
 
 
+def test_scraper_url_rejects_malformed_or_unexpected_ports():
+    assert _validated_scraper_url("https://github.com:not-a-port/trending") is None
+    assert _validated_scraper_url("https://github.com:444/trending") is None
+    assert _validated_scraper_url("https://github.com:443/trending") == (
+        "https://github.com:443/trending",
+        "github.com",
+    )
+
+
 def test_scraper_url_accepts_curated_https_host():
     validated = _validated_scraper_url("https://github.com/trending?since=daily")
     assert validated == ("https://github.com/trending?since=daily", "github.com")
