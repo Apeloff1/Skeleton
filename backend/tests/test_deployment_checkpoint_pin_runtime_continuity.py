@@ -54,7 +54,7 @@ class Plane:
     def epistemic_finality(self): return _trust()
 
 
-def _setup(tmp_path):
+def _setup(tmp_path, *, continuity_required=False):
     plane = Plane()
     gateway = DeploymentGateway(tmp_path / "gateway", control_plane=plane)
     plane.gateway = gateway
@@ -65,7 +65,7 @@ def _setup(tmp_path):
     )
     runtime = DeploymentCheckpointPinRuntime(
         tmp_path / "pins", checkpoint_ledger=gateway.checkpoints,
-        policy=DeploymentCheckpointPinPolicy(witnesses, 2, 300, True),
+        policy=DeploymentCheckpointPinPolicy(witnesses, 2, 300, True, continuity_required),
     )
     return gateway, runtime, pairs, witnesses
 
@@ -120,10 +120,45 @@ def test_current_quorum_without_prior_epoch_is_not_continuity(tmp_path):
 
     status = runtime.status(now=now)
     assert status["requirement_satisfied"] is True
-    assert status["trust_frontier"]["continuity_ready"] is False
+    assert status["trust_frontier"]["continuity_ready"] is True  # genesis is the initial anchor
     try:
         runtime.latest_witnessed_continuity(now=now)
     except ValueError as exc:
         assert "prior checkpoint" in str(exc)
     else:
-        raise AssertionError("single witnessed epoch unexpectedly formed continuity")
+        raise AssertionError("single witnessed epoch unexpectedly formed continuity proof")
+
+
+def test_continuity_required_blocks_after_history_advances_until_both_epochs_are_fresh(tmp_path):
+    gateway, runtime, pairs, witnesses = _setup(tmp_path, continuity_required=True)
+    genesis = gateway.checkpoints.latest(); assert genesis is not None
+    _witness(runtime, genesis, pairs, witnesses, "genesis", "2026-09-14T20:00:00+00:00")
+    now = datetime(2026, 9, 14, 20, 1, tzinfo=UTC)
+    assert runtime.requirement_satisfied(now=now) is True
+    assert runtime.status(now=now)["policy"]["continuity_required"] is True
+
+    gateway.prepare({
+        "target": "runtime", "environment": "staging",
+        "strategy": "rolling", "artifact": "artifact-v2",
+    })
+    current = gateway.checkpoints.latest(); assert current is not None
+    assert current.sequence > genesis.sequence
+    assert runtime.requirement_satisfied(now=now) is False
+
+    _witness(runtime, current, pairs, witnesses, "current", "2026-09-14T20:00:30+00:00")
+    assert runtime.requirement_satisfied(now=now) is True
+    assert runtime.status(now=now)["trust_frontier"]["continuity_ready"] is True
+
+
+def test_continuity_required_does_not_accept_only_current_epoch_after_advance(tmp_path):
+    gateway, runtime, pairs, witnesses = _setup(tmp_path, continuity_required=True)
+    gateway.prepare({
+        "target": "runtime", "environment": "staging",
+        "strategy": "rolling", "artifact": "artifact-v3",
+    })
+    current = gateway.checkpoints.latest(); assert current is not None
+    _witness(runtime, current, pairs, witnesses, "current-only", "2026-09-14T20:00:00+00:00")
+    now = datetime(2026, 9, 14, 20, 1, tzinfo=UTC)
+    assert runtime.quorum(now=now).reached is True
+    assert runtime.status(now=now)["trust_frontier"]["continuity_ready"] is False
+    assert runtime.requirement_satisfied(now=now) is False
