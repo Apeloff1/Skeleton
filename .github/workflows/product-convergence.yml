@@ -5,6 +5,7 @@ on:
     paths:
       - "backend/core/**"
       - "backend/routes/ops.py"
+      - "backend/routes/nexus.py"
       - "backend/tests/test_content_store.py"
       - "backend/tests/test_execution_receipts.py"
       - "backend/tests/test_execution_evidence.py"
@@ -20,6 +21,10 @@ on:
       - "backend/tests/test_product_control_plane.py"
       - "backend/tests/test_product_executor_registry.py"
       - "backend/tests/test_product_contract_parity.py"
+      - "backend/tests/test_truth_verifier_scientific.py"
+      - "backend/tests/test_verified_curiosity.py"
+      - "backend/tests/test_curiosity_engine.py"
+      - "backend/tests/test_idle_curiosity_runtime.py"
       - "backend/tests/test_progression.py"
       - "backend/tests/test_playable_simulation.py"
       - "backend/tests/test_runtime_sessions.py"
@@ -43,6 +48,7 @@ on:
     paths:
       - "backend/core/**"
       - "backend/routes/ops.py"
+      - "backend/routes/nexus.py"
       - "backend/tests/test_content_store.py"
       - "backend/tests/test_execution_receipts.py"
       - "backend/tests/test_execution_evidence.py"
@@ -58,6 +64,10 @@ on:
       - "backend/tests/test_product_control_plane.py"
       - "backend/tests/test_product_executor_registry.py"
       - "backend/tests/test_product_contract_parity.py"
+      - "backend/tests/test_truth_verifier_scientific.py"
+      - "backend/tests/test_verified_curiosity.py"
+      - "backend/tests/test_curiosity_engine.py"
+      - "backend/tests/test_idle_curiosity_runtime.py"
       - "backend/tests/test_progression.py"
       - "backend/tests/test_playable_simulation.py"
       - "backend/tests/test_runtime_sessions.py"
@@ -112,6 +122,10 @@ jobs:
           tests/test_product_executor_registry.py
           tests/test_native_product_executors.py
           tests/test_product_contract_parity.py
+          tests/test_truth_verifier_scientific.py
+          tests/test_verified_curiosity.py
+          tests/test_curiosity_engine.py
+          tests/test_idle_curiosity_runtime.py
           tests/test_progression.py
           tests/test_playable_simulation.py
           tests/test_runtime_sessions.py
