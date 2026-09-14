@@ -33,7 +33,7 @@ def _pin_package(tmp_path):
     return witnesses, manifest, publication, package
 
 
-def _advance_package(tmp_path):
+def _advance_package(tmp_path, *, required=False):
     gateway = _gateway(tmp_path)
     _deploy(gateway, "artifact-v1")
     anchor = gateway.checkpoints.latest()
@@ -47,7 +47,7 @@ def _advance_package(tmp_path):
         checkpoint_ledger=gateway.checkpoints,
     )
     manifest = build_deployment_checkpoint_trust_policy_manifest(
-        DeploymentCheckpointPinPolicy(witnesses, 3, 300, True, False)
+        DeploymentCheckpointPinPolicy(witnesses, 3, 300, required, False)
     )
     package = build_deployment_checkpoint_verification_package(
         policy_manifest=manifest,
@@ -81,8 +81,8 @@ def test_dispatch_verifies_single_pin_with_exact_context(tmp_path):
     ) is True
 
 
-def test_dispatch_verifies_trust_advance_with_anchor_context_only(tmp_path):
-    witnesses, manifest, current, package = _advance_package(tmp_path)
+def test_dispatch_verifies_trust_advance_as_optional_audit_evidence(tmp_path):
+    witnesses, manifest, current, package = _advance_package(tmp_path, required=False)
     assert verify_policy_bound_verification_package(
         package,
         expected_manifest_sha256=manifest.manifest_sha256,
@@ -90,6 +90,17 @@ def test_dispatch_verifies_trust_advance_with_anchor_context_only(tmp_path):
         expected_current_publication_sha256=current.sha256,
         anchor_verified_at="2026-09-14T20:01:00+00:00",
     ) is True
+
+
+def test_dispatch_rejects_trust_advance_for_required_current_head_witness_policy(tmp_path):
+    witnesses, manifest, current, package = _advance_package(tmp_path, required=True)
+    assert verify_policy_bound_verification_package(
+        package,
+        expected_manifest_sha256=manifest.manifest_sha256,
+        trusted_witnesses=witnesses,
+        expected_current_publication_sha256=current.sha256,
+        anchor_verified_at="2026-09-14T20:01:00+00:00",
+    ) is False
 
 
 def test_dispatch_verifies_witnessed_continuity_with_both_endpoint_times(tmp_path):
@@ -152,12 +163,12 @@ def test_dispatch_rejects_wrong_policy_pin_and_registry_splice(tmp_path):
 
 
 def test_continuity_policy_cannot_be_satisfied_by_trust_advance_package(tmp_path):
-    witnesses, _, current, package = _advance_package(tmp_path)
+    witnesses, _, current, package = _advance_package(tmp_path, required=False)
     continuity_manifest = build_deployment_checkpoint_trust_policy_manifest(
         DeploymentCheckpointPinPolicy(witnesses, 3, 300, True, True)
     )
-    # The package remains bound to its original non-continuity manifest, so trying to
-    # validate it against a stronger pinned policy must fail before proof dispatch.
+    # The package remains bound to its original optional manifest, so trying to
+    # validate it against a stronger pinned policy fails before proof dispatch.
     assert verify_policy_bound_verification_package(
         package,
         expected_manifest_sha256=continuity_manifest.manifest_sha256,
