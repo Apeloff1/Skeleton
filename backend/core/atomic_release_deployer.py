@@ -1,11 +1,8 @@
 """Atomic, replay-safe release activation backend.
 
-This is a concrete deployment side effect for Skeleton itself: a validated deployment
-plan activates an immutable release record for a target/environment channel. The
-activation pointer is atomically replaced and every release is retained in a
-hash-chained history. Authorization ID is the idempotency identity, allowing recovery
-when a process crashes after authorization consumption but before the caller records
-success.
+A validated deployment plan activates an immutable release record for a
+(target, environment) channel. Activation pointers are atomically replaced and all
+releases remain in hash-chained history. Authorization ID is the idempotency key.
 """
 from __future__ import annotations
 
@@ -69,14 +66,17 @@ def _parse_time(value: str) -> datetime:
 
 class AtomicReleaseDeployer:
     def __init__(self, root: str | Path) -> None:
-        self.root = Path(root); self.root.mkdir(parents=True, exist_ok=True)
+        self.root = Path(root)
+        self.root.mkdir(parents=True, exist_ok=True)
         self._global_lease = FileLease(self.root / ".release-index.lock")
 
     def _channel(self, plan: dict[str, Any]) -> tuple[Path, FileLease]:
-        target = str(plan.get("target") or "").strip(); environment = str(plan.get("environment") or "").strip()
+        target = str(plan.get("target") or "").strip()
+        environment = str(plan.get("environment") or "").strip()
         if not target or not environment:
             raise ReleaseDeploymentError("deployment plan target/environment missing")
-        channel = self.root / _channel_key(target, environment); channel.mkdir(parents=True, exist_ok=True)
+        channel = self.root / _channel_key(target, environment)
+        channel.mkdir(parents=True, exist_ok=True)
         return channel, FileLease(channel / ".release.lock")
 
     @staticmethod
@@ -92,25 +92,34 @@ class AtomicReleaseDeployer:
 
     def _history(self, channel: Path) -> tuple[ReleaseRecord, ...]:
         path = channel / "releases.jsonl"
-        if not path.exists(): return ()
-        try: lines = path.read_text(encoding="utf-8").splitlines()
-        except OSError as exc: raise ReleaseDeploymentError("release history unreadable") from exc
-        rows: list[ReleaseRecord] = []; previous = ""
+        if not path.exists():
+            return ()
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except OSError as exc:
+            raise ReleaseDeploymentError("release history unreadable") from exc
+        rows: list[ReleaseRecord] = []
+        previous = ""
         for index, line in enumerate(lines, start=1):
-            if not line.strip(): continue
-            try: row = self._restore(json.loads(line))
+            if not line.strip():
+                continue
+            try:
+                row = self._restore(json.loads(line))
             except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
                 raise ReleaseDeploymentError("release history malformed") from exc
             if row.version != RELEASE_LEDGER_VERSION or row.sequence != index or row.previous_sha256 != previous:
                 raise ReleaseDeploymentError("release history ancestry/version mismatch")
             if not _SHA256.fullmatch(row.sha256) or (row.previous_sha256 and not _SHA256.fullmatch(row.previous_sha256)):
                 raise ReleaseDeploymentError("release history digest malformed")
-            try: _parse_time(row.activated_at)
-            except ValueError as exc: raise ReleaseDeploymentError(str(exc)) from exc
+            try:
+                _parse_time(row.activated_at)
+            except ValueError as exc:
+                raise ReleaseDeploymentError(str(exc)) from exc
             payload = {key: value for key, value in asdict(row).items() if key != "sha256"}
             if not hmac.compare_digest(_sha(payload), row.sha256):
                 raise ReleaseDeploymentError("release history hash mismatch")
-            previous = row.sha256; rows.append(row)
+            previous = row.sha256
+            rows.append(row)
         return tuple(rows)
 
     @staticmethod
@@ -119,11 +128,14 @@ class AtomicReleaseDeployer:
         return {**payload, "sha256": _sha(payload)}
 
     def _write_current(self, channel: Path, record: ReleaseRecord) -> None:
-        path = channel / "current.json"; temp = path.with_suffix(f".{os.getpid()}.tmp")
+        path = channel / "current.json"
+        temp = path.with_suffix(f".{os.getpid()}.tmp")
         envelope = self._current_envelope(record)
         try:
             with temp.open("wb") as handle:
-                handle.write(_canonical(envelope)); handle.flush(); os.fsync(handle.fileno())
+                handle.write(_canonical(envelope))
+                handle.flush()
+                os.fsync(handle.fileno())
             os.replace(temp, path)
         finally:
             temp.unlink(missing_ok=True)
@@ -131,11 +143,14 @@ class AtomicReleaseDeployer:
     def current(self, *, target: str, environment: str) -> ReleaseRecord | None:
         channel = self.root / _channel_key(str(target).strip(), str(environment).strip())
         path = channel / "current.json"
-        if not path.exists(): return None
+        if not path.exists():
+            return None
         lease = FileLease(channel / ".release.lock")
         with lease.acquire():
-            try: envelope = json.loads(path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError) as exc: raise ReleaseDeploymentError("current release unreadable") from exc
+            try:
+                envelope = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ReleaseDeploymentError("current release unreadable") from exc
             payload = {"version": envelope.get("version"), "release": envelope.get("release")}
             if envelope.get("version") != RELEASE_LEDGER_VERSION or not isinstance(envelope.get("release"), dict):
                 raise ReleaseDeploymentError("current release malformed")
@@ -157,7 +172,8 @@ class AtomicReleaseDeployer:
         if not _SHA256.fullmatch(consumption.system_root_sha256):
             raise ReleaseDeploymentError("authorization system root is invalid")
 
-        stamp = activated_at or datetime.now(UTC).isoformat(); _parse_time(stamp)
+        stamp = activated_at or datetime.now(UTC).isoformat()
+        _parse_time(stamp)
         channel, lease = self._channel(plan)
         history_path = channel / "releases.jsonl"
         with lease.acquire():
@@ -184,31 +200,38 @@ class AtomicReleaseDeployer:
             record = ReleaseRecord(**payload, sha256=_sha(payload))
             with history_path.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(asdict(record), ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n")
-                handle.flush(); os.fsync(handle.fileno())
+                handle.flush()
+                os.fsync(handle.fileno())
             self._write_current(channel, record)
             return record
 
-    def find_by_authorization(self, authorization_id: str) -> ReleaseRecord | None:
+    def snapshot(self) -> tuple[ReleaseRecord, ...]:
+        """Return every verified release across all channels in deterministic order."""
+        rows: list[ReleaseRecord] = []
         with self._global_lease.acquire():
             for channel in self.root.iterdir():
-                if not channel.is_dir(): continue
+                if not channel.is_dir():
+                    continue
                 lease = FileLease(channel / ".release.lock")
                 with lease.acquire():
-                    for row in self._history(channel):
-                        if row.authorization_id == authorization_id:
-                            return row
-        return None
+                    rows.extend(self._history(channel))
+        return tuple(sorted(rows, key=lambda row: (row.activated_at, row.environment, row.target, row.release_id)))
+
+    def find_by_authorization(self, authorization_id: str) -> ReleaseRecord | None:
+        return next((row for row in self.snapshot() if row.authorization_id == authorization_id), None)
 
     def status(self) -> dict[str, Any]:
-        channels = releases = 0; heads: list[str] = []
-        with self._global_lease.acquire():
-            for channel in self.root.iterdir():
-                if not channel.is_dir(): continue
-                lease = FileLease(channel / ".release.lock")
-                with lease.acquire():
-                    history = self._history(channel)
-                if history:
-                    channels += 1; releases += len(history); heads.append(history[-1].sha256)
-        return {"version": RELEASE_LEDGER_VERSION, "channels": channels, "releases": releases,
-                "head_set_sha256": _sha(sorted(heads)), "cross_process_locking": True,
-                "lock_backend": self._global_lease.backend, "verified": True}
+        rows = self.snapshot()
+        channels = {(row.environment, row.target) for row in rows}
+        heads: dict[tuple[str, str], ReleaseRecord] = {}
+        for row in rows:
+            heads[(row.environment, row.target)] = row
+        return {
+            "version": RELEASE_LEDGER_VERSION,
+            "channels": len(channels),
+            "releases": len(rows),
+            "head_set_sha256": _sha(sorted(row.sha256 for row in heads.values())),
+            "cross_process_locking": True,
+            "lock_backend": self._global_lease.backend,
+            "verified": True,
+        }
