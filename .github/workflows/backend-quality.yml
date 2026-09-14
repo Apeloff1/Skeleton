@@ -1,7 +1,7 @@
 name: Backend Quality
 
 # Fast, fail-closed backend gate: lint, syntax compilation, critical
-# security-boundary regression tests, and process/deserialization policy.
+# security-boundary regression tests, and repository security policy.
 
 on:
   push:
@@ -13,6 +13,7 @@ on:
     paths:
       - "backend/**"
       - ".github/workflows/backend-quality.yml"
+      - ".github/workflows/**"
 
 permissions:
   contents: read
@@ -53,6 +54,9 @@ jobs:
       - name: Deserialization safety gate
         run: python scripts/check_deserialization_safety.py
 
+      - name: GitHub Actions workflow security gate
+        run: python scripts/check_workflow_security.py
+
       - name: Security boundary regression tests
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
@@ -65,6 +69,7 @@ jobs:
           tests/test_process_safety_namespace_get.py
           tests/test_process_safety_getattribute.py
           tests/test_deserialization_safety_gate.py
+          tests/test_workflow_security_gate.py
           tests/test_security_middleware_hardening.py
           tests/test_client_ip_security.py
           tests/test_size_limit_security.py
