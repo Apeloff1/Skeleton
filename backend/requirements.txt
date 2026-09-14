@@ -30,6 +30,9 @@ passlib==1.7.4
 bcrypt==4.0.1
 PyJWT==2.11.0
 python-jose==3.5.0
+# Direct dependency: epistemic transparency witnesses use Ed25519 verification.
+# Do not rely on an optional/transitive crypto backend for trust-critical code.
+cryptography>=46.0.4,<47
 
 # --- AI / LLM ---
 openai==2.37.0
