@@ -8,7 +8,12 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from core.epistemic_trust_runtime import EpistemicTrustRuntime
 from core.signed_finality_evidence import build_signed_finality_evidence, verify_signed_finality_evidence
-from core.signed_transparency_witness import SignedWitnessRejected, sign_statement_for_witness, verify_signed_statement
+from core.signed_transparency_witness import (
+    SignedTransparencyWitnessLedger,
+    SignedWitnessRejected,
+    sign_statement_for_witness,
+    verify_signed_statement,
+)
 from core.transparency_witness import TrustedWitness
 from core.transparency_witness_config import WitnessPolicyConfig
 
@@ -56,6 +61,69 @@ def test_ed25519_statement_fails_under_wrong_key_and_tampering(tmp_path):
     tampered = {**asdict(statement), "root_sha256": "f" * 64}
     assert verify_signed_statement(tampered, public_key_b64=keys[0][1], expected_group="org-a") is False
     with pytest.raises(SignedWitnessRejected): runtime.observe_signed_witness(tampered)
+
+
+def test_signed_statement_rejects_type_confusion_extra_fields_and_noncanonical_values(tmp_path):
+    runtime, keys, witnesses = _runtime(tmp_path)
+    runtime.publish(authority_root_sha256="1" * 64, epistemic_root_sha256="2" * 64,
+                    observed_at="2026-09-14T17:00:00+00:00")
+    descriptor = runtime.transparency.log.descriptor()
+    now = datetime(2026, 9, 14, 17, 0, tzinfo=UTC)
+    statement = sign_statement_for_witness(
+        private_key_b64=keys[0][0], public_key_b64=keys[0][1], log_id=descriptor["log_id"],
+        tree_size=descriptor["tree_size"], root_sha256=descriptor["root_sha256"], witness_id="w0",
+        independence_group="org-a", observed_at=now.isoformat(), nonce="strict-1",
+    )
+    raw = asdict(statement)
+
+    assert verify_signed_statement({**raw, "tree_size": True}, public_key_b64=keys[0][1], expected_group="org-a") is False
+    assert verify_signed_statement({**raw, "unexpected": "field"}, public_key_b64=keys[0][1], expected_group="org-a") is False
+    assert verify_signed_statement({**raw, "root_sha256": raw["root_sha256"].upper()}, public_key_b64=keys[0][1], expected_group="org-a") is False
+    assert verify_signed_statement({**raw, "observed_at": "2026-09-14T19:00:00+02:00"}, public_key_b64=keys[0][1], expected_group="org-a") is False
+    assert verify_signed_statement(raw, public_key_b64=keys[0][1] + "\n", expected_group="org-a") is False
+
+
+def test_signing_rejects_mismatched_keypair_and_noncanonical_targets():
+    private_a, public_a = _keypair()
+    _, public_b = _keypair()
+    with pytest.raises(ValueError, match="does not match"):
+        sign_statement_for_witness(
+            private_key_b64=private_a, public_key_b64=public_b,
+            log_id="epistemic", tree_size=1, root_sha256="1" * 64,
+            witness_id="w0", independence_group="org-a",
+            observed_at="2026-09-14T17:00:00+00:00", nonce="n",
+        )
+    with pytest.raises(ValueError):
+        sign_statement_for_witness(
+            private_key_b64=private_a, public_key_b64=public_a,
+            log_id="epistemic", tree_size=True, root_sha256="1" * 64,
+            witness_id="w0", independence_group="org-a",
+            observed_at="2026-09-14T17:00:00+00:00", nonce="n",
+        )
+    with pytest.raises(ValueError):
+        sign_statement_for_witness(
+            private_key_b64=private_a, public_key_b64=public_a,
+            log_id="epistemic", tree_size=1, root_sha256="A" * 64,
+            witness_id="w0", independence_group="org-a",
+            observed_at="2026-09-14T17:00:00+00:00", nonce="n",
+        )
+    with pytest.raises(ValueError, match="normalized to UTC"):
+        sign_statement_for_witness(
+            private_key_b64=private_a, public_key_b64=public_a,
+            log_id="epistemic", tree_size=1, root_sha256="1" * 64,
+            witness_id="w0", independence_group="org-a",
+            observed_at="2026-09-14T19:00:00+02:00", nonce="n",
+        )
+
+
+def test_signed_witness_policy_rejects_bool_numeric_configuration(tmp_path):
+    private, public = _keypair()
+    witness = TrustedWitness("w0", "org-a", True, public)
+    with pytest.raises(ValueError, match="positive integer"):
+        SignedTransparencyWitnessLedger(tmp_path / "a", trusted_witnesses=(witness,), required_groups=True)
+    with pytest.raises(ValueError, match="integer between"):
+        SignedTransparencyWitnessLedger(tmp_path / "b", trusted_witnesses=(witness,), max_age_seconds=True)
+    assert private
 
 
 def test_signed_finality_bundle_verifies_only_against_external_pinned_keys(tmp_path):
