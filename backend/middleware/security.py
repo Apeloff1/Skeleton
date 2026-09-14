@@ -1,7 +1,7 @@
 """Security middleware for the FastAPI application.
 
 The middleware in this module is deliberately fail-closed around client
-identity and request sizing.  Forwarding headers are accepted only from
+identity and request sizing. Forwarding headers are accepted only from
 configured trusted proxies, rate-limit state is bounded, audit data avoids
 raw exception leakage, and body limits are enforced on streamed/chunked
 requests rather than trusting Content-Length alone.
@@ -9,6 +9,7 @@ requests rather than trusting Content-Length alone.
 from __future__ import annotations
 
 import asyncio
+import math
 import os
 import re
 import time
@@ -32,6 +33,27 @@ def _env_int(name: str, default: int, *, minimum: int, maximum: int) -> int:
     except ValueError:
         value = default
     return max(minimum, min(maximum, value))
+
+
+def _env_float(name: str, default: float, *, minimum: float, maximum: float) -> float:
+    raw = os.environ.get(name, str(default)).strip()
+    try:
+        value = float(raw)
+    except ValueError:
+        value = default
+    if not math.isfinite(value):
+        value = default
+    return max(minimum, min(maximum, value))
+
+
+def _bounded_float(value: object, default: float, *, minimum: float, maximum: float) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        parsed = default
+    if not math.isfinite(parsed):
+        parsed = default
+    return max(minimum, min(maximum, parsed))
 
 
 def _safe_content_length(value: str | None) -> int | None:
@@ -76,10 +98,18 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         prefix: str = "/api",
     ):
         super().__init__(app)
-        configured_rps = float(os.environ.get("CODEDOCK_RATE_LIMIT_RPS", "2"))
+        configured_rps = _env_float("CODEDOCK_RATE_LIMIT_RPS", 2.0, minimum=0.01, maximum=10_000.0)
         configured_burst = _env_int("CODEDOCK_RATE_LIMIT_BURST", 120, minimum=1, maximum=100_000)
-        RateLimitMiddleware._rps = max(0.01, min(10_000.0, rps or configured_rps))
-        RateLimitMiddleware._burst = max(1, min(100_000, burst or configured_burst))
+        RateLimitMiddleware._rps = _bounded_float(
+            rps if rps is not None else configured_rps,
+            configured_rps,
+            minimum=0.01,
+            maximum=10_000.0,
+        )
+        RateLimitMiddleware._burst = max(
+            1,
+            min(100_000, int(burst) if burst is not None else configured_burst),
+        )
         RateLimitMiddleware._max_buckets = _env_int(
             "CODEDOCK_RATE_LIMIT_MAX_BUCKETS", 20_000, minimum=256, maximum=1_000_000
         )
@@ -189,6 +219,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
         ua = _safe_text(request.headers.get("user-agent", ""), 200)
         state_rid = getattr(request.state, "request_id", "")
         rid = _safe_text(str(state_rid), 128) if state_rid else os.urandom(8).hex()
+        audit_path = _safe_text(request.url.path, 1024)
+        audit_method = _safe_text(request.method, 32)
         parsed_length = _safe_content_length(request.headers.get("content-length"))
         body_size = parsed_length if parsed_length is not None and parsed_length >= 0 else None
         error = None
@@ -208,8 +240,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
             AuditMiddleware._buf.append(
                 {
                     "ts": time.time(),
-                    "method": request.method,
-                    "path": request.url.path,
+                    "method": audit_method,
+                    "path": audit_path,
                     "status": status,
                     "duration_ms": dur_ms,
                     "ip": ip,
@@ -304,7 +336,10 @@ class SizeLimitMiddleware:
 
         headers = {key.lower(): value for key, value in scope.get("headers", [])}
         raw_length = headers.get(b"content-length")
-        length_text = raw_length.decode("ascii", "strict") if raw_length is not None else None
+        try:
+            length_text = raw_length.decode("ascii", "strict") if raw_length is not None else None
+        except UnicodeDecodeError:
+            length_text = "__invalid__"
         parsed_length = _safe_content_length(length_text)
         if parsed_length == -1:
             response = JSONResponse(
