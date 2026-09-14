@@ -9,6 +9,9 @@ on:
       - "backend/core/epistemic_transparency.py"
       - "backend/core/transparency_log.py"
       - "backend/core/transparency_witness.py"
+      - "backend/core/signed_transparency_witness.py"
+      - "backend/core/signed_finality_evidence.py"
+      - "backend/core/signed_portable_claim.py"
       - "backend/core/transparency_finality.py"
       - "backend/core/transparency_finality_proof.py"
       - "backend/core/portable_claim_proof.py"
@@ -16,6 +19,7 @@ on:
       - "backend/core/epistemic_attestation.py"
       - "backend/tests/test_portable_claim_proof.py"
       - "backend/tests/test_portable_finality_proof.py"
+      - "backend/tests/test_signed_portable_claim.py"
       - "backend/tests/test_claim_proof_attestation.py"
       - "backend/tests/test_transparency_log.py"
       - ".github/workflows/portable-truth-proofs.yml"
@@ -27,6 +31,9 @@ on:
       - "backend/core/epistemic_transparency.py"
       - "backend/core/transparency_log.py"
       - "backend/core/transparency_witness.py"
+      - "backend/core/signed_transparency_witness.py"
+      - "backend/core/signed_finality_evidence.py"
+      - "backend/core/signed_portable_claim.py"
       - "backend/core/transparency_finality.py"
       - "backend/core/transparency_finality_proof.py"
       - "backend/core/portable_claim_proof.py"
@@ -34,6 +41,7 @@ on:
       - "backend/core/epistemic_attestation.py"
       - "backend/tests/test_portable_claim_proof.py"
       - "backend/tests/test_portable_finality_proof.py"
+      - "backend/tests/test_signed_portable_claim.py"
       - "backend/tests/test_claim_proof_attestation.py"
       - "backend/tests/test_transparency_log.py"
       - ".github/workflows/portable-truth-proofs.yml"
@@ -53,11 +61,12 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install focused dependencies
-        run: python -m pip install "pytest>=8,<9"
-      - name: Verify membership publication finality and freshness
+        run: python -m pip install "pytest>=8,<9" "cryptography>=46.0.4,<47"
+      - name: Verify membership, transparency, signed finality and freshness
         run: >-
           python -m pytest -q
           tests/test_portable_claim_proof.py
           tests/test_portable_finality_proof.py
+          tests/test_signed_portable_claim.py
           tests/test_claim_proof_attestation.py
           tests/test_transparency_log.py
