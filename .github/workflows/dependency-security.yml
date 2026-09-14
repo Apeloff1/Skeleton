@@ -77,9 +77,6 @@ jobs:
   javascript-audit:
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    defaults:
-      run:
-        working-directory: frontend
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -92,10 +89,12 @@ jobs:
           cache-dependency-path: frontend/yarn.lock
 
       - name: Install frozen frontend dependency graph
+        working-directory: frontend
         run: yarn install --frozen-lockfile --non-interactive
 
       - name: Audit production JavaScript dependencies
         id: yarn-audit
+        working-directory: frontend
         shell: bash
         run: |
           set +e
@@ -104,12 +103,15 @@ jobs:
           echo "status=$status" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Generate frontend CycloneDX SBOM
-        run: >-
-          npx --yes @cyclonedx/cyclonedx-npm@6.0.1
-          --output-format JSON
-          --output-file "$RUNNER_TEMP/frontend-sbom.cdx.json"
-          package.json
+      - name: Generate Yarn-aware CycloneDX SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0 / Syft v1.42.3
+        with:
+          path: frontend
+          format: cyclonedx-json
+          output-file: ${{ runner.temp }}/frontend-sbom.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+          dependency-snapshot: false
 
       - name: Upload frontend audit and SBOM
         if: always()
