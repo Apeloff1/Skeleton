@@ -2,8 +2,7 @@
 
 Assurance is invariant-driven, not a vanity average. Hard failures block the
 posture; warnings degrade it. Convergence uses evidence-backed readiness, while
-durability requires process-safe journaling, monotonic identity and verified
-cross-process audit ancestry.
+durability and epistemic integrity require process-safe, attestable state.
 """
 from __future__ import annotations
 
@@ -101,6 +100,35 @@ def evaluate_assurance(
         "receipts.provenance-generation", "hard", receipt_version >= 2,
         f"receipt schema generation v{receipt_version}",
     ))
+
+    # Epistemic integrity is deploy-relevant. A system that cannot distinguish
+    # evidence from speculation must not advertise healthy assurance.
+    curiosity = operations.get("curiosity") if isinstance(operations.get("curiosity"), dict) else {}
+    verification = curiosity.get("verification") if isinstance(curiosity.get("verification"), dict) else {}
+    if verification:
+        registry = verification.get("evidence_registry") if isinstance(verification.get("evidence_registry"), dict) else {}
+        knowledge = verification.get("knowledge") if isinstance(verification.get("knowledge"), dict) else {}
+        policy = verification.get("verification_policy") if isinstance(verification.get("verification_policy"), dict) else {}
+        invariants += [
+            AssuranceInvariant("truth.gated-promotion", "hard", verification.get("truth_gated") is True,
+                               f"truth_gated={verification.get('truth_gated', False)}"),
+            AssuranceInvariant("truth.speculation-nonauthoritative", "hard", verification.get("speculation_authoritative") is False,
+                               f"speculation_authoritative={verification.get('speculation_authoritative', True)}"),
+            AssuranceInvariant("truth.model-consensus-not-evidence", "hard", verification.get("model_consensus_is_empirical_evidence") is False,
+                               f"model_consensus_is_empirical_evidence={verification.get('model_consensus_is_empirical_evidence', True)}"),
+            AssuranceInvariant("truth.evidence-registry-coherent", "hard", registry.get("cross_process_locking") is True,
+                               f"locking={registry.get('lock_backend', 'missing')}"),
+            AssuranceInvariant("truth.four-surface-knowledge", "hard", int(knowledge.get("surface_count", 0) or 0) == 4,
+                               f"surface_count={knowledge.get('surface_count', 0)}"),
+            AssuranceInvariant("truth.empirical-required", "hard", policy.get("require_empirical_support") is True,
+                               f"require_empirical_support={policy.get('require_empirical_support', False)}"),
+            AssuranceInvariant("truth.reproducibility-required", "hard", policy.get("require_reproducibility_signal") is True,
+                               f"require_reproducibility_signal={policy.get('require_reproducibility_signal', False)}"),
+            AssuranceInvariant("truth.falsifiability-required", "hard", policy.get("require_falsifiable_claim") is True,
+                               f"require_falsifiable_claim={policy.get('require_falsifiable_claim', False)}"),
+            AssuranceInvariant("truth.contradiction-blocks", "hard", policy.get("contradiction_blocks") is True,
+                               f"contradiction_blocks={policy.get('contradiction_blocks', False)}"),
+        ]
 
     coverage = float(executor_coverage.get("coverage_pct", 0.0) or 0.0)
     readiness_pct = float((readiness or {}).get("ready_pct", coverage) or 0.0)
