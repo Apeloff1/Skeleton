@@ -99,6 +99,14 @@ def test_nonfinite_rate_limit_float_falls_back(monkeypatch):
     assert middleware._rps == 2.0
 
 
+def test_invalid_programmatic_burst_falls_back():
+    async def app(scope, receive, send):
+        return None
+
+    middleware = RateLimitMiddleware(app, burst="not-an-int")
+    assert middleware._burst >= 1
+
+
 async def _body_echo_app(scope, receive, send):
     while True:
         message = await receive()
@@ -164,6 +172,22 @@ def test_size_limit_rejects_chunked_body_without_content_length():
     assert _status(events) == 413
 
 
+def test_size_limit_rejects_duplicate_content_length():
+    events = _run_size_limit(
+        headers=[(b"content-length", b"5"), (b"content-length", b"5")],
+        chunks=[b"hello"],
+    )
+    assert _status(events) == 400
+
+
+def test_size_limit_rejects_content_length_with_transfer_encoding():
+    events = _run_size_limit(
+        headers=[(b"content-length", b"5"), (b"transfer-encoding", b"chunked")],
+        chunks=[b"hello"],
+    )
+    assert _status(events) == 400
+
+
 def test_size_limit_rejects_invalid_content_length():
     events = _run_size_limit(headers=[(b"content-length", b"not-a-number")], chunks=[b"hello"])
     assert _status(events) == 400
@@ -177,6 +201,11 @@ def test_size_limit_rejects_non_ascii_content_length():
 def test_size_limit_rejects_negative_content_length():
     events = _run_size_limit(headers=[(b"content-length", b"-1")], chunks=[b"hello"])
     assert _status(events) == 400
+
+
+def test_size_limit_clamps_invalid_programmatic_limit():
+    middleware = SizeLimitMiddleware(_body_echo_app, max_mb=-100)
+    assert middleware.max_bytes == 1024 * 1024
 
 
 def test_size_limit_allows_body_under_cap():
