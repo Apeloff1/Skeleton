@@ -97,6 +97,8 @@ class DeploymentGateway:
     def _record_transition(self, *, release: ReleaseRecord, consumption: DeploymentConsumption,
                            pre_system_root_sha256: str) -> DeploymentTransitionReceipt:
         post_root = str(self.control_plane.system_root()["root_sha256"])
+        if hmac.compare_digest(pre_system_root_sha256, post_root):
+            raise DeploymentGatewayError("release activation did not rotate the whole-system root")
         return self.receipts.record(
             authorization_id=consumption.authorization_id,
             plan_sha256=consumption.plan_sha256,
@@ -135,7 +137,8 @@ class DeploymentGateway:
             if (existing_release.plan_sha256 != existing_consumption.plan_sha256
                     or existing_release.system_root_sha256 != existing_consumption.system_root_sha256
                     or existing_receipt.release_sha256 != existing_release.sha256
-                    or existing_receipt.plan_sha256 != existing_consumption.plan_sha256):
+                    or existing_receipt.plan_sha256 != existing_consumption.plan_sha256
+                    or existing_receipt.pre_system_root_sha256 != existing_consumption.system_root_sha256):
                 raise DeploymentGatewayError("release/authorization/transition evidence mismatch")
             return DeploymentExecution(authorization_id, True, None, existing_consumption,
                                        existing_release, existing_receipt)
@@ -182,8 +185,38 @@ class DeploymentGateway:
     def evidence_gaps(self) -> list[dict[str, str]]:
         releases = {row.authorization_id: row for row in self.releases.snapshot()}
         receipts = {row.authorization_id: row for row in self.receipts.snapshot()}
+        authorization_events = self.authorizations.snapshot_events()
+        consumes = {
+            str(row["authorization_id"]): row
+            for row in authorization_events
+            if row.get("kind") == "consume"
+        }
         gaps: list[dict[str, str]] = []
+
+        for authorization_id, consume in consumes.items():
+            release = releases.get(authorization_id)
+            if release is None:
+                gaps.append({
+                    "authorization_id": authorization_id,
+                    "release_id": "",
+                    "kind": "consumption_without_release",
+                })
+                continue
+            if (release.plan_sha256 != str(consume.get("plan_sha256") or "")
+                    or release.system_root_sha256 != str(consume.get("system_root_sha256") or "")):
+                gaps.append({
+                    "authorization_id": authorization_id,
+                    "release_id": release.release_id,
+                    "kind": "release_consumption_mismatch",
+                })
+
         for authorization_id, release in releases.items():
+            if authorization_id not in consumes:
+                gaps.append({
+                    "authorization_id": authorization_id,
+                    "release_id": release.release_id,
+                    "kind": "release_without_consumption",
+                })
             receipt = receipts.get(authorization_id)
             if receipt is None:
                 gaps.append({
@@ -191,12 +224,19 @@ class DeploymentGateway:
                     "release_id": release.release_id,
                     "kind": "release_without_transition_receipt",
                 })
-            elif receipt.release_sha256 != release.sha256:
+                continue
+            if (receipt.release_sha256 != release.sha256
+                    or receipt.plan_sha256 != release.plan_sha256
+                    or receipt.pre_system_root_sha256 != release.system_root_sha256
+                    or receipt.target != release.target
+                    or receipt.environment != release.environment
+                    or receipt.artifact != release.artifact):
                 gaps.append({
                     "authorization_id": authorization_id,
                     "release_id": release.release_id,
                     "kind": "release_receipt_mismatch",
                 })
+
         for authorization_id, receipt in receipts.items():
             if authorization_id not in releases:
                 gaps.append({
@@ -204,7 +244,12 @@ class DeploymentGateway:
                     "release_id": receipt.release_id,
                     "kind": "transition_receipt_without_release",
                 })
-        return gaps
+
+        return sorted(gaps, key=lambda row: (row["authorization_id"], row["kind"], row["release_id"]))
+
+    def portable_proof(self, authorization_id: str):
+        from core.deployment_proof import build_portable_deployment_proof
+        return build_portable_deployment_proof(self, authorization_id)
 
     def status(self) -> dict[str, Any]:
         gaps = self.evidence_gaps()
