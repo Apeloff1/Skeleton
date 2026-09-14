@@ -1,6 +1,7 @@
 name: Frontend Type Repair
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - "scripts/frontend_type_repair.py"
