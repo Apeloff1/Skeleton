@@ -1,8 +1,11 @@
 """Security primitives for client identity and request correlation.
 
 Forwarding headers are attacker-controlled unless the immediate peer is a
-trusted reverse proxy.  This module centralises that trust boundary so rate
+trusted reverse proxy. This module centralises that trust boundary so rate
 limits, audit logs, and access logs agree on the same client identity.
+
+The default is deliberately fail-closed: no proxy network is trusted unless
+TRUSTED_PROXY_CIDRS is configured explicitly by the deployment.
 """
 from __future__ import annotations
 
@@ -16,7 +19,9 @@ from ipaddress import IPv4Address, IPv4Network, IPv6Address, IPv6Network
 IPAddress = IPv4Address | IPv6Address
 IPNetwork = IPv4Network | IPv6Network
 
-_DEFAULT_TRUSTED_PROXY_CIDRS = "127.0.0.1/32,::1/128"
+# Never trust forwarding headers implicitly. A deployment behind a known
+# ingress must opt in with the ingress' exact CIDR(s), e.g. 10.0.0.0/24.
+_DEFAULT_TRUSTED_PROXY_CIDRS = ""
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,64}$")
 
 
@@ -62,8 +67,8 @@ def extract_client_ip(
     """Return the defensible client IP for a request.
 
     X-Forwarded-For is considered only when the immediate ASGI peer belongs to
-    TRUSTED_PROXY_CIDRS.  The chain is then walked right-to-left, discarding
-    trusted hops until the nearest untrusted address is found.  Malformed
+    TRUSTED_PROXY_CIDRS. The chain is then walked right-to-left, discarding
+    trusted hops until the nearest untrusted address is found. Malformed
     forwarded entries are ignored rather than accepted as identity strings.
     """
     peer = _parse_ip(peer_host)
