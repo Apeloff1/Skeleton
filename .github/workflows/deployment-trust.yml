@@ -58,6 +58,7 @@ on:
       - "backend/tests/test_deployment_checkpoint_verification_package.py"
       - "backend/tests/test_deployment_checkpoint_verification_dispatch.py"
       - "backend/tests/test_deployment_checkpoint_policy_rotation.py"
+      - "backend/tests/test_deployment_checkpoint_runtime_policy_status.py"
       - "backend/tests/test_deployment_preflight.py"
       - "backend/tests/test_control_plane_deployment.py"
       - "backend/tests/test_deployment_authorization.py"
@@ -146,6 +147,7 @@ on:
       - "backend/tests/test_deployment_checkpoint_verification_package.py"
       - "backend/tests/test_deployment_checkpoint_verification_dispatch.py"
       - "backend/tests/test_deployment_checkpoint_policy_rotation.py"
+      - "backend/tests/test_deployment_checkpoint_runtime_policy_status.py"
       - "backend/tests/test_deployment_preflight.py"
       - "backend/tests/test_control_plane_deployment.py"
       - "backend/tests/test_deployment_authorization.py"
@@ -215,6 +217,7 @@ jobs:
           tests/test_deployment_checkpoint_verification_package.py
           tests/test_deployment_checkpoint_verification_dispatch.py
           tests/test_deployment_checkpoint_policy_rotation.py
+          tests/test_deployment_checkpoint_runtime_policy_status.py
           tests/test_deployment_preflight.py
           tests/test_control_plane_deployment.py
           tests/test_deployment_authorization.py
