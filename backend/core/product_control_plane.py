@@ -1,7 +1,7 @@
 """Restart-safe control plane for canonical product operations.
 
-Owns durable policy persistence, admission, native executor bindings and
-integrity-checked execution receipts as one service boundary.
+Owns durable policy persistence, admission, native executor bindings, compact
+execution receipts and content-addressed result payloads as one service boundary.
 """
 from __future__ import annotations
 
@@ -84,11 +84,12 @@ class ProductControlPlane:
         receipt = self.receipts.read(operation_id)
         return asdict(receipt) if receipt is not None else None
 
+    def receipt_result(self, operation_id: str) -> dict[str, Any]:
+        return self.receipts.load_result(operation_id)
+
     def executor_coverage(self) -> dict[str, Any]:
         canonical = [(domain.domain, action) for domain in CANONICAL_PRODUCT_POLICY for action in domain.actions]
         bound = {(item["capability_id"], item["action"]) for item in self.executors.snapshot()}
-        # Domains and capability ids intentionally match for all canonical capabilities except world-forge,
-        # where they are already identical. Keep this explicit instead of guessing aliases.
         covered = [(domain, action) for domain, action in canonical if (domain, action) in bound]
         missing = [{"capability_id": domain, "action": action} for domain, action in canonical
                    if (domain, action) not in bound]
@@ -133,5 +134,5 @@ class ProductControlPlane:
                                "edicts": [asdict(edict) for edict in governance.edicts]},
                 "executors": {"bound": len(self.executors), "bindings": list(self.executors.snapshot()),
                               "coverage": self.executor_coverage()},
-                "receipts": {"count": len(self.receipts.list_recent(limit=500))},
+                "receipts": self.receipts.stats(),
                 "operations": self.operations.snapshot()}
