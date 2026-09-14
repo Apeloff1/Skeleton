@@ -90,11 +90,14 @@ def evaluate_assurance(*, lifecycle: Iterable[dict[str, Any]], operations: dict[
         calibration = verification.get("calibration") if isinstance(verification.get("calibration"), dict) else {}
         knowledge = verification.get("knowledge") if isinstance(verification.get("knowledge"), dict) else {}
         policy = verification.get("verification_policy") if isinstance(verification.get("verification_policy"), dict) else {}
+        epistemic_root = operations.get("epistemic_root") if isinstance(operations.get("epistemic_root"), dict) else {}
         truth_claims = int(truth.get("claims", 0) or 0); truth_authoritative = int(truth.get("authoritative", 0) or 0)
         truth_revoked = int(truth.get("revoked", 0) or 0); truth_expired = int(truth.get("expired", 0) or 0)
         unresolved_lineage = int(lineage.get("unresolved_lineage", 0) or 0)
         truth_counts_sane = all(x >= 0 for x in (truth_claims, truth_authoritative, truth_revoked, truth_expired)) and truth_authoritative <= truth_claims
         calibration_version = int(calibration.get("version", 0) or 0)
+        epistemic_digest = str(epistemic_root.get("root_sha256") or "")
+        epistemic_ok = epistemic_root.get("verified") is True and len(epistemic_digest) == 64
         invariants += [
             AssuranceInvariant("truth.gated-promotion", "hard", verification.get("truth_gated") is True,
                                f"truth_gated={verification.get('truth_gated', False)}"),
@@ -104,6 +107,8 @@ def evaluate_assurance(*, lifecycle: Iterable[dict[str, Any]], operations: dict[
                                f"model_consensus_is_empirical_evidence={verification.get('model_consensus_is_empirical_evidence', True)}"),
             AssuranceInvariant("truth.semantic-similarity-not-identity", "hard", verification.get("semantic_similarity_is_truth_identity") is False,
                                f"semantic_similarity_is_truth_identity={verification.get('semantic_similarity_is_truth_identity', True)}"),
+            AssuranceInvariant("truth.epistemic-root-verifiable", "hard", epistemic_ok,
+                               f"verified={epistemic_root.get('verified', False)}, root={'present' if len(epistemic_digest) == 64 else 'invalid'}"),
             AssuranceInvariant("truth.evidence-registry-coherent", "hard", registry.get("cross_process_locking") is True,
                                f"locking={registry.get('lock_backend', 'missing')}"),
             AssuranceInvariant("truth.evidence-default-citation-bound", "hard", registry.get("truth_eligible_default") is True,
