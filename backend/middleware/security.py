@@ -4,7 +4,7 @@ security.py — defensive middleware for the FastAPI app.
 Provides:
   1. RateLimitMiddleware — bounded per-client+route token bucket
   2. AuditMiddleware     — bounded, sanitized in-memory request audit
-  3. SizeLimitMiddleware — streaming request-body cap
+  3. SizeLimitMiddleware — streaming request-body and framing enforcement
   4. safe_relative_path  — strict path traversal protection
 
 The core middleware is imported unconditionally by server.py, so AuditMiddleware
@@ -14,12 +14,12 @@ basic response hardening.
 """
 from __future__ import annotations
 
-import asyncio
 import os
 import re
 import time
 from collections import OrderedDict, deque
 from pathlib import Path
+from threading import Lock
 from typing import Deque, Dict, Tuple
 
 from fastapi import Request, Response
@@ -32,6 +32,13 @@ except ImportError:
     from middleware.client_identity import client_ip, sanitize_request_id
 
 
+def _env_truthy(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 class _Bucket:
     __slots__ = ("tokens", "last_refill")
 
@@ -41,10 +48,15 @@ class _Bucket:
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Per-client, per-route-prefix token bucket with bounded LRU state."""
+    """Per-client, per-route-prefix token bucket with bounded LRU state.
+
+    The critical section contains no await points, so a process-local threading
+    lock is safer than an asyncio lock created at import time: it cannot bind to
+    the wrong event loop when uvicorn/gunicorn workers create fresh loops.
+    """
 
     _buckets: OrderedDict[Tuple[str, str], _Bucket] = OrderedDict()
-    _lock = asyncio.Lock()
+    _lock = Lock()
     _rps: float = 2.0
     _burst: int = 120
     _max_buckets: int = 20_000
@@ -70,8 +82,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         except ValueError:
             env_max = 20_000
 
-        RateLimitMiddleware._rps = min(max(rps or env_rps, 0.01), 100_000.0)
-        RateLimitMiddleware._burst = min(max(burst or env_burst, 1), 1_000_000)
+        selected_rps = env_rps if rps is None else float(rps)
+        selected_burst = env_burst if burst is None else int(burst)
+        RateLimitMiddleware._rps = min(max(selected_rps, 0.01), 100_000.0)
+        RateLimitMiddleware._burst = min(max(selected_burst, 1), 1_000_000)
         RateLimitMiddleware._max_buckets = min(max(env_max, 100), 1_000_000)
         self.prefix = prefix
 
@@ -92,7 +106,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         now = time.monotonic()
         ip, route = self._key(request)
-        async with RateLimitMiddleware._lock:
+        with RateLimitMiddleware._lock:
             key = (ip, route)
             bucket = RateLimitMiddleware._buckets.get(key)
             if bucket is None:
@@ -130,15 +144,18 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     @classmethod
     def snapshot(cls) -> dict:
         """Return limiter health without disclosing client addresses."""
+        with cls._lock:
+            lowest = [
+                {"route": key[1], "tokens_remaining": round(bucket.tokens, 2)}
+                for key, bucket in sorted(cls._buckets.items(), key=lambda kv: kv[1].tokens)[:20]
+            ]
+            active = len(cls._buckets)
         return {
             "rps": cls._rps,
             "burst": cls._burst,
-            "active_buckets": len(cls._buckets),
+            "active_buckets": active,
             "max_buckets": cls._max_buckets,
-            "lowest_tokens": [
-                {"route": k[1], "tokens_remaining": round(v.tokens, 2)}
-                for k, v in sorted(cls._buckets.items(), key=lambda kv: kv[1].tokens)[:20]
-            ],
+            "lowest_tokens": lowest,
         }
 
 
@@ -163,7 +180,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
         headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=(), usb=()")
         headers.setdefault("X-Permitted-Cross-Domain-Policies", "none")
         headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
-        headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        if request.url.scheme == "https" or _env_truthy("FORCE_HSTS"):
+            headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 
         path = request.url.path
         embeddable = path.startswith("/api/playable/") and path.endswith("/raw")
@@ -237,7 +255,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         limit = min(max(int(limit), 1), 1000)
         rows = list(cls._buf)
         if since_ts:
-            rows = [r for r in rows if r["ts"] >= since_ts]
+            rows = [row for row in rows if row["ts"] >= since_ts]
         rows = rows[-limit:]
         if not include_sensitive:
             rows = [
@@ -272,8 +290,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
             total_ms += row["duration_ms"]
         top_paths = sorted(path_counts.items(), key=lambda kv: -kv[1])[:15]
         slowest = sorted(
-            [(p, max(t), sum(t) / len(t)) for p, t in path_times.items()],
-            key=lambda x: -x[1],
+            [(path, max(times), sum(times) / len(times)) for path, times in path_times.items()],
+            key=lambda item: -item[1],
         )[:10]
         return {
             "total_requests": len(cls._buf),
@@ -282,10 +300,10 @@ class AuditMiddleware(BaseHTTPMiddleware):
             "avg_ms": round(total_ms / len(cls._buf), 2),
             "statuses": dict(sorted(statuses.items())),
             "methods": methods,
-            "top_paths": [{"path": p, "count": c} for p, c in top_paths],
+            "top_paths": [{"path": path, "count": count} for path, count in top_paths],
             "slowest": [
-                {"path": p, "p_max_ms": round(mx, 1), "p_avg_ms": round(av, 1)}
-                for p, mx, av in slowest
+                {"path": path, "p_max_ms": round(max_ms, 1), "p_avg_ms": round(avg_ms, 1)}
+                for path, max_ms, avg_ms in slowest
             ],
         }
 
@@ -294,8 +312,18 @@ class _BodyTooLarge(Exception):
     pass
 
 
+class _TooManyBodyChunks(Exception):
+    pass
+
+
 class SizeLimitMiddleware:
-    """Enforce the body cap from both Content-Length and actual ASGI chunks."""
+    """Enforce framing sanity and body caps from declared and streamed data.
+
+    Duplicate Content-Length and Content-Length+Transfer-Encoding are rejected
+    before application code runs. Those combinations are common HTTP request
+    smuggling primitives because intermediaries can disagree about which length
+    wins. Actual ASGI body bytes are always counted as a second line of defense.
+    """
 
     def __init__(self, app, max_mb: int | None = None):
         self.app = app
@@ -303,8 +331,17 @@ class SizeLimitMiddleware:
             configured = int(os.environ.get("CODEDOCK_MAX_BODY_MB", "25"))
         except ValueError:
             configured = 25
+        try:
+            configured_chunks = int(os.environ.get("CODEDOCK_MAX_BODY_CHUNKS", "8192"))
+        except ValueError:
+            configured_chunks = 8192
         selected = max_mb if max_mb is not None else configured
         self.max_bytes = min(max(int(selected), 1), 1024) * 1024 * 1024
+        self.max_chunks = min(max(configured_chunks, 32), 100_000)
+
+    @staticmethod
+    def _reject(status_code: int, error: str, **extra):
+        return JSONResponse(status_code=status_code, content={"error": error, **extra})
 
     async def __call__(self, scope, receive, send):
         if scope.get("type") != "http":
@@ -317,39 +354,57 @@ class SizeLimitMiddleware:
             await self.app(scope, receive, send)
             return
 
-        headers = {
-            key.decode("latin-1").lower(): value.decode("latin-1")
-            for key, value in scope.get("headers", [])
-        }
-        raw_length = headers.get("content-length")
-        if raw_length is not None:
-            try:
-                declared = int(raw_length)
-            except ValueError:
-                response = JSONResponse(status_code=400, content={"error": "invalid_content_length"})
+        content_lengths: list[str] = []
+        transfer_encodings: list[str] = []
+        for raw_key, raw_value in scope.get("headers", []):
+            key = bytes(raw_key).lower()
+            if key == b"content-length":
+                content_lengths.append(bytes(raw_value).decode("latin-1").strip())
+            elif key == b"transfer-encoding":
+                transfer_encodings.append(bytes(raw_value).decode("latin-1").strip())
+
+        if len(content_lengths) > 1:
+            response = self._reject(400, "ambiguous_body_framing")
+            await response(scope, receive, send)
+            return
+        if content_lengths and transfer_encodings:
+            response = self._reject(400, "ambiguous_body_framing")
+            await response(scope, receive, send)
+            return
+
+        declared: int | None = None
+        if content_lengths:
+            raw_length = content_lengths[0]
+            if not re.fullmatch(r"[0-9]+", raw_length):
+                response = self._reject(400, "invalid_content_length")
                 await response(scope, receive, send)
                 return
-            if declared < 0:
-                response = JSONResponse(status_code=400, content={"error": "invalid_content_length"})
+            try:
+                declared = int(raw_length, 10)
+            except (TypeError, ValueError, OverflowError):
+                response = self._reject(400, "invalid_content_length")
                 await response(scope, receive, send)
                 return
             if declared > self.max_bytes:
-                response = JSONResponse(
-                    status_code=413,
-                    content={"error": "payload_too_large", "limit_bytes": self.max_bytes},
-                )
+                response = self._reject(413, "payload_too_large", limit_bytes=self.max_bytes)
                 await response(scope, receive, send)
                 return
 
         seen = 0
+        chunks = 0
         response_started = False
 
         async def limited_receive():
-            nonlocal seen
+            nonlocal seen, chunks
             message = await receive()
             if message.get("type") == "http.request":
+                chunks += 1
+                if chunks > self.max_chunks:
+                    raise _TooManyBodyChunks
                 seen += len(message.get("body", b""))
                 if seen > self.max_bytes:
+                    raise _BodyTooLarge
+                if declared is not None and seen > declared:
                     raise _BodyTooLarge
             return message
 
@@ -364,10 +419,12 @@ class SizeLimitMiddleware:
         except _BodyTooLarge:
             if response_started:
                 return
-            response = JSONResponse(
-                status_code=413,
-                content={"error": "payload_too_large", "limit_bytes": self.max_bytes},
-            )
+            response = self._reject(413, "payload_too_large", limit_bytes=self.max_bytes)
+            await response(scope, receive, send)
+        except _TooManyBodyChunks:
+            if response_started:
+                return
+            response = self._reject(413, "too_many_body_chunks", max_chunks=self.max_chunks)
             await response(scope, receive, send)
 
 
