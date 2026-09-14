@@ -56,6 +56,13 @@ def _sha(value: Any) -> str:
     return hashlib.sha256(_canonical(value)).hexdigest()
 
 
+def _parse_time(value: str) -> datetime:
+    stamp = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    if stamp.tzinfo is None:
+        raise ValueError("finality timestamp must be timezone-aware")
+    return stamp.astimezone(UTC)
+
+
 def _record_hash(*, sequence: int, log_id: str, tree_size: int, root_sha256: str,
                  witness_quorum_sha256: str, witness_groups: tuple[str, ...],
                  finalized_at: str, previous_sha256: str) -> str:
@@ -104,6 +111,8 @@ class TransparencyFinality:
                 raise FinalityIntegrityError("finality ancestry mismatch")
             if not _SHA256.fullmatch(row.root_sha256) or not _SHA256.fullmatch(row.witness_quorum_sha256):
                 raise FinalityIntegrityError("finality digest malformed")
+            try: _parse_time(row.finalized_at)
+            except ValueError as exc: raise FinalityIntegrityError("finality timestamp malformed") from exc
             expected = _record_hash(sequence=row.sequence, log_id=row.log_id, tree_size=row.tree_size,
                                     root_sha256=row.root_sha256, witness_quorum_sha256=row.witness_quorum_sha256,
                                     witness_groups=row.witness_groups, finalized_at=row.finalized_at,
@@ -113,7 +122,7 @@ class TransparencyFinality:
             previous = row.sha256; last_size = row.tree_size; rows.append(row)
         return tuple(rows)
 
-    def _candidate(self) -> tuple[dict[str, Any], WitnessQuorum]:
+    def _candidate(self, *, now: datetime | None = None) -> tuple[dict[str, Any], WitnessQuorum]:
         transparency = self.transparency.health(); gossip = self.gossip.status()
         if transparency.get("verified") is not True or transparency.get("prefix_aligned") is not True:
             raise FinalityBlocked("transparency state is not internally verified")
@@ -124,13 +133,19 @@ class TransparencyFinality:
         root = str(descriptor.get("root_sha256") or "")
         if not log_id or tree_size < 1 or not _SHA256.fullmatch(root):
             raise FinalityBlocked("no publishable transparency head")
-        quorum = self.witnesses.quorum(log_id=log_id, tree_size=tree_size, root_sha256=root)
+        quorum = self.witnesses.quorum(log_id=log_id, tree_size=tree_size, root_sha256=root, now=now)
         if not quorum.reached or quorum.frozen:
-            raise FinalityBlocked("trusted witness quorum not reached")
+            stale = f", stale_receipts={quorum.stale_receipts}" if quorum.stale_receipts else ""
+            raise FinalityBlocked(
+                f"trusted witness quorum not reached: groups={quorum.independent_groups}/{quorum.required_groups}{stale}"
+            )
         return descriptor, quorum
 
     def finalize(self, *, finalized_at: str | None = None) -> FinalityRecord:
-        descriptor, quorum = self._candidate(); stamp = finalized_at or datetime.now(UTC).isoformat()
+        stamp = finalized_at or datetime.now(UTC).isoformat()
+        try: evaluation_time = _parse_time(stamp)
+        except ValueError as exc: raise FinalityBlocked(str(exc)) from exc
+        descriptor, quorum = self._candidate(now=evaluation_time)
         with self._lease.acquire():
             rows = self._load_verified(); latest = rows[-1] if rows else None
             size = int(descriptor["tree_size"]); root = str(descriptor["root_sha256"]); log_id = str(descriptor["log_id"])
@@ -164,7 +179,7 @@ class TransparencyFinality:
         latest = rows[-1] if rows else None
         blocked_reason = ""; candidate_quorum: dict[str, Any] | None = None
         try:
-            _, quorum = self._candidate(); candidate_quorum = asdict(quorum)
+            _, quorum = self._candidate(now=datetime.now(UTC)); candidate_quorum = asdict(quorum)
         except FinalityBlocked as exc:
             blocked_reason = str(exc)
         return {"version": FINALITY_VERSION, "finalized_entries": len(rows),
