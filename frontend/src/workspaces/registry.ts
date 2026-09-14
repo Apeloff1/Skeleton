@@ -35,14 +35,14 @@ export type WorkspaceDefinition = {
 export const WORKSPACES: readonly WorkspaceDefinition[] = [
   {
     id: 'jeeves',
-    title: 'Jeeves Intelligence',
-    subtitle: 'Assistant, reasoning, voice, agents and decision support',
+    title: 'Jeeves Operator',
+    subtitle: 'Control, reason, route, evaluate and adopt across the whole app',
     icon: 'sparkles',
     accent: '#A78BFA',
-    route: '/jeeves-hub',
+    route: '/jeeves-control',
     status: 'evolving',
     legacySources: ['Jeeves desktop assistant', 'stock assistant shell', 'OpenAI/API router experiments'],
-    evolvedCapabilities: ['assistant chat', 'voice', 'agent routing', 'memory', 'tool control', 'analysis surfaces'],
+    evolvedCapabilities: ['assistant chat', 'voice', 'agent routing', 'memory', 'tool control', 'analysis surfaces', 'measured adoption'],
   },
   {
     id: 'work',
