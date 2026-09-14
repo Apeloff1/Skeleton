@@ -80,6 +80,10 @@ def _clean(text: str) -> str:
     text = text.casefold().replace("−", "-").replace("–", "-").replace("—", "-")
     text = re.sub(r"(?<=\d)\s*%", " percent", text)
     text = re.sub(r"[^a-z0-9.%+\-/]+", " ", text)
+    # Keep decimal points only when they are between digits. Sentence punctuation
+    # must not become part of a unit token (for example ``milliseconds.``), or a
+    # same-number/different-unit citation can evade structural comparison.
+    text = re.sub(r"(?<!\d)\.|\.(?!\d)", " ", text)
     return " ".join(text.split())
 
 
