@@ -230,6 +230,39 @@ def test_js_ignores_security_patterns_in_block_comment(tmp_path: Path) -> None:
     assert findings == []
 
 
+def test_js_ignores_eval_and_function_text_inside_string_data(tmp_path: Path) -> None:
+    findings = _scan_js(
+        tmp_path,
+        'const docs = "eval(userInput); new Function(\\"x\\", source)";\n',
+    )
+    assert findings == []
+
+
+def test_js_ignores_tls_pattern_inside_string_data(tmp_path: Path) -> None:
+    findings = _scan_js(
+        tmp_path,
+        'const docs = "rejectUnauthorized: false";\n',
+    )
+    assert findings == []
+
+
+def test_js_rejects_eval_inside_template_expression(tmp_path: Path) -> None:
+    findings = _scan_js(
+        tmp_path,
+        "const output = `${eval(userInput)}`;\n",
+    )
+    assert any("dynamic eval() is forbidden" in finding for finding in findings)
+
+
+def test_js_ignores_pseudo_child_process_reference_in_string_data(tmp_path: Path) -> None:
+    findings = _scan_js(
+        tmp_path,
+        'const docs = "import { spawn } from child_process";\n'
+        "const config = { shell: true };\n",
+    )
+    assert findings == []
+
+
 def test_js_comment_mask_preserves_real_code_after_comment(tmp_path: Path) -> None:
     findings = _scan_js(
         tmp_path,
