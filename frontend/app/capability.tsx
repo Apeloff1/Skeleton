@@ -68,19 +68,24 @@ export default function CapabilityRoute() {
             <View style={styles.operationPill}>
               <Text style={styles.operationText}>{action.operation}</Text>
             </View>
-            {action.legacyHref ? (
+            <View style={styles.buttonRow}>
               <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => router.push(action.legacyHref as never)}
+                style={[styles.actionButton, { flex: 1 }]}
+                onPress={() => router.push(`/operation?capability=${encodeURIComponent(capability.id)}&action=${encodeURIComponent(action.id)}` as never)}
                 activeOpacity={0.8}
               >
-                <Text style={styles.actionButtonText}>Open implementation</Text>
+                <Text style={styles.actionButtonText}>Governed action</Text>
               </TouchableOpacity>
-            ) : (
-              <View style={styles.contractOnly}>
-                <Text style={styles.contractOnlyText}>Runtime contract registered</Text>
-              </View>
-            )}
+              {action.legacyHref ? (
+                <TouchableOpacity
+                  style={[styles.legacyActionButton, { flex: 1 }]}
+                  onPress={() => router.push(action.legacyHref as never)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.legacyActionButtonText}>Legacy UI</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
           </View>
         ))}
 
@@ -117,10 +122,11 @@ const styles = StyleSheet.create({
   actionDescription: { color: '#95A1B4', fontSize: 12, lineHeight: 18, marginTop: 5 },
   operationPill: { alignSelf: 'flex-start', marginTop: 12, borderRadius: 9, backgroundColor: '#151B2B', paddingHorizontal: 9, paddingVertical: 6 },
   operationText: { color: '#8F9DFF', fontFamily: 'monospace', fontSize: 10 },
-  actionButton: { marginTop: 14, borderRadius: 12, backgroundColor: '#6D5CE7', paddingHorizontal: 14, paddingVertical: 11, alignItems: 'center' },
+  buttonRow: { flexDirection: 'row', gap: 8, marginTop: 14 },
+  actionButton: { borderRadius: 12, backgroundColor: '#6D5CE7', paddingHorizontal: 14, paddingVertical: 11, alignItems: 'center' },
   actionButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '850' },
-  contractOnly: { marginTop: 14, borderRadius: 12, borderWidth: 1, borderColor: '#263047', paddingHorizontal: 14, paddingVertical: 11 },
-  contractOnlyText: { color: '#77849A', textAlign: 'center', fontSize: 11, fontWeight: '750' },
+  legacyActionButton: { borderRadius: 12, borderWidth: 1, borderColor: '#334059', paddingHorizontal: 14, paddingVertical: 11, alignItems: 'center' },
+  legacyActionButtonText: { color: '#AAB4C7', fontSize: 12, fontWeight: '800' },
   footerCard: { marginTop: 6, borderRadius: 18, borderWidth: 1, borderColor: '#30374A', padding: 16, backgroundColor: '#111622' },
   footerTitle: { color: '#DDE3EE', fontSize: 14, fontWeight: '850' },
   footerText: { color: '#7E899B', fontSize: 11, lineHeight: 17, marginTop: 5 },
