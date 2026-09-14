@@ -22,18 +22,25 @@ _NX = str(Path(__file__).resolve().parent.parent / "knowledge_nexus")
 
 
 def _isolated(fn):
-    saved_path = list(sys.path); saved_mods = set(sys.modules); sys.path.insert(0, _NX)
-    try: return fn()
+    saved_path = list(sys.path)
+    saved_mods = set(sys.modules)
+    sys.path.insert(0, _NX)
+    try:
+        return fn()
     finally:
         sys.path[:] = saved_path
         for name in list(sys.modules):
-            if name in saved_mods: continue
-            mod = sys.modules.get(name); f = getattr(mod, "__file__", "") or ""
-            if f.startswith(_NX): del sys.modules[name]
+            if name in saved_mods:
+                continue
+            mod = sys.modules.get(name)
+            f = getattr(mod, "__file__", "") or ""
+            if f.startswith(_NX):
+                del sys.modules[name]
 
 
 def _capabilities() -> dict:
-    root = Path(_NX); caps: dict[str, list[str]] = {}
+    root = Path(_NX)
+    caps: dict[str, list[str]] = {}
     if root.exists():
         for d in sorted(p for p in root.iterdir() if p.is_dir() and p.name != "__pycache__"):
             caps[d.name] = sorted(f.stem for f in d.glob("*.py"))
@@ -41,19 +48,31 @@ def _capabilities() -> dict:
 
 
 @router.on_event("startup")
-async def _start_curiosity() -> None: curiosity_service().start()
+async def _start_curiosity() -> None:
+    curiosity_service().start()
 
 
 @router.on_event("shutdown")
-async def _stop_curiosity() -> None: curiosity_service().stop()
+async def _stop_curiosity() -> None:
+    curiosity_service().stop()
 
 
 @router.get("/status")
 async def nexus_status():
-    caps = _capabilities(); curiosity = curiosity_service().status()
-    return {"vendored": bool(caps), "domains": list(caps), "module_count": sum(len(v) for v in caps.values()),
-            "capabilities": caps, "curiosity": {"enabled": curiosity["enabled"], "engine": curiosity["engine"],
-            "runtime": curiosity["runtime"], "verification": curiosity["verification"]}}
+    caps = _capabilities()
+    curiosity = curiosity_service().status()
+    return {
+        "vendored": bool(caps),
+        "domains": list(caps),
+        "module_count": sum(len(v) for v in caps.values()),
+        "capabilities": caps,
+        "curiosity": {
+            "enabled": curiosity["enabled"],
+            "engine": curiosity["engine"],
+            "runtime": curiosity["runtime"],
+            "verification": curiosity["verification"],
+        },
+    }
 
 
 @router.get("/orchestrator")
@@ -61,10 +80,15 @@ async def nexus_orchestrator():
     def _load():
         from orchestration.nexus_orchestration_layer import NexusOrchestrator
         o = NexusOrchestrator()
-        return {"ok": True, "orchestrator": "NexusOrchestrator",
-                "methods": [m for m in dir(o) if not m.startswith("_") and callable(getattr(o, m))]}
-    try: return _isolated(_load)
-    except Exception as e: return JSONResponse({"ok": False, "error": f"{type(e).__name__}: {e}"[:200]}, status_code=207)
+        return {
+            "ok": True,
+            "orchestrator": "NexusOrchestrator",
+            "methods": [m for m in dir(o) if not m.startswith("_") and callable(getattr(o, m))],
+        }
+    try:
+        return _isolated(_load)
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": f"{type(e).__name__}: {e}"[:200]}, status_code=207)
 
 
 class NexusEvent(BaseModel):
@@ -77,8 +101,10 @@ async def nexus_event(body: NexusEvent):
     def _run():
         from orchestration.nexus_orchestration_layer import NexusOrchestrator
         return NexusOrchestrator().process_important_event(body.event, body.source)
-    try: return {"ok": True, "result": _isolated(_run)}
-    except Exception as e: return JSONResponse({"ok": False, "error": f"{type(e).__name__}: {e}"[:200]}, status_code=207)
+    try:
+        return {"ok": True, "result": _isolated(_run)}
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": f"{type(e).__name__}: {e}"[:200]}, status_code=207)
 
 
 class CuriosityPrompt(BaseModel):
@@ -103,6 +129,12 @@ class TruthEvidenceBody(BaseModel):
     reproducible: bool = False
     peer_reviewed: bool = False
     primary: bool = False
+    provenance_verified: bool = False
+    preregistered: bool = False
+    data_available: bool = False
+    code_available: bool = False
+    sample_size: int | None = Field(default=None, ge=1)
+    uncertainty_reported: bool = False
     notes: str = Field(default="", max_length=4000)
 
 
@@ -118,12 +150,14 @@ async def curiosity_observe(body: CuriosityPrompt):
 
 
 @router.get("/curiosity/status")
-async def curiosity_status(): return curiosity_service().status()
+async def curiosity_status():
+    return curiosity_service().status()
 
 
 @router.get("/curiosity/frontier")
 async def curiosity_frontier(limit: int = Query(default=20, ge=1, le=100)):
-    rows = curiosity_service().frontier(limit=limit); return {"count": len(rows), "topics": rows}
+    rows = curiosity_service().frontier(limit=limit)
+    return {"count": len(rows), "topics": rows}
 
 
 @router.get("/curiosity/knowledge")
@@ -140,16 +174,32 @@ async def curiosity_verification_status():
 async def curiosity_verify_claim(body: VerifyClaimBody):
     evidence: list[EvidenceItem] = []
     for row in body.evidence:
-        try: kind = EvidenceKind(row.kind)
+        try:
+            kind = EvidenceKind(row.kind)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=f"unsupported evidence kind: {row.kind}") from exc
         evidence.append(EvidenceItem(
-            source_id=row.source_id, locator=row.locator, kind=kind, supports=row.supports,
-            independence_group=row.independence_group, quality=row.quality, observed_at=row.observed_at,
-            reproducible=row.reproducible, peer_reviewed=row.peer_reviewed, primary=row.primary, notes=row.notes,
+            source_id=row.source_id,
+            locator=row.locator,
+            kind=kind,
+            supports=row.supports,
+            independence_group=row.independence_group,
+            quality=row.quality,
+            observed_at=row.observed_at,
+            reproducible=row.reproducible,
+            peer_reviewed=row.peer_reviewed,
+            primary=row.primary,
+            notes=row.notes,
+            provenance_verified=row.provenance_verified,
+            preregistered=row.preregistered,
+            data_available=row.data_available,
+            code_available=row.code_available,
+            sample_size=row.sample_size,
+            uncertainty_reported=row.uncertainty_reported,
         ))
     result = curiosity_service().engine.verifier.verify_claim(body.claim, evidence, falsifiable=body.falsifiable)
-    payload = asdict(result); payload["state"] = result.state.value
+    payload = asdict(result)
+    payload["state"] = result.state.value
     payload["accepted_evidence"] = [{**asdict(item), "kind": item.kind.value} for item in result.accepted_evidence]
     payload["rejected_evidence"] = [{**asdict(item), "kind": item.kind.value} for item in result.rejected_evidence]
     payload["authoritative"] = result.state.value == "verified"
@@ -158,7 +208,8 @@ async def curiosity_verify_claim(body: VerifyClaimBody):
 
 @router.post("/curiosity/research")
 async def curiosity_research_now():
-    try: return await curiosity_service().run_now()
+    try:
+        return await curiosity_service().run_now()
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"curiosity research unavailable: {type(exc).__name__}: {exc}"[:1000]) from exc
 
@@ -166,5 +217,6 @@ async def curiosity_research_now():
 @router.post("/curiosity/boost")
 async def curiosity_boost(body: CuriosityBoost):
     changed = curiosity_service().engine.boost(body.subject, body.delta)
-    if not changed: raise HTTPException(status_code=404, detail="subject not found in curiosity frontier")
+    if not changed:
+        raise HTTPException(status_code=404, detail="subject not found in curiosity frontier")
     return {"subject": body.subject, "boosted": True, "delta": body.delta}
