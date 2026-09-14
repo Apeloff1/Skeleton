@@ -10,19 +10,45 @@ ROOT = Path(__file__).resolve().parents[2]
 PYTHON_REQUIREMENTS = ROOT / "backend" / "requirements.txt"
 FRONTEND_PACKAGE = ROOT / "frontend" / "package.json"
 FRONTEND_LOCK = ROOT / "frontend" / "yarn.lock"
-_PY_EXACT_RE = re.compile(r"^[A-Za-z0-9_.-]+(?:\[[^\]]+\])?==[^\s;]+(?:\s*;.*)?$")
-_MUTABLE_JS_PREFIXES = ("git+", "git://", "http://", "https://", "file:", "link:", "workspace:")
+_PY_EXACT_RE = re.compile(
+    r"^[A-Za-z0-9_.-]+(?:\[[^\]]+\])?==(?P<version>[^\s;]+)(?:\s*;.*)?$"
+)
+_MUTABLE_JS_PREFIXES = (
+    "git+",
+    "git://",
+    "git+ssh://",
+    "ssh://",
+    "http://",
+    "https://",
+    "file:",
+    "link:",
+    "workspace:",
+    "github:",
+    "gitlab:",
+    "bitbucket:",
+)
 _MUTABLE_JS_VALUES = {"*", "latest", "next", "beta", "alpha", "canary"}
+_PACKAGE_MANAGER_RE = re.compile(r"^yarn@[^+\s]+\+sha512\.[0-9a-fA-F]{128}$")
 
 
 def python_violations(path: Path = PYTHON_REQUIREMENTS) -> list[str]:
     findings: list[str] = []
     for number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         line = raw.split("#", 1)[0].strip()
-        if not line or line.startswith(("-r", "--")):
+        if not line:
             continue
-        if not _PY_EXACT_RE.fullmatch(line):
+        if line.startswith("-"):
+            findings.append(
+                f"{path.name}:{number}: requirements directives/includes are forbidden in the production manifest: {line}"
+            )
+            continue
+        match = _PY_EXACT_RE.fullmatch(line)
+        if not match:
             findings.append(f"{path.name}:{number}: production dependency is not exact-pinned: {line}")
+            continue
+        version = match.group("version")
+        if "*" in version:
+            findings.append(f"{path.name}:{number}: wildcard version is not an exact pin: {line}")
     return findings
 
 
@@ -33,8 +59,8 @@ def frontend_violations(package_path: Path = FRONTEND_PACKAGE, lock_path: Path =
 
     package = json.loads(package_path.read_text(encoding="utf-8"))
     manager = str(package.get("packageManager", "")).strip()
-    if not manager.startswith("yarn@") or "+sha512." not in manager:
-        findings.append("frontend/package.json: packageManager must pin Yarn with an integrity hash")
+    if not _PACKAGE_MANAGER_RE.fullmatch(manager):
+        findings.append("frontend/package.json: packageManager must pin Yarn with a full sha512 integrity hash")
 
     for section in ("dependencies", "devDependencies", "optionalDependencies"):
         for name, raw_value in sorted(package.get(section, {}).items()):
