@@ -4,6 +4,12 @@ This composes strict deployment-specific witness policy, the verified local chec
 publication ledger, durable signed-pin ingestion, canonical witness targets, and
 freshness-bounded quorum into one runtime. It deliberately does not alter the system
 root it observes, avoiding self-reference.
+
+Trust advancement is an audit/update primitive, not a substitute for current-head
+quorum. A previously witnessed publication can prove append-only ancestry to the
+current publication, while a policy that requires external witnesses still requires a
+fresh independent quorum on the current publication before deployment trust is
+satisfied.
 """
 from __future__ import annotations
 
@@ -25,6 +31,10 @@ from core.deployment_checkpoint_pin_ledger import (
 from core.deployment_checkpoint_target import (
     DeploymentCheckpointWitnessTarget,
     build_deployment_checkpoint_witness_target,
+)
+from core.deployment_checkpoint_trust_advance import (
+    DeploymentCheckpointTrustAdvance,
+    build_deployment_checkpoint_trust_advance,
 )
 from core.deployment_checkpoint_witness import DeploymentCheckpointPinBundle, DeploymentCheckpointPinReceipt
 
@@ -77,6 +87,27 @@ class DeploymentCheckpointPinRuntime:
         now: datetime | None = None,
     ) -> DeploymentCheckpointPinBundle:
         return self.ledger.portable_bundle(publication_sequence=publication_sequence, now=now)
+
+    def trust_advance(
+        self,
+        *,
+        publication_sequence: int,
+        now: datetime | None = None,
+    ) -> DeploymentCheckpointTrustAdvance:
+        """Advance a fresh witnessed anchor to the current append-only checkpoint head.
+
+        The anchor bundle is constructed only after the configured independent-witness
+        quorum is reached at ``now``. The returned packet remains independently
+        verifiable against externally supplied witness keys, quorum policy, anchor
+        verification time, and current publication head.
+        """
+        if type(publication_sequence) is not int or publication_sequence < 1:
+            raise ValueError("publication_sequence must be a positive integer")
+        bundle = self.portable_bundle(publication_sequence=publication_sequence, now=now)
+        return build_deployment_checkpoint_trust_advance(
+            pin_bundle=bundle,
+            checkpoint_ledger=self.checkpoints,
+        )
 
     def requirement_satisfied(self, *, now: datetime | None = None) -> bool:
         if not self.policy.required:
