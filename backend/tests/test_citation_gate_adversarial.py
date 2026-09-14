@@ -49,8 +49,12 @@ def test_exact_legacy_record_can_be_upgraded_once_with_citation_attestation(tmp_
     assert upgraded.citation_bound is True
     assert upgraded.citation_binding_attestation_sha256 == "a" * 64
     assert registry.evidence_for(claim) == (item,)
-    with pytest.raises(EvidenceRegistryIntegrityError):
-        registry.register(claim, item, citation_binding_attestation_sha256="b" * 64)
+
+    # A second independently valid citation binding is a replay, not a provenance
+    # rewrite. The first immutable attestation remains the anchor.
+    replayed = registry.register(claim, item, citation_binding_attestation_sha256="b" * 64)
+    assert replayed.id == first.id
+    assert replayed.citation_binding_attestation_sha256 == "a" * 64
 
 
 def test_same_evidence_identity_cannot_change_material_payload(tmp_path):
@@ -83,6 +87,8 @@ def test_accept_finding_rejects_strong_raw_evidence_without_citation_binding(tmp
     assert record.claims == ()
     assert engine.truth_ledger.authoritative(claim) is False
     assert engine.evidence_registry.stats()["citation_bound_records"] == 0
+    assert engine.source_lineage.get("study-a") is None
+    assert engine.source_lineage.get("study-b") is None
 
 
 def test_reverification_does_not_consume_unbound_registry_records(tmp_path):
