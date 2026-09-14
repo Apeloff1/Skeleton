@@ -1,10 +1,11 @@
 """Portable, independently verifiable deployment transition proofs.
 
 A deployment is not considered proven merely because its individual records hash.
-This packet carries the complete self-verifying preflight plus suffix witnesses from
-the authorization issue, activated release, and transition receipt to each ledger's
-current head. Verification cross-binds the decision, plan, authorization, pre-deploy
-root, release, post-deploy root, and all three durable chains.
+This packet carries the exact canonical rollout plan, the complete self-verifying
+preflight, and suffix witnesses from the authorization issue, activated release, and
+transition receipt to each ledger's current head. Verification cross-binds the plan,
+decision, authorization, release target, artifact, pre/post roots, timestamps, and all
+three durable chains.
 
 External consumers must pin the expected ledger heads out of band. Supplying heads
 from the same packet proves consistency only, not external trust.
@@ -19,9 +20,10 @@ import json
 import re
 from typing import Any, Mapping, Sequence
 
-from core.deployment_authorization import restore_preflight_snapshot
+from core.deployment_authorization import plan_digest, restore_preflight_snapshot
+from core.deployment_planner import verify_deployment_plan
 
-DEPLOYMENT_PROOF_VERSION = 2
+DEPLOYMENT_PROOF_VERSION = 3
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -30,6 +32,7 @@ class PortableDeploymentProof:
     version: int
     authorization_id: str
     plan_sha256: str
+    plan: dict[str, Any]
     pre_system_root_sha256: str
     post_system_root_sha256: str
     preflight: dict[str, Any]
@@ -73,6 +76,19 @@ def _proof_payload(proof: PortableDeploymentProof | Mapping[str, Any]) -> dict[s
     return {key: value for key, value in raw.items() if key != "proof_sha256"}
 
 
+def _portable_plan(issue: Mapping[str, Any]) -> dict[str, Any]:
+    raw = issue.get("plan")
+    if not isinstance(raw, dict) or not raw:
+        raise ValueError("deployment authorization predates portable plan snapshots")
+    plan = dict(raw)
+    if not verify_deployment_plan(plan):
+        raise ValueError("persisted deployment plan failed integrity verification")
+    expected = str(issue.get("plan_sha256") or "")
+    if not _is_sha(expected) or not hmac.compare_digest(plan_digest(plan), expected):
+        raise ValueError("persisted deployment plan diverges from authorization digest")
+    return plan
+
+
 def build_portable_deployment_proof(gateway, authorization_id: str) -> PortableDeploymentProof:
     authorization_id = str(authorization_id).strip()
     if not authorization_id:
@@ -91,6 +107,7 @@ def build_portable_deployment_proof(gateway, authorization_id: str) -> PortableD
     preflight = restore_preflight_snapshot(preflight_raw)
     if not preflight.allowed or not preflight.stable:
         raise ValueError("deployment preflight is not authorizing/stable")
+    plan = _portable_plan(issue)
     consume = next((row for row in authorization_suffix
                     if row.get("kind") == "consume" and row.get("authorization_id") == authorization_id), None)
     if consume is None:
@@ -116,10 +133,16 @@ def build_portable_deployment_proof(gateway, authorization_id: str) -> PortableD
         raise ValueError("transition receipt is missing from verified receipt history")
     receipt_suffix = tuple(asdict(row) for row in receipt_rows[receipt_index:])
 
+    if receipt.plan_sha256 != issue.get("plan_sha256") or release.plan_sha256 != issue.get("plan_sha256"):
+        raise ValueError("deployment evidence diverges from authorized plan")
+    if any(str(plan.get(field) or "") != getattr(release, field) for field in ("target", "environment", "artifact")):
+        raise ValueError("activated release diverges from authorized rollout identity")
+
     payload = {
         "version": DEPLOYMENT_PROOF_VERSION,
         "authorization_id": authorization_id,
         "plan_sha256": receipt.plan_sha256,
+        "plan": plan,
         "pre_system_root_sha256": receipt.pre_system_root_sha256,
         "post_system_root_sha256": receipt.post_system_root_sha256,
         "preflight": dict(preflight_raw),
@@ -195,6 +218,15 @@ def verify_portable_deployment_proof(
         if not authorization_id or hmac.compare_digest(pre_root, post_root):
             return False
 
+        plan = raw.get("plan")
+        if not isinstance(plan, dict) or not plan or not verify_deployment_plan(plan):
+            return False
+        if not hmac.compare_digest(plan_digest(plan), plan_sha):
+            return False
+        for field in ("target", "environment", "artifact"):
+            if not str(plan.get(field) or "").strip():
+                return False
+
         preflight_raw = raw.get("preflight")
         if not isinstance(preflight_raw, dict):
             return False
@@ -209,11 +241,14 @@ def verify_portable_deployment_proof(
         auth_suffix = tuple(dict(row) for row in raw.get("authorization_suffix") or ())
         if not _verify_chain_suffix(auth_suffix, expected_head=expected_authorization_head_sha256):
             return False
-        issue = next((row for row in auth_suffix if row.get("kind") == "issue" and row.get("authorization_id") == authorization_id), None)
-        consume = next((row for row in auth_suffix if row.get("kind") == "consume" and row.get("authorization_id") == authorization_id), None)
-        if issue is None or consume is None:
+        issue = auth_suffix[0] if auth_suffix else None
+        if issue is None or issue.get("kind") != "issue" or issue.get("authorization_id") != authorization_id:
             return False
-        if issue.get("preflight") != preflight_raw:
+        consume = next((row for row in auth_suffix[1:]
+                        if row.get("kind") == "consume" and row.get("authorization_id") == authorization_id), None)
+        if consume is None:
+            return False
+        if issue.get("preflight") != preflight_raw or issue.get("plan") != plan:
             return False
         if issue.get("preflight_sha256") != preflight.attestation_sha256:
             return False
@@ -236,6 +271,11 @@ def verify_portable_deployment_proof(
             return False
         if release.get("system_root_sha256") != pre_root:
             return False
+        if any(release.get(field) != plan.get(field) for field in ("target", "environment", "artifact")):
+            return False
+        activated_at = _parse_time(release.get("activated_at"))
+        if activated_at < consumed_at:
+            return False
         release_suffix = tuple(dict(row) for row in raw.get("release_suffix") or ())
         if not release_suffix or release_suffix[0].get("sha256") != release.get("sha256"):
             return False
@@ -253,7 +293,11 @@ def verify_portable_deployment_proof(
             return False
         if receipt.get("pre_system_root_sha256") != pre_root or receipt.get("post_system_root_sha256") != post_root:
             return False
-        if any(receipt.get(field) != release.get(field) for field in ("target", "environment", "artifact")):
+        if any(receipt.get(field) != release.get(field) or receipt.get(field) != plan.get(field)
+               for field in ("target", "environment", "artifact")):
+            return False
+        executed_at = _parse_time(receipt.get("executed_at"))
+        if executed_at != activated_at:
             return False
         receipt_suffix = tuple(dict(row) for row in raw.get("receipt_suffix") or ())
         if not receipt_suffix or receipt_suffix[0].get("sha256") != receipt.get("sha256"):
