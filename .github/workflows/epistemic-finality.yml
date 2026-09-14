@@ -1,0 +1,50 @@
+name: Epistemic Witness Finality
+
+on:
+  push:
+    paths:
+      - "backend/core/transparency_witness.py"
+      - "backend/core/transparency_witness_config.py"
+      - "backend/core/transparency_finality.py"
+      - "backend/core/transparency_finality_proof.py"
+      - "backend/core/epistemic_trust_runtime.py"
+      - "backend/core/curiosity_service.py"
+      - "backend/tests/test_transparency_finality.py"
+      - "backend/tests/test_epistemic_trust_runtime.py"
+      - "backend/tests/test_portable_finality_proof.py"
+      - ".github/workflows/epistemic-finality.yml"
+  pull_request:
+    paths:
+      - "backend/core/transparency_witness.py"
+      - "backend/core/transparency_witness_config.py"
+      - "backend/core/transparency_finality.py"
+      - "backend/core/transparency_finality_proof.py"
+      - "backend/core/epistemic_trust_runtime.py"
+      - "backend/core/curiosity_service.py"
+      - "backend/tests/test_transparency_finality.py"
+      - "backend/tests/test_epistemic_trust_runtime.py"
+      - "backend/tests/test_portable_finality_proof.py"
+      - ".github/workflows/epistemic-finality.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  epistemic-finality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install focused dependencies
+        run: python -m pip install "pytest>=8,<9"
+      - name: Verify witness diversity finality and trust runtime
+        run: >-
+          python -m pytest -q
+          tests/test_transparency_finality.py
+          tests/test_epistemic_trust_runtime.py
+          tests/test_portable_finality_proof.py
