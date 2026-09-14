@@ -2,15 +2,16 @@
 services/import_export_svc.py — ImportExport service.
 
 Extracted from server.py (Feb 2026 Phase-7). Self-contained: re-implements
-the original ImportExportService class with **identical public surface**
-and **identical singleton name** (``import_export``). Server.py keeps a
-back-compat shim so callers that do ``from server import import_export``
-work unchanged.
+the original ImportExportService class with identical public surface and
+singleton name (``import_export``).
 """
 from __future__ import annotations
 
+import html
+import json
 import re
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Any
 
 
 class ImportExportService:
@@ -27,64 +28,88 @@ class ImportExportService:
 
     SUPPORTED_EXPORT_FORMATS = ["txt", "html", "pdf", "md", "json", "zip"]
 
-    async def import_file(self, content: str, filename: str, format_hint: str = None) -> dict:
+    async def import_file(self, content: str, filename: str, format_hint: str | None = None) -> dict:
         """Import a file and detect its language."""
         extension = filename.split(".")[-1].lower() if "." in filename else (format_hint or "")
-        language  = self._detect_language(content, extension)
-        metadata  = self._extract_metadata(content, language)
+        language = self._detect_language(content, extension)
+        metadata = self._extract_metadata(content, language)
         return {
-            "success":     True,
-            "filename":    filename,
-            "language":    language,
-            "content":     content,
-            "metadata":    metadata,
-            "line_count":  len(content.splitlines()),
-            "char_count":  len(content),
+            "success": True,
+            "filename": filename,
+            "language": language,
+            "content": content,
+            "metadata": metadata,
+            "line_count": len(content.splitlines()),
+            "char_count": len(content),
         }
 
-    async def export_file(self, code: str, language: str, format: str, options: dict = None) -> dict:
+    async def export_file(
+        self,
+        code: str,
+        language: str,
+        format: str,
+        options: dict[str, Any] | None = None,
+    ) -> dict:
         """Export code in various formats."""
         options = options or {}
         if format == "txt":
             return {"content": code, "mime_type": "text/plain", "extension": ".txt"}
         if format == "html":
-            html = self._code_to_html(code, language, options)
-            return {"content": html, "mime_type": "text/html", "extension": ".html"}
+            rendered = self._code_to_html(code, language, options)
+            return {"content": rendered, "mime_type": "text/html", "extension": ".html"}
         if format == "md":
-            md = f"```{language}\n{code}\n```"
-            return {"content": md, "mime_type": "text/markdown", "extension": ".md"}
+            # Fence length is chosen dynamically so untrusted code cannot close
+            # the surrounding Markdown fence and inject sibling document blocks.
+            fence_len = max(3, self._longest_backtick_run(code) + 1)
+            fence = "`" * fence_len
+            safe_language = self._safe_language_label(language)
+            markdown = f"{fence}{safe_language}\n{code}\n{fence}"
+            return {"content": markdown, "mime_type": "text/markdown", "extension": ".md"}
         if format == "json":
-            import json
             data = {
-                "code":        code,
-                "language":    language,
-                "exported_at": datetime.utcnow().isoformat(),
-                "version":     "9.0.0",
+                "code": code,
+                "language": language,
+                "exported_at": datetime.now(timezone.utc).isoformat(),
+                "version": "9.0.0",
             }
-            return {"content": json.dumps(data, indent=2), "mime_type": "application/json", "extension": ".json"}
+            return {
+                "content": json.dumps(data, indent=2),
+                "mime_type": "application/json",
+                "extension": ".json",
+            }
         return {"error": f"Unsupported format: {format}"}
+
+    @staticmethod
+    def _longest_backtick_run(value: str) -> int:
+        runs = re.findall(r"`+", value)
+        return max((len(run) for run in runs), default=0)
+
+    @staticmethod
+    def _safe_language_label(language: str) -> str:
+        # Markdown info strings and generated HTML metadata should not accept
+        # arbitrary delimiters/control characters from request data.
+        return re.sub(r"[^A-Za-z0-9_+.#-]", "", str(language))[:64] or "text"
 
     def _detect_language(self, content: str, extension: str) -> str:
         extension_map = {
-            "py": "python",     "js": "javascript", "ts": "typescript",
-            "cpp": "cpp",       "c": "c",           "h": "c",           "hpp": "cpp",
-            "java": "java",     "kt": "kotlin",     "swift": "swift",
-            "rs": "rust",       "go": "go",         "rb": "ruby",       "php": "php",
-            "html": "html",     "css": "css",       "scss": "scss",
-            "json": "json",     "yaml": "yaml",     "yml": "yaml",
-            "xml": "xml",       "md": "markdown",   "sql": "sql",
-            "sh": "bash",       "bash": "bash",     "ps1": "powershell",
-            "r": "r",           "jl": "julia",      "lua": "lua",       "pl": "perl",
-            "ex": "elixir",     "exs": "elixir",    "hs": "haskell",
-            "ml": "ocaml",      "fs": "f_sharp",    "clj": "clojure",
-            "scala": "scala",   "dart": "dart",     "sol": "solidity",
-            "v": "verilog",     "vhd": "vhdl",      "asm": "assembly_x86",
-            "s": "assembly_arm","wat": "webassembly",
-            "tex": "latex",     "typ": "typst",     "toml": "toml",
+            "py": "python", "js": "javascript", "ts": "typescript",
+            "cpp": "cpp", "c": "c", "h": "c", "hpp": "cpp",
+            "java": "java", "kt": "kotlin", "swift": "swift",
+            "rs": "rust", "go": "go", "rb": "ruby", "php": "php",
+            "html": "html", "css": "css", "scss": "scss",
+            "json": "json", "yaml": "yaml", "yml": "yaml",
+            "xml": "xml", "md": "markdown", "sql": "sql",
+            "sh": "bash", "bash": "bash", "ps1": "powershell",
+            "r": "r", "jl": "julia", "lua": "lua", "pl": "perl",
+            "ex": "elixir", "exs": "elixir", "hs": "haskell",
+            "ml": "ocaml", "fs": "f_sharp", "clj": "clojure",
+            "scala": "scala", "dart": "dart", "sol": "solidity",
+            "v": "verilog", "vhd": "vhdl", "asm": "assembly_x86",
+            "s": "assembly_arm", "wat": "webassembly",
+            "tex": "latex", "typ": "typst", "toml": "toml",
         }
         if extension in extension_map:
             return extension_map[extension]
-        # Content-based fallback
         if content.startswith("#!/usr/bin/env python") or "import " in content[:100]:
             return "python"
         if "function " in content[:100] or "const " in content[:100]:
@@ -95,12 +120,12 @@ class ImportExportService:
 
     def _extract_metadata(self, content: str, language: str) -> dict:
         metadata: dict = {
-            "functions":       [],
-            "classes":         [],
-            "imports":         [],
-            "comments_ratio":  0,
+            "functions": [],
+            "classes": [],
+            "imports": [],
+            "comments_ratio": 0,
         }
-        lines         = content.splitlines()
+        lines = content.splitlines()
         comment_lines = 0
         for line in lines:
             stripped = line.strip()
@@ -111,9 +136,9 @@ class ImportExportService:
             if language == "python" and stripped.startswith("def "):
                 metadata["functions"].append(stripped[4:].split("(")[0])
             elif language == "javascript" and "function " in stripped:
-                m = re.search(r"function\s+(\w+)", stripped)
-                if m:
-                    metadata["functions"].append(m.group(1))
+                match = re.search(r"function\s+(\w+)", stripped)
+                if match:
+                    metadata["functions"].append(match.group(1))
             if language == "python" and stripped.startswith("class "):
                 metadata["classes"].append(stripped[6:].split("(")[0].split(":")[0])
         if lines:
@@ -121,14 +146,16 @@ class ImportExportService:
         return metadata
 
     def _code_to_html(self, code: str, language: str, options: dict) -> str:
-        theme      = options.get("theme", "dark")
-        bg_color   = "#1E1E1E" if theme == "dark" else "#FFFFFF"
+        theme = options.get("theme", "dark")
+        bg_color = "#1E1E1E" if theme == "dark" else "#FFFFFF"
         text_color = "#D4D4D4" if theme == "dark" else "#000000"
-        escaped    = code.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        escaped_code = html.escape(code, quote=True)
+        escaped_language = html.escape(self._safe_language_label(language), quote=True)
         return f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
     <title>CodeDock Export</title>
     <style>
         body {{ background: {bg_color}; color: {text_color}; font-family: 'Fira Code', monospace; padding: 20px; }}
@@ -137,8 +164,8 @@ class ImportExportService:
     </style>
 </head>
 <body>
-    <div class="header">Language: {language} | Exported from CodeDock v9.0.0</div>
-    <pre><code>{escaped}</code></pre>
+    <div class="header">Language: {escaped_language} | Exported from CodeDock v9.0.0</div>
+    <pre><code>{escaped_code}</code></pre>
 </body>
 </html>"""
 
