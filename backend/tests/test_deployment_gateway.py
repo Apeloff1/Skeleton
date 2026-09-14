@@ -69,6 +69,14 @@ def _payload(artifact="artifact-v1"):
     return {"target": "product-runtime", "environment": "staging", "strategy": "rolling", "artifact": artifact}
 
 
+def _rehash(plan):
+    body = dict(plan)
+    body.pop("plan_sha256", None)
+    return hashlib.sha256(
+        json.dumps(body, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
 def test_prepare_execute_and_idempotent_release_replay(tmp_path):
     plane, gateway = _gateway(tmp_path)
     prepared = gateway.prepare(_payload())
@@ -115,6 +123,19 @@ def test_root_or_plan_mutation_blocks_before_release_side_effect(tmp_path):
     second = gateway.prepare(_payload())
     with pytest.raises(DeploymentGatewayError, match="authorized plan"):
         gateway.execute(second.authorization.id, _payload("artifact-v2"))
+    assert gateway.releases.status()["releases"] == 0
+
+
+def test_self_consistent_but_semantically_forged_compiled_plan_is_rejected(tmp_path):
+    _, gateway = _gateway(tmp_path)
+    prepared = gateway.prepare(_payload())
+    forged = json.loads(json.dumps(prepared.plan))
+    forged["rollback"]["automatic"] = False
+    forged["plan_sha256"] = _rehash(forged)
+
+    with pytest.raises(ValueError, match="semantic verification"):
+        gateway.execute(prepared.authorization.id, forged)
+    assert gateway.authorizations.consumption(prepared.authorization.id) is None
     assert gateway.releases.status()["releases"] == 0
 
 
