@@ -7,11 +7,25 @@ health checks, rollback triggers and immutable input identity.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 from typing import Any
 
 _ALLOWED_ENVS = {"development", "staging", "production"}
 _ALLOWED_STRATEGIES = {"rolling", "canary", "blue-green"}
+_PLAN_KEYS = {
+    "schema_version",
+    "target",
+    "artifact",
+    "environment",
+    "strategy",
+    "preflight",
+    "phases",
+    "health",
+    "rollback",
+    "plan_sha256",
+}
+_HEALTH_KEYS = {"max_error_rate_pct", "max_p95_latency_ms", "min_success_rate_pct"}
 
 
 def _canonical(value: Any) -> bytes:
@@ -95,6 +109,43 @@ def compile_deployment_plan(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def verify_deployment_plan(plan: dict[str, Any]) -> bool:
-    candidate = dict(plan)
-    digest = str(candidate.pop("plan_sha256", ""))
-    return bool(digest) and hashlib.sha256(_canonical(candidate)).hexdigest() == digest
+    """Verify both cryptographic identity and compiler-defined rollout semantics.
+
+    A self-consistent hash is not enough: accepting an arbitrary object plus a freshly
+    recomputed digest would let callers bypass the compiler's environment, phase,
+    health and rollback policy. A valid plan must be byte-for-byte canonical JSON
+    equivalent to a plan that this version of the compiler can produce.
+    """
+    if not isinstance(plan, dict) or set(plan) != _PLAN_KEYS:
+        return False
+    if plan.get("schema_version") != 1:
+        return False
+    if plan.get("environment") not in _ALLOWED_ENVS or plan.get("strategy") not in _ALLOWED_STRATEGIES:
+        return False
+    health = plan.get("health")
+    phases = plan.get("phases")
+    if not isinstance(health, dict) or set(health) != _HEALTH_KEYS or not isinstance(phases, list) or not phases:
+        return False
+
+    payload: dict[str, Any] = {
+        "target": plan.get("target"),
+        "artifact": plan.get("artifact"),
+        "environment": plan.get("environment"),
+        "strategy": plan.get("strategy"),
+        "max_error_rate_pct": health.get("max_error_rate_pct"),
+        "max_p95_latency_ms": health.get("max_p95_latency_ms"),
+        "min_success_rate_pct": health.get("min_success_rate_pct"),
+    }
+    if plan.get("strategy") == "canary":
+        first = phases[0]
+        if not isinstance(first, dict) or "traffic_pct" not in first:
+            return False
+        payload["canary_percent"] = first["traffic_pct"]
+
+    try:
+        expected = compile_deployment_plan(payload)
+        supplied = _canonical(plan)
+        canonical_expected = _canonical(expected)
+    except (TypeError, ValueError, OverflowError):
+        return False
+    return hmac.compare_digest(supplied, canonical_expected)
