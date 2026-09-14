@@ -6,6 +6,9 @@ from pathlib import Path
 from scripts.check_dependency_policy import frontend_violations, python_violations
 
 
+VALID_MANAGER = "yarn@1.22.22+sha512." + ("a" * 128)
+
+
 def test_python_policy_accepts_exact_pins(tmp_path: Path) -> None:
     requirements = tmp_path / "requirements.txt"
     requirements.write_text("fastapi==1.2.3\nuvicorn[standard]==0.30.0\n", encoding="utf-8")
@@ -20,7 +23,29 @@ def test_python_policy_rejects_ranges_and_unpinned_requirements(tmp_path: Path) 
     assert all("not exact-pinned" in finding for finding in findings)
 
 
-def _package(tmp_path: Path, dependency: str, value: str, *, manager: str = "yarn@1.22.22+sha512.test") -> tuple[Path, Path]:
+def test_python_policy_rejects_nested_requirement_and_constraint_directives(tmp_path: Path) -> None:
+    requirements = tmp_path / "requirements.txt"
+    requirements.write_text("-r secondary.txt\n--constraint constraints.txt\n", encoding="utf-8")
+    findings = python_violations(requirements)
+    assert len(findings) == 2
+    assert all("directives/includes are forbidden" in finding for finding in findings)
+
+
+def test_python_policy_rejects_wildcard_exact_operator(tmp_path: Path) -> None:
+    requirements = tmp_path / "requirements.txt"
+    requirements.write_text("cryptography==46.*\n", encoding="utf-8")
+    findings = python_violations(requirements)
+    assert len(findings) == 1
+    assert "wildcard version is not an exact pin" in findings[0]
+
+
+def _package(
+    tmp_path: Path,
+    dependency: str,
+    value: str,
+    *,
+    manager: str = VALID_MANAGER,
+) -> tuple[Path, Path]:
     package = tmp_path / "package.json"
     lock = tmp_path / "yarn.lock"
     package.write_text(
@@ -43,10 +68,16 @@ def test_frontend_policy_rejects_git_and_url_sources(tmp_path: Path) -> None:
     assert any("non-registry source" in finding for finding in findings)
 
 
+def test_frontend_policy_rejects_hosted_vcs_aliases(tmp_path: Path) -> None:
+    package, lock = _package(tmp_path, "example", "github:owner/repo#main")
+    findings = frontend_violations(package, lock)
+    assert any("non-registry source" in finding for finding in findings)
+
+
 def test_frontend_policy_requires_lockfile(tmp_path: Path) -> None:
     package = tmp_path / "package.json"
     package.write_text(
-        json.dumps({"packageManager": "yarn@1.22.22+sha512.test", "dependencies": {"react": "19.1.0"}}),
+        json.dumps({"packageManager": VALID_MANAGER, "dependencies": {"react": "19.1.0"}}),
         encoding="utf-8",
     )
     findings = frontend_violations(package, tmp_path / "missing.lock")
@@ -55,6 +86,17 @@ def test_frontend_policy_requires_lockfile(tmp_path: Path) -> None:
 
 def test_frontend_policy_requires_package_manager_integrity(tmp_path: Path) -> None:
     package, lock = _package(tmp_path, "react", "19.1.0", manager="yarn@1.22.22")
+    findings = frontend_violations(package, lock)
+    assert any("integrity hash" in finding for finding in findings)
+
+
+def test_frontend_policy_rejects_truncated_package_manager_integrity(tmp_path: Path) -> None:
+    package, lock = _package(
+        tmp_path,
+        "react",
+        "19.1.0",
+        manager="yarn@1.22.22+sha512.deadbeef",
+    )
     findings = frontend_violations(package, lock)
     assert any("integrity hash" in finding for finding in findings)
 
