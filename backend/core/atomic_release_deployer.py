@@ -166,19 +166,33 @@ class AtomicReleaseDeployer:
                  *, activated_at: str | None = None) -> ReleaseRecord:
         if not verify_deployment_plan(plan):
             raise ReleaseDeploymentError("deployment plan integrity verification failed")
+        authorization_id = str(consumption.authorization_id or "").strip()
+        if not authorization_id:
+            raise ReleaseDeploymentError("authorization consumption identity is missing")
+        if not _SHA256.fullmatch(str(consumption.consume_event_sha256 or "")):
+            raise ReleaseDeploymentError("authorization consume event digest is invalid")
         bound_plan = plan_digest(plan)
         if not hmac.compare_digest(bound_plan, consumption.plan_sha256):
             raise ReleaseDeploymentError("authorization consumption is bound to a different deployment plan")
         if not _SHA256.fullmatch(consumption.system_root_sha256):
             raise ReleaseDeploymentError("authorization system root is invalid")
+        try:
+            consumed_at = _parse_time(consumption.consumed_at)
+        except ValueError as exc:
+            raise ReleaseDeploymentError("authorization consumption timestamp is invalid") from exc
 
         stamp = activated_at or datetime.now(UTC).isoformat()
-        _parse_time(stamp)
+        try:
+            activation_time = _parse_time(stamp)
+        except ValueError as exc:
+            raise ReleaseDeploymentError(str(exc)) from exc
+        if activation_time < consumed_at:
+            raise ReleaseDeploymentError("release cannot activate before authorization consumption")
         channel, lease = self._channel(plan)
         history_path = channel / "releases.jsonl"
         with lease.acquire():
             history = list(self._history(channel))
-            replay = next((row for row in history if row.authorization_id == consumption.authorization_id), None)
+            replay = next((row for row in history if row.authorization_id == authorization_id), None)
             if replay is not None:
                 if replay.plan_sha256 != bound_plan or replay.system_root_sha256 != consumption.system_root_sha256:
                     raise ReleaseDeploymentError("authorization id was previously used for different release evidence")
@@ -187,11 +201,11 @@ class AtomicReleaseDeployer:
             previous = history[-1] if history else None
             sequence = len(history) + 1
             release_id = hashlib.sha256(
-                f"{consumption.authorization_id}\0{bound_plan}\0{consumption.system_root_sha256}".encode("utf-8")
+                f"{authorization_id}\0{bound_plan}\0{consumption.system_root_sha256}".encode("utf-8")
             ).hexdigest()
             payload = {
                 "version": RELEASE_LEDGER_VERSION, "sequence": sequence, "release_id": release_id,
-                "authorization_id": consumption.authorization_id, "target": str(plan["target"]),
+                "authorization_id": authorization_id, "target": str(plan["target"]),
                 "environment": str(plan["environment"]), "artifact": str(plan["artifact"]),
                 "plan_sha256": bound_plan, "system_root_sha256": consumption.system_root_sha256,
                 "activated_at": stamp, "previous_release_id": previous.release_id if previous else "",
