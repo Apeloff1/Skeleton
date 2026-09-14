@@ -4,7 +4,7 @@ A deployment checkpoint is useful to an external verifier only after its root ha
 been anchored somewhere durable. This ledger provides that local anchoring primitive:
 each publication embeds a fully self-verifying checkpoint, links to the prior
 publication, uses strict canonical JSON, fsyncs before returning, and validates
-monotonic release/channel evolution on every replay.
+monotonic authorization, receipt, release, and channel evolution on every replay.
 
 The ledger intentionally allows checkpoints that report evidence gaps. Recording an
 incident is part of the forensic truth. Such a checkpoint remains unsuitable as proof
@@ -24,7 +24,6 @@ from typing import Any, Mapping
 
 from core.canonical_json import CanonicalJSONError, canonical_json_sha256, canonical_json_text
 from core.deployment_evidence_checkpoint import (
-    DEPLOYMENT_EVIDENCE_CHECKPOINT_VERSION,
     DeploymentEvidenceCheckpoint,
     ReleaseChannelCheckpoint,
     verify_deployment_evidence_checkpoint,
@@ -47,7 +46,9 @@ _PUBLICATION_KEYS = {
 _CHECKPOINT_KEYS = {
     "version",
     "authorization_head_sha256",
+    "authorization_events",
     "receipt_head_sha256",
+    "receipt_events",
     "release_channels",
     "completed_releases",
     "fully_portable_releases",
@@ -114,7 +115,9 @@ def _checkpoint_from_mapping(raw: Any) -> DeploymentEvidenceCheckpoint:
     checkpoint = DeploymentEvidenceCheckpoint(
         version=raw.get("version"),
         authorization_head_sha256=raw.get("authorization_head_sha256"),
+        authorization_events=raw.get("authorization_events"),
         receipt_head_sha256=raw.get("receipt_head_sha256"),
+        receipt_events=raw.get("receipt_events"),
         release_channels=tuple(channels),
         completed_releases=raw.get("completed_releases"),
         fully_portable_releases=raw.get("fully_portable_releases"),
@@ -138,7 +141,32 @@ def _channel_index(checkpoint: DeploymentEvidenceCheckpoint) -> dict[tuple[str, 
     return {(row.environment, row.target): row for row in checkpoint.release_channels}
 
 
+def _validate_counted_head(*, label: str, previous_count: int, current_count: int,
+                           previous_head: str, current_head: str) -> None:
+    if current_count < previous_count:
+        raise DeploymentCheckpointLedgerError(f"deployment checkpoint {label} event count regressed")
+    same_head = hmac.compare_digest(previous_head, current_head)
+    if current_count == previous_count and not same_head:
+        raise DeploymentCheckpointLedgerError(f"deployment checkpoint {label} head changed without an event")
+    if current_count > previous_count and same_head:
+        raise DeploymentCheckpointLedgerError(f"deployment checkpoint {label} events advanced without rotating head")
+
+
 def _validate_evolution(previous: DeploymentEvidenceCheckpoint, current: DeploymentEvidenceCheckpoint) -> None:
+    _validate_counted_head(
+        label="authorization",
+        previous_count=previous.authorization_events,
+        current_count=current.authorization_events,
+        previous_head=previous.authorization_head_sha256,
+        current_head=current.authorization_head_sha256,
+    )
+    _validate_counted_head(
+        label="receipt",
+        previous_count=previous.receipt_events,
+        current_count=current.receipt_events,
+        previous_head=previous.receipt_head_sha256,
+        current_head=current.receipt_head_sha256,
+    )
     if current.completed_releases < previous.completed_releases:
         raise DeploymentCheckpointLedgerError("deployment checkpoint release count regressed")
     if current.fully_portable_releases < previous.fully_portable_releases:
@@ -232,14 +260,15 @@ class DeploymentCheckpointLedger:
         rows: list[DeploymentCheckpointPublication] = []
         roots: set[str] = set()
         previous_time: datetime | None = None
-        for expected_sequence, line in enumerate(lines, start=1):
+        for line in lines:
             if not line.strip():
-                continue
+                raise DeploymentCheckpointLedgerError("checkpoint publication ledger contains blank record")
             try:
                 raw = json.loads(line)
             except json.JSONDecodeError as exc:
                 raise DeploymentCheckpointLedgerError("checkpoint publication ledger malformed") from exc
             row = _restore_publication(raw)
+            expected_sequence = len(rows) + 1
             if row.sequence != expected_sequence:
                 raise DeploymentCheckpointLedgerError("checkpoint publication sequence mismatch")
             previous = rows[-1] if rows else None
