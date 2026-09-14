@@ -7,6 +7,7 @@ import pytest
 
 from core.deployment_checkpoint_proof import (
     build_deployment_checkpoint_publication_proof,
+    verify_deployment_checkpoint_publication_extension,
     verify_deployment_checkpoint_publication_proof,
 )
 from core.deployment_gateway import DeploymentGateway
@@ -106,6 +107,11 @@ def test_external_head_and_start_root_are_not_self_asserted(tmp_path):
         expected_ledger_head_sha256=proof.ledger_head_sha256,
         expected_start_checkpoint_root_sha256="e" * 64,
     ) is False
+    assert verify_deployment_checkpoint_publication_proof(
+        proof,
+        expected_ledger_head_sha256=proof.ledger_head_sha256,
+        expected_start_publication_sha256="d" * 64,
+    ) is False
 
 
 def test_publication_tampering_fails_even_when_outer_proof_shape_is_unchanged(tmp_path):
@@ -139,6 +145,48 @@ def test_truncated_suffix_cannot_verify_against_newer_external_head(tmp_path):
     assert verify_deployment_checkpoint_publication_proof(
         truncated,
         expected_ledger_head_sha256=proof.ledger_head_sha256,
+    ) is False
+
+
+def test_old_pinned_publication_head_can_advance_trust_without_genesis_replay(tmp_path):
+    gateway = _gateway(tmp_path)
+    _deploy(gateway, "artifact-v1")
+    old_history = gateway.checkpoints.history()
+    anchor = old_history[-1]
+
+    _deploy(gateway, "artifact-v2")
+    proof = build_deployment_checkpoint_publication_proof(gateway.checkpoints, anchor.sequence)
+    new_head = gateway.checkpoints.status()["head_sha256"]
+
+    assert proof.publications[0].sha256 == anchor.sha256
+    assert proof.start_sequence == anchor.sequence
+    assert proof.start_sequence > 1
+    assert verify_deployment_checkpoint_publication_extension(
+        proof,
+        expected_previous_ledger_head_sha256=anchor.sha256,
+        expected_current_ledger_head_sha256=new_head,
+    ) is True
+
+
+def test_checkpoint_extension_rejects_wrong_old_pin_and_forked_anchor(tmp_path):
+    gateway = _gateway(tmp_path)
+    _deploy(gateway, "artifact-v1")
+    anchor = gateway.checkpoints.history()[-1]
+    _deploy(gateway, "artifact-v2")
+    proof = build_deployment_checkpoint_publication_proof(gateway.checkpoints, anchor.sequence)
+
+    assert verify_deployment_checkpoint_publication_extension(
+        proof,
+        expected_previous_ledger_head_sha256="f" * 64,
+        expected_current_ledger_head_sha256=proof.ledger_head_sha256,
+    ) is False
+
+    forked_anchor = replace(proof.publications[0], previous_sha256="e" * 64)
+    forked = replace(proof, publications=(forked_anchor, *proof.publications[1:]))
+    assert verify_deployment_checkpoint_publication_extension(
+        forked,
+        expected_previous_ledger_head_sha256=anchor.sha256,
+        expected_current_ledger_head_sha256=proof.ledger_head_sha256,
     ) is False
 
 
