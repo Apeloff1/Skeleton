@@ -39,6 +39,37 @@ def _digest(value: Any) -> str:
     return hashlib.sha256(_canonical(value)).hexdigest()
 
 
+def _epistemic_trust_invariants(operations: dict[str, Any]) -> list[AssuranceInvariant]:
+    trust = operations.get("epistemic_trust") if isinstance(operations.get("epistemic_trust"), dict) else {}
+    if not trust:
+        return []
+    witnesses = trust.get("witnesses") if isinstance(trust.get("witnesses"), dict) else {}
+    finality = trust.get("finality") if isinstance(trust.get("finality"), dict) else {}
+    policy = trust.get("policy") if isinstance(trust.get("policy"), dict) else {}
+    current = trust.get("current_head") if isinstance(trust.get("current_head"), dict) else {}
+    witness_ok = witnesses.get("healthy") is True and witnesses.get("cross_process_locking") is True
+    finality_ok = finality.get("verified") is True and finality.get("cross_process_locking") is True
+    integrity_ok = trust.get("integrity_healthy") is True and witness_ok and finality_ok
+    finality_required = policy.get("finality_required") is True
+    quorum_capable = policy.get("quorum_capable") is True
+    finality_satisfied = trust.get("finality_satisfied") is True and current.get("finalized") is True
+    configured_groups = int(policy.get("configured_independence_groups", 0) or 0)
+    required_groups = int(policy.get("required_groups", 0) or 0)
+    max_age = int(policy.get("max_age_seconds", 0) or 0)
+    return [
+        AssuranceInvariant("truth.trust-runtime-integrity", "hard", integrity_ok,
+                           f"integrity_healthy={trust.get('integrity_healthy', False)}"),
+        AssuranceInvariant("truth.witness-ledger-coherent", "hard", witness_ok,
+                           f"healthy={witnesses.get('healthy', False)}, locking={witnesses.get('lock_backend', 'missing')}"),
+        AssuranceInvariant("truth.finality-ledger-coherent", "hard", finality_ok,
+                           f"verified={finality.get('verified', False)}, locking={finality.get('lock_backend', 'missing')}"),
+        AssuranceInvariant("truth.witness-quorum-capable", "hard" if finality_required else "warning", quorum_capable,
+                           f"groups={configured_groups}/{required_groups}, witness_max_age_seconds={max_age}"),
+        AssuranceInvariant("truth.current-head-finalized", "hard" if finality_required else "warning", finality_satisfied,
+                           f"required={finality_required}, finalized={finality_satisfied}"),
+    ]
+
+
 def evaluate_assurance(*, lifecycle: Iterable[dict[str, Any]], operations: dict[str, Any],
                        executor_bindings: Iterable[dict[str, Any]], executor_coverage: dict[str, Any],
                        receipt_stats: dict[str, Any], readiness: dict[str, Any] | None = None) -> AssuranceReport:
@@ -164,6 +195,8 @@ def evaluate_assurance(*, lifecycle: Iterable[dict[str, Any]], operations: dict[
             AssuranceInvariant("truth.gossip-process-safe", "hard", gossip.get("cross_process_locking") is True,
                                f"locking={gossip.get('lock_backend', 'missing')}"),
         ]
+
+    invariants += _epistemic_trust_invariants(operations)
 
     coverage = float(executor_coverage.get("coverage_pct", 0.0) or 0.0)
     readiness_pct = float((readiness or {}).get("ready_pct", coverage) or 0.0)
