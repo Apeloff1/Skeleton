@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppHeader, Chip, FeatureCard, Screen, SearchBar, SectionHeader } from '../components/UI';
 import theme from '../theme/tokens';
 import { WORKSPACES, WORKSPACE_COUNTS, WorkspaceStatus } from '../src/workspaces/registry';
+import { LEGACY_ACTIVE, LEGACY_COVERAGE, LEGACY_TOTAL } from '../src/workspaces/legacyMap';
 
 type Filter = 'all' | WorkspaceStatus;
 
@@ -59,6 +60,22 @@ export default function WorkspacesScreen() {
           <Stat label="Migration" value={WORKSPACE_COUNTS.migration} />
         </View>
 
+        <View style={styles.coverageCard}>
+          <View style={styles.coverageTop}>
+            <View>
+              <Text style={styles.coverageEyebrow}>LEGACY ABSORPTION</Text>
+              <Text style={styles.coverageTitle}>{LEGACY_COVERAGE}% capability coverage</Text>
+            </View>
+            <Text style={styles.coverageCount}>{LEGACY_ACTIVE}/{LEGACY_TOTAL}</Text>
+          </View>
+          <View style={styles.track}>
+            <View style={[styles.fill, { width: `${LEGACY_COVERAGE}%` }]} />
+          </View>
+          <Text style={styles.coverageText}>
+            Coverage counts capabilities that are already absorbed or actively evolving. Queued and retired behavior stays explicit in the migration ledger.
+          </Text>
+        </View>
+
         <SearchBar
           value={query}
           onChangeText={setQuery}
@@ -94,6 +111,16 @@ export default function WorkspacesScreen() {
             />
           ))}
         </View>
+
+        <SectionHeader title="Migration Oversight" subtitle="Track every legacy capability to a canonical destination" />
+        <FeatureCard
+          title="Legacy Absorption Map"
+          subtitle={`${LEGACY_TOTAL} capabilities tracked across ${WORKSPACES.length} canonical workspaces`}
+          icon="git-merge"
+          color={theme.colors.primaryHover}
+          badge={`${LEGACY_COVERAGE}% covered`}
+          onPress={() => router.push('/migration-map' as any)}
+        />
 
         <SectionHeader title="Migration Contract" />
         <View style={styles.contract}>
@@ -162,6 +189,26 @@ const styles = StyleSheet.create({
   },
   statValue: { ...theme.typography.h2, color: theme.colors.text },
   statLabel: { ...theme.typography.caption, color: theme.colors.textMuted, marginTop: 2 },
+  coverageCard: {
+    padding: theme.spacing.base,
+    borderRadius: theme.radii.xl,
+    borderWidth: 1,
+    borderColor: `${theme.colors.primary}55`,
+    backgroundColor: theme.colors.surface,
+  },
+  coverageTop: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: theme.spacing.md },
+  coverageEyebrow: { ...theme.typography.micro, color: theme.colors.primaryHover },
+  coverageTitle: { ...theme.typography.h3, color: theme.colors.text, marginTop: 3 },
+  coverageCount: { ...theme.typography.monoSm, color: theme.colors.textMuted },
+  track: {
+    height: 7,
+    borderRadius: theme.radii.full,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.surfaceAlt,
+    marginTop: theme.spacing.md,
+  },
+  fill: { height: '100%', borderRadius: theme.radii.full, backgroundColor: theme.colors.primaryHover },
+  coverageText: { ...theme.typography.caption, color: theme.colors.textMuted, marginTop: theme.spacing.sm },
   filters: { gap: theme.spacing.sm, paddingVertical: 2 },
   grid: { gap: theme.spacing.sm },
   contract: {
