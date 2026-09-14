@@ -36,6 +36,7 @@ class MetricSpec:
     ceiling: float | None = None
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "direction", Direction(self.direction))
         if not self.name.strip():
             raise ValueError("metric name must be non-empty")
         if not math.isfinite(self.weight) or self.weight <= 0:
@@ -61,6 +62,7 @@ class EvolutionCandidate:
     scope: Sequence[str] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "mode", ChangeMode(self.mode))
         if not self.candidate_id.strip() or not self.baseline_id.strip():
             raise ValueError("candidate_id and baseline_id are required")
         if self.candidate_id == self.baseline_id:
