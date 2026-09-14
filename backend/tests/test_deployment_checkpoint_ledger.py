@@ -70,13 +70,17 @@ def _gateway(tmp_path):
     return gateway
 
 
-def _deploy(gateway, artifact: str, *, target: str = "runtime"):
-    prepared = gateway.prepare({
+def _prepare(gateway, artifact: str, *, target: str = "runtime"):
+    return gateway.prepare({
         "target": target,
         "environment": "staging",
         "strategy": "rolling",
         "artifact": artifact,
     })
+
+
+def _deploy(gateway, artifact: str, *, target: str = "runtime"):
+    prepared = _prepare(gateway, artifact, target=target)
     gateway.execute(prepared.authorization.id, prepared.plan)
     return prepared
 
@@ -85,7 +89,9 @@ def _checkpoint_payload(checkpoint: DeploymentEvidenceCheckpoint, *, include_roo
     payload = {
         "version": checkpoint.version,
         "authorization_head_sha256": checkpoint.authorization_head_sha256,
+        "authorization_events": checkpoint.authorization_events,
         "receipt_head_sha256": checkpoint.receipt_head_sha256,
+        "receipt_events": checkpoint.receipt_events,
         "release_channels": [asdict(item) for item in checkpoint.release_channels],
         "completed_releases": checkpoint.completed_releases,
         "fully_portable_releases": checkpoint.fully_portable_releases,
@@ -112,6 +118,8 @@ def test_publications_persist_ancestry_and_same_head_is_idempotent(tmp_path):
     gateway = _gateway(tmp_path)
     ledger = DeploymentCheckpointLedger(tmp_path / "checkpoints")
     empty = build_deployment_evidence_checkpoint(gateway)
+    assert empty.authorization_events == 0
+    assert empty.receipt_events == 0
     first = ledger.publish(empty, published_at="2026-09-14T12:00:00+00:00")
     replay = ledger.publish(empty, published_at="2026-09-14T12:00:01+00:00")
     assert replay == first
@@ -119,6 +127,8 @@ def test_publications_persist_ancestry_and_same_head_is_idempotent(tmp_path):
 
     _deploy(gateway, "artifact-v1")
     current = build_deployment_evidence_checkpoint(gateway)
+    assert current.authorization_events == 2
+    assert current.receipt_events == 1
     second = ledger.publish(current, published_at="2026-09-14T12:01:00+00:00")
 
     assert second.sequence == 2
@@ -145,6 +155,56 @@ def test_historical_checkpoint_root_cannot_be_republished_as_rollback(tmp_path):
         ledger.publish(empty, published_at="2026-09-14T12:02:00+00:00")
 
 
+def test_stale_authorization_head_is_rejected_by_event_count(tmp_path):
+    gateway = _gateway(tmp_path)
+    stale = build_deployment_evidence_checkpoint(gateway)
+    _prepare(gateway, "artifact-v1")
+    fresh = build_deployment_evidence_checkpoint(gateway)
+    assert stale.authorization_events == 0
+    assert fresh.authorization_events == 1
+
+    ledger = DeploymentCheckpointLedger(tmp_path / "checkpoints")
+    ledger.publish(fresh, published_at="2026-09-14T12:00:00+00:00")
+    with pytest.raises(DeploymentCheckpointLedgerError, match="authorization event count regressed"):
+        ledger.publish(stale, published_at="2026-09-14T12:01:00+00:00")
+
+
+def test_authorization_head_cannot_change_at_same_event_count(tmp_path):
+    gateway = _gateway(tmp_path)
+    _prepare(gateway, "artifact-v1")
+    checkpoint = build_deployment_evidence_checkpoint(gateway)
+    forged = _reseal(checkpoint, authorization_head_sha256="f" * 64)
+    ledger = DeploymentCheckpointLedger(tmp_path / "checkpoints")
+    ledger.publish(checkpoint, published_at="2026-09-14T12:00:00+00:00")
+
+    with pytest.raises(DeploymentCheckpointLedgerError, match="authorization head changed without an event"):
+        ledger.publish(forged, published_at="2026-09-14T12:01:00+00:00")
+
+
+def test_event_count_cannot_advance_without_rotating_head(tmp_path):
+    gateway = _gateway(tmp_path)
+    _prepare(gateway, "artifact-v1")
+    checkpoint = build_deployment_evidence_checkpoint(gateway)
+    forged = _reseal(checkpoint, authorization_events=checkpoint.authorization_events + 1)
+    ledger = DeploymentCheckpointLedger(tmp_path / "checkpoints")
+    ledger.publish(checkpoint, published_at="2026-09-14T12:00:00+00:00")
+
+    with pytest.raises(DeploymentCheckpointLedgerError, match="authorization events advanced without rotating head"):
+        ledger.publish(forged, published_at="2026-09-14T12:01:00+00:00")
+
+
+def test_receipt_count_cannot_advance_without_rotating_head(tmp_path):
+    gateway = _gateway(tmp_path)
+    _deploy(gateway, "artifact-v1")
+    checkpoint = build_deployment_evidence_checkpoint(gateway)
+    forged = _reseal(checkpoint, receipt_events=checkpoint.receipt_events + 1)
+    ledger = DeploymentCheckpointLedger(tmp_path / "checkpoints")
+    ledger.publish(checkpoint, published_at="2026-09-14T12:00:00+00:00")
+
+    with pytest.raises(DeploymentCheckpointLedgerError, match="receipt events advanced without rotating head"):
+        ledger.publish(forged, published_at="2026-09-14T12:01:00+00:00")
+
+
 def test_valid_but_older_release_state_cannot_follow_newer_checkpoint(tmp_path):
     gateway = _gateway(tmp_path)
     _deploy(gateway, "artifact-v1")
@@ -154,7 +214,9 @@ def test_valid_but_older_release_state_cannot_follow_newer_checkpoint(tmp_path):
     ledger = DeploymentCheckpointLedger(tmp_path / "checkpoints")
     ledger.publish(two_releases, published_at="2026-09-14T12:02:00+00:00")
 
-    with pytest.raises(DeploymentCheckpointLedgerError, match="release count regressed"):
+    # Authorization count regression is detected even before the redundant release-count
+    # invariant, proving a stale writer cannot hide behind a plausible release channel.
+    with pytest.raises(DeploymentCheckpointLedgerError, match="event count regressed"):
         ledger.publish(one_release, published_at="2026-09-14T12:03:00+00:00")
 
 
