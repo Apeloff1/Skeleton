@@ -12,18 +12,33 @@ def test_journal_is_durable_and_restores(tmp_path):
     assert first.seq == 1
     assert second.seq == 2
     assert outbox.pending_count == 2
+    assert outbox.capacity_remaining == 2
 
     restored = DurableOutbox(tmp_path, cap=4)
     assert [entry.seq for entry in restored.pending()] == [1, 2]
     assert restored.pending()[0].payload == {"id": "a"}
+    assert restored.capacity_remaining == 2
 
 
 def test_full_outbox_backpressures_without_evicting(tmp_path):
     outbox = DurableOutbox(tmp_path, cap=1)
+    assert outbox.has_capacity() is True
     outbox.journal("builds", {"id": "a"})
+    assert outbox.has_capacity() is False
+    assert outbox.capacity_remaining == 0
     with pytest.raises(OutboxFullError, match="backpressured"):
         outbox.journal("builds", {"id": "b"})
     assert [entry.payload["id"] for entry in outbox.pending()] == ["a"]
+
+
+def test_capacity_preflight_supports_batch_queries(tmp_path):
+    outbox = DurableOutbox(tmp_path, cap=3)
+    assert outbox.has_capacity(3) is True
+    outbox.journal("x", {"id": 1})
+    assert outbox.has_capacity(2) is True
+    assert outbox.has_capacity(3) is False
+    with pytest.raises(ValueError, match="negative"):
+        outbox.has_capacity(-1)
 
 
 def test_confirm_removes_only_after_success(tmp_path):
