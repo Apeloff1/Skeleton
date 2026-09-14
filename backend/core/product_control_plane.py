@@ -13,6 +13,7 @@ from typing import Any
 from core.canonical_product_policy import CANONICAL_PRODUCT_POLICY, POLICY_VERSION
 from core.charter_policy import Charter, CharterPolicy, Edict, Rule
 from core.policy_repository import PolicyRepository
+from core.product_executor_registry import ExecutorNotRegistered, ProductExecutorRegistry
 from core.product_kernel import PRODUCT_KERNEL, ProductKernel
 from core.product_operations import AdmittedOperation, ProductOperationCoordinator
 
@@ -80,6 +81,34 @@ class ProductControlPlane:
             }
             for operation in self.operations.pending_operations()
         ]
+
+    async def execute_registered(self, seq: int, registry: ProductExecutorRegistry) -> bool:
+        operation = next((item for item in self.operations.pending_operations() if item.outbox_seq == seq), None)
+        if operation is None:
+            return False
+        try:
+            executor = registry.executor_for(operation)
+        except ExecutorNotRegistered:
+            return False
+        result = await self.operations.execute_one(seq, executor)
+        return result.confirmed
+
+    async def execute_registered_pending(
+        self,
+        registry: ProductExecutorRegistry,
+        *,
+        limit: int | None = None,
+    ) -> int:
+        pending = self.operations.pending_operations()
+        if limit is not None:
+            if limit < 0:
+                raise ValueError("limit cannot be negative")
+            pending = pending[:limit]
+        confirmed = 0
+        for operation in pending:
+            if await self.execute_registered(operation.outbox_seq, registry):
+                confirmed += 1
+        return confirmed
 
     def status(self) -> dict[str, Any]:
         governance = self.policy.snapshot()
