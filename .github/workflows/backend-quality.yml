@@ -9,11 +9,13 @@ on:
     paths:
       - "backend/**"
       - ".github/workflows/backend-quality.yml"
+      - ".gitattributes"
   pull_request:
     paths:
       - "backend/**"
       - ".github/workflows/backend-quality.yml"
       - ".github/workflows/**"
+      - ".gitattributes"
       - "frontend/package.json"
       - "frontend/yarn.lock"
 
@@ -68,6 +70,9 @@ jobs:
       - name: Immutable dependency declaration policy
         run: python scripts/check_dependency_policy.py
 
+      - name: Repository artifact policy
+        run: python scripts/check_artifact_policy.py
+
       - name: Audit Python dependencies for known vulnerabilities
         uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
         with:
@@ -114,6 +119,7 @@ jobs:
           tests/test_workflow_security_gate.py
           tests/test_secret_hygiene_gate.py
           tests/test_dependency_policy.py
+          tests/test_artifact_policy.py
           tests/test_sbom_generator.py
           tests/test_build_provenance.py
           tests/test_security_config.py
