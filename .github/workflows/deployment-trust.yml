@@ -44,6 +44,7 @@ on:
       - "backend/tests/test_deployment_checkpoint_pin_config.py"
       - "backend/tests/test_deployment_checkpoint_pin_wire.py"
       - "backend/tests/test_deployment_checkpoint_assurance.py"
+      - "backend/tests/test_deployment_checkpoint_route_architecture.py"
       - "backend/tests/test_deployment_preflight.py"
       - "backend/tests/test_control_plane_deployment.py"
       - "backend/tests/test_deployment_authorization.py"
@@ -118,6 +119,7 @@ on:
       - "backend/tests/test_deployment_checkpoint_pin_config.py"
       - "backend/tests/test_deployment_checkpoint_pin_wire.py"
       - "backend/tests/test_deployment_checkpoint_assurance.py"
+      - "backend/tests/test_deployment_checkpoint_route_architecture.py"
       - "backend/tests/test_deployment_preflight.py"
       - "backend/tests/test_control_plane_deployment.py"
       - "backend/tests/test_deployment_authorization.py"
@@ -179,6 +181,7 @@ jobs:
           tests/test_deployment_checkpoint_pin_config.py
           tests/test_deployment_checkpoint_pin_wire.py
           tests/test_deployment_checkpoint_assurance.py
+          tests/test_deployment_checkpoint_route_architecture.py
           tests/test_deployment_preflight.py
           tests/test_control_plane_deployment.py
           tests/test_deployment_authorization.py
