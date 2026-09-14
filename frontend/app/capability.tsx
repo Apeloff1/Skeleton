@@ -69,16 +69,26 @@ export default function CapabilityRoute() {
               <Text style={styles.operationText}>{action.operation}</Text>
             </View>
             <View style={styles.buttonRow}>
-              <TouchableOpacity
-                style={[styles.actionButton, { flex: 1 }]}
-                onPress={() => router.push(`/operation?capability=${encodeURIComponent(capability.id)}&action=${encodeURIComponent(action.id)}` as never)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.actionButtonText}>Governed action</Text>
-              </TouchableOpacity>
+              {action.href ? (
+                <TouchableOpacity
+                  style={[styles.nativeActionButton, styles.flexButton]}
+                  onPress={() => router.push(action.href as never)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.nativeActionButtonText}>Open product surface</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.flexButton]}
+                  onPress={() => router.push(`/operation?capability=${encodeURIComponent(capability.id)}&action=${encodeURIComponent(action.id)}` as never)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.actionButtonText}>Governed action</Text>
+                </TouchableOpacity>
+              )}
               {action.legacyHref ? (
                 <TouchableOpacity
-                  style={[styles.legacyActionButton, { flex: 1 }]}
+                  style={[styles.legacyActionButton, styles.flexButton]}
                   onPress={() => router.push(action.legacyHref as never)}
                   activeOpacity={0.8}
                 >
@@ -123,8 +133,11 @@ const styles = StyleSheet.create({
   operationPill: { alignSelf: 'flex-start', marginTop: 12, borderRadius: 9, backgroundColor: '#151B2B', paddingHorizontal: 9, paddingVertical: 6 },
   operationText: { color: '#8F9DFF', fontFamily: 'monospace', fontSize: 10 },
   buttonRow: { flexDirection: 'row', gap: 8, marginTop: 14 },
+  flexButton: { flex: 1 },
   actionButton: { borderRadius: 12, backgroundColor: '#6D5CE7', paddingHorizontal: 14, paddingVertical: 11, alignItems: 'center' },
   actionButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '850' },
+  nativeActionButton: { borderRadius: 12, backgroundColor: '#247A5A', paddingHorizontal: 14, paddingVertical: 11, alignItems: 'center' },
+  nativeActionButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '850' },
   legacyActionButton: { borderRadius: 12, borderWidth: 1, borderColor: '#334059', paddingHorizontal: 14, paddingVertical: 11, alignItems: 'center' },
   legacyActionButtonText: { color: '#AAB4C7', fontSize: 12, fontWeight: '800' },
   footerCard: { marginTop: 6, borderRadius: 18, borderWidth: 1, borderColor: '#30374A', padding: 16, backgroundColor: '#111622' },
