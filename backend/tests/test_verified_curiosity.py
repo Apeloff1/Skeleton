@@ -1,7 +1,4 @@
-import json
-
-from core.evidence_registry import EvidenceRegistry
-from core.truth_verifier import EvidenceKind
+from core.truth_verifier import EvidenceItem, EvidenceKind
 from core.verified_curiosity import VerifiedCuriosityEngine
 
 
@@ -95,13 +92,11 @@ def test_contradicted_claim_is_quarantined_from_orientation(tmp_path):
 def test_retracted_evidence_no_longer_counts(tmp_path):
     engine = VerifiedCuriosityEngine(tmp_path)
     claim = "Measured output is 10 units."
-    a = engine.evidence_registry.register(claim, engine.epistemic_gate.evaluate({
-        "claims": [], "claim_evidence": {}
-    }) and __import__("core.truth_verifier", fromlist=["EvidenceItem"]).EvidenceItem(
+    record = engine.evidence_registry.register(claim, EvidenceItem(
         source_id="study-a", locator="r1", kind=EvidenceKind.PRIMARY_EMPIRICAL,
         supports=True, independence_group="lab-a", quality=0.9, reproducible=True,
     ))
-    assert engine.evidence_registry.retract(a.id, "paper withdrawn") is True
+    assert engine.evidence_registry.retract(record.id, "paper withdrawn") is True
     assert engine.evidence_registry.evidence_for(claim) == ()
     records = engine.evidence_registry.records_for(claim)
     assert records[0].retracted is True
