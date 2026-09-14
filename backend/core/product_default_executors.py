@@ -3,7 +3,7 @@
 Adapters target framework-free runtime primitives instead of calling HTTP routes.
 Receipts capture exact input provenance and executor contracts. Introspection
 adapters receive narrow providers from the control plane, avoiding circular
-imports while turning product status/policy/audit into governed query actions.
+imports while turning product state/policy/audit/safety into governed actions.
 """
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from core.execution_receipts import ExecutionReceiptStore, ReceiptIntegrityError
 from core.product_executor_registry import ProductExecutorRegistry
 from core.product_operations import AdmittedOperation
 from core.runtime_sessions import RuntimeSessionManager
+from core.world_system_composer import blueprint_dict, compose_world_systems
 
 Provider = Callable[[], dict[str, Any] | list[dict[str, Any]]]
 
@@ -20,11 +21,13 @@ _CONTRACTS = {
     "native.studio.project.create": (1, "state", True),
     "native.studio.pipeline.inspect": (1, "query", True),
     "native.worldforge.world.create": (1, "state", True),
+    "native.worldforge.world.systems.compose": (1, "state", True),
     "native.playables.playable.launch": (1, "state", True),
     "native.playables.runtime.sessions": (1, "query", True),
     "native.operations.ops.runtime": (1, "query", True),
     "native.governance.policy": (1, "query", True),
     "native.governance.audit": (1, "query", True),
+    "native.governance.safety": (1, "query", True),
 }
 
 
@@ -37,12 +40,14 @@ class NativeProductExecutors:
         operations_provider: Provider | None = None,
         policy_provider: Provider | None = None,
         audit_provider: Provider | None = None,
+        safety_provider: Provider | None = None,
     ) -> None:
         self.receipts = receipt_store
         self.sessions = sessions or RuntimeSessionManager()
         self.operations_provider = operations_provider
         self.policy_provider = policy_provider
         self.audit_provider = audit_provider
+        self.safety_provider = safety_provider
 
     def _already_complete(self, operation: AdmittedOperation, executor: str) -> bool:
         existing = self.receipts.read(operation.id)
@@ -106,17 +111,31 @@ class NativeProductExecutors:
             return True
         return self._write(operation, executor, self._provider_result(self.operations_provider, "pipeline"))
 
+    @staticmethod
+    def _generate_world(payload: dict[str, Any]) -> dict[str, Any]:
+        from routes.worldforge_core import WorldConfig, build_world
+        cfg = WorldConfig(**dict(payload.get("config") or payload))
+        return build_world(cfg)
+
     def create_world(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
         executor = "native.worldforge.world.create"
         if self._already_complete(operation, executor):
             return True
-        from routes.worldforge_core import WorldConfig, build_world
-        cfg = WorldConfig(**dict(payload.get("config") or payload))
-        world = build_world(cfg)
+        world = self._generate_world(payload)
+        return self._write(operation, executor, {"world": world})
+
+    def compose_world_systems(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
+        executor = "native.worldforge.world.systems.compose"
+        if self._already_complete(operation, executor):
+            return True
+        supplied = payload.get("world")
+        if supplied is not None and not isinstance(supplied, dict):
+            raise ValueError("world must be an object when supplied")
+        world = dict(supplied) if isinstance(supplied, dict) else self._generate_world(payload)
+        blueprint = compose_world_systems(world)
         return self._write(operation, executor, {
-            "world": world,
-            "seed": getattr(cfg, "seed", None),
-            "scale": getattr(cfg, "scale", None),
+            "blueprint": blueprint_dict(blueprint),
+            "world_signature": blueprint.world_signature,
         })
 
     def launch_playable(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
@@ -165,11 +184,18 @@ class NativeProductExecutors:
             return True
         return self._write(operation, executor, self._provider_result(self.audit_provider, "audit"))
 
+    def governance_safety(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
+        executor = "native.governance.safety"
+        if self._already_complete(operation, executor):
+            return True
+        return self._write(operation, executor, self._provider_result(self.safety_provider, "safety"))
+
     def register_into(self, registry: ProductExecutorRegistry) -> ProductExecutorRegistry:
         registry.register("studio", "project.create", self.create_project, name="native.studio.project.create", version=1, effect_class="state", replay_safe=True)
         if self.operations_provider is not None:
             registry.register("studio", "pipeline.inspect", self.pipeline_inspect, name="native.studio.pipeline.inspect", version=1, effect_class="query", replay_safe=True)
         registry.register("world-forge", "world.create", self.create_world, name="native.worldforge.world.create", version=1, effect_class="state", replay_safe=True)
+        registry.register("world-forge", "world.systems.compose", self.compose_world_systems, name="native.worldforge.world.systems.compose", version=1, effect_class="state", replay_safe=True)
         registry.register("playables", "playable.launch", self.launch_playable, name="native.playables.playable.launch", version=1, effect_class="state", replay_safe=True)
         registry.register("playables", "runtime.sessions", self.runtime_sessions, name="native.playables.runtime.sessions", version=1, effect_class="query", replay_safe=True)
         if self.operations_provider is not None:
@@ -178,6 +204,8 @@ class NativeProductExecutors:
             registry.register("governance", "governance.policy", self.governance_policy, name="native.governance.policy", version=1, effect_class="query", replay_safe=True)
         if self.audit_provider is not None:
             registry.register("governance", "governance.audit", self.governance_audit, name="native.governance.audit", version=1, effect_class="query", replay_safe=True)
+        if self.safety_provider is not None:
+            registry.register("governance", "governance.safety", self.governance_safety, name="native.governance.safety", version=1, effect_class="query", replay_safe=True)
         return registry
 
 
@@ -188,6 +216,7 @@ def build_default_executor_registry(
     operations_provider: Provider | None = None,
     policy_provider: Provider | None = None,
     audit_provider: Provider | None = None,
+    safety_provider: Provider | None = None,
 ) -> tuple[ProductExecutorRegistry, NativeProductExecutors]:
     registry = ProductExecutorRegistry()
     adapters = NativeProductExecutors(
@@ -196,6 +225,7 @@ def build_default_executor_registry(
         operations_provider=operations_provider,
         policy_provider=policy_provider,
         audit_provider=audit_provider,
+        safety_provider=safety_provider,
     )
     adapters.register_into(registry)
     return registry, adapters
