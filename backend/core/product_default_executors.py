@@ -8,8 +8,10 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from core.curiosity_engine import CuriosityEngine
 from core.deployment_planner import compile_deployment_plan
 from core.execution_receipts import ExecutionReceiptStore, ReceiptIntegrityError
+from core.knowledge_augmented_jeeves import KnowledgeAugmentedJeeves
 from core.product_executor_registry import ProductExecutorRegistry
 from core.product_operations import AdmittedOperation
 from core.progression_intelligence import inspect_progression
@@ -26,6 +28,9 @@ _CONTRACTS = {
     "native.playables.playable.launch": (1, "state", True),
     "native.playables.runtime.sessions": (1, "query", True),
     "native.playables.progress.inspect": (1, "query", True),
+    "native.jeeves.reason": (1, "state", True),
+    "native.jeeves.plan": (1, "state", True),
+    "native.jeeves.agents.review": (1, "state", True),
     "native.operations.ops.runtime": (1, "query", True),
     "native.operations.ops.deployments": (1, "query", True),
     "native.governance.policy": (1, "query", True),
@@ -40,6 +45,7 @@ class NativeProductExecutors:
         receipt_store: ExecutionReceiptStore,
         *,
         sessions: RuntimeSessionManager | None = None,
+        curiosity: CuriosityEngine | None = None,
         operations_provider: Provider | None = None,
         policy_provider: Provider | None = None,
         audit_provider: Provider | None = None,
@@ -47,6 +53,8 @@ class NativeProductExecutors:
     ) -> None:
         self.receipts = receipt_store
         self.sessions = sessions or RuntimeSessionManager()
+        self.curiosity = curiosity
+        self.jeeves = KnowledgeAugmentedJeeves(curiosity) if curiosity is not None else None
         self.operations_provider = operations_provider
         self.policy_provider = policy_provider
         self.audit_provider = audit_provider
@@ -160,12 +168,30 @@ class NativeProductExecutors:
         executor = "native.playables.progress.inspect"
         if self._already_complete(operation, executor): return True
         raw = payload.get("progression") or payload.get("state") or {}
-        if not isinstance(raw, dict):
-            raise ValueError("progression must be an object")
+        if not isinstance(raw, dict): raise ValueError("progression must be an object")
         stages = payload.get("known_stages") or ()
-        if not isinstance(stages, (list, tuple)):
-            raise ValueError("known_stages must be an array")
+        if not isinstance(stages, (list, tuple)): raise ValueError("known_stages must be an array")
         return self._write(operation, executor, {"progression": inspect_progression(raw, known_stages=stages)})
+
+    def _require_jeeves(self) -> KnowledgeAugmentedJeeves:
+        if self.jeeves is None:
+            raise RuntimeError("curiosity knowledge fabric unavailable")
+        return self.jeeves
+
+    def jeeves_reason(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
+        executor = "native.jeeves.reason"
+        if self._already_complete(operation, executor): return True
+        return self._write(operation, executor, {"reasoning_frame": self._require_jeeves().reason(payload)})
+
+    def jeeves_plan(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
+        executor = "native.jeeves.plan"
+        if self._already_complete(operation, executor): return True
+        return self._write(operation, executor, {"plan": self._require_jeeves().plan(payload)})
+
+    def agents_review(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
+        executor = "native.jeeves.agents.review"
+        if self._already_complete(operation, executor): return True
+        return self._write(operation, executor, {"review": self._require_jeeves().review(payload)})
 
     def ops_runtime(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
         executor = "native.operations.ops.runtime"
@@ -173,6 +199,8 @@ class NativeProductExecutors:
         result = self._provider_result(self.operations_provider, "operations")
         result["sessions"] = self.sessions.snapshot()
         result["receipts"] = self.receipts.stats()
+        if self.curiosity is not None:
+            result["curiosity"] = self.curiosity.stats()
         return self._write(operation, executor, result)
 
     def ops_deployments(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
@@ -204,6 +232,10 @@ class NativeProductExecutors:
         registry.register("playables", "playable.launch", self.launch_playable, name="native.playables.playable.launch", version=1, effect_class="state", replay_safe=True)
         registry.register("playables", "runtime.sessions", self.runtime_sessions, name="native.playables.runtime.sessions", version=1, effect_class="query", replay_safe=True)
         registry.register("playables", "progress.inspect", self.progress_inspect, name="native.playables.progress.inspect", version=1, effect_class="query", replay_safe=True)
+        if self.jeeves is not None:
+            registry.register("jeeves", "jeeves.reason", self.jeeves_reason, name="native.jeeves.reason", version=1, effect_class="state", replay_safe=True)
+            registry.register("jeeves", "jeeves.plan", self.jeeves_plan, name="native.jeeves.plan", version=1, effect_class="state", replay_safe=True)
+            registry.register("jeeves", "agents.review", self.agents_review, name="native.jeeves.agents.review", version=1, effect_class="state", replay_safe=True)
         if self.operations_provider is not None:
             registry.register("operations", "ops.runtime", self.ops_runtime, name="native.operations.ops.runtime", version=1, effect_class="query", replay_safe=True)
         registry.register("operations", "ops.deployments", self.ops_deployments, name="native.operations.ops.deployments", version=1, effect_class="query", replay_safe=True)
@@ -220,6 +252,7 @@ def build_default_executor_registry(
     receipt_store: ExecutionReceiptStore,
     *,
     sessions: RuntimeSessionManager | None = None,
+    curiosity: CuriosityEngine | None = None,
     operations_provider: Provider | None = None,
     policy_provider: Provider | None = None,
     audit_provider: Provider | None = None,
@@ -229,6 +262,7 @@ def build_default_executor_registry(
     adapters = NativeProductExecutors(
         receipt_store,
         sessions=sessions,
+        curiosity=curiosity,
         operations_provider=operations_provider,
         policy_provider=policy_provider,
         audit_provider=audit_provider,
