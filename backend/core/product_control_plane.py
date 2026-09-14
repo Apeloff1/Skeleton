@@ -8,6 +8,7 @@ from typing import Any
 from core.capability_readiness import ReadinessReport, evaluate_readiness
 from core.canonical_product_policy import CANONICAL_PRODUCT_POLICY, POLICY_VERSION
 from core.charter_policy import Charter, CharterPolicy, Edict, Rule
+from core.deployment_checkpoint_pin_runtime import DeploymentCheckpointPinRuntime
 from core.deployment_gateway import DeploymentGateway
 from core.epistemic_attestation import epistemic_root_dict
 from core.epistemic_claim_index import EpistemicClaimIndex
@@ -38,6 +39,10 @@ class ProductControlPlane:
         self.curiosity = VerifiedCuriosityEngine(self.root / "curiosity")
         self.epistemic_trust = EpistemicTrustRuntime(self.root / "epistemic-trust")
         self.deployments = DeploymentGateway(self.root / "deployments", control_plane=self)
+        self.deployment_checkpoint_pins = DeploymentCheckpointPinRuntime(
+            self.root / "deployment-checkpoint-pins",
+            checkpoint_ledger=self.deployments.checkpoints,
+        )
         if bind_native_executors:
             self.executors, self.native_executors = build_default_executor_registry(
                 self.receipts, curiosity=self.curiosity,
@@ -85,12 +90,17 @@ class ProductControlPlane:
                 "gossip": trust["gossip"], "trust": trust,
                 "gossip_observation": published.get("gossip")}
 
+    def _deployment_projection(self) -> dict[str, Any]:
+        projection = dict(self.deployments.status())
+        projection["checkpoint_witness"] = self.deployment_checkpoint_pins.status()
+        return projection
+
     def _operations_projection(self) -> dict[str, Any]:
         projection = dict(self.operations.snapshot())
         projection["outbox_health"] = self.operations.outbox.health()
         projection["curiosity"] = self.curiosity.stats()
         projection["epistemic_root"] = self._epistemic_root()
-        projection["deployments"] = self.deployments.status()
+        projection["deployments"] = self._deployment_projection()
         trust = self.epistemic_trust.status()
         projection["epistemic_trust"] = trust
         projection["epistemic_transparency"] = trust["transparency"]
@@ -139,12 +149,12 @@ class ProductControlPlane:
 
     def _safety_projection(self) -> dict[str, Any]:
         assurance = self.assurance_report(); readiness = self.readiness_report(); epistemic = self._epistemic_root()
-        trust = self.epistemic_trust.status()
+        trust = self.epistemic_trust.status(); deployments = self._deployment_projection()
         return {"posture": assurance["posture"], "hard_failures": assurance["hard_failures"], "warnings": assurance["warnings"],
             "native_coverage_pct": assurance["native_coverage_pct"], "readiness_pct": assurance["readiness_pct"],
             "attestation_sha256": assurance["attestation_sha256"], "readiness_attestation_sha256": readiness["attestation_sha256"],
             "system_root_sha256": self.system_root()["root_sha256"], "epistemic_root_sha256": epistemic["root_sha256"],
-            "epistemic_trust": trust, "deployments": self.deployments.status(), "curiosity": self.curiosity.stats(),
+            "epistemic_trust": trust, "deployments": deployments, "curiosity": self.curiosity.stats(),
             "verification": self.curiosity.verification_status(), "invariants": assurance["invariants"]}
 
     def ratify(self, domain: str, rules: list[Rule]) -> Charter:
@@ -221,12 +231,12 @@ class ProductControlPlane:
         governance = self.policy.snapshot(); ledger = self.execution_ledger(); counts: dict[str, int] = {}; anomalies = 0
         for item in ledger: counts[item["state"]] = counts.get(item["state"], 0) + 1; anomalies += len(item.get("anomalies", ()))
         readiness = self.readiness_report(); assurance = self.assurance_report(); root = self.system_root(); operations = self._operations_projection(); epistemic = self._epistemic_root()
-        trust = self.epistemic_trust.status()
+        trust = self.epistemic_trust.status(); deployments = self._deployment_projection()
         return {"policy_version": POLICY_VERSION, "policy_bootstrap_enabled": self.bootstrap_policy,
             "kernel": {"capabilities": [{"id": c.id, "pillar": c.pillar.value, "critical": c.critical} for c in self.operations.kernel.all()], "critical_ids": list(self.operations.kernel.critical_ids())},
             "governance": {"charters": [asdict(x) for x in governance.charters], "edicts": [asdict(x) for x in governance.edicts]},
             "executors": {"bound": len(self.executors), "bindings": list(self.executors.snapshot()), "coverage": self.executor_coverage()},
-            "readiness": readiness, "receipts": self.receipts.stats(), "deployments": self.deployments.status(), "curiosity": self.curiosity.stats(),
+            "readiness": readiness, "receipts": self.receipts.stats(), "deployments": deployments, "curiosity": self.curiosity.stats(),
             "verification": self.curiosity.verification_status(), "epistemic_root": epistemic,
             "epistemic_trust": trust, "epistemic_transparency": trust["transparency"], "epistemic_gossip": trust["gossip"],
             "lifecycle": {"operations": len(ledger), "states": counts, "evidence_gaps": counts.get("evidence_gap", 0) + counts.get("receipt_unattested", 0), "anomalies": anomalies},
