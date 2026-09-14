@@ -1,6 +1,6 @@
 """Trusted client-IP resolution for HTTP middleware.
 
-Never trust forwarding headers merely because they are present.  A request may
+Never trust forwarding headers merely because they are present. A request may
 supply ``X-Forwarded-For`` itself, so the header is considered only when the
 immediate TCP peer belongs to an explicitly trusted proxy network.
 
@@ -13,9 +13,12 @@ from __future__ import annotations
 import ipaddress
 import os
 from functools import lru_cache
-from typing import Iterable
+from typing import Iterable, TypeAlias
 
 from starlette.requests import Request
+
+IPAddress: TypeAlias = ipaddress.IPv4Address | ipaddress.IPv6Address
+IPNetwork: TypeAlias = ipaddress.IPv4Network | ipaddress.IPv6Network
 
 _DEFAULT_TRUSTED_PROXY_CIDRS = "127.0.0.0/8,::1/128"
 
@@ -28,24 +31,23 @@ def _split_cidrs(raw: str) -> Iterable[str]:
 
 
 @lru_cache(maxsize=8)
-def _trusted_networks(raw: str) -> tuple[ipaddress._BaseNetwork, ...]:
-    networks: list[ipaddress._BaseNetwork] = []
+def _trusted_networks(raw: str) -> tuple[IPNetwork, ...]:
+    networks: list[IPNetwork] = []
     for value in _split_cidrs(raw):
         try:
             networks.append(ipaddress.ip_network(value, strict=False))
         except ValueError:
-            # Invalid configuration must not widen trust. Ignore the bad entry
-            # and continue with the remaining explicitly valid networks.
+            # Invalid configuration must never widen trust.
             continue
     return tuple(networks)
 
 
-def trusted_proxy_networks() -> tuple[ipaddress._BaseNetwork, ...]:
+def trusted_proxy_networks() -> tuple[IPNetwork, ...]:
     raw = os.environ.get("TRUSTED_PROXY_CIDRS", _DEFAULT_TRUSTED_PROXY_CIDRS)
     return _trusted_networks(raw)
 
 
-def _parse_ip(value: str) -> ipaddress._BaseAddress | None:
+def _parse_ip(value: str) -> IPAddress | None:
     value = value.strip()
     if not value:
         return None
@@ -55,18 +57,17 @@ def _parse_ip(value: str) -> ipaddress._BaseAddress | None:
         return None
 
 
-def _is_trusted_proxy(address: ipaddress._BaseAddress) -> bool:
+def _is_trusted_proxy(address: IPAddress) -> bool:
     return any(address in network for network in trusted_proxy_networks())
 
 
 def resolve_client_ip(request: Request, *, unknown: str = "-") -> str:
-    """Return the authenticated network peer/client address for ``request``.
+    """Return the trusted network client identity for ``request``.
 
     ``X-Forwarded-For`` is used only when the socket peer is a configured
-    trusted proxy.  The chain is walked from right to left and stops at the
-    first untrusted hop.  Any malformed forwarded address causes a fail-closed
-    fallback to the immediate peer rather than accepting attacker-controlled
-    text as an identity.
+    trusted proxy. The chain is walked from right to left and stops at the
+    first untrusted hop. Any malformed forwarded address causes a fail-closed
+    fallback to the immediate peer.
     """
     peer_text = request.client.host if request.client else ""
     peer = _parse_ip(peer_text)
@@ -80,7 +81,7 @@ def resolve_client_ip(request: Request, *, unknown: str = "-") -> str:
     if not xff:
         return peer.compressed
 
-    forwarded: list[ipaddress._BaseAddress] = []
+    forwarded: list[IPAddress] = []
     for value in xff.split(","):
         parsed = _parse_ip(value)
         if parsed is None:
