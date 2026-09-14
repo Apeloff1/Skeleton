@@ -18,7 +18,31 @@ def _scan(tmp_path: Path, source: str) -> list[str]:
 def test_accepts_sha_pinned_action_and_read_permissions(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
+        f"name: test\non: [push]\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - uses: actions/checkout@{PIN}\n        with:\n          persist-credentials: false\n",
+    )
+    assert findings == []
+
+
+def test_rejects_checkout_default_persisted_credentials(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
         f"name: test\non: [push]\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - uses: actions/checkout@{PIN}\n",
+    )
+    assert any("persist-credentials: false" in finding for finding in findings)
+
+
+def test_rejects_checkout_explicit_persisted_credentials(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        f"name: test\non: [push]\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - uses: actions/checkout@{PIN}\n        with: {{persist-credentials: true}}\n",
+    )
+    assert any("persist-credentials: false" in finding for finding in findings)
+
+
+def test_accepts_inline_checkout_credential_hardening(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        f"name: test\non: [push]\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - uses: actions/checkout@{PIN}\n        with: {{persist-credentials: false}}\n",
     )
     assert findings == []
 
@@ -26,7 +50,7 @@ def test_accepts_sha_pinned_action_and_read_permissions(tmp_path: Path) -> None:
 def test_rejects_tag_pinned_action(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
-        "name: test\non: [push]\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - uses: actions/checkout@v4\n",
+        "name: test\non: [push]\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - uses: actions/checkout@v4\n        with: {persist-credentials: false}\n",
     )
     assert any("not pinned to a 40-character commit SHA" in finding for finding in findings)
 
@@ -90,7 +114,7 @@ def test_allows_local_actions(tmp_path: Path) -> None:
 def test_rejects_missing_top_level_permissions(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
-        f"name: test\non: [push]\njobs:\n  test:\n    steps:\n      - uses: actions/checkout@{PIN}\n",
+        f"name: test\non: [push]\njobs:\n  test:\n    steps:\n      - uses: actions/checkout@{PIN}\n        with: {{persist-credentials: false}}\n",
     )
     assert any("missing explicit top-level permissions" in finding for finding in findings)
 
