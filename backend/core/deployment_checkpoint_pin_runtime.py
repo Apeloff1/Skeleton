@@ -86,7 +86,6 @@ class DeploymentCheckpointPinRuntime:
         return self.ledger.quorum(publication_sequence=publication_sequence, now=now)
 
     def latest_witnessed_quorum(self, *, now: datetime | None = None) -> DeploymentCheckpointPinQuorum | None:
-        """Return the newest publication that currently has a fresh independent quorum."""
         history = self.checkpoints.history()
         for publication in reversed(history):
             quorum = self.quorum(publication_sequence=publication.sequence, now=now)
@@ -95,7 +94,6 @@ class DeploymentCheckpointPinRuntime:
         return None
 
     def latest_prior_witnessed_quorum(self, *, now: datetime | None = None) -> DeploymentCheckpointPinQuorum | None:
-        """Return the newest fresh witnessed publication strictly before the current head."""
         history = self.checkpoints.history()
         if len(history) < 2:
             return None
@@ -122,10 +120,7 @@ class DeploymentCheckpointPinRuntime:
         if type(publication_sequence) is not int or publication_sequence < 1:
             raise ValueError("publication_sequence must be a positive integer")
         bundle = self.portable_bundle(publication_sequence=publication_sequence, now=now)
-        return build_deployment_checkpoint_trust_advance(
-            pin_bundle=bundle,
-            checkpoint_ledger=self.checkpoints,
-        )
+        return build_deployment_checkpoint_trust_advance(pin_bundle=bundle, checkpoint_ledger=self.checkpoints)
 
     def advance_latest_witnessed(self, *, now: datetime | None = None) -> DeploymentCheckpointTrustAdvance:
         quorum = self.latest_witnessed_quorum(now=now)
@@ -139,7 +134,6 @@ class DeploymentCheckpointPinRuntime:
         previous_publication_sequence: int,
         now: datetime | None = None,
     ) -> DeploymentCheckpointWitnessedContinuity:
-        """Prove continuity from a fresh witnessed prior epoch to a fresh witnessed head."""
         if type(previous_publication_sequence) is not int or previous_publication_sequence < 1:
             raise ValueError("previous_publication_sequence must be a positive integer")
         latest = self.checkpoints.latest()
@@ -147,14 +141,8 @@ class DeploymentCheckpointPinRuntime:
             raise ValueError("checkpoint publication history is empty")
         if previous_publication_sequence >= latest.sequence:
             raise ValueError("previous witnessed publication must precede the current head")
-        previous_bundle = self.portable_bundle(
-            publication_sequence=previous_publication_sequence,
-            now=now,
-        )
-        current_bundle = self.portable_bundle(
-            publication_sequence=latest.sequence,
-            now=now,
-        )
+        previous_bundle = self.portable_bundle(publication_sequence=previous_publication_sequence, now=now)
+        current_bundle = self.portable_bundle(publication_sequence=latest.sequence, now=now)
         return build_deployment_checkpoint_witnessed_continuity(
             previous_bundle=previous_bundle,
             current_bundle=current_bundle,
@@ -168,16 +156,25 @@ class DeploymentCheckpointPinRuntime:
         current = self.quorum(now=now)
         if current is None or not current.reached:
             raise ValueError("current checkpoint publication lacks a fresh witness quorum")
-        return self.witnessed_continuity(
-            previous_publication_sequence=previous.publication_sequence,
-            now=now,
-        )
+        return self.witnessed_continuity(previous_publication_sequence=previous.publication_sequence, now=now)
 
     def requirement_satisfied(self, *, now: datetime | None = None) -> bool:
         if not self.policy.required:
             return True
-        quorum = self.quorum(now=now)
-        return quorum is not None and quorum.reached
+        current = self.quorum(now=now)
+        current_ok = current is not None and current.reached
+        if not current_ok:
+            return False
+        if not self.policy.continuity_required:
+            return True
+        history = self.checkpoints.history()
+        if len(history) <= 1:
+            # Genesis has no earlier publication to bridge; a fresh quorum establishes
+            # the initial external trust anchor. Continuity becomes mandatory once the
+            # journal advances beyond genesis.
+            return True
+        previous = self.latest_prior_witnessed_quorum(now=now)
+        return previous is not None and previous.publication_sequence < history[-1].sequence
 
     def status(self, *, now: datetime | None = None) -> dict[str, Any]:
         ledger = self.ledger.status(now=now)
@@ -185,19 +182,22 @@ class DeploymentCheckpointPinRuntime:
         quorum = self.quorum(now=now)
         latest_witnessed = self.latest_witnessed_quorum(now=now)
         prior_witnessed = self.latest_prior_witnessed_quorum(now=now)
-        satisfied = not self.policy.required or (quorum is not None and quorum.reached)
         current_sequence = target.tree_size if target is not None else 0
         witnessed_sequence = latest_witnessed.publication_sequence if latest_witnessed is not None else 0
         publications_behind = max(0, current_sequence - witnessed_sequence) if witnessed_sequence else current_sequence
         continuity_ready = (
             quorum is not None and quorum.reached
-            and prior_witnessed is not None
-            and prior_witnessed.publication_sequence < current_sequence
+            and (
+                current_sequence <= 1
+                or (prior_witnessed is not None and prior_witnessed.publication_sequence < current_sequence)
+            )
         )
+        satisfied = self.requirement_satisfied(now=now)
         return {
             "version": 1,
             "policy": {
                 "required": self.policy.required,
+                "continuity_required": self.policy.continuity_required,
                 "required_groups": self.policy.required_groups,
                 "max_age_seconds": self.policy.max_age_seconds,
                 "trusted_witnesses": len(tuple(row for row in self.policy.witnesses if row.enabled)),
