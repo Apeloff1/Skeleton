@@ -2,7 +2,8 @@
 
 Assurance is invariant-driven, not a vanity average. Hard failures block the
 posture; warnings degrade it. Convergence uses evidence-backed readiness, while
-durability requires a cross-process coherent journal with persistent sequencing.
+durability requires process-safe journaling, monotonic identity and verified
+cross-process audit ancestry.
 """
 from __future__ import annotations
 
@@ -61,11 +62,14 @@ def evaluate_assurance(
 
     audit_sequence = int(operations.get("audit_sequence", 0) or 0)
     audit_head = operations.get("audit_head")
+    audit_health = operations.get("audit_health") if isinstance(operations.get("audit_health"), dict) else {}
     audit_ok = audit_sequence == 0 or isinstance(audit_head, str) and len(audit_head) == 64
-    invariants.append(AssuranceInvariant(
-        "audit.head-continuity", "hard", bool(audit_ok),
-        f"sequence={audit_sequence}, head={'present' if audit_head else 'missing'}",
-    ))
+    audit_runtime_ok = audit_health.get("cross_process_locking") is True and audit_health.get("verified") is True
+    invariants += [
+        AssuranceInvariant("audit.head-continuity", "hard", bool(audit_ok), f"sequence={audit_sequence}, head={'present' if audit_head else 'missing'}"),
+        AssuranceInvariant("audit.cross-process-coherence", "hard", audit_runtime_ok,
+                           f"locking={audit_health.get('lock_backend', 'missing')}, verified={audit_health.get('verified', False)}"),
+    ]
 
     capacity = int(operations.get("outbox_capacity_remaining", 0) or 0)
     invariants += [
@@ -74,17 +78,16 @@ def evaluate_assurance(
     ]
     outbox_health = operations.get("outbox_health") if isinstance(operations.get("outbox_health"), dict) else {}
     process_safe = outbox_health.get("cross_process_locking") is True
+    leased_factory = outbox_health.get("leased_intent_factory") is True
     meta_version = int(outbox_health.get("sequence_meta_version", 0) or 0)
     next_sequence = int(outbox_health.get("next_sequence", 0) or 0)
     invariants += [
-        AssuranceInvariant(
-            "queue.cross-process-coherence", "hard", process_safe,
-            f"locking={outbox_health.get('lock_backend', 'missing')}",
-        ),
-        AssuranceInvariant(
-            "queue.monotonic-sequence", "hard", meta_version >= 1 and next_sequence > 0,
-            f"metadata=v{meta_version}, next_sequence={next_sequence}",
-        ),
+        AssuranceInvariant("queue.cross-process-coherence", "hard", process_safe,
+                           f"locking={outbox_health.get('lock_backend', 'missing')}"),
+        AssuranceInvariant("queue.atomic-intent-staging", "hard", leased_factory,
+                           f"leased_intent_factory={leased_factory}"),
+        AssuranceInvariant("queue.monotonic-sequence", "hard", meta_version >= 1 and next_sequence > 0,
+                           f"metadata=v{meta_version}, next_sequence={next_sequence}"),
     ]
 
     unsafe = [binding for binding in bindings if binding.get("effect_class") in {"state", "external"} and not binding.get("replay_safe")]
@@ -105,30 +108,26 @@ def evaluate_assurance(
     unsafe_actions = int((readiness or {}).get("unsafe_actions", 0) or 0)
     invariants += [
         AssuranceInvariant("convergence.policy-complete", "hard", policy_gaps == 0, f"{policy_gaps} canonical policy gap(s)"),
-        AssuranceInvariant("convergence.no-unsafe-actions", "hard", unsafe_actions == 0, f"{unsafe_actions} canonical action(s) violate readiness safety contracts"),
-        AssuranceInvariant("convergence.native-ready-majority", "warning", readiness_pct >= 50.0, f"{readiness_pct:.1f}% canonical actions are evidence-backed native-ready"),
+        AssuranceInvariant("convergence.no-unsafe-actions", "hard", unsafe_actions == 0,
+                           f"{unsafe_actions} canonical action(s) violate readiness safety contracts"),
+        AssuranceInvariant("convergence.native-ready-majority", "warning", readiness_pct >= 50.0,
+                           f"{readiness_pct:.1f}% canonical actions are evidence-backed native-ready"),
     ]
 
     hard_failures = sum(not item.passed for item in invariants if item.severity == "hard")
     warnings = sum(not item.passed for item in invariants if item.severity == "warning")
     posture = "blocked" if hard_failures else ("degraded" if warnings else "healthy")
-    payload = {
-        "posture": posture, "hard_failures": hard_failures, "warnings": warnings,
-        "native_coverage_pct": coverage, "readiness_pct": readiness_pct,
-        "invariants": [asdict(item) for item in invariants],
-    }
-    return AssuranceReport(
-        posture=posture, hard_failures=hard_failures, warnings=warnings,
-        native_coverage_pct=coverage, readiness_pct=readiness_pct,
-        invariants=tuple(invariants), attestation_sha256=_digest(payload),
-    )
+    payload = {"posture": posture, "hard_failures": hard_failures, "warnings": warnings,
+               "native_coverage_pct": coverage, "readiness_pct": readiness_pct,
+               "invariants": [asdict(item) for item in invariants]}
+    return AssuranceReport(posture=posture, hard_failures=hard_failures, warnings=warnings,
+                           native_coverage_pct=coverage, readiness_pct=readiness_pct,
+                           invariants=tuple(invariants), attestation_sha256=_digest(payload))
 
 
 def verify_assurance(report: AssuranceReport) -> bool:
-    payload = {
-        "posture": report.posture, "hard_failures": report.hard_failures,
-        "warnings": report.warnings, "native_coverage_pct": report.native_coverage_pct,
-        "readiness_pct": report.readiness_pct,
-        "invariants": [asdict(item) for item in report.invariants],
-    }
+    payload = {"posture": report.posture, "hard_failures": report.hard_failures,
+               "warnings": report.warnings, "native_coverage_pct": report.native_coverage_pct,
+               "readiness_pct": report.readiness_pct,
+               "invariants": [asdict(item) for item in report.invariants]}
     return _digest(payload) == report.attestation_sha256
