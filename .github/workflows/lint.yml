@@ -46,3 +46,6 @@ jobs:
         env:
           CI: "true"
         run: yarn lint:ci
+
+      - name: Run cockpit bridge contract
+        run: node --test scripts/cockpit-bridge.test.mjs
