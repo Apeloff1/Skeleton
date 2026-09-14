@@ -113,17 +113,45 @@ def deployment_checkpoint_witness_invariants(status: Mapping[str, Any]) -> tuple
     publications_behind = frontier.get("publications_behind")
     advance_available = frontier.get("advance_available")
     continuity_ready_raw = frontier.get("continuity_ready")
-    frontier_shape = (
+
+    frontier_types_ok = (
         _nonnegative_int(current_sequence)
         and _nonnegative_int(latest_witnessed_sequence)
         and _nonnegative_int(prior_witnessed_sequence)
         and _nonnegative_int(publications_behind)
         and type(advance_available) is bool
         and type(continuity_ready_raw) is bool
-        and latest_witnessed_sequence <= current_sequence
-        and prior_witnessed_sequence < current_sequence if current_sequence > 0 and prior_witnessed_sequence > 0 else True
     )
-    continuity_ready = frontier_shape and continuity_ready_raw is True
+    if frontier_types_ok:
+        expected_behind = (
+            max(0, current_sequence - latest_witnessed_sequence)
+            if latest_witnessed_sequence
+            else current_sequence
+        )
+        prior_order_ok = (
+            prior_witnessed_sequence == 0
+            or (current_sequence > 0 and prior_witnessed_sequence < current_sequence)
+        )
+        expected_advance = latest_witnessed_sequence > 0 and expected_behind > 0
+        expected_continuity = (
+            current_reached
+            and (
+                current_sequence <= 1
+                or (prior_witnessed_sequence > 0 and prior_witnessed_sequence < current_sequence)
+            )
+        )
+        frontier_shape = (
+            latest_witnessed_sequence <= current_sequence
+            and prior_order_ok
+            and publications_behind == expected_behind
+            and advance_available == expected_advance
+            and continuity_ready_raw == expected_continuity
+            and (not current_reached or latest_witnessed_sequence == current_sequence)
+        )
+    else:
+        expected_continuity = False
+        frontier_shape = False
+    continuity_ready = frontier_shape and expected_continuity
 
     policy_satisfied = (
         policy_shape
