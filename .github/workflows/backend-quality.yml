@@ -14,6 +14,8 @@ on:
       - "backend/**"
       - ".github/workflows/backend-quality.yml"
       - ".github/workflows/**"
+      - "frontend/package.json"
+      - "frontend/yarn.lock"
 
 permissions:
   contents: read
@@ -63,6 +65,9 @@ jobs:
       - name: Repository secret hygiene gate
         run: python scripts/check_secret_hygiene.py
 
+      - name: Immutable dependency declaration policy
+        run: python scripts/check_dependency_policy.py
+
       - name: Audit Python dependencies for known vulnerabilities
         uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
         with:
@@ -96,6 +101,7 @@ jobs:
           tests/test_sast_security_gate.py
           tests/test_workflow_security_gate.py
           tests/test_secret_hygiene_gate.py
+          tests/test_dependency_policy.py
           tests/test_sbom_generator.py
           tests/test_security_config.py
           tests/test_security_parser_fuzz.py
