@@ -103,9 +103,13 @@ def root_from_frontier(size: int, frontier: dict[int, str]) -> str:
     expected_levels = {level for level in range(size.bit_length()) if (size >> level) & 1}
     if set(frontier) != expected_levels:
         raise ValueError("frontier does not match tree size")
+    # Frontier peaks represent the binary decomposition of the tree from the
+    # oldest/largest subtree to the newest/smallest subtree. Fold low->high so
+    # each larger historical peak becomes the left child of the accumulated
+    # newer suffix. Example n=7: H(root[0:4], H(root[4:6], leaf[6])).
     acc: str | None = None
-    for level in sorted(frontier, reverse=True):
-        acc = frontier[level] if acc is None else node_hash(acc, frontier[level])
+    for level in sorted(frontier):
+        acc = frontier[level] if acc is None else node_hash(frontier[level], acc)
     if acc is None:
         raise ValueError("non-empty tree has empty frontier")
     return acc
@@ -195,7 +199,7 @@ class TransparencyLog:
         except OSError as exc:
             raise TransparencyIntegrityError("transparency log unreadable") from exc
         rows: list[TransparencyEntry] = []
-        for raw_index, line in enumerate(lines):
+        for line in lines:
             if not line.strip(): continue
             try: entry = self._restore(json.loads(line))
             except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
