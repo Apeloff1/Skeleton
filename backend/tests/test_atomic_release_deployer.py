@@ -89,8 +89,18 @@ def test_self_hashed_but_semantically_forged_plan_cannot_activate(tmp_path):
     plan["rollback"]["automatic"] = False
     forged = _rehash(plan)
 
+    with pytest.raises(ValueError, match="semantic verification"):
+        plan_digest(forged)
+
+    forged_consumption = DeploymentConsumption(
+        authorization_id="auth-1",
+        consumed_at="2026-09-14T12:00:00+00:00",
+        system_root_sha256="a" * 64,
+        plan_sha256=forged["plan_sha256"],
+        consume_event_sha256="b" * 64,
+    )
     with pytest.raises(ReleaseDeploymentError, match="plan integrity"):
-        deployer.activate(forged, _consumption(forged), activated_at="2026-09-14T12:00:01+00:00")
+        deployer.activate(forged, forged_consumption, activated_at="2026-09-14T12:00:01+00:00")
     assert deployer.snapshot() == ()
 
 
