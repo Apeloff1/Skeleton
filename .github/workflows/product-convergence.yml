@@ -103,6 +103,7 @@ jobs:
           tests/test_deployment_checkpoint_proof.py
           tests/test_deployment_checkpoint_pin_wire.py
           tests/test_deployment_checkpoint_assurance.py
+          tests/test_deployment_checkpoint_route_architecture.py
           tests/test_deployment_checkpoint_trust_advance.py
           tests/test_deployment_checkpoint_witnessed_continuity.py
           tests/test_deployment_checkpoint_pin_runtime_continuity.py
