@@ -1,9 +1,10 @@
 """Portable, independently verifiable deployment transition proofs.
 
 A deployment is not considered proven merely because its individual records hash.
-This packet carries suffix witnesses from the authorization issue, activated release,
-and transition receipt to each ledger's current head. Verification cross-binds the
-plan, authorization, pre-deploy root, release, post-deploy root, and all three chains.
+This packet carries the complete self-verifying preflight plus suffix witnesses from
+the authorization issue, activated release, and transition receipt to each ledger's
+current head. Verification cross-binds the decision, plan, authorization, pre-deploy
+root, release, post-deploy root, and all three durable chains.
 
 External consumers must pin the expected ledger heads out of band. Supplying heads
 from the same packet proves consistency only, not external trust.
@@ -18,7 +19,9 @@ import json
 import re
 from typing import Any, Mapping, Sequence
 
-DEPLOYMENT_PROOF_VERSION = 1
+from core.deployment_authorization import restore_preflight_snapshot
+
+DEPLOYMENT_PROOF_VERSION = 2
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -29,6 +32,7 @@ class PortableDeploymentProof:
     plan_sha256: str
     pre_system_root_sha256: str
     post_system_root_sha256: str
+    preflight: dict[str, Any]
     authorization_suffix: tuple[dict[str, Any], ...]
     authorization_head_sha256: str
     release: dict[str, Any]
@@ -80,6 +84,13 @@ def build_portable_deployment_proof(gateway, authorization_id: str) -> PortableD
     if issue_index is None:
         raise KeyError(authorization_id)
     authorization_suffix = tuple(dict(row) for row in authorization_events[issue_index:])
+    issue = authorization_suffix[0]
+    preflight_raw = issue.get("preflight")
+    if not isinstance(preflight_raw, dict):
+        raise ValueError("deployment authorization predates portable preflight snapshots")
+    preflight = restore_preflight_snapshot(preflight_raw)
+    if not preflight.allowed or not preflight.stable:
+        raise ValueError("deployment preflight is not authorizing/stable")
     consume = next((row for row in authorization_suffix
                     if row.get("kind") == "consume" and row.get("authorization_id") == authorization_id), None)
     if consume is None:
@@ -111,6 +122,7 @@ def build_portable_deployment_proof(gateway, authorization_id: str) -> PortableD
         "plan_sha256": receipt.plan_sha256,
         "pre_system_root_sha256": receipt.pre_system_root_sha256,
         "post_system_root_sha256": receipt.post_system_root_sha256,
+        "preflight": dict(preflight_raw),
         "authorization_suffix": authorization_suffix,
         "authorization_head_sha256": authorization_events[-1]["sha256"],
         "release": asdict(release),
@@ -183,12 +195,27 @@ def verify_portable_deployment_proof(
         if not authorization_id or hmac.compare_digest(pre_root, post_root):
             return False
 
+        preflight_raw = raw.get("preflight")
+        if not isinstance(preflight_raw, dict):
+            return False
+        preflight = restore_preflight_snapshot(preflight_raw)
+        if not preflight.allowed or not preflight.stable:
+            return False
+        if preflight.root_before_sha256 != pre_root or preflight.root_after_sha256 != pre_root:
+            return False
+        if preflight.report.system_root_sha256 != pre_root or not preflight.report.allowed:
+            return False
+
         auth_suffix = tuple(dict(row) for row in raw.get("authorization_suffix") or ())
         if not _verify_chain_suffix(auth_suffix, expected_head=expected_authorization_head_sha256):
             return False
         issue = next((row for row in auth_suffix if row.get("kind") == "issue" and row.get("authorization_id") == authorization_id), None)
         consume = next((row for row in auth_suffix if row.get("kind") == "consume" and row.get("authorization_id") == authorization_id), None)
         if issue is None or consume is None:
+            return False
+        if issue.get("preflight") != preflight_raw:
+            return False
+        if issue.get("preflight_sha256") != preflight.attestation_sha256:
             return False
         if consume.get("issue_event_sha256") != issue.get("sha256"):
             return False
