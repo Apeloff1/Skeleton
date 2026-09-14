@@ -1,6 +1,8 @@
 import api, { ApiResult } from '../utils/apiClient';
 
 export type ControlPlaneStatus = {
+  policy_version: number;
+  policy_bootstrap_enabled: boolean;
   kernel: {
     capabilities: Array<{ id: string; pillar: string; critical: boolean }>;
     critical_ids: string[];
@@ -22,6 +24,23 @@ export type ControlPlaneStatus = {
     audit_sequence: number;
     audit_head: string | null;
   };
+};
+
+export type PendingOperation = {
+  operation_id: string;
+  capability_id: string;
+  pillar: string;
+  domain: string;
+  action: string;
+  principal: string;
+  outbox_seq: number;
+  admitted_at: string;
+  idempotency_key: string | null;
+};
+
+export type PendingOperationResponse = {
+  count: number;
+  operations: PendingOperation[];
 };
 
 export type OperationAdmission = {
@@ -46,12 +65,23 @@ export type AdmitOperationInput = {
 
 const ROOT = '/api/admin/ops/product-control';
 
+function tokenQuery(token: string): string {
+  return token ? `?token=${encodeURIComponent(token)}` : '';
+}
+
 export function getProductControlStatus(token = '', signal?: AbortSignal): Promise<ApiResult<ControlPlaneStatus>> {
-  const query = token ? `?token=${encodeURIComponent(token)}` : '';
-  return api.get<ControlPlaneStatus>(`${ROOT}/status${query}`, {
+  return api.get<ControlPlaneStatus>(`${ROOT}/status${tokenQuery(token)}`, {
     signal,
     cacheKey: 'product-control-status',
     cacheTtlMs: 5_000,
+  });
+}
+
+export function getPendingProductOperations(token = '', signal?: AbortSignal): Promise<ApiResult<PendingOperationResponse>> {
+  return api.get<PendingOperationResponse>(`${ROOT}/pending${tokenQuery(token)}`, {
+    signal,
+    cacheKey: 'product-control-pending',
+    cacheTtlMs: 2_000,
   });
 }
 
@@ -60,11 +90,10 @@ export function admitProductOperation(
   token = '',
   signal?: AbortSignal,
 ): Promise<ApiResult<OperationAdmission>> {
-  const query = token ? `?token=${encodeURIComponent(token)}` : '';
   const idempotencyKey = input.idempotency_key || `${input.capability_id}:${input.action}:${Date.now()}`;
-  return api.post<OperationAdmission>(`${ROOT}/admit${query}`, { ...input, idempotency_key: idempotencyKey }, {
-    signal,
-    idempotencyKey,
-    retries: 2,
-  });
+  return api.post<OperationAdmission>(
+    `${ROOT}/admit${tokenQuery(token)}`,
+    { ...input, idempotency_key: idempotencyKey },
+    { signal, idempotencyKey, retries: 2 },
+  );
 }
