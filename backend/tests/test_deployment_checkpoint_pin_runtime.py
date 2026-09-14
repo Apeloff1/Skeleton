@@ -110,6 +110,9 @@ def test_optional_policy_is_satisfied_without_external_witnesses(tmp_path):
     status = runtime.status(now=datetime(2026, 9, 14, 20, 1, tzinfo=UTC))
     assert status["requirement_satisfied"] is True
     assert status["current_quorum"]["reached"] is False
+    assert status["latest_witnessed_quorum"] is None
+    assert status["trust_frontier"]["latest_witnessed_publication_sequence"] == 0
+    assert status["trust_frontier"]["advance_available"] is False
     assert status["verified"] is True
 
 
@@ -129,9 +132,11 @@ def test_required_policy_needs_fresh_independent_quorum_for_current_publication(
     assert runtime.requirement_satisfied(now=now) is False
     runtime.observe(_sign(publication, keys[1], witnesses[1], "b"))
     assert runtime.requirement_satisfied(now=now) is True
+    witnessed = runtime.status(now=now)
+    assert witnessed["trust_frontier"]["latest_witnessed_publication_sequence"] == publication.sequence
+    assert witnessed["trust_frontier"]["publications_behind"] == 0
+    assert witnessed["trust_frontier"]["advance_available"] is False
 
-    # Preparing a deployment advances the publication history. The old signatures
-    # remain forensic evidence but cannot authorize the new current checkpoint.
     prepared = gateway.prepare({
         "target": "runtime",
         "environment": "staging",
@@ -142,6 +147,10 @@ def test_required_policy_needs_fresh_independent_quorum_for_current_publication(
     newer = gateway.checkpoints.latest(); assert newer is not None
     assert newer.sha256 != publication.sha256
     assert runtime.requirement_satisfied(now=now) is False
+    stale_frontier = runtime.status(now=now)["trust_frontier"]
+    assert stale_frontier["latest_witnessed_publication_sequence"] == publication.sequence
+    assert stale_frontier["publications_behind"] == newer.sequence - publication.sequence
+    assert stale_frontier["advance_available"] is True
 
 
 def test_witnessed_anchor_can_advance_history_without_satisfying_current_quorum(tmp_path):
@@ -169,6 +178,8 @@ def test_witnessed_anchor_can_advance_history_without_satisfying_current_quorum(
     assert runtime.requirement_satisfied(now=now) is False
 
     packet = runtime.trust_advance(publication_sequence=anchor.sequence, now=now)
+    latest_packet = runtime.advance_latest_witnessed(now=now)
+    assert latest_packet == packet
     assert packet.anchor_publication_sha256 == anchor.sha256
     assert packet.current_publication_sha256 == current.sha256
     assert verify_deployment_checkpoint_trust_advance(
@@ -200,6 +211,12 @@ def test_trust_advance_rejects_unwitnessed_anchor(tmp_path):
         assert "quorum" in str(exc)
     else:
         raise AssertionError("unwitnessed anchor unexpectedly produced a trust-advance packet")
+    try:
+        runtime.advance_latest_witnessed(now=datetime(2026, 9, 14, 20, 1, tzinfo=UTC))
+    except ValueError as exc:
+        assert "fresh witness quorum" in str(exc)
+    else:
+        raise AssertionError("unwitnessed history unexpectedly produced a trust-advance packet")
 
 
 def test_witness_target_rotates_with_publication_history(tmp_path):
