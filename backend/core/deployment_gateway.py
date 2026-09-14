@@ -69,7 +69,9 @@ class DeploymentGateway:
     def _plan(value: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(value, dict):
             raise ValueError("deployment input must be an object")
-        if verify_deployment_plan(value):
+        if "plan_sha256" in value or "schema_version" in value:
+            if not verify_deployment_plan(value):
+                raise ValueError("compiled deployment plan failed semantic verification")
             return dict(value)
         return compile_deployment_plan(value)
 
