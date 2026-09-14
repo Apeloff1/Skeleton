@@ -62,7 +62,7 @@ def test_canonical_admission_is_visible_in_pending_projection(tmp_path):
     }]
 
 
-def test_status_exposes_attested_readiness_assurance_root_and_durability(tmp_path):
+def test_status_exposes_truth_gated_assurance_root_and_durability(tmp_path):
     plane = ProductControlPlane(tmp_path, outbox_cap=64)
     plane.ratify("builds", [Rule("submit", "build.submit")])
     status = plane.status()
@@ -72,10 +72,16 @@ def test_status_exposes_attested_readiness_assurance_root_and_durability(tmp_pat
     assert status["operations"]["outbox_capacity_remaining"] == 64
     assert status["operations"]["outbox_health"]["cross_process_locking"] is True
     assert status["operations"]["outbox_health"]["leased_intent_factory"] is True
-    assert status["executors"]["coverage"]["bound_actions"] == 12
-    assert status["readiness"]["ready_actions"] == 12
-    assert status["readiness"]["ready_pct"] == 57.1
+    assert status["executors"]["coverage"]["bound_actions"] == 15
+    assert status["readiness"]["ready_actions"] == 15
+    assert status["readiness"]["ready_pct"] == 71.4
+    assert status["verification"]["truth_gated"] is True
+    assert status["verification"]["speculation_authoritative"] is False
+    assert status["verification"]["model_consensus_is_empirical_evidence"] is False
     assert status["assurance"]["hard_failures"] == 0
+    invariant_ids = {x["id"] for x in status["assurance"]["invariants"]}
+    assert "truth.gated-promotion" in invariant_ids
+    assert "truth.model-consensus-not-evidence" in invariant_ids
     assert len(status["assurance"]["attestation_sha256"]) == 64
     assert len(status["system_root"]["root_sha256"]) == 64
     assert status["receipts"]["version"] == 2
