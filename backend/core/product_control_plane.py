@@ -101,6 +101,33 @@ class ProductControlPlane:
     def receipt_result(self, operation_id: str) -> dict[str, Any]:
         return self.receipts.load_result(operation_id)
 
+    def operation_lifecycle(self, operation_id: str) -> dict[str, Any]:
+        pending = next((item for item in self.operations.pending_operations() if item.id == operation_id), None)
+        receipt = self.receipts.read(operation_id)
+        binding = self.executors.resolve(pending.capability_id, pending.action) if pending is not None else None
+        if pending is not None and receipt is not None:
+            state = "executed_unconfirmed"
+        elif pending is not None and binding is not None:
+            state = "pending_bound"
+        elif pending is not None:
+            state = "pending_unbound"
+        elif receipt is not None:
+            state = "confirmed"
+        else:
+            state = "unknown"
+        audit_events = [asdict(entry) for entry in self.operations.audit.entries(limit=500)
+                        if operation_id in entry.detail]
+        return {
+            "operation_id": operation_id,
+            "state": state,
+            "pending": asdict(pending) if pending is not None else None,
+            "executor": ({"name": binding.name, "version": binding.version,
+                          "effect_class": binding.effect_class, "replay_safe": binding.replay_safe}
+                         if binding is not None else None),
+            "receipt": asdict(receipt) if receipt is not None else None,
+            "audit_events": audit_events,
+        }
+
     def executor_coverage(self) -> dict[str, Any]:
         canonical = [(domain.domain, action) for domain in CANONICAL_PRODUCT_POLICY for action in domain.actions]
         bound = {(item["capability_id"], item["action"]) for item in self.executors.snapshot()}
