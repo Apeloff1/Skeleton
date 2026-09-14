@@ -2,7 +2,7 @@ from core.truth_verifier import EvidenceItem, EvidenceKind
 from core.verified_curiosity import VerifiedCuriosityEngine
 
 
-def _verified_evidence(source, group, *, replication=False, supports=True, quality=0.85):
+def _verified_evidence(source, group, *, replication=False, supports=True, quality=0.95):
     return {
         "source_id": source,
         "source": source,
@@ -14,6 +14,12 @@ def _verified_evidence(source, group, *, replication=False, supports=True, quali
         "reproducible": replication,
         "peer_reviewed": True,
         "primary": True,
+        "provenance_verified": True,
+        "preregistered": True,
+        "data_available": True,
+        "code_available": True,
+        "sample_size": 240,
+        "uncertainty_reported": True,
     }
 
 
@@ -73,13 +79,14 @@ def test_contradicted_claim_is_quarantined_from_orientation(tmp_path):
     engine = VerifiedCuriosityEngine(tmp_path)
     engine.observe_prompt("algorithm benchmark")
     inquiry = engine.next_inquiry()
+    assert inquiry is not None
     claim = "Algorithm A decreases measured latency."
     record = engine.accept_finding(inquiry, {
         "summary": "Conflicting benchmark evidence.",
         "claims": [claim],
         "falsifiable": {claim: True},
         "claim_evidence": {claim: [
-            _verified_evidence("bench-a", "lab-a", replication=True),
+            _verified_evidence("bench-a", "lab-a"),
             _verified_evidence("bench-b", "lab-b", replication=True),
             _verified_evidence("bench-c", "lab-c", supports=False, replication=True),
         ]},
@@ -93,8 +100,21 @@ def test_retracted_evidence_no_longer_counts(tmp_path):
     engine = VerifiedCuriosityEngine(tmp_path)
     claim = "Measured output is 10 units."
     record = engine.evidence_registry.register(claim, EvidenceItem(
-        source_id="study-a", locator="r1", kind=EvidenceKind.PRIMARY_EMPIRICAL,
-        supports=True, independence_group="lab-a", quality=0.9, reproducible=True,
+        source_id="study-a",
+        locator="r1",
+        kind=EvidenceKind.PRIMARY_EMPIRICAL,
+        supports=True,
+        independence_group="lab-a",
+        quality=0.95,
+        reproducible=True,
+        peer_reviewed=True,
+        primary=True,
+        provenance_verified=True,
+        preregistered=True,
+        data_available=True,
+        code_available=True,
+        sample_size=100,
+        uncertainty_reported=True,
     ))
     assert engine.evidence_registry.retract(record.id, "paper withdrawn") is True
     assert engine.evidence_registry.evidence_for(claim) == ()
@@ -109,3 +129,5 @@ def test_truth_gate_status_is_explicit(tmp_path):
     assert status["speculation_authoritative"] is False
     assert status["model_consensus_is_empirical_evidence"] is False
     assert status["verification_policy"]["minimum_independent_support"] == 2
+    assert status["verification_policy"]["require_provenance_verified"] is True
+    assert status["verification_policy"]["require_independent_replication_for_experiments"] is True
