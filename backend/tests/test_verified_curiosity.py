@@ -2,7 +2,7 @@ from core.truth_verifier import EvidenceItem, EvidenceKind
 from core.verified_curiosity import VerifiedCuriosityEngine
 
 
-def _verified_evidence(source, group, claim, *, replication=False, supports=True, quality=0.95):
+def _verified_evidence(source, group, claim, *, replication=False, supports=True, quality=0.95, evidence_span=None):
     return {
         "source_id": source,
         "source": source,
@@ -22,7 +22,7 @@ def _verified_evidence(source, group, claim, *, replication=False, supports=True
         "uncertainty_reported": True,
         "citation_binding": {
             "binding_method": "direct_quote",
-            "evidence_span": claim,
+            "evidence_span": evidence_span or claim,
             "mapping_rationale": "",
         },
     }
@@ -93,7 +93,10 @@ def test_contradicted_claim_is_quarantined_from_orientation(tmp_path):
         "claim_evidence": {claim: [
             _verified_evidence("bench-a", "lab-a", claim),
             _verified_evidence("bench-b", "lab-b", claim, replication=True),
-            _verified_evidence("bench-c", "lab-c", claim, supports=False, replication=True),
+            _verified_evidence(
+                "bench-c", "lab-c", claim, supports=False, replication=True,
+                evidence_span="Algorithm A does not decrease measured latency.",
+            ),
         ]},
     })
     assert claim not in record.claims
@@ -134,7 +137,9 @@ def test_truth_gate_status_is_explicit(tmp_path):
     assert status["speculation_authoritative"] is False
     assert status["model_consensus_is_empirical_evidence"] is False
     assert status["semantic_similarity_is_truth_identity"] is False
+    assert status["evidence_registry"]["truth_eligible_default"] is True
     assert status["calibration"]["cross_process_locking"] is True
+    assert status["calibration"]["truth_authority"] is False
     assert status["verification_policy"]["minimum_independent_support"] == 2
     assert status["verification_policy"]["require_provenance_verified"] is True
     assert status["verification_policy"]["require_independent_replication_for_experiments"] is True
