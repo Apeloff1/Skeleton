@@ -110,6 +110,8 @@ def get_stats() -> dict:
             "burst": _RATE_BURST,
             "max_buckets": _RATE_MAX_BUCKETS,
             "bucket_ttl_seconds": _RATE_BUCKET_TTL,
+            "active_buckets": _counts.get("rate_limit_active_buckets", 0),
+            "evictions_total": _counts.get("rate_limit_evictions", 0),
             "exempt_ips": sorted(_EXEMPT_IPS),
         },
     }
@@ -230,20 +232,29 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         self._refill_per_sec = self.per_minute / 60.0
         self._buckets: Dict[str, _Bucket] = {}
         self._last_prune = time.monotonic()
+        _counts["rate_limit_active_buckets"] = 0
 
     def _prune_buckets(self, now: float) -> None:
         if now - self._last_prune < 30 and len(self._buckets) < _RATE_MAX_BUCKETS:
             return
+
+        evicted = 0
         cutoff = now - _RATE_BUCKET_TTL
         stale = [key for key, bucket in self._buckets.items() if bucket.last < cutoff]
         for key in stale:
-            self._buckets.pop(key, None)
+            if self._buckets.pop(key, None) is not None:
+                evicted += 1
 
         if len(self._buckets) >= _RATE_MAX_BUCKETS:
             overflow = len(self._buckets) - _RATE_MAX_BUCKETS + max(1, _RATE_MAX_BUCKETS // 10)
             oldest = sorted(self._buckets.items(), key=lambda item: item[1].last)[:overflow]
             for key, _bucket in oldest:
-                self._buckets.pop(key, None)
+                if self._buckets.pop(key, None) is not None:
+                    evicted += 1
+
+        if evicted:
+            _counts["rate_limit_evictions"] += evicted
+        _counts["rate_limit_active_buckets"] = len(self._buckets)
         self._last_prune = now
 
     def _bucket_for(self, ip: str) -> _Bucket:
@@ -253,6 +264,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         if bucket is None:
             bucket = _Bucket(self.burst, self._refill_per_sec)
             self._buckets[ip] = bucket
+            _counts["rate_limit_active_buckets"] = len(self._buckets)
         return bucket
 
     async def dispatch(self, request: Request, call_next: Callable):
