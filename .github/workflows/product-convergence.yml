@@ -31,6 +31,8 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -94,6 +96,7 @@ jobs:
           tests/test_deployment_proof_semantics.py
           tests/test_deployment_proof_diagnostics.py
           tests/test_deployment_evidence_checkpoint.py
+          tests/test_deployment_checkpoint_ledger.py
           tests/test_charter_policy.py
           tests/test_durable_outbox.py
           tests/test_worm_audit.py
