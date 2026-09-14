@@ -1,8 +1,7 @@
 """Restart-safe control plane for canonical product operations.
 
-Owns durable policy persistence and the operation coordinator as one service
-boundary. New installations receive an explicit versioned allow-list matching
-the canonical product shell; persisted policy always wins on restart.
+Owns durable policy persistence, admission, native executor bindings and
+integrity-checked execution receipts as one service boundary.
 """
 from __future__ import annotations
 
@@ -12,7 +11,9 @@ from typing import Any
 
 from core.canonical_product_policy import CANONICAL_PRODUCT_POLICY, POLICY_VERSION
 from core.charter_policy import Charter, CharterPolicy, Edict, Rule
+from core.execution_receipts import ExecutionReceiptStore
 from core.policy_repository import PolicyRepository
+from core.product_default_executors import build_default_executor_registry
 from core.product_executor_registry import ExecutorNotRegistered, ProductExecutorRegistry
 from core.product_kernel import PRODUCT_KERNEL, ProductKernel
 from core.product_operations import AdmittedOperation, ProductOperationCoordinator
@@ -26,6 +27,7 @@ class ProductControlPlane:
         kernel: ProductKernel = PRODUCT_KERNEL,
         outbox_cap: int = 4096,
         bootstrap_policy: bool = True,
+        bind_native_executors: bool = True,
     ) -> None:
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
@@ -40,6 +42,12 @@ class ProductControlPlane:
             policy=self.policy,
             outbox_cap=outbox_cap,
         )
+        self.receipts = ExecutionReceiptStore(self.root / "receipts")
+        if bind_native_executors:
+            self.executors, self.native_executors = build_default_executor_registry(self.receipts)
+        else:
+            self.executors = ProductExecutorRegistry()
+            self.native_executors = None
 
     def _bootstrap_canonical_policy(self) -> None:
         for domain_policy in CANONICAL_PRODUCT_POLICY:
@@ -78,6 +86,7 @@ class ProductControlPlane:
                 "outbox_seq": operation.outbox_seq,
                 "admitted_at": operation.admitted_at,
                 "idempotency_key": operation.idempotency_key,
+                "executor_bound": self.executors.resolve(operation.capability_id, operation.action) is not None,
             }
             for operation in self.operations.pending_operations()
         ]
@@ -87,12 +96,24 @@ class ProductControlPlane:
             raise ValueError("audit limit must be between 0 and 500")
         return [asdict(entry) for entry in self.operations.audit.entries(limit=limit)]
 
-    async def execute_registered(self, seq: int, registry: ProductExecutorRegistry) -> bool:
+    def receipt_history(self, *, limit: int = 50) -> list[dict[str, Any]]:
+        return [asdict(receipt) for receipt in self.receipts.list_recent(limit=limit)]
+
+    def receipt(self, operation_id: str) -> dict[str, Any] | None:
+        receipt = self.receipts.read(operation_id)
+        return asdict(receipt) if receipt is not None else None
+
+    async def execute_registered(
+        self,
+        seq: int,
+        registry: ProductExecutorRegistry | None = None,
+    ) -> bool:
+        active_registry = registry or self.executors
         operation = next((item for item in self.operations.pending_operations() if item.outbox_seq == seq), None)
         if operation is None:
             return False
         try:
-            executor = registry.executor_for(operation)
+            executor = active_registry.executor_for(operation)
         except ExecutorNotRegistered:
             return False
         result = await self.operations.execute_one(seq, executor)
@@ -100,7 +121,7 @@ class ProductControlPlane:
 
     async def execute_registered_pending(
         self,
-        registry: ProductExecutorRegistry,
+        registry: ProductExecutorRegistry | None = None,
         *,
         limit: int | None = None,
     ) -> int:
@@ -134,6 +155,13 @@ class ProductControlPlane:
             "governance": {
                 "charters": [asdict(charter) for charter in governance.charters],
                 "edicts": [asdict(edict) for edict in governance.edicts],
+            },
+            "executors": {
+                "bound": len(self.executors),
+                "bindings": list(self.executors.snapshot()),
+            },
+            "receipts": {
+                "count": len(self.receipts.list_recent(limit=500)),
             },
             "operations": self.operations.snapshot(),
         }
