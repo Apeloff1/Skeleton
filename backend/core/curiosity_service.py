@@ -1,4 +1,4 @@
-"""Operational service boundary for Curiosity + live truth watch + transparency."""
+"""Operational service boundary for Curiosity + live truth watch + epistemic trust."""
 from __future__ import annotations
 
 import os
@@ -11,9 +11,8 @@ from core.curiosity_engine import Researcher
 from core.curiosity_research_pipeline import default_ensemble_researcher
 from core.epistemic_attestation import epistemic_root_dict
 from core.epistemic_claim_index import EpistemicClaimIndex
-from core.epistemic_transparency import EpistemicTransparency
+from core.epistemic_trust_runtime import EpistemicTrustRuntime
 from core.idle_curiosity_runtime import IdleCuriosityRuntime
-from core.transparency_gossip import TransparencyGossip
 from core.truth_watch import TruthEventKind, TruthWatchFeed
 from core.verified_curiosity import VerifiedCuriosityEngine
 
@@ -32,11 +31,20 @@ class CuriosityService:
             minimum_score=float(os.environ.get("CURIOSITY_MIN_SCORE", "0.18")),
         )
         self.watch = TruthWatchFeed(self.root / "truth-watch")
-        self.transparency = EpistemicTransparency(self.root / "transparency")
-        self.gossip = TransparencyGossip(self.root / "transparency-gossip")
+        self.trust = EpistemicTrustRuntime(self.root / "epistemic-trust")
         self._watch_stop = threading.Event()
         self._watch_lock = threading.Lock()
         self._watch_thread: threading.Thread | None = None
+
+    @property
+    def transparency(self):
+        """Compatibility view backed by the unified trust runtime."""
+        return self.trust.transparency
+
+    @property
+    def gossip(self):
+        """Compatibility view backed by the unified trust runtime."""
+        return self.trust.gossip
 
     @property
     def enabled(self) -> bool:
@@ -139,35 +147,30 @@ class CuriosityService:
         return claim_proof_dict(self.engine, claim)
 
     def checkpoint_truth(self, *, observed_at: str | None = None) -> dict[str, Any]:
-        before = self.transparency.log.descriptor()
         authority_root = EpistemicClaimIndex(self.engine).root_sha256()
         epistemic_root = self.epistemic_root()["root_sha256"]
-        published = self.transparency.publish(
-            authority_root_sha256=authority_root,
-            epistemic_root_sha256=epistemic_root,
-            observed_at=observed_at,
+        return self.trust.publish(
+            authority_root_sha256=authority_root, epistemic_root_sha256=epistemic_root,
+            observed_at=observed_at, source="curiosity-service",
         )
-        after = published["transparency"]
-        consistency = None
-        if before["tree_size"] and after["tree_size"] > before["tree_size"]:
-            consistency = self.transparency.log.consistency(before["tree_size"])
-        gossip = self.gossip.observe(
-            log_id=after["log_id"], tree_size=after["tree_size"], root_sha256=after["root_sha256"],
-            source="local-control-plane", consistency=consistency,
-        )
-        return {**published, "gossip": gossip}
 
     def transparency_status(self) -> dict[str, Any]:
-        return {"health": self.transparency.health(), "gossip": self.gossip.status()}
+        return self.trust.status()
 
     def transparency_inclusion(self, checkpoint_sha256: str) -> dict[str, Any]:
-        return self.transparency.inclusion_for_checkpoint(checkpoint_sha256)
+        return self.trust.transparency.inclusion_for_checkpoint(checkpoint_sha256)
 
     def transparency_consistency(self, old_size: int) -> dict[str, Any]:
-        return self.transparency.consistency_from(old_size)
+        return self.trust.transparency.consistency_from(old_size)
 
     def observe_transparency_head(self, *, log_id: str, tree_size: int, root_sha256: str, source: str) -> dict[str, Any]:
-        return self.gossip.observe(log_id=log_id, tree_size=tree_size, root_sha256=root_sha256, source=source)
+        return self.trust.observe_peer_head(log_id=log_id, tree_size=tree_size, root_sha256=root_sha256, source=source)
+
+    def finality_status(self) -> dict[str, Any]:
+        return {"trust": self.trust.status(), "current": self.trust.finality_for_current_head()}
+
+    def finalize_truth(self) -> dict[str, Any]:
+        return self.trust.maybe_finalize()
 
     async def run_now(self) -> dict[str, Any]:
         return await self.engine.run_once(self.researcher, minimum_score=self.runtime.minimum_score)
@@ -178,7 +181,7 @@ class CuriosityService:
     def status(self) -> dict[str, Any]:
         return {"enabled": self.enabled, "runtime": self.runtime.snapshot(), "engine": self.engine.stats(),
                 "verification": self.engine.verification_status(), "epistemic_root": self.epistemic_root(),
-                "transparency": self.transparency_status(), "frontier": self.frontier(limit=10),
+                "transparency": self.trust.status(), "frontier": self.frontier(limit=10),
                 "truth_watch": {**self.watch.stats(), "enabled": self.watch_enabled,
                                 "worker_alive": bool(self._watch_thread and self._watch_thread.is_alive())}}
 
