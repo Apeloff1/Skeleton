@@ -83,7 +83,22 @@ def test_prepare_execute_and_idempotent_release_replay(tmp_path):
     assert gateway.authorizations.status()["consumed"] == 1
     assert gateway.releases.status()["releases"] == 1
     assert gateway.receipts.status()["receipts"] == 1
-    assert gateway.status()["verified"] is True
+    status = gateway.status()
+    assert status["verified"] is True
+    assert status["independently_verifiable"] is True
+    assert status["portability"] == {
+        "proof_version": 3,
+        "completed_releases": 1,
+        "fully_portable": 1,
+        "legacy_or_incomplete": 0,
+        "legacy_preflight_hash_only": 0,
+        "legacy_plan_hash_only": 0,
+        "incomplete_transition_evidence": 0,
+        "all_completed_releases_portable": True,
+    }
+    proof = gateway.portable_proof(prepared.authorization.id)
+    assert proof.plan == prepared.plan
+    assert proof.plan_sha256 == first.release.plan_sha256
     current = gateway.releases.current(target="product-runtime", environment="staging")
     assert current is not None and current.release_id == first.release.release_id
 
@@ -115,12 +130,14 @@ def test_consumed_but_not_activated_authorization_is_explicit_evidence_gap_until
     assert gateway.releases.status()["releases"] == 0
     incomplete = gateway.status()
     assert incomplete["verified"] is False
+    assert incomplete["independently_verifiable"] is False
     assert {row["kind"] for row in incomplete["evidence_gaps"]} == {"consumption_without_release"}
 
     resumed = gateway.execute(prepared.authorization.id, prepared.plan)
     assert resumed.resumed is True
     assert gateway.releases.status()["releases"] == 1
     assert gateway.status()["verified"] is True
+    assert gateway.status()["independently_verifiable"] is True
 
     prepared2 = gateway.prepare(_payload("artifact-v2"))
     gateway.authorizations.consume(
