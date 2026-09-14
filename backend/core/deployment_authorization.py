@@ -1,9 +1,9 @@
 """Single-use deployment authorizations bound to stable preflight and plan identity.
 
 The ledger is a cross-process, append-only authorization state machine. New issue
-events persist the complete self-verifying preflight snapshot so a later portable
-proof can independently reconstruct the decision that authorized deployment. Legacy
-hash-only issue rows remain readable but are explicitly reported as such.
+events persist both the complete self-verifying preflight snapshot and the canonical
+plan body, so later portable proofs can reconstruct exactly what decision and rollout
+were authorized. Legacy hash-only rows remain readable but are reported explicitly.
 """
 from __future__ import annotations
 
@@ -180,6 +180,12 @@ class DeploymentAuthorizationLedger:
                         raise DeploymentAuthorizationError("persisted preflight digest diverges from issue event")
                     if preflight.root_after_sha256 != row["system_root_sha256"]:
                         raise DeploymentAuthorizationError("persisted preflight root diverges from issue event")
+                if "plan" in row:
+                    plan = row["plan"]
+                    if not isinstance(plan, dict) or not plan:
+                        raise DeploymentAuthorizationError("persisted deployment plan snapshot is malformed")
+                    if not hmac.compare_digest(plan_digest(plan), str(row["plan_sha256"])):
+                        raise DeploymentAuthorizationError("persisted deployment plan digest diverges from issue event")
                 issues[auth_id] = row
             else:
                 issue = issues.get(auth_id)
@@ -244,6 +250,7 @@ class DeploymentAuthorizationLedger:
                 "preflight_sha256": preflight.attestation_sha256,
                 "preflight": serialize_preflight_snapshot(preflight),
                 "plan_sha256": digest,
+                "plan": dict(plan),
                 "issued_at": stamp,
                 "expires_at": expires,
             }, rows)
@@ -321,6 +328,7 @@ class DeploymentAuthorizationLedger:
             "ledger_head_sha256": str(rows[-1]["sha256"]) if rows else "",
             "ledger_events": len(rows),
             "portable_preflight": isinstance(issue.get("preflight"), dict),
+            "portable_plan": isinstance(issue.get("plan"), dict),
             "verified": True,
         }
 
@@ -334,14 +342,17 @@ class DeploymentAuthorizationLedger:
             rows = self._load_verified()
         issues = [x for x in rows if x.get("kind") == "issue"]
         consumed = {x.get("authorization_id") for x in rows if x.get("kind") == "consume"}
-        portable = sum(isinstance(row.get("preflight"), dict) for row in issues)
+        preflight_snapshots = sum(isinstance(row.get("preflight"), dict) for row in issues)
+        plan_snapshots = sum(isinstance(row.get("plan"), dict) for row in issues)
         return {
             "version": AUTH_VERSION,
             "issued": len(issues),
             "consumed": len(consumed),
             "outstanding": sum(x.get("authorization_id") not in consumed for x in issues),
-            "preflight_snapshots": portable,
-            "legacy_preflight_hash_only": len(issues) - portable,
+            "preflight_snapshots": preflight_snapshots,
+            "plan_snapshots": plan_snapshots,
+            "legacy_preflight_hash_only": len(issues) - preflight_snapshots,
+            "legacy_plan_hash_only": len(issues) - plan_snapshots,
             "head_sha256": rows[-1]["sha256"] if rows else "",
             "cross_process_locking": True,
             "lock_backend": self._lease.backend,
