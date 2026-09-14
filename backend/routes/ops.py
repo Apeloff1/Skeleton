@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from core.charter_policy import Rule
 from core.control_plane_deployment import control_plane_preflight_dict
 from core.databases import client as _SHARED_MONGO_CLIENT
+from core.deployment_gateway import DeploymentGatewayError
 from core.durable_outbox import OutboxFullError
 from core.execution_receipts import ReceiptIntegrityError
 from core.product_control_plane import ProductControlPlane
@@ -71,6 +72,18 @@ class AdmitInput(BaseModel):
     idempotency_key: str | None = Field(default=None, max_length=256)
 
 
+class DeploymentPrepareInput(BaseModel):
+    deployment: dict = Field(default_factory=dict)
+    ttl_seconds: int = Field(default=300, ge=1, le=3600)
+    max_attempts: int = Field(default=3, ge=1, le=10)
+
+
+class DeploymentExecuteInput(BaseModel):
+    authorization_id: str = Field(min_length=1, max_length=128)
+    deployment: dict = Field(default_factory=dict)
+    max_attempts: int = Field(default=3, ge=1, le=10)
+
+
 @router.get("/overview")
 async def overview(token: str = Query("")):
     if not _authorized(token): return {"error": "unauthorized"}
@@ -84,7 +97,7 @@ async def overview(token: str = Query("")):
     ]).to_list(1)
     gmv = round((paid[0]["gmv"] if paid else 0) or 0, 2)
     paid_count = paid[0]["n"] if paid else 0
-    active_listings = await _db.marketplace_listings.count_documents({"active": True})
+    active_listings = await _db.marketplace_listings.count_documents({"active": True)
     live_tournaments = await _db.tournaments.count_documents({"status": "live"})
     creators = len(await _db.marketplace_listings.distinct("creator_id"))
     recent_tx = await _db.payment_transactions.find({}, {"_id": 0, "session_id": 1, "playable_id": 1,
@@ -130,14 +143,58 @@ async def product_control_status(token: str = Query("")):
 
 @router.get("/product-control/assurance")
 async def product_control_assurance(token: str = Query("")):
-    _require_ops(token)
-    return _control_plane().assurance_report()
+    _require_ops(token); return _control_plane().assurance_report()
 
 
 @router.get("/product-control/deployment-preflight")
 async def product_control_deployment_preflight(max_attempts: int = Query(3, ge=1, le=10), token: str = Query("")):
+    _require_ops(token); return control_plane_preflight_dict(_control_plane(), max_attempts=max_attempts)
+
+
+@router.get("/product-control/deployments")
+async def product_control_deployments(token: str = Query("")):
+    _require_ops(token); return _control_plane().deployments.status()
+
+
+@router.post("/product-control/deployments/prepare")
+async def product_control_prepare_deployment(body: DeploymentPrepareInput, token: str = Query("")):
     _require_ops(token)
-    return control_plane_preflight_dict(_control_plane(), max_attempts=max_attempts)
+    try:
+        prepared = _control_plane().deployments.prepare(
+            body.deployment, ttl_seconds=body.ttl_seconds, max_attempts=body.max_attempts,
+        )
+        return _control_plane().deployments.prepared_dict(prepared)
+    except (DeploymentGatewayError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/product-control/deployments/execute")
+async def product_control_execute_deployment(body: DeploymentExecuteInput, token: str = Query("")):
+    _require_ops(token)
+    try:
+        execution = _control_plane().deployments.execute(
+            body.authorization_id, body.deployment, max_attempts=body.max_attempts,
+        )
+        return _control_plane().deployments.execution_dict(execution)
+    except (DeploymentGatewayError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/product-control/deployments/current")
+async def product_control_current_release(target: str = Query(min_length=1, max_length=256),
+                                          environment: str = Query(min_length=1, max_length=64),
+                                          token: str = Query("")):
+    _require_ops(token)
+    try: release = _control_plane().deployments.releases.current(target=target, environment=environment)
+    except Exception as exc: raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {"release": None if release is None else release.__dict__ if hasattr(release, "__dict__") else {
+        "version": release.version, "sequence": release.sequence, "release_id": release.release_id,
+        "authorization_id": release.authorization_id, "target": release.target, "environment": release.environment,
+        "artifact": release.artifact, "plan_sha256": release.plan_sha256,
+        "system_root_sha256": release.system_root_sha256, "activated_at": release.activated_at,
+        "previous_release_id": release.previous_release_id, "previous_sha256": release.previous_sha256,
+        "sha256": release.sha256,
+    }}
 
 
 @router.get("/product-control/pending")
@@ -147,9 +204,7 @@ async def product_control_pending(token: str = Query("")):
 
 @router.get("/product-control/ledger")
 async def product_control_ledger(token: str = Query("")):
-    _require_ops(token)
-    ledger = _control_plane().execution_ledger()
-    return {"count": len(ledger), "operations": ledger}
+    _require_ops(token); ledger = _control_plane().execution_ledger(); return {"count": len(ledger), "operations": ledger}
 
 
 @router.get("/product-control/audit")
@@ -201,8 +256,7 @@ async def product_control_execute(seq: int, token: str = Query("")):
 
 @router.post("/product-control/execute-pending")
 async def product_control_execute_pending(limit: int = Query(32, ge=0, le=256), token: str = Query("")):
-    _require_ops(token)
-    return await _control_plane().dispatch_pending(limit=limit)
+    _require_ops(token); return await _control_plane().dispatch_pending(limit=limit)
 
 
 @router.post("/product-control/policy/ratify")
