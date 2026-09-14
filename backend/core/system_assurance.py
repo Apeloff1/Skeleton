@@ -40,6 +40,14 @@ def _digest(value: Any) -> str:
     return hashlib.sha256(_canonical(value)).hexdigest()
 
 
+def _exact_nonnegative_int(value: Any) -> bool:
+    return type(value) is int and value >= 0
+
+
+def _sha_shape(value: Any) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(ch in "0123456789abcdef" for ch in value)
+
+
 def _deployment_invariants(operations: dict[str, Any]) -> list[AssuranceInvariant]:
     deployment = operations.get("deployments") if isinstance(operations.get("deployments"), dict) else {}
     if not deployment:
@@ -47,13 +55,48 @@ def _deployment_invariants(operations: dict[str, Any]) -> list[AssuranceInvarian
     authorization = deployment.get("authorization") if isinstance(deployment.get("authorization"), dict) else {}
     releases = deployment.get("release_backend") if isinstance(deployment.get("release_backend"), dict) else {}
     receipts = deployment.get("transition_receipts") if isinstance(deployment.get("transition_receipts"), dict) else {}
-    gap_count = int(deployment.get("evidence_gap_count", 0) or 0)
-    release_count = int(releases.get("releases", 0) or 0)
-    receipt_count = int(receipts.get("receipts", 0) or 0)
+    checkpoint = deployment.get("evidence_checkpoint") if isinstance(deployment.get("evidence_checkpoint"), dict) else {}
+    publication = deployment.get("checkpoint_publication") if isinstance(deployment.get("checkpoint_publication"), dict) else {}
+
+    raw_gap_count = deployment.get("evidence_gap_count", 0)
+    raw_release_count = releases.get("releases", 0)
+    raw_receipt_count = receipts.get("receipts", 0)
+    count_types_ok = all(_exact_nonnegative_int(value) for value in (raw_gap_count, raw_release_count, raw_receipt_count))
+    gap_count = raw_gap_count if _exact_nonnegative_int(raw_gap_count) else -1
+    release_count = raw_release_count if _exact_nonnegative_int(raw_release_count) else -1
+    receipt_count = raw_receipt_count if _exact_nonnegative_int(raw_receipt_count) else -1
+
     authorization_ok = authorization.get("verified") is True and authorization.get("cross_process_locking") is True
     releases_ok = releases.get("verified") is True and releases.get("cross_process_locking") is True
     receipts_ok = receipts.get("verified") is True and receipts.get("cross_process_locking") is True
-    cardinality_ok = release_count == receipt_count and gap_count == 0
+    cardinality_ok = count_types_ok and release_count == receipt_count and gap_count == 0
+
+    checkpoint_counts_ok = all(_exact_nonnegative_int(checkpoint.get(key)) for key in (
+        "authorization_events", "receipt_events", "completed_releases", "fully_portable_releases", "evidence_gap_count",
+    ))
+    checkpoint_shape_ok = (
+        checkpoint.get("version") == 2
+        and checkpoint_counts_ok
+        and _sha_shape(checkpoint.get("root_sha256"))
+        and _sha_shape(checkpoint.get("attestation_sha256"))
+    )
+    publication_count = publication.get("publications")
+    publication_ok = (
+        publication.get("verified") is True
+        and publication.get("cross_process_locking") is True
+        and type(publication_count) is int
+        and publication_count >= 1
+        and _sha_shape(publication.get("head_sha256"))
+        and _sha_shape(publication.get("checkpoint_root_sha256"))
+    )
+    checkpoint_current = (
+        deployment.get("checkpoint_current") is True
+        and checkpoint_shape_ok
+        and publication_ok
+        and publication.get("checkpoint_root_sha256") == checkpoint.get("root_sha256")
+    )
+    externally_pinnable = deployment.get("externally_pinnable") is True and checkpoint_current
+
     return [
         AssuranceInvariant(
             "deployment.authorization-ledger-coherent", "hard", authorization_ok,
@@ -68,12 +111,29 @@ def _deployment_invariants(operations: dict[str, Any]) -> list[AssuranceInvarian
             f"verified={receipts.get('verified', False)}, locking={receipts.get('lock_backend', 'missing')}",
         ),
         AssuranceInvariant(
-            "deployment.evidence-complete", "hard", deployment.get("verified") is True and gap_count == 0,
-            f"evidence_gaps={gap_count}",
+            "deployment.evidence-complete", "hard",
+            deployment.get("verified") is True and count_types_ok and gap_count == 0,
+            f"evidence_gaps={raw_gap_count}, exact_counts={count_types_ok}",
         ),
         AssuranceInvariant(
             "deployment.release-receipt-cardinality", "hard", cardinality_ok,
-            f"releases={release_count}, transition_receipts={receipt_count}, gaps={gap_count}",
+            f"releases={raw_release_count}, transition_receipts={raw_receipt_count}, gaps={raw_gap_count}",
+        ),
+        AssuranceInvariant(
+            "deployment.checkpoint-verifiable", "hard", checkpoint_shape_ok,
+            f"version={checkpoint.get('version', 'missing')}, authorization_events={checkpoint.get('authorization_events', 'missing')}, receipt_events={checkpoint.get('receipt_events', 'missing')}",
+        ),
+        AssuranceInvariant(
+            "deployment.checkpoint-ledger-coherent", "hard", publication_ok,
+            f"verified={publication.get('verified', False)}, publications={publication_count}, locking={publication.get('lock_backend', 'missing')}",
+        ),
+        AssuranceInvariant(
+            "deployment.checkpoint-current", "hard", checkpoint_current,
+            f"current={deployment.get('checkpoint_current', False)}, published_root_matches={publication.get('checkpoint_root_sha256') == checkpoint.get('root_sha256')}",
+        ),
+        AssuranceInvariant(
+            "deployment.externally-pinnable", "hard", externally_pinnable,
+            f"externally_pinnable={deployment.get('externally_pinnable', False)}",
         ),
     ]
 
