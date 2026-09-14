@@ -84,7 +84,7 @@ jobs:
         run: python -m pip install "pytest>=8,<9" "cryptography>=46.0.4,<47"
       - name: Verify finality, authorization, release activation and stable-root deployment
         run: >-
-          python -m pytest -q
+          python -m pytest -q --noconftest
           tests/test_witness_freshness_migration.py
           tests/test_signed_witness_finality.py
           tests/test_deployment_preflight.py
