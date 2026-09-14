@@ -144,6 +144,36 @@ def build_deployment_checkpoint_publication_proof(
     )
 
 
+def build_deployment_checkpoint_publication_extension(
+    ledger: DeploymentCheckpointLedger,
+    previous_ledger_head_sha256: str,
+) -> DeploymentCheckpointPublicationProof:
+    """Build a suffix proof directly from a previously pinned publication head.
+
+    The caller supplies only the externally retained old head. The ledger resolves
+    its authenticated publication sequence internally and returns that anchor plus all
+    later publications through the current head. This avoids trusting a server-side
+    sequence number as part of the auditor's state.
+    """
+    if not _is_sha(previous_ledger_head_sha256):
+        raise ValueError("previous deployment checkpoint ledger head must be lowercase sha256")
+    history = ledger.history()
+    anchor = next(
+        (row for row in history if hmac.compare_digest(row.sha256, previous_ledger_head_sha256)),
+        None,
+    )
+    if anchor is None:
+        raise KeyError(previous_ledger_head_sha256)
+    proof = build_deployment_checkpoint_publication_proof(ledger, anchor.sequence)
+    if not verify_deployment_checkpoint_publication_extension(
+        proof,
+        expected_previous_ledger_head_sha256=previous_ledger_head_sha256,
+        expected_current_ledger_head_sha256=proof.ledger_head_sha256,
+    ):
+        raise DeploymentCheckpointLedgerError("checkpoint publication extension failed verification")
+    return proof
+
+
 def verify_deployment_checkpoint_publication_proof(
     proof: DeploymentCheckpointPublicationProof,
     *,
