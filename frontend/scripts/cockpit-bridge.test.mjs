@@ -1,13 +1,47 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import test, { after } from 'node:test';
+import { pathToFileURL } from 'node:url';
+import * as ts from 'typescript';
 
-import {
+const bridgeSourceUrl = new URL('../src/cockpit/previewBridge.ts', import.meta.url);
+const bridgeSource = await readFile(bridgeSourceUrl, 'utf8');
+const transpiled = ts.transpileModule(bridgeSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ES2022,
+    target: ts.ScriptTarget.ES2022,
+  },
+  fileName: 'previewBridge.ts',
+  reportDiagnostics: true,
+});
+const transpileErrors = (transpiled.diagnostics ?? []).filter(
+  (diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error,
+);
+assert.equal(
+  transpileErrors.length,
+  0,
+  transpileErrors
+    .map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'))
+    .join('\n'),
+);
+
+const tempDir = await mkdtemp(join(tmpdir(), 'skeleton-cockpit-'));
+const emittedModulePath = join(tempDir, 'previewBridge.mjs');
+await writeFile(emittedModulePath, transpiled.outputText, 'utf8');
+after(async () => {
+  await rm(tempDir, { recursive: true, force: true });
+});
+
+const cockpit = await import(pathToFileURL(emittedModulePath).href);
+const {
   COCKPIT_BRIDGE_CHANNEL,
   COCKPIT_BRIDGE_VERSION,
   getConfiguredCockpitOrigins,
   installCockpitPreviewBridge,
   isSafeCockpitPath,
-} from '../src/cockpit/previewBridge.ts';
+} = cockpit;
 
 function withGlobal(name, value) {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, name);
