@@ -38,4 +38,7 @@ def test_control_plane_root_changes_when_durable_evidence_changes(tmp_path):
 def test_system_root_includes_all_critical_evidence_domains(tmp_path):
     root = ProductControlPlane(tmp_path).system_root()
     names = {item["name"] for item in root["components"]}
-    assert names == {"policy", "executors", "readiness", "lifecycle", "audit", "outbox", "receipts", "kernel"}
+    assert names == {
+        "policy", "executors", "readiness", "lifecycle", "audit", "outbox", "receipts", "kernel",
+        "curiosity_runtime", "epistemic_root", "epistemic_transparency", "epistemic_gossip",
+    }
