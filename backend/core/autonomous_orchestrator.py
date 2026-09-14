@@ -11,6 +11,10 @@ PlanNode.status ∈ {planned, running, done, manual_review, skipped, error}
 
 Doctrine: execution runs in a worker thread (kick + poll) so the ingress proxy
 is never blocked. Deterministic forges by default; LLM only when a model is set.
+
+Jeeves runtime integration adds bounded priority admission, cancellation,
+time/step budgets and structured execution evidence without changing the
+existing synchronous plan API.
 """
 from __future__ import annotations
 
@@ -186,7 +190,13 @@ def _exec_node(build_id: str, node: dict, by_id: dict) -> dict:
     return {"error": "unknown_kind"}
 
 
-def execute_plan(plan_id: str, on_progress=None) -> dict:
+def execute_plan(plan_id: str, on_progress=None, execution=None) -> dict:
+    """Execute a plan, optionally under a Jeeves ExecutionContext.
+
+    The optional context preserves backwards compatibility for synchronous
+    callers while allowing the async control plane to enforce cancellation,
+    budgets and evidence at every node boundary.
+    """
     plan = get_plan(plan_id)
     if not plan:
         return {"error": "plan_not_found"}
@@ -200,10 +210,25 @@ def execute_plan(plan_id: str, on_progress=None) -> dict:
         progressed = False
         for n in list(remaining):
             if _ready(n, by_id):
+                if execution is not None:
+                    execution.checkpoint(
+                        "orchestrator.node.start",
+                        {"plan_id": plan_id, "node_id": n["id"], "kind": n["kind"],
+                         "target": n.get("target")},
+                        consume_step=True,
+                    )
                 n["status"] = "running"
                 if on_progress:
                     on_progress(n, plan)
                 n["result"] = _exec_node(plan["build_id"], n, by_id)
+                if execution is not None:
+                    execution.check()
+                    execution.record(
+                        "orchestrator.node.finish",
+                        {"plan_id": plan_id, "node_id": n["id"], "kind": n["kind"],
+                         "status": n["status"], "produced_gid": n.get("produced_gid")},
+                        ok=n["status"] in ("done", "manual_review"),
+                    )
                 remaining = [x for x in remaining if x["status"] in ("planned", "error")]
                 progressed = True
         if not progressed:
@@ -214,14 +239,20 @@ def execute_plan(plan_id: str, on_progress=None) -> dict:
     plan["status"] = ("done" if done == len(nodes)
                       else "needs_review" if review else "partial")
     _save_plan(plan)
+    execution_snapshot = execution.snapshot() if execution is not None else None
     try:
         from core import provenance_ledger as pl
-        pl.append(plan["build_id"], "orchestrator_execute",
-                  {"plan_id": plan_id, "done": done, "review": review, "error": err})
+        data = {"plan_id": plan_id, "done": done, "review": review, "error": err}
+        if execution_snapshot is not None:
+            data["execution"] = execution_snapshot
+        pl.append(plan["build_id"], "orchestrator_execute", data)
     except Exception:
         pass
-    return {"plan_id": plan_id, "status": plan["status"], "done": done,
-            "manual_review": review, "error": err, "nodes": nodes}
+    result = {"plan_id": plan_id, "status": plan["status"], "done": done,
+              "manual_review": review, "error": err, "nodes": nodes}
+    if execution_snapshot is not None:
+        result["execution"] = execution_snapshot
+    return result
 
 
 def replan_from(plan_id: str, node_id: str) -> dict:
@@ -284,8 +315,9 @@ def list_plans(build_id: str, limit: int = 20) -> dict:
     return {"build_id": build_id, "count": len(rows), "plans": rows}
 
 
-# ── async jobs ───────────────────────────────────────────────────────────────
+# ── async jobs / bounded runtime control ─────────────────────────────────────
 _JOBS: dict[str, dict] = {}
+_JOB_TOKENS: dict[str, object] = {}
 _LOCK = threading.Lock()
 
 
@@ -295,6 +327,7 @@ def _put(jid: str, patch: dict):
         if len(_JOBS) > 64:
             oldest = sorted(_JOBS.items(), key=lambda kv: kv[1].get("started", 0))[0][0]
             _JOBS.pop(oldest, None)
+            _JOB_TOKENS.pop(oldest, None)
 
 
 def get_job(jid: str) -> dict:
@@ -302,19 +335,115 @@ def get_job(jid: str) -> dict:
         return dict(_JOBS.get(jid) or {"status": "unknown", "job_id": jid})
 
 
-def start_execute_job(plan_id: str) -> str:
+def cancel_job(jid: str, reason: str = "operator_cancelled") -> dict:
+    """Cooperatively cancel a queued/running orchestration job."""
+    with _LOCK:
+        token = _JOB_TOKENS.get(jid)
+        job = _JOBS.get(jid)
+    if job is None:
+        return {"job_id": jid, "status": "unknown", "cancelled": False}
+    if token is None:
+        return {"job_id": jid, "status": job.get("status"), "cancelled": False}
+    changed = token.cancel(reason)
+    if changed:
+        _put(jid, {"cancel_requested": True, "cancel_reason": reason})
+    return {"job_id": jid, "status": get_job(jid).get("status"), "cancelled": changed}
+
+
+def runtime_status() -> dict:
+    """Return the shared Jeeves admission/governor/capability state."""
+    from core.jeeves_execution_kernel import get_default_runtime
+    snapshot = get_default_runtime().snapshot()
+    with _LOCK:
+        states: dict[str, int] = {}
+        for job in _JOBS.values():
+            status = str(job.get("status", "unknown"))
+            states[status] = states.get(status, 0) + 1
+    snapshot["jobs"] = states
+    return snapshot
+
+
+def start_execute_job(
+    plan_id: str,
+    *,
+    priority: str = "interactive",
+    max_steps: int | None = None,
+    max_seconds: float | None = None,
+    admission_timeout: float | None = 5.0,
+) -> str:
+    """Run a plan under the bounded Jeeves runtime.
+
+    Defaults preserve the old call shape (`start_execute_job(plan_id)`) while
+    adding explicit priority, cancellation and budgets for richer callers.
+    """
+    from core.jeeves_execution_kernel import CancellationToken
+
     jid = uuid.uuid4().hex[:12]
-    _put(jid, {"job_id": jid, "status": "running", "plan_id": plan_id,
-               "started": time.time(), "current": None, "result": None})
+    token = CancellationToken()
+    with _LOCK:
+        _JOB_TOKENS[jid] = token
+    _put(jid, {"job_id": jid, "status": "queued", "plan_id": plan_id,
+               "started": time.time(), "current": None, "result": None,
+               "priority": priority, "max_steps": max_steps,
+               "max_seconds": max_seconds, "cancel_requested": False})
 
     def _worker():
+        from core.jeeves_execution_kernel import (
+            AdmissionRejected,
+            BudgetExceeded,
+            ExecutionCancelled,
+            get_default_runtime,
+        )
+        runtime = get_default_runtime()
+        plan = get_plan(plan_id)
+        if not plan:
+            _put(jid, {"status": "error", "error": "plan_not_found",
+                       "finished": time.time()})
+            with _LOCK:
+                _JOB_TOKENS.pop(jid, None)
+            return
         try:
-            def _prog(node, plan):
-                _put(jid, {"current": f"{node['kind']}:{node.get('target') or node['id']}"})
-            res = execute_plan(plan_id, on_progress=_prog)
-            _put(jid, {"status": "error" if res.get("error") else "done", "result": res})
-        except Exception as e:
-            _put(jid, {"status": "error", "error": str(e)})
+            with runtime.execution(
+                run_id=jid,
+                build_id=plan.get("build_id"),
+                priority=priority,
+                cancellation=token,
+                max_steps=max_steps,
+                max_seconds=max_seconds,
+                admission_timeout=admission_timeout,
+            ) as execution:
+                _put(jid, {"status": "running", "runtime": execution.snapshot()})
+
+                def _prog(node, _plan):
+                    _put(jid, {
+                        "current": f"{node['kind']}:{node.get('target') or node['id']}",
+                        "runtime": execution.snapshot(),
+                    })
+
+                res = execute_plan(plan_id, on_progress=_prog, execution=execution)
+                _put(jid, {
+                    "status": "error" if res.get("error") else "done",
+                    "result": res,
+                    "runtime": execution.snapshot(),
+                    "evidence": execution.evidence(),
+                    "finished": time.time(),
+                    "current": None,
+                })
+        except ExecutionCancelled as exc:
+            _put(jid, {"status": "cancelled", "error": str(exc),
+                       "finished": time.time(), "current": None})
+        except BudgetExceeded as exc:
+            _put(jid, {"status": "budget_exceeded", "error": str(exc),
+                       "finished": time.time(), "current": None})
+        except AdmissionRejected as exc:
+            _put(jid, {"status": "rejected", "error": str(exc),
+                       "finished": time.time(), "current": None})
+        except Exception as exc:
+            _put(jid, {"status": "error", "error": str(exc),
+                       "finished": time.time(), "current": None})
+        finally:
+            with _LOCK:
+                _JOB_TOKENS.pop(jid, None)
 
     threading.Thread(target=_worker, daemon=True, name=f"orch-{jid}").start()
     return jid
