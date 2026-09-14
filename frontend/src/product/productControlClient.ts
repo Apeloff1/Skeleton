@@ -38,6 +38,15 @@ export type ExecutionReceipt = {
   completed_at: string; result_artifact_id: string; result_sha256: string; result_summary: Record<string, unknown>;
   legacy_inline_result: Record<string, unknown> | null;
 };
+export type DispatchFailure = { outbox_seq: number; operation_id: string; executor: string; error: string };
+export type DispatchReport = {
+  attempted: number;
+  confirmed: number[];
+  deferred: number[];
+  unbound: number[];
+  failed: DispatchFailure[];
+  remaining: number;
+};
 export type OperationAdmission = { operation_id: string; capability_id: string; pillar: string; outbox_seq: number; admitted_at: string; audit_hash: string };
 export type AdmitOperationInput = { capability_id: string; domain: string; action: string; principal: string; actor_weight: number; payload: Record<string, unknown>; quorum_approved?: boolean; idempotency_key?: string };
 
@@ -67,8 +76,8 @@ export function getExecutionResult(operationId: string, token = '', signal?: Abo
 export function executeProductOperation(seq: number, token = '', signal?: AbortSignal): Promise<ApiResult<{ outbox_seq: number; confirmed: boolean; status: string }>> {
   return api.post(`${ROOT}/execute/${seq}${tokenQuery(token)}`, {}, { signal, retries: 0 });
 }
-export function executePendingProductOperations(token = '', limit = 32, signal?: AbortSignal): Promise<ApiResult<{ confirmed: number; remaining: number }>> {
-  return api.post(`${ROOT}/execute-pending${tokenQueryWith(token, { limit })}`, {}, { signal, retries: 0 });
+export function executePendingProductOperations(token = '', limit = 32, signal?: AbortSignal): Promise<ApiResult<DispatchReport>> {
+  return api.post<DispatchReport>(`${ROOT}/execute-pending${tokenQueryWith(token, { limit })}`, {}, { signal, retries: 0 });
 }
 export function admitProductOperation(input: AdmitOperationInput, token = '', signal?: AbortSignal): Promise<ApiResult<OperationAdmission>> {
   const idempotencyKey = input.idempotency_key || `${input.capability_id}:${input.action}:${Date.now()}`;
