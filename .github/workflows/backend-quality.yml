@@ -63,6 +63,17 @@ jobs:
       - name: Repository secret hygiene gate
         run: python scripts/check_secret_hygiene.py
 
+      - name: Generate deterministic CycloneDX SBOM
+        run: python scripts/generate_sbom.py --output ../artifacts/sbom.cdx.json
+
+      - name: Upload security SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: security-sbom
+          path: artifacts/sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Security boundary regression tests
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
@@ -78,6 +89,7 @@ jobs:
           tests/test_sast_security_gate.py
           tests/test_workflow_security_gate.py
           tests/test_secret_hygiene_gate.py
+          tests/test_sbom_generator.py
           tests/test_security_config.py
           tests/test_security_parser_fuzz.py
           tests/test_security_middleware_hardening.py
