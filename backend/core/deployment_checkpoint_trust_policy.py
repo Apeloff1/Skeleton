@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 import hmac
 import re
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 from core.canonical_json import CanonicalJSONError, canonical_json_sha256
 from core.deployment_checkpoint_pin_config import DeploymentCheckpointPinPolicy
@@ -19,6 +19,11 @@ from core.transparency_witness import TrustedWitness
 
 DEPLOYMENT_CHECKPOINT_TRUST_POLICY_VERSION = 1
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_MANIFEST_KEYS = {
+    "version", "required_groups", "max_age_seconds", "required",
+    "continuity_required", "witnesses", "manifest_sha256",
+}
+_WITNESS_KEYS = {"id", "independence_group", "public_key_fingerprint"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,6 +162,60 @@ def verify_deployment_checkpoint_trust_policy_manifest(
         )
     except (CanonicalJSONError, TypeError, ValueError):
         return False
+
+
+def decode_deployment_checkpoint_trust_policy_manifest(
+    raw: Any,
+) -> DeploymentCheckpointTrustPolicyManifest:
+    """Restore a policy manifest from strict JSON-shaped data without granting trust."""
+    if not isinstance(raw, Mapping) or set(raw) != _MANIFEST_KEYS:
+        raise ValueError("deployment checkpoint trust policy schema mismatch")
+    version = raw.get("version")
+    required_groups = raw.get("required_groups")
+    max_age_seconds = raw.get("max_age_seconds")
+    required = raw.get("required")
+    continuity_required = raw.get("continuity_required")
+    digest = raw.get("manifest_sha256")
+    if type(version) is not int or version != DEPLOYMENT_CHECKPOINT_TRUST_POLICY_VERSION:
+        raise ValueError("deployment checkpoint trust policy version malformed")
+    if type(required_groups) is not int or not 1 <= required_groups <= 64:
+        raise ValueError("deployment checkpoint trust policy quorum malformed")
+    if type(max_age_seconds) is not int or not 1 <= max_age_seconds <= 604800:
+        raise ValueError("deployment checkpoint trust policy freshness malformed")
+    if type(required) is not bool or type(continuity_required) is not bool:
+        raise ValueError("deployment checkpoint trust policy flags malformed")
+    if continuity_required and not required:
+        raise ValueError("deployment checkpoint trust continuity requires signed pins")
+    if not isinstance(digest, str) or not _SHA256.fullmatch(digest):
+        raise ValueError("deployment checkpoint trust policy digest malformed")
+    rows = raw.get("witnesses")
+    if not isinstance(rows, list):
+        raise ValueError("deployment checkpoint trust policy witnesses must be a JSON array")
+    witnesses: list[DeploymentCheckpointTrustPolicyWitness] = []
+    for item in rows:
+        if not isinstance(item, Mapping) or set(item) != _WITNESS_KEYS:
+            raise ValueError("deployment checkpoint trust policy witness schema mismatch")
+        witness_id = _canonical_text(item.get("id"), "witness id")
+        group = _canonical_text(item.get("independence_group"), "witness group")
+        fingerprint = item.get("public_key_fingerprint")
+        if not isinstance(fingerprint, str) or not _SHA256.fullmatch(fingerprint):
+            raise ValueError("deployment checkpoint trust policy witness fingerprint malformed")
+        witnesses.append(DeploymentCheckpointTrustPolicyWitness(witness_id, group, fingerprint))
+    manifest = DeploymentCheckpointTrustPolicyManifest(
+        version,
+        required_groups,
+        max_age_seconds,
+        required,
+        continuity_required,
+        tuple(witnesses),
+        digest,
+    )
+    if not verify_deployment_checkpoint_trust_policy_manifest(
+        manifest,
+        expected_manifest_sha256=digest,
+    ):
+        raise ValueError("deployment checkpoint trust policy manifest integrity failed")
+    return manifest
 
 
 def verify_deployment_checkpoint_trust_registry(
