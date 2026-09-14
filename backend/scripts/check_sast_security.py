@@ -1,18 +1,32 @@
-"""Dependency-free high-confidence Python SAST gate.
+"""Dependency-free high-confidence Python/JavaScript/TypeScript SAST gate.
 
-This scanner intentionally targets dangerous primitives with a low false-positive
+The scanner intentionally targets dangerous primitives with a low false-positive
 rate. Broader lint/security tooling can layer on top, but these patterns should
-never silently enter backend production code.
+never silently enter production code.
 """
 from __future__ import annotations
 
 import ast
 from pathlib import Path
+import re
 import sys
 from typing import Iterable
 
-ROOT = Path(__file__).resolve().parents[1]
-SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", "node_modules"}
+REPO_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_ROOT = REPO_ROOT / "backend"
+FRONTEND_ROOT = REPO_ROOT / "frontend"
+SKIP_DIRS = {
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "node_modules",
+    "dist",
+    "build",
+    ".next",
+    ".expo",
+    "coverage",
+}
 TRACKED_MODULES = {"requests", "httpx", "ssl", "tempfile", "jwt"}
 NETWORK_CALLS = {
     "requests.get",
@@ -33,10 +47,56 @@ NETWORK_CALLS = {
     "httpx.options",
     "httpx.request",
 }
+JS_SUFFIXES = {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"}
+JS_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (
+        "dynamic eval() is forbidden",
+        re.compile(r"(?<![A-Za-z0-9_$\.])eval\s*\("),
+    ),
+    (
+        "Function constructor is forbidden",
+        re.compile(r"(?<![A-Za-z0-9_$\.])(?:new\s+)?Function\s*\("),
+    ),
+    (
+        "TLS rejectUnauthorized:false is forbidden",
+        re.compile(r"\brejectUnauthorized\s*:\s*false\b"),
+    ),
+    (
+        "NODE_TLS_REJECT_UNAUTHORIZED=0 is forbidden",
+        re.compile(
+            r"\bprocess\s*\.\s*env\s*\.\s*NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*['\"]0['\"]"
+        ),
+    ),
+    (
+        "child_process.exec()/execSync() is forbidden",
+        re.compile(r"\bchild_process\s*\.\s*exec(?:Sync)?\s*\("),
+    ),
+    (
+        "require('child_process').exec()/execSync() is forbidden",
+        re.compile(
+            r"\brequire\s*\(\s*['\"](?:node:)?child_process['\"]\s*\)\s*\.\s*exec(?:Sync)?\s*\("
+        ),
+    ),
+)
+CHILD_PROCESS_IMPORT_RE = re.compile(
+    r"(?:import\s*\{(?P<esm>[^}]*)\}\s*from\s*['\"](?:node:)?child_process['\"]"
+    r"|(?:const|let|var)\s*\{(?P<cjs>[^}]*)\}\s*=\s*require\s*\(\s*['\"](?:node:)?child_process['\"]\s*\))"
+)
 
 
 def python_files() -> Iterable[Path]:
-    for path in ROOT.rglob("*.py"):
+    for path in BACKEND_ROOT.rglob("*.py"):
+        if any(part in SKIP_DIRS for part in path.parts):
+            continue
+        yield path
+
+
+def javascript_files() -> Iterable[Path]:
+    if not FRONTEND_ROOT.exists():
+        return
+    for path in FRONTEND_ROOT.rglob("*"):
+        if not path.is_file() or path.suffix.lower() not in JS_SUFFIXES:
+            continue
         if any(part in SKIP_DIRS for part in path.parts):
             continue
         yield path
@@ -44,7 +104,7 @@ def python_files() -> Iterable[Path]:
 
 def display_path(path: Path) -> Path:
     try:
-        return path.relative_to(ROOT)
+        return path.relative_to(REPO_ROOT)
     except ValueError:
         return path
 
@@ -140,6 +200,7 @@ def call_violation(node: ast.Call, aliases: dict[str, str]) -> str | None:
 
 
 def violations(path: Path) -> list[str]:
+    """Return high-confidence Python findings for ``path``."""
     label = display_path(path)
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -157,16 +218,79 @@ def violations(path: Path) -> list[str]:
     return findings
 
 
+def _line_number(text: str, offset: int) -> int:
+    return text.count("\n", 0, offset) + 1
+
+
+def _destructured_child_process_names(text: str) -> set[str]:
+    names: set[str] = set()
+    for match in CHILD_PROCESS_IMPORT_RE.finditer(text):
+        declaration = match.group("esm") or match.group("cjs") or ""
+        for raw_item in declaration.split(","):
+            item = raw_item.strip()
+            if not item:
+                continue
+            # ESM: exec as runCommand. CJS: exec: runCommand.
+            if " as " in item:
+                source, local = (piece.strip() for piece in item.split(" as ", 1))
+            elif ":" in item:
+                source, local = (piece.strip() for piece in item.split(":", 1))
+            else:
+                source = local = item
+            if source in {"exec", "execSync"} and re.fullmatch(r"[A-Za-z_$][\w$]*", local):
+                names.add(local)
+    return names
+
+
+def javascript_violations(path: Path) -> list[str]:
+    """Return low-noise JavaScript/TypeScript security findings for ``path``."""
+    label = display_path(path)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        return [f"{label}: read failure: {exc}"]
+
+    findings: list[str] = []
+    for message, pattern in JS_PATTERNS:
+        for match in pattern.finditer(text):
+            findings.append(f"{label}:{_line_number(text, match.start())}: {message}")
+
+    for local_name in sorted(_destructured_child_process_names(text)):
+        call_re = re.compile(rf"(?<![A-Za-z0-9_$\.]){re.escape(local_name)}\s*\(")
+        for match in call_re.finditer(text):
+            findings.append(
+                f"{label}:{_line_number(text, match.start())}: imported child_process {local_name}() is forbidden"
+            )
+
+    # A shell-enabled spawn crosses the same command-interpreter trust boundary
+    # as exec. Restrict this rule to files that actually reference child_process
+    # to avoid flagging unrelated configuration objects with `shell: true`.
+    if re.search(r"['\"](?:node:)?child_process['\"]|\bchild_process\b", text):
+        shell_true = re.compile(r"\bshell\s*:\s*true\b")
+        for match in shell_true.finditer(text):
+            findings.append(
+                f"{label}:{_line_number(text, match.start())}: child_process shell:true is forbidden"
+            )
+
+    return findings
+
+
 def main() -> int:
     findings: list[str] = []
+    python_count = 0
+    js_count = 0
     for path in python_files():
+        python_count += 1
         findings.extend(violations(path))
+    for path in javascript_files():
+        js_count += 1
+        findings.extend(javascript_violations(path))
     if findings:
         print("High-confidence SAST violations detected:", file=sys.stderr)
         for finding in sorted(findings):
             print(f"  - {finding}", file=sys.stderr)
         return 1
-    print("High-confidence SAST gate passed.")
+    print(f"High-confidence SAST gate passed ({python_count} Python, {js_count} JS/TS files).")
     return 0
 
 
