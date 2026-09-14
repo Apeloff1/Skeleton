@@ -9,9 +9,9 @@ def test_default_control_plane_readiness_is_evidence_backed(tmp_path):
     plane = ProductControlPlane(tmp_path)
     report = plane.readiness_report()
     assert report["canonical_actions"] == 21
-    assert report["ready_actions"] == 10
-    assert report["ready_pct"] == 47.6
-    assert report["governed_unbound"] == 11
+    assert report["ready_actions"] == 12
+    assert report["ready_pct"] == 57.1
+    assert report["governed_unbound"] == 9
     assert report["unsafe_actions"] == 0
     assert report["policy_gaps"] == 0
     assert len(report["attestation_sha256"]) == 64
