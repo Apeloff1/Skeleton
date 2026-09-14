@@ -7,6 +7,7 @@ Security properties:
   * Request IDs are normalized before they reach response headers or logs.
   * Log fields derived from request metadata are normalized to one line.
   * Rate-limit state is bounded and stale buckets are evicted.
+  * Security-sensitive environment values fail closed in production.
 """
 from __future__ import annotations
 
@@ -24,18 +25,14 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from core.client_ip import resolve_client_ip
+from core.security_config import env_bool, env_int
 
 log = logging.getLogger("api.middleware")
 
 
 def _env_int(name: str, default: int, *, minimum: int, maximum: int) -> int:
-    raw = os.environ.get(name, str(default)).strip()
-    try:
-        value = int(raw)
-    except ValueError:
-        log.warning("invalid integer for %s; using default", name)
-        value = default
-    return max(minimum, min(maximum, value))
+    """Compatibility wrapper around the shared security configuration parser."""
+    return env_int(name, default, minimum=minimum, maximum=maximum)
 
 
 # ── Configuration ─────────────────────────────────────────────────────
@@ -45,7 +42,7 @@ _RATE_MAX_BUCKETS = _env_int("RATE_LIMIT_MAX_BUCKETS", 10_000, minimum=128, maxi
 _RATE_BUCKET_TTL = _env_int("RATE_LIMIT_BUCKET_TTL_SECONDS", 900, minimum=60, maximum=86_400)
 _EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "127.0.0.1,::1,localhost")
 _EXEMPT_IPS = {ip.strip() for ip in _EXEMPT_RAW.split(",") if ip.strip()}
-_ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
+_ACCESS_LOG = env_bool("ACCESS_LOG", True)
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]+")
 
