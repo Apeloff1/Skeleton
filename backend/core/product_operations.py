@@ -111,24 +111,19 @@ class ProductOperationCoordinator:
     @staticmethod
     def _from_intent(entry: OutboxEntry) -> AdmittedOperation:
         p = entry.payload
-        return AdmittedOperation(
-            id=str(p["operation_id"]), capability_id=str(p["capability_id"]), pillar=str(p["pillar"]),
+        return AdmittedOperation(id=str(p["operation_id"]), capability_id=str(p["capability_id"]), pillar=str(p["pillar"]),
             domain=str(p["domain"]), action=str(p["action"]), principal=str(p["principal"]),
-            artifact_manifest_id=str(p["artifact_manifest_id"]), outbox_seq=entry.seq,
-            admitted_at=str(p["admitted_at"]), audit_hash=str(p.get("audit_hash", "")), idempotency_key=p.get("idempotency_key"),
-        )
+            artifact_manifest_id=str(p["artifact_manifest_id"]), outbox_seq=entry.seq, admitted_at=str(p["admitted_at"]),
+            audit_hash=str(p.get("audit_hash", "")), idempotency_key=p.get("idempotency_key"))
 
-    def admit(self, *, capability_id: str, domain: str, action: str, principal: str,
-              actor_weight: int, payload: dict[str, Any], quorum_approved: bool = False,
-              idempotency_key: str | None = None) -> AdmittedOperation:
+    def admit(self, *, capability_id: str, domain: str, action: str, principal: str, actor_weight: int,
+              payload: dict[str, Any], quorum_approved: bool = False, idempotency_key: str | None = None) -> AdmittedOperation:
         if not isinstance(payload, dict): raise ValueError("payload must be an object")
         if idempotency_key is not None:
             idempotency_key = idempotency_key.strip()
             if not idempotency_key: raise ValueError("idempotency_key cannot be blank")
         with self._lock:
             with self._process_lock.acquire():
-                # Refresh after acquiring the process lease so another worker's
-                # completed admission is visible before we evaluate this key.
                 self._idempotency = self._load_index()
                 if idempotency_key is not None and idempotency_key in self._idempotency:
                     return self._restore_operation(self._idempotency[idempotency_key])
@@ -137,35 +132,26 @@ class ProductOperationCoordinator:
                 decision = self.policy.decide(domain, action, actor_weight)
                 if not decision.permitted:
                     self.audit.append(kind="operation_rejected", seal=decision.cited_rule or "NO_RULE", principal=principal,
-                                      route=f"product:{capability_id}", detail=decision.reason)
+                        route=f"product:{capability_id}", detail=decision.reason)
                     raise OperationRejected(decision.reason)
                 if decision.quorum_required and not quorum_approved:
                     self.audit.append(kind="operation_rejected", seal=decision.cited_rule or "QUORUM", principal=principal,
-                                      route=f"product:{capability_id}", detail="charter permits action but quorum approval is missing")
+                        route=f"product:{capability_id}", detail="charter permits action but quorum approval is missing")
                     raise OperationRejected("quorum approval required")
 
                 op_id = uuid.uuid4().hex; admitted_at = datetime.now(UTC).isoformat(); artifact_box: dict[str, Manifest] = {}
                 def build_intent(_seq: int) -> dict[str, Any]:
                     artifact = self.store.put_bytes(f"operation-{op_id}.json", self._encode_payload(payload)); artifact_box["value"] = artifact
-                    return {
-                        "operation_id": op_id, "capability_id": capability.id, "pillar": capability.pillar.value,
-                        "domain": domain, "action": action, "principal": principal,
-                        "artifact_manifest_id": artifact.id, "admitted_at": admitted_at, "idempotency_key": idempotency_key,
-                    }
-                # Capacity is checked before build_intent executes, under the
-                # outbox process lease. No artifact is staged when capacity is full.
+                    return {"operation_id": op_id, "capability_id": capability.id, "pillar": capability.pillar.value,
+                        "domain": domain, "action": action, "principal": principal, "artifact_manifest_id": artifact.id,
+                        "admitted_at": admitted_at, "idempotency_key": idempotency_key}
                 outbox_entry = self.outbox.journal_factory("product_operations", build_intent)
                 artifact = artifact_box["value"]
-                audit_entry: AuditEntry = self.audit.append(
-                    kind="operation_admitted", seal=decision.cited_rule or "CHARTER", principal=principal,
-                    route=f"product:{capability_id}",
-                    detail=json.dumps({"operation_id": op_id, "outbox_seq": outbox_entry.seq, "artifact": artifact.id}, sort_keys=True, separators=(",", ":")),
-                )
-                operation = AdmittedOperation(
-                    id=op_id, capability_id=capability.id, pillar=capability.pillar.value, domain=domain, action=action,
-                    principal=principal, artifact_manifest_id=artifact.id, outbox_seq=outbox_entry.seq,
-                    admitted_at=admitted_at, audit_hash=audit_entry.hash, idempotency_key=idempotency_key,
-                )
+                audit_entry: AuditEntry = self.audit.append(kind="operation_admitted", seal=decision.cited_rule or "CHARTER", principal=principal,
+                    route=f"product:{capability_id}", detail=json.dumps({"operation_id": op_id, "outbox_seq": outbox_entry.seq, "artifact": artifact.id}, sort_keys=True, separators=(",", ":")))
+                operation = AdmittedOperation(id=op_id, capability_id=capability.id, pillar=capability.pillar.value, domain=domain,
+                    action=action, principal=principal, artifact_manifest_id=artifact.id, outbox_seq=outbox_entry.seq,
+                    admitted_at=admitted_at, audit_hash=audit_entry.hash, idempotency_key=idempotency_key)
                 if idempotency_key is not None:
                     self._idempotency[idempotency_key] = asdict(operation); self._persist_index()
                 return operation
@@ -189,14 +175,14 @@ class ProductOperationCoordinator:
             if inspect.isawaitable(executed): executed = await executed
         except Exception as exc:
             self.audit.append(kind="operation_execution_failed", seal="EXECUTOR", principal=operation.principal,
-                              route=f"product:{operation.capability_id}", detail=json.dumps({"operation_id": operation.id, "outbox_seq": seq, "error": type(exc).__name__}, sort_keys=True, separators=(",", ":")))
+                route=f"product:{operation.capability_id}", detail=json.dumps({"operation_id": operation.id, "outbox_seq": seq, "error": type(exc).__name__}, sort_keys=True, separators=(",", ":")))
             raise OperationExecutionError(f"executor raised for operation {operation.id}") from exc
         if not executed:
             audit = self.audit.append(kind="operation_execution_deferred", seal="EXECUTOR", principal=operation.principal,
-                                      route=f"product:{operation.capability_id}", detail=json.dumps({"operation_id": operation.id, "outbox_seq": seq}, sort_keys=True, separators=(",", ":")))
+                route=f"product:{operation.capability_id}", detail=json.dumps({"operation_id": operation.id, "outbox_seq": seq}, sort_keys=True, separators=(",", ":")))
             return ExecutionResult(operation.id, seq, False, False, audit.hash)
         audit = self.audit.append(kind="operation_executed", seal="EXECUTOR", principal=operation.principal,
-                                  route=f"product:{operation.capability_id}", detail=json.dumps({"operation_id": operation.id, "outbox_seq": seq}, sort_keys=True, separators=(",", ":")))
+            route=f"product:{operation.capability_id}", detail=json.dumps({"operation_id": operation.id, "outbox_seq": seq}, sort_keys=True, separators=(",", ":")))
         confirmed = await self.outbox.confirm_one(seq, lambda _: True)
         return ExecutionResult(operation.id, seq, True, confirmed, audit.hash)
 
@@ -211,12 +197,10 @@ class ProductOperationCoordinator:
         return completed
 
     def snapshot(self) -> dict[str, Any]:
-        latest = self.audit.latest
         with self._lock:
             with self._process_lock.acquire(): self._idempotency = self._load_index(); idempotency_count = len(self._idempotency)
-        return {
-            "capabilities": len(self.kernel.all()), "pending_operations": self.outbox.pending_count,
+        audit_health = self.audit.health()
+        return {"capabilities": len(self.kernel.all()), "pending_operations": self.outbox.pending_count,
             "outbox_capacity_remaining": self.outbox.capacity_remaining, "idempotency_records": idempotency_count,
-            "content_store": self.store.stats(), "audit_sequence": self.audit.sequence, "audit_head": latest.hash if latest else None,
-            "admission_cross_process_locking": True, "admission_lock_backend": self._process_lock.backend,
-        }
+            "content_store": self.store.stats(), "audit_sequence": audit_health["sequence"], "audit_head": audit_health["head"],
+            "audit_health": audit_health, "admission_cross_process_locking": True, "admission_lock_backend": self._process_lock.backend}
