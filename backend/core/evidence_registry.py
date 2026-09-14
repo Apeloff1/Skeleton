@@ -1,10 +1,10 @@
 """Durable evidence registry for empirical verification.
 
-Tracks evidence provenance, independence groups, freshness and retraction status.
-The registry does not decide truth; it provides the verifier with auditable source
-state and prevents retracted/stale/duplicate evidence from counting as independent.
-Source-level retractions can atomically invalidate every affected evidence record
-while retaining the historical record for audit and later contradiction analysis.
+The registry preserves historical evidence independently from truth eligibility.
+Evidence is eligible for authoritative verification only after a claim-level
+citation binding has been validated by the epistemic gate and its attestation is
+persisted here. Legacy/unbound evidence remains searchable and retractable, but
+cannot silently regain authority during later re-verification.
 """
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ import hmac
 import json
 import os
 from pathlib import Path
+import re
 from typing import Any, Iterable
 
 from core.file_lease import FileLease
@@ -34,9 +35,15 @@ class EvidenceRecord:
     claim: str
     item: EvidenceItem
     registered_at: str
+    citation_binding_attestation_sha256: str = ""
+    citation_bound_at: str = ""
     retracted: bool = False
     retraction_reason: str = ""
     retracted_at: str = ""
+
+    @property
+    def citation_bound(self) -> bool:
+        return bool(self.citation_binding_attestation_sha256)
 
 
 def _canonical(value: Any) -> bytes:
@@ -45,6 +52,13 @@ def _canonical(value: Any) -> bytes:
 
 def _digest(value: Any) -> str:
     return hashlib.sha256(_canonical(value)).hexdigest()
+
+
+def _attestation(value: str) -> str:
+    value = str(value or "").lower().strip()
+    if value and not re.fullmatch(r"[0-9a-f]{64}", value):
+        raise ValueError("citation binding attestation must be a 64-character sha256")
+    return value
 
 
 class EvidenceRegistry:
@@ -87,31 +101,52 @@ class EvidenceRegistry:
         item_raw = dict(raw["item"]); item_raw["kind"] = EvidenceKind(item_raw["kind"])
         return EvidenceRecord(
             id=str(raw["id"]), claim=str(raw["claim"]), item=EvidenceItem(**item_raw),
-            registered_at=str(raw["registered_at"]), retracted=bool(raw.get("retracted", False)),
+            registered_at=str(raw["registered_at"]),
+            citation_binding_attestation_sha256=str(raw.get("citation_binding_attestation_sha256", "")),
+            citation_bound_at=str(raw.get("citation_bound_at", "")),
+            retracted=bool(raw.get("retracted", False)),
             retraction_reason=str(raw.get("retraction_reason", "")), retracted_at=str(raw.get("retracted_at", "")),
         )
 
-    def register(self, claim: str, item: EvidenceItem, *, registered_at: str | None = None) -> EvidenceRecord:
+    def register(self, claim: str, item: EvidenceItem, *, registered_at: str | None = None,
+                 citation_binding_attestation_sha256: str = "") -> EvidenceRecord:
         claim = " ".join(str(claim).split()).strip()
         if not claim: raise ValueError("claim cannot be blank")
         stamp = registered_at or datetime.now(UTC).isoformat()
+        citation_attestation = _attestation(citation_binding_attestation_sha256)
         identity = {
             "claim": claim, "source_id": item.source_id, "locator": item.locator,
             "kind": item.kind.value, "independence_group": item.independence_group,
             "observed_at": item.observed_at,
         }
         record_id = _digest(identity)[:24]
-        record = EvidenceRecord(record_id, claim, item, stamp)
+        serialized_item = self._serialize_item(item)
         serialized = {
-            "id": record.id, "claim": record.claim, "item": self._serialize_item(record.item),
-            "registered_at": record.registered_at, "retracted": False,
-            "retraction_reason": "", "retracted_at": "",
+            "id": record_id, "claim": claim, "item": serialized_item,
+            "registered_at": stamp,
+            "citation_binding_attestation_sha256": citation_attestation,
+            "citation_bound_at": stamp if citation_attestation else "",
+            "retracted": False, "retraction_reason": "", "retracted_at": "",
         }
         with self._lease.acquire():
             records = self._load(); existing = records.get(record_id)
-            if existing is not None: return self._restore(existing)
+            if existing is not None:
+                # Record identity intentionally excludes quality/support flags so the
+                # same source locator cannot create duplicate records. Those fields
+                # are nevertheless immutable: changing them is an integrity conflict.
+                if existing.get("item") != serialized_item or str(existing.get("claim", "")) != claim:
+                    raise EvidenceRegistryIntegrityError("evidence identity collision with different evidence payload")
+                existing_attestation = str(existing.get("citation_binding_attestation_sha256", ""))
+                if citation_attestation:
+                    if existing_attestation and not hmac.compare_digest(existing_attestation, citation_attestation):
+                        raise EvidenceRegistryIntegrityError("citation binding attestation is immutable once recorded")
+                    if not existing_attestation:
+                        existing["citation_binding_attestation_sha256"] = citation_attestation
+                        existing["citation_bound_at"] = stamp
+                        records[record_id] = existing; self._write(records)
+                return self._restore(existing)
             records[record_id] = serialized; self._write(records)
-        return record
+        return self._restore(serialized)
 
     def retract(self, record_id: str, reason: str, *, retracted_at: str | None = None) -> bool:
         reason = " ".join(str(reason).split()).strip()
@@ -135,25 +170,31 @@ class EvidenceRegistry:
             for record_id, raw in records.items():
                 item = raw.get("item") if isinstance(raw.get("item"), dict) else {}
                 if str(item.get("source_id", "")) not in ids: continue
-                raw["retracted"] = True
-                raw["retraction_reason"] = reason[:2000]
-                raw["retracted_at"] = stamp
-                records[record_id] = raw
-                record_ids.append(record_id); claims.add(str(raw.get("claim", "")))
+                raw["retracted"] = True; raw["retraction_reason"] = reason[:2000]; raw["retracted_at"] = stamp
+                records[record_id] = raw; record_ids.append(record_id); claims.add(str(raw.get("claim", "")))
             if record_ids: self._write(records)
         return {"record_ids": tuple(sorted(record_ids)), "claims": tuple(sorted(x for x in claims if x))}
 
-    def evidence_for(self, claim: str, *, include_retracted: bool = False) -> tuple[EvidenceItem, ...]:
+    def evidence_for(self, claim: str, *, include_retracted: bool = False,
+                     citation_bound_only: bool = False) -> tuple[EvidenceItem, ...]:
         claim = " ".join(str(claim).split()).strip()
         with self._lease.acquire(): records = self._load()
         restored = [self._restore(raw) for raw in records.values()]
-        return tuple(r.item for r in restored if r.claim == claim and (include_retracted or not r.retracted))
+        return tuple(
+            record.item for record in restored
+            if record.claim == claim
+            and (include_retracted or not record.retracted)
+            and (not citation_bound_only or record.citation_bound)
+        )
 
-    def records_for(self, claim: str) -> tuple[EvidenceRecord, ...]:
+    def records_for(self, claim: str, *, citation_bound_only: bool = False) -> tuple[EvidenceRecord, ...]:
         with self._lease.acquire(): records = self._load()
-        return tuple(self._restore(raw) for raw in records.values() if str(raw.get("claim")) == claim)
+        rows = [self._restore(raw) for raw in records.values() if str(raw.get("claim")) == claim]
+        if citation_bound_only: rows = [row for row in rows if row.citation_bound]
+        return tuple(rows)
 
-    def records_for_sources(self, source_ids: Iterable[str], *, include_retracted: bool = True) -> tuple[EvidenceRecord, ...]:
+    def records_for_sources(self, source_ids: Iterable[str], *, include_retracted: bool = True,
+                            citation_bound_only: bool = False) -> tuple[EvidenceRecord, ...]:
         ids = {str(x).strip() for x in source_ids if str(x).strip()}
         with self._lease.acquire(): records = self._load()
         out: list[EvidenceRecord] = []
@@ -161,15 +202,15 @@ class EvidenceRegistry:
             item = raw.get("item") if isinstance(raw.get("item"), dict) else {}
             if str(item.get("source_id", "")) not in ids: continue
             record = self._restore(raw)
-            if include_retracted or not record.retracted: out.append(record)
+            if not include_retracted and record.retracted: continue
+            if citation_bound_only and not record.citation_bound: continue
+            out.append(record)
         return tuple(out)
 
     def snapshot(self, *, include_retracted: bool = True) -> tuple[EvidenceRecord, ...]:
-        """Return a detached, deterministic registry snapshot for migration/audit."""
         with self._lease.acquire(): records = self._load()
         rows = [self._restore(raw) for raw in records.values()]
-        if not include_retracted:
-            rows = [row for row in rows if not row.retracted]
+        if not include_retracted: rows = [row for row in rows if not row.retracted]
         return tuple(sorted(rows, key=lambda row: (row.claim.casefold(), row.item.source_id, row.id)))
 
     def all_claims(self, *, include_only_active: bool = False) -> tuple[str, ...]:
@@ -183,9 +224,18 @@ class EvidenceRegistry:
     def stats(self) -> dict[str, Any]:
         with self._lease.acquire(): records = self._load()
         retracted = sum(1 for raw in records.values() if raw.get("retracted"))
+        citation_bound = sum(bool(raw.get("citation_binding_attestation_sha256")) for raw in records.values())
+        active_bound = sum(
+            bool(raw.get("citation_binding_attestation_sha256")) and not raw.get("retracted")
+            for raw in records.values()
+        )
         groups = {raw.get("item", {}).get("independence_group") for raw in records.values()}
         claims = {str(raw.get("claim", "")) for raw in records.values() if str(raw.get("claim", ""))}
-        return {"version": REGISTRY_VERSION, "records": len(records), "active_records": len(records) - retracted,
-                "retracted": retracted, "claims": len(claims),
-                "independence_groups": len({g for g in groups if g}), "sha256": self._checksum(records),
-                "cross_process_locking": True, "lock_backend": self._lease.backend}
+        return {
+            "version": REGISTRY_VERSION, "records": len(records), "active_records": len(records) - retracted,
+            "citation_bound_records": citation_bound, "active_citation_bound_records": active_bound,
+            "unbound_records": len(records) - citation_bound,
+            "retracted": retracted, "claims": len(claims),
+            "independence_groups": len({g for g in groups if g}), "sha256": self._checksum(records),
+            "cross_process_locking": True, "lock_backend": self._lease.backend,
+        }
