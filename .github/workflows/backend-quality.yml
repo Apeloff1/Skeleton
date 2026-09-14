@@ -31,6 +31,8 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-python@v7
         with:
