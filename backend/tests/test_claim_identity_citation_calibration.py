@@ -9,6 +9,18 @@ from core.curiosity_engine import Inquiry
 from core.curiosity_research_pipeline import EnsembleCuriosityResearcher
 
 
+def _inquiry() -> Inquiry:
+    return Inquiry(
+        id="i1",
+        subject="latency",
+        questions=("Does A reduce latency?",),
+        context_record_ids=(),
+        keywords=("latency",),
+        score=1.0,
+        reason="test",
+    )
+
+
 def test_claim_identity_normalizes_format_but_preserves_truth_material_differences():
     engine = ClaimIdentityEngine()
     equivalent = engine.compare(
@@ -94,7 +106,6 @@ def test_calibration_is_measurement_not_truth_and_resolution_is_immutable(tmp_pa
     assert metrics["resolved"] == 1
     assert metrics["brier_score"] == 0.04
 
-    # Replaying the same resolution is safe; rewriting the outcome is corruption.
     assert ledger.resolve(forecast.id, outcome=True, verification_attestation_sha256="a" * 64).outcome is True
     with pytest.raises(CalibrationIntegrityError):
         ledger.resolve(forecast.id, outcome=False, verification_attestation_sha256="b" * 64)
@@ -119,8 +130,7 @@ def test_research_pipeline_refuses_legacy_claim_labels_without_binding():
         }]
 
     researcher = EnsembleCuriosityResearcher(completion, models=("m1",), source_search=source_search)
-    inquiry = Inquiry(id="i1", subject="latency", questions=("Does A reduce latency?",), keywords=("latency",), score=1.0, reason="test")
-    finding = asyncio.run(researcher(inquiry, {}))
+    finding = asyncio.run(researcher(_inquiry(), {}))
     assert finding["claim_bound_evidence_count"] == 0
     assert finding["citation_integrity"]["rejected"] == 1
     assert finding["citation_integrity"]["reports"][0]["reasons"] == ["legacy_claim_label_without_inspectable_binding"]
@@ -152,8 +162,7 @@ def test_research_pipeline_accepts_inspectable_binding_and_deduplicates_identity
         }]
 
     researcher = EnsembleCuriosityResearcher(completion, models=("m1", "m2"), source_search=source_search)
-    inquiry = Inquiry(id="i1", subject="latency", questions=("Does A reduce latency?",), keywords=("latency",), score=1.0, reason="test")
-    finding = asyncio.run(researcher(inquiry, {}))
+    finding = asyncio.run(researcher(_inquiry(), {}))
     assert finding["claims"] == [canonical]
     assert finding["semantic_variants"][canonical] == sorted([canonical, variant])
     assert finding["claim_bound_evidence_count"] == 1
