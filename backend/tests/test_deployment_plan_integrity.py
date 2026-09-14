@@ -96,3 +96,43 @@ def test_digest_only_tamper_is_rejected():
     plan = compile_deployment_plan({"artifact": "sha256:a", "environment": "staging"})
     plan["plan_sha256"] = "0" * 64
     assert verify_deployment_plan(plan) is False
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("artifact", {"sha256": "a"}, "artifact must be a string"),
+        ("target", ["runtime"], "target must be a string"),
+        ("environment", ["staging"], "environment must be a string"),
+        ("strategy", {"name": "rolling"}, "strategy must be a string"),
+        ("canary_percent", True, "canary_percent must be numeric"),
+        ("canary_percent", 12.5, "canary_percent must be a whole number"),
+        ("max_p95_latency_ms", False, "max_p95_latency_ms must be numeric"),
+        ("max_p95_latency_ms", 12.5, "max_p95_latency_ms must be a whole number"),
+        ("max_error_rate_pct", float("nan"), "max_error_rate_pct must be finite"),
+        ("min_success_rate_pct", float("inf"), "min_success_rate_pct must be finite"),
+    ],
+)
+def test_compiler_rejects_ambiguous_or_nonportable_input(field, value, message):
+    payload = {"artifact": "sha256:a", field: value}
+    with pytest.raises(ValueError, match=message):
+        compile_deployment_plan(payload)
+
+
+def test_numeric_strings_remain_supported_without_lossy_truncation():
+    plan = compile_deployment_plan({
+        "artifact": "sha256:a",
+        "environment": "production",
+        "strategy": "canary",
+        "canary_percent": "17",
+        "max_error_rate_pct": "0.5",
+        "max_p95_latency_ms": "400",
+        "min_success_rate_pct": "99.5",
+    })
+    assert plan["phases"][0]["traffic_pct"] == 17
+    assert plan["health"] == {
+        "max_error_rate_pct": 0.5,
+        "max_p95_latency_ms": 400,
+        "min_success_rate_pct": 99.5,
+    }
+    assert verify_deployment_plan(plan) is True
