@@ -2,8 +2,8 @@
 
 Evidence does not exist in isolation. A secondary analysis, mirror, derivative
 report, or synthesized dataset can inherit defects from an upstream source.
-This registry records source ancestry explicitly so a retraction can propagate
-through descendants without deleting historical evidence.
+Legacy placeholders may be resolved only by explicit provenance; retractions and
+historical registration time are preserved across that resolution.
 """
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from core.file_lease import FileLease
 
 
 LINEAGE_VERSION = 1
+LEGACY_UNRESOLVED_PREFIX = "legacy_unresolved:"
 
 
 class SourceLineageIntegrityError(RuntimeError):
@@ -47,11 +48,17 @@ def _sha(value: Any) -> str:
     return hashlib.sha256(_canonical(value)).hexdigest()
 
 
+def _validate_digest(value: str) -> str:
+    value = str(value or "").lower()
+    if value and (len(value) != 64 or any(c not in "0123456789abcdef" for c in value)):
+        raise ValueError("content_sha256 must be a 64-character hex digest")
+    return value
+
+
 class SourceLineageGraph:
     def __init__(self, root: str | Path) -> None:
         self.root = Path(root); self.root.mkdir(parents=True, exist_ok=True)
-        self.path = self.root / "source-lineage.json"
-        self._lease = FileLease(self.root / ".source-lineage.lock")
+        self.path = self.root / "source-lineage.json"; self._lease = FileLease(self.root / ".source-lineage.lock")
         with self._lease.acquire():
             if not self.path.exists(): self._write({})
             else: self._load()
@@ -62,15 +69,11 @@ class SourceLineageGraph:
 
     def _load(self) -> dict[str, dict[str, Any]]:
         try: envelope = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            raise SourceLineageIntegrityError("source lineage unreadable") from exc
+        except (OSError, json.JSONDecodeError) as exc: raise SourceLineageIntegrityError("source lineage unreadable") from exc
         nodes = envelope.get("nodes"); checksum = envelope.get("sha256")
-        if envelope.get("version") != LINEAGE_VERSION:
-            raise SourceLineageIntegrityError("unsupported source lineage version")
-        if not isinstance(nodes, dict) or not isinstance(checksum, str):
-            raise SourceLineageIntegrityError("source lineage malformed")
-        if not hmac.compare_digest(checksum, self._checksum(nodes)):
-            raise SourceLineageIntegrityError("source lineage checksum mismatch")
+        if envelope.get("version") != LINEAGE_VERSION: raise SourceLineageIntegrityError("unsupported source lineage version")
+        if not isinstance(nodes, dict) or not isinstance(checksum, str): raise SourceLineageIntegrityError("source lineage malformed")
+        if not hmac.compare_digest(checksum, self._checksum(nodes)): raise SourceLineageIntegrityError("source lineage checksum mismatch")
         return {str(k): dict(v) for k, v in nodes.items() if isinstance(v, dict)}
 
     def _write(self, nodes: dict[str, dict[str, Any]]) -> None:
@@ -84,13 +87,11 @@ class SourceLineageGraph:
 
     @staticmethod
     def _restore(raw: dict[str, Any]) -> SourceNode:
-        return SourceNode(
-            source_id=str(raw["source_id"]), source_kind=str(raw.get("source_kind", "unknown")),
+        return SourceNode(source_id=str(raw["source_id"]), source_kind=str(raw.get("source_kind", "unknown")),
             locator=str(raw.get("locator", "")), parent_ids=tuple(raw.get("parent_ids", ())),
             content_sha256=str(raw.get("content_sha256", "")), registered_at=str(raw["registered_at"]),
             retracted=bool(raw.get("retracted", False)), retraction_reason=str(raw.get("retraction_reason", "")),
-            retracted_at=str(raw.get("retracted_at", "")),
-        )
+            retracted_at=str(raw.get("retracted_at", "")))
 
     def register(self, source_id: str, *, source_kind: str, locator: str = "", parent_ids: Iterable[str] = (),
                  content_sha256: str = "", registered_at: str | None = None) -> SourceNode:
@@ -98,14 +99,11 @@ class SourceLineageGraph:
         parents = tuple(dict.fromkeys(str(x).strip() for x in parent_ids if str(x).strip()))
         if not source_id: raise ValueError("source_id required")
         if source_id in parents: raise ValueError("source cannot depend on itself")
-        if content_sha256 and (len(content_sha256) != 64 or any(c not in "0123456789abcdefABCDEF" for c in content_sha256)):
-            raise ValueError("content_sha256 must be a 64-character hex digest")
-        stamp = registered_at or datetime.now(UTC).isoformat()
+        digest = _validate_digest(content_sha256); stamp = registered_at or datetime.now(UTC).isoformat()
         with self._lease.acquire():
-            nodes = self._load()
-            missing = [p for p in parents if p not in nodes]
+            nodes = self._load(); missing = [p for p in parents if p not in nodes]
             if missing: raise ValueError(f"unknown parent source(s): {', '.join(missing)}")
-            candidate = SourceNode(source_id, source_kind[:120], str(locator)[:2000], parents, content_sha256.lower(), stamp)
+            candidate = SourceNode(source_id, source_kind[:120], str(locator)[:2000], parents, digest, stamp)
             existing = nodes.get(source_id)
             if existing is not None:
                 restored = self._restore(existing)
@@ -114,6 +112,25 @@ class SourceLineageGraph:
                 if immutable != wanted: raise SourceLineageIntegrityError("source identity collision")
                 return restored
             nodes[source_id] = asdict(candidate); self._write(nodes); return candidate
+
+    def resolve_legacy(self, source_id: str, *, source_kind: str, locator: str = "",
+                       parent_ids: Iterable[str] = (), content_sha256: str = "") -> SourceNode:
+        source_id = str(source_id).strip(); parents = tuple(dict.fromkeys(str(x).strip() for x in parent_ids if str(x).strip()))
+        if not source_id or source_id in parents: raise ValueError("invalid source lineage resolution")
+        source_kind = str(source_kind).strip() or "unknown"; digest = _validate_digest(content_sha256)
+        with self._lease.acquire():
+            nodes = self._load(); raw = nodes.get(source_id)
+            if raw is None: raise KeyError(source_id)
+            current = self._restore(raw)
+            if not current.source_kind.startswith(LEGACY_UNRESOLVED_PREFIX):
+                raise SourceLineageIntegrityError("only legacy unresolved sources can be resolved")
+            missing = [parent for parent in parents if parent not in nodes]
+            if missing: raise ValueError(f"unknown parent source(s): {', '.join(missing)}")
+            descendants = self._descendant_ids(nodes, {source_id}) - {source_id}
+            if any(parent in descendants for parent in parents): raise ValueError("source lineage cycle detected")
+            resolved = SourceNode(source_id, source_kind[:120], str(locator)[:2000], parents, digest,
+                current.registered_at, current.retracted, current.retraction_reason, current.retracted_at)
+            nodes[source_id] = asdict(resolved); self._write(nodes); return resolved
 
     def get(self, source_id: str) -> SourceNode | None:
         with self._lease.acquire(): raw = self._load().get(source_id)
@@ -145,23 +162,19 @@ class SourceLineageGraph:
             if source_id not in nodes: return ()
             affected = self._descendant_ids(nodes, {source_id}) if cascade else {source_id}
             for sid in affected:
-                raw = nodes[sid]
-                raw["retracted"] = True
+                raw = nodes[sid]; raw["retracted"] = True
                 raw["retraction_reason"] = reason[:2000] if sid == source_id else f"upstream retraction: {source_id} — {reason[:1800]}"
-                raw["retracted_at"] = stamp
-                nodes[sid] = raw
+                raw["retracted_at"] = stamp; nodes[sid] = raw
             self._write(nodes)
         return tuple(sorted(affected))
 
     def active(self, source_id: str) -> bool:
-        node = self.get(source_id)
-        return bool(node is not None and not node.retracted)
+        node = self.get(source_id); return bool(node is not None and not node.retracted)
 
     def stats(self) -> dict[str, Any]:
         with self._lease.acquire(): nodes = self._load()
-        return {
-            "version": LINEAGE_VERSION, "sources": len(nodes),
+        return {"version": LINEAGE_VERSION, "sources": len(nodes),
             "retracted": sum(1 for x in nodes.values() if x.get("retracted")),
+            "unresolved_lineage": sum(1 for x in nodes.values() if str(x.get("source_kind", "")).startswith(LEGACY_UNRESOLVED_PREFIX)),
             "edges": sum(len(x.get("parent_ids", ())) for x in nodes.values()),
-            "sha256": self._checksum(nodes), "cross_process_locking": True, "lock_backend": self._lease.backend,
-        }
+            "sha256": self._checksum(nodes), "cross_process_locking": True, "lock_backend": self._lease.backend}
