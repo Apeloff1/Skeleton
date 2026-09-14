@@ -9,6 +9,7 @@ Security properties:
   • unknown clients and loopback peers are rate limited unless explicitly exempted
   • browser cross-origin API reads fail closed unless CORS_ORIGINS is configured
   • API responses receive defensive browser/security headers by default
+  • rejected requests remain inside tracing, header, and access-log envelopes
 
 Tunable via env:
   RATE_LIMIT_PER_MIN       default 600
@@ -84,7 +85,6 @@ def _same_origin(request: Request, origin: str) -> bool:
     return origin.rstrip("/") == request_origin
 
 
-# ── Configuration ─────────────────────────────────────────────────────
 _RATE_PER_MIN = _positive_int_env("RATE_LIMIT_PER_MIN", 600, maximum=1_000_000)
 _RATE_BURST = _positive_int_env("RATE_LIMIT_BURST", 60, maximum=100_000)
 _MAX_BUCKETS = _positive_int_env("RATE_LIMIT_MAX_BUCKETS", 10_000, maximum=1_000_000)
@@ -92,7 +92,6 @@ _EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "")
 _EXEMPT_IPS = {ip.strip() for ip in _EXEMPT_RAW.split(",") if ip.strip()}
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
 
-# Telemetry counters (in-memory) ──────────────────────────────────────
 _lat_ring: Deque[float] = deque(maxlen=1024)
 _lat_lock: asyncio.Lock | None = None
 
@@ -147,7 +146,6 @@ def get_stats() -> dict:
     }
 
 
-# ── Request ID ────────────────────────────────────────────────────────
 class RequestIdMiddleware(BaseHTTPMiddleware):
     """Attach a safe bounded request ID for logs and cross-service tracing."""
 
@@ -169,15 +167,8 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         return response
 
 
-# ── Browser origin policy ─────────────────────────────────────────────
 class OriginGuardMiddleware(BaseHTTPMiddleware):
-    """Fail closed for browser cross-origin API requests.
-
-    Starlette CORS configuration in legacy server bootstrap historically
-    defaulted to '*'. This guard independently prevents response-data exposure
-    unless CORS_ORIGINS explicitly authorizes an origin. Requests without an
-    Origin header (CLI/service-to-service) are unaffected.
-    """
+    """Fail closed for browser cross-origin API requests."""
 
     async def dispatch(self, request: Request, call_next: Callable):
         if not request.url.path.startswith("/api"):
@@ -202,7 +193,6 @@ class OriginGuardMiddleware(BaseHTTPMiddleware):
         )
 
 
-# ── Defensive response headers ────────────────────────────────────────
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Attach defense-in-depth browser headers to API responses."""
 
@@ -224,8 +214,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "Content-Security-Policy",
             "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
         )
-        # HSTS is safe only when clients reach this authority exclusively over
-        # HTTPS. Operators behind TLS-terminating proxies can force it on.
         if request.url.scheme == "https" or _env_truthy("FORCE_HSTS"):
             headers.setdefault("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
         if "server" in headers:
@@ -233,7 +221,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
-# ── Access log ────────────────────────────────────────────────────────
 class AccessLogMiddleware(BaseHTTPMiddleware):
     """Emit one structured log line per request using validated identity."""
 
@@ -288,7 +275,6 @@ def _client_ip(request: Request) -> str:
     return client_ip(request)
 
 
-# ── Rate limiter ──────────────────────────────────────────────────────
 class _Bucket:
     __slots__ = ("tokens", "last", "capacity", "refill_per_sec")
 
@@ -382,11 +368,17 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
 def install_middleware(app) -> None:
     """Install security middleware in Starlette's reverse-add (LIFO) order.
 
-    The origin guard is added last so it sits outermost within this stack and
-    rejects untrusted browser origins before expensive handlers execute.
+    Effective request path after these calls:
+
+        RequestId -> SecurityHeaders -> AccessLog -> OriginGuard
+                  -> RateLimiter -> application
+
+    RequestId and SecurityHeaders are deliberately outermost so every API
+    response, including 403/429 short-circuits, is correlated and hardened.
+    AccessLog wraps both rejection layers so denied traffic remains observable.
     """
+    app.add_middleware(RateLimiterMiddleware)
+    app.add_middleware(OriginGuardMiddleware)
     app.add_middleware(AccessLogMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestIdMiddleware)
-    app.add_middleware(RateLimiterMiddleware)
-    app.add_middleware(OriginGuardMiddleware)
