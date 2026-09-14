@@ -43,6 +43,18 @@ export type PendingOperationResponse = {
   operations: PendingOperation[];
 };
 
+export type AuditEntry = {
+  seq: number;
+  ts: string;
+  kind: string;
+  seal: string;
+  principal: string;
+  route: string;
+  detail: string;
+  prev_hash: string;
+  hash: string;
+};
+
 export type OperationAdmission = {
   operation_id: string;
   capability_id: string;
@@ -69,6 +81,14 @@ function tokenQuery(token: string): string {
   return token ? `?token=${encodeURIComponent(token)}` : '';
 }
 
+function tokenQueryWith(token: string, params: Record<string, string | number>): string {
+  const query = new URLSearchParams();
+  if (token) query.set('token', token);
+  Object.entries(params).forEach(([key, value]) => query.set(key, String(value)));
+  const encoded = query.toString();
+  return encoded ? `?${encoded}` : '';
+}
+
 export function getProductControlStatus(token = '', signal?: AbortSignal): Promise<ApiResult<ControlPlaneStatus>> {
   return api.get<ControlPlaneStatus>(`${ROOT}/status${tokenQuery(token)}`, {
     signal,
@@ -81,6 +101,14 @@ export function getPendingProductOperations(token = '', signal?: AbortSignal): P
   return api.get<PendingOperationResponse>(`${ROOT}/pending${tokenQuery(token)}`, {
     signal,
     cacheKey: 'product-control-pending',
+    cacheTtlMs: 2_000,
+  });
+}
+
+export function getProductAuditHistory(token = '', limit = 50, signal?: AbortSignal): Promise<ApiResult<{ entries: AuditEntry[] }>> {
+  return api.get<{ entries: AuditEntry[] }>(`${ROOT}/audit${tokenQueryWith(token, { limit })}`, {
+    signal,
+    cacheKey: `product-control-audit-${limit}`,
     cacheTtlMs: 2_000,
   });
 }
