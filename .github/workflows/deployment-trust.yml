@@ -5,18 +5,23 @@ on:
     paths:
       - "backend/core/transparency_witness.py"
       - "backend/core/transparency_witness_config.py"
+      - "backend/core/signed_transparency_witness.py"
+      - "backend/core/signed_finality_evidence.py"
       - "backend/core/transparency_finality.py"
       - "backend/core/epistemic_trust_runtime.py"
       - "backend/core/deployment_preflight.py"
       - "backend/core/control_plane_deployment.py"
+      - "backend/core/deployment_authorization.py"
       - "backend/core/system_assurance.py"
       - "backend/core/system_root_attestation.py"
       - "backend/core/product_control_plane.py"
       - "backend/core/portable_claim_proof.py"
       - "backend/routes/ops.py"
       - "backend/tests/test_witness_freshness_migration.py"
+      - "backend/tests/test_signed_witness_finality.py"
       - "backend/tests/test_deployment_preflight.py"
       - "backend/tests/test_control_plane_deployment.py"
+      - "backend/tests/test_deployment_authorization.py"
       - "backend/tests/test_epistemic_trust_runtime.py"
       - "backend/tests/test_portable_finality_proof.py"
       - "backend/tests/test_system_assurance_trust.py"
@@ -27,18 +32,23 @@ on:
     paths:
       - "backend/core/transparency_witness.py"
       - "backend/core/transparency_witness_config.py"
+      - "backend/core/signed_transparency_witness.py"
+      - "backend/core/signed_finality_evidence.py"
       - "backend/core/transparency_finality.py"
       - "backend/core/epistemic_trust_runtime.py"
       - "backend/core/deployment_preflight.py"
       - "backend/core/control_plane_deployment.py"
+      - "backend/core/deployment_authorization.py"
       - "backend/core/system_assurance.py"
       - "backend/core/system_root_attestation.py"
       - "backend/core/product_control_plane.py"
       - "backend/core/portable_claim_proof.py"
       - "backend/routes/ops.py"
       - "backend/tests/test_witness_freshness_migration.py"
+      - "backend/tests/test_signed_witness_finality.py"
       - "backend/tests/test_deployment_preflight.py"
       - "backend/tests/test_control_plane_deployment.py"
+      - "backend/tests/test_deployment_authorization.py"
       - "backend/tests/test_epistemic_trust_runtime.py"
       - "backend/tests/test_portable_finality_proof.py"
       - "backend/tests/test_system_assurance_trust.py"
@@ -61,13 +71,15 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install focused dependencies
-        run: python -m pip install "pytest>=8,<9"
-      - name: Verify freshness, finality, assurance and stable-root deployment decisions
+        run: python -m pip install "pytest>=8,<9" "cryptography>=46.0.4,<47"
+      - name: Verify signed witnesses, finality, authorization and stable-root deployment decisions
         run: >-
           python -m pytest -q
           tests/test_witness_freshness_migration.py
+          tests/test_signed_witness_finality.py
           tests/test_deployment_preflight.py
           tests/test_control_plane_deployment.py
+          tests/test_deployment_authorization.py
           tests/test_epistemic_trust_runtime.py
           tests/test_portable_finality_proof.py
           tests/test_system_assurance_trust.py
