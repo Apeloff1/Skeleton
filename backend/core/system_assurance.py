@@ -81,10 +81,8 @@ def evaluate_assurance(
     meta_version = int(outbox_health.get("sequence_meta_version", 0) or 0)
     next_sequence = int(outbox_health.get("next_sequence", 0) or 0)
     invariants += [
-        AssuranceInvariant("queue.cross-process-coherence", "hard", process_safe,
-                           f"locking={outbox_health.get('lock_backend', 'missing')}"),
-        AssuranceInvariant("queue.atomic-intent-staging", "hard", leased_factory,
-                           f"leased_intent_factory={leased_factory}"),
+        AssuranceInvariant("queue.cross-process-coherence", "hard", process_safe, f"locking={outbox_health.get('lock_backend', 'missing')}"),
+        AssuranceInvariant("queue.atomic-intent-staging", "hard", leased_factory, f"leased_intent_factory={leased_factory}"),
         AssuranceInvariant("queue.monotonic-sequence", "hard", meta_version >= 1 and next_sequence > 0,
                            f"metadata=v{meta_version}, next_sequence={next_sequence}"),
     ]
@@ -101,14 +99,19 @@ def evaluate_assurance(
         f"receipt schema generation v{receipt_version}",
     ))
 
-    # Epistemic integrity is deploy-relevant. A system that cannot distinguish
-    # evidence from speculation must not advertise healthy assurance.
     curiosity = operations.get("curiosity") if isinstance(operations.get("curiosity"), dict) else {}
     verification = curiosity.get("verification") if isinstance(curiosity.get("verification"), dict) else {}
     if verification:
         registry = verification.get("evidence_registry") if isinstance(verification.get("evidence_registry"), dict) else {}
+        lineage = verification.get("source_lineage") if isinstance(verification.get("source_lineage"), dict) else {}
+        truth = verification.get("truth_ledger") if isinstance(verification.get("truth_ledger"), dict) else {}
         knowledge = verification.get("knowledge") if isinstance(verification.get("knowledge"), dict) else {}
         policy = verification.get("verification_policy") if isinstance(verification.get("verification_policy"), dict) else {}
+        truth_claims = int(truth.get("claims", 0) or 0)
+        truth_authoritative = int(truth.get("authoritative", 0) or 0)
+        truth_revoked = int(truth.get("revoked", 0) or 0)
+        truth_expired = int(truth.get("expired", 0) or 0)
+        truth_counts_sane = all(x >= 0 for x in (truth_claims, truth_authoritative, truth_revoked, truth_expired)) and truth_authoritative <= truth_claims
         invariants += [
             AssuranceInvariant("truth.gated-promotion", "hard", verification.get("truth_gated") is True,
                                f"truth_gated={verification.get('truth_gated', False)}"),
@@ -118,12 +121,22 @@ def evaluate_assurance(
                                f"model_consensus_is_empirical_evidence={verification.get('model_consensus_is_empirical_evidence', True)}"),
             AssuranceInvariant("truth.evidence-registry-coherent", "hard", registry.get("cross_process_locking") is True,
                                f"locking={registry.get('lock_backend', 'missing')}"),
+            AssuranceInvariant("truth.source-lineage-coherent", "hard", lineage.get("cross_process_locking") is True,
+                               f"sources={lineage.get('sources', 0)}, locking={lineage.get('lock_backend', 'missing')}"),
+            AssuranceInvariant("truth.state-ledger-coherent", "hard", truth.get("cross_process_locking") is True and truth_counts_sane,
+                               f"claims={truth_claims}, authoritative={truth_authoritative}, revoked={truth_revoked}, expired={truth_expired}"),
+            AssuranceInvariant("truth.claims-current", "warning", truth_expired == 0,
+                               f"{truth_expired} verified claim(s) awaiting re-verification"),
             AssuranceInvariant("truth.four-surface-knowledge", "hard", int(knowledge.get("surface_count", 0) or 0) == 4,
                                f"surface_count={knowledge.get('surface_count', 0)}"),
             AssuranceInvariant("truth.empirical-required", "hard", policy.get("require_empirical_support") is True,
                                f"require_empirical_support={policy.get('require_empirical_support', False)}"),
+            AssuranceInvariant("truth.provenance-required", "hard", policy.get("require_provenance_verified") is True,
+                               f"require_provenance_verified={policy.get('require_provenance_verified', False)}"),
             AssuranceInvariant("truth.reproducibility-required", "hard", policy.get("require_reproducibility_signal") is True,
                                f"require_reproducibility_signal={policy.get('require_reproducibility_signal', False)}"),
+            AssuranceInvariant("truth.independent-replication-required", "hard", policy.get("require_independent_replication_for_experiments") is True,
+                               f"require_independent_replication_for_experiments={policy.get('require_independent_replication_for_experiments', False)}"),
             AssuranceInvariant("truth.falsifiability-required", "hard", policy.get("require_falsifiable_claim") is True,
                                f"require_falsifiable_claim={policy.get('require_falsifiable_claim', False)}"),
             AssuranceInvariant("truth.contradiction-blocks", "hard", policy.get("contradiction_blocks") is True,
