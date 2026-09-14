@@ -1,8 +1,8 @@
 """Integrity-checked durable receipts for governed product execution.
 
 Receipts are written only by executors after producing a concrete result. Each
-operation gets at most one canonical receipt file. The envelope is SHA-256
-protected and atomically replaced so dashboards can trust completed-work state.
+operation gets one canonical write-once receipt. The envelope is SHA-256
+protected and atomically created so dashboards can trust completed-work state.
 """
 from __future__ import annotations
 
@@ -60,9 +60,19 @@ class ExecutionReceiptStore:
         executor: str,
         result: dict[str, Any],
     ) -> ExecutionReceipt:
-        # Validate result serialization before touching disk.
-        self._canonical(result)
+        self._canonical(result)  # validate serialization before touching disk
         path = self._path(operation_id)
+        existing = self.read(operation_id)
+        if existing is not None:
+            if (
+                existing.capability_id == capability_id
+                and existing.action == action
+                and existing.executor == executor
+                and existing.result == result
+            ):
+                return existing
+            raise ReceiptIntegrityError("execution receipt is write-once")
+
         receipt = ExecutionReceipt(
             operation_id=operation_id,
             capability_id=capability_id,
@@ -74,11 +84,18 @@ class ExecutionReceiptStore:
         payload = {"version": self.VERSION, "receipt": asdict(receipt)}
         envelope = {"payload": payload, "sha256": self._digest(payload)}
         temp = path.with_suffix(".tmp")
-        with temp.open("wb") as handle:
-            handle.write(self._canonical(envelope))
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temp, path)
+        try:
+            with temp.open("xb") as handle:
+                handle.write(self._canonical(envelope))
+                handle.flush()
+                os.fsync(handle.fileno())
+            # Fail closed on a racing writer instead of overwriting its receipt.
+            if path.exists():
+                raise ReceiptIntegrityError("execution receipt already exists")
+            os.replace(temp, path)
+        finally:
+            if temp.exists():
+                temp.unlink(missing_ok=True)
         return receipt
 
     def read(self, operation_id: str) -> ExecutionReceipt | None:
@@ -97,7 +114,7 @@ class ExecutionReceiptStore:
             raise ReceiptIntegrityError("execution receipt checksum mismatch")
         try:
             raw = payload["receipt"]
-            return ExecutionReceipt(
+            receipt = ExecutionReceipt(
                 operation_id=str(raw["operation_id"]),
                 capability_id=str(raw["capability_id"]),
                 action=str(raw["action"]),
@@ -107,6 +124,9 @@ class ExecutionReceiptStore:
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise ReceiptIntegrityError("execution receipt payload is invalid") from exc
+        if receipt.operation_id != operation_id:
+            raise ReceiptIntegrityError("execution receipt operation id mismatch")
+        return receipt
 
     def list_recent(self, *, limit: int = 50) -> list[ExecutionReceipt]:
         if limit < 0 or limit > 500:
