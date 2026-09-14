@@ -155,7 +155,7 @@ async def checkpoint_witness_trust_advance(
     publication_sequence: int | None = Query(default=None, ge=1),
     token: str = Query(""),
 ):
-    """Export audit-only append-only ancestry from a witnessed anchor to current head."""
+    """Export an append-only audit bridge from a fresh witnessed anchor to current head."""
     _require_ops(token)
     try:
         runtime = _runtime()
@@ -164,11 +164,7 @@ async def checkpoint_witness_trust_advance(
             if publication_sequence is None
             else runtime.trust_advance(publication_sequence=publication_sequence)
         )
-        return {
-            "proof": asdict(packet),
-            "proof_role": "audit-only",
-            "current_head_freshly_witnessed": False,
-        }
+        return asdict(packet)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="deployment checkpoint publication not found") from exc
     except DeploymentCheckpointPinRejected as exc:
@@ -193,11 +189,7 @@ async def checkpoint_witness_continuity(
                 previous_publication_sequence=previous_publication_sequence,
             )
         )
-        return {
-            "proof": asdict(packet),
-            "proof_role": "deploy-authority-capable",
-            "current_head_freshly_witnessed": True,
-        }
+        return asdict(packet)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="deployment checkpoint publication not found") from exc
     except DeploymentCheckpointPinRejected as exc:
