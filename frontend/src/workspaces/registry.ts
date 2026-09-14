@@ -130,7 +130,19 @@ export const WORKSPACES: readonly WorkspaceDefinition[] = [
     route: '/command-center',
     status: 'live',
     legacySources: ['admin dashboards', 'API switching panels', 'runtime diagnostics', 'GameForge middleware gate'],
-    evolvedCapabilities: ['mission control', 'agents', 'telemetry', 'builds', 'safety', 'feature flags', 'diagnostics', 'verified audit ledger'],
+    evolvedCapabilities: [
+      'mission control',
+      'agents',
+      'telemetry',
+      'builds',
+      'safety',
+      'feature flags',
+      'diagnostics',
+      'verified audit ledger',
+      'verified principal identity',
+      'fail-closed route policy',
+      'route-policy coverage gate',
+    ],
   },
 ] as const;
 
