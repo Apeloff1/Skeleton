@@ -52,7 +52,7 @@ Risk is not a completion score. It determines the validation and approval burden
 6. **No ad-hoc credential system.** The historical shared-password-folder idea is retired. Vault may hold secure references, but secrets require trusted secure storage and explicit authorization boundaries.
 7. **Preserve provenance.** Research, market evidence, generated assets, and imported references retain source metadata where available.
 8. **Typed mutation.** High-risk actions declare required approval, scope, evidence, and rollback behavior before they are exposed to operator automation.
-9. **Shared primitives first.** Timers, ledgers, tasks, messages, references, projects, telemetry, model routing, preview control and audit gates should be implemented once and reused.
+9. **Shared primitives first.** Timers, ledgers, tasks, messages, references, projects, telemetry, model routing, preview control, verified identity and audit gates should be implemented once and reused.
 10. **Migration state stays explicit.** A screen or route is not called live merely because a placeholder renders.
 
 ## Historical interface mapping
@@ -78,8 +78,8 @@ Risk is not a completion score. It determines the validation and approval burden
 | Tamagotchi dinosaur game | lifecycle simulation | Creation Studio | queue as reusable game template |
 | WordPress utilities | content/site/build tooling | Creation Studio | decompose into explicit tools |
 | Desktop GUI builders | app project generation | Creation Studio | evolve |
-| HyperForge cockpit | secure host/guest preview navigation, route publication and history sync | Creation Studio + System Control | preview bridge absorbed; capability commands and evidence evolving |
-| GameForge middleware gate | fail-closed audit and request-governance boundary | System Control | verified WORM audit absorbed; remaining edge admission primitives evolve natively |
+| HyperForge cockpit | secure host/guest preview navigation, route publication and history sync | Creation Studio + System Control | preview bridge + command receipts absorbed; project-state sync evolving |
+| GameForge middleware gate | verified identity, fail-closed policy, request bounds and durable audit | System Control | native primitives absorbed; staged HTTP enforcement evolving |
 | Admin dashboards | system oversight | System Control | absorbed |
 | Runtime diagnostics | logs, health, telemetry | System Control | absorbed |
 
@@ -87,11 +87,18 @@ Risk is not a completion score. It determines the validation and approval burden
 
 ### HyperForge cockpit
 
-The useful host/guest contract from `Apeloff1/hyperforge-cockpit-sota` is now represented by `frontend/src/cockpit/previewBridge.ts` and wired through the Expo root layout. The Skeleton version removes vendor branding and Vite/TanStack coupling, uses the canonical route registry, validates parent origin/source, rejects unsafe navigation, bounds browser Back at the preview root, and supports deterministic cleanup. See `docs/HYPERFORGE_COCKPIT_ABSORPTION.md` for provenance and invariants.
+The useful host/guest contract from `Apeloff1/hyperforge-cockpit-sota` is now represented by `frontend/src/cockpit/previewBridge.ts` and wired through the Expo root layout. The Skeleton version removes vendor branding and Vite/TanStack coupling, uses the canonical route registry, validates parent origin/source, rejects unsafe navigation, bounds browser Back at the preview root, emits bounded accepted/rejected command receipts, and supports deterministic cleanup. See `docs/HYPERFORGE_COCKPIT_ABSORPTION.md` for provenance and invariants.
 
 ### GameForge gate
 
-The strongest durable-audit primitive from `Apeloff1/gameforge-middleware` already has a native Skeleton implementation in `backend/core/worm_audit.py`: append-only hash ancestry, cross-process locking, complete-chain re-verification, fsync-before-return, verified health state, and fail-closed tamper detection. This is selective promotion rather than a C#/YARP dependency. Principal authentication, route-policy admission and request-body bounds should converge on existing Skeleton security/control-plane contracts instead of introducing a second gateway stack.
+The useful security doctrine from `Apeloff1/gameforge-middleware` is now split across stronger Skeleton-native primitives instead of importing a C#/YARP gateway:
+
+- `backend/middleware/security.py::SizeLimitMiddleware` retains request-body bounds;
+- `backend/core/worm_audit.py::WormAuditLog` provides append-only hash ancestry, cross-process locking, complete-chain re-verification, fsync-before-return, verified health state and fail-closed tamper detection;
+- `backend/core/principal_seal.py` provides versioned, expiring, key-rotatable HMAC principal credentials and segment-aware fail-closed route-domain admission;
+- `backend/core/route_policy_coverage.py` measures whether a route inventory is fully classified before enforcement is allowed to become global.
+
+The remaining work is controlled rollout: generate the live route inventory, assign every intended route to open/protected policy, connect sensitive domains to existing charter/capability authorization, run report-only admission, and enforce incrementally. See `docs/GAMEFORGE_GATE_ABSORPTION.md`.
 
 ## Definition of absorbed
 
@@ -108,8 +115,8 @@ A capability can move to `absorbed` only when all of the following are true:
 
 ## Next mining priorities
 
-1. Extend the cockpit bridge with capability-scoped commands, execution evidence and WorldGraph revision/hash synchronization rather than importing the old cockpit shell.
-2. Close remaining GameForge edge-gate parity by mapping request bounds, verified principal identity and fail-closed route policy into existing Skeleton security primitives.
+1. Extend the cockpit bridge with WorldGraph revision/hash synchronization and capability-scoped execution evidence rather than importing the old cockpit shell.
+2. Generate the actual FastAPI route-policy inventory and use the new coverage gate to prove safe report-only GameForge identity rollout before enforcement.
 3. Move automated market ingestion behind the provenance-first source ledger before expanding analysis automation.
 4. Expand Collaboration with role-scoped task and schedule primitives before porting broader admin views.
 5. Convert remaining Creation Studio legacy projects into project templates instead of dedicated legacy screens.
