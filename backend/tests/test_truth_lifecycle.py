@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 from core.claim_truth_ledger import ClaimTruthLedger
 from core.contradiction_resolver import ContradictionResolver
+from core.knowledge_augmented_jeeves import KnowledgeAugmentedJeeves
 from core.source_lineage import SourceLineageGraph
 from core.truth_verifier import EvidenceItem, EvidenceKind
 from core.verified_curiosity import VerifiedCuriosityEngine
@@ -90,7 +91,6 @@ def test_retracting_source_revokes_claim_and_removes_orientation_authority(tmp_p
     after = engine.orientation_pack("latency research")
     assert claim not in after["claims"]
     assert any("NON-AUTHORITATIVE" in row and claim in row for row in after["unresolved"])
-    # Historical knowledge remains available for audit; only authority is revoked.
     historical = engine.fabric.get(record.id)
     assert historical is not None and claim in historical.claims
 
@@ -116,3 +116,18 @@ def test_reverification_can_restore_authority_only_after_valid_evidence_returns(
     report = engine.reverify_claim(claim)
     assert report["state"] != "verified"
     assert report["authoritative"] is False
+
+
+def test_jeeves_reasoning_uses_live_truth_projection_not_historical_archive(tmp_path):
+    engine = VerifiedCuriosityEngine(tmp_path)
+    claim = "System D decreases measured latency by 11 percent."
+    _promote(engine, claim)
+    jeeves = KnowledgeAugmentedJeeves(engine)
+    before = jeeves.reason({"prompt": "empirical latency research", "_curiosity_signal_key": "before"})
+    assert claim in before["known_claims"]
+
+    engine.retract_source("study-primary", "calibration failure")
+    after = jeeves.reason({"prompt": "empirical latency research", "_curiosity_signal_key": "after"})
+    assert claim not in after["known_claims"]
+    assert any("NON-AUTHORITATIVE" in gap and claim in gap for gap in after["unresolved"])
+    assert after["epistemic_state"] != "grounded"
