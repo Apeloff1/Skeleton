@@ -41,6 +41,7 @@ class TrustedWitness:
     id: str
     independence_group: str
     enabled: bool = True
+    public_key_b64: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,7 +130,7 @@ class TransparencyWitnessLedger:
                 raise ValueError("trusted witness id and independence_group are required")
             if witness_id in registry:
                 raise ValueError(f"duplicate trusted witness: {witness_id}")
-            registry[witness_id] = TrustedWitness(witness_id, group, bool(row.enabled))
+            registry[witness_id] = TrustedWitness(witness_id, group, bool(row.enabled), str(row.public_key_b64 or "").strip())
         return registry
 
     def configure(self, rows: Iterable[TrustedWitness]) -> None:
@@ -253,6 +254,8 @@ class TransparencyWitnessLedger:
         return {"version": WITNESS_LEDGER_VERSION, "historical_receipt_versions": versions,
                 "trusted_witnesses": len(self._trusted),
                 "enabled_witnesses": sum(w.enabled for w in self._trusted.values()),
+                "signed_capable_witnesses": sum(bool(w.public_key_b64) for w in self._trusted.values() if w.enabled),
+                "signed_capable_groups": len({w.independence_group for w in self._trusted.values() if w.enabled and w.public_key_b64}),
                 "independence_groups": len({w.independence_group for w in self._trusted.values() if w.enabled}),
                 "required_groups": self.required_groups, "max_age_seconds": self.max_age_seconds,
                 "receipts": len(receipts), "incidents": len(incidents),
