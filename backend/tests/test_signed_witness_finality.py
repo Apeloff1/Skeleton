@@ -78,16 +78,16 @@ def test_correlated_groups_and_stale_statements_cannot_manufacture_signed_finali
     now = datetime(2026, 9, 14, 17, 10, tzinfo=UTC)
     correlated.publish(authority_root_sha256="5" * 64, epistemic_root_sha256="6" * 64, observed_at=now.isoformat())
     _sign(correlated, keys, witnesses, now=now)
-    result = correlated.maybe_finalize()
+    result = correlated.maybe_finalize(finalized_at=(now + timedelta(seconds=1)).isoformat())
     assert result["finalized"] is False
     assert "groups=2/3" in result["blocked_reason"]
 
     stale, keys2, witnesses2 = _runtime(tmp_path / "stale", max_age=30)
     stale.publish(authority_root_sha256="7" * 64, epistemic_root_sha256="8" * 64, observed_at=now.isoformat())
     _sign(stale, keys2, witnesses2, now=now)
-    result = stale.maybe_finalize()
-    # Wall-clock finalization is far beyond the fixed 2026-09-14 timestamp in future test runs.
+    result = stale.maybe_finalize(finalized_at=(now + timedelta(seconds=31)).isoformat())
     assert result["finalized"] is False
+    assert "stale_receipts=3" in result["blocked_reason"]
 
 
 def test_bundle_tampering_breaks_offline_verification(tmp_path):
