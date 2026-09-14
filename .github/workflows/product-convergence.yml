@@ -110,6 +110,7 @@ jobs:
           tests/test_deployment_checkpoint_trust_policy.py
           tests/test_deployment_checkpoint_policy_verifier.py
           tests/test_deployment_checkpoint_verification_package.py
+          tests/test_deployment_checkpoint_verification_dispatch.py
           tests/test_deployment_checkpoint_policy_rotation.py
           tests/test_deployment_checkpoint_witnessed_continuity.py
           tests/test_deployment_checkpoint_pin_runtime_continuity.py
