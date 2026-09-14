@@ -64,7 +64,7 @@ jobs:
         run: python -m pip install "pytest>=8,<9" "cryptography>=46.0.4,<47"
       - name: Verify membership, transparency, signed finality and freshness
         run: >-
-          python -m pytest -q
+          python -m pytest -q --noconftest
           tests/test_portable_claim_proof.py
           tests/test_portable_finality_proof.py
           tests/test_signed_portable_claim.py
