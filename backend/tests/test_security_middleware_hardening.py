@@ -4,9 +4,9 @@ import asyncio
 
 from starlette.requests import Request
 
-from api_middleware import _request_id
+from api_middleware import _request_id, _safe_log_field
 from core.client_ip import resolve_client_ip
-from middleware.security import SizeLimitMiddleware
+from middleware.security import RateLimitMiddleware, SizeLimitMiddleware
 
 
 def _request(peer: str, headers: dict[str, str] | None = None) -> Request:
@@ -69,6 +69,34 @@ def test_request_id_rejects_control_characters():
 def test_request_id_preserves_safe_value():
     request = _request("127.0.0.1", {"x-request-id": "req-1234.safe:value"})
     assert _request_id(request) == "req-1234.safe:value"
+
+
+def test_log_fields_are_single_line_and_bounded():
+    sanitized = _safe_log_field("/api/demo\r\nforged=true\x00tail", limit=24)
+    assert "\r" not in sanitized
+    assert "\n" not in sanitized
+    assert "\x00" not in sanitized
+    assert len(sanitized) <= 24
+
+
+def test_invalid_rate_limit_float_falls_back_instead_of_crashing(monkeypatch):
+    monkeypatch.setenv("CODEDOCK_RATE_LIMIT_RPS", "not-a-float")
+
+    async def app(scope, receive, send):
+        return None
+
+    middleware = RateLimitMiddleware(app)
+    assert middleware._rps == 2.0
+
+
+def test_nonfinite_rate_limit_float_falls_back(monkeypatch):
+    monkeypatch.setenv("CODEDOCK_RATE_LIMIT_RPS", "nan")
+
+    async def app(scope, receive, send):
+        return None
+
+    middleware = RateLimitMiddleware(app)
+    assert middleware._rps == 2.0
 
 
 async def _body_echo_app(scope, receive, send):
@@ -138,6 +166,16 @@ def test_size_limit_rejects_chunked_body_without_content_length():
 
 def test_size_limit_rejects_invalid_content_length():
     events = _run_size_limit(headers=[(b"content-length", b"not-a-number")], chunks=[b"hello"])
+    assert _status(events) == 400
+
+
+def test_size_limit_rejects_non_ascii_content_length():
+    events = _run_size_limit(headers=[(b"content-length", b"\xff")], chunks=[b"hello"])
+    assert _status(events) == 400
+
+
+def test_size_limit_rejects_negative_content_length():
+    events = _run_size_limit(headers=[(b"content-length", b"-1")], chunks=[b"hello"])
     assert _status(events) == 400
 
 
