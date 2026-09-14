@@ -80,6 +80,15 @@ class DeploymentCheckpointPinRuntime:
     ) -> DeploymentCheckpointPinQuorum | None:
         return self.ledger.quorum(publication_sequence=publication_sequence, now=now)
 
+    def latest_witnessed_quorum(self, *, now: datetime | None = None) -> DeploymentCheckpointPinQuorum | None:
+        """Return the newest publication that currently has a fresh independent quorum."""
+        history = self.checkpoints.history()
+        for publication in reversed(history):
+            quorum = self.quorum(publication_sequence=publication.sequence, now=now)
+            if quorum is not None and quorum.reached:
+                return quorum
+        return None
+
     def portable_bundle(
         self,
         *,
@@ -109,6 +118,13 @@ class DeploymentCheckpointPinRuntime:
             checkpoint_ledger=self.checkpoints,
         )
 
+    def advance_latest_witnessed(self, *, now: datetime | None = None) -> DeploymentCheckpointTrustAdvance:
+        """Build a trust-advance packet from the newest fresh witnessed publication."""
+        quorum = self.latest_witnessed_quorum(now=now)
+        if quorum is None:
+            raise ValueError("no checkpoint publication has a fresh witness quorum")
+        return self.trust_advance(publication_sequence=quorum.publication_sequence, now=now)
+
     def requirement_satisfied(self, *, now: datetime | None = None) -> bool:
         if not self.policy.required:
             return True
@@ -119,7 +135,11 @@ class DeploymentCheckpointPinRuntime:
         ledger = self.ledger.status(now=now)
         target = self.current_target()
         quorum = self.quorum(now=now)
+        latest_witnessed = self.latest_witnessed_quorum(now=now)
         satisfied = not self.policy.required or (quorum is not None and quorum.reached)
+        current_sequence = target.tree_size if target is not None else 0
+        witnessed_sequence = latest_witnessed.publication_sequence if latest_witnessed is not None else 0
+        publications_behind = max(0, current_sequence - witnessed_sequence) if witnessed_sequence else current_sequence
         return {
             "version": 1,
             "policy": {
@@ -134,6 +154,13 @@ class DeploymentCheckpointPinRuntime:
             "ledger": ledger,
             "current_target": None if target is None else asdict(target),
             "current_quorum": None if quorum is None else asdict(quorum),
+            "latest_witnessed_quorum": None if latest_witnessed is None else asdict(latest_witnessed),
+            "trust_frontier": {
+                "current_publication_sequence": current_sequence,
+                "latest_witnessed_publication_sequence": witnessed_sequence,
+                "publications_behind": publications_behind,
+                "advance_available": latest_witnessed is not None and publications_behind > 0,
+            },
             "requirement_satisfied": satisfied,
             "verified": ledger.get("verified") is True,
             "cross_process_locking": ledger.get("cross_process_locking") is True,
