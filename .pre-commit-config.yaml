@@ -70,6 +70,13 @@ repos:
         pass_filenames: false
         files: ^(backend/.*\.py|frontend/.*\.(js|jsx|mjs|cjs|ts|tsx))$
 
+      - id: javascript-process-alias-safety
+        name: JavaScript child_process namespace alias safety
+        entry: bash -c 'cd backend && python scripts/check_js_process_alias_safety.py'
+        language: system
+        pass_filenames: false
+        files: ^frontend/.*\.(js|jsx|mjs|cjs|ts|tsx)$
+
       - id: workflow-security
         name: GitHub Actions workflow security policy
         entry: bash -c 'cd backend && python scripts/check_workflow_security.py'
@@ -86,10 +93,10 @@ repos:
 
       - id: backend-security-regressions
         name: backend security scanner regression suite
-        entry: bash -c 'cd backend && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest tests/test_exec_guard.py tests/test_process_safety_gate.py tests/test_process_safety_destructuring.py tests/test_process_safety_partial.py tests/test_process_safety_namespace_get.py tests/test_process_safety_getattribute.py tests/test_deserialization_safety_gate.py tests/test_sast_security_gate.py tests/test_workflow_security_gate.py tests/test_secret_hygiene_gate.py'
+        entry: bash -c 'cd backend && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest tests/test_exec_guard.py tests/test_process_safety_gate.py tests/test_process_safety_destructuring.py tests/test_process_safety_partial.py tests/test_process_safety_namespace_get.py tests/test_process_safety_getattribute.py tests/test_deserialization_safety_gate.py tests/test_sast_security_gate.py tests/test_js_process_alias_safety.py tests/test_workflow_security_gate.py tests/test_secret_hygiene_gate.py'
         language: system
         pass_filenames: false
-        files: ^backend/(core/exec_guard\.py|scripts/check_(process_safety|deserialization_safety|sast_security|workflow_security|secret_hygiene)\.py|tests/test_(exec_guard|process_safety_gate|process_safety_destructuring|process_safety_partial|process_safety_namespace_get|process_safety_getattribute|deserialization_safety_gate|sast_security_gate|workflow_security_gate|secret_hygiene_gate)\.py)$
+        files: ^backend/(core/exec_guard\.py|scripts/check_(process_safety|deserialization_safety|sast_security|js_process_alias_safety|workflow_security|secret_hygiene)\.py|tests/test_(exec_guard|process_safety_gate|process_safety_destructuring|process_safety_partial|process_safety_namespace_get|process_safety_getattribute|deserialization_safety_gate|sast_security_gate|js_process_alias_safety|workflow_security_gate|secret_hygiene_gate)\.py)$
 
       - id: frontend-lint
         name: frontend canonical lint gate
@@ -147,5 +154,5 @@ ci:
   autoupdate_schedule: monthly
   # Local hooks depend on project environments unavailable to pre-commit.ci;
   # GitHub Actions enforces them authoritatively.
-  skip: [mypy, repo-toolchain-contract, backend-ruff, backend-compile, backend-process-safety, backend-deserialization-safety, repository-sast-safety, workflow-security, repository-secret-hygiene, backend-security-regressions, frontend-lint, frontend-typecheck]
+  skip: [mypy, repo-toolchain-contract, backend-ruff, backend-compile, backend-process-safety, backend-deserialization-safety, repository-sast-safety, javascript-process-alias-safety, workflow-security, repository-secret-hygiene, backend-security-regressions, frontend-lint, frontend-typecheck]
   submodules: false
