@@ -26,6 +26,18 @@ export type SystemRootAttestation = {
   components: Array<{ name: string; sha256: string }>;
   root_sha256: string;
 };
+export type PreflightFinding = { id: string; severity: 'hard' | 'warning'; detail: string };
+export type DeploymentPreflightReport = {
+  version: number; allowed: boolean; posture: 'ready' | 'degraded' | 'blocked';
+  blockers: PreflightFinding[]; warnings: PreflightFinding[];
+  assurance_attestation_sha256: string; system_root_sha256: string; trust_state_sha256: string;
+  finality_required: boolean; finality_satisfied: boolean; attestation_sha256: string;
+};
+export type ControlPlaneDeploymentPreflight = {
+  version: number; allowed: boolean; stable: boolean; attempts: number;
+  root_before_sha256: string; root_after_sha256: string; evaluated_at: string;
+  unstable_reason: string; report: DeploymentPreflightReport; attestation_sha256: string; self_verified: boolean;
+};
 export type ControlPlaneStatus = {
   policy_version: number;
   policy_bootstrap_enabled: boolean;
@@ -65,6 +77,10 @@ function tokenQueryWith(token: string, params: Record<string, string | number>):
 }
 export function getProductControlStatus(token = '', signal?: AbortSignal): Promise<ApiResult<ControlPlaneStatus>> {
   return api.get<ControlPlaneStatus>(`${ROOT}/status${tokenQuery(token)}`, { signal, cacheKey: 'product-control-status', cacheTtlMs: 5_000 });
+}
+export function getDeploymentPreflight(token = '', maxAttempts = 3, signal?: AbortSignal): Promise<ApiResult<ControlPlaneDeploymentPreflight>> {
+  return api.get<ControlPlaneDeploymentPreflight>(`${ROOT}/deployment-preflight${tokenQueryWith(token, { max_attempts: maxAttempts })}`,
+    { signal, cacheKey: 'product-control-deployment-preflight', cacheTtlMs: 2_000 });
 }
 export function getPendingProductOperations(token = '', signal?: AbortSignal): Promise<ApiResult<PendingOperationResponse>> {
   return api.get<PendingOperationResponse>(`${ROOT}/pending${tokenQuery(token)}`, { signal, cacheKey: 'product-control-pending', cacheTtlMs: 2_000 });
