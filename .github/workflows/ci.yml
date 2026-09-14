@@ -62,7 +62,7 @@ jobs:
       - name: Security hardening regression tests
         working-directory: ./backend
         run: |
-          python -m pip install --no-input "pytest>=8,<9" "starlette>=0.37,<1"
+          python -m pip install --no-input "pytest>=8,<9" "fastapi>=0.110,<1"
           PYTHONPATH=. python -m pytest -q tests/test_security_hardening.py
 
   skeleton-test:
