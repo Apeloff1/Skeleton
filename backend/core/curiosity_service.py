@@ -46,8 +46,6 @@ class CuriosityService:
             try:
                 self.watch.apply_pending(self.engine, limit=limit)
             except Exception:
-                # Feed integrity/provider failures remain queryable in watch state;
-                # the watcher must not bring down the API process.
                 continue
 
     def _start_watch(self) -> bool:
@@ -70,7 +68,9 @@ class CuriosityService:
         return curiosity_started or watch_started
 
     def stop(self) -> bool:
-        return self.runtime.stop() or self._stop_watch()
+        curiosity_stopped = self.runtime.stop()
+        watch_stopped = self._stop_watch()
+        return curiosity_stopped or watch_stopped
 
     def observe(self, prompt: str, *, user_scope: str = "default", signal_key: str | None = None) -> dict[str, Any]:
         signal = self.engine.observe_prompt(prompt, user_scope=user_scope, signal_key=signal_key)
