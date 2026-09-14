@@ -40,11 +40,14 @@ on:
       - "backend/core/achievement_engine.py"
       - "backend/core/economy_runtime.py"
       - "backend/core/dialogue_runtime.py"
+      - "backend/routes/ops.py"
+      - "frontend/src/product/productCatalog.ts"
       - "backend/tests/test_content_store.py"
       - "backend/tests/test_product_operations.py"
       - "backend/tests/test_policy_repository.py"
       - "backend/tests/test_product_control_plane.py"
       - "backend/tests/test_product_executor_registry.py"
+      - "backend/tests/test_product_contract_parity.py"
       - "backend/tests/test_progression.py"
       - "backend/tests/test_playable_simulation.py"
       - "backend/tests/test_runtime_sessions.py"
@@ -102,11 +105,14 @@ on:
       - "backend/core/achievement_engine.py"
       - "backend/core/economy_runtime.py"
       - "backend/core/dialogue_runtime.py"
+      - "backend/routes/ops.py"
+      - "frontend/src/product/productCatalog.ts"
       - "backend/tests/test_content_store.py"
       - "backend/tests/test_product_operations.py"
       - "backend/tests/test_policy_repository.py"
       - "backend/tests/test_product_control_plane.py"
       - "backend/tests/test_product_executor_registry.py"
+      - "backend/tests/test_product_contract_parity.py"
       - "backend/tests/test_progression.py"
       - "backend/tests/test_playable_simulation.py"
       - "backend/tests/test_runtime_sessions.py"
@@ -150,6 +156,7 @@ jobs:
           tests/test_policy_repository.py
           tests/test_product_control_plane.py
           tests/test_product_executor_registry.py
+          tests/test_product_contract_parity.py
           tests/test_progression.py
           tests/test_playable_simulation.py
           tests/test_runtime_sessions.py
