@@ -1,24 +1,18 @@
 """Epistemic promotion gate between research findings and durable knowledge.
 
-Research may be exploratory; Orientation Room is not. This gate converts a raw
-finding into separated verified/provisional/speculative/contradicted projections.
-Only VERIFIED claims are eligible for authoritative reasoning context.
+Research may be exploratory; Orientation Room is not. Raw evidence metadata is
+normalized into TruthVerifier evidence contracts, including provenance and
+methodology signals. Only VERIFIED claims are eligible for authoritative context.
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 import hashlib
 import json
-from typing import Any, Iterable
+from typing import Any
 
 from core.evidence_registry import EvidenceRegistry
-from core.truth_verifier import (
-    EvidenceItem,
-    EvidenceKind,
-    TruthVerifier,
-    VerificationBatch,
-    VerificationState,
-)
+from core.truth_verifier import EvidenceItem, EvidenceKind, TruthVerifier, VerificationBatch
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,10 +41,21 @@ def _kind(value: Any) -> EvidenceKind:
         return EvidenceKind.UNSOURCED
 
 
+def _sample_size(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
 def evidence_item_from_dict(raw: dict[str, Any]) -> EvidenceItem:
     source_id = str(raw.get("source_id") or raw.get("source") or "").strip()
     locator = str(raw.get("locator") or "").strip()
     independence = str(raw.get("independence_group") or source_id or "unknown").strip()
+    provenance_verified = bool(raw.get("provenance_verified", raw.get("verified_locator", False)))
     return EvidenceItem(
         source_id=source_id,
         locator=locator,
@@ -63,6 +68,12 @@ def evidence_item_from_dict(raw: dict[str, Any]) -> EvidenceItem:
         peer_reviewed=bool(raw.get("peer_reviewed", False)),
         primary=bool(raw.get("primary", False)),
         notes=str(raw.get("notes") or "")[:4000],
+        provenance_verified=provenance_verified,
+        preregistered=bool(raw.get("preregistered", False)),
+        data_available=bool(raw.get("data_available", False)),
+        code_available=bool(raw.get("code_available", False)),
+        sample_size=_sample_size(raw.get("sample_size")),
+        uncertainty_reported=bool(raw.get("uncertainty_reported", False)),
     )
 
 
@@ -85,8 +96,8 @@ class EpistemicGate:
         for claim in claims:
             explicit = claim_evidence_raw.get(claim)
             if explicit is None:
-                # Generic evidence is intentionally NOT assumed to support every
-                # claim unless the finding explicitly marks it applies_to_all.
+                # A citation attached to a paragraph is not claim evidence unless
+                # the producer explicitly binds it to all candidate claims.
                 source_rows = generic_raw if finding.get("evidence_applies_to_all") is True else ()
             else:
                 source_rows = explicit
@@ -112,9 +123,11 @@ class EpistemicGate:
                     "empirical_support": item.empirical_support,
                     "independent_support": item.independent_support,
                     "independent_contradictions": item.independent_contradictions,
+                    "provenance_verified_support": item.provenance_verified_support,
                     "total_quality": item.total_quality,
                     "mean_quality": item.mean_quality,
                     "reproducibility_signal": item.reproducibility_signal,
+                    "independent_replication": item.independent_replication,
                     "falsifiable": item.falsifiable,
                     "reasons": list(item.reasons),
                     "attestation_sha256": item.attestation_sha256,
@@ -132,8 +145,7 @@ class EpistemicGate:
 
     @staticmethod
     def hoag_gaps(decision: EpistemicDecision) -> tuple[str, ...]:
-        """Non-verified material is retained only as an auditable research gap."""
-        rows = []
+        rows: list[str] = []
         for claim in decision.provisional_claims:
             rows.append(f"PROVISIONAL — requires stronger independent empirical support: {claim}")
         for claim in decision.contradicted_claims:
