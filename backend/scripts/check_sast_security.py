@@ -28,6 +28,10 @@ SKIP_DIRS = {
     "coverage",
 }
 TRACKED_MODULES = {"requests", "httpx", "ssl", "tempfile", "jwt"}
+REQUESTS_SESSION_CALLS = {
+    f"requests.Session.{method}"
+    for method in ("get", "post", "put", "patch", "delete", "head", "options", "request")
+}
 NETWORK_CALLS = {
     "requests.get",
     "requests.post",
@@ -37,7 +41,7 @@ NETWORK_CALLS = {
     "requests.head",
     "requests.options",
     "requests.request",
-    "requests.Session.request",
+    *REQUESTS_SESSION_CALLS,
     "httpx.get",
     "httpx.post",
     "httpx.put",
@@ -140,6 +144,19 @@ def import_aliases(tree: ast.AST) -> dict[str, str]:
 
 
 def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
+    """Resolve tracked imports and methods invoked on inline constructors.
+
+    ``dotted_name`` intentionally handles only Name/Attribute chains. Security
+    rules also need to recognize calls such as ``requests.Session().get(...)``;
+    the owner of that final attribute is an ``ast.Call`` rather than a Name.
+    Resolving only the constructor function keeps this high-confidence without
+    attempting general data-flow inference.
+    """
+    if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Call):
+        owner = canonical_name(node.value.func, aliases)
+        if owner:
+            return f"{owner}.{node.attr}"
+
     name = dotted_name(node)
     if not name:
         return None
