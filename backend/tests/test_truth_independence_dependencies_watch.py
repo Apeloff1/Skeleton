@@ -1,6 +1,9 @@
+import pytest
+
+from core.claim_dependency_graph import ClaimDependencyGraph
 from core.evidence_registry import EvidenceRegistry
 from core.source_independence import SourceIndependenceAnalyzer
-from core.source_lineage import SourceLineageGraph
+from core.source_lineage import SourceLineageGraph, SourceLineageIntegrityError
 from core.truth_verifier import EvidenceItem, EvidenceKind
 from core.truth_watch import TruthWatchFeed
 from core.verified_curiosity import VerifiedCuriosityEngine
@@ -70,6 +73,18 @@ def test_legacy_unknown_ancestry_cannot_manufacture_replication(tmp_path):
     assert result["state"] != "verified"
 
 
+def test_explicit_provenance_resolves_legacy_placeholder_without_rewriting_history(tmp_path):
+    lineage = SourceLineageGraph(tmp_path)
+    lineage.register("legacy-paper", source_kind="legacy_unresolved:primary_empirical", locator="doi:paper")
+    lineage.register("dataset", source_kind="official_data", locator="dataset:v2")
+    assert lineage.stats()["unresolved_lineage"] == 1
+    resolved = lineage.resolve_legacy("legacy-paper", source_kind="primary_empirical", locator="doi:paper", parent_ids=("dataset",))
+    assert resolved.parent_ids == ("dataset",)
+    assert lineage.stats()["unresolved_lineage"] == 0
+    with pytest.raises(SourceLineageIntegrityError):
+        lineage.resolve_legacy("legacy-paper", source_kind="replication", locator="doi:paper")
+
+
 def test_claim_dependency_revocation_cascades_without_erasing_history(tmp_path):
     engine = VerifiedCuriosityEngine(tmp_path)
     premise = "Measured intervention A decreases latency by 8 percent."
@@ -93,6 +108,13 @@ def test_dependency_gate_blocks_verified_evidence_when_premise_is_unknown(tmp_pa
     assert record.claims == ()
     assert engine.truth_ledger.authoritative(child) is False
     assert any("UNVERIFIED" in question for question in record.questions)
+
+
+def test_claim_dependency_cycles_fail_closed(tmp_path):
+    graph = ClaimDependencyGraph(tmp_path)
+    graph.register("Claim A is measured true.", ("Claim B is measured true.",))
+    with pytest.raises(ValueError, match="cycle"):
+        graph.register("Claim B is measured true.", ("Claim A is measured true.",))
 
 
 def test_unverified_watch_retraction_is_held_without_side_effect(tmp_path):
@@ -123,3 +145,6 @@ def test_verified_watch_retraction_revokes_authority_and_advances_checkpoint(tmp
     stats = feed.stats()
     assert stats["checkpoints"]["verified-publisher"] == "cursor-42"
     assert stats["states"]["applied"] == 1
+    restored = TruthWatchFeed(tmp_path / "watch-feed")
+    assert restored.stats()["checkpoints"]["verified-publisher"] == "cursor-42"
+    assert restored.snapshot()[0].disposition == "applied"
