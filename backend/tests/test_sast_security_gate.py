@@ -131,3 +131,37 @@ def test_js_allows_non_shell_spawn_and_normal_json_parse(tmp_path: Path) -> None
         "const value = JSON.parse(payload);\n",
     )
     assert findings == []
+
+
+def test_js_ignores_eval_text_in_line_comment(tmp_path: Path) -> None:
+    findings = _scan_js(
+        tmp_path,
+        "// module-eval (which is documentation only)\nconst value = 1;\n",
+    )
+    assert findings == []
+
+
+def test_js_ignores_security_patterns_in_block_comment(tmp_path: Path) -> None:
+    findings = _scan_js(
+        tmp_path,
+        "/* eval(userInput); child_process.exec(command); rejectUnauthorized: false */\n"
+        "const value = 1;\n",
+    )
+    assert findings == []
+
+
+def test_js_comment_mask_preserves_real_code_after_comment(tmp_path: Path) -> None:
+    findings = _scan_js(
+        tmp_path,
+        "// harmless eval( text in docs\nconst result = eval(userInput);\n",
+    )
+    assert len([finding for finding in findings if "dynamic eval()" in finding]) == 1
+    assert any(":2:" in finding for finding in findings)
+
+
+def test_js_comment_markers_inside_strings_do_not_hide_following_code(tmp_path: Path) -> None:
+    findings = _scan_js(
+        tmp_path,
+        'const url = "https://example.com/path";\nconst result = eval(userInput);\n',
+    )
+    assert any("dynamic eval() is forbidden" in finding for finding in findings)
