@@ -154,12 +154,11 @@ def policy_satisfied_by_proof_kind(
     manifest: DeploymentCheckpointTrustPolicyManifest,
     proof_kind: str,
 ) -> bool:
-    """Return whether a proof family can satisfy the pinned deployment policy.
+    """Conservatively classify proof families without inspecting a concrete proof.
 
-    ``trust_advance`` is deliberately excluded from mandatory witness policies: it
-    authenticates ancestry from an older witnessed head, not a fresh quorum on the
-    current head. A required non-continuity policy accepts a current pin or the stronger
-    two-endpoint continuity proof; a continuity-required policy accepts only the latter.
+    A continuity-required policy returns only ``witnessed_continuity`` here because a
+    bare kind does not reveal whether a pin targets genesis. Use
+    :func:`proof_satisfies_policy` when a concrete proof packet is available.
     """
     if proof_kind not in {PROOF_PIN, PROOF_TRUST_ADVANCE, PROOF_WITNESSED_CONTINUITY}:
         return False
@@ -168,6 +167,33 @@ def policy_satisfied_by_proof_kind(
     if manifest.continuity_required:
         return proof_kind == PROOF_WITNESSED_CONTINUITY
     return proof_kind in {PROOF_PIN, PROOF_WITNESSED_CONTINUITY}
+
+
+def proof_satisfies_policy(
+    manifest: DeploymentCheckpointTrustPolicyManifest,
+    proof_kind: str,
+    proof: object,
+) -> bool:
+    """Classify one concrete proof against deployment witness policy semantics.
+
+    Continuity has one intentional genesis exception shared with the runtime: the first
+    publication has no earlier epoch to bridge, so a fresh witnessed pin on publication
+    sequence 1 establishes the initial external trust anchor. From publication 2 onward
+    a continuity-required policy accepts only a two-endpoint witnessed-continuity proof.
+    """
+    if proof_kind == PROOF_PIN:
+        if not isinstance(proof, DeploymentCheckpointPinBundle):
+            return False
+        if not manifest.required:
+            return True
+        if manifest.continuity_required:
+            return proof.publication_sequence == 1
+        return True
+    if proof_kind == PROOF_TRUST_ADVANCE:
+        return isinstance(proof, DeploymentCheckpointTrustAdvance) and not manifest.required
+    if proof_kind == PROOF_WITNESSED_CONTINUITY:
+        return isinstance(proof, DeploymentCheckpointWitnessedContinuity)
+    return False
 
 
 def verify_policy_bound_verification_package(
@@ -196,7 +222,11 @@ def verify_policy_bound_verification_package(
     """
     if not verify_deployment_checkpoint_verification_package(package):
         return False
-    if not policy_satisfied_by_proof_kind(package.policy_manifest, package.proof_kind):
+    if not proof_satisfies_policy(
+        package.policy_manifest,
+        package.proof_kind,
+        package.proof,
+    ):
         return False
 
     manifest = package.policy_manifest
