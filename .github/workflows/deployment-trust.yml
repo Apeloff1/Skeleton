@@ -27,6 +27,7 @@ on:
       - "backend/core/deployment_checkpoint_pin_runtime.py"
       - "backend/core/deployment_checkpoint_pin_wire.py"
       - "backend/core/deployment_checkpoint_trust_wire.py"
+      - "backend/core/deployment_checkpoint_pin_diagnostics.py"
       - "backend/core/deployment_checkpoint_assurance.py"
       - "backend/core/deployment_checkpoint_trust_advance.py"
       - "backend/core/deployment_checkpoint_witnessed_continuity.py"
@@ -45,6 +46,7 @@ on:
       - "backend/tests/test_deployment_checkpoint_pin_config.py"
       - "backend/tests/test_deployment_checkpoint_pin_wire.py"
       - "backend/tests/test_deployment_checkpoint_assurance.py"
+      - "backend/tests/test_deployment_checkpoint_pin_diagnostics.py"
       - "backend/tests/test_deployment_checkpoint_route_architecture.py"
       - "backend/tests/test_deployment_checkpoint_trust_wire.py"
       - "backend/tests/test_deployment_preflight.py"
@@ -104,6 +106,7 @@ on:
       - "backend/core/deployment_checkpoint_pin_runtime.py"
       - "backend/core/deployment_checkpoint_pin_wire.py"
       - "backend/core/deployment_checkpoint_trust_wire.py"
+      - "backend/core/deployment_checkpoint_pin_diagnostics.py"
       - "backend/core/deployment_checkpoint_assurance.py"
       - "backend/core/deployment_checkpoint_trust_advance.py"
       - "backend/core/deployment_checkpoint_witnessed_continuity.py"
@@ -122,6 +125,7 @@ on:
       - "backend/tests/test_deployment_checkpoint_pin_config.py"
       - "backend/tests/test_deployment_checkpoint_pin_wire.py"
       - "backend/tests/test_deployment_checkpoint_assurance.py"
+      - "backend/tests/test_deployment_checkpoint_pin_diagnostics.py"
       - "backend/tests/test_deployment_checkpoint_route_architecture.py"
       - "backend/tests/test_deployment_checkpoint_trust_wire.py"
       - "backend/tests/test_deployment_preflight.py"
@@ -185,6 +189,7 @@ jobs:
           tests/test_deployment_checkpoint_pin_config.py
           tests/test_deployment_checkpoint_pin_wire.py
           tests/test_deployment_checkpoint_assurance.py
+          tests/test_deployment_checkpoint_pin_diagnostics.py
           tests/test_deployment_checkpoint_route_architecture.py
           tests/test_deployment_checkpoint_trust_wire.py
           tests/test_deployment_preflight.py
