@@ -7,10 +7,8 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from core.deployment_checkpoint_ledger import DeploymentCheckpointLedger
 from core.deployment_checkpoint_pin_wire import decode_deployment_checkpoint_pin_receipt
 from core.deployment_checkpoint_witness import sign_deployment_checkpoint_pin
-from core.deployment_evidence_checkpoint import DeploymentEvidenceCheckpoint
 
 
 def _keypair():
@@ -28,25 +26,8 @@ def _keypair():
 
 
 def _publication(tmp_path):
-    # Use a real verified checkpoint publication from the same schema the runtime uses.
-    checkpoint = DeploymentEvidenceCheckpoint(
-        version=2,
-        authorization_head_sha256="a" * 64,
-        authorization_events=0,
-        receipt_head_sha256="b" * 64,
-        receipt_events=0,
-        release_channels=(),
-        completed_releases=0,
-        fully_portable_releases=0,
-        evidence_gap_count=0,
-        release_channels_sha256="c" * 64,
-        root_sha256="d" * 64,
-        attestation_sha256="e" * 64,
-    )
-    # The manually assembled checkpoint above is intentionally not assumed valid;
-    # construction through a real gateway is covered elsewhere. Here we only need
-    # a publication parser fixture, so import the established helper lazily.
     from tests.test_deployment_checkpoint_pin_ledger import _gateway
+
     gateway = _gateway(tmp_path)
     publication = gateway.checkpoints.latest()
     assert publication is not None
@@ -101,5 +82,36 @@ def test_version_and_digest_type_confusion_are_rejected(tmp_path):
 def test_publication_schema_drift_fails_before_signature_verification(tmp_path):
     _, raw = _raw_receipt(tmp_path)
     raw["publication"]["checkpoint"]["unexpected"] = 1
+    with pytest.raises(ValueError, match="portable canonical JSON"):
+        decode_deployment_checkpoint_pin_receipt(raw)
+
+
+def test_witness_bool_tree_size_and_noncanonical_timestamp_fail_during_decode(tmp_path):
+    _, raw = _raw_receipt(tmp_path)
+    raw["witness"]["tree_size"] = True
+    with pytest.raises(ValueError, match="portable canonical JSON"):
+        decode_deployment_checkpoint_pin_receipt(raw)
+
+    _, raw = _raw_receipt(tmp_path / "time")
+    raw["witness"]["observed_at"] = "2026-09-14T22:00:00+02:00"
+    with pytest.raises(ValueError, match="portable canonical JSON"):
+        decode_deployment_checkpoint_pin_receipt(raw)
+
+
+def test_witness_signature_and_digest_wire_encodings_are_canonical(tmp_path):
+    _, raw = _raw_receipt(tmp_path)
+    raw["witness"]["signature_b64"] = raw["witness"]["signature_b64"].rstrip("=")
+    with pytest.raises(ValueError, match="portable canonical JSON"):
+        decode_deployment_checkpoint_pin_receipt(raw)
+
+    _, raw = _raw_receipt(tmp_path / "sha")
+    raw["witness"]["statement_sha256"] = "G" * 64
+    with pytest.raises(ValueError, match="portable canonical JSON"):
+        decode_deployment_checkpoint_pin_receipt(raw)
+
+
+def test_witness_text_fields_reject_whitespace_normalization(tmp_path):
+    _, raw = _raw_receipt(tmp_path)
+    raw["witness"]["witness_id"] = " wire-w0 "
     with pytest.raises(ValueError, match="portable canonical JSON"):
         decode_deployment_checkpoint_pin_receipt(raw)
