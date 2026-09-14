@@ -7,8 +7,10 @@
 
 ARG UV_VERSION=0.12.4
 
+# Official Python multi-platform index pinned for reproducible rebuilds.
+# Refresh this digest deliberately alongside dependency/security review.
 # Stage 1: Builder with uv
-FROM python:3.11-slim AS builder
+FROM python:3.11-slim@sha256:9534e5a8e315485d4061ed659af0fd78a284c015f9b73661b41d6bab25604534 AS builder
 ARG UV_VERSION
 
 WORKDIR /app
@@ -24,7 +26,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN uv pip install -r requirements.txt
 
 # Stage 2: Production
-FROM python:3.11-slim AS production
+FROM python:3.11-slim@sha256:9534e5a8e315485d4061ed659af0fd78a284c015f9b73661b41d6bab25604534 AS production
 
 WORKDIR /app
 

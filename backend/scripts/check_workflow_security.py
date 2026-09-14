@@ -1,9 +1,10 @@
 """Static GitHub Actions policy gate.
 
 The checker is dependency-free so it can run in the earliest CI phase. It
-requires immutable action references, explicit workflow permissions, rejects
-high-risk event/permission patterns, and prevents direct interpolation of
-attacker-controlled GitHub event fields into shell ``run`` commands.
+requires immutable action references, explicit workflow permissions, hardened
+checkout credential handling, rejects high-risk event/permission patterns, and
+prevents direct interpolation of attacker-controlled GitHub event fields into
+shell ``run`` commands.
 """
 from __future__ import annotations
 
@@ -19,7 +20,12 @@ SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 USES_RE = re.compile(r"^\s*(?:-\s*)?(?:\{\s*)?uses\s*:\s*[\"']?([^\"'\s,}#]+)")
 RUN_RE = re.compile(r"^(?P<indent>\s*)(?:-\s*)?run\s*:\s*(?P<value>.*)$")
 EXPRESSION_RE = re.compile(r"\$\{\{(?P<body>.*?)\}\}")
+PERSIST_FALSE_RE = re.compile(
+    r"\bpersist-credentials\s*:\s*(?:false|['\"]false['\"])(?=\s*[,}#]|\s*$)",
+    re.IGNORECASE,
+)
 BLOCK_SCALARS = {"|", ">", "|-", ">-", "|+", ">+"}
+CHECKOUT_ACTION = "actions/checkout@"
 
 # These fields can be controlled by pull-request authors, issue/comment authors,
 # or commit authors. They must cross the shell boundary through env/input data,
@@ -57,6 +63,23 @@ def _container_violation(reference: str) -> str | None:
 
 def _indent_width(line: str) -> int:
     return len(line) - len(line.lstrip(" "))
+
+
+def _checkout_credentials_disabled(lines: list[str], uses_index: int) -> bool:
+    """Return whether a checkout step explicitly disables credential persistence."""
+    base_indent = _indent_width(lines[uses_index])
+    index = uses_index + 1
+    while index < len(lines):
+        line = lines[index]
+        stripped = line.strip()
+        if stripped:
+            indent = _indent_width(line)
+            if indent < base_indent or (indent == base_indent and stripped.startswith("- ")):
+                break
+            if PERSIST_FALSE_RE.search(line):
+                return True
+        index += 1
+    return False
 
 
 def _run_fragments(lines: list[str]) -> Iterable[tuple[int, str]]:
@@ -106,7 +129,8 @@ def violations(path: Path) -> list[str]:
     lines = text.splitlines()
     has_top_level_permissions = False
 
-    for number, line in enumerate(lines, 1):
+    for index, line in enumerate(lines):
+        number = index + 1
         stripped = line.strip()
         if line == stripped and stripped.startswith("permissions:"):
             has_top_level_permissions = True
@@ -123,6 +147,12 @@ def violations(path: Path) -> list[str]:
         if not match:
             continue
         reference = match.group(1).strip("\"'")
+
+        if reference.startswith(CHECKOUT_ACTION) and not _checkout_credentials_disabled(lines, index):
+            findings.append(
+                f"{path.name}:{number}: actions/checkout must set persist-credentials: false"
+            )
+
         if _is_local(reference):
             continue
         if reference.startswith("docker://"):
