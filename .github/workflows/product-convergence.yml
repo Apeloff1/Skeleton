@@ -10,6 +10,7 @@ on:
       - "backend/tests/test_execution_evidence.py"
       - "backend/tests/test_execution_lifecycle_integration.py"
       - "backend/tests/test_system_assurance.py"
+      - "backend/tests/test_system_root_attestation.py"
       - "backend/tests/test_capability_readiness.py"
       - "backend/tests/test_progression_intelligence_and_deployment.py"
       - "backend/tests/test_native_product_executors.py"
@@ -47,6 +48,7 @@ on:
       - "backend/tests/test_execution_evidence.py"
       - "backend/tests/test_execution_lifecycle_integration.py"
       - "backend/tests/test_system_assurance.py"
+      - "backend/tests/test_system_root_attestation.py"
       - "backend/tests/test_capability_readiness.py"
       - "backend/tests/test_progression_intelligence_and_deployment.py"
       - "backend/tests/test_native_product_executors.py"
@@ -100,6 +102,7 @@ jobs:
           tests/test_execution_evidence.py
           tests/test_execution_lifecycle_integration.py
           tests/test_system_assurance.py
+          tests/test_system_root_attestation.py
           tests/test_capability_readiness.py
           tests/test_progression_intelligence_and_deployment.py
           tests/test_world_system_composer.py
