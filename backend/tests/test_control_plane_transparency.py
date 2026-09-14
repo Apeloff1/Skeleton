@@ -8,17 +8,20 @@ def test_control_plane_checkpoints_epistemic_state_into_system_root(tmp_path):
     invariant_ids = {row["id"] for row in assurance["invariants"]}
     assert "truth.transparency-prefix-aligned" in invariant_ids
     assert "truth.gossip-no-equivocation" in invariant_ids
+    assert "truth.witness-ledger-coherent" in invariant_ids
+    assert "truth.finality-ledger-coherent" in invariant_ids
 
     status = plane.status()
-    transparency = status["epistemic_transparency"]
-    assert transparency["verified"] is True
-    assert transparency["prefix_aligned"] is True
-    assert transparency["transparency_entries"] >= 1
-    assert status["epistemic_gossip"]["healthy"] is True
+    trust = status["epistemic_trust"]
+    assert trust["transparency"]["verified"] is True
+    assert trust["transparency"]["prefix_aligned"] is True
+    assert trust["transparency"]["transparency_entries"] >= 1
+    assert trust["gossip"]["healthy"] is True
+    assert trust["integrity_healthy"] is True
 
     components = {row["name"] for row in status["system_root"]["components"]}
-    assert "epistemic_transparency" in components
-    assert "epistemic_gossip" in components
+    assert "epistemic_trust" in components
+    assert "epistemic_root" in components
 
 
 def test_split_view_blocks_assurance_and_rotates_system_root(tmp_path):
@@ -40,6 +43,7 @@ def test_split_view_blocks_assurance_and_rotates_system_root(tmp_path):
     assurance = plane.assurance_report()
     assert assurance["posture"] == "blocked"
     assert any(row["id"] == "truth.gossip-no-equivocation" and not row["passed"] for row in assurance["invariants"])
+    assert any(row["id"] == "truth.trust-runtime-integrity" and not row["passed"] for row in assurance["invariants"])
     after = plane.system_root()["root_sha256"]
     assert after != before
 
