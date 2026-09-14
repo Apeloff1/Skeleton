@@ -30,14 +30,20 @@ def _stack(tmp_path, *, groups=3):
 
 
 def _publish(transparency, authority="a", epistemic="b"):
-    return transparency.publish(authority_root_sha256=authority * 64, epistemic_root_sha256=epistemic * 64,
-                                observed_at="2026-09-14T16:30:00+00:00")
+    return transparency.publish(
+        authority_root_sha256=authority * 64,
+        epistemic_root_sha256=epistemic * 64,
+    )
 
 
 def _witness(witnesses, descriptor, witness_id):
-    return witnesses.observe(log_id=descriptor["log_id"], tree_size=descriptor["tree_size"],
-                             root_sha256=descriptor["root_sha256"], witness_id=witness_id,
-                             transport_authenticated=True, observed_at="2026-09-14T16:31:00+00:00")
+    return witnesses.observe(
+        log_id=descriptor["log_id"],
+        tree_size=descriptor["tree_size"],
+        root_sha256=descriptor["root_sha256"],
+        witness_id=witness_id,
+        transport_authenticated=True,
+    )
 
 
 def test_quorum_counts_independence_groups_not_raw_witness_count(tmp_path):
@@ -57,7 +63,7 @@ def test_quorum_counts_independence_groups_not_raw_witness_count(tmp_path):
     _witness(witnesses, descriptor, "witness-c")
     quorum = witnesses.quorum(log_id=descriptor["log_id"], tree_size=descriptor["tree_size"], root_sha256=descriptor["root_sha256"])
     assert quorum.independent_groups == 3 and quorum.reached is True
-    finalized = finality.finalize(finalized_at="2026-09-14T16:32:00+00:00")
+    finalized = finality.finalize()
     assert finalized.tree_size == 1
     assert finalized.root_sha256 == descriptor["root_sha256"]
     assert finalized.witness_groups == ("operator-a", "operator-b", "operator-c")
@@ -94,13 +100,17 @@ def test_equivocating_trusted_witness_freezes_finality(tmp_path):
 def test_finality_chain_advances_only_on_larger_witnessed_tree(tmp_path):
     transparency, _, witnesses, finality = _stack(tmp_path)
     first = _publish(transparency, "1", "2")["transparency"]
-    for wid in ("witness-a", "witness-b", "witness-c"): _witness(witnesses, first, wid)
-    one = finality.finalize(finalized_at="2026-09-14T16:32:00+00:00")
+    for wid in ("witness-a", "witness-b", "witness-c"):
+        _witness(witnesses, first, wid)
+    one = finality.finalize()
 
-    second = transparency.publish(authority_root_sha256="3" * 64, epistemic_root_sha256="4" * 64,
-                                  observed_at="2026-09-14T16:33:00+00:00")["transparency"]
-    for wid in ("witness-a", "witness-b", "witness-c"): _witness(witnesses, second, wid)
-    two = finality.finalize(finalized_at="2026-09-14T16:34:00+00:00")
+    second = transparency.publish(
+        authority_root_sha256="3" * 64,
+        epistemic_root_sha256="4" * 64,
+    )["transparency"]
+    for wid in ("witness-a", "witness-b", "witness-c"):
+        _witness(witnesses, second, wid)
+    two = finality.finalize()
     assert two.tree_size == 2 and two.sequence == 2
     assert two.previous_sha256 == one.sha256
     assert finality.latest() == two
@@ -109,7 +119,8 @@ def test_finality_chain_advances_only_on_larger_witnessed_tree(tmp_path):
 def test_finality_ledger_tamper_is_detected(tmp_path):
     transparency, _, witnesses, finality = _stack(tmp_path)
     descriptor = _publish(transparency)["transparency"]
-    for wid in ("witness-a", "witness-b", "witness-c"): _witness(witnesses, descriptor, wid)
+    for wid in ("witness-a", "witness-b", "witness-c"):
+        _witness(witnesses, descriptor, wid)
     finality.finalize()
 
     rows = finality.path.read_text(encoding="utf-8").splitlines()
