@@ -62,6 +62,12 @@ def _rehash(row):
     return row
 
 
+def _strict_rehash(row):
+    payload = {key: value for key, value in row.items() if key != "sha256"}
+    row["sha256"] = canonical_json_sha256(payload)
+    return row
+
+
 def test_authorization_binds_root_plan_expiry_and_exactly_once(tmp_path):
     ledger = DeploymentAuthorizationLedger(tmp_path)
     plan = _plan("artifact-r1")
@@ -217,9 +223,49 @@ def test_rehashed_semantically_forged_plan_is_rejected_on_reload(tmp_path):
     raw = json.loads(ledger.path.read_text(encoding="utf-8").strip())
     raw["plan"]["rollback"]["automatic"] = False
     raw["plan_sha256"] = canonical_json_sha256(raw["plan"])
-    payload = {key: value for key, value in raw.items() if key != "sha256"}
-    raw["sha256"] = canonical_json_sha256(payload)
+    raw = _strict_rehash(raw)
     ledger.path.write_text(canonical_json_text(raw) + "\n", encoding="utf-8")
 
     with pytest.raises(DeploymentAuthorizationError, match="failed verification"):
         DeploymentAuthorizationLedger(tmp_path)
+
+
+@pytest.mark.parametrize("ttl", [True, 1.5, "60", 0, 3601])
+def test_authorization_ttl_requires_bounded_exact_integer(tmp_path, ttl):
+    ledger = DeploymentAuthorizationLedger(tmp_path)
+    with pytest.raises(ValueError, match="integer between 1 and 3600"):
+        ledger.issue(preflight=_preflight(), plan=_plan(), ttl_seconds=ttl)
+
+
+def test_bool_sequence_cannot_masquerade_as_sequence_one(tmp_path):
+    ledger = DeploymentAuthorizationLedger(tmp_path)
+    ledger.issue(preflight=_preflight(), plan=_plan(),
+                 issued_at="2026-09-14T17:00:00+00:00")
+    raw = json.loads(ledger.path.read_text(encoding="utf-8").strip())
+    raw["sequence"] = True
+    raw = _strict_rehash(raw)
+    ledger.path.write_text(canonical_json_text(raw) + "\n", encoding="utf-8")
+    with pytest.raises(DeploymentAuthorizationError, match="ancestry/version"):
+        DeploymentAuthorizationLedger(tmp_path)
+
+
+def test_string_boolean_preflight_snapshot_is_not_coerced(tmp_path):
+    ledger = DeploymentAuthorizationLedger(tmp_path)
+    ledger.issue(preflight=_preflight(), plan=_plan(),
+                 issued_at="2026-09-14T17:00:00+00:00")
+    raw = json.loads(ledger.path.read_text(encoding="utf-8").strip())
+    raw["preflight"]["allowed"] = "false"
+    raw = _strict_rehash(raw)
+    ledger.path.write_text(canonical_json_text(raw) + "\n", encoding="utf-8")
+    with pytest.raises(DeploymentAuthorizationError, match="preflight snapshot"):
+        DeploymentAuthorizationLedger(tmp_path)
+
+
+def test_consume_rejects_coerced_authorization_identity_and_root(tmp_path):
+    ledger = DeploymentAuthorizationLedger(tmp_path)
+    auth = ledger.issue(preflight=_preflight(), plan=_plan(),
+                        issued_at="2026-09-14T17:00:00+00:00")
+    with pytest.raises(ValueError, match="authorization_id"):
+        ledger.consume(123, current_system_root_sha256="a" * 64, plan=_plan())
+    with pytest.raises(ValueError, match="must be sha256"):
+        ledger.consume(auth.id, current_system_root_sha256=True, plan=_plan())
