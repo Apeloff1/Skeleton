@@ -5,6 +5,7 @@ token-bucket rate limiter.
 Security properties:
   * Forwarded client IPs are trusted only from configured proxy CIDRs.
   * Request IDs are normalized before they reach response headers or logs.
+  * Log fields derived from request metadata are normalized to one line.
   * Rate-limit state is bounded and stale buckets are evicted.
 """
 from __future__ import annotations
@@ -46,6 +47,7 @@ _EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "127.0.0.1,::1,localhost")
 _EXEMPT_IPS = {ip.strip() for ip in _EXEMPT_RAW.split(",") if ip.strip()}
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]+")
 
 # Telemetry counters (in-memory) ────────────────────────────────────
 _lat_ring: Deque[float] = deque(maxlen=1024)
@@ -71,6 +73,12 @@ def _percentile(sorted_vals, pct: float) -> float:
         return 0.0
     k = max(0, min(len(sorted_vals) - 1, int(pct / 100.0 * (len(sorted_vals) - 1))))
     return sorted_vals[k]
+
+
+def _safe_log_field(value: object, limit: int = 512) -> str:
+    """Normalize untrusted metadata before it reaches a line-oriented log."""
+    normalized = _CONTROL_CHARS_RE.sub(" ", str(value))
+    return normalized[: max(1, min(limit, 4096))]
 
 
 def _request_id(request: Request) -> str:
@@ -119,7 +127,11 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
             if "No response returned" in str(exc):
                 from fastapi.responses import Response as _Resp
 
-                log.debug("client disconnected mid-request rid=%s path=%s", rid, request.url.path)
+                log.debug(
+                    "client disconnected mid-request rid=%s path=%s",
+                    rid,
+                    _safe_log_field(request.url.path),
+                )
                 resp = _Resp(status_code=499)
                 resp.headers["X-Request-Id"] = rid
                 return resp
@@ -136,6 +148,8 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         t0 = time.perf_counter()
         rid = getattr(request.state, "request_id", "-")
+        log_method = _safe_log_field(request.method, 32)
+        log_path = _safe_log_field(request.url.path)
         try:
             response = await call_next(request)
             status = response.status_code
@@ -143,8 +157,8 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
             dur = (time.perf_counter() - t0) * 1000
             log.exception(
                 "method=%s path=%s status=500 dur_ms=%.2f rid=%s ip=%s err=unhandled",
-                request.method,
-                request.url.path,
+                log_method,
+                log_path,
                 dur,
                 rid,
                 _client_ip(request),
@@ -167,8 +181,8 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
         if request.url.path not in ("/api/health", "/api/_telemetry"):
             log.info(
                 "method=%s path=%s status=%d dur_ms=%.2f rid=%s ip=%s",
-                request.method,
-                request.url.path,
+                log_method,
+                log_path,
                 status,
                 dur,
                 rid,
@@ -254,7 +268,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
             log.warning(
                 "rate_limited ip=%s path=%s retry=%.1fs rid=%s",
                 ip,
-                request.url.path,
+                _safe_log_field(request.url.path),
                 retry,
                 rid,
             )
