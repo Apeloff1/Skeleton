@@ -46,6 +46,13 @@ def test_reflection_lineage_must_exist_and_stay_with_agent():
         bank.remember_reflection("a", "lesson", ["b1"])
 
 
+def test_reflection_agent_identity_is_normalized():
+    bank = MemoryBank()
+    bank.remember("a", "episode", memory_id="a1")
+    reflection = bank.remember_reflection("  a  ", "lesson", ["a1"])
+    assert reflection.agent_id == "a"
+
+
 def test_evolution_accepts_measured_improvement_with_evidence():
     policy = EvolutionPolicy(
         (
@@ -65,6 +72,22 @@ def test_evolution_accepts_measured_improvement_with_evidence():
     assert decision.accepted is True
     assert decision.gain > decision.required_gain
     assert decision.violations == ()
+
+
+def test_policy_accepts_string_enum_inputs_but_normalizes_them():
+    metric = MetricSpec("latency", "lower")
+    candidate = EvolutionCandidate(
+        candidate_id="c2",
+        baseline_id="c1",
+        metrics={"latency": 90},
+        evidence_ids=("bench:1",),
+        mode="evolve",
+    )
+    policy = EvolutionPolicy((metric,))
+    decision = policy.evaluate({"latency": 100}, candidate)
+    assert metric.direction is Direction.LOWER
+    assert candidate.mode is ChangeMode.EVOLVE
+    assert decision.accepted is True
 
 
 def test_evolution_rejects_protected_regression_even_if_other_metric_wins():
