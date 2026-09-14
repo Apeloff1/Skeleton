@@ -1,8 +1,8 @@
 """
 routes/nexus.py — Knowledge Nexus integration + Curiosity epistemic service.
 
-The vendored Nexus remains isolation-guarded. Curiosity and empirical verification
-are native subsystems mounted under the already-live /api/nexus surface.
+The vendored Nexus remains isolation-guarded. Curiosity, empirical verification,
+truth-state and provenance-gated watch feeds share the live /api/nexus surface.
 """
 from __future__ import annotations
 
@@ -16,31 +16,25 @@ from pydantic import BaseModel, Field
 
 from core.curiosity_service import curiosity_service
 from core.truth_verifier import EvidenceItem, EvidenceKind
+from core.truth_watch import TruthEventKind
 
 router = APIRouter(prefix="/api/nexus", tags=["knowledge-nexus"])
 _NX = str(Path(__file__).resolve().parent.parent / "knowledge_nexus")
 
 
 def _isolated(fn):
-    saved_path = list(sys.path)
-    saved_mods = set(sys.modules)
-    sys.path.insert(0, _NX)
-    try:
-        return fn()
+    saved_path = list(sys.path); saved_mods = set(sys.modules); sys.path.insert(0, _NX)
+    try: return fn()
     finally:
         sys.path[:] = saved_path
         for name in list(sys.modules):
-            if name in saved_mods:
-                continue
-            mod = sys.modules.get(name)
-            f = getattr(mod, "__file__", "") or ""
-            if f.startswith(_NX):
-                del sys.modules[name]
+            if name in saved_mods: continue
+            mod = sys.modules.get(name); f = getattr(mod, "__file__", "") or ""
+            if f.startswith(_NX): del sys.modules[name]
 
 
 def _capabilities() -> dict:
-    root = Path(_NX)
-    caps: dict[str, list[str]] = {}
+    root = Path(_NX); caps: dict[str, list[str]] = {}
     if root.exists():
         for d in sorted(p for p in root.iterdir() if p.is_dir() and p.name != "__pycache__"):
             caps[d.name] = sorted(f.stem for f in d.glob("*.py"))
@@ -48,31 +42,18 @@ def _capabilities() -> dict:
 
 
 @router.on_event("startup")
-async def _start_curiosity() -> None:
-    curiosity_service().start()
+async def _start_curiosity() -> None: curiosity_service().start()
 
 
 @router.on_event("shutdown")
-async def _stop_curiosity() -> None:
-    curiosity_service().stop()
+async def _stop_curiosity() -> None: curiosity_service().stop()
 
 
 @router.get("/status")
 async def nexus_status():
-    caps = _capabilities()
-    curiosity = curiosity_service().status()
-    return {
-        "vendored": bool(caps),
-        "domains": list(caps),
-        "module_count": sum(len(v) for v in caps.values()),
-        "capabilities": caps,
-        "curiosity": {
-            "enabled": curiosity["enabled"],
-            "engine": curiosity["engine"],
-            "runtime": curiosity["runtime"],
-            "verification": curiosity["verification"],
-        },
-    }
+    caps = _capabilities(); curiosity = curiosity_service().status()
+    return {"vendored": bool(caps), "domains": list(caps), "module_count": sum(len(v) for v in caps.values()),
+            "capabilities": caps, "curiosity": curiosity}
 
 
 @router.get("/orchestrator")
@@ -80,15 +61,10 @@ async def nexus_orchestrator():
     def _load():
         from orchestration.nexus_orchestration_layer import NexusOrchestrator
         o = NexusOrchestrator()
-        return {
-            "ok": True,
-            "orchestrator": "NexusOrchestrator",
-            "methods": [m for m in dir(o) if not m.startswith("_") and callable(getattr(o, m))],
-        }
-    try:
-        return _isolated(_load)
-    except Exception as e:
-        return JSONResponse({"ok": False, "error": f"{type(e).__name__}: {e}"[:200]}, status_code=207)
+        return {"ok": True, "orchestrator": "NexusOrchestrator",
+                "methods": [m for m in dir(o) if not m.startswith("_") and callable(getattr(o, m))]}
+    try: return _isolated(_load)
+    except Exception as e: return JSONResponse({"ok": False, "error": f"{type(e).__name__}: {e}"[:200]}, status_code=207)
 
 
 class NexusEvent(BaseModel):
@@ -101,10 +77,8 @@ async def nexus_event(body: NexusEvent):
     def _run():
         from orchestration.nexus_orchestration_layer import NexusOrchestrator
         return NexusOrchestrator().process_important_event(body.event, body.source)
-    try:
-        return {"ok": True, "result": _isolated(_run)}
-    except Exception as e:
-        return JSONResponse({"ok": False, "error": f"{type(e).__name__}: {e}"[:200]}, status_code=207)
+    try: return {"ok": True, "result": _isolated(_run)}
+    except Exception as e: return JSONResponse({"ok": False, "error": f"{type(e).__name__}: {e}"[:200]}, status_code=207)
 
 
 class CuriosityPrompt(BaseModel):
@@ -126,6 +100,16 @@ class SourceRetractionBody(BaseModel):
 
 class ReverifyClaimBody(BaseModel):
     claim: str = Field(min_length=1, max_length=10000)
+
+
+class TruthWatchEventBody(BaseModel):
+    kind: str
+    target: str = Field(min_length=1, max_length=10000)
+    reason: str = Field(default="", max_length=2000)
+    provider: str = Field(min_length=1, max_length=300)
+    provider_cursor: str = Field(default="", max_length=1000)
+    provenance_verified: bool = False
+    event_id: str | None = Field(default=None, max_length=128)
 
 
 class TruthEvidenceBody(BaseModel):
@@ -160,14 +144,12 @@ async def curiosity_observe(body: CuriosityPrompt):
 
 
 @router.get("/curiosity/status")
-async def curiosity_status():
-    return curiosity_service().status()
+async def curiosity_status(): return curiosity_service().status()
 
 
 @router.get("/curiosity/frontier")
 async def curiosity_frontier(limit: int = Query(default=20, ge=1, le=100)):
-    rows = curiosity_service().frontier(limit=limit)
-    return {"count": len(rows), "topics": rows}
+    rows = curiosity_service().frontier(limit=limit); return {"count": len(rows), "topics": rows}
 
 
 @router.get("/curiosity/knowledge")
@@ -176,65 +158,64 @@ async def curiosity_knowledge(q: str = Query(min_length=1, max_length=1000), lim
 
 
 @router.get("/curiosity/verification")
-async def curiosity_verification_status():
-    return curiosity_service().engine.verification_status()
+async def curiosity_verification_status(): return curiosity_service().engine.verification_status()
 
 
 @router.get("/curiosity/truth")
 async def curiosity_truth_state(claim: str = Query(min_length=1, max_length=10000)):
-    engine = curiosity_service().engine
-    state = engine.truth_ledger.get(claim)
-    return {
-        "claim": claim,
-        "state": asdict(state) if state is not None else None,
-        "authoritative": engine.truth_ledger.authoritative(claim),
-        "contradiction": engine.contradiction_status(claim),
-    }
+    engine = curiosity_service().engine; state = engine.truth_ledger.get(claim)
+    return {"claim": claim, "state": asdict(state) if state is not None else None,
+            "authoritative": engine.truth_ledger.authoritative(claim), "contradiction": engine.contradiction_status(claim),
+            "dependencies": list(engine.claim_dependencies.dependencies(claim)),
+            "dependents": list(engine.claim_dependencies.dependents(claim, recursive=True))}
 
 
 @router.post("/curiosity/reverify")
-async def curiosity_reverify_claim(body: ReverifyClaimBody):
-    return curiosity_service().engine.reverify_claim(body.claim)
+async def curiosity_reverify_claim(body: ReverifyClaimBody): return curiosity_service().engine.reverify_claim(body.claim)
 
 
 @router.post("/curiosity/retract-source")
 async def curiosity_retract_source(body: SourceRetractionBody):
     engine = curiosity_service().engine
-    if engine.source_lineage.get(body.source_id) is None:
-        raise HTTPException(status_code=404, detail="source not found in lineage registry")
+    if engine.source_lineage.get(body.source_id) is None: raise HTTPException(status_code=404, detail="source not found in lineage registry")
     return engine.retract_source(body.source_id, body.reason, cascade=body.cascade)
+
+
+@router.get("/curiosity/watch")
+async def curiosity_watch_status(limit: int = Query(default=100, ge=1, le=1000)):
+    service = curiosity_service()
+    return {"status": service.watch.stats(),
+            "pending": [{**asdict(event), "kind": event.kind.value} for event in service.watch.pending(limit=limit)]}
+
+
+@router.post("/curiosity/watch")
+async def curiosity_watch_ingest(body: TruthWatchEventBody):
+    try: TruthEventKind(body.kind)
+    except ValueError as exc: raise HTTPException(status_code=422, detail=f"unsupported truth watch event kind: {body.kind}") from exc
+    return curiosity_service().ingest_watch(kind=body.kind, target=body.target, reason=body.reason,
+        provider=body.provider, provider_cursor=body.provider_cursor,
+        provenance_verified=body.provenance_verified, event_id=body.event_id)
+
+
+@router.post("/curiosity/watch/apply")
+async def curiosity_watch_apply(limit: int = Query(default=100, ge=1, le=1000)):
+    return curiosity_service().apply_watch_now(limit=limit)
 
 
 @router.post("/curiosity/verify")
 async def curiosity_verify_claim(body: VerifyClaimBody):
     evidence: list[EvidenceItem] = []
     for row in body.evidence:
-        try:
-            kind = EvidenceKind(row.kind)
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=f"unsupported evidence kind: {row.kind}") from exc
-        evidence.append(EvidenceItem(
-            source_id=row.source_id,
-            locator=row.locator,
-            kind=kind,
-            supports=row.supports,
-            independence_group=row.independence_group,
-            quality=row.quality,
-            observed_at=row.observed_at,
-            reproducible=row.reproducible,
-            peer_reviewed=row.peer_reviewed,
-            primary=row.primary,
-            notes=row.notes,
-            provenance_verified=row.provenance_verified,
-            preregistered=row.preregistered,
-            data_available=row.data_available,
-            code_available=row.code_available,
-            sample_size=row.sample_size,
-            uncertainty_reported=row.uncertainty_reported,
-        ))
+        try: kind = EvidenceKind(row.kind)
+        except ValueError as exc: raise HTTPException(status_code=422, detail=f"unsupported evidence kind: {row.kind}") from exc
+        evidence.append(EvidenceItem(source_id=row.source_id, locator=row.locator, kind=kind, supports=row.supports,
+            independence_group=row.independence_group, quality=row.quality, observed_at=row.observed_at,
+            reproducible=row.reproducible, peer_reviewed=row.peer_reviewed, primary=row.primary, notes=row.notes,
+            provenance_verified=row.provenance_verified, preregistered=row.preregistered,
+            data_available=row.data_available, code_available=row.code_available, sample_size=row.sample_size,
+            uncertainty_reported=row.uncertainty_reported))
     result = curiosity_service().engine.verifier.verify_claim(body.claim, evidence, falsifiable=body.falsifiable)
-    payload = asdict(result)
-    payload["state"] = result.state.value
+    payload = asdict(result); payload["state"] = result.state.value
     payload["accepted_evidence"] = [{**asdict(item), "kind": item.kind.value} for item in result.accepted_evidence]
     payload["rejected_evidence"] = [{**asdict(item), "kind": item.kind.value} for item in result.rejected_evidence]
     payload["authoritative"] = result.state.value == "verified"
@@ -243,8 +224,7 @@ async def curiosity_verify_claim(body: VerifyClaimBody):
 
 @router.post("/curiosity/research")
 async def curiosity_research_now():
-    try:
-        return await curiosity_service().run_now()
+    try: return await curiosity_service().run_now()
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"curiosity research unavailable: {type(exc).__name__}: {exc}"[:1000]) from exc
 
@@ -252,6 +232,5 @@ async def curiosity_research_now():
 @router.post("/curiosity/boost")
 async def curiosity_boost(body: CuriosityBoost):
     changed = curiosity_service().engine.boost(body.subject, body.delta)
-    if not changed:
-        raise HTTPException(status_code=404, detail="subject not found in curiosity frontier")
+    if not changed: raise HTTPException(status_code=404, detail="subject not found in curiosity frontier")
     return {"subject": body.subject, "boosted": True, "delta": body.delta}
