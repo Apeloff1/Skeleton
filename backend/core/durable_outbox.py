@@ -1,11 +1,8 @@
 """Durable, bounded, cross-process coherent outbox for consequential effects.
 
-Intent is journaled before exposure. Capacity exhaustion backpressures callers;
-unconfirmed work is never silently evicted. Every state-changing decision occurs
-under both an in-process RLock and an OS-backed file lease. A checksum-protected
-sequence high-watermark prevents identifier reuse after an empty queue/restart.
-The leased journal factory lets callers perform prerequisite staging only after
-capacity is secured, closing cross-process preflight/staging races.
+All journal mutations are guarded by a reusable OS-backed FileLease. Sequence
+identity is monotonic across empty queues/restarts, and leased intent factories
+let callers stage prerequisites only after capacity is secured.
 """
 from __future__ import annotations
 
@@ -21,14 +18,7 @@ from pathlib import Path
 import threading
 from typing import Any, Awaitable, Callable, Iterator
 
-try:
-    import fcntl  # type: ignore
-except ImportError:  # pragma: no cover
-    fcntl = None
-try:
-    import msvcrt  # type: ignore
-except ImportError:  # pragma: no cover
-    msvcrt = None
+from core.file_lease import FileLease
 
 
 class OutboxFullError(RuntimeError): pass
@@ -54,7 +44,8 @@ class DurableOutbox:
     def __init__(self, directory: str | os.PathLike[str], cap: int = 4096) -> None:
         if cap <= 0: raise ValueError("cap must be positive")
         self.directory = Path(directory); self.directory.mkdir(parents=True, exist_ok=True)
-        self.path = self.directory / "outbox.jsonl"; self.meta_path = self.directory / "outbox.meta.json"; self.lock_path = self.directory / ".outbox.lock"
+        self.path = self.directory / "outbox.jsonl"; self.meta_path = self.directory / "outbox.meta.json"
+        self._process_lock = FileLease(self.directory / ".outbox.lock")
         self.cap = cap; self._lock = threading.RLock()
         with self._guard(refresh=False):
             self._entries = self._restore(); inferred = max((e.seq for e in self._entries), default=0) + 1
@@ -66,26 +57,9 @@ class DurableOutbox:
     def _digest(cls, value: Any) -> str: return hashlib.sha256(cls._canonical(value)).hexdigest()
 
     @contextmanager
-    def _process_lease(self) -> Iterator[None]:
-        with self.lock_path.open("a+b") as handle:
-            if fcntl is not None:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-                try: yield
-                finally: fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-                return
-            if msvcrt is not None:  # pragma: no cover
-                handle.seek(0, os.SEEK_END)
-                if handle.tell() == 0: handle.write(b"\0"); handle.flush()
-                handle.seek(0); msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
-                try: yield
-                finally: handle.seek(0); msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-                return
-            raise RuntimeError("no supported OS file-locking primitive available")
-
-    @contextmanager
     def _guard(self, *, refresh: bool = True) -> Iterator[None]:
         with self._lock:
-            with self._process_lease():
+            with self._process_lock.acquire():
                 if refresh and hasattr(self, "_entries"):
                     self._entries = self._restore(); inferred = max((e.seq for e in self._entries), default=0) + 1
                     self._next_seq = max(inferred, self._load_next_seq(default=inferred))
@@ -140,8 +114,7 @@ class DurableOutbox:
         if not collection.strip(): raise ValueError("collection is required")
         with self._guard():
             if len(self._entries) >= self.cap: raise OutboxFullError("outbox full — durable persistence is backpressured, not dropped")
-            seq = self._next_seq
-            payload = payload_factory(seq)
+            seq = self._next_seq; payload = payload_factory(seq)
             if not isinstance(payload, dict): raise ValueError("payload factory must return an object")
             json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
             entry = OutboxEntry(seq=seq, collection=collection, payload=dict(payload), journaled_at=datetime.now(UTC).isoformat())
@@ -191,4 +164,4 @@ class DurableOutbox:
         with self._guard():
             return {"pending": len(self._entries), "capacity": self.cap, "capacity_remaining": max(0, self.cap - len(self._entries)),
                     "next_sequence": self._next_seq, "sequence_meta_version": self.META_VERSION, "cross_process_locking": True,
-                    "leased_intent_factory": True, "lock_backend": "fcntl" if fcntl is not None else "msvcrt"}
+                    "leased_intent_factory": True, "lock_backend": self._process_lock.backend}
