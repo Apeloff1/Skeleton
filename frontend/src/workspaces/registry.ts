@@ -118,8 +118,8 @@ export const WORKSPACES: readonly WorkspaceDefinition[] = [
     accent: '#FB7185',
     route: '/gameforge-studio',
     status: 'live',
-    legacySources: ['Tamagotchi dinosaur game', 'WordPress tools', 'desktop app builders', 'media generators'],
-    evolvedCapabilities: ['game forge', 'code tools', 'asset generation', 'media', 'world forge', 'build export'],
+    legacySources: ['Tamagotchi dinosaur game', 'WordPress tools', 'desktop app builders', 'media generators', 'HyperForge cockpit'],
+    evolvedCapabilities: ['game forge', 'code tools', 'asset generation', 'media', 'world forge', 'build export', 'cockpit preview bridge'],
   },
   {
     id: 'system',
@@ -129,8 +129,8 @@ export const WORKSPACES: readonly WorkspaceDefinition[] = [
     accent: '#C4B5FD',
     route: '/command-center',
     status: 'live',
-    legacySources: ['admin dashboards', 'API switching panels', 'runtime diagnostics'],
-    evolvedCapabilities: ['mission control', 'agents', 'telemetry', 'builds', 'safety', 'feature flags', 'diagnostics'],
+    legacySources: ['admin dashboards', 'API switching panels', 'runtime diagnostics', 'GameForge middleware gate'],
+    evolvedCapabilities: ['mission control', 'agents', 'telemetry', 'builds', 'safety', 'feature flags', 'diagnostics', 'verified audit ledger'],
   },
 ] as const;
 
