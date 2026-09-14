@@ -13,14 +13,12 @@ from middleware.client_identity import (
     parse_trusted_proxy_cidrs,
     sanitize_request_id,
 )
-from middleware.security import SizeLimitMiddleware, safe_relative_path
+from middleware.security import AuditMiddleware, SizeLimitMiddleware, safe_relative_path
 
 
 def test_proxy_trust_is_fail_closed_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("TRUSTED_PROXY_CIDRS", raising=False)
     assert parse_trusted_proxy_cidrs() == ()
-    # Even a loopback peer cannot make a forwarding header authoritative until
-    # the deployment explicitly declares that peer/network as trusted.
     assert extract_client_ip("127.0.0.1", "203.0.113.99") == "127.0.0.1"
 
 
@@ -85,7 +83,6 @@ def test_unknown_client_does_not_bypass_rate_limit() -> None:
         "query_string": b"",
         "headers": [],
         "server": ("example.test", 443),
-        # Intentionally no client tuple: identity resolves to "unknown".
     }
     request = Request(scope)
 
@@ -128,6 +125,63 @@ def test_loopback_client_is_not_implicitly_exempt() -> None:
 
     assert first.status_code == 200
     assert second.status_code == 429
+
+
+def test_audit_snapshot_redacts_client_metadata_by_default() -> None:
+    original = AuditMiddleware._buf
+    try:
+        from collections import deque
+
+        AuditMiddleware._buf = deque(
+            [
+                {
+                    "ts": 1.0,
+                    "method": "GET",
+                    "path": "/api/private",
+                    "status": 200,
+                    "duration_ms": 1.2,
+                    "ip": "203.0.113.10",
+                    "ua": "sensitive-user-agent",
+                    "rid": "abc123",
+                    "req_bytes": 0,
+                    "error": None,
+                }
+            ],
+            maxlen=5000,
+        )
+        public = AuditMiddleware.snapshot()
+        assert "ip" not in public["entries"][0]
+        assert "ua" not in public["entries"][0]
+
+        privileged = AuditMiddleware.snapshot(include_sensitive=True)
+        assert privileged["entries"][0]["ip"] == "203.0.113.10"
+    finally:
+        AuditMiddleware._buf = original
+
+
+def test_audit_middleware_applies_security_header_baseline() -> None:
+    middleware = AuditMiddleware(lambda scope, receive, send: None)
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "method": "GET",
+        "scheme": "https",
+        "path": "/api/private",
+        "raw_path": b"/api/private",
+        "query_string": b"",
+        "headers": [],
+        "server": ("example.test", 443),
+        "client": ("198.51.100.7", 53000),
+    }
+
+    async def call_next(_request: Request) -> Response:
+        return Response("ok", status_code=200)
+
+    response = asyncio.run(middleware.dispatch(Request(scope), call_next))
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["strict-transport-security"].startswith("max-age=")
+    assert response.headers["referrer-policy"] == "no-referrer"
 
 
 def test_safe_relative_path_rejects_escape_and_absolute_paths(tmp_path: Path) -> None:
