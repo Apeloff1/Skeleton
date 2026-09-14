@@ -11,7 +11,9 @@ def test_epistemic_checkpoint_is_included_and_reconciles_across_restart(tmp_path
                           observed_at="2026-09-14T16:00:00+00:00")
     assert first["verified"] is True
     assert first["transparency"]["tree_size"] == 1
-    assert first["inclusion"]["verified"] if "verified" in first["inclusion"] else True
+    inclusion = layer.inclusion_for_checkpoint(first["checkpoint"]["sha256"])
+    assert inclusion["verified"] is True
+    assert inclusion["root_sha256"] == first["transparency"]["root_sha256"]
 
     replay = layer.publish(authority_root_sha256="a" * 64, epistemic_root_sha256="b" * 64,
                            observed_at="2026-09-14T16:01:00+00:00")
