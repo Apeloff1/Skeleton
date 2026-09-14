@@ -132,6 +132,13 @@ async def product_control_pending(token: str = Query("")):
     _require_ops(token); pending = _control_plane().pending(); return {"count": len(pending), "operations": pending}
 
 
+@router.get("/product-control/ledger")
+async def product_control_ledger(token: str = Query("")):
+    _require_ops(token)
+    ledger = _control_plane().execution_ledger()
+    return {"count": len(ledger), "operations": ledger}
+
+
 @router.get("/product-control/audit")
 async def product_control_audit(limit: int = Query(50, ge=0, le=500), token: str = Query("")):
     _require_ops(token); return {"entries": _control_plane().audit_history(limit=limit)}
