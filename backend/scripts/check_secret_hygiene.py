@@ -88,6 +88,10 @@ PLACEHOLDER_MARKERS = (
     "dummy",
     "not-a-real",
     "redacted",
+    # Canonical documentation-only database credentials. Keep these narrow:
+    # matching is applied to the credential-shaped candidate, not the full line.
+    "user:pass@",
+    "username:password@",
 )
 
 
