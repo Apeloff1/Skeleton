@@ -22,6 +22,7 @@ on:
       - "frontend/app/operation.tsx"
       - "frontend/app/control-plane.tsx"
       - "frontend/components/LaunchCascade.tsx"
+      - "frontend/tsconfig.product.json"
       - ".github/workflows/product-kernel.yml"
   pull_request:
     paths:
@@ -44,6 +45,7 @@ on:
       - "frontend/app/operation.tsx"
       - "frontend/app/control-plane.tsx"
       - "frontend/components/LaunchCascade.tsx"
+      - "frontend/tsconfig.product.json"
       - ".github/workflows/product-kernel.yml"
 
 permissions:
@@ -83,4 +85,5 @@ jobs:
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
       - run: yarn install --frozen-lockfile
-      - run: yarn typecheck
+      - name: Typecheck canonical product contract
+        run: yarn tsc --noEmit -p tsconfig.product.json
