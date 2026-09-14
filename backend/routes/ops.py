@@ -20,7 +20,6 @@ from core.product_operations import OperationExecutionError, OperationRejected
 
 router = APIRouter(prefix="/api/admin/ops", tags=["ops"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
-
 _COLLECTIONS = ["playables", "playable_jobs", "marketplace_listings", "marketplace_purchases",
                 "payment_transactions", "tournaments", "tournament_rewards", "liveops_progress"]
 
@@ -154,14 +153,23 @@ async def product_control_receipt(operation_id: str, token: str = Query("")):
     return receipt
 
 
+@router.get("/product-control/receipt/{operation_id}/result")
+async def product_control_receipt_result(operation_id: str, token: str = Query("")):
+    _require_ops(token)
+    try: return _control_plane().receipt_result(operation_id)
+    except ValueError as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ReceiptIntegrityError as exc:
+        status = 404 if "not found" in str(exc).lower() else 500
+        raise HTTPException(status_code=status, detail=str(exc)) from exc
+
+
 @router.post("/product-control/execute/{seq}")
 async def product_control_execute(seq: int, token: str = Query("")):
     _require_ops(token)
     if seq < 0: raise HTTPException(status_code=400, detail="sequence cannot be negative")
     try: confirmed = await _control_plane().execute_registered(seq)
     except OperationExecutionError as exc: raise HTTPException(status_code=502, detail=str(exc)) from exc
-    return {"outbox_seq": seq, "confirmed": confirmed,
-            "status": "executed" if confirmed else "deferred_or_unbound"}
+    return {"outbox_seq": seq, "confirmed": confirmed, "status": "executed" if confirmed else "deferred_or_unbound"}
 
 
 @router.post("/product-control/execute-pending")
