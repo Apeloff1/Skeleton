@@ -6,6 +6,7 @@ on:
       - "backend/core/**"
       - "backend/routes/ops.py"
       - "backend/routes/nexus.py"
+      - "backend/routes/deployment_checkpoint_trust.py"
       - "backend/tests/**"
       - "frontend/src/product/productCatalog.ts"
       - ".github/workflows/product-convergence.yml"
@@ -15,6 +16,7 @@ on:
       - "backend/core/**"
       - "backend/routes/ops.py"
       - "backend/routes/nexus.py"
+      - "backend/routes/deployment_checkpoint_trust.py"
       - "backend/tests/**"
       - "frontend/src/product/productCatalog.ts"
       - ".github/workflows/product-convergence.yml"
@@ -99,9 +101,12 @@ jobs:
           tests/test_deployment_evidence_checkpoint.py
           tests/test_deployment_checkpoint_ledger.py
           tests/test_deployment_checkpoint_proof.py
+          tests/test_deployment_checkpoint_pin_wire.py
+          tests/test_deployment_checkpoint_assurance.py
           tests/test_deployment_checkpoint_trust_advance.py
           tests/test_deployment_checkpoint_witnessed_continuity.py
           tests/test_deployment_checkpoint_pin_runtime_continuity.py
+          tests/test_control_plane_release_integration.py
           tests/test_charter_policy.py
           tests/test_durable_outbox.py
           tests/test_worm_audit.py
