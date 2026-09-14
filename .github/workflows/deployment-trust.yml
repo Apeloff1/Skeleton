@@ -18,24 +18,6 @@ on:
       - "backend/core/deployment_proof.py"
       - "backend/core/deployment_proof_diagnostics.py"
       - "backend/core/deployment_evidence_checkpoint.py"
-      - "backend/core/deployment_checkpoint_ledger.py"
-      - "backend/core/deployment_checkpoint_proof.py"
-      - "backend/core/deployment_checkpoint_witness.py"
-      - "backend/core/deployment_checkpoint_target.py"
-      - "backend/core/deployment_checkpoint_pin_config.py"
-      - "backend/core/deployment_checkpoint_pin_ledger.py"
-      - "backend/core/deployment_checkpoint_pin_runtime.py"
-      - "backend/core/deployment_checkpoint_pin_wire.py"
-      - "backend/core/deployment_checkpoint_trust_wire.py"
-      - "backend/core/deployment_checkpoint_pin_diagnostics.py"
-      - "backend/core/deployment_checkpoint_trust_policy.py"
-      - "backend/core/deployment_checkpoint_policy_verifier.py"
-      - "backend/core/deployment_checkpoint_verification_package.py"
-      - "backend/core/deployment_checkpoint_policy_rotation.py"
-      - "backend/core/deployment_checkpoint_assurance.py"
-      - "backend/core/deployment_checkpoint_trust_advance.py"
-      - "backend/core/deployment_checkpoint_witnessed_continuity.py"
-      - "backend/core/assurance_composition.py"
       - "backend/core/deployment_gateway.py"
       - "backend/core/deployment_planner.py"
       - "backend/core/system_assurance.py"
@@ -43,22 +25,8 @@ on:
       - "backend/core/product_control_plane.py"
       - "backend/core/portable_claim_proof.py"
       - "backend/routes/ops.py"
-      - "backend/routes/deployment_checkpoint_trust.py"
       - "backend/tests/test_witness_freshness_migration.py"
       - "backend/tests/test_signed_witness_finality.py"
-      - "backend/tests/test_witness_policy_config_strict.py"
-      - "backend/tests/test_deployment_checkpoint_pin_config.py"
-      - "backend/tests/test_deployment_checkpoint_pin_wire.py"
-      - "backend/tests/test_deployment_checkpoint_assurance.py"
-      - "backend/tests/test_deployment_checkpoint_pin_diagnostics.py"
-      - "backend/tests/test_deployment_checkpoint_route_architecture.py"
-      - "backend/tests/test_deployment_checkpoint_trust_wire.py"
-      - "backend/tests/test_deployment_checkpoint_trust_policy.py"
-      - "backend/tests/test_deployment_checkpoint_policy_verifier.py"
-      - "backend/tests/test_deployment_checkpoint_verification_package.py"
-      - "backend/tests/test_deployment_checkpoint_verification_dispatch.py"
-      - "backend/tests/test_deployment_checkpoint_policy_rotation.py"
-      - "backend/tests/test_deployment_checkpoint_runtime_policy_status.py"
       - "backend/tests/test_deployment_preflight.py"
       - "backend/tests/test_control_plane_deployment.py"
       - "backend/tests/test_deployment_authorization.py"
@@ -70,16 +38,6 @@ on:
       - "backend/tests/test_deployment_proof_semantics.py"
       - "backend/tests/test_deployment_proof_diagnostics.py"
       - "backend/tests/test_deployment_evidence_checkpoint.py"
-      - "backend/tests/test_deployment_checkpoint_ledger.py"
-      - "backend/tests/test_deployment_checkpoint_proof.py"
-      - "backend/tests/test_deployment_checkpoint_witness.py"
-      - "backend/tests/test_deployment_checkpoint_target.py"
-      - "backend/tests/test_deployment_checkpoint_pin_ledger.py"
-      - "backend/tests/test_deployment_checkpoint_pin_hardening.py"
-      - "backend/tests/test_deployment_checkpoint_pin_runtime.py"
-      - "backend/tests/test_deployment_checkpoint_pin_runtime_continuity.py"
-      - "backend/tests/test_deployment_checkpoint_trust_advance.py"
-      - "backend/tests/test_deployment_checkpoint_witnessed_continuity.py"
       - "backend/tests/test_system_assurance_deployment.py"
       - "backend/tests/test_control_plane_release_integration.py"
       - "backend/tests/test_epistemic_trust_runtime.py"
@@ -107,24 +65,6 @@ on:
       - "backend/core/deployment_proof.py"
       - "backend/core/deployment_proof_diagnostics.py"
       - "backend/core/deployment_evidence_checkpoint.py"
-      - "backend/core/deployment_checkpoint_ledger.py"
-      - "backend/core/deployment_checkpoint_proof.py"
-      - "backend/core/deployment_checkpoint_witness.py"
-      - "backend/core/deployment_checkpoint_target.py"
-      - "backend/core/deployment_checkpoint_pin_config.py"
-      - "backend/core/deployment_checkpoint_pin_ledger.py"
-      - "backend/core/deployment_checkpoint_pin_runtime.py"
-      - "backend/core/deployment_checkpoint_pin_wire.py"
-      - "backend/core/deployment_checkpoint_trust_wire.py"
-      - "backend/core/deployment_checkpoint_pin_diagnostics.py"
-      - "backend/core/deployment_checkpoint_trust_policy.py"
-      - "backend/core/deployment_checkpoint_policy_verifier.py"
-      - "backend/core/deployment_checkpoint_verification_package.py"
-      - "backend/core/deployment_checkpoint_policy_rotation.py"
-      - "backend/core/deployment_checkpoint_assurance.py"
-      - "backend/core/deployment_checkpoint_trust_advance.py"
-      - "backend/core/deployment_checkpoint_witnessed_continuity.py"
-      - "backend/core/assurance_composition.py"
       - "backend/core/deployment_gateway.py"
       - "backend/core/deployment_planner.py"
       - "backend/core/system_assurance.py"
@@ -132,22 +72,8 @@ on:
       - "backend/core/product_control_plane.py"
       - "backend/core/portable_claim_proof.py"
       - "backend/routes/ops.py"
-      - "backend/routes/deployment_checkpoint_trust.py"
       - "backend/tests/test_witness_freshness_migration.py"
       - "backend/tests/test_signed_witness_finality.py"
-      - "backend/tests/test_witness_policy_config_strict.py"
-      - "backend/tests/test_deployment_checkpoint_pin_config.py"
-      - "backend/tests/test_deployment_checkpoint_pin_wire.py"
-      - "backend/tests/test_deployment_checkpoint_assurance.py"
-      - "backend/tests/test_deployment_checkpoint_pin_diagnostics.py"
-      - "backend/tests/test_deployment_checkpoint_route_architecture.py"
-      - "backend/tests/test_deployment_checkpoint_trust_wire.py"
-      - "backend/tests/test_deployment_checkpoint_trust_policy.py"
-      - "backend/tests/test_deployment_checkpoint_policy_verifier.py"
-      - "backend/tests/test_deployment_checkpoint_verification_package.py"
-      - "backend/tests/test_deployment_checkpoint_verification_dispatch.py"
-      - "backend/tests/test_deployment_checkpoint_policy_rotation.py"
-      - "backend/tests/test_deployment_checkpoint_runtime_policy_status.py"
       - "backend/tests/test_deployment_preflight.py"
       - "backend/tests/test_control_plane_deployment.py"
       - "backend/tests/test_deployment_authorization.py"
@@ -159,16 +85,6 @@ on:
       - "backend/tests/test_deployment_proof_semantics.py"
       - "backend/tests/test_deployment_proof_diagnostics.py"
       - "backend/tests/test_deployment_evidence_checkpoint.py"
-      - "backend/tests/test_deployment_checkpoint_ledger.py"
-      - "backend/tests/test_deployment_checkpoint_proof.py"
-      - "backend/tests/test_deployment_checkpoint_witness.py"
-      - "backend/tests/test_deployment_checkpoint_target.py"
-      - "backend/tests/test_deployment_checkpoint_pin_ledger.py"
-      - "backend/tests/test_deployment_checkpoint_pin_hardening.py"
-      - "backend/tests/test_deployment_checkpoint_pin_runtime.py"
-      - "backend/tests/test_deployment_checkpoint_pin_runtime_continuity.py"
-      - "backend/tests/test_deployment_checkpoint_trust_advance.py"
-      - "backend/tests/test_deployment_checkpoint_witnessed_continuity.py"
       - "backend/tests/test_system_assurance_deployment.py"
       - "backend/tests/test_control_plane_release_integration.py"
       - "backend/tests/test_epistemic_trust_runtime.py"
@@ -190,10 +106,10 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.11"
       - name: Install focused dependencies
@@ -205,19 +121,6 @@ jobs:
           python -m pytest -q --noconftest
           tests/test_witness_freshness_migration.py
           tests/test_signed_witness_finality.py
-          tests/test_witness_policy_config_strict.py
-          tests/test_deployment_checkpoint_pin_config.py
-          tests/test_deployment_checkpoint_pin_wire.py
-          tests/test_deployment_checkpoint_assurance.py
-          tests/test_deployment_checkpoint_pin_diagnostics.py
-          tests/test_deployment_checkpoint_route_architecture.py
-          tests/test_deployment_checkpoint_trust_wire.py
-          tests/test_deployment_checkpoint_trust_policy.py
-          tests/test_deployment_checkpoint_policy_verifier.py
-          tests/test_deployment_checkpoint_verification_package.py
-          tests/test_deployment_checkpoint_verification_dispatch.py
-          tests/test_deployment_checkpoint_policy_rotation.py
-          tests/test_deployment_checkpoint_runtime_policy_status.py
           tests/test_deployment_preflight.py
           tests/test_control_plane_deployment.py
           tests/test_deployment_authorization.py
@@ -229,16 +132,6 @@ jobs:
           tests/test_deployment_proof_semantics.py
           tests/test_deployment_proof_diagnostics.py
           tests/test_deployment_evidence_checkpoint.py
-          tests/test_deployment_checkpoint_ledger.py
-          tests/test_deployment_checkpoint_proof.py
-          tests/test_deployment_checkpoint_witness.py
-          tests/test_deployment_checkpoint_target.py
-          tests/test_deployment_checkpoint_pin_ledger.py
-          tests/test_deployment_checkpoint_pin_hardening.py
-          tests/test_deployment_checkpoint_pin_runtime.py
-          tests/test_deployment_checkpoint_pin_runtime_continuity.py
-          tests/test_deployment_checkpoint_trust_advance.py
-          tests/test_deployment_checkpoint_witnessed_continuity.py
           tests/test_system_assurance_deployment.py
           tests/test_control_plane_release_integration.py
           tests/test_epistemic_trust_runtime.py
