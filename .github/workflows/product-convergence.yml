@@ -45,6 +45,13 @@ jobs:
       - name: Run convergence regression suites
         run: >-
           python -m pytest -q --noconftest
+          tests/test_jeeves_execution_kernel.py
+          tests/test_autonomous_orchestrator_runtime.py
+          tests/test_jeeves_memory_and_evolution.py
+          tests/test_world_graph.py
+          tests/test_live_session.py
+          tests/test_model_router.py
+          tests/test_jeeves_control_plane.py
           tests/test_content_store.py
           tests/test_execution_receipts.py
           tests/test_execution_evidence.py
