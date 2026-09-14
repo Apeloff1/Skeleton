@@ -81,7 +81,7 @@ def test_quorum_finalized_packet_verifies_against_pinned_finality_hash(tmp_path)
     for witness_id in ("w1", "w2", "w3"):
         witnesses.observe(log_id=descriptor["log_id"], tree_size=descriptor["tree_size"],
                           root_sha256=descriptor["root_sha256"], witness_id=witness_id,
-                          transport_authenticated=True)
+                          transport_authenticated=True, observed_at=now.isoformat())
     finalized = finality.finalize(finalized_at=(now + timedelta(seconds=1)).isoformat())
 
     packet = build_portable_claim_proof(engine, claim, transparency=transparency, finality=finality,
@@ -109,10 +109,11 @@ def test_substituted_finality_root_fails_even_when_packet_is_rehashed_elsewhere(
     for witness_id in ("w1", "w2", "w3"):
         witnesses.observe(log_id=descriptor["log_id"], tree_size=descriptor["tree_size"],
                           root_sha256=descriptor["root_sha256"], witness_id=witness_id,
-                          transport_authenticated=True)
-    finality.finalize()
-    packet = build_portable_claim_proof(engine, claim, transparency=transparency, finality=finality)
+                          transport_authenticated=True, observed_at=now.isoformat())
+    finality.finalize(finalized_at=(now + timedelta(seconds=1)).isoformat())
+    packet = build_portable_claim_proof(engine, claim, transparency=transparency, finality=finality,
+                                        generated_at=(now + timedelta(seconds=2)).isoformat())
 
     altered = dict(packet.finality_anchor); altered["root_sha256"] = "f" * 64
     tampered = replace(packet, finality_anchor=altered)
-    assert verify_portable_claim_proof(tampered, now=datetime.now(UTC), require_finality=True) is False
+    assert verify_portable_claim_proof(tampered, now=now + timedelta(seconds=3), require_finality=True) is False
