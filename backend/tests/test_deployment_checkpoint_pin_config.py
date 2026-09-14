@@ -28,6 +28,7 @@ def test_deployment_pin_policy_is_independent_from_epistemic_env(monkeypatch):
         raw_json="[]", required_groups=1, max_age_seconds=300, required=False,
     )
     assert policy.required is False
+    assert policy.continuity_required is False
     assert policy.witnesses == ()
 
 
@@ -44,9 +45,27 @@ def test_valid_required_policy_preserves_exact_contract():
         raw_json=_raw(), required_groups=2, max_age_seconds=300, required=True,
     )
     assert policy.required is True
+    assert policy.continuity_required is False
     assert policy.required_groups == 2
     assert policy.max_age_seconds == 300
     assert {row.independence_group for row in policy.witnesses} == {"org-a", "org-b"}
+
+
+def test_continuity_policy_promotes_environment_mode_to_required(monkeypatch):
+    monkeypatch.setenv("DEPLOYMENT_CHECKPOINT_CONTINUITY_REQUIRED", "true")
+    policy = load_deployment_checkpoint_pin_policy(
+        raw_json=_raw(), required_groups=2, max_age_seconds=300,
+    )
+    assert policy.continuity_required is True
+    assert policy.required is True
+
+
+def test_explicit_continuity_cannot_contradict_explicit_optional_pins():
+    with pytest.raises(ValueError, match="continuity requires signed pins"):
+        load_deployment_checkpoint_pin_policy(
+            raw_json=_raw(), required_groups=2, max_age_seconds=300,
+            required=False, continuity_required=True,
+        )
 
 
 def test_policy_arguments_reject_python_type_confusion():
@@ -56,6 +75,8 @@ def test_policy_arguments_reject_python_type_confusion():
         load_deployment_checkpoint_pin_policy(raw_json="[]", required_groups=1, max_age_seconds=True)
     with pytest.raises(ValueError, match="requirement must be boolean"):
         load_deployment_checkpoint_pin_policy(raw_json="[]", required_groups=1, required="false")
+    with pytest.raises(ValueError, match="continuity requirement must be boolean"):
+        load_deployment_checkpoint_pin_policy(raw_json="[]", required_groups=1, continuity_required="false")
 
 
 def test_noncanonical_deployment_environment_values_fail_closed(monkeypatch):
@@ -70,5 +91,10 @@ def test_noncanonical_deployment_environment_values_fail_closed(monkeypatch):
 
     monkeypatch.setenv("DEPLOYMENT_CHECKPOINT_WITNESS_MAX_AGE_SECONDS", "300")
     monkeypatch.setenv("DEPLOYMENT_CHECKPOINT_SIGNED_PINS_REQUIRED", "TRUE")
+    with pytest.raises(ValueError, match="canonical boolean string"):
+        load_deployment_checkpoint_pin_policy(raw_json="[]")
+
+    monkeypatch.setenv("DEPLOYMENT_CHECKPOINT_SIGNED_PINS_REQUIRED", "false")
+    monkeypatch.setenv("DEPLOYMENT_CHECKPOINT_CONTINUITY_REQUIRED", "TRUE")
     with pytest.raises(ValueError, match="canonical boolean string"):
         load_deployment_checkpoint_pin_policy(raw_json="[]")
