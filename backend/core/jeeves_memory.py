@@ -225,6 +225,9 @@ class MemoryBank:
         importance: float = 0.9,
         tags: Iterable[str] = (),
     ) -> MemoryRecord:
+        agent_id = (agent_id or "").strip()
+        if not agent_id:
+            raise ValueError("agent_id is required")
         source_ids = tuple(dict.fromkeys(str(x).strip() for x in source_ids if str(x).strip()))
         if not source_ids:
             raise ValueError("reflection requires at least one source memory")
