@@ -6,6 +6,11 @@ Provides:
   2. AuditMiddleware     — bounded, sanitized in-memory request audit
   3. SizeLimitMiddleware — streaming request-body cap
   4. safe_relative_path  — strict path traversal protection
+
+The core middleware is imported unconditionally by server.py, so AuditMiddleware
+also installs a minimum browser-security header baseline. This means optional
+observability/reliability imports cannot accidentally leave the service without
+basic response hardening.
 """
 from __future__ import annotations
 
@@ -72,7 +77,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     @staticmethod
     def _is_exempt(path: str) -> bool:
-        # Health checks are intentionally cheap and commonly called by ingress.
         return path == "/api/health" or path.startswith("/api/health/")
 
     def _key(self, request: Request) -> Tuple[str, str]:
@@ -139,7 +143,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 
 class AuditMiddleware(BaseHTTPMiddleware):
-    """Record bounded, sanitized metadata for recent API requests."""
+    """Record bounded request metadata and enforce baseline response headers."""
 
     _buf: Deque[dict] = deque(maxlen=5000)
     _max_entries: int = 5000
@@ -151,9 +155,38 @@ class AuditMiddleware(BaseHTTPMiddleware):
             AuditMiddleware._max_entries = max_entries
             AuditMiddleware._buf = deque(AuditMiddleware._buf, maxlen=max_entries)
 
+    @staticmethod
+    def _apply_security_headers(request: Request, response: Response) -> None:
+        headers = response.headers
+        headers.setdefault("X-Content-Type-Options", "nosniff")
+        headers.setdefault("Referrer-Policy", "no-referrer")
+        headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=(), usb=()")
+        headers.setdefault("X-Permitted-Cross-Domain-Policies", "none")
+        headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+        headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+
+        path = request.url.path
+        embeddable = path.startswith("/api/playable/") and path.endswith("/raw")
+        if embeddable:
+            headers.setdefault(
+                "Content-Security-Policy",
+                "sandbox allow-scripts; default-src 'self' data: blob:; "
+                "img-src 'self' data: blob:; media-src 'self' data: blob:; "
+                "style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' blob:; "
+                "connect-src 'self'",
+            )
+        else:
+            headers.setdefault("X-Frame-Options", "DENY")
+
+        if path.startswith(("/api/auth", "/api/security", "/api/admin", "/api/_telemetry", "/api/metrics")):
+            headers.setdefault("Cache-Control", "no-store, max-age=0")
+            headers.setdefault("Pragma", "no-cache")
+
     async def dispatch(self, request: Request, call_next):
         if not request.url.path.startswith("/api"):
-            return await call_next(request)
+            response = await call_next(request)
+            self._apply_security_headers(request, response)
+            return response
 
         start = time.perf_counter()
         ip = client_ip(request)
@@ -169,9 +202,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
             status = response.status_code
+            self._apply_security_headers(request, response)
         except Exception as exc:
-            # Exception messages can contain tokens, paths, SQL fragments, or
-            # user data. Keep only the class for operational correlation.
             error = type(exc).__name__
             status = 500
             raise
@@ -194,12 +226,24 @@ class AuditMiddleware(BaseHTTPMiddleware):
         return response
 
     @classmethod
-    def snapshot(cls, limit: int = 200, since_ts: float | None = None) -> dict:
+    def snapshot(
+        cls,
+        limit: int = 200,
+        since_ts: float | None = None,
+        *,
+        include_sensitive: bool = False,
+    ) -> dict:
+        """Return audit rows; client IP/User-Agent are redacted by default."""
         limit = min(max(int(limit), 1), 1000)
         rows = list(cls._buf)
         if since_ts:
             rows = [r for r in rows if r["ts"] >= since_ts]
         rows = rows[-limit:]
+        if not include_sensitive:
+            rows = [
+                {key: value for key, value in row.items() if key not in {"ip", "ua"}}
+                for row in rows
+            ]
         return {
             "count": len(rows),
             "buffer_capacity": cls._max_entries,
@@ -319,9 +363,6 @@ class SizeLimitMiddleware:
             await self.app(scope, limited_receive, tracking_send)
         except _BodyTooLarge:
             if response_started:
-                # The downstream application started a response before fully
-                # consuming an oversized body; terminate instead of emitting an
-                # invalid second response.
                 return
             response = JSONResponse(
                 status_code=413,
@@ -336,8 +377,6 @@ def safe_relative_path(base: Path | str, candidate: str) -> Path:
         raise ValueError("unsafe path")
 
     normalized = candidate.replace("\\", "/")
-    # Reject POSIX absolute paths and Windows drive/UNC forms rather than
-    # silently rewriting them as relative input.
     if normalized.startswith("/") or normalized.startswith("//") or re.match(r"^[A-Za-z]:", normalized):
         raise ValueError("unsafe path")
 
