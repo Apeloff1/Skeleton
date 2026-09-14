@@ -6,6 +6,7 @@ from scripts.check_workflow_security import violations
 
 
 PIN = "11d5960a326750d5838078e36cf38b85af677262"
+DOCKER_DIGEST = "a" * 64
 
 
 def _scan(tmp_path: Path, source: str) -> list[str]:
@@ -36,6 +37,46 @@ def test_rejects_unversioned_action(tmp_path: Path) -> None:
         "name: test\non: [push]\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - uses: vendor/action\n",
     )
     assert any("must be pinned" in finding for finding in findings)
+
+
+def test_rejects_tag_pinned_job_level_reusable_workflow(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions:\n  contents: read\njobs:\n  reusable:\n    uses: vendor/repo/.github/workflows/reuse.yml@v1\n",
+    )
+    assert any("not pinned to a 40-character commit SHA" in finding for finding in findings)
+
+
+def test_accepts_sha_pinned_job_level_reusable_workflow(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        f"name: test\non: [push]\npermissions:\n  contents: read\njobs:\n  reusable:\n    uses: vendor/repo/.github/workflows/reuse.yml@{PIN}\n",
+    )
+    assert findings == []
+
+
+def test_rejects_inline_mapping_tag_pin(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - {uses: actions/checkout@v4}\n",
+    )
+    assert any("not pinned to a 40-character commit SHA" in finding for finding in findings)
+
+
+def test_rejects_mutable_docker_action_tag(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - uses: docker://alpine:3.20\n",
+    )
+    assert any("container action must be pinned" in finding for finding in findings)
+
+
+def test_accepts_digest_pinned_docker_action(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        f"name: test\non: [push]\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - uses: docker://alpine@sha256:{DOCKER_DIGEST}\n",
+    )
+    assert findings == []
 
 
 def test_allows_local_actions(tmp_path: Path) -> None:
