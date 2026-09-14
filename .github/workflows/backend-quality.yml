@@ -42,4 +42,6 @@ jobs:
       - name: Execution security regressions
         env:
           PYTHONPATH: "."
-        run: pytest -q tests/test_exec_guard.py tests/test_execution_security_contract.py
+        # These tests intentionally use only the stdlib. Do not load the global
+        # backend conftest, which imports the full application dependency stack.
+        run: pytest -q --noconftest tests/test_exec_guard.py tests/test_execution_security_contract.py
