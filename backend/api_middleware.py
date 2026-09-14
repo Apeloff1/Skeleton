@@ -3,16 +3,17 @@ api_middleware — request ID injection, structured logging, and an in-memory
 token-bucket rate limiter.
 
 Security properties:
-  • forwarding headers are trusted only from configured proxy CIDRs
+  • forwarding headers are trusted only from explicitly configured proxy CIDRs
   • request IDs are bounded and validated before logging/echoing
   • token-bucket state is LRU-bounded to resist memory exhaustion
+  • unknown clients and loopback peers are rate limited unless explicitly exempted
 
 Tunable via env:
   RATE_LIMIT_PER_MIN       default 600
   RATE_LIMIT_BURST         default 60
   RATE_LIMIT_MAX_BUCKETS   default 10000
-  RATE_LIMIT_EXEMPT        default "127.0.0.1,::1"
-  TRUSTED_PROXY_CIDRS      default "127.0.0.1/32,::1/128"
+  RATE_LIMIT_EXEMPT        default "" (no implicit exemptions)
+  TRUSTED_PROXY_CIDRS      default "" (no implicit trusted proxies)
   ACCESS_LOG               default 1
 """
 from __future__ import annotations
@@ -48,7 +49,9 @@ def _positive_int_env(name: str, default: int, *, maximum: int) -> int:
 _RATE_PER_MIN = _positive_int_env("RATE_LIMIT_PER_MIN", 600, maximum=1_000_000)
 _RATE_BURST = _positive_int_env("RATE_LIMIT_BURST", 60, maximum=100_000)
 _MAX_BUCKETS = _positive_int_env("RATE_LIMIT_MAX_BUCKETS", 10_000, maximum=1_000_000)
-_EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "127.0.0.1,::1")
+# Exemptions are an explicit deployment decision. In particular, loopback is
+# not exempt by default because reverse proxies commonly connect over loopback.
+_EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "")
 _EXEMPT_IPS = {ip.strip() for ip in _EXEMPT_RAW.split(",") if ip.strip()}
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
 
@@ -244,8 +247,10 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         if not request.url.path.startswith("/api"):
             return await call_next(request)
         ip = _client_ip(request)
-        if ip in _EXEMPT_IPS or ip == "unknown":
+        if ip in _EXEMPT_IPS:
             return await call_next(request)
+        # Unknown identity is intentionally *not* exempt. All such requests
+        # share a bounded bucket rather than gaining an unlimited bypass.
         ok, retry = self._bucket_for(ip).take(1)
         if not ok:
             _counts["rate_limited"] += 1
