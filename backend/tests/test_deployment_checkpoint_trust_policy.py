@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import asdict, replace
 
+import pytest
+
+from core.canonical_json import canonical_json_clone
 from core.deployment_checkpoint_pin_config import DeploymentCheckpointPinPolicy
 from core.deployment_checkpoint_trust_policy import (
     build_deployment_checkpoint_trust_policy_manifest,
+    decode_deployment_checkpoint_trust_policy_manifest,
     verify_deployment_checkpoint_trust_policy_manifest,
     verify_deployment_checkpoint_trust_registry,
 )
@@ -118,3 +122,50 @@ def test_disabled_witnesses_do_not_enter_active_policy_identity():
         build_deployment_checkpoint_trust_policy_manifest(with_disabled)
         == build_deployment_checkpoint_trust_policy_manifest(active_only)
     )
+
+
+def test_json_policy_manifest_round_trip_preserves_identity():
+    manifest = build_deployment_checkpoint_trust_policy_manifest(_policy(continuity=True))
+    raw = canonical_json_clone(asdict(manifest))
+    decoded = decode_deployment_checkpoint_trust_policy_manifest(raw)
+    assert decoded == manifest
+    assert verify_deployment_checkpoint_trust_policy_manifest(
+        decoded,
+        expected_manifest_sha256=manifest.manifest_sha256,
+    ) is True
+
+
+def test_policy_wire_rejects_unknown_fields_nonarrays_and_bool_integer_confusion():
+    manifest = build_deployment_checkpoint_trust_policy_manifest(_policy())
+    raw = canonical_json_clone(asdict(manifest))
+    raw["server_authoritative"] = True
+    with pytest.raises(ValueError, match="schema mismatch"):
+        decode_deployment_checkpoint_trust_policy_manifest(raw)
+
+    raw = canonical_json_clone(asdict(manifest))
+    raw["witnesses"] = tuple(raw["witnesses"])
+    with pytest.raises(ValueError, match="JSON array"):
+        decode_deployment_checkpoint_trust_policy_manifest(raw)
+
+    raw = canonical_json_clone(asdict(manifest))
+    raw["required_groups"] = True
+    with pytest.raises(ValueError, match="quorum malformed"):
+        decode_deployment_checkpoint_trust_policy_manifest(raw)
+
+
+def test_policy_wire_rejects_witness_text_fingerprint_and_digest_tampering():
+    manifest = build_deployment_checkpoint_trust_policy_manifest(_policy())
+    raw = canonical_json_clone(asdict(manifest))
+    raw["witnesses"][0]["id"] = " " + raw["witnesses"][0]["id"]
+    with pytest.raises(ValueError, match="canonical non-empty text"):
+        decode_deployment_checkpoint_trust_policy_manifest(raw)
+
+    raw = canonical_json_clone(asdict(manifest))
+    raw["witnesses"][0]["public_key_fingerprint"] = "F" * 64
+    with pytest.raises(ValueError, match="fingerprint malformed"):
+        decode_deployment_checkpoint_trust_policy_manifest(raw)
+
+    raw = canonical_json_clone(asdict(manifest))
+    raw["manifest_sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="integrity failed"):
+        decode_deployment_checkpoint_trust_policy_manifest(raw)
