@@ -1,8 +1,11 @@
-from dataclasses import replace
+from dataclasses import asdict, replace
 import hashlib
+import json
 
+from core.deployment_authorization import plan_digest
 from core.deployment_gateway import DeploymentGateway
 from core.deployment_proof import build_portable_deployment_proof, verify_portable_deployment_proof
+from core.deployment_planner import verify_deployment_plan
 
 
 def _assurance():
@@ -63,6 +66,16 @@ def _pins(gateway, proof):
     }
 
 
+def _reseal(proof, **changes):
+    raw = asdict(proof)
+    raw.update(changes)
+    raw.pop("proof_sha256", None)
+    digest = hashlib.sha256(json.dumps(
+        raw, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str,
+    ).encode("utf-8")).hexdigest()
+    return {**raw, "proof_sha256": digest}
+
+
 def test_portable_proof_verifies_historical_deployment_against_newer_heads(tmp_path):
     gateway = _gateway(tmp_path)
     first = gateway.prepare(_input("artifact-v1"))
@@ -71,10 +84,16 @@ def test_portable_proof_verifies_historical_deployment_against_newer_heads(tmp_p
     gateway.execute(second.authorization.id, second.plan)
 
     proof = build_portable_deployment_proof(gateway, first.authorization.id)
-    assert proof.version == 2
+    assert proof.version == 3
     assert proof.preflight["allowed"] is True
     assert proof.preflight["stable"] is True
     assert proof.preflight["root_after_sha256"] == proof.pre_system_root_sha256
+    assert verify_deployment_plan(proof.plan) is True
+    assert plan_digest(proof.plan) == proof.plan_sha256
+    assert proof.plan["target"] == proof.release["target"] == proof.transition_receipt["target"]
+    assert proof.plan["environment"] == proof.release["environment"] == proof.transition_receipt["environment"]
+    assert proof.plan["artifact"] == proof.release["artifact"] == proof.transition_receipt["artifact"]
+    assert proof.authorization_suffix[0]["plan"] == proof.plan
     assert len(proof.authorization_suffix) >= 4
     assert len(proof.release_suffix) == 2
     assert len(proof.receipt_suffix) == 2
@@ -123,6 +142,36 @@ def test_cross_link_preflight_or_packet_tampering_fails_closed(tmp_path):
     release_suffix = list(proof.release_suffix)
     release_suffix[0] = {**release_suffix[0], "artifact": "substituted"}
     assert verify_portable_deployment_proof(replace(proof, release_suffix=tuple(release_suffix)), **pins) is False
+
+
+def test_resealed_plan_substitution_still_fails_closed(tmp_path):
+    gateway = _gateway(tmp_path)
+    prepared = gateway.prepare(_input("artifact-v1"))
+    gateway.execute(prepared.authorization.id, prepared.plan)
+    proof = build_portable_deployment_proof(gateway, prepared.authorization.id)
+    pins = _pins(gateway, proof)
+
+    substituted = dict(proof.plan)
+    substituted["artifact"] = "artifact-evil"
+    candidate = dict(substituted)
+    candidate.pop("plan_sha256")
+    substituted["plan_sha256"] = hashlib.sha256(json.dumps(
+        candidate, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+    ).encode("utf-8")).hexdigest()
+
+    assert verify_deployment_plan(substituted) is True
+    assert verify_portable_deployment_proof(_reseal(proof, plan=substituted), **pins) is False
+
+
+def test_missing_portable_plan_or_plan_digest_mismatch_fails_closed(tmp_path):
+    gateway = _gateway(tmp_path)
+    prepared = gateway.prepare(_input("artifact-v1"))
+    gateway.execute(prepared.authorization.id, prepared.plan)
+    proof = build_portable_deployment_proof(gateway, prepared.authorization.id)
+    pins = _pins(gateway, proof)
+
+    assert verify_portable_deployment_proof(_reseal(proof, plan={}), **pins) is False
+    assert verify_portable_deployment_proof(_reseal(proof, plan_sha256="9" * 64), **pins) is False
 
 
 def test_unconsumed_authorization_cannot_produce_deployment_proof(tmp_path):
