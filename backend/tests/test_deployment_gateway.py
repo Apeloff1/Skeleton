@@ -88,9 +88,18 @@ def _rehash(plan):
 
 def test_prepare_execute_and_idempotent_release_replay(tmp_path):
     plane, gateway = _gateway(tmp_path)
+    genesis = gateway.checkpoints.latest()
+    assert genesis is not None
+    assert genesis.sequence == 1
+    assert genesis.checkpoint.authorization_events == 0
+    assert genesis.checkpoint.receipt_events == 0
+    assert genesis.checkpoint.completed_releases == 0
+
     prepared = gateway.prepare(_payload())
     after_prepare = gateway.checkpoints.latest()
     assert after_prepare is not None
+    assert after_prepare.sequence == 2
+    assert after_prepare.previous_checkpoint_root_sha256 == genesis.checkpoint_root_sha256
     assert after_prepare.checkpoint.authorization_events == 1
     assert after_prepare.checkpoint.receipt_events == 0
     assert after_prepare.checkpoint.completed_releases == 0
@@ -98,7 +107,7 @@ def test_prepare_execute_and_idempotent_release_replay(tmp_path):
     first = gateway.execute(prepared.authorization.id, prepared.plan)
     after_execute = gateway.checkpoints.latest()
     assert after_execute is not None
-    assert after_execute.sequence == 2
+    assert after_execute.sequence == 3
     assert after_execute.checkpoint.authorization_events == 2
     assert after_execute.checkpoint.receipt_events == 1
     assert after_execute.checkpoint.completed_releases == 1
@@ -106,7 +115,7 @@ def test_prepare_execute_and_idempotent_release_replay(tmp_path):
 
     second = gateway.execute(prepared.authorization.id, prepared.plan)
     assert gateway.checkpoints.latest() == after_execute
-    assert len(gateway.checkpoints.history()) == 2
+    assert len(gateway.checkpoints.history()) == 3
 
     assert first.resumed is False
     assert second.resumed is True
@@ -121,7 +130,7 @@ def test_prepare_execute_and_idempotent_release_replay(tmp_path):
     assert status["independently_verifiable"] is True
     assert status["checkpoint_current"] is True
     assert status["externally_pinnable"] is True
-    assert status["checkpoint_publication"]["publications"] == 2
+    assert status["checkpoint_publication"]["publications"] == 3
     assert status["evidence_checkpoint"]["authorization_events"] == 2
     assert status["evidence_checkpoint"]["receipt_events"] == 1
     assert status["portability"] == {
