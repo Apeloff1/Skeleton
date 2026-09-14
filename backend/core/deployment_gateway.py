@@ -1,15 +1,15 @@
 """Governed deployment gateway for Skeleton's atomic release backend.
 
-Preparation compiles the deployment plan, samples a stable control-plane preflight,
+Preparation compiles a deterministic plan, samples a stable control-plane preflight,
 and issues a short-lived authorization bound to both plan and whole-system root.
-Execution re-evaluates deployment safety immediately before the side effect, consumes
-the authorization exactly once, then activates the release atomically.
+Execution re-evaluates safety immediately before the side effect, consumes the
+authorization exactly once, activates the release atomically, then records a
+post-activation transition receipt binding the pre/post system roots.
 
-A completed activation is itself the durable product-state proof. Replaying an
-already-completed authorization returns that proof without demanding the *old*
-pre-deploy system root still be current; a consumed-but-not-activated authorization,
-by contrast, may resume only while its original root is still current and a fresh
-preflight remains authorizing.
+Transition receipts are deliberately excluded from the system root they attest to.
+If a process dies after release activation but before receipt persistence, the gap is
+*not* silently reconstructed from later state: status exposes a hard evidence gap and
+replay fails closed until an explicit forensic reconciliation path handles it.
 """
 from __future__ import annotations
 
@@ -32,6 +32,7 @@ from core.deployment_authorization import (
     plan_digest,
 )
 from core.deployment_planner import compile_deployment_plan, verify_deployment_plan
+from core.deployment_receipts import DeploymentReceiptLedger, DeploymentTransitionReceipt
 
 
 class DeploymentGatewayError(RuntimeError):
@@ -52,14 +53,17 @@ class DeploymentExecution:
     preflight: ControlPlaneDeploymentPreflight | None
     consumption: DeploymentConsumption
     release: ReleaseRecord
+    transition_receipt: DeploymentTransitionReceipt
 
 
 class DeploymentGateway:
     def __init__(self, root: str | Path, *, control_plane) -> None:
-        self.root = Path(root); self.root.mkdir(parents=True, exist_ok=True)
+        self.root = Path(root)
+        self.root.mkdir(parents=True, exist_ok=True)
         self.control_plane = control_plane
         self.authorizations = DeploymentAuthorizationLedger(self.root / "authorizations")
         self.releases = AtomicReleaseDeployer(self.root / "releases")
+        self.receipts = DeploymentReceiptLedger(self.root / "transition-receipts")
 
     @staticmethod
     def _plan(value: dict[str, Any]) -> dict[str, Any]:
@@ -69,15 +73,24 @@ class DeploymentGateway:
             return dict(value)
         return compile_deployment_plan(value)
 
-    def prepare(self, deployment_input: dict[str, Any], *, ttl_seconds: int = 300,
-                max_attempts: int = 3) -> PreparedDeployment:
+    def prepare(
+        self,
+        deployment_input: dict[str, Any],
+        *,
+        ttl_seconds: int = 300,
+        max_attempts: int = 3,
+    ) -> PreparedDeployment:
         plan = self._plan(deployment_input)
         preflight = evaluate_control_plane_deployment(self.control_plane, max_attempts=max_attempts)
         if not verify_control_plane_deployment_preflight(preflight):
             raise DeploymentGatewayError("deployment preflight attestation failed verification")
         if not preflight.allowed or not preflight.stable:
             raise DeploymentGatewayError("deployment preflight blocked authorization")
-        authorization = self.authorizations.issue(preflight=preflight, plan=plan, ttl_seconds=ttl_seconds)
+        authorization = self.authorizations.issue(
+            preflight=preflight,
+            plan=plan,
+            ttl_seconds=ttl_seconds,
+        )
         return PreparedDeployment(plan, preflight, authorization)
 
     def _fresh_preflight(self, *, expected_root: str, max_attempts: int) -> ControlPlaneDeploymentPreflight:
@@ -90,8 +103,36 @@ class DeploymentGateway:
             raise DeploymentGatewayError("whole-system root changed since deployment authorization")
         return preflight
 
-    def execute(self, authorization_id: str, deployment_input: dict[str, Any], *,
-                max_attempts: int = 3) -> DeploymentExecution:
+    def _record_transition(
+        self,
+        *,
+        release: ReleaseRecord,
+        consumption: DeploymentConsumption,
+        pre_system_root_sha256: str,
+    ) -> DeploymentTransitionReceipt:
+        post_root = str(self.control_plane.system_root()["root_sha256"])
+        if hmac.compare_digest(pre_system_root_sha256, post_root):
+            raise DeploymentGatewayError("release activation did not rotate the whole-system root")
+        return self.receipts.record(
+            authorization_id=consumption.authorization_id,
+            plan_sha256=consumption.plan_sha256,
+            release_id=release.release_id,
+            release_sha256=release.sha256,
+            target=release.target,
+            environment=release.environment,
+            artifact=release.artifact,
+            pre_system_root_sha256=pre_system_root_sha256,
+            post_system_root_sha256=post_root,
+            executed_at=release.activated_at,
+        )
+
+    def execute(
+        self,
+        authorization_id: str,
+        deployment_input: dict[str, Any],
+        *,
+        max_attempts: int = 3,
+    ) -> DeploymentExecution:
         authorization_id = str(authorization_id).strip()
         if not authorization_id:
             raise ValueError("authorization_id is required")
@@ -100,6 +141,7 @@ class DeploymentGateway:
 
         existing_release = self.releases.find_by_authorization(authorization_id)
         existing_consumption = self.authorizations.consumption(authorization_id)
+        existing_receipt = self.receipts.by_authorization(authorization_id)
         authorization = self.authorizations.authorization(authorization_id)
         if authorization is None:
             raise DeploymentGatewayError("deployment authorization not found")
@@ -109,10 +151,26 @@ class DeploymentGateway:
         if existing_release is not None:
             if existing_consumption is None:
                 raise DeploymentGatewayError("release exists without authorization consumption evidence")
-            if (existing_release.plan_sha256 != existing_consumption.plan_sha256 or
-                    existing_release.system_root_sha256 != existing_consumption.system_root_sha256):
-                raise DeploymentGatewayError("release/authorization evidence mismatch")
-            return DeploymentExecution(authorization_id, True, None, existing_consumption, existing_release)
+            if existing_receipt is None:
+                raise DeploymentGatewayError("deployment transition evidence gap: activated release has no transition receipt")
+            if (
+                existing_release.plan_sha256 != existing_consumption.plan_sha256
+                or existing_release.system_root_sha256 != existing_consumption.system_root_sha256
+                or existing_receipt.release_sha256 != existing_release.sha256
+                or existing_receipt.plan_sha256 != existing_consumption.plan_sha256
+            ):
+                raise DeploymentGatewayError("release/authorization/transition evidence mismatch")
+            return DeploymentExecution(
+                authorization_id,
+                True,
+                None,
+                existing_consumption,
+                existing_release,
+                existing_receipt,
+            )
+
+        if existing_receipt is not None:
+            raise DeploymentGatewayError("transition receipt exists without activated release")
 
         if existing_consumption is not None:
             preflight = self._fresh_preflight(
@@ -122,9 +180,24 @@ class DeploymentGateway:
             if not hmac.compare_digest(existing_consumption.plan_sha256, expected_plan):
                 raise DeploymentGatewayError("consumed authorization is bound to a different deployment plan")
             release = self.releases.activate(plan, existing_consumption)
-            return DeploymentExecution(authorization_id, True, preflight, existing_consumption, release)
+            receipt = self._record_transition(
+                release=release,
+                consumption=existing_consumption,
+                pre_system_root_sha256=existing_consumption.system_root_sha256,
+            )
+            return DeploymentExecution(
+                authorization_id,
+                True,
+                preflight,
+                existing_consumption,
+                release,
+                receipt,
+            )
 
-        preflight = self._fresh_preflight(expected_root=authorization.system_root_sha256, max_attempts=max_attempts)
+        preflight = self._fresh_preflight(
+            expected_root=authorization.system_root_sha256,
+            max_attempts=max_attempts,
+        )
         try:
             consumption = self.authorizations.consume(
                 authorization_id,
@@ -134,21 +207,73 @@ class DeploymentGateway:
         except DeploymentAuthorizationError as exc:
             raise DeploymentGatewayError(str(exc)) from exc
         release = self.releases.activate(plan, consumption)
-        return DeploymentExecution(authorization_id, False, preflight, consumption, release)
+        receipt = self._record_transition(
+            release=release,
+            consumption=consumption,
+            pre_system_root_sha256=preflight.root_after_sha256,
+        )
+        return DeploymentExecution(
+            authorization_id,
+            False,
+            preflight,
+            consumption,
+            release,
+            receipt,
+        )
+
+    def evidence_gaps(self) -> list[dict[str, str]]:
+        releases = {row.authorization_id: row for row in self.releases_snapshot()}
+        receipts = {row.authorization_id: row for row in self.receipts.snapshot()}
+        gaps: list[dict[str, str]] = []
+        for authorization_id, release in releases.items():
+            receipt = receipts.get(authorization_id)
+            if receipt is None:
+                gaps.append({
+                    "authorization_id": authorization_id,
+                    "release_id": release.release_id,
+                    "kind": "release_without_transition_receipt",
+                })
+            elif receipt.release_sha256 != release.sha256:
+                gaps.append({
+                    "authorization_id": authorization_id,
+                    "release_id": release.release_id,
+                    "kind": "release_receipt_mismatch",
+                })
+        for authorization_id, receipt in receipts.items():
+            if authorization_id not in releases:
+                gaps.append({
+                    "authorization_id": authorization_id,
+                    "release_id": receipt.release_id,
+                    "kind": "transition_receipt_without_release",
+                })
+        return gaps
+
+    def releases_snapshot(self) -> tuple[ReleaseRecord, ...]:
+        rows: list[ReleaseRecord] = []
+        for channel in self.releases.root.iterdir():
+            if not channel.is_dir():
+                continue
+            rows.extend(self.releases._history(channel))
+        return tuple(sorted(rows, key=lambda row: (row.activated_at, row.release_id)))
 
     def status(self) -> dict[str, Any]:
+        gaps = self.evidence_gaps()
         return {
             "authorization": self.authorizations.status(),
             "release_backend": self.releases.status(),
-            "verified": True,
+            "transition_receipts": self.receipts.status(),
+            "evidence_gaps": gaps,
+            "evidence_gap_count": len(gaps),
+            "verified": len(gaps) == 0,
         }
 
     def root_component(self) -> dict[str, Any]:
         """Product-state projection safe to include in the system root.
 
-        Outstanding permissions are intentionally excluded: issuing an authorization
-        must not mutate the root that authorization is bound to. Activated releases
-        are consequential product state and therefore rotate the root.
+        Outstanding permissions and transition receipts are intentionally excluded:
+        issuing permission must not mutate the root it authorizes, and a receipt
+        cannot be part of the root it attests. Activated release state *is*
+        consequential product state and therefore rotates the root.
         """
         return {"release_backend": self.releases.status()}
 
@@ -168,4 +293,5 @@ class DeploymentGateway:
             "preflight": asdict(execution.preflight) if execution.preflight is not None else None,
             "consumption": asdict(execution.consumption),
             "release": asdict(execution.release),
+            "transition_receipt": asdict(execution.transition_receipt),
         }
