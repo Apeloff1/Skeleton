@@ -92,7 +92,7 @@ jobs:
           tests/test_deployment_gateway.py
           tests/test_deployment_proof.py
           tests/test_deployment_proof_semantics.py
-          tests/test_deployment_proof_history_invariants.py
+          tests/test_deployment_proof_diagnostics.py
           tests/test_charter_policy.py
           tests/test_durable_outbox.py
           tests/test_worm_audit.py
