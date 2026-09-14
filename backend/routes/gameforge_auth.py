@@ -13,15 +13,15 @@ public fallback credential.
 """
 from __future__ import annotations
 
-import os
 import secrets
-from datetime import datetime, timedelta, timezone
-from typing import Annotated, Literal, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Annotated, Literal
 
 import bcrypt as _bcrypt
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+import httpx
 import jwt
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, EmailStr, Field
 
 from core.auth_security import (
@@ -52,12 +52,14 @@ def _enforced() -> bool:
 
 
 def _users():
-    from core.databases import get_sync_db
+    from core.databases import get_sync_db  # noqa: PLC0415
+
     return get_sync_db()["gameforge_users"]
 
 
 def _sessions():
-    from core.databases import get_sync_db
+    from core.databases import get_sync_db  # noqa: PLC0415
+
     return get_sync_db()["user_sessions"]
 
 
@@ -76,7 +78,7 @@ DUMMY_HASH = hash_password("dummy-password-for-timing-safety")
 
 
 def create_access_token(*, sub: str, role: Role) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         "sub": sub,
         "role": role,
@@ -107,7 +109,7 @@ def seed_admin():
                     "role": "admin",
                     "disabled": False,
                     "auth": "password",
-                    "created_at": datetime.now(timezone.utc),
+                    "created_at": datetime.now(UTC),
                 }
             )
     except Exception:  # noqa: BLE001
@@ -131,7 +133,7 @@ class TokenOut(BaseModel):
     role: str
 
 
-def get_current_user(token: Annotated[Optional[str], Depends(oauth2_scheme)]):
+def get_current_user(token: Annotated[str | None, Depends(oauth2_scheme)]):
     if not token:
         return None
     # 1) Google session token (opaque) — look up in user_sessions.
@@ -141,8 +143,8 @@ def get_current_user(token: Annotated[Optional[str], Depends(oauth2_scheme)]):
             exp = sess.get("expires_at")
             if exp is not None:
                 if exp.tzinfo is None:
-                    exp = exp.replace(tzinfo=timezone.utc)
-                if exp < datetime.now(timezone.utc):
+                    exp = exp.replace(tzinfo=UTC)
+                if exp < datetime.now(UTC):
                     return None
             return _users().find_one(
                 {"email": sess.get("email"), "disabled": {"$ne": True}},
@@ -206,7 +208,7 @@ def register(body: RegisterIn):
             "password_hash": hash_password(body.password),
             "role": "viewer",
             "disabled": False,
-            "created_at": datetime.now(timezone.utc),
+            "created_at": datetime.now(UTC),
         }
     )
     return {
@@ -246,27 +248,26 @@ class SessionIn(BaseModel):
 
 @router.post("/session", response_model=TokenOut)
 async def google_session(body: SessionIn):
-    """Exchange an Emergent OAuth session_id for a persistent session token.
+    """Exchange an OAuth session_id for a persistent session token.
 
     The frontend passes the one-time `session_id` from the redirect. We verify
     it with the configured session-data API (single consumption here — the
     frontend never calls it directly), upsert the user by email, persist the
     returned `session_token` (7-day TTL) and hand it back as the bearer token.
     """
-    import httpx
-
     seed_admin()
+    session_api = resolve_session_api()
     try:
-        async with httpx.AsyncClient(timeout=15) as c:
-            r = await c.get(
-                resolve_session_api(),
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.get(
+                session_api,
                 headers={"X-Session-ID": body.session_id},
             )
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=f"Auth provider unreachable: {e}")
-    if r.status_code != 200:
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"Auth provider unreachable: {exc}") from exc
+    if response.status_code != 200:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
-    data = r.json()
+    data = response.json()
     email = (data.get("email") or "").lower()
     session_token = data.get("session_token")
     if not email or not session_token:
@@ -282,7 +283,7 @@ async def google_session(body: SessionIn):
                 "$set": {
                     "name": data.get("name"),
                     "picture": data.get("picture"),
-                    "last_login": datetime.now(timezone.utc),
+                    "last_login": datetime.now(UTC),
                 }
             },
         )
@@ -296,11 +297,11 @@ async def google_session(body: SessionIn):
                 "disabled": False,
                 "name": data.get("name"),
                 "picture": data.get("picture"),
-                "created_at": datetime.now(timezone.utc),
+                "created_at": datetime.now(UTC),
             }
         )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     _sessions().update_one(
         {"session_token": session_token},
         {
@@ -317,8 +318,8 @@ async def google_session(body: SessionIn):
 
 
 @router.post("/logout")
-def logout(token: Annotated[Optional[str], Depends(oauth2_scheme)]):
-    """Revoke a Google session token (JWTs are stateless — client just drops)."""
+def logout(token: Annotated[str | None, Depends(oauth2_scheme)]):
+    """Revoke an opaque session token (JWTs are stateless — client just drops)."""
     if token:
         try:
             _sessions().delete_one({"session_token": token})
@@ -333,8 +334,8 @@ class SetRoleIn(BaseModel):
 
 
 @router.post("/set-role")
-def set_role(body: SetRoleIn, admin=Depends(require_role("admin"))):
-    """Admin-only: promote/demote a user (e.g. a Google-provisioned viewer)."""
+def set_role(body: SetRoleIn, _admin=Depends(require_role("admin"))):
+    """Admin-only: promote/demote a user (e.g. an OAuth-provisioned viewer)."""
     res = _users().update_one({"email": body.email.lower()}, {"$set": {"role": body.role}})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
@@ -342,7 +343,7 @@ def set_role(body: SetRoleIn, admin=Depends(require_role("admin"))):
 
 
 @router.get("/users")
-def list_users(admin=Depends(require_role("admin"))):
+def list_users(_admin=Depends(require_role("admin"))):
     """Admin-only: list users + roles for the role-management panel."""
     rows = list(_users().find({}, {"_id": 0, "password_hash": 0}).limit(200))
     return {"ok": True, "users": rows}
