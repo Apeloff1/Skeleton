@@ -37,6 +37,7 @@ from core.deployment_checkpoint_trust_advance import (
     DeploymentCheckpointTrustAdvance,
     build_deployment_checkpoint_trust_advance,
 )
+from core.deployment_checkpoint_trust_policy import build_deployment_checkpoint_trust_policy_manifest
 from core.deployment_checkpoint_witness import DeploymentCheckpointPinBundle, DeploymentCheckpointPinReceipt
 from core.deployment_checkpoint_witnessed_continuity import (
     DeploymentCheckpointWitnessedContinuity,
@@ -193,6 +194,13 @@ class DeploymentCheckpointPinRuntime:
             )
         )
         satisfied = self.requirement_satisfied(now=now)
+        manifest = build_deployment_checkpoint_trust_policy_manifest(self.policy)
+        if not self.policy.required:
+            deploy_authority_proofs = ("none-required", "pin", "witnessed_continuity")
+        elif self.policy.continuity_required:
+            deploy_authority_proofs = ("witnessed_continuity",)
+        else:
+            deploy_authority_proofs = ("pin", "witnessed_continuity")
         return {
             "version": 1,
             "policy": {
@@ -204,6 +212,9 @@ class DeploymentCheckpointPinRuntime:
                 "configured_independence_groups": len({
                     row.independence_group for row in self.policy.witnesses if row.enabled
                 }),
+                "manifest_sha256": manifest.manifest_sha256,
+                "deploy_authority_proof_kinds": deploy_authority_proofs,
+                "audit_only_proof_kinds": ("trust_advance",),
             },
             "ledger": ledger,
             "current_target": None if target is None else asdict(target),
