@@ -254,8 +254,12 @@ def record_biotope_catch(
         raise TypeError("is_trophy must be a boolean")
 
     counts = dict(evidence.counts)
+    emitted_count_keys: set[str] = set()
 
     def increment(key: str) -> None:
+        if key in emitted_count_keys:
+            return
+        emitted_count_keys.add(key)
         counts[key] = counts.get(key, 0) + 1
 
     increment(f"{biotope}_catches")
@@ -273,10 +277,7 @@ def record_biotope_catch(
             dict.fromkeys(_token(value, "caught fish family token") for value in family_tokens)
         )
 
-    canonical_family_tokens = {biotope, stage, rarity_token}
     for family in families:
-        if family in canonical_family_tokens:
-            continue
         increment(f"{family}_catches")
 
     species_by_stage = {key: set(values) for key, values in evidence.species_by_stage.items()}
