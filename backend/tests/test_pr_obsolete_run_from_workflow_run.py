@@ -50,6 +50,18 @@ def test_closed_pr_allows_cleanup_without_head_match() -> None:
     )
 
 
+def test_unknown_pr_state_fails_closed() -> None:
+    api = FakeApi(payload={"state": "migrating", "head": {"sha": "new-head"}})
+
+    with pytest.raises(RuntimeError, match="unknown state"):
+        live_pr_head_converged(
+            api,
+            repo="Apeloff1/Skeleton",
+            pr_number=681,
+            signal_head_sha="new-head",
+        )
+
+
 def test_open_pr_without_head_sha_fails_closed() -> None:
     api = FakeApi(payload={"state": "open", "head": {}})
 
