@@ -13,6 +13,8 @@ selected ones, and hands their candidate lists to the Fuser/Ranker.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from threading import RLock
+from types import MappingProxyType
 from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from skeleton.kernel.errors import KernelError
@@ -33,11 +35,12 @@ class QueryPlan:
 
 @dataclass(frozen=True)
 class PrefetchedQuery:
-    """Results fetched for a concrete plan before normal execution.
+    """Results fetched for a concrete planner registry generation.
 
     Prefetch is deliberately best-effort: failures are recorded instead of
-    changing search semantics. ``execute`` retries any failed or missing
-    retriever through the normal path.
+    changing search semantics. ``execute`` retries failed/missing retrievers and
+    discards the entire prefetched result snapshot after registry replacement so
+    an old retriever cannot continue serving through a reusable bundle.
     """
 
     plan: QueryPlan
@@ -45,6 +48,19 @@ class PrefetchedQuery:
         default_factory=dict
     )
     failures: Tuple[str, ...] = ()
+    registry_generation: int = 0
+
+    def __post_init__(self) -> None:
+        # Freeze the mapping shape so consumers cannot add/remove retriever
+        # entries from a prepared bundle after the planner has stamped it.
+        frozen_results = MappingProxyType(
+            {
+                str(name): tuple(results)
+                for name, results in self.results_by_retriever.items()
+            }
+        )
+        object.__setattr__(self, "results_by_retriever", frozen_results)
+        object.__setattr__(self, "failures", tuple(self.failures))
 
 
 class QueryPlanner:
@@ -61,32 +77,42 @@ class QueryPlanner:
         self.fuser = fuser or Fuser(strategy=FusionStrategy.RRF)
         self.ranker = ranker or Ranker()
         self._retrievers: Dict[str, Callable[[str], Sequence[ScoredResult]]] = {}
+        self._registry_generation = 0
+        self._registry_lock = RLock()
 
     def register(
         self, name: str, retriever: Callable[[str], Sequence[ScoredResult]]
     ) -> None:
-        self._retrievers[name] = retriever
+        with self._registry_lock:
+            self._retrievers[name] = retriever
+            self._registry_generation += 1
 
     def plan(self, query: str) -> QueryPlan:
         # Default heuristic: lexical-tagged queries prefer tfidf; the rest
         # fire every retriever. Anything richer plugs in via strategy hooks.
-        if not self._retrievers:
+        with self._registry_lock:
+            selected = tuple(sorted(self._retrievers))
+        if not selected:
             raise RetrievalError("no retrievers registered")
-        selected = tuple(sorted(self._retrievers))
         return QueryPlan(query=query, retrievers=selected, reason="default-all")
 
     def prefetch(self, plan: QueryPlan) -> PrefetchedQuery:
         """Warm the retrieval work selected by *plan*.
 
-        The returned bundle can be handed to :meth:`execute` so successful
-        retrievers are not invoked a second time. A failed speculative fetch is
-        intentionally non-fatal and is retried by normal execution.
+        Retriever callables and the registry generation are snapshotted under
+        the registry lock, but retrieval itself executes outside that lock. A
+        replacement that races after the snapshot makes this bundle stale; the
+        generation fence in :meth:`execute` then ignores these cached results.
         """
+        with self._registry_lock:
+            generation = self._registry_generation
+            retrievers = tuple(
+                (name, self._retrievers.get(name)) for name in plan.retrievers
+            )
 
         results: Dict[str, Tuple[ScoredResult, ...]] = {}
         failures: List[str] = []
-        for name in plan.retrievers:
-            fn = self._retrievers.get(name)
+        for name, fn in retrievers:
             if fn is None:
                 continue
             try:
@@ -97,6 +123,7 @@ class QueryPlanner:
             plan=plan,
             results_by_retriever=results,
             failures=tuple(failures),
+            registry_generation=generation,
         )
 
     def execute(
@@ -113,18 +140,27 @@ class QueryPlanner:
         if prefetched is not None and prefetched.plan != resolved_plan:
             raise RetrievalError("prefetched results do not match supplied plan")
 
-        lists: Dict[str, List[ScoredResult]] = {}
-        prefetched_results = (
-            prefetched.results_by_retriever if prefetched is not None else {}
-        )
+        with self._registry_lock:
+            current_generation = self._registry_generation
+            retrievers = {
+                name: self._retrievers.get(name) for name in resolved_plan.retrievers
+            }
 
+        prefetched_results: Mapping[str, Tuple[ScoredResult, ...]] = {}
+        if (
+            prefetched is not None
+            and prefetched.registry_generation == current_generation
+        ):
+            prefetched_results = prefetched.results_by_retriever
+
+        lists: Dict[str, List[ScoredResult]] = {}
         for name in resolved_plan.retrievers:
             cached = prefetched_results.get(name)
             if cached is not None:
                 lists[name] = list(cached)
                 continue
 
-            fn = self._retrievers.get(name)
+            fn = retrievers.get(name)
             if fn is None:
                 continue
             lists[name] = list(fn(query))
@@ -135,4 +171,5 @@ class QueryPlanner:
         return tuple(ranked)
 
     def available(self) -> Tuple[str, ...]:
-        return tuple(sorted(self._retrievers))
+        with self._registry_lock:
+            return tuple(sorted(self._retrievers))
