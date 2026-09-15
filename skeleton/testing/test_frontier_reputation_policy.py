@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from skeleton.frontier.reputation import (
+    ReputationLevel,
     apply_reputation_change,
     calculate_spillover,
     current_benefits,
@@ -41,6 +42,34 @@ def test_faction_adapter_preserves_relationships_benefits_and_metadata():
     assert faction.metadata["leader"] == "guild_master_thornwood"
 
 
+def test_faction_adapter_deduplicates_relationships_and_rejects_contradictions():
+    deduplicated = faction_from_record(
+        {
+            "id": "guild",
+            "name": "Guild",
+            "allies": ["merchants", "merchants", "PORT_AUTHORITY"],
+            "enemies": ["pirates", "pirates"],
+        }
+    )
+    assert deduplicated.allies == ("merchants", "port_authority")
+    assert deduplicated.enemies == ("pirates",)
+
+    with pytest.raises(ValueError, match="allied with or hostile to itself"):
+        faction_from_record(
+            {"id": "guild", "name": "Guild", "allies": ["guild"]}
+        )
+
+    with pytest.raises(ValueError, match="allies and enemies overlap"):
+        faction_from_record(
+            {
+                "id": "guild",
+                "name": "Guild",
+                "allies": ["merchants"],
+                "enemies": ["MERCHANTS"],
+            }
+        )
+
+
 def test_reputation_threshold_edges_are_unambiguous():
     assert reputation_level(-1001).name == "Hated"
     assert reputation_level(-500).name == "Hostile"
@@ -53,6 +82,22 @@ def test_reputation_threshold_edges_are_unambiguous():
     assert reputation_level(9000).name == "Revered"
     assert reputation_level(21000).name == "Exalted"
     assert reputation_level(2_000_000).name == "Exalted"
+
+
+def test_custom_reputation_levels_require_unique_monotonic_identity():
+    duplicate_rank = (
+        ReputationLevel(min_rep=0, rank=0, name="Neutral"),
+        ReputationLevel(min_rep=500, rank=0, name="Friendly"),
+    )
+    with pytest.raises(ValueError, match="ranks must be unique"):
+        reputation_level(500, levels=duplicate_rank)
+
+    reversed_rank = (
+        ReputationLevel(min_rep=0, rank=1, name="Neutral"),
+        ReputationLevel(min_rep=500, rank=0, name="Friendly"),
+    )
+    with pytest.raises(ValueError, match="ranks must increase"):
+        reputation_level(500, levels=reversed_rank)
 
 
 def test_next_level_reports_threshold_and_remaining_reputation():
@@ -143,6 +188,15 @@ def test_standing_summary_counts_untracked_factions_as_neutral():
         "reputation": -600,
         "level": "Hated",
     }
+
+
+def test_standing_summary_normalizes_ids_and_rejects_ambiguous_catalogs():
+    summary = standing_summary({"PIRATES": -600}, ["pirates", "mystics"])
+    assert summary["standings"]["hated"] == 1
+    assert summary["standings"]["neutral"] == 1
+
+    with pytest.raises(ValueError, match="duplicate faction id"):
+        standing_summary({}, ["pirates", "PIRATES"])
 
 
 def test_standing_summary_rejects_unknown_tracked_factions():
