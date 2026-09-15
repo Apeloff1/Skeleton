@@ -8,6 +8,9 @@ cd "$ROOT_DIR"
 printf '%s\n' '[secret-scan] running repository-native high-confidence scanner'
 python backend/scripts/check_secret_hygiene.py
 
+printf '%s\n' '[secret-scan] validating frontend Docker secret boundary'
+python backend/scripts/check_docker_secret_boundary.py
+
 if ! command -v gitleaks >/dev/null 2>&1; then
   cat >&2 <<EOF
 [secret-scan] gitleaks is required for full-history scanning.
