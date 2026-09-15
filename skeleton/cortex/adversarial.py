@@ -246,12 +246,16 @@ def _review_state(ctx: AdversarialContext) -> Dict[str, Any]:
 
 def _isolated_review_context(ctx: AdversarialContext) -> AdversarialContext:
     """Deep-isolate untrusted judge callbacks from caller and repairer state."""
+    isolated: Optional[AdversarialContext]
     try:
-        return deepcopy(ctx)
-    except Exception as exc:
+        isolated = deepcopy(ctx)
+    except Exception:
+        isolated = None
+    if isolated is None:
         raise RuntimeError(
             "adversarial invariant violated: judge review context isolation failed"
-        ) from exc
+        )
+    return isolated
 
 
 def _text(value: Any) -> str:
