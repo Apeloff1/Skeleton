@@ -4,14 +4,16 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'skeleton/**'
+      - 'skeleton/frontier/**'
+      - 'skeleton/testing/test_frontier_*.py'
       - 'pyproject.toml'
       - '.github/workflows/frontier-contracts.yml'
   push:
     branches:
       - 'frontier/**'
     paths:
-      - 'skeleton/**'
+      - 'skeleton/frontier/**'
+      - 'skeleton/testing/test_frontier_*.py'
       - 'pyproject.toml'
       - '.github/workflows/frontier-contracts.yml'
 
