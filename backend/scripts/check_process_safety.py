@@ -10,6 +10,7 @@ command strings are rejected in favor of explicit argument vectors.
 from __future__ import annotations
 
 import ast
+import os
 from pathlib import Path
 import sys
 from typing import Iterable
@@ -27,11 +28,47 @@ UNSAFE_CALLS = {
 }
 
 
+class ScanCoverageError(RuntimeError):
+    """Raised when the scanner cannot prove that all intended files were visited."""
+
+
+def _walk_error(error: OSError) -> None:
+    location = error.filename or ROOT
+    raise ScanCoverageError(f"unable to traverse {location}: {error}") from error
+
+
 def python_files() -> Iterable[Path]:
-    for path in ROOT.rglob("*.py"):
-        if any(part in SKIP_DIRS for part in path.parts):
-            continue
-        yield path
+    if not ROOT.exists():
+        raise ScanCoverageError(f"required scan root does not exist: {ROOT}")
+    if not ROOT.is_dir():
+        raise ScanCoverageError(f"required scan root is not a directory: {ROOT}")
+
+    files: list[Path] = []
+    try:
+        for current, dirnames, filenames in os.walk(
+            ROOT,
+            topdown=True,
+            onerror=_walk_error,
+            followlinks=False,
+        ):
+            dirnames[:] = sorted(
+                name
+                for name in dirnames
+                if name not in SKIP_DIRS and not name.endswith(".egg-info")
+            )
+            current_path = Path(current)
+            for filename in sorted(filenames):
+                if filename.endswith(".py"):
+                    files.append(current_path / filename)
+    except ScanCoverageError:
+        raise
+    except OSError as exc:
+        raise ScanCoverageError(f"unable to traverse required scan root {ROOT}: {exc}") from exc
+
+    if not files:
+        raise ScanCoverageError(f"scan discovered zero Python files in required root: {ROOT}")
+
+    yield from files
 
 
 def display_path(path: Path) -> Path:
@@ -351,7 +388,13 @@ def violations(path: Path) -> list[str]:
 
 def main() -> int:
     findings: list[str] = []
-    for path in python_files():
+    try:
+        paths = list(python_files())
+    except ScanCoverageError as exc:
+        print(f"Process-safety scan incomplete: {exc}", file=sys.stderr)
+        return 2
+
+    for path in paths:
         findings.extend(violations(path))
     if findings:
         print("Unsafe process invocation patterns detected:", file=sys.stderr)
