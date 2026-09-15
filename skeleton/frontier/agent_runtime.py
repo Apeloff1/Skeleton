@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -62,6 +63,67 @@ def _normalize_capabilities(
             raise ValueError(f"{field_name} entries must not be empty")
         normalized.add(value)
     return frozenset(normalized)
+
+
+def _canonical_idempotency_value(
+    value: object,
+    *,
+    path: str,
+    _active_containers: set[int] | None = None,
+) -> Any:
+    """Return a deterministic strict-JSON value for execution fingerprinting.
+
+    Idempotency is an identity boundary, so the permissive provenance digest
+    fallback-to-repr behavior is intentionally not used here. Unsupported,
+    recursive, or non-finite context values fail before a reservation or agent
+    side effect can occur.
+    """
+
+    if value is None or isinstance(value, (str, bool, int)):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError(f"{path} must contain only finite JSON numbers")
+        return value
+
+    active = _active_containers if _active_containers is not None else set()
+    if isinstance(value, list):
+        identity = id(value)
+        if identity in active:
+            raise ValueError(f"{path} must not contain recursive containers")
+        active.add(identity)
+        try:
+            return [
+                _canonical_idempotency_value(
+                    item,
+                    path=f"{path}[{index}]",
+                    _active_containers=active,
+                )
+                for index, item in enumerate(value)
+            ]
+        finally:
+            active.remove(identity)
+
+    if isinstance(value, Mapping):
+        identity = id(value)
+        if identity in active:
+            raise ValueError(f"{path} must not contain recursive containers")
+        active.add(identity)
+        try:
+            canonical: dict[str, Any] = {}
+            for key, item in value.items():
+                if not isinstance(key, str):
+                    raise TypeError(f"{path} JSON object keys must be strings")
+                canonical[key] = _canonical_idempotency_value(
+                    item,
+                    path=f"{path}.{key}",
+                    _active_containers=active,
+                )
+            return canonical
+        finally:
+            active.remove(identity)
+
+    raise TypeError(f"{path} must contain only JSON-compatible values")
 
 
 @dataclass(frozen=True, slots=True)
@@ -233,16 +295,19 @@ class AgentRuntime:
         shared_future: asyncio.Future[ExecutionResult] | None = None
         owns_reservation = False
         if idempotency_key is not None:
-            if not isinstance(idempotency_key, str):
-                raise TypeError("idempotency_key must be a string")
-            normalized_key = idempotency_key.strip()
-            if not normalized_key:
-                raise ValueError("idempotency_key must not be empty")
+            normalized_key = _require_normalized_text(
+                idempotency_key,
+                "idempotency_key",
+            )
+            canonical_context = _canonical_idempotency_value(
+                normalized_context,
+                path="context",
+            )
             fingerprint = stable_content_digest(
                 {
                     "agent": agent.name,
                     "task": normalized_task,
-                    "context": normalized_context,
+                    "context": canonical_context,
                     "required_capabilities": sorted(required),
                     "source_repository": normalized_source_repository,
                     "source_revision": normalized_source_revision,
@@ -310,11 +375,11 @@ class AgentRuntime:
                         metadata=provenance_metadata,
                     ),
                 )
-        except asyncio.CancelledError:
+
+            if shared_future is not None and not shared_future.done():
+                shared_future.set_result(result)
+            return result
+        except BaseException:
             if normalized_key is not None and shared_future is not None:
                 await self._cancel_idempotency(normalized_key, shared_future)
             raise
-
-        if shared_future is not None and not shared_future.done():
-            shared_future.set_result(result)
-        return result
