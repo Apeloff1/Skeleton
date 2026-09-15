@@ -51,11 +51,14 @@ _lat_ring: Deque[float] = deque(maxlen=1024)
 # wrong loop in K8s where uvicorn workers may use a fresh loop).
 _lat_lock: asyncio.Lock | None = None
 
+
 def _get_lat_lock() -> asyncio.Lock:
     global _lat_lock
     if _lat_lock is None:
         _lat_lock = asyncio.Lock()
     return _lat_lock
+
+
 _counts: Dict[str, int] = defaultdict(int)
 _started_at: float = time.time()
 
@@ -95,7 +98,8 @@ def get_stats() -> dict:
             "exempt_ips": sorted(_EXEMPT_IPS),
             "buckets": _counts.get("rate_limit_buckets", 0),
             "max_buckets": _MAX_BUCKETS,
-            "evictions": _counts.get("rate_limit_evictions", 0),
+            "expired_pruned": _counts.get("rate_limit_expired_pruned", 0),
+            "saturation_rejections": _counts.get("rate_limit_saturation_rejections", 0),
         },
     }
 
@@ -205,9 +209,10 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
     """Per-IP token bucket with bounded idle state.
 
     Exempt IPs (loopback) skip the check. State is pruned after the idle TTL
-    and capped at `max_buckets`; when the cap is reached, the stalest bucket
-    is evicted before a new one is created. Mutation is serialized per
-    middleware instance so cleanup/eviction cannot race bucket creation.
+    and capped at `max_buckets`. When all slots are occupied by active
+    identities, unseen identities are rejected until a slot expires instead
+    of evicting active state and receiving a fresh burst. Mutation is
+    serialized per middleware instance so cleanup/admission cannot race.
 
     NOTE: This is *in-memory* and per-process. Sufficient for single-replica
     deployments and dev. For horizontal scaling, swap in a shared store.
@@ -222,39 +227,55 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         bucket_ttl: float | None = None,
     ):
         super().__init__(app)
-        self.per_minute = per_minute or _RATE_PER_MIN
-        self.burst = burst or _RATE_BURST
+        self.per_minute = per_minute if per_minute is not None else _RATE_PER_MIN
+        self.burst = burst if burst is not None else _RATE_BURST
+        if self.per_minute <= 0:
+            raise ValueError("per_minute must be positive")
+        if self.burst <= 0:
+            raise ValueError("burst must be positive")
         self.max_buckets = max(1, max_buckets if max_buckets is not None else _MAX_BUCKETS)
         self.bucket_ttl = max(0.01, bucket_ttl if bucket_ttl is not None else _BUCKET_TTL)
         self._refill_per_sec = self.per_minute / 60.0
         self._buckets: Dict[str, _Bucket] = {}
         self._state_lock: asyncio.Lock | None = None
-        self._evictions = 0
+        self._expired_pruned = 0
+        self._saturation_rejections = 0
 
     def _get_state_lock(self) -> asyncio.Lock:
         if self._state_lock is None:
             self._state_lock = asyncio.Lock()
         return self._state_lock
 
-    def _prune_expired(self, now: float) -> None:
+    def _prune_expired(self, now: float) -> int:
         expired = [ip for ip, bucket in self._buckets.items() if now - bucket.last >= self.bucket_ttl]
         for ip in expired:
             del self._buckets[ip]
+        if expired:
+            pruned = len(expired)
+            self._expired_pruned += pruned
+            _counts["rate_limit_expired_pruned"] += pruned
+        return len(expired)
 
-    def _bucket_for(self, ip: str, now: float | None = None) -> _Bucket:
+    def _retry_until_capacity(self, now: float) -> float:
+        if not self._buckets:
+            return self.bucket_ttl
+        remaining = [self.bucket_ttl - (now - bucket.last) for bucket in self._buckets.values()]
+        return max(0.01, min(remaining))
+
+    def _bucket_for(self, ip: str, now: float | None = None) -> Tuple[_Bucket | None, float]:
         now = time.monotonic() if now is None else now
         self._prune_expired(now)
-        b = self._buckets.get(ip)
-        if b is None:
+        bucket = self._buckets.get(ip)
+        if bucket is None:
             if len(self._buckets) >= self.max_buckets:
-                evict_ip, _ = min(self._buckets.items(), key=lambda item: item[1].last)
-                del self._buckets[evict_ip]
-                self._evictions += 1
-                _counts["rate_limit_evictions"] += 1
-            b = _Bucket(self.burst, self._refill_per_sec)
-            self._buckets[ip] = b
+                self._saturation_rejections += 1
+                _counts["rate_limit_saturation_rejections"] += 1
+                _counts["rate_limit_buckets"] = len(self._buckets)
+                return None, self._retry_until_capacity(now)
+            bucket = _Bucket(self.burst, self._refill_per_sec)
+            self._buckets[ip] = bucket
         _counts["rate_limit_buckets"] = len(self._buckets)
-        return b
+        return bucket, 0.0
 
     async def dispatch(self, request: Request, call_next: Callable):
         # Bypass non-API routes (Expo serves /, /assets, etc. from same origin)
@@ -264,7 +285,11 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         if ip in _EXEMPT_IPS or ip == "-":
             return await call_next(request)
         async with self._get_state_lock():
-            ok, retry = self._bucket_for(ip).take(1)
+            bucket, retry = self._bucket_for(ip)
+            if bucket is None:
+                ok = False
+            else:
+                ok, retry = bucket.take(1)
         if not ok:
             _counts["rate_limited"] += 1
             rid = getattr(request.state, "request_id", "-")
