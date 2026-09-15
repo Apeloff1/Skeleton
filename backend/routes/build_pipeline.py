@@ -1,5 +1,5 @@
 """
-build_pipeline.py — Unified API surface for the new binary/vault/tool/interpreter
+build_pipeline.py — Unified API surface for binary/vault/tool/interpreter
 infrastructure.
 
 Endpoints:
@@ -8,30 +8,36 @@ Endpoints:
   GET    /api/binary/artifacts/{build_id}        — list artifacts for a build
   GET    /api/vault/collections                  — list available vault collections
   POST   /api/vault/query                        — query a vault collection / topic
-  GET    /api/vault/stats                        — vault statistics
+  GET    /api/vault/loader-stats                 — static vault-loader statistics
   POST   /api/tools/invoke                       — single tool call
   POST   /api/tools/invoke_many                  — parallel multi-call
   GET    /api/tools/describe                     — schema of available tools
   POST   /api/interpreter/run                    — interpreter run (multi-lang dispatch)
   GET    /api/interpreter/state/{session_id}     — fetch persisted REPL state
   POST   /api/jeeves/consult                     — direct in-process Jeeves query
+
+The canonical user-vault statistics endpoint is owned by ``routes.vault``.
+The loader-specific statistics endpoint is intentionally distinct so FastAPI
+registration order cannot shadow one implementation with another.
 """
 from __future__ import annotations
-import os
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel
-from typing import Any, Optional
-from motor.motor_asyncio import AsyncIOMotorClient
-# ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
-from core.databases import client as _SHARED_MONGO_CLIENT
 
-from services import binary_builder, vault_loader, tool_registry, jeeves_consultant
+import contextlib
+import io
+import os
+from typing import Any
+
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
+from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import BaseModel, Field
+
+from core.databases import client as _SHARED_MONGO_CLIENT
 from core.exec_guard import code_execution_enabled, execution_disabled_response
+from services import binary_builder, jeeves_consultant, tool_registry, vault_loader
 
 router = APIRouter()
 
-_MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 _DB_NAME = os.environ.get("DB_NAME", "test_database")
 _client: AsyncIOMotorClient | None = None
 
@@ -39,14 +45,14 @@ _client: AsyncIOMotorClient | None = None
 def _db():
     global _client
     if _client is None:
-        _client = _SHARED_MONGO_CLIENT  # consolidated → core.databases.client
+        _client = _SHARED_MONGO_CLIENT
     return _client[_DB_NAME]
 
 
 # ───────────────────────────── BINARY ─────────────────────────────
 class PackageReq(BaseModel):
     build_id: str
-    kinds: list[str] = ["zip", "apk"]
+    kinds: list[str] = Field(default_factory=lambda: ["zip", "apk"])
 
 
 @router.post("/binary/package")
@@ -59,7 +65,6 @@ async def binary_package(req: PackageReq):
     if not build:
         raise HTTPException(404, f"build_id not found: {req.build_id}")
     out = await binary_builder.package_build(build, kinds=req.kinds)
-    # Persist
     for art in out["artifacts"]:
         await db.build_artifacts.update_one(
             {"artifact_id": art["artifact_id"]}, {"$set": art}, upsert=True,
@@ -73,7 +78,7 @@ async def binary_download(build_id: str, kind: str):
         raise HTTPException(400, "kind must be 'zip' or 'apk'")
     path = binary_builder.find_artifact_path(build_id, kind)
     if not path:
-        raise HTTPException(404, f"artifact not found — call /api/binary/package first")
+        raise HTTPException(404, "artifact not found — call /api/binary/package first")
     media = "application/zip" if kind == "zip" else "application/vnd.android.package-archive"
     return FileResponse(str(path), media_type=media, filename=f"galaxy_{build_id}.{kind}")
 
@@ -93,10 +98,10 @@ async def vault_collections():
 
 
 class VaultQueryReq(BaseModel):
-    collection: Optional[str] = None
-    topic: Optional[str] = None
+    collection: str | None = None
+    topic: str | None = None
     limit: int = 10
-    contains: Optional[str] = None
+    contains: str | None = None
 
 
 @router.post("/vault/query")
@@ -110,15 +115,16 @@ async def vault_query(req: VaultQueryReq):
     raise HTTPException(400, "specify either 'collection' or 'topic'")
 
 
-@router.get("/vault/stats")
-async def vault_stats():
+@router.get("/vault/loader-stats")
+async def vault_loader_stats():
+    """Return static loader/catalogue statistics, not user-vault statistics."""
     return vault_loader.stats()
 
 
 # ───────────────────────────── TOOLS ─────────────────────────────
 class ToolInvokeReq(BaseModel):
     tool: str
-    params: dict = {}
+    params: dict[str, Any] = Field(default_factory=dict)
 
 
 @router.post("/tools/invoke")
@@ -132,7 +138,7 @@ class ToolMultiReq(BaseModel):
 
 @router.post("/tools/invoke_many")
 async def tools_invoke_many(req: ToolMultiReq):
-    payload = [{"tool": c.tool, "params": c.params} for c in req.calls]
+    payload = [{"tool": call.tool, "params": call.params} for call in req.calls]
     return {"results": await tool_registry.invoke_many(payload)}
 
 
@@ -142,9 +148,7 @@ async def tools_describe():
 
 
 # ───────────────────────────── INTERPRETER ─────────────────────────────
-# Persistent REPL state per session_id (Python only — multi-lang
-# dispatches to the existing /api/playground/run for those.)
-_REPL_STATE: dict[str, dict] = {}
+_REPL_STATE: dict[str, dict[str, Any]] = {}
 
 
 class InterpReq(BaseModel):
@@ -159,20 +163,23 @@ async def interpreter_run(req: InterpReq):
         return execution_disabled_response("Interpreter execution")
 
     if req.language != "python":
-        # Forward via the tool registry (which spawns subprocesses for compiled
-        # langs and uses the playground for the rest).
         if req.language in ("c", "cpp", "cxx", "go", "rust"):
-            return await tool_registry.invoke("compile_code", {"language": req.language, "code": req.code})
-        return await tool_registry.invoke("run_code", {"language": req.language, "code": req.code})
+            return await tool_registry.invoke(
+                "compile_code", {"language": req.language, "code": req.code}
+            )
+        return await tool_registry.invoke(
+            "run_code", {"language": req.language, "code": req.code}
+        )
 
-    # Python — persistent globals/locals per session
-    import io, contextlib
-    state = _REPL_STATE.setdefault(req.session_id, {"globals": {"__name__": "__interp__"}, "history": []})
+    state = _REPL_STATE.setdefault(
+        req.session_id, {"globals": {"__name__": "__interp__"}, "history": []}
+    )
     buf_out, buf_err = io.StringIO(), io.StringIO()
     try:
         if not code_execution_enabled():
             return execution_disabled_response("Interpreter execution")
         import builtins
+
         with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
             builtins.exec(builtins.compile(req.code, "<interp>", "exec"), state["globals"])
         state["history"].append({"code": req.code, "ok": True})
@@ -183,12 +190,12 @@ async def interpreter_run(req: InterpReq):
             "session_id": req.session_id,
             "history_length": len(state["history"]),
         }
-    except Exception as e:
-        state["history"].append({"code": req.code, "ok": False, "error": str(e)})
+    except Exception as exc:  # noqa: BLE001
+        state["history"].append({"code": req.code, "ok": False, "error": str(exc)})
         return {
             "ok": False,
             "stdout": buf_out.getvalue()[-8000:],
-            "stderr": f"{buf_err.getvalue()}\n{type(e).__name__}: {e}"[-8000:],
+            "stderr": f"{buf_err.getvalue()}\n{type(exc).__name__}: {exc}"[-8000:],
             "session_id": req.session_id,
             "history_length": len(state["history"]),
         }
@@ -196,19 +203,19 @@ async def interpreter_run(req: InterpReq):
 
 @router.get("/interpreter/state/{session_id}")
 async def interpreter_state(session_id: str):
-    s = _REPL_STATE.get(session_id)
-    if not s:
+    state = _REPL_STATE.get(session_id)
+    if not state:
         return {"session_id": session_id, "exists": False}
     return {
-        "session_id":    session_id,
-        "exists":        True,
-        "var_names":     [k for k in s["globals"] if not k.startswith("__")],
-        "history_count": len(s["history"]),
-        "recent":        s["history"][-5:],
+        "session_id": session_id,
+        "exists": True,
+        "var_names": [key for key in state["globals"] if not key.startswith("__")],
+        "history_count": len(state["history"]),
+        "recent": state["history"][-5:],
     }
 
 
-# ───────────────────────────── JEEVES CONSULT ─────────────────────────────
+# ───────────────────────────── JEEVES CONSULT ──────────────────────────
 class ConsultReq(BaseModel):
     context: str = "lesson"
     topic: str = ""
