@@ -42,15 +42,10 @@ def python_files() -> Iterable[Path]:
     """Yield every Python file in the active runtime/security roots exactly once."""
     seen: set[Path] = set()
     for root in SCAN_ROOTS:
-        if not root.exists():
-            continue
-        for path in root.rglob("*.py"):
-            if any(part in SKIP_DIRS for part in path.parts):
+        for path in BACKEND_GATE.walk_python_files(root, skip_dirs=SKIP_DIRS):
+            if path in seen:
                 continue
-            resolved = path.resolve()
-            if resolved in seen:
-                continue
-            seen.add(resolved)
+            seen.add(path)
             yield path
 
 
@@ -101,7 +96,7 @@ def argv_violations(path: Path) -> list[str]:
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     except (OSError, UnicodeError, SyntaxError) as exc:
-        return [f"{label}: parse failure: {exc}"]
+        return [f"{label}: parse failure: {type(exc).__name__}"]
 
     aliases = BACKEND_GATE.assignment_aliases(tree, BACKEND_GATE.import_aliases(tree))
     findings: list[str] = []
@@ -124,11 +119,19 @@ def violations(path: Path) -> list[str]:
 
 
 def main() -> int:
+    try:
+        paths = list(python_files())
+    except BACKEND_GATE.ProcessSafetyScanError as exc:
+        print("Repository process-safety violations detected:", file=sys.stderr)
+        print(f"  - scanner coverage failure: {exc}", file=sys.stderr)
+        return 1
+
     findings: list[str] = []
-    scanned = 0
-    for path in python_files():
-        scanned += 1
+    scanned = len(paths)
+    for path in paths:
         findings.extend(violations(path))
+    if scanned == 0:
+        findings.append("scanner coverage failure: no repository Python files were scanned")
 
     if findings:
         print("Repository process-safety violations detected:", file=sys.stderr)
