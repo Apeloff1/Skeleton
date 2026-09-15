@@ -38,10 +38,17 @@ const cockpit = await import(pathToFileURL(emittedModulePath).href);
 const {
   COCKPIT_BRIDGE_CHANNEL,
   COCKPIT_BRIDGE_VERSION,
+  COCKPIT_PROJECT_STATE_EVENT,
   getConfiguredCockpitOrigins,
+  getConfiguredCockpitProjectState,
   installCockpitPreviewBridge,
   isSafeCockpitPath,
+  normalizeCockpitProjectState,
+  publishCockpitProjectState,
 } = cockpit;
+
+const WORLD_HASH = 'a'.repeat(64);
+const NEXT_WORLD_HASH = 'b'.repeat(64);
 
 function withGlobal(name, value) {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, name);
@@ -97,7 +104,10 @@ function makeBrowser({ parentOrigin = 'https://cockpit.example' } = {}) {
     removeEventListener(type, listener) {
       if (listeners.get(type) === listener) listeners.delete(type);
     },
-    dispatchEvent() {},
+    dispatchEvent(event) {
+      listeners.get(event.type)?.(event);
+      return true;
+    },
   };
   const document = { referrer: `${parentOrigin}/host` };
   return { window, document, parent, history, listeners, posts, historyMoves };
@@ -107,6 +117,12 @@ function receipts(browser) {
   return browser.posts
     .map(({ message }) => message)
     .filter((message) => message.type === 'command-result');
+}
+
+function projectStates(browser) {
+  return browser.posts
+    .map(({ message }) => message)
+    .filter((message) => message.type === 'project-state');
 }
 
 test('cockpit path validation rejects cross-origin and protocol-relative paths', () => {
@@ -133,6 +149,32 @@ test('configured cockpit origins are normalized, deduplicated, and scheme bounde
   }
 });
 
+test('project state accepts only bounded revision and sha256 identity', () => {
+  assert.deepEqual(
+    normalizeCockpitProjectState({
+      projectId: 'galaxy/project-7',
+      revision: 42,
+      semanticHash: WORLD_HASH.toUpperCase(),
+      dirty: false,
+      source: 'world-graph',
+    }),
+    {
+      projectId: 'galaxy/project-7',
+      revision: 42,
+      semanticHash: WORLD_HASH,
+      dirty: false,
+      source: 'world-graph',
+    },
+  );
+  assert.equal(normalizeCockpitProjectState({ revision: -1, semanticHash: WORLD_HASH }), null);
+  assert.equal(normalizeCockpitProjectState({ revision: 1.5, semanticHash: WORLD_HASH }), null);
+  assert.equal(normalizeCockpitProjectState({ revision: 1, semanticHash: 'not-a-hash' }), null);
+  assert.equal(
+    normalizeCockpitProjectState({ revision: 1, semanticHash: WORLD_HASH, projectId: 'bad project id' }),
+    null,
+  );
+});
+
 test('external cockpit parent fails closed when it is not allowlisted', () => {
   const browser = makeBrowser();
   const restoreWindow = withGlobal('window', browser.window);
@@ -148,7 +190,7 @@ test('external cockpit parent fails closed when it is not allowlisted', () => {
   }
 });
 
-test('trusted cockpit parent receives readiness, bounded commands, and execution receipts', async () => {
+test('trusted cockpit receives read-only project revision/hash plus command receipts', async () => {
   const browser = makeBrowser();
   const restoreWindow = withGlobal('window', browser.window);
   const restoreDocument = withGlobal('document', browser.document);
@@ -157,14 +199,33 @@ test('trusted cockpit parent receives readiness, bounded commands, and execution
     const dispose = installCockpitPreviewBridge({
       allowedParentOrigins: ['https://cockpit.example'],
       getRoutePaths: () => ['/galaxy', '/jeeves-control', '//invalid.example'],
+      getProjectState: () => ({
+        projectId: 'project-alpha',
+        revision: 7,
+        semanticHash: WORLD_HASH,
+        dirty: true,
+        source: 'world-graph',
+      }),
       navigate: (path) => navigations.push(path),
     });
 
     assert.deepEqual(
       browser.posts.map(({ message }) => message.type),
-      ['location', 'routes', 'ready'],
+      ['location', 'routes', 'project-state', 'ready'],
     );
     assert.deepEqual(browser.posts[1].message.paths, ['/galaxy', '/jeeves-control']);
+    assert.deepEqual(browser.posts[2].message, {
+      channel: COCKPIT_BRIDGE_CHANNEL,
+      version: COCKPIT_BRIDGE_VERSION,
+      type: 'project-state',
+      available: true,
+      projectId: 'project-alpha',
+      revision: 7,
+      semanticHash: WORLD_HASH,
+      dirty: true,
+      source: 'world-graph',
+      writable: false,
+    });
     assert.ok(
       browser.posts.every(({ origin }) => origin === 'https://cockpit.example'),
       'guest messages must target only the trusted parent origin',
@@ -186,6 +247,28 @@ test('trusted cockpit parent receives readiness, bounded commands, and execution
     });
     assert.deepEqual(navigations, []);
     assert.deepEqual(receipts(browser), []);
+
+    onMessage({
+      source: browser.parent,
+      origin: 'https://cockpit.example',
+      data: {
+        channel: COCKPIT_BRIDGE_CHANNEL,
+        version: COCKPIT_BRIDGE_VERSION,
+        type: 'project-state-request',
+        requestId: 'world-state-1',
+        patch: [{ op: 'delete_everything' }],
+      },
+    });
+    assert.equal(projectStates(browser).length, 2);
+    assert.deepEqual(receipts(browser).at(-1), {
+      channel: COCKPIT_BRIDGE_CHANNEL,
+      version: COCKPIT_BRIDGE_VERSION,
+      type: 'command-result',
+      requestId: 'world-state-1',
+      command: 'project-state-request',
+      status: 'accepted',
+    });
+    assert.deepEqual(navigations, [], 'project-state request must remain read-only');
 
     onMessage({
       source: browser.parent,
@@ -277,6 +360,64 @@ test('trusted cockpit parent receives readiness, bounded commands, and execution
     dispose();
     assert.equal(browser.listeners.size, 0);
   } finally {
+    restoreDocument();
+    restoreWindow();
+  }
+});
+
+test('local project-state publisher validates state and pushes bridge refresh events', () => {
+  const browser = makeBrowser();
+  const restoreWindow = withGlobal('window', browser.window);
+  const restoreDocument = withGlobal('document', browser.document);
+  const restoreProject = withGlobal('__SKELETON_COCKPIT_PROJECT_STATE__', undefined);
+  try {
+    const dispose = installCockpitPreviewBridge({
+      allowedParentOrigins: ['https://cockpit.example'],
+      getProjectState: getConfiguredCockpitProjectState,
+    });
+    assert.deepEqual(projectStates(browser).at(-1), {
+      channel: COCKPIT_BRIDGE_CHANNEL,
+      version: COCKPIT_BRIDGE_VERSION,
+      type: 'project-state',
+      available: false,
+    });
+
+    assert.equal(
+      publishCockpitProjectState({
+        projectId: 'project-beta',
+        revision: 8,
+        semanticHash: NEXT_WORLD_HASH,
+        dirty: false,
+      }),
+      true,
+    );
+    assert.deepEqual(projectStates(browser).at(-1), {
+      channel: COCKPIT_BRIDGE_CHANNEL,
+      version: COCKPIT_BRIDGE_VERSION,
+      type: 'project-state',
+      available: true,
+      projectId: 'project-beta',
+      revision: 8,
+      semanticHash: NEXT_WORLD_HASH,
+      dirty: false,
+      writable: false,
+    });
+    assert.equal(browser.listeners.has(COCKPIT_PROJECT_STATE_EVENT), true);
+
+    const countBeforeInvalid = projectStates(browser).length;
+    assert.equal(
+      publishCockpitProjectState({ revision: 9, semanticHash: 'invalid' }),
+      false,
+    );
+    assert.equal(projectStates(browser).length, countBeforeInvalid);
+
+    assert.equal(publishCockpitProjectState(null), true);
+    assert.deepEqual(projectStates(browser).at(-1).available, false);
+
+    dispose();
+    assert.equal(browser.listeners.has(COCKPIT_PROJECT_STATE_EVENT), false);
+  } finally {
+    restoreProject();
     restoreDocument();
     restoreWindow();
   }
