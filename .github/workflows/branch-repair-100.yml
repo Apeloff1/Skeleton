@@ -74,6 +74,17 @@ jobs:
               --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .head.ref'
           )
 
+          branch_has_open_pr() {
+            local branch="$1" count
+            count=$(gh api -X GET "/repos/${GITHUB_REPOSITORY}/pulls" \
+              -f state=open \
+              -f head="${GITHUB_REPOSITORY_OWNER}:${branch}" \
+              -f per_page=1 \
+              --jq '[.[] | select(.head.repo.full_name == .base.repo.full_name)] | length' \
+              2>/dev/null) || return 0
+            [[ "${count:-0}" != "0" ]]
+          }
+
           has_active_ci() {
             local sha="$1" state count
             for state in requested waiting pending queued in_progress; do
@@ -112,11 +123,10 @@ jobs:
           while read -r tip branch; do
             [[ -n "$tip" && -n "$branch" ]] || continue
             [[ "$branch" != main ]] || continue
-
-            inspected=$((inspected + 1))
-            if (( inspected > inspect_limit )); then
+            if (( inspected >= inspect_limit )); then
               break
             fi
+            inspected=$((inspected + 1))
 
             case "$branch" in
               develop|release/*|keep/*|backup/*)
@@ -170,7 +180,7 @@ jobs:
                 printf '%s %s preserved moved-before-update\n' "$branch" "$live_tip" >> ../branch-repair-results.txt
                 continue
               fi
-              if [[ -n "${open_pr_heads[$branch]+x}" ]] || has_active_ci "$live_tip" || ! head_is_settled "$live_tip"; then
+              if branch_has_open_pr "$branch" || has_active_ci "$live_tip" || ! head_is_settled "$live_tip"; then
                 raced=$((raced + 1))
                 printf '%s %s preserved became-active\n' "$branch" "$live_tip" >> ../branch-repair-results.txt
                 continue
