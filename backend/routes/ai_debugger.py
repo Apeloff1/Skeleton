@@ -18,6 +18,7 @@ from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
+import logging
 import uuid
 import re
 import os
@@ -28,6 +29,7 @@ load_dotenv(ROOT_DIR / '.env')
 
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 
+logger = logging.getLogger("CodeDock.AIDebugger")
 router = APIRouter(prefix="/debugger", tags=["AI Debugger"])
 
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
@@ -75,6 +77,12 @@ class DebugResult(BaseModel):
 # AI HELPER
 # ============================================================================
 
+def _debugger_http_error(operation: str, exc: Exception) -> HTTPException:
+    """Return a stable public failure without exposing provider/library details."""
+    logger.warning("AI debugger %s failed: %s", operation, type(exc).__name__)
+    return HTTPException(status_code=500, detail="AI debugger request failed")
+
+
 async def call_debugger_ai(prompt: str, system_prompt: str) -> str:
     try:
         chat = LlmChat(
@@ -85,8 +93,11 @@ async def call_debugger_ai(prompt: str, system_prompt: str) -> str:
         
         response = await chat.send_message(UserMessage(text=prompt))
         return response.content if hasattr(response, 'content') else str(response)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("AI debugger provider failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=500, detail="AI debugger provider failed") from None
 
 # ============================================================================
 # DEBUGGER ENDPOINTS
@@ -231,8 +242,10 @@ Provide your analysis as:
             ],
             timestamp=datetime.utcnow().isoformat()
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _debugger_http_error("analyze", exc) from None
 
 @router.post("/interpret-error")
 async def interpret_error(error_message: str, language: str = "python", code: Optional[str] = None):
@@ -264,8 +277,10 @@ Provide:
             "language": language,
             "timestamp": datetime.utcnow().isoformat()
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _debugger_http_error("interpret-error", exc) from None
 
 @router.post("/security-scan")
 async def security_scan(request: SecurityScanRequest):
@@ -345,8 +360,10 @@ For each vulnerability found:
             ],
             "timestamp": datetime.utcnow().isoformat()
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _debugger_http_error("security-scan", exc) from None
 
 @router.post("/performance-analysis")
 async def performance_analysis(request: PerformanceAnalysisRequest):
@@ -400,8 +417,10 @@ async def performance_analysis(request: PerformanceAnalysisRequest):
             ],
             "timestamp": datetime.utcnow().isoformat()
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _debugger_http_error("performance-analysis", exc) from None
 
 @router.post("/quick-fix")
 async def quick_fix(code: str, language: str = "python"):
@@ -438,8 +457,10 @@ Return ONLY the fixed code with brief inline comments for changes."""
             "language": language,
             "timestamp": datetime.utcnow().isoformat()
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _debugger_http_error("quick-fix", exc) from None
 
 @router.post("/explain-code")
 async def explain_code(code: str, language: str = "python", detail_level: str = "standard"):
@@ -469,5 +490,7 @@ Provide:
             "detail_level": detail_level,
             "timestamp": datetime.utcnow().isoformat()
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _debugger_http_error("explain-code", exc) from None
