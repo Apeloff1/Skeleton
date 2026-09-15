@@ -5,6 +5,8 @@ on:
     branches: [main]
   push:
     branches: [main, develop]
+    paths-ignore:
+      - '.github/workflows/branch-clean.yml'
   workflow_dispatch:
 
 concurrency:
