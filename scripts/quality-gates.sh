@@ -30,6 +30,13 @@ printf '\n== Backend Ruff ==\n'
 printf '\n== Backend syntax ==\n'
 python -m compileall -q backend
 
+printf '\n== Provider timeout/failure chaos ==\n'
+(
+  cd backend
+  PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+    tests/test_ai_provider_reliability.py
+)
+
 printf '\n== Runtime, cache, deployment, API, and observability contracts ==\n'
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   tests/test_model_runtime.py \
