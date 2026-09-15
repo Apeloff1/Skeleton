@@ -181,8 +181,9 @@ class JeevesCore:
     """Conversational orchestration with pluggable LLM backends, memory
     matrices, knowledge-graph citations, and the between-turns ResponseCycle.
 
-    Tool execution is deliberately explicit. Plain user text never grants a
-    capability: callers must request tools via ``context["tool_calls"]``.
+    Tool execution is deliberately explicit. Plain user text and request
+    context never grant a capability by themselves: callers must both request
+    tools via ``context["tool_calls"]`` and authorize them via ``allowed_tools``.
     """
 
     def __init__(self, bus: Optional[EventBus] = None, retriever: Optional[Any] = None,
@@ -224,8 +225,30 @@ class JeevesCore:
             raise ValueError("tool already registered")
         self._tools[normalized] = handler
 
-    def _requested_tool_calls(self, context: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Validate explicit tool-call requests before any session mutation."""
+    def _authorized_tool_names(self, allowed_tools: Optional[List[str]]) -> set:
+        """Normalize a trusted per-call capability grant."""
+        if allowed_tools is None:
+            return set()
+        if not isinstance(allowed_tools, list):
+            raise ValueError("allowed_tools must be a list")
+
+        authorized = set()
+        for name in allowed_tools:
+            if not isinstance(name, str):
+                raise ValueError("allowed tool name must be a string")
+            normalized = name.strip().lower()
+            if not _TOOL_NAME_RE.fullmatch(normalized):
+                raise ValueError("invalid allowed tool name")
+            authorized.add(normalized)
+        return authorized
+
+    def _requested_tool_calls(
+        self,
+        context: Optional[Dict[str, Any]],
+        allowed_tools: Optional[List[str]],
+    ) -> List[Dict[str, Any]]:
+        """Validate tool requests and their separate capability grant."""
+        authorized = self._authorized_tool_names(allowed_tools)
         if context is not None and not isinstance(context, dict):
             raise ValueError("context must be an object")
         raw = (context or {}).get("tool_calls", [])
@@ -245,11 +268,16 @@ class JeevesCore:
             if not isinstance(name, str):
                 raise ValueError("tool call name must be a string")
             normalized = name.strip().lower()
-            if not _TOOL_NAME_RE.fullmatch(normalized) or normalized not in self._tools:
+            if not _TOOL_NAME_RE.fullmatch(normalized):
                 raise ValueError("unknown or invalid tool")
             if not isinstance(arguments, dict):
                 raise ValueError("tool call arguments must be an object")
-            calls.append({"name": normalized, "arguments": _copy_bounded_json(arguments)})
+            copied_arguments = _copy_bounded_json(arguments)
+            if normalized not in authorized:
+                raise ValueError("tool not authorized")
+            if normalized not in self._tools:
+                raise ValueError("unknown or invalid tool")
+            calls.append({"name": normalized, "arguments": copied_arguments})
         return calls
 
     def _provider_complete(self, prompt: str, prior_context: List[str], system: str) -> str:
@@ -277,7 +305,13 @@ class JeevesCore:
             })
         return session
 
-    def ask(self, session_id: str, input_text: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def ask(
+        self,
+        session_id: str,
+        input_text: str,
+        context: Optional[Dict[str, Any]] = None,
+        allowed_tools: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
         session = self._memory.get_session(session_id)
         if not session:
             return {"error": "Session not found", "session_id": session_id}
@@ -286,7 +320,7 @@ class JeevesCore:
         if len(input_text) > _MAX_INPUT_CHARS:
             raise ValueError("input_text too large")
 
-        requested_tool_calls = self._requested_tool_calls(context)
+        requested_tool_calls = self._requested_tool_calls(context, allowed_tools)
         prior_context = session.context_window()
         metadata_source = {key: value for key, value in (context or {}).items() if key != "tool_calls"}
         user_metadata = _copy_bounded_json(metadata_source)
