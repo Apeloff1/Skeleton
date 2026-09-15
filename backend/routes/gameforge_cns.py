@@ -8,12 +8,15 @@ base; the vendored ``backend/gameforge/`` package is mounted here under a single
 
 ALL imports are defensive: if any Zaibatsu module fails to load, this router
 still registers with a degraded ``/health`` report instead of crashing boot.
+Runtime module selection is intentionally avoided: every executable import path
+below is statically declared and reviewable.
 """
 from __future__ import annotations
 
-from pathlib import Path
-
 import asyncio
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -24,23 +27,84 @@ router = APIRouter(prefix="/api/gameforge", tags=["gameforge-cns"])
 _MOUNTED: list[str] = []
 _FAILED: dict[str, str] = {}
 
+
 # ── Mount every Zaibatsu sub-router under /api/gameforge ──────────────────────
-_SUBROUTERS = [
-    ("gameforge.api.diaries",         "diaries"),
-    ("gameforge.api.scim",            "scim"),
-    ("gameforge.api.personal_logs",   "logs"),
-    ("gameforge.api.calendar_api",    "calendar"),
-    ("gameforge.api.neuro_api",       "neuro"),
-    ("gameforge.api.decade_logs_api", "decade"),
-    ("gameforge.api.coherence_api",   "coherence"),
-    ("gameforge.api.math_api",        "math"),
-    ("gameforge.api.exocortex_api",   "exocortex"),
-    ("gameforge.api.security_api",    "security"),
+def _diaries_router():
+    from gameforge.api.diaries import router as subrouter
+
+    return subrouter
+
+
+def _scim_router():
+    from gameforge.api.scim import router as subrouter
+
+    return subrouter
+
+
+def _personal_logs_router():
+    from gameforge.api.personal_logs import router as subrouter
+
+    return subrouter
+
+
+def _calendar_router():
+    from gameforge.api.calendar_api import router as subrouter
+
+    return subrouter
+
+
+def _neuro_router():
+    from gameforge.api.neuro_api import router as subrouter
+
+    return subrouter
+
+
+def _decade_router():
+    from gameforge.api.decade_logs_api import router as subrouter
+
+    return subrouter
+
+
+def _coherence_router():
+    from gameforge.api.coherence_api import router as subrouter
+
+    return subrouter
+
+
+def _math_router():
+    from gameforge.api.math_api import router as subrouter
+
+    return subrouter
+
+
+def _exocortex_router():
+    from gameforge.api.exocortex_api import router as subrouter
+
+    return subrouter
+
+
+def _security_router():
+    from gameforge.api.security_api import router as subrouter
+
+    return subrouter
+
+
+_SUBROUTERS: list[tuple[str, Callable[[], APIRouter]]] = [
+    ("diaries", _diaries_router),
+    ("scim", _scim_router),
+    ("logs", _personal_logs_router),
+    ("calendar", _calendar_router),
+    ("neuro", _neuro_router),
+    ("decade", _decade_router),
+    ("coherence", _coherence_router),
+    ("math", _math_router),
+    ("exocortex", _exocortex_router),
+    ("security", _security_router),
 ]
-for _mod_path, _label in _SUBROUTERS:
+
+for _label, _loader in _SUBROUTERS:
     try:
-        _mod = __import__(_mod_path, fromlist=["router"])
-        router.include_router(_mod.router)
+        router.include_router(_loader())
         _MOUNTED.append(_label)
     except Exception as e:  # noqa: BLE001 — degrade, never crash boot
         _FAILED[_label] = f"{type(e).__name__}: {e}"[:160]
@@ -50,12 +114,24 @@ for _mod_path, _label in _SUBROUTERS:
 async def gameforge_rooms(limit: int = 20):
     """Room registry summary — total count (now 1000) + a capability sample."""
     from gameforge.rooms.full_room_registry import all_rooms
+
     rooms = all_rooms()
-    sample = [{"room_id": k, **{kk: v.get(kk) for kk in
-              ("division", "api_access", "mcp_access", "concurrent_query")}}
-              for k, v in list(rooms.items())[:max(1, min(limit, 100))]]
+    sample = [
+        {
+            "room_id": k,
+            **{
+                kk: v.get(kk)
+                for kk in ("division", "api_access", "mcp_access", "concurrent_query")
+            },
+        }
+        for k, v in list(rooms.items())[: max(1, min(limit, 100))]
+    ]
     concurrent = sum(1 for v in rooms.values() if v.get("concurrent_query"))
-    return {"total": len(rooms), "concurrent_query_capable": concurrent, "sample": sample}
+    return {
+        "total": len(rooms),
+        "concurrent_query_capable": concurrent,
+        "sample": sample,
+    }
 
 
 class RoomQuery(BaseModel):
@@ -70,6 +146,7 @@ async def gameforge_room_query(room_id: str, body: RoomQuery):
     External HTTP is gated by GAMEFORGE_ENABLE_EXTERNAL_APIS (inward-focused default)."""
     from gameforge.rooms.full_room_registry import all_rooms
     from gameforge.rooms.room_api_gateway import query_concurrent
+
     if room_id not in all_rooms():
         return JSONResponse({"error": f"unknown room '{room_id}'"}, status_code=404)
     return await query_concurrent(room_id, body.mcp_queries, body.api_targets, body.sources)
@@ -88,6 +165,7 @@ async def gameforge_broadcast(body: BroadcastQuery):
     (bounded by a semaphore) and aggregate the mesh's answers."""
     from gameforge.rooms.full_room_registry import all_rooms
     from gameforge.rooms.room_api_gateway import query_concurrent
+
     rooms = list(all_rooms().keys())
     targets = rooms[: max(1, min(body.max_rooms, 1000))]
     sem = asyncio.Semaphore(max(1, min(body.concurrency, 128)))
@@ -116,70 +194,160 @@ def _trim(out):
     return str(out)[:800]
 
 
+# Static activation dispatch. Each callable contains a fixed import path so request
+# data can never select a Python module or attribute to execute.
+def _run_cns_execution_cycle() -> Any:
+    from gameforge.cns_execution_orchestrator import run_full_cns_cycle
+
+    return run_full_cns_cycle()
+
+
+def _run_full_cns_activation() -> Any:
+    from gameforge.integration.full_cns_integration_layer import FullCNSIntegrationLayer
+
+    return FullCNSIntegrationLayer().activate_full_cns()
+
+
+def _run_system_health_check() -> Any:
+    from gameforge.cns_full_integration_layer import CNSFullIntegrationLayer
+
+    return CNSFullIntegrationLayer().run_full_system_health_check()
+
+
+def _run_begin_cns_activation() -> Any:
+    from gameforge.bootstrap.begin_cns_activation import BeginCNSActivation
+
+    return BeginCNSActivation().run()
+
+
+_ACTIVATION_STEPS: list[tuple[str, Callable[[], Any]]] = [
+    ("cns_execution_cycle", _run_cns_execution_cycle),
+    ("full_cns_activation", _run_full_cns_activation),
+    ("system_health_check", _run_system_health_check),
+    ("begin_cns_activation", _run_begin_cns_activation),
+]
+
+
 @router.post("/activate")
 async def gameforge_activate():
-    """Activate the newly-merged CNS execution + bootstrap engines so they become
-    LIVE capabilities (not dormant modules). Each step runs in a worker thread and
-    is fully guarded — a failing engine is reported, never crashes the request."""
-    import asyncio as _aio
-    steps = [
-        ("cns_execution_cycle", "gameforge.cns_execution_orchestrator", "run_full_cns_cycle", None),
-        ("full_cns_activation", "gameforge.integration.full_cns_integration_layer", "FullCNSIntegrationLayer", "activate_full_cns"),
-        ("system_health_check", "gameforge.cns_full_integration_layer", "CNSFullIntegrationLayer", "run_full_system_health_check"),
-        ("begin_cns_activation", "gameforge.bootstrap.begin_cns_activation", "BeginCNSActivation", "run"),
-    ]
+    """Activate the explicitly approved CNS execution + bootstrap engines.
 
-    def _one(mod: str, attr: str, method):
-        m = __import__(mod, fromlist=[attr])
-        obj = getattr(m, attr)
-        return getattr(obj(), method)() if method else obj()
+    Each step runs in a worker thread and is fully guarded — a failing engine is
+    reported, never crashes the request. Import targets are static and reviewable.
+    """
+    import asyncio as _aio
 
     results: dict = {}
-    for name, mod, attr, method in steps:
+    for name, runner in _ACTIVATION_STEPS:
         try:
-            out = await _aio.wait_for(_aio.to_thread(_one, mod, attr, method), timeout=25)
+            out = await _aio.wait_for(_aio.to_thread(runner), timeout=25)
             results[name] = {"ok": True, "result": _trim(out)}
         except Exception as e:  # noqa: BLE001
             results[name] = {"ok": False, "error": f"{type(e).__name__}: {e}"[:180]}
     activated = sum(1 for r in results.values() if r["ok"])
-    return {"activated": activated, "total": len(steps),
-            "status": "live" if activated else "degraded", "engines": results}
+    return {
+        "activated": activated,
+        "total": len(_ACTIVATION_STEPS),
+        "status": "live" if activated else "degraded",
+        "engines": results,
+    }
+
+
+# Static architecture probes. Returning the imported module makes each import a
+# real, used expression while retaining defensive per-module reporting.
+def _probe_observability() -> Any:
+    from gameforge.enterprise import observability
+
+    return observability
+
+
+def _probe_hybrid_rag_engine() -> Any:
+    from gameforge.exocortex.agentic import hybrid_rag_engine
+
+    return hybrid_rag_engine
+
+
+def _probe_vector_shard_manager() -> Any:
+    from gameforge.exocortex.agentic import vector_shard_manager
+
+    return vector_shard_manager
+
+
+def _probe_latent_metrics_table() -> Any:
+    from gameforge.exocortex.agentic import latent_metrics_table
+
+    return latent_metrics_table
+
+
+def _probe_database_architecture() -> Any:
+    from gameforge.persistence import marathon_store
+
+    return marathon_store
+
+
+def _probe_dspy_pipeline() -> Any:
+    from gameforge.exocortex.agentic import dspy_game_creation_pipeline
+
+    return dspy_game_creation_pipeline
+
+
+def _probe_grok_thinking() -> Any:
+    from gameforge.exocortex.agentic import grok_thinking
+
+    return grok_thinking
+
+
+def _probe_mcp_connectors() -> Any:
+    from gameforge.exocortex.agentic import mcp_connectors
+
+    return mcp_connectors
+
+
+def _probe_jeeves_zaibatsu() -> Any:
+    from gameforge.exocortex.zaibatsu import jeeves_zaibatsu
+
+    return jeeves_zaibatsu
+
+
+_ARCHITECTURE_PROBES: dict[str, Callable[[], Any]] = {
+    "observability": _probe_observability,
+    "hybrid_rag_engine": _probe_hybrid_rag_engine,
+    "vector_shard_manager": _probe_vector_shard_manager,
+    "latent_metrics_table": _probe_latent_metrics_table,
+    "database_architecture": _probe_database_architecture,
+    "dspy_pipeline": _probe_dspy_pipeline,
+    "grok_thinking": _probe_grok_thinking,
+    "mcp_connectors": _probe_mcp_connectors,
+    "jeeves_zaibatsu": _probe_jeeves_zaibatsu,
+}
 
 
 @router.get("/architecture")
 async def gameforge_architecture():
-    """Item 31 — prove the core Zaibatsu architectural additions are LIVE by
-    importing each subsystem module and reporting availability."""
-    modules = {
-        "observability":        "gameforge.enterprise.observability",
-        "hybrid_rag_engine":    "gameforge.exocortex.agentic.hybrid_rag_engine",
-        "vector_shard_manager": "gameforge.exocortex.agentic.vector_shard_manager",
-        "latent_metrics_table": "gameforge.exocortex.agentic.latent_metrics_table",
-        "database_architecture": "gameforge.persistence.marathon_store",
-        "dspy_pipeline":        "gameforge.exocortex.agentic.dspy_game_creation_pipeline",
-        "grok_thinking":        "gameforge.exocortex.agentic.grok_thinking",
-        "mcp_connectors":       "gameforge.exocortex.agentic.mcp_connectors",
-        "jeeves_zaibatsu":      "gameforge.exocortex.zaibatsu.jeeves_zaibatsu",
-    }
+    """Item 31 — report availability of statically approved Zaibatsu modules."""
     report: dict = {}
-    for name, path in modules.items():
+    for name, probe in _ARCHITECTURE_PROBES.items():
         try:
-            __import__(path)
+            probe()
             report[name] = "live"
         except Exception as e:  # noqa: BLE001
             report[name] = f"unavailable: {type(e).__name__}"
     live = sum(1 for v in report.values() if v == "live")
-    return {"live": live, "total": len(modules), "modules": report}
+    return {"live": live, "total": len(_ARCHITECTURE_PROBES), "modules": report}
 
 
 @router.get("/status")
 async def gameforge_status():
     """Which Zaibatsu sub-systems mounted successfully."""
-    from gameforge.version import __version__, __codename__
+    from gameforge.version import __codename__, __version__
+
     return {
-        "codename": __codename__, "version": __version__,
-        "mounted": _MOUNTED, "mounted_count": len(_MOUNTED),
-        "failed": _FAILED, "cockpit": "/api/gameforge/cockpit",
+        "codename": __codename__,
+        "version": __version__,
+        "mounted": _MOUNTED,
+        "mounted_count": len(_MOUNTED),
+        "failed": _FAILED,
+        "cockpit": "/api/gameforge/cockpit",
     }
 
 
@@ -200,6 +368,7 @@ async def gameforge_health():
     report: dict = {"ok": True, "mounted": _MOUNTED, "failed": _FAILED}
     try:
         from gameforge.rooms.full_room_registry import all_rooms
+
         report["rooms"] = len(all_rooms())
     except Exception as e:  # noqa: BLE001
         report["ok"] = False
