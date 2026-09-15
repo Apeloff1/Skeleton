@@ -68,6 +68,7 @@ web-build/
 
 # Generated agent handoff / local runtime state; source/config under .emergent stays tracked.
 .emergent/summary.txt
+.emergent/emergent.yml
 .emergent/cron/applied.hash
 
 # ==========================================================================
