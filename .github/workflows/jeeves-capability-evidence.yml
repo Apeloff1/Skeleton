@@ -1,0 +1,45 @@
+name: Jeeves Capability Evidence
+
+on:
+  pull_request:
+    paths:
+      - "skeleton/jeeves/evidence_core.py"
+      - "skeleton/jeeves/llm_core.py"
+      - "tests/test_jeeves_evidence_capability_bridge.py"
+      - ".github/workflows/jeeves-capability-evidence.yml"
+  push:
+    branches: [main, develop]
+    paths:
+      - "skeleton/jeeves/evidence_core.py"
+      - "skeleton/jeeves/llm_core.py"
+      - "tests/test_jeeves_evidence_capability_bridge.py"
+      - ".github/workflows/jeeves-capability-evidence.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jeeves-capability-evidence-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capability-evidence-contract:
+    name: Capability evidence contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Install focused test dependency
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+      - name: Compile bridge surface
+        run: python -m compileall -q skeleton/jeeves/evidence_core.py skeleton/jeeves/llm_core.py
+      - name: Run canonical capability bridge regressions
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest -q --noconftest tests/test_jeeves_evidence_capability_bridge.py
