@@ -89,6 +89,21 @@ async def test_compat_chat_preserves_local_history(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_legacy_aliases_delegate_to_send_message(monkeypatch) -> None:
+    adapter = _FakeAdapter()
+    monkeypatch.setattr(
+        "core.ai_provider_compat.ProviderRegistry.from_env",
+        lambda: _FakeRegistry(adapter),
+    )
+
+    chat = LlmChat("legacy-key", "session", "old rules").with_system_message("rules")
+    assert await chat.chat(UserMessage(content="one")) == "answer"
+    assert await chat.generate(UserMessage(message="two")) == "answer"
+    assert [request.prompt for request in adapter.requests] == ["one", "two"]
+    assert all(request.instructions == "rules" for request in adapter.requests)
+
+
+@pytest.mark.asyncio
 async def test_multimodal_legacy_surface_fails_explicitly() -> None:
     chat = LlmChat().with_params(modalities=["image", "text"])
     with pytest.raises(ProviderUnavailableError, match="multimodal"):
@@ -96,7 +111,8 @@ async def test_multimodal_legacy_surface_fails_explicitly() -> None:
 
 
 def test_user_message_and_response_are_legacy_compatible() -> None:
-    message = UserMessage(text="hello")
-    assert message.content == "hello"
+    assert UserMessage(text="hello").content == "hello"
+    assert UserMessage(content="hello").text == "hello"
+    assert UserMessage(message="hello").text == "hello"
     response = ChatResponse("world")
     assert response.content == "world"
