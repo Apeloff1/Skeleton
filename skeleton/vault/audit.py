@@ -16,6 +16,7 @@ hash chain is broken or unreadable (fail closed).
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -204,8 +205,23 @@ class AuditLog:
         self._entries: List[AuditEntry] = []
         self._last_hash: Optional[str] = None
         self._path: Optional[Path] = Path(path) if path is not None else None
-        if self._path is not None and restore:
-            self._restore_chain()
+        self._append_poisoned = False
+        self._append_requires_restore = False
+
+        if self._path is not None:
+            if restore:
+                self._restore_chain()
+            else:
+                try:
+                    self._append_requires_restore = self._path.stat().st_size > 0
+                except FileNotFoundError:
+                    self._append_requires_restore = False
+                except OSError as exc:
+                    raise AuditChainBroken(
+                        "WORM audit chain state unreadable — refusing unverified append",
+                        context={"path": str(self._path), "error": str(exc)},
+                        cause=exc,
+                    ) from exc
 
     @property
     def path(self) -> Optional[Path]:
@@ -232,16 +248,30 @@ class AuditLog:
         outcome: str = "success",
         metadata: Optional[Dict[str, Any]] = None,
     ) -> AuditEntry:
+        if self._append_poisoned:
+            raise AuditChainBroken(
+                "WORM audit append state is uncertain after a persistence failure — "
+                "reopen the ledger before appending",
+                context={"path": str(self._path) if self._path else None},
+            )
+        if self._append_requires_restore:
+            raise AuditChainBroken(
+                "WORM audit ledger contains existing data but restore was disabled — "
+                "reopen with restore=True before appending",
+                context={"path": str(self._path) if self._path else None},
+            )
+
         # Sanitizer boundary: only validated hex fingerprint enters the entry /
         # persist path (CodeQL py/clear-text-storage-sensitive-data).
         fp = _subject_fp(subject_key)
+        metadata_snapshot = copy.deepcopy(metadata) if metadata is not None else {}
         entry = AuditEntry(
             entry_id=entry_id,
             actor=actor,
             action=action,
             subject_fp=fp,
             outcome=outcome,
-            metadata=metadata or {},
+            metadata=metadata_snapshot,
             previous_hash=self._last_hash,
             timestamp=self._now(),
         )
@@ -257,10 +287,21 @@ class AuditLog:
             hash=hash_value,
             timestamp=entry.timestamp,
         )
+
+        # Durable state is authoritative. Never advance the in-memory chain
+        # until the append has been flushed and fsynced successfully.
+        if self._path is not None:
+            try:
+                self._persist(entry)
+            except OSError:
+                # A failed append may have partially reached storage. Refuse
+                # further writes on this instance until a reopen verifies the
+                # durable chain and reconstructs the correct head.
+                self._append_poisoned = True
+                raise
+
         self._entries.append(entry)
         self._last_hash = entry.hash
-        if self._path is not None:
-            self._persist(entry)
         return entry
 
     def tamper_check(self) -> Tuple[bool, int]:
@@ -328,40 +369,43 @@ class AuditLog:
         assert self._path is not None
         if not self._path.exists():
             return
+
+        prev: Optional[str] = None
         try:
-            lines = self._path.read_text(encoding="utf-8").splitlines()
-        except OSError as exc:
+            with self._path.open("r", encoding="utf-8") as fh:
+                for line_no, line in enumerate(fh, start=1):
+                    if not line.strip():
+                        continue
+                    try:
+                        raw = json.loads(line)
+                        entry = _entry_from_dict(raw)
+                    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+                        raise AuditChainBroken(
+                            f"WORM audit chain unreadable at line {line_no} — refusing to start",
+                            context={"path": str(self._path), "line": line_no},
+                            cause=exc,
+                        ) from exc
+                    if entry.previous_hash != prev or entry.hash != _compute_hash(entry):
+                        raise AuditChainBroken(
+                            f"WORM audit chain broken at index {len(self._entries)} "
+                            "— refusing to start",
+                            context={
+                                "path": str(self._path),
+                                "first_bad_index": len(self._entries),
+                                "line": line_no,
+                            },
+                        )
+                    self._entries.append(entry)
+                    prev = entry.hash
+                    self._last_hash = entry.hash
+        except AuditChainBroken:
+            raise
+        except (OSError, UnicodeError) as exc:
             raise AuditChainBroken(
                 "WORM audit chain unreadable — refusing to start",
                 context={"path": str(self._path), "error": str(exc)},
                 cause=exc,
             ) from exc
-
-        prev: Optional[str] = None
-        for line_no, line in enumerate(lines, start=1):
-            if not line.strip():
-                continue
-            try:
-                raw = json.loads(line)
-                entry = _entry_from_dict(raw)
-            except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
-                raise AuditChainBroken(
-                    f"WORM audit chain unreadable at line {line_no} — refusing to start",
-                    context={"path": str(self._path), "line": line_no},
-                    cause=exc,
-                ) from exc
-            if entry.previous_hash != prev or entry.hash != _compute_hash(entry):
-                raise AuditChainBroken(
-                    f"WORM audit chain broken at index {len(self._entries)} — refusing to start",
-                    context={
-                        "path": str(self._path),
-                        "first_bad_index": len(self._entries),
-                        "line": line_no,
-                    },
-                )
-            self._entries.append(entry)
-            prev = entry.hash
-            self._last_hash = entry.hash
 
     def _persist(self, entry: AuditEntry) -> None:
         assert self._path is not None
