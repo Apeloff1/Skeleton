@@ -6,7 +6,7 @@ on:
     branches:
       - main
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/5 * * * *"
 
 concurrency:
   group: queue-drain-${{ github.repository }}
@@ -35,6 +35,7 @@ jobs:
           python3 - <<'PY'
           import json
           import os
+          import time
           import urllib.error
           import urllib.parse
           import urllib.request
@@ -64,95 +65,146 @@ jobs:
               except urllib.error.HTTPError as exc:
                   return exc.code, None
 
-          # Resolve the only SHA that queued main-branch work is allowed to keep.
-          status, branch = request(f'/repos/{repo}/branches/main')
-          if status != 200 or not isinstance(branch, dict):
-              raise SystemExit(f'failed to resolve main HEAD: HTTP {status}')
-          main_sha = ((branch.get('commit') or {}).get('sha') or '').strip()
-          if not main_sha:
-              raise SystemExit('failed to resolve main HEAD SHA')
+          def resolve_main_sha():
+              status, branch = request(f'/repos/{repo}/branches/main')
+              if status != 200 or not isinstance(branch, dict):
+                  raise SystemExit(f'failed to resolve main HEAD: HTTP {status}')
+              sha = ((branch.get('commit') or {}).get('sha') or '').strip()
+              if not sha:
+                  raise SystemExit('failed to resolve main HEAD SHA')
+              return sha
 
-          queued = []
-          for page in range(1, 11):
-              query = urllib.parse.urlencode({
-                  'status': 'queued',
-                  'per_page': 100,
-                  'page': page,
-              })
-              status, payload = request(f'/repos/{repo}/actions/runs?{query}')
-              if status != 200 or not isinstance(payload, dict):
-                  raise SystemExit(f'failed to list queued runs: HTTP {status}')
-              batch = payload.get('workflow_runs') or []
-              queued.extend(batch)
-              if len(batch) < 100:
-                  break
+          def list_queued():
+              queued = []
+              for page in range(1, 11):
+                  query = urllib.parse.urlencode({
+                      'status': 'queued',
+                      'per_page': 100,
+                      'page': page,
+                  })
+                  status, payload = request(f'/repos/{repo}/actions/runs?{query}')
+                  if status != 200 or not isinstance(payload, dict):
+                      raise SystemExit(f'failed to list queued runs: HTTP {status}')
+                  batch = payload.get('workflow_runs') or []
+                  queued.extend(batch)
+                  if len(batch) < 100:
+                      break
+              return queued
 
-          # Policy:
-          # 1. Any queued main run not targeting live main HEAD is obsolete.
-          # 2. On every other ref/event tuple, preserve only the newest queued run.
-          # 3. Never cancel this drainer's own current run.
-          seen = set()
-          selected = []
-          obsolete_main = 0
-          duplicate = 0
-          for run in sorted(queued, key=lambda item: item.get('created_at') or '', reverse=True):
-              run_id = int(run.get('id') or 0)
-              if run_id == current:
-                  continue
+          attempted = set()
+          totals = {
+              'inspected': 0,
+              'selected': 0,
+              'obsolete_main': 0,
+              'duplicate': 0,
+              'accepted': 0,
+              'moved': 0,
+              'failed': 0,
+          }
+          pass_lines = []
+          latest_main_sha = ''
 
-              if (
-                  (run.get('head_branch') or '') == 'main'
-                  and (run.get('head_sha') or '') != main_sha
+          # GitHub-managed security and dependency runs can arrive several
+          # seconds after a push. Sweep repeatedly so delayed fanout is folded
+          # into the same cleanup run instead of requiring another commit.
+          for pass_number in range(1, 5):
+              main_sha = resolve_main_sha()
+              latest_main_sha = main_sha
+              queued = list_queued()
+              totals['inspected'] += len(queued)
+
+              seen = set()
+              selected = []
+              obsolete_main = 0
+              duplicate = 0
+
+              for run in sorted(
+                  queued,
+                  key=lambda item: item.get('created_at') or '',
+                  reverse=True,
               ):
-                  selected.append(run)
-                  obsolete_main += 1
-                  continue
+                  run_id = int(run.get('id') or 0)
+                  if not run_id or run_id == current or run_id in attempted:
+                      continue
 
-              key = (
-                  int(run.get('workflow_id') or 0),
-                  run.get('head_branch') or '',
-                  run.get('event') or '',
-              )
-              if key in seen:
-                  selected.append(run)
-                  duplicate += 1
-              else:
-                  seen.add(key)
+                  if (
+                      (run.get('head_branch') or '') == 'main'
+                      and (run.get('head_sha') or '') != main_sha
+                  ):
+                      selected.append(run)
+                      obsolete_main += 1
+                      continue
 
-          accepted = moved = failed = 0
-          for run in selected:
-              run_id = int(run['id'])
-              status, _ = request(
-                  f'/repos/{repo}/actions/runs/{run_id}/cancel',
-                  method='POST',
+                  key = (
+                      int(run.get('workflow_id') or 0),
+                      run.get('head_branch') or '',
+                      run.get('event') or '',
+                  )
+                  if key in seen:
+                      selected.append(run)
+                      duplicate += 1
+                  else:
+                      seen.add(key)
+
+              accepted = moved = failed = 0
+              for run in selected:
+                  run_id = int(run['id'])
+                  attempted.add(run_id)
+                  status, _ = request(
+                      f'/repos/{repo}/actions/runs/{run_id}/cancel',
+                      method='POST',
+                  )
+                  if status in {200, 202}:
+                      accepted += 1
+                  elif status in {404, 409, 422}:
+                      moved += 1
+                  else:
+                      failed += 1
+                      print(f'cancel failed: id={run_id} status={status}')
+
+              totals['selected'] += len(selected)
+              totals['obsolete_main'] += obsolete_main
+              totals['duplicate'] += duplicate
+              totals['accepted'] += accepted
+              totals['moved'] += moved
+              totals['failed'] += failed
+
+              line = (
+                  f'pass={pass_number} main_sha={main_sha} inspected={len(queued)} '
+                  f'selected={len(selected)} obsolete_main={obsolete_main} '
+                  f'duplicate={duplicate} accepted={accepted} moved={moved} '
+                  f'failed={failed}'
               )
-              if status in {200, 202}:
-                  accepted += 1
-              elif status in {404, 409, 422}:
-                  moved += 1
-              else:
-                  failed += 1
-                  print(f'cancel failed: id={run_id} status={status}')
+              print(line)
+              pass_lines.append(line)
+
+              if pass_number < 4:
+                  time.sleep(8)
 
           print(
-              f'main_sha={main_sha} inspected={len(queued)} selected={len(selected)} '
-              f'obsolete_main={obsolete_main} duplicate={duplicate} '
-              f'accepted={accepted} moved={moved} failed={failed}'
+              'totals '
+              + ' '.join(f'{key}={value}' for key, value in totals.items())
           )
 
           summary = os.environ.get('GITHUB_STEP_SUMMARY')
           if summary:
               with open(summary, 'a', encoding='utf-8') as handle:
                   handle.write('## Actions queue drain\n')
-                  handle.write(f'- Live main SHA: `{main_sha}`\n')
-                  handle.write(f'- Queued runs inspected: {len(queued)}\n')
-                  handle.write(f'- Obsolete main runs selected: {obsolete_main}\n')
-                  handle.write(f'- Older duplicate runs selected: {duplicate}\n')
-                  handle.write(f'- Cancel requests accepted: {accepted}\n')
-                  handle.write(f'- Already moved/completed: {moved}\n')
-                  handle.write(f'- Cancellation failures: {failed}\n')
-                  handle.write('- Safety: current main HEAD and newest queued run for every remaining workflow/ref/event tuple are preserved; in-progress work is never cancelled.\n')
+                  handle.write(f'- Latest live main SHA: `{latest_main_sha}`\n')
+                  handle.write('- Sweep passes: 4 over ~24 seconds\n')
+                  handle.write(f'- Queued observations: {totals["inspected"]}\n')
+                  handle.write(f'- Obsolete main selections: {totals["obsolete_main"]}\n')
+                  handle.write(f'- Duplicate selections: {totals["duplicate"]}\n')
+                  handle.write(f'- Cancel requests accepted: {totals["accepted"]}\n')
+                  handle.write(f'- Already moved/completed: {totals["moved"]}\n')
+                  handle.write(f'- Cancellation failures: {totals["failed"]}\n')
+                  handle.write('- Safety: current main HEAD, unique current-head work, PR work, and all in-progress runs are preserved.\n')
+                  handle.write('\n### Passes\n')
+                  for line in pass_lines:
+                      handle.write(f'- `{line}`\n')
 
-          if failed:
-              raise SystemExit(f'queue drain had {failed} cancellation failure(s)')
+          if totals['failed']:
+              raise SystemExit(
+                  f'queue drain had {totals["failed"]} cancellation failure(s)'
+              )
           PY
