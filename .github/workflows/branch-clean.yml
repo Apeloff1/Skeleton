@@ -1,4 +1,4 @@
-name: Prune redundant branches
+name: Prune merged branches safely
 
 on:
   workflow_dispatch:
@@ -17,7 +17,7 @@ permissions: {}
 
 jobs:
   prune:
-    name: Delete only content-redundant branch refs
+    name: Delete only proven-redundant branch refs
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -31,6 +31,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           auth_dir="$RUNNER_TEMP/branch-clean-auth"
           mkdir -p "$auth_dir"
           cat > "$auth_dir/askpass.sh" <<'EOF'
@@ -49,27 +50,30 @@ jobs:
             echo "GIT_ASKPASS=$GIT_ASKPASS"
             echo 'GIT_ASKPASS_REQUIRE=force'
           } >> "$GITHUB_ENV"
+
           git init repo
           cd repo
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --quiet --prune --no-tags --filter=blob:none origin '+refs/heads/*:refs/remotes/origin/*'
 
-      - name: Classify and prune redundant branches
+      - name: Classify and prune proven-redundant branches
         shell: bash
         run: |
           set -euo pipefail
           cd repo
+
           main_ref=refs/remotes/origin/main
           classified_main=$(git rev-parse "$main_ref")
-          declare -A classification=()
           declare -A open_pr_heads=()
+          declare -A merged_pr_tips=()
           delete_branches=()
           delete_tips=()
           ancestor_count=0
-          equivalent_count=0
+          merged_pr_count=0
           unique_count=0
           protected_count=0
           open_pr_count=0
+          late_open_pr_count=0
           : > ../preserved-branches.txt
 
           load_open_pr_heads() {
@@ -84,25 +88,24 @@ jobs:
             )
           }
 
-          is_patch_equivalent() {
-            local base="$1"
-            local tip="$2"
-            local merge_base
-            if git diff --quiet "$base" "$tip"; then
-              return 0
-            fi
-            merge_base=$(git merge-base "$base" "$tip" || true)
-            [[ -n "$merge_base" ]] || return 1
-            if git rev-list --merges "${merge_base}..${tip}" | grep -q .; then
-              return 1
-            fi
-            ! git cherry "$base" "$tip" | grep -q '^+'
+          load_merged_pr_tips() {
+            local branch tip
+            merged_pr_tips=()
+            while IFS=$'\t' read -r branch tip; do
+              [[ -n "$branch" && -n "$tip" ]] || continue
+              merged_pr_tips["${branch}:${tip}"]=1
+            done < <(
+              gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=closed&per_page=100&sort=updated&direction=desc" \
+                --jq '.[] | select(.merged_at != null and .head.repo.full_name == .base.repo.full_name) | [.head.ref, .head.sha] | @tsv'
+            )
           }
 
           load_open_pr_heads
+          load_merged_pr_tips
 
           while read -r tip branch; do
             [[ -n "$tip" && -n "$branch" ]] || continue
+
             case "$branch" in
               main|develop|release/*|backup/*|keep/*)
                 protected_count=$((protected_count + 1))
@@ -117,34 +120,21 @@ jobs:
               continue
             fi
 
-            if [[ -z "${classification[$tip]+x}" ]]; then
-              if git merge-base --is-ancestor "$tip" "$main_ref"; then
-                classification[$tip]='ancestor'
-              elif is_patch_equivalent "$main_ref" "$tip"; then
-                classification[$tip]='equivalent'
-              else
-                classification[$tip]='unique'
-              fi
+            if git merge-base --is-ancestor "$tip" "$main_ref"; then
+              ancestor_count=$((ancestor_count + 1))
+              delete_branches+=("$branch")
+              delete_tips+=("$tip")
+            elif [[ -n "${merged_pr_tips[${branch}:${tip}]+x}" ]]; then
+              merged_pr_count=$((merged_pr_count + 1))
+              delete_branches+=("$branch")
+              delete_tips+=("$tip")
+            else
+              unique_count=$((unique_count + 1))
+              printf '%s %s unique-or-unproven\n' "$branch" "$tip" >> ../preserved-branches.txt
             fi
-
-            case "${classification[$tip]}" in
-              ancestor)
-                ancestor_count=$((ancestor_count + 1))
-                delete_branches+=("$branch")
-                delete_tips+=("$tip")
-                ;;
-              equivalent)
-                equivalent_count=$((equivalent_count + 1))
-                delete_branches+=("$branch")
-                delete_tips+=("$tip")
-                ;;
-              unique)
-                unique_count=$((unique_count + 1))
-                printf '%s %s unique-or-complex\n' "$branch" "$tip" >> ../preserved-branches.txt
-                ;;
-            esac
           done < <(git for-each-ref --format='%(objectname) %(refname:strip=3)' refs/remotes/origin | sort -k2,2)
 
+          # Never act on a stale classification if main moved while the sweep was running.
           git fetch --quiet --no-tags --filter=blob:none origin '+refs/heads/main:refs/remotes/origin/main'
           current_main=$(git rev-parse "$main_ref")
           if [[ "$current_main" != "$classified_main" ]]; then
@@ -152,17 +142,16 @@ jobs:
               echo '## Branch cleanup deferred'
               echo '- main moved while branches were being classified.'
               echo '- No branch refs were deleted from the stale classification.'
-              echo '- The next scheduled sweep will reclassify against the new main tip.'
+              echo '- The next sweep will reclassify against the new main tip.'
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
-          # Re-read open PR heads immediately before deletion. If a PR opened while
-          # classification was running, preserve its branch even if it was previously eligible.
+          # Re-read open PR heads immediately before deletion. A PR created during
+          # classification must win over cleanup even when its branch is redundant.
           load_open_pr_heads
           safe_delete_branches=()
           safe_delete_tips=()
-          late_open_pr_count=0
           for ((i=0; i<${#delete_branches[@]}; i++)); do
             branch="${delete_branches[$i]}"
             tip="${delete_tips[$i]}"
@@ -183,6 +172,7 @@ jobs:
             batch_tips=("${safe_delete_tips[@]:offset:delete_batch_size}")
             lease_args=()
             refspecs=()
+
             for ((i=0; i<${#batch_branches[@]}; i++)); do
               branch="${batch_branches[$i]}"
               tip="${batch_tips[$i]}"
@@ -195,6 +185,7 @@ jobs:
               continue
             fi
 
+            # Isolate a moved/protected ref instead of blocking deletion of the rest.
             for ((i=0; i<${#batch_branches[@]}; i++)); do
               branch="${batch_branches[$i]}"
               tip="${batch_tips[$i]}"
@@ -207,18 +198,18 @@ jobs:
           done
 
           {
-            echo '## Redundant branch cleanup'
+            echo '## Safe branch pruning'
             echo "- Fully merged branch refs eligible: $ancestor_count"
-            echo "- Patch-equivalent branch refs eligible: $equivalent_count"
-            echo "- Unique/complex branch refs preserved: $unique_count"
+            echo "- Exact merged-PR head refs eligible: $merged_pr_count"
+            echo "- Unique/unproven branch refs preserved: $unique_count"
             echo "- Long-lived/protected-name refs preserved: $protected_count"
             echo "- Open-PR branch refs preserved during classification: $open_pr_count"
             echo "- Newly-opened PR branch refs preserved before deletion: $late_open_pr_count"
             echo "- Branch refs deleted: $deleted"
             echo "- Moved or server-protected refs preserved at deletion time: $raced_or_blocked"
-            echo '- main was never modified by this workflow.'
-            echo '- Open pull-request heads are fail-safe preserved.'
-            echo '- Every deletion used an expected-tip lease.'
+            echo '- main is never modified by this workflow.'
+            echo '- Patch-equivalence heuristics are not used for deletion.'
+            echo '- Every deletion uses an expected-tip lease.'
             if [[ -s ../preserved-branches.txt ]]; then
               echo
               echo '### Preserved branch sample'
