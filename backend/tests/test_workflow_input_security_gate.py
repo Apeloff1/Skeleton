@@ -83,6 +83,38 @@ def test_rejects_chomped_folded_block_scalar_bypass(tmp_path: Path) -> None:
     assert any("direct workflow input interpolation" in finding for finding in findings)
 
 
+def test_rejects_anchored_block_scalar_input_interpolation(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: workflow_dispatch\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: &command >-\n          echo \"${{ inputs.payload }}\"\n",
+    )
+    assert any("direct workflow input interpolation" in finding for finding in findings)
+
+
+def test_rejects_tagged_block_scalar_input_interpolation(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: workflow_dispatch\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: !!str |\n          echo \"${{ github.event.inputs.payload }}\"\n",
+    )
+    assert any("direct workflow input interpolation" in finding for finding in findings)
+
+
+def test_rejects_aliased_run_shell(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: workflow_dispatch\nenv:\n  HIDDEN_RUN: &hidden_run \"echo '${{ inputs.payload }}'\"\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: *hidden_run\n",
+    )
+    assert any("aliased run shell is forbidden" in finding for finding in findings)
+
+
+def test_allows_safe_anchored_block_scalar(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: &safe_command |\n          echo safe\n",
+    )
+    assert findings == []
+
+
 def test_rejects_folded_input_expression_split_across_lines(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
