@@ -23,9 +23,9 @@ Correlation identifiers are operational metadata, not a place to store credentia
 
 `ObservableOrchestrator` is the canonical observable execution boundary for API-, agent-, and tool-backed orchestration. It owns a `StructuredLogger` and `Tracer` by default, while allowing callers to inject shared instances when a larger runtime owns those sinks/exporters.
 
-Lifecycle logging is metadata-only. The structured logger records the same run/tool lifecycle topics emitted onto the event bus together with correlation, run, call, tool, status, attempt, duration, and stable error-type fields. Tool arguments, tool outputs, and arbitrary exception messages are not copied into the log context.
+Lifecycle logging is metadata-only. The structured logger records the same run/tool lifecycle topics emitted onto the event bus together with correlation, run, call, tool, status, attempt, duration, and stable error-type fields. Tool arguments, tool outputs, and arbitrary exception messages are not copied into the log context. In-memory log retention is bounded, and sink failures are isolated from the instrumented execution path.
 
-Each orchestration run creates an `orchestration.run` span whose trace ID is the canonical correlation ID. Tool execution creates child `orchestration.tool` spans, preserving the same trace ID and parent/child relation. Trace attributes remain metadata-only and use the shared redaction boundary. Failed tool spans retain stable exception types rather than exception messages supplied by handlers.
+Each orchestration run creates an `orchestration.run` span whose trace ID is the canonical correlation ID. Tool execution creates child `orchestration.tool` spans, preserving the same trace ID and parent/child relation. Trace attributes remain metadata-only and use the shared redaction boundary. Failed tool spans retain stable exception types rather than exception messages supplied by handlers. Trace export is best-effort so collector/exporter failures cannot turn successful runtime work into application failures.
 
 Because the API correlation adapter and Genesis `Coordinator` both execute registered work through `ObservableOrchestrator`, the shared logging/tracing helpers now cover the canonical API → agent → tool execution path rather than existing only as standalone package utilities.
 
@@ -59,8 +59,10 @@ The package root exposes the canonical health, metrics-registry, structured-logg
 - default runtime attachment and Genesis reuse of the event-to-metrics bridge;
 - API request correlation through run, agent, and tool lifecycle events;
 - structured lifecycle logs with shared correlation and no tool payload leakage;
+- bounded structured-log retention and isolation of failing sinks;
 - correlated run/tool trace parentage and metadata-only attributes;
 - stable, redacted failure diagnostics in logs and traces;
+- isolation of failing trace exporters from runtime execution;
 - health-probe exception redaction;
 - bounded event collection and baseline metric classification;
 - compatibility with the current `MetricsRegistry` API.
