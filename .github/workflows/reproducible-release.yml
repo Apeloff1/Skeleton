@@ -7,7 +7,9 @@ on:
       - "requirements.txt"
       - "requirements-build.txt"
       - "scripts/release_provenance.py"
+      - "scripts/normalize_sdist.py"
       - "scripts/testing/test_release_provenance.py"
+      - "scripts/testing/test_normalize_sdist.py"
       - ".github/workflows/reproducible-release.yml"
       - "docs/REPRODUCIBLE_RELEASES.md"
   push:
@@ -18,7 +20,9 @@ on:
       - "requirements.txt"
       - "requirements-build.txt"
       - "scripts/release_provenance.py"
+      - "scripts/normalize_sdist.py"
       - "scripts/testing/test_release_provenance.py"
+      - "scripts/testing/test_normalize_sdist.py"
       - ".github/workflows/reproducible-release.yml"
       - "docs/REPRODUCIBLE_RELEASES.md"
   workflow_dispatch:
@@ -69,7 +73,9 @@ jobs:
       - name: Run release provenance regression tests
         run: |
           python -m pip install --disable-pip-version-check "pytest==8.4.2"
-          python -m pytest -q source-a/scripts/testing/test_release_provenance.py
+          python -m pytest -q \
+            source-a/scripts/testing/test_release_provenance.py \
+            source-a/scripts/testing/test_normalize_sdist.py
 
       - name: Build release A
         working-directory: source-a
@@ -78,6 +84,7 @@ jobs:
           set -euo pipefail
           export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
           python -m build --no-isolation --outdir dist
+          python scripts/normalize_sdist.py --source-date-epoch "$SOURCE_DATE_EPOCH" dist/*.tar.gz
           python scripts/release_provenance.py sbom \
             --pyproject pyproject.toml \
             --output dist/release-sbom.cdx.json \
@@ -92,6 +99,7 @@ jobs:
             --input pyproject.toml \
             --input requirements-build.txt \
             --input requirements.txt \
+            --input scripts/normalize_sdist.py \
             --sbom-ref dist/release-sbom.cdx.json
 
       - name: Build release B from clean checkout
@@ -101,6 +109,7 @@ jobs:
           set -euo pipefail
           export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
           python -m build --no-isolation --outdir dist
+          python scripts/normalize_sdist.py --source-date-epoch "$SOURCE_DATE_EPOCH" dist/*.tar.gz
           python scripts/release_provenance.py sbom \
             --pyproject pyproject.toml \
             --output dist/release-sbom.cdx.json \
@@ -115,6 +124,7 @@ jobs:
             --input pyproject.toml \
             --input requirements-build.txt \
             --input requirements.txt \
+            --input scripts/normalize_sdist.py \
             --sbom-ref dist/release-sbom.cdx.json
 
       - name: Verify byte-for-byte reproducibility
