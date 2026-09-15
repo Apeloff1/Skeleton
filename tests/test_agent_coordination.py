@@ -38,6 +38,22 @@ def test_successful_handler_still_releases_agent_capacity() -> None:
     assert pool.stats()["total_load"] == 0
 
 
+def test_assign_rejects_duplicate_running_task_without_leaking_capacity() -> None:
+    pool = AgentPool(max_agents=2)
+    first_agent = pool.create({"work"}, capacity=2)
+    second_agent = pool.create({"work"}, capacity=2)
+    task = Task(task_id="job", description="single unit of work")
+
+    assert pool.assign(first_agent, task) is True
+    assert pool.assign(first_agent, task) is False
+    assert pool.assign(second_agent, task) is False
+    assert pool.stats()["tasks_assigned"] == 1
+    assert pool.stats()["total_load"] == 1
+
+    pool.release(first_agent, task.task_id)
+    assert pool.stats()["total_load"] == 0
+
+
 def test_find_capable_skips_saturated_agents() -> None:
     pool = AgentPool(max_agents=2)
     saturated = pool.create({"work"}, capacity=1)
