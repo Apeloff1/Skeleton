@@ -1,0 +1,20 @@
+name: PR Lifecycle Signal
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize, closed]
+
+# This workflow intentionally has no write token and never checks out or executes
+# repository code. Its completion is only a trusted trigger for the privileged
+# workflow_run drainer on the default branch.
+permissions:
+  contents: read
+
+jobs:
+  signal:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 2
+    steps:
+      - name: Emit lifecycle signal
+        run: printf '%s\n' 'pull-request lifecycle signal complete'

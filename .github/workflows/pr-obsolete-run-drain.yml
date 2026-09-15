@@ -1,24 +1,25 @@
 name: Drain obsolete PR Actions
 
 on:
-  pull_request_target:
-    branches: [main]
-    types: [synchronize, closed]
+  workflow_run:
+    workflows: ["PR Lifecycle Signal"]
+    types: [completed]
 
-# Security boundary: pull_request_target loads this workflow from the trusted
-# base branch. The job checks out exactly the event's base SHA and never checks
-# out, imports, or executes the pull-request head.
+# Privilege separation: the pull-request workflow is read-only and executes no
+# repository code. This privileged drainer is loaded from the default branch by
+# workflow_run and checks out only the trusted default-branch SHA.
 permissions: {}
 
 concurrency:
-  group: pr-run-drain-${{ github.event.pull_request.number }}
+  group: pr-run-drain-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: true
 
 jobs:
   drain:
     if: >-
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.base.ref == github.event.repository.default_branch
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_branch != github.event.repository.default_branch
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 7
     permissions:
@@ -29,18 +30,16 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
       CURRENT_RUN_ID: ${{ github.run_id }}
-      PR_NUMBER: ${{ github.event.pull_request.number }}
-      PR_ACTION: ${{ github.event.action }}
-      EVENT_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-      EVENT_HEAD_REF: ${{ github.event.pull_request.head.ref }}
-      EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-      EVENT_BEFORE_SHA: ${{ github.event.before }}
+      PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+      EVENT_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+      EVENT_HEAD_REF: ${{ github.event.workflow_run.head_branch }}
+      EVENT_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
     steps:
-      - name: Check out trusted base control plane
+      - name: Check out trusted default-branch control plane
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 1
 
@@ -48,4 +47,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python backend/scripts/pr_obsolete_run_drain.py
+          python backend/scripts/pr_obsolete_run_from_workflow_run.py
