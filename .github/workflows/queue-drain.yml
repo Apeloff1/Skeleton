@@ -2,6 +2,11 @@ name: Drain superseded Actions queue
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "*/10 * * * *"
 
 concurrency:
   group: queue-drain-${{ github.repository }}
@@ -11,8 +16,8 @@ permissions: {}
 
 jobs:
   drain:
-    # Recovery stays manual and off the normal x64 pool. The write token exists
-    # only for this job and is used only to cancel older queued duplicates.
+    # Run cleanup off the normal x64 pool. The write token exists only for this
+    # job and is used only to cancel older queued duplicates.
     permissions:
       actions: write
       contents: read
