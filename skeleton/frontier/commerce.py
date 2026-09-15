@@ -20,7 +20,7 @@ paid bundle/currency entitlements.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, time, timedelta, timezone
 from random import Random
 from types import MappingProxyType
@@ -139,7 +139,7 @@ class ShopItemSpec:
     cost: Mapping[str, int]
     unlock_level: int = 1
     grant_quantity: int = 1
-    effects: Mapping[str, int] = MappingProxyType({})
+    effects: Mapping[str, int] = field(default_factory=dict)
     unlocks: tuple[str, ...] = ()
     repeatable: bool | None = None
 
@@ -176,8 +176,8 @@ class ShopPurchasePlan:
     quantity: int
     debits: Mapping[str, int]
     item_grants: tuple[str, ...] = ()
-    bait_increments: Mapping[str, int] = MappingProxyType({})
-    effect_increments: Mapping[str, int] = MappingProxyType({})
+    bait_increments: Mapping[str, int] = field(default_factory=dict)
+    effect_increments: Mapping[str, int] = field(default_factory=dict)
     unlocks: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
@@ -625,7 +625,7 @@ class BundleSpec:
 @dataclass(frozen=True, slots=True)
 class BundlePurchaseHistory:
     purchased_product_ids: frozenset[str] = frozenset()
-    last_purchase_at: Mapping[str, datetime] = MappingProxyType({})
+    last_purchase_at: Mapping[str, datetime] = field(default_factory=dict)
     consumed_transaction_ids: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:

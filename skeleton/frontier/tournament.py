@@ -18,7 +18,7 @@ Hardening over the source:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from types import MappingProxyType
 from typing import Iterable, Mapping, Sequence
@@ -194,7 +194,7 @@ class TournamentEntry:
 @dataclass(frozen=True, slots=True)
 class TournamentState:
     spec: TournamentSpec
-    entries: Mapping[str, TournamentEntry] = MappingProxyType({})
+    entries: Mapping[str, TournamentEntry] = field(default_factory=dict)
     status: str = "active"
     finalization_id: str | None = None
 

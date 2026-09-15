@@ -18,7 +18,7 @@ only portable collection semantics and hardens mutation boundaries:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from types import MappingProxyType
 from typing import Iterable, Mapping, Sequence
@@ -174,7 +174,7 @@ class FishCatchStats:
 @dataclass(frozen=True, slots=True)
 class CollectionState:
     discovered_species: frozenset[str] = frozenset()
-    fish_stats: Mapping[str, FishCatchStats] = MappingProxyType({})
+    fish_stats: Mapping[str, FishCatchStats] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         discovered = _id_set(self.discovered_species, "discovered species")
