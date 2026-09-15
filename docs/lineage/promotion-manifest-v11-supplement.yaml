@@ -119,6 +119,37 @@ waves:
       - skeleton/testing/test_frontier_cooking_benchmark.py
       - scripts/benchmark_frontier_cooking.py
       - docs/lineage/COOKING_PROMOTION_2026-09-15.md
+  - wave: 15
+    surface: aquarium-display
+    decision: reconcile-parallel-promotion-keep-single-canonical-core
+    source_blob: 223f65a8b8cb4c60528e6c4cc585a01296178ea0
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/aquarium_routes.py
+      - repository: Apeloff1/Openworld
+        path: backend/aquarium_routes.py
+    targets:
+      - skeleton/frontier/aquarium.py
+      - skeleton/frontier/aquarium_adapters.py
+      - skeleton/frontier/gameplay.py
+    hardening:
+      - derived-fish-and-decoration-counts
+      - bounded-display-position-plane
+      - global-fish-and-placement-identity-uniqueness
+      - quantity-aware-exact-one-decoration-consumption
+      - wallet-neutral-purchase-plans
+      - pure-daily-like-identity-ledger
+      - canonical-subject-and-state-digests
+      - fail-closed-event-state-rehydration
+      - recomputed-digest-malformed-state-rejection
+      - duplicate-aquarium-model-rejection
+    evidence:
+      - skeleton/testing/test_frontier_aquarium_policy.py
+      - skeleton/testing/test_frontier_aquarium_event_memory.py
+      - skeleton/testing/test_frontier_aquarium_gameplay_facade.py
+      - skeleton/testing/test_frontier_aquarium_benchmark.py
+      - scripts/benchmark_frontier_aquarium.py
+      - docs/lineage/AQUARIUM_PROMOTION_2026-09-15.md
 rejected_from_kernel:
   - source-catalogs
   - fastapi-routes
@@ -127,15 +158,16 @@ rejected_from_kernel:
   - wallet-mutation
   - inventory-persistence
   - provider-specific-background-workers
+  - duplicate-domain-primitives
 benchmark_policy:
   timing: observational-only
   correctness: gated
 next_candidate:
-  surface: aquarium-display
+  surface: biotope
   disposition: promote-once-exact-shared-lineage
-  shared_blob: 223f65a8b8cb4c60528e6c4cc585a01296178ea0
+  shared_blob: b79a167a3b568477e7db1fa95d64fc3949171a7e
   compared_sources:
     - repository: Apeloff1/Lorebuffa
-      path: backend/aquarium_routes.py
+      path: backend/biotope_routes.py
     - repository: Apeloff1/Openworld
-      path: backend/aquarium_routes.py
+      path: backend/biotope_routes.py
