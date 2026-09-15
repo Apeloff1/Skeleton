@@ -8,7 +8,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 import api_middleware
-from api_middleware import AccessLogMiddleware, RequestIdMiddleware
+from api_middleware import AccessLogMiddleware, RateLimiterMiddleware, RequestIdMiddleware
 from middleware.security import AuditMiddleware
 
 
@@ -96,6 +96,37 @@ def test_control_char_request_id_cannot_inject_access_log_line(
     assert messages
     assert all("\n" not in message and "\r" not in message for message in messages)
     assert all("forged-entry=1" not in message for message in messages)
+    assert any(f"rid={canonical}" in message for message in messages)
+
+
+def test_rate_limit_log_cannot_be_line_injected_by_request_id(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    request = _request([b"attacker\nforged-rate-limit=1"])
+    limiter = RateLimiterMiddleware(
+        object(), per_minute=1, burst=1, max_buckets=4, bucket_ttl=300
+    )
+    bucket, _ = limiter._bucket_for("198.51.100.40")
+    assert bucket is not None
+    consumed, _ = bucket.take()
+    assert consumed
+
+    with caplog.at_level(logging.WARNING, logger="api.middleware"):
+        response = asyncio.run(limiter.dispatch(request, _endpoint))
+
+    canonical = request.state.request_id
+    messages = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "api.middleware"
+    ]
+
+    assert response.status_code == 429
+    assert response.headers["x-request-id"] == canonical
+    assert api_middleware._REQUEST_ID_RE.fullmatch(canonical)
+    assert messages
+    assert all("\n" not in message and "\r" not in message for message in messages)
+    assert all("forged-rate-limit=1" not in message for message in messages)
     assert any(f"rid={canonical}" in message for message in messages)
 
 
