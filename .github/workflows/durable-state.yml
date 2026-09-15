@@ -5,11 +5,13 @@ on:
     paths:
       - "skeleton/state/**"
       - "skeleton/testing/test_durable_run_store.py"
+      - "skeleton/testing/test_checkpoint_migrations.py"
       - ".github/workflows/durable-state.yml"
   pull_request:
     paths:
       - "skeleton/state/**"
       - "skeleton/testing/test_durable_run_store.py"
+      - "skeleton/testing/test_checkpoint_migrations.py"
       - ".github/workflows/durable-state.yml"
 
 permissions:
@@ -37,4 +39,7 @@ jobs:
       - name: Run durable recovery contracts
         env:
           PYTHONPATH: "."
-        run: python -m pytest -q --noconftest skeleton/testing/test_durable_run_store.py
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_durable_run_store.py
+          skeleton/testing/test_checkpoint_migrations.py
