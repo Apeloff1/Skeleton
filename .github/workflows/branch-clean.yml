@@ -22,6 +22,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
+      pull-requests: read
     env:
       GH_TOKEN: ${{ github.token }}
       GIT_TERMINAL_PROMPT: '0'
@@ -61,13 +62,27 @@ jobs:
           main_ref=refs/remotes/origin/main
           classified_main=$(git rev-parse "$main_ref")
           declare -A classification=()
+          declare -A open_pr_heads=()
           delete_branches=()
           delete_tips=()
           ancestor_count=0
           equivalent_count=0
           unique_count=0
           protected_count=0
+          open_pr_count=0
           : > ../preserved-branches.txt
+
+          load_open_pr_heads() {
+            local branch
+            open_pr_heads=()
+            while IFS= read -r branch; do
+              [[ -n "$branch" ]] || continue
+              open_pr_heads["$branch"]=1
+            done < <(
+              gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+                --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .head.ref'
+            )
+          }
 
           is_patch_equivalent() {
             local base="$1"
@@ -84,6 +99,8 @@ jobs:
             ! git cherry "$base" "$tip" | grep -q '^+'
           }
 
+          load_open_pr_heads
+
           while read -r tip branch; do
             [[ -n "$tip" && -n "$branch" ]] || continue
             case "$branch" in
@@ -93,6 +110,12 @@ jobs:
                 continue
                 ;;
             esac
+
+            if [[ -n "${open_pr_heads[$branch]+x}" ]]; then
+              open_pr_count=$((open_pr_count + 1))
+              printf '%s %s open-pr-head\n' "$branch" "$tip" >> ../preserved-branches.txt
+              continue
+            fi
 
             if [[ -z "${classification[$tip]+x}" ]]; then
               if git merge-base --is-ancestor "$tip" "$main_ref"; then
@@ -134,12 +157,30 @@ jobs:
             exit 0
           fi
 
+          # Re-read open PR heads immediately before deletion. If a PR opened while
+          # classification was running, preserve its branch even if it was previously eligible.
+          load_open_pr_heads
+          safe_delete_branches=()
+          safe_delete_tips=()
+          late_open_pr_count=0
+          for ((i=0; i<${#delete_branches[@]}; i++)); do
+            branch="${delete_branches[$i]}"
+            tip="${delete_tips[$i]}"
+            if [[ -n "${open_pr_heads[$branch]+x}" ]]; then
+              late_open_pr_count=$((late_open_pr_count + 1))
+              printf '%s %s open-pr-head-late\n' "$branch" "$tip" >> ../preserved-branches.txt
+              continue
+            fi
+            safe_delete_branches+=("$branch")
+            safe_delete_tips+=("$tip")
+          done
+
           deleted=0
           raced_or_blocked=0
           delete_batch_size=32
-          for ((offset=0; offset<${#delete_branches[@]}; offset+=delete_batch_size)); do
-            batch_branches=("${delete_branches[@]:offset:delete_batch_size}")
-            batch_tips=("${delete_tips[@]:offset:delete_batch_size}")
+          for ((offset=0; offset<${#safe_delete_branches[@]}; offset+=delete_batch_size)); do
+            batch_branches=("${safe_delete_branches[@]:offset:delete_batch_size}")
+            batch_tips=("${safe_delete_tips[@]:offset:delete_batch_size}")
             lease_args=()
             refspecs=()
             for ((i=0; i<${#batch_branches[@]}; i++)); do
@@ -171,9 +212,12 @@ jobs:
             echo "- Patch-equivalent branch refs eligible: $equivalent_count"
             echo "- Unique/complex branch refs preserved: $unique_count"
             echo "- Long-lived/protected-name refs preserved: $protected_count"
+            echo "- Open-PR branch refs preserved during classification: $open_pr_count"
+            echo "- Newly-opened PR branch refs preserved before deletion: $late_open_pr_count"
             echo "- Branch refs deleted: $deleted"
             echo "- Moved or server-protected refs preserved at deletion time: $raced_or_blocked"
             echo '- main was never modified by this workflow.'
+            echo '- Open pull-request heads are fail-safe preserved.'
             echo '- Every deletion used an expected-tip lease.'
             if [[ -s ../preserved-branches.txt ]]; then
               echo
