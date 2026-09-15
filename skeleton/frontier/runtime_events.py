@@ -21,7 +21,15 @@ _HEX_DIGITS = frozenset("0123456789abcdef")
 def _require_text(value: object, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"runtime outcome event {field_name} must be a non-empty string")
+    if value != value.strip():
+        raise ValueError(f"runtime outcome event {field_name} must be normalized")
     return value
+
+
+def _optional_text(value: object, field_name: str) -> str | None:
+    if value is None:
+        return None
+    return _require_text(value, field_name)
 
 
 def _require_sha256(value: object, field_name: str) -> str:
@@ -33,7 +41,7 @@ def _require_sha256(value: object, field_name: str) -> str:
     return digest
 
 
-def _require_aware_timestamp(value: object, field_name: str) -> str:
+def _parse_aware_timestamp(value: object, field_name: str) -> datetime:
     text = _require_text(value, field_name)
     try:
         parsed = datetime.fromisoformat(text)
@@ -45,50 +53,113 @@ def _require_aware_timestamp(value: object, field_name: str) -> str:
         raise ValueError(
             f"runtime outcome event {field_name} must be timezone-aware"
         )
-    return parsed.astimezone(timezone.utc).isoformat()
+    return parsed.astimezone(timezone.utc)
+
+
+def _require_aware_timestamp(value: object, field_name: str) -> str:
+    return _parse_aware_timestamp(value, field_name).isoformat()
+
+
+def _require_runtime_datetime(value: object, field_name: str) -> datetime:
+    if not isinstance(value, datetime):
+        raise TypeError(f"execution {field_name} must be a datetime")
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("execution timestamps must be timezone-aware")
+    return value.astimezone(timezone.utc)
 
 
 def execution_result_to_event(result: ExecutionResult) -> DomainEvent:
-    """Convert one runtime result into a JSON-safe, provenance-bound event."""
+    """Convert one canonical runtime result into a provenance-bound event.
+
+    The producer boundary verifies that the result's provenance still describes
+    the actual runtime artifact before minting the durable execution identity.
+    """
 
     if result.provenance is None:
         raise ValueError("execution result requires provenance before publication")
-    if result.started_at.tzinfo is None or result.finished_at.tzinfo is None:
-        raise ValueError("execution timestamps must be timezone-aware")
+
+    agent = _require_text(result.agent, "agent")
+    task = _require_text(result.task, "task")
+    started = _require_runtime_datetime(result.started_at, "started_at")
+    finished = _require_runtime_datetime(result.finished_at, "finished_at")
+    if finished < started:
+        raise ValueError("execution finished_at must not precede started_at")
+
+    expected_operation = (
+        "agent.execute.completed" if result.succeeded else "agent.execute.failed"
+    )
+    if result.provenance.operation != expected_operation:
+        raise ValueError("execution provenance operation disagrees with result state")
+
+    artifact_sha256 = _require_sha256(
+        result.provenance.content_sha256,
+        "provenance.content_sha256",
+    )
+    expected_artifact = stable_content_digest(
+        result.output
+        if result.succeeded
+        else {"task": task, "agent": agent, "error": result.error}
+    )
+    if artifact_sha256 != expected_artifact:
+        raise ValueError("execution provenance artifact digest does not match result")
+
+    source_repository = _require_text(
+        result.provenance.source_repository,
+        "provenance.source_repository",
+    )
+    _optional_text(result.provenance.source_revision, "provenance.source_revision")
+    _optional_text(result.provenance.source_path, "provenance.source_path")
+
+    provenance_metadata = result.provenance.metadata
+    if not isinstance(provenance_metadata, Mapping):
+        raise TypeError("execution provenance metadata must be a mapping")
+    metadata_agent = _require_text(provenance_metadata.get("agent"), "provenance.metadata.agent")
+    metadata_task = _require_text(provenance_metadata.get("task"), "provenance.metadata.task")
+    if metadata_agent != agent or metadata_task != task:
+        raise ValueError("execution provenance metadata disagrees with runtime result")
+
+    task_sha256 = stable_content_digest(task)
+    idempotency_sha256 = provenance_metadata.get("idempotency_key_sha256")
+    if idempotency_sha256 is not None:
+        idempotency_sha256 = _require_sha256(
+            idempotency_sha256,
+            "provenance.metadata.idempotency_key_sha256",
+        )
 
     provenance = result.provenance.as_dict()
-    task_sha256 = stable_content_digest(result.task)
-    idempotency_sha256 = result.provenance.metadata.get("idempotency_key_sha256")
+    # Materialize the already validated source repository so the event cannot
+    # accidentally inherit a coercion or whitespace variant from custom input.
+    provenance["source_repository"] = source_repository
     identity_material = {
-        "agent": result.agent,
+        "agent": agent,
         "task_sha256": task_sha256,
-        "started_at": result.started_at.astimezone(timezone.utc).isoformat(),
-        "finished_at": result.finished_at.astimezone(timezone.utc).isoformat(),
-        "artifact_sha256": result.provenance.content_sha256,
+        "started_at": started.isoformat(),
+        "finished_at": finished.isoformat(),
+        "artifact_sha256": artifact_sha256,
         "idempotency_key_sha256": idempotency_sha256,
-        "operation": result.provenance.operation,
+        "operation": expected_operation,
     }
     execution_identity = stable_content_digest(identity_material)
 
     payload: dict[str, Any] = {
         "execution_identity_sha256": execution_identity,
-        "agent": result.agent,
+        "agent": agent,
         "succeeded": result.succeeded,
         "task_sha256": task_sha256,
-        "artifact_sha256": result.provenance.content_sha256,
+        "artifact_sha256": artifact_sha256,
         "started_at": identity_material["started_at"],
         "finished_at": identity_material["finished_at"],
         "provenance": provenance,
     }
     if idempotency_sha256 is not None:
-        payload["idempotency_key_sha256"] = str(idempotency_sha256)
+        payload["idempotency_key_sha256"] = idempotency_sha256
     if result.error is not None:
-        payload["error"] = result.error
+        payload["error"] = _require_text(result.error, "error")
 
     return DomainEvent(
         topic="runtime.completed" if result.succeeded else "runtime.failed",
         payload=payload,
-        occurred_at=result.finished_at.astimezone(timezone.utc),
+        occurred_at=finished,
     )
 
 
@@ -121,12 +192,32 @@ def execution_event_to_memory_item(event: DomainEvent) -> Mapping[str, Any]:
         event.payload.get("task_sha256"),
         "task_sha256",
     )
-    started_at = _require_aware_timestamp(event.payload.get("started_at"), "started_at")
-    finished_at = _require_aware_timestamp(
-        event.payload.get("finished_at"),
-        "finished_at",
-    )
+    started = _parse_aware_timestamp(event.payload.get("started_at"), "started_at")
+    finished = _parse_aware_timestamp(event.payload.get("finished_at"), "finished_at")
+    if finished < started:
+        raise ValueError("runtime outcome event finished_at must not precede started_at")
+    started_at = started.isoformat()
+    finished_at = finished.isoformat()
+
+    if not isinstance(event.occurred_at, datetime):
+        raise TypeError("runtime outcome event occurred_at must be a datetime")
+    if event.occurred_at.tzinfo is None or event.occurred_at.utcoffset() is None:
+        raise ValueError("runtime outcome event occurred_at must be timezone-aware")
+    if event.occurred_at.astimezone(timezone.utc) != finished:
+        raise ValueError("runtime outcome event occurred_at must equal finished_at")
+
     operation = _require_text(provenance.get("operation"), "provenance.operation")
+    source_repository = _require_text(
+        provenance.get("source_repository"),
+        "provenance.source_repository",
+    )
+    source_revision = _optional_text(
+        provenance.get("source_revision"),
+        "provenance.source_revision",
+    )
+    source_path = _optional_text(provenance.get("source_path"), "provenance.source_path")
+    _require_text(provenance.get("actor"), "provenance.actor")
+    _require_aware_timestamp(provenance.get("timestamp"), "provenance.timestamp")
 
     provenance_artifact = _require_sha256(
         provenance.get("content_sha256"),
@@ -141,6 +232,16 @@ def execution_event_to_memory_item(event: DomainEvent) -> Mapping[str, Any]:
     expected_topic = "runtime.completed" if succeeded else "runtime.failed"
     if event.topic != expected_topic:
         raise ValueError("runtime outcome event topic disagrees with succeeded state")
+    expected_operation = "agent.execute.completed" if succeeded else "agent.execute.failed"
+    if operation != expected_operation:
+        raise ValueError("runtime outcome event operation disagrees with succeeded state")
+
+    raw_error = event.payload.get("error")
+    if succeeded:
+        if raw_error is not None:
+            raise ValueError("successful runtime outcome event must not contain an error")
+    else:
+        _require_text(raw_error, "error")
 
     idempotency_sha256: str | None = None
     raw_idempotency = event.payload.get("idempotency_key_sha256")
@@ -151,19 +252,30 @@ def execution_event_to_memory_item(event: DomainEvent) -> Mapping[str, Any]:
         )
 
     provenance_metadata = provenance.get("metadata")
-    if provenance_metadata is not None and not isinstance(provenance_metadata, Mapping):
+    if not isinstance(provenance_metadata, Mapping):
         raise TypeError("runtime outcome event provenance metadata must be a mapping")
-    if isinstance(provenance_metadata, Mapping):
-        provenance_idempotency = provenance_metadata.get("idempotency_key_sha256")
-        if provenance_idempotency is not None:
-            provenance_idempotency = _require_sha256(
-                provenance_idempotency,
-                "provenance.metadata.idempotency_key_sha256",
-            )
-            if provenance_idempotency != idempotency_sha256:
-                raise ValueError(
-                    "runtime outcome event idempotency digest disagrees with provenance"
-                )
+
+    provenance_agent = _require_text(
+        provenance_metadata.get("agent"),
+        "provenance.metadata.agent",
+    )
+    if provenance_agent != agent:
+        raise ValueError("runtime outcome event agent disagrees with provenance")
+    provenance_task = _require_text(
+        provenance_metadata.get("task"),
+        "provenance.metadata.task",
+    )
+    if stable_content_digest(provenance_task) != task_sha256:
+        raise ValueError("runtime outcome event task digest disagrees with provenance")
+
+    provenance_idempotency = provenance_metadata.get("idempotency_key_sha256")
+    if provenance_idempotency is not None:
+        provenance_idempotency = _require_sha256(
+            provenance_idempotency,
+            "provenance.metadata.idempotency_key_sha256",
+        )
+    if provenance_idempotency != idempotency_sha256:
+        raise ValueError("runtime outcome event idempotency digest disagrees with provenance")
 
     identity_material = {
         "agent": agent,
@@ -185,9 +297,9 @@ def execution_event_to_memory_item(event: DomainEvent) -> Mapping[str, Any]:
         "task_sha256": task_sha256,
         "artifact_sha256": artifact_sha256,
         "execution_identity_sha256": execution_id,
-        "source_repository": str(provenance.get("source_repository") or ""),
-        "source_revision": provenance.get("source_revision"),
-        "source_path": provenance.get("source_path"),
+        "source_repository": source_repository,
+        "source_revision": source_revision,
+        "source_path": source_path,
         "operation": operation,
     }
     if idempotency_sha256 is not None:
