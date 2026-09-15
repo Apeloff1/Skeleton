@@ -108,14 +108,17 @@ def live_pr_head_converged(
     exposes a synchronize event's new head. Running cleanup in that window can
     cancel the new head's CodeQL/CI jobs as obsolete. Closed PRs are safe to
     drain immediately; open PRs must first match the immutable signal head.
+    Any other/missing state is ambiguous and therefore fails closed.
     """
     status, payload, _ = api.request(f"/repos/{repo}/pulls/{pr_number}")
     if status != 200 or not isinstance(payload, dict):
         raise RuntimeError(f"failed to refresh PR #{pr_number}: HTTP {status}")
 
     state = str(payload.get("state") or "").lower()
-    if state != "open":
+    if state == "closed":
         return True
+    if state != "open":
+        raise RuntimeError(f"PR #{pr_number} response has unknown state {state!r}")
 
     head = payload.get("head") or {}
     live_head_sha = str(head.get("sha") or "")
