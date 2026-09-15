@@ -5,15 +5,20 @@ name: CI/CD
 on:
   push:
     branches: [main, develop]
-    paths-ignore:
-      - '.github/workflows/branch-clean.yml'
-      - 'docs/**'
-      - '**/*.md'
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/*.md'
+      - '!.github/workflows/**'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: [main]
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/*.md'
+      - '!.github/workflows/**'
+      - '.github/workflows/ci.yml'
 
 # Collapse superseded validation for the same PR or branch so rapid pushes do
 # not occupy runner capacity with stale commits. Workflow name keeps unrelated
