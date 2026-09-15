@@ -8,7 +8,7 @@ contract without coupling the kernel to a vendor or web framework.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +21,7 @@ class NPCSpec:
     traits: tuple[str, ...] = ()
     tags: tuple[str, ...] = ()
     stats: Mapping[str, int] = field(default_factory=dict)
+    metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -30,6 +31,7 @@ class NPCSpec:
             "traits": list(self.traits),
             "tags": list(self.tags),
             "stats": dict(self.stats),
+            "metadata": dict(self.metadata),
         }
 
 
