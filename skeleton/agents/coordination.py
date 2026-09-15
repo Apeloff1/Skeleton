@@ -9,12 +9,23 @@ Provides:
 
 from __future__ import annotations
 
+import asyncio
+import threading
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
 
-from skeleton.kernel.events import DomainEvent, EventBus
+from skeleton.frontier.orchestration import (
+    CanonicalOrchestrator,
+    RunRecord,
+    RunStatus,
+    ToolInvocation,
+    ToolRegistry,
+    ToolResult,
+    TurnOutcome,
+)
+from skeleton.kernel.events import EventBus
 
 
 class TaskStatus(Enum):
@@ -28,6 +39,7 @@ class TaskStatus(Enum):
 @dataclass
 class Task:
     """A single unit of work for an agent."""
+
     task_id: str
     description: str
     priority: int = 1  # Higher = more urgent
@@ -36,7 +48,7 @@ class Task:
     result: Any = None
     error: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-    created_at: float = field(default_factory=__import__('time').time)
+    created_at: float = field(default_factory=__import__("time").time)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -49,6 +61,84 @@ class Task:
             "error": self.error,
             "metadata": self.metadata,
         }
+
+
+class _CoordinatorHandlerDriver:
+    """Thin compatibility driver that turns one legacy handler into a tool call."""
+
+    def __init__(self, task: Task, tool_name: str) -> None:
+        self._task = task
+        self._tool_name = tool_name
+        self._requested = False
+
+    async def next_turn(
+        self,
+        *,
+        run: RunRecord,
+        tool_results: tuple[ToolResult, ...],
+    ) -> TurnOutcome:
+        if not self._requested:
+            if tool_results:
+                raise RuntimeError("coordinator received tool results before dispatch")
+            self._requested = True
+            return TurnOutcome(
+                tool_calls=(
+                    ToolInvocation(
+                        call_id=f"{self._task.task_id}:handler",
+                        name=self._tool_name,
+                        arguments={},
+                    ),
+                )
+            )
+
+        if len(tool_results) != 1:
+            raise RuntimeError("coordinator handler must produce exactly one tool result")
+        return TurnOutcome(output=tool_results[0].output, terminal=True)
+
+
+def _run_awaitable_blocking(
+    factory: Callable[[], Awaitable[RunRecord]],
+) -> RunRecord:
+    """Run canonical async orchestration behind the legacy synchronous API."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(factory())
+
+    result: list[RunRecord] = []
+    failure: list[BaseException] = []
+
+    def runner() -> None:
+        try:
+            result.append(asyncio.run(factory()))
+        except BaseException as exc:
+            failure.append(exc)
+
+    thread = threading.Thread(
+        target=runner,
+        name="skeleton-coordinator-orchestrator",
+        daemon=True,
+    )
+    thread.start()
+    thread.join()
+
+    if failure:
+        raise failure[0]
+    if not result:
+        raise RuntimeError("canonical coordinator orchestration produced no result")
+    return result[0]
+
+
+def _legacy_error_text(error: str | None) -> str | None:
+    """Preserve the pre-migration public Task.error shape where practical."""
+    if not error:
+        return error
+    error_type, separator, message = error.partition(": ")
+    if separator and (
+        error_type.endswith("Error") or error_type.endswith("Exception")
+    ):
+        return message
+    return error
 
 
 class AgentPool:
@@ -71,12 +161,18 @@ class AgentPool:
             "capacity": capacity,
             "load": 0,
             "tasks": [],
-            "created_at": __import__('time').time(),
+            "created_at": __import__("time").time(),
         }
         self._stats["created"] += 1
 
         if self._bus:
-            self._bus.emit("agents.pool.created", {"agent_id": agent_id, "specialisations": list(specialisations)})
+            self._bus.emit(
+                "agents.pool.created",
+                {
+                    "agent_id": agent_id,
+                    "specialisations": list(specialisations),
+                },
+            )
 
         return agent_id
 
@@ -96,7 +192,10 @@ class AgentPool:
         self._stats["tasks_assigned"] += 1
 
         if self._bus:
-            self._bus.emit("agents.task.assigned", {"agent_id": agent_id, "task_id": task.task_id})
+            self._bus.emit(
+                "agents.task.assigned",
+                {"agent_id": agent_id, "task_id": task.task_id},
+            )
 
         return True
 
@@ -137,18 +236,49 @@ class AgentPool:
 class Coordinator:
     """Central coordinator for dispatching tasks to capable agents."""
 
+    _HANDLER_TOOL_NAME = "coordinator.handler"
+
     def __init__(self, pool: Optional[AgentPool] = None, bus: Optional[EventBus] = None):
         self.pool = pool or AgentPool(bus=bus)
         self._bus = bus
         self._tasks: Dict[str, Task] = {}
         self._handlers: Dict[str, Callable[[Task], Any]] = {}
+        self._runs: Dict[str, RunRecord] = {}
         self._stats = {"dispatched": 0, "completed": 0, "failed": 0}
 
     def register_handler(self, task_type: str, handler: Callable[[Task], Any]) -> None:
         """Register a handler for a specific task type."""
         self._handlers[task_type] = handler
 
-    def dispatch(self, description: str, task_type: str = "default", priority: int = 1, specialisation: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None) -> Task:
+    def _execute_handler(
+        self,
+        task: Task,
+        handler: Callable[[Task], Any],
+    ) -> RunRecord:
+        tools = ToolRegistry()
+        tools.register(
+            self._HANDLER_TOOL_NAME,
+            lambda _arguments: handler(task),
+        )
+        driver = _CoordinatorHandlerDriver(task, self._HANDLER_TOOL_NAME)
+        orchestrator = CanonicalOrchestrator(tools=tools, max_turns=2)
+        record = _run_awaitable_blocking(
+            lambda: orchestrator.run(
+                driver,
+                run_id=f"coordinator:{task.task_id}",
+            )
+        )
+        self._runs[task.task_id] = record
+        return record
+
+    def dispatch(
+        self,
+        description: str,
+        task_type: str = "default",
+        priority: int = 1,
+        specialisation: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Task:
         """Dispatch a new task to the agent pool."""
         task = Task(
             task_id=str(uuid.uuid4())[:8],
@@ -187,33 +317,49 @@ class Coordinator:
 
         self._stats["dispatched"] += 1
 
-        # Execute handler if available. Once a synchronous handler reaches a
-        # terminal state, always release its agent slot—even when it raises.
         handler = self._handlers.get(task_type)
         if handler:
             try:
-                task.result = handler(task)
-                task.status = TaskStatus.COMPLETED
-                self._stats["completed"] += 1
-            except Exception as e:
-                task.status = TaskStatus.FAILED
-                task.error = str(e)
-                self._stats["failed"] += 1
+                record = self._execute_handler(task, handler)
             finally:
                 if task.agent_id is not None:
                     self.pool.release(task.agent_id, task.task_id)
 
+            if record.status is RunStatus.COMPLETED:
+                task.result = record.output
+                task.error = None
+                task.status = TaskStatus.COMPLETED
+                self._stats["completed"] += 1
+            elif record.status is RunStatus.CANCELLED:
+                task.error = _legacy_error_text(record.error)
+                task.status = TaskStatus.CANCELLED
+            elif record.status is RunStatus.FAILED:
+                task.error = _legacy_error_text(record.error)
+                task.status = TaskStatus.FAILED
+                self._stats["failed"] += 1
+            else:
+                raise RuntimeError(
+                    "canonical coordinator orchestration returned a non-terminal run"
+                )
+
         if self._bus:
-            self._bus.emit("agents.coordinator.dispatched", {
-                "task_id": task.task_id,
-                "agent_id": task.agent_id,
-                "status": task.status.name,
-            })
+            self._bus.emit(
+                "agents.coordinator.dispatched",
+                {
+                    "task_id": task.task_id,
+                    "agent_id": task.agent_id,
+                    "status": task.status.name,
+                },
+            )
 
         return task
 
     def get_task(self, task_id: str) -> Optional[Task]:
         return self._tasks.get(task_id)
+
+    def get_run_record(self, task_id: str) -> Optional[RunRecord]:
+        """Return canonical orchestration evidence for an executed task."""
+        return self._runs.get(task_id)
 
     def list_tasks(self, status: Optional[TaskStatus] = None) -> List[Task]:
         tasks = list(self._tasks.values())
@@ -224,9 +370,17 @@ class Coordinator:
     def stats(self) -> Dict[str, Any]:
         return {
             **self._stats,
-            "pending": len([t for t in self._tasks.values() if t.status == TaskStatus.PENDING]),
-            "running": len([t for t in self._tasks.values() if t.status == TaskStatus.RUNNING]),
-            "completed": len([t for t in self._tasks.values() if t.status == TaskStatus.COMPLETED]),
-            "failed": len([t for t in self._tasks.values() if t.status == TaskStatus.FAILED]),
+            "pending": len(
+                [t for t in self._tasks.values() if t.status == TaskStatus.PENDING]
+            ),
+            "running": len(
+                [t for t in self._tasks.values() if t.status == TaskStatus.RUNNING]
+            ),
+            "completed": len(
+                [t for t in self._tasks.values() if t.status == TaskStatus.COMPLETED]
+            ),
+            "failed": len(
+                [t for t in self._tasks.values() if t.status == TaskStatus.FAILED]
+            ),
             "total": len(self._tasks),
         }
