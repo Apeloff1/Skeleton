@@ -12,8 +12,8 @@ on:
     - cron: '41 4 * * 0'
 
 concurrency:
-  group: artifact-policy-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: artifact-policy-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
