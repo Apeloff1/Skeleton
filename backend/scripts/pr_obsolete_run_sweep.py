@@ -213,7 +213,13 @@ def sweep(
                 continue
 
             counts["obsolete"] += 1
-            attempted = counts["accepted"] + counts["forced"] + counts["moved"] + counts["deferred"] + counts["failed"]
+            attempted = (
+                counts["accepted"]
+                + counts["forced"]
+                + counts["moved"]
+                + counts["deferred"]
+                + counts["failed"]
+            )
             if attempted >= max_cancellations:
                 counts["over_cap"] += 1
                 continue
@@ -271,7 +277,7 @@ def main() -> int:
         return 1
 
     _write_summary(summary)
-    if summary["failed"] or summary["deferred"] or summary["resolution_failed"]:
+    if summary["failed"] or summary["deferred"]:
         return 1
     return 0
 
