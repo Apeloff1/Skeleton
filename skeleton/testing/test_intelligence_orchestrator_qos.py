@@ -180,6 +180,67 @@ def test_cache_key_separates_context_and_confidence_contract() -> None:
     assert calls["count"] == 3
 
 
+def test_cache_key_separates_max_attempts_contract() -> None:
+    orchestrator = IntelligenceOrchestrator(
+        selection_mode="best_confidence", result_cache_ttl_seconds=30
+    )
+    orchestrator.register_handler("one", lambda task: result(task, "one", 0.6), priority=10)
+    orchestrator.register_handler("two", lambda task: result(task, "two", 0.99))
+
+    limited = orchestrator.reason("same", max_attempts=1)
+    expanded = orchestrator.reason("same", max_attempts=2)
+
+    assert limited["answer"] == "one"
+    assert expanded["answer"] == "two"
+    assert expanded["cached"] is False
+
+
+def test_disabling_handler_invalidates_cached_answer() -> None:
+    orchestrator = IntelligenceOrchestrator(result_cache_ttl_seconds=30)
+    orchestrator.register_handler("only", lambda task: result(task, "old", 0.9))
+
+    assert orchestrator.reason("same")["answer"] == "old"
+    assert orchestrator.reason("same")["cached"] is True
+
+    orchestrator.set_handler_enabled("only", False)
+    after_disable = orchestrator.reason("same")
+
+    assert "error" in after_disable
+    assert after_disable["cached"] is False
+
+
+def test_replacing_handler_invalidates_cached_answer() -> None:
+    orchestrator = IntelligenceOrchestrator(result_cache_ttl_seconds=30)
+    orchestrator.register_handler("provider", lambda task: result(task, "old", 0.9))
+
+    assert orchestrator.reason("same")["answer"] == "old"
+    assert orchestrator.reason("same")["cached"] is True
+
+    orchestrator.register_handler("provider", lambda task: result(task, "new", 0.95))
+    replacement = orchestrator.reason("same")
+
+    assert replacement["answer"] == "new"
+    assert replacement["cached"] is False
+
+
+def test_handler_removed_during_execution_cannot_return_stale_result() -> None:
+    orchestrator = IntelligenceOrchestrator()
+
+    def volatile(task):
+        orchestrator.unregister_handler("volatile")
+        return result(task, "stale", 1.0)
+
+    orchestrator.register_handler("volatile", volatile, priority=100)
+    orchestrator.register_handler("fallback", lambda task: result(task, "fresh", 0.8))
+
+    response = orchestrator.reason("race")
+
+    assert response["answer"] == "fresh"
+    assert response["handler"] == "fallback"
+    assert response["attempts"][0]["status"] == "stale"
+    assert orchestrator.stats()["fallbacks"] == 1
+
+
 def test_invalid_handler_result_is_isolated_as_failure() -> None:
     orchestrator = IntelligenceOrchestrator()
     orchestrator.register_handler("invalid", lambda task: {"answer": "wrong type"}, priority=10)
