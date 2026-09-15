@@ -11,6 +11,7 @@ from skeleton.frontier.orchestration import (
     RunStatus,
     StepKind,
     StepStatus,
+    ToolCapability,
     ToolInvocation,
     ToolRegistry,
     TransientToolError,
@@ -159,3 +160,92 @@ def test_invalid_terminal_transition_is_rejected():
         pass
     else:
         raise AssertionError("terminal state transition was accepted")
+
+
+def test_sensitive_tool_capability_is_denied_by_default():
+    called = False
+
+    class Driver:
+        async def next_turn(self, *, run, tool_results):
+            return TurnOutcome(
+                tool_calls=(ToolInvocation("network-call", "fetch", {}),)
+            )
+
+    def fetch(_arguments):
+        nonlocal called
+        called = True
+        return "should not run"
+
+    async def run():
+        tools = ToolRegistry()
+        tools.register("fetch", fetch, capabilities={ToolCapability.NETWORK})
+        record = await CanonicalOrchestrator(tools=tools).run(
+            Driver(), run_id="cap-denied"
+        )
+
+        assert record.status is RunStatus.FAILED
+        assert called is False
+        assert "denied capabilities: network" in record.error
+        tool_step = record.steps[-1]
+        assert tool_step.kind is StepKind.TOOL
+        assert tool_step.status is StepStatus.FAILED
+        assert tool_step.attempt == 1
+        assert len(record.capability_decisions) == 1
+        decision = record.capability_decisions[0]
+        assert decision.run_id == "cap-denied"
+        assert decision.call_id == "network-call"
+        assert decision.tool_name == "fetch"
+        assert decision.capability is ToolCapability.NETWORK
+        assert decision.allowed is False
+
+    asyncio.run(run())
+
+
+def test_explicit_capability_grant_allows_tool_and_audits_decision():
+    class Driver:
+        def __init__(self):
+            self.calls = 0
+
+        async def next_turn(self, *, run, tool_results):
+            self.calls += 1
+            if self.calls == 1:
+                return TurnOutcome(
+                    tool_calls=(ToolInvocation("repo-call", "mutate", {}),)
+                )
+            assert tool_results[0].output == "changed"
+            return TurnOutcome(output="done", terminal=True)
+
+    async def run():
+        tools = ToolRegistry()
+        tools.register(
+            "mutate",
+            lambda _arguments: "changed",
+            capabilities={ToolCapability.REPOSITORY_MUTATION},
+        )
+        record = await CanonicalOrchestrator(tools=tools).run(
+            Driver(),
+            run_id="cap-allowed",
+            capabilities={ToolCapability.REPOSITORY_MUTATION},
+        )
+
+        assert record.status is RunStatus.COMPLETED
+        assert record.output == "done"
+        assert len(record.capability_decisions) == 1
+        decision = record.capability_decisions[0]
+        assert decision.run_id == "cap-allowed"
+        assert decision.call_id == "repo-call"
+        assert decision.tool_name == "mutate"
+        assert decision.capability is ToolCapability.REPOSITORY_MUTATION
+        assert decision.allowed is True
+
+    asyncio.run(run())
+
+
+def test_tool_capabilities_reject_unknown_values():
+    tools = ToolRegistry()
+    try:
+        tools.register("bad", lambda _arguments: None, capabilities={"root"})
+    except ValueError as exc:
+        assert "unknown tool capability: root" in str(exc)
+    else:
+        raise AssertionError("unknown tool capability was accepted")

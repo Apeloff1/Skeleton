@@ -1,15 +1,16 @@
 """Canonical agent orchestration lifecycle.
 
 This module owns run/step transitions, bounded retries, cooperative cancellation,
-and tool invocation lifecycle. Provider- and agent-specific drivers adapt their
-turn generation to :class:`OrchestrationDriver` rather than owning another loop.
+tool invocation lifecycle, and explicit capability authorization. Provider- and
+agent-specific drivers adapt their turn generation to :class:`OrchestrationDriver`
+rather than owning another loop.
 """
 from __future__ import annotations
 
 import asyncio
 import inspect
 import uuid
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Protocol
@@ -37,6 +38,16 @@ class StepStatus(str, Enum):
 class StepKind(str, Enum):
     MODEL = "model"
     TOOL = "tool"
+
+
+class ToolCapability(str, Enum):
+    """Sensitive capabilities that tools must declare explicitly."""
+
+    FILESYSTEM = "filesystem"
+    NETWORK = "network"
+    PROCESS = "process"
+    SECRETS = "secrets"
+    REPOSITORY_MUTATION = "repository_mutation"
 
 
 RUN_TRANSITIONS: Mapping[RunStatus, frozenset[RunStatus]] = {
@@ -84,6 +95,10 @@ class TransientToolError(OrchestrationError):
 
 class ToolNotFoundError(OrchestrationError):
     """Requested tool is not registered."""
+
+
+class CapabilityDeniedError(OrchestrationError):
+    """Raised when a tool requests capabilities the run was not granted."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,11 +162,23 @@ class StepRecord:
         self.status = target
 
 
+@dataclass(frozen=True, slots=True)
+class CapabilityDecision:
+    """Auditable capability decision for one tool invocation."""
+
+    run_id: str
+    call_id: str
+    tool_name: str
+    capability: ToolCapability
+    allowed: bool
+
+
 @dataclass(slots=True)
 class RunRecord:
     run_id: str
     status: RunStatus = RunStatus.PENDING
     steps: list[StepRecord] = field(default_factory=list)
+    capability_decisions: list[CapabilityDecision] = field(default_factory=list)
     output: Any = None
     error: str | None = None
     turns: int = 0
@@ -187,24 +214,47 @@ class OrchestrationDriver(Protocol):
 ToolHandler = Callable[[Mapping[str, Any]], Any | Awaitable[Any]]
 
 
+@dataclass(frozen=True, slots=True)
+class ToolDefinition:
+    """Registered tool handler plus its explicit capability requirements."""
+
+    name: str
+    handler: ToolHandler
+    capabilities: frozenset[ToolCapability] = frozenset()
+
+
 class ToolRegistry:
     """Explicit registry for tool handlers used by the canonical lifecycle."""
 
     def __init__(self) -> None:
-        self._handlers: dict[str, ToolHandler] = {}
+        self._definitions: dict[str, ToolDefinition] = {}
 
-    def register(self, name: str, handler: ToolHandler) -> None:
+    def register(
+        self,
+        name: str,
+        handler: ToolHandler,
+        *,
+        capabilities: Iterable[ToolCapability | str] = (),
+    ) -> None:
         normalized = _normalized_name(name, "tool name")
-        if normalized in self._handlers:
+        if normalized in self._definitions:
             raise ValueError(f"tool already registered: {normalized}")
-        self._handlers[normalized] = handler
+        self._definitions[normalized] = ToolDefinition(
+            name=normalized,
+            handler=handler,
+            capabilities=_normalize_capabilities(capabilities),
+        )
 
-    def resolve(self, name: str) -> ToolHandler:
+    def definition(self, name: str) -> ToolDefinition:
         normalized = _normalized_name(name, "tool name")
         try:
-            return self._handlers[normalized]
+            return self._definitions[normalized]
         except KeyError as exc:
             raise ToolNotFoundError(f"unknown tool: {normalized}") from exc
+
+    def resolve(self, name: str) -> ToolHandler:
+        """Resolve a handler while preserving the pre-capability registry API."""
+        return self.definition(name).handler
 
 
 @dataclass(slots=True)
@@ -227,7 +277,9 @@ class CanonicalOrchestrator:
         *,
         cancellation: CancellationToken | None = None,
         run_id: str | None = None,
+        capabilities: Iterable[ToolCapability | str] = (),
     ) -> RunRecord:
+        granted_capabilities = _normalize_capabilities(capabilities)
         record = RunRecord(run_id=run_id or uuid.uuid4().hex)
         if cancellation is not None and cancellation.cancelled:
             record.transition(RunStatus.CANCELLED)
@@ -278,6 +330,7 @@ class CanonicalOrchestrator:
                         record,
                         call,
                         cancellation=cancellation,
+                        granted_capabilities=granted_capabilities,
                     )
                     results.append(result)
                 tool_results = tuple(results)
@@ -310,8 +363,9 @@ class CanonicalOrchestrator:
         call: ToolInvocation,
         *,
         cancellation: CancellationToken | None,
+        granted_capabilities: frozenset[ToolCapability],
     ) -> ToolResult:
-        handler = self.tools.resolve(call.name)
+        definition = self.tools.definition(call.name)
         step = StepRecord(
             step_id=uuid.uuid4().hex,
             kind=StepKind.TOOL,
@@ -319,6 +373,33 @@ class CanonicalOrchestrator:
         )
         record.steps.append(step)
 
+        denied: list[ToolCapability] = []
+        for capability in sorted(definition.capabilities, key=lambda item: item.value):
+            allowed = capability in granted_capabilities
+            record.capability_decisions.append(
+                CapabilityDecision(
+                    run_id=record.run_id,
+                    call_id=call.call_id,
+                    tool_name=definition.name,
+                    capability=capability,
+                    allowed=allowed,
+                )
+            )
+            if not allowed:
+                denied.append(capability)
+
+        if denied:
+            step.transition(StepStatus.RUNNING)
+            step.attempt = 1
+            names = ", ".join(capability.value for capability in denied)
+            error = CapabilityDeniedError(
+                f"tool {call.name!r} denied capabilities: {names}"
+            )
+            step.error = _error_text(error)
+            step.transition(StepStatus.FAILED)
+            raise error
+
+        handler = definition.handler
         last_error: BaseException | None = None
         for attempt in range(1, self.tool_retry_budget.max_attempts + 1):
             _raise_if_cancelled(cancellation)
@@ -391,6 +472,26 @@ def _normalized_name(value: object, field_name: str) -> str:
     if normalized != value:
         raise ValueError(f"{field_name} must be normalized")
     return value
+
+
+def _normalize_capabilities(
+    capabilities: Iterable[ToolCapability | str],
+) -> frozenset[ToolCapability]:
+    if isinstance(capabilities, (str, bytes)):
+        raise TypeError("capabilities must be an iterable of capability values")
+
+    normalized: set[ToolCapability] = set()
+    for capability in capabilities:
+        if isinstance(capability, ToolCapability):
+            normalized.add(capability)
+            continue
+        if not isinstance(capability, str):
+            raise TypeError("capability values must be ToolCapability or str")
+        try:
+            normalized.add(ToolCapability(capability))
+        except ValueError as exc:
+            raise ValueError(f"unknown tool capability: {capability}") from exc
+    return frozenset(normalized)
 
 
 def _error_text(exc: BaseException) -> str:
