@@ -41,6 +41,15 @@ def test_declared_size_must_match_exemplars():
         JeevesCortex().import_tract(payload)
 
 
+def test_boolean_declared_size_is_rejected():
+    payload = _valid_payload()
+    payload["exemplars"] = payload["exemplars"][:1]
+    payload["size"] = True
+
+    with pytest.raises(CortexError, match="size"):
+        JeevesCortex().import_tract(payload)
+
+
 def test_non_finite_exemplar_confidence_is_rejected():
     payload = _valid_payload()
     payload["exemplars"][0]["confidence"] = math.nan
