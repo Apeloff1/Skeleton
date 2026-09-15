@@ -268,7 +268,7 @@ export default function SettingsHome() {
 }
 
 function VaultCard() {
-  const [stats, setStats] = React.useState<{ disk_mb: number; raw_mb: number; saved_mb: number; compression_ratio: number; zstd_level: number; builds: number; total_files: number; keep_target: number } | null>(null);
+  const [stats, setStats] = React.useState<{ disk_mb: number; raw_mb: number; saved_mb: number; compression_ratio: number; zstd_level: number; builds: number; total_files: number; keep_target: number; newest_build_id?: string | null } | null>(null);
   const [busy, setBusy] = React.useState(false);
 
   const load = React.useCallback(async () => {

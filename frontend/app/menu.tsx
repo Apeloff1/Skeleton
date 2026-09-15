@@ -34,7 +34,7 @@ import { useFeatureFlag } from '../utils/featureFlags';
 // Add an entry here whenever a new modal lands in index.tsx.
 // ─────────────────────────────────────────────────────────────────────
 interface FeatureCardItem {
-  id: ModalType | string;
+  id: Exclude<ModalType, null> | string;
   title: string;
   desc: string;
   icon: string;
@@ -306,7 +306,7 @@ export default function MenuScreen() {
           },
         },
         { label: `About · ID: ${card.id}`,
-          onPress: () => toast.info(`${card.title} · category lookup → ${card.desc}`, { durationMs: 4500 }),
+          onPress: () => { toast.info(`${card.title} · category lookup → ${card.desc}`, { durationMs: 4500 }); },
         },
         { label: 'Hide from menu', kind: 'destructive',
           onPress: async () => {

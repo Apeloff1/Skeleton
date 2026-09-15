@@ -539,7 +539,7 @@ export default function CommandCenter() {
                         </Text>
                       </View>
 
-                      {pipe[gf.id].stages.map((s) => (
+                      {pipe[gf.id].stages.map((s: { key: string; icon: string; order: number; label: string; passed: boolean; score: string | number; report?: { note?: string } }) => (
                         <View key={s.key} style={styles.pipeStage}>
                           <Text style={styles.pipeStageIcon}>{s.icon}</Text>
                           <Text style={styles.pipeStageLbl}>{s.order}. {s.label}</Text>

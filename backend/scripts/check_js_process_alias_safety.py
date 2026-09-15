@@ -306,10 +306,10 @@ def violations(path: Path) -> list[str]:
                 if key in seen:
                     continue
                 seen.add(key)
-                notation = " bracket" if call_kind == "bracket" else ""
+                notation = " bracket " if call_kind == "bracket" else "."
                 findings.append(
                     f"{label}:{_line_number(text, match.start())}: "
-                    f"child_process namespace alias {alias}{notation} exec()/execSync() is forbidden"
+                    f"child_process namespace alias {alias}{notation}exec()/execSync() is forbidden"
                 )
 
     return findings

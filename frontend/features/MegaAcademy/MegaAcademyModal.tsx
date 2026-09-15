@@ -537,7 +537,6 @@ function DetailSheet({ item, tab, onClose, color }: { item: any; tab: TabKey; on
     // Use Jeeves persona flair when enabled (catchphrase + mannerism speed)
     if (isJeevesEnabled()) {
       const ctx = tab === 'quizzes' ? 'quiz_nudge'
-                : tab === 'lessons' ? 'lesson'
                 : tab === 'challenges' ? 'code_walkthrough'
                 : 'lesson';
       jeevesSpeak(text, { context: ctx as any, readCode: academy.readCodeBlocks, onComplete: () => setPlaying(false) });

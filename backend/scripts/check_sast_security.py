@@ -7,6 +7,7 @@ never silently enter production code.
 from __future__ import annotations
 
 import ast
+from collections import Counter
 from pathlib import Path
 import re
 import sys
@@ -51,6 +52,7 @@ NETWORK_CALLS = {
     "httpx.options",
     "httpx.request",
 }
+PYTHON_SCOPES = (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
 JS_SUFFIXES = {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"}
 JS_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
@@ -85,6 +87,11 @@ JS_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 CHILD_PROCESS_IMPORT_RE = re.compile(
     r"(?:import\s*\{(?P<esm>[^}]*)\}\s*from\s*['\"](?:node:)?child_process['\"]"
     r"|(?:const|let|var)\s*\{(?P<cjs>[^}]*)\}\s*=\s*require\s*\(\s*['\"](?:node:)?child_process['\"]\s*\))"
+)
+CHILD_PROCESS_REFERENCE_RE = re.compile(
+    r"(?:\bimport\b[^\n;]*\bfrom\s*['\"](?:node:)?child_process['\"]"
+    r"|\brequire\s*\(\s*['\"](?:node:)?child_process['\"]\s*\)"
+    r"|\bchild_process\b)"
 )
 
 
@@ -144,14 +151,7 @@ def import_aliases(tree: ast.AST) -> dict[str, str]:
 
 
 def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
-    """Resolve tracked imports and methods invoked on inline constructors.
-
-    ``dotted_name`` intentionally handles only Name/Attribute chains. Security
-    rules also need to recognize calls such as ``requests.Session().get(...)``;
-    the owner of that final attribute is an ``ast.Call`` rather than a Name.
-    Resolving only the constructor function keeps this high-confidence without
-    attempting general data-flow inference.
-    """
+    """Resolve tracked imports, stable bindings, and inline constructors."""
     if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Call):
         owner = canonical_name(node.value.func, aliases)
         if owner:
@@ -165,6 +165,79 @@ def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
     if replacement is None:
         return name
     return replacement + (f".{suffix}" if dot else "")
+
+
+def _scope_nodes(scope: ast.AST) -> Iterable[ast.AST]:
+    """Yield nodes owned by ``scope`` without descending into nested scopes."""
+
+    def descend(node: ast.AST) -> Iterable[ast.AST]:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, PYTHON_SCOPES):
+                continue
+            yield child
+            yield from descend(child)
+
+    yield from descend(scope)
+
+
+def _parameter_names(scope: ast.AST) -> set[str]:
+    if not isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+        return set()
+    args = scope.args
+    names = {arg.arg for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs)}
+    if args.vararg:
+        names.add(args.vararg.arg)
+    if args.kwarg:
+        names.add(args.kwarg.arg)
+    return names
+
+
+def _assigned_names(node: ast.AST) -> list[str]:
+    if isinstance(node, ast.Assign):
+        return [target.id for target in node.targets if isinstance(target, ast.Name)]
+    if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+        return [node.target.id]
+    return []
+
+
+def _assignment_value(node: ast.AST) -> ast.AST | None:
+    if isinstance(node, ast.Assign):
+        return node.value
+    if isinstance(node, ast.AnnAssign):
+        return node.value
+    return None
+
+
+def _requests_session_bindings(scope: ast.AST, aliases: dict[str, str]) -> dict[str, str]:
+    """Infer only unambiguous, single-assignment Session variables in a scope.
+
+    A candidate is discarded if the name is a parameter or has any second store
+    in the same lexical scope. This intentionally prefers false negatives over
+    false positives while closing the common ``session = requests.Session()``
+    scanner bypass.
+    """
+    nodes = list(_scope_nodes(scope))
+    stores = Counter(
+        node.id
+        for node in nodes
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+    )
+    parameters = _parameter_names(scope)
+    candidates: set[str] = set()
+
+    for node in nodes:
+        value = _assignment_value(node)
+        if not isinstance(value, ast.Call):
+            continue
+        if canonical_name(value.func, aliases) != "requests.Session":
+            continue
+        candidates.update(_assigned_names(node))
+
+    return {
+        name: "requests.Session"
+        for name in candidates
+        if stores[name] == 1 and name not in parameters
+    }
 
 
 def _keyword(node: ast.Call, name: str) -> ast.AST | None:
@@ -224,14 +297,17 @@ def violations(path: Path) -> list[str]:
     except (OSError, UnicodeError, SyntaxError) as exc:
         return [f"{label}: parse failure: {exc}"]
 
-    aliases = import_aliases(tree)
+    import_map = import_aliases(tree)
     findings: list[str] = []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        violation = call_violation(node, aliases)
-        if violation:
-            findings.append(f"{label}:{node.lineno}: {violation}")
+    scopes = [node for node in ast.walk(tree) if isinstance(node, PYTHON_SCOPES)]
+    for scope in scopes:
+        aliases = {**import_map, **_requests_session_bindings(scope, import_map)}
+        for node in _scope_nodes(scope):
+            if not isinstance(node, ast.Call):
+                continue
+            violation = call_violation(node, aliases)
+            if violation:
+                findings.append(f"{label}:{node.lineno}: {violation}")
     return findings
 
 
@@ -240,12 +316,7 @@ def _line_number(text: str, offset: int) -> int:
 
 
 def _mask_js_comments(text: str) -> str:
-    """Replace JS/TS comment bytes with spaces while preserving offsets/newlines.
-
-    Regex rules can then inspect executable source without matching documentation
-    such as ``module-eval (which...)``. String and template contents are kept
-    intact so module specifiers used by child-process rules remain discoverable.
-    """
+    """Replace JS/TS comment bytes with spaces while preserving offsets/newlines."""
     chars = list(text)
     out = list(text)
     state = "code"
@@ -314,9 +385,118 @@ def _mask_js_comments(text: str) -> str:
     return "".join(out)
 
 
-def _destructured_child_process_names(text: str) -> set[str]:
+def _js_code_positions(text: str) -> list[bool]:
+    """Mark executable JS/TS positions, including `${...}` template bodies."""
+    positions = [False] * len(text)
+    state = "code"
+    escaped = False
+    template_expr_depths: list[int] = []
+    i = 0
+
+    while i < len(text):
+        ch = text[i]
+        nxt = text[i + 1] if i + 1 < len(text) else ""
+
+        if state == "line-comment":
+            if ch == "\n":
+                state = "code"
+            i += 1
+            continue
+
+        if state == "block-comment":
+            if ch == "*" and nxt == "/":
+                state = "code"
+                i += 2
+            else:
+                i += 1
+            continue
+
+        if state in {"single", "double"}:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif (state == "single" and ch == "'") or (state == "double" and ch == '"'):
+                state = "code"
+            i += 1
+            continue
+
+        if state == "template":
+            if escaped:
+                escaped = False
+                i += 1
+                continue
+            if ch == "\\":
+                escaped = True
+                i += 1
+                continue
+            if ch == "`":
+                state = "code"
+                i += 1
+                continue
+            if ch == "$" and nxt == "{":
+                template_expr_depths.append(1)
+                state = "code"
+                i += 2
+                continue
+            i += 1
+            continue
+
+        positions[i] = True
+        if ch == "/" and nxt == "/":
+            positions[i] = False
+            if i + 1 < len(text):
+                positions[i + 1] = False
+            state = "line-comment"
+            i += 2
+            continue
+        if ch == "/" and nxt == "*":
+            positions[i] = False
+            if i + 1 < len(text):
+                positions[i + 1] = False
+            state = "block-comment"
+            i += 2
+            continue
+        if ch == "'":
+            positions[i] = False
+            state = "single"
+            escaped = False
+            i += 1
+            continue
+        if ch == '"':
+            positions[i] = False
+            state = "double"
+            escaped = False
+            i += 1
+            continue
+        if ch == "`":
+            positions[i] = False
+            state = "template"
+            escaped = False
+            i += 1
+            continue
+        if template_expr_depths:
+            if ch == "{":
+                template_expr_depths[-1] += 1
+            elif ch == "}":
+                template_expr_depths[-1] -= 1
+                if template_expr_depths[-1] == 0:
+                    template_expr_depths.pop()
+                    state = "template"
+        i += 1
+
+    return positions
+
+
+def _starts_in_js_code(code_positions: list[bool], start: int) -> bool:
+    return 0 <= start < len(code_positions) and code_positions[start]
+
+
+def _destructured_child_process_names(text: str, code_positions: list[bool]) -> set[str]:
     names: set[str] = set()
     for match in CHILD_PROCESS_IMPORT_RE.finditer(text):
+        if not _starts_in_js_code(code_positions, match.start()):
+            continue
         declaration = match.group("esm") or match.group("cjs") or ""
         for raw_item in declaration.split(","):
             item = raw_item.strip()
@@ -343,24 +523,32 @@ def javascript_violations(path: Path) -> list[str]:
         return [f"{label}: read failure: {exc}"]
 
     scan_text = _mask_js_comments(text)
+    code_positions = _js_code_positions(text)
     findings: list[str] = []
     for message, pattern in JS_PATTERNS:
         for match in pattern.finditer(scan_text):
+            if not _starts_in_js_code(code_positions, match.start()):
+                continue
             findings.append(f"{label}:{_line_number(text, match.start())}: {message}")
 
-    for local_name in sorted(_destructured_child_process_names(scan_text)):
+    for local_name in sorted(_destructured_child_process_names(scan_text, code_positions)):
         call_re = re.compile(rf"(?<![A-Za-z0-9_$\.]){re.escape(local_name)}\s*\(")
         for match in call_re.finditer(scan_text):
+            if not _starts_in_js_code(code_positions, match.start()):
+                continue
             findings.append(
                 f"{label}:{_line_number(text, match.start())}: imported child_process {local_name}() is forbidden"
             )
 
-    # A shell-enabled spawn crosses the same command-interpreter trust boundary
-    # as exec. Restrict this rule to files that actually reference child_process
-    # to avoid flagging unrelated configuration objects with `shell: true`.
-    if re.search(r"['\"](?:node:)?child_process['\"]|\bchild_process\b", scan_text):
+    has_child_process_reference = any(
+        _starts_in_js_code(code_positions, match.start())
+        for match in CHILD_PROCESS_REFERENCE_RE.finditer(scan_text)
+    )
+    if has_child_process_reference:
         shell_true = re.compile(r"\bshell\s*:\s*true\b")
         for match in shell_true.finditer(scan_text):
+            if not _starts_in_js_code(code_positions, match.start()):
+                continue
             findings.append(
                 f"{label}:{_line_number(text, match.start())}: child_process shell:true is forbidden"
             )

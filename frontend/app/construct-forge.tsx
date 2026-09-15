@@ -321,7 +321,7 @@ export default function ConstructForge() {
               <Construct3DView geometry={spec.geometry || []} palette={palette}
                 partColors={partColors} selectedPart={selectedPart}
                 surface={spec.surface} vfx={spec.vfx}
-                onSelectPart={(i) => setSelectedPart(i)} height={300} />
+                onSelectPart={(i: number) => setSelectedPart(i)} height={300} />
             </LazyMount>
             {selectedPart !== null && (
               <View style={styles.partRow}>

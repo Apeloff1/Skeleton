@@ -138,6 +138,7 @@ interface Playable {
   model?: string; raw_path: string; llm_error?: string | null;
   repair_attempts?: number; evaluation?: Evaluation; parent_id?: string | null;
   tweak?: string; intricacy?: number; repair_trail?: any[];
+  reactions?: Record<string, number>; version?: number | string; remix_count?: number; derive_mode?: string;
 }
 interface ListItem {
   playable_id: string; title: string; genre: string; status: string;

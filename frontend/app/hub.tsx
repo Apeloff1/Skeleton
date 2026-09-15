@@ -30,8 +30,18 @@ import { traceStepSync } from '../utils/bootTracer';
 // module-eval (which spiked memory and hard-crashed mid-tier Android).
 // Every modal below is rendered inside <LazyModal>, which now provides the
 // required <Suspense> boundary, so React.lazy works transparently.
-const lazyNamed = (loader: () => Promise<any>, key: string) =>
-  React.lazy(() => loader().then((m: any) => ({ default: m[key] })));
+type LazyComponentExport<T> = T extends React.ComponentType<infer P>
+  ? React.ComponentType<P>
+  : React.ComponentType<any>;
+
+const lazyNamed = <TModule, TKey extends keyof TModule>(
+  loader: () => Promise<TModule>,
+  key: TKey,
+): React.LazyExoticComponent<LazyComponentExport<TModule[TKey]>> =>
+  React.lazy(async () => {
+    const module = await loader();
+    return { default: module[key] as LazyComponentExport<TModule[TKey]> };
+  });
 
 // Custom Hooks
 import { useTheme } from '../hooks/useTheme';

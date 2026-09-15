@@ -199,6 +199,11 @@ function StudioInner() {
     if (r.ok) setBuilds(r.data?.builds || []);
   }, []);
 
+  const loadVaultPkgs = React.useCallback(async () => {
+    const r = await api.get<any>(`${WF}/vault?limit=25`, { timeoutMs: 15000 });
+    if (r.ok && r.data?.ok) setVaultPkgs(r.data.packages || []);
+  }, []);
+
   React.useEffect(() => { loadOverview(); }, [loadOverview]);
   React.useEffect(() => {
     if (tab === 'Build') { loadBuild(); loadBuildsList(); }
@@ -260,11 +265,6 @@ function StudioInner() {
     if (r.ok && r.data?.ok) setPlan(r.data);
     setBusy(false);
   };
-  const loadVaultPkgs = React.useCallback(async () => {
-    const r = await api.get<any>(`${WF}/vault?limit=25`, { timeoutMs: 15000 });
-    if (r.ok && r.data?.ok) setVaultPkgs(r.data.packages || []);
-  }, []);
-
   const runWorkflow = async () => {
     const p = wfPrompt.trim();
     if (!p || wfBusy) return;
