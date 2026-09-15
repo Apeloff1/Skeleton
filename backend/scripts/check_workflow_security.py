@@ -303,7 +303,7 @@ def _forbidden_trigger_violations(lines: list[str], path_name: str) -> list[str]
                     if len(event) >= 2 and event[0] == event[-1] and event[0] in {"'", '"'}:
                         event = event[1:-1]
                     if event == FORBIDDEN_TRIGGER:
-                        findings.append(f"{path.name}:{number}: pull_request_target is forbidden")
+                        findings.append(f"{path_name}:{number}: pull_request_target is forbidden")
                         break
                 continue
             continue
