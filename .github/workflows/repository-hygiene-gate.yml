@@ -44,7 +44,7 @@ jobs:
 
           while IFS= read -r -d '' path; do
             case "$path" in
-              */.DS_Store|.DS_Store|*/Thumbs.db|Thumbs.db|*.log|*/__pycache__/*|*/.pytest_cache/*|*/.mypy_cache/*|*/.ruff_cache/*|*/node_modules/*|*/.venv/*|*/coverage/*)
+              */.DS_Store|.DS_Store|*/Thumbs.db|Thumbs.db|*.log|__pycache__/*|*/__pycache__/*|.pytest_cache/*|*/.pytest_cache/*|.mypy_cache/*|*/.mypy_cache/*|.ruff_cache/*|*/.ruff_cache/*|node_modules/*|*/node_modules/*|.venv/*|*/.venv/*|coverage/*|*/coverage/*)
                 echo "::error file=${path}::Generated or machine-local file should not be committed."
                 failed=1
                 ;;
