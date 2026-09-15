@@ -100,11 +100,6 @@
     "browserslist": "4.28.9",
     "@expo/plist/**/@xmldom/xmldom": "0.8.15",
     "speech-rule-engine/**/@xmldom/xmldom": "0.9.12",
-    "isomorphic-fetch/**/node-fetch": "2.7.0",
-    "react-native/ws": "6.2.4",
-    "@react-native/dev-middleware/ws": "6.2.4",
-    "@expo/plist/@xmldom/xmldom": "0.8.15",
-    "speech-rule-engine/@xmldom/xmldom": "0.9.12",
-    "isomorphic-fetch/node-fetch": "2.7.0"
+    "isomorphic-fetch/**/node-fetch": "2.7.0"
   }
 }
