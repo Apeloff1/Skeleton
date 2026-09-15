@@ -11,9 +11,17 @@ from typing import Any, Iterable, Mapping, Protocol
 
 from skeleton.frontier.contracts import (
     AgentContract,
+    MemoryContract,
     ProvenanceRecord,
     stable_content_digest,
 )
+from skeleton.frontier.retrieval_context import (
+    retrieval_audit_summary,
+    retrieve_memory_context,
+)
+
+
+_RETRIEVED_CONTEXT_KEY = "retrieved_context"
 
 
 class AgentFailure(RuntimeError):
@@ -149,10 +157,16 @@ class AgentRuntime:
     invariant promoted from GameForge without importing its MongoDB guard or
     durable outbox. Identical concurrent or repeated requests share one result;
     reusing a key for a different execution fails closed.
+
+    When ``memory_query`` is supplied to :meth:`execute`, runtime retrieval uses
+    the canonical ``MemoryContract`` configured on ``memory``. Validated hits
+    are injected under ``retrieved_context`` and their content-free identities
+    are retained in execution provenance.
     """
 
     agents: dict[str, AgentLike] = field(default_factory=dict)
     idempotency_capacity: int = 4096
+    memory: MemoryContract | None = None
     _idempotency_lock: asyncio.Lock = field(
         default_factory=asyncio.Lock,
         init=False,
@@ -247,6 +261,9 @@ class AgentRuntime:
         source_revision: str | None = None,
         source_path: str | None = None,
         idempotency_key: str | None = None,
+        memory_query: str | None = None,
+        memory_limit: int = 5,
+        memory_filters: Mapping[str, Any] | None = None,
     ) -> ExecutionResult:
         normalized_agent_name = _require_normalized_text(agent_name, "agent name")
         normalized_task = _require_normalized_text(task, "task")
@@ -262,6 +279,33 @@ class AgentRuntime:
         if context is not None and not isinstance(context, Mapping):
             raise TypeError("context must be a mapping")
         normalized_context = dict(context or {})
+
+        normalized_memory_query: str | None = None
+        canonical_memory_filters: dict[str, Any] | None = None
+        if memory_query is not None:
+            normalized_memory_query = _require_normalized_text(
+                memory_query,
+                "memory_query",
+            )
+            if isinstance(memory_limit, bool) or not isinstance(memory_limit, int):
+                raise TypeError("memory_limit must be an integer")
+            if memory_limit < 1:
+                raise ValueError("memory_limit must be positive")
+            if memory_filters is not None and not isinstance(memory_filters, Mapping):
+                raise TypeError("memory_filters must be a mapping")
+            if _RETRIEVED_CONTEXT_KEY in normalized_context:
+                raise ValueError(
+                    f"context key {_RETRIEVED_CONTEXT_KEY!r} is reserved for runtime retrieval"
+                )
+            canonical_filters = _canonical_idempotency_value(
+                dict(memory_filters or {}),
+                path="memory_filters",
+            )
+            if not isinstance(canonical_filters, dict):
+                raise TypeError("memory_filters must normalize to an object")
+            canonical_memory_filters = canonical_filters
+        elif memory_filters is not None:
+            raise ValueError("memory_filters requires memory_query")
 
         agent = self.resolve(normalized_agent_name)
 
@@ -312,6 +356,9 @@ class AgentRuntime:
                     "source_repository": normalized_source_repository,
                     "source_revision": normalized_source_revision,
                     "source_path": normalized_source_path,
+                    "memory_query": normalized_memory_query,
+                    "memory_limit": memory_limit if normalized_memory_query is not None else None,
+                    "memory_filters": canonical_memory_filters,
                 }
             )
             shared_future, owns_reservation = await self._reserve_idempotency(
@@ -321,7 +368,7 @@ class AgentRuntime:
             if not owns_reservation:
                 return await asyncio.shield(shared_future)
 
-        provenance_metadata = {
+        provenance_metadata: dict[str, Any] = {
             "agent": agent.name,
             "task": normalized_task,
             "required_capabilities": sorted(required),
@@ -331,11 +378,35 @@ class AgentRuntime:
             provenance_metadata["idempotency_key_sha256"] = stable_content_digest(
                 normalized_key
             )
+        if normalized_memory_query is not None:
+            provenance_metadata["retrieval_request"] = {
+                "query_sha256": stable_content_digest(normalized_memory_query),
+                "limit": memory_limit,
+                "filters_sha256": stable_content_digest(canonical_memory_filters or {}),
+            }
 
         started = datetime.now(timezone.utc)
         try:
             try:
-                output = await agent.run(normalized_task, normalized_context)
+                execution_context = normalized_context
+                if normalized_memory_query is not None:
+                    if self.memory is None:
+                        raise RuntimeError(
+                            "memory_query requires a configured canonical MemoryContract"
+                        )
+                    hits = await retrieve_memory_context(
+                        self.memory,
+                        normalized_memory_query,
+                        limit=memory_limit,
+                        filters=canonical_memory_filters,
+                    )
+                    execution_context = dict(normalized_context)
+                    execution_context[_RETRIEVED_CONTEXT_KEY] = [
+                        hit.as_agent_context() for hit in hits
+                    ]
+                    provenance_metadata["retrieval_hits"] = retrieval_audit_summary(hits)
+
+                output = await agent.run(normalized_task, execution_context)
             except Exception as exc:
                 finished = datetime.now(timezone.utc)
                 error = f"{type(exc).__name__}: {exc}"
