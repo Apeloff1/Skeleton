@@ -24,6 +24,7 @@ import asyncio
 import logging
 import math
 import os
+import re
 import time
 import uuid
 from collections import OrderedDict, defaultdict, deque
@@ -44,6 +45,7 @@ _MAX_BUCKETS = int(os.environ.get("RATE_LIMIT_MAX_BUCKETS", "4096"))
 _BUCKET_TTL = float(os.environ.get("RATE_LIMIT_BUCKET_TTL", "300"))
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
 _MAX_RETRY_AFTER_SECONDS = 86_400
+_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 
 # Telemetry counters (in-memory) ────────────────────────────────────
 # Last 1024 latencies as a ring buffer for p50/p95 computation.
@@ -89,6 +91,14 @@ def _bounded_retry_after(retry: float) -> int:
     return max(1, min(_MAX_RETRY_AFTER_SECONDS, math.ceil(max(0.0, retry))))
 
 
+def _request_id(request: Request) -> str:
+    """Return one canonical safe request ID, replacing ambiguous/unsafe input."""
+    candidates = request.headers.getlist("x-request-id")
+    if len(candidates) == 1 and _REQUEST_ID_RE.fullmatch(candidates[0]):
+        return candidates[0]
+    return uuid.uuid4().hex
+
+
 def get_stats() -> dict:
     """Snapshot for /api/_telemetry. Cheap O(n log n) sort over ≤1024 samples."""
     vals = sorted(_lat_ring)
@@ -121,12 +131,10 @@ def get_stats() -> dict:
 
 # ── Request ID ────────────────────────────────────────────────────────
 class RequestIdMiddleware(BaseHTTPMiddleware):
-    """Pulls X-Request-Id from the inbound header if present, otherwise mints
-    one. The id is exposed on `request.state.request_id` and echoed back on
-    the response header. Useful for cross-service correlation."""
+    """Accept one bounded header-safe X-Request-Id or mint one."""
 
     async def dispatch(self, request: Request, call_next: Callable):
-        rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:16]
+        rid = _request_id(request)
         request.state.request_id = rid
         try:
             response: Response = await call_next(request)
@@ -326,7 +334,10 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
                 ok, retry = bucket.take(1)
         if not ok:
             _counts["rate_limited"] += 1
-            rid = getattr(request.state, "request_id", "-")
+            # RateLimiter is outermost and may short-circuit before
+            # RequestIdMiddleware runs, so resolve the same canonical ID here.
+            rid = _request_id(request)
+            request.state.request_id = rid
             retry_after = _bounded_retry_after(retry)
             log.warning("rate_limited ip=%s path=%s retry=%.1fs rid=%s", ip, request.url.path, retry, rid)
             return JSONResponse(
