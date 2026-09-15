@@ -9,6 +9,12 @@ from skeleton.agents.swarm_checkpoint import Checkpoint, CheckpointStore
 from skeleton.agents.swarm_control import SubmitResult, SwarmControlPlane
 from skeleton.agents.swarm_dedupe import Completion, CompletionCache
 from skeleton.agents.swarm_drain import DrainPlan, drain, plan_drain
+from skeleton.agents.swarm_durable import (
+    DurableSwarmCapture,
+    DurableSwarmError,
+    DurableSwarmRecovery,
+    SwarmDurableBridge,
+)
 from skeleton.agents.swarm_exact_lease import lease_exact
 from skeleton.agents.swarm_fairness import FairShareLedger, TenantShare
 from skeleton.agents.swarm_fencing import LeaseFence, assert_fence, fence_for, fenced_fail, fenced_renew, fenced_succeed
@@ -50,7 +56,8 @@ __all__ = [
     "SwarmTask", "TaskState", "WorkerState", "AdmissionDecision", "AdmissionPolicy",
     "capability_coverage", "AutoscalePolicy", "ScaleRecommendation", "BrokerResult", "CompletionResult",
     "SwarmBroker", "Checkpoint", "CheckpointStore", "SubmitResult", "SwarmControlPlane", "Completion",
-    "CompletionCache", "DrainPlan", "drain", "plan_drain", "lease_exact", "FairShareLedger", "TenantShare",
+    "CompletionCache", "DrainPlan", "drain", "plan_drain", "DurableSwarmCapture", "DurableSwarmError",
+    "DurableSwarmRecovery", "SwarmDurableBridge", "lease_exact", "FairShareLedger", "TenantShare",
     "LeaseFence", "assert_fence", "fence_for", "fenced_fail", "fenced_renew", "fenced_succeed", "GCResult",
     "capacity", "gc_compact_runtime", "IdempotencyConflict", "IdempotencyRecord", "IdempotencyRegistry",
     "IngressDecision", "SwarmIngressGovernor", "InvariantReport", "audit", "JanitorResult", "reap_stale_workers",
