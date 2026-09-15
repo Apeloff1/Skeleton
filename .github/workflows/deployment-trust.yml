@@ -61,7 +61,6 @@ on:
       - "backend/core/deployment_preflight.py"
       - "backend/core/control_plane_deployment.py"
       - "backend/core/deployment_authorization.py"
-      - "backend/core/deployment_plan_integrity.py"
       - "backend/core/atomic_release_deployer.py"
       - "backend/core/deployment_receipts.py"
       - "backend/core/deployment_proof.py"
