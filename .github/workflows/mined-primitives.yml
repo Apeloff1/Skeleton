@@ -2,6 +2,7 @@ name: Mined Primitive Gates
 
 on:
   push:
+    branches: [main]
     paths:
       - "backend/core/worm_audit.py"
       - "backend/tests/test_worm_audit.py"
