@@ -22,6 +22,7 @@ PROCESS_TESTS = (
     "test_process_safety_partial.py",
     "test_process_safety_namespace_get.py",
     "test_process_safety_getattribute.py",
+    "test_process_safety_helper_aliases.py",
 )
 SECURITY_SCRIPTS = (
     "check_process_safety.py",
@@ -30,6 +31,7 @@ SECURITY_SCRIPTS = (
     "check_js_process_alias_safety.py",
     "check_workflow_security.py",
     "check_secret_hygiene.py",
+    "check_malware_iocs.py",
 )
 SECURITY_TESTS = (
     "test_exec_guard.py",
@@ -39,6 +41,7 @@ SECURITY_TESTS = (
     "test_js_process_alias_safety.py",
     "test_workflow_security_gate.py",
     "test_secret_hygiene_gate.py",
+    "test_malware_ioc_gate.py",
 )
 SECURITY_HOOKS = (
     "backend-process-safety",
@@ -47,6 +50,7 @@ SECURITY_HOOKS = (
     "javascript-process-alias-safety",
     "workflow-security",
     "repository-secret-hygiene",
+    "repository-malware-ioc",
     "backend-security-regressions",
 )
 DEPENDENCY_SECURITY_MARKERS = (
@@ -79,12 +83,36 @@ def require_all(text: str, needles: tuple[str, ...], message: str, failures: lis
 
 
 def cancel_false(workflow: str) -> bool:
-    return re.search(r"^\s*cancel-in-progress:\s*false\s*(?:#.*)?$", workflow, re.MULTILINE) is not None
+    return re.search(
+        r"^\s*cancel-in-progress:\s*false\s*(?:#.*)?$",
+        workflow,
+        re.MULTILINE,
+    ) is not None
+
+
+def cancel_true(workflow: str) -> bool:
+    return re.search(
+        r"^\s*cancel-in-progress:\s*true\s*(?:#.*)?$",
+        workflow,
+        re.MULTILINE,
+    ) is not None
+
+
+def sha_scoped_cancellation(workflow: str) -> bool:
+    """Return true when cancellation cannot cross commit SHA boundaries."""
+    group = re.search(r"^\s*group:\s*(.+)$", workflow, re.MULTILINE)
+    return bool(
+        group
+        and "${{ github.sha }}" in group.group(1)
+        and cancel_true(workflow)
+    )
 
 
 def pinned_action_count(workflow: str, action: str, generation: str) -> int:
     """Count immutable action pins carrying the expected human-readable generation."""
-    pattern = re.compile(rf"{re.escape(action)}@[0-9a-fA-F]{{40}}\s+#\s*{re.escape(generation)}\b")
+    pattern = re.compile(
+        rf"{re.escape(action)}@[0-9a-fA-F]{{40}}\s+#\s*{re.escape(generation)}\b"
+    )
     return len(pattern.findall(workflow))
 
 
@@ -93,7 +121,8 @@ def main() -> int:
 
     root_project = tomllib.loads(read("pyproject.toml"))
     require(
-        root_project.get("tool", {}).get("uv", {}).get("required-version") == UV_REQUIRED_VERSION,
+        root_project.get("tool", {}).get("uv", {}).get("required-version")
+        == UV_REQUIRED_VERSION,
         f"repository uv must be pinned to {UV_REQUIRED_VERSION}",
         failures,
     )
@@ -110,18 +139,42 @@ def main() -> int:
     pytest_markers = pytest_cfg.get("markers", [])
     conftest = read("backend/tests/conftest.py")
 
-    require(project.get("requires-python") == ">=3.11", "backend requires Python >=3.11", failures)
-    require(tool.get("ruff", {}).get("target-version") == "py311", "Ruff target must be py311", failures)
-    require(str(tool.get("mypy", {}).get("python_version")) == "3.11", "mypy target must be 3.11", failures)
-    require(RUFF_DEV_REQUIREMENT in dev, "backend dev Ruff compatibility range drifted", failures)
-    require(RUFF_DEV_REQUIREMENT in uv_dev, "uv dev Ruff compatibility range drifted", failures)
+    require(
+        project.get("requires-python") == ">=3.11",
+        "backend requires Python >=3.11",
+        failures,
+    )
+    require(
+        tool.get("ruff", {}).get("target-version") == "py311",
+        "Ruff target must be py311",
+        failures,
+    )
+    require(
+        str(tool.get("mypy", {}).get("python_version")) == "3.11",
+        "mypy target must be 3.11",
+        failures,
+    )
+    require(
+        RUFF_DEV_REQUIREMENT in dev,
+        "backend dev Ruff compatibility range drifted",
+        failures,
+    )
+    require(
+        RUFF_DEV_REQUIREMENT in uv_dev,
+        "uv dev Ruff compatibility range drifted",
+        failures,
+    )
     require(
         any(str(item).startswith("pytest-timeout>=") for item in dev)
         and any(str(item).startswith("pytest-timeout>=") for item in test_deps),
         "backend dev/test dependencies must include pytest-timeout",
         failures,
     )
-    require(any(str(marker).startswith("timeout(") for marker in pytest_markers), "pytest strict-marker contract must register timeout(seconds)", failures)
+    require(
+        any(str(marker).startswith("timeout(") for marker in pytest_markers),
+        "pytest strict-marker contract must register timeout(seconds)",
+        failures,
+    )
     require(
         "pytest_ignore_collect" in conftest
         and "EXPO_PUBLIC_BACKEND_URL" in conftest
@@ -130,29 +183,76 @@ def main() -> int:
         "backend hermetic collection boundary for live Expo suites drifted",
         failures,
     )
-    require(not any(str(item).lower().startswith("emergentintegrations") for item in runtime_deps), "retired emergentintegrations SDK must not be a project dependency", failures)
     require(
-        re.search(r"^\s*emergentintegrations(?:[<>=!~].*)?$", requirements, re.MULTILINE | re.IGNORECASE) is None,
+        not any(
+            str(item).lower().startswith("emergentintegrations")
+            for item in runtime_deps
+        ),
+        "retired emergentintegrations SDK must not be a project dependency",
+        failures,
+    )
+    require(
+        re.search(
+            r"^\s*emergentintegrations(?:[<>=!~].*)?$",
+            requirements,
+            re.MULTILINE | re.IGNORECASE,
+        )
+        is None,
         "retired emergentintegrations SDK must not be installed from requirements.txt",
         failures,
     )
-    require((ROOT / "backend/emergentintegrations/llm/chat.py").is_file(), "local emergentintegrations compatibility boundary missing", failures)
+    require(
+        (ROOT / "backend/emergentintegrations/llm/chat.py").is_file(),
+        "local emergentintegrations compatibility boundary missing",
+        failures,
+    )
 
     frontend = json.loads(read("frontend/package.json"))
-    require(frontend.get("engines", {}).get("node") == ">=24", "frontend must require Node >=24", failures)
+    require(
+        frontend.get("engines", {}).get("node") == ">=24",
+        "frontend must require Node >=24",
+        failures,
+    )
     for script in ("lint:ci", "typecheck", "export:web"):
-        require(script in frontend.get("scripts", {}), f"missing frontend script {script}", failures)
-    require(re.search(r"^ARG NODE_VERSION=24$", read("frontend/Dockerfile"), re.MULTILINE) is not None, "frontend Docker Node must be 24", failures)
-    require("ghcr.io/astral-sh/uv:latest" not in read("backend/Dockerfile"), "backend Docker must not use uv:latest", failures)
+        require(
+            script in frontend.get("scripts", {}),
+            f"missing frontend script {script}",
+            failures,
+        )
+    require(
+        re.search(
+            r"^ARG NODE_VERSION=24$",
+            read("frontend/Dockerfile"),
+            re.MULTILINE,
+        )
+        is not None,
+        "frontend Docker Node must be 24",
+        failures,
+    )
+    require(
+        "ghcr.io/astral-sh/uv:latest" not in read("backend/Dockerfile"),
+        "backend Docker must not use uv:latest",
+        failures,
+    )
 
     ci = read(".github/workflows/ci.yml")
     require(
-        re.search(rf'^\s*PYTHON_VERSION:\s*"{re.escape(PYTHON_VERSION)}"\s*$', ci, re.MULTILINE) is not None,
+        re.search(
+            rf'^\s*PYTHON_VERSION:\s*"{re.escape(PYTHON_VERSION)}"\s*$',
+            ci,
+            re.MULTILINE,
+        )
+        is not None,
         f"CI Python must be pinned to {PYTHON_VERSION}",
         failures,
     )
     require(
-        re.search(rf'^\s*NODE_VERSION:\s*"{re.escape(NODE_VERSION)}"\s*$', ci, re.MULTILINE) is not None,
+        re.search(
+            rf'^\s*NODE_VERSION:\s*"{re.escape(NODE_VERSION)}"\s*$',
+            ci,
+            re.MULTILINE,
+        )
+        is not None,
         f"CI Node must be pinned to {NODE_VERSION}",
         failures,
     )
@@ -166,9 +266,22 @@ def main() -> int:
         "CI frontend must consume the canonical pinned Node version",
         failures,
     )
-    require_all(ci, ("yarn lint:ci", "yarn typecheck", "yarn export:web"), "CI frontend scripts drifted", failures)
-    require("python ../scripts/check_toolchain_contract.py" in ci, "CI backend lint must execute the repository toolchain contract", failures)
-    require(cancel_false(ci), "CI must keep active validation alive", failures)
+    require_all(
+        ci,
+        ("yarn lint:ci", "yarn typecheck", "yarn export:web"),
+        "CI frontend scripts drifted",
+        failures,
+    )
+    require(
+        "python ../scripts/check_toolchain_contract.py" in ci,
+        "CI backend lint must execute the repository toolchain contract",
+        failures,
+    )
+    require(
+        cancel_false(ci) or sha_scoped_cancellation(ci),
+        "CI concurrency must preserve validation across distinct commit SHAs",
+        failures,
+    )
     require(
         pinned_action_count(ci, "actions/checkout", "v7.0.1") > 0
         and pinned_action_count(ci, "actions/setup-python", "v7.0.0") > 0
@@ -181,42 +294,117 @@ def main() -> int:
         "CI must use exactly three immutable setup-uv v10.1.0 sites backed by the repository uv pin",
         failures,
     )
-    require(ci.count(f'"ruff=={RUFF_CI_VERSION}"') == 2, f"CI Ruff execution must be pinned to {RUFF_CI_VERSION}", failures)
-    require("ruff==0.9.*" not in ci, "CI must not use wildcard Ruff execution", failures)
-    require(pinned_action_count(ci, "docker/setup-buildx-action", "v4.3.0") == 1, "Buildx version/count drifted", failures)
-    require(pinned_action_count(ci, "docker/build-push-action", "v7.3.0") == 3, "build-push version/count drifted", failures)
-    require(ci.count('"pydantic>=2.5,<3"') >= 3, "Skeleton/Jeeves/Cockpit CI jobs must install pydantic runtime slice", failures)
-    require(ci.count('"pydantic-settings>=2.1,<3"') >= 3, "Skeleton/Jeeves/Cockpit CI jobs must install pydantic-settings runtime slice", failures)
-    for required_job in ("skeleton-test", "school-jeeves-test", "cockpit-smoke", "backend-test", "backend-import-smoke", "frontend"):
+    require(
+        ci.count(f'"ruff=={RUFF_CI_VERSION}"') == 2,
+        f"CI Ruff execution must be pinned to {RUFF_CI_VERSION}",
+        failures,
+    )
+    require(
+        "ruff==0.9.*" not in ci,
+        "CI must not use wildcard Ruff execution",
+        failures,
+    )
+    require(
+        pinned_action_count(ci, "docker/setup-buildx-action", "v4.3.0") == 1,
+        "Buildx version/count drifted",
+        failures,
+    )
+    require(
+        pinned_action_count(ci, "docker/build-push-action", "v7.3.0") == 3,
+        "build-push version/count drifted",
+        failures,
+    )
+    require(
+        ci.count('"pydantic>=2.5,<3"') >= 3,
+        "Skeleton/Jeeves/Cockpit CI jobs must install pydantic runtime slice",
+        failures,
+    )
+    require(
+        ci.count('"pydantic-settings>=2.1,<3"') >= 3,
+        "Skeleton/Jeeves/Cockpit CI jobs must install pydantic-settings runtime slice",
+        failures,
+    )
+    for required_job in (
+        "skeleton-test",
+        "school-jeeves-test",
+        "cockpit-smoke",
+        "backend-test",
+        "backend-import-smoke",
+        "frontend",
+    ):
         require(f"  {required_job}:" in ci, f"CI job missing {required_job}", failures)
-    require(FULL_DEPLOY_NEEDS in ci, "Docker publishing must fail closed on every critical test/smoke gate", failures)
+    require(
+        FULL_DEPLOY_NEEDS in ci,
+        "Docker publishing must fail closed on every critical test/smoke gate",
+        failures,
+    )
+
+    # Frontend lint/type/export are canonical CI jobs now. A second standalone
+    # lint workflow duplicates expensive work and used to amplify the Actions queue.
+    require(
+        not (ROOT / ".github/workflows/lint.yml").exists(),
+        "legacy standalone lint workflow must stay retired; canonical CI owns frontend lint",
+        failures,
+    )
 
     backend_quality = read(".github/workflows/backend-quality.yml")
     require(
-        f'python-version: "{PYTHON_VERSION}"' in backend_quality and f'"ruff=={RUFF_CI_VERSION}"' in backend_quality,
+        f'python-version: "{PYTHON_VERSION}"' in backend_quality
+        and f'"ruff=={RUFF_CI_VERSION}"' in backend_quality,
         f"Backend Quality must use Python {PYTHON_VERSION} and Ruff {RUFF_CI_VERSION}",
         failures,
     )
-    require("ruff==0.9.*" not in backend_quality, "Backend Quality must not use wildcard Ruff execution", failures)
-    require_all(backend_quality, SECURITY_SCRIPTS, "Backend Quality scanner coverage drifted", failures)
-    require_all(backend_quality, SECURITY_TESTS, "Backend Quality security regression coverage drifted", failures)
-    require("--noconftest" in backend_quality and 'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in backend_quality, "Backend Quality security isolation drifted", failures)
-    require(cancel_false(backend_quality), "Backend Quality concurrency drifted", failures)
-
-    lint = read(".github/workflows/lint.yml")
     require(
-        re.search(rf'^\s*node-version:\s*"?{re.escape(NODE_VERSION)}"?\s*$', lint, re.MULTILINE) is not None
-        and "yarn lint:ci" in lint,
-        f"Lint must use Node {NODE_VERSION} and the canonical lint command",
+        "ruff==0.9.*" not in backend_quality,
+        "Backend Quality must not use wildcard Ruff execution",
         failures,
     )
-    require(cancel_false(lint), "Lint concurrency drifted", failures)
+    require_all(
+        backend_quality,
+        SECURITY_SCRIPTS,
+        "Backend Quality scanner coverage drifted",
+        failures,
+    )
+    require_all(
+        backend_quality,
+        SECURITY_TESTS,
+        "Backend Quality security regression coverage drifted",
+        failures,
+    )
+    require(
+        "--noconftest" in backend_quality
+        and 'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in backend_quality,
+        "Backend Quality security isolation drifted",
+        failures,
+    )
+    require(
+        cancel_false(backend_quality) or sha_scoped_cancellation(backend_quality),
+        "Backend Quality concurrency must preserve validation across distinct commit SHAs",
+        failures,
+    )
 
     dependency_security = read(".github/workflows/dependency-security.yml")
-    require_all(dependency_security, DEPENDENCY_SECURITY_MARKERS, "dependency audit/SBOM contract drifted", failures)
-    require(cancel_false(dependency_security), "Dependency Security concurrency drifted", failures)
-    require("pip-audit" in dependency_security and "yarn audit" in dependency_security, "Dependency Security must audit both ecosystems", failures)
-    require(dependency_security.count("persist-credentials: false") >= 2, "Dependency Security checkouts must not persist credentials", failures)
+    require_all(
+        dependency_security,
+        DEPENDENCY_SECURITY_MARKERS,
+        "dependency audit/SBOM contract drifted",
+        failures,
+    )
+    require(
+        cancel_true(dependency_security),
+        "Dependency Security must cancel superseded same-ref dependency audits",
+        failures,
+    )
+    require(
+        "pip-audit" in dependency_security and "yarn audit" in dependency_security,
+        "Dependency Security must audit both ecosystems",
+        failures,
+    )
+    require(
+        dependency_security.count("persist-credentials: false") >= 2,
+        "Dependency Security checkouts must not persist credentials",
+        failures,
+    )
     require(
         "if: steps.python-audit.outputs.status != '0'" in dependency_security
         and "if: steps.yarn-audit.outputs.status != '0'" in dependency_security,
@@ -225,23 +413,76 @@ def main() -> int:
     )
 
     quality = read("scripts/quality-gates.sh")
-    require_all(quality, SECURITY_SCRIPTS, "local scanner coverage drifted", failures)
-    require_all(quality, SECURITY_TESTS, "local security regression coverage drifted", failures)
-    require("--noconftest" in quality and "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1" in quality, "local security isolation drifted", failures)
+    require_all(
+        quality,
+        SECURITY_SCRIPTS,
+        "local scanner coverage drifted",
+        failures,
+    )
+    require_all(
+        quality,
+        SECURITY_TESTS,
+        "local security regression coverage drifted",
+        failures,
+    )
+    require(
+        "--noconftest" in quality and "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1" in quality,
+        "local security isolation drifted",
+        failures,
+    )
 
     precommit = read(".pre-commit-config.yaml")
-    require_all(precommit, SECURITY_SCRIPTS, "pre-commit scanner coverage drifted", failures)
-    require_all(precommit, SECURITY_TESTS, "pre-commit security regression coverage drifted", failures)
-    require_all(precommit, SECURITY_HOOKS, "pre-commit security hook coverage drifted", failures)
-    require("repo-toolchain-contract" in precommit, "pre-commit toolchain self-enforcement missing", failures)
-    require("dependency-security" in precommit, "pre-commit toolchain hook must watch dependency-security workflow", failures)
-    require("PYTEST_DISABLE_PLUGIN_AUTOLOAD=1" in precommit and "--noconftest" in precommit, "pre-commit security isolation drifted", failures)
-    require("tests/test_process_safety.py" not in precommit, "superseded process test referenced", failures)
+    require_all(
+        precommit,
+        SECURITY_SCRIPTS,
+        "pre-commit scanner coverage drifted",
+        failures,
+    )
+    require_all(
+        precommit,
+        SECURITY_TESTS,
+        "pre-commit security regression coverage drifted",
+        failures,
+    )
+    require_all(
+        precommit,
+        SECURITY_HOOKS,
+        "pre-commit security hook coverage drifted",
+        failures,
+    )
+    require(
+        "repo-toolchain-contract" in precommit,
+        "pre-commit toolchain self-enforcement missing",
+        failures,
+    )
+    require(
+        "dependency-security" in precommit,
+        "pre-commit toolchain hook must watch dependency-security workflow",
+        failures,
+    )
+    require(
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1" in precommit and "--noconftest" in precommit,
+        "pre-commit security isolation drifted",
+        failures,
+    )
+    require(
+        "tests/test_process_safety.py" not in precommit,
+        "superseded process test referenced",
+        failures,
+    )
 
     for script_name in SECURITY_SCRIPTS:
-        require((ROOT / "backend/scripts" / script_name).is_file(), f"security scanner missing: {script_name}", failures)
+        require(
+            (ROOT / "backend/scripts" / script_name).is_file(),
+            f"security scanner missing: {script_name}",
+            failures,
+        )
     for test_name in SECURITY_TESTS:
-        require((ROOT / "backend/tests" / test_name).is_file(), f"security regression test missing: {test_name}", failures)
+        require(
+            (ROOT / "backend/tests" / test_name).is_file(),
+            f"security regression test missing: {test_name}",
+            failures,
+        )
 
     if failures:
         print("Toolchain contract violations:", file=sys.stderr)
@@ -251,8 +492,8 @@ def main() -> int:
 
     print(
         "Toolchain contract passed: immutable CI actions, runtime/tooling, hermetic test boundaries, "
-        "local/CI/pre-commit security parity, dependency audits/SBOMs, regression isolation, self-enforcement, "
-        "and fail-closed deployment gates aligned."
+        "canonical frontend validation, local/CI/pre-commit security parity, dependency audits/SBOMs, "
+        "SHA-safe concurrency, regression isolation, self-enforcement, and fail-closed deployment gates aligned."
     )
     return 0
 
