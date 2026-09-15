@@ -21,6 +21,38 @@ def test_rejects_aliased_pickle_load(tmp_path: Path) -> None:
     assert any("pickle.load() is forbidden" in finding for finding in findings)
 
 
+def test_rejects_stable_callable_alias_to_pickle_loads(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import pickle\ndecoder = pickle.loads\nvalue = decoder(payload)\n",
+    )
+    assert any("pickle.loads() is forbidden" in finding for finding in findings)
+
+
+def test_rejects_stable_callable_alias_chain(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import pickle\ndecoder = pickle.loads\nrestore = decoder\nvalue = restore(payload)\n",
+    )
+    assert any("pickle.loads() is forbidden" in finding for finding in findings)
+
+
+def test_rejects_function_local_callable_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import pickle\ndef decode(payload):\n    loader = pickle.loads\n    return loader(payload)\n",
+    )
+    assert any("pickle.loads() is forbidden" in finding for finding in findings)
+
+
+def test_rebound_callable_alias_is_not_assumed_to_keep_provenance(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import json\nimport pickle\ndecoder = pickle.loads\ndecoder = json.loads\nvalue = decoder(payload)\n",
+    )
+    assert findings == []
+
+
 def test_rejects_joblib_load(tmp_path: Path) -> None:
     findings = _scan(tmp_path, "import joblib\nvalue = joblib.load(path)\n")
     assert any("joblib.load() is forbidden" in finding for finding in findings)
@@ -36,6 +68,14 @@ def test_rejects_yaml_load_without_safe_loader(tmp_path: Path) -> None:
     assert any("requires literal SafeLoader" in finding for finding in findings)
 
 
+def test_rejects_yaml_load_through_callable_alias_without_safe_loader(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import yaml\nloader = yaml.load\nvalue = loader(text, Loader=yaml.FullLoader)\n",
+    )
+    assert any("requires literal SafeLoader" in finding for finding in findings)
+
+
 def test_allows_yaml_safe_load(tmp_path: Path) -> None:
     findings = _scan(tmp_path, "import yaml\nvalue = yaml.safe_load(text)\n")
     assert findings == []
@@ -46,6 +86,14 @@ def test_allows_yaml_load_with_safe_loader(tmp_path: Path) -> None:
     assert findings == []
 
 
+def test_allows_yaml_load_alias_with_safe_loader(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import yaml\nloader = yaml.load\nvalue = loader(text, Loader=yaml.SafeLoader)\n",
+    )
+    assert findings == []
+
+
 def test_rejects_numpy_pickle_enabled_load(tmp_path: Path) -> None:
     findings = _scan(tmp_path, "import numpy as np\nvalue = np.load(path, allow_pickle=True)\n")
     assert any("allow_pickle override must be literal False" in finding for finding in findings)
@@ -53,6 +101,14 @@ def test_rejects_numpy_pickle_enabled_load(tmp_path: Path) -> None:
 
 def test_rejects_numpy_dynamic_pickle_setting(tmp_path: Path) -> None:
     findings = _scan(tmp_path, "import numpy as np\nvalue = np.load(path, allow_pickle=setting)\n")
+    assert any("allow_pickle override must be literal False" in finding for finding in findings)
+
+
+def test_rejects_numpy_pickle_enabled_load_through_callable_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import numpy as np\nloader = np.load\nvalue = loader(path, allow_pickle=True)\n",
+    )
     assert any("allow_pickle override must be literal False" in finding for finding in findings)
 
 
@@ -76,8 +132,24 @@ def test_rejects_torch_load_with_dynamic_weights_only(tmp_path: Path) -> None:
     assert any("weights_only=True" in finding for finding in findings)
 
 
+def test_rejects_torch_load_alias_without_weights_only(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import torch\nloader = torch.load\nvalue = loader(path)\n",
+    )
+    assert any("weights_only=True" in finding for finding in findings)
+
+
 def test_allows_torch_weights_only_load(tmp_path: Path) -> None:
     findings = _scan(tmp_path, "import torch\nvalue = torch.load(path, weights_only=True)\n")
+    assert findings == []
+
+
+def test_allows_torch_alias_with_weights_only(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import torch\nloader = torch.load\nvalue = loader(path, weights_only=True)\n",
+    )
     assert findings == []
 
 
