@@ -1,5 +1,5 @@
 """
-Skeleton Developer CLI Package
+Skeleton Developer CLI Package.
 
 Provides developer tooling for the Skeleton platform:
   - scaffold: Project templates and generation
@@ -10,18 +10,23 @@ Provides developer tooling for the Skeleton platform:
 Usage:
     from skeleton.developer import ScaffoldEngine, Wizard
     engine = ScaffoldEngine()
-    engine.create_project("minimal-agent", "my-project")
+    wizard = Wizard(engine)
 """
 
 from skeleton.developer.scaffold import ScaffoldEngine, list_templates
-from skeleton.developer.wizard import Wizard, WizardMode, SubsystemExplorer
+from skeleton.developer.wizard import ProjectWizard, SubsystemExplorer
 from skeleton.developer.commands import CommandRegistry
+
+# ``Wizard`` was the documented package-level name even though the implementation
+# has always been ``ProjectWizard``. Keep that public spelling as a compatibility
+# alias while exporting the canonical class explicitly.
+Wizard = ProjectWizard
 
 __all__ = [
     "ScaffoldEngine",
     "list_templates",
+    "ProjectWizard",
     "Wizard",
-    "WizardMode",
     "SubsystemExplorer",
     "CommandRegistry",
 ]
