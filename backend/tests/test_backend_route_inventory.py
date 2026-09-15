@@ -128,6 +128,70 @@ def test_inventory_resolves_child_router_factory_composition_without_false_root_
     assert not any(row.path == "/capacity" for row in report.routes)
 
 
+def test_inventory_recursively_follows_directly_imported_child_routers(tmp_path: Path):
+    registry_path = registry(tmp_path, known='[("routes.parent", "router")]')
+    routes_root = tmp_path / "routes"
+    write(
+        routes_root / "leaf.py",
+        "from fastapi import APIRouter\n"
+        "router = APIRouter(prefix='/leaf')\n"
+        "@router.get('/ready')\n"
+        "def ready(): pass\n",
+    )
+    write(
+        routes_root / "child.py",
+        "from fastapi import APIRouter\n"
+        "from routes.leaf import router as leaf_router\n"
+        "router = APIRouter(prefix='/child')\n"
+        "@router.post('/run')\n"
+        "def run(): pass\n"
+        "router.include_router(leaf_router, prefix='/nested')\n",
+    )
+    write(
+        routes_root / "parent.py",
+        "from fastapi import APIRouter\n"
+        "from routes.child import router as child_router\n"
+        "router = APIRouter(prefix='/api/parent')\n"
+        "@router.get('/status')\n"
+        "def status(): pass\n"
+        "router.include_router(child_router, prefix='/mounted')\n",
+    )
+
+    report = build_inventory(registry_path, routes_root)
+
+    assert report.complete is True
+    assert report.duplicate_route_count == 0
+    assert {(row.method, row.path) for row in report.routes} == {
+        ("GET", "/api/parent/status"),
+        ("POST", "/api/parent/mounted/child/run"),
+        ("GET", "/api/parent/mounted/child/nested/leaf/ready"),
+    }
+
+
+def test_inventory_reports_import_cycles_instead_of_recursing_forever(tmp_path: Path):
+    registry_path = registry(tmp_path, known='[("routes.a", "router")]')
+    routes_root = tmp_path / "routes"
+    write(
+        routes_root / "a.py",
+        "from fastapi import APIRouter\n"
+        "from routes.b import router as b_router\n"
+        "router = APIRouter(prefix='/api/a')\n"
+        "router.include_router(b_router)\n",
+    )
+    write(
+        routes_root / "b.py",
+        "from fastapi import APIRouter\n"
+        "from routes.a import router as a_router\n"
+        "router = APIRouter(prefix='/b')\n"
+        "router.include_router(a_router)\n",
+    )
+
+    report = build_inventory(registry_path, routes_root)
+
+    assert report.complete is False
+    assert any("router include cycle" in row.reason for row in report.unresolved)
+
+
 def test_inventory_preserves_dynamic_paths_as_explicit_unresolved_evidence(tmp_path: Path):
     registry_path = registry(tmp_path, known='[("routes.dynamic", "router")]')
     routes_root = tmp_path / "routes"
