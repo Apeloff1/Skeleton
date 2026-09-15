@@ -146,6 +146,74 @@ def test_stale_open_pr_head_is_cancelled() -> None:
     assert summary["accepted"] == 1
 
 
+def test_closed_pr_reopened_on_run_sha_is_preserved_before_cancel() -> None:
+    pr_reads = 0
+
+    def handler(method: str, path: str):
+        nonlocal pr_reads
+        if method == "GET" and "/actions/runs?" in path:
+            payload = [run(31, "old")] if "status=queued" in path else []
+            return 200, {"workflow_runs": payload}, {}
+        if method == "GET" and "/commits/old/pulls" in path:
+            return 200, [{"number": 702}], {}
+        if method == "GET" and path.endswith("/pulls/702"):
+            pr_reads += 1
+            current = (
+                pr(702, state="closed", head_sha="old")
+                if pr_reads == 1
+                else pr(702, state="open", head_sha="old")
+            )
+            return 200, current, {}
+        if method == "POST" and path.endswith("/cancel"):
+            raise AssertionError("reopened authoritative run must not be cancelled")
+        raise AssertionError(f"unexpected network call: {method} {path}")
+
+    summary = sweep(
+        FakeApi(handler),
+        repo=REPO,
+        current_run_id=999,
+        default_branch=DEFAULT_BRANCH,
+    )
+
+    assert summary["obsolete"] == 1
+    assert summary["race_preserved"] == 1
+    assert summary["authoritative"] == 1
+    assert summary["accepted"] == 0
+    assert pr_reads == 2
+
+
+def test_stale_open_pr_moved_back_to_run_sha_is_preserved_before_cancel() -> None:
+    pr_reads = 0
+
+    def handler(method: str, path: str):
+        nonlocal pr_reads
+        if method == "GET" and "/actions/runs?" in path:
+            payload = [run(32, "old")] if "status=queued" in path else []
+            return 200, {"workflow_runs": payload}, {}
+        if method == "GET" and "/commits/old/pulls" in path:
+            return 200, [{"number": 703}], {}
+        if method == "GET" and path.endswith("/pulls/703"):
+            pr_reads += 1
+            head_sha = "new" if pr_reads == 1 else "old"
+            return 200, pr(703, state="open", head_sha=head_sha), {}
+        if method == "POST" and path.endswith("/cancel"):
+            raise AssertionError("head-rollback authoritative run must not be cancelled")
+        raise AssertionError(f"unexpected network call: {method} {path}")
+
+    summary = sweep(
+        FakeApi(handler),
+        repo=REPO,
+        current_run_id=999,
+        default_branch=DEFAULT_BRANCH,
+    )
+
+    assert summary["obsolete"] == 1
+    assert summary["race_preserved"] == 1
+    assert summary["authoritative"] == 1
+    assert summary["accepted"] == 0
+    assert pr_reads == 2
+
+
 def test_default_branch_cross_repo_and_unclassified_runs_fail_closed() -> None:
     api = FakeApi(
         handler_for(
