@@ -12,6 +12,9 @@ CLOSE_BARRIER_WORKFLOWS = (
     "malware-gate.yml",
     "provenance-policy.yml",
     "codeql.yml",
+    "merge-readiness.yml",
+    "repository-hygiene-gate.yml",
+    "secret-scanning.yml",
 )
 
 
@@ -40,3 +43,11 @@ def test_close_barriers_keep_normal_pr_lifecycle_events() -> None:
         text = (WORKFLOWS / name).read_text(encoding="utf-8")
         for action in ("opened", "synchronize", "reopened"):
             assert action in text, f"{name} lost normal PR action {action}"
+
+
+def test_merge_readiness_skips_every_job_on_close() -> None:
+    text = (WORKFLOWS / "merge-readiness.yml").read_text(encoding="utf-8")
+    assert text.count("github.event.action != 'closed'") >= 5, (
+        "merge-readiness close barrier must cover all four validation jobs and "
+        "the final readiness aggregator"
+    )
