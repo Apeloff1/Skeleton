@@ -69,7 +69,7 @@ jobs:
       - name: Run release provenance regression tests
         run: |
           python -m pip install --disable-pip-version-check "pytest==8.4.2"
-          python -m pytest -q source-a/skeleton/testing/test_release_provenance.py
+          python -m pytest -q --noconftest source-a/skeleton/testing/test_release_provenance.py
 
       - name: Build release A
         working-directory: source-a
