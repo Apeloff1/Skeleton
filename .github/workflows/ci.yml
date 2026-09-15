@@ -36,8 +36,6 @@ jobs:
         with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - name: Repository toolchain contract
         run: python ../scripts/check_toolchain_contract.py
-      - name: Install pinned backend quality tools
-        run: uv tool install "ruff==0.9.10"
       - name: Backend correctness lint
         run: uvx --from "ruff==0.9.10" ruff check . --output-format=github
       - name: Backend syntax compilation
