@@ -75,11 +75,17 @@ def gossip_cortices(dst, src, *, alpha: float = 0.5) -> Dict[str, Any]:
 
 
 def absorb_mouth(dst_lm, src_lm, *, alpha: float = 0.2) -> Dict[str, Any]:
-    """Copy a (possibly shallower) mouth into dst. Mixes E/P/Wout + min(layers)."""
+    """Copy a trained (possibly shallower) mouth into dst."""
     if dst_lm is None or src_lm is None:
         return {"absorbed": 0, "reason": "missing"}
     if int(getattr(dst_lm, "dim", 0) or 0) != int(getattr(src_lm, "dim", 0) or 0):
         return {"absorbed": 0, "reason": "dim-mismatch"}
+    source_training = max(
+        int(getattr(src_lm, "fitted", 0) or 0),
+        int(getattr(src_lm, "steps", 0) or 0),
+    )
+    if source_training <= 0:
+        return {"absorbed": 0, "reason": "source-unfitted"}
     a = max(0.0, min(1.0, float(alpha)))
     if a == 0.0:
         return {"absorbed": 1, "alpha": 0.0, "reason": "alpha0", "layers": 0}

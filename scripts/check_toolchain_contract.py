@@ -304,9 +304,10 @@ def main() -> int:
         "CI must use exactly three immutable setup-uv v10.1.0 sites backed by the repository uv pin",
         failures,
     )
+    ruff_command = f'uvx --from "ruff=={RUFF_CI_VERSION}" ruff check . --output-format=github'
     require(
-        ci.count(f'"ruff=={RUFF_CI_VERSION}"') == 2,
-        f"CI Ruff execution must be pinned to {RUFF_CI_VERSION}",
+        ci.count(ruff_command) == 1,
+        f"CI backend lint must execute Ruff {RUFF_CI_VERSION} exactly once",
         failures,
     )
     require(
