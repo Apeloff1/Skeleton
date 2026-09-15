@@ -8,9 +8,12 @@ on:
   schedule:
     - cron: "*/5 * * * *"
 
+# Keep one cleanup run alive while main is moving rapidly. GitHub still keeps
+# at most one pending run for this group, so newer pushes coalesce without
+# killing the active drainer before it can finish its multi-pass sweep.
 concurrency:
   group: queue-drain-${{ github.repository }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions: {}
 
