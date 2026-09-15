@@ -1,9 +1,9 @@
 """Narrow compatibility facade for retiring ``emergentintegrations.llm.chat``.
 
-This module intentionally preserves only the small builder/message surface used
-by older backend call sites while routing text generation through
-:mod:`core.ai_provider`.  It is a migration bridge, not a second provider
-runtime. New code must use ``ProviderRegistry`` / ``ProviderRequest`` directly.
+Older backend call sites keep their historical builder/message surface while
+supported text generation is routed through :mod:`core.ai_provider`. This is a
+migration bridge, not a second provider runtime. New code must use
+``ProviderRegistry`` / ``ProviderRequest`` directly.
 
 Legacy provider/model hints are advisory. The configured ``AI_PROVIDER`` remains
 authoritative, credentials come from the canonical provider environment, and
@@ -23,11 +23,17 @@ from core.ai_provider import (
 )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, init=False)
 class UserMessage:
-    """Minimal legacy-compatible user message."""
+    """Legacy-compatible user message container."""
 
     text: str
+
+    def __init__(self, text: str | None = None, **kwargs: Any) -> None:
+        candidate = text
+        if candidate is None:
+            candidate = kwargs.pop("content", kwargs.pop("message", ""))
+        object.__setattr__(self, "text", str(candidate))
 
     @property
     def content(self) -> str:
@@ -47,17 +53,28 @@ class LlmChat:
 
     def __init__(
         self,
+        *args: Any,
         api_key: str | None = None,
         session_id: str | None = None,
         system_message: str | None = None,
         **_: Any,
     ) -> None:
+        positional = list(args)
+        if api_key is None and positional:
+            api_key = positional.pop(0)
+        if session_id is None and positional:
+            session_id = positional.pop(0)
+        if system_message is None and positional:
+            system_message = positional.pop(0)
+        if positional:
+            raise TypeError("LlmChat accepts at most three legacy positional arguments")
+
         # ``api_key`` is accepted solely for source compatibility. Credentials
         # are intentionally resolved by the canonical provider runtime so a
         # legacy universal key is never forwarded to an unrelated vendor API.
         self._legacy_api_key_present = bool(api_key)
-        self.session_id = session_id or ""
-        self.system_message = system_message or ""
+        self.session_id = str(session_id or "")
+        self.system_message = str(system_message or "")
         self._provider_hint: str | None = None
         self._model_hint: str | None = None
         self._max_output_tokens: int | None = None
@@ -67,6 +84,10 @@ class LlmChat:
     def with_model(self, provider: str, model: str) -> "LlmChat":
         self._provider_hint = (provider or "").strip().lower() or None
         self._model_hint = (model or "").strip() or None
+        return self
+
+    def with_system_message(self, system_message: str) -> "LlmChat":
+        self.system_message = str(system_message or "")
         return self
 
     def with_max_tokens(self, max_tokens: int) -> "LlmChat":
@@ -118,7 +139,19 @@ class LlmChat:
         self._history.append(AIMessage(role="assistant", content=response.text))
         return ChatResponse(response.text)
 
-    async def send_message_multimodal_response(self, message: Any) -> tuple[str, list[dict[str, Any]]]:
+    async def chat(self, message: Any) -> ChatResponse:
+        """Legacy alias for :meth:`send_message`."""
+
+        return await self.send_message(message)
+
+    async def generate(self, message: Any) -> ChatResponse:
+        """Legacy alias for :meth:`send_message`."""
+
+        return await self.send_message(message)
+
+    async def send_message_multimodal_response(
+        self, message: Any
+    ) -> tuple[str, list[dict[str, Any]]]:
         del message
         raise ProviderUnavailableError(
             "legacy multimodal generation is not implemented by the canonical text provider runtime"
