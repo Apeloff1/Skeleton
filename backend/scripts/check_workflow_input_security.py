@@ -25,8 +25,11 @@ RUN_RE = re.compile(
     r"^(?P<indent>\s*)(?:-\s*)?(?:run|'run'|\"run\")\s*:\s*(?P<value>.*)$"
 )
 EXPRESSION_RE = re.compile(r"\$\{\{(?P<body>.*?)\}\}")
+# Match the input contexts as expression tokens, not only property access.
+# Whole-object transforms such as toJSON(inputs) remain attacker-controlled and
+# must not be interpolated directly into a shell command either.
 UNTRUSTED_INPUT_RE = re.compile(
-    r"(?<![A-Za-z0-9_])(?:github\.event\.inputs|inputs)\s*(?:\.|\[)"
+    r"(?<![A-Za-z0-9_])(?:github\.event\.inputs|inputs)(?![A-Za-z0-9_])"
 )
 # YAML block scalars may combine a chomping indicator (+/-) and an indentation
 # indicator (1-9) in either order: |, |-, |2, |2-, |-2, >+2, and so on.
@@ -73,10 +76,40 @@ def _run_fragments(lines: list[str]) -> Iterable[tuple[int, str]]:
             index += 1
 
 
+def _without_expression_string_literals(body: str) -> str:
+    """Blank GitHub-expression single-quoted strings while preserving tokens.
+
+    GitHub expressions use single-quoted string literals and escape a literal
+    quote by doubling it. Ignoring literal contents prevents harmless text such
+    as ``'inputs.payload'`` from being mistaken for an input-context reference.
+    """
+    output: list[str] = []
+    index = 0
+    in_string = False
+
+    while index < len(body):
+        char = body[index]
+        if char == "'":
+            if in_string and index + 1 < len(body) and body[index + 1] == "'":
+                output.extend((" ", " "))
+                index += 2
+                continue
+            in_string = not in_string
+            output.append(" ")
+        elif in_string:
+            output.append(" ")
+        else:
+            output.append(char)
+        index += 1
+
+    return "".join(output)
+
+
 def _direct_input_expression(fragment: str) -> str | None:
     for expression in EXPRESSION_RE.finditer(fragment):
         body = expression.group("body")
-        if UNTRUSTED_INPUT_RE.search(body):
+        searchable = _without_expression_string_literals(body)
+        if UNTRUSTED_INPUT_RE.search(searchable):
             return body.strip()
     return None
 
@@ -117,7 +150,7 @@ def main() -> int:
 
     print(
         f"Workflow input security gate passed for {len(workflows)} workflow files: "
-        "no direct inputs.* or github.event.inputs.* interpolation in run shells."
+        "no direct inputs or github.event.inputs interpolation in run shells."
     )
     return 0
 
