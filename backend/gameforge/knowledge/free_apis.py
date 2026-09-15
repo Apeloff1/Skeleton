@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 from typing import Any, Optional
+from urllib.parse import urlsplit
 
 # key -> {name, category, url (may contain {q}/{lat}/{lon}/{from}/{to}), note}
 FREE_APIS: dict[str, dict] = {
@@ -15,9 +16,9 @@ FREE_APIS: dict[str, dict] = {
     "wikidata":      {"name": "Wikidata Search", "category": "reference", "url": "https://www.wikidata.org/w/api.php?action=wbsearchentities&search={q}&language=en&format=json", "note": "entity search"},
     "dictionary":    {"name": "Free Dictionary", "category": "language", "url": "https://api.dictionaryapi.dev/api/v2/entries/en/{q}", "note": "word definitions"},
     "datamuse":      {"name": "Datamuse Words", "category": "language", "url": "https://api.datamuse.com/words?ml={q}", "note": "synonyms/related words"},
-    "numbers":       {"name": "Numbers API", "category": "reference", "url": "http://numbersapi.com/{q}", "note": "facts about a number"},
+    "numbers":       {"name": "Numbers API", "category": "reference", "url": "https://numbersapi.com/{q}", "note": "facts about a number"},
     # ── Dev / research ──
-    "arxiv":         {"name": "arXiv", "category": "research", "url": "http://export.arxiv.org/api/query?search_query=all:{q}&max_results=3", "note": "academic papers (xml)"},
+    "arxiv":         {"name": "arXiv", "category": "research", "url": "https://export.arxiv.org/api/query?search_query=all:{q}&max_results=3", "note": "academic papers (xml)"},
     "hackernews":    {"name": "Hacker News", "category": "dev", "url": "https://hn.algolia.com/api/v1/search?query={q}", "note": "tech discussion"},
     "github":        {"name": "GitHub Repo Search", "category": "dev", "url": "https://api.github.com/search/repositories?q={q}&per_page=5", "note": "open-source repos"},
     "openlibrary":   {"name": "Open Library", "category": "reference", "url": "https://openlibrary.org/search.json?q={q}&limit=3", "note": "books"},
@@ -28,8 +29,8 @@ FREE_APIS: dict[str, dict] = {
     "weather":       {"name": "Open-Meteo Weather", "category": "geo", "url": "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true", "note": "needs lat/lon"},
     "nominatim":     {"name": "OSM Nominatim", "category": "geo", "url": "https://nominatim.openstreetmap.org/search?q={q}&format=json&limit=3", "note": "geocoding"},
     "sunrise":       {"name": "Sunrise/Sunset", "category": "geo", "url": "https://api.sunrise-sunset.org/json?lat={lat}&lng={lon}", "note": "needs lat/lon"},
-    "iss":           {"name": "ISS Location", "category": "science", "url": "http://api.open-notify.org/iss-now.json", "note": "live ISS position"},
-    "universities":  {"name": "Universities", "category": "reference", "url": "http://universities.hipolabs.com/search?name={q}", "note": "universities"},
+    "iss":           {"name": "ISS Location", "category": "science", "url": "https://api.open-notify.org/iss-now.json", "note": "live ISS position"},
+    "universities":  {"name": "Universities", "category": "reference", "url": "https://universities.hipolabs.com/search?name={q}", "note": "universities"},
     "zippopotam":    {"name": "Zip Codes (US)", "category": "geo", "url": "https://api.zippopotam.us/us/{q}", "note": "US zip lookup"},
     # ── Finance ──
     "coingecko":     {"name": "CoinGecko Price", "category": "finance", "url": "https://api.coingecko.com/api/v3/simple/price?ids={q}&vs_currencies=usd", "note": "crypto price"},
@@ -83,14 +84,27 @@ def _build_url(api: dict, params: dict) -> str:
     return url
 
 
+def _validate_catalog_url(api: dict, url: str) -> None:
+    """Ensure generated URLs stay on the fixed public API host over HTTPS."""
+    configured = urlsplit(api["url"])
+    actual = urlsplit(url)
+    if configured.scheme != "https" or actual.scheme != "https":
+        raise ValueError("API URL must use HTTPS")
+    if not configured.hostname or actual.hostname != configured.hostname:
+        raise ValueError("API URL host is not part of the trusted catalog")
+    if actual.username or actual.password:
+        raise ValueError("API URL credentials are not allowed")
+
+
 async def fetch(api_key: str, params: dict) -> dict:
     api = FREE_APIS.get(api_key)
     if not api:
         return {"ok": False, "error": f"unknown api '{api_key}'", "available": sorted(FREE_APIS.keys())}
     url = _build_url(api, params or {})
     try:
+        _validate_catalog_url(api, url)
         import httpx
-        async with httpx.AsyncClient(timeout=10, follow_redirects=True, headers=_HEADERS) as c:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=False, headers=_HEADERS) as c:
             r = await c.get(url)
         ct = r.headers.get("content-type", "")
         body: Any
