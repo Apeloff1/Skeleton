@@ -29,6 +29,7 @@ from skeleton.frontier.orchestration import (
     ToolResult,
 )
 from skeleton.kernel.events import EventBus
+from skeleton.observability.event_bridge import EventMetricsBridge
 
 
 _CURRENT_CORRELATION_ID: ContextVar[str] = ContextVar(
@@ -53,7 +54,14 @@ def _normalized_correlation_id(value: str | None, *, fallback: str) -> str:
 
 
 class ObservableOrchestrator(CanonicalOrchestrator):
-    """Canonical orchestrator with metadata-only lifecycle events attached."""
+    """Canonical orchestrator with metadata-only lifecycle events attached.
+
+    Every instance owns an event bus and an attached :class:`EventMetricsBridge`
+    by default, so choosing the observable runtime cannot silently drop lifecycle
+    metrics. Callers that already own either primitive may inject them; the
+    supplied bridge is attached to the supplied (or generated) bus exactly once
+    by this runtime boundary.
+    """
 
     def __init__(
         self,
@@ -62,17 +70,18 @@ class ObservableOrchestrator(CanonicalOrchestrator):
         tool_retry_budget: RetryBudget = RetryBudget(),
         max_turns: int = 16,
         event_bus: EventBus | None = None,
+        metrics_bridge: EventMetricsBridge | None = None,
     ) -> None:
         super().__init__(
             tools=tools or ToolRegistry(),
             tool_retry_budget=tool_retry_budget,
             max_turns=max_turns,
         )
-        self.event_bus = event_bus
+        self.event_bus = event_bus or EventBus()
+        self.metrics_bridge = metrics_bridge or EventMetricsBridge()
+        self.metrics_bridge.attach(self.event_bus)
 
     def _emit(self, topic: str, payload: dict[str, object]) -> None:
-        if self.event_bus is None:
-            return
         self.event_bus.emit(
             topic,
             payload,

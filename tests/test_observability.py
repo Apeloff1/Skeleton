@@ -64,6 +64,22 @@ def test_event_bus_emit_preserves_and_infers_correlation_id() -> None:
     assert events[1].correlation_id == "task-9"
 
 
+def test_event_metrics_bridge_attachment_is_idempotent() -> None:
+    bus = EventBus()
+    bridge = EventMetricsBridge()
+
+    bridge.attach(bus)
+    bridge.attach(bus)
+    bus.emit("runtime.run.started", {"run_id": "run-1"})
+
+    assert bus.stats()["subscribed"] == 1
+    assert len(bridge.events()) == 1
+    assert bridge.registry.get_counter(
+        "observability.events_total",
+        labels={"topic": "runtime.run.started"},
+    ) == 1.0
+
+
 def test_event_metrics_bridge_redacts_and_collects_baseline_metrics() -> None:
     bus = EventBus()
     bridge = EventMetricsBridge(max_events=4)

@@ -5,6 +5,7 @@ from collections import deque
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
+from weakref import WeakSet
 
 from skeleton.kernel.events import DomainEvent, EventBus
 from skeleton.observability.metrics_registry import MetricsRegistry
@@ -34,9 +35,14 @@ class EventMetricsBridge:
             raise ValueError("max_events must be at least 1")
         self.registry = registry or MetricsRegistry()
         self._events: deque[ObservedEvent] = deque(maxlen=max_events)
+        self._attached_buses: WeakSet[EventBus] = WeakSet()
 
     def attach(self, bus: EventBus) -> None:
+        """Attach to a bus once; repeated attachment must not double-count events."""
+        if bus in self._attached_buses:
+            return
         bus.subscribe("*", self.observe)
+        self._attached_buses.add(bus)
 
     def observe(self, event: DomainEvent) -> None:
         payload = redact_payload(event.payload)

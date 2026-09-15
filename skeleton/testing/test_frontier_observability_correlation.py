@@ -63,6 +63,17 @@ class _OneToolDriver(OrchestrationDriver):
         return TurnOutcome(output=tool_results[0].output, terminal=True)
 
 
+class _TerminalDriver(OrchestrationDriver):
+    async def next_turn(
+        self,
+        *,
+        run: RunRecord,
+        tool_results: tuple[ToolResult, ...],
+    ) -> TurnOutcome:
+        del run, tool_results
+        return TurnOutcome(output="ok", terminal=True)
+
+
 def _observed_orchestrator(
     handler,
     *,
@@ -72,15 +83,55 @@ def _observed_orchestrator(
     tools.register("lookup", handler)
     bus = EventBus()
     bridge = EventMetricsBridge()
-    bridge.attach(bus)
     return (
         ObservableOrchestrator(
             tools=tools,
             tool_retry_budget=retry_budget,
             event_bus=bus,
+            metrics_bridge=bridge,
         ),
         bridge,
     )
+
+
+def test_observable_runtime_attaches_metrics_bridge_by_default() -> None:
+    async def scenario() -> None:
+        orchestrator = ObservableOrchestrator()
+
+        record = await orchestrator.run(
+            _TerminalDriver(),
+            run_id="run-default-observability",
+            correlation_id="req-default-observability",
+        )
+
+        assert record.status is RunStatus.COMPLETED
+        events = orchestrator.metrics_bridge.events()
+        assert [event.topic for event in events] == [
+            "orchestration.run.started",
+            "orchestration.run.completed",
+        ]
+        assert {event.correlation_id for event in events} == {
+            "req-default-observability"
+        }
+        assert orchestrator.metrics_bridge.registry.get_counter(
+            "observability.events_total",
+            labels={"topic": "orchestration.run.started"},
+        ) == 1.0
+        assert orchestrator.metrics_bridge.registry.get_counter(
+            "observability.events_total",
+            labels={"topic": "orchestration.run.completed"},
+        ) == 1.0
+
+    asyncio.run(scenario())
+
+
+def test_injected_metrics_bridge_is_runtime_bridge() -> None:
+    bridge = EventMetricsBridge()
+    bus = EventBus()
+    orchestrator = ObservableOrchestrator(event_bus=bus, metrics_bridge=bridge)
+
+    assert orchestrator.event_bus is bus
+    assert orchestrator.metrics_bridge is bridge
 
 
 def test_request_id_survives_api_to_run_to_tool_without_payload_leakage() -> None:
