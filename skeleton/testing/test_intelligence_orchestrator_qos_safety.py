@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import pytest
@@ -65,6 +66,20 @@ def test_handler_replacement_invalidates_cached_result() -> None:
     assert replacement["answer"] == {"handler": "replacement"}
 
 
+def test_handler_unregister_invalidates_cached_result() -> None:
+    orchestrator = IntelligenceOrchestrator(result_cache_ttl_seconds=60.0)
+    orchestrator.register_handler(
+        "primary", lambda task: _result(task.task_id, "old", 0.9)
+    )
+
+    assert orchestrator.reason("same query")["answer"] == "old"
+    assert orchestrator.unregister_handler("primary") is True
+
+    after_unregister = orchestrator.reason("same query")
+    assert after_unregister["cached"] is False
+    assert after_unregister["error"] == "No eligible reasoning handlers are available"
+
+
 def test_cached_nested_answer_is_defensively_isolated() -> None:
     orchestrator = IntelligenceOrchestrator(result_cache_ttl_seconds=60.0)
 
@@ -81,6 +96,28 @@ def test_cached_nested_answer_is_defensively_isolated() -> None:
     assert cached["cached"] is True
     assert cached["answer"] == {"nested": ["original"]}
     assert cached["sources"] == ["fixture"]
+
+
+def test_expired_deadline_cannot_be_bypassed_by_cache_hit() -> None:
+    calls = 0
+
+    def handler(task):
+        nonlocal calls
+        calls += 1
+        return _result(task.task_id, "cached", 0.9)
+
+    orchestrator = IntelligenceOrchestrator(result_cache_ttl_seconds=60.0)
+    orchestrator.register_handler("primary", handler)
+
+    warm = orchestrator.reason("deadline cache")
+    assert warm["cached"] is False
+    assert calls == 1
+
+    expired = orchestrator.reason("deadline cache", deadline=time.time() - 1.0)
+    assert expired["cached"] is False
+    assert "error" in expired
+    assert calls == 1
+    assert orchestrator.stats()["deadline_exceeded"] >= 1
 
 
 def test_handler_exception_text_is_not_exposed_in_result_stats_or_events() -> None:
