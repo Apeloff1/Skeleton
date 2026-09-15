@@ -1,0 +1,79 @@
+name: Reliability Capacity Baseline
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "skeleton/testing/api_gateway_reliability_profiles.py"
+      - "skeleton/testing/provider_stream_reliability_profiles.py"
+      - "skeleton/testing/process_resource_reliability_profiles.py"
+      - ".github/workflows/reliability-capacity-baseline.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reliability-capacity-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  baseline:
+    name: Capture ubuntu-latest capacity baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11.16"
+
+      - name: Install canonical runtime dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check .
+
+      - name: Capture representative reliability profiles
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline_dir="${RUNNER_TEMP}/reliability-baseline"
+          mkdir -p "$baseline_dir"
+
+          python -m skeleton.testing.api_gateway_reliability_profiles \
+            --requests 5000 \
+            --concurrency 32 \
+            --json | tee "$baseline_dir/api-gateway.json"
+
+          python -m skeleton.testing.provider_stream_reliability_profiles \
+            --runs 250 \
+            --concurrency 16 \
+            --chunks 4 \
+            --transient-failures 2 \
+            --max-attempts 3 \
+            --json | tee "$baseline_dir/provider-stream.json"
+
+          python -m skeleton.testing.process_resource_reliability_profiles \
+            --iterations 20000 \
+            --warmup 256 \
+            --json | tee "$baseline_dir/process-resource.json"
+
+          {
+            echo "## Reliability capacity baseline"
+            echo
+            echo "Execution class: GitHub-hosted ubuntu-latest"
+            echo "Python: 3.11.16"
+            echo "Commit: ${GITHUB_SHA}"
+            echo
+            echo '```json'
+            echo '{'
+            echo '  "api_gateway":'
+            cat "$baseline_dir/api-gateway.json"
+            echo '  ,"provider_stream":'
+            cat "$baseline_dir/provider-stream.json"
+            echo '  ,"process_resource":'
+            cat "$baseline_dir/process-resource.json"
+            echo '}'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
