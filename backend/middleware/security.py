@@ -232,29 +232,234 @@ class AuditMiddleware(BaseHTTPMiddleware):
 # ─────────────────────────────────────────────────────────────────
 # Body-size cap
 # ─────────────────────────────────────────────────────────────────
-class SizeLimitMiddleware(BaseHTTPMiddleware):
-    """Reject any /api/* request whose Content-Length exceeds the cap.
-    Defaults to 25 MB (covers chunked file uploads). Configurable via env
-    CODEDOCK_MAX_BODY_MB."""
+def _matches_api_boundary(path: str) -> bool:
+    """Match /api itself or a true child route, never /apiary-style lookalikes."""
+    return path == "/api" or path.startswith("/api/")
 
-    def __init__(self, app, max_mb: int | None = None):
-        super().__init__(app)
-        self.max_bytes = (max_mb or int(os.environ.get("CODEDOCK_MAX_BODY_MB", "25"))) * 1024 * 1024
 
-    async def dispatch(self, request: Request, call_next):
-        if request.url.path.startswith("/api") and request.method in ("POST", "PUT", "PATCH"):
-            cl = request.headers.get("content-length")
-            if cl and int(cl) > self.max_bytes:
-                return JSONResponse(
+class SizeLimitMiddleware:
+    """Fail closed on malformed request framing and oversized API bodies.
+
+    The middleware is a raw ASGI boundary rather than BaseHTTPMiddleware so it
+    can count every streamed body chunk before application code runs. Bodies are
+    buffered only after reserving space from a bounded aggregate in-flight
+    budget, then replayed verbatim to the downstream application.
+    """
+
+    def __init__(
+        self,
+        app,
+        max_mb: int | None = None,
+        max_inflight_mb: int | None = None,
+    ):
+        self.app = app
+        configured_mb = max_mb if max_mb is not None else int(
+            os.environ.get("CODEDOCK_MAX_BODY_MB", "25")
+        )
+        configured_inflight_mb = (
+            max_inflight_mb
+            if max_inflight_mb is not None
+            else int(os.environ.get("CODEDOCK_MAX_INFLIGHT_BODY_MB", "128"))
+        )
+        if configured_mb <= 0:
+            raise ValueError("maximum body size must be positive")
+        if configured_inflight_mb <= 0:
+            raise ValueError("maximum in-flight body budget must be positive")
+
+        self.max_bytes = int(configured_mb) * 1024 * 1024
+        self.max_inflight_bytes = int(configured_inflight_mb) * 1024 * 1024
+        self._inflight_body_bytes = 0
+        self._inflight_lock = asyncio.Lock()
+
+    async def _reserve_body_bytes(self, amount: int) -> bool:
+        if amount <= 0:
+            return True
+        async with self._inflight_lock:
+            if amount > self.max_inflight_bytes - self._inflight_body_bytes:
+                return False
+            self._inflight_body_bytes += amount
+            return True
+
+    async def _release_body_bytes(self, amount: int) -> None:
+        if amount <= 0:
+            return
+        async with self._inflight_lock:
+            self._inflight_body_bytes = max(0, self._inflight_body_bytes - amount)
+
+    async def _reject(self, scope, receive, send, *, status_code: int, content: dict, headers=None):
+        response = JSONResponse(status_code=status_code, content=content, headers=headers)
+        await response(scope, receive, send)
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get("path") or "/"
+        if not _matches_api_boundary(path):
+            await self.app(scope, receive, send)
+            return
+
+        raw_headers = list(scope.get("headers") or [])
+        content_lengths = [
+            value.decode("latin-1").strip(" \t")
+            for key, value in raw_headers
+            if key.lower() == b"content-length"
+        ]
+        transfer_encodings = [
+            value.decode("latin-1").strip(" \t")
+            for key, value in raw_headers
+            if key.lower() == b"transfer-encoding"
+        ]
+
+        if len(content_lengths) > 1 or len(transfer_encodings) > 1:
+            await self._reject(
+                scope,
+                receive,
+                send,
+                status_code=400,
+                content={"error": "invalid_request_framing"},
+            )
+            return
+        if content_lengths and transfer_encodings:
+            await self._reject(
+                scope,
+                receive,
+                send,
+                status_code=400,
+                content={"error": "invalid_request_framing"},
+            )
+            return
+
+        declared: int | None = None
+        if content_lengths:
+            raw_declared = content_lengths[0]
+            if not raw_declared.isascii() or not raw_declared.isdigit():
+                await self._reject(
+                    scope,
+                    receive,
+                    send,
+                    status_code=400,
+                    content={"error": "invalid_content_length"},
+                )
+                return
+
+            normalized_declared = raw_declared.lstrip("0") or "0"
+            limit_text = str(self.max_bytes)
+            if len(normalized_declared) > len(limit_text) or (
+                len(normalized_declared) == len(limit_text)
+                and normalized_declared > limit_text
+            ):
+                await self._reject(
+                    scope,
+                    receive,
+                    send,
                     status_code=413,
                     content={
                         "error": "payload_too_large",
                         "detail": f"body exceeds {self.max_bytes // 1024 // 1024} MB",
                         "limit_bytes": self.max_bytes,
-                        "got_bytes":   int(cl),
+                        "got_bytes_at_least": self.max_bytes + 1,
                     },
                 )
-        return await call_next(request)
+                return
+            declared = int(normalized_declared, 10)
+
+        buffered: list[dict] = []
+        seen = 0
+        reserved = 0
+        try:
+            while True:
+                message = await receive()
+                message_type = message.get("type")
+                if message_type == "http.disconnect":
+                    return
+                if message_type != "http.request":
+                    await self._reject(
+                        scope,
+                        receive,
+                        send,
+                        status_code=400,
+                        content={"error": "invalid_request_body_stream"},
+                    )
+                    return
+
+                body = message.get("body") or b""
+                if not isinstance(body, (bytes, bytearray)):
+                    await self._reject(
+                        scope,
+                        receive,
+                        send,
+                        status_code=400,
+                        content={"error": "invalid_request_body_stream"},
+                    )
+                    return
+                chunk_size = len(body)
+
+                if seen + chunk_size > self.max_bytes:
+                    await self._reject(
+                        scope,
+                        receive,
+                        send,
+                        status_code=413,
+                        content={
+                            "error": "payload_too_large",
+                            "detail": f"body exceeds {self.max_bytes // 1024 // 1024} MB",
+                            "limit_bytes": self.max_bytes,
+                            "got_bytes": seen + chunk_size,
+                        },
+                    )
+                    return
+
+                if not await self._reserve_body_bytes(chunk_size):
+                    await self._reject(
+                        scope,
+                        receive,
+                        send,
+                        status_code=503,
+                        content={
+                            "error": "body_capacity_exhausted",
+                            "detail": "in-flight request body budget exhausted",
+                            "limit_bytes": self.max_inflight_bytes,
+                        },
+                        headers={"Retry-After": "1"},
+                    )
+                    return
+
+                reserved += chunk_size
+                seen += chunk_size
+                buffered.append(
+                    {
+                        **message,
+                        "body": bytes(body),
+                    }
+                )
+                if not message.get("more_body", False):
+                    break
+
+            if declared is not None and seen != declared:
+                await self._reject(
+                    scope,
+                    receive,
+                    send,
+                    status_code=400,
+                    content={"error": "invalid_content_length"},
+                )
+                return
+
+            index = 0
+
+            async def replay_receive():
+                nonlocal index
+                if index < len(buffered):
+                    message = buffered[index]
+                    index += 1
+                    return message
+                return {"type": "http.request", "body": b"", "more_body": False}
+
+            await self.app(scope, replay_receive, send)
+        finally:
+            await self._release_body_bytes(reserved)
 
 
 # ─────────────────────────────────────────────────────────────────
