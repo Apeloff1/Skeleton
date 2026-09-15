@@ -48,6 +48,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   tests/test_orchestration.py \
   tests/test_orchestration_error_redaction.py \
   tests/test_frontier_runtime_memory_retrieval.py \
+  tests/test_retrieval_pipeline_internals.py \
   tests/test_agent_coordination.py \
   tests/test_api_gateway_rate_limit_reliability.py \
   tests/test_api_gateway_payload_reliability.py \
@@ -112,6 +113,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_repository_process_safety.py \
   backend/tests/test_deserialization_safety_gate.py \
   backend/tests/test_dynamic_import_safety.py \
+  backend/tests/test_scanner_nonempty_contract.py \
   backend/tests/test_archive_extraction_safety.py \
   backend/tests/test_security_scan_surface.py \
   backend/tests/test_live_scraper_network_security.py \
