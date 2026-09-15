@@ -109,6 +109,13 @@ const severityCount = (name) => {
   return Number.isFinite(value) && value >= 0 ? value : 0;
 };
 const blockingSummaryCount = severityCount('high') + severityCount('critical');
+const observedBlockingAdvisories = findings.length + mitigated.length;
+if ((blockingSummaryCount > 0) !== (observedBlockingAdvisories > 0)) {
+  console.error(
+    '[yarn-audit-policy] high/critical audit summary and advisory detail disagree; blocking',
+  );
+  process.exit(2);
+}
 if (auditStatus !== 0 && blockingSummaryCount === 0) {
   console.error(
     `[yarn-audit-policy] yarn audit exited ${auditStatus} without high/critical findings; treating as execution failure`,
