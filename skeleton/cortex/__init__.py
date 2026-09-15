@@ -178,7 +178,10 @@ def _validate_tract_payload(payload) -> None:
         _tract_error("tract exemplar limit exceeded", max_exemplars=_TRACT_MAX_EXEMPLARS)
     declared_size = payload.get("size")
     if declared_size is not None and (
-        not isinstance(declared_size, int) or declared_size < 0 or declared_size != len(exemplars)
+        isinstance(declared_size, bool)
+        or not isinstance(declared_size, int)
+        or declared_size < 0
+        or declared_size != len(exemplars)
     ):
         _tract_error("tract size does not match exemplars")
 
