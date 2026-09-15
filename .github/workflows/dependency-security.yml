@@ -98,8 +98,8 @@ jobs:
         shell: bash
         run: |
           set +e
-          yarn audit --groups dependencies --level high --json > "$RUNNER_TEMP/yarn-audit.json"
-          status=$?
+          yarn audit --groups dependencies --level high --json | tee "$RUNNER_TEMP/yarn-audit.json"
+          status=${PIPESTATUS[0]}
           echo "status=$status" >> "$GITHUB_OUTPUT"
           exit 0
 
