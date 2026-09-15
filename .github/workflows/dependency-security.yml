@@ -11,6 +11,7 @@ on:
       - "frontend/scripts/patch-node-modules.js"
       - "frontend/scripts/verify-image-size-security.js"
       - "frontend/scripts/enforce-yarn-audit.js"
+      - "frontend/scripts/test-enforce-yarn-audit.js"
       - ".github/workflows/dependency-security.yml"
   pull_request:
     paths:
@@ -21,6 +22,7 @@ on:
       - "frontend/scripts/patch-node-modules.js"
       - "frontend/scripts/verify-image-size-security.js"
       - "frontend/scripts/enforce-yarn-audit.js"
+      - "frontend/scripts/test-enforce-yarn-audit.js"
       - ".github/workflows/dependency-security.yml"
   workflow_dispatch:
 
@@ -94,6 +96,10 @@ jobs:
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
 
+      - name: Run Yarn audit policy regression tests
+        working-directory: frontend
+        run: node scripts/test-enforce-yarn-audit.js
+
       - name: Install frozen frontend dependency graph
         working-directory: frontend
         run: yarn install --frozen-lockfile --non-interactive
@@ -104,11 +110,16 @@ jobs:
         run: node scripts/verify-image-size-security.js
 
       - name: Audit production JavaScript dependencies
+        id: yarn-audit
         working-directory: frontend
         shell: bash
         run: |
           set +e
-          yarn audit --groups dependencies --level high --json > "$RUNNER_TEMP/yarn-audit.json"
+          yarn audit --groups dependencies --level high --json \
+            > "$RUNNER_TEMP/yarn-audit.json" \
+            2> "$RUNNER_TEMP/yarn-audit.stderr"
+          status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
           exit 0
 
       - name: Generate Yarn-aware CycloneDX SBOM
@@ -128,6 +139,7 @@ jobs:
           name: frontend-dependency-security
           path: |
             ${{ runner.temp }}/yarn-audit.json
+            ${{ runner.temp }}/yarn-audit.stderr
             ${{ runner.temp }}/frontend-sbom.cdx.json
           if-no-files-found: warn
           retention-days: 14
@@ -136,5 +148,6 @@ jobs:
         if: always()
         env:
           IMAGE_SIZE_SECURITY_VERIFIED: ${{ steps.image-size-security.outcome }}
+          YARN_AUDIT_STATUS: ${{ steps.yarn-audit.outputs.status }}
         working-directory: frontend
         run: node scripts/enforce-yarn-audit.js "$RUNNER_TEMP/yarn-audit.json"
