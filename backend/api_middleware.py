@@ -31,7 +31,7 @@ import re
 import time
 import uuid
 from collections import defaultdict, deque
-from typing import Callable, Deque, Dict, Tuple
+from collections.abc import Callable
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -72,9 +72,9 @@ def _parse_trusted_proxy_networks(
 
 _TRUSTED_PROXY_NETWORKS = _parse_trusted_proxy_networks(_TRUSTED_PROXY_RAW)
 
-_lat_ring: Deque[float] = deque(maxlen=1024)
+_lat_ring: deque[float] = deque(maxlen=1024)
 _lat_lock: asyncio.Lock | None = None
-_counts: Dict[str, int] = defaultdict(int)
+_counts: dict[str, int] = defaultdict(int)
 _started_at: float = time.time()
 
 
@@ -165,14 +165,12 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
             response: Response = await call_next(request)
         except RuntimeError as exc:
             if "No response returned" in str(exc):
-                from fastapi.responses import Response as _Resp
-
                 log.debug(
                     "client disconnected mid-request rid=%s path=%s",
                     rid,
                     request.url.path,
                 )
-                response = _Resp(status_code=499)
+                response = Response(status_code=499)
                 response.headers["X-Request-Id"] = rid
                 return response
             raise
@@ -287,7 +285,7 @@ class _Bucket:
         self.tokens = float(capacity)
         self.last = time.monotonic()
 
-    def take(self, n: int = 1) -> Tuple[bool, float]:
+    def take(self, n: int = 1) -> tuple[bool, float]:
         now = time.monotonic()
         elapsed = now - self.last
         if elapsed > 0:
@@ -326,8 +324,8 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
             raise ValueError("per_minute must be positive and finite")
         if not math.isfinite(float(configured_burst)) or configured_burst <= 0:
             raise ValueError("burst must be positive and finite")
-        if configured_max <= 0:
-            raise ValueError("max_buckets must be positive")
+        if not math.isfinite(float(configured_max)) or configured_max <= 0:
+            raise ValueError("max_buckets must be positive and finite")
         if not math.isfinite(float(configured_ttl)) or configured_ttl <= 0:
             raise ValueError("bucket_ttl must be positive and finite")
 
@@ -336,7 +334,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         self.max_buckets = int(configured_max)
         self.bucket_ttl = float(configured_ttl)
         self._refill_per_sec = self.per_minute / 60.0
-        self._buckets: Dict[str, _Bucket] = {}
+        self._buckets: dict[str, _Bucket] = {}
         self._state_lock: asyncio.Lock | None = None
         self._evictions = 0
         self._expired_pruned = 0
@@ -374,7 +372,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
 
     def _bucket_for(
         self, ip: str, now: float | None = None
-    ) -> Tuple[_Bucket | None, float]:
+    ) -> tuple[_Bucket | None, float]:
         now = time.monotonic() if now is None else now
         self._prune_expired(now)
         bucket = self._buckets.get(ip)
