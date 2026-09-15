@@ -34,6 +34,16 @@ class WorldBounds:
     def max_y(self) -> int:
         return self.y + self.height
 
+    def contains(self, point: tuple[float, float]) -> bool:
+        """Return whether ``point`` is inside these half-open bounds.
+
+        Region lookup intentionally uses half-open rectangles so adjacent
+        source regions do not both own a coordinate on their shared edge.
+        """
+
+        x, y = point
+        return self.x <= x < self.max_x and self.y <= y < self.max_y
+
 
 @dataclass(frozen=True, slots=True)
 class WorldRegion:
@@ -44,6 +54,32 @@ class WorldRegion:
     dangers: tuple[str, ...] = ()
     points_of_interest: tuple[Mapping[str, Any], ...] = ()
     metadata: Mapping[str, Any] = field(default_factory=dict)
+
+
+def _string_sequence(value: Any, *, field_name: str) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        raise TypeError(f"{field_name} must be a sequence")
+    return tuple(
+        text
+        for item in value
+        if (text := str(item).strip().lower())
+    )
+
+
+def _point_records(value: Any) -> tuple[Mapping[str, Any], ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        raise TypeError("points_of_interest must be a sequence")
+
+    points: list[Mapping[str, Any]] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, Mapping):
+            raise TypeError(f"points_of_interest[{index}] must be a mapping")
+        points.append(dict(item))
+    return tuple(points)
 
 
 def region_from_record(record: Mapping[str, Any]) -> WorldRegion:
@@ -76,15 +112,8 @@ def region_from_record(record: Mapping[str, Any]) -> WorldRegion:
     if difficulty < 0:
         raise ValueError("world region difficulty must not be negative")
 
-    dangers = tuple(
-        str(value).strip().lower()
-        for value in (record.get("dangers") or ())
-        if str(value).strip()
-    )
-    raw_pois = record.get("points_of_interest") or ()
-    if not isinstance(raw_pois, Sequence) or isinstance(raw_pois, (str, bytes)):
-        raise TypeError("points_of_interest must be a sequence")
-    points = tuple(dict(value) for value in raw_pois if isinstance(value, Mapping))
+    dangers = _string_sequence(record.get("dangers"), field_name="dangers")
+    points = _point_records(record.get("points_of_interest"))
 
     consumed = {
         "id",
@@ -104,6 +133,35 @@ def region_from_record(record: Mapping[str, Any]) -> WorldRegion:
         points_of_interest=points,
         metadata=metadata,
     )
+
+
+def find_region_by_id(
+    regions: Sequence[WorldRegion],
+    region_id: str,
+) -> WorldRegion | None:
+    """Resolve one region by id and reject ambiguous duplicate catalogs."""
+
+    normalized = region_id.strip()
+    if not normalized:
+        raise ValueError("region_id must not be empty")
+
+    matches = [region for region in regions if region.id == normalized]
+    if len(matches) > 1:
+        raise ValueError(f"duplicate world region id: {normalized}")
+    return matches[0] if matches else None
+
+
+def find_region_at(
+    regions: Sequence[WorldRegion],
+    point: tuple[float, float],
+) -> WorldRegion | None:
+    """Resolve the unique region owning ``point`` using half-open bounds."""
+
+    matches = [region for region in regions if region.bounds.contains(point)]
+    if len(matches) > 1:
+        ids = ", ".join(sorted(region.id for region in matches))
+        raise ValueError(f"overlapping world regions at point {point}: {ids}")
+    return matches[0] if matches else None
 
 
 def calculate_supplies_needed(time_minutes: int) -> dict[str, int]:
