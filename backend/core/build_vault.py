@@ -278,7 +278,7 @@ def get_stats(build_id: str) -> dict:
 
 def _iter_shard(build_id: str, shard_file: str) -> Iterator[Tuple[str, str]]:
     safe_build_id = _validate_build_id(build_id)
-    if Path(shard_file).name != shard_file or not shard_file:
+    if not shard_file or Path(shard_file).name != shard_file:
         return
     if shard_file in {".", ".."} or any(ch in shard_file for ch in "/\\\x00"):
         return
@@ -375,9 +375,7 @@ def package_zip(build_id: str, out_path: Path | None = None) -> Path:
         out_path = d / f"{build_id}.zip"
     else:
         out_path = Path(out_path)
-        root = BUILDS_ROOT.resolve()
-        resolved = out_path.resolve()
-        if resolved.parent != d.resolve():
+        if out_path.resolve().parent != d.resolve():
             raise ValueError("out_path must stay inside the build directory")
     with zipfile.ZipFile(out_path, "w", compression=zipfile.ZIP_DEFLATED,
                          compresslevel=6, allowZip64=True) as zf:
