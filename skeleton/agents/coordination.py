@@ -81,8 +81,14 @@ class AgentPool:
         return agent_id
 
     def assign(self, agent_id: str, task: Task) -> bool:
-        """Assign a task to an agent."""
+        """Assign a pending, unowned task to an agent."""
         if agent_id not in self._agents:
+            return False
+
+        # A Task represents one unit of work and may only own one agent slot.
+        # Re-accepting an already-running/owned Task duplicates its task ID and
+        # increments pool load again, leaving phantom capacity after release.
+        if task.status is not TaskStatus.PENDING or task.agent_id is not None:
             return False
 
         agent = self._agents[agent_id]
