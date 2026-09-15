@@ -35,8 +35,13 @@ on:
 
 permissions: {}
 
+# PR synchronizations should supersede stale PR analysis, and the PR close event
+# must retain its runner-free cancellation barrier. Main pushes and scheduled
+# scans must not cancel analysis that has already started: frequent main updates
+# would otherwise starve CodeQL indefinitely. The queue drainer still removes
+# obsolete queued main runs while allowing an active security scan to finish.
 concurrency:
-  group: codeql-${{ github.event.pull_request.number || github.sha }}
+  group: codeql-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
