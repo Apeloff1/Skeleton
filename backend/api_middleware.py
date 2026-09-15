@@ -40,7 +40,7 @@ _RATE_BURST = int(os.environ.get("RATE_LIMIT_BURST", "60"))
 _EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "127.0.0.1,::1,localhost")
 _EXEMPT_IPS = {ip.strip() for ip in _EXEMPT_RAW.split(",") if ip.strip()}
 _MAX_BUCKETS = max(1, int(os.environ.get("RATE_LIMIT_MAX_BUCKETS", "4096")))
-_BUCKET_TTL = max(1.0, float(os.environ.get("RATE_LIMIT_BUCKET_TTL", "300")))
+_BUCKET_TTL = max(0.01, float(os.environ.get("RATE_LIMIT_BUCKET_TTL", "300")))
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
 
 # Telemetry counters (in-memory) ────────────────────────────────────
@@ -225,7 +225,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         self.per_minute = per_minute or _RATE_PER_MIN
         self.burst = burst or _RATE_BURST
         self.max_buckets = max(1, max_buckets if max_buckets is not None else _MAX_BUCKETS)
-        self.bucket_ttl = max(1.0, bucket_ttl if bucket_ttl is not None else _BUCKET_TTL)
+        self.bucket_ttl = max(0.01, bucket_ttl if bucket_ttl is not None else _BUCKET_TTL)
         self._refill_per_sec = self.per_minute / 60.0
         self._buckets: Dict[str, _Bucket] = {}
         self._state_lock: asyncio.Lock | None = None
