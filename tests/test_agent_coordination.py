@@ -3,24 +3,28 @@
 from skeleton.agents.coordination import AgentPool, Coordinator, Task, TaskStatus
 
 
-def test_failed_handler_releases_agent_capacity() -> None:
+def test_failed_handler_releases_agent_capacity_without_persisting_message() -> None:
     pool = AgentPool(max_agents=1)
     pool.create({"work"}, capacity=1)
     coordinator = Coordinator(pool=pool)
 
+    sensitive_message = "api-key=super-secret-handler-detail"
+
     def fail(_task):
-        raise RuntimeError("boom")
+        raise RuntimeError(sensitive_message)
 
     coordinator.register_handler("work", fail)
 
     first = coordinator.dispatch("first", task_type="work")
     assert first.status is TaskStatus.FAILED
-    assert first.error == "boom"
+    assert first.error == "RuntimeError: handler execution failed"
+    assert sensitive_message not in first.error
     assert pool.stats()["total_load"] == 0
 
     second = coordinator.dispatch("second", task_type="work")
     assert second.status is TaskStatus.FAILED
-    assert second.error == "boom"
+    assert second.error == "RuntimeError: handler execution failed"
+    assert sensitive_message not in second.error
     assert pool.stats()["total_load"] == 0
     assert pool.stats()["tasks_assigned"] == 2
 
