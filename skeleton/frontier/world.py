@@ -82,6 +82,17 @@ def _point_records(value: Any) -> tuple[Mapping[str, Any], ...]:
     return tuple(points)
 
 
+def _validate_point(point: tuple[float, float], *, name: str) -> None:
+    if len(point) != 2:
+        raise ValueError(f"{name} must contain exactly two coordinates")
+    try:
+        finite = all(math.isfinite(float(value)) for value in point)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must contain finite numeric coordinates") from exc
+    if not finite:
+        raise ValueError(f"{name} must contain finite numeric coordinates")
+
+
 def region_from_record(record: Mapping[str, Any]) -> WorldRegion:
     """Normalize a source world-region record without importing its catalog."""
 
@@ -157,6 +168,7 @@ def find_region_at(
 ) -> WorldRegion | None:
     """Resolve the unique region owning ``point`` using half-open bounds."""
 
+    _validate_point(point, name="point")
     matches = [region for region in regions if region.bounds.contains(point)]
     if len(matches) > 1:
         ids = ", ".join(sorted(region.id for region in matches))
@@ -225,8 +237,10 @@ def calculate_route(
 ) -> dict[str, Any]:
     """Calculate source-compatible route distance, time, dangers and supplies."""
 
-    if units_per_minute <= 0:
-        raise ValueError("units_per_minute must be positive")
+    _validate_point(start, name="start")
+    _validate_point(end, name="end")
+    if not math.isfinite(units_per_minute) or units_per_minute <= 0:
+        raise ValueError("units_per_minute must be finite and positive")
     distance = math.dist(start, end)
     estimated_time = int(distance / units_per_minute)
 
@@ -350,6 +364,13 @@ def generate_random_island(
         raise ValueError("user_id must not be empty")
     vocabulary.validate()
 
+    island_id = str(id_factory()).strip()
+    if not island_id:
+        raise ValueError("id_factory must return a non-empty identifier")
+    discovered_at = now()
+    if discovered_at.tzinfo is None:
+        raise ValueError("now must return a timezone-aware datetime")
+
     max_features = min(3, len(vocabulary.features))
     max_fish_types = min(3, len(vocabulary.fish_types))
     feature_count = rng.randint(1, max_features)
@@ -359,7 +380,7 @@ def generate_random_island(
     name = f"{rng.choice(vocabulary.prefixes)} {rng.choice(vocabulary.suffixes)}"
 
     return {
-        "id": str(id_factory()),
+        "id": island_id,
         "name": name,
         "region": region.id,
         "position": {
@@ -374,7 +395,7 @@ def generate_random_island(
         "fish_types": list(fish_types),
         "rare_fish_chance": 0.05 * region.difficulty,
         "discovered_by": user_id,
-        "discovered_at": now().astimezone(timezone.utc).isoformat(),
+        "discovered_at": discovered_at.astimezone(timezone.utc).isoformat(),
         "has_beach_fishing": True,
         "has_secrets": rng.random() < 0.3,
         "danger_level": region.difficulty,
