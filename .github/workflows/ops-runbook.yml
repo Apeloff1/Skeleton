@@ -1,0 +1,62 @@
+name: Operations Runbook
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "docs/PRODUCTION_SECURITY_RUNBOOK.md"
+      - "scripts/check_ops_runbook.py"
+      - ".github/workflows/ops-runbook.yml"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/backend-quality.yml"
+      - ".github/workflows/dependency-security.yml"
+      - ".github/workflows/deployment-trust.yml"
+      - ".github/workflows/secret-scanning.yml"
+      - "backend/scripts/check_process_safety.py"
+      - "backend/scripts/check_deserialization_safety.py"
+      - "backend/scripts/check_sast_security.py"
+      - "backend/scripts/check_workflow_security.py"
+      - "backend/scripts/check_secret_hygiene.py"
+  push:
+    branches: [main]
+    paths:
+      - "docs/PRODUCTION_SECURITY_RUNBOOK.md"
+      - "scripts/check_ops_runbook.py"
+      - ".github/workflows/ops-runbook.yml"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/backend-quality.yml"
+      - ".github/workflows/dependency-security.yml"
+      - ".github/workflows/deployment-trust.yml"
+      - ".github/workflows/secret-scanning.yml"
+      - "backend/scripts/check_process_safety.py"
+      - "backend/scripts/check_deserialization_safety.py"
+      - "backend/scripts/check_sast_security.py"
+      - "backend/scripts/check_workflow_security.py"
+      - "backend/scripts/check_secret_hygiene.py"
+  workflow_dispatch:
+
+concurrency:
+  group: ops-runbook-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Runbook contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Compile validator
+        run: python -m compileall -q scripts/check_ops_runbook.py
+      - name: Validate production runbook contract
+        run: python scripts/check_ops_runbook.py
+      - name: Reject whitespace errors
+        run: git diff --check HEAD^ HEAD
