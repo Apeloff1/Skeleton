@@ -8,16 +8,18 @@ Provides independent edge controls wired by server.py:
   3. SizeLimitMiddleware       — hard cap on declared and streamed body bytes
   4. safe_relative_path()      — path-traversal protection helper
 
-Proxy-provided client identity is deliberately opt-in.  Set
-``CODEDOCK_TRUST_PROXY_HEADERS=true`` only when the application is behind a
-trusted reverse proxy that overwrites client-supplied forwarding headers.
+Proxy-provided client identity is trusted only when the immediate peer is in
+``CODEDOCK_TRUSTED_PROXY_CIDRS``. Forwarding chains are parsed right-to-left
+and malformed chains fail closed to the immediate peer.
 """
 from __future__ import annotations
 
 import asyncio
 import os
+import re
 import time
-from collections import deque
+from collections import OrderedDict, deque
+from ipaddress import ip_address, ip_network
 from pathlib import Path
 from typing import Deque, Dict, Tuple
 
@@ -26,11 +28,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 
-_TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
-
-
-def _truthy_env(name: str) -> bool:
-    return os.environ.get(name, "").strip().lower() in _TRUE_VALUES
+_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")
 
 
 def _matches_path_prefix(path: str, prefix: str) -> bool:
@@ -42,13 +40,54 @@ def _matches_path_prefix(path: str, prefix: str) -> bool:
     return current == expected or current.startswith(expected + "/")
 
 
+def _trusted_proxy_networks():
+    """Return configured proxy networks; any malformed entry disables trust."""
+    raw = os.environ.get("CODEDOCK_TRUSTED_PROXY_CIDRS", "")
+    networks = []
+    for value in raw.split(","):
+        value = value.strip()
+        if not value:
+            continue
+        try:
+            networks.append(ip_network(value, strict=False))
+        except ValueError:
+            return ()
+    return tuple(networks)
+
+
 def _request_client_ip(request: Request) -> str:
-    """Resolve client identity without trusting spoofable proxy headers by default."""
-    if _truthy_env("CODEDOCK_TRUST_PROXY_HEADERS"):
-        forwarded = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
-        if forwarded:
-            return forwarded
-    return request.client.host if request.client else "unknown"
+    """Resolve the nearest untrusted client hop behind explicitly trusted proxies."""
+    peer = request.client.host if request.client else "unknown"
+    networks = _trusted_proxy_networks()
+    if not networks:
+        return peer
+
+    try:
+        peer_addr = ip_address(peer)
+    except ValueError:
+        return peer
+    if not any(peer_addr in network for network in networks):
+        return peer
+
+    forwarded = request.headers.get("x-forwarded-for")
+    if not forwarded:
+        return peer
+
+    values = [value.strip() for value in forwarded.split(",") if value.strip()]
+    if not values:
+        return peer
+
+    parsed = []
+    for value in values:
+        try:
+            parsed.append(ip_address(value))
+        except ValueError:
+            return peer
+
+    for address in reversed(parsed):
+        if not any(address in network for network in networks):
+            return str(address)
+    return peer
 
 
 def _safe_content_length(raw: str | None) -> int:
@@ -59,6 +98,12 @@ def _safe_content_length(raw: str | None) -> int:
     except (TypeError, ValueError):
         return 0
     return max(0, value)
+
+
+def _safe_request_id(raw: str | None) -> str:
+    if raw and _REQUEST_ID_RE.fullmatch(raw):
+        return raw
+    return os.urandom(8).hex()
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -75,7 +120,7 @@ class _Bucket:
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Per-client, per-route token bucket with bounded process memory."""
 
-    _buckets: Dict[Tuple[str, str], _Bucket] = {}
+    _buckets: "OrderedDict[Tuple[str, str], _Bucket]" = OrderedDict()
     _lock = asyncio.Lock()
     _rps: float = 2.0
     _burst: int = 120
@@ -129,10 +174,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     @classmethod
     def _evict_oldest_bucket(cls) -> None:
-        if not cls._buckets:
-            return
-        oldest = min(cls._buckets.items(), key=lambda item: item[1].last_refill)[0]
-        cls._buckets.pop(oldest, None)
+        if cls._buckets:
+            cls._buckets.popitem(last=False)
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
@@ -154,6 +197,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     last_refill=now,
                 )
                 RateLimitMiddleware._buckets[key] = bucket
+            else:
+                RateLimitMiddleware._buckets.move_to_end(key)
             elapsed = max(0.0, now - bucket.last_refill)
             bucket.tokens = min(
                 float(RateLimitMiddleware._burst),
@@ -220,7 +265,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         start = time.perf_counter()
         ip = _request_client_ip(request)
         ua = request.headers.get("user-agent", "")[:200]
-        rid = request.headers.get("x-request-id") or os.urandom(4).hex()
+        rid = _safe_request_id(request.headers.get("x-request-id"))
         body_size = _safe_content_length(request.headers.get("content-length"))
         error = None
         status = 0
@@ -229,7 +274,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
             status = response.status_code
         except Exception as exc:
-            error = f"{type(exc).__name__}: {exc}"
+            error = type(exc).__name__
             status = 500
             raise
         finally:
@@ -303,12 +348,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
 # ─────────────────────────────────────────────────────────────────
 # Body-size cap
 # ─────────────────────────────────────────────────────────────────
-class _PayloadTooLarge(Exception):
-    pass
-
-
 class SizeLimitMiddleware:
-    """Enforce the body limit on actual ASGI bytes, not only Content-Length."""
+    """Enforce the body limit before application code can observe the request."""
 
     def __init__(self, app, max_mb: int | None = None):
         self.app = app
@@ -336,31 +377,30 @@ class SizeLimitMiddleware:
             for key, value in raw_headers
             if key.lower() == b"content-length"
         ]
-        if len(set(content_lengths)) > 1:
+        transfer_encodings = [
+            value.decode("latin-1").strip()
+            for key, value in raw_headers
+            if key.lower() == b"transfer-encoding"
+        ]
+
+        if len(content_lengths) > 1 or (content_lengths and transfer_encodings):
             response = JSONResponse(
                 status_code=400,
-                content={"error": "invalid_content_length"},
+                content={"error": "invalid_request_framing"},
             )
             await response(scope, receive, send)
             return
 
         if content_lengths:
-            try:
-                declared = int(content_lengths[0])
-            except ValueError:
+            raw_declared = content_lengths[0]
+            if not raw_declared.isascii() or not raw_declared.isdigit():
                 response = JSONResponse(
                     status_code=400,
                     content={"error": "invalid_content_length"},
                 )
                 await response(scope, receive, send)
                 return
-            if declared < 0:
-                response = JSONResponse(
-                    status_code=400,
-                    content={"error": "invalid_content_length"},
-                )
-                await response(scope, receive, send)
-                return
+            declared = int(raw_declared, 10)
             if declared > self.max_bytes:
                 response = JSONResponse(
                     status_code=413,
@@ -374,39 +414,42 @@ class SizeLimitMiddleware:
                 await response(scope, receive, send)
                 return
 
+        buffered: list[dict] = []
         seen = 0
-        response_started = False
-
-        async def bounded_receive():
-            nonlocal seen
+        while True:
             message = await receive()
-            if message.get("type") == "http.request":
-                seen += len(message.get("body") or b"")
-                if seen > self.max_bytes:
-                    raise _PayloadTooLarge
-            return message
+            if message.get("type") == "http.disconnect":
+                return
+            buffered.append(message)
+            if message.get("type") != "http.request":
+                continue
+            seen += len(message.get("body") or b"")
+            if seen > self.max_bytes:
+                response = JSONResponse(
+                    status_code=413,
+                    content={
+                        "error": "payload_too_large",
+                        "detail": f"body exceeds {self.max_bytes // 1024 // 1024} MB",
+                        "limit_bytes": self.max_bytes,
+                        "got_bytes": seen,
+                    },
+                )
+                await response(scope, receive, send)
+                return
+            if not message.get("more_body", False):
+                break
 
-        async def tracking_send(message):
-            nonlocal response_started
-            if message.get("type") == "http.response.start":
-                response_started = True
-            await send(message)
+        index = 0
 
-        try:
-            await self.app(scope, bounded_receive, tracking_send)
-        except _PayloadTooLarge:
-            if response_started:
-                raise
-            response = JSONResponse(
-                status_code=413,
-                content={
-                    "error": "payload_too_large",
-                    "detail": f"body exceeds {self.max_bytes // 1024 // 1024} MB",
-                    "limit_bytes": self.max_bytes,
-                    "got_bytes": seen,
-                },
-            )
-            await response(scope, receive, send)
+        async def replay_receive():
+            nonlocal index
+            if index < len(buffered):
+                message = buffered[index]
+                index += 1
+                return message
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        await self.app(scope, replay_receive, send)
 
 
 # ─────────────────────────────────────────────────────────────────
