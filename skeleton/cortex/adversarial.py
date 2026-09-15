@@ -12,6 +12,7 @@ import hmac
 import json
 import os
 import re
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from enum import Enum
 from typing import Any, Callable, Dict, Iterable, Mapping, Optional, Sequence, Tuple
@@ -225,6 +226,79 @@ def _snapshot(value: Any) -> Any:
     if isinstance(value, (list, tuple, set, frozenset)):
         return [_snapshot(v) for v in value]
     return repr(value)
+
+
+def _review_state(ctx: AdversarialContext) -> Dict[str, Any]:
+    """Snapshot nested state a semantic judge may observe but never mutate."""
+    return {
+        "request": ctx.request,
+        "candidate": _snapshot(ctx.candidate),
+        "evidence": _snapshot(ctx.evidence),
+        "tool_outputs": _snapshot(ctx.tool_outputs),
+        "external_content": _snapshot(ctx.external_content),
+        "metadata": _snapshot(ctx.metadata),
+        "confidence": float(ctx.confidence),
+        "requires_evidence": bool(ctx.requires_evidence),
+        "is_prediction": bool(ctx.is_prediction),
+        "has_side_effects": bool(ctx.has_side_effects),
+    }
+
+
+_REVIEW_IMMUTABLE_ATOMS = (type(None), bool, int, float, complex, str, bytes, range)
+
+
+def _mutable_graph_ids(value: Any, seen: Optional[set[int]] = None) -> set[int]:
+    """Collect mutable/opaque identities so deceptive deepcopy aliases fail closed."""
+    if isinstance(value, _REVIEW_IMMUTABLE_ATOMS):
+        return set()
+    if seen is None:
+        seen = set()
+    object_id = id(value)
+    if object_id in seen:
+        return set()
+    seen.add(object_id)
+
+    identities: set[int] = set()
+    children: Iterable[Any] = ()
+    if isinstance(value, Mapping):
+        identities.add(object_id)
+        children = tuple(value.keys()) + tuple(value.values())
+    elif isinstance(value, (list, set, bytearray)):
+        identities.add(object_id)
+        children = value
+    elif isinstance(value, (tuple, frozenset)):
+        children = value
+    else:
+        # Unknown non-primitive objects are treated as mutable security state.
+        # If deepcopy intentionally returns the same instance, the overlap below
+        # proves the isolation boundary is not trustworthy.
+        identities.add(object_id)
+        try:
+            children = tuple(vars(value).values())
+        except (TypeError, AttributeError):
+            children = ()
+
+    for child in children:
+        identities.update(_mutable_graph_ids(child, seen))
+    return identities
+
+
+def _isolated_review_context(ctx: AdversarialContext) -> AdversarialContext:
+    """Deep-isolate untrusted judge callbacks from caller and repairer state."""
+    isolated: Optional[AdversarialContext]
+    try:
+        isolated = deepcopy(ctx)
+        shared_mutable = _mutable_graph_ids(ctx) & _mutable_graph_ids(isolated)
+        semantically_equal = _review_state(ctx) == _review_state(isolated)
+    except Exception:
+        isolated = None
+        shared_mutable = set()
+        semantically_equal = False
+    if isolated is None or shared_mutable or not semantically_equal:
+        raise RuntimeError(
+            "adversarial invariant violated: judge review context isolation failed"
+        )
+    return isolated
 
 
 def _text(value: Any) -> str:
@@ -449,9 +523,15 @@ class AdversarialEngine:
         results = [_baseline(spec, ctx, ()) for spec in specs]
 
         if self.judge is not None:
+            review_ctx = _isolated_review_context(ctx)
             for start in range(0, 99, 10):
                 batch = tuple(specs[start:min(start + 10, 99)])
-                verdicts = self.judge(ctx, batch) or {}
+                before = _review_state(review_ctx)
+                verdicts = self.judge(review_ctx, batch) or {}
+                if _review_state(review_ctx) != before:
+                    raise RuntimeError(
+                        "adversarial invariant violated: judge mutated review context"
+                    )
                 for spec in batch:
                     if spec.gate_id not in verdicts:
                         continue
