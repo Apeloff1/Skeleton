@@ -1,12 +1,10 @@
-"""Trusted PR-lifecycle Actions cleanup.
+"""Trusted workflow-run cleanup for obsolete pull-request Actions runs.
 
-This module is executed only from a pull_request_target workflow that checks out
-the event's trusted base SHA. It never imports or executes pull-request code.
-
-The drainer cancels live pull_request/dynamic workflow runs that belong to one
-same-repository PR and are no longer authoritative for that PR's current head.
+The privileged workflow is loaded from the default branch via ``workflow_run``.
+It never consumes artifacts or executes code from the triggering pull request.
+The source workflow has no token permissions and exists only as a lifecycle
+signal for synchronize/closed events.
 """
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -21,6 +19,7 @@ from typing import Any, Callable
 LIVE_STATUSES = ("queued", "in_progress", "waiting", "pending", "requested")
 PR_RUN_EVENTS = frozenset({"pull_request", "dynamic"})
 BASE_RETRYABLE = frozenset({0, 429, 500, 502, 503, 504})
+SIGNAL_WORKFLOW_PATH = ".github/workflows/pr-lifecycle-signal.yml"
 
 
 @dataclass(frozen=True)
@@ -103,6 +102,158 @@ def _retry_delay(headers: dict[str, str], attempt: int) -> float:
     return float(2 ** attempt)
 
 
+def _get_json(api: GitHubApi, path: str, *, expected: int = 200) -> Any:
+    status, payload, _ = api.request(path)
+    if status != expected:
+        raise RuntimeError(f"GitHub API GET failed for {path}: HTTP {status}")
+    return payload
+
+
+def fetch_pr(api: GitHubApi, repo: str, pr_number: int) -> dict[str, Any]:
+    payload = _get_json(api, f"/repos/{repo}/pulls/{pr_number}")
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"malformed PR #{pr_number} payload")
+    return payload
+
+
+def fetch_trigger_run(api: GitHubApi, repo: str, run_id: int) -> dict[str, Any]:
+    payload = _get_json(api, f"/repos/{repo}/actions/runs/{run_id}")
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"malformed trigger workflow run #{run_id}")
+    return payload
+
+
+def list_pr_commit_shas(api: GitHubApi, repo: str, pr_number: int) -> set[str]:
+    shas: set[str] = set()
+    for page in range(1, 4):
+        query = urllib.parse.urlencode({"per_page": 100, "page": page})
+        payload = _get_json(api, f"/repos/{repo}/pulls/{pr_number}/commits?{query}")
+        if not isinstance(payload, list):
+            raise RuntimeError(f"malformed PR #{pr_number} commits payload")
+        for commit in payload:
+            if isinstance(commit, dict) and commit.get("sha"):
+                shas.add(str(commit["sha"]))
+        if len(payload) < 100:
+            break
+    return shas
+
+
+def _associated_pr_numbers(api: GitHubApi, repo: str, sha: str) -> set[int]:
+    if not sha:
+        return set()
+    status, payload, _ = api.request(f"/repos/{repo}/commits/{sha}/pulls")
+    if status != 200 or not isinstance(payload, list):
+        return set()
+    return {
+        int(item.get("number") or 0)
+        for item in payload
+        if isinstance(item, dict) and int(item.get("number") or 0) > 0
+    }
+
+
+def _branch_pr_numbers(
+    api: GitHubApi,
+    repo: str,
+    default_branch: str,
+    head_branch: str,
+) -> set[int]:
+    if not head_branch:
+        return set()
+    owner = repo.split("/", 1)[0]
+    query = urllib.parse.urlencode(
+        {
+            "state": "all",
+            "base": default_branch,
+            "head": f"{owner}:{head_branch}",
+            "per_page": 100,
+        }
+    )
+    status, payload, _ = api.request(f"/repos/{repo}/pulls?{query}")
+    if status != 200 or not isinstance(payload, list):
+        return set()
+    return {
+        int(item.get("number") or 0)
+        for item in payload
+        if isinstance(item, dict) and int(item.get("number") or 0) > 0
+    }
+
+
+def resolve_context_from_trigger(api: GitHubApi) -> DrainContext | None:
+    repo = os.environ["REPO"]
+    default_branch = os.environ["DEFAULT_BRANCH"]
+    current_run_id = int(os.environ["CURRENT_RUN_ID"])
+    trigger_run_id = int(os.environ["TRIGGER_RUN_ID"])
+    trigger = fetch_trigger_run(api, repo, trigger_run_id)
+
+    if str(trigger.get("event") or "") != "pull_request":
+        raise RuntimeError("refusing non-pull_request workflow_run trigger")
+    if str(trigger.get("path") or "") != SIGNAL_WORKFLOW_PATH:
+        raise RuntimeError("workflow_run did not originate from the lifecycle signal")
+    trigger_repo = _repo_full_name(trigger.get("repository"))
+    if trigger_repo and trigger_repo != repo:
+        raise RuntimeError("workflow_run repository does not match target repository")
+
+    head_branch = str(trigger.get("head_branch") or "")
+    head_sha = str(trigger.get("head_sha") or "")
+    trigger_head_repo = _repo_full_name(trigger.get("head_repository"))
+    if trigger_head_repo and trigger_head_repo != repo:
+        # Fork PRs must not cause privileged Actions mutation. Skipping is cleaner
+        # than turning every fork lifecycle event into a failed trusted workflow.
+        return None
+
+    numbers = {
+        int(item.get("number") or 0)
+        for item in trigger.get("pull_requests") or []
+        if isinstance(item, dict) and int(item.get("number") or 0) > 0
+    }
+    if not numbers:
+        numbers.update(_associated_pr_numbers(api, repo, head_sha))
+    if not numbers:
+        numbers.update(_branch_pr_numbers(api, repo, default_branch, head_branch))
+
+    viable: list[dict[str, Any]] = []
+    for number in sorted(numbers):
+        pr = fetch_pr(api, repo, number)
+        head = pr.get("head") or {}
+        base = pr.get("base") or {}
+        if _repo_full_name(head.get("repo")) != repo:
+            continue
+        if str(base.get("ref") or "") != default_branch:
+            continue
+        if head_branch and str(head.get("ref") or "") != head_branch:
+            continue
+        viable.append(pr)
+
+    if not viable:
+        return None
+    if len(viable) > 1:
+        exact = [
+            item
+            for item in viable
+            if head_sha and str((item.get("head") or {}).get("sha") or "") == head_sha
+        ]
+        if len(exact) == 1:
+            viable = exact
+        else:
+            raise RuntimeError("ambiguous workflow_run to pull-request association")
+
+    selected = viable[0]
+    head = selected.get("head") or {}
+    state = str(selected.get("state") or "")
+    live_head_sha = str(head.get("sha") or "")
+    return DrainContext(
+        repo=repo,
+        current_run_id=current_run_id,
+        pr_number=int(selected["number"]),
+        event_action="synchronize" if state == "open" else "closed",
+        event_head_repo=_repo_full_name(head.get("repo")),
+        event_head_ref=str(head.get("ref") or ""),
+        event_head_sha=live_head_sha,
+        event_before_sha=head_sha if head_sha != live_head_sha else "",
+        default_branch=default_branch,
+    )
+
+
 def list_runs(api: GitHubApi, repo: str, status_name: str) -> list[dict[str, Any]]:
     runs: list[dict[str, Any]] = []
     for page in range(1, 11):
@@ -121,36 +272,11 @@ def list_runs(api: GitHubApi, repo: str, status_name: str) -> list[dict[str, Any
     return runs
 
 
-def fetch_pr(api: GitHubApi, repo: str, pr_number: int) -> dict[str, Any]:
-    status, payload, _ = api.request(f"/repos/{repo}/pulls/{pr_number}")
-    if status != 200 or not isinstance(payload, dict):
-        raise RuntimeError(f"failed to resolve PR #{pr_number}: HTTP {status}")
-    return payload
-
-
-def list_pr_commit_shas(api: GitHubApi, repo: str, pr_number: int) -> set[str]:
-    shas: set[str] = set()
-    # GitHub caps pull-request commits at 250; three 100-entry pages cover it.
-    for page in range(1, 4):
-        query = urllib.parse.urlencode({"per_page": 100, "page": page})
-        status, payload, _ = api.request(
-            f"/repos/{repo}/pulls/{pr_number}/commits?{query}"
-        )
-        if status != 200 or not isinstance(payload, list):
-            raise RuntimeError(f"failed to list PR #{pr_number} commits: HTTP {status}")
-        for commit in payload:
-            if isinstance(commit, dict) and commit.get("sha"):
-                shas.add(str(commit["sha"]))
-        if len(payload) < 100:
-            break
-    return shas
-
-
 def explicit_pr_link(run: dict[str, Any], pr_number: int) -> bool:
-    for pull in run.get("pull_requests") or []:
-        if isinstance(pull, dict) and int(pull.get("number") or 0) == pr_number:
-            return True
-    return False
+    return any(
+        isinstance(pull, dict) and int(pull.get("number") or 0) == pr_number
+        for pull in run.get("pull_requests") or []
+    )
 
 
 def commit_links_pr(
@@ -164,14 +290,7 @@ def commit_links_pr(
         return False
     if sha in cache:
         return cache[sha]
-    status, payload, _ = api.request(f"/repos/{repo}/commits/{sha}/pulls")
-    if status != 200 or not isinstance(payload, list):
-        cache[sha] = False
-        return False
-    linked = any(
-        isinstance(pull, dict) and int(pull.get("number") or 0) == pr_number
-        for pull in payload
-    )
+    linked = pr_number in _associated_pr_numbers(api, repo, sha)
     cache[sha] = linked
     return linked
 
@@ -187,15 +306,12 @@ def belongs_to_pr(
 ) -> bool:
     if run.get("event") not in PR_RUN_EVENTS:
         return False
-
     run_id = int(run.get("id") or 0)
     if not run_id or run_id == context.current_run_id:
         return False
-
     run_branch = str(run.get("head_branch") or "")
     if not run_branch or run_branch == context.default_branch:
         return False
-
     if explicit_pr_link(run, context.pr_number):
         return True
 
@@ -203,7 +319,6 @@ def belongs_to_pr(
     pr_head_ref = str(head.get("ref") or context.event_head_ref)
     pr_head_repo = _repo_full_name(head.get("repo")) or context.event_head_repo
     run_head_repo = _repo_full_name(run.get("head_repository"))
-
     if (
         pr_head_repo != context.repo
         or run_head_repo != context.repo
@@ -212,7 +327,7 @@ def belongs_to_pr(
         return False
 
     sha = str(run.get("head_sha") or "")
-    trusted_event_shas = {
+    trusted_shas = {
         value
         for value in (
             context.event_head_sha,
@@ -221,21 +336,14 @@ def belongs_to_pr(
         )
         if value
     }
-    if sha in trusted_event_shas or sha in known_pr_shas:
+    if sha in trusted_shas or sha in known_pr_shas:
         return True
-
-    return commit_links_pr(
-        api, context.repo, sha, context.pr_number, commit_link_cache
-    )
+    return commit_links_pr(api, context.repo, sha, context.pr_number, commit_link_cache)
 
 
 def _run_completed(api: GitHubApi, repo: str, run_id: int) -> bool:
     status, payload, _ = api.request(f"/repos/{repo}/actions/runs/{run_id}")
-    return (
-        status == 200
-        and isinstance(payload, dict)
-        and payload.get("status") == "completed"
-    )
+    return status == 200 and isinstance(payload, dict) and payload.get("status") == "completed"
 
 
 def _post_with_retry(
@@ -256,16 +364,13 @@ def _post_with_retry(
 
 
 def cancel_run(api: GitHubApi, repo: str, run_id: int) -> CancelResult:
-    status, payload = _post_with_retry(
-        api, f"/repos/{repo}/actions/runs/{run_id}/cancel"
-    )
+    status, payload = _post_with_retry(api, f"/repos/{repo}/actions/runs/{run_id}/cancel")
     if status in {200, 202}:
         return CancelResult("accepted", status)
     if status == 404:
         return CancelResult("moved", status)
     if status in {409, 422} and _run_completed(api, repo, run_id):
         return CancelResult("moved", status)
-
     if status in {409, 422} or _retryable(status, payload):
         forced_status, forced_payload = _post_with_retry(
             api, f"/repos/{repo}/actions/runs/{run_id}/force-cancel"
@@ -279,29 +384,10 @@ def cancel_run(api: GitHubApi, repo: str, run_id: int) -> CancelResult:
         if _retryable(forced_status, forced_payload):
             return CancelResult("deferred", forced_status)
         return CancelResult("failed", forced_status)
-
     return CancelResult("failed", status)
 
 
-def build_context_from_env() -> DrainContext:
-    return DrainContext(
-        repo=os.environ["REPO"],
-        current_run_id=int(os.environ["CURRENT_RUN_ID"]),
-        pr_number=int(os.environ["PR_NUMBER"]),
-        event_action=os.environ["PR_ACTION"],
-        event_head_repo=os.environ["EVENT_HEAD_REPO"],
-        event_head_ref=os.environ["EVENT_HEAD_REF"],
-        event_head_sha=os.environ["EVENT_HEAD_SHA"],
-        event_before_sha=os.environ.get("EVENT_BEFORE_SHA", ""),
-        default_branch=os.environ["DEFAULT_BRANCH"],
-    )
-
-
 def drain(api: GitHubApi, context: DrainContext) -> dict[str, int | str]:
-    if context.event_action not in {"synchronize", "closed"}:
-        raise RuntimeError(
-            f"unexpected pull_request_target action: {context.event_action!r}"
-        )
     if context.event_head_repo != context.repo:
         raise RuntimeError("refusing privileged cleanup for a cross-repository PR")
     if not context.event_head_ref:
@@ -311,9 +397,11 @@ def drain(api: GitHubApi, context: DrainContext) -> dict[str, int | str]:
 
     pr = fetch_pr(api, context.repo, context.pr_number)
     head = pr.get("head") or {}
-    live_head_repo = _repo_full_name(head.get("repo"))
-    if live_head_repo != context.repo:
+    base = pr.get("base") or {}
+    if _repo_full_name(head.get("repo")) != context.repo:
         raise RuntimeError("pull request is no longer same-repository")
+    if str(base.get("ref") or "") != context.default_branch:
+        raise RuntimeError("pull request no longer targets the default branch")
 
     state = str(pr.get("state") or "")
     authoritative_sha = str(head.get("sha") or "") if state == "open" else ""
@@ -332,7 +420,6 @@ def drain(api: GitHubApi, context: DrainContext) -> dict[str, int | str]:
     selected: list[dict[str, Any]] = []
     seen_ids: set[int] = set()
     commit_link_cache: dict[str, bool] = {}
-
     for status_name in LIVE_STATUSES:
         for run in list_runs(api, context.repo, status_name):
             run_id = int(run.get("id") or 0)
@@ -353,13 +440,7 @@ def drain(api: GitHubApi, context: DrainContext) -> dict[str, int | str]:
             if state != "open" or run_sha != authoritative_sha:
                 selected.append(run)
 
-    counts = {
-        "accepted": 0,
-        "forced": 0,
-        "moved": 0,
-        "deferred": 0,
-        "failed": 0,
-    }
+    counts = {"accepted": 0, "forced": 0, "moved": 0, "deferred": 0, "failed": 0}
     for run in selected:
         result = cancel_run(api, context.repo, int(run["id"]))
         counts[result.outcome] += 1
@@ -381,7 +462,7 @@ def _write_summary(summary: dict[str, int | str]) -> None:
     text = (
         "## Obsolete PR Actions drain\n"
         f"- PR: `#{summary['pr']}`\n"
-        f"- Event: `{summary['event_action']}`\n"
+        f"- Resolved lifecycle: `{summary['event_action']}`\n"
         f"- Live PR state: `{summary['live_state']}`\n"
         f"- Authoritative head: `{summary['authoritative_sha']}`\n"
         f"- Matching live runs inspected: {summary['inspected']}\n"
@@ -391,8 +472,8 @@ def _write_summary(summary: dict[str, int | str]) -> None:
         f"- Already completed/moved: {summary['moved']}\n"
         f"- Transient cancellations deferred: {summary['deferred']}\n"
         f"- Terminal cancellation failures: {summary['failed']}\n"
-        "- Trust boundary: workflow + script loaded from the PR base SHA; "
-        "pull-request code is never checked out or executed.\n"
+        "- Trust boundary: privileged workflow and script come from the default branch; "
+        "the unprivileged source workflow contributes no artifacts or executable code.\n"
     )
     print(" ".join(line.strip() for line in text.splitlines() if line.strip()))
     path = os.environ.get("GITHUB_STEP_SUMMARY")
@@ -402,15 +483,16 @@ def _write_summary(summary: dict[str, int | str]) -> None:
 
 
 def main() -> int:
-    token = os.environ["GH_TOKEN"]
-    context = build_context_from_env()
-    api = GitHubApi(token)
+    api = GitHubApi(os.environ["GH_TOKEN"])
     try:
+        context = resolve_context_from_trigger(api)
+        if context is None:
+            print("drain skipped: trigger does not resolve to a same-repository default-branch PR")
+            return 0
         summary = drain(api, context)
     except RuntimeError as exc:
         print(f"drain failed: {exc}")
         return 1
-
     _write_summary(summary)
     if int(summary["failed"]) or int(summary["deferred"]):
         return 1

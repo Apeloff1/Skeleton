@@ -1,24 +1,24 @@
 name: Drain obsolete PR Actions
 
 on:
-  pull_request_target:
-    branches: [main]
-    types: [synchronize, closed]
+  workflow_run:
+    workflows: ['PR Lifecycle Signal']
+    types: [completed]
 
-# Security boundary: pull_request_target loads this workflow from the trusted
-# base branch. The job checks out exactly the event's base SHA and never checks
-# out, imports, or executes the pull-request head.
+# workflow_run executes this workflow from the trusted default branch. The
+# triggering PR workflow is unprivileged, and this job never consumes artifacts
+# or executes code from the pull-request head.
 permissions: {}
 
 concurrency:
-  group: pr-run-drain-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: pr-run-drain-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
 
 jobs:
   drain:
     if: >-
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.base.ref == github.event.repository.default_branch
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 7
     permissions:
@@ -29,18 +29,13 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
       CURRENT_RUN_ID: ${{ github.run_id }}
-      PR_NUMBER: ${{ github.event.pull_request.number }}
-      PR_ACTION: ${{ github.event.action }}
-      EVENT_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-      EVENT_HEAD_REF: ${{ github.event.pull_request.head.ref }}
-      EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-      EVENT_BEFORE_SHA: ${{ github.event.before }}
+      TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
     steps:
-      - name: Check out trusted base control plane
+      - name: Check out trusted control plane
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 1
 
