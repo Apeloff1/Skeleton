@@ -172,23 +172,67 @@ class ReplayEngine:
 
 
 class JournaledBus:
-    """EventBus wrapper: publishes through to the wrapped bus while
-    appending every event to the journal. Drop-in replacement."""
+    """EventBus wrapper that journals and observes the canonical runtime stream."""
 
-    def __init__(self, bus: Any, journal: EventJournal):
+    _CORRELATION_KEYS = (
+        "correlation_id",
+        "request_id",
+        "run_id",
+        "task_id",
+        "call_id",
+        "rid",
+    )
+
+    def __init__(
+        self,
+        bus: Any,
+        journal: EventJournal,
+        metrics_bridge: Optional[Any] = None,
+    ):
         self._bus = bus
         self.journal = journal
+        if metrics_bridge is None:
+            from skeleton.observability.event_bridge import EventMetricsBridge
+
+            metrics_bridge = EventMetricsBridge()
+        self.metrics_bridge = metrics_bridge
+        self.metrics_bridge.attach(self._bus)
 
     def publish(self, event: Any) -> None:
         self.journal.append(event.topic, event.payload, event.correlation_id)
         self._bus.publish(event)
 
-    def emit(self, topic: str, payload: Dict[str, Any]) -> None:
-        self.journal.append(topic, payload, "")
-        self._bus.emit(topic, payload)
+    def emit(
+        self,
+        topic: str,
+        payload: Dict[str, Any],
+        *,
+        correlation_id: str = "",
+    ) -> None:
+        """Emit one journaled event while preserving the shared correlation contract."""
+        from skeleton.kernel.events import DomainEvent
+
+        resolved = correlation_id
+        if not resolved:
+            for key in self._CORRELATION_KEYS:
+                candidate = payload.get(key)
+                if isinstance(candidate, str) and candidate:
+                    resolved = candidate
+                    break
+        self.publish(
+            DomainEvent(
+                topic=topic,
+                payload=payload,
+                correlation_id=resolved,
+            )
+        )
 
     def subscribe(self, topic: str, handler: Any) -> None:
         self._bus.subscribe(topic, handler)
 
     def stats(self) -> Dict[str, Any]:
-        return {"bus": self._bus.stats(), "journal": self.journal.stats()}
+        return {
+            "bus": self._bus.stats(),
+            "journal": self.journal.stats(),
+            "observability": self.metrics_bridge.snapshot()["metrics"],
+        }
