@@ -1,4 +1,4 @@
-version: 9
+version: 10
 canonical_repository: Apeloff1/Skeleton
 strategy: selective-promotion
 rules:
@@ -166,7 +166,7 @@ integration_wave_3:
     - source-world-map-is-one-shared-lineage-not-two-promotions
     - world-memory-runtime-event-cross-contract-seam-is-covered
 integration_wave_4:
-  status: journal-semantics-promoted
+  status: journal-semantics-promoted-and-hardened
   surface: event-durability
   primary_source: Apeloff1/gameforge-rs
   source_path: crates/gf-core/src/lib.rs
@@ -186,6 +186,9 @@ integration_wave_4:
     - bounded-unconfirmed-capacity
     - backpressure-instead-of-dropping-pending-work
     - persistent-pending-recovery-evidence
+    - strict-finite-json-payload-boundary
+    - fail-closed-corrupt-row-decoding
+    - corrupt-rows-remain-unacknowledged
   rejected_from-kernel:
     - mongodb-client
     - mongodb-document-types
@@ -195,10 +198,12 @@ integration_wave_4:
   evidence:
     - skeleton/testing/test_frontier_events.py
     - skeleton/testing/test_frontier_event_journal.py
+    - skeleton/testing/test_frontier_event_json_boundary.py
+    - skeleton/testing/test_frontier_event_corruption.py
     - skeleton/testing/test_frontier_event_benchmark.py
     - skeleton/testing/test_frontier_world_memory_runtime.py
     - scripts/benchmark_frontier_events.py
-  rationale: preserve the outbox safety invariant on the canonical EventBus using a provider-neutral journal boundary and stdlib SQLite backend; benchmark timing is observational only
+  rationale: preserve the outbox safety invariant on the canonical EventBus using a provider-neutral journal boundary and stdlib SQLite backend; malformed persisted rows fail closed without acknowledgement and benchmark timing is observational only
 integration_wave_5:
   status: pure-policy-promoted
   surface: crew-and-store-policy
@@ -231,7 +236,7 @@ integration_wave_5:
     - skeleton/testing/test_frontier_ship_policy.py
   rationale: the source blobs differ, but the portable policy inspected across both is shared; promote policy once and keep source catalogs authoritative
 integration_wave_6:
-  status: recovery-seam-landed
+  status: recovery-seam-landed-and-hardened
   surface: runtime-event-memory-recovery
   primary_source: Apeloff1/gameforge-rs
   source_path: crates/gf-core/src/lib.rs
@@ -246,6 +251,10 @@ integration_wave_6:
     - idempotency-digest-preservation
     - crash-reopen-pending-event-recovery
     - downstream-memory-provenance-preservation
+    - consumer-side-execution-identity-revalidation
+    - provenance-artifact-consistency
+    - provenance-idempotency-consistency
+    - repeat-delivery-memory-upsert
   rejected_from-kernel:
     - second-runtime
     - second-event-bus
@@ -253,7 +262,8 @@ integration_wave_6:
     - background-reconciler
   evidence:
     - skeleton/testing/test_frontier_runtime_event_recovery.py
-  rationale: bridge canonical runtime, event and memory contracts without merging their responsibilities or losing source provenance and idempotency identity
+    - skeleton/testing/test_frontier_runtime_event_integrity.py
+  rationale: bridge canonical runtime, event and memory contracts without merging their responsibilities; consumers verify identity and provenance before using the stable execution digest as an idempotent memory key
 integration_wave_7:
   status: shared-lineage-policy-promoted
   surface: quest-reputation-captains-log
