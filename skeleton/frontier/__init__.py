@@ -19,6 +19,18 @@ from skeleton.frontier.memory_adapters import CollectionMemoryAdapter, SQLiteCol
 from skeleton.frontier.npc import NPCGenerator, NPCSpec
 from skeleton.frontier.npc_adapters import npc_spec_from_domain_record
 from skeleton.frontier.npc_profiles import ArchetypeProfile, get_profile, infer_archetype
+from skeleton.frontier.quests import (
+    ObjectiveProgress,
+    QuestProgressState,
+    QuestSpec,
+    RewardPlan,
+    available_quests,
+    initialize_progress,
+    quest_from_record,
+    reward_plan,
+    select_quests_by_type,
+    update_objective_progress,
+)
 from skeleton.frontier.resilience import DegradationLevel, ResilienceController, ResilienceDecision
 from skeleton.frontier.ship import (
     CrewRoleSpec,
@@ -64,15 +76,20 @@ __all__ = [
     "MemoryItem",
     "NPCGenerator",
     "NPCSpec",
+    "ObjectiveProgress",
     "ProvenanceRecord",
     "PurchaseQuote",
+    "QuestProgressState",
+    "QuestSpec",
     "ResilienceController",
     "ResilienceDecision",
+    "RewardPlan",
     "SQLiteCollection",
     "SQLiteEventJournal",
     "WorldBounds",
     "WorldRegion",
     "aggregate_crew",
+    "available_quests",
     "calculate_route",
     "calculate_supplies_needed",
     "can_afford",
@@ -86,10 +103,15 @@ __all__ = [
     "get_profile",
     "hiring_cost",
     "infer_archetype",
+    "initialize_progress",
     "npc_spec_from_domain_record",
     "project_fog_of_war",
+    "quest_from_record",
     "quote_purchase",
     "region_from_record",
+    "reward_plan",
+    "select_quests_by_type",
     "stable_content_digest",
     "stores_for_location",
+    "update_objective_progress",
 ]
