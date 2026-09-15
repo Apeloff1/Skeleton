@@ -96,14 +96,14 @@ def get_stats() -> dict:
 
 
 def _request_id(request: Request) -> str:
-    candidate = request.headers.get("x-request-id", "")
-    if candidate and _REQUEST_ID_RE.fullmatch(candidate):
-        return candidate
-    return uuid.uuid4().hex[:16]
+    candidates = request.headers.getlist("x-request-id")
+    if len(candidates) == 1 and _REQUEST_ID_RE.fullmatch(candidates[0]):
+        return candidates[0]
+    return uuid.uuid4().hex
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
-    """Accept a bounded header-safe X-Request-Id or mint one."""
+    """Accept one bounded header-safe X-Request-Id or mint one."""
 
     async def dispatch(self, request: Request, call_next: Callable):
         rid = _request_id(request)
