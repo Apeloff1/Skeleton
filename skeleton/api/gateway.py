@@ -88,10 +88,10 @@ class APIGateway:
         self._last_bucket_sweep = now
 
     def _rate_ok(self, key: str, per_s: float) -> bool:
-        if per_s <= 0:
-            return True
         now = time.monotonic()
         self._sweep_rate_buckets(now)
+        if per_s <= 0:
+            return True
         window = [
             timestamp
             for timestamp in self._buckets.get(key, [])
