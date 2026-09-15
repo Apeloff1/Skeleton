@@ -61,7 +61,7 @@ def run_api_gateway_throughput_profile(*, requests: int = 5_000, concurrency: in
     workers = min(concurrency, requests)
 
     gateway = APIGateway()
-    gateway.route("/reliability/echo", lambda payload: {"index": payload["index"]})
+    route = gateway.route("/reliability/echo", lambda payload: {"index": payload["index"]})
 
     def one_request(index: int) -> tuple[int, bool, float]:
         response = gateway.handle(
@@ -84,7 +84,6 @@ def run_api_gateway_throughput_profile(*, requests: int = 5_000, concurrency: in
     completed = sum(status == 200 for status in statuses)
     failed = requests - completed
     mismatches = sum(not matches for matches in body_matches)
-    route = gateway._routes["/reliability/echo"]
     invariants_passed = (
         completed == requests
         and failed == 0
