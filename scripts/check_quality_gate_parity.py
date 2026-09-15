@@ -22,6 +22,8 @@ SHARED_BACKEND_MARKERS: tuple[tuple[str, str], ...] = (
     ("process invocation safety", "check_process_safety.py"),
     ("unsafe deserialization safety", "check_deserialization_safety.py"),
     ("high-confidence SAST", "check_sast_security.py"),
+    ("repository Python SAST", "check_repository_python_sast.py"),
+    ("repository Python SAST regression", "test_repository_python_sast_scope.py"),
     ("JavaScript process alias safety", "check_js_process_alias_safety.py"),
     ("workflow security", "check_workflow_security.py"),
     ("secret hygiene", "check_secret_hygiene.py"),
@@ -84,6 +86,10 @@ def main() -> int:
         failures.append("Backend Quality must trigger on parity-guard changes for push and pull_request")
     if ci.count('"scripts/quality-gates.sh"') < 2:
         failures.append("Backend Quality must trigger on local canonical-gate changes for push and pull_request")
+    if ci.count('"scripts/check_repository_python_sast.py"') < 2:
+        failures.append(
+            "Backend Quality must trigger on repository Python SAST changes for push and pull_request"
+        )
 
     if RUFF_DEV_REQUIREMENT not in requirements_dev:
         failures.append(f"requirements-dev.txt must include {RUFF_DEV_REQUIREMENT}")
