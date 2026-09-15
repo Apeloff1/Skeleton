@@ -11,10 +11,12 @@ Surfaces the previously-dormant "in-room" systems so they are visible + usable:
   • RAG mesh (Hybrid RAG / Omni RAG) + AAAHRAG (Knowledge Nexus librarian)
 
 Everything is defensive: a missing module/file degrades to a status note, never
-crashes boot.
+crashes boot. Optional Python modules are selected through a static loader map;
+request/runtime strings cannot choose arbitrary import targets.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 import glob
 import json
 import os
@@ -81,10 +83,152 @@ def _load_roles() -> dict[str, list]:
     return roles
 
 
-def _import(path: str, attr: str = None):
+# Static optional-module loaders. The string lookup is an allowlist; each Python
+# import target is fixed in source and therefore reviewable by the security gate.
+def _load_full_room_registry():
+    import gameforge.rooms.full_room_registry as module
+
+    return module
+
+
+def _load_structure_map():
+    import gameforge.rooms.structure_map as module
+
+    return module
+
+
+def _load_room_bookshelf():
+    import gameforge.rooms.room_bookshelf as module
+
+    return module
+
+
+def _load_team_rolodex():
+    import gameforge.rooms.team_rolodex as module
+
+    return module
+
+
+def _load_room_toolbox_checkout_manager():
+    import gameforge.agent_tools.room_toolbox_checkout_manager as module
+
+    return module
+
+
+def _load_fast_travel():
+    import gameforge.navigation.fast_travel_optimized_pathing as module
+
+    return module
+
+
+def _load_agentic_nav_map():
+    import gameforge.navigation.agentic_nav_map as module
+
+    return module
+
+
+def _load_true_sota_nav_map():
+    import gameforge.navigation.true_sota_exquisite_nav_map as module
+
+    return module
+
+
+def _load_fog_of_knowledge():
+    import gameforge.navigation.fog_of_knowledge_system as module
+
+    return module
+
+
+def _load_hybrid_rag_engine():
+    import gameforge.exocortex.agentic.hybrid_rag_engine as module
+
+    return module
+
+
+def _load_omni_advanced_rag():
+    import gameforge.rag.omni_advanced_rag_system as module
+
+    return module
+
+
+def _load_room_hybrid_rag():
+    import gameforge.rooms.room_hybrid_rag as module
+
+    return module
+
+
+def _load_rag_navigation_synergy():
+    import gameforge.synergy.rag_navigation_synergy_engine as module
+
+    return module
+
+
+def _load_aaahrag_librarian():
+    import knowledge_nexus.agents.librarian_agent_implementation as module
+
+    return module
+
+
+def _load_room_seat_manager():
+    import gameforge.rooms.room_seat_manager as module
+
+    return module
+
+
+def _load_role_seat_engine():
+    import gameforge.roles.seat_assignment_system.role_seat_assignment_engine as module
+
+    return module
+
+
+def _load_agent_seat_cycling():
+    import gameforge.rooms.agent_seat_cycling_engine as module
+
+    return module
+
+
+def _load_coder_pool():
+    import gameforge.rooms.coder_pool as module
+
+    return module
+
+
+def _load_style_application():
+    import gameforge.agents.style_application as module
+
+    return module
+
+
+_MODULE_LOADERS: dict[str, Callable[[], Any]] = {
+    "gameforge.rooms.full_room_registry": _load_full_room_registry,
+    "gameforge.rooms.structure_map": _load_structure_map,
+    "gameforge.rooms.room_bookshelf": _load_room_bookshelf,
+    "gameforge.rooms.team_rolodex": _load_team_rolodex,
+    "gameforge.agent_tools.room_toolbox_checkout_manager": _load_room_toolbox_checkout_manager,
+    "gameforge.navigation.fast_travel_optimized_pathing": _load_fast_travel,
+    "gameforge.navigation.agentic_nav_map": _load_agentic_nav_map,
+    "gameforge.navigation.true_sota_exquisite_nav_map": _load_true_sota_nav_map,
+    "gameforge.navigation.fog_of_knowledge_system": _load_fog_of_knowledge,
+    "gameforge.exocortex.agentic.hybrid_rag_engine": _load_hybrid_rag_engine,
+    "gameforge.rag.omni_advanced_rag_system": _load_omni_advanced_rag,
+    "gameforge.rooms.room_hybrid_rag": _load_room_hybrid_rag,
+    "gameforge.synergy.rag_navigation_synergy_engine": _load_rag_navigation_synergy,
+    "knowledge_nexus.agents.librarian_agent_implementation": _load_aaahrag_librarian,
+    "gameforge.rooms.room_seat_manager": _load_room_seat_manager,
+    "gameforge.roles.seat_assignment_system.role_seat_assignment_engine": _load_role_seat_engine,
+    "gameforge.rooms.agent_seat_cycling_engine": _load_agent_seat_cycling,
+    "gameforge.rooms.coder_pool": _load_coder_pool,
+    "gameforge.agents.style_application": _load_style_application,
+}
+
+
+def _import(path: str, attr: str | None = None):
+    loader = _MODULE_LOADERS.get(path)
+    if loader is None:
+        return None
     try:
-        m = __import__(path, fromlist=[attr or "x"])
-        return getattr(m, attr) if attr else m
+        module = loader()
+        return getattr(module, attr) if attr else module
     except Exception:  # noqa: BLE001
         return None
 
