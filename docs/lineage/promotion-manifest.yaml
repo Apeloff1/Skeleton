@@ -1,4 +1,4 @@
-version: 3
+version: 4
 canonical_repository: Apeloff1/Skeleton
 strategy: selective-promotion
 rules:
@@ -26,7 +26,7 @@ sources:
       rag: skeleton/frontier/memory_adapters.py
       pipelines: skeleton/game
   - repository: Apeloff1/gameforge-rs
-    capabilities: [gameforge, simulation, generation, digest, outbox]
+    capabilities: [gameforge, simulation, generation, digest, idempotency, outbox]
     disposition: promote-unique-only
     destinations:
       engine: skeleton/game
@@ -104,6 +104,26 @@ integration_wave_2:
       decision: promote-digest-semantics-only
       target: skeleton/frontier/contracts.py
       rationale: adopt one SHA-256 content digest contract; defer MongoDB outbox and persistence plumbing
+    - surface: runtime-idempotency
+      primary_source: Apeloff1/gameforge-rs
+      source_path: crates/gf-core/src/lib.rs
+      source_blob: 481fcfca5a23272b70353eb09b7c3406bbc9bdd9
+      decision: promote-idempotency-semantics-only
+      target: skeleton/frontier/agent_runtime.py
+      evidence:
+        - skeleton/testing/test_frontier_runtime.py
+      promoted_semantics:
+        - duplicate-suppression
+        - fail-closed-key-reuse
+        - concurrent-request-coalescing
+        - bounded-in-process-retention
+        - backpressure-when-all-retained-executions-are-in-flight
+      deferred:
+        - mongodb-duplicate-key-guard
+        - mongodb-client
+        - durable-outbox
+        - background-reconciler
+      rationale: preserve typed duplicate-suppression behavior at the runtime boundary without importing GameForge persistence infrastructure
     - surface: capability-boundary
       primary_source: Apeloff1/hyperforge-cockpit-sota
       source_path: src/lib/preview-host-bridge.ts
