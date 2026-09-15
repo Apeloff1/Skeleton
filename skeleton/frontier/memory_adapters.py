@@ -1,9 +1,9 @@
 """Boundary adapters for promoted memory implementations.
 
 The Prood/Tutolage RAG implementation uses a Chroma-style synchronous
-collection API. This module preserves those useful collection/query semantics
-behind ``MemoryContract`` without making ChromaDB (or any provider) a kernel
-dependency.
+collection API. This module preserves those useful collection/query/filter
+semantics behind ``MemoryContract`` without making ChromaDB (or any provider) a
+kernel dependency.
 
 ``SQLiteCollection`` is a dependency-free persistent implementation of that
 same structural collection surface. It is intentionally a backend, not a new
@@ -15,13 +15,13 @@ from __future__ import annotations
 
 import asyncio
 import json
-import re
 import sqlite3
 import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Protocol, Sequence
-from uuid import uuid4
+
+from skeleton.frontier.memory import lexical_relevance, normalize_memory_item
 
 
 class CollectionLike(Protocol):
@@ -65,58 +65,20 @@ def _first_row(value: Any) -> list[Any]:
     return list(value)
 
 
-def _portable_metadata(item: Mapping[str, Any]) -> dict[str, Any]:
-    """Flatten portable item fields into collection metadata.
-
-    ``MemoryContract`` items historically allowed useful filter fields at the
-    top level while the Prood/Tutolage RAG service stores filter state as
-    collection metadata. Flattening non-content fields here makes both models
-    conform without changing the public contract. Conflicts fail closed rather
-    than silently selecting one representation.
-    """
-
-    raw_metadata = item.get("metadata") or {}
-    if not isinstance(raw_metadata, Mapping):
-        raise TypeError("memory item metadata must be a mapping")
-
-    metadata = dict(raw_metadata)
-    ignored = {"id", "content", "text", "document", "metadata"}
-    for key, value in item.items():
-        if key in ignored:
-            continue
-        if key in metadata and metadata[key] != value:
-            raise ValueError(f"conflicting memory metadata field: {key}")
-        metadata[key] = value
-    return metadata
-
-
 @dataclass(slots=True)
 class CollectionMemoryAdapter:
     """Adapt a Chroma-like collection to ``MemoryContract``.
 
-    Input items intentionally use a tiny portable shape: ``id`` is optional,
-    content may be supplied as ``content``, ``text`` or ``document``. Explicit
-    ``metadata`` and additional top-level fields become filterable collection
-    metadata. Search results preserve source ids, metadata and relevance when
-    available.
+    All input normalization is shared with ``InMemoryStore``: ids are
+    non-empty, content comes from content/text/document, metadata must be a
+    mapping, and conflicting top-level/nested filter fields fail closed.
+    Search results preserve source ids, metadata and relevance when available.
     """
 
     collection: CollectionLike
 
-    @staticmethod
-    def _content(item: Mapping[str, Any]) -> str:
-        for key in ("content", "text", "document"):
-            value = item.get(key)
-            if value is not None:
-                text = str(value).strip()
-                if text:
-                    return text
-        raise ValueError("memory item requires non-empty content/text/document")
-
     async def put(self, item: Mapping[str, Any]) -> str:
-        item_id = str(item.get("id") or uuid4())
-        metadata = _portable_metadata(item)
-        content = self._content(item)
+        item_id, content, metadata = normalize_memory_item(item)
         await asyncio.to_thread(
             self.collection.add,
             documents=[content],
@@ -162,7 +124,10 @@ class CollectionMemoryAdapter:
         return hits
 
     async def delete(self, item_id: str) -> None:
-        await asyncio.to_thread(self.collection.delete, ids=[item_id])
+        normalized = str(item_id).strip()
+        if not normalized:
+            raise ValueError("memory id must not be empty")
+        await asyncio.to_thread(self.collection.delete, ids=[normalized])
 
 
 class SQLiteCollection:
@@ -229,21 +194,6 @@ class SQLiteCollection:
         where: Mapping[str, Any] | None,
     ) -> bool:
         return not where or all(metadata.get(key) == value for key, value in where.items())
-
-    @staticmethod
-    def _score(document: str, query: str) -> float:
-        query = query.casefold().strip()
-        if not query:
-            return 1.0
-
-        haystack = document.casefold()
-        if query in haystack:
-            return 1.0
-
-        terms = tuple(dict.fromkeys(re.findall(r"\w+", query)))
-        if not terms:
-            return 1.0
-        return sum(1 for term in terms if term in haystack) / len(terms)
 
     def _rows(self) -> list[sqlite3.Row]:
         with self._lock:
@@ -320,7 +270,7 @@ class SQLiteCollection:
             metadata = json.loads(row["metadata_json"])
             if not self._matches(metadata, where):
                 continue
-            score = self._score(row["document"], query)
+            score = lexical_relevance(row["document"], query)
             if query.strip() and score <= 0.0:
                 continue
             ranked.append(
