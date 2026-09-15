@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -29,6 +31,20 @@ class _FakeResponses:
 class _FakeClient:
     def __init__(self, responses: _FakeResponses) -> None:
         self.responses = responses
+
+
+class _TailOnlyHistory(Sequence):
+    """Sequence that fails if normalization scans the irrelevant old prefix."""
+
+    def __len__(self) -> int:
+        return 1_000
+
+    def __getitem__(self, index: int) -> Any:
+        if index == 999:
+            return {"role": "user", "content": "tail"}
+        if 0 <= index < 999:
+            raise AssertionError("history normalization scanned past a full newest-first budget")
+        raise IndexError(index)
 
 
 @pytest.mark.asyncio
@@ -118,3 +134,24 @@ def test_normalize_history_filters_roles_and_keeps_newest_with_budget() -> None:
         AIMessage(role="assistant", content="890"),
         AIMessage(role="user", content="abcde"),
     )
+
+
+def test_normalize_history_stops_scanning_sequence_once_budget_is_full() -> None:
+    normalized = normalize_history(_TailOnlyHistory(), char_budget=4)
+
+    assert normalized == (AIMessage(role="user", content="tail"),)
+
+
+def test_normalize_history_bounds_generic_iterable_tail() -> None:
+    history = iter(
+        [
+            {"role": "user", "content": "old"},
+            {"role": "assistant", "content": "older"},
+            {"role": "system", "content": "ignored"},
+            {"role": "user", "content": "abcdefgh"},
+        ]
+    )
+
+    normalized = normalize_history(history, char_budget=5)
+
+    assert normalized == (AIMessage(role="user", content="defgh"),)

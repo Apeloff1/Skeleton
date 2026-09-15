@@ -8,6 +8,8 @@ instead of importing vendor SDKs directly.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections import deque
+from collections.abc import Sequence as SequenceABC
 from dataclasses import dataclass, field
 import os
 import time
@@ -82,6 +84,20 @@ class ProviderAdapter(ABC):
         return {"id": self.provider_id, "model": self.model, "available": self.available}
 
 
+def _normalize_history_item(item: Mapping[str, Any] | Any) -> AIMessage | None:
+    if not isinstance(item, Mapping):
+        return None
+    raw_role = item.get("role")
+    raw_content = item.get("content")
+    if not isinstance(raw_role, str) or not isinstance(raw_content, str):
+        return None
+    role = raw_role.strip().lower()
+    content = raw_content.strip()
+    if role not in _ALLOWED_HISTORY_ROLES or not content:
+        return None
+    return AIMessage(role=role, content=content)
+
+
 def normalize_history(
     history: Iterable[Mapping[str, Any]] | None,
     *,
@@ -89,36 +105,61 @@ def normalize_history(
 ) -> tuple[AIMessage, ...]:
     """Normalize untrusted chat history into a bounded provider-neutral form."""
 
-    if not history or char_budget <= 0:
+    if history is None or char_budget <= 0:
         return ()
 
-    normalized: list[AIMessage] = []
-    for item in history:
-        if not isinstance(item, Mapping):
-            continue
-        raw_role = item.get("role")
-        raw_content = item.get("content")
-        if not isinstance(raw_role, str) or not isinstance(raw_content, str):
-            continue
-        role = raw_role.strip().lower()
-        content = raw_content.strip()
-        if role not in _ALLOWED_HISTORY_ROLES or not content:
-            continue
-        normalized.append(AIMessage(role=role, content=content))
+    # Most request histories arrive as list/tuple sequences. Walk them from
+    # newest to oldest so once the retained character budget is full we can
+    # stop without parsing, allocating, or retaining the older prefix.
+    if isinstance(history, SequenceABC):
+        kept_reversed: list[AIMessage] = []
+        used = 0
+        for item in reversed(history):
+            message = _normalize_history_item(item)
+            if message is None:
+                continue
+            remaining = char_budget - used
+            if remaining <= 0:
+                break
+            if len(message.content) > remaining:
+                message = AIMessage(
+                    role=message.role,
+                    content=message.content[-remaining:],
+                )
+            kept_reversed.append(message)
+            used += len(message.content)
+            if used >= char_budget:
+                break
+        return tuple(reversed(kept_reversed))
 
-    kept_reversed: list[AIMessage] = []
+    # Generic iterables cannot be traversed backwards. Keep only a rolling
+    # character-bounded tail instead of materializing the entire normalized
+    # history before applying the budget.
+    kept: deque[AIMessage] = deque()
     used = 0
-    for message in reversed(normalized):
-        remaining = char_budget - used
-        if remaining <= 0:
-            break
-        content = message.content
-        if len(content) > remaining:
-            content = content[-remaining:]
-        kept_reversed.append(AIMessage(role=message.role, content=content))
-        used += len(content)
+    for item in history:
+        message = _normalize_history_item(item)
+        if message is None:
+            continue
+        kept.append(message)
+        used += len(message.content)
+        overflow = used - char_budget
+        while overflow > 0 and kept:
+            oldest = kept[0]
+            oldest_len = len(oldest.content)
+            if oldest_len <= overflow:
+                used -= oldest_len
+                kept.popleft()
+                overflow = used - char_budget
+                continue
+            kept[0] = AIMessage(
+                role=oldest.role,
+                content=oldest.content[overflow:],
+            )
+            used -= overflow
+            overflow = 0
 
-    return tuple(reversed(kept_reversed))
+    return tuple(kept)
 
 
 def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
