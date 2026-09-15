@@ -2,8 +2,9 @@
 
 The canonical bus remains provider-neutral and in-process. A journal can be
 attached to preserve the portable GameForge outbox invariant: record intent
-before exposing an event, leave failed deliveries pending, and confirm only
-after successful fan-out. No MongoDB client or second event bus is imported.
+before exposing an event, leave failed or currently undeliverable events
+pending, and confirm only after successful fan-out. No MongoDB client or second
+event bus is imported.
 """
 
 from __future__ import annotations
@@ -63,13 +64,15 @@ class EventBus:
 
     Recovery is explicit rather than backgrounded. ``replay_pending`` processes
     journal entries oldest-first and confirms each only after successful fan-
-    out. Handler side effects therefore have at-least-once semantics if a prior
-    delivery partially completed before failing.
+    out to at least one subscriber. Handler side effects therefore have
+    at-least-once semantics if a prior delivery partially completed before
+    failing.
     """
 
     def __init__(self, *, journal: EventJournal | None = None) -> None:
         self._handlers: dict[str, list[Handler]] = {}
         self._lock = asyncio.Lock()
+        self._replay_lock = asyncio.Lock()
         self._journal = journal
 
     async def subscribe(self, topic: str, handler: Handler) -> None:
@@ -91,30 +94,32 @@ class EventBus:
     async def publish(self, event: DomainEvent) -> int:
         token = await self._journal.journal(event) if self._journal else None
         delivered = await self._deliver(event)
-        if self._journal is not None and token is not None:
+        if self._journal is not None and token is not None and delivered > 0:
             await self._journal.confirm(token)
         return delivered
 
     async def replay_pending(self, *, limit: int = 100) -> int:
         """Replay pending durable events in journal order.
 
-        A failing handler aborts the replay immediately and leaves that entry
-        plus all later entries pending, preserving source order and avoiding
-        silent skips.
+        Replays are serialized per bus instance. A failing handler or an event
+        with no current subscribers stops replay at that entry and leaves it,
+        plus all later entries, pending. This preserves source order and avoids
+        both silent acknowledgement and concurrent double-delivery.
         """
 
-        if limit < 1:
-            return 0
-        if self._journal is None:
+        if limit < 1 or self._journal is None:
             return 0
 
-        entries = await self._journal.pending(limit=limit)
-        replayed = 0
-        for entry in entries:
-            await self._deliver(entry.event)
-            await self._journal.confirm(entry.token)
-            replayed += 1
-        return replayed
+        async with self._replay_lock:
+            entries = await self._journal.pending(limit=limit)
+            replayed = 0
+            for entry in entries:
+                delivered = await self._deliver(entry.event)
+                if delivered == 0:
+                    break
+                await self._journal.confirm(entry.token)
+                replayed += 1
+            return replayed
 
 
 class SQLiteEventJournal:
