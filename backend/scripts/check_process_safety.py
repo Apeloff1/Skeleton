@@ -10,7 +10,9 @@ command strings are rejected in favor of explicit argument vectors.
 from __future__ import annotations
 
 import ast
+import os
 from pathlib import Path
+import stat
 import sys
 from typing import Iterable
 
@@ -27,11 +29,32 @@ UNSAFE_CALLS = {
 }
 
 
+def walk_python_files(root: Path, skip_dirs: set[str]) -> Iterable[Path]:
+    """Traverse *root* without following symlinks and surface discovery errors."""
+    metadata = os.stat(root, follow_symlinks=False)
+    if not stat.S_ISDIR(metadata.st_mode):
+        raise NotADirectoryError(str(root))
+
+    pending = [root]
+    while pending:
+        current = pending.pop()
+        with os.scandir(current) as entries:
+            discovered = sorted(entries, key=lambda entry: entry.name)
+
+        child_dirs: list[Path] = []
+        for entry in discovered:
+            if entry.name in skip_dirs or entry.is_symlink():
+                continue
+            if entry.is_dir(follow_symlinks=False):
+                child_dirs.append(Path(entry.path))
+                continue
+            if entry.is_file(follow_symlinks=False) and entry.name.endswith(".py"):
+                yield Path(entry.path)
+        pending.extend(reversed(child_dirs))
+
+
 def python_files() -> Iterable[Path]:
-    for path in ROOT.rglob("*.py"):
-        if any(part in SKIP_DIRS for part in path.parts):
-            continue
-        yield path
+    yield from walk_python_files(ROOT, SKIP_DIRS)
 
 
 def display_path(path: Path) -> Path:
@@ -307,7 +330,9 @@ def violations(path: Path) -> list[str]:
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     except (OSError, UnicodeError, SyntaxError) as exc:
-        return [f"{label}: parse failure: {exc}"]
+        line = getattr(exc, "lineno", None)
+        location = f"{label}:{line}" if line else str(label)
+        return [f"{location}: parse failure: {exc.__class__.__name__}"]
 
     aliases = assignment_aliases(tree, import_aliases(tree))
     findings = star_import_violations(tree, label)
@@ -352,11 +377,24 @@ def violations(path: Path) -> list[str]:
 def main() -> int:
     findings: list[str] = []
     scanned = 0
-    for path in python_files():
-        scanned += 1
-        findings.extend(violations(path))
+    try:
+        for path in python_files():
+            scanned += 1
+            findings.extend(violations(path))
+    except OSError as exc:
+        print(
+            f"Process safety scan failed closed: source discovery failed ({exc.__class__.__name__}).",
+            file=sys.stderr,
+        )
+        return 1
+
     if scanned == 0:
-        findings.append("scanner coverage failure: no backend Python files were scanned")
+        print(
+            "Process safety scan failed closed: no backend Python files were scanned (zero Python files discovered).",
+            file=sys.stderr,
+        )
+        return 1
+
     if findings:
         print("Unsafe process invocation patterns detected:", file=sys.stderr)
         for finding in sorted(findings):
