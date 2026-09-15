@@ -200,3 +200,130 @@ class TestBuilder:
         assert "moe" in st and "callosum" in st and "sleep" in st and "rl" in st
         assert st["moe"]["experts"]["left"]["head_kind"] == "numeric"
         assert st["moe"]["experts"]["right"]["head_kind"] == "bias"
+
+
+class TestIntelligenceOrchestratorQoSSafety:
+    @staticmethod
+    def _result(task, answer, confidence):
+        from skeleton.intelligence.orchestrator import ReasoningResult
+
+        return ReasoningResult(
+            task_id=task.task_id,
+            answer=answer,
+            confidence=confidence,
+            sources=["fixture"],
+        )
+
+    def test_handler_disable_invalidates_cached_result(self):
+        from skeleton.intelligence.orchestrator import IntelligenceOrchestrator
+
+        orchestrator = IntelligenceOrchestrator(result_cache_ttl_seconds=60.0)
+        calls = {"count": 0}
+
+        def handler(task):
+            calls["count"] += 1
+            return self._result(task, {"version": calls["count"]}, 0.9)
+
+        orchestrator.register_handler("primary", handler)
+        first = orchestrator.reason("same query")
+        assert first["cached"] is False
+        assert calls["count"] == 1
+
+        orchestrator.set_handler_enabled("primary", False)
+        after_disable = orchestrator.reason("same query")
+
+        assert after_disable["cached"] is False
+        assert after_disable["error"] == "No eligible reasoning handlers are available"
+        assert calls["count"] == 1
+
+    def test_handler_replacement_invalidates_cached_result(self):
+        from skeleton.intelligence.orchestrator import IntelligenceOrchestrator
+
+        orchestrator = IntelligenceOrchestrator(result_cache_ttl_seconds=60.0)
+
+        def first_handler(task):
+            return self._result(task, {"handler": "first"}, 0.9)
+
+        def replacement_handler(task):
+            return self._result(task, {"handler": "replacement"}, 0.95)
+
+        orchestrator.register_handler("primary", first_handler)
+        assert orchestrator.reason("same query")["answer"] == {"handler": "first"}
+
+        orchestrator.register_handler("primary", replacement_handler)
+        replacement = orchestrator.reason("same query")
+
+        assert replacement["cached"] is False
+        assert replacement["answer"] == {"handler": "replacement"}
+
+    def test_cached_nested_answer_is_defensively_isolated(self):
+        from skeleton.intelligence.orchestrator import IntelligenceOrchestrator
+
+        orchestrator = IntelligenceOrchestrator(result_cache_ttl_seconds=60.0)
+
+        def handler(task):
+            return self._result(task, {"nested": ["original"]}, 0.9)
+
+        orchestrator.register_handler("primary", handler)
+        first = orchestrator.reason("cache isolation")
+        first["answer"]["nested"].append("caller-poison")
+        first["sources"].append("caller-poison")
+
+        cached = orchestrator.reason("cache isolation")
+
+        assert cached["cached"] is True
+        assert cached["answer"] == {"nested": ["original"]}
+        assert cached["sources"] == ["fixture"]
+
+    def test_handler_exception_text_is_not_exposed(self):
+        from skeleton.intelligence.orchestrator import IntelligenceOrchestrator
+
+        sentinel = "TOKEN-super-secret-signed-url-value"
+
+        class RecordingBus:
+            def __init__(self):
+                self.events = []
+
+            def emit(self, topic, payload):
+                self.events.append((topic, payload))
+
+        bus = RecordingBus()
+        orchestrator = IntelligenceOrchestrator(bus=bus)
+
+        def handler(task):
+            raise RuntimeError(f"provider failed with {sentinel}")
+
+        orchestrator.register_handler("primary", handler)
+        result = orchestrator.reason("redaction")
+
+        assert sentinel not in repr(result)
+        assert sentinel not in repr(orchestrator.stats())
+        assert sentinel not in repr(bus.events)
+        assert result["attempts"] == [
+            {
+                "handler": "primary",
+                "status": "failed",
+                "error_type": "RuntimeError",
+            }
+        ]
+        assert orchestrator.stats()["handlers"]["primary"]["last_error"] == "RuntimeError"
+
+    def test_average_confidence_uses_consistent_population(self):
+        from skeleton.intelligence.orchestrator import IntelligenceOrchestrator
+
+        orchestrator = IntelligenceOrchestrator(min_confidence=0.5)
+        confidences = iter((0.2, 0.8))
+
+        def handler(task):
+            return self._result(task, "answer", next(confidences))
+
+        orchestrator.register_handler("primary", handler)
+        rejected = orchestrator.reason("first")
+        accepted = orchestrator.reason("second")
+
+        assert "error" in rejected
+        assert accepted["answer"] == "answer"
+        telemetry = orchestrator.stats()["handlers"]["primary"]
+        assert telemetry["rejected"] == 1
+        assert telemetry["successes"] == 1
+        assert abs(telemetry["avg_confidence"] - 0.5) < 1e-9
