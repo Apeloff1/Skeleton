@@ -76,17 +76,13 @@ class ExecutionReceiptStore:
         if any(ch not in "0123456789abcdefABCDEF" for ch in operation_id):
             raise ValueError("operation_id must be a hexadecimal identifier")
 
-        # basename() creates an explicit path boundary that static analyzers and
-        # reviewers can verify. The equality check prevents silent normalization
-        # from turning a traversal attempt into an alias for another receipt.
         requested = f"{operation_id}.json"
-        filename = os.path.basename(requested)
-        if filename != requested or filename in {"", ".", ".."}:
-            raise ValueError("operation_id does not map to a safe receipt path")
-        path = self.directory / filename
-        if path.resolve(strict=False).parent != self.directory.resolve():
+        root = os.path.realpath(os.fspath(self.directory))
+        fullpath = os.path.realpath(os.path.normpath(os.path.join(root, requested)))
+        root_prefix = root + os.sep
+        if not fullpath.startswith(root_prefix):
             raise ValueError("operation_id escapes the receipt directory")
-        return path
+        return Path(fullpath)
 
     def write(
         self,
