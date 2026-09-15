@@ -1,7 +1,7 @@
 """Enforce secret exclusions for Docker contexts that copy the repository broadly.
 
 A Dockerfile that uses ``COPY . .`` sends the build context to the daemon before
-any image-layer policy can help.  This gate keeps the adjacent ``.dockerignore``
+any image-layer policy can help. This gate keeps the adjacent ``.dockerignore``
 as an explicit, regression-tested security boundary for credential-shaped local
 files.
 """
@@ -15,7 +15,7 @@ import sys
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# Keep this list intentionally small and high-confidence.  These entries match
+# Keep this list intentionally small and high-confidence. These entries match
 # local credential/key material that should never enter a frontend build context.
 REQUIRED_SECRET_EXCLUSIONS = frozenset(
     {
@@ -25,15 +25,23 @@ REQUIRED_SECRET_EXCLUSIONS = frozenset(
         "*.key",
         "*.p12",
         "*.pfx",
+        "*.crt",
+        "*.cer",
         "credentials*.json",
         "service-account*.json",
     }
 )
 
+# Negation rules can undo an earlier exclusion. Keep the exception surface
+# explicit and fail closed on every other reinclusion so a future edit cannot
+# silently make credential-shaped local files visible to the Docker builder.
+REQUIRED_REINCLUSIONS = frozenset({"!.env.example"})
+ALLOWED_REINCLUSIONS = REQUIRED_REINCLUSIONS
+
 # Match shell-form broad copies while allowing ordinary COPY options such as
 # --chown. JSON-array COPY is intentionally not considered broad here because the
-# canonical Dockerfile does not use it and guessing Docker parsing semantics would
-# make the gate less deterministic.
+# canonical Dockerfile does not use it; changing copy syntax must trigger review
+# of this guard rather than silently disabling it.
 BROAD_COPY_RE = re.compile(
     r"^\s*(?:COPY|ADD)\s+(?:--\S+\s+)*\.\s+\.\s*(?:#.*)?$",
     re.IGNORECASE,
@@ -45,6 +53,9 @@ class DockerContextPolicy:
     dockerfile: Path
     ignore_file: Path
     required_exclusions: frozenset[str] = REQUIRED_SECRET_EXCLUSIONS
+    required_reinclusions: frozenset[str] = REQUIRED_REINCLUSIONS
+    allowed_reinclusions: frozenset[str] = ALLOWED_REINCLUSIONS
+    require_broad_copy: bool = True
 
 
 POLICIES = (
@@ -89,6 +100,11 @@ def policy_violations(
         for number, line in enumerate(docker_text.splitlines(), 1)
         if BROAD_COPY_RE.match(line)
     ]
+    if policy.require_broad_copy and not broad_copy_lines:
+        return [
+            f"{policy.dockerfile}: expected broad Docker context copy is absent; "
+            "review this guard with the Dockerfile change"
+        ]
     if not broad_copy_lines:
         return []
 
@@ -98,16 +114,34 @@ def policy_violations(
     assert ignore_text is not None
 
     patterns = _active_ignore_patterns(ignore_text)
-    missing = sorted(policy.required_exclusions - patterns)
-    if not missing:
-        return []
-
+    findings: list[str] = []
     copy_locations = ",".join(str(number) for number in broad_copy_lines)
-    return [
+
+    missing = sorted(policy.required_exclusions - patterns)
+    findings.extend(
         f"{policy.ignore_file}: missing required secret exclusion {pattern!r} "
         f"for broad Docker context copy at {policy.dockerfile}:{copy_locations}"
         for pattern in missing
-    ]
+    )
+
+    missing_reinclusions = sorted(policy.required_reinclusions - patterns)
+    findings.extend(
+        f"{policy.ignore_file}: missing required narrow reinclusion {pattern!r}"
+        for pattern in missing_reinclusions
+    )
+
+    unexpected_reinclusions = sorted(
+        pattern
+        for pattern in patterns
+        if pattern.startswith("!") and pattern not in policy.allowed_reinclusions
+    )
+    findings.extend(
+        f"{policy.ignore_file}: unexpected reinclusion {pattern!r}; "
+        "explicit policy review is required"
+        for pattern in unexpected_reinclusions
+    )
+
+    return findings
 
 
 def scan_repository(*, repo_root: Path = REPO_ROOT) -> list[str]:
