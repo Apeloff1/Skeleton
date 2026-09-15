@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, Callable, Dict, List, Optional, Set
 
-from skeleton.kernel.events import DomainEvent, EventBus
+from skeleton.kernel.events import EventBus
 
 
 class TaskStatus(Enum):
@@ -28,6 +28,7 @@ class TaskStatus(Enum):
 @dataclass
 class Task:
     """A single unit of work for an agent."""
+
     task_id: str
     description: str
     priority: int = 1  # Higher = more urgent
@@ -36,7 +37,7 @@ class Task:
     result: Any = None
     error: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-    created_at: float = field(default_factory=__import__('time').time)
+    created_at: float = field(default_factory=__import__("time").time)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -49,6 +50,11 @@ class Task:
             "error": self.error,
             "metadata": self.metadata,
         }
+
+
+def _public_handler_error(exc: BaseException) -> str:
+    """Return a stable failure summary without persisting handler exception data."""
+    return f"{type(exc).__name__}: handler execution failed"
 
 
 class AgentPool:
@@ -71,12 +77,18 @@ class AgentPool:
             "capacity": capacity,
             "load": 0,
             "tasks": [],
-            "created_at": __import__('time').time(),
+            "created_at": __import__("time").time(),
         }
         self._stats["created"] += 1
 
         if self._bus:
-            self._bus.emit("agents.pool.created", {"agent_id": agent_id, "specialisations": list(specialisations)})
+            self._bus.emit(
+                "agents.pool.created",
+                {
+                    "agent_id": agent_id,
+                    "specialisations": list(specialisations),
+                },
+            )
 
         return agent_id
 
@@ -102,7 +114,10 @@ class AgentPool:
         self._stats["tasks_assigned"] += 1
 
         if self._bus:
-            self._bus.emit("agents.task.assigned", {"agent_id": agent_id, "task_id": task.task_id})
+            self._bus.emit(
+                "agents.task.assigned",
+                {"agent_id": agent_id, "task_id": task.task_id},
+            )
 
         return True
 
@@ -143,7 +158,11 @@ class AgentPool:
 class Coordinator:
     """Central coordinator for dispatching tasks to capable agents."""
 
-    def __init__(self, pool: Optional[AgentPool] = None, bus: Optional[EventBus] = None):
+    def __init__(
+        self,
+        pool: Optional[AgentPool] = None,
+        bus: Optional[EventBus] = None,
+    ):
         self.pool = pool or AgentPool(bus=bus)
         self._bus = bus
         self._tasks: Dict[str, Task] = {}
@@ -154,7 +173,14 @@ class Coordinator:
         """Register a handler for a specific task type."""
         self._handlers[task_type] = handler
 
-    def dispatch(self, description: str, task_type: str = "default", priority: int = 1, specialisation: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None) -> Task:
+    def dispatch(
+        self,
+        description: str,
+        task_type: str = "default",
+        priority: int = 1,
+        specialisation: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Task:
         """Dispatch a new task to the agent pool."""
         task = Task(
             task_id=str(uuid.uuid4())[:8],
@@ -201,20 +227,23 @@ class Coordinator:
                 task.result = handler(task)
                 task.status = TaskStatus.COMPLETED
                 self._stats["completed"] += 1
-            except Exception as e:
+            except Exception as exc:
                 task.status = TaskStatus.FAILED
-                task.error = str(e)
+                task.error = _public_handler_error(exc)
                 self._stats["failed"] += 1
             finally:
                 if task.agent_id is not None:
                     self.pool.release(task.agent_id, task.task_id)
 
         if self._bus:
-            self._bus.emit("agents.coordinator.dispatched", {
-                "task_id": task.task_id,
-                "agent_id": task.agent_id,
-                "status": task.status.name,
-            })
+            self._bus.emit(
+                "agents.coordinator.dispatched",
+                {
+                    "task_id": task.task_id,
+                    "agent_id": task.agent_id,
+                    "status": task.status.name,
+                },
+            )
 
         return task
 
@@ -230,9 +259,17 @@ class Coordinator:
     def stats(self) -> Dict[str, Any]:
         return {
             **self._stats,
-            "pending": len([t for t in self._tasks.values() if t.status == TaskStatus.PENDING]),
-            "running": len([t for t in self._tasks.values() if t.status == TaskStatus.RUNNING]),
-            "completed": len([t for t in self._tasks.values() if t.status == TaskStatus.COMPLETED]),
-            "failed": len([t for t in self._tasks.values() if t.status == TaskStatus.FAILED]),
+            "pending": len(
+                [t for t in self._tasks.values() if t.status == TaskStatus.PENDING]
+            ),
+            "running": len(
+                [t for t in self._tasks.values() if t.status == TaskStatus.RUNNING]
+            ),
+            "completed": len(
+                [t for t in self._tasks.values() if t.status == TaskStatus.COMPLETED]
+            ),
+            "failed": len(
+                [t for t in self._tasks.values() if t.status == TaskStatus.FAILED]
+            ),
             "total": len(self._tasks),
         }
