@@ -16,7 +16,6 @@ from enum import Enum, auto
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from skeleton.frontier.orchestration import (
-    CanonicalOrchestrator,
     OrchestrationDriver,
     RunRecord,
     RunStatus,
@@ -26,6 +25,7 @@ from skeleton.frontier.orchestration import (
     TurnOutcome,
 )
 from skeleton.kernel.events import EventBus
+from skeleton.observability.orchestration import ObservableOrchestrator
 
 
 class TaskStatus(Enum):
@@ -70,6 +70,20 @@ class Task:
             "error": self.error,
             "metadata": self.metadata,
         }
+
+
+def _task_correlation_id(task: Task) -> str:
+    """Resolve bounded correlation metadata, falling back to the task ID."""
+    for key in ("correlation_id", "request_id", "run_id", "rid"):
+        candidate = task.metadata.get(key)
+        if (
+            isinstance(candidate, str)
+            and candidate
+            and candidate == candidate.strip()
+            and len(candidate) <= 128
+        ):
+            return candidate
+    return task.task_id
 
 
 class AgentPool:
@@ -146,6 +160,7 @@ class AgentPool:
             self._bus.emit(
                 "agents.task.assigned",
                 {"agent_id": agent_id, "task_id": task.task_id},
+                correlation_id=_task_correlation_id(task),
             )
 
         return True
@@ -239,18 +254,18 @@ class Coordinator:
 
     Agent selection/capacity remains local to :class:`AgentPool`. When a local
     handler is registered, its execution and terminal state are owned by
-    :class:`CanonicalOrchestrator`; ``TaskStatus`` is only a compatibility
+    :class:`ObservableOrchestrator`; ``TaskStatus`` is only a compatibility
     projection of the resulting ``RunRecord``.
     """
 
     def __init__(self, pool: Optional[AgentPool] = None, bus: Optional[EventBus] = None):
-        self.pool = pool or AgentPool(bus=bus)
-        self._bus = bus
         self._tasks: Dict[str, Task] = {}
         self._handlers: Dict[str, Callable[[Task], Any]] = {}
         self._runs: Dict[str, RunRecord] = {}
         self._tools = ToolRegistry()
-        self._orchestrator = CanonicalOrchestrator(tools=self._tools)
+        self._orchestrator = ObservableOrchestrator(tools=self._tools, event_bus=bus)
+        self._bus = self._orchestrator.event_bus
+        self.pool = pool or AgentPool(bus=self._bus)
         self._registered_tool_types: Set[str] = set()
         self._stats = {"dispatched": 0, "completed": 0, "failed": 0}
 
@@ -329,15 +344,15 @@ class Coordinator:
         return task
 
     def _emit_dispatch(self, task: Task) -> None:
-        if self._bus:
-            self._bus.emit(
-                "agents.coordinator.dispatched",
-                {
-                    "task_id": task.task_id,
-                    "agent_id": task.agent_id,
-                    "status": task.status.name,
-                },
-            )
+        self._bus.emit(
+            "agents.coordinator.dispatched",
+            {
+                "task_id": task.task_id,
+                "agent_id": task.agent_id,
+                "status": task.status.name,
+            },
+            correlation_id=_task_correlation_id(task),
+        )
 
     def _project_run(self, task: Task, record: RunRecord) -> None:
         if record.status is RunStatus.COMPLETED:
@@ -365,7 +380,7 @@ class Coordinator:
     ) -> Task:
         """Dispatch a task without starting a nested event loop.
 
-        Registered local handlers execute through ``CanonicalOrchestrator``.
+        Registered local handlers execute through ``ObservableOrchestrator``.
         Tasks with no local handler preserve the historical externally-executed
         behavior and remain ``RUNNING`` after pool assignment.
         """
@@ -387,6 +402,7 @@ class Coordinator:
             record = await self._orchestrator.run(
                 _CoordinatorDriver(task.task_id, task_type),
                 run_id=task.task_id,
+                correlation_id=_task_correlation_id(task),
             )
             self._runs[task.task_id] = record
             self._project_run(task, record)
