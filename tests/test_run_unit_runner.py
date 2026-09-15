@@ -18,6 +18,19 @@ class _Probe:
         _raise_nested()
 
 
+class _DescriptorProbe:
+    def test_instance(self) -> str:
+        return "instance"
+
+    @staticmethod
+    def test_static() -> str:
+        return "static"
+
+    @classmethod
+    def test_class(cls) -> type:
+        return cls
+
+
 class _AsyncProbe:
     def __init__(self) -> None:
         self.ran = False
@@ -80,6 +93,33 @@ def test_test_methods_get_fresh_instances() -> None:
     assert len({id(owner) for owner in owners}) == len(owners)
 
 
+def test_static_and_class_methods_are_not_silently_dropped() -> None:
+    methods = dict(runner._iter_test_methods(_DescriptorProbe))
+    assert set(methods) == {"test_instance", "test_static", "test_class"}
+    assert methods["test_instance"]() == "instance"
+    assert methods["test_static"]() == "static"
+    assert methods["test_class"]() is _DescriptorProbe
+
+
+def test_module_level_functions_are_collected_but_imports_are_not() -> None:
+    mod = ModuleType("runner_module_probe")
+
+    def test_local() -> str:
+        return "local"
+
+    def test_imported() -> str:
+        return "imported"
+
+    test_local.__module__ = mod.__name__
+    test_imported.__module__ = "some_other_module"
+    mod.test_local = test_local
+    mod.test_imported = test_imported
+
+    functions = dict(runner._iter_module_test_functions(mod))
+    assert set(functions) == {"test_local"}
+    assert functions["test_local"]() == "local"
+
+
 def test_awaitable_test_result_is_executed_to_completion() -> None:
     probe = _AsyncProbe()
     runner._invoke_test(probe.test_async_success)
@@ -111,6 +151,26 @@ def test_system_exit_zero_is_recorded_as_failure(monkeypatch, capsys) -> None:
     assert runner.main() == 1
     out = capsys.readouterr().out
     assert "FAIL TestExit test_exit_zero SystemExit 0" in out
+    assert "RESULT 0 ok 1 fail 0 superseded" in out
+
+
+def test_module_level_failure_changes_main_exit_status(monkeypatch, capsys) -> None:
+    probe = ModuleType("runner_module_failure")
+
+    def test_failure() -> None:
+        raise AssertionError("module-regression")
+
+    test_failure.__module__ = probe.__name__
+    probe.test_failure = test_failure
+    empty = ModuleType("runner_empty_probe")
+    monkeypatch.setattr(runner, "f", probe)
+    monkeypatch.setattr(runner, "j", empty)
+    monkeypatch.setattr(runner, "c", empty)
+    monkeypatch.setattr(runner, "x", empty)
+
+    assert runner.main() == 1
+    out = capsys.readouterr().out
+    assert "FAIL runner_module_failure test_failure AssertionError module-regression" in out
     assert "RESULT 0 ok 1 fail 0 superseded" in out
 
 
