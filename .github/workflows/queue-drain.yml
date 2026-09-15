@@ -18,8 +18,7 @@ permissions:
 
 jobs:
   drain:
-    # Use the ARM hosted pool so queue recovery is not forced to wait behind
-    # the saturated ubuntu-latest pool it is trying to repair.
+    # Keep recovery off the saturated x64 pool.
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     env:
@@ -27,7 +26,7 @@ jobs:
       REPO: ${{ github.repository }}
       CURRENT_RUN_ID: ${{ github.run_id }}
     steps:
-      - name: Cancel stale and superseded queued runs
+      - name: Cancel stale active runs and superseded queued runs
         shell: bash
         run: |
           set -euo pipefail
@@ -79,14 +78,14 @@ jobs:
                       return 0, None
               return 0, None
 
-          def list_pages(path, item_key, *, max_pages=100):
+          def list_collection(path, key=None, max_pages=100):
               out = []
               for page in range(1, max_pages + 1):
                   sep = '&' if '?' in path else '?'
                   status, payload = request_json(f'{path}{sep}per_page=100&page={page}')
-                  if status != 200 or not isinstance(payload, (dict, list)):
-                      raise RuntimeError(f'failed to list {path} page {page}: HTTP {status}')
-                  items = payload if isinstance(payload, list) else (payload.get(item_key) or [])
+                  if status != 200:
+                      raise RuntimeError(f'failed listing {path} page {page}: HTTP {status}')
+                  items = payload if isinstance(payload, list) else (payload.get(key) or [])
                   out.extend(items)
                   if len(items) < 100:
                       break
@@ -95,10 +94,10 @@ jobs:
           def live_state():
               branches = {
                   item.get('name')
-                  for item in list_pages(f'/repos/{repo}/branches', '')
+                  for item in list_collection(f'/repos/{repo}/branches', max_pages=20)
                   if item.get('name')
               }
-              pulls = list_pages(f'/repos/{repo}/pulls?state=open', '')
+              pulls = list_collection(f'/repos/{repo}/pulls?state=open', max_pages=10)
               open_numbers = {int(pr['number']) for pr in pulls if pr.get('number') is not None}
               open_heads = {
                   (pr.get('head') or {}).get('ref')
@@ -107,15 +106,17 @@ jobs:
               }
               return branches, open_numbers, open_heads
 
-          def queued_window():
-              # GitHub caps this listing to the newest 1,000 results. Repeated
-              # sweeps expose older entries as stale runs are cancelled.
+          def list_runs(status_name, max_pages=10):
               runs = []
-              for page in range(1, 11):
-                  query = urllib.parse.urlencode({'status': 'queued', 'per_page': 100, 'page': page})
+              for page in range(1, max_pages + 1):
+                  query = urllib.parse.urlencode({
+                      'status': status_name,
+                      'per_page': 100,
+                      'page': page,
+                  })
                   status, payload = request_json(f'/repos/{repo}/actions/runs?{query}')
                   if status != 200 or not isinstance(payload, dict):
-                      raise RuntimeError(f'failed to list queued runs page {page}: HTTP {status}')
+                      raise RuntimeError(f'failed listing {status_name} runs page {page}: HTTP {status}')
                   batch = payload.get('workflow_runs') or []
                   runs.extend(batch)
                   if len(batch) < 100:
@@ -126,56 +127,26 @@ jobs:
               match = re.fullmatch(r'refs/pull/(\d+)/(?:head|merge)', branch or '')
               return int(match.group(1)) if match else None
 
-          def classify(runs, branches, open_numbers, open_heads):
-              seen = set()
-              keep = []
-              cancel = []
-              for run in sorted(runs, key=lambda r: r.get('created_at') or '', reverse=True):
-                  run_id = int(run['id'])
-                  workflow_id = int(run.get('workflow_id') or 0)
-                  branch = run.get('head_branch') or ''
-                  event = run.get('event') or ''
-                  key = (workflow_id, branch, event)
-                  linked_prs = {
-                      int(pr['number'])
-                      for pr in (run.get('pull_requests') or [])
-                      if pr.get('number') is not None
-                  }
-
-                  stale = False
-                  reason = ''
-                  if run_id == current:
-                      keep.append(run)
-                      seen.add(key)
-                      continue
-
-                  if event in {'pull_request', 'pull_request_target'}:
-                      if linked_prs:
-                          stale = linked_prs.isdisjoint(open_numbers)
-                      else:
-                          stale = branch not in open_heads
-                      if stale:
-                          reason = 'closed-pr'
-                  elif event == 'dynamic':
-                      pr_number = pull_number_from_ref(branch)
-                      if pr_number is not None and pr_number not in open_numbers:
-                          stale = True
-                          reason = 'closed-dynamic-pr'
-                  elif event == 'push':
-                      if branch and branch != 'main' and branch not in branches:
-                          stale = True
-                          reason = 'deleted-branch'
-
-                  if stale:
-                      run['_drain_reason'] = reason
-                      cancel.append(run)
-                  elif key in seen:
-                      run['_drain_reason'] = 'superseded-duplicate'
-                      cancel.append(run)
-                  else:
-                      seen.add(key)
-                      keep.append(run)
-              return keep, cancel
+          def stale_reason(run, branches, open_numbers, open_heads):
+              if int(run['id']) == current:
+                  return None
+              event = run.get('event') or ''
+              branch = run.get('head_branch') or ''
+              linked_prs = {
+                  int(pr['number'])
+                  for pr in (run.get('pull_requests') or [])
+                  if pr.get('number') is not None
+              }
+              if event in {'pull_request', 'pull_request_target'}:
+                  stale = linked_prs.isdisjoint(open_numbers) if linked_prs else branch not in open_heads
+                  return 'closed-pr' if stale else None
+              if event == 'dynamic':
+                  pr_number = pull_number_from_ref(branch)
+                  if pr_number is not None and pr_number not in open_numbers:
+                      return 'closed-dynamic-pr'
+              if event == 'push' and branch and branch != 'main' and branch not in branches:
+                  return 'deleted-branch'
+              return None
 
           def cancel_one(run):
               run_id = int(run['id'])
@@ -185,38 +156,13 @@ jobs:
               )
               return run_id, status, run.get('_drain_reason') or '', run.get('name') or '', run.get('head_branch') or ''
 
-          inspected_total = 0
-          selected_total = 0
-          accepted_total = 0
-          moved_total = 0
-          failed_total = 0
-          reason_totals = {}
-
-          for sweep in range(1, 7):
-              branches, open_numbers, open_heads = live_state()
-              queued = queued_window()
-              inspected_total += len(queued)
-              if not queued:
-                  print(f'sweep {sweep}: queue empty')
-                  break
-
-              keep, cancel = classify(queued, branches, open_numbers, open_heads)
-              print(
-                  f'sweep {sweep}: inspected={len(queued)} preserved={len(keep)} '
-                  f'selected={len(cancel)} branches={len(branches)} open_prs={len(open_numbers)}'
-              )
-              if not cancel:
-                  print('no stale or duplicate runs found in current 1,000-run window')
-                  break
-
-              selected_total += len(cancel)
-              for run in cancel:
-                  reason = run.get('_drain_reason') or 'unknown'
-                  reason_totals[reason] = reason_totals.get(reason, 0) + 1
-
+          def cancel_batch(runs, label):
               accepted = moved = failed = 0
+              if not runs:
+                  print(f'{label}: nothing selected')
+                  return accepted, moved, failed
               with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-                  futures = [pool.submit(cancel_one, run) for run in cancel]
+                  futures = [pool.submit(cancel_one, run) for run in runs]
                   for index, future in enumerate(concurrent.futures.as_completed(futures), 1):
                       run_id, status, reason, name, branch = future.result()
                       if status in {200, 202}:
@@ -225,45 +171,115 @@ jobs:
                           moved += 1
                       else:
                           failed += 1
-                          print(
-                              f'cancel failed: id={run_id} status={status} reason={reason} '
-                              f'name={name} branch={branch}'
-                          )
+                          print(f'cancel failed: id={run_id} status={status} reason={reason} name={name} branch={branch}')
                       if index % 100 == 0 or index == len(futures):
-                          print(
-                              f'sweep {sweep}: processed {index}/{len(futures)}; '
-                              f'accepted={accepted} moved={moved} failed={failed}'
-                          )
+                          print(f'{label}: processed {index}/{len(futures)} accepted={accepted} moved={moved} failed={failed}')
+              return accepted, moved, failed
 
-              accepted_total += accepted
-              moved_total += moved
-              failed_total += failed
+          branches, open_numbers, open_heads = live_state()
+          print(f'live state: branches={len(branches)} open_prs={len(open_numbers)}')
 
-              if failed > max(10, len(cancel) // 20):
-                  raise SystemExit(f'too many cancellation failures in sweep {sweep}: {failed}')
+          totals = {
+              'active_selected': 0,
+              'queued_selected': 0,
+              'accepted': 0,
+              'moved': 0,
+              'failed': 0,
+          }
+          reasons = {}
+
+          # First free execution slots. Only stale active runs are cancelled;
+          # live main/existing-branch work is never cancelled here.
+          active = list_runs('in_progress', max_pages=10)
+          stale_active = []
+          for run in active:
+              reason = stale_reason(run, branches, open_numbers, open_heads)
+              if reason:
+                  run['_drain_reason'] = 'active-' + reason
+                  stale_active.append(run)
+                  reasons['active-' + reason] = reasons.get('active-' + reason, 0) + 1
+          totals['active_selected'] = len(stale_active)
+          a, m, f = cancel_batch(stale_active, 'active')
+          totals['accepted'] += a
+          totals['moved'] += m
+          totals['failed'] += f
+          time.sleep(2)
+
+          # Then peel the newest 1,000 queued runs repeatedly. Preserve the
+          # newest run for each workflow/ref/event tuple, plus all live PR and
+          # existing-branch work.
+          for sweep in range(1, 9):
+              if sweep in {1, 5}:
+                  branches, open_numbers, open_heads = live_state()
+              queued = list_runs('queued', max_pages=10)
+              if not queued:
+                  print(f'queue sweep {sweep}: queue empty')
+                  break
+
+              seen = set()
+              selected = []
+              preserved = 0
+              for run in sorted(queued, key=lambda r: r.get('created_at') or '', reverse=True):
+                  if int(run['id']) == current:
+                      preserved += 1
+                      continue
+                  workflow_id = int(run.get('workflow_id') or 0)
+                  branch = run.get('head_branch') or ''
+                  event = run.get('event') or ''
+                  key = (workflow_id, branch, event)
+                  reason = stale_reason(run, branches, open_numbers, open_heads)
+                  if reason:
+                      run['_drain_reason'] = reason
+                      selected.append(run)
+                      reasons[reason] = reasons.get(reason, 0) + 1
+                  elif key in seen:
+                      run['_drain_reason'] = 'superseded-duplicate'
+                      selected.append(run)
+                      reasons['superseded-duplicate'] = reasons.get('superseded-duplicate', 0) + 1
+                  else:
+                      seen.add(key)
+                      preserved += 1
+
+              print(f'queue sweep {sweep}: inspected={len(queued)} preserved={preserved} selected={len(selected)}')
+              if not selected:
+                  break
+              totals['queued_selected'] += len(selected)
+              a, m, f = cancel_batch(selected, f'queue sweep {sweep}')
+              totals['accepted'] += a
+              totals['moved'] += m
+              totals['failed'] += f
+              if f > max(10, len(selected) // 20):
+                  raise SystemExit(f'too many cancellation failures in sweep {sweep}: {f}')
               time.sleep(2)
 
-          status, final_payload = request_json(
+          status, payload = request_json(
               f'/repos/{repo}/actions/runs?' + urllib.parse.urlencode({'status': 'queued', 'per_page': 1})
           )
-          remaining = final_payload.get('total_count') if status == 200 and isinstance(final_payload, dict) else None
+          remaining = payload.get('total_count') if status == 200 and isinstance(payload, dict) else None
+          status, active_payload = request_json(
+              f'/repos/{repo}/actions/runs?' + urllib.parse.urlencode({'status': 'in_progress', 'per_page': 1})
+          )
+          active_remaining = active_payload.get('total_count') if status == 200 and isinstance(active_payload, dict) else None
 
-          print(f'accepted cancellations total: {accepted_total}')
-          print(f'already moved/completed total: {moved_total}')
-          print(f'failed cancellations total: {failed_total}')
-          print(f'queue remaining reported by GitHub: {remaining}')
-          print(f'cancellation reasons: {json.dumps(reason_totals, sort_keys=True)}')
+          print(f'totals: {json.dumps(totals, sort_keys=True)}')
+          print(f'reasons: {json.dumps(reasons, sort_keys=True)}')
+          print(f'queued remaining: {remaining}')
+          print(f'in-progress remaining: {active_remaining}')
 
           summary = os.environ.get('GITHUB_STEP_SUMMARY')
           if summary:
               with open(summary, 'a', encoding='utf-8') as fh:
-                  fh.write('## Actions queue drain\n')
-                  fh.write(f'- Queue windows inspected across sweeps: {inspected_total}\n')
-                  fh.write(f'- Stale/superseded runs selected: {selected_total}\n')
-                  fh.write(f'- Cancel requests accepted: {accepted_total}\n')
-                  fh.write(f'- Already moved/completed: {moved_total}\n')
-                  fh.write(f'- Cancellation failures after retries: {failed_total}\n')
-                  fh.write(f'- Queue remaining reported by GitHub: {remaining}\n')
-                  fh.write(f'- Reasons: `{json.dumps(reason_totals, sort_keys=True)}`\n')
-                  fh.write('- Safety: open PRs, existing branches, main, and newest workflow/ref/event runs are preserved.\n')
+                  fh.write('## Actions backlog recovery\n')
+                  fh.write(f"- Stale in-progress runs selected: {totals['active_selected']}\n")
+                  fh.write(f"- Queued stale/superseded runs selected: {totals['queued_selected']}\n")
+                  fh.write(f"- Cancel requests accepted: {totals['accepted']}\n")
+                  fh.write(f"- Already moved/completed: {totals['moved']}\n")
+                  fh.write(f"- Cancellation failures: {totals['failed']}\n")
+                  fh.write(f'- Queued runs remaining: {remaining}\n')
+                  fh.write(f'- In-progress runs remaining: {active_remaining}\n')
+                  fh.write(f'- Reasons: `{json.dumps(reasons, sort_keys=True)}`\n')
+                  fh.write('- Safety: open PRs, existing branches, current main work, and newest workflow/ref/event runs are preserved.\n')
+
+          if totals['failed'] > max(10, (totals['active_selected'] + totals['queued_selected']) // 20):
+              raise SystemExit(f"too many cancellation failures: {totals['failed']}")
           PY
