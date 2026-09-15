@@ -66,7 +66,7 @@ def dotted_name(node: ast.AST) -> str | None:
         current = current.value
     if isinstance(current, ast.Name):
         parts.append(current.id)
-        return ".".join(reversed(parts))
+        return "."join(reversed(parts))
     return None
 
 
