@@ -1,0 +1,143 @@
+name: Current Main Repair
+
+on:
+  push:
+    branches:
+      - resolve/current-main-ci-security-consolidation-20260915
+    paths:
+      - .github/workflows/current-main-repair.yml
+
+permissions:
+  contents: read
+
+jobs:
+  repair:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: true
+          ref: ${{ github.ref_name }}
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Apply constrained baseline repairs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          # 1) Dataclass MappingProxyType defaults must use factories on Python 3.11+.
+          targets = {
+              Path("skeleton/frontier/commerce.py"): (
+                  "from dataclasses import dataclass, replace",
+                  "from dataclasses import dataclass, field, replace",
+              ),
+              Path("skeleton/frontier/encyclopedia.py"): (
+                  "from dataclasses import dataclass",
+                  "from dataclasses import dataclass, field",
+              ),
+              Path("skeleton/frontier/tournament.py"): (
+                  "from dataclasses import dataclass, replace",
+                  "from dataclasses import dataclass, field, replace",
+              ),
+          }
+          field_default = re.compile(
+              r"^(\s*[A-Za-z_]\w*:\s*Mapping\[[^\n]+\]\s*=\s*)"
+              r"MappingProxyType\(\{\}\)\s*$",
+              re.MULTILINE,
+          )
+          total = 0
+          for path, (old_import, new_import) in targets.items():
+              text = path.read_text(encoding="utf-8")
+              if old_import not in text and new_import not in text:
+                  raise SystemExit(f"unexpected dataclasses import in {path}")
+              text = text.replace(old_import, new_import, 1)
+              text, count = field_default.subn(
+                  r"\1field(default_factory=lambda: MappingProxyType({}))",
+                  text,
+              )
+              if count == 0:
+                  raise SystemExit(f"no MappingProxyType dataclass defaults found in {path}")
+              total += count
+              path.write_text(text, encoding="utf-8")
+              print(f"{path}: repaired {count} default(s)")
+          if total < 3:
+              raise SystemExit(f"expected at least 3 immutable-default repairs, got {total}")
+
+          # 2) Keep fish family counters from colliding with canonical location counters.
+          adapter = Path("skeleton/frontier/biotope_achievement_adapters.py")
+          text = adapter.read_text(encoding="utf-8")
+          old = '    for family in families:\n        increment(f"{family}_catches")\n'
+          new = (
+              '    for family in families:\n'
+              '        # A fish-id family token may equal its biotope/stage name. Avoid\n'
+              '        # double-counting the canonical location counter in that case.\n'
+              '        if family in {biotope, stage}:\n'
+              '            continue\n'
+              '        increment(f"{family}_catches")\n'
+          )
+          if old not in text:
+              raise SystemExit("expected family counter loop not found")
+          adapter.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          # 3) The branch-prune workflow needs write permission only on its mutating job.
+          prune = Path(".github/workflows/branch-prune-arm.yml")
+          text = prune.read_text(encoding="utf-8")
+          old = "permissions:\n  contents: write\n\njobs:\n  consolidate-and-prune:\n"
+          new = (
+              "permissions:\n  contents: read\n\njobs:\n"
+              "  consolidate-and-prune:\n"
+              "    permissions:\n      contents: write\n"
+          )
+          if old not in text:
+              raise SystemExit("expected branch-prune permission block not found")
+          prune.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          # 4) Gate Boundary imports FastAPI through skeleton.api during collection.
+          gate = Path(".github/workflows/gate-boundary-security.yml")
+          text = gate.read_text(encoding="utf-8")
+          old = 'run: python -m pip install "pytest>=8,<9" "starlette>=0.27,<1" "pydantic>=2.0,<3" "pydantic-settings>=2.0,<3"'
+          new = (
+              'run: python -m pip install "pytest>=8,<9" "starlette>=0.27,<1" '
+              '"fastapi>=0.100,<1" "pydantic>=2.0,<3" "pydantic-settings>=2.0,<3"'
+          )
+          if old not in text:
+              raise SystemExit("expected Gate Boundary dependency command not found")
+          gate.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          Path(".github/workflows/current-main-repair.yml").unlink()
+          print(f"repaired {total} frontier defaults plus counter/workflow boundaries")
+          PY
+
+      - name: Install validation runtime
+        run: python -m pip install --disable-pip-version-check -e . "pytest>=8,<10" pytest-asyncio
+
+      - name: Validate repaired contracts
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m compileall -q skeleton/frontier
+          python scripts/check_workflow_security.py
+          python -m pytest -q skeleton/testing/test_gate_policy_boundaries.py
+          python -m pytest -q skeleton/testing/test_frontier_*.py
+
+      - name: Commit validated repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            skeleton/frontier/commerce.py \
+            skeleton/frontier/encyclopedia.py \
+            skeleton/frontier/tournament.py \
+            skeleton/frontier/biotope_achievement_adapters.py \
+            .github/workflows/branch-prune-arm.yml \
+            .github/workflows/gate-boundary-security.yml \
+            .github/workflows/current-main-repair.yml
+          git commit -s -m "fix(ci): repair current-main security and frontier gates"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
