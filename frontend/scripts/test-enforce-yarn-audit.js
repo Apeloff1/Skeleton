@@ -9,7 +9,7 @@ const path = require('path');
 const policy = path.join(__dirname, 'enforce-yarn-audit.js');
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'yarn-audit-policy-'));
 
-const summary = (high = 0, critical = 0) => ({
+const summary = (high = 0, critical = 0, overrides = {}) => ({
   type: 'auditSummary',
   data: {
     vulnerabilities: {
@@ -18,6 +18,7 @@ const summary = (high = 0, critical = 0) => ({
       moderate: 0,
       high,
       critical,
+      ...overrides,
     },
     dependencies: 1,
     devDependencies: 0,
@@ -76,9 +77,20 @@ function expectFail(name, lines, status) {
 
 try {
   expectPass('clean', [JSON.stringify(summary())], 0);
+  expectPass(
+    'moderate-only-mask',
+    [JSON.stringify(summary(0, 0, { moderate: 2 }))],
+    4,
+  );
+  expectPass(
+    'lower-severity-combined-mask',
+    [JSON.stringify(summary(0, 0, { info: 1, moderate: 2 }))],
+    5,
+  );
 
   expectFail('empty', [], 1);
   expectFail('malformed-json', ['{not-json'], 1);
+  expectFail('status-outside-yarn-mask', [JSON.stringify(summary())], 32);
   expectFail(
     'audit-error-record',
     [JSON.stringify({ type: 'error', data: 'registry unavailable' }), JSON.stringify(summary())],
@@ -90,14 +102,44 @@ try {
     8,
   );
   expectFail(
-    'status-without-blocking-summary',
-    [JSON.stringify(summary())],
+    'duplicate-summary',
+    [JSON.stringify(summary()), JSON.stringify(summary())],
+    0,
+  );
+  expectFail(
+    'negative-summary-count',
+    [JSON.stringify(summary(0, 0, { moderate: -1 }))],
+    0,
+  );
+  expectFail(
+    'fractional-summary-count',
+    [JSON.stringify(summary(0, 0, { low: 0.5 }))],
+    0,
+  );
+  expectFail(
+    'string-summary-count',
+    [JSON.stringify(summary(0, 0, { high: '0' }))],
+    0,
+  );
+  expectFail(
+    'status-summary-mask-mismatch',
+    [JSON.stringify(summary(0, 0, { moderate: 1 }))],
     8,
   );
   expectFail(
     'summary-without-advisory-detail',
     [JSON.stringify(summary(1, 0))],
     8,
+  );
+  expectFail(
+    'malformed-advisory',
+    [JSON.stringify({ type: 'auditAdvisory', data: {} }), JSON.stringify(summary())],
+    0,
+  );
+  expectFail(
+    'unknown-advisory-severity',
+    [JSON.stringify(advisory({ severity: 'severe' })), JSON.stringify(summary())],
+    0,
   );
   expectFail(
     'zero-status-with-blocking-summary',
