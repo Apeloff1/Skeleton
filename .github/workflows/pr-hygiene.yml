@@ -52,7 +52,7 @@ jobs:
           grep -Eq '^\.github/|^scripts/' "$files" && desired+=(area/automation) || true
           grep -Eqi '(^|/)(docs?|documentation)/|(^|/)(README|CONTRIBUTING|SECURITY|CODE_OF_CONDUCT)(\.|$)|\.md$' "$files" && desired+=(area/docs) || true
           grep -Eqi '(^|/)(Dockerfile|docker-compose[^/]*\.ya?ml)$|(^|/)(infra|infrastructure|deploy|deployment)/' "$files" && desired+=(area/infrastructure) || true
-          grep -Eqi '(^|/)(package(-lock)?\.json|yarn\.lock|pnpm-lock\.ya?ml|requirements[^/]*\.txt|pyproject\.toml|uv\.lock|poetry\.lock|Pipfile(\.lock)?|Dockerfile)$|^\.github/dependabot\.yml$' "$files" && desired+=(change/dependencies) || true
+          grep -Eqi '(^|/)(package(-lock)?\.json|yarn\.lock|pnpm-lock\.ya?ml|requirements[^/]*\.txt|requirements\.snapshot|pyproject\.toml|uv\.lock|poetry\.lock|Pipfile(\.lock)?|Dockerfile)$|^\.github/dependabot\.yml$' "$files" && desired+=(change/dependencies) || true
           grep -Eqi '^\.github/workflows/|(^|/)(auth|security|crypto|migrations?|infra|infrastructure|deploy|deployment)(/|$)|(^|/)Dockerfile$' "$files" && desired+=(risk/high) || true
 
           managed=(size/xs size/s size/m size/l size/xl area/backend area/frontend area/core area/tests area/automation area/docs area/infrastructure change/dependencies risk/high)
@@ -76,26 +76,62 @@ jobs:
             esac
           }
 
+          # Labels are metadata, not a merge-safety gate. Some GitHub App/token
+          # configurations report Issues: write yet still reject repository-label
+          # creation or PR label replacement with HTTP 403. Treat that as a
+          # degraded annotation path instead of failing the whole PR check.
           existing=$(gh api --paginate "/repos/${REPO}/labels?per_page=100" --jq '.[].name')
+          create_failures=0
           for label in "${desired[@]}"; do
             if ! grep -Fxq "$label" <<<"$existing"; then
               IFS=$'\t' read -r color description < <(label_spec "$label")
-              gh label create "$label" --repo "$REPO" --color "$color" --description "$description" --force >/dev/null
+              if gh label create "$label" --repo "$REPO" --color "$color" --description "$description" >/dev/null 2>&1; then
+                existing+=$'\n'"$label"
+              else
+                create_failures=$((create_failures + 1))
+                echo "::warning::PR hygiene could not create label '$label'; classification will continue without it."
+              fi
+            fi
+          done
+
+          available_desired=()
+          unavailable_desired=()
+          for label in "${desired[@]}"; do
+            if grep -Fxq "$label" <<<"$existing"; then
+              available_desired+=("$label")
+            else
+              unavailable_desired+=("$label")
             fi
           done
 
           current=$(gh api "/repos/${REPO}/issues/${PR}/labels?per_page=100")
           current_names=$(jq '[.[].name]' <<<"$current")
           managed_json=$(printf '%s\n' "${managed[@]}" | jq -R . | jq -s .)
-          desired_json=$(printf '%s\n' "${desired[@]}" | jq -R . | jq -s 'unique')
+          if ((${#available_desired[@]})); then
+            desired_json=$(printf '%s\n' "${available_desired[@]}" | jq -R . | jq -s 'unique')
+          else
+            desired_json='[]'
+          fi
           payload=$(jq -n --argjson current "$current_names" --argjson managed "$managed_json" --argjson desired "$desired_json" '{labels: (($current - $managed + $desired) | unique)}')
-          printf '%s' "$payload" | gh api --method PUT "/repos/${REPO}/issues/${PR}/labels" --input - >/dev/null
+
+          label_write='applied'
+          if ! printf '%s' "$payload" | gh api --method PUT "/repos/${REPO}/issues/${PR}/labels" --input - >/dev/null 2>&1; then
+            label_write='permission-degraded'
+            echo '::warning::PR hygiene could not replace managed PR labels; merge-safety checks remain unaffected.'
+          fi
 
           {
             echo '## PR hygiene'
             echo "- Changed lines: $changed (+$additions / -$deletions)"
-            echo '- Managed labels:'
+            echo "- Label write status: $label_write"
+            echo "- Label creation failures: $create_failures"
+            echo '- Desired managed labels:'
             printf '%s\n' "${desired[@]}" | sort -u | sed 's/^/  - `/' | sed 's/$/`/'
-            echo '- Manual labels are preserved.'
+            if ((${#unavailable_desired[@]})); then
+              echo '- Unavailable labels skipped:'
+              printf '%s\n' "${unavailable_desired[@]}" | sort -u | sed 's/^/  - `/' | sed 's/$/`/'
+            fi
+            echo '- Manual labels are preserved whenever label mutation is available.'
             echo '- Pull-request code was not checked out or executed.'
+            echo '- Label/API permission failures are annotations only and do not block branch flow.'
           } >> "$GITHUB_STEP_SUMMARY"
