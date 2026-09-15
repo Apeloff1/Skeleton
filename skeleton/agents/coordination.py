@@ -68,6 +68,10 @@ class AgentPool:
     def __init__(self, max_agents: int = 16, bus: Optional[EventBus] = None):
         self.max_agents = max_agents
         self._agents: Dict[str, Dict[str, Any]] = {}
+        # Capacity ownership is keyed by logical task ID, not Task object
+        # identity. This prevents two independently-created Task instances with
+        # the same ID from consuming multiple agent slots.
+        self._task_owners: Dict[str, str] = {}
         self._bus = bus
         self._stats = {"created": 0, "destroyed": 0, "tasks_assigned": 0}
 
@@ -98,14 +102,18 @@ class AgentPool:
         return agent_id
 
     def assign(self, agent_id: str, task: Task) -> bool:
-        """Assign a pending, unowned task to an agent."""
+        """Assign a pending, globally-unowned task to an agent."""
         if agent_id not in self._agents:
             return False
 
-        # A Task represents one unit of work and may only own one agent slot.
-        # Re-accepting an already-running/owned Task duplicates its task ID and
-        # increments pool load again, leaving phantom capacity after release.
-        if task.status is not TaskStatus.PENDING or task.agent_id is not None:
+        # A logical task may own exactly one agent slot. Object-local state
+        # prevents reuse of the same Task instance, while the owner registry
+        # closes the distinct-object/same-task-id duplication path.
+        if (
+            task.status is not TaskStatus.PENDING
+            or task.agent_id is not None
+            or task.task_id in self._task_owners
+        ):
             return False
 
         agent = self._agents[agent_id]
@@ -114,6 +122,7 @@ class AgentPool:
 
         agent["tasks"].append(task.task_id)
         agent["load"] += 1
+        self._task_owners[task.task_id] = agent_id
         task.agent_id = agent_id
         task.status = TaskStatus.RUNNING
         self._stats["tasks_assigned"] += 1
@@ -127,12 +136,19 @@ class AgentPool:
         return True
 
     def release(self, agent_id: str, task_id: str) -> None:
-        """Release a completed task from an agent."""
-        if agent_id in self._agents:
-            agent = self._agents[agent_id]
-            if task_id in agent["tasks"]:
-                agent["tasks"].remove(task_id)
-                agent["load"] = max(0, agent["load"] - 1)
+        """Release a task only from the agent that currently owns its slot."""
+        if self._task_owners.get(task_id) != agent_id:
+            return
+        if agent_id not in self._agents:
+            return
+
+        agent = self._agents[agent_id]
+        if task_id not in agent["tasks"]:
+            return
+
+        agent["tasks"].remove(task_id)
+        agent["load"] = max(0, agent["load"] - 1)
+        self._task_owners.pop(task_id, None)
 
     def find_capable(self, specialisation: str) -> List[str]:
         """Find available agents with a given specialisation, sorted by load."""
@@ -146,10 +162,15 @@ class AgentPool:
         return [aid for aid, _ in capable]
 
     def destroy(self, agent_id: str) -> None:
-        """Remove an agent from the pool."""
-        if agent_id in self._agents:
-            del self._agents[agent_id]
-            self._stats["destroyed"] += 1
+        """Remove an agent and release ownership of every slot it held."""
+        agent = self._agents.pop(agent_id, None)
+        if agent is None:
+            return
+
+        for task_id in tuple(agent["tasks"]):
+            if self._task_owners.get(task_id) == agent_id:
+                self._task_owners.pop(task_id, None)
+        self._stats["destroyed"] += 1
 
     def stats(self) -> Dict[str, Any]:
         return {
