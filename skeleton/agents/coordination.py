@@ -109,11 +109,12 @@ class AgentPool:
                 agent["load"] = max(0, agent["load"] - 1)
 
     def find_capable(self, specialisation: str) -> List[str]:
-        """Find agents with a given specialisation, sorted by load."""
+        """Find available agents with a given specialisation, sorted by load."""
         capable = [
             (aid, agent["load"])
             for aid, agent in self._agents.items()
             if specialisation in agent["specialisations"]
+            and agent["load"] < agent["capacity"]
         ]
         capable.sort(key=lambda x: x[1])
         return [aid for aid, _ in capable]
@@ -157,28 +158,32 @@ class Coordinator:
         )
         self._tasks[task.task_id] = task
 
-        # Find capable agent
         spec = specialisation or task_type
         candidates = self.pool.find_capable(spec)
 
-        if not candidates:
-            # Create a new agent if pool has capacity
+        # Capacity can change between discovery and assignment. Try every
+        # currently available candidate before expanding the pool.
+        assigned = False
+        for agent_id in candidates:
+            if self.pool.assign(agent_id, task):
+                assigned = True
+                break
+
+        if not assigned:
             try:
                 agent_id = self.pool.create({spec})
-                candidates = [agent_id]
             except RuntimeError:
                 task.status = TaskStatus.FAILED
                 task.error = f"No agents available for specialisation: {spec}"
                 self._stats["failed"] += 1
                 return task
 
-        # Assign to least loaded capable agent
-        assigned = self.pool.assign(candidates[0], task)
-        if not assigned:
-            task.status = TaskStatus.FAILED
-            task.error = "Agent at capacity"
-            self._stats["failed"] += 1
-            return task
+            assigned = self.pool.assign(agent_id, task)
+            if not assigned:
+                task.status = TaskStatus.FAILED
+                task.error = "New agent could not accept task"
+                self._stats["failed"] += 1
+                return task
 
         self._stats["dispatched"] += 1
 
