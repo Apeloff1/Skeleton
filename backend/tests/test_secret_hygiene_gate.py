@@ -3,6 +3,7 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
+from scripts import check_secret_hygiene as secret_hygiene
 from scripts.check_secret_hygiene import violations
 
 
@@ -13,6 +14,70 @@ def _scan(tmp_path: Path, source: str) -> list[str]:
     path = tmp_path / "sample.env"
     path.write_text(source, encoding="utf-8")
     return violations(path)
+
+
+def test_read_failure_fails_closed_without_raw_exception_text(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    path = tmp_path / "blocked.env"
+    path.write_text("TOKEN=hidden\n", encoding="utf-8")
+    original_open = Path.open
+
+    def blocked_open(self: Path, *args, **kwargs):
+        if self == path:
+            raise PermissionError("sensitive filesystem detail")
+        return original_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", blocked_open)
+    findings = violations(path)
+
+    assert len(findings) == 1
+    assert "read failure: PermissionError" in findings[0]
+    assert "sensitive filesystem detail" not in findings[0]
+
+
+def test_stat_failure_does_not_drop_secret_candidate(tmp_path: Path, monkeypatch) -> None:
+    path = tmp_path / "blocked.env"
+    path.write_text("TOKEN=value\n", encoding="utf-8")
+    original_lstat = Path.lstat
+
+    def blocked_lstat(self: Path, *args, **kwargs):
+        if self == path:
+            raise PermissionError("metadata unavailable")
+        return original_lstat(self, *args, **kwargs)
+
+    monkeypatch.setattr(secret_hygiene, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(Path, "lstat", blocked_lstat)
+
+    assert path in list(secret_hygiene.candidate_files())
+
+
+def test_bounded_reader_skips_oversized_candidate(tmp_path: Path) -> None:
+    path = tmp_path / "large.env"
+    path.write_bytes(b"A" * (secret_hygiene.MAX_FILE_BYTES + 1))
+
+    assert violations(path) == []
+
+
+def test_main_fails_closed_when_no_candidates(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(secret_hygiene, "candidate_files", lambda: iter(()))
+
+    assert secret_hygiene.main() == 1
+    captured = capsys.readouterr()
+    assert "no tracked-style text files were scanned" in captured.err
+
+
+def test_main_fails_closed_on_repository_traversal_error(monkeypatch, capsys) -> None:
+    def broken_candidates():
+        raise PermissionError("sensitive traversal detail")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(secret_hygiene, "candidate_files", broken_candidates)
+
+    assert secret_hygiene.main() == 1
+    captured = capsys.readouterr()
+    assert "repository traversal failure: PermissionError" in captured.err
+    assert "sensitive traversal detail" not in captured.err
 
 
 def test_detects_private_key_material(tmp_path: Path) -> None:

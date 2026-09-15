@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+import stat
 import sys
 from typing import Iterable
 
@@ -107,19 +108,32 @@ PLACEHOLDER_MARKERS = (
 )
 
 
+def _is_text_candidate(path: Path) -> bool:
+    return path.name.startswith(".env") or path.suffix.lower() in TEXT_SUFFIXES
+
+
 def candidate_files() -> Iterable[Path]:
+    """Yield repository text candidates without silently dropping metadata failures.
+
+    Symlinks are not followed. A security-relevant path whose metadata cannot be
+    read is still yielded so ``violations`` can either scan it with a bounded read
+    or produce a fail-closed finding.
+    """
     for path in REPO_ROOT.rglob("*"):
-        if not path.is_file():
-            continue
         if any(part in SKIP_DIRS for part in path.parts):
             continue
-        try:
-            if path.stat().st_size > MAX_FILE_BYTES:
-                continue
-        except OSError:
+        if not _is_text_candidate(path):
             continue
-        if path.name.startswith(".env") or path.suffix.lower() in TEXT_SUFFIXES:
+        try:
+            metadata = path.lstat()
+        except OSError:
             yield path
+            continue
+        if not stat.S_ISREG(metadata.st_mode):
+            continue
+        if metadata.st_size > MAX_FILE_BYTES:
+            continue
+        yield path
 
 
 def _is_placeholder(candidate: str) -> bool:
@@ -129,14 +143,27 @@ def _is_placeholder(candidate: str) -> bool:
 
 def violations(path: Path) -> list[str]:
     try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeError):
-        return []
-
-    try:
         label = path.relative_to(REPO_ROOT)
     except ValueError:
         label = path
+
+    try:
+        # Bound the actual read as well as discovery-time metadata. This keeps a
+        # stat failure or size-change race from turning secret scanning into an
+        # unbounded memory read.
+        with path.open("rb") as handle:
+            raw = handle.read(MAX_FILE_BYTES + 1)
+    except OSError as exc:
+        return [f"{label}: read failure: {type(exc).__name__}"]
+
+    if len(raw) > MAX_FILE_BYTES:
+        return []
+
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeError as exc:
+        # Never echo raw decoder text/bytes into CI logs.
+        return [f"{label}: read failure: {type(exc).__name__}"]
 
     findings: list[str] = []
     for number, line in enumerate(text.splitlines(), 1):
@@ -155,9 +182,16 @@ def violations(path: Path) -> list[str]:
 def main() -> int:
     findings: list[str] = []
     scanned = 0
-    for path in candidate_files():
-        scanned += 1
-        findings.extend(violations(path))
+    try:
+        for path in candidate_files():
+            scanned += 1
+            findings.extend(violations(path))
+    except OSError as exc:
+        findings.append(f"repository traversal failure: {type(exc).__name__}")
+
+    if scanned == 0:
+        findings.append("scanner coverage failure: no tracked-style text files were scanned")
+
     if findings:
         print("Potential committed secrets detected:", file=sys.stderr)
         for finding in sorted(findings):
