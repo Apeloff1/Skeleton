@@ -7,6 +7,7 @@ on:
       - "skeleton/jeeves/llm_core.py"
       - "skeleton/jeeves/providers.py"
       - "tests/test_jeeves_live_hardening.py"
+      - "tests/test_jeeves_adversarial.py"
       - "tests/test_jeeves_adversarial_followup.py"
       - "tests/test_jeeves_history_boundary.py"
       - "tests/test_jeeves_local_provider_policy.py"
@@ -17,6 +18,7 @@ on:
       - "skeleton/jeeves/llm_core.py"
       - "skeleton/jeeves/providers.py"
       - "tests/test_jeeves_live_hardening.py"
+      - "tests/test_jeeves_adversarial.py"
       - "tests/test_jeeves_adversarial_followup.py"
       - "tests/test_jeeves_history_boundary.py"
       - "tests/test_jeeves_local_provider_policy.py"
@@ -52,6 +54,7 @@ jobs:
         run: >-
           python -m pytest -q
           tests/test_jeeves_live_hardening.py
+          tests/test_jeeves_adversarial.py
           tests/test_jeeves_adversarial_followup.py
           tests/test_jeeves_history_boundary.py
           tests/test_jeeves_local_provider_policy.py
