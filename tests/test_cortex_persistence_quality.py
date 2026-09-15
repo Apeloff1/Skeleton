@@ -46,6 +46,28 @@ def test_midbrain_fit_advances_steps_and_mutates_transformer_weights() -> None:
     assert transformer.layers[0].Wq != weights_before
 
 
+def test_teacher_contact_advances_lora_adapter_state() -> None:
+    neo = JeevesCortex()
+    neo.bind_hf("left")
+
+    first = neo.contact("left", "plan tensor ttk")
+    teacher_lm = neo.slots["left"].standin
+    bank = teacher_lm.lora
+    assert bank is not None
+    first_adapter = bank.to_dict()
+
+    second = neo.contact("left", "plan tensor lattice oracle")
+    second_adapter = bank.to_dict()
+
+    assert first["contacted"] == 1
+    assert second["contacted"] == 1
+    assert second["contacts"] > first["contacts"]
+    assert first_adapter["steps"] > 0
+    assert second_adapter["steps"] > first_adapter["steps"]
+    assert second_adapter["energy"] > 0.0
+    assert "left:lora" in neo.own.models
+
+
 def test_sleep_state_roundtrips_non_default_values(tmp_path) -> None:
     neo = JeevesCortex()
     neo.sleep.record("persist-me", [0.125] * 8, slack=0.75)
