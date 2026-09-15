@@ -49,7 +49,12 @@ _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 def _parse_trusted_proxy_networks(
     raw: str,
 ) -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
-    """Parse explicitly trusted ingress/proxy CIDRs without widening trust."""
+    """Parse explicitly trusted ingress/proxy CIDRs fail-closed.
+
+    A partially valid allowlist is unsafe because operators can reasonably
+    believe every configured ingress is enforced. Any malformed entry disables
+    forwarded-header trust rather than silently accepting the remaining CIDRs.
+    """
     networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
     for value in raw.split(","):
         value = value.strip()
@@ -58,7 +63,8 @@ def _parse_trusted_proxy_networks(
         try:
             networks.append(ipaddress.ip_network(value, strict=False))
         except ValueError:
-            log.warning("ignoring invalid TRUSTED_PROXY_CIDRS entry")
+            log.error("invalid TRUSTED_PROXY_CIDRS configuration; disabling proxy trust")
+            return ()
     return tuple(networks)
 
 
@@ -193,8 +199,8 @@ def _client_ip(request: Request) -> str:
     The direct peer is authoritative by default. X-Forwarded-For is considered
     only when the immediate peer is explicitly configured as a trusted proxy.
     The forwarded chain is walked right-to-left, skipping trusted proxy hops and
-    returning the nearest untrusted address. Malformed chains fail closed to the
-    direct peer.
+    returning the nearest untrusted address. Malformed or ambiguous chains fail
+    closed to the direct peer.
     """
     client = request.client
     peer = client.host.strip() if client and client.host else "-"
@@ -202,12 +208,21 @@ def _client_ip(request: Request) -> str:
     if peer == "-" or not _is_trusted_proxy(peer):
         return canonical_peer or peer
 
-    xff = request.headers.get("x-forwarded-for", "")
+    # Multiple field-lines are parser-ambiguous across reverse proxies. Never
+    # merge them into a trusted identity at the application boundary.
+    forwarded_headers = request.headers.getlist("x-forwarded-for")
+    if len(forwarded_headers) != 1:
+        return canonical_peer or peer
+    xff = forwarded_headers[0]
     if not xff:
         return canonical_peer or peer
 
-    forwarded = [_canonical_ip(part) for part in xff.split(",")]
-    if not forwarded or any(value is None for value in forwarded):
+    parts = [part.strip() for part in xff.split(",")]
+    if not parts or any(not part for part in parts):
+        return canonical_peer or peer
+
+    forwarded = [_canonical_ip(part) for part in parts]
+    if any(value is None for value in forwarded):
         return canonical_peer or peer
 
     for value in reversed(forwarded):
