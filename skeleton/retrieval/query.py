@@ -13,7 +13,7 @@ selected ones, and hands their candidate lists to the Fuser/Ranker.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from skeleton.kernel.errors import KernelError
 from skeleton.retrieval.fusion import Fuser, FusionStrategy, ScoredResult
