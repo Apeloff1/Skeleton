@@ -1,24 +1,27 @@
 name: PR Hygiene
 
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, reopened, synchronize, edited, ready_for_review, converted_to_draft]
 
 concurrency:
   group: pr-hygiene-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
-# This privileged workflow never checks out or executes pull-request code.
-permissions:
-  contents: read
-  issues: write
-  pull-requests: read
+# Label mutation is restricted to same-repository pull requests. Fork pull
+# requests are intentionally skipped instead of granting a privileged trigger.
+permissions: {}
 
 jobs:
   classify:
     name: Classify pull request
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
