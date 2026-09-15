@@ -28,7 +28,13 @@ EXPRESSION_RE = re.compile(r"\$\{\{(?P<body>.*?)\}\}")
 UNTRUSTED_INPUT_RE = re.compile(
     r"(?<![A-Za-z0-9_])(?:github\.event\.inputs|inputs)\s*(?:\.|\[)"
 )
-BLOCK_SCALARS = {"|", ">", "|-", ">-", "|+", ">+"}
+# YAML block scalars may combine a chomping indicator (+/-) and an indentation
+# indicator (1-9) in either order: |, |-, |2, |2-, |-2, >+2, and so on.
+# Recognize the full legal family so non-default scalar headers cannot hide the
+# shell body from this security gate.
+BLOCK_SCALAR_RE = re.compile(
+    r"^[|>](?:(?:[+-][1-9]?)|(?:[1-9][+-]?))?$"
+)
 
 
 def workflow_files() -> list[Path]:
@@ -51,7 +57,7 @@ def _run_fragments(lines: list[str]) -> Iterable[tuple[int, str]]:
 
         value = match.group("value").strip()
         line_number = index + 1
-        if value not in BLOCK_SCALARS:
+        if not BLOCK_SCALAR_RE.fullmatch(value):
             yield line_number, value
             index += 1
             continue
