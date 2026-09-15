@@ -79,6 +79,9 @@ python backend/scripts/check_dynamic_import_safety.py
 printf '\n== Backend tar archive extraction safety ==\n'
 python backend/scripts/check_archive_extraction_safety.py
 
+printf '\n== Security scanner surface preflight ==\n'
+python backend/scripts/check_security_scan_surface.py
+
 printf '\n== Backend/frontend high-confidence SAST ==\n'
 python backend/scripts/check_sast_security.py
 
@@ -109,7 +112,9 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_repository_process_safety.py \
   backend/tests/test_deserialization_safety_gate.py \
   backend/tests/test_dynamic_import_safety.py \
+  backend/tests/test_scanner_nonempty_contract.py \
   backend/tests/test_archive_extraction_safety.py \
+  backend/tests/test_security_scan_surface.py \
   backend/tests/test_live_scraper_network_security.py \
   backend/tests/test_ai_reader_error_redaction.py \
   backend/tests/test_sast_security_gate.py \
@@ -121,6 +126,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_workflow_event_shell_security.py \
   backend/tests/test_secret_hygiene_gate.py \
   backend/tests/test_malware_ioc_gate.py \
+  backend/tests/test_malware_ioc_io_fail_closed.py \
   backend/tests/test_incident_response_runbook.py \
   backend/tests/test_webhook_cron_security.py \
   backend/tests/test_audit_framing_stack.py

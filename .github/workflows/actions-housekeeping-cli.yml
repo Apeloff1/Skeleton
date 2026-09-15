@@ -22,7 +22,6 @@ jobs:
     timeout-minutes: 30
     permissions:
       actions: write
-      contents: read
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}

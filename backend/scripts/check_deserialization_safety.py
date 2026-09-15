@@ -274,14 +274,18 @@ def violations(path: Path) -> list[str]:
 
 def main() -> int:
     findings: list[str] = []
+    scanned = 0
     for path in python_files():
+        scanned += 1
         findings.extend(violations(path))
+    if scanned == 0:
+        findings.append("scanner coverage failure: no backend Python files were scanned")
     if findings:
         print("Unsafe deserialization patterns detected:", file=sys.stderr)
         for finding in sorted(findings):
             print(f"  - {finding}", file=sys.stderr)
         return 1
-    print("Deserialization safety gate passed: no unsafe object loaders found.")
+    print(f"Deserialization safety gate passed across {scanned} backend Python files: no unsafe object loaders found.")
     return 0
 
 

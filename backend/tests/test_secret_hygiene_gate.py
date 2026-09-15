@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import tomllib
 from pathlib import Path
 
@@ -78,6 +79,29 @@ def test_main_fails_closed_on_repository_traversal_error(monkeypatch, capsys) ->
     captured = capsys.readouterr()
     assert "repository traversal failure: PermissionError" in captured.err
     assert "sensitive traversal detail" not in captured.err
+
+
+def test_nested_directory_enumeration_failure_is_not_silently_skipped(
+    tmp_path: Path, monkeypatch, capsys,
+) -> None:
+    blocked = tmp_path / "blocked"
+    blocked.mkdir()
+    (blocked / "hidden.env").write_text("TOKEN=hidden\n", encoding="utf-8")
+    (tmp_path / "visible.env").write_text("TOKEN=placeholder\n", encoding="utf-8")
+    real_scandir = os.scandir
+
+    def guarded_scandir(path):
+        if Path(path) == blocked:
+            raise PermissionError("sensitive directory detail")
+        return real_scandir(path)
+
+    monkeypatch.setattr(secret_hygiene, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(secret_hygiene.os, "scandir", guarded_scandir)
+
+    assert secret_hygiene.main() == 1
+    captured = capsys.readouterr()
+    assert "repository traversal failure: PermissionError" in captured.err
+    assert "sensitive directory detail" not in captured.err
 
 
 def test_detects_private_key_material(tmp_path: Path) -> None:
