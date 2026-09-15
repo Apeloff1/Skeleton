@@ -7,8 +7,7 @@
 fastapi==0.141.1
 uvicorn[standard]==0.52.4
 python-multipart==0.0.32
-# google-genai 2.23.0 requires websockets>=13,<17; pin the newest compatible
-# 16.x maintenance release so the backend dependency graph remains resolvable.
+# Keep the backend websocket runtime on the maintained 16.x line.
 websockets==16.1.1
 orjson==3.12.0
 aiofiles==25.1.0
@@ -42,7 +41,9 @@ cryptography==50.0.1
 # keep the compatible 2.x line until the provider stack is migrated together.
 openai==2.37.0
 litellm==1.100.1
-google-genai==2.23.0
+# google-genai was removed after the #116 runtime audit found no active Python
+# model-execution call sites. Direct Google provider imports are CI-gated until
+# a canonical ProviderAdapter and shared contract tests are added deliberately.
 # The retired Emergent SDK is replaced by backend/emergentintegrations, a local
 # boot-safe compatibility layer. Do not reintroduce it as a registry dependency.
 tenacity==9.1.4
