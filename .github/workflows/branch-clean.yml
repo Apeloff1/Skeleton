@@ -1,5 +1,6 @@
 name: Consolidate and clean merged branches
 # Repository-wide safe branch sweep. Patch-equivalent history is absorbed; unique work is preserved.
+# Manual execution trigger: 2026-09-15 consolidated-main pruning
 
 on:
   workflow_dispatch:
