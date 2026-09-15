@@ -1,6 +1,7 @@
 """Static GitHub Actions policy gate."""
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 import re
 import sys
@@ -55,6 +56,17 @@ PULL_REQUEST_TARGET_SEQUENCE_RE = re.compile(
 )
 CHECKOUT_ACTION = "actions/checkout@"
 FORBIDDEN_TRIGGER = "pull_request_target"
+
+# pull_request_target remains forbidden by default. The obsolete-run drainer is
+# the sole exception because it needs Actions write access while deliberately
+# executing only default-branch control-plane code. The exception is content-
+# addressed: any byte-level workflow change automatically revokes the exception
+# until the security policy is reviewed and this digest is deliberately updated.
+TRUSTED_PULL_REQUEST_TARGET_SHA256 = {
+    "pr-obsolete-run-drain.yml": (
+        "dff208e01fcb638184f67b1029014653a000c43908467a60f18f225976b7634d"
+    ),
+}
 
 UNTRUSTED_RUN_CONTEXTS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("pull request title/body", re.compile(r"\bgithub\.event\.pull_request\.(?:title|body)\b")),
@@ -197,7 +209,20 @@ def _strip_node_properties(value: str) -> str:
     return match.group("value").strip()
 
 
-def _forbidden_trigger_violations(lines: list[str], path_name: str) -> list[str]:
+def _approved_pull_request_target(path_name: str, text: str) -> bool:
+    expected = TRUSTED_PULL_REQUEST_TARGET_SHA256.get(path_name)
+    if expected is None:
+        return False
+    actual = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return actual == expected
+
+
+def _forbidden_trigger_violations(
+    lines: list[str],
+    path_name: str,
+    *,
+    allow_pull_request_target: bool = False,
+) -> list[str]:
     findings: list[str] = []
     for index, line in enumerate(lines):
         if line != line.lstrip(" "):
@@ -220,14 +245,15 @@ def _forbidden_trigger_violations(lines: list[str], path_name: str) -> list[str]
             if len(scalar) >= 2 and scalar[0] == scalar[-1] and scalar[0] in {"'", '"'}:
                 scalar = scalar[1:-1]
             if scalar == FORBIDDEN_TRIGGER:
-                findings.append(f"{path_name}:{number}: pull_request_target is forbidden")
+                if not allow_pull_request_target:
+                    findings.append(f"{path_name}:{number}: pull_request_target is forbidden")
                 continue
 
             if value.startswith("{"):
                 if any(
                     _yaml_key_name(entry) == FORBIDDEN_TRIGGER
                     for entry in _flow_mapping_entries(value)
-                ):
+                ) and not allow_pull_request_target:
                     findings.append(f"{path_name}:{number}: pull_request_target is forbidden")
                 continue
 
@@ -237,7 +263,10 @@ def _forbidden_trigger_violations(lines: list[str], path_name: str) -> list[str]
                     if len(event) >= 2 and event[0] == event[-1] and event[0] in {"'", '"'}:
                         event = event[1:-1]
                     if event == FORBIDDEN_TRIGGER:
-                        findings.append(f"{path_name}:{number}: pull_request_target is forbidden")
+                        if not allow_pull_request_target:
+                            findings.append(
+                                f"{path_name}:{number}: pull_request_target is forbidden"
+                            )
                         break
                 continue
             continue
@@ -260,9 +289,10 @@ def _forbidden_trigger_violations(lines: list[str], path_name: str) -> list[str]
             if indent != direct_indent:
                 continue
             if PULL_REQUEST_TARGET_KEY_RE.match(child) or PULL_REQUEST_TARGET_SEQUENCE_RE.match(child):
-                findings.append(
-                    f"{path_name}:{child_number}: pull_request_target is forbidden"
-                )
+                if not allow_pull_request_target:
+                    findings.append(
+                        f"{path_name}:{child_number}: pull_request_target is forbidden"
+                    )
     return findings
 
 
@@ -289,7 +319,13 @@ def violations(path: Path) -> list[str]:
         lines, path.name
     )
     findings.extend(permission_findings)
-    findings.extend(_forbidden_trigger_violations(lines, path.name))
+    findings.extend(
+        _forbidden_trigger_violations(
+            lines,
+            path.name,
+            allow_pull_request_target=_approved_pull_request_target(path.name, text),
+        )
+    )
 
     for number, fragment in _flow_style_steps(lines):
         if any(USES_RE.match(source_line) for source_line in fragment.splitlines()):
