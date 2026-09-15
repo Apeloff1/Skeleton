@@ -7,6 +7,7 @@ rotation after a confirmed exposure.
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import re
 import stat
@@ -113,27 +114,38 @@ def _is_text_candidate(path: Path) -> bool:
 
 
 def candidate_files() -> Iterable[Path]:
-    """Yield repository text candidates without silently dropping metadata failures.
+    """Yield bounded text candidates without hiding traversal or metadata loss.
 
-    Symlinks are not followed. A security-relevant path whose metadata cannot be
-    read is still yielded so ``violations`` can either scan it with a bounded read
-    or produce a fail-closed finding.
+    Directory enumeration uses ``os.scandir`` instead of ``Path.rglob`` so an
+    unreadable subtree raises into ``main`` and blocks the gate. Symlinks are not
+    followed. If metadata for an entry cannot be read, that path is still yielded
+    so ``violations`` produces a sanitized fail-closed finding.
     """
-    for path in REPO_ROOT.rglob("*"):
-        if any(part in SKIP_DIRS for part in path.parts):
-            continue
-        if not _is_text_candidate(path):
-            continue
-        try:
-            metadata = path.lstat()
-        except OSError:
-            yield path
-            continue
-        if not stat.S_ISREG(metadata.st_mode):
-            continue
-        if metadata.st_size > MAX_FILE_BYTES:
-            continue
-        yield path
+    pending = [REPO_ROOT]
+    while pending:
+        directory = pending.pop()
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                path = Path(entry.path)
+                if path.name in SKIP_DIRS:
+                    continue
+                try:
+                    metadata = path.lstat()
+                except OSError:
+                    yield path
+                    continue
+                if stat.S_ISLNK(metadata.st_mode):
+                    continue
+                if stat.S_ISDIR(metadata.st_mode):
+                    pending.append(path)
+                    continue
+                if not stat.S_ISREG(metadata.st_mode):
+                    continue
+                if not _is_text_candidate(path):
+                    continue
+                if metadata.st_size > MAX_FILE_BYTES:
+                    continue
+                yield path
 
 
 def _is_placeholder(candidate: str) -> bool:
