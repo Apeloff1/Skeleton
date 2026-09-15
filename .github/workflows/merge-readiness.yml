@@ -13,11 +13,12 @@ on:
 permissions:
   contents: read
 
-# Only the newest validation for a PR or branch can become authoritative.
-# Cancel superseded fanout early so stale commits do not occupy runner slots.
+# PR validation can safely supersede an older run for the same pull request.
+# Every main push uses its immutable head SHA so canonical post-merge evidence
+# is never cancelled merely because main advances again before runners start.
 concurrency:
-  group: merge-readiness-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: merge-readiness-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   PYTHON_VERSION: "3.11.16"
