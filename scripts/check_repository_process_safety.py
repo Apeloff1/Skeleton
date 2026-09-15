@@ -143,7 +143,7 @@ def argv_violations(path: Path) -> list[str]:
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     except (OSError, UnicodeError, SyntaxError) as exc:
-        return [f"{label}: parse failure: {exc}"]
+        return [f"{label}: parse failure: {type(exc).__name__}"]
 
     aliases = BACKEND_GATE.assignment_aliases(tree, BACKEND_GATE.import_aliases(tree))
     findings: list[str] = []
