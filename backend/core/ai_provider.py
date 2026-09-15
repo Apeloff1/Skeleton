@@ -11,13 +11,23 @@ from abc import ABC, abstractmethod
 from collections import deque
 from collections.abc import Sequence as SequenceABC
 from dataclasses import dataclass, field
+from ipaddress import IPv4Address, IPv6Address, ip_address
 import os
+import socket
 import time
 from typing import Any, Iterable, Mapping, Sequence
+from urllib.parse import urlsplit
 
 
 _ALLOWED_HISTORY_ROLES = frozenset({"user", "assistant"})
 _DEFAULT_HISTORY_CHAR_BUDGET = 80_000
+_BLOCKED_PROVIDER_HOSTNAMES = frozenset(
+    {
+        "localhost",
+        "metadata.google.internal",
+        "metadata.goog",
+    }
+)
 
 
 class ProviderError(RuntimeError):
@@ -30,6 +40,80 @@ class ProviderUnavailableError(ProviderError):
 
 class ProviderInvocationError(ProviderError):
     """Raised when a configured provider fails to return usable output."""
+
+
+def _literal_ip_address(host: str) -> IPv4Address | IPv6Address | None:
+    """Parse canonical and legacy numeric IP spellings without DNS resolution."""
+
+    try:
+        return ip_address(host)
+    except ValueError:
+        pass
+
+    # POSIX inet_aton accepts legacy IPv4 spellings such as 2130706433,
+    # 0177.0.0.1, and 0x7f000001. Browsers/resolvers may interpret these as
+    # loopback even though ipaddress deliberately rejects them as non-canonical.
+    try:
+        packed = socket.inet_aton(host)
+    except OSError:
+        return None
+    return ip_address(packed)
+
+
+def _validate_provider_base_url(base_url: str) -> str:
+    """Validate a configured provider endpoint before credentials can reach it.
+
+    Custom provider endpoints are operator configuration, not request input, but
+    a bad value can still redirect a long-lived API credential toward a local or
+    metadata service. Keep this boundary deterministic and network-free: require
+    HTTPS, forbid URL credentials and ambiguous URL components, and reject
+    obvious local/non-global literal targets. Hostname DNS/rebinding behavior is
+    intentionally left to the TLS-validated transport rather than resolving here
+    and creating a second time-of-check/time-of-use DNS decision.
+    """
+
+    value = base_url.strip()
+    if not value:
+        return ""
+    if any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in value):
+        raise ProviderUnavailableError("AI provider base URL is invalid")
+
+    try:
+        parsed = urlsplit(value)
+    except ValueError as exc:
+        raise ProviderUnavailableError("AI provider base URL is invalid") from exc
+
+    if parsed.scheme.lower() != "https":
+        raise ProviderUnavailableError("AI provider base URL must use HTTPS")
+    if parsed.username is not None or parsed.password is not None:
+        raise ProviderUnavailableError("AI provider base URL must not contain credentials")
+    if parsed.query or parsed.fragment:
+        raise ProviderUnavailableError("AI provider base URL must not contain a query or fragment")
+
+    hostname = parsed.hostname
+    if not hostname:
+        raise ProviderUnavailableError("AI provider base URL must include a hostname")
+    try:
+        parsed.port
+    except ValueError as exc:
+        raise ProviderUnavailableError("AI provider base URL contains an invalid port") from exc
+
+    try:
+        normalized_host = hostname.rstrip(".").encode("idna").decode("ascii").lower()
+    except UnicodeError as exc:
+        raise ProviderUnavailableError("AI provider base URL contains an invalid hostname") from exc
+
+    if (
+        normalized_host in _BLOCKED_PROVIDER_HOSTNAMES
+        or normalized_host.endswith(".localhost")
+    ):
+        raise ProviderUnavailableError("AI provider base URL targets a blocked local endpoint")
+
+    literal_ip = _literal_ip_address(normalized_host)
+    if literal_ip is not None and not literal_ip.is_global:
+        raise ProviderUnavailableError("AI provider base URL targets a non-public IP address")
+
+    return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,6 +310,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
         if not self.api_key:
             return False
         try:
+            _validate_provider_base_url(self.base_url)
             self._load_client_class()
         except ProviderUnavailableError:
             return False
@@ -247,14 +332,15 @@ class OpenAIProviderAdapter(ProviderAdapter):
         if not self.api_key:
             raise ProviderUnavailableError("OPENAI_API_KEY is not configured")
 
+        validated_base_url = _validate_provider_base_url(self.base_url)
         async_openai = self._load_client_class()
         kwargs: dict[str, Any] = {
             "api_key": self.api_key,
             "timeout": self.timeout_seconds,
             "max_retries": self.max_retries,
         }
-        if self.base_url:
-            kwargs["base_url"] = self.base_url
+        if validated_base_url:
+            kwargs["base_url"] = validated_base_url
         self._client = async_openai(**kwargs)
         return self._client
 
