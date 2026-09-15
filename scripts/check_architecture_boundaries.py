@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Fail closed on high-risk Skeleton package boundary violations.
 
-The first enforcement slice is intentionally small: keep the kernel dependency-free
-and prevent domain/application code from depending upward on the HTTP adapter.
-See docs/CANONICAL_MODULE_BOUNDARIES.md for the full ownership contract.
+The gate combines the canonical Skeleton layering rules with repository-root production
+boundaries. It intentionally stays dependency-free so it can run early in CI.
+See docs/CANONICAL_MODULE_BOUNDARIES.md for the ownership contract.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from typing import Iterable
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SKELETON_ROOT = REPO_ROOT / "skeleton"
+BACKEND_ROOT = REPO_ROOT / "backend"
 
 _KERNEL_FORBIDDEN_ROOTS = {
     "fastapi",
@@ -31,6 +32,19 @@ _KERNEL_FORBIDDEN_ROOTS = {
     "redis",
     "aiohttp",
 }
+
+_PRODUCTION_RULES = (
+    {
+        "root": "skeleton",
+        "excluded_prefixes": ("skeleton/testing/",),
+        "forbidden_modules": ("backend", "frontend", "tests"),
+    },
+    {
+        "root": "backend",
+        "excluded_prefixes": ("backend/tests/",),
+        "forbidden_modules": ("frontend", "tests", "skeleton.testing"),
+    },
+)
 
 
 @dataclass(frozen=True)
@@ -74,57 +88,115 @@ def _imports_api(module: str, level: int = 0) -> bool:
     return level > 0 and (module == "api" or module.startswith("api."))
 
 
-def collect_violations(repo_root: Path = REPO_ROOT) -> list[Violation]:
+def _matches_module(module: str, forbidden: str) -> bool:
+    """Match one module namespace exactly or below it, never lookalike prefixes."""
+    return module == forbidden or module.startswith(forbidden + ".")
+
+
+def _production_rule_for(path: Path, repo_root: Path):
+    try:
+        rel = path.relative_to(repo_root).as_posix()
+    except ValueError:
+        return None, None
+
+    for rule in _PRODUCTION_RULES:
+        root = rule["root"]
+        if rel == root or rel.startswith(root + "/"):
+            return rel, rule
+    return rel, None
+
+
+def _absolute_imports(node: ast.AST) -> list[str]:
+    if isinstance(node, ast.Import):
+        return [alias.name for alias in node.names]
+    if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+        return [node.module]
+    return []
+
+
+def collect_violations(repo_root: Path = REPO_ROOT, *, require_roots: bool = False) -> list[Violation]:
     skeleton_root = repo_root / "skeleton"
+    backend_root = repo_root / "backend"
     kernel_root = skeleton_root / "kernel"
     api_root = skeleton_root / "api"
     violations: list[Violation] = []
 
-    for path in _python_files(skeleton_root):
-        try:
-            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        except (OSError, UnicodeError, SyntaxError) as exc:
-            line = getattr(exc, "lineno", None) or 1
-            violations.append(Violation(path, int(line), f"cannot validate Python module: {type(exc).__name__}"))
-            continue
+    if require_roots:
+        for root_name in ("skeleton", "backend"):
+            source_root = repo_root / root_name
+            if not source_root.is_dir():
+                violations.append(Violation(source_root, 1, "missing canonical source root"))
 
-        in_kernel = _is_under(path, kernel_root)
-        in_api = _is_under(path, api_root)
-        cli_entry = path == skeleton_root / "__main__.py"
-
-        for node in ast.walk(tree):
-            imports: list[tuple[str, int]] = []
-            if isinstance(node, ast.Import):
-                imports.extend((alias.name, 0) for alias in node.names)
-            elif isinstance(node, ast.ImportFrom):
-                imports.append((node.module or "", node.level))
-            else:
+    source_roots = [root for root in (skeleton_root, backend_root) if root.is_dir()]
+    for source_root in source_roots:
+        for path in _python_files(source_root):
+            rel, production_rule = _production_rule_for(path, repo_root)
+            if rel is None:
+                violations.append(Violation(path, 1, "source path is outside repository root"))
                 continue
 
-            for module, level in imports:
-                if in_kernel and level == 0 and _imports_forbidden_kernel_dependency(module):
-                    violations.append(
-                        Violation(
-                            path,
-                            node.lineno,
-                            f"kernel must not import framework/I/O dependency {module!r}",
-                        )
-                    )
+            try:
+                tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            except (OSError, UnicodeError, SyntaxError) as exc:
+                line = getattr(exc, "lineno", None) or 1
+                violations.append(Violation(path, int(line), f"cannot validate Python module: {type(exc).__name__}"))
+                continue
 
-                if not in_api and not cli_entry and _imports_api(module, level):
-                    violations.append(
-                        Violation(
-                            path,
-                            node.lineno,
-                            "domain/application code must not depend upward on skeleton.api",
+            in_skeleton = _is_under(path, skeleton_root)
+            in_kernel = in_skeleton and _is_under(path, kernel_root)
+            in_api = in_skeleton and _is_under(path, api_root)
+            cli_entry = path == skeleton_root / "__main__.py"
+            production_exempt = bool(
+                production_rule
+                and any(rel.startswith(prefix) for prefix in production_rule["excluded_prefixes"])
+            )
+
+            for node in ast.walk(tree):
+                imports: list[tuple[str, int]] = []
+                if isinstance(node, ast.Import):
+                    imports.extend((alias.name, 0) for alias in node.names)
+                elif isinstance(node, ast.ImportFrom):
+                    imports.append((node.module or "", node.level))
+                else:
+                    continue
+
+                for module, level in imports:
+                    if in_kernel and level == 0 and _imports_forbidden_kernel_dependency(module):
+                        violations.append(
+                            Violation(
+                                path,
+                                node.lineno,
+                                f"kernel must not import framework/I/O dependency {module!r}",
+                            )
                         )
-                    )
+
+                    if in_skeleton and not in_api and not cli_entry and _imports_api(module, level):
+                        violations.append(
+                            Violation(
+                                path,
+                                node.lineno,
+                                "domain/application code must not depend upward on skeleton.api",
+                            )
+                        )
+
+                if production_rule and not production_exempt:
+                    for module in _absolute_imports(node):
+                        for forbidden in production_rule["forbidden_modules"]:
+                            if _matches_module(module, forbidden):
+                                violations.append(
+                                    Violation(
+                                        path,
+                                        node.lineno,
+                                        f"forbidden import {module!r} from {production_rule['root']} production code",
+                                    )
+                                )
+                                break
 
     return violations
 
 
 def main() -> int:
-    violations = collect_violations()
+    violations = collect_violations(REPO_ROOT, require_roots=True)
     if not violations:
         print("architecture boundaries: ok")
         return 0
