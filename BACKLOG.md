@@ -1,6 +1,6 @@
 # Skeleton Backlog — failed-commit register + forward work
 
-Updated 2026-09-15 (backlog reconciliation). Original register dated 2026-09-01. Two sections: things that failed and were recovered
+Updated 2026-09-15 (F-6 landed + backlog reconciliation). Original register dated 2026-09-01. Two sections: things that failed and were recovered
 (so the failure modes stay visible), and the frontier backlog (what to
 build next, ordered).
 
@@ -31,8 +31,9 @@ Those planes are out-of-scope for this register — audit separately.
 
 ## 2. Frontier backlog — ordered by leverage
 
-Updated 2026-09-15. Tier-1 seams F-1..F-5, F-7 and F-8..F-10 are
-**landed**; do not re-open them without a regression.
+Updated 2026-09-15. Tier-1 seams F-1..F-10 (except numbering gaps reserved
+for historical ordering) and Tier-2 differentiator F-6 are **landed**; do not
+re-open them without a regression.
 
 ### Landed (keep visible — failure modes + PR anchors)
 
@@ -43,6 +44,7 @@ Updated 2026-09-15. Tier-1 seams F-1..F-5, F-7 and F-8..F-10 are
 | F-3 Rot-triggered compaction | #4 | `/memory/query` + `RotGuardedCompactor` |
 | F-4 HandoffRegistry × AgentMesh | #6 | `skeleton/swarm/mesh_handoff.py` |
 | F-5 forge VerificationLoop | #7 / #28 | materialise revise-until-green + E2E deepen |
+| F-6 Mixture-of-depths | #290 | residual-RMS per-token early exit, causal K/V retention, telemetry, profiler, focused CI |
 | F-7 skills-as-files context | #224 | fresh disk reload loop + bounded context cards + GameForge bank bridge |
 | F-8 blackboard poison guards | #18 | provenance + quarantine |
 | F-9 N+1 tool-call suppression | #20 | compose `kernel/dedup.py` |
@@ -67,29 +69,30 @@ Recent backlog hygiene on 2026-09-15 also retired stale overlapping work:
 issue #255 was completed by merged PR #257, and open PR #237 was closed as
 superseded by merged PR #247.
 
-### Tier 2 — frontier pushes (next differentiating work)
+### Tier 2 — differentiation status
 
-1. **F-6. Mixture-of-depths for the neo transformer** — dynamic per-token
-   compute allocation in `cortex/transformer.py`. Note: `cortex/moe.py` is
-   Mixture-of-*Experts* (different); MoD is still open.
+**F-6 is complete.** PR #290 landed opt-in mixture-of-depths inference without
+changing `TinyTransformer` training or snapshot semantics. The next open work
+is structural Tier 3; do not create a second MoD implementation unless #290
+regresses.
 
-### Tier 3 — structural (bigger, schedule carefully)
+### Tier 3 — structural (next open work; schedule carefully)
 
-2. **F-11. Track E cleanup** — root sprawl moves, SEVEN_BY physical moves,
+1. **F-11. Track E cleanup** — root sprawl moves, SEVEN_BY physical moves,
    godot binary to LFS, shim deletion. Local git ops.
-3. **F-12. H5.4 cortex persistence** — genesis twin vs live singleton once
+2. **F-12. H5.4 cortex persistence** — genesis twin vs live singleton once
    `$SKELETON_OWN` exists in the container.
-4. **F-13. EconomicOptimiser audit** — `intelligence/economic.py` predates
+3. **F-13. EconomicOptimiser audit** — `intelligence/economic.py` predates
    the cascade router; reconcile the two routing contracts.
-5. **F-14. Speculative RAG** — pre-fetch likely-needed documents during
+4. **F-14. Speculative RAG** — pre-fetch likely-needed documents during
    the planning phase of a pipeline run (compose quad + composer).
    Adjacent: `cortex/speculate.py` is token continuation, not RAG prefetch.
-6. **F-15. Organism/social/galaxy plane audit** — the repo grew three
-   planes while the waves landed (see §1 drift note). Same size-filtered
-   read methodology as the deep-cut campaign, when their churn settles.
+5. **F-15. Organism/social/galaxy plane audit** — the repo grew three
+    planes while the waves landed (see §1 drift note). Same size-filtered
+    read methodology as the deep-cut campaign, when their churn settles.
 
 ## Definition of SOTA (working)
 
-Tier-1 SOTA seams (F-2..F-5, F-7, F-10) are landed in code. The former
-CI-1..CI-3 blockers are resolved on main; the next differentiation target is
-F-6 Mixture-of-Depths, with Tier-3 cleanup and persistence work following.
+Tier-1 SOTA seams, the former CI-1..CI-3 blockers, and F-6 Mixture-of-Depths
+are landed on main. Keep CI green and advance through F-11..F-15 in order,
+starting with Track E cleanup rather than duplicating completed frontier work.
