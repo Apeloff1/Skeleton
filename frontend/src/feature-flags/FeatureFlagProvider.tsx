@@ -103,8 +103,15 @@ export const FeatureFlagProvider: React.FC<ProviderProps> = ({
       .then(() => {
         if (cancelled) return;
         const warmed = snapshot(userId);
-        if (warmed?.ok) ingest(warmed);
-        else setFlags(current => applyOverrides(current));
+        if (warmed?.ok) {
+          ingest(warmed);
+        } else {
+          // Never carry a previous user's rollout into a new user scope while
+          // the background refresh is pending. Bundled flags + local/query
+          // overrides are the safe cross-user floor.
+          setFlags(applyOverrides(BUNDLED_FALLBACK_FLAGS));
+          setEnvironment('unknown');
+        }
         setLoading(false);
       })
       .catch((caught: any) => {
