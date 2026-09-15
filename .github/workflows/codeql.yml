@@ -3,8 +3,22 @@ name: CodeQL
 on:
   push:
     branches: [main]
+    paths:
+      - '**/*.py'
+      - '**/*.pyi'
+      - '!satellites/branch-snapshots/**'
+      - '!satellites/**/branch-snapshots/**'
+      - '.github/workflows/codeql.yml'
+      - '.github/codeql/**'
   pull_request:
     branches: [main]
+    paths:
+      - '**/*.py'
+      - '**/*.pyi'
+      - '!satellites/branch-snapshots/**'
+      - '!satellites/**/branch-snapshots/**'
+      - '.github/workflows/codeql.yml'
+      - '.github/codeql/**'
   schedule:
     - cron: "17 4 * * 1"
 
