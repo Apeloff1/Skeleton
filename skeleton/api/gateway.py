@@ -7,6 +7,9 @@ transform hooks. Produces per-route stats for the dashboard.
 """
 from __future__ import annotations
 
+import hashlib
+import json
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
@@ -59,6 +62,8 @@ class APIGateway:
         self._transforms: List[Callable[[Any], Any]] = []
         self._buckets: Dict[str, List[float]] = {}
         self._last_bucket_sweep: Optional[float] = None
+        self._bucket_lock = threading.Lock()
+        self._stats_lock = threading.Lock()
 
     def route(self, path: str, handler: Callable[[Dict[str, Any]], Any], *,
               scope: str = "public", action: str = "read",
@@ -70,6 +75,22 @@ class APIGateway:
 
     def add_transform(self, fn: Callable[[Any], Any]) -> None:
         self._transforms.append(fn)
+
+    @staticmethod
+    def _cache_key(path: str, payload: Dict[str, Any]) -> Optional[str]:
+        """Build a stable cache key for JSON payloads; skip unsupported values."""
+        try:
+            canonical = json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            )
+        except (TypeError, ValueError):
+            return None
+        digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        return f"{path}:{digest}"
 
     def _sweep_rate_buckets(self, now: float) -> None:
         """Drop inactive limiter keys after their one-second window expires."""
@@ -89,20 +110,32 @@ class APIGateway:
 
     def _rate_ok(self, key: str, per_s: float) -> bool:
         now = time.monotonic()
-        self._sweep_rate_buckets(now)
         if per_s <= 0:
+            last_sweep = self._last_bucket_sweep
+            sweep_due = (
+                last_sweep is None
+                or now - last_sweep >= self._BUCKET_SWEEP_INTERVAL_S
+            )
+            if sweep_due and self._bucket_lock.acquire(blocking=False):
+                try:
+                    self._sweep_rate_buckets(now)
+                finally:
+                    self._bucket_lock.release()
             return True
-        window = [
-            timestamp
-            for timestamp in self._buckets.get(key, [])
-            if now - timestamp < self._RATE_WINDOW_S
-        ]
-        if len(window) >= per_s:
+
+        with self._bucket_lock:
+            self._sweep_rate_buckets(now)
+            window = [
+                timestamp
+                for timestamp in self._buckets.get(key, [])
+                if now - timestamp < self._RATE_WINDOW_S
+            ]
+            if len(window) >= per_s:
+                self._buckets[key] = window
+                return False
+            window.append(now)
             self._buckets[key] = window
-            return False
-        window.append(now)
-        self._buckets[key] = window
-        return True
+            return True
 
     def handle(self, request: GatewayRequest) -> GatewayResponse:
         start = time.time_ns()
@@ -117,39 +150,46 @@ class APIGateway:
         if not self._rate_ok(f"{request.actor}:{route.path}", route.rate_limit_per_s):
             return GatewayResponse(429, {"error": "rate limited"}, (time.time_ns() - start) / 1e6)
 
-        cache_key = f"{route.path}:{hash(frozenset(request.payload.items())) if request.payload else 0}"
+        cache_key: Optional[str] = None
         if self._cache and route.cache_ttl_s > 0:
-            hit = self._cache.get("gateway", cache_key)
-            if hit is not None:
-                return GatewayResponse(200, hit, (time.time_ns() - start) / 1e6, cached=True)
+            cache_key = self._cache_key(route.path, request.payload)
+            if cache_key is not None:
+                hit = self._cache.get("gateway", cache_key)
+                if hit is not None:
+                    return GatewayResponse(200, hit, (time.time_ns() - start) / 1e6, cached=True)
 
-        route.calls += 1
+        with self._stats_lock:
+            route.calls += 1
         try:
             body = route.handler(request.payload)
             for transform in self._transforms:
                 body = transform(body)
             status = 200
-        except Exception as exc:  # noqa: BLE001
-            route.errors += 1
-            body = {"error": str(exc)}
+        except Exception:  # noqa: BLE001
+            with self._stats_lock:
+                route.errors += 1
+            body = {"error": "internal server error"}
             status = 500
         duration = (time.time_ns() - start) / 1e6
-        route.total_ms += duration
+        with self._stats_lock:
+            route.total_ms += duration
 
-        if self._cache and route.cache_ttl_s > 0 and status == 200:
+        if self._cache and cache_key is not None and status == 200:
             self._cache.set("gateway", cache_key, body, ttl_s=route.cache_ttl_s)
         if self._logger:
             self._logger.info("gateway", f"{request.path} → {status}", actor=request.actor, ms=round(duration, 2))
         return GatewayResponse(status, body, duration)
 
     def card(self) -> Dict[str, Any]:
-        return {
-            "kind": "api-gateway-card",
-            "routes": {p: {
+        with self._stats_lock:
+            routes = {p: {
                 "calls": r.calls,
                 "errors": r.errors,
                 "mean_ms": round(r.mean_ms(), 2),
                 "scope": r.scope,
-            } for p, r in self._routes.items()},
+            } for p, r in self._routes.items()}
+        return {
+            "kind": "api-gateway-card",
+            "routes": routes,
             "transforms": len(self._transforms),
         }
