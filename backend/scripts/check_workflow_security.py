@@ -257,16 +257,33 @@ def _forbidden_trigger_violations(lines: list[str], path_name: str) -> list[str]
 
             continue
 
+        children: list[tuple[int, str, int]] = []
         child_index = index + 1
         while child_index < len(lines):
             child = lines[child_index]
-            if child.strip() and _indent_width(child) == 0:
+            stripped_child = child.strip()
+            indent = _indent_width(child)
+            if stripped_child and indent == 0:
                 break
+            if stripped_child and not stripped_child.startswith("#"):
+                children.append((child_index + 1, child, indent))
+            child_index += 1
+
+        if not children:
+            continue
+
+        # Only direct children of top-level ``on`` define events. Nested values
+        # such as ``push.branches: [pull_request_target]`` are filters, not event
+        # declarations, and must not be rejected merely because they share the
+        # forbidden event's spelling.
+        direct_indent = min(indent for _line_number, _child, indent in children)
+        for child_number, child, indent in children:
+            if indent != direct_indent:
+                continue
             if PULL_REQUEST_TARGET_KEY_RE.match(child) or PULL_REQUEST_TARGET_SEQUENCE_RE.match(child):
                 findings.append(
-                    f"{path_name}:{child_index + 1}: pull_request_target is forbidden"
+                    f"{path_name}:{child_number}: pull_request_target is forbidden"
                 )
-            child_index += 1
 
     return findings
 
