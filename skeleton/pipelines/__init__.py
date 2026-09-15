@@ -5,6 +5,7 @@ Exports:
 - NPCPipeline / GameLogicPipeline / AnimationPipeline: Content generators
 - GameForge: End-to-end game generation orchestrator
 - GameSpec: Packaged output artifact
+- LorebuffaDialogueRuntime: Stateful domain dialogue execution
 """
 
 from skeleton.pipelines.generation import (
@@ -16,6 +17,12 @@ from skeleton.pipelines.generation import (
     NPCSpec,
 )
 from skeleton.pipelines.gameforge import GameForge, GameSpec
+from skeleton.pipelines.lorebuffa_dialogue import (
+    LorebuffaDialogueRuntime,
+    LorebuffaDialogueState,
+    LorebuffaDialogueTurn,
+    completed_marina_dialogue,
+)
 
 __all__ = [
     "NPCPipeline",
@@ -26,4 +33,8 @@ __all__ = [
     "AnimationSpec",
     "GameForge",
     "GameSpec",
+    "LorebuffaDialogueRuntime",
+    "LorebuffaDialogueState",
+    "LorebuffaDialogueTurn",
+    "completed_marina_dialogue",
 ]
