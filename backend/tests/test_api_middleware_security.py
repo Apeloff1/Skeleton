@@ -78,6 +78,13 @@ def test_malformed_forwarded_chain_falls_back_to_peer(monkeypatch) -> None:
     assert api_middleware._client_ip(request) == "10.0.0.5"
 
 
+def test_quoted_xff_token_falls_back_to_peer(monkeypatch) -> None:
+    _trust(monkeypatch, "10.0.0.0/8")
+    request = _request("10.0.0.5", xff='"198.51.100.24", 10.0.0.7')
+
+    assert api_middleware._client_ip(request) == "10.0.0.5"
+
+
 def test_empty_forwarded_hop_falls_back_to_peer(monkeypatch) -> None:
     _trust(monkeypatch, "10.0.0.0/8")
     request = _request("10.0.0.5", xff="198.51.100.24,,10.0.0.7")
@@ -121,3 +128,17 @@ def test_request_id_accepts_only_bounded_header_safe_values() -> None:
     assert api_middleware._request_id(accepted) == "trace-01.prod:abc_123"
     assert api_middleware._request_id(rejected) != "unsafe value with spaces"
     assert len(api_middleware._request_id(oversized)) == 16
+
+
+def test_duplicate_request_id_field_lines_are_replaced() -> None:
+    request = _request(
+        "198.51.100.24",
+        extra_headers=[
+            (b"x-request-id", b"trace-a"),
+            (b"x-request-id", b"trace-b"),
+        ],
+    )
+
+    request_id = api_middleware._request_id(request)
+    assert request_id not in {"trace-a", "trace-b"}
+    assert len(request_id) == 16
