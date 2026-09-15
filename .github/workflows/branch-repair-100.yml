@@ -1,27 +1,25 @@
-name: Repair up to 100 stale branch refs
+name: Repair stale branch refs
 
 on:
   workflow_dispatch:
     inputs:
       batch_offset:
-        description: 'Number of sorted non-main refs to skip before inspecting up to 100 branches'
+        description: 'Number of sorted non-main refs to skip before inspecting up to 200 branches'
         required: false
         default: '0'
         type: string
   push:
     branches: [main]
-    paths:
-      - '.github/workflows/branch-repair-100.yml'
 
 concurrency:
-  group: branch-repair-100-${{ github.repository }}
+  group: branch-repair-${{ github.repository }}
   cancel-in-progress: false
 
 permissions: {}
 
 jobs:
   repair:
-    name: Safely inspect and fast-forward 100 branches
+    name: Safely inspect and fast-forward up to 200 branches
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 20
     permissions:
@@ -31,9 +29,9 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GIT_TERMINAL_PROMPT: '0'
-      # A workflow-file merge automatically advances to the next 100-ref window.
-      # Manual dispatch remains explicit and defaults to the first window.
-      REPAIR_BATCH_OFFSET: ${{ github.event_name == 'workflow_dispatch' && inputs.batch_offset || '100' }}
+      # Every main update rechecks the full current branch set. Manual dispatch
+      # can still start from a later sorted offset when targeted repair is useful.
+      REPAIR_BATCH_OFFSET: ${{ github.event_name == 'workflow_dispatch' && inputs.batch_offset || '0' }}
     steps:
       - name: Fetch repository branch graph
         shell: bash
@@ -70,7 +68,7 @@ jobs:
           set -euo pipefail
           cd repo
 
-          inspect_limit=100
+          inspect_limit=200
           batch_offset="${REPAIR_BATCH_OFFSET:-0}"
           min_head_age_seconds=300
           main_ref=refs/remotes/origin/main
@@ -235,7 +233,7 @@ jobs:
           )
 
           {
-            echo '## 100-branch repair sweep'
+            echo '## Branch repair sweep'
             echo "- Batch offset: $batch_offset"
             echo "- Initial main tip: \`$initial_main\`"
             echo "- Branches inspected: $inspected / $inspect_limit"
