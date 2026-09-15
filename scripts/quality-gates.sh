@@ -65,7 +65,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   tests/test_runtime_observability_bridge.py
 
 printf '\n== Backend process safety ==\n'
-python backend/scripts/check_process_safety.py
+python backend/scripts/run_process_safety_gate.py
 
 printf '\n== Repository process safety ==\n'
 python scripts/check_repository_process_safety.py
@@ -101,6 +101,7 @@ printf '\n== Backend security scanner regressions ==\n'
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_exec_guard.py \
   backend/tests/test_process_safety_gate.py \
+  backend/tests/test_process_safety_fail_closed.py \
   backend/tests/test_process_safety_destructuring.py \
   backend/tests/test_process_safety_partial.py \
   backend/tests/test_process_safety_namespace_get.py \
