@@ -1,0 +1,7 @@
+title = "Skeleton secret scanning policy"
+
+# Keep Gitleaks' maintained default detector set while making the repository's
+# scanner policy explicit and reviewable. Add narrow repository-specific rules
+# or allowlists here only when they are backed by tests and review evidence.
+[extend]
+useDefault = true
