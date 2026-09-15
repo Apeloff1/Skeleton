@@ -1,6 +1,6 @@
 # GameForge Gate Absorption
 
-Status: durable audit, request bounds, verified principal credentials, fail-closed route-domain policy, rollout coverage accounting, and the existing JWT/RBAC surface now have Skeleton-native hardened contracts. Global HTTP policy enforcement remains staged until the live route inventory is explicitly chartered.
+Status: durable audit, request bounds, verified principal credentials, fail-closed route-domain policy, strict static route inventory, rollout coverage accounting, and the existing JWT/RBAC surface now have Skeleton-native hardened contracts. Global HTTP policy enforcement remains staged; the API surface is fully inventoried and policy-written, while domain migration away from the explicit `legacy_api` bucket continues.
 
 ## Source provenance
 
@@ -20,11 +20,9 @@ Skeleton already had stronger native equivalents for two gate responsibilities, 
 
 The in-memory audit middleware remains useful for operational telemetry, while the WORM ledger is the durable evidence boundary.
 
-## Newly promoted principal contract
+## Verified principal contract
 
-`backend/core/principal_seal.py` adds a framework-neutral principal credential and route admission layer.
-
-### Credential invariants
+`backend/core/principal_seal.py` provides a framework-neutral principal credential and route admission layer.
 
 The v1 credential is:
 
@@ -32,88 +30,112 @@ The v1 credential is:
 v1.key_id.principal_id.attester_id.issued_at.expires_at.signature_hex
 ```
 
-Its contract is intentionally stricter than the mined implementation:
+Its invariants are intentionally stricter than the mined implementation:
 
 1. HMAC-SHA256 covers the version, key id, principal, attester and both timestamps.
 2. Verification selects one explicit key id instead of trialing every live secret.
 3. Verification uses constant-time signature comparison.
 4. Keys shorter than 32 bytes are rejected at configuration time.
 5. Principal, attester and key identifiers are bounded and restricted to an unambiguous character set.
-6. Credentials have both issue and expiry timestamps, a local maximum TTL and bounded clock skew.
-7. Unknown keys, malformed credentials, unsupported versions, excessive TTLs, future credentials, expired credentials and signature mismatches all fail closed.
-8. A keyring can retain old verification keys while issuance moves to a new key, enabling rotation without accepting self-declared identity.
+6. Credentials have issue and expiry timestamps, a local maximum TTL and bounded clock skew.
+7. Unknown keys, malformed credentials, unsupported versions, excessive TTLs, future credentials, expired credentials and signature mismatches fail closed.
+8. A keyring can retain old verification keys while issuance moves to a new key.
 9. A codec without an explicit signing key is verification-only and cannot mint credentials.
 
-## Fail-closed route policy and rollout coverage
+## Static route inventory is now a hard quality boundary
 
-`RouteDomainPolicy` is a separate pure contract so rollout does not implicitly change the live FastAPI surface.
+`backend/scripts/backend_route_inventory_core.py` and the repository-aware `backend/scripts/backend_route_inventory.py` statically inventory the registered FastAPI surface without importing application modules or booting databases/providers.
 
-- health/readiness paths can be declared explicitly open;
-- protected route prefixes map to governance domains;
-- matching is path-segment aware, so `/api/studioevil` does not inherit `/api/studio`;
-- longest-prefix matching allows narrower domains such as `/api/studio/admin` to override `/api/studio`;
-- a written protected route without a verified principal returns a 401-style admission result;
-- an unwritten route is sealed with a 404-style result;
-- an admitted result carries only identity that already passed cryptographic verification;
-- domain-specific action authorization remains downstream in `CharterPolicy` / capability policy rather than being duplicated here.
+The scanner understands:
 
-`backend/core/route_policy_coverage.py` makes rollout measurable before enforcement:
+- the canonical `core/routes_registry.py` registry;
+- literal router/mount prefixes;
+- local `include_router` composition;
+- guarded direct router imports across modules;
+- local router factories;
+- imperative `add_api_route` calls;
+- the fixed in-repo GameForge CNS dynamic subrouter manifest;
+- recursion/cycle detection and explicit unresolved evidence for unsupported dynamic composition.
 
-- unique application paths are classified as explicit-open, domain-protected, or unwritten;
-- exact-match framework exclusions cannot hide an entire sensitive prefix;
-- per-domain route counts and deterministic path evidence are emitted;
-- an incomplete inventory can be promoted into a hard failure through `require_complete_route_policy`;
-- global policy enforcement therefore has a testable prerequisite instead of a manual readiness claim.
+The first strict clean baseline measured:
+
+- **217 / 217 registered route modules scanned**;
+- **2,158 method+path registrations**;
+- **2,114 unique paths**;
+- **0 unresolved route expressions**;
+- **0 duplicate method+path registrations**.
+
+Before strict mode was enabled, the inventory exposed 16 duplicate registrations. Consolidation removed the obsolete static Hub/Compiler collisions, separated the build-pipeline vault compatibility surface, and eliminated the duplicate swarm `/census` registration by making `swarm_cold_legion.py` one canonical router.
+
+`.github/workflows/backend-quality.yml` now runs the inventory with both `--strict` and `--fail-on-duplicates`, and `backend_route_collisions.py --fail` independently verifies that registration order cannot hide duplicate endpoints.
+
+## Fail-closed route policy and measured rollout
+
+`backend/core/route_policy_coverage.py` classifies unique application paths as explicit-open, domain-protected, or unwritten and can fail when coverage is incomplete.
+
+`backend/core/route_policy_catalog.py` adds the canonical report-only catalog. Health/readiness remain narrowly prefix-open; login/register/session are exact-open only so future descendants cannot silently become public. Protected domains use longest-prefix classification, with `/api` as an explicit protected migration bucket named `legacy_api`.
+
+On the clean baseline, `backend/scripts/backend_route_policy_report.py` measured complete written coverage and an enforcement-ready inventory. The first domain distribution included:
+
+- `studio`: 248 paths;
+- `gameforge`: 285;
+- `jeeves`: 54;
+- `worldforge`: 31;
+- `learning`: 99;
+- `vault`: 14;
+- `governance`: 13;
+- `build_artifacts`: 12;
+- `code_execution`: 10;
+- `collaboration`: 8;
+- smaller operations/identity/tooling domains;
+- `legacy_api`: 1,317 paths, approximately 62.7% of protected paths.
+
+The inventory is therefore structurally ready for report-only admission, but domain migration is not finished. `legacy_api` is deliberately protected rather than open; its ratio is the measurable debt to reduce before broad enforcement.
 
 ## Existing JWT/RBAC surface hardened
 
-Skeleton already had `backend/routes/gameforge_auth.py`, so the gate work now strengthens that route rather than introducing a second login/session system.
+Skeleton already had `backend/routes/gameforge_auth.py`, so the gate work strengthens that route rather than introducing a second login/session system.
 
 `backend/core/auth_security.py` now owns security-sensitive configuration:
 
 - production-like environments default to auth enforcement when no explicit override is provided;
-- production token minting requires an explicitly configured JWT secret of sufficient length;
+- production token minting requires an explicitly configured strong JWT secret;
 - local development without a configured secret gets a process-ephemeral secret instead of a public fixed fallback;
 - bootstrap admin creation is disabled unless an email/password pair is explicitly supplied;
 - bootstrap passwords are strength-bounded and excluded from object representation;
 - the external OAuth/session exchange URL is validated and must use HTTPS when auth is enforced;
 - diagnostics expose only non-secret configuration state.
 
-`backend/routes/gameforge_auth.py` was aligned with the repository's actual maintained dependency boundary:
-
-- PyJWT is used instead of the removed `python-jose` dependency;
-- tokens now carry and verify issuer, audience, issue/expiry timestamps and a unique JTI;
-- configured bootstrap credentials replace repository-embedded defaults;
-- deferred database imports remain boot-safe while security configuration fails closed in enforced environments;
-- the OAuth session endpoint is resolved before the network call, preventing configuration failure from being confused with provider unavailability.
+`backend/routes/gameforge_auth.py` now uses PyJWT, verifies issuer/audience, issues JTI-tagged tokens, removes repository-default administrator credentials and public fallback secrets, and resolves the OAuth provider endpoint before network access.
 
 Deployment note: removing repository defaults does not delete any historical administrator record that may already exist in a persistent database. Existing deployments should review/rotate legacy administrator credentials as part of rollout.
 
 ## Validation
 
-`backend/tests/test_principal_seal.py` covers principal issuance/verification, tampering, time windows, maximum TTL, rotation, weak/missing/unknown keys, malformed credentials, route boundaries and fail-closed protected/unwritten routes.
+The convergence/quality layers cover:
 
-`backend/tests/test_route_policy_coverage.py` covers deterministic coverage accounting, exact-only exclusions, complete/incomplete readiness, bounded failure evidence and JSON-friendly coverage snapshots.
+- principal seal issuance, tampering, TTL/skew and key rotation;
+- route-domain admission and coverage accounting;
+- exact-open bootstrap semantics;
+- auth configuration and the real PyJWT route contract;
+- recursive/static backend route inventory including CNS dynamic composition;
+- duplicate collision evidence;
+- inventory-backed route policy reporting;
+- existing WORM audit, charter policy, deployment trust and execution evidence suites.
 
-`backend/tests/test_auth_security.py` covers production/dev enforcement defaults, explicit flag parsing, secret requirements, ephemeral development secrets, opt-in bootstrap credentials, HTTPS session configuration and secret-free diagnostics.
-
-`backend/tests/test_gameforge_auth_hardening.py` executes the actual FastAPI auth module with the production PyJWT/bcrypt stack to prove issuer/audience/JTI token semantics, wrong-audience rejection, disabled-by-default bootstrap creation, explicitly configured bootstrap creation and production fail-closed token minting.
-
-All four suites are included in `.github/workflows/product-convergence.yml`; the workflow installs the focused production auth dependencies required to exercise the real route module. Earlier focused runs passed 15/15 principal tests and 21/21 combined principal/route-policy tests before the broader CI handoff.
+A strict route-baseline run passed Backend Quality, Product Convergence, Lint, Route Coverage and Deployment Trust together. CI/CD runs may be cancelled by newer pushes because this branch is receiving rapid consolidation commits; cancellation is not treated as a passing result.
 
 ## Rollout boundary
 
-The principal/domain contract is deliberately **not** installed globally as middleware in this slice. Skeleton has a large legacy API surface, and fail-closed policy is safe only after every intended route is either explicitly open or assigned to a domain. Turning it on before that inventory exists would convert a security improvement into an availability regression.
+The principal/domain contract is still **not** installed globally as enforcing middleware. Structural inventory readiness is now proven, but broad authorization rollout should remain staged:
 
-The next safe rollout sequence is:
-
-1. generate an explicit route inventory from the existing registered FastAPI routes;
-2. classify every production route as open or domain-protected;
-3. use `route_policy_coverage` to prove the inventory is complete;
-4. map sensitive domains into `CharterPolicy` / capability authorization;
-5. add a FastAPI adapter that verifies a principal seal and stores only `VerifiedPrincipal` on request state;
-6. append allow/deny decisions to the existing durable WORM evidence boundary where required;
-7. run the adapter in report-only mode and prove there are no unclassified legitimate requests;
-8. move protected domains to enforcement incrementally rather than flipping the whole API at once.
+1. continue splitting `legacy_api` paths into narrower governance domains;
+2. map sensitive domains into `CharterPolicy` / capability authorization;
+3. add a FastAPI report-only adapter that verifies a principal seal and stores only `VerifiedPrincipal` on request state;
+4. append allow/deny decisions to the existing durable WORM evidence boundary where required;
+5. compare report-only decisions against legitimate traffic and eliminate policy mismatches;
+6. enforce high-risk domains first;
+7. reduce the allowed `legacy_api` ratio through CI over time;
+8. only then consider broader default enforcement.
 
 This keeps the useful GameForge doctrine—verified identity, explicit policy and fail-closed evidence—while avoiding a second gateway stack and unsafe big-bang enforcement.
