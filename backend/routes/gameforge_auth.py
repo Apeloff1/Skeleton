@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated, Literal, Optional
 
 import bcrypt as _bcrypt
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr, Field
