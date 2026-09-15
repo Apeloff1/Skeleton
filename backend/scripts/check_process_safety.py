@@ -18,6 +18,7 @@ SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", "node_modules"}
 SUBPROCESS_CALLS = {"run", "call", "check_call", "check_output", "Popen"}
 TRACKED_MODULES = {"asyncio", "os", "subprocess"}
 KNOWN_MODULES = TRACKED_MODULES | {"functools"}
+ALIASABLE_HELPERS = {"getattr", "vars", "functools.partial"}
 UNSAFE_CALLS = {
     "os.system": "os.system() is forbidden",
     "os.popen": "os.popen() is forbidden",
@@ -98,8 +99,7 @@ def namespace_mapping_owner(node: ast.AST, aliases: dict[str, str]) -> str | Non
         return owner if owner in TRACKED_MODULES else None
     if (
         isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "vars"
+        and canonical_name(node.func, aliases) == "vars"
         and len(node.args) == 1
         and not node.keywords
     ):
@@ -187,7 +187,7 @@ def destructured_assignments(target: ast.AST, value: ast.AST) -> list[tuple[str,
 
 
 def assignment_aliases(tree: ast.AST, aliases: dict[str, str]) -> dict[str, str]:
-    """Resolve aliases assigned from tracked process callables or namespace mappings."""
+    """Resolve aliases assigned from tracked process callables or policy helpers."""
     resolved = dict(aliases)
     assignments: list[tuple[str, ast.AST]] = []
     for node in ast.walk(tree):
@@ -202,6 +202,7 @@ def assignment_aliases(tree: ast.AST, aliases: dict[str, str]) -> dict[str, str]
         UNSAFE_CALLS.keys()
         | {f"subprocess.{call}" for call in SUBPROCESS_CALLS}
         | {f"{module}.__dict__" for module in TRACKED_MODULES}
+        | ALIASABLE_HELPERS
     )
     changed = True
     while changed:
