@@ -1,12 +1,15 @@
-"""Contract tests for API/CLI command parity and error semantics."""
+"""Contract tests for API/CLI command parity and error/auth semantics."""
 
 from __future__ import annotations
 
 import asyncio
 import json
 
+import pytest
+from fastapi import HTTPException
+
 from skeleton.__main__ import main
-from skeleton.api.command_routes import execute_command
+from skeleton.api import command_routes
 from skeleton.application import CommandService, build_runtime_command_service, parity_matrix
 
 
@@ -26,6 +29,12 @@ def test_parity_matrix_maps_all_required_operation_families():
     assert set(rows) == {"run", "tool", "memory", "status", "configuration", "admin"}
     assert matrix["full_surface_parity"] is True
     assert all(row["api"] and row["cli"] for row in rows.values())
+    assert {name for name, row in rows.items() if row["auth_required"]} == {
+        "run",
+        "tool",
+        "memory",
+        "admin",
+    }
 
 
 def test_unknown_command_has_stable_cli_and_http_semantics():
@@ -74,8 +83,48 @@ def test_cli_status_uses_shared_contract(capsys):
     assert payload["contract_version"] == parity_matrix()["contract_version"]
 
 
-def test_api_status_uses_shared_contract():
-    response = asyncio.run(execute_command("status", {}, state=_FakeState()))
+def test_api_status_uses_shared_contract_without_seal(monkeypatch):
+    def unexpected_seal(_value):
+        raise AssertionError("public status command must not require a seal")
+
+    monkeypatch.setattr(command_routes, "require_seal", unexpected_seal)
+    response = asyncio.run(
+        command_routes.execute_command("status", {}, state=_FakeState(), x_gf_seal=None)
+    )
     assert response["command"] == "status"
     assert response["ok"] is True
     assert response["data"]["status"] == "healthy"
+
+
+@pytest.mark.parametrize("command", ["run", "tool", "memory", "admin"])
+def test_api_auth_required_commands_cross_hmac_seal_boundary(monkeypatch, command):
+    observed = []
+
+    def fake_require_seal(value):
+        observed.append(value)
+        if value != "valid-seal":
+            raise HTTPException(status_code=401, detail="invalid seal")
+        return "attester"
+
+    monkeypatch.setattr(command_routes, "require_seal", fake_require_seal)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            command_routes.execute_command(command, {}, state=_FakeState(), x_gf_seal=None)
+        )
+    assert exc_info.value.status_code == 401
+    assert observed == [None]
+
+    observed.clear()
+    response = asyncio.run(
+        command_routes.execute_command(
+            command,
+            {},
+            state=_FakeState(),
+            x_gf_seal="valid-seal",
+        )
+    )
+    assert observed == ["valid-seal"]
+    assert response.status_code == 503
+    payload = json.loads(response.body)
+    assert payload["error"]["code"] == "unavailable"
