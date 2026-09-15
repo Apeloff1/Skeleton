@@ -150,6 +150,32 @@ waves:
       - skeleton/testing/test_frontier_aquarium_benchmark.py
       - scripts/benchmark_frontier_aquarium.py
       - docs/lineage/AQUARIUM_PROMOTION_2026-09-15.md
+post_v11_hardening:
+  - surface: runtime-idempotency-identity
+    decision: harden-promoted-gameforge-idempotency-semantics
+    source:
+      repository: Apeloff1/gameforge-rs
+      path: crates/gf-core/src/lib.rs
+      blob: 481fcfca5a23272b70353eb09b7c3406bbc9bdd9
+    target: skeleton/frontier/agent_runtime.py
+    commits:
+      implementation: bed0391456fa217483915388c9571334ed14b03d
+      regression_evidence: 551fa08be519c4d2fbc99877da60aaed3e379a90
+    hardening:
+      - strict-json-domain-for-keyed-context
+      - finite-number-enforcement
+      - string-only-json-object-keys
+      - recursive-container-rejection
+      - exact-normalized-idempotency-key-identity
+      - canonical-object-order-independent-fingerprint
+      - abnormal-owner-exit-reservation-cleanup
+      - unkeyed-python-context-compatibility-preserved
+    evidence:
+      - skeleton/testing/test_frontier_runtime_idempotency_boundary.py
+    rejected_from_kernel:
+      - mongodb-duplicate-key-guard
+      - source-outbox-plumbing
+      - provider-specific-serialization
 rejected_from_kernel:
   - source-catalogs
   - fastapi-routes
