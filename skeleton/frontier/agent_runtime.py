@@ -23,12 +23,45 @@ class AgentLike(AgentContract, Protocol):
     async def run(self, task: str, context: Mapping[str, Any] | None = None) -> Any: ...
 
 
-def _normalize_capabilities(capabilities: Iterable[str]) -> frozenset[str]:
-    return frozenset(
-        capability.strip().lower()
-        for capability in capabilities
-        if capability and capability.strip()
-    )
+def _require_normalized_text(value: object, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"{field_name} must be a string")
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError(f"{field_name} must not be empty")
+    if normalized != value:
+        raise ValueError(f"{field_name} must be normalized")
+    return value
+
+
+def _optional_normalized_text(value: object, field_name: str) -> str | None:
+    if value is None:
+        return None
+    return _require_normalized_text(value, field_name)
+
+
+def _normalize_capabilities(
+    capabilities: Iterable[str],
+    *,
+    field_name: str = "capabilities",
+) -> frozenset[str]:
+    if isinstance(capabilities, (str, bytes)):
+        raise TypeError(f"{field_name} must be an iterable of strings, not a string")
+
+    normalized: set[str] = set()
+    try:
+        iterator = iter(capabilities)
+    except TypeError as exc:
+        raise TypeError(f"{field_name} must be an iterable of strings") from exc
+
+    for capability in iterator:
+        if not isinstance(capability, str):
+            raise TypeError(f"{field_name} entries must be strings")
+        value = capability.strip().lower()
+        if not value:
+            raise ValueError(f"{field_name} entries must not be empty")
+        normalized.add(value)
+    return frozenset(normalized)
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,21 +101,29 @@ class AgentRuntime:
     ] = field(default_factory=OrderedDict, init=False, repr=False)
 
     def __post_init__(self) -> None:
+        if isinstance(self.idempotency_capacity, bool) or not isinstance(
+            self.idempotency_capacity, int
+        ):
+            raise TypeError("idempotency_capacity must be an integer")
         if self.idempotency_capacity < 1:
             raise ValueError("idempotency_capacity must be positive")
 
     def register(self, agent: AgentLike) -> None:
-        if not agent.name.strip():
-            raise ValueError("agent name must not be empty")
-        if agent.name in self.agents:
-            raise ValueError(f"agent already registered: {agent.name}")
-        self.agents[agent.name] = agent
+        name = _require_normalized_text(getattr(agent, "name", None), "agent name")
+        capabilities = getattr(agent, "capabilities", None)
+        if capabilities is None:
+            raise TypeError("agent capabilities must be an iterable of strings")
+        _normalize_capabilities(capabilities, field_name="agent capabilities")
+        if name in self.agents:
+            raise ValueError(f"agent already registered: {name}")
+        self.agents[name] = agent
 
     def resolve(self, name: str) -> AgentLike:
+        normalized_name = _require_normalized_text(name, "agent name")
         try:
-            return self.agents[name]
+            return self.agents[normalized_name]
         except KeyError as exc:
-            raise KeyError(f"unknown agent: {name}") from exc
+            raise KeyError(f"unknown agent: {normalized_name}") from exc
 
     async def _reserve_idempotency(
         self,
@@ -145,14 +186,40 @@ class AgentRuntime:
         source_path: str | None = None,
         idempotency_key: str | None = None,
     ) -> ExecutionResult:
-        if not task.strip():
-            raise ValueError("task must not be empty")
-        agent = self.resolve(agent_name)
+        normalized_agent_name = _require_normalized_text(agent_name, "agent name")
+        normalized_task = _require_normalized_text(task, "task")
+        normalized_source_repository = _require_normalized_text(
+            source_repository,
+            "source_repository",
+        )
+        normalized_source_revision = _optional_normalized_text(
+            source_revision,
+            "source_revision",
+        )
+        normalized_source_path = _optional_normalized_text(source_path, "source_path")
+        if context is not None and not isinstance(context, Mapping):
+            raise TypeError("context must be a mapping")
+        normalized_context = dict(context or {})
 
-        required = set(_normalize_capabilities(required_capabilities or ()))
-        if required_capability:
-            required.update(_normalize_capabilities((required_capability,)))
-        available = _normalize_capabilities(agent.capabilities)
+        agent = self.resolve(normalized_agent_name)
+
+        required = set(
+            _normalize_capabilities(
+                required_capabilities or (),
+                field_name="required_capabilities",
+            )
+        )
+        if required_capability is not None:
+            required.update(
+                _normalize_capabilities(
+                    (required_capability,),
+                    field_name="required_capability",
+                )
+            )
+        available = _normalize_capabilities(
+            agent.capabilities,
+            field_name="agent capabilities",
+        )
         missing = sorted(required.difference(available))
         if missing:
             raise PermissionError(
@@ -163,18 +230,20 @@ class AgentRuntime:
         shared_future: asyncio.Future[ExecutionResult] | None = None
         owns_reservation = False
         if idempotency_key is not None:
+            if not isinstance(idempotency_key, str):
+                raise TypeError("idempotency_key must be a string")
             normalized_key = idempotency_key.strip()
             if not normalized_key:
                 raise ValueError("idempotency_key must not be empty")
             fingerprint = stable_content_digest(
                 {
                     "agent": agent.name,
-                    "task": task,
-                    "context": dict(context or {}),
+                    "task": normalized_task,
+                    "context": normalized_context,
                     "required_capabilities": sorted(required),
-                    "source_repository": source_repository,
-                    "source_revision": source_revision,
-                    "source_path": source_path,
+                    "source_repository": normalized_source_repository,
+                    "source_revision": normalized_source_revision,
+                    "source_path": normalized_source_path,
                 }
             )
             shared_future, owns_reservation = await self._reserve_idempotency(
@@ -186,7 +255,7 @@ class AgentRuntime:
 
         provenance_metadata = {
             "agent": agent.name,
-            "task": task,
+            "task": normalized_task,
             "required_capabilities": sorted(required),
             "agent_capabilities": sorted(available),
         }
@@ -198,21 +267,25 @@ class AgentRuntime:
         started = datetime.now(timezone.utc)
         try:
             try:
-                output = await agent.run(task, context)
+                output = await agent.run(normalized_task, normalized_context)
             except Exception as exc:
                 finished = datetime.now(timezone.utc)
                 error = f"{type(exc).__name__}: {exc}"
                 result = ExecutionResult(
-                    task=task,
+                    task=normalized_task,
                     agent=agent.name,
                     started_at=started,
                     finished_at=finished,
                     error=error,
                     provenance=ProvenanceRecord.for_artifact(
-                        source_repository=source_repository,
-                        source_revision=source_revision,
-                        source_path=source_path,
-                        payload={"task": task, "agent": agent.name, "error": error},
+                        source_repository=normalized_source_repository,
+                        source_revision=normalized_source_revision,
+                        source_path=normalized_source_path,
+                        payload={
+                            "task": normalized_task,
+                            "agent": agent.name,
+                            "error": error,
+                        },
                         operation="agent.execute.failed",
                         metadata=provenance_metadata,
                     ),
@@ -220,15 +293,15 @@ class AgentRuntime:
             else:
                 finished = datetime.now(timezone.utc)
                 result = ExecutionResult(
-                    task=task,
+                    task=normalized_task,
                     agent=agent.name,
                     started_at=started,
                     finished_at=finished,
                     output=output,
                     provenance=ProvenanceRecord.for_artifact(
-                        source_repository=source_repository,
-                        source_revision=source_revision,
-                        source_path=source_path,
+                        source_repository=normalized_source_repository,
+                        source_revision=normalized_source_revision,
+                        source_path=normalized_source_path,
                         payload=output,
                         operation="agent.execute.completed",
                         metadata=provenance_metadata,
