@@ -1,129 +1,98 @@
 name: PR Hygiene
 
 on:
-  pull_request:
-    types: [opened, reopened, synchronize, edited, ready_for_review]
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited, ready_for_review, converted_to_draft]
 
 concurrency:
   group: pr-hygiene-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+# This privileged workflow never checks out or executes pull-request code.
 permissions:
   contents: read
+  issues: write
+  pull-requests: read
 
 jobs:
-  label:
-    name: Keep pull requests easy to scan
-    if: github.event.pull_request.head.repo.full_name == github.repository
+  classify:
+    name: Classify pull request
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    permissions:
-      contents: read
-      issues: write
-      pull-requests: write
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
       PR: ${{ github.event.pull_request.number }}
     steps:
-      - name: Ensure managed labels exist
+      - name: Apply size, area, dependency, and risk labels
         shell: bash
         run: |
           set -euo pipefail
-
-          ensure_label() {
-            local name="$1"
-            local color="$2"
-            local description="$3"
-            gh label create "$name" --repo "$REPO" --color "$color" --description "$description" --force >/dev/null
-          }
-
-          ensure_label 'size/xs' 'c5def5' 'Very small pull request (0-50 changed lines)'
-          ensure_label 'size/s' 'bfdadc' 'Small pull request (51-200 changed lines)'
-          ensure_label 'size/m' 'fef2c0' 'Medium pull request (201-500 changed lines)'
-          ensure_label 'size/l' 'f9d0c4' 'Large pull request (501-1000 changed lines)'
-          ensure_label 'size/xl' 'd93f0b' 'Extra-large pull request (more than 1000 changed lines)'
-          ensure_label 'area/backend' '1d76db' 'Touches backend code'
-          ensure_label 'area/frontend' '5319e7' 'Touches frontend code'
-          ensure_label 'area/core' '0e8a16' 'Touches Skeleton core/runtime code'
-          ensure_label 'area/tests' '7057ff' 'Touches tests or test fixtures'
-          ensure_label 'area/automation' '6f42c1' 'Touches GitHub automation or repository tooling'
-          ensure_label 'area/docs' '0075ca' 'Touches documentation'
-          ensure_label 'area/infrastructure' 'b60205' 'Touches containers or infrastructure files'
-
-      - name: Calculate and apply size label
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          meta=$(gh pr view "$PR" --repo "$REPO" --json additions,deletions,labels)
-          additions=$(jq -r '.additions' <<<"$meta")
-          deletions=$(jq -r '.deletions' <<<"$meta")
+          files="$RUNNER_TEMP/pr-files.txt"
+          pr_json=$(gh api "/repos/${REPO}/pulls/${PR}")
+          gh api --paginate "/repos/${REPO}/pulls/${PR}/files?per_page=100" --jq '.[].filename' > "$files"
+          additions=$(jq -r '.additions' <<<"$pr_json")
+          deletions=$(jq -r '.deletions' <<<"$pr_json")
           changed=$((additions + deletions))
 
-          if (( changed <= 50 )); then
-            target='size/xs'
-          elif (( changed <= 200 )); then
-            target='size/s'
-          elif (( changed <= 500 )); then
-            target='size/m'
-          elif (( changed <= 1000 )); then
-            target='size/l'
-          else
-            target='size/xl'
-          fi
+          if (( changed <= 50 )); then size='size/xs';
+          elif (( changed <= 200 )); then size='size/s';
+          elif (( changed <= 500 )); then size='size/m';
+          elif (( changed <= 1000 )); then size='size/l';
+          else size='size/xl'; fi
 
-          for label in size/xs size/s size/m size/l size/xl; do
-            if jq -e --arg label "$label" '.labels[]? | select(.name == $label)' <<<"$meta" >/dev/null; then
-              gh pr edit "$PR" --repo "$REPO" --remove-label "$label" >/dev/null
+          desired=("$size")
+          grep -Eq '^backend/' "$files" && desired+=(area/backend) || true
+          grep -Eq '^frontend/' "$files" && desired+=(area/frontend) || true
+          grep -Eq '^skeleton/' "$files" && desired+=(area/core) || true
+          grep -Eq '(^|/)(tests?|testing|fixtures?)/|(^|/)test_[^/]+\.py$|\.test\.[jt]sx?$|\.spec\.[jt]sx?$' "$files" && desired+=(area/tests) || true
+          grep -Eq '^\.github/|^scripts/' "$files" && desired+=(area/automation) || true
+          grep -Eqi '(^|/)(docs?|documentation)/|(^|/)(README|CONTRIBUTING|SECURITY|CODE_OF_CONDUCT)(\.|$)|\.md$' "$files" && desired+=(area/docs) || true
+          grep -Eqi '(^|/)(Dockerfile|docker-compose[^/]*\.ya?ml)$|(^|/)(infra|infrastructure|deploy|deployment)/' "$files" && desired+=(area/infrastructure) || true
+          grep -Eqi '(^|/)(package(-lock)?\.json|yarn\.lock|pnpm-lock\.ya?ml|requirements[^/]*\.txt|pyproject\.toml|uv\.lock|poetry\.lock|Pipfile(\.lock)?|Dockerfile)$|^\.github/dependabot\.yml$' "$files" && desired+=(change/dependencies) || true
+          grep -Eqi '^\.github/workflows/|(^|/)(auth|security|crypto|migrations?|infra|infrastructure|deploy|deployment)(/|$)|(^|/)Dockerfile$' "$files" && desired+=(risk/high) || true
+
+          managed=(size/xs size/s size/m size/l size/xl area/backend area/frontend area/core area/tests area/automation area/docs area/infrastructure change/dependencies risk/high)
+
+          label_spec() {
+            case "$1" in
+              size/xs) printf '%s\t%s\n' c5def5 'Very small pull request (0-50 changed lines)' ;;
+              size/s) printf '%s\t%s\n' bfdadc 'Small pull request (51-200 changed lines)' ;;
+              size/m) printf '%s\t%s\n' fef2c0 'Medium pull request (201-500 changed lines)' ;;
+              size/l) printf '%s\t%s\n' f9d0c4 'Large pull request (501-1000 changed lines)' ;;
+              size/xl) printf '%s\t%s\n' d93f0b 'Extra-large pull request (more than 1000 changed lines)' ;;
+              area/backend) printf '%s\t%s\n' 1d76db 'Touches backend code' ;;
+              area/frontend) printf '%s\t%s\n' 5319e7 'Touches frontend code' ;;
+              area/core) printf '%s\t%s\n' 0e8a16 'Touches Skeleton core/runtime code' ;;
+              area/tests) printf '%s\t%s\n' 7057ff 'Touches tests or test fixtures' ;;
+              area/automation) printf '%s\t%s\n' 6f42c1 'Touches GitHub automation or repository tooling' ;;
+              area/docs) printf '%s\t%s\n' 0075ca 'Touches documentation' ;;
+              area/infrastructure) printf '%s\t%s\n' b60205 'Touches containers or infrastructure files' ;;
+              change/dependencies) printf '%s\t%s\n' 0366d6 'Changes dependency manifests or lockfiles' ;;
+              risk/high) printf '%s\t%s\n' b60205 'Touches security, workflow, migration, or deployment boundaries' ;;
+            esac
+          }
+
+          existing=$(gh api --paginate "/repos/${REPO}/labels?per_page=100" --jq '.[].name')
+          for label in "${desired[@]}"; do
+            if ! grep -Fxq "$label" <<<"$existing"; then
+              IFS=$'\t' read -r color description < <(label_spec "$label")
+              gh label create "$label" --repo "$REPO" --color "$color" --description "$description" --force >/dev/null
             fi
           done
-          gh pr edit "$PR" --repo "$REPO" --add-label "$target" >/dev/null
+
+          current=$(gh api "/repos/${REPO}/issues/${PR}/labels?per_page=100")
+          current_names=$(jq '[.[].name]' <<<"$current")
+          managed_json=$(printf '%s\n' "${managed[@]}" | jq -R . | jq -s .)
+          desired_json=$(printf '%s\n' "${desired[@]}" | jq -R . | jq -s 'unique')
+          payload=$(jq -n --argjson current "$current_names" --argjson managed "$managed_json" --argjson desired "$desired_json" '{labels: (($current - $managed + $desired) | unique)}')
+          printf '%s' "$payload" | gh api --method PUT "/repos/${REPO}/issues/${PR}/labels" --input - >/dev/null
 
           {
             echo '## PR hygiene'
             echo "- Changed lines: $changed (+$additions / -$deletions)"
-            echo "- Size label: $target"
+            echo '- Managed labels:'
+            printf '%s\n' "${desired[@]}" | sort -u | sed 's/^/  - `/' | sed 's/$/`/'
+            echo '- Manual labels are preserved.'
+            echo '- Pull-request code was not checked out or executed.'
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Apply area labels from changed paths
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          managed=(
-            area/backend
-            area/frontend
-            area/core
-            area/tests
-            area/automation
-            area/docs
-            area/infrastructure
-          )
-
-          current=$(gh pr view "$PR" --repo "$REPO" --json labels)
-          for label in "${managed[@]}"; do
-            if jq -e --arg label "$label" '.labels[]? | select(.name == $label)' <<<"$current" >/dev/null; then
-              gh pr edit "$PR" --repo "$REPO" --remove-label "$label" >/dev/null
-            fi
-          done
-
-          files=$(gh pr view "$PR" --repo "$REPO" --json files --jq '.files[].path')
-          labels=()
-
-          grep -Eq '^backend/' <<<"$files" && labels+=(area/backend) || true
-          grep -Eq '^frontend/' <<<"$files" && labels+=(area/frontend) || true
-          grep -Eq '^skeleton/' <<<"$files" && labels+=(area/core) || true
-          grep -Eq '(^|/)(tests?|testing|fixtures?)/|(^|/)test_[^/]+\.py$|\.test\.[jt]sx?$|\.spec\.[jt]sx?$' <<<"$files" && labels+=(area/tests) || true
-          grep -Eq '^\.github/|^scripts/' <<<"$files" && labels+=(area/automation) || true
-          grep -Eqi '(^|/)(docs?|documentation)/|(^|/)(README|CONTRIBUTING|SECURITY|CODE_OF_CONDUCT)(\.|$)|\.md$' <<<"$files" && labels+=(area/docs) || true
-          grep -Eqi '(^|/)(Dockerfile|docker-compose[^/]*\.ya?ml)$|(^|/)(infra|infrastructure|deploy|deployment)/' <<<"$files" && labels+=(area/infrastructure) || true
-
-          if ((${#labels[@]} > 0)); then
-            for label in "${labels[@]}"; do
-              gh pr edit "$PR" --repo "$REPO" --add-label "$label" >/dev/null
-            done
-            printf '%s\n' "${labels[@]}" | sed 's/^/- Area: /' >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo '- Area: unclassified' >> "$GITHUB_STEP_SUMMARY"
-          fi
