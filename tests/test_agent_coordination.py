@@ -20,7 +20,8 @@ def test_failed_handler_releases_agent_capacity() -> None:
 
     first = coordinator.dispatch("first", task_type="work")
     assert first.status is TaskStatus.FAILED
-    assert first.error == "boom"
+    assert first.error == "ToolExecutionError: tool 'work' failed with RuntimeError"
+    assert "boom" not in first.error
     assert pool.stats()["total_load"] == 0
 
     first_run = coordinator.get_run_record(first.task_id)
@@ -28,10 +29,12 @@ def test_failed_handler_releases_agent_capacity() -> None:
     assert first_run.status is RunStatus.FAILED
     assert first_run.steps[-1].kind is StepKind.TOOL
     assert first_run.steps[-1].status is StepStatus.FAILED
+    assert "boom" not in (first_run.error or "")
+    assert "boom" not in (first_run.steps[-1].error or "")
 
     second = coordinator.dispatch("second", task_type="work")
     assert second.status is TaskStatus.FAILED
-    assert second.error == "boom"
+    assert second.error == "ToolExecutionError: tool 'work' failed with RuntimeError"
     assert pool.stats()["total_load"] == 0
     assert pool.stats()["tasks_assigned"] == 2
 
