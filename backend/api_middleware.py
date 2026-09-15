@@ -91,6 +91,7 @@ _TRUSTED_PROXY_NETWORKS = _parse_trusted_proxy_networks(
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 _MAX_XFF_HOPS = 32
+_MAX_XFF_CHARS = 2048
 
 # Telemetry counters (in-memory) ───────────────────────────────────────
 _lat_ring: Deque[float] = deque(maxlen=1024)
@@ -210,8 +211,8 @@ def _client_ip(request: Request) -> str:
     The direct peer is authoritative unless it is explicitly trusted. For a
     trusted peer, one bounded well-formed XFF chain is walked right-to-left,
     skipping trusted proxy hops and selecting the nearest untrusted address.
-    Ambiguous, malformed, or overlong forwarded headers fail closed to the
-    direct peer.
+    Ambiguous, malformed, oversized, or overlong forwarded headers fail closed
+    to the direct peer.
     """
     client = request.client
     peer = client.host.strip() if client and client.host else "-"
@@ -222,7 +223,10 @@ def _client_ip(request: Request) -> str:
     forwarded_headers = request.headers.getlist("x-forwarded-for")
     if len(forwarded_headers) != 1:
         return canonical_peer or peer
-    parts = [part.strip() for part in forwarded_headers[0].split(",")]
+    forwarded_value = forwarded_headers[0]
+    if len(forwarded_value) > _MAX_XFF_CHARS:
+        return canonical_peer or peer
+    parts = [part.strip() for part in forwarded_value.split(",")]
     if not parts or len(parts) > _MAX_XFF_HOPS or any(not part for part in parts):
         return canonical_peer or peer
 

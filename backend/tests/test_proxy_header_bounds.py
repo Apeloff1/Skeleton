@@ -26,18 +26,38 @@ def _request(client_host: str, xff: str) -> Request:
     )
 
 
-def test_xff_chain_has_hard_hop_bound(monkeypatch) -> None:
+def _trust_test_proxy(monkeypatch) -> None:
     monkeypatch.setattr(
         api_middleware,
         "_TRUSTED_PROXY_NETWORKS",
         (ipaddress.ip_network("10.0.0.0/8"),),
     )
+
+
+def test_xff_chain_has_hard_hop_bound(monkeypatch) -> None:
+    _trust_test_proxy(monkeypatch)
     peer = "10.0.0.5"
     within_bound = ",".join(f"198.51.100.{index}" for index in range(1, 33))
     over_bound = within_bound + ",198.51.100.33"
 
     assert api_middleware._client_ip(_request(peer, within_bound)) == "198.51.100.32"
     assert api_middleware._client_ip(_request(peer, over_bound)) == peer
+
+
+def test_xff_value_has_hard_character_bound_before_ip_parsing(monkeypatch) -> None:
+    _trust_test_proxy(monkeypatch)
+    peer = "10.0.0.5"
+    original = api_middleware._canonical_ip
+
+    def guarded_canonical_ip(value: str):
+        if len(value) > 1000:
+            raise AssertionError("oversized forwarded value reached the IP parser")
+        return original(value)
+
+    monkeypatch.setattr(api_middleware, "_canonical_ip", guarded_canonical_ip)
+    oversized = "1" * (api_middleware._MAX_XFF_CHARS + 1)
+
+    assert api_middleware._client_ip(_request(peer, oversized)) == peer
 
 
 def test_telemetry_reports_proxy_count_without_disclosing_networks(monkeypatch) -> None:
