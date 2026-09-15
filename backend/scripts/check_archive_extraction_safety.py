@@ -9,7 +9,6 @@ quality gate.
 from __future__ import annotations
 
 import ast
-from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
 import sys
@@ -29,6 +28,7 @@ SKIP_DIRS = {
 PYTHON_SCOPES = (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
 TARFILE_CONSTRUCTORS = {"tarfile.open", "tarfile.TarFile", "tarfile.TarFile.open"}
 TARFILE_EXTRACTION_CALLS = {"tarfile.TarFile.extract", "tarfile.TarFile.extractall"}
+TARFILE_SAFE_CALLABLES = TARFILE_CONSTRUCTORS | TARFILE_EXTRACTION_CALLS | {"tarfile.data_filter"}
 
 
 def production_python_files() -> Iterable[Path]:
@@ -84,11 +84,17 @@ def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
     name = dotted_name(node)
     if not name:
         return None
-    root, dot, suffix = name.partition(".")
-    replacement = aliases.get(root)
-    if replacement is None:
-        return name
-    return replacement + (f".{suffix}" if dot else "")
+
+    # Prefer the longest exact/prefix binding so instance attributes such as
+    # ``holder.archive.extractall`` can resolve through ``holder.archive``
+    # before a shorter import alias is considered.
+    for alias in sorted(aliases, key=len, reverse=True):
+        if name == alias:
+            return aliases[alias]
+        prefix = alias + "."
+        if name.startswith(prefix):
+            return aliases[alias] + name[len(alias) :]
+    return name
 
 
 def _scope_nodes(scope: ast.AST) -> Iterable[ast.AST]:
@@ -105,6 +111,9 @@ def _scope_nodes(scope: ast.AST) -> Iterable[ast.AST]:
 def _target_names(target: ast.AST | None) -> set[str]:
     if isinstance(target, ast.Name):
         return {target.id}
+    if isinstance(target, ast.Attribute):
+        name = dotted_name(target)
+        return {name} if name else set()
     if isinstance(target, (ast.Tuple, ast.List)):
         names: set[str] = set()
         for item in target.elts:
@@ -113,49 +122,84 @@ def _target_names(target: ast.AST | None) -> set[str]:
     return set()
 
 
-def _parameter_names(scope: ast.AST) -> set[str]:
-    if not isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
-        return set()
-    args = scope.args
-    names = {arg.arg for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs)}
-    if args.vararg:
-        names.add(args.vararg.arg)
-    if args.kwarg:
-        names.add(args.kwarg.arg)
-    return names
+def _assignment_pairs(scope: ast.AST) -> Iterable[tuple[set[str], ast.AST]]:
+    for node in _scope_nodes(scope):
+        if isinstance(node, ast.Assign):
+            names: set[str] = set()
+            for target in node.targets:
+                names.update(_target_names(target))
+            if names:
+                yield names, node.value
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            names = _target_names(node.target)
+            if names:
+                yield names, node.value
+        elif isinstance(node, ast.NamedExpr):
+            names = _target_names(node.target)
+            if names:
+                yield names, node.value
+
+
+def _callable_aliases(scope: ast.AST, aliases: dict[str, str]) -> dict[str, str]:
+    """Infer simple aliases to tarfile constructors, extraction methods, and data_filter."""
+    inferred: dict[str, str] = {}
+    current = dict(aliases)
+    # A small bounded fixpoint handles chains such as ``open_tar = tarfile.open``
+    # followed by ``open_again = open_tar`` without turning this into dataflow.
+    for _ in range(4):
+        changed = False
+        for names, value in _assignment_pairs(scope):
+            canonical = canonical_name(value, current)
+            if canonical not in TARFILE_SAFE_CALLABLES:
+                continue
+            for name in names:
+                if current.get(name) == canonical:
+                    continue
+                inferred[name] = canonical
+                current[name] = canonical
+                changed = True
+        if not changed:
+            break
+    return inferred
 
 
 def _tarfile_bindings(scope: ast.AST, aliases: dict[str, str]) -> dict[str, str]:
-    """Infer stable names bound directly to a TarFile instance."""
-    nodes = list(_scope_nodes(scope))
-    stores = Counter(
-        node.id
-        for node in nodes
-        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
-    )
+    """Infer names/attributes ever bound directly to a TarFile instance.
+
+    Once a symbol is proven to hold a TarFile in the scope we conservatively keep
+    treating extraction through that symbol as security-sensitive even if it is
+    later reassigned. Dropping multiply-stored symbols created a fail-open bypass.
+    """
     candidates: set[str] = set()
 
-    for node in nodes:
-        if isinstance(node, (ast.Assign, ast.AnnAssign)):
-            value = node.value
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            if isinstance(value, ast.Call) and canonical_name(value.func, aliases) in TARFILE_CONSTRUCTORS:
-                for target in targets:
-                    candidates.update(_target_names(target))
-        elif isinstance(node, (ast.With, ast.AsyncWith)):
-            for item in node.items:
-                if (
-                    isinstance(item.context_expr, ast.Call)
-                    and canonical_name(item.context_expr.func, aliases) in TARFILE_CONSTRUCTORS
-                ):
-                    candidates.update(_target_names(item.optional_vars))
+    for names, value in _assignment_pairs(scope):
+        if isinstance(value, ast.Call) and canonical_name(value.func, aliases) in TARFILE_CONSTRUCTORS:
+            candidates.update(names)
 
-    parameters = _parameter_names(scope)
-    return {
-        name: "tarfile.TarFile"
-        for name in candidates
-        if stores[name] == 1 and name not in parameters
-    }
+    for node in _scope_nodes(scope):
+        if not isinstance(node, (ast.With, ast.AsyncWith)):
+            continue
+        for item in node.items:
+            if (
+                isinstance(item.context_expr, ast.Call)
+                and canonical_name(item.context_expr.func, aliases) in TARFILE_CONSTRUCTORS
+            ):
+                candidates.update(_target_names(item.optional_vars))
+
+    return {name: "tarfile.TarFile" for name in candidates}
+
+
+def _scope_aliases(scope: ast.AST, import_map: dict[str, str]) -> dict[str, str]:
+    aliases = dict(import_map)
+    for _ in range(4):
+        before = dict(aliases)
+        aliases.update(_callable_aliases(scope, aliases))
+        aliases.update(_tarfile_bindings(scope, aliases))
+        # Instance bindings can make method aliases resolvable on the next pass.
+        aliases.update(_callable_aliases(scope, aliases))
+        if aliases == before:
+            break
+    return aliases
 
 
 def _keyword(node: ast.Call, name: str) -> ast.AST | None:
@@ -195,7 +239,7 @@ def violations(path: Path) -> list[str]:
     findings: list[str] = []
     scopes = [node for node in ast.walk(tree) if isinstance(node, PYTHON_SCOPES)]
     for scope in scopes:
-        aliases = {**import_map, **_tarfile_bindings(scope, import_map)}
+        aliases = _scope_aliases(scope, import_map)
         for node in _scope_nodes(scope):
             if not isinstance(node, ast.Call):
                 continue
@@ -222,7 +266,7 @@ def main() -> int:
         for finding in sorted(findings):
             print(f"  - {finding}", file=sys.stderr)
         return 1
-    print("Archive extraction safety gate passed: all tar extraction uses the data filter.")
+    print("Archive extraction safety gate passed: all tracked tar extraction uses the data filter.")
     return 0
 
 
