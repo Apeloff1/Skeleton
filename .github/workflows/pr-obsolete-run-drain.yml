@@ -4,21 +4,29 @@ on:
   workflow_run:
     workflows: ["PR Lifecycle Signal"]
     types: [requested]
+  schedule:
+    - cron: '*/10 * * * *'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/pr-obsolete-run-drain.yml'
+      - 'backend/scripts/pr_obsolete_run_drain.py'
+      - 'backend/scripts/pr_obsolete_run_sweep.py'
 
-# Privilege separation: the pull-request workflow is read-only and executes no
-# repository code. This privileged drainer is loaded from the default branch by
-# workflow_run and checks out only the trusted default-branch SHA. Trigger on
-# requested so cleanup can begin when the signal run is created instead of
-# waiting for that read-only signal to consume runner capacity first.
+# Privilege separation: pull-request code only emits a read-only lifecycle
+# signal. Privileged cleanup is loaded from the default branch. The event-driven
+# path drains one PR immediately; trusted main/scheduled runs reconcile backlog
+# whose original lifecycle signal was missed.
 permissions: {}
 
 concurrency:
-  group: pr-run-drain-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+  group: pr-run-drain-${{ github.event_name }}-${{ github.event.workflow_run.head_branch || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
   drain:
     if: >-
+      github.event_name == 'workflow_run' &&
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
       github.event.workflow_run.head_branch != github.event.repository.default_branch
@@ -50,3 +58,31 @@ jobs:
         run: |
           set -euo pipefail
           python backend/scripts/pr_obsolete_run_from_workflow_run.py
+
+  sweep:
+    if: github.event_name == 'schedule' || github.event_name == 'push'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      CURRENT_RUN_ID: ${{ github.run_id }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      MAX_CANCELLATIONS: '250'
+    steps:
+      - name: Check out trusted default-branch control plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Reconcile missed obsolete PR runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python backend/scripts/pr_obsolete_run_sweep.py
