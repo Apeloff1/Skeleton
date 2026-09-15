@@ -82,11 +82,11 @@ def test_rejects_incomplete_workflow_file_enumeration() -> None:
 
 
 def test_rejects_fail_open_workflow_file_pagination_limit() -> None:
-    source = _replace_once(
-        _source(),
-        "              return None\n\n          def live_validation",
-        "              return False\n\n          def live_validation",
-    )
+    source = _source()
+    prefix, suffix = source.split("          def live_validation", 1)
+    assert prefix.rstrip().endswith("return None")
+    prefix = prefix.rstrip()[: -len("return None")] + "return False\n\n"
+    source = prefix + "          def live_validation" + suffix
     assert "scan limit is exhausted" in _messages(source)
 
 
