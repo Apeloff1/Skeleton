@@ -2,6 +2,7 @@ name: Deployment Trust
 
 on:
   push:
+    branches: [main]
     paths:
       - "backend/core/canonical_json.py"
       - "backend/core/transparency_witness.py"
