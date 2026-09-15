@@ -9,8 +9,9 @@ in the same test remains a hard failure.
 
 This runner intentionally stays lightweight, but it also preserves pytest's
 important per-test instance isolation, executes awaitable test results to
-completion, and treats an explicit ``SystemExit`` as a test failure rather than
-allowing ``SystemExit(0)`` to turn the whole runner falsely green.
+completion, collects module-level and descriptor-backed tests, and treats an
+explicit ``SystemExit`` as a test failure rather than allowing ``SystemExit(0)``
+to turn the whole runner falsely green.
 """
 from __future__ import annotations
 
@@ -19,8 +20,8 @@ import inspect
 import linecache
 import sys
 from pathlib import Path
-from types import TracebackType
-from typing import Awaitable, Iterator, TypeVar
+from types import ModuleType, TracebackType
+from typing import Awaitable, Callable, Iterator, TypeVar
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -42,6 +43,7 @@ SUPERSEDED_ASSERTIONS = {
 }
 
 T = TypeVar("T")
+TestCallable = Callable[[], object]
 
 
 def _terminal_traceback(exc: BaseException) -> TracebackType | None:
@@ -74,27 +76,74 @@ def _matches_superseded_assertion(
     return actual_line == expected_line
 
 
-def _iter_test_methods(cls: type) -> Iterator[tuple[str, object]]:
-    """Yield test methods with a fresh class instance for every test."""
+def _iter_module_test_functions(mod: ModuleType) -> Iterator[tuple[str, TestCallable]]:
+    """Yield test functions defined by ``mod``, excluding imported helpers."""
 
-    for mname, _ in inspect.getmembers(cls, inspect.isfunction):
+    for name, func in inspect.getmembers_static(mod, inspect.isfunction):
+        if name.startswith("test_") and func.__module__ == mod.__name__:
+            yield name, func
+
+
+def _iter_test_methods(cls: type) -> Iterator[tuple[str, TestCallable]]:
+    """Yield pytest-shaped methods without silently dropping descriptors.
+
+    Plain instance methods receive a fresh class instance per test. Static and
+    class methods are collected explicitly so a decorator cannot make a test
+    disappear from the dependency-free CI lane.
+    """
+
+    for mname, raw in inspect.getmembers_static(cls):
         if not mname.startswith("test_"):
             continue
-        inst = cls()
-        yield mname, getattr(inst, mname)
+        if isinstance(raw, classmethod):
+            yield mname, getattr(cls, mname)
+            continue
+        if isinstance(raw, staticmethod):
+            yield mname, raw.__func__
+            continue
+        if inspect.isfunction(raw):
+            inst = cls()
+            yield mname, getattr(inst, mname)
 
 
 async def _await_result(awaitable: Awaitable[T]) -> T:
     return await awaitable
 
 
-def _invoke_test(meth: object) -> object:
+def _invoke_test(meth: TestCallable) -> object:
     """Invoke one test and synchronously complete any awaitable it returns."""
 
-    result = meth()  # type: ignore[operator]
+    result = meth()
     if inspect.isawaitable(result):
         return asyncio.run(_await_result(result))
     return result
+
+
+def _run_case(
+    owner: str,
+    name: str,
+    meth: TestCallable,
+    superseded_key: tuple[str, str] | None = None,
+) -> tuple[int, int, int]:
+    """Run one collected test and return pass/fail/superseded deltas."""
+
+    try:
+        _invoke_test(meth)
+        print("PASS", owner, name)
+        return 1, 0, 0
+    except AssertionError as exc:
+        spec = SUPERSEDED_ASSERTIONS.get(superseded_key) if superseded_key else None
+        if spec and _matches_superseded_assertion(meth, exc, spec["assertion"]):
+            print("SUPERSEDED", owner, name, "->", spec["successor"], repr(exc))
+            return 0, 0, 1
+        print("FAIL", owner, name, type(exc).__name__, exc)
+        return 0, 1, 0
+    except SystemExit as exc:
+        print("FAIL", owner, name, type(exc).__name__, exc)
+        return 0, 1, 0
+    except Exception as exc:
+        print("FAIL", owner, name, type(exc).__name__, exc)
+        return 0, 1, 0
 
 
 def main() -> int:
@@ -102,29 +151,21 @@ def main() -> int:
     passes = 0
     superseded = 0
     for mod in (f, j, c, x):
-        for name, cls in inspect.getmembers(mod, inspect.isclass):
+        for name, meth in _iter_module_test_functions(mod):
+            p, failed, s = _run_case(mod.__name__, name, meth)
+            passes += p
+            fails += failed
+            superseded += s
+
+        for name, cls in inspect.getmembers_static(mod, inspect.isclass):
             if not name.startswith("Test") or cls.__module__ != mod.__name__:
                 continue
             for mname, meth in _iter_test_methods(cls):
-                key = (name, mname)
-                try:
-                    _invoke_test(meth)
-                    print("PASS", name, mname)
-                    passes += 1
-                except AssertionError as exc:
-                    spec = SUPERSEDED_ASSERTIONS.get(key)
-                    if spec and _matches_superseded_assertion(meth, exc, spec["assertion"]):
-                        superseded += 1
-                        print("SUPERSEDED", name, mname, "->", spec["successor"], repr(exc))
-                        continue
-                    fails += 1
-                    print("FAIL", name, mname, type(exc).__name__, exc)
-                except SystemExit as exc:
-                    fails += 1
-                    print("FAIL", name, mname, type(exc).__name__, exc)
-                except Exception as exc:
-                    fails += 1
-                    print("FAIL", name, mname, type(exc).__name__, exc)
+                p, failed, s = _run_case(name, mname, meth, (name, mname))
+                passes += p
+                fails += failed
+                superseded += s
+
     print(f"RESULT {passes} ok {fails} fail {superseded} superseded")
     return 1 if fails else 0
 
