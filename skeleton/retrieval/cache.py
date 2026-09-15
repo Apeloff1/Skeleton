@@ -6,6 +6,7 @@ per query key for a bounded TTL and bounded entry count.
 
 from __future__ import annotations
 
+import copy
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -22,11 +23,12 @@ class CacheEntry:
 
 
 class ResultCache:
-    """TTL cache with LRU eviction and a hard entry bound.
+    """TTL cache with LRU eviction, isolation, and a hard entry bound.
 
     Cache operations are synchronized so the same instance can safely back
-    concurrent retrieval requests. ``RLock`` keeps compound LRU operations
-    (lookup + recency update, expiry scan + eviction) atomic.
+    concurrent retrieval requests. Mutable result objects are deep-copied on
+    both insertion and retrieval so callers cannot poison later cache hits by
+    mutating a result or nested metadata they received from another request.
     """
 
     def __init__(self, *, ttl_s: float = 60.0, max_entries: int = 512) -> None:
@@ -56,9 +58,27 @@ class ResultCache:
 
             # A hot query should not be evicted before colder entries.
             self._entries.move_to_end(query)
-            return entry.results
+            stored_results = entry.results
+
+        # Do not execute arbitrary metadata copy hooks while holding the cache
+        # lock. If a payload cannot be isolated, evict it rather than exposing
+        # the cache's private mutable objects to a caller.
+        try:
+            return copy.deepcopy(stored_results)
+        except Exception:
+            with self._lock:
+                if self._entries.get(query) is entry:
+                    self._entries.pop(query, None)
+            return None
 
     def put(self, query: str, results: Tuple[ScoredResult, ...]) -> None:
+        try:
+            cached_results = copy.deepcopy(tuple(results))
+        except Exception:
+            # Caching is an optimization. A value that cannot be safely isolated
+            # must not make retrieval fail or enter the shared cache by reference.
+            return
+
         with self._lock:
             now = time.monotonic()
 
@@ -80,7 +100,7 @@ class ResultCache:
                 self._entries.popitem(last=False)
 
             self._entries[query] = CacheEntry(
-                results=results,
+                results=cached_results,
                 expires_at=now + self.ttl_s,
             )
 
