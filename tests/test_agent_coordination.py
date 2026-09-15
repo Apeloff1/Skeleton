@@ -213,3 +213,51 @@ def test_unhandled_task_preserves_external_running_compatibility() -> None:
     assert task.status is TaskStatus.RUNNING
     assert task.agent_id is not None
     assert coordinator.get_run_record(task.task_id) is None
+
+
+def test_agent_pool_rejects_invalid_capacity_configuration() -> None:
+    for value in (0, -1, True, 1.5):
+        with pytest.raises((TypeError, ValueError)):
+            AgentPool(max_agents=value)  # type: ignore[arg-type]
+
+    pool = AgentPool(max_agents=1)
+    for value in (0, -1, False, 1.5):
+        with pytest.raises((TypeError, ValueError)):
+            pool.create({"work"}, capacity=value)  # type: ignore[arg-type]
+
+
+def test_register_handler_rejects_non_callable_before_tool_registration() -> None:
+    coordinator = Coordinator()
+
+    with pytest.raises(TypeError, match="handler must be callable"):
+        coordinator.register_handler("work", None)  # type: ignore[arg-type]
+
+    assert coordinator.list_tasks() == []
+
+
+def test_failed_fresh_agent_assignment_does_not_leak_pool_slot() -> None:
+    class RejectingPool(AgentPool):
+        def assign(self, agent_id: str, task: Task) -> bool:
+            return False
+
+    pool = RejectingPool(max_agents=1)
+    coordinator = Coordinator(pool=pool)
+
+    task = coordinator.dispatch("job", task_type="work")
+
+    assert task.status is TaskStatus.FAILED
+    assert task.error == "New agent could not accept task"
+    assert pool.stats()["active"] == 0
+    assert pool.stats()["created"] == 1
+    assert pool.stats()["destroyed"] == 1
+
+
+def test_dispatch_copies_metadata_from_caller() -> None:
+    metadata = {"request": "original"}
+    coordinator = Coordinator()
+
+    task = coordinator.dispatch("job", task_type="remote", metadata=metadata)
+    metadata["request"] = "mutated"
+
+    assert task.status is TaskStatus.RUNNING
+    assert task.metadata == {"request": "original"}
