@@ -111,7 +111,10 @@ jobs:
         run: python scripts/check_js_process_alias_safety.py
 
       - name: GitHub Actions workflow security gate
-        run: python scripts/check_workflow_security.py
+        run: python scripts/check_workflow_security_policy.py
+
+      - name: GitHub Actions container security gate
+        run: python scripts/check_workflow_container_security.py
 
       - name: Repository secret hygiene gate
         run: python scripts/check_secret_hygiene.py
@@ -138,6 +141,8 @@ jobs:
           tests/test_sast_security_gate.py
           tests/test_js_process_alias_safety.py
           tests/test_workflow_security_gate.py
+          tests/test_workflow_privileged_trigger_security.py
+          tests/test_workflow_container_security.py
           tests/test_workflow_flow_style_security.py
           tests/test_workflow_event_context_security.py
           tests/test_workflow_quoted_key_security.py
