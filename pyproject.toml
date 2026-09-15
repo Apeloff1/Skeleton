@@ -15,7 +15,7 @@ warn_unused_ignores = true
 required-version = "==0.12.15"
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools==80.9.0", "wheel==0.45.1"]
 build-backend = "setuptools.build_meta"
 
 [project]
