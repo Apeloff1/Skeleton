@@ -1,4 +1,4 @@
-version: 6
+version: 7
 canonical_repository: Apeloff1/Skeleton
 strategy: selective-promotion
 rules:
@@ -43,18 +43,20 @@ sources:
     destinations:
       web: cockpit/web
   - repository: Apeloff1/Lorebuffa
-    capabilities: [lore, world-building, narrative, npc-catalog, world-map]
+    capabilities: [lore, world-building, narrative, npc-catalog, world-map, crew, stores, quests, reputation]
     disposition: adapt-unique-only
     destinations:
       domain_pack: domain-packs/lorebuffa
       npc_adapter: skeleton/frontier/npc_adapters.py
       world: skeleton/frontier/world.py
+      ship_policy: skeleton/frontier/ship.py
   - repository: Apeloff1/Openworld
-    capabilities: [world, exploration, procedural-content, npc-catalog, world-map]
-    disposition: deduplicate-shared-lineage
+    capabilities: [world, exploration, procedural-content, npc-catalog, world-map, crew, stores, quests, reputation]
+    disposition: characterize-and-deduplicate
     destinations:
       world: skeleton/frontier/world.py
       npc_adapter: skeleton/frontier/npc_adapters.py
+      ship_policy: skeleton/frontier/ship.py
 integration_wave_2:
   status: acceptance-increment-landed
   increments:
@@ -144,6 +146,7 @@ integration_wave_3:
   target: skeleton/frontier/world.py
   promoted_capabilities:
     - region-normalization
+    - region-id-and-coordinate-lookup
     - route-distance-and-danger-policy
     - voyage-supply-policy
     - fog-of-war-projection
@@ -159,8 +162,9 @@ integration_wave_3:
   notes:
     - randomness-clock-and-identity-are-injected
     - route-danger-intersection-is-two-dimensional
+    - malformed-and-non-finite-inputs-fail-closed
     - source-world-map-is-one-shared-lineage-not-two-promotions
-    - world-memory-runtime-cross-contract-seam-is-covered
+    - world-memory-runtime-event-cross-contract-seam-is-covered
 integration_wave_4:
   status: journal-semantics-promoted
   surface: event-durability
@@ -174,6 +178,8 @@ integration_wave_4:
     - journal-before-delivery
     - confirm-after-successful-fanout
     - failed-delivery-remains-pending
+    - ordered-explicit-pending-replay
+    - at-least-once-recovery-semantics
     - bounded-unconfirmed-capacity
     - backpressure-instead-of-dropping-pending-work
     - persistent-pending-recovery-evidence
@@ -186,7 +192,67 @@ integration_wave_4:
   evidence:
     - skeleton/testing/test_frontier_events.py
     - skeleton/testing/test_frontier_event_journal.py
+    - skeleton/testing/test_frontier_world_memory_runtime.py
   rationale: preserve the outbox safety invariant on the canonical EventBus using a provider-neutral journal boundary and stdlib SQLite backend
+integration_wave_5:
+  status: pure-policy-promoted
+  surface: crew-and-store-policy
+  compared_sources:
+    - repository: Apeloff1/Lorebuffa
+      source_path: backend/ship_system.py
+      source_blob: ef37a57f3851b84f11f83c99ec60d59b34d64806
+    - repository: Apeloff1/Openworld
+      source_path: backend/ship_system.py
+      source_blob: 9ddbd1df0a1279f062c769872140fff550b69283
+  decision: promote-shared-policy-not-source-file
+  target: skeleton/frontier/ship.py
+  promoted_capabilities:
+    - crew-role-normalization
+    - hiring-cost-and-role-limit-policy
+    - injected-random-crew-name-policy
+    - crew-bonus-and-salary-aggregation
+    - morale-band-dialogue-policy
+    - store-purchase-quote-policy
+    - affordability-check
+    - location-store-selection
+  rejected_from-kernel:
+    - source-crew-catalog
+    - source-store-catalog
+    - fastapi-routes
+    - motor-mongodb-client
+    - user-wallet-mutation
+    - inventory-persistence
+  evidence:
+    - skeleton/testing/test_frontier_ship_policy.py
+  rationale: the source blobs differ, but the portable policy inspected across both is shared; promote policy once and keep source catalogs authoritative
+source_dedup_inventory:
+  - capability: quests
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/quest_system.py
+        blob: c572dcc8919d342a8febb224e0131047b47c2644
+      - repository: Apeloff1/Openworld
+        path: backend/quest_system.py
+        blob: c572dcc8919d342a8febb224e0131047b47c2644
+    decision: one-shared-lineage-before-any-promotion
+  - capability: reputation
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/reputation_system.py
+        blob: 1ee119789969f963d258128ff544ea81bfd86526
+      - repository: Apeloff1/Openworld
+        path: backend/reputation_system.py
+        blob: 1ee119789969f963d258128ff544ea81bfd86526
+    decision: one-shared-lineage-before-any-promotion
+  - capability: captains-log
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/captains_log.py
+        blob: 5ed7efd452e7f2bb4ef7024185d66d65f1bd89d8
+      - repository: Apeloff1/Openworld
+        path: backend/captains_log.py
+        blob: 5ed7efd452e7f2bb4ef7024185d66d65f1bd89d8
+    decision: one-shared-lineage-before-any-promotion
 promotion_gates:
   - contract-tests
   - integration-tests
