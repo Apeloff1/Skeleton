@@ -15,6 +15,7 @@ and malformed chains fail closed to the immediate peer.
 from __future__ import annotations
 
 import asyncio
+import math
 import os
 import re
 import time
@@ -69,12 +70,17 @@ def _request_client_ip(request: Request) -> str:
     if not any(peer_addr in network for network in networks):
         return peer
 
-    forwarded = request.headers.get("x-forwarded-for")
+    # Multiple XFF field-lines or empty chain elements are ambiguous across
+    # intermediaries. Do not normalize attacker-controlled ambiguity into trust.
+    forwarded_headers = request.headers.getlist("x-forwarded-for")
+    if len(forwarded_headers) != 1:
+        return peer
+    forwarded = forwarded_headers[0]
     if not forwarded:
         return peer
 
-    values = [value.strip() for value in forwarded.split(",") if value.strip()]
-    if not values:
+    values = [value.strip() for value in forwarded.split(",")]
+    if not values or any(not value for value in values):
         return peer
 
     parsed = []
@@ -93,11 +99,13 @@ def _request_client_ip(request: Request) -> str:
 def _safe_content_length(raw: str | None) -> int:
     if not raw:
         return 0
-    try:
-        value = int(raw)
-    except (TypeError, ValueError):
+    value = raw.strip(" \t")
+    if not value.isascii() or not value.isdigit():
         return 0
-    return max(0, value)
+    try:
+        return int(value, 10)
+    except ValueError:
+        return 0
 
 
 def _safe_request_id(raw: str | None) -> str:
@@ -125,6 +133,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     _rps: float = 2.0
     _burst: int = 120
     _max_buckets: int = 10_000
+    _bucket_ttl: float = 300.0
+    _capacity_rejections: int = 0
+    _expired_prunes: int = 0
 
     def __init__(
         self,
@@ -133,6 +144,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         burst: int | None = None,
         prefix: str = "/api",
         max_buckets: int | None = None,
+        bucket_ttl: float | None = None,
     ):
         super().__init__(app)
         configured_rps = rps if rps is not None else float(
@@ -144,16 +156,22 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         configured_max = max_buckets if max_buckets is not None else int(
             os.environ.get("CODEDOCK_RATE_LIMIT_MAX_BUCKETS", "10000")
         )
-        if configured_rps <= 0:
-            raise ValueError("rate limit rps must be positive")
+        configured_ttl = bucket_ttl if bucket_ttl is not None else float(
+            os.environ.get("CODEDOCK_RATE_LIMIT_BUCKET_TTL", "300")
+        )
+        if not math.isfinite(float(configured_rps)) or configured_rps <= 0:
+            raise ValueError("rate limit rps must be finite and positive")
         if configured_burst <= 0:
             raise ValueError("rate limit burst must be positive")
         if configured_max <= 0:
             raise ValueError("rate limit bucket cap must be positive")
+        if not math.isfinite(float(configured_ttl)) or configured_ttl <= 0:
+            raise ValueError("rate limit bucket ttl must be finite and positive")
 
         RateLimitMiddleware._rps = float(configured_rps)
         RateLimitMiddleware._burst = int(configured_burst)
         RateLimitMiddleware._max_buckets = int(configured_max)
+        RateLimitMiddleware._bucket_ttl = float(configured_ttl)
         self.prefix = prefix
         self._whitelist = (
             "/api/health",
@@ -173,9 +191,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return ip, route
 
     @classmethod
-    def _evict_oldest_bucket(cls) -> None:
-        if cls._buckets:
+    def _prune_expired_buckets(cls, now: float) -> None:
+        while cls._buckets:
+            key = next(iter(cls._buckets))
+            bucket = cls._buckets[key]
+            if now - bucket.last_refill < cls._bucket_ttl:
+                break
             cls._buckets.popitem(last=False)
+            cls._expired_prunes += 1
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
@@ -188,10 +211,23 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         ip, route = self._key(request)
         key = (ip, route)
         async with RateLimitMiddleware._lock:
+            RateLimitMiddleware._prune_expired_buckets(now)
             bucket = RateLimitMiddleware._buckets.get(key)
             if bucket is None:
                 if len(RateLimitMiddleware._buckets) >= RateLimitMiddleware._max_buckets:
-                    RateLimitMiddleware._evict_oldest_bucket()
+                    # Evicting an active bucket to admit attacker-chosen new state
+                    # resets that bucket's tokens and turns the memory cap into a
+                    # rate-limit bypass. At capacity, fail closed instead.
+                    RateLimitMiddleware._capacity_rejections += 1
+                    return JSONResponse(
+                        status_code=429,
+                        content={
+                            "error": "rate_limited",
+                            "detail": "rate limit identity capacity reached",
+                            "retry_after_seconds": 1,
+                        },
+                        headers={"Retry-After": "1"},
+                    )
                 bucket = _Bucket(
                     tokens=float(RateLimitMiddleware._burst),
                     last_refill=now,
@@ -208,7 +244,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             if bucket.tokens < 1.0:
                 retry_after = max(
                     1,
-                    int((1.0 - bucket.tokens) / max(RateLimitMiddleware._rps, 0.01)),
+                    math.ceil((1.0 - bucket.tokens) / RateLimitMiddleware._rps),
                 )
                 return JSONResponse(
                     status_code=429,
@@ -232,7 +268,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             "rps": cls._rps,
             "burst": cls._burst,
             "max_buckets": cls._max_buckets,
+            "bucket_ttl_seconds": cls._bucket_ttl,
             "active_buckets": len(cls._buckets),
+            "capacity_rejections": cls._capacity_rejections,
+            "expired_prunes": cls._expired_prunes,
             "top": [
                 {"ip": k[0], "route": k[1], "tokens_remaining": round(v.tokens, 2)}
                 for k, v in sorted(cls._buckets.items(), key=lambda kv: kv[1].tokens)[:20]
@@ -366,19 +405,18 @@ class SizeLimitMiddleware:
             return
 
         path = scope.get("path") or "/"
-        method = str(scope.get("method") or "GET").upper()
-        if not _matches_path_prefix(path, "/api") or method not in {"POST", "PUT", "PATCH"}:
+        if not _matches_path_prefix(path, "/api"):
             await self.app(scope, receive, send)
             return
 
         raw_headers = list(scope.get("headers") or [])
         content_lengths = [
-            value.decode("latin-1").strip()
+            value.decode("latin-1").strip(" \t")
             for key, value in raw_headers
             if key.lower() == b"content-length"
         ]
         transfer_encodings = [
-            value.decode("latin-1").strip()
+            value.decode("latin-1").strip(" \t")
             for key, value in raw_headers
             if key.lower() == b"transfer-encoding"
         ]
@@ -391,6 +429,7 @@ class SizeLimitMiddleware:
             await response(scope, receive, send)
             return
 
+        declared: int | None = None
         if content_lengths:
             raw_declared = content_lengths[0]
             if not raw_declared.isascii() or not raw_declared.isdigit():
@@ -400,19 +439,26 @@ class SizeLimitMiddleware:
                 )
                 await response(scope, receive, send)
                 return
-            declared = int(raw_declared, 10)
-            if declared > self.max_bytes:
+
+            normalized_declared = raw_declared.lstrip("0") or "0"
+            limit_text = str(self.max_bytes)
+            if len(normalized_declared) > len(limit_text) or (
+                len(normalized_declared) == len(limit_text)
+                and normalized_declared > limit_text
+            ):
                 response = JSONResponse(
                     status_code=413,
                     content={
                         "error": "payload_too_large",
                         "detail": f"body exceeds {self.max_bytes // 1024 // 1024} MB",
                         "limit_bytes": self.max_bytes,
-                        "got_bytes": declared,
+                        "got_bytes_at_least": self.max_bytes + 1,
                     },
                 )
                 await response(scope, receive, send)
                 return
+
+            declared = int(normalized_declared, 10)
 
         buffered: list[dict] = []
         seen = 0
@@ -438,6 +484,14 @@ class SizeLimitMiddleware:
                 return
             if not message.get("more_body", False):
                 break
+
+        if declared is not None and seen != declared:
+            response = JSONResponse(
+                status_code=400,
+                content={"error": "invalid_content_length"},
+            )
+            await response(scope, receive, send)
+            return
 
         index = 0
 
