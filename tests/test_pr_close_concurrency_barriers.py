@@ -11,6 +11,8 @@ CLOSE_BARRIER_WORKFLOWS = (
     "malware-gate.yml",
     "provenance-policy.yml",
     "codeql.yml",
+    "pr-hygiene.yml",
+    "workflow-input-security.yml",
 )
 
 
