@@ -22,6 +22,10 @@ on:
       - ".github/workflows/product-convergence.yml"
       - ".github/workflows/deployment-trust.yml"
 
+concurrency:
+  group: product-convergence-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
