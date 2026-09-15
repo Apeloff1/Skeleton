@@ -13,6 +13,7 @@ WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pr-obsolete-run-drain.yml"
 
 def test_workflow_run_adapter_is_directly_executable_from_repo_root() -> None:
     env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
     for key in (
         "GH_TOKEN",
         "REPO",
