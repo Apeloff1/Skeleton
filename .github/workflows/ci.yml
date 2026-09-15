@@ -10,11 +10,11 @@ on:
   pull_request:
     branches: [main]
 
-# GitHub can deliver workflow events out of commit order. Key concurrency by
-# SHA so a late parent event cannot cancel validation for the current head;
-# queue-drain removes stale queued work against the live branch tip.
+# Collapse superseded validation for the same PR or branch so rapid pushes do
+# not occupy runner capacity with stale commits. Workflow name keeps unrelated
+# pipelines isolated while PR number/ref scopes cancellation to one change set.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
