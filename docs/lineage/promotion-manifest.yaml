@@ -1,4 +1,4 @@
-version: 5
+version: 6
 canonical_repository: Apeloff1/Skeleton
 strategy: selective-promotion
 rules:
@@ -103,7 +103,7 @@ integration_wave_2:
       source_blob: 481fcfca5a23272b70353eb09b7c3406bbc9bdd9
       decision: promote-digest-semantics-only
       target: skeleton/frontier/contracts.py
-      rationale: adopt one SHA-256 content digest contract; defer MongoDB outbox and persistence plumbing
+      rationale: adopt one SHA-256 content digest contract without importing GameForge persistence infrastructure
     - surface: runtime-idempotency
       primary_source: Apeloff1/gameforge-rs
       source_path: crates/gf-core/src/lib.rs
@@ -121,9 +121,8 @@ integration_wave_2:
       deferred:
         - mongodb-duplicate-key-guard
         - mongodb-client
-        - durable-outbox
         - background-reconciler
-      rationale: preserve typed duplicate-suppression behavior at the runtime boundary without importing GameForge persistence infrastructure
+      rationale: preserve duplicate-suppression behavior at the runtime boundary without MongoDB coupling
     - surface: capability-boundary
       primary_source: Apeloff1/hyperforge-cockpit-sota
       source_path: src/lib/preview-host-bridge.ts
@@ -156,10 +155,38 @@ integration_wave_3:
     - full-world-catalog
   evidence:
     - skeleton/testing/test_frontier_world_policy.py
+    - skeleton/testing/test_frontier_world_memory_runtime.py
   notes:
     - randomness-clock-and-identity-are-injected
     - route-danger-intersection-is-two-dimensional
     - source-world-map-is-one-shared-lineage-not-two-promotions
+    - world-memory-runtime-cross-contract-seam-is-covered
+integration_wave_4:
+  status: journal-semantics-promoted
+  surface: event-durability
+  primary_source: Apeloff1/gameforge-rs
+  source_path: crates/gf-core/src/lib.rs
+  source_blob: 481fcfca5a23272b70353eb09b7c3406bbc9bdd9
+  decision: fold-portable-outbox-invariant-into-existing-event-bus
+  target: skeleton/frontier/events.py
+  backend: skeleton.frontier.events.SQLiteEventJournal
+  promoted_semantics:
+    - journal-before-delivery
+    - confirm-after-successful-fanout
+    - failed-delivery-remains-pending
+    - bounded-unconfirmed-capacity
+    - backpressure-instead-of-dropping-pending-work
+    - persistent-pending-recovery-evidence
+  rejected_from-kernel:
+    - mongodb-client
+    - mongodb-document-types
+    - second-event-bus
+    - background-reconciler
+    - source-database-singleton
+  evidence:
+    - skeleton/testing/test_frontier_events.py
+    - skeleton/testing/test_frontier_event_journal.py
+  rationale: preserve the outbox safety invariant on the canonical EventBus using a provider-neutral journal boundary and stdlib SQLite backend
 promotion_gates:
   - contract-tests
   - integration-tests
