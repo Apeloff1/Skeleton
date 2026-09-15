@@ -2,27 +2,31 @@ name: Merge Readiness
 
 on:
   pull_request:
-    branches: [main]
+    branches:
+      - main
   push:
-    branches: [main]
+    branches:
+      - main
 
 permissions:
   contents: read
 
 concurrency:
-  group: merge-readiness-${{ github.event.pull_request.number || github.ref }}
+  group: merge-readiness-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  quarantine-policy:
+  quarantine_policy:
     name: Quarantine Policy
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
       - name: Validate flaky-test quarantine registry
@@ -33,10 +37,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
       - name: Install focused unit-test runtime
@@ -51,36 +57,39 @@ jobs:
           PYTHONPATH: "."
         run: python tests/run_unit.py
 
-  integration-smoke:
+  integration_smoke:
     name: Integration Smoke
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: ./backend
     services:
       mongodb:
         image: mongo:7.0
-        ports: [27017:27017]
+        ports:
+          - "27017:27017"
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - name: Set up uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
       - name: Install backend runtime
+        working-directory: backend
         run: |
           uv venv
           uv pip install -r requirements.txt
       - name: Import application with live Mongo service
+        working-directory: backend
         env:
           MONGO_URL: mongodb://localhost:27017/test
           SKIP_HEAVY_SEED: "true"
         run: uv run python -c "import server; assert server.app is not None; print('server import: OK')"
 
-  quality-security:
+  quality_security:
     name: Lint Type Security
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -90,10 +99,12 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
           cache: yarn
@@ -119,33 +130,34 @@ jobs:
 
   readiness:
     name: Merge Readiness
-    if: ${{ always() }}
+    if: always()
     needs:
-      - quarantine-policy
+      - quarantine_policy
       - unit
-      - integration-smoke
-      - quality-security
+      - integration_smoke
+      - quality_security
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Summarize required checks
         env:
-          NEEDS_JSON: ${{ toJSON(needs) }}
+          QUARANTINE_RESULT: ${{ needs.quarantine_policy.result }}
+          UNIT_RESULT: ${{ needs.unit.result }}
+          INTEGRATION_RESULT: ${{ needs.integration_smoke.result }}
+          QUALITY_RESULT: ${{ needs.quality_security.result }}
         run: |
           python - <<'PY'
-          import json
           import os
           from pathlib import Path
 
-          needs = json.loads(os.environ["NEEDS_JSON"])
-          rows = []
-          failures = []
-          for name, payload in sorted(needs.items()):
-              result = payload.get("result", "unknown")
-              rows.append(f"| `{name}` | `{result}` |")
-              if result != "success":
-                  failures.append(f"{name}={result}")
-
+          results = {
+              "quarantine_policy": os.environ["QUARANTINE_RESULT"],
+              "unit": os.environ["UNIT_RESULT"],
+              "integration_smoke": os.environ["INTEGRATION_RESULT"],
+              "quality_security": os.environ["QUALITY_RESULT"],
+          }
+          failures = {name: result for name, result in results.items() if result != "success"}
+          rows = [f"| `{name}` | `{result}` |" for name, result in sorted(results.items())]
           summary = [
               "# Merge readiness",
               "",
@@ -155,11 +167,10 @@ jobs:
               "",
           ]
           if failures:
-              summary.append("**NOT READY:** " + ", ".join(failures))
+              summary.append("**NOT READY:** " + ", ".join(f"{name}={result}" for name, result in failures.items()))
           else:
               summary.append("**READY:** all repository merge gates passed for this head SHA.")
-
           Path(os.environ["GITHUB_STEP_SUMMARY"]).write_text("\n".join(summary) + "\n", encoding="utf-8")
           if failures:
-              raise SystemExit("required merge gates failed: " + ", ".join(failures))
+              raise SystemExit("required merge gates failed: " + ", ".join(f"{name}={result}" for name, result in failures.items()))
           PY
