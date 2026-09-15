@@ -34,3 +34,4 @@ def test_backend_code_mounts_are_read_only_but_runtime_data_stays_writable() -> 
     assert "      - ./skeleton:/app/skeleton:ro" in block
     assert "      - backend_data:/app/data" in block
     assert "      - backend_data:/app/data:ro" not in block
+    assert "      - /app/__pycache__" not in block
