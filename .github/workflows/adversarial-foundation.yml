@@ -8,7 +8,10 @@ on:
       - "backend/Dockerfile"
       - "frontend/Dockerfile"
       - "backend/api_middleware.py"
+      - "backend/core/security_v2.py"
+      - "backend/middleware/**"
       - "backend/tests/test_api_middleware_security.py"
+      - "backend/tests/test_security_v2_adversarial.py"
       - "pyproject.toml"
       - "setup.cfg"
       - "skeleton/developer/cli.py"
@@ -21,7 +24,10 @@ on:
       - "backend/Dockerfile"
       - "frontend/Dockerfile"
       - "backend/api_middleware.py"
+      - "backend/core/security_v2.py"
+      - "backend/middleware/**"
       - "backend/tests/test_api_middleware_security.py"
+      - "backend/tests/test_security_v2_adversarial.py"
       - "pyproject.toml"
       - "setup.cfg"
       - "skeleton/developer/cli.py"
@@ -63,10 +69,13 @@ jobs:
           python-version: "3.11"
       - name: Install runtime and focused test dependencies
         run: python -m pip install . "pytest>=8,<9"
-      - name: Enforce proxy identity and API routing trust boundaries
+      - name: Enforce middleware security trust boundaries
         env:
           PYTHONPATH: backend
-        run: python -m pytest -q backend/tests/test_api_middleware_security.py
+        run: >-
+          python -m pytest -q
+          backend/tests/test_api_middleware_security.py
+          backend/tests/test_security_v2_adversarial.py
 
   docker-builds:
     runs-on: ubuntu-latest
