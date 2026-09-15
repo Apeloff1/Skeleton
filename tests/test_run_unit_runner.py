@@ -99,6 +99,24 @@ def test_test_methods_get_fresh_instances() -> None:
     assert len({id(owner) for owner in owners}) == len(owners)
 
 
+def test_instance_construction_is_interleaved_with_execution(monkeypatch) -> None:
+    events: list[str] = []
+
+    class TestOrder:
+        def __init__(self) -> None:
+            events.append("init")
+
+        def test_a(self) -> None:
+            events.append("a")
+
+        def test_b(self) -> None:
+            events.append("b")
+
+    probe = _module_with_test_class("runner_constructor_order", TestOrder)
+    assert _run_only(monkeypatch, probe) == 0
+    assert events == ["init", "a", "init", "b"]
+
+
 def test_static_and_class_methods_are_not_silently_dropped() -> None:
     methods = dict(runner._iter_test_methods(_DescriptorProbe))
     assert set(methods) == {"test_instance", "test_static", "test_class"}
