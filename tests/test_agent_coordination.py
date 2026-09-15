@@ -112,17 +112,24 @@ def test_assign_rejects_distinct_task_objects_with_same_id() -> None:
     assert pool.stats()["total_load"] == 0
 
 
-def test_destroy_releases_task_id_ownership() -> None:
+def test_destroy_cancels_running_task_before_releasing_task_id() -> None:
     pool = AgentPool(max_agents=2)
     first_agent = pool.create({"work"}, capacity=1)
     task = Task(task_id="shared", description="owned")
     assert pool.assign(first_agent, task) is True
+    assert task.status is TaskStatus.RUNNING
 
     pool.destroy(first_agent)
+
+    assert task.status is TaskStatus.CANCELLED
+    assert task.error == "Assigned agent was destroyed before task completion"
+    assert task.agent_id == first_agent
 
     second_agent = pool.create({"work"}, capacity=1)
     replacement = Task(task_id="shared", description="replacement")
     assert pool.assign(second_agent, replacement) is True
+    assert replacement.status is TaskStatus.RUNNING
+    assert replacement.agent_id == second_agent
     assert pool.stats()["total_load"] == 1
 
 
