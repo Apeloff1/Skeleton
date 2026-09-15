@@ -16,6 +16,7 @@ from skeleton.observability.metrics import (
     default_sampler,
 )
 from skeleton.observability.metrics_registry import MetricsRegistry
+from skeleton.observability.orchestration import ObservableOrchestrator
 from skeleton.observability.redaction import (
     REDACTED,
     redact_payload,
@@ -44,6 +45,7 @@ __all__ = [
     "InMemoryExporter",
     "EventMetricsBridge",
     "ObservedEvent",
+    "ObservableOrchestrator",
     "REDACTED",
     "redact_payload",
     "redact_text",
