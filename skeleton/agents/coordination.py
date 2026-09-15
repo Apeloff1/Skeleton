@@ -64,7 +64,7 @@ class AgentPool:
         """Create a new agent and return its ID."""
         if len(self._agents) >= self.max_agents:
             raise RuntimeError(f"Agent pool at capacity ({self.max_agents})")
-        
+
         agent_id = str(uuid.uuid4())[:8]
         self._agents[agent_id] = {
             "specialisations": set(specialisations),
@@ -74,30 +74,30 @@ class AgentPool:
             "created_at": __import__('time').time(),
         }
         self._stats["created"] += 1
-        
+
         if self._bus:
             self._bus.emit("agents.pool.created", {"agent_id": agent_id, "specialisations": list(specialisations)})
-        
+
         return agent_id
 
     def assign(self, agent_id: str, task: Task) -> bool:
         """Assign a task to an agent."""
         if agent_id not in self._agents:
             return False
-        
+
         agent = self._agents[agent_id]
         if agent["load"] >= agent["capacity"]:
             return False
-        
+
         agent["tasks"].append(task.task_id)
         agent["load"] += 1
         task.agent_id = agent_id
         task.status = TaskStatus.RUNNING
         self._stats["tasks_assigned"] += 1
-        
+
         if self._bus:
             self._bus.emit("agents.task.assigned", {"agent_id": agent_id, "task_id": task.task_id})
-        
+
         return True
 
     def release(self, agent_id: str, task_id: str) -> None:
@@ -156,11 +156,11 @@ class Coordinator:
             metadata=metadata or {},
         )
         self._tasks[task.task_id] = task
-        
+
         # Find capable agent
         spec = specialisation or task_type
         candidates = self.pool.find_capable(spec)
-        
+
         if not candidates:
             # Create a new agent if pool has capacity
             try:
@@ -171,7 +171,7 @@ class Coordinator:
                 task.error = f"No agents available for specialisation: {spec}"
                 self._stats["failed"] += 1
                 return task
-        
+
         # Assign to least loaded capable agent
         assigned = self.pool.assign(candidates[0], task)
         if not assigned:
@@ -179,29 +179,32 @@ class Coordinator:
             task.error = "Agent at capacity"
             self._stats["failed"] += 1
             return task
-        
+
         self._stats["dispatched"] += 1
-        
-        # Execute handler if available
+
+        # Execute handler if available. Once a synchronous handler reaches a
+        # terminal state, always release its agent slot—even when it raises.
         handler = self._handlers.get(task_type)
         if handler:
             try:
                 task.result = handler(task)
                 task.status = TaskStatus.COMPLETED
                 self._stats["completed"] += 1
-                self.pool.release(task.agent_id, task.task_id)
             except Exception as e:
                 task.status = TaskStatus.FAILED
                 task.error = str(e)
                 self._stats["failed"] += 1
-        
+            finally:
+                if task.agent_id is not None:
+                    self.pool.release(task.agent_id, task.task_id)
+
         if self._bus:
             self._bus.emit("agents.coordinator.dispatched", {
                 "task_id": task.task_id,
                 "agent_id": task.agent_id,
                 "status": task.status.name,
             })
-        
+
         return task
 
     def get_task(self, task_id: str) -> Optional[Task]:
