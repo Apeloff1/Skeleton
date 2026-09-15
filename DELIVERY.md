@@ -101,3 +101,15 @@ CORS_ORIGINS        default "*"
 - **Rate limiter is in-process** — sufficient for single-replica
   deploys. Swap to Redis-backed for horizontal scaling.
 - **Scheduler uses local notifications only** (no remote push).
+
+## 🛡️ Operations and repository controls
+
+Before a production-affecting deployment or merge, use the committed controls:
+
+- `docs/SECURITY_OPERATIONS_RUNBOOK.md` — deployment trust boundaries,
+  incident triage/containment/recovery, credential rotation, and rollback.
+- `docs/MERGE_READINESS.md` — required-check and flaky/quarantine policy.
+
+The environment defaults listed above are historical CodeDock delivery notes;
+for current middleware defaults and proxy-trust controls, treat
+`backend/api_middleware.py` and the security operations runbook as authoritative.
