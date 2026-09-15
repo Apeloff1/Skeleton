@@ -31,11 +31,18 @@ RUN yarn export:web
 
 # Stage 4: Production (Nginx)
 FROM nginx:alpine@sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5ffd29f1d3 AS production
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=builder /app/dist /usr/share/nginx/html
+
+# The official image starts as root so it can bind privileged ports and prepare
+# runtime directories. Prepare the writable nginx paths at build time, then
+# permanently drop privileges for the production process.
+RUN chown -R nginx:nginx /var/cache/nginx /var/run /etc/nginx/conf.d /usr/share/nginx/html
+COPY --chown=nginx:nginx nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder --chown=nginx:nginx /app/dist /usr/share/nginx/html
+
+USER nginx
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -qO- http://127.0.0.1/healthz >/dev/null || exit 1
+    CMD wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1
 
-EXPOSE 80
+EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]
