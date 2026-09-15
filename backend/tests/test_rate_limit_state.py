@@ -81,15 +81,18 @@ def test_concurrent_bucket_creation_never_exceeds_cap() -> None:
     assert middleware._evictions == 60
 
 
-def test_stale_bucket_detection_does_not_mutate_active_bucket() -> None:
-    bucket = _Bucket(capacity=2, refill_per_sec=1)
-    bucket.tokens = 0
-    now = bucket.last + 10
+def test_stale_bucket_is_pruned_while_active_bucket_survives() -> None:
+    stale_bucket = _Bucket(capacity=2, refill_per_sec=1)
+    stale_bucket.tokens = 0
+    now = stale_bucket.last + 10
 
+    active_bucket = _Bucket(capacity=2, refill_per_sec=1)
     middleware = RateLimiterMiddleware(object(), max_buckets=4, bucket_ttl=5)
-    middleware._buckets["198.51.100.20"] = bucket
-    middleware._bucket_for("198.51.100.21", now=now)
+    middleware._buckets["198.51.100.20"] = stale_bucket
+    middleware._buckets["198.51.100.21"] = active_bucket
+    middleware._bucket_for("198.51.100.22", now=now)
 
     assert "198.51.100.20" not in middleware._buckets
-    assert "198.51.100.21" in middleware._buckets
-    assert bucket.tokens == 0
+    assert middleware._buckets["198.51.100.21"] is active_bucket
+    assert "198.51.100.22" in middleware._buckets
+    assert stale_bucket.tokens == 0
