@@ -1,0 +1,46 @@
+name: Jeeves History Boundary
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "skeleton/jeeves/providers.py"
+      - "skeleton/jeeves/llm_core.py"
+      - "tests/test_jeeves_history_boundary.py"
+      - ".github/workflows/jeeves-history-boundary.yml"
+  push:
+    branches: [main]
+    paths:
+      - "skeleton/jeeves/providers.py"
+      - "skeleton/jeeves/llm_core.py"
+      - "tests/test_jeeves_history_boundary.py"
+      - ".github/workflows/jeeves-history-boundary.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jeeves-history-boundary-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  history-boundary:
+    name: History delimiter isolation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Install focused test dependency
+        run: python -m pip install "pytest>=8,<9"
+      - name: Compile provider boundary
+        run: python -m compileall -q skeleton/jeeves/providers.py skeleton/jeeves/llm_core.py
+      - name: Run history-boundary regressions
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest -q tests/test_jeeves_history_boundary.py
