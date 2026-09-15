@@ -11,13 +11,12 @@ from typing import Any, Iterable, Mapping, Protocol
 
 from skeleton.frontier.contracts import (
     AgentContract,
-    MemoryContract,
     ProvenanceRecord,
     stable_content_digest,
 )
 from skeleton.frontier.retrieval_context import (
+    RetrieverContract,
     retrieval_audit_summary,
-    retrieve_memory_context,
 )
 
 
@@ -159,14 +158,14 @@ class AgentRuntime:
     reusing a key for a different execution fails closed.
 
     When ``memory_query`` is supplied to :meth:`execute`, runtime retrieval uses
-    the canonical ``MemoryContract`` configured on ``memory``. Validated hits
-    are injected under ``retrieved_context`` and their content-free identities
-    are retained in execution provenance.
+    the canonical ``RetrieverContract`` configured on ``retriever``. Validated
+    hits are injected under ``retrieved_context`` and their content-free
+    identities are retained in execution provenance.
     """
 
     agents: dict[str, AgentLike] = field(default_factory=dict)
     idempotency_capacity: int = 4096
-    memory: MemoryContract | None = None
+    retriever: RetrieverContract | None = None
     _idempotency_lock: asyncio.Lock = field(
         default_factory=asyncio.Lock,
         init=False,
@@ -390,12 +389,11 @@ class AgentRuntime:
             try:
                 execution_context = normalized_context
                 if normalized_memory_query is not None:
-                    if self.memory is None:
+                    if self.retriever is None:
                         raise RuntimeError(
-                            "memory_query requires a configured canonical MemoryContract"
+                            "memory_query requires a configured canonical RetrieverContract"
                         )
-                    hits = await retrieve_memory_context(
-                        self.memory,
+                    hits = await self.retriever.retrieve(
                         normalized_memory_query,
                         limit=memory_limit,
                         filters=canonical_memory_filters,
