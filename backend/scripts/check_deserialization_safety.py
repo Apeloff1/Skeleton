@@ -10,6 +10,7 @@ paths by accident.
 from __future__ import annotations
 
 import ast
+from collections import Counter
 from pathlib import Path
 import sys
 from typing import Iterable
@@ -31,6 +32,12 @@ UNSAFE_OBJECT_LOADERS = {
     "yaml.unsafe_load",
     "yaml.unsafe_load_all",
 }
+TRACKED_DESERIALIZER_CALLABLES = UNSAFE_OBJECT_LOADERS | {
+    "yaml.load",
+    "yaml.load_all",
+    "numpy.load",
+    "torch.load",
+}
 TRACKED_MODULES = {
     "pickle",
     "_pickle",
@@ -42,6 +49,7 @@ TRACKED_MODULES = {
     "numpy",
     "torch",
 }
+PYTHON_SCOPES = (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
 
 
 def python_files() -> Iterable[Path]:
@@ -97,6 +105,86 @@ def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
     if replacement is None:
         return name
     return replacement + (f".{suffix}" if dot else "")
+
+
+def _scope_nodes(scope: ast.AST) -> Iterable[ast.AST]:
+    """Yield nodes owned by one lexical scope without entering nested scopes."""
+
+    def descend(node: ast.AST) -> Iterable[ast.AST]:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, PYTHON_SCOPES):
+                continue
+            yield child
+            yield from descend(child)
+
+    yield from descend(scope)
+
+
+def _parameter_names(scope: ast.AST) -> set[str]:
+    if not isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+        return set()
+    args = scope.args
+    names = {arg.arg for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs)}
+    if args.vararg:
+        names.add(args.vararg.arg)
+    if args.kwarg:
+        names.add(args.kwarg.arg)
+    return names
+
+
+def _assigned_names(node: ast.AST) -> list[str]:
+    if isinstance(node, ast.Assign):
+        return [target.id for target in node.targets if isinstance(target, ast.Name)]
+    if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+        return [node.target.id]
+    return []
+
+
+def _assignment_value(node: ast.AST) -> ast.AST | None:
+    if isinstance(node, ast.Assign):
+        return node.value
+    if isinstance(node, ast.AnnAssign):
+        return node.value
+    return None
+
+
+def stable_deserializer_aliases(scope: ast.AST, import_map: dict[str, str]) -> dict[str, str]:
+    """Resolve unambiguous local callable aliases to tracked deserializers.
+
+    Only names with exactly one store in the lexical scope are trusted. Parameters
+    and rebound names are intentionally discarded so ordinary application
+    callables cannot be mistaken for dangerous deserializers. Alias chains are
+    resolved to a fixed point, covering patterns such as ``decode = pickle.loads``
+    and ``restore = decode`` without broad data-flow analysis.
+    """
+
+    nodes = list(_scope_nodes(scope))
+    stores = Counter(
+        node.id
+        for node in nodes
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+    )
+    parameters = _parameter_names(scope)
+    resolved: dict[str, str] = {}
+
+    changed = True
+    while changed:
+        changed = False
+        aliases = {**import_map, **resolved}
+        for node in nodes:
+            value = _assignment_value(node)
+            if value is None:
+                continue
+            source = canonical_name(value, aliases)
+            if source not in TRACKED_DESERIALIZER_CALLABLES:
+                continue
+            for name in _assigned_names(node):
+                if name in resolved or name in parameters or stores[name] != 1:
+                    continue
+                resolved[name] = source
+                changed = True
+
+    return resolved
 
 
 def keyword_value(node: ast.Call, name: str) -> ast.AST | None:
@@ -170,14 +258,17 @@ def violations(path: Path) -> list[str]:
     except (OSError, UnicodeError, SyntaxError) as exc:
         return [f"{label}: parse failure: {exc}"]
 
-    aliases = import_aliases(tree)
+    import_map = import_aliases(tree)
     findings = star_import_violations(tree, label)
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        violation = call_violation(node, aliases)
-        if violation:
-            findings.append(f"{label}:{node.lineno}: {violation}")
+    scopes = [node for node in ast.walk(tree) if isinstance(node, PYTHON_SCOPES)]
+    for scope in scopes:
+        aliases = {**import_map, **stable_deserializer_aliases(scope, import_map)}
+        for node in _scope_nodes(scope):
+            if not isinstance(node, ast.Call):
+                continue
+            violation = call_violation(node, aliases)
+            if violation:
+                findings.append(f"{label}:{node.lineno}: {violation}")
     return findings
 
 
