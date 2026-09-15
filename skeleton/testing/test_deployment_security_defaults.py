@@ -5,11 +5,15 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _service_block(compose: str, service: str) -> str:
-    marker = f"  {service}:\n"
-    start = compose.index(marker)
-    tail = compose[start + len(marker):]
-    next_service = tail.find("\n  ")
-    return tail if next_service < 0 else tail[:next_service]
+    lines = compose.splitlines()
+    marker = f"  {service}:"
+    start = lines.index(marker)
+    block = [lines[start]]
+    for line in lines[start + 1:]:
+        if line.startswith("  ") and not line.startswith("    ") and line.strip().endswith(":"):
+            break
+        block.append(line)
+    return "\n".join(block)
 
 
 def test_compose_requires_runtime_secrets_authenticated_mongo_and_local_data_ports() -> None:
