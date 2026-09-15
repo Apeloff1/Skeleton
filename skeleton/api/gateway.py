@@ -46,6 +46,9 @@ class GatewayResponse:
 class APIGateway:
     """Middleware-chained API gateway."""
 
+    _RATE_WINDOW_S = 1.0
+    _BUCKET_SWEEP_INTERVAL_S = 1.0
+
     def __init__(self, rbac: Any = None, rate_limiter: Any = None,
                  cache: Any = None, logger: Any = None):
         self._routes: Dict[str, Route] = {}
@@ -55,6 +58,7 @@ class APIGateway:
         self._logger = logger
         self._transforms: List[Callable[[Any], Any]] = []
         self._buckets: Dict[str, List[float]] = {}
+        self._last_bucket_sweep: Optional[float] = None
 
     def route(self, path: str, handler: Callable[[Dict[str, Any]], Any], *,
               scope: str = "public", action: str = "read",
@@ -67,11 +71,32 @@ class APIGateway:
     def add_transform(self, fn: Callable[[Any], Any]) -> None:
         self._transforms.append(fn)
 
+    def _sweep_rate_buckets(self, now: float) -> None:
+        """Drop inactive limiter keys after their one-second window expires."""
+        last_sweep = self._last_bucket_sweep
+        if last_sweep is not None and now - last_sweep < self._BUCKET_SWEEP_INTERVAL_S:
+            return
+
+        cutoff = now - self._RATE_WINDOW_S
+        stale = [
+            key
+            for key, timestamps in self._buckets.items()
+            if not timestamps or timestamps[-1] <= cutoff
+        ]
+        for key in stale:
+            self._buckets.pop(key, None)
+        self._last_bucket_sweep = now
+
     def _rate_ok(self, key: str, per_s: float) -> bool:
         if per_s <= 0:
             return True
-        now = time.time()
-        window = [t for t in self._buckets.get(key, []) if now - t < 1.0]
+        now = time.monotonic()
+        self._sweep_rate_buckets(now)
+        window = [
+            timestamp
+            for timestamp in self._buckets.get(key, [])
+            if now - timestamp < self._RATE_WINDOW_S
+        ]
         if len(window) >= per_s:
             self._buckets[key] = window
             return False
