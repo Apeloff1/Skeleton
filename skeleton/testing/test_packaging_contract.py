@@ -24,3 +24,22 @@ def test_runtime_image_excludes_development_payload() -> None:
     assert "pip install --no-cache-dir -e" not in dockerfile
     assert "COPY tests" not in dockerfile
     assert "USER appuser" in dockerfile
+
+
+def test_runtime_dockerfiles_keep_security_hardening() -> None:
+    root_dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    backend_dockerfile = (ROOT / "backend" / "Dockerfile").read_text(encoding="utf-8")
+
+    # Production base images must be immutable and runtime users non-root.
+    assert "python:3.14-slim@sha256:" in root_dockerfile
+    assert "USER appuser" in root_dockerfile
+    assert "/usr/sbin/nologin" in root_dockerfile
+
+    assert "FROM python:3.14-slim@sha256:" in backend_dockerfile
+    assert "USER appuser" in backend_dockerfile
+    assert "/usr/sbin/nologin" in backend_dockerfile
+
+    # Do not add OS packages just to probe the local service.
+    assert "urllib.request.urlopen" in backend_dockerfile
+    assert "RUN apt-get" not in backend_dockerfile
+    assert "curl -f http://localhost:8001/api/health" not in backend_dockerfile
