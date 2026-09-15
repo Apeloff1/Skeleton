@@ -48,10 +48,17 @@ PERMISSION_ENTRY_RE = re.compile(
     r"(?P<value>read|write|none)\s*(?:#.*)?$",
     re.IGNORECASE,
 )
-PULL_REQUEST_TARGET_RE = re.compile(
+TOP_LEVEL_ON_RE = re.compile(
+    r"^(?:on|'on'|\"on\")\s*:\s*(?P<value>.*)$"
+)
+PULL_REQUEST_TARGET_KEY_RE = re.compile(
     r"^\s*(?:pull_request_target|'pull_request_target'|\"pull_request_target\")\s*:"
 )
+PULL_REQUEST_TARGET_SEQUENCE_RE = re.compile(
+    r"^\s*-\s*(?:pull_request_target|'pull_request_target'|\"pull_request_target\")\s*(?:#.*)?$"
+)
 CHECKOUT_ACTION = "actions/checkout@"
+FORBIDDEN_TRIGGER = "pull_request_target"
 
 # These fields can be controlled by pull-request authors, issue/comment authors,
 # or commit authors. They must cross the shell boundary through env/input data,
@@ -200,6 +207,87 @@ def _top_level_permission_violations(
     return has_top_level, findings
 
 
+def _yaml_key_name(entry: str) -> str:
+    """Return a simple YAML mapping key name with optional quotes removed."""
+    key = entry.partition(":")[0].strip()
+    if len(key) >= 2 and key[0] == key[-1] and key[0] in {"'", '"'}:
+        return key[1:-1]
+    return key
+
+
+def _forbidden_trigger_violations(lines: list[str], path_name: str) -> list[str]:
+    """Reject pull_request_target across equivalent YAML event encodings."""
+    findings: list[str] = []
+
+    for index, line in enumerate(lines):
+        if line != line.lstrip(" "):
+            continue
+        match = TOP_LEVEL_ON_RE.match(line)
+        if not match:
+            continue
+
+        number = index + 1
+        value = match.group("value").split("#", 1)[0].strip()
+        if value:
+            scalar = value
+            if len(scalar) >= 2 and scalar[0] == scalar[-1] and scalar[0] in {"'", '"'}:
+                scalar = scalar[1:-1]
+            if scalar == FORBIDDEN_TRIGGER:
+                findings.append(f"{path_name}:{number}: pull_request_target is forbidden")
+                continue
+
+            if value.startswith("{"):
+                if any(
+                    _yaml_key_name(entry) == FORBIDDEN_TRIGGER
+                    for entry in _flow_mapping_entries(value)
+                ):
+                    findings.append(f"{path_name}:{number}: pull_request_target is forbidden")
+                continue
+
+            if value.startswith("[") and value.endswith("]"):
+                items = value[1:-1].split(",")
+                for item in items:
+                    event = item.strip()
+                    if len(event) >= 2 and event[0] == event[-1] and event[0] in {"'", '"'}:
+                        event = event[1:-1]
+                    if event == FORBIDDEN_TRIGGER:
+                        findings.append(f"{path_name}:{number}: pull_request_target is forbidden")
+                        break
+                continue
+
+            continue
+
+        children: list[tuple[int, str, int]] = []
+        child_index = index + 1
+        while child_index < len(lines):
+            child = lines[child_index]
+            stripped_child = child.strip()
+            indent = _indent_width(child)
+            if stripped_child and indent == 0:
+                break
+            if stripped_child and not stripped_child.startswith("#"):
+                children.append((child_index + 1, child, indent))
+            child_index += 1
+
+        if not children:
+            continue
+
+        # Only direct children of top-level ``on`` define events. Nested values
+        # such as ``push.branches: [pull_request_target]`` are filters, not event
+        # declarations, and must not be rejected merely because they share the
+        # forbidden event's spelling.
+        direct_indent = min(indent for _line_number, _child, indent in children)
+        for child_number, child, indent in children:
+            if indent != direct_indent:
+                continue
+            if PULL_REQUEST_TARGET_KEY_RE.match(child) or PULL_REQUEST_TARGET_SEQUENCE_RE.match(child):
+                findings.append(
+                    f"{path_name}:{child_number}: pull_request_target is forbidden"
+                )
+
+    return findings
+
+
 def _untrusted_expression(fragment: str) -> str | None:
     for expression in EXPRESSION_RE.finditer(fragment):
         body = expression.group("body")
@@ -227,6 +315,7 @@ def violations(path: Path) -> list[str]:
         lines, path.name
     )
     findings.extend(permission_findings)
+    findings.extend(_forbidden_trigger_violations(lines, path.name))
 
     # Compact flow mappings can place ``uses`` after another key on the same
     # physical line, where the line-anchored action parser cannot see it. Inspect
@@ -252,9 +341,6 @@ def violations(path: Path) -> list[str]:
 
     for index, line in enumerate(lines):
         number = index + 1
-
-        if PULL_REQUEST_TARGET_RE.match(line):
-            findings.append(f"{path.name}:{number}: pull_request_target is forbidden")
 
         if re.match(r"^\s*permissions\s*:\s*write-all\s*$", line):
             findings.append(f"{path.name}:{number}: write-all permissions are forbidden")
