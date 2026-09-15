@@ -1,4 +1,4 @@
-version: 8
+version: 9
 canonical_repository: Apeloff1/Skeleton
 strategy: selective-promotion
 rules:
@@ -195,8 +195,10 @@ integration_wave_4:
   evidence:
     - skeleton/testing/test_frontier_events.py
     - skeleton/testing/test_frontier_event_journal.py
+    - skeleton/testing/test_frontier_event_benchmark.py
     - skeleton/testing/test_frontier_world_memory_runtime.py
-  rationale: preserve the outbox safety invariant on the canonical EventBus using a provider-neutral journal boundary and stdlib SQLite backend
+    - scripts/benchmark_frontier_events.py
+  rationale: preserve the outbox safety invariant on the canonical EventBus using a provider-neutral journal boundary and stdlib SQLite backend; benchmark timing is observational only
 integration_wave_5:
   status: pure-policy-promoted
   surface: crew-and-store-policy
@@ -228,6 +230,100 @@ integration_wave_5:
   evidence:
     - skeleton/testing/test_frontier_ship_policy.py
   rationale: the source blobs differ, but the portable policy inspected across both is shared; promote policy once and keep source catalogs authoritative
+integration_wave_6:
+  status: recovery-seam-landed
+  surface: runtime-event-memory-recovery
+  primary_source: Apeloff1/gameforge-rs
+  source_path: crates/gf-core/src/lib.rs
+  source_blob: 481fcfca5a23272b70353eb09b7c3406bbc9bdd9
+  decision: compose-existing-primitives-with-boundary-adapter
+  target: skeleton/frontier/runtime_events.py
+  promoted_semantics:
+    - runtime-result-to-domain-event
+    - provenance-required-before-publication
+    - timezone-aware-execution-boundaries
+    - stable-execution-identity
+    - idempotency-digest-preservation
+    - crash-reopen-pending-event-recovery
+    - downstream-memory-provenance-preservation
+  rejected_from-kernel:
+    - second-runtime
+    - second-event-bus
+    - second-memory-store
+    - background-reconciler
+  evidence:
+    - skeleton/testing/test_frontier_runtime_event_recovery.py
+  rationale: bridge canonical runtime, event and memory contracts without merging their responsibilities or losing source provenance and idempotency identity
+integration_wave_7:
+  status: shared-lineage-policy-promoted
+  surface: quest-reputation-captains-log
+  decision: promote-each-identical-source-lineage-once
+  increments:
+    - capability: quests
+      primary_source: Apeloff1/Lorebuffa
+      source_path: backend/quest_system.py
+      source_blob: c572dcc8919d342a8febb224e0131047b47c2644
+      equivalent_sources:
+        - repository: Apeloff1/Openworld
+          source_path: backend/quest_system.py
+          source_blob: c572dcc8919d342a8febb224e0131047b47c2644
+      target: skeleton/frontier/quests.py
+      promoted_capabilities:
+        - source-record-normalization
+        - prerequisite-availability
+        - monotonic-objective-progress
+        - completion-state
+        - mutation-free-reward-planning
+        - deterministic-type-selection
+      evidence:
+        - skeleton/testing/test_frontier_quest_policy.py
+        - skeleton/testing/test_frontier_quest_reputation_logbook.py
+    - capability: reputation
+      primary_source: Apeloff1/Lorebuffa
+      source_path: backend/reputation_system.py
+      source_blob: 1ee119789969f963d258128ff544ea81bfd86526
+      equivalent_sources:
+        - repository: Apeloff1/Openworld
+          source_path: backend/reputation_system.py
+          source_blob: 1ee119789969f963d258128ff544ea81bfd86526
+      target: skeleton/frontier/reputation.py
+      promoted_capabilities:
+        - faction-record-normalization
+        - reputation-threshold-resolution
+        - cumulative-benefits
+        - ally-enemy-spillover
+        - mutation-free-reputation-change
+        - standing-summary
+      evidence:
+        - skeleton/testing/test_frontier_reputation_policy.py
+        - skeleton/testing/test_frontier_quest_reputation_logbook.py
+    - capability: captains-log
+      primary_source: Apeloff1/Lorebuffa
+      source_path: backend/captains_log.py
+      source_blob: 5ed7efd452e7f2bb4ef7024185d66d65f1bd89d8
+      equivalent_sources:
+        - repository: Apeloff1/Openworld
+          source_path: backend/captains_log.py
+          source_blob: 5ed7efd452e7f2bb4ef7024185d66d65f1bd89d8
+      target: skeleton/frontier/logbook.py
+      promoted_capabilities:
+        - log-record-normalization
+        - fail-closed-template-rendering
+        - pin-delete-search-milestone-policy
+        - statistics-and-timeline-projection
+        - canonical-memory-adapter
+        - canonical-domain-event-adapter
+      evidence:
+        - skeleton/testing/test_frontier_logbook_policy.py
+        - skeleton/testing/test_frontier_quest_reputation_logbook.py
+  rejected_from-kernel:
+    - source-quest-catalog
+    - source-faction-catalog
+    - source-log-persistence
+    - fastapi-routes
+    - motor-mongodb-client
+    - wallet-or-user-document-mutations
+  rationale: the three source blobs are identical across Lorebuffa and Openworld, so each portable policy is promoted once and composed through existing frontier memory/event contracts
 source_dedup_inventory:
   - capability: quests
     sources:
@@ -237,7 +333,8 @@ source_dedup_inventory:
       - repository: Apeloff1/Openworld
         path: backend/quest_system.py
         blob: c572dcc8919d342a8febb224e0131047b47c2644
-    decision: one-shared-lineage-before-any-promotion
+    decision: promoted-once-shared-lineage
+    target: skeleton/frontier/quests.py
   - capability: reputation
     sources:
       - repository: Apeloff1/Lorebuffa
@@ -246,7 +343,8 @@ source_dedup_inventory:
       - repository: Apeloff1/Openworld
         path: backend/reputation_system.py
         blob: 1ee119789969f963d258128ff544ea81bfd86526
-    decision: one-shared-lineage-before-any-promotion
+    decision: promoted-once-shared-lineage
+    target: skeleton/frontier/reputation.py
   - capability: captains-log
     sources:
       - repository: Apeloff1/Lorebuffa
@@ -255,7 +353,8 @@ source_dedup_inventory:
       - repository: Apeloff1/Openworld
         path: backend/captains_log.py
         blob: 5ed7efd452e7f2bb4ef7024185d66d65f1bd89d8
-    decision: one-shared-lineage-before-any-promotion
+    decision: promoted-once-shared-lineage
+    target: skeleton/frontier/logbook.py
 promotion_gates:
   - contract-tests
   - integration-tests
