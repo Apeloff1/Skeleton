@@ -150,6 +150,61 @@ waves:
       - skeleton/testing/test_frontier_aquarium_benchmark.py
       - scripts/benchmark_frontier_aquarium.py
       - docs/lineage/AQUARIUM_PROMOTION_2026-09-15.md
+  - wave: 16
+    surface: biotope-progression
+    decision: promote-once-exact-shared-lineage
+    source_blob: b79a167a3b568477e7db1fa95d64fc3949171a7e
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/biotope_routes.py
+      - repository: Apeloff1/Openworld
+        path: backend/biotope_routes.py
+    targets:
+      - skeleton/frontier/biotope.py
+      - skeleton/frontier/biotope_adapters.py
+      - skeleton/frontier/gameplay.py
+    hardening:
+      - explicit-boat-gating
+      - contiguous-stage-topology-validation
+      - sequential-stage-unlock
+      - all-crossed-mastery-threshold-drain
+      - canonical-progress-digest
+      - exact-unlocked-progress-map-coverage-at-boundary
+      - stale-mastery-xp-residue-rejection
+      - paired-active-biotope-stage-presence
+      - fail-closed-event-progress-rehydration
+    evidence:
+      - skeleton/testing/test_frontier_biotope_policy.py
+      - skeleton/testing/test_frontier_biotope_event_memory.py
+      - skeleton/testing/test_frontier_biotope_gameplay_facade.py
+      - skeleton/testing/test_frontier_biotope_benchmark.py
+      - scripts/benchmark_frontier_biotope.py
+      - docs/lineage/BIOTOPE_PROMOTION_2026-09-15.md
+  - wave: 17
+    surface: biotope-achievement-signals
+    decision: adapt-to-canonical-achievement-engine-not-duplicate-subsystem
+    source_blob: 5a06312eebf8bb21fef28b1010dfc3ccff6b6500
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/biotope_achievements_routes.py
+      - repository: Apeloff1/Openworld
+        path: backend/biotope_achievements_routes.py
+    targets:
+      - skeleton/frontier/biotope_achievement_adapters.py
+    hardening:
+      - nested-source-reward-normalization
+      - count-or-size-threshold-normalization
+      - freshwater-lake-to-lake-stat-alias-repair
+      - explicit-species-groups-no-fish-id-prefix-guessing
+      - trophy-size-max-stat-semantics
+      - world-angler-each-threshold-enforcement
+      - canonical-achievement-state-machine-reuse
+      - canonical-achievement-event-memory-reuse
+    evidence:
+      - skeleton/testing/test_frontier_biotope_achievement_adapters.py
+      - skeleton/testing/test_frontier_biotope_achievement_benchmark.py
+      - scripts/benchmark_frontier_biotope_achievements.py
+      - docs/lineage/BIOTOPE_ACHIEVEMENTS_PROMOTION_2026-09-15.md
 post_v11_hardening:
   - surface: runtime-idempotency-identity
     decision: harden-promoted-gameforge-idempotency-semantics
@@ -185,15 +240,17 @@ rejected_from_kernel:
   - inventory-persistence
   - provider-specific-background-workers
   - duplicate-domain-primitives
+  - duplicate-achievement-engine
+  - fish-database-registry
 benchmark_policy:
   timing: observational-only
   correctness: gated
 next_candidate:
-  surface: biotope
+  surface: fish-encyclopedia-collection
   disposition: promote-once-exact-shared-lineage
-  shared_blob: b79a167a3b568477e7db1fa95d64fc3949171a7e
+  shared_blob: e842d3697187503b1e1da2df3563d797777c6bfb
   compared_sources:
     - repository: Apeloff1/Lorebuffa
-      path: backend/biotope_routes.py
+      path: backend/encyclopedia_routes.py
     - repository: Apeloff1/Openworld
-      path: backend/biotope_routes.py
+      path: backend/encyclopedia_routes.py
