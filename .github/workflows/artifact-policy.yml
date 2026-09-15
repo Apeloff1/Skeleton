@@ -3,6 +3,7 @@ name: Artifact Policy
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, closed]
   push:
     branches: [main, develop]
     paths-ignore:
@@ -20,6 +21,7 @@ permissions:
 
 jobs:
   validate:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     name: Artifact placement and provenance
     runs-on: ubuntu-latest
     timeout-minutes: 5
