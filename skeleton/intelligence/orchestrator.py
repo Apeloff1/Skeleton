@@ -10,6 +10,7 @@ and can cache stable results. Existing two-argument ``register_handler`` and
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import threading
@@ -292,7 +293,12 @@ class IntelligenceOrchestrator:
             attempt_limit,
             routing_epoch,
         )
-        if use_cache and self._result_cache_ttl_seconds > 0:
+        cache_allowed = (
+            use_cache
+            and self._result_cache_ttl_seconds > 0
+            and not (deadline is not None and time.time() >= deadline)
+        )
+        if cache_allowed:
             cached = self._cache_get(cache_key, routing_epoch)
             if cached is not None:
                 cached["task_id"] = task.task_id
@@ -385,7 +391,6 @@ class IntelligenceOrchestrator:
                         "handler": capability,
                         "status": "failed",
                         "error_type": type(exc).__name__,
-                        "error": str(exc),
                     }
                 )
                 self._emit(
@@ -394,7 +399,6 @@ class IntelligenceOrchestrator:
                         "task_id": task.task_id,
                         "capability": capability,
                         "error_type": type(exc).__name__,
-                        "error": str(exc),
                     },
                 )
 
@@ -442,7 +446,7 @@ class IntelligenceOrchestrator:
                     "attempt_count": len(attempts),
                 },
             )
-            if use_cache and self._result_cache_ttl_seconds > 0:
+            if cache_allowed:
                 self._cache_put(cache_key, payload, routing_epoch)
             return payload
 
@@ -563,8 +567,9 @@ class IntelligenceOrchestrator:
             telemetry.avg_latency_ms = self._running_average(
                 telemetry.avg_latency_ms, latency_ms, telemetry.attempts
             )
+            observed = telemetry.successes + telemetry.rejected
             telemetry.avg_confidence = self._running_average(
-                telemetry.avg_confidence, float(result.confidence), telemetry.successes
+                telemetry.avg_confidence, float(result.confidence), observed
             )
             return True
 
@@ -610,7 +615,7 @@ class IntelligenceOrchestrator:
             telemetry.attempts += 1
             telemetry.failures += 1
             telemetry.consecutive_failures += 1
-            telemetry.last_error = f"{type(exc).__name__}: {exc}"
+            telemetry.last_error = type(exc).__name__
             telemetry.avg_latency_ms = self._running_average(
                 telemetry.avg_latency_ms, latency_ms, telemetry.attempts
             )
@@ -668,15 +673,24 @@ class IntelligenceOrchestrator:
                 self._cache.pop(key, None)
                 self._stats["cache_misses"] += 1
                 return None
+            try:
+                payload = copy.deepcopy(entry.payload)
+            except Exception:
+                self._cache.pop(key, None)
+                self._stats["cache_misses"] += 1
+                return None
             self._cache.move_to_end(key)
             self._stats["cache_hits"] += 1
-            return dict(entry.payload)
+            return payload
 
     def _cache_put(self, key: str, payload: Dict[str, Any], routing_epoch: int) -> bool:
         with self._lock:
             if self._routing_epoch != routing_epoch:
                 return False
-            cached_payload = dict(payload)
+            try:
+                cached_payload = copy.deepcopy(payload)
+            except Exception:
+                return False
             cached_payload.pop("attempts", None)
             self._cache[key] = _CacheEntry(
                 payload=cached_payload,
