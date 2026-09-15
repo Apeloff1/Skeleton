@@ -5,6 +5,9 @@ Provides:
 - NPCPipeline: Generate NPC specifications
 - GameLogicPipeline: Design game mechanics
 - AnimationPipeline: Create animation specifications
+
+Every outward creation is passed through Jeeves' tri-engine adversarial quality
+boundary: quality + adversarial quality + integrity, 100 gates per lane.
 """
 
 from __future__ import annotations
@@ -72,14 +75,31 @@ class AnimationSpec:
         }
 
 
+def _release(request: str, candidate: Any, creation_type: str) -> Any:
+    # Keep the heavy cortex package out of ordinary pipeline imports. The
+    # release boundary is loaded only when a generated artifact is returned.
+    from skeleton.cortex.tri_adversarial import guard_tri_creation
+
+    return guard_tri_creation(
+        request=request,
+        candidate=candidate,
+        metadata={"creation_type": creation_type},
+    )
+
+
 class NPCPipeline:
     """Generate NPC specifications from descriptions."""
 
-    def run(self, description: str, name: Optional[str] = None, dialogue_beats: int = 3, params: Optional[Dict[str, Any]] = None) -> NPCSpec:
-        """Generate an NPC specification."""
+    def run(
+        self,
+        description: str,
+        name: Optional[str] = None,
+        dialogue_beats: int = 3,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> NPCSpec:
+        """Generate and tri-engine validate an NPC specification."""
         beats = [f"Beat {i+1}: {description[:20]}..." for i in range(dialogue_beats)]
-        
-        return NPCSpec(
+        spec = NPCSpec(
             name=name or "Unnamed NPC",
             description=description,
             dialogue_beats=beats,
@@ -92,44 +112,51 @@ class NPCPipeline:
             },
             params=params or {},
         )
+        return _release(description, spec, "npc")
 
 
 class GameLogicPipeline:
     """Design game mechanics and progression systems."""
 
-    def run(self, description: str, title: str = "untitled", max_level: int = 50, curve: str = "quadratic", currency: str = "gold") -> GameLogicSpec:
-        """Generate game logic specification."""
+    def run(
+        self,
+        description: str,
+        title: str = "untitled",
+        max_level: int = 50,
+        curve: str = "quadratic",
+        currency: str = "gold",
+    ) -> GameLogicSpec:
+        """Generate and tri-engine validate a game-logic specification."""
         mechanics = [
             {"name": "combat", "type": "turn_based", "description": description[:30]},
             {"name": "progression", "type": "level_up", "max_level": max_level},
             {"name": "economy", "type": "currency", "currency": currency},
         ]
 
-        # Generate progression curve
         if curve == "linear":
             progression = [{"level": i, "xp_required": i * 100} for i in range(1, max_level + 1)]
         elif curve == "exponential":
             progression = [{"level": i, "xp_required": int(100 * (1.5 ** i))} for i in range(1, max_level + 1)]
-        else:  # quadratic
+        else:
             progression = [{"level": i, "xp_required": i * i * 50} for i in range(1, max_level + 1)]
 
-        return GameLogicSpec(
+        spec = GameLogicSpec(
             title=title,
             max_level=max_level,
             curve=curve,
             currency=currency,
             mechanics=mechanics,
-            progression=progression[:10],  # Truncate for brevity
+            progression=progression[:10],
         )
+        return _release(description, spec, "game_logic")
 
 
 class AnimationPipeline:
     """Create animation specifications."""
 
     def run(self, description: str, actions: Optional[tuple] = None) -> AnimationSpec:
-        """Generate animation specification."""
+        """Generate and tri-engine validate an animation specification."""
         default_actions = actions or ("idle", "walk", "run", "attack")
-        
         transitions = []
         for i in range(len(default_actions) - 1):
             transitions.append({
@@ -139,7 +166,7 @@ class AnimationPipeline:
                 "blend": "smooth",
             })
 
-        return AnimationSpec(
+        spec = AnimationSpec(
             description=description,
             actions=list(default_actions),
             skeleton_type="humanoid",
@@ -150,3 +177,4 @@ class AnimationPipeline:
                 "ik_enabled": False,
             },
         )
+        return _release(description, spec, "animation")
