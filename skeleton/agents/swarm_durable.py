@@ -1,7 +1,7 @@
 """Durable persistence bridge for the existing swarm recovery manager.
 
 This module does not implement another scheduler or checkpoint format. It stores
-``SwarmRecoveryManager``'s already-versioned, checksummed archive inside the
+``SwarmRecoveryManager``'s already-versioned, checksummed archive inside a
 provider-neutral durable run store so swarm state survives process restarts
 while the existing recovery manager remains the canonical swarm serializer.
 """
@@ -9,11 +9,29 @@ while the existing recovery manager remains the canonical swarm serializer.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any, Protocol, runtime_checkable
 
 from skeleton.agents.swarm_recovery import RECOVERY_ARCHIVE_VERSION, SwarmRecoveryManager
 from skeleton.agents.swarm_runtime import SwarmRuntime
 from skeleton.agents.swarm_tenant_broker import TenantSwarmBroker
-from skeleton.state import CheckpointRecord, ResumeState, SQLiteRunStore
+from skeleton.state import CheckpointRecord, ResumeState
+
+
+@runtime_checkable
+class DurableCheckpointStore(Protocol):
+    """Minimal durable-store surface required by the swarm recovery bridge."""
+
+    def checkpoint(
+        self,
+        run_id: str,
+        state: Any,
+        *,
+        worker_id: str,
+        after_step_id: str | None = None,
+        state_version: int = 1,
+    ) -> CheckpointRecord: ...
+
+    def resume_state(self, run_id: str) -> ResumeState: ...
 
 
 class DurableSwarmError(RuntimeError):
@@ -42,11 +60,11 @@ class DurableSwarmRecovery:
 
 
 class SwarmDurableBridge:
-    """Persist canonical swarm recovery archives through ``SQLiteRunStore``."""
+    """Persist canonical swarm recovery archives through a durable checkpoint store."""
 
-    def __init__(self, store: SQLiteRunStore) -> None:
-        if not isinstance(store, SQLiteRunStore):
-            raise TypeError("store must be a SQLiteRunStore")
+    def __init__(self, store: DurableCheckpointStore) -> None:
+        if not isinstance(store, DurableCheckpointStore):
+            raise TypeError("store must implement the durable checkpoint-store contract")
         self.store = store
 
     def persist(
@@ -125,9 +143,7 @@ class SwarmDurableBridge:
             raise DurableSwarmError("durable swarm checkpoint must contain an object")
         archive_version = checkpoint.state.get("version")
         if archive_version != checkpoint.state_version:
-            raise DurableSwarmError(
-                "durable checkpoint envelope/archive version mismatch"
-            )
+            raise DurableSwarmError("durable checkpoint envelope/archive version mismatch")
         try:
             manager = SwarmRecoveryManager.from_archive(checkpoint.state)
         except (TypeError, ValueError) as exc:
