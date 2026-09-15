@@ -24,7 +24,10 @@ WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 RUN_RE = re.compile(
     r"^(?P<indent>\s*)(?:-\s*)?(?:run|'run'|\"run\")\s*:\s*(?P<value>.*)$"
 )
-EXPRESSION_RE = re.compile(r"\$\{\{(?P<body>.*?)\}\}")
+# A GitHub expression embedded in a YAML block scalar may span physical lines.
+# DOTALL ensures the security gate inspects the expression after the full run
+# block has been reconstructed instead of only matching single-line forms.
+EXPRESSION_RE = re.compile(r"\$\{\{(?P<body>.*?)\}\}", re.DOTALL)
 # Match the input contexts as expression tokens, not only property access.
 # Whole-object transforms such as toJSON(inputs) remain attacker-controlled and
 # must not be interpolated directly into a shell command either.
@@ -49,7 +52,7 @@ def _indent_width(line: str) -> int:
 
 
 def _run_fragments(lines: list[str]) -> Iterable[tuple[int, str]]:
-    """Yield shell fragments and source line numbers from run steps."""
+    """Yield complete shell fragments and source line numbers from run steps."""
     index = 0
     while index < len(lines):
         line = lines[index]
@@ -67,13 +70,23 @@ def _run_fragments(lines: list[str]) -> Iterable[tuple[int, str]]:
 
         base_indent = len(match.group("indent"))
         index += 1
+        block_lines: list[str] = []
+        first_content_line: int | None = None
         while index < len(lines):
             child = lines[index]
             if child.strip() and _indent_width(child) <= base_indent:
                 break
-            if child.strip():
-                yield index + 1, child.strip()
+            if child.strip() and first_content_line is None:
+                first_content_line = index + 1
+            block_lines.append(child)
             index += 1
+
+        if first_content_line is not None:
+            # Keep the complete block together. YAML folded scalars can turn
+            # physical newlines into spaces, and GitHub expressions may contain
+            # whitespace, so line-by-line scanning would permit split-expression
+            # bypasses such as `${{` / `inputs.payload` / `}}` on separate lines.
+            yield first_content_line, "\n".join(block_lines)
 
 
 def _without_expression_string_literals(body: str) -> str:

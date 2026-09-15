@@ -83,6 +83,30 @@ def test_rejects_chomped_folded_block_scalar_bypass(tmp_path: Path) -> None:
     assert any("direct workflow input interpolation" in finding for finding in findings)
 
 
+def test_rejects_folded_input_expression_split_across_lines(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: workflow_dispatch\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: >\n          echo \"${{\n            inputs.payload\n          }}\"\n",
+    )
+    assert any("direct workflow input interpolation" in finding for finding in findings)
+
+
+def test_rejects_folded_event_input_expression_split_across_lines(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: workflow_dispatch\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: >-\n          printf '%s\\n' '${{\n            github.event.inputs.payload\n          }}'\n",
+    )
+    assert any("direct workflow input interpolation" in finding for finding in findings)
+
+
+def test_allows_folded_trusted_expression_split_across_lines(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: >\n          echo \"${{\n            github.repository\n          }}\"\n",
+    )
+    assert findings == []
+
+
 def test_rejects_commented_block_scalar_header_bypass(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
