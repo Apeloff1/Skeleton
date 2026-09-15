@@ -16,6 +16,8 @@ on:
       - "docs/SECURITY_INCIDENT_RESPONSE.md"
       - "scripts/check_architecture_boundaries.py"
       - "scripts/check_provider_runtime_boundary.py"
+      - "scripts/check_quality_gate_parity.py"
+      - "scripts/quality-gates.sh"
       - "tests/test_architecture_boundaries.py"
       - "tests/test_provider_runtime_boundary.py"
       - ".github/workflows/**"
@@ -31,6 +33,8 @@ on:
       - "docs/SECURITY_INCIDENT_RESPONSE.md"
       - "scripts/check_architecture_boundaries.py"
       - "scripts/check_provider_runtime_boundary.py"
+      - "scripts/check_quality_gate_parity.py"
+      - "scripts/quality-gates.sh"
       - "tests/test_architecture_boundaries.py"
       - "tests/test_provider_runtime_boundary.py"
       - ".github/workflows/**"
@@ -70,6 +74,10 @@ jobs:
 
       - name: Syntax check (full backend)
         run: python -m compileall -q .
+
+      - name: Canonical local/CI quality parity gate
+        working-directory: .
+        run: python scripts/check_quality_gate_parity.py
 
       - name: Canonical architecture boundary gate
         working-directory: .
