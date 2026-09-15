@@ -4,7 +4,7 @@ on:
   pull_request:
     branches:
       - main
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
   push:
     branches:
       - main
@@ -27,7 +27,7 @@ env:
 
 jobs:
   quarantine_policy:
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Quarantine Policy
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -46,7 +46,7 @@ jobs:
         run: python scripts/check_flaky_quarantine.py
 
   unit:
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Unit
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -72,7 +72,7 @@ jobs:
         run: python tests/run_unit.py
 
   integration_smoke:
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Integration Smoke
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -120,7 +120,7 @@ jobs:
           skeleton/testing/test_frontier_observability_correlation.py
 
   quality_security:
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: Lint Type Security
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -161,7 +161,7 @@ jobs:
 
   readiness:
     name: Merge Readiness
-    if: ${{ always() && (github.event_name != 'pull_request' || github.event.action != 'closed') }}
+    if: ${{ always() && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')) }}
     needs:
       - quarantine_policy
       - unit
