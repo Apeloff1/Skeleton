@@ -7,7 +7,9 @@
 fastapi==0.141.1
 uvicorn[standard]==0.52.4
 python-multipart==0.0.32
-websockets==17.1
+# google-genai 2.23.0 requires websockets>=13,<17; pin the newest compatible
+# 16.x maintenance release so the backend dependency graph remains resolvable.
+websockets==16.1.1
 orjson==3.12.0
 aiofiles==25.1.0
 httpx==0.28.1
