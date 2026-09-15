@@ -127,6 +127,8 @@ class CollectionMemoryAdapter:
             n_results=limit,
             where=where or None,
         )
+        if not isinstance(raw, Mapping):
+            raise TypeError("collection query result must be a mapping")
         documents = _first_row(raw.get("documents", []))
         metadatas = _first_row(raw.get("metadatas", []))
         ids = _first_row(raw.get("ids", []))
@@ -134,11 +136,17 @@ class CollectionMemoryAdapter:
 
         hits: list[Mapping[str, Any]] = []
         for index, document in enumerate(documents[:limit]):
-            hit: dict[str, Any] = {"content": str(document)}
+            if not isinstance(document, str):
+                raise TypeError("collection result document must be a string")
+            hit: dict[str, Any] = {"content": document}
             if index < len(ids):
-                item_id = str(ids[index]).strip()
+                if not isinstance(ids[index], str):
+                    raise TypeError("collection result memory id must be a string")
+                item_id = ids[index].strip()
                 if not item_id:
                     raise ValueError("collection result memory id must not be empty")
+                if item_id != ids[index]:
+                    raise ValueError("collection result memory id must be normalized")
                 hit["id"] = item_id
             if index < len(metadatas):
                 raw_metadata = metadatas[index] or {}
@@ -171,7 +179,7 @@ class SQLiteCollection:
     consumed by ``CollectionMemoryAdapter``. It provides deterministic lexical
     retrieval, exact metadata filtering, namespace isolation and idempotent
     upsert behavior without becoming the canonical retrieval engine. Persisted
-    metadata is decoded fail-closed; malformed/non-finite/non-object JSON never
+    rows are decoded fail-closed; malformed identity, document or metadata never
     becomes a memory hit or participates in a filtered mutation.
     """
 
@@ -181,9 +189,13 @@ class SQLiteCollection:
         *,
         namespace: str = "frontier_memory",
     ) -> None:
-        namespace = namespace.strip()
-        if not namespace:
+        if not isinstance(namespace, str):
+            raise TypeError("namespace must be a string")
+        normalized_namespace = namespace.strip()
+        if not normalized_namespace:
             raise ValueError("namespace must not be empty")
+        if normalized_namespace != namespace:
+            raise ValueError("namespace must be normalized")
 
         self.namespace = namespace
         self._connection = sqlite3.connect(
@@ -269,11 +281,44 @@ class SQLiteCollection:
             return None
         normalized: set[str] = set()
         for item_id in ids:
-            value = str(item_id).strip()
+            if not isinstance(item_id, str):
+                raise TypeError("memory id must be a string")
+            value = item_id.strip()
             if not value:
                 raise ValueError("memory id must not be empty")
             normalized.add(value)
         return normalized
+
+    @staticmethod
+    def _row_identity(row: sqlite3.Row) -> tuple[int, str, str]:
+        seq = row["seq"]
+        if not isinstance(seq, int) or isinstance(seq, bool) or seq < 1:
+            raise MemoryStoreCorruptionError(
+                "memory sequence must be a positive integer"
+            )
+        item_id = row["item_id"]
+        if not isinstance(item_id, str) or not item_id.strip():
+            raise MemoryStoreCorruptionError(
+                "memory item id must be stored as a non-empty string"
+            )
+        if item_id != item_id.strip():
+            raise MemoryStoreCorruptionError(
+                "memory item id must be stored in normalized form"
+            )
+        document = row["document"]
+        if not isinstance(document, str):
+            raise MemoryStoreCorruptionError(
+                "memory document must be stored as text"
+            )
+        return seq, item_id, document
+
+    def _decoded_row(
+        self,
+        row: sqlite3.Row,
+    ) -> tuple[int, str, str, Mapping[str, Any]]:
+        seq, item_id, document = self._row_identity(row)
+        metadata = self._metadata_from_json(row["metadata_json"])
+        return seq, item_id, document, metadata
 
     def _rows(self) -> list[sqlite3.Row]:
         with self._lock:
@@ -301,16 +346,20 @@ class SQLiteCollection:
 
         rows: list[tuple[str, str, str, str]] = []
         for document, metadata, item_id in zip(documents, metadatas, ids):
-            normalized_id = str(item_id).strip()
+            if not isinstance(item_id, str):
+                raise TypeError("memory id must be a string")
+            normalized_id = item_id.strip()
             if not normalized_id:
                 raise ValueError("memory id must not be empty")
+            if not isinstance(document, str):
+                raise TypeError("memory document must be a string")
             if not isinstance(metadata, Mapping):
                 raise TypeError("metadata must be a mapping")
             rows.append(
                 (
                     self.namespace,
                     normalized_id,
-                    str(document),
+                    document,
                     self._metadata_json(metadata),
                 )
             )
@@ -348,21 +397,13 @@ class SQLiteCollection:
         query = str(query_texts[0]) if query_texts else ""
         ranked: list[tuple[float, int, str, str, Mapping[str, Any]]] = []
         for row in self._rows():
-            metadata = self._metadata_from_json(row["metadata_json"])
+            seq, item_id, document, metadata = self._decoded_row(row)
             if not self._matches(metadata, normalized_where):
                 continue
-            score = lexical_relevance(row["document"], query)
+            score = lexical_relevance(document, query)
             if query.strip() and score <= 0.0:
                 continue
-            ranked.append(
-                (
-                    score,
-                    int(row["seq"]),
-                    row["item_id"],
-                    row["document"],
-                    metadata,
-                )
-            )
+            ranked.append((score, seq, item_id, document, metadata))
 
         ranked.sort(key=lambda candidate: (candidate[0], candidate[1]), reverse=True)
         selected = ranked[:n_results]
@@ -383,12 +424,13 @@ class SQLiteCollection:
         normalized_where = normalize_memory_filters(where)
         selected: list[tuple[str, str, Mapping[str, Any]]] = []
         for row in self._rows():
-            if wanted is not None and row["item_id"] not in wanted:
+            raw_id = row["item_id"]
+            if wanted is not None and raw_id not in wanted:
                 continue
-            metadata = self._metadata_from_json(row["metadata_json"])
+            _, item_id, document, metadata = self._decoded_row(row)
             if not self._matches(metadata, normalized_where):
                 continue
-            selected.append((row["item_id"], row["document"], metadata))
+            selected.append((item_id, document, metadata))
         return {
             "documents": [candidate[1] for candidate in selected],
             "metadatas": [candidate[2] for candidate in selected],
@@ -404,7 +446,7 @@ class SQLiteCollection:
         wanted = self._normalized_ids(ids)
 
         # Exact or full deletion is also the repair path for corrupt rows and
-        # therefore deliberately does not require metadata deserialization.
+        # therefore deliberately does not require row deserialization.
         if where is None:
             with self._lock:
                 if wanted is None:
@@ -426,12 +468,13 @@ class SQLiteCollection:
         normalized_where = normalize_memory_filters(where)
         targets: list[str] = []
         for row in self._rows():
-            if wanted is not None and row["item_id"] not in wanted:
+            raw_id = row["item_id"]
+            if wanted is not None and raw_id not in wanted:
                 continue
-            metadata = self._metadata_from_json(row["metadata_json"])
+            _, item_id, _, metadata = self._decoded_row(row)
             if not self._matches(metadata, normalized_where):
                 continue
-            targets.append(row["item_id"])
+            targets.append(item_id)
 
         if not targets:
             return
