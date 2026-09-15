@@ -1,0 +1,180 @@
+name: Drain obsolete PR Actions
+
+on:
+  pull_request:
+    types: [synchronize, closed]
+
+# This workflow never checks out or executes pull-request code. It mutates only
+# Actions run state and runs only for same-repository PRs, where GITHUB_TOKEN can
+# carry the explicitly scoped actions:write permission.
+permissions: {}
+
+concurrency:
+  group: pr-run-drain-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  drain:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      CURRENT_RUN_ID: ${{ github.run_id }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_ACTION: ${{ github.event.action }}
+      LIVE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Cancel obsolete live PR-linked runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          repo = os.environ['REPO']
+          token = os.environ['GH_TOKEN']
+          current_run_id = int(os.environ['CURRENT_RUN_ID'])
+          pr_number = int(os.environ['PR_NUMBER'])
+          action = os.environ['PR_ACTION']
+          live_head_sha = os.environ['LIVE_HEAD_SHA'].strip()
+          api = 'https://api.github.com'
+          live_statuses = ('queued', 'in_progress', 'waiting', 'pending', 'requested')
+          retryable = frozenset({0, 429, 500, 502, 503, 504})
+          headers = {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': f'Bearer {token}',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'skeleton-pr-run-drainer',
+          }
+
+          if action not in {'synchronize', 'closed'}:
+              raise SystemExit(f'unexpected pull_request action: {action!r}')
+          if action == 'synchronize' and not live_head_sha:
+              raise SystemExit('missing live pull-request head SHA')
+
+          def request(path, *, method='GET'):
+              req = urllib.request.Request(
+                  api + path,
+                  data=b'' if method != 'GET' else None,
+                  headers=headers,
+                  method=method,
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as response:
+                      raw = response.read()
+                      return response.status, json.loads(raw) if raw else None
+              except urllib.error.HTTPError as exc:
+                  return exc.code, None
+              except urllib.error.URLError:
+                  return 0, None
+
+          def list_runs(status_name):
+              runs = []
+              for page in range(1, 11):
+                  query = urllib.parse.urlencode({
+                      'status': status_name,
+                      'per_page': 100,
+                      'page': page,
+                  })
+                  status, payload = request(f'/repos/{repo}/actions/runs?{query}')
+                  if status != 200 or not isinstance(payload, dict):
+                      raise SystemExit(
+                          f'failed to list {status_name} runs: HTTP {status}'
+                      )
+                  batch = payload.get('workflow_runs') or []
+                  runs.extend(batch)
+                  if len(batch) < 100:
+                      break
+              return runs
+
+          def belongs_to_pr(run):
+              # GitHub's dynamic Advanced Security runs can be tied to the same
+              # PR/head and consume the same runner queue as normal PR checks.
+              if run.get('event') not in {'pull_request', 'dynamic'}:
+                  return False
+              for pull in run.get('pull_requests') or []:
+                  if int(pull.get('number') or 0) == pr_number:
+                      return True
+              return False
+
+          def cancel(run_id):
+              status = 0
+              for attempt in range(1, 4):
+                  status, _ = request(
+                      f'/repos/{repo}/actions/runs/{run_id}/cancel',
+                      method='POST',
+                  )
+                  if status not in retryable:
+                      return status
+                  if attempt < 3:
+                      time.sleep(2 ** (attempt - 1))
+              return status
+
+          inspected = 0
+          selected = []
+          seen_ids = set()
+          for status_name in live_statuses:
+              for run in list_runs(status_name):
+                  run_id = int(run.get('id') or 0)
+                  if (
+                      not run_id
+                      or run_id == current_run_id
+                      or run_id in seen_ids
+                      or not belongs_to_pr(run)
+                  ):
+                      continue
+                  seen_ids.add(run_id)
+                  inspected += 1
+
+                  # Closing a PR makes every remaining PR-linked validation
+                  # non-authoritative. Synchronizing preserves only the new head.
+                  if action == 'closed' or (run.get('head_sha') or '') != live_head_sha:
+                      selected.append(run)
+
+          accepted = moved = deferred = failed = 0
+          for run in selected:
+              run_id = int(run['id'])
+              status = cancel(run_id)
+              if status in {200, 202}:
+                  accepted += 1
+              elif status in {404, 409, 422}:
+                  moved += 1
+              elif status in retryable:
+                  deferred += 1
+              else:
+                  failed += 1
+                  print(f'cancel failed: id={run_id} status={status}')
+
+          print(
+              f'pr={pr_number} action={action} live_head={live_head_sha} '
+              f'inspected={inspected} selected={len(selected)} accepted={accepted} '
+              f'moved={moved} deferred={deferred} failed={failed}'
+          )
+
+          summary = os.environ.get('GITHUB_STEP_SUMMARY')
+          if summary:
+              with open(summary, 'a', encoding='utf-8') as handle:
+                  handle.write('## Obsolete PR Actions drain\n')
+                  handle.write(f'- PR: `#{pr_number}`\n')
+                  handle.write(f'- Event: `{action}`\n')
+                  handle.write(f'- Live head: `{live_head_sha}`\n')
+                  handle.write(f'- Matching live runs inspected: {inspected}\n')
+                  handle.write(f'- Obsolete runs selected: {len(selected)}\n')
+                  handle.write(f'- Cancel requests accepted: {accepted}\n')
+                  handle.write(f'- Already moved/completed: {moved}\n')
+                  handle.write(f'- Transient cancellations deferred: {deferred}\n')
+                  handle.write(f'- Terminal cancellation failures: {failed}\n')
+
+          if failed:
+              raise SystemExit(f'{failed} terminal cancellation failure(s)')
+          PY
