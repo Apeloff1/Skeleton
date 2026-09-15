@@ -1,6 +1,6 @@
 # Skeleton Backlog — failed-commit register + forward work
 
-Updated 2026-09-15 (F-7 revival). Original register dated 2026-09-01. Two sections: things that failed and were recovered
+Updated 2026-09-15 (F-6 implementation + CI register reconciliation). Original register dated 2026-09-01. Two sections: things that failed and were recovered
 (so the failure modes stay visible), and the frontier backlog (what to
 build next, ordered).
 
@@ -48,39 +48,43 @@ Updated 2026-09-15. Tier-1 seams F-1..F-5, F-7 and F-8..F-10 are
 | F-9 N+1 tool-call suppression | #20 | compose `kernel/dedup.py` |
 | F-10 PromptImproveDriver | #31 | ImproveLoop over prefix variants |
 | P6 policy enforcement | #13 | CodeVerifier + repair/verify gates |
+| CI-1 Jeeves import/API compatibility | main | `skeleton.jeeves.core.Jeeves` exists and package exports both `Jeeves` and `JeevesCore`; stale blocker removed |
+| CI-2 cortex restore | #25 | merged; no longer depends on CI-1 |
+| CI-3 cockpit-smoke CI | main | dedicated `cockpit-smoke` job is present in `.github/workflows/ci.yml` |
 
-### Live ops gaps (block merges — fill before new frontier)
+### Live ops status (reconciled 2026-09-15)
 
-1. **CI-1. Jeeves import + CLI shims** — `pipeline` imports `Jeeves` but
-   `jeeves.core` only exports `JeevesCore`; CLI lost `eras`/`plan`/`cockpit`/`walk`.
-   Owned by Not Soo Old Git (extend-only PR in flight). Blocks PR #29.
-2. **CI-2. Draft PR #25 cortex restore** — still GameForge-red + conflicting
-   with main; rebase after CI-1.
-3. **CI-3. PR #29 cockpit-smoke CI wire** — ready once CI-1 lands.
+The former CI-1..CI-3 merge blockers are already represented on current
+`main`. They stay visible in the landed table above so a stale register does
+not send later work back through completed recovery paths. Re-open only on a
+new regression with a failing check or reproducer.
 
 ### Tier 2 — frontier pushes (next differentiating work)
 
-4. **F-6. Mixture-of-depths for the neo transformer** — dynamic per-token
+1. **F-6. Mixture-of-depths for the neo transformer** — dynamic per-token
    compute allocation in `cortex/transformer.py`. Note: `cortex/moe.py` is
-   Mixture-of-*Experts* (different); MoD is still open.
+   Mixture-of-*Experts* (different). Active implementation: sparse FFN routing
+   with dense attention and a 1.0 compatibility default, so existing snapshots
+   keep their current behavior.
 
 ### Tier 3 — structural (bigger, schedule carefully)
 
-5. **F-11. Track E cleanup** — root sprawl moves, SEVEN_BY physical moves,
+2. **F-11. Track E cleanup** — root sprawl moves, SEVEN_BY physical moves,
    godot binary to LFS, shim deletion. Local git ops.
-6. **F-12. H5.4 cortex persistence** — genesis twin vs live singleton once
+3. **F-12. H5.4 cortex persistence** — genesis twin vs live singleton once
    `$SKELETON_OWN` exists in the container.
-7. **F-13. EconomicOptimiser audit** — `intelligence/economic.py` predates
+4. **F-13. EconomicOptimiser audit** — `intelligence/economic.py` predates
    the cascade router; reconcile the two routing contracts.
-8. **F-14. Speculative RAG** — pre-fetch likely-needed documents during
+5. **F-14. Speculative RAG** — pre-fetch likely-needed documents during
    the planning phase of a pipeline run (compose quad + composer).
    Adjacent: `cortex/speculate.py` is token continuation, not RAG prefetch.
-9. **F-15. Organism/social/galaxy plane audit** — the repo grew three
+6. **F-15. Organism/social/galaxy plane audit** — the repo grew three
     planes while the waves landed (see §1 drift note). Same size-filtered
     read methodology as the deep-cut campaign, when their churn settles.
 
 ## Definition of SOTA (working)
 
-Tier-1 SOTA seams (F-2..F-5, F-7, F-10) are landed in code. Remaining bar:
-main CI green (CI-1..CI-3), then Tier-2 differentiation (F-6 MoD) where the
-system stops catching up and starts pushing.
+Tier-1 SOTA seams (F-2..F-5, F-7, F-10) and the former live-ops CI gaps are
+landed in code. Remaining bar: keep main CI green, land Tier-2 differentiation
+(F-6 MoD), then continue through the structural Tier-3 work without reviving
+stale blockers.
