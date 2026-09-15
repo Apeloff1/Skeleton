@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Mapping
 
-from skeleton.frontier.aquarium_models import DecorationSpec, DisplayFish, AquariumPosition, aware, count, counts, text
+from skeleton.frontier.aquarium_models import AquariumPosition, DisplayFish, aware, count, counts, text
 
 
 @dataclass(frozen=True, slots=True)
@@ -13,7 +14,7 @@ class PlacedDecoration:
     decoration_id: str
     name: str
     position: AquariumPosition
-    placed_at: object
+    placed_at: datetime
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "id", text(self.id, "placed decoration id"))
