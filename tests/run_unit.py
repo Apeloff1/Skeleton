@@ -3,26 +3,26 @@
 
 The GameForge cortex grew a stronger owned-mouth contract in Queue28/Queue29:
 PFC's internal transformer is now trained, while one older assertion still
-encodes the superseded pre-transfer contract.  We execute that test and may
-suppress only that exact obsolete assertion.  Any different assertion failure
+encodes the superseded pre-transfer contract. We execute that test and may
+suppress only that exact obsolete assertion. Any different assertion failure
 in the same test remains a hard failure.
 
 This runner intentionally stays lightweight, but it also preserves pytest's
 important per-test instance isolation, executes awaitable test results to
 completion, collects module-level and descriptor-backed tests, and fails closed
-when imports, collection, unsupported lifecycle hooks, or explicit
-``SystemExit`` attempts short-circuit the suite.
+when imports, collection, unsupported test semantics, or explicit ``SystemExit``
+attempts short-circuit the suite.
 """
 from __future__ import annotations
 
 import asyncio
 import importlib
 import inspect
-import linecache
 import sys
+import unittest
 from pathlib import Path
-from types import ModuleType, TracebackType
-from typing import Awaitable, Callable, Iterator, TypeVar
+from types import CodeType, MappingProxyType, ModuleType, TracebackType
+from typing import Awaitable, Callable, Iterator, Mapping, NamedTuple, TypeVar
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -48,19 +48,37 @@ UNSUPPORTED_CLASS_LIFECYCLE_HOOKS = (
     "teardown_method",
 )
 
-# These are not generic skips. The method is executed and suppression is
-# permitted only when the terminal traceback frame is the test method itself
-# and the failing source line exactly matches the documented obsolete assert.
-SUPERSEDED_ASSERTIONS = {
-    ("TestNeural", "test_train_fits_all_four_neurals"): {
-        "successor": "TestQueue28Queue29.test_tied_cosine_all_slot_lms",
-        "assertion": 'assert lms["pfc"]["transformer_steps"] == 0',
-    },
-}
+# These are not generic skips. The target is resolved before any test body runs,
+# and suppression is permitted only when the terminal traceback points at the
+# one unique source line documented here.
+SUPERSEDED_ASSERTIONS = MappingProxyType(
+    {
+        ("TestNeural", "test_train_fits_all_four_neurals"): MappingProxyType(
+            {
+                "module": "tests.test_cortex",
+                "successor": "TestQueue28Queue29.test_tied_cosine_all_slot_lms",
+                "assertion": 'assert lms["pfc"]["transformer_steps"] == 0',
+            }
+        ),
+    }
+)
 
 T = TypeVar("T")
 TestCallable = Callable[[], object]
 _MISSING = object()
+
+
+class ResolvedSuppression(NamedTuple):
+    code: CodeType
+    line: int
+    successor: str
+
+
+class CollectedCase(NamedTuple):
+    owner: str
+    name: str
+    meth: TestCallable
+    suppression: ResolvedSuppression | None
 
 
 def _terminal_traceback(exc: BaseException) -> TracebackType | None:
@@ -72,66 +90,171 @@ def _terminal_traceback(exc: BaseException) -> TracebackType | None:
     return tb
 
 
+def _resolve_assertion_location(
+    meth: object,
+    expected_line: str,
+    _getsourcelines: Callable[[object], tuple[list[str], int]] = inspect.getsourcelines,
+) -> tuple[CodeType, int]:
+    """Resolve one documented assertion to one immutable code/line identity."""
+
+    func = getattr(meth, "__func__", meth)
+    code = getattr(func, "__code__", None)
+    if code is None:
+        raise RuntimeError("suppression target has no Python code object")
+
+    source, start = _getsourcelines(func)
+    matches = [start + offset for offset, line in enumerate(source) if line.strip() == expected_line]
+    if len(matches) != 1:
+        raise RuntimeError(
+            "documented superseded assertion must occur exactly once "
+            f"(found {len(matches)})"
+        )
+    return code, matches[0]
+
+
 def _matches_superseded_assertion(
     meth: object,
     exc: AssertionError,
     expected_line: str,
 ) -> bool:
-    """Return true only for the exact documented assertion in ``meth``.
+    """Compatibility helper used by regression tests for exact suppression."""
 
-    Matching both the terminal code object and source line prevents a new
-    regression in a helper or an earlier assertion from being hidden merely
-    because it happened inside a historically superseded test method.
-    """
-
-    tb = _terminal_traceback(exc)
-    func = getattr(meth, "__func__", meth)
-    code = getattr(func, "__code__", None)
-    if tb is None or code is None or tb.tb_frame.f_code is not code:
+    try:
+        code, line = _resolve_assertion_location(meth, expected_line)
+    except (OSError, RuntimeError, TypeError):
         return False
-    actual_line = linecache.getline(code.co_filename, tb.tb_lineno).strip()
-    return actual_line == expected_line
+    tb = _terminal_traceback(exc)
+    return tb is not None and tb.tb_frame.f_code is code and tb.tb_lineno == line
 
 
-def _load_test_module(name: str) -> ModuleType:
-    return importlib.import_module(name)
+def _matches_resolved_suppression(exc: AssertionError, suppression: ResolvedSuppression) -> bool:
+    tb = _terminal_traceback(exc)
+    return (
+        tb is not None
+        and tb.tb_frame.f_code is suppression.code
+        and tb.tb_lineno == suppression.line
+    )
 
 
-def _first_unsupported_hook(target: object, names: tuple[str, ...]) -> str | None:
+def _load_test_module(
+    name: str,
+    _import_module: Callable[[str], ModuleType] = importlib.import_module,
+) -> ModuleType:
+    return _import_module(name)
+
+
+def _first_unsupported_hook(
+    target: object,
+    names: tuple[str, ...],
+    _getattr_static: Callable[..., object] = inspect.getattr_static,
+) -> str | None:
     for name in names:
-        if inspect.getattr_static(target, name, _MISSING) is not _MISSING:
+        if _getattr_static(target, name, _MISSING) is not _MISSING:
             return name
     return None
 
 
-def _iter_module_test_functions(mod: ModuleType) -> Iterator[tuple[str, TestCallable]]:
-    """Yield test functions defined by ``mod``, excluding imported helpers."""
+def _has_pytest_marks(
+    target: object,
+    _getattr_static: Callable[..., object] = inspect.getattr_static,
+) -> bool:
+    """Return true when pytest-specific marker semantics would be required."""
 
-    for name, func in inspect.getmembers_static(mod, inspect.isfunction):
-        if name.startswith("test_") and func.__module__ == mod.__name__:
-            yield name, func
+    return _getattr_static(target, "pytestmark", _MISSING) is not _MISSING
 
 
-def _iter_test_methods(cls: type) -> Iterator[tuple[str, TestCallable]]:
-    """Yield pytest-shaped methods without silently dropping descriptors.
+def _iter_module_test_functions(
+    mod: ModuleType,
+    _getmembers_static: Callable[..., list[tuple[str, object]]] = inspect.getmembers_static,
+    _isfunction: Callable[[object], bool] = inspect.isfunction,
+) -> Iterator[tuple[str, TestCallable]]:
+    """Yield local module tests and reject unsupported callable test shapes."""
 
-    Plain instance methods receive a fresh class instance per test. Static and
-    class methods are collected explicitly so a decorator cannot make a test
-    disappear from the dependency-free CI lane.
-    """
+    for name, candidate in _getmembers_static(mod):
+        if not name.startswith("test_"):
+            continue
+        if _isfunction(candidate):
+            if getattr(candidate, "__module__", None) != mod.__name__:
+                continue
+            if _has_pytest_marks(candidate):
+                raise RuntimeError(f"unsupported pytest marks on {name}")
+            yield name, candidate
+            continue
 
-    for mname, raw in inspect.getmembers_static(cls):
+        origin = getattr(candidate, "__module__", None)
+        if origin not in (None, mod.__name__):
+            continue
+        if callable(candidate):
+            raise RuntimeError(
+                f"unsupported callable test shape {name}: {type(candidate).__name__}"
+            )
+
+
+def _iter_test_methods(
+    cls: type,
+    _getmembers_static: Callable[..., list[tuple[str, object]]] = inspect.getmembers_static,
+    _isfunction: Callable[[object], bool] = inspect.isfunction,
+) -> Iterator[tuple[str, TestCallable]]:
+    """Compatibility collector returning fresh bound instances per method."""
+
+    for mname, raw in _getmembers_static(cls):
         if not mname.startswith("test_"):
             continue
         if isinstance(raw, classmethod):
+            func = raw.__func__
+            if _has_pytest_marks(raw) or _has_pytest_marks(func):
+                raise RuntimeError(f"unsupported pytest marks on {mname}")
             yield mname, getattr(cls, mname)
             continue
         if isinstance(raw, staticmethod):
-            yield mname, raw.__func__
+            func = raw.__func__
+            if _has_pytest_marks(raw) or _has_pytest_marks(func):
+                raise RuntimeError(f"unsupported pytest marks on {mname}")
+            yield mname, func
             continue
-        if inspect.isfunction(raw):
+        if _isfunction(raw):
+            if _has_pytest_marks(raw):
+                raise RuntimeError(f"unsupported pytest marks on {mname}")
             inst = cls()
             yield mname, getattr(inst, mname)
+            continue
+        if callable(raw):
+            raise RuntimeError(
+                f"unsupported callable test shape {mname}: {type(raw).__name__}"
+            )
+
+
+def _iter_frozen_test_methods(
+    cls: type,
+    _getmembers_static: Callable[..., list[tuple[str, object]]] = inspect.getmembers_static,
+    _isfunction: Callable[[object], bool] = inspect.isfunction,
+) -> Iterator[tuple[str, TestCallable]]:
+    """Freeze method identities while deferring instance construction to execution."""
+
+    for mname, raw in _getmembers_static(cls):
+        if not mname.startswith("test_"):
+            continue
+        if isinstance(raw, classmethod):
+            func = raw.__func__
+            if _has_pytest_marks(raw) or _has_pytest_marks(func):
+                raise RuntimeError(f"unsupported pytest marks on {mname}")
+            yield mname, (lambda _func=func, _cls=cls: _func(_cls))
+            continue
+        if isinstance(raw, staticmethod):
+            func = raw.__func__
+            if _has_pytest_marks(raw) or _has_pytest_marks(func):
+                raise RuntimeError(f"unsupported pytest marks on {mname}")
+            yield mname, func
+            continue
+        if _isfunction(raw):
+            if _has_pytest_marks(raw):
+                raise RuntimeError(f"unsupported pytest marks on {mname}")
+            yield mname, (lambda _func=raw, _cls=cls: _func(_cls()))
+            continue
+        if callable(raw):
+            raise RuntimeError(
+                f"unsupported callable test shape {mname}: {type(raw).__name__}"
+            )
 
 
 async def _await_result(awaitable: Awaitable[T]) -> T:
@@ -149,72 +272,139 @@ def _invoke_test(meth: TestCallable) -> object:
     return result
 
 
+def _unwrap_static_test_method(cls: type, name: str) -> object:
+    raw = inspect.getattr_static(cls, name, _MISSING)
+    if raw is _MISSING:
+        raise RuntimeError(f"suppression target method is missing: {name}")
+    if isinstance(raw, (classmethod, staticmethod)):
+        return raw.__func__
+    if inspect.isfunction(raw):
+        return raw
+    raise RuntimeError(f"suppression target is not a Python test method: {name}")
+
+
+def _resolve_suppressions(
+    modules: list[ModuleType],
+    unavailable_modules: frozenset[str] = frozenset(),
+    registry: Mapping[tuple[str, str], Mapping[str, str]] | None = None,
+) -> Mapping[tuple[str, str, str], ResolvedSuppression]:
+    """Resolve suppression policy before executing any test body."""
+
+    active_registry = SUPERSEDED_ASSERTIONS if registry is None else registry
+    by_name = {mod.__name__: mod for mod in modules}
+    resolved: dict[tuple[str, str, str], ResolvedSuppression] = {}
+
+    for (class_name, method_name), spec in active_registry.items():
+        module_name = spec["module"]
+        if module_name in unavailable_modules:
+            continue
+        mod = by_name.get(module_name)
+        if mod is None:
+            raise RuntimeError(f"suppression target module was not loaded: {module_name}")
+
+        cls = inspect.getattr_static(mod, class_name, _MISSING)
+        if not inspect.isclass(cls) or getattr(cls, "__module__", None) != module_name:
+            raise RuntimeError(
+                f"suppression target class is missing or imported: {module_name}.{class_name}"
+            )
+
+        meth = _unwrap_static_test_method(cls, method_name)
+        code, line = _resolve_assertion_location(meth, spec["assertion"])
+        resolved[(module_name, class_name, method_name)] = ResolvedSuppression(
+            code=code,
+            line=line,
+            successor=spec["successor"],
+        )
+
+    return MappingProxyType(resolved)
+
+
 def _run_case(
-    owner: str,
-    name: str,
-    meth: TestCallable,
-    superseded_key: tuple[str, str] | None = None,
+    case: CollectedCase,
+    _invoke: Callable[[TestCallable], object] = _invoke_test,
 ) -> tuple[int, int, int]:
-    """Run one collected test and return pass/fail/superseded deltas."""
+    """Run one pre-collected test and return pass/fail/superseded deltas."""
 
     try:
-        _invoke_test(meth)
-        print("PASS", owner, name)
+        _invoke(case.meth)
+        print("PASS", case.owner, case.name)
         return 1, 0, 0
     except AssertionError as exc:
-        spec = SUPERSEDED_ASSERTIONS.get(superseded_key) if superseded_key else None
-        if spec and _matches_superseded_assertion(meth, exc, spec["assertion"]):
-            print("SUPERSEDED", owner, name, "->", spec["successor"], repr(exc))
+        suppression = case.suppression
+        if suppression and _matches_resolved_suppression(exc, suppression):
+            print(
+                "SUPERSEDED",
+                case.owner,
+                case.name,
+                "->",
+                suppression.successor,
+                repr(exc),
+            )
             return 0, 0, 1
-        print("FAIL", owner, name, type(exc).__name__, exc)
+        print("FAIL", case.owner, case.name, type(exc).__name__, exc)
         return 0, 1, 0
     except SystemExit as exc:
-        print("FAIL", owner, name, type(exc).__name__, exc)
+        print("FAIL", case.owner, case.name, type(exc).__name__, exc)
         return 0, 1, 0
     except Exception as exc:
-        print("FAIL", owner, name, type(exc).__name__, exc)
+        print("FAIL", case.owner, case.name, type(exc).__name__, exc)
         return 0, 1, 0
 
 
-def _run_module(mod: ModuleType) -> tuple[int, int, int]:
-    passes = 0
+def _collect_module(
+    mod: ModuleType,
+    resolved_suppressions: Mapping[tuple[str, str, str], ResolvedSuppression],
+) -> tuple[list[CollectedCase], int]:
+    """Collect one module completely before any test body is allowed to run."""
+
+    cases: list[CollectedCase] = []
     fails = 0
-    superseded = 0
-    collected = 0
     collection_failed = False
+
+    if _has_pytest_marks(mod):
+        print("FAIL COLLECT", mod.__name__, "unsupported module pytest marks")
+        return [], 1
 
     hook = _first_unsupported_hook(mod, UNSUPPORTED_MODULE_LIFECYCLE_HOOKS)
     if hook is not None:
         print("FAIL COLLECT", mod.__name__, "unsupported lifecycle hook", hook)
-        return 0, 1, 0
+        return [], 1
 
     try:
         module_tests = list(_iter_module_test_functions(mod))
     except SystemExit as exc:
         print("FAIL COLLECT", mod.__name__, type(exc).__name__, exc)
-        return 0, 1, 0
+        return [], 1
     except Exception as exc:
         print("FAIL COLLECT", mod.__name__, type(exc).__name__, exc)
-        return 0, 1, 0
+        return [], 1
 
     for name, meth in module_tests:
-        collected += 1
-        p, failed, s = _run_case(mod.__name__, name, meth)
-        passes += p
-        fails += failed
-        superseded += s
+        cases.append(CollectedCase(mod.__name__, name, meth, None))
 
     try:
         classes = inspect.getmembers_static(mod, inspect.isclass)
     except SystemExit as exc:
         print("FAIL COLLECT", mod.__name__, type(exc).__name__, exc)
-        return passes, fails + 1, superseded
+        return cases, fails + 1
     except Exception as exc:
         print("FAIL COLLECT", mod.__name__, type(exc).__name__, exc)
-        return passes, fails + 1, superseded
+        return cases, fails + 1
 
     for name, cls in classes:
         if not name.startswith("Test") or cls.__module__ != mod.__name__:
+            continue
+
+        if issubclass(cls, unittest.TestCase):
+            print("FAIL COLLECT", name, "unsupported unittest.TestCase semantics")
+            fails += 1
+            collection_failed = True
+            continue
+
+        if _has_pytest_marks(cls):
+            print("FAIL COLLECT", name, "unsupported class pytest marks")
+            fails += 1
+            collection_failed = True
             continue
 
         hook = _first_unsupported_hook(cls, UNSUPPORTED_CLASS_LIFECYCLE_HOOKS)
@@ -225,7 +415,7 @@ def _run_module(mod: ModuleType) -> tuple[int, int, int]:
             continue
 
         try:
-            methods = list(_iter_test_methods(cls))
+            methods = list(_iter_frozen_test_methods(cls))
         except SystemExit as exc:
             print("FAIL COLLECT", name, type(exc).__name__, exc)
             fails += 1
@@ -238,16 +428,30 @@ def _run_module(mod: ModuleType) -> tuple[int, int, int]:
             continue
 
         for mname, meth in methods:
-            collected += 1
-            p, failed, s = _run_case(name, mname, meth, (name, mname))
-            passes += p
-            fails += failed
-            superseded += s
+            suppression = resolved_suppressions.get((mod.__name__, name, mname))
+            cases.append(CollectedCase(name, mname, meth, suppression))
 
-    if collected == 0 and not collection_failed:
+    if not cases and not collection_failed:
         print("FAIL COLLECT", mod.__name__, "no tests collected")
         fails += 1
 
+    return cases, fails
+
+
+def _run_module(
+    mod: ModuleType,
+    resolved_suppressions: Mapping[tuple[str, str, str], ResolvedSuppression] | None = None,
+) -> tuple[int, int, int]:
+    """Compatibility wrapper for running one already-imported test module."""
+
+    cases, fails = _collect_module(mod, resolved_suppressions or {})
+    passes = 0
+    superseded = 0
+    for case in cases:
+        p, failed, s = _run_case(case)
+        passes += p
+        fails += failed
+        superseded += s
     return passes, fails, superseded
 
 
@@ -256,19 +460,62 @@ def main() -> int:
     passes = 0
     superseded = 0
 
-    for module_name in TEST_MODULE_NAMES:
+    # Capture runner policy before importing any test module. Imports can execute
+    # arbitrary module-level code; they must not be able to rewrite what this
+    # invocation intends to import or suppress.
+    module_names = tuple(TEST_MODULE_NAMES)
+    registry = SUPERSEDED_ASSERTIONS
+    loader = _load_test_module
+    resolver = _resolve_suppressions
+    collector = _collect_module
+    run_case = _run_case
+
+    loaded: list[ModuleType] = []
+    unavailable: set[str] = set()
+    for module_name in module_names:
         try:
-            mod = _load_test_module(module_name)
+            loaded.append(loader(module_name))
         except SystemExit as exc:
+            unavailable.add(module_name)
             fails += 1
             print("FAIL IMPORT", module_name, type(exc).__name__, exc)
+        except Exception as exc:
+            unavailable.add(module_name)
+            fails += 1
+            print("FAIL IMPORT", module_name, type(exc).__name__, exc)
+
+    try:
+        resolved = resolver(loaded, frozenset(unavailable), registry)
+    except SystemExit as exc:
+        fails += 1
+        resolved = {}
+        print("FAIL CONFIG superseded assertions", type(exc).__name__, exc)
+    except Exception as exc:
+        fails += 1
+        resolved = {}
+        print("FAIL CONFIG superseded assertions", type(exc).__name__, exc)
+
+    # Freeze every test identity before the first test body executes. Instance
+    # construction is still deferred to each test invocation, so test classes
+    # keep per-test timing/isolation without allowing an earlier test to erase a
+    # later method from collection.
+    collected: list[CollectedCase] = []
+    for mod in loaded:
+        try:
+            cases, collection_fails = collector(mod, resolved)
+        except SystemExit as exc:
+            fails += 1
+            print("FAIL COLLECT", mod.__name__, type(exc).__name__, exc)
             continue
         except Exception as exc:
             fails += 1
-            print("FAIL IMPORT", module_name, type(exc).__name__, exc)
+            print("FAIL COLLECT", mod.__name__, type(exc).__name__, exc)
             continue
+        collected.extend(cases)
+        fails += collection_fails
 
-        p, failed, s = _run_module(mod)
+    for case in collected:
+        p, failed, s = run_case(case)
         passes += p
         fails += failed
         superseded += s
