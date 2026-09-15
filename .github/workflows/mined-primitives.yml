@@ -27,6 +27,7 @@ concurrency:
 jobs:
   backend-worm-audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 8
     defaults:
       run:
         working-directory: backend
@@ -36,7 +37,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.11"
+          python-version: "3.11.16"
       - name: Install focused test dependencies
         run: python -m pip install "pytest>=8,<9"
       - name: Run WORM ledger regression suite
@@ -44,6 +45,7 @@ jobs:
 
   frontend-ui-verdict:
     runs-on: ubuntu-latest
+    timeout-minutes: 8
     defaults:
       run:
         working-directory: frontend
@@ -53,6 +55,6 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "24"
+          node-version: "24.20.0"
       - name: Run mined UI regression oracle tests
         run: node --test scripts/ui-regression-verdict.test.mjs
