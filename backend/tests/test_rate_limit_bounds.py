@@ -96,6 +96,29 @@ async def test_rate_limiter_preserves_active_bucket_when_capacity_is_full():
 
 
 @pytest.mark.asyncio
+async def test_recent_access_reorders_bucket_for_constant_time_expiry_pruning():
+    limiter = RateLimiterMiddleware(_App(), per_minute=60, burst=2, max_buckets=2, bucket_ttl=30)
+
+    async with limiter._get_state_lock():
+        first, _ = limiter._bucket_for("198.51.100.1")
+        second, _ = limiter._bucket_for("198.51.100.2")
+        assert first is not None
+        assert second is not None
+
+        first_again, _ = limiter._bucket_for("198.51.100.1")
+        assert first_again is first
+        assert list(limiter._buckets) == ["198.51.100.2", "198.51.100.1"]
+
+        second.last -= 31
+        admitted, retry = limiter._bucket_for("198.51.100.3")
+
+    assert admitted is not None
+    assert retry == 0.0
+    assert list(limiter._buckets) == ["198.51.100.1", "198.51.100.3"]
+    assert limiter._expired_pruned == 1
+
+
+@pytest.mark.asyncio
 async def test_saturation_churn_cannot_reset_an_existing_exhausted_bucket():
     limiter = RateLimiterMiddleware(_App(), per_minute=1, burst=1, max_buckets=2, bucket_ttl=300)
 
