@@ -32,6 +32,7 @@ const severityBits = Object.freeze({
   high: 8,
   critical: 16,
 });
+const blockingSeverityMask = severityBits.high | severityBits.critical;
 
 const allowedMitigatedAdvisories = new Set([
   // image-size has no patched npm release. These two parser-progress flaws are
@@ -43,7 +44,7 @@ const allowedMitigatedAdvisories = new Set([
 
 const findings = [];
 const mitigated = [];
-let observedSeverityMask = 0;
+let observedBlockingMask = 0;
 let sawAuditSummary = false;
 
 let auditText;
@@ -86,9 +87,13 @@ for (const line of auditText.split(/\r?\n/)) {
     console.error(`[yarn-audit-policy] unknown advisory severity: ${severity || 'missing'}`);
     process.exit(2);
   }
-  observedSeverityMask |= severityBit;
 
+  // Yarn Classic's --level flag filters printed advisories but intentionally
+  // does not filter the process exit mask. Reconcile only the blocking bits
+  // that the high-level JSON stream is guaranteed to expose.
   if (!['high', 'critical'].includes(severity)) continue;
+  observedBlockingMask |= severityBit;
+
   const ghsa = String(advisory.github_advisory_id || '');
   const item = {
     module: String(advisory.module_name || 'unknown'),
@@ -108,9 +113,10 @@ if (!sawAuditSummary) {
   process.exit(2);
 }
 
-if (auditStatus !== observedSeverityMask) {
+const reportedBlockingMask = auditStatus & blockingSeverityMask;
+if (reportedBlockingMask !== observedBlockingMask) {
   console.error(
-    `[yarn-audit-policy] yarn exit mask ${auditStatus} does not match parsed advisory mask ${observedSeverityMask}`,
+    `[yarn-audit-policy] yarn blocking-severity mask ${reportedBlockingMask} does not match parsed mask ${observedBlockingMask}`,
   );
   process.exit(2);
 }
