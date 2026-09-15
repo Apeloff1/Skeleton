@@ -17,7 +17,7 @@ Status here is descriptive, not a substitute for GitHub issue state. Issue #540 
 | --- | --- | --- | --- | --- |
 | Stable aggregate merge summary | `.github/workflows/merge-readiness.yml`; `scripts/check_merge_readiness_contract.py` | quarantine/unit/integration/quality jobs feed the single `Merge Readiness` summary | Canonical | `main` is currently unprotected, so the repository cannot force the summary to be required without admin settings. |
 | Third-party action immutability | `backend/scripts/check_workflow_security.py` | `backend/tests/test_workflow_security_gate.py` covers tag/unversioned action rejection and SHA-pinned acceptance | Canonical | Repository administrators can still bypass source-controlled CI while `main` is unprotected. |
-| Checkout credential persistence | `backend/scripts/check_workflow_security.py` | `backend/tests/test_workflow_security_gate.py` covers missing/true/false `persist-credentials` behavior | Canonical | Same branch-protection/admin bypass risk. |
+| Checkout credential persistence | `backend/scripts/check_workflow_security.py` | `backend/tests/test_workflow_security_gate.py`; `backend/tests/test_workflow_security_checkout_credentials.py` covers missing/true/false values plus sibling-`env`, nested-mapping, block, and flow-style bypasses | Canonical | Same branch-protection/admin bypass risk. |
 | Untrusted workflow event/input shell boundary | `backend/scripts/check_workflow_input_security.py`, composed by `check_workflow_security.py` | `backend/tests/test_workflow_input_security_gate.py`; `backend/tests/test_workflow_event_shell_security.py` | Canonical | New expression forms require continuing regression coverage. |
 | `pull_request_target` prohibition | `backend/scripts/check_workflow_security.py` | workflow security regressions reject the trigger | Canonical | None known in source-controlled policy; admin bypass remains external. |
 | Job/service image immutability | `backend/scripts/check_workflow_container_security.py`, composed by `check_workflow_security.py` | `backend/tests/test_workflow_security_gate.py` covers mutable job/service image rejection | Canonical | Digest refresh provenance and base-image lifecycle remain tracked separately. |
@@ -36,7 +36,8 @@ Status here is descriptive, not a substitute for GitHub issue state. Issue #540 
 | JavaScript child-process alias safety | `backend/scripts/check_js_process_alias_safety.py` | `backend/tests/test_js_process_alias_safety.py` | Canonical | Frontend/browser-specific sink coverage still needs periodic review. |
 | API payload/rate-limit/error-redaction contracts | canonical runtime tests in `tests/` | `tests/test_api_gateway_payload_reliability.py`, `tests/test_api_gateway_rate_limit_reliability.py`, `tests/test_api_gateway_error_redaction.py` | Canonical | Header limits, CORS/auth boundaries, content-type validation, and SSRF-specific coverage remain tracked in #540. |
 | Tool/sandbox capability boundary | provider/runtime and architecture boundary gates plus consolidated sandbox contracts | canonical architecture/provider tests and closed capability-sandbox work under parent #80 | Canonical / implemented | #540 still tracks adversarial proof that untrusted model/tool input cannot widen grants. |
-| Adversarial release boundary | `skeleton/cortex/adversarial.py`; `skeleton/cortex/tri_adversarial.py` | `tests/test_adversarial_engine.py`, `tests/test_tri_adversarial_engine.py`, focused candidate-isolation regressions | Canonical | Judge mutation combined with a REPAIR verdict has a residual boundary case identified during #614 review and requires a focused follow-up fix. |
+| Adversarial release boundary | `skeleton/cortex/adversarial.py`; `skeleton/cortex/tri_adversarial.py` | `tests/test_adversarial_engine.py`, `tests/test_tri_adversarial_engine.py`, candidate-isolation and mutation/repair-boundary regressions | Canonical | Lane candidates and metadata are deep-isolated and judge mutation is fail-closed outside the explicit bounded repair path; new judge interfaces must preserve this invariant. |
+| Application-container privilege boundary | root/backend/frontend production Dockerfiles; `docker-compose.yml` | `skeleton/testing/test_deployment_security_defaults.py` verifies non-secret deployment defaults, immutable stateful refs, `no-new-privileges`, capability drops, and canonical liveness probes | Implemented | Read-only root filesystems and writable-mount minimization remain compatibility work; third-party database/vector images require their own capability review. |
 
 ## Secrets, malware, and telemetry controls
 
@@ -57,7 +58,7 @@ Status here is descriptive, not a substitute for GitHub issue state. Issue #540 
 | Deployment trust | `.github/workflows/deployment-trust.yml` | deployment trust policy workflow | Supplemental | Environment protection and deploy permissions are partly repository/organization-admin settings. |
 | Release provenance / attestations | provenance/release policy workflows in `.github/workflows/` | source-controlled release-evidence checks | Supplemental / pending completion | #540 still tracks refusal of release when required provenance/attestation evidence is absent. |
 | Container vulnerability scanning | dependency/release security workflows | workflow evidence | Pending verification | #540 still requires proof that every deployable image is scanned for HIGH/CRITICAL findings. |
-| Base-image digest lifecycle | CI service image policy plus Dockerfiles/build workflows | workflow container scanner covers CI service images | Pending | Production/base-image digest pinning and controlled refresh automation remain open. |
+| Base/deployment image immutability | digest-pinned root/backend/frontend Dockerfiles plus digest-pinned Mongo/Chroma compose refs; CI service-image policy | `skeleton/testing/test_deployment_security_defaults.py`; workflow container scanner for CI service images | Implemented / refresh pending | Controlled digest-refresh automation and refresh provenance remain open. |
 
 ## Operational readiness
 
@@ -90,11 +91,10 @@ Issue #540 remains open for the following high-value work:
 - complete network/SSRF and API boundary audit;
 - fail-closed scanner self-failure regressions across the security suite;
 - realistic secret-fixture/high-entropy false-negative audit;
-- dependency/container vulnerability and digest-refresh verification;
-- production container non-root/capability/read-only-filesystem/runtime-secret hardening;
+- dependency/container vulnerability and controlled digest-refresh verification;
+- read-only-filesystem/writable-mount minimization and runtime-secret hardening;
 - release provenance/attestation refusal behavior;
-- adversarial malformed-input, traversal, archive-bomb/zip-slip, SSRF, command-injection, unsafe-serialization, and leakage tests;
-- the residual adversarial judge-mutation + REPAIR boundary identified after #614.
+- adversarial malformed-input, traversal, archive-bomb/zip-slip, SSRF, command-injection, unsafe-serialization, and leakage tests.
 
 ## Closure rule
 
