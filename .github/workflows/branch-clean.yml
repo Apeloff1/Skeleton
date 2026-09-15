@@ -118,8 +118,12 @@ jobs:
             while read -r tip branch; do
               [[ -n "$tip" && -n "$branch" ]] || continue
 
+              # Permanent coordination/release refs are never cleanup candidates.
+              # Backup refs are different: keep them while they are unique, but
+              # allow deletion once their exact tip is provably represented by main
+              # or by a merged PR. This prevents absorbed backups becoming immortal.
               case "$branch" in
-                main|develop|release/*|backup/*|keep/*)
+                main|develop|release/*|keep/*)
                   protected_count=$((protected_count + 1))
                   printf '%s %s protected-name\n' "$branch" "$tip" >> ../preserved-branches.txt
                   continue
@@ -140,6 +144,9 @@ jobs:
                 merged_pr_count=$((merged_pr_count + 1))
                 delete_branches+=("$branch")
                 delete_tips+=("$tip")
+              elif [[ "$branch" == backup/* ]]; then
+                protected_count=$((protected_count + 1))
+                printf '%s %s protected-backup-unmerged\n' "$branch" "$tip" >> ../preserved-branches.txt
               else
                 unique_count=$((unique_count + 1))
                 printf '%s %s unique-or-unproven\n' "$branch" "$tip" >> ../preserved-branches.txt
@@ -223,7 +230,7 @@ jobs:
               echo "- Fully merged branch refs eligible: $ancestor_count"
               echo "- Exact merged-PR head refs eligible: $merged_pr_count"
               echo "- Unique/unproven branch refs preserved: $unique_count"
-              echo "- Long-lived/protected-name refs preserved: $protected_count"
+              echo "- Long-lived or still-unique backup refs preserved: $protected_count"
               echo "- Open-PR branch refs preserved during classification: $open_pr_count"
               echo "- Newly-opened PR branch refs preserved before deletion: $late_open_pr_count"
               echo "- Branch refs deleted: $deleted"
