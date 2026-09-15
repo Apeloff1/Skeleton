@@ -150,6 +150,29 @@ def test_quad_adapter_composes_with_planner_prefetch_without_double_query() -> N
     assert [item.fragment_id for item in results] == ["quad-doc"]
 
 
+def test_result_cache_isolates_put_and_get_mutations() -> None:
+    cache = ResultCache(ttl_s=30.0, max_entries=8)
+    original = _result("cached", "original")
+    original.metadata["nested"] = {"value": 1}
+    cache.put("query", (original,))
+
+    original.content = "mutated after put"
+    original.metadata["nested"]["value"] = 999
+
+    first = cache.get("query")
+    assert first is not None
+    assert first[0].content == "original"
+    assert first[0].metadata["nested"]["value"] == 1
+
+    first[0].content = "mutated cache hit"
+    first[0].metadata["nested"]["value"] = 777
+    second = cache.get("query")
+
+    assert second is not None
+    assert second[0].content == "original"
+    assert second[0].metadata["nested"]["value"] == 1
+
+
 def test_result_cache_survives_concurrent_lru_activity() -> None:
     cache = ResultCache(ttl_s=30.0, max_entries=8)
     cached_result = (_result("cached", "value"),)
