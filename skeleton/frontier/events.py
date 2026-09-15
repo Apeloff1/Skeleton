@@ -16,8 +16,8 @@ import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Awaitable, Callable, Mapping, Protocol, Sequence
-from uuid import uuid4
+from typing import Any, Awaitable, Callable, Mapping, Protocol, Sequence
+from uuid import UUID, uuid4
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +49,15 @@ class EventJournalCorruptionError(ValueError):
 
 def _reject_json_constant(value: str) -> object:
     raise ValueError(f"non-finite JSON numeric constant: {value}")
+
+
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON object key: {key}")
+        result[key] = value
+    return result
 
 
 class EventJournal(Protocol):
@@ -136,8 +145,8 @@ class SQLiteEventJournal:
     Entries are inserted before delivery and retained until confirmed. Capacity
     applies only to unconfirmed entries: when full, the journal backpressures
     publishers instead of dropping pending work. Persisted rows are decoded
-    fail-closed: malformed JSON, non-object payloads and invalid timestamps are
-    never exposed to subscribers or acknowledged by replay.
+    fail-closed: malformed/ambiguous JSON, non-object payloads, invalid UUIDv4
+    tokens and invalid timestamps never reach subscribers or replay acknowledgements.
     """
 
     def __init__(
@@ -208,10 +217,11 @@ class SQLiteEventJournal:
             payload = json.loads(
                 payload_json,
                 parse_constant=_reject_json_constant,
+                object_pairs_hook=_unique_json_object,
             )
         except (json.JSONDecodeError, TypeError, ValueError) as exc:
             raise EventJournalCorruptionError(
-                "event journal payload is not valid strict JSON"
+                "event journal payload is not valid unambiguous strict JSON"
             ) from exc
         if not isinstance(payload, dict):
             raise EventJournalCorruptionError(
@@ -243,6 +253,28 @@ class SQLiteEventJournal:
             raise EventJournalCorruptionError(
                 "event journal topic must be a non-empty string"
             )
+        if value != value.strip():
+            raise EventJournalCorruptionError(
+                "event journal topic must be stored in normalized form"
+            )
+        return value
+
+    @staticmethod
+    def _deserialize_token(value: object) -> str:
+        if not isinstance(value, str):
+            raise EventJournalCorruptionError(
+                "event journal token must be stored as text"
+            )
+        try:
+            parsed = UUID(value)
+        except (ValueError, AttributeError) as exc:
+            raise EventJournalCorruptionError(
+                "event journal token must be a canonical UUIDv4"
+            ) from exc
+        if parsed.version != 4 or str(parsed) != value:
+            raise EventJournalCorruptionError(
+                "event journal token must be a canonical UUIDv4"
+            )
         return value
 
     def _pending_count_sync(self) -> int:
@@ -260,6 +292,8 @@ class SQLiteEventJournal:
     def _journal_sync(self, event: DomainEvent) -> str:
         if not isinstance(event.topic, str) or not event.topic.strip():
             raise ValueError("event topic must not be empty")
+        if event.topic != event.topic.strip():
+            raise ValueError("event topic must be normalized")
         if not isinstance(event.occurred_at, datetime):
             raise TypeError("event occurred_at must be a datetime")
         if event.occurred_at.tzinfo is None or event.occurred_at.utcoffset() is None:
@@ -344,7 +378,7 @@ class SQLiteEventJournal:
         for row in rows:
             entries.append(
                 JournalEntry(
-                    token=row["token"],
+                    token=self._deserialize_token(row["token"]),
                     event=DomainEvent(
                         topic=self._deserialize_topic(row["topic"]),
                         payload=self._deserialize_payload(row["payload_json"]),
