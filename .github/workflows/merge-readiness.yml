@@ -7,6 +7,8 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - '.github/workflows/branch-clean.yml'
 
 concurrency:
   group: merge-readiness-${{ github.event.pull_request.number || github.ref }}
