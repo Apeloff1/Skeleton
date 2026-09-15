@@ -47,10 +47,19 @@ function runCase(name, records, status, expectedExit, imageVerifier = 'success')
 
 try {
   runCase('clean', [summary], 0, 0);
+  runCase('filtered-low-mask', [summary], 2, 0);
+  runCase('filtered-moderate-mask', [summary], 4, 0);
+  runCase('filtered-info-low-moderate-mask', [summary], 7, 0);
   runCase(
     'mitigated-high',
     [advisory({ module: 'image-size', severity: 'high', ghsa: 'GHSA-5p2g-fcmc-qvqq' }), summary],
     8,
+    0,
+  );
+  runCase(
+    'mitigated-high-with-filtered-lower-bits',
+    [advisory({ module: 'image-size', severity: 'high', ghsa: 'GHSA-w3rx-r6r6-pgpr' }), summary],
+    15,
     0,
   );
   runCase(
@@ -59,8 +68,14 @@ try {
     16,
     1,
   );
+  runCase(
+    'unmitigated-critical-with-filtered-lower-bits',
+    [advisory({ module: 'fixture-package', severity: 'critical', ghsa: 'GHSA-test-test-test' }), summary],
+    23,
+    1,
+  );
   runCase('missing-summary', [advisory({ module: 'fixture-package', severity: 'high', ghsa: 'GHSA-test-test-test' })], 8, 2);
-  runCase('status-mismatch', [summary], 1, 2);
+  runCase('blocking-status-mismatch', [summary], 8, 2);
   runCase('malformed-json', ['{not-json'], 0, 2);
   runCase('verifier-failure', [summary], 0, 1, 'failure');
   console.log('[yarn-audit-policy-test] all regression cases passed');
