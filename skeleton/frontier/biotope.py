@@ -241,6 +241,11 @@ def _stages_for_biotope(
                 f"duplicate stage number {stage.stage_number} for biotope {biotope_id}"
             )
         seen_numbers.add(stage.stage_number)
+    expected_numbers = set(range(1, len(stages) + 1))
+    if seen_numbers != expected_numbers:
+        raise ValueError(
+            f"stage progression for biotope {biotope_id} must be contiguous and start at 1"
+        )
     return stages
 
 
@@ -318,6 +323,10 @@ def can_unlock_stage(
     if not isinstance(stage, BiotopeStageSpec):
         raise TypeError("stage must be BiotopeStageSpec")
     level = _positive_int(player_level, "player_level")
+    candidates = _stages_for_biotope(stage.biotope_id, stages)
+    catalog_stage = next((candidate for candidate in candidates if candidate.id == stage.id), None)
+    if catalog_stage is None or catalog_stage != stage:
+        raise ValueError("stage must match the supplied biotope stage catalog")
     if stage.id in progress.unlocked_stages:
         return False
     if stage.biotope_id not in progress.unlocked_biotopes:
@@ -327,7 +336,6 @@ def can_unlock_stage(
     if stage.stage_number == 1:
         return True
 
-    candidates = _stages_for_biotope(stage.biotope_id, stages)
     previous = next(
         (
             candidate
