@@ -7,6 +7,7 @@ execution paths.
 from __future__ import annotations
 
 import ast
+import os
 from pathlib import Path
 import sys
 from typing import Iterable
@@ -28,11 +29,46 @@ SKIP_DIRS = {
 }
 
 
-def python_files() -> Iterable[Path]:
-    for path in BACKEND_ROOT.rglob("*.py"):
-        if any(part in SKIP_DIRS for part in path.parts):
-            continue
-        yield path
+class DynamicImportScanError(RuntimeError):
+    """Raised when the scanner cannot prove complete source discovery."""
+
+
+def python_files(root: Path | None = None) -> Iterable[Path]:
+    """Yield backend Python sources without following symlinks.
+
+    Security gates must not silently lose coverage when a directory cannot be
+    enumerated, so traversal errors are converted into one stable scanner error
+    and handled as a hard failure by ``main``.
+    """
+    scan_root = BACKEND_ROOT if root is None else root
+    files: list[Path] = []
+    pending = [scan_root]
+
+    while pending:
+        directory = pending.pop()
+        try:
+            with os.scandir(directory) as iterator:
+                entries = sorted(iterator, key=lambda entry: entry.name)
+        except OSError as exc:
+            raise DynamicImportScanError("source traversal failed") from exc
+
+        child_dirs: list[Path] = []
+        for entry in entries:
+            try:
+                if entry.is_symlink():
+                    continue
+                if entry.is_dir(follow_symlinks=False):
+                    if entry.name not in SKIP_DIRS:
+                        child_dirs.append(Path(entry.path))
+                    continue
+                if entry.is_file(follow_symlinks=False) and entry.name.endswith(".py"):
+                    files.append(Path(entry.path))
+            except OSError as exc:
+                raise DynamicImportScanError("source traversal failed") from exc
+
+        pending.extend(reversed(child_dirs))
+
+    yield from sorted(files)
 
 
 def display_path(path: Path) -> Path:
@@ -211,7 +247,7 @@ def violations(path: Path) -> list[str]:
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     except (OSError, UnicodeError, SyntaxError) as exc:
-        return [f"{label}: parse failure: {exc}"]
+        return [f"{label}: parse failure: {type(exc).__name__}"]
 
     importlib_modules, builtins_modules, function_aliases = _import_aliases(tree)
     _propagate_aliases(tree, importlib_modules, builtins_modules, function_aliases)
@@ -238,9 +274,15 @@ def violations(path: Path) -> list[str]:
 
 def main() -> int:
     findings: list[str] = []
-    scanned = 0
-    for path in python_files():
-        scanned += 1
+    try:
+        paths = list(python_files())
+    except DynamicImportScanError as exc:
+        print("Dynamic import safety violations detected:", file=sys.stderr)
+        print(f"  - scanner coverage failure: {exc}", file=sys.stderr)
+        return 1
+
+    scanned = len(paths)
+    for path in paths:
         findings.extend(violations(path))
     if scanned == 0:
         findings.append("scanner coverage failure: no backend Python files were scanned")
