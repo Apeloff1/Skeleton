@@ -1,0 +1,56 @@
+name: Swarm Durable Recovery
+
+on:
+  push:
+    paths:
+      - "skeleton/agents/swarm_durable.py"
+      - "skeleton/agents/swarm_recovery.py"
+      - "skeleton/agents/swarm_checkpoint.py"
+      - "skeleton/agents/swarm_runtime.py"
+      - "skeleton/state/**"
+      - "skeleton/testing/test_swarm_durable.py"
+      - ".github/workflows/swarm-durable-recovery.yml"
+  pull_request:
+    paths:
+      - "skeleton/agents/swarm_durable.py"
+      - "skeleton/agents/swarm_recovery.py"
+      - "skeleton/agents/swarm_checkpoint.py"
+      - "skeleton/agents/swarm_runtime.py"
+      - "skeleton/state/**"
+      - "skeleton/testing/test_swarm_durable.py"
+      - ".github/workflows/swarm-durable-recovery.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swarm-durable-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  swarm-durable-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Install focused test dependency
+        run: python -m pip install "pytest>=8,<9"
+      - name: Compile recovery boundary
+        run: >-
+          python -m compileall -q
+          skeleton/state
+          skeleton/agents/swarm_durable.py
+          skeleton/agents/swarm_recovery.py
+          skeleton/agents/swarm_checkpoint.py
+      - name: Run durable swarm integration contracts
+        env:
+          PYTHONPATH: "."
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_durable_run_store.py
+          skeleton/testing/test_swarm_durable.py
