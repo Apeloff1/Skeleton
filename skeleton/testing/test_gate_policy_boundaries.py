@@ -11,8 +11,8 @@ from skeleton.api.middleware import GatePolicy
         "/health",
         "/health/",
         "/health/live",
-        "/metrics",
-        "/metrics/prometheus",
+        "/ready",
+        "/api/v1/health/live",
         "/api/v1/health/ready",
     ],
 )
@@ -26,12 +26,15 @@ def test_open_routes_allow_only_exact_routes_and_true_children(path: str) -> Non
         "/healthcare",
         "/health-check",
         "/readyz",
+        "/metrics",
         "/metrics-private",
+        "/api/v1/health",
         "/api/v1/healthcare",
+        "/api/v1/metrics",
         "/api/v1/metrics-private",
     ],
 )
-def test_open_route_lookalikes_remain_sealed(path: str) -> None:
+def test_sensitive_or_lookalike_routes_remain_sealed(path: str) -> None:
     assert not GatePolicy().is_open_route(path)
 
 
@@ -49,6 +52,11 @@ def test_root_open_prefix_is_exact_only() -> None:
         ("/api/v1/forge/jobs", "forge"),
         ("/api/v1/cortex", "cognition"),
         ("/api/v1/cortex/status", "cognition"),
+        ("/api/v1/health", "observability"),
+        ("/api/v1/metrics", "observability"),
+        ("/cortex/status", "cognition"),
+        ("/cockpit", "interface"),
+        ("/openapi.json", "interface"),
     ],
 )
 def test_governance_domain_matches_exact_routes_and_children(path: str, expected: str) -> None:
@@ -62,7 +70,41 @@ def test_governance_domain_matches_exact_routes_and_children(path: str, expected
         "/api/v1/cortexual",
         "/api/governance-backdoor",
         "/api/courtroom",
+        "/cockpit-admin",
+        "/docs-private",
     ],
 )
 def test_governance_domain_lookalikes_are_unwritten(path: str) -> None:
     assert GatePolicy().required_domain(path) is None
+
+
+def test_server_default_open_surface_is_probe_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    from skeleton.api import server
+
+    monkeypatch.delenv("SKELETON_PUBLIC_DEV_SURFACES", raising=False)
+    prefixes = server._gate_open_prefixes()
+
+    assert "/" in prefixes
+    assert "/api/v1/health/live" in prefixes
+    assert "/api/v1/health/ready" in prefixes
+    for sensitive in (
+        "/api/v1/health",
+        "/api/v1/metrics",
+        "/api/v1/genesis",
+        "/cortex/status",
+        "/cockpit",
+        "/docs",
+        "/openapi.json",
+        "/redoc",
+    ):
+        assert sensitive not in prefixes
+
+
+def test_dev_surface_exposure_requires_explicit_opt_in(monkeypatch: pytest.MonkeyPatch) -> None:
+    from skeleton.api import server
+
+    monkeypatch.setenv("SKELETON_PUBLIC_DEV_SURFACES", "true")
+    prefixes = server._gate_open_prefixes()
+
+    for dev_surface in server._DEV_OPEN_PREFIXES:
+        assert dev_surface in prefixes
