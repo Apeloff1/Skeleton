@@ -11,6 +11,7 @@ from skeleton.frontier.events import (
     DomainEvent,
     EventBus,
     EventJournal,
+    EventJournalCorruptionError,
     JournalEntry,
     SQLiteEventJournal,
 )
@@ -102,6 +103,7 @@ __all__ = [
     "DomainEvent",
     "EventBus",
     "EventJournal",
+    "EventJournalCorruptionError",
     "ExecutionResult",
     "FactionSpec",
     "InMemoryStore",
