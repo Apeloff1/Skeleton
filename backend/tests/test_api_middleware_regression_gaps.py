@@ -12,6 +12,7 @@ from starlette.responses import Response
 
 import api_middleware
 from api_middleware import RateLimiterMiddleware
+from middleware import hardening
 
 
 def _request(client_host: str, *, xff: str) -> Request:
@@ -41,6 +42,25 @@ def _plain_request(client_host: str = "192.0.2.10") -> Request:
             "headers": [],
             "client": (client_host, 12345),
             "server": ("test", 80),
+            "scheme": "http",
+        }
+    )
+
+
+def _path_request(path: str, *, origin: str | None = None) -> Request:
+    headers = [(b"host", b"api.example.test")]
+    if origin is not None:
+        headers.append((b"origin", origin.encode("latin-1")))
+    return Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": path,
+            "raw_path": path.encode("ascii"),
+            "query_string": b"",
+            "headers": headers,
+            "client": ("192.0.2.10", 12345),
+            "server": ("api.example.test", 80),
             "scheme": "http",
         }
     )
@@ -252,3 +272,61 @@ def test_telemetry_reports_proxy_count_without_disclosing_networks(monkeypatch) 
     assert "trusted_proxy_cidrs" not in stats
     assert "10.0.0.0/8" not in repr(stats)
     assert "2001:db8::/32" not in repr(stats)
+
+
+def test_exact_api_path_cannot_bypass_production_cors(monkeypatch) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.delenv("CORS_ORIGINS", raising=False)
+    middleware = hardening.RequestTimeoutMiddleware(object(), default_timeout_s=30)
+    called = False
+
+    async def handler(_request: Request) -> Response:
+        nonlocal called
+        called = True
+        return Response(status_code=204)
+
+    response = asyncio.run(
+        middleware.dispatch(
+            _path_request("/api", origin="https://attacker.example"),
+            handler,
+        )
+    )
+
+    assert response.status_code == 403
+    assert called is False
+
+
+def test_api_lookalike_path_remains_outside_api_hardening(monkeypatch) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.delenv("CORS_ORIGINS", raising=False)
+    middleware = hardening.RequestTimeoutMiddleware(object(), default_timeout_s=30)
+    called = False
+
+    async def handler(_request: Request) -> Response:
+        nonlocal called
+        called = True
+        return Response(status_code=204)
+
+    response = asyncio.run(
+        middleware.dispatch(
+            _path_request("/apiary", origin="https://attacker.example"),
+            handler,
+        )
+    )
+
+    assert response.status_code == 204
+    assert called is True
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("/api/binary/build", 120.0),
+        ("/api/binary/build/", 120.0),
+        ("/api/binary/build/job-123", 120.0),
+        ("/api/binary/build-evil", 30.0),
+        ("/api/binary/builder", 30.0),
+    ],
+)
+def test_timeout_overrides_require_route_boundary(path: str, expected: float) -> None:
+    assert hardening._resolve_timeout(path, 30.0) == expected
