@@ -37,6 +37,15 @@ def main() -> int:
         failures,
     )
     require(
+        re.search(
+            r"group:\s*merge-readiness-\$\{\{\s*github\.event\.pull_request\.number\s*\|\|\s*github\.sha\s*\}\}",
+            text,
+        )
+        is not None,
+        "concurrency group must isolate pull requests by number and pushes by SHA",
+        failures,
+    )
+    require(
         re.search(rf'^\s*PYTHON_VERSION:\s*"{re.escape(PYTHON_VERSION)}"\s*$', text, re.MULTILINE)
         is not None,
         f"Python must be pinned to {PYTHON_VERSION}",
@@ -85,7 +94,7 @@ def main() -> int:
             print(f"  - {failure}")
         return 1
 
-    print("Merge-readiness contract passed: stable aggregate, exact toolchain, PR-only cancellation, quarantine/security/secret gates, and fail-closed result aggregation are aligned.")
+    print("Merge-readiness contract passed: stable aggregate, exact toolchain, PR-only cancellation, SHA-isolated main pushes, quarantine/security/secret gates, and fail-closed result aggregation are aligned.")
     return 0
 
 
