@@ -8,30 +8,37 @@ from skeleton.agents.coordination import AgentPool, Coordinator, Task, TaskStatu
 from skeleton.frontier.orchestration import RunStatus, StepKind, StepStatus
 
 
-def test_failed_handler_releases_agent_capacity() -> None:
+def test_failed_handler_releases_agent_capacity_without_persisting_message() -> None:
     pool = AgentPool(max_agents=1)
     pool.create({"work"}, capacity=1)
     coordinator = Coordinator(pool=pool)
+    sensitive_message = "api-key=super-secret-handler-detail"
 
     def fail(_task):
-        raise RuntimeError("boom")
+        raise RuntimeError(sensitive_message)
 
     coordinator.register_handler("work", fail)
 
     first = coordinator.dispatch("first", task_type="work")
     assert first.status is TaskStatus.FAILED
-    assert first.error == "boom"
+    assert first.error == "ToolExecutionError: tool 'work' failed with RuntimeError"
+    assert sensitive_message not in first.error
     assert pool.stats()["total_load"] == 0
 
     first_run = coordinator.get_run_record(first.task_id)
     assert first_run is not None
     assert first_run.status is RunStatus.FAILED
+    assert first_run.error == first.error
+    assert sensitive_message not in first_run.error
     assert first_run.steps[-1].kind is StepKind.TOOL
     assert first_run.steps[-1].status is StepStatus.FAILED
+    assert first_run.steps[-1].error == first.error
+    assert sensitive_message not in first_run.steps[-1].error
 
     second = coordinator.dispatch("second", task_type="work")
     assert second.status is TaskStatus.FAILED
-    assert second.error == "boom"
+    assert second.error == "ToolExecutionError: tool 'work' failed with RuntimeError"
+    assert sensitive_message not in second.error
     assert pool.stats()["total_load"] == 0
     assert pool.stats()["tasks_assigned"] == 2
 
