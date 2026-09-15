@@ -7,7 +7,13 @@ from skeleton.frontier.contracts import (
     ProvenanceRecord,
     stable_content_digest,
 )
-from skeleton.frontier.events import DomainEvent, EventBus
+from skeleton.frontier.events import (
+    DomainEvent,
+    EventBus,
+    EventJournal,
+    JournalEntry,
+    SQLiteEventJournal,
+)
 from skeleton.frontier.memory import InMemoryStore, MemoryItem
 from skeleton.frontier.memory_adapters import CollectionMemoryAdapter, SQLiteCollection
 from skeleton.frontier.npc import NPCGenerator, NPCSpec
@@ -33,9 +39,11 @@ __all__ = [
     "DegradationLevel",
     "DomainEvent",
     "EventBus",
+    "EventJournal",
     "ExecutionResult",
     "InMemoryStore",
     "IslandVocabulary",
+    "JournalEntry",
     "MemoryContract",
     "MemoryItem",
     "NPCGenerator",
@@ -44,6 +52,7 @@ __all__ = [
     "ResilienceController",
     "ResilienceDecision",
     "SQLiteCollection",
+    "SQLiteEventJournal",
     "WorldBounds",
     "WorldRegion",
     "calculate_route",
