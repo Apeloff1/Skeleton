@@ -37,6 +37,7 @@ import { FeatureFlagProvider } from '../src/feature-flags';
 import { StabilityBanner } from '../src/components/StabilityBanner';
 import {
   getConfiguredCockpitOrigins,
+  getConfiguredCockpitProjectState,
   installCockpitPreviewBridge,
 } from '../src/cockpit/previewBridge';
 import { installGlobalErrorHandlers } from '../src/utils/globalErrors';
@@ -69,6 +70,7 @@ export default function RootLayout() {
     const dispose = installCockpitPreviewBridge({
       allowedParentOrigins: getConfiguredCockpitOrigins(),
       getRoutePaths: () => ROUTE_REGISTRY.map((entry) => entry.path),
+      getProjectState: getConfiguredCockpitProjectState,
       navigate: (path) => router.push(path as Href),
     });
     return dispose;
