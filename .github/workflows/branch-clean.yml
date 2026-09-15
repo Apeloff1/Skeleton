@@ -3,20 +3,25 @@ name: Prune merged branches safely
 on:
   workflow_dispatch:
   schedule:
-    - cron: '17 3 * * *'
+    - cron: '*/5 * * * *'
   push:
     branches: [main]
 
+# Keep one cleanup sweep alive while main is moving rapidly. GitHub coalesces
+# newer triggers into at most one pending run for this concurrency group, so
+# push storms cannot repeatedly kill the active classifier before it finishes.
 concurrency:
   group: branch-clean-${{ github.repository }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions: {}
 
 jobs:
   prune:
     name: Delete only proven-redundant branch refs
-    runs-on: ubuntu-24.04
+    # Keep branch maintenance off the normal x64 pool so heavy test traffic
+    # cannot starve cleanup. The workflow uses only git, gh, and bash.
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 15
     permissions:
       contents: write
@@ -133,6 +138,9 @@ jobs:
           done < <(git for-each-ref --format='%(objectname) %(refname:strip=3)' refs/remotes/origin | sort -k2,2)
 
           # Never act on a stale classification if main moved while the sweep was running.
+          # With cancel-in-progress disabled, the newest trigger remains queued and will
+          # immediately reclassify against the latest main tip instead of repeatedly
+          # killing this active run. The five-minute schedule is the recovery backstop.
           git fetch --quiet --no-tags --filter=blob:none origin '+refs/heads/main:refs/remotes/origin/main'
           current_main=$(git rev-parse "$main_ref")
           if [[ "$current_main" != "$classified_main" ]]; then
@@ -140,7 +148,8 @@ jobs:
               echo '## Branch cleanup deferred'
               echo '- main moved while branches were being classified.'
               echo '- No branch refs were deleted from the stale classification.'
-              echo '- The next sweep will reclassify against the new main tip.'
+              echo '- The coalesced pending sweep will reclassify against the new main tip.'
+              echo '- A five-minute scheduled sweep provides an additional recovery backstop.'
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
