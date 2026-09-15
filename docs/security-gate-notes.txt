@@ -1,5 +1,0 @@
-Repository security gate notes.
-
-The dedicated security workflow runs the repository IOC scanner on every pull request and push, and also runs the deterministic payload policy. Scheduled and manual runs perform a full tracked-file sweep.
-
-The workflow uses read-only repository permissions and does not persist checkout credentials.
