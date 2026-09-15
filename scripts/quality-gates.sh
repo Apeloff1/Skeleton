@@ -25,6 +25,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   tests/test_frontier_runtime_memory_retrieval.py \
   tests/test_agent_coordination.py \
   skeleton/testing/test_tiered_cache.py \
+  skeleton/testing/test_retrieval_hot_path.py \
   skeleton/testing/test_deployment_security_defaults.py \
   skeleton/testing/test_frontier_observability_correlation.py \
   skeleton/testing/test_request_seal_id_validation.py \

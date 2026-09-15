@@ -11,10 +11,12 @@ extracted from the text, so the knowledge graph self-populates.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from collections import deque
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from skeleton.kernel.events import EventBus
+from skeleton.retrieval.cache import ResultCache
 from skeleton.retrieval.extraction import TripleExtractor
 from skeleton.retrieval.fusion import Fuser, FusionStrategy, ScoredResult
 
@@ -22,6 +24,7 @@ from skeleton.retrieval.fusion import Fuser, FusionStrategy, ScoredResult
 @dataclass
 class PlaneResult:
     """Results from a single retrieval plane."""
+
     plane: str
     results: List[ScoredResult]
     latency_ms: float = 0.0
@@ -38,13 +41,26 @@ class QuadRetriever:
     - KAG (Knowledge-Augmented Generation): structured knowledge graph
     """
 
-    def __init__(self, bus: Optional[EventBus] = None, extractor: Optional[TripleExtractor] = None):
+    _PLANE_HISTORY_LIMIT = 64
+
+    def __init__(
+        self,
+        bus: Optional[EventBus] = None,
+        extractor: Optional[TripleExtractor] = None,
+        cache: Optional[ResultCache] = None,
+    ) -> None:
         self._bus = bus
         self._planes: Dict[str, Any] = {}
         self._fuser = Fuser(strategy=FusionStrategy.RRF)
-        self._cache: Dict[str, List[ScoredResult]] = {}
+        self._cache = cache if cache is not None else ResultCache()
         self._extractor = extractor or TripleExtractor()
-        self._stats = {"queries": 0, "cache_hits": 0, "ingested": 0, "triples_extracted": 0, "planes_used": []}
+        self._plane_history: deque[str] = deque(maxlen=self._PLANE_HISTORY_LIMIT)
+        self._stats = {
+            "queries": 0,
+            "cache_hits": 0,
+            "ingested": 0,
+            "triples_extracted": 0,
+        }
 
     def register_plane(self, name: str, retriever: Any) -> None:
         """Register a retrieval plane."""
@@ -95,7 +111,10 @@ class QuadRetriever:
                 content=content,
                 score=float(getattr(result, "score", 0.0)),
                 plane=str(getattr(result, "plane", "") or plane_name),
-                provenance=str(getattr(result, "provenance", "") or cls._metadata_provenance(metadata)),
+                provenance=str(
+                    getattr(result, "provenance", "")
+                    or cls._metadata_provenance(metadata)
+                ),
                 metadata=metadata,
             )
 
@@ -111,7 +130,9 @@ class QuadRetriever:
                 content=str(content),
                 score=float(result.get("score", 0.0)),
                 plane=str(result.get("plane") or plane_name),
-                provenance=str(result.get("provenance") or cls._metadata_provenance(metadata)),
+                provenance=str(
+                    result.get("provenance") or cls._metadata_provenance(metadata)
+                ),
                 metadata=metadata,
             )
 
@@ -121,12 +142,13 @@ class QuadRetriever:
         """Query all registered planes and fuse results."""
         cache_key = f"{query}:{k}"
 
-        if use_cache and cache_key in self._cache:
-            self._stats["cache_hits"] += 1
-            return self._cache[cache_key]
+        if use_cache:
+            cached = self._cache.get(cache_key)
+            if cached is not None:
+                self._stats["cache_hits"] += 1
+                return list(cached)
 
         self._stats["queries"] += 1
-
         results_by_plane: Dict[str, List[ScoredResult]] = {}
 
         for plane_name, retriever in self._planes.items():
@@ -148,25 +170,34 @@ class QuadRetriever:
                 ]
                 if normalized:
                     results_by_plane[plane_name] = normalized
-                    self._stats["planes_used"].append(plane_name)
+                    self._plane_history.append(plane_name)
             except Exception:
                 continue
 
         fused = self._fuser.fuse(results_by_plane, top_k=k)
 
         if use_cache:
-            self._cache[cache_key] = fused
+            self._cache.put(cache_key, tuple(fused))
 
         if self._bus:
-            self._bus.emit("retrieval.quad.query", {
-                "query": query,
-                "planes": list(results_by_plane.keys()),
-                "results": len(fused),
-            })
+            self._bus.emit(
+                "retrieval.quad.query",
+                {
+                    "query": query,
+                    "planes": list(results_by_plane.keys()),
+                    "results": len(fused),
+                },
+            )
 
         return fused
 
-    def ingest_document(self, doc_id: str, text: str, metadata: Optional[Dict[str, Any]] = None, salience: float = 0.5) -> int:
+    def ingest_document(
+        self,
+        doc_id: str,
+        text: str,
+        metadata: Optional[Dict[str, Any]] = None,
+        salience: float = 0.5,
+    ) -> int:
         """Ingest a document: chunk into RAG and extract triples into KAG.
 
         Returns the number of chunks ingested into RAG.
@@ -176,6 +207,7 @@ class QuadRetriever:
         rag = self._planes.get("rag")
         if rag and hasattr(rag, "add"):
             from skeleton.memory.core import Chunk
+
             chunk = Chunk(text=text, chunk_id=doc_id, metadata=metadata or {})
             rag.add(chunk)
             chunks += 1
@@ -193,23 +225,27 @@ class QuadRetriever:
         if mag is not None and hasattr(mag, "record") and salience >= 0.7:
             mag.record(doc_id, text[:500], tags=(metadata or {}).get("tags", []))
 
-        # Invalidate cache: new content can change rankings
+        # New content can change rankings, so all cached query results are stale.
         self._cache.clear()
         self._stats["ingested"] += chunks
 
         if self._bus:
-            self._bus.emit("retrieval.quad.ingested", {
-                "doc_id": doc_id,
-                "chunks": chunks,
-                "triples": self._stats["triples_extracted"],
-                "salience": salience,
-            })
+            self._bus.emit(
+                "retrieval.quad.ingested",
+                {
+                    "doc_id": doc_id,
+                    "chunks": chunks,
+                    "triples": self._stats["triples_extracted"],
+                    "salience": salience,
+                },
+            )
 
         return chunks
 
     def stats(self) -> Dict[str, Any]:
         return {
             **self._stats,
+            "planes_used": list(self._plane_history),
             "planes_registered": len(self._planes),
-            "cache_size": len(self._cache),
+            "cache_size": self._cache.size(),
         }
