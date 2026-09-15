@@ -34,6 +34,23 @@ def _normalized_limit(limit: object) -> int:
     return limit
 
 
+def _required_text(value: object, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"legacy memory {field_name} must be a string")
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError(f"legacy memory {field_name} must not be empty")
+    if normalized != value:
+        raise ValueError(f"legacy memory {field_name} must be normalized")
+    return value
+
+
+def _optional_text(value: object, field_name: str) -> str | None:
+    if value is None:
+        return None
+    return _required_text(value, field_name)
+
+
 def _normalized_relevance(value: object, *, empty_query: bool) -> float:
     if empty_query:
         return 1.0
@@ -54,29 +71,39 @@ def _normalized_relevance(value: object, *, empty_query: bool) -> float:
 class LegacyMemoryStoreAdapter:
     """Expose one synchronous ``MemoryStore`` through async ``MemoryContract``.
 
-    The adapter normalizes both writes and reads to the same portable JSON data
-    model used by Frontier's native backends. It therefore acts as a migration
-    boundary rather than preserving legacy backend-specific result shapes.
+    ``source_repository`` is required because canonical runtime retrieval is
+    fail-closed on unattributed context. Optional revision/path defaults let a
+    migration preserve finer lineage while item-specific metadata, when present,
+    remains authoritative.
     """
 
     store: MemoryStore
+    source_repository: str
     source_tier: str = "legacy"
+    source_revision: str | None = None
+    source_path: str | None = None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.source_tier, str):
-            raise TypeError("legacy memory source_tier must be a string")
-        normalized = self.source_tier.strip()
-        if not normalized:
-            raise ValueError("legacy memory source_tier must not be empty")
-        if normalized != self.source_tier:
-            raise ValueError("legacy memory source_tier must be normalized")
+        _required_text(self.source_repository, "source_repository")
+        _required_text(self.source_tier, "source_tier")
+        _optional_text(self.source_revision, "source_revision")
+        _optional_text(self.source_path, "source_path")
+
+    def _with_source_defaults(self, metadata: Mapping[str, Any]) -> dict[str, Any]:
+        normalized = normalize_memory_metadata(metadata)
+        normalized.setdefault("source_repository", self.source_repository)
+        if self.source_revision is not None:
+            normalized.setdefault("source_revision", self.source_revision)
+        if self.source_path is not None:
+            normalized.setdefault("source_path", self.source_path)
+        return normalized
 
     async def put(self, item: Mapping[str, Any]) -> str:
         item_id, content, metadata = normalize_memory_item(item)
         chunk = MemoryChunk(
             id=item_id,
             text=content,
-            metadata=metadata,
+            metadata=self._with_source_defaults(metadata),
             source_tier=self.source_tier,
         )
         await asyncio.to_thread(self.store.add, chunk)
@@ -116,7 +143,7 @@ class LegacyMemoryStoreAdapter:
             content = str(chunk.text).strip()
             if not content:
                 raise ValueError("legacy memory result content must not be empty")
-            metadata = normalize_memory_metadata(chunk.metadata)
+            metadata = self._with_source_defaults(chunk.metadata)
             metadata.setdefault("source_tier", chunk.source_tier or self.source_tier)
             relevance = _normalized_relevance(
                 result.score,
