@@ -67,6 +67,24 @@ def _python_env() -> dict[str, str]:
     return env
 
 
+def run_test(path: Path) -> int:
+    """Run one evidence file through pytest and return its process status.
+
+    Using pytest rather than executing the file directly is intentional: a
+    plain ``python tests/test_x.py`` can exit successfully without collecting
+    or running any tests. Pytest returns a non-zero status when no tests are
+    collected, so canonical evidence cannot silently pass while inert.
+    """
+    relative = path.relative_to(REPO_ROOT)
+    completed = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", str(relative)],
+        cwd=REPO_ROOT,
+        env=_python_env(),
+        check=False,
+    )
+    return completed.returncode
+
+
 def main() -> int:
     payload = json.loads(MANIFEST.read_text(encoding="utf-8"))
     try:
@@ -75,22 +93,16 @@ def main() -> int:
         print(f"provenance-evidence: rejected: {exc}", file=sys.stderr)
         return 1
 
-    env = _python_env()
     for path in tests:
         relative = path.relative_to(REPO_ROOT)
         print(f"provenance-evidence: running {relative}")
-        completed = subprocess.run(
-            [sys.executable, str(relative)],
-            cwd=REPO_ROOT,
-            env=env,
-            check=False,
-        )
-        if completed.returncode != 0:
+        returncode = run_test(path)
+        if returncode != 0:
             print(
-                f"provenance-evidence: failed {relative} with exit code {completed.returncode}",
+                f"provenance-evidence: failed {relative} with exit code {returncode}",
                 file=sys.stderr,
             )
-            return completed.returncode
+            return returncode
 
     print(f"provenance-evidence: OK ({len(tests)} canonical evidence test files)")
     return 0
