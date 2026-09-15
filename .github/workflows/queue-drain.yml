@@ -96,6 +96,47 @@ jobs:
                       break
               return runs
 
+          def list_head_runs(head_sha):
+              runs = []
+              for page in range(1, 11):
+                  query = urllib.parse.urlencode({
+                      'head_sha': head_sha,
+                      'per_page': 100,
+                      'page': page,
+                  })
+                  status, payload = request(f'/repos/{repo}/actions/runs?{query}')
+                  if status != 200 or not isinstance(payload, dict):
+                      raise SystemExit(
+                          f'failed to list current-head runs: HTTP {status}'
+                      )
+                  batch = payload.get('workflow_runs') or []
+                  runs.extend(batch)
+                  if len(batch) < 100:
+                      break
+              return runs
+
+          def workflow_event_key(run):
+              return (
+                  int(run.get('workflow_id') or 0),
+                  run.get('event') or '',
+              )
+
+          def queue_key(run):
+              return (
+                  int(run.get('workflow_id') or 0),
+                  run.get('head_branch') or '',
+                  run.get('event') or '',
+              )
+
+          def is_usable_replacement(run):
+              # A failed current-head validation is still authoritative and
+              # supersedes older code. A cancelled run produced no usable
+              # validation result and therefore must not evict the last one.
+              return not (
+                  run.get('status') == 'completed'
+                  and run.get('conclusion') == 'cancelled'
+              )
+
           attempted = set()
           totals = {
               'queued_inspected': 0,
@@ -104,6 +145,8 @@ jobs:
               'obsolete_main': 0,
               'duplicate': 0,
               'stale_dynamic_active': 0,
+              'preserved_last_validation': 0,
+              'preserved_dynamic_without_replacement': 0,
               'accepted': 0,
               'moved': 0,
               'failed': 0,
@@ -113,12 +156,20 @@ jobs:
 
           # GitHub-managed security and dependency runs can arrive several
           # seconds after a push. Sweep repeatedly so delayed fanout is folded
-          # into one cleanup run. Stale in-progress work is only reclaimed when
-          # it is a GitHub-managed dynamic run on an obsolete main SHA; normal
-          # CI, deployments, PR work, and current-head jobs are never stopped.
+          # into one cleanup run. Path-filtered workflows need extra care: an
+          # older SHA is cancellable only when current HEAD has a replacement
+          # run for that workflow/event. Otherwise preserve the newest pending
+          # validation so a test/docs-only push cannot erase the last relevant
+          # code validation merely by advancing main.
           for pass_number in range(1, 5):
               main_sha = resolve_main_sha()
               latest_main_sha = main_sha
+              head_runs = list_head_runs(main_sha)
+              replacement_keys = {
+                  workflow_event_key(run)
+                  for run in head_runs
+                  if is_usable_replacement(run)
+              }
               queued = list_runs('queued')
               active = list_runs('in_progress')
               totals['queued_inspected'] += len(queued)
@@ -129,6 +180,8 @@ jobs:
               obsolete_main = 0
               duplicate = 0
               stale_dynamic_active = 0
+              preserved_last_validation = 0
+              preserved_dynamic_without_replacement = 0
 
               for run in sorted(
                   queued,
@@ -139,19 +192,31 @@ jobs:
                   if not run_id or run_id == current or run_id in attempted:
                       continue
 
-                  if (
-                      (run.get('head_branch') or '') == 'main'
+                  key = queue_key(run)
+                  replacement_key = workflow_event_key(run)
+                  branch = run.get('head_branch') or ''
+                  old_main = (
+                      branch == 'main'
                       and (run.get('head_sha') or '') != main_sha
-                  ):
-                      selected.append(run)
-                      obsolete_main += 1
+                  )
+
+                  if old_main:
+                      if replacement_key in replacement_keys:
+                          selected.append(run)
+                          obsolete_main += 1
+                          continue
+
+                      # No current-head replacement exists. Preserve the newest
+                      # outstanding run for this workflow/ref/event and cancel
+                      # only older copies of that same validation lane.
+                      if key in seen:
+                          selected.append(run)
+                          duplicate += 1
+                      else:
+                          seen.add(key)
+                          preserved_last_validation += 1
                       continue
 
-                  key = (
-                      int(run.get('workflow_id') or 0),
-                      run.get('head_branch') or '',
-                      run.get('event') or '',
-                  )
                   if key in seen:
                       selected.append(run)
                       duplicate += 1
@@ -168,8 +233,11 @@ jobs:
                       and (run.get('head_sha') or '') != main_sha
                       and path.startswith('dynamic/')
                   ):
-                      selected.append(run)
-                      stale_dynamic_active += 1
+                      if workflow_event_key(run) in replacement_keys:
+                          selected.append(run)
+                          stale_dynamic_active += 1
+                      else:
+                          preserved_dynamic_without_replacement += 1
 
               accepted = moved = failed = 0
               for run in selected:
@@ -191,6 +259,10 @@ jobs:
               totals['obsolete_main'] += obsolete_main
               totals['duplicate'] += duplicate
               totals['stale_dynamic_active'] += stale_dynamic_active
+              totals['preserved_last_validation'] += preserved_last_validation
+              totals['preserved_dynamic_without_replacement'] += (
+                  preserved_dynamic_without_replacement
+              )
               totals['accepted'] += accepted
               totals['moved'] += moved
               totals['failed'] += failed
@@ -200,6 +272,9 @@ jobs:
                   f'active={len(active)} selected={len(selected)} '
                   f'obsolete_main={obsolete_main} duplicate={duplicate} '
                   f'stale_dynamic_active={stale_dynamic_active} '
+                  f'preserved_last_validation={preserved_last_validation} '
+                  'preserved_dynamic_without_replacement='
+                  f'{preserved_dynamic_without_replacement} '
                   f'accepted={accepted} moved={moved} failed={failed}'
               )
               print(line)
@@ -236,6 +311,14 @@ jobs:
                       f'{totals["stale_dynamic_active"]}\n'
                   )
                   handle.write(
+                      '- Last path-filtered validations preserved: '
+                      f'{totals["preserved_last_validation"]}\n'
+                  )
+                  handle.write(
+                      '- Dynamic active runs preserved without replacement: '
+                      f'{totals["preserved_dynamic_without_replacement"]}\n'
+                  )
+                  handle.write(
                       f'- Cancel requests accepted: {totals["accepted"]}\n'
                   )
                   handle.write(
@@ -245,8 +328,10 @@ jobs:
                       f'- Cancellation failures: {totals["failed"]}\n'
                   )
                   handle.write(
-                      '- Safety: current main HEAD, unique current-head work, '
-                      'normal in-progress CI/deployments, and PR work are preserved.\n'
+                      '- Safety: current main HEAD, the newest outstanding '
+                      'validation for path-filtered workflows without a HEAD '
+                      'replacement, normal in-progress CI/deployments, and PR '
+                      'work are preserved.\n'
                   )
                   handle.write('\n### Passes\n')
                   for line in pass_lines:
