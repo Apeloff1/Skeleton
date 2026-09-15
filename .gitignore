@@ -130,6 +130,8 @@ chroma_data/
 backend/.git_workspaces/
 
 # Generated build / vault artifacts — never commit (large binaries)
+backend/artifacts/
+backend/artifacts_media/
 backend/data/builds_vault/
 backend/data/galaxy_vault/
 backend/data/**/zips/
