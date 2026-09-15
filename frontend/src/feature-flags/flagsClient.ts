@@ -1,10 +1,5 @@
 /**
- * src/feature-flags/flagsClient.ts — talks to /api/feature-flags.
- *
- * Wraps the shared `apiClient` so feature-flag reads pick up the same
- * retry / abort / RID instrumentation everything else uses. Results are
- * cached in-memory for `CACHE_TTL_MS` so the same screen doesn't refetch
- * on every mount.
+ * Feature-flag client with short-lived, user-scoped in-memory deduplication.
  */
 import api from '../utils/apiClient';
 
@@ -26,57 +21,93 @@ export interface FlagsSnapshot {
   fetched_at: number;
 }
 
-const CACHE_TTL_MS = 60_000;
-let _cache: FlagsSnapshot | null = null;
-let _inflight: Promise<FlagsSnapshot> | null = null;
-
-/** Reads the cached snapshot (no I/O). Returns null if cold. */
-export function snapshot(): FlagsSnapshot | null {
-  return _cache;
+export interface LoadFlagsOptions {
+  force?: boolean;
+  timeoutMs?: number;
+  retries?: number;
 }
 
-/** Forces a refetch on the next ``loadFlags`` call. */
+const CACHE_TTL_MS = 60_000;
+let cache: FlagsSnapshot | null = null;
+let cacheKey: string | null = null;
+let inflight: { key: string; promise: Promise<FlagsSnapshot> } | null = null;
+
+function keyFor(userId: string | null): string {
+  return userId || '_anon_';
+}
+
+/** Reads the last successful cached snapshot without I/O. */
+export function snapshot(): FlagsSnapshot | null {
+  return cache;
+}
+
+/** Forces a refetch on the next loadFlags call. */
 export function invalidate(): void {
-  _cache = null;
-  _inflight = null;
+  cache = null;
+  cacheKey = null;
+  inflight = null;
 }
 
 export async function loadFlags(
   userId: string | null = null,
-  opts: { force?: boolean } = {},
+  opts: LoadFlagsOptions = {},
 ): Promise<FlagsSnapshot> {
-  if (!opts.force && _cache && (Date.now() - _cache.fetched_at) < CACHE_TTL_MS) {
-    return _cache;
+  const key = keyFor(userId);
+  if (
+    !opts.force &&
+    cache &&
+    cacheKey === key &&
+    (Date.now() - cache.fetched_at) < CACHE_TTL_MS
+  ) {
+    return cache;
   }
-  if (_inflight) return _inflight;
+
+  if (inflight?.key === key) return inflight.promise;
 
   const path = userId
     ? `/api/feature-flags?user_id=${encodeURIComponent(userId)}`
-    : `/api/feature-flags`;
+    : '/api/feature-flags';
 
-  _inflight = (async () => {
-    const r = await api.get<{ ok: boolean; environment: string; user_id: string | null; flags: ResolvedFlag[] }>(
-      path,
-      { cacheKey: `ff:${userId || '_anon_'}`, cacheTtlMs: CACHE_TTL_MS, timeoutMs: 6000, retries: 1 },
-    );
-    const snap: FlagsSnapshot = {
-      ok: !!r.ok,
-      environment: r.data?.environment || 'unknown',
-      user_id: userId,
-      flags: Array.isArray(r.data?.flags) ? r.data!.flags : [],
+  let request!: Promise<FlagsSnapshot>;
+  request = (async () => {
+    const response = await api.get<{
+      ok: boolean;
+      environment: string;
+      user_id: string | null;
+      flags: ResolvedFlag[];
+    }>(path, {
+      cacheKey: `ff:${key}`,
+      cacheTtlMs: CACHE_TTL_MS,
+      timeoutMs: opts.timeoutMs ?? 6_000,
+      retries: opts.retries ?? 1,
+    });
+
+    const result: FlagsSnapshot = {
+      ok: !!response.ok,
+      environment: response.data?.environment || 'unknown',
+      user_id: response.data?.user_id ?? userId,
+      flags: Array.isArray(response.data?.flags) ? response.data!.flags : [],
       fetched_at: Date.now(),
     };
-    _cache = snap;
-    _inflight = null;
-    return snap;
-  })();
 
-  return _inflight;
+    // A transient network failure must not poison the 60s cache or replace a
+    // previously healthy snapshot with an empty one. The provider can retry in
+    // the background while continuing to render its bundled/last-known flags.
+    if (result.ok) {
+      cache = result;
+      cacheKey = key;
+    }
+    return result;
+  })().finally(() => {
+    if (inflight?.promise === request) inflight = null;
+  });
+
+  inflight = { key, promise: request };
+  return request;
 }
 
-/** Synchronous read against the warmed cache only. */
 export function isEnabledCached(name: string, fallback: boolean = false): boolean {
-  if (!_cache) return fallback;
-  const f = _cache.flags.find(x => x.name === name);
-  return f ? f.resolved : fallback;
+  if (!cache) return fallback;
+  const flag = cache.flags.find(item => item.name === name);
+  return flag ? flag.resolved : fallback;
 }
