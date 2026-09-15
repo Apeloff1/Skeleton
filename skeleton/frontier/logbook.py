@@ -21,6 +21,30 @@ from skeleton.frontier.events import DomainEvent
 MILESTONE_IMPORTANCE = frozenset({"milestone", "legendary", "achievement"})
 
 
+def _strings(value: Any, *, field_name: str) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        raise TypeError(f"{field_name} must be a sequence")
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        text = str(item).strip()
+        if text and text not in seen:
+            seen.add(text)
+            normalized.append(text)
+    return tuple(normalized)
+
+
+def _boolean(value: Any, *, field_name: str, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if not isinstance(value, bool):
+        raise TypeError(f"{field_name} must be a boolean")
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class CaptainLogEntry:
     entry_id: str
@@ -37,6 +61,43 @@ class CaptainLogEntry:
     is_auto_generated: bool = False
     is_pinned: bool = False
 
+    def __post_init__(self) -> None:
+        for field_name in ("entry_id", "user_id", "title", "content", "log_type"):
+            value = getattr(self, field_name)
+            if not isinstance(value, str):
+                raise TypeError(f"log entry {field_name} must be a string")
+            normalized = value.strip()
+            if not normalized:
+                raise ValueError(f"log entry {field_name} must not be empty")
+            if field_name == "log_type":
+                normalized = normalized.lower()
+            object.__setattr__(self, field_name, normalized)
+
+        importance = str(self.importance or "normal").strip().lower() or "normal"
+        object.__setattr__(self, "importance", importance)
+
+        if not isinstance(self.created_at, datetime):
+            raise TypeError("log entry created_at must be a datetime")
+        if self.created_at.tzinfo is None:
+            raise ValueError("log entry created_at must be timezone-aware")
+        object.__setattr__(self, "created_at", self.created_at.astimezone(timezone.utc))
+
+        location = str(self.location or "").strip() or None
+        in_game_date = str(self.in_game_date or "").strip() or None
+        object.__setattr__(self, "location", location)
+        object.__setattr__(self, "in_game_date", in_game_date)
+        object.__setattr__(
+            self,
+            "related_entities",
+            _strings(self.related_entities, field_name="related_entities"),
+        )
+        object.__setattr__(self, "tags", _strings(self.tags, field_name="tags"))
+
+        if not isinstance(self.is_auto_generated, bool):
+            raise TypeError("is_auto_generated must be a boolean")
+        if not isinstance(self.is_pinned, bool):
+            raise TypeError("is_pinned must be a boolean")
+
     def as_dict(self) -> dict[str, Any]:
         return {
             "entry_id": self.entry_id,
@@ -48,19 +109,11 @@ class CaptainLogEntry:
             "location": self.location,
             "related_entities": list(self.related_entities),
             "tags": list(self.tags),
-            "created_at": self.created_at.astimezone(timezone.utc).isoformat(),
+            "created_at": self.created_at.isoformat(),
             "in_game_date": self.in_game_date,
             "is_auto_generated": self.is_auto_generated,
             "is_pinned": self.is_pinned,
         }
-
-
-def _strings(value: Any, *, field_name: str) -> tuple[str, ...]:
-    if value is None:
-        return ()
-    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
-        raise TypeError(f"{field_name} must be a sequence")
-    return tuple(text for item in value if (text := str(item).strip()))
 
 
 def _parse_datetime(value: Any) -> datetime:
@@ -80,6 +133,9 @@ def _parse_datetime(value: Any) -> datetime:
 
 
 def log_entry_from_record(record: Mapping[str, Any]) -> CaptainLogEntry:
+    if not isinstance(record, Mapping):
+        raise TypeError("log entry record must be a mapping")
+
     required = {
         key: str(record.get(key) or "").strip()
         for key in ("entry_id", "user_id", "title", "content", "log_type")
@@ -88,7 +144,7 @@ def log_entry_from_record(record: Mapping[str, Any]) -> CaptainLogEntry:
     if missing:
         raise ValueError(f"log entry requires non-empty fields: {', '.join(missing)}")
 
-    importance = str(record.get("importance") or "normal").strip().lower()
+    importance = str(record.get("importance") or "normal").strip().lower() or "normal"
     location = str(record.get("location") or "").strip() or None
     in_game_date = str(record.get("in_game_date") or "").strip() or None
     return CaptainLogEntry(
@@ -106,8 +162,11 @@ def log_entry_from_record(record: Mapping[str, Any]) -> CaptainLogEntry:
         tags=_strings(record.get("tags"), field_name="tags"),
         created_at=_parse_datetime(record.get("created_at")),
         in_game_date=in_game_date,
-        is_auto_generated=bool(record.get("is_auto_generated", False)),
-        is_pinned=bool(record.get("is_pinned", False)),
+        is_auto_generated=_boolean(
+            record.get("is_auto_generated"),
+            field_name="is_auto_generated",
+        ),
+        is_pinned=_boolean(record.get("is_pinned"), field_name="is_pinned"),
     )
 
 
@@ -132,6 +191,11 @@ def render_log_template(
 ) -> CaptainLogEntry:
     """Render a source-shaped auto-log template with explicit dependencies."""
 
+    if not isinstance(template, Mapping):
+        raise TypeError("log template must be a mapping")
+    if not isinstance(variables, Mapping):
+        raise TypeError("log template variables must be a mapping")
+
     user_id = user_id.strip()
     if not user_id:
         raise ValueError("user_id must not be empty")
@@ -150,6 +214,8 @@ def render_log_template(
     if not entry_id:
         raise ValueError("id_factory must return a non-empty identifier")
     created_at = now()
+    if not isinstance(created_at, datetime):
+        raise TypeError("now must return a datetime")
     if created_at.tzinfo is None:
         raise ValueError("now must return a timezone-aware datetime")
 
@@ -159,7 +225,7 @@ def render_log_template(
     except (KeyError, IndexError, AttributeError, ValueError) as exc:
         raise ValueError("invalid log template formatting") from exc
 
-    importance = str(template.get("importance") or "normal").strip().lower()
+    importance = str(template.get("importance") or "normal").strip().lower() or "normal"
     return CaptainLogEntry(
         entry_id=entry_id,
         user_id=user_id,
@@ -213,7 +279,18 @@ def log_statistics(
     *,
     known_types: Sequence[str] = (),
 ) -> dict[str, Any]:
-    by_type = {str(log_type).strip().lower(): 0 for log_type in known_types if str(log_type).strip()}
+    normalized_types: list[str] = []
+    seen_types: set[str] = set()
+    for log_type in known_types:
+        normalized = str(log_type).strip().lower()
+        if not normalized:
+            continue
+        if normalized in seen_types:
+            raise ValueError(f"duplicate known log type: {normalized}")
+        seen_types.add(normalized)
+        normalized_types.append(normalized)
+
+    by_type = {log_type: 0 for log_type in normalized_types}
     milestones = 0
     legendary = 0
     for entry in entries:
@@ -238,6 +315,8 @@ def timeline(
 ) -> Mapping[str, tuple[CaptainLogEntry, ...]]:
     if month is not None and year is None:
         raise ValueError("timeline month requires year")
+    if year is not None and not 1 <= year <= 9999:
+        raise ValueError("timeline year must be between 1 and 9999")
     if month is not None and not 1 <= month <= 12:
         raise ValueError("timeline month must be between 1 and 12")
 
@@ -266,7 +345,7 @@ def log_entry_to_memory_item(entry: CaptainLogEntry) -> dict[str, Any]:
             "location": entry.location,
             "related_entities": list(entry.related_entities),
             "tags": list(entry.tags),
-            "created_at": entry.created_at.astimezone(timezone.utc).isoformat(),
+            "created_at": entry.created_at.isoformat(),
             "in_game_date": entry.in_game_date,
             "is_auto_generated": entry.is_auto_generated,
             "is_pinned": entry.is_pinned,
