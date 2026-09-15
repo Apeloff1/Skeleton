@@ -48,7 +48,7 @@ python scripts/release_provenance.py emit \
   --input requirements-build.txt \
   --input requirements.txt \
   --sbom-ref dist/release-sbom.cdx.json
-sha256sum -c release-meta/SHA256SUMS
+(cd dist && sha256sum -c ../release-meta/SHA256SUMS)
 ```
 
 To compare two independent builds, run:
