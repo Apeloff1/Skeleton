@@ -64,14 +64,7 @@ def literal_string(node: ast.AST) -> str | None:
 
 
 def obvious_command_string(node: ast.AST) -> bool:
-    """Return True when an argv expression is statically string-shaped.
-
-    This intentionally handles only cases that are safe to classify without
-    data-flow guessing: string literals, f-strings, concatenations containing a
-    string-shaped operand, and common string-building methods. Unknown names
-    remain allowed so legitimate dynamically assembled argument vectors are not
-    falsely rejected by this lightweight gate.
-    """
+    """Return True when an argv expression is statically string-shaped."""
     if literal_string(node) is not None or isinstance(node, ast.JoinedStr):
         return True
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
@@ -83,7 +76,6 @@ def obvious_command_string(node: ast.AST) -> bool:
 
 
 def command_argument(node: ast.Call) -> ast.AST | None:
-    """Return the subprocess argv argument from positional or keyword form."""
     if node.args:
         return node.args[0]
     for keyword in node.keywords:
@@ -201,7 +193,6 @@ def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
 
 
 def destructured_assignments(target: ast.AST, value: ast.AST) -> list[tuple[str, ast.AST]]:
-    """Pair exact positional tuple/list destructuring targets with source nodes."""
     if isinstance(target, ast.Name):
         return [(target.id, value)]
     if isinstance(target, ast.Starred):
@@ -217,7 +208,6 @@ def destructured_assignments(target: ast.AST, value: ast.AST) -> list[tuple[str,
 
 
 def assignment_aliases(tree: ast.AST, aliases: dict[str, str]) -> dict[str, str]:
-    """Resolve aliases assigned from tracked process callables or policy helpers."""
     resolved = dict(aliases)
     assignments: list[tuple[str, ast.AST]] = []
     for node in ast.walk(tree):
@@ -279,7 +269,6 @@ def dynamic_namespace_get_violation(node: ast.Call, aliases: dict[str, str]) -> 
 
 
 def partial_policy_violations(node: ast.Call, aliases: dict[str, str]) -> list[str]:
-    """Validate process-sensitive arguments pre-bound through functools.partial."""
     if canonical_name(node.func, aliases) != "functools.partial" or not node.args:
         return []
     target = canonical_name(node.args[0], aliases)
@@ -351,17 +340,22 @@ def violations(path: Path) -> list[str]:
 
 def main() -> int:
     findings: list[str] = []
+    scanned = 0
     for path in python_files():
+        scanned += 1
         findings.extend(violations(path))
+    if scanned == 0:
+        findings.append("scanner coverage failure: no backend Python files were scanned")
     if findings:
         print("Unsafe process invocation patterns detected:", file=sys.stderr)
         for finding in sorted(findings):
             print(f"  - {finding}", file=sys.stderr)
         return 1
     print(
-        "Process safety gate passed: no unsafe shell execution, statically obvious string-shaped subprocess commands, "
-        "opaque subprocess kwargs, dynamic process lookup, process-sensitive star imports, unsafe process partials, "
-        "unsafe process namespace get()/__getattribute__(), os.system(), or os.popen() calls found."
+        f"Process safety gate passed across {scanned} backend Python files: no unsafe shell execution, "
+        "statically obvious string-shaped subprocess commands, opaque subprocess kwargs, dynamic process lookup, "
+        "process-sensitive star imports, unsafe process partials, unsafe process namespace get()/__getattribute__(), "
+        "os.system(), or os.popen() calls found."
     )
     return 0
 
