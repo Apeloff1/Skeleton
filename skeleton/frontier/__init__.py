@@ -14,6 +14,16 @@ from skeleton.frontier.npc import NPCGenerator, NPCSpec
 from skeleton.frontier.npc_adapters import npc_spec_from_domain_record
 from skeleton.frontier.npc_profiles import ArchetypeProfile, get_profile, infer_archetype
 from skeleton.frontier.resilience import DegradationLevel, ResilienceController, ResilienceDecision
+from skeleton.frontier.world import (
+    IslandVocabulary,
+    WorldBounds,
+    WorldRegion,
+    calculate_route,
+    calculate_supplies_needed,
+    generate_random_island,
+    project_fog_of_war,
+    region_from_record,
+)
 
 __all__ = [
     "AgentContract",
@@ -25,6 +35,7 @@ __all__ = [
     "EventBus",
     "ExecutionResult",
     "InMemoryStore",
+    "IslandVocabulary",
     "MemoryContract",
     "MemoryItem",
     "NPCGenerator",
@@ -33,8 +44,15 @@ __all__ = [
     "ResilienceController",
     "ResilienceDecision",
     "SQLiteCollection",
+    "WorldBounds",
+    "WorldRegion",
+    "calculate_route",
+    "calculate_supplies_needed",
+    "generate_random_island",
     "get_profile",
     "infer_archetype",
     "npc_spec_from_domain_record",
+    "project_fog_of_war",
+    "region_from_record",
     "stable_content_digest",
 ]
