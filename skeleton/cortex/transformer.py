@@ -88,6 +88,28 @@ class TransformerBlock:
             return dx, dg, zeros(len(dg))
         return layer_norm_bwd(dy, hat, inv, g)
 
+    @staticmethod
+    def _depth_route_mask(states: Sequence[Sequence[float]], depth_ratio: float) -> List[bool]:
+        """Select the highest-energy tokens for the expensive FFN sublayer.
+
+        Attention remains dense, so skipped tokens still read and write the
+        residual stream.  A ratio of 1.0 is the compatibility path and exactly
+        matches the pre-MoD block topology; 0.0 makes the block attention-only.
+        """
+        n = len(states)
+        ratio = max(0.0, min(1.0, float(depth_ratio)))
+        if n == 0 or ratio <= 0.0:
+            return [False] * n
+        if ratio >= 1.0:
+            return [True] * n
+        capacity = max(1, min(n, int(math.ceil(ratio * n))))
+        scored = [
+            (sum(float(v) * float(v) for v in state), -t, t)
+            for t, state in enumerate(states)
+        ]
+        chosen = {t for _score, _tie, t in sorted(scored, reverse=True)[:capacity]}
+        return [t in chosen for t in range(n)]
+
     def snapshot(self) -> Dict[str, Any]:
         return {
             "Wq": _copy_mat(self.Wq), "Wk": _copy_mat(self.Wk),
@@ -128,7 +150,7 @@ class TransformerBlock:
             blk.ln2_g = ones(dim)
         return blk
 
-    def forward(self, X: List[List[float]], n_heads: int):
+    def forward(self, X: List[List[float]], n_heads: int, depth_ratio: float = 1.0):
         n = len(X)
         Xn: List[List[float]] = []
         hats1: List[List[float]] = []
@@ -151,28 +173,37 @@ class TransformerBlock:
         Un: List[List[float]] = []
         hats2: List[List[float]] = []
         invs2: List[float] = []
-        Y = U
+        route_mask = self._depth_route_mask(U, depth_ratio) if self.d_ff else [False] * n
+        Y = [list(u) for u in U]
         if self.d_ff:
             for u in U:
                 y, hat, inv = self._norm(u, self.ln2_g, self.ln2_b)
                 Un.append(y)
                 hats2.append(hat)
                 invs2.append(inv)
-            if self.ffn_kind == "swiglu":
-                for u in Un:
-                    yi, g, p = swiglu(u, self.W1, self.Wu, self.b1, self.bu)
-                    z.append(yi); gate.append(g); up.append(p)
-                pre = gate
-            else:
-                pre = [add(matvec(self.W1, u), self.b1) for u in Un]
-                z = [gelu(p) for p in pre]
-            ff = [add(matvec(self.W2, zi), self.b2) for zi in z]
-            Y = [add(U[t], ff[t]) for t in range(n)]
+            z = [[] for _ in range(n)]
+            pre = [[] for _ in range(n)]
+            gate = [[] for _ in range(n)]
+            up = [[] for _ in range(n)]
+            for t, routed in enumerate(route_mask):
+                if not routed:
+                    continue
+                u = Un[t]
+                if self.ffn_kind == "swiglu":
+                    zi, g, p = swiglu(u, self.W1, self.Wu, self.b1, self.bu)
+                    z[t], gate[t], up[t], pre[t] = zi, g, p, g
+                else:
+                    p = add(matvec(self.W1, u), self.b1)
+                    pre[t] = p
+                    z[t] = gelu(p)
+                ff = add(matvec(self.W2, z[t]), self.b2)
+                Y[t] = add(U[t], ff)
         cache = {
             "X": X, "Xn": Xn, "hats1": hats1, "invs1": invs1,
             "Q": Q, "K": K, "V": V, "C": C, "As": As, "attn": attn, "U": U,
             "Un": Un, "hats2": hats2, "invs2": invs2, "z": z, "pre": pre,
-            "gate": gate, "up": up, "n_heads": n_heads,
+            "gate": gate, "up": up, "route_mask": route_mask,
+            "depth_ratio": max(0.0, min(1.0, float(depth_ratio))), "n_heads": n_heads,
         }
         return Y, cache
 
@@ -185,13 +216,16 @@ class TransformerBlock:
                 s = 2.0 / g
                 dY[t] = [x * s for x in dY[t]]
         dU = [list(dY[t]) for t in range(n)]
-        if self.d_ff and cache.get("z"):
+        route_mask = list(cache.get("route_mask") or ([True] * n if self.d_ff else [False] * n))
+        if self.d_ff and any(route_mask):
             Un = cache["Un"]
             z = cache["z"]
             acc_b2 = zeros(D)
             acc_b1 = zeros(len(self.b1))
             d_Un = [zeros(D) for _ in range(n)]
             for t in range(n):
+                if not route_mask[t]:
+                    continue
                 add_outer(self.W2, dY[t], z[t], -lr)
                 for i in range(D):
                     acc_b2[i] += dY[t][i]
@@ -220,6 +254,8 @@ class TransformerBlock:
             invs2 = cache["invs2"]
             Usrc = cache.get("U") or []
             for t in range(n):
+                if not route_mask[t]:
+                    continue
                 dx, dg, db = self._norm_bwd(d_Un[t], hats2[t], invs2[t], self.ln2_g, Usrc[t] if t < len(Usrc) else None)
                 dU[t] = add(dU[t], dx)
                 acc_dg = add(acc_dg, dg)
@@ -272,7 +308,13 @@ class TransformerBlock:
         n_heads: int,
         pos: int,
     ) -> List[float]:
-        """One-token decode step. Ks/Vs grow with unroped keys; RoPE at attend time."""
+        """One-token decode step. Ks/Vs grow with unroped keys; RoPE at attend time.
+
+        Cached single-token decode intentionally remains full-depth. Sequence
+        forwards have enough tokens to enforce an actual MoD capacity budget;
+        applying a one-token top-k independently would make cache/no-cache
+        decoding disagree for reasons unrelated to model weights.
+        """
         y, _, _ = self._norm(x, self.ln1_g, self.ln1_b)
         q = matvec(self.Wq, y)
         k = matvec(self.Wk, y)
@@ -332,6 +374,7 @@ class TinyTransformer:
         d_ff: int = 0,
         norm: str = "ln",
         ffn_kind: str = "gelu",
+        depth_ratio: float = 1.0,
     ) -> None:
         itos = [UNK] + sorted({str(t) for t in (vocab or ()) if t and t != UNK})
         self.itos: List[str] = itos
@@ -351,6 +394,7 @@ class TinyTransformer:
         ff = max(0, int(d_ff))
         self.norm = "rms" if str(norm).lower() == "rms" else "ln"
         self.ffn_kind = "swiglu" if str(ffn_kind).lower() == "swiglu" else "gelu"
+        self.depth_ratio = max(0.0, min(1.0, float(depth_ratio)))
         self.layers: List[TransformerBlock] = [
             TransformerBlock(D, ff, rng, s, norm=self.norm, ffn_kind=self.ffn_kind)
             for _ in range(nL)
@@ -450,8 +494,8 @@ class TinyTransformer:
     def to(self, device: str = "cpu") -> "TinyTransformer":
         """Bind a device. CUDA if torch can see a GPU; else CPU. Never throws.
 
-        When torch exists the weights pin on the bound device (GPU-resident
-        if cuda, otherwise torch-cpu). Python lists catch up on snapshot().
+        Sparse MoD execution currently stays on the owned Python path; the
+        torch harness is only shape-compatible with full-depth FFNs.
         """
         from skeleton.cortex.device import resolve
         info = resolve(device)
@@ -464,7 +508,7 @@ class TinyTransformer:
                 pass
         self._accel = None
         self.resident = False
-        pin = bool(info.get("torch")) and self.requested != "cpu"
+        pin = bool(info.get("torch")) and self.requested != "cpu" and self.depth_ratio >= 1.0
         if pin:
             try:
                 from skeleton.cortex.torch_lm import TorchAccel
@@ -476,13 +520,15 @@ class TinyTransformer:
                 self._accel = None
                 self.device = "cpu"
                 self.resident = False
+        elif self.depth_ratio < 1.0:
+            self.device = "cpu"
         return self
 
     def _forward(self, ids: Sequence[int]):
         H = self._encode(ids)
         caches = []
         for layer in self.layers:
-            H, cache = layer.forward(H, self.n_heads)
+            H, cache = layer.forward(H, self.n_heads, self.depth_ratio)
             caches.append(cache)
         return H, caches
 
@@ -528,7 +574,7 @@ class TinyTransformer:
 
     def _logits_window(self, ids: Sequence[int], cache: Optional[KVCache] = None) -> List[float]:
         window = list(ids[-self.ctx:] or [self.unk])
-        if cache is None:
+        if cache is None or self.depth_ratio < 1.0:
             return self._logits(window)
         if cache.primed_for(window):
             return self._step(window[-1], cache)
@@ -737,7 +783,7 @@ class TinyTransformer:
         else:
             ids = [self._id(str(t)) for t in prefix] or [self.unk]
         out = list(ids)
-        cache = KVCache(self.n_layers, self.ctx) if use_cache else None
+        cache = KVCache(self.n_layers, self.ctx) if use_cache and self.depth_ratio >= 1.0 else None
         for _ in range(max(1, n)):
             window = out[-self.ctx:]
             logits = self._logits_window(window, cache)
@@ -760,6 +806,7 @@ class TinyTransformer:
             "n_heads": self.n_heads,
             "n_layers": self.n_layers,
             "d_ff": self.d_ff,
+            "depth_ratio": self.depth_ratio,
             "device": self.device,
             "resident": bool(self.resident),
             "fitted": self.fitted,
@@ -797,6 +844,7 @@ class TinyTransformer:
             d_ff=int((data or {}).get("d_ff") or 0),
             norm=str((data or {}).get("norm") or "ln"),
             ffn_kind=str((data or {}).get("ffn_kind") or "gelu"),
+            depth_ratio=float((data or {}).get("depth_ratio", 1.0)),
         )
         lm.itos = itos
         lm.stoi = {t: i for i, t in enumerate(itos)}
