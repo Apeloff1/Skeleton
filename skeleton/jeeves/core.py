@@ -75,7 +75,6 @@ def _cortex_can_think(cortex: Any) -> bool:
     return cortex is not None and callable(getattr(cortex, "think", None))
 
 
-
 def _local_responder(message: str, history: list[Turn], context: dict[str, Any]) -> str:
     """Fallback responder: Socratic scaffolding without an LLM backend."""
     topic = message.strip().rstrip("?")[:80]
@@ -206,7 +205,6 @@ class Jeeves:
     def think(self, stimulus: str, *, context: dict[str, Any] | None = None):
         """Neocortex think — the model in training, not a chat wrapper."""
         if not _cortex_can_think(self._cortex):
-            # Observability stub: fall back to local hemispheres (BuilderBrain path).
             from skeleton.cortex.hemispheres import LeftHemisphere, RightHemisphere
             from skeleton.cortex.pfc import PrefrontalCortex
             ctx = context or {}
@@ -272,7 +270,6 @@ class Jeeves:
 
     def observe_run(self, *, era: str, walk: dict[str, Any], plan: dict[str, Any],
                     vision: str = "") -> dict[str, Any]:
-        """Ingest a finished forge-run so own-system can recall extract outcomes."""
         extracted = bool((walk or {}).get("extracted"))
         collapsed = bool((walk or {}).get("collapsed"))
         hops = (walk or {}).get("hops")
@@ -378,7 +375,6 @@ class Jeeves:
 
     def plan_build(self, pack: dict[str, Any] | None = None, *,
                    tensor=None, reading=None, vision: str = "") -> dict[str, Any]:
-        """Jeeves-as-builder: design the run the forge will emit."""
         from skeleton.jeeves.builder import BuilderBrain
         if vision:
             pack = self.bind_era(vision)
@@ -408,7 +404,6 @@ class Jeeves:
         return out
 
     def advise(self, session_id: str, telemetry: dict[str, Any] | None = None) -> dict[str, Any]:
-        """Tactical cascade. Opens nothing; uses bound era + live telemetry."""
         session = self._get(session_id)
         brain = self._brain_get()
         advice = brain.advise(telemetry or {})
@@ -429,3 +424,7 @@ class Jeeves:
             raise SessionError("unknown session", context={"session_id": session_id})
         return session
 
+
+# CI-1 / GB-3: pipeline and older imports expect JeevesCore from this module.
+# Alias lives at module end, never inside the class body.
+JeevesCore = Jeeves
