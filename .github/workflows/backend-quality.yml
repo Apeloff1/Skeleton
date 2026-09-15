@@ -72,6 +72,14 @@ jobs:
           --routes-root routes
           --require-inventory-clean
 
+      - name: Rank legacy route-policy debt
+        run: >-
+          python scripts/backend_route_policy_debt.py
+          --registry core/routes_registry.py
+          --routes-root routes
+          --depth 2
+          --top 30
+
       - name: Process invocation safety gate
         run: python scripts/check_process_safety.py
 
@@ -110,3 +118,4 @@ jobs:
           tests/test_backend_route_inventory_cns.py
           tests/test_route_policy_catalog.py
           tests/test_backend_route_policy_report.py
+          tests/test_backend_route_policy_debt.py
