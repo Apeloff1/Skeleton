@@ -29,7 +29,7 @@ SCOPE_RE = re.compile(
 )
 BROAD_PERMISSION_RE = re.compile(
     r"^(?P<indent> *)(?:permissions|'permissions'|\"permissions\")\s*:\s*"
-    r"(?P<value>read-all|write-all)\s*(?:#.*)?$",
+    r"(?P<quote>['\"]?)(?P<value>read-all|write-all)(?P=quote)\s*(?:#.*)?$",
     re.IGNORECASE,
 )
 
