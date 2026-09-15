@@ -28,47 +28,30 @@ UNSAFE_CALLS = {
 }
 
 
-class ScanCoverageError(RuntimeError):
-    """Raised when the scanner cannot prove that all intended files were visited."""
+def walk_python_files(root: Path, skip_dirs: set[str]) -> Iterable[Path]:
+    """Walk Python files without following symlinks and without hiding I/O errors."""
+    if root.is_symlink():
+        raise OSError("scan root must not be a symlink")
 
-
-def _walk_error(error: OSError) -> None:
-    location = error.filename or ROOT
-    raise ScanCoverageError(f"unable to traverse {location}: {error}") from error
+    stack = [root]
+    while stack:
+        current = stack.pop()
+        child_dirs: list[Path] = []
+        python_paths: list[Path] = []
+        with os.scandir(current) as entries:
+            for entry in sorted(entries, key=lambda item: item.name):
+                if entry.name in skip_dirs:
+                    continue
+                if entry.is_dir(follow_symlinks=False):
+                    child_dirs.append(Path(entry.path))
+                elif entry.is_file(follow_symlinks=False) and entry.name.endswith(".py"):
+                    python_paths.append(Path(entry.path))
+        yield from python_paths
+        stack.extend(reversed(child_dirs))
 
 
 def python_files() -> Iterable[Path]:
-    if not ROOT.exists():
-        raise ScanCoverageError(f"required scan root does not exist: {ROOT}")
-    if not ROOT.is_dir():
-        raise ScanCoverageError(f"required scan root is not a directory: {ROOT}")
-
-    files: list[Path] = []
-    try:
-        for current, dirnames, filenames in os.walk(
-            ROOT,
-            topdown=True,
-            onerror=_walk_error,
-            followlinks=False,
-        ):
-            dirnames[:] = sorted(
-                name
-                for name in dirnames
-                if name not in SKIP_DIRS and not name.endswith(".egg-info")
-            )
-            current_path = Path(current)
-            for filename in sorted(filenames):
-                if filename.endswith(".py"):
-                    files.append(current_path / filename)
-    except ScanCoverageError:
-        raise
-    except OSError as exc:
-        raise ScanCoverageError(f"unable to traverse required scan root {ROOT}: {exc}") from exc
-
-    if not files:
-        raise ScanCoverageError(f"scan discovered zero Python files in required root: {ROOT}")
-
-    yield from files
+    yield from walk_python_files(ROOT, SKIP_DIRS)
 
 
 def display_path(path: Path) -> Path:
@@ -390,14 +373,14 @@ def main() -> int:
     findings: list[str] = []
     scanned = 0
     try:
-        paths = list(python_files())
-    except ScanCoverageError as exc:
-        print(f"Process-safety scan incomplete: {exc}", file=sys.stderr)
-        return 2
-
-    for path in paths:
-        scanned += 1
-        findings.extend(violations(path))
+        for path in python_files():
+            scanned += 1
+            findings.extend(violations(path))
+    except OSError as exc:
+        print(f"Process safety scan failed: {type(exc).__name__}", file=sys.stderr)
+        return 1
+    if scanned == 0:
+        findings.append("scanner coverage failure: no backend Python files were scanned")
     if findings:
         print("Unsafe process invocation patterns detected:", file=sys.stderr)
         for finding in sorted(findings):

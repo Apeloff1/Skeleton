@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import ast
 import importlib.util
-import os
 from pathlib import Path
 import sys
 from types import ModuleType
@@ -26,10 +25,6 @@ SCAN_ROOTS = (
 SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", "node_modules", "legacy_root"}
 
 
-class ScanCoverageError(RuntimeError):
-    """Raised when the scanner cannot prove that all intended files were visited."""
-
-
 def _load_backend_gate() -> ModuleType:
     spec = importlib.util.spec_from_file_location("_backend_process_safety", BACKEND_GATE_PATH)
     if spec is None or spec.loader is None:
@@ -43,57 +38,16 @@ BACKEND_GATE = _load_backend_gate()
 SUBPROCESS_CALLS = {f"subprocess.{name}" for name in BACKEND_GATE.SUBPROCESS_CALLS}
 
 
-def _walk_error(error: OSError) -> None:
-    location = error.filename or "<unknown>"
-    raise ScanCoverageError(f"unable to traverse {location}: {error}") from error
-
-
 def python_files() -> Iterable[Path]:
-    """Yield every Python file in active runtime/security roots, or fail closed."""
+    """Yield every Python file in required runtime/security roots exactly once."""
     seen: set[Path] = set()
-    files: list[Path] = []
-
     for root in SCAN_ROOTS:
-        if not root.exists():
-            raise ScanCoverageError(f"required scan root does not exist: {root}")
-        if not root.is_dir():
-            raise ScanCoverageError(f"required scan root is not a directory: {root}")
-
-        try:
-            for current, dirnames, filenames in os.walk(
-                root,
-                topdown=True,
-                onerror=_walk_error,
-                followlinks=False,
-            ):
-                dirnames[:] = sorted(
-                    name
-                    for name in dirnames
-                    if name not in SKIP_DIRS and not name.endswith(".egg-info")
-                )
-                current_path = Path(current)
-                for filename in sorted(filenames):
-                    if not filename.endswith(".py"):
-                        continue
-                    path = current_path / filename
-                    try:
-                        resolved = path.resolve(strict=True)
-                    except OSError as exc:
-                        raise ScanCoverageError(f"unable to resolve scanned file {path}: {exc}") from exc
-                    if resolved in seen:
-                        continue
-                    seen.add(resolved)
-                    files.append(path)
-        except ScanCoverageError:
-            raise
-        except OSError as exc:
-            raise ScanCoverageError(f"unable to traverse required scan root {root}: {exc}") from exc
-
-    if not files:
-        roots = ", ".join(str(root) for root in SCAN_ROOTS)
-        raise ScanCoverageError(f"scan discovered zero Python files across required roots: {roots}")
-
-    yield from files
+        for path in BACKEND_GATE.walk_python_files(root, SKIP_DIRS):
+            absolute = path.absolute()
+            if absolute in seen:
+                continue
+            seen.add(absolute)
+            yield path
 
 
 def display_path(path: Path) -> Path:
@@ -169,15 +123,16 @@ def main() -> int:
     findings: list[str] = []
     scanned = 0
     try:
-        paths = list(python_files())
-    except ScanCoverageError as exc:
-        print(f"Repository process-safety scan incomplete: {exc}", file=sys.stderr)
-        return 2
+        for path in python_files():
+            scanned += 1
+            findings.extend(violations(path))
+    except OSError as exc:
+        print(f"Repository process-safety scan failed: {type(exc).__name__}", file=sys.stderr)
+        return 1
 
-    for path in paths:
-        scanned += 1
-        findings.extend(violations(path))
-
+    if scanned == 0:
+        print("Repository process-safety scan failed: zero Python files scanned.", file=sys.stderr)
+        return 1
     if findings:
         print("Repository process-safety violations detected:", file=sys.stderr)
         for finding in sorted(set(findings)):
