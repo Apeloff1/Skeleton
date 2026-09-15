@@ -14,6 +14,7 @@ matrices observe every turn:
 from __future__ import annotations
 
 import copy
+import math
 import re
 import time
 import uuid
@@ -32,7 +33,52 @@ from skeleton.jeeves.matrices_llm import (
 
 _TOOL_NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
 _MAX_TOOL_CALLS_PER_TURN = 4
+_MAX_REQUEST_DEPTH = 8
+_MAX_REQUEST_NODES = 512
+_MAX_REQUEST_STRING_CHARS = 16_384
+_MAX_INPUT_CHARS = 32_768
 _PROVIDER_ERROR_CONTENT = "[provider unavailable]"
+
+
+def _copy_bounded_json(value: Any, *, depth: int = 0, budget: Optional[List[int]] = None) -> Any:
+    """Copy request data while enforcing a small, JSON-only attack surface.
+
+    Tool arguments and metadata are caller-controlled. ``copy.deepcopy`` on
+    arbitrary Python objects can invoke attacker-defined methods, while deeply
+    nested or enormous structures can exhaust recursion/memory. Accept only the
+    primitive shapes an HTTP JSON caller can legitimately provide and cap their
+    depth, node count, and string size before handlers or session state see them.
+    """
+    if budget is None:
+        budget = [_MAX_REQUEST_NODES]
+    if depth > _MAX_REQUEST_DEPTH:
+        raise ValueError("request structure too deep")
+    budget[0] -= 1
+    if budget[0] < 0:
+        raise ValueError("request structure too large")
+
+    if value is None or type(value) is bool or type(value) is int:
+        return value
+    if type(value) is float:
+        if not math.isfinite(value):
+            raise ValueError("request numbers must be finite")
+        return value
+    if type(value) is str:
+        if len(value) > _MAX_REQUEST_STRING_CHARS:
+            raise ValueError("request string too large")
+        return value
+    if type(value) is list:
+        return [_copy_bounded_json(item, depth=depth + 1, budget=budget) for item in value]
+    if type(value) is dict:
+        copied: Dict[str, Any] = {}
+        for key, item in value.items():
+            if type(key) is not str:
+                raise ValueError("request object keys must be strings")
+            if len(key) > _MAX_REQUEST_STRING_CHARS:
+                raise ValueError("request object key too large")
+            copied[key] = _copy_bounded_json(item, depth=depth + 1, budget=budget)
+        return copied
+    raise ValueError("request values must be JSON-compatible primitives")
 
 
 class SessionMode(Enum):
@@ -98,7 +144,7 @@ class MemoryManager:
         self._stats["evicted"] += 1
 
     def create_session(self, user_id: str, mode: SessionMode = SessionMode.TUTORING) -> Session:
-        session = Session(session_id=str(uuid.uuid4())[:12], user_id=user_id, mode=mode)
+        session = Session(session_id=uuid.uuid4().hex, user_id=user_id, mode=mode)
         self._sessions[session.session_id] = session
         self._user_sessions.setdefault(user_id, []).append(session.session_id)
         self._stats["created"] += 1
@@ -203,15 +249,19 @@ class JeevesCore:
                 raise ValueError("unknown or invalid tool")
             if not isinstance(arguments, dict):
                 raise ValueError("tool call arguments must be an object")
-            calls.append({"name": normalized, "arguments": copy.deepcopy(arguments)})
+            calls.append({"name": normalized, "arguments": _copy_bounded_json(arguments)})
         return calls
 
     def _provider_complete(self, prompt: str, prior_context: List[str], system: str) -> str:
         """Use a real provider-native system channel when the adapter supports it."""
         if getattr(self._provider, "supports_system_prompt", False):
-            return self._provider.complete(prompt, context=prior_context, system=system)
-        legacy_prompt = f"{system}\n\n{prompt}" if system else prompt
-        return self._provider.complete(legacy_prompt, context=prior_context)
+            content = self._provider.complete(prompt, context=prior_context, system=system)
+        else:
+            legacy_prompt = f"{system}\n\n{prompt}" if system else prompt
+            content = self._provider.complete(legacy_prompt, context=prior_context)
+        if not isinstance(content, str):
+            raise TypeError("provider must return text")
+        return content
 
     @property
     def provider_name(self) -> str:
@@ -231,11 +281,15 @@ class JeevesCore:
         session = self._memory.get_session(session_id)
         if not session:
             return {"error": "Session not found", "session_id": session_id}
+        if not isinstance(input_text, str):
+            raise ValueError("input_text must be a string")
+        if len(input_text) > _MAX_INPUT_CHARS:
+            raise ValueError("input_text too large")
 
         requested_tool_calls = self._requested_tool_calls(context)
         prior_context = session.context_window()
-        user_metadata = copy.deepcopy(context or {})
-        user_metadata.pop("tool_calls", None)
+        metadata_source = {key: value for key, value in (context or {}).items() if key != "tool_calls"}
+        user_metadata = _copy_bounded_json(metadata_source)
         session.add_turn("user", input_text, **user_metadata)
 
         self.sam.observe(input_text)
