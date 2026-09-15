@@ -11,6 +11,13 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
+from skeleton.observability.contract import (
+    CorrelationContext,
+    bind_context,
+    current_context,
+    get_observability,
+)
+
 
 @dataclass
 class Route:
@@ -33,6 +40,9 @@ class GatewayRequest:
     path: str
     actor: str = "anonymous"
     payload: Dict[str, Any] = field(default_factory=dict)
+    request_id: Optional[str] = None
+    run_id: Optional[str] = None
+    trace_id: Optional[str] = None
 
 
 @dataclass
@@ -41,6 +51,9 @@ class GatewayResponse:
     body: Any
     duration_ms: float
     cached: bool = False
+    request_id: Optional[str] = None
+    run_id: Optional[str] = None
+    trace_id: Optional[str] = None
 
 
 class APIGateway:
@@ -80,42 +93,76 @@ class APIGateway:
         return True
 
     def handle(self, request: GatewayRequest) -> GatewayResponse:
-        start = time.time_ns()
-        route = self._routes.get(request.path)
-        if not route:
-            return GatewayResponse(404, {"error": "not found"}, 0.0)
+        started = time.time_ns()
+        context = CorrelationContext.create(
+            request_id=request.request_id,
+            run_id=request.run_id,
+            trace_id=request.trace_id,
+        )
+        observability = get_observability()
 
-        if self._rbac and route.scope != "public":
-            if not self._rbac.check_scope(request.actor, route.scope, route.action):
-                return GatewayResponse(403, {"error": "forbidden"}, (time.time_ns() - start) / 1e6)
+        with bind_context(context):
+            def respond(status: int, body: Any, *, cached: bool = False) -> GatewayResponse:
+                duration = (time.time_ns() - started) / 1e6
+                active = current_context() or context
+                observability.emit(
+                    "gateway.request",
+                    component="api",
+                    status="ok" if status < 400 else "error",
+                    duration_ms=duration,
+                    rate_limited=status == 429,
+                    attrs={
+                        "path": request.path,
+                        "actor": request.actor,
+                        "http_status": status,
+                        "cached": cached,
+                    },
+                )
+                return GatewayResponse(
+                    status,
+                    body,
+                    duration,
+                    cached=cached,
+                    request_id=active.request_id,
+                    run_id=active.run_id,
+                    trace_id=active.trace_id,
+                )
 
-        if not self._rate_ok(f"{request.actor}:{route.path}", route.rate_limit_per_s):
-            return GatewayResponse(429, {"error": "rate limited"}, (time.time_ns() - start) / 1e6)
+            route = self._routes.get(request.path)
+            if not route:
+                return respond(404, {"error": "not found"})
 
-        cache_key = f"{route.path}:{hash(frozenset(request.payload.items())) if request.payload else 0}"
-        if self._cache and route.cache_ttl_s > 0:
-            hit = self._cache.get("gateway", cache_key)
-            if hit is not None:
-                return GatewayResponse(200, hit, (time.time_ns() - start) / 1e6, cached=True)
+            if self._rbac and route.scope != "public":
+                if not self._rbac.check_scope(request.actor, route.scope, route.action):
+                    return respond(403, {"error": "forbidden"})
 
-        route.calls += 1
-        try:
-            body = route.handler(request.payload)
-            for transform in self._transforms:
-                body = transform(body)
-            status = 200
-        except Exception as exc:  # noqa: BLE001
-            route.errors += 1
-            body = {"error": str(exc)}
-            status = 500
-        duration = (time.time_ns() - start) / 1e6
-        route.total_ms += duration
+            if not self._rate_ok(f"{request.actor}:{route.path}", route.rate_limit_per_s):
+                return respond(429, {"error": "rate limited"})
 
-        if self._cache and route.cache_ttl_s > 0 and status == 200:
-            self._cache.set("gateway", cache_key, body, ttl_s=route.cache_ttl_s)
-        if self._logger:
-            self._logger.info("gateway", f"{request.path} → {status}", actor=request.actor, ms=round(duration, 2))
-        return GatewayResponse(status, body, duration)
+            cache_key = f"{route.path}:{hash(frozenset(request.payload.items())) if request.payload else 0}"
+            if self._cache and route.cache_ttl_s > 0:
+                hit = self._cache.get("gateway", cache_key)
+                if hit is not None:
+                    return respond(200, hit, cached=True)
+
+            route.calls += 1
+            try:
+                body = route.handler(request.payload)
+                for transform in self._transforms:
+                    body = transform(body)
+                status = 200
+            except Exception as exc:  # noqa: BLE001
+                route.errors += 1
+                body = {"error": str(exc)}
+                status = 500
+            duration = (time.time_ns() - started) / 1e6
+            route.total_ms += duration
+
+            if self._cache and route.cache_ttl_s > 0 and status == 200:
+                self._cache.set("gateway", cache_key, body, ttl_s=route.cache_ttl_s)
+            if self._logger:
+                self._logger.info("gateway", f"{request.path} → {status}", actor=request.actor, ms=round(duration, 2))
+            return respond(status, body)
 
     def card(self) -> Dict[str, Any]:
         return {
