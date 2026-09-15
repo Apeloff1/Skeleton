@@ -144,9 +144,11 @@ def test_ambiguous_or_malformed_xff_falls_back_to_peer(
     )
     malformed = _request(client_host="10.0.0.10", xff="203.0.113.1, ,10.0.0.9")
     invalid = _request(client_host="10.0.0.10", xff="not-an-ip")
+    quoted = _request(client_host="10.0.0.10", xff='"203.0.113.1",10.0.0.9')
     assert api_middleware._client_ip(duplicate) == "10.0.0.10"
     assert api_middleware._client_ip(malformed) == "10.0.0.10"
     assert api_middleware._client_ip(invalid) == "10.0.0.10"
+    assert api_middleware._client_ip(quoted) == "10.0.0.10"
 
 
 def test_all_trusted_forwarded_hops_fall_back_to_direct_peer(
@@ -249,11 +251,18 @@ def test_rate_limiter_serializes_concurrent_high_cardinality_admission() -> None
 @pytest.mark.parametrize(
     ("kwargs", "message"),
     [
-        ({"per_minute": 0}, "per_minute must be positive"),
-        ({"burst": 0}, "burst must be positive"),
-        ({"max_buckets": 0}, "max_buckets must be positive"),
-        ({"bucket_ttl": 0}, "bucket_ttl must be a positive finite number"),
-        ({"bucket_ttl": float("inf")}, "bucket_ttl must be a positive finite number"),
+        ({"per_minute": 0}, "per_minute must be finite and positive"),
+        ({"per_minute": float("nan")}, "per_minute must be finite and positive"),
+        ({"per_minute": float("inf")}, "per_minute must be finite and positive"),
+        ({"burst": 0}, "burst must be finite and positive"),
+        ({"burst": float("nan")}, "burst must be finite and positive"),
+        ({"burst": float("inf")}, "burst must be finite and positive"),
+        ({"max_buckets": 0}, "max_buckets must be finite and positive"),
+        ({"max_buckets": float("nan")}, "max_buckets must be finite and positive"),
+        ({"max_buckets": float("inf")}, "max_buckets must be finite and positive"),
+        ({"bucket_ttl": 0}, "bucket_ttl must be finite and positive"),
+        ({"bucket_ttl": float("nan")}, "bucket_ttl must be finite and positive"),
+        ({"bucket_ttl": float("inf")}, "bucket_ttl must be finite and positive"),
     ],
 )
 def test_rate_limiter_rejects_nonpositive_or_nonfinite_configuration(
@@ -261,6 +270,21 @@ def test_rate_limiter_rejects_nonpositive_or_nonfinite_configuration(
 ) -> None:
     with pytest.raises(ValueError, match=message):
         RateLimiterMiddleware(object(), **kwargs)
+
+
+@pytest.mark.parametrize(
+    ("retry", "expected"),
+    [
+        (0.0, 1),
+        (0.1, 1),
+        (1.2, 2),
+        (90_000.0, 86_400),
+        (float("inf"), 86_400),
+        (float("nan"), 86_400),
+    ],
+)
+def test_retry_after_is_always_finite_and_bounded(retry: float, expected: int) -> None:
+    assert api_middleware._bounded_retry_after(retry) == expected
 
 
 def test_rate_limit_short_circuit_uses_one_canonical_request_id() -> None:
