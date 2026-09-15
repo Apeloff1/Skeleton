@@ -104,11 +104,14 @@ jobs:
         run: node scripts/verify-image-size-security.js
 
       - name: Audit production JavaScript dependencies
+        id: yarn-audit
         working-directory: frontend
         shell: bash
         run: |
           set +e
           yarn audit --groups dependencies --level high --json > "$RUNNER_TEMP/yarn-audit.json"
+          status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
           exit 0
 
       - name: Generate Yarn-aware CycloneDX SBOM
