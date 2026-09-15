@@ -11,6 +11,9 @@ python_version = "3.11"
 ignore_missing_imports = true
 warn_unused_ignores = true
 
+[tool.uv]
+required-version = "==0.12.15"
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"

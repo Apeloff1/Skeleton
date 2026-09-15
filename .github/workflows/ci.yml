@@ -15,8 +15,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PYTHON_VERSION: "3.11"
-  NODE_VERSION: "24"
+  PYTHON_VERSION: "3.11.16"
+  NODE_VERSION: "24.20.0"
 permissions:
   contents: read
 jobs:
@@ -30,13 +30,13 @@ jobs:
         with: {persist-credentials: false}
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with: {python-version: "3.11"}
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - name: Repository toolchain contract
         run: python ../scripts/check_toolchain_contract.py
       - name: Install pinned backend quality tools
-        run: uv tool install "ruff==0.9.*"
+        run: uv tool install "ruff==0.9.10"
       - name: Backend correctness lint
-        run: uvx --from "ruff==0.9.*" ruff check . --output-format=github
+        run: uvx --from "ruff==0.9.10" ruff check . --output-format=github
       - name: Backend syntax compilation
         run: python -m compileall -q .
       - name: Process invocation safety gate
@@ -49,7 +49,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: {persist-credentials: false}
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with: {python-version: "3.11"}
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - name: Install Skeleton runtime slice
         run: python -m pip install "pytest>=8,<9" "fastapi>=0.110,<1" "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3"
       - name: Test forge / jeeves / context
@@ -100,7 +100,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: {persist-credentials: false}
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with: {python-version: "3.11"}
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - name: Install focused test/runtime slice
         run: python -m pip install "pytest>=8,<9" "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3"
       - name: Compile school package
@@ -116,7 +116,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: {persist-credentials: false}
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with: {python-version: "3.11"}
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - name: Install Skeleton runtime slice
         run: python -m pip install "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3"
       - env: {PYTHONPATH: "."}
@@ -136,7 +136,7 @@ jobs:
         with: {persist-credentials: false}
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with: {python-version: "3.11"}
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - run: |
           uv venv
           uv pip install -r requirements.txt
@@ -156,7 +156,7 @@ jobs:
         with: {persist-credentials: false}
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with: {python-version: "3.11"}
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - run: |
           uv venv
           uv pip install -r requirements.txt
@@ -175,7 +175,7 @@ jobs:
         with: {persist-credentials: false}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "24"
+          node-version: "${{ env.NODE_VERSION }}"
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
       - run: yarn install --frozen-lockfile
