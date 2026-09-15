@@ -24,6 +24,8 @@ WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 RUN_RE = re.compile(
     r"^(?P<indent>\s*)(?:-\s*)?(?:run|'run'|\"run\")\s*:\s*(?P<value>.*)$"
 )
+FLOW_STEP_RE = re.compile(r"^(?P<indent>\s*)-\s*\{")
+FLOW_RUN_KEY_RE = re.compile(r"^(?:run|'run'|\"run\")\s*:")
 # GitHub Actions supports YAML anchors and aliases. An alias used as the value
 # of ``run`` hides the shell text from this lightweight scanner because resolving
 # aliases requires parsing the whole YAML document. Reject such shell aliases
@@ -56,6 +58,151 @@ def workflow_files() -> list[Path]:
 
 def _indent_width(line: str) -> int:
     return len(line) - len(line.lstrip(" "))
+
+
+def _flow_mapping_depth(fragment: str) -> int:
+    """Return brace depth for a YAML flow mapping, ignoring quoted braces."""
+    start = fragment.find("{")
+    if start < 0:
+        return 0
+
+    depth = 0
+    in_single = False
+    in_double = False
+    escaped = False
+    index = start
+    while index < len(fragment):
+        char = fragment[index]
+        if in_single:
+            if char == "'" and index + 1 < len(fragment) and fragment[index + 1] == "'":
+                index += 2
+                continue
+            if char == "'":
+                in_single = False
+            index += 1
+            continue
+        if in_double:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_double = False
+            index += 1
+            continue
+
+        if char == "'":
+            in_single = True
+        elif char == '"':
+            in_double = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+        index += 1
+    return depth
+
+
+def _flow_mapping_entries(fragment: str) -> list[str]:
+    """Split the outer YAML flow mapping into top-level entries only."""
+    start = fragment.find("{")
+    if start < 0:
+        return []
+
+    entries: list[str] = []
+    current: list[str] = []
+    depth = 0
+    in_single = False
+    in_double = False
+    escaped = False
+    index = start
+
+    while index < len(fragment):
+        char = fragment[index]
+        if in_single:
+            if depth >= 1:
+                current.append(char)
+            if char == "'" and index + 1 < len(fragment) and fragment[index + 1] == "'":
+                if depth >= 1:
+                    current.append(fragment[index + 1])
+                index += 2
+                continue
+            if char == "'":
+                in_single = False
+            index += 1
+            continue
+        if in_double:
+            if depth >= 1:
+                current.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_double = False
+            index += 1
+            continue
+
+        if char == "'":
+            in_single = True
+            if depth >= 1:
+                current.append(char)
+        elif char == '"':
+            in_double = True
+            if depth >= 1:
+                current.append(char)
+        elif char == "{":
+            depth += 1
+            if depth > 1:
+                current.append(char)
+        elif char == "}":
+            if depth == 1:
+                entry = "".join(current).strip()
+                if entry:
+                    entries.append(entry)
+                current = []
+                depth -= 1
+                break
+            if depth > 1:
+                depth -= 1
+                current.append(char)
+        elif char == "," and depth == 1:
+            entry = "".join(current).strip()
+            if entry:
+                entries.append(entry)
+            current = []
+        elif depth >= 1:
+            current.append(char)
+        index += 1
+
+    if current and depth >= 1:
+        entry = "".join(current).strip()
+        if entry:
+            entries.append(entry)
+    return entries
+
+
+def _flow_style_steps(lines: list[str]) -> Iterable[tuple[int, str]]:
+    """Yield complete flow-style step mappings, including multiline forms."""
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        match = FLOW_STEP_RE.match(line)
+        if not match:
+            index += 1
+            continue
+
+        start_line = index + 1
+        base_indent = len(match.group("indent"))
+        block_lines = [line]
+        while _flow_mapping_depth("\n".join(block_lines)) > 0 and index + 1 < len(lines):
+            next_line = lines[index + 1]
+            if next_line.strip() and _indent_width(next_line) < base_indent:
+                break
+            index += 1
+            block_lines.append(lines[index])
+        yield start_line, "\n".join(block_lines)
+        index += 1
 
 
 def _run_fragments(lines: list[str]) -> Iterable[tuple[int, str]]:
@@ -141,7 +288,16 @@ def violations(path: Path) -> list[str]:
         return [f"{path}: read failure: {exc}"]
 
     findings: list[str] = []
-    for line_number, fragment in _run_fragments(text.splitlines()):
+    lines = text.splitlines()
+
+    for line_number, fragment in _flow_style_steps(lines):
+        if any(FLOW_RUN_KEY_RE.match(entry.strip()) for entry in _flow_mapping_entries(fragment)):
+            findings.append(
+                f"{path.name}:{line_number}: flow-style run step is forbidden because the security gate "
+                "cannot safely audit shell boundaries in compact YAML mappings; use a block-style run step"
+            )
+
+    for line_number, fragment in _run_fragments(lines):
         if RUN_ALIAS_RE.fullmatch(fragment.strip()):
             findings.append(
                 f"{path.name}:{line_number}: aliased run shell is forbidden because the security gate "
