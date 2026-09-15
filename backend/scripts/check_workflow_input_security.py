@@ -36,14 +36,12 @@ RUN_ALIAS_RE = re.compile(r"^\*[^\s#]+(?:\s+#.*)?$")
 # DOTALL ensures the security gate inspects the expression after the full run
 # block has been reconstructed instead of only matching single-line forms.
 EXPRESSION_RE = re.compile(r"\$\{\{(?P<body>.*?)\}\}", re.DOTALL)
-# Match untrusted workflow contexts as expression tokens, not only property
-# access. Whole-object transforms such as toJSON(inputs) or toJSON(github.event)
-# remain attacker-controlled and must not be interpolated directly into a shell
-# command either. Platform-owned contexts such as github.repository remain
-# allowed because they are not event-payload data.
-UNTRUSTED_INPUT_RE = re.compile(
-    r"(?<![A-Za-z0-9_])(?:github\.event|inputs)(?![A-Za-z0-9_])"
-)
+# Inputs are wholly caller-controlled. The github context is mixed-trust: direct
+# github.event access and whole-object github transforms are untrusted, while
+# platform-owned properties such as github.repository are allowed.
+INPUT_CONTEXT_RE = re.compile(r"(?<![A-Za-z0-9_])inputs(?![A-Za-z0-9_])")
+GITHUB_CONTEXT_RE = re.compile(r"(?<![A-Za-z0-9_])github(?![A-Za-z0-9_])")
+IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_-]*")
 # YAML block scalars may carry node properties such as ``&anchor`` or ``!tag``
 # before the scalar indicator. They may also combine a chomping indicator (+/-)
 # and an indentation indicator (1-9) in either order: |, |-, |2, |2-, |-2,
@@ -247,11 +245,12 @@ def _run_fragments(lines: list[str]) -> Iterable[tuple[int, str]]:
 
 
 def _without_expression_string_literals(body: str) -> str:
-    """Blank GitHub-expression single-quoted strings while preserving tokens.
+    """Blank GitHub-expression single-quoted strings while preserving positions.
 
     GitHub expressions use single-quoted string literals and escape a literal
-    quote by doubling it. Ignoring literal contents prevents harmless text such
-    as ``'inputs.payload'`` from being mistaken for an input-context reference.
+    quote by doubling it. Preserving positions lets follow-up checks inspect the
+    original text for bracket-property syntax without treating literal contents
+    as executable context references.
     """
     output: list[str] = []
     index = 0
@@ -275,11 +274,88 @@ def _without_expression_string_literals(body: str) -> str:
     return "".join(output)
 
 
+def _skip_space(text: str, index: int) -> int:
+    while index < len(text) and text[index].isspace():
+        index += 1
+    return index
+
+
+def _bracket_property(body: str, index: int) -> tuple[str | None, int]:
+    """Parse ``['property']``/``[\"property\"]`` starting at ``index``."""
+    if index >= len(body) or body[index] != "[":
+        return None, index
+    index = _skip_space(body, index + 1)
+    if index >= len(body) or body[index] not in {"'", '"'}:
+        return None, index
+
+    quote = body[index]
+    index += 1
+    chars: list[str] = []
+    while index < len(body):
+        char = body[index]
+        if quote == "'" and char == "'" and index + 1 < len(body) and body[index + 1] == "'":
+            chars.append("'")
+            index += 2
+            continue
+        if quote == '"' and char == "\\" and index + 1 < len(body):
+            chars.append(body[index + 1])
+            index += 2
+            continue
+        if char == quote:
+            index = _skip_space(body, index + 1)
+            if index < len(body) and body[index] == "]":
+                return "".join(chars), index + 1
+            return None, index
+        chars.append(char)
+        index += 1
+    return None, index
+
+
+def _github_reference_is_untrusted(body: str, searchable: str, end: int) -> bool:
+    """Classify a github-context reference beginning at a known token.
+
+    ``github.event`` and bracket-equivalent access are untrusted. A whole github
+    object is also untrusted because transforms such as ``toJSON(github)`` carry
+    the event payload. Other explicit github properties remain allowed.
+    """
+    index = _skip_space(searchable, end)
+    if index >= len(searchable):
+        return True
+
+    if searchable[index] == ".":
+        index = _skip_space(searchable, index + 1)
+        match = IDENTIFIER_RE.match(searchable, index)
+        if match is None:
+            return True
+        return match.group(0) == "event"
+
+    if searchable[index] == "[":
+        property_name, _ = _bracket_property(body, index)
+        if property_name is None:
+            # Dynamic/opaque github object indexing is fail-closed because it can
+            # select ``event`` without exposing the property name statically.
+            return True
+        return property_name == "event"
+
+    # Whole-object usage (for example toJSON(github)) contains github.event.
+    return True
+
+
+def _contains_untrusted_context(body: str) -> bool:
+    searchable = _without_expression_string_literals(body)
+    if INPUT_CONTEXT_RE.search(searchable):
+        return True
+
+    for match in GITHUB_CONTEXT_RE.finditer(searchable):
+        if _github_reference_is_untrusted(body, searchable, match.end()):
+            return True
+    return False
+
+
 def _direct_input_expression(fragment: str) -> str | None:
     for expression in EXPRESSION_RE.finditer(fragment):
         body = expression.group("body")
-        searchable = _without_expression_string_literals(body)
-        if UNTRUSTED_INPUT_RE.search(searchable):
+        if _contains_untrusted_context(body):
             return body.strip()
     return None
 
@@ -312,8 +388,8 @@ def violations(path: Path) -> list[str]:
         if expression is None:
             continue
         findings.append(
-            f"{path.name}:{line_number}: direct workflow input interpolation in run shell is forbidden "
-            f"({expression}); pass the input through env and quote the environment variable instead"
+            f"{path.name}:{line_number}: direct untrusted workflow context interpolation in run shell is forbidden "
+            f"({expression}); pass event/input data through env and quote the environment variable instead"
         )
     return findings
 
@@ -336,7 +412,7 @@ def main() -> int:
 
     print(
         f"Workflow input security gate passed for {len(workflows)} workflow files: "
-        "no direct inputs or github.event interpolation in run shells."
+        "no direct untrusted event/input context interpolation in run shells."
     )
     return 0
 
