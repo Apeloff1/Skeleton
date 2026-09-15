@@ -134,10 +134,12 @@ def get_stats() -> dict:
 
 
 def _request_id(request: Request) -> str:
-    """Return a bounded, header-safe request id or mint a new one."""
-    candidate = request.headers.get("x-request-id", "")
-    if candidate and _REQUEST_ID_RE.fullmatch(candidate):
-        return candidate
+    """Return one unambiguous bounded header-safe request id or mint a new one."""
+    candidates = request.headers.getlist("x-request-id")
+    if len(candidates) == 1:
+        candidate = candidates[0]
+        if candidate and _REQUEST_ID_RE.fullmatch(candidate):
+            return candidate
     return uuid.uuid4().hex[:16]
 
 
@@ -177,8 +179,6 @@ def _canonical_ip(value: str) -> str | None:
     value = value.strip()
     if not value:
         return None
-    if len(value) >= 2 and value[0] == value[-1] == '"':
-        value = value[1:-1].strip()
     try:
         return str(ipaddress.ip_address(value))
     except ValueError:
