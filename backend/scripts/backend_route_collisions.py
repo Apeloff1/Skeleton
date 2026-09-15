@@ -6,7 +6,10 @@ import argparse
 from collections import defaultdict
 from pathlib import Path
 
-from scripts.backend_route_inventory import RouteRecord, build_inventory
+try:  # imported from backend tests/tools
+    from scripts.backend_route_inventory import RouteRecord, build_inventory
+except ModuleNotFoundError:  # executed directly from ``backend/`` in CI
+    from backend_route_inventory import RouteRecord, build_inventory
 
 
 def collision_groups(routes: tuple[RouteRecord, ...]) -> tuple[tuple[RouteRecord, ...], ...]:
