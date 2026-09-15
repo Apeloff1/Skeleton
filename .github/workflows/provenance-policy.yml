@@ -3,6 +3,7 @@ name: Provenance Policy
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, closed]
   push:
     branches: [main]
   workflow_dispatch:
@@ -16,6 +17,7 @@ concurrency:
 
 jobs:
   validate:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     name: Provenance Manifest
     runs-on: ubuntu-latest
     timeout-minutes: 5
