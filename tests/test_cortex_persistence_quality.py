@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from skeleton.cortex import JeevesCortex
+from skeleton.cortex.callosum import CorpusCallosum
 
 
 def test_cuda_request_contract_is_exact_even_when_hardware_degrades() -> None:
@@ -14,6 +15,19 @@ def test_cuda_request_contract_is_exact_even_when_hardware_degrades() -> None:
     if not result["cuda"]:
         assert result["actual"] == "cpu"
         assert neo.status()["lm"]["device"] == "cpu"
+
+
+def test_bilateral_callosum_fusion_changes_the_fused_residual() -> None:
+    cc = CorpusCallosum(dim=8, seed=8)
+    hidden = [0.3, 0.1, -0.2, 0.4, 0.0, 0.2, -0.1, 0.5]
+
+    unilateral, _, _ = cc.fuse(hidden, left_on=True, right_on=False)
+    bilateral, _, _ = cc.fuse(hidden, left_on=True, right_on=True)
+
+    assert cc.fires == 2
+    assert bilateral != unilateral
+    assert cc.last_attn_lr
+    assert cc.last_attn_rl
 
 
 def test_sleep_state_roundtrips_non_default_values(tmp_path) -> None:
