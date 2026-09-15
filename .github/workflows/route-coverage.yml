@@ -8,6 +8,10 @@ on:
       - 'frontend/app/**'
       - 'scripts/route_coverage_check.py'
       - 'scripts/test_route_coverage_check.py'
+      - 'backend/core/routes_registry.py'
+      - 'backend/routes/**'
+      - 'backend/scripts/backend_route_inventory.py'
+      - 'backend/tests/test_backend_route_inventory.py'
       - '.github/workflows/route-coverage.yml'
   pull_request:
     paths:
@@ -15,6 +19,11 @@ on:
       - 'frontend/app/**'
       - 'scripts/route_coverage_check.py'
       - 'scripts/test_route_coverage_check.py'
+      - 'backend/core/routes_registry.py'
+      - 'backend/routes/**'
+      - 'backend/scripts/backend_route_inventory.py'
+      - 'backend/tests/test_backend_route_inventory.py'
+      - '.github/workflows/route-coverage.yml'
 
 permissions:
   contents: read
@@ -25,9 +34,9 @@ concurrency:
 
 jobs:
   route-coverage:
-    name: Validate registry ↔ filesystem
+    name: Validate registries and static backend inventory
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -39,20 +48,27 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Run route coverage regression tests
+      - name: Run frontend route coverage regression tests
         run: python3 -m unittest -v scripts/test_route_coverage_check.py
 
-      - name: Run route coverage check (static)
+      - name: Run frontend route coverage check (static)
         run: python3 scripts/route_coverage_check.py
 
-      - name: Run route coverage check (JSON for artifact)
-        if: always()
-        run: python3 scripts/route_coverage_check.py --json > route-coverage.json || true
+      - name: Run backend route inventory (static, report-only)
+        run: python3 backend/scripts/backend_route_inventory.py
 
-      - name: Upload coverage report
+      - name: Emit route evidence artifacts
+        if: always()
+        run: |
+          python3 scripts/route_coverage_check.py --json > route-coverage.json || true
+          python3 backend/scripts/backend_route_inventory.py --json > backend-route-inventory.json || true
+
+      - name: Upload coverage reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: route-coverage-report
-          path: route-coverage.json
+          path: |
+            route-coverage.json
+            backend-route-inventory.json
           retention-days: 30
