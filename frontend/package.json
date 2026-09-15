@@ -12,7 +12,8 @@
     "lint": "expo lint",
     "lint:ci": "expo lint --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "export:web": "expo export --platform web"
+    "export:web": "expo export --platform web",
+    "audit:policy:test": "node ./scripts/test-enforce-yarn-audit.js"
   },
   "engines": { "node": ">=24" },
   "dependencies": {
