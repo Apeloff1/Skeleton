@@ -25,6 +25,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: execution-evidence-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   evidence-lifecycle:
     runs-on: ubuntu-latest
