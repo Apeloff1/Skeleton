@@ -4,6 +4,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "check_workflow_permissions.py"
 SPEC = importlib.util.spec_from_file_location("check_workflow_permissions", SCRIPT)
@@ -115,6 +116,38 @@ jobs: {}
 """
         findings = permissions.violations_from_text("unsafe.yml", text)
         self.assertTrue(any("multiple top-level" in finding for finding in findings))
+
+    def test_rejects_symlinked_workflow_file(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "target.yml"
+            target.write_text("name: target\npermissions: {}\njobs: {}\n", encoding="utf-8")
+            link = root / "linked.yml"
+            try:
+                link.symlink_to(target)
+            except (NotImplementedError, OSError) as exc:
+                self.skipTest(f"symlinks unavailable: {type(exc).__name__}")
+
+            findings = permissions.violations(link)
+
+        self.assertEqual(findings, ["linked.yml: workflow files must not be symlinks"])
+
+    def test_rejects_symlinked_workflow_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "real-workflows"
+            target.mkdir()
+            (target / "safe.yml").write_text(
+                "name: safe\npermissions: {}\njobs: {}\n", encoding="utf-8"
+            )
+            link = root / "workflows"
+            try:
+                link.symlink_to(target, target_is_directory=True)
+            except (NotImplementedError, OSError) as exc:
+                self.skipTest(f"directory symlinks unavailable: {type(exc).__name__}")
+
+            with mock.patch.object(permissions, "WORKFLOW_DIR", link):
+                self.assertEqual(permissions.main(), 1)
 
     def test_read_failure_is_redacted(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
