@@ -68,6 +68,21 @@ def test_teacher_contact_advances_lora_adapter_state() -> None:
     assert "left:lora" in neo.own.models
 
 
+def test_sleep_replay_advances_both_neo_mouths() -> None:
+    neo = JeevesCortex()
+    neo.think("plan tensor ttk lattice")
+    gelu_before = neo.transformer.steps
+    rms_before = neo.neo_rms.steps
+
+    result = neo.sleep_cycle(n=1)
+
+    assert result["replays"] == 1
+    assert neo.transformer.steps > gelu_before
+    assert neo.neo_rms.steps > rms_before
+    assert neo.sleep.cycles >= 1
+    assert neo.sleep.replays >= 1
+
+
 def test_sleep_state_roundtrips_non_default_values(tmp_path) -> None:
     neo = JeevesCortex()
     neo.sleep.record("persist-me", [0.125] * 8, slack=0.75)
