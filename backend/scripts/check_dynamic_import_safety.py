@@ -33,15 +33,16 @@ class DynamicImportScanError(RuntimeError):
     """Raised when the scanner cannot prove complete source discovery."""
 
 
-def python_files(root: Path = BACKEND_ROOT) -> Iterable[Path]:
+def python_files(root: Path | None = None) -> Iterable[Path]:
     """Yield backend Python sources without following symlinks.
 
     Security gates must not silently lose coverage when a directory cannot be
     enumerated, so traversal errors are converted into one stable scanner error
     and handled as a hard failure by ``main``.
     """
+    scan_root = BACKEND_ROOT if root is None else root
     files: list[Path] = []
-    pending = [root]
+    pending = [scan_root]
 
     while pending:
         directory = pending.pop()
