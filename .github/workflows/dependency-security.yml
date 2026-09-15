@@ -186,7 +186,7 @@ jobs:
           - name: backend
             context: .
             file: ./backend/Dockerfile
-            target: ""
+            target: production
             image: skeleton-backend:security-scan
           - name: frontend
             context: ./frontend
