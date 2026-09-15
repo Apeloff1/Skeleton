@@ -19,16 +19,34 @@ import sys
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
+# YAML permits plain, single-quoted, and double-quoted mapping keys. Treat all
+# legal spellings of the GitHub Actions ``run`` key as shell boundaries so a
+# quoted key cannot bypass the interpolation gate.
 RUN_RE = re.compile(
     r"^(?P<indent>\s*)(?:-\s*)?(?:run|'run'|\"run\")\s*:\s*(?P<value>.*)$"
 )
 FLOW_STEP_RE = re.compile(r"^(?P<indent>\s*)-\s*\{")
 FLOW_RUN_KEY_RE = re.compile(r"^(?:run|'run'|\"run\")\s*:")
+# GitHub Actions supports YAML anchors and aliases. An alias used as the value
+# of ``run`` hides the shell text from this lightweight scanner because resolving
+# aliases requires parsing the whole YAML document. Reject such shell aliases
+# fail-closed instead of treating the opaque alias name as trusted shell text.
 RUN_ALIAS_RE = re.compile(r"^\*[^\s#]+(?:\s+#.*)?$")
+# A GitHub expression embedded in a YAML block scalar may span physical lines.
+# DOTALL ensures the security gate inspects the expression after the full run
+# block has been reconstructed instead of only matching single-line forms.
 EXPRESSION_RE = re.compile(r"\$\{\{(?P<body>.*?)\}\}", re.DOTALL)
+# Inputs are wholly caller-controlled. The github context is mixed-trust: direct
+# github.event access and whole-object github transforms are untrusted, while
+# platform-owned properties such as github.repository are allowed.
 INPUT_CONTEXT_RE = re.compile(r"(?<![A-Za-z0-9_])inputs(?![A-Za-z0-9_])")
 GITHUB_CONTEXT_RE = re.compile(r"(?<![A-Za-z0-9_])github(?![A-Za-z0-9_])")
 IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_-]*")
+# YAML block scalars may carry node properties such as ``&anchor`` or ``!tag``
+# before the scalar indicator. They may also combine a chomping indicator (+/-)
+# and an indentation indicator (1-9) in either order: |, |-, |2, |2-, |-2,
+# >+2, and so on. A trailing YAML comment is legal after whitespace. Recognize
+# this full family so anchors, tags, and alternate headers cannot hide a run body.
 BLOCK_SCALAR_RE = re.compile(
     r"^(?:(?:[!&][^\s#]+)\s+)*"
     r"[|>](?:(?:[+-][1-9]?)|(?:[1-9][+-]?))?(?:\s+#.*)?$"
@@ -219,11 +237,21 @@ def _run_fragments(lines: list[str]) -> Iterable[tuple[int, str]]:
             index += 1
 
         if first_content_line is not None:
+            # Keep the complete block together. YAML folded scalars can turn
+            # physical newlines into spaces, and GitHub expressions may contain
+            # whitespace, so line-by-line scanning would permit split-expression
+            # bypasses such as `${{` / `inputs.payload` / `}}` on separate lines.
             yield first_content_line, "\n".join(block_lines)
 
 
 def _without_expression_string_literals(body: str) -> str:
-    """Blank expression string literals while preserving character positions."""
+    """Blank GitHub-expression single-quoted strings while preserving positions.
+
+    GitHub expressions use single-quoted string literals and escape a literal
+    quote by doubling it. Preserving positions lets follow-up checks inspect the
+    original text for bracket-property syntax without treating literal contents
+    as executable context references.
+    """
     output: list[str] = []
     index = 0
     in_string = False
@@ -253,7 +281,7 @@ def _skip_space(text: str, index: int) -> int:
 
 
 def _bracket_property(body: str, index: int) -> tuple[str | None, int]:
-    """Parse a static bracket property starting at ``index``."""
+    """Parse ``['property']``/``[\"property\"]`` starting at ``index``."""
     if index >= len(body) or body[index] != "[":
         return None, index
     index = _skip_space(body, index + 1)
@@ -284,7 +312,12 @@ def _bracket_property(body: str, index: int) -> tuple[str | None, int]:
 
 
 def _github_reference_is_untrusted(body: str, searchable: str, end: int) -> bool:
-    """Classify one github-context token at a shell expression boundary."""
+    """Classify a github-context reference beginning at a known token.
+
+    ``github.event`` and bracket-equivalent access are untrusted. A whole github
+    object is also untrusted because transforms such as ``toJSON(github)`` carry
+    the event payload. Other explicit github properties remain allowed.
+    """
     index = _skip_space(searchable, end)
     if index >= len(searchable):
         return True
@@ -299,9 +332,12 @@ def _github_reference_is_untrusted(body: str, searchable: str, end: int) -> bool
     if searchable[index] == "[":
         property_name, _ = _bracket_property(body, index)
         if property_name is None:
+            # Dynamic/opaque github object indexing is fail-closed because it can
+            # select ``event`` without exposing the property name statically.
             return True
         return property_name == "event"
 
+    # Whole-object usage (for example toJSON(github)) contains github.event.
     return True
 
 
@@ -309,10 +345,11 @@ def _contains_untrusted_context(body: str) -> bool:
     searchable = _without_expression_string_literals(body)
     if INPUT_CONTEXT_RE.search(searchable):
         return True
-    return any(
-        _github_reference_is_untrusted(body, searchable, match.end())
-        for match in GITHUB_CONTEXT_RE.finditer(searchable)
-    )
+
+    for match in GITHUB_CONTEXT_RE.finditer(searchable):
+        if _github_reference_is_untrusted(body, searchable, match.end()):
+            return True
+    return False
 
 
 def _direct_input_expression(fragment: str) -> str | None:
