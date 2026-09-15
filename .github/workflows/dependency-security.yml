@@ -102,6 +102,10 @@ jobs:
         working-directory: frontend
         run: yarn install --frozen-lockfile --non-interactive --ignore-scripts
 
+      - name: Apply reviewed local node_modules security patches
+        working-directory: frontend
+        run: node scripts/patch-node-modules.js
+
       - name: Test JavaScript audit policy parser
         working-directory: frontend
         run: yarn audit:policy:test
