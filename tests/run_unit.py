@@ -224,20 +224,26 @@ def _run_module(mod: ModuleType) -> tuple[int, int, int]:
             collection_failed = True
             continue
 
-        try:
-            methods = list(_iter_test_methods(cls))
-        except SystemExit as exc:
-            print("FAIL COLLECT", name, type(exc).__name__, exc)
-            fails += 1
-            collection_failed = True
-            continue
-        except Exception as exc:
-            print("FAIL COLLECT", name, type(exc).__name__, exc)
-            fails += 1
-            collection_failed = True
-            continue
+        # Consume the iterator one item at a time so each instance is created
+        # immediately before its test runs. Materializing it would execute all
+        # constructors during collection and can change stateful test behavior.
+        methods = _iter_test_methods(cls)
+        while True:
+            try:
+                mname, meth = next(methods)
+            except StopIteration:
+                break
+            except SystemExit as exc:
+                print("FAIL COLLECT", name, type(exc).__name__, exc)
+                fails += 1
+                collection_failed = True
+                break
+            except Exception as exc:
+                print("FAIL COLLECT", name, type(exc).__name__, exc)
+                fails += 1
+                collection_failed = True
+                break
 
-        for mname, meth in methods:
             collected += 1
             p, failed, s = _run_case(name, mname, meth, (name, mname))
             passes += p
