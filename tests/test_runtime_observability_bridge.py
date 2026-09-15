@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from skeleton.agents.coordination import TaskStatus
+from skeleton.agents.coordination import AgentPool, Coordinator, TaskStatus
 from skeleton.foundation.journal import EventJournal, JournaledBus
 from skeleton.genesis import Genesis
 from skeleton.kernel.events import EventBus
+from skeleton.observability.event_bridge import EventMetricsBridge
 from skeleton.observability.orchestration import ObservableOrchestrator
 
 
@@ -122,3 +123,29 @@ def test_genesis_agent_handler_keeps_request_correlation_through_tool_run() -> N
         "orchestration.run.completed",
         "agents.coordinator.dispatched",
     } <= correlated_topics
+
+
+def test_coordinator_reuses_injected_pool_bus_when_bus_is_omitted() -> None:
+    bus = EventBus()
+    bridge = EventMetricsBridge()
+    bridge.attach(bus)
+    pool = AgentPool(max_agents=1, bus=bus)
+    pool.create({"work"}, capacity=1)
+    coordinator = Coordinator(pool=pool)
+    coordinator.register_handler("work", lambda task: task.description.upper())
+    before = len(bridge.events())
+
+    task = coordinator.dispatch(
+        "pooled",
+        task_type="work",
+        metadata={"request_id": "req-pool-121"},
+    )
+
+    assert task.status is TaskStatus.COMPLETED
+    assert task.result == "POOLED"
+    events = bridge.events()[before:]
+    assert any(
+        event.topic == "orchestration.run.completed"
+        and event.correlation_id == "req-pool-121"
+        for event in events
+    )
