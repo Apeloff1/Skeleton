@@ -196,7 +196,7 @@ class MixtureOfDepths:
 
     def forward_ids(self, ids: Sequence[int]) -> List[List[float]]:
         """Return fixed-shape hidden states and record per-token effective depth."""
-        token_ids = list(ids) or [self.model.unk]
+        token_ids = list(ids)[-self.model.ctx :] or [self.model.unk]
         hidden = self.model._encode(token_ids)
         token_count = len(hidden)
 
