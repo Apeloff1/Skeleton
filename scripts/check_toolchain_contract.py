@@ -51,7 +51,7 @@ DEPENDENCY_SECURITY_MARKERS = (
     "python-sbom.cdx.json",
     "Enforce Python vulnerability policy",
     "yarn audit --groups dependencies --level high --json",
-    "anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610",
+    "anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26",
     "format: cyclonedx-json",
     "frontend-sbom.cdx.json",
     "Enforce JavaScript vulnerability policy",
@@ -140,15 +140,15 @@ def main() -> int:
     require("python ../scripts/check_toolchain_contract.py" in ci, "CI backend lint must execute the repository toolchain contract", failures)
     require(cancel_false(ci), "CI must keep active validation alive", failures)
     require(
-        pinned_action_count(ci, "actions/checkout", "v4") > 0
-        and pinned_action_count(ci, "actions/setup-python", "v5") > 0
-        and pinned_action_count(ci, "actions/setup-node", "v4") > 0,
+        pinned_action_count(ci, "actions/checkout", "v7.0.1") > 0
+        and pinned_action_count(ci, "actions/setup-python", "v7.0.0") > 0
+        and pinned_action_count(ci, "actions/setup-node", "v7.0.0") > 0,
         "CI must use immutable proven core action generations",
         failures,
     )
-    require(pinned_action_count(ci, "astral-sh/setup-uv", "v4") > 0, "CI uv setup drifted", failures)
-    require(pinned_action_count(ci, "docker/setup-buildx-action", "v3") == 1, "Buildx version/count drifted", failures)
-    require(pinned_action_count(ci, "docker/build-push-action", "v5") == 3, "build-push version/count drifted", failures)
+    require(pinned_action_count(ci, "astral-sh/setup-uv", "v10.1.0") > 0, "CI uv setup drifted", failures)
+    require(pinned_action_count(ci, "docker/setup-buildx-action", "v4.3.0") == 1, "Buildx version/count drifted", failures)
+    require(pinned_action_count(ci, "docker/build-push-action", "v7.3.0") == 3, "build-push version/count drifted", failures)
     require(ci.count('"pydantic>=2.5,<3"') >= 3, "Skeleton/Jeeves/Cockpit CI jobs must install pydantic runtime slice", failures)
     require(ci.count('"pydantic-settings>=2.1,<3"') >= 3, "Skeleton/Jeeves/Cockpit CI jobs must install pydantic-settings runtime slice", failures)
     for required_job in ("skeleton-test", "school-jeeves-test", "cockpit-smoke", "backend-test", "backend-import-smoke", "frontend"):
