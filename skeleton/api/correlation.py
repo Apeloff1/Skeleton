@@ -1,17 +1,18 @@
 """API request correlation helpers for canonical runtime execution.
 
-The functions stay framework-light: any request object exposing ``headers`` and
-``state`` can participate. A valid existing request-state identifier wins,
-otherwise exactly one valid ``X-Request-ID`` is accepted; malformed or duplicate
-header values fail closed to a server-generated identifier.
+This module bridges the existing Gate request seal into orchestration telemetry.
+It reuses :func:`skeleton.api.middleware.get_request_id` for server-generated
+identifiers and honors ``request.state.seal`` as the canonical API request ID.
+Exactly one syntactically valid ``X-Request-ID`` may seed a missing seal;
+duplicate or malformed values fail closed to a generated identifier.
 """
 
 from __future__ import annotations
 
 import re
-import secrets
 from collections.abc import Mapping
 
+from skeleton.api.middleware import get_request_id
 from skeleton.frontier.model_runtime import CancellationToken
 from skeleton.frontier.orchestration import (
     OrchestrationDriver,
@@ -33,7 +34,9 @@ def _valid_request_id(value: object) -> str | None:
 def request_correlation_id(request: object) -> str:
     """Resolve and persist one safe request correlation identifier."""
     state = getattr(request, "state", None)
-    state_id = _valid_request_id(getattr(state, "request_id", None))
+    state_id = _valid_request_id(getattr(state, "seal", None))
+    if state_id is None:
+        state_id = _valid_request_id(getattr(state, "request_id", None))
     if state_id is not None:
         return state_id
 
@@ -49,17 +52,15 @@ def request_correlation_id(request: object) -> str:
         if isinstance(raw, str):
             candidates = [raw]
 
-    resolved = (
-        _valid_request_id(candidates[0])
-        if len(candidates) == 1
-        else None
-    ) or secrets.token_hex(16)
+    supplied = _valid_request_id(candidates[0]) if len(candidates) == 1 else None
+    resolved = get_request_id(supplied)
 
     if state is not None:
-        try:
-            setattr(state, "request_id", resolved)
-        except (AttributeError, TypeError):
-            pass
+        for attribute in ("seal", "request_id"):
+            try:
+                setattr(state, attribute, resolved)
+            except (AttributeError, TypeError):
+                pass
     return resolved
 
 
