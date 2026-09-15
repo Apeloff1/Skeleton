@@ -9,9 +9,14 @@ Provides:
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, Optional, Set
 
 from skeleton.kernel.events import EventBus
+from skeleton.observability.contract import (
+    annotate_context,
+    current_context,
+    get_observability,
+)
 
 
 class MeshBridge:
@@ -37,23 +42,45 @@ class MeshBridge:
     def dispatch(self, task: Any, specialisation: str) -> bool:
         """Route a Coordinator task through the mesh.
 
-        On success, stamps task.metadata with the mesh agent id and
-        records the assignment. Caller still owns execution/result.
+        On success, stamps task.metadata with the mesh agent id and current
+        correlation identifiers, then keeps that agent id active for any tool
+        execution that follows in the same request context.
         """
+        observability = get_observability()
         agent = self._mesh.route(specialisation)
         if agent is None:
             self._stats["failed"] += 1
+            observability.emit(
+                "mesh.dispatch",
+                component="agent",
+                status="error",
+                attrs={"task_id": task.task_id, "specialisation": specialisation},
+            )
             return False
 
-        self._assignments[task.task_id] = agent.agent_id
-        task.metadata["mesh_agent_id"] = agent.agent_id
+        agent_id = str(agent.agent_id)
+        self._assignments[task.task_id] = agent_id
+        task.metadata["mesh_agent_id"] = agent_id
+        context = annotate_context(agent_id=agent_id) or current_context()
+        if context is not None:
+            task.metadata["correlation"] = context.to_dict()
         self._stats["bridged"] += 1
 
+        observability.emit(
+            "mesh.dispatch",
+            component="agent",
+            attrs={
+                "task_id": task.task_id,
+                "mesh_agent_id": agent_id,
+                "specialisation": specialisation,
+            },
+        )
         if self._bus:
             self._bus.emit("agents.bridge.dispatched", {
                 "task_id": task.task_id,
-                "mesh_agent_id": agent.agent_id,
+                "mesh_agent_id": agent_id,
                 "specialisation": specialisation,
+                "correlation": context.to_dict() if context is not None else {},
             })
         return True
 
