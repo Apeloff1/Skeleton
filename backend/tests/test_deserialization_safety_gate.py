@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+from scripts import check_deserialization_safety as scanner
 from scripts.check_deserialization_safety import violations
 
 
@@ -156,3 +159,98 @@ def test_allows_torch_alias_with_weights_only(tmp_path: Path) -> None:
 def test_rejects_deserializer_star_import(tmp_path: Path) -> None:
     findings = _scan(tmp_path, "from pickle import *\n")
     assert any("star import" in finding for finding in findings)
+
+
+def test_nested_enumeration_failure_is_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = tmp_path / "backend"
+    blocked = root / "blocked"
+    blocked.mkdir(parents=True)
+    (root / "safe.py").write_text("value = 1\n", encoding="utf-8")
+
+    real_scandir = scanner.os.scandir
+
+    def guarded_scandir(path):
+        if Path(path) == blocked:
+            raise PermissionError("SENSITIVE_DESERIALIZATION_TRAVERSAL_DETAIL")
+        return real_scandir(path)
+
+    monkeypatch.setattr(scanner, "ROOT", root)
+    monkeypatch.setattr(scanner.os, "scandir", guarded_scandir)
+
+    assert scanner.main() == 1
+    captured = capsys.readouterr()
+    assert "scanner coverage failure: source traversal failed" in captured.err
+    assert "SENSITIVE_DESERIALIZATION_TRAVERSAL_DETAIL" not in captured.err
+
+
+def test_missing_backend_root_is_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(scanner, "ROOT", tmp_path / "missing-backend")
+
+    assert scanner.main() == 1
+    captured = capsys.readouterr()
+    assert "scanner coverage failure: source traversal failed" in captured.err
+
+
+def test_zero_file_scan_cannot_report_success(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(scanner, "ROOT", tmp_path)
+
+    assert scanner.main() == 1
+    captured = capsys.readouterr()
+    assert "no backend Python files were scanned" in captured.err
+
+
+def test_parse_failure_reports_exception_class_without_payload(tmp_path: Path) -> None:
+    bad = tmp_path / "broken.py"
+    bad.write_text(
+        "def broken(:  # SENSITIVE_DESERIALIZATION_PARSE_DETAIL\n    pass\n",
+        encoding="utf-8",
+    )
+
+    findings = scanner.violations(bad)
+
+    assert findings == [f"{bad}: parse failure: SyntaxError"]
+    assert "SENSITIVE_DESERIALIZATION_PARSE_DETAIL" not in findings[0]
+    assert "invalid syntax" not in findings[0]
+
+
+def test_discovery_does_not_follow_symlink_directories(tmp_path: Path) -> None:
+    root = tmp_path / "backend"
+    external = tmp_path / "external"
+    root.mkdir()
+    external.mkdir()
+    (root / "safe.py").write_text("value = 1\n", encoding="utf-8")
+    (external / "hidden.py").write_text("import pickle\npickle.loads(payload)\n", encoding="utf-8")
+
+    link = root / "linked"
+    try:
+        link.symlink_to(external, target_is_directory=True)
+    except OSError:
+        pytest.skip("directory symlinks are unavailable on this platform")
+
+    assert list(scanner.python_files(root)) == [root / "safe.py"]
+
+
+def test_symlink_scan_root_is_fail_closed(tmp_path: Path) -> None:
+    external = tmp_path / "external"
+    external.mkdir()
+    (external / "safe.py").write_text("value = 1\n", encoding="utf-8")
+    link = tmp_path / "backend-link"
+    try:
+        link.symlink_to(external, target_is_directory=True)
+    except OSError:
+        pytest.skip("directory symlinks are unavailable on this platform")
+
+    with pytest.raises(scanner.DeserializationScanError, match="source traversal failed"):
+        list(scanner.python_files(link))
