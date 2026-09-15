@@ -88,6 +88,24 @@ waves:
       - skeleton/testing/test_frontier_bait_benchmark.py
       - skeleton/testing/test_frontier_gameplay_facade.py
       - scripts/benchmark_frontier_bait.py
+  - wave: 14
+    surface: cooking-kitchen
+    decision: promote-shared-policy-after-semantic-comparison
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/cooking_routes.py
+        blob: 4c366d1c0baa89223758c28f0d4217d1dfa49bc9
+      - repository: Apeloff1/Openworld
+        path: backend/cooking_routes.py
+        blob: 24575861b7120f036bd646a4ed94950ce27d45ce
+    divergence: presentation-only-constant-error-string-f-prefix
+    targets:
+      - skeleton/frontier/cooking.py
+      - skeleton/frontier/cooking_adapters.py
+    evidence:
+      - skeleton/testing/test_frontier_cooking_policy.py
+      - skeleton/testing/test_frontier_cooking_integration.py
+      - docs/lineage/COOKING_PROMOTION_2026-09-15.md
 rejected_from_kernel:
   - source-catalogs
   - fastapi-routes
@@ -100,12 +118,11 @@ benchmark_policy:
   timing: observational-only
   correctness: gated
 next_candidate:
-  surface: cooking
-  disposition: semantic-comparison-required
+  surface: aquarium-display
+  disposition: promote-once-exact-shared-lineage
+  shared_blob: 223f65a8b8cb4c60528e6c4cc585a01296178ea0
   compared_sources:
     - repository: Apeloff1/Lorebuffa
-      path: backend/cooking_routes.py
-      blob: 4c366d1c0baa89223758c28f0d4217d1dfa49bc9
+      path: backend/aquarium_routes.py
     - repository: Apeloff1/Openworld
-      path: backend/cooking_routes.py
-      blob: 24575861b7120f036bd646a4ed94950ce27d45ce
+      path: backend/aquarium_routes.py
