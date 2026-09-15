@@ -31,8 +31,8 @@ Those planes are out-of-scope for this register — audit separately.
 
 ## 2. Frontier backlog — ordered by leverage
 
-Updated 2026-09-15. Tier-1 seams F-1..F-5, F-7 and F-8..F-10 are
-**landed**; do not re-open them without a regression.
+Updated 2026-09-15. Tier-1 seams F-1..F-10 and the Tier-2 F-6 frontier push
+are **landed**; do not re-open them without a regression.
 
 ### Landed (keep visible — failure modes + PR anchors)
 
@@ -43,6 +43,7 @@ Updated 2026-09-15. Tier-1 seams F-1..F-5, F-7 and F-8..F-10 are
 | F-3 Rot-triggered compaction | #4 | `/memory/query` + `RotGuardedCompactor` |
 | F-4 HandoffRegistry × AgentMesh | #6 | `skeleton/swarm/mesh_handoff.py` |
 | F-5 forge VerificationLoop | #7 / #28 | materialise revise-until-green + E2E deepen |
+| F-6 Mixture-of-Depths | #290 | opt-in residual-RMS per-token depth routing + depth telemetry/profiler |
 | F-7 skills-as-files context | #224 | fresh disk reload loop + bounded context cards + GameForge bank bridge |
 | F-8 blackboard poison guards | #18 | provenance + quarantine |
 | F-9 N+1 tool-call suppression | #20 | compose `kernel/dedup.py` |
@@ -64,32 +65,34 @@ them as regression contracts rather than re-opening stale branches.
    dedicated `cockpit-smoke` job and runs `scripts/cockpit-smoke.sh`.
 
 Recent backlog hygiene on 2026-09-15 also retired stale overlapping work:
-issue #255 was completed by merged PR #257, and open PR #237 was closed as
-superseded by merged PR #247.
+issue #255 was completed by merged PR #257, PR #237 was superseded by merged
+#247, and the competing F-6 branches #133/#260 were retired in favor of merged
+#290.
 
-### Tier 2 — frontier pushes (next differentiating work)
+### Tier 2 — frontier push — LANDED
 
-1. **F-6. Mixture-of-depths for the neo transformer** — dynamic per-token
-   compute allocation in `cortex/transformer.py`. Note: `cortex/moe.py` is
-   Mixture-of-*Experts* (different); MoD is still open.
+**F-6. Mixture-of-Depths for the neo transformer — LANDED via #290.** The
+current implementation adds dynamic per-token inference depth while preserving
+the full-depth path, training/backprop, and snapshot interchange. `cortex/moe.py`
+remains Mixture-of-*Experts* and is a separate mechanism.
 
-### Tier 3 — structural (bigger, schedule carefully)
+### Tier 3 — structural (next work, schedule carefully)
 
-2. **F-11. Track E cleanup** — root sprawl moves, SEVEN_BY physical moves,
+1. **F-11. Track E cleanup** — root sprawl moves, SEVEN_BY physical moves,
    godot binary to LFS, shim deletion. Local git ops.
-3. **F-12. H5.4 cortex persistence** — genesis twin vs live singleton once
+2. **F-12. H5.4 cortex persistence** — genesis twin vs live singleton once
    `$SKELETON_OWN` exists in the container.
-4. **F-13. EconomicOptimiser audit** — `intelligence/economic.py` predates
+3. **F-13. EconomicOptimiser audit** — `intelligence/economic.py` predates
    the cascade router; reconcile the two routing contracts.
-5. **F-14. Speculative RAG** — pre-fetch likely-needed documents during
+4. **F-14. Speculative RAG** — pre-fetch likely-needed documents during
    the planning phase of a pipeline run (compose quad + composer).
    Adjacent: `cortex/speculate.py` is token continuation, not RAG prefetch.
-6. **F-15. Organism/social/galaxy plane audit** — the repo grew three
+5. **F-15. Organism/social/galaxy plane audit** — the repo grew three
    planes while the waves landed (see §1 drift note). Same size-filtered
    read methodology as the deep-cut campaign, when their churn settles.
 
 ## Definition of SOTA (working)
 
-Tier-1 SOTA seams (F-2..F-5, F-7, F-10) are landed in code. The former
-CI-1..CI-3 blockers are resolved on main; the next differentiation target is
-F-6 Mixture-of-Depths, with Tier-3 cleanup and persistence work following.
+Tier-1 SOTA seams and F-6 Mixture-of-Depths are landed in code. The former
+CI-1..CI-3 blockers are resolved on main; the next differentiation work is the
+Tier-3 structural queue, starting with F-11 cleanup and F-12 cortex persistence.
