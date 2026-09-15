@@ -63,6 +63,21 @@ def test_cli_entry_may_wire_the_api_adapter(tmp_path: Path) -> None:
     assert collect_violations(tmp_path) == []
 
 
+def test_deployment_harness_is_exact_api_composition_root(tmp_path: Path) -> None:
+    _write(tmp_path, "skeleton/deploy/harness.py", "from skeleton.api import create_app\n")
+
+    assert collect_violations(tmp_path) == []
+
+
+def test_other_deployment_modules_cannot_import_api(tmp_path: Path) -> None:
+    _write(tmp_path, "skeleton/deploy/worker.py", "from skeleton.api import create_app\n")
+
+    violations = collect_violations(tmp_path)
+
+    assert len(violations) == 1
+    assert "must not depend upward on skeleton.api" in violations[0].message
+
+
 def test_skeleton_production_rejects_backend_frontend_and_test_roots(tmp_path: Path) -> None:
     root = _repo(tmp_path)
     _write(
@@ -95,7 +110,7 @@ def test_backend_production_rejects_frontend_and_test_only_roots(tmp_path: Path)
 
 def test_test_trees_are_exempt_from_production_direction_rules(tmp_path: Path) -> None:
     root = _repo(tmp_path)
-    _write(root, "skeleton/testing/probe.py", "import backend.server\n")
+    _write(root, "skeleton/testing/probe.py", "import backend.server\nfrom skeleton.api import routes\n")
     _write(root, "backend/tests/probe.py", "from skeleton.testing import helper\nimport tests.fixtures\n")
 
     assert collect_violations(root) == []
