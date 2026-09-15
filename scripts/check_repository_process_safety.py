@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import os
 from pathlib import Path
 import sys
 from types import ModuleType
@@ -38,15 +39,34 @@ BACKEND_GATE = _load_backend_gate()
 SUBPROCESS_CALLS = {f"subprocess.{name}" for name in BACKEND_GATE.SUBPROCESS_CALLS}
 
 
+def _scandir(path: Path):
+    """Indirection for explicit, testable, non-symlink-following traversal."""
+    return os.scandir(path)
+
+
+def _walk_python_files(root: Path) -> Iterable[Path]:
+    """Walk one required root while allowing every traversal error to propagate."""
+    with _scandir(root) as entries:
+        for entry in entries:
+            path = Path(entry.path)
+            if entry.is_dir(follow_symlinks=False):
+                if entry.name in SKIP_DIRS:
+                    continue
+                yield from _walk_python_files(path)
+            elif entry.is_file(follow_symlinks=False) and entry.name.endswith(".py"):
+                yield path
+
+
 def python_files() -> Iterable[Path]:
-    """Yield every Python file in the active runtime/security roots exactly once."""
+    """Yield every Python file in the active runtime/security roots exactly once.
+
+    Every configured root is required. Missing/unreadable roots and descendant
+    traversal failures intentionally propagate to ``main`` so coverage cannot
+    silently shrink.
+    """
     seen: set[Path] = set()
     for root in SCAN_ROOTS:
-        if not root.exists():
-            continue
-        for path in root.rglob("*.py"):
-            if any(part in SKIP_DIRS for part in path.parts):
-                continue
+        for path in _walk_python_files(root):
             resolved = path.resolve()
             if resolved in seen:
                 continue
@@ -101,7 +121,7 @@ def argv_violations(path: Path) -> list[str]:
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     except (OSError, UnicodeError, SyntaxError) as exc:
-        return [f"{label}: parse failure: {exc}"]
+        return [f"{label}: parse failure ({type(exc).__name__})"]
 
     aliases = BACKEND_GATE.assignment_aliases(tree, BACKEND_GATE.import_aliases(tree))
     findings: list[str] = []
@@ -126,9 +146,17 @@ def violations(path: Path) -> list[str]:
 def main() -> int:
     findings: list[str] = []
     scanned = 0
-    for path in python_files():
-        scanned += 1
-        findings.extend(violations(path))
+    try:
+        for path in python_files():
+            scanned += 1
+            findings.extend(violations(path))
+    except OSError as exc:
+        findings.append(
+            f"scanner coverage failure: repository traversal failed ({type(exc).__name__})"
+        )
+
+    if scanned == 0:
+        findings.append("scanner coverage failure: no repository Python files were scanned")
 
     if findings:
         print("Repository process-safety violations detected:", file=sys.stderr)
