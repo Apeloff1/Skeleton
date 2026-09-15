@@ -8,8 +8,9 @@ exist only when explicitly configured.
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Literal
 
 import bcrypt as _bcrypt
 from fastapi import APIRouter, Depends, HTTPException
@@ -24,12 +25,15 @@ from core.auth_security import (
     resolve_session_api,
 )
 
+log = logging.getLogger("routes.gameforge_auth")
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 Role = Literal["viewer", "editor", "admin"]
 ROLE_RANK = {"viewer": 0, "editor": 1, "admin": 2}
 ALGORITHM = "HS256"
 ACCESS_TOKEN_MINUTES = 240
+_LEGACY_PUBLIC_SEED_EMAIL = "admin@gameforge.io"
+_seed_initialized = False
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
@@ -79,29 +83,71 @@ def create_access_token(*, sub: str, role: Role) -> str:
     return jwt.encode(payload, _secret(), algorithm=ALGORITHM)
 
 
-def seed_admin():
-    """Idempotently create an explicitly configured bootstrap admin + indexes."""
+def seed_admin() -> None:
+    """Initialize auth indexes and migrate legacy bootstrap state once per worker.
+
+    Production-like environments disable the retired public bootstrap account
+    unless an operator explicitly configures that same email with a new strong
+    password. Explicit bootstrap credentials are upserted and password-rotated,
+    so deployments upgraded from the old seed cannot retain the retired hash.
+    """
+    global _seed_initialized
+    if _seed_initialized:
+        return
+
     seed = resolve_seed_admin()
     try:
         users = _users()
         users.create_index("email", unique=True)
         sessions = _sessions()
         sessions.create_index("session_token", unique=True)
-        # TTL index — Mongo auto-purges expired Google sessions.
         sessions.create_index("expires_at", expireAfterSeconds=0)
-        if seed is not None and not users.find_one({"email": seed.email}):
-            users.insert_one(
+
+        if _enforced() and (seed is None or seed.email != _LEGACY_PUBLIC_SEED_EMAIL):
+            users.update_one(
                 {
-                    "email": seed.email,
-                    "password_hash": hash_password(seed.password),
-                    "role": "admin",
-                    "disabled": False,
+                    "email": _LEGACY_PUBLIC_SEED_EMAIL,
                     "auth": "password",
-                    "created_at": datetime.now(timezone.utc),
-                }
+                },
+                {
+                    "$set": {
+                        "disabled": True,
+                        "security_migration": "legacy_public_seed_disabled",
+                    }
+                },
             )
+
+        if seed is not None:
+            existing = users.find_one({"email": seed.email})
+            existing_hash = existing.get("password_hash") if existing else None
+            fields = {
+                "role": "admin",
+                "disabled": False,
+                "auth": "password",
+            }
+            if not isinstance(existing_hash, str) or not verify_password(
+                seed.password,
+                existing_hash,
+            ):
+                fields["password_hash"] = hash_password(seed.password)
+
+            users.update_one(
+                {"email": seed.email},
+                {
+                    "$set": fields,
+                    "$setOnInsert": {
+                        "email": seed.email,
+                        "created_at": datetime.now(timezone.utc),
+                    },
+                },
+                upsert=True,
+            )
+
+        _seed_initialized = True
     except Exception:  # noqa: BLE001
-        pass
+        log.exception("auth bootstrap initialization failed")
+        if _enforced():
+            raise
 
 
 class RegisterIn(BaseModel):
@@ -120,7 +166,7 @@ class TokenOut(BaseModel):
     role: str
 
 
-def get_current_user(token: Annotated[Optional[str], Depends(oauth2_scheme)]):
+def get_current_user(token: Annotated[str | None, Depends(oauth2_scheme)]):
     if not token:
         return None
     # 1) Google session token (opaque) — look up in user_sessions.
@@ -233,31 +279,23 @@ class SessionIn(BaseModel):
 
 @router.post("/session", response_model=TokenOut)
 async def google_session(body: SessionIn):
-    """Exchange an Emergent OAuth session_id for a persistent session token.
-
-    The frontend passes the one-time `session_id` from the redirect. We verify
-    it with the configured session-data API (single consumption here — the
-    frontend never calls it directly), upsert the user by email, persist the
-    returned `session_token` (7-day TTL) and hand it back as the bearer token.
-    """
+    """Exchange an OAuth session_id for a persistent session token."""
     import httpx
 
     seed_admin()
     session_api = resolve_session_api()
     try:
-        async with httpx.AsyncClient(timeout=15) as c:
-            r = await c.get(
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.get(
                 session_api,
                 headers={"X-Session-ID": body.session_id},
             )
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(
-            status_code=502,
-            detail=f"Auth provider unreachable: {e}",
-        )
-    if r.status_code != 200:
+    except Exception:  # noqa: BLE001
+        log.exception("auth provider session exchange failed")
+        raise HTTPException(status_code=502, detail="Auth provider unreachable") from None
+    if response.status_code != 200:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
-    data = r.json()
+    data = response.json()
     email = (data.get("email") or "").lower()
     session_token = data.get("session_token")
     if not email or not session_token:
@@ -308,7 +346,7 @@ async def google_session(body: SessionIn):
 
 
 @router.post("/logout")
-def logout(token: Annotated[Optional[str], Depends(oauth2_scheme)]):
+def logout(token: Annotated[str | None, Depends(oauth2_scheme)]):
     """Revoke a Google session token (JWTs are stateless — client just drops)."""
     if token:
         try:
@@ -324,7 +362,7 @@ class SetRoleIn(BaseModel):
 
 
 @router.post("/set-role")
-def set_role(body: SetRoleIn, admin=Depends(require_role("admin"))):
+def set_role(body: SetRoleIn, _admin=Depends(require_role("admin"))):
     """Admin-only: promote/demote a user (e.g. a Google-provisioned viewer)."""
     res = _users().update_one(
         {"email": body.email.lower()},
@@ -336,7 +374,7 @@ def set_role(body: SetRoleIn, admin=Depends(require_role("admin"))):
 
 
 @router.get("/users")
-def list_users(admin=Depends(require_role("admin"))):
+def list_users(_admin=Depends(require_role("admin"))):
     """Admin-only: list users + roles for the role-management panel."""
     rows = list(_users().find({}, {"_id": 0, "password_hash": 0}).limit(200))
     return {"ok": True, "users": rows}
