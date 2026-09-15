@@ -18,6 +18,9 @@ import os
 from typing import Any, Dict, List, Optional, Protocol
 
 
+_MAX_PROVIDER_RESPONSE_BYTES = 2 * 1024 * 1024
+
+
 class LLMProvider(Protocol):
     """Interface all LLM backends must satisfy."""
 
@@ -62,6 +65,24 @@ def _user_message(prompt: str, context: Optional[List[str]]) -> str:
         "</conversation_history_json>\n\n"
         f"Current request:\n{prompt}"
     )
+
+
+def _read_provider_json(response: Any) -> Any:
+    """Read and decode a provider response under a hard byte budget.
+
+    Provider token limits are advisory. A remote endpoint may still send a much
+    larger body, so read at most one byte beyond the configured budget and fail
+    closed before allocating or decoding an unbounded response. Response content
+    is intentionally omitted from raised errors so provider payloads and secrets
+    do not leak through logs.
+    """
+    raw = response.read(_MAX_PROVIDER_RESPONSE_BYTES + 1)
+    if len(raw) > _MAX_PROVIDER_RESPONSE_BYTES:
+        raise RuntimeError("LLM provider response exceeded size limit")
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError, TypeError) as exc:
+        raise RuntimeError("LLM provider returned malformed JSON") from exc
 
 
 def _extract_openai_text(data: Any) -> str:
@@ -168,7 +189,7 @@ class OpenAIProvider:
             headers={"Authorization": f"Bearer {self._key}", "Content-Type": "application/json"},
         )
         with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read())
+            data = _read_provider_json(resp)
         return _extract_openai_text(data)
 
 
@@ -212,7 +233,7 @@ class AnthropicProvider:
             },
         )
         with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read())
+            data = _read_provider_json(resp)
         return _extract_anthropic_text(data)
 
 
