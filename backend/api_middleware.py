@@ -91,9 +91,9 @@ _TRUSTED_PROXY_NETWORKS = _parse_trusted_proxy_networks(
 )
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+_MAX_RETRY_AFTER_SECONDS = 86_400
 _MAX_XFF_HOPS = 32
 _MAX_XFF_CHARS = 2048
-_MAX_RETRY_AFTER_SECONDS = 86_400
 
 # Telemetry counters (in-memory) ───────────────────────────────────────
 _lat_ring: Deque[float] = deque(maxlen=1024)
@@ -198,8 +198,6 @@ def _canonical_ip(value: str) -> str | None:
     value = value.strip()
     if not value:
         return None
-    if len(value) >= 2 and value[0] == value[-1] == '"':
-        value = value[1:-1].strip()
     try:
         return str(ipaddress.ip_address(value))
     except ValueError:
