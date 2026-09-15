@@ -4,11 +4,13 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '*/5 * * * *'
+  push:
+    branches: [main]
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
 
-# One updater is enough. New schedule/PR events coalesce instead of killing the
-# active pass while it is evaluating a rapidly moving repository.
+# One updater is enough. New schedule/push/PR events coalesce instead of killing
+# the active pass while it is evaluating a rapidly moving repository.
 concurrency:
   group: branch-flow-${{ github.repository }}
   cancel-in-progress: false
