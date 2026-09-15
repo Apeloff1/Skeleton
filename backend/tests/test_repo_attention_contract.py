@@ -81,6 +81,15 @@ def test_rejects_loss_of_timeline_reconciliation() -> None:
     assert "sweep contract missing timeline activity clock" in _messages(source)
 
 
+def test_rejects_loss_of_commit_timestamp_extraction() -> None:
+    source = _replace_once(
+        _source(),
+        "$e.committer.date // $e.author.date //\n                     $e.updated_at",
+        "$e.updated_at",
+    )
+    assert "sweep contract missing commit timestamp extraction" in _messages(source)
+
+
 def test_rejects_loss_of_two_pass_race_convergence() -> None:
     source = _replace_once(_source(), "            for pass in 1 2; do", "            for pass in 1; do")
     assert "sweep contract missing two-pass convergence" in _messages(source)
