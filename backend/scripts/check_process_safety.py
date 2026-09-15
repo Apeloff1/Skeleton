@@ -344,7 +344,7 @@ def violations(path: Path) -> list[str]:
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     except (OSError, UnicodeError, SyntaxError) as exc:
-        return [f"{label}: parse failure: {exc}"]
+        return [f"{label}: parse failure: {type(exc).__name__}"]
 
     aliases = assignment_aliases(tree, import_aliases(tree))
     findings = star_import_violations(tree, label)
@@ -388,6 +388,7 @@ def violations(path: Path) -> list[str]:
 
 def main() -> int:
     findings: list[str] = []
+    scanned = 0
     try:
         paths = list(python_files())
     except ScanCoverageError as exc:
@@ -395,6 +396,7 @@ def main() -> int:
         return 2
 
     for path in paths:
+        scanned += 1
         findings.extend(violations(path))
     if findings:
         print("Unsafe process invocation patterns detected:", file=sys.stderr)
@@ -402,9 +404,10 @@ def main() -> int:
             print(f"  - {finding}", file=sys.stderr)
         return 1
     print(
-        "Process safety gate passed: no unsafe shell execution, statically obvious string-shaped subprocess commands, "
-        "opaque subprocess kwargs, dynamic process lookup, process-sensitive star imports, unsafe process partials, "
-        "unsafe process namespace get()/__getattribute__(), os.system(), or os.popen() calls found."
+        f"Process safety gate passed across {scanned} backend Python files: no unsafe shell execution, "
+        "statically obvious string-shaped subprocess commands, opaque subprocess kwargs, dynamic process lookup, "
+        "process-sensitive star imports, unsafe process partials, unsafe process namespace get()/__getattribute__(), "
+        "os.system(), or os.popen() calls found."
     )
     return 0
 
