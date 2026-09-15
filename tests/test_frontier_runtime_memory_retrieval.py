@@ -11,6 +11,9 @@ from skeleton.frontier.contracts import stable_content_digest
 from skeleton.frontier.memory import InMemoryStore
 
 
+_SECRET_DETAIL = "api-key=do-not-persist"
+
+
 class _RecordingAgent:
     name = "memory-agent"
     capabilities = {"research"}
@@ -26,6 +29,24 @@ class _RecordingAgent:
             "task": task,
             "retrieved": len((context or {}).get("retrieved_context", [])),
         }
+
+
+class _ExplodingAgent(_RecordingAgent):
+    async def run(self, task, context=None):
+        self.calls += 1
+        self.context = context
+        raise RuntimeError(_SECRET_DETAIL)
+
+
+class _ExplodingMemory:
+    async def put(self, item):
+        raise NotImplementedError
+
+    async def search(self, query, *, limit=10, filters=None):
+        raise RuntimeError(_SECRET_DETAIL)
+
+    async def delete(self, item_id):
+        raise NotImplementedError
 
 
 def test_runtime_uses_memory_contract_and_preserves_source_provenance() -> None:
@@ -123,8 +144,7 @@ def test_runtime_retrieval_fails_closed_without_source_provenance() -> None:
         )
 
         assert not result.succeeded
-        assert result.error is not None
-        assert "source_repository" in result.error
+        assert result.error == "AgentFailure: agent execution failed with ValueError"
         assert agent.calls == 0
         assert result.provenance is not None
         assert result.provenance.metadata["retrieval_request"]["query_sha256"] == stable_content_digest("alpha")
@@ -183,8 +203,46 @@ def test_runtime_returns_failure_when_retrieval_is_requested_without_memory() ->
         )
 
         assert not result.succeeded
-        assert result.error is not None
-        assert "configured canonical MemoryContract" in result.error
+        assert result.error == "AgentFailure: agent execution failed with RuntimeError"
         assert agent.calls == 0
+
+    asyncio.run(scenario())
+
+
+def test_agent_exception_message_is_not_exposed_or_persisted() -> None:
+    async def scenario() -> None:
+        agent = _ExplodingAgent()
+        runtime = AgentRuntime()
+        runtime.register(agent)
+
+        result = await runtime.execute("memory-agent", "explode")
+
+        assert not result.succeeded
+        assert result.error == "AgentFailure: agent execution failed with RuntimeError"
+        assert _SECRET_DETAIL not in result.error
+        assert result.provenance is not None
+        assert _SECRET_DETAIL not in str(result.provenance.as_dict())
+
+    asyncio.run(scenario())
+
+
+def test_memory_backend_exception_message_is_not_exposed_or_persisted() -> None:
+    async def scenario() -> None:
+        agent = _RecordingAgent()
+        runtime = AgentRuntime(memory=_ExplodingMemory())
+        runtime.register(agent)
+
+        result = await runtime.execute(
+            "memory-agent",
+            "retrieve",
+            memory_query="alpha",
+        )
+
+        assert not result.succeeded
+        assert result.error == "AgentFailure: agent execution failed with RuntimeError"
+        assert _SECRET_DETAIL not in result.error
+        assert agent.calls == 0
+        assert result.provenance is not None
+        assert _SECRET_DETAIL not in str(result.provenance.as_dict())
 
     asyncio.run(scenario())
