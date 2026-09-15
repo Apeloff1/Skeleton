@@ -17,6 +17,7 @@ on:
       - "scripts/check_architecture_boundaries.py"
       - "scripts/check_provider_runtime_boundary.py"
       - "scripts/check_quality_gate_parity.py"
+      - "scripts/check_repository_python_sast.py"
       - "scripts/quality-gates.sh"
       - "tests/test_architecture_boundaries.py"
       - "tests/test_provider_runtime_boundary.py"
@@ -34,6 +35,7 @@ on:
       - "scripts/check_architecture_boundaries.py"
       - "scripts/check_provider_runtime_boundary.py"
       - "scripts/check_quality_gate_parity.py"
+      - "scripts/check_repository_python_sast.py"
       - "scripts/quality-gates.sh"
       - "tests/test_architecture_boundaries.py"
       - "tests/test_provider_runtime_boundary.py"
@@ -107,6 +109,10 @@ jobs:
       - name: High-confidence Python and JavaScript SAST gate
         run: python scripts/check_sast_security.py
 
+      - name: Core/tooling Python high-confidence SAST gate
+        working-directory: .
+        run: python scripts/check_repository_python_sast.py
+
       - name: JavaScript child_process alias safety gate
         run: python scripts/check_js_process_alias_safety.py
 
@@ -136,6 +142,7 @@ jobs:
           tests/test_process_safety_helper_aliases.py
           tests/test_deserialization_safety_gate.py
           tests/test_sast_security_gate.py
+          tests/test_repository_python_sast_scope.py
           tests/test_js_process_alias_safety.py
           tests/test_workflow_security_gate.py
           tests/test_workflow_flow_style_security.py
