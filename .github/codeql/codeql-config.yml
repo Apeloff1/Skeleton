@@ -1,5 +1,11 @@
 name: Skeleton CodeQL
 
+# Run the default CodeQL security suite plus the extended security queries.
+# The extended suite increases coverage for lower-confidence but security-relevant
+# dataflow patterns without opting into the much noisier quality-only suite.
+queries:
+  - uses: security-extended
+
 # Frozen branch snapshots are archival evidence, not supported production,
 # build, deploy, or dependency-management surfaces. Exclude only the canonical
 # archival tree so future similarly named paths remain scanned by default.
