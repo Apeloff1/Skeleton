@@ -192,3 +192,63 @@ def test_extreme_positive_rate_cannot_crash_retry_after_path() -> None:
     assert response.status_code == 429
     assert response.headers["retry-after"] == "86400"
     assert payload["retry_after_seconds"] == 86_400
+
+
+def test_trusted_proxy_rejects_quoted_xff_tokens(monkeypatch) -> None:
+    monkeypatch.setattr(
+        api_middleware,
+        "_TRUSTED_PROXY_NETWORKS",
+        (ipaddress.ip_network("10.0.0.0/8"),),
+    )
+    request = _request("10.0.0.5", xff='"198.51.100.20", 10.0.0.6')
+
+    assert api_middleware._client_ip(request) == "10.0.0.5"
+
+
+def test_xff_value_has_hard_character_bound_before_ip_parsing(monkeypatch) -> None:
+    monkeypatch.setattr(
+        api_middleware,
+        "_TRUSTED_PROXY_NETWORKS",
+        (ipaddress.ip_network("10.0.0.0/8"),),
+    )
+    original = api_middleware._canonical_ip
+
+    def guarded_canonical_ip(value: str):
+        if len(value) > 1000:
+            raise AssertionError("oversized forwarded value reached IP parsing")
+        return original(value)
+
+    monkeypatch.setattr(api_middleware, "_canonical_ip", guarded_canonical_ip)
+    oversized = "1" * (api_middleware._MAX_XFF_CHARS + 1)
+
+    assert api_middleware._client_ip(_request("10.0.0.5", xff=oversized)) == "10.0.0.5"
+
+
+def test_xff_chain_has_hard_hop_bound(monkeypatch) -> None:
+    monkeypatch.setattr(
+        api_middleware,
+        "_TRUSTED_PROXY_NETWORKS",
+        (ipaddress.ip_network("10.0.0.0/8"),),
+    )
+    within_bound = ",".join(f"198.51.100.{index}" for index in range(1, 33))
+    over_bound = within_bound + ",198.51.100.33"
+
+    assert api_middleware._client_ip(_request("10.0.0.5", xff=within_bound)) == "198.51.100.32"
+    assert api_middleware._client_ip(_request("10.0.0.5", xff=over_bound)) == "10.0.0.5"
+
+
+def test_telemetry_reports_proxy_count_without_disclosing_networks(monkeypatch) -> None:
+    monkeypatch.setattr(
+        api_middleware,
+        "_TRUSTED_PROXY_NETWORKS",
+        (
+            ipaddress.ip_network("10.0.0.0/8"),
+            ipaddress.ip_network("2001:db8::/32"),
+        ),
+    )
+    stats = api_middleware.get_stats()["rate_limit"]
+
+    assert stats["trusted_proxy_count"] == 2
+    assert "trusted_proxy_cidrs" not in stats
+    assert "10.0.0.0/8" not in repr(stats)
+    assert "2001:db8::/32" not in repr(stats)
