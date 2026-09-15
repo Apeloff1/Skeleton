@@ -86,5 +86,20 @@
     "typescript": "~5.9.3"
   },
   "private": true,
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
+  "resolutions": {
+    "**/minimatch/brace-expansion": "1.1.18",
+    "shell-quote": "1.10.0",
+    "tar": "7.5.21",
+    "undici": "6.28.0",
+    "js-yaml": "3.15.2",
+    "postcss": "8.5.25",
+    "react-native/ws": "6.2.4",
+    "@react-native/dev-middleware/ws": "6.2.4",
+    "nanoid": "3.3.18",
+    "browserslist": "4.28.9",
+    "@expo/plist/@xmldom/xmldom": "0.8.15",
+    "speech-rule-engine/@xmldom/xmldom": "0.9.12",
+    "isomorphic-fetch/node-fetch": "2.7.0"
+  }
 }
