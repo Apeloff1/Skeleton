@@ -185,8 +185,9 @@ def test_random_island_generation_injects_rng_clock_and_identity():
     assert first["discovered_by"] == "user-7"
     assert first["discovered_at"] == "2026-09-15T09:45:00+00:00"
     assert first["rare_fish_chance"] == pytest.approx(0.15)
-    assert 300 <= first["position"]["x"] <= 400
-    assert 200 <= first["position"]["y"] <= 300
+    assert 300 <= first["position"]["x"] < 400
+    assert 200 <= first["position"]["y"] < 300
+    assert region.bounds.contains((first["position"]["x"], first["position"]["y"]))
     assert 1 <= len(first["features"]) <= 3
     assert 1 <= len(first["fish_types"]) <= 3
 
@@ -208,4 +209,17 @@ def test_random_island_generation_rejects_ambiguous_clock_and_identity():
             rng=random.Random(7),
             id_factory=lambda: "island-7",
             now=lambda: datetime(2026, 9, 15, 9, 45),
+        )
+
+
+def test_random_island_generation_rejects_zero_area_regions():
+    zero_width = region_from_record(
+        _record(bounds={"x": 0, "y": 0, "width": 0, "height": 100})
+    )
+    with pytest.raises(ValueError, match="positive-area bounds"):
+        generate_random_island(
+            zero_width,
+            "user-7",
+            rng=random.Random(7),
+            id_factory=lambda: "island-7",
         )
