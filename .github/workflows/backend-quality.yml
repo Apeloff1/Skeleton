@@ -153,6 +153,7 @@ jobs:
           tests/test_process_safety_helper_aliases.py
           tests/test_deserialization_safety_gate.py
           tests/test_dynamic_import_safety.py
+          tests/test_scanner_nonempty_contract.py
           tests/test_archive_extraction_safety.py
           tests/test_security_scan_surface.py
           tests/test_live_scraper_network_security.py
