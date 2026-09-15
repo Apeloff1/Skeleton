@@ -10,6 +10,7 @@ command strings are rejected in favor of explicit argument vectors.
 from __future__ import annotations
 
 import ast
+import os
 from pathlib import Path
 import sys
 from typing import Iterable
@@ -27,11 +28,26 @@ UNSAFE_CALLS = {
 }
 
 
+def _scandir(path: Path):
+    """Indirection for explicit, testable, non-symlink-following traversal."""
+    return os.scandir(path)
+
+
+def _walk_python_files(root: Path) -> Iterable[Path]:
+    """Walk the backend root while allowing traversal errors to propagate."""
+    with _scandir(root) as entries:
+        for entry in entries:
+            path = Path(entry.path)
+            if entry.is_dir(follow_symlinks=False):
+                if entry.name in SKIP_DIRS:
+                    continue
+                yield from _walk_python_files(path)
+            elif entry.is_file(follow_symlinks=False) and entry.name.endswith(".py"):
+                yield path
+
+
 def python_files() -> Iterable[Path]:
-    for path in ROOT.rglob("*.py"):
-        if any(part in SKIP_DIRS for part in path.parts):
-            continue
-        yield path
+    yield from _walk_python_files(ROOT)
 
 
 def display_path(path: Path) -> Path:
@@ -134,7 +150,9 @@ def namespace_mapping_owner(node: ast.AST, aliases: dict[str, str]) -> str | Non
         and not node.keywords
     ):
         owner = canonical_name(node.args[0], aliases)
-        return owner if owner in TRACKED_MODULES else None
+        if owner in TRACKED_MODULES:
+            return owner
+        return None
     return None
 
 
@@ -307,7 +325,7 @@ def violations(path: Path) -> list[str]:
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     except (OSError, UnicodeError, SyntaxError) as exc:
-        return [f"{label}: parse failure: {exc}"]
+        return [f"{label}: parse failure ({type(exc).__name__})"]
 
     aliases = assignment_aliases(tree, import_aliases(tree))
     findings = star_import_violations(tree, label)
@@ -352,9 +370,14 @@ def violations(path: Path) -> list[str]:
 def main() -> int:
     findings: list[str] = []
     scanned = 0
-    for path in python_files():
-        scanned += 1
-        findings.extend(violations(path))
+    try:
+        for path in python_files():
+            scanned += 1
+            findings.extend(violations(path))
+    except OSError as exc:
+        findings.append(
+            f"scanner coverage failure: backend traversal failed ({type(exc).__name__})"
+        )
     if scanned == 0:
         findings.append("scanner coverage failure: no backend Python files were scanned")
     if findings:
