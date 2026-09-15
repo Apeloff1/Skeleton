@@ -9,7 +9,9 @@ on:
       - 'backend/server.py'
       - 'scripts/check_provider_runtime_boundary.py'
       - 'tests/test_provider_runtime_boundary.py'
+      - 'tests/test_frontier_runtime_memory_retrieval.py'
       - 'docs/PROVIDER_RUNTIME.md'
+      - 'docs/MEMORY_RETRIEVAL.md'
       - 'pyproject.toml'
       - '.github/workflows/frontier-contracts.yml'
   push:
@@ -21,7 +23,9 @@ on:
       - 'backend/server.py'
       - 'scripts/check_provider_runtime_boundary.py'
       - 'tests/test_provider_runtime_boundary.py'
+      - 'tests/test_frontier_runtime_memory_retrieval.py'
       - 'docs/PROVIDER_RUNTIME.md'
+      - 'docs/MEMORY_RETRIEVAL.md'
       - 'pyproject.toml'
       - '.github/workflows/frontier-contracts.yml'
 
@@ -56,4 +60,7 @@ jobs:
       - name: Run frontier contract tests
         env:
           PYTHONPATH: .
-        run: python -m pytest -q skeleton/testing/test_frontier_*.py
+        run: >-
+          python -m pytest -q
+          skeleton/testing/test_frontier_*.py
+          tests/test_frontier_runtime_memory_retrieval.py
