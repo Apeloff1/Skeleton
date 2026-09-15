@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import importlib.util
 import json
 import tempfile
@@ -24,14 +23,14 @@ class PackageLifecyclePolicyTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tempdir.cleanup()
 
-    def _write_scripts(self, scripts: dict[str, str]) -> None:
+    def _write_scripts(self, scripts: dict[str, object]) -> None:
         payload = {"name": "frontend", "scripts": scripts}
         (self.root / "frontend" / "package.json").write_text(
             json.dumps(payload), encoding="utf-8"
         )
 
     def _violations(self) -> list[str]:
-        with contextlib.chdir(self.root):
+        with mock.patch.object(lifecycle, "REPO_ROOT", self.root):
             with mock.patch.object(
                 lifecycle,
                 "tracked_package_files",
@@ -54,6 +53,16 @@ class PackageLifecyclePolicyTests(unittest.TestCase):
         self._write_scripts({"preinstall": "node ./scripts/bootstrap.js"})
         findings = self._violations()
         self.assertTrue(any("preinstall" in finding for finding in findings))
+
+    def test_rejects_non_string_lifecycle_command(self) -> None:
+        self._write_scripts({"postinstall": ["node", "script.js"]})
+        findings = self._violations()
+        self.assertTrue(any("must be a string" in finding for finding in findings))
+
+    def test_rejects_malformed_manifest_cleanly(self) -> None:
+        (self.root / "frontend" / "package.json").write_text("{broken", encoding="utf-8")
+        findings = self._violations()
+        self.assertTrue(any("cannot safely parse manifest" in finding for finding in findings))
 
 
 if __name__ == "__main__":
