@@ -9,7 +9,7 @@ on:
 
 concurrency:
   group: branch-clean-${{ github.repository }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions: {}
 
