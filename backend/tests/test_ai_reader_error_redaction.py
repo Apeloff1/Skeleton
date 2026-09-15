@@ -7,6 +7,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 AI_READER = REPO_ROOT / "backend" / "routes" / "ai_reader.py"
 AI_PIPELINE = REPO_ROOT / "backend" / "routes" / "ai_pipeline.py"
+AI_DEBUGGER = REPO_ROOT / "backend" / "routes" / "ai_debugger.py"
 
 
 def _is_exception_handler(handler: ast.ExceptHandler) -> bool:
@@ -85,3 +86,34 @@ def test_ai_pipeline_image_helpers_do_not_forward_provider_error_payloads() -> N
     assert 'result.get("error"' not in source
     assert "result.get('error'" not in source
     assert source.count('"error": "image generation failed"') >= 3
+
+
+def test_ai_debugger_broad_failures_cannot_reach_http_error_detail() -> None:
+    leaks = _broad_failure_http_leaks(AI_DEBUGGER)
+    assert leaks == [], f"AI Debugger exposes caught exception data in HTTP responses at lines {leaks}"
+
+
+def test_ai_debugger_does_not_stringify_caught_failures() -> None:
+    source = AI_DEBUGGER.read_text(encoding="utf-8")
+    assert "detail=str(" not in source
+    assert "str(exc)" not in source
+    assert "str(e)" not in source
+    assert "repr(exc)" not in source
+    assert "repr(e)" not in source
+
+
+def test_ai_debugger_uses_stable_generic_public_failures() -> None:
+    source = AI_DEBUGGER.read_text(encoding="utf-8")
+    assert 'detail="AI debugger request failed"' in source
+    assert source.count("raise _debugger_http_error(") == 7
+    assert source.count(" from None") >= 7
+
+
+def test_ai_debugger_preserves_existing_http_exceptions() -> None:
+    source = AI_DEBUGGER.read_text(encoding="utf-8")
+    assert source.count("except HTTPException:\n        raise") == 7
+
+
+def test_ai_debugger_logs_exception_class_without_payload() -> None:
+    source = AI_DEBUGGER.read_text(encoding="utf-8")
+    assert 'log.warning("AI debugger %s failed: %s", operation, type(exc).__name__)' in source
