@@ -35,7 +35,9 @@ def test_gate_preserves_canonical_middleware_stack() -> None:
 
 
 def test_diplomat_resolves_explicit_library_without_loading(tmp_path: Path) -> None:
-    library = tmp_path / diplomat._library_names()[0]
+    # Explicit resolution is extension-agnostic: loading is deliberately a
+    # separate step so discovery can be tested without a platform native build.
+    library = tmp_path / "gf-ffi-test-library"
     library.write_bytes(b"not-a-real-library")
     assert diplomat.resolve_library_path(library) == library.resolve()
 
@@ -52,6 +54,10 @@ def test_diplomat_missing_default_is_nonfatal(monkeypatch: pytest.MonkeyPatch) -
 def test_open_default_fails_cleanly_when_resolution_is_absent(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(diplomat, "resolve_library_path", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        diplomat,
+        "resolve_library_path",
+        lambda *_args, **_kwargs: None,
+    )
     with pytest.raises(diplomat.NativeUnavailable, match="gf-ffi library not found"):
         diplomat.Zaibatsu.open_default()
