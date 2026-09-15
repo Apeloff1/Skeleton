@@ -97,7 +97,7 @@ def test_api_status_uses_shared_contract_without_seal(monkeypatch):
 
 
 @pytest.mark.parametrize("command", ["run", "tool", "memory", "admin"])
-def test_api_auth_required_commands_cross_hmac_seal_boundary(monkeypatch, command):
+def test_api_auth_required_commands_reject_missing_seal(monkeypatch, command):
     observed = []
 
     def fake_require_seal(value):
@@ -115,7 +115,18 @@ def test_api_auth_required_commands_cross_hmac_seal_boundary(monkeypatch, comman
     assert exc_info.value.status_code == 401
     assert observed == [None]
 
-    observed.clear()
+
+@pytest.mark.parametrize("command", ["run", "tool", "memory", "admin"])
+def test_api_auth_required_commands_accept_valid_seal_before_dispatch(monkeypatch, command):
+    observed = []
+
+    def fake_require_seal(value):
+        observed.append(value)
+        if value != "valid-seal":
+            raise HTTPException(status_code=401, detail="invalid seal")
+        return "attester"
+
+    monkeypatch.setattr(command_routes, "require_seal", fake_require_seal)
     response = asyncio.run(
         command_routes.execute_command(
             command,
@@ -124,7 +135,12 @@ def test_api_auth_required_commands_cross_hmac_seal_boundary(monkeypatch, comman
             x_gf_seal="valid-seal",
         )
     )
+
     assert observed == ["valid-seal"]
-    assert response.status_code == 503
-    payload = json.loads(response.body)
-    assert payload["error"]["code"] == "unavailable"
+    if command == "admin":
+        assert response["ok"] is True
+        assert response["data"]["initialized"] is False
+    else:
+        assert response.status_code == 503
+        payload = json.loads(response.body)
+        assert payload["error"]["code"] == "unavailable"
