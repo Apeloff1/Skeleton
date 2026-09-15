@@ -1,5 +1,10 @@
 """
-Quantum Compiler Suite Routes
+Legacy compiler-analysis helpers.
+
+The canonical public compiler API is owned by ``routes.compiler_tools``. This
+router remains importable for older internal consumers, but its endpoints live
+under a hidden legacy prefix so registration order cannot shadow the guarded
+compiler-tool implementation.
 """
 
 from fastapi import APIRouter
@@ -9,7 +14,7 @@ import ast
 import hashlib
 from datetime import datetime
 
-router = APIRouter(prefix="/compiler", tags=["Compiler"])
+router = APIRouter(prefix="/_legacy/compiler", tags=["Compiler Legacy"], include_in_schema=False)
 
 # Sanitizers available
 SANITIZERS = {
@@ -128,11 +133,10 @@ def run_sanitizers(code: str, sanitizer_ids: List[str]) -> List[Dict[str, Any]]:
 
 @router.post("/compile")
 async def compile_code(request: CompileRequest):
-    """Compile and analyze code with sanitizers and optimizers"""
+    """Legacy compile-like analysis retained for internal compatibility."""
     analysis = analyze_python_code(request.code)
     sanitizer_results = run_sanitizers(request.code, request.sanitizers)
     
-    # Generate performance suggestions
     suggestions = []
     if analysis.get("complexity", 0) > 10:
         suggestions.append("Consider breaking down complex functions")
@@ -159,7 +163,7 @@ async def compile_code(request: CompileRequest):
 
 @router.get("/sanitizers")
 async def get_sanitizers():
-    """Get available sanitizers"""
+    """Get legacy sanitizer metadata."""
     return {
         "sanitizers": list(SANITIZERS.values()),
         "total": len(SANITIZERS)
@@ -168,7 +172,7 @@ async def get_sanitizers():
 
 @router.get("/optimizers")
 async def get_optimizers():
-    """Get available optimizers"""
+    """Get legacy optimizer metadata."""
     return {
         "optimizers": list(OPTIMIZERS.values()),
         "total": len(OPTIMIZERS)
@@ -177,13 +181,13 @@ async def get_optimizers():
 
 @router.post("/analyze-structure")
 async def analyze_structure(request: CompileRequest):
-    """Deep structural analysis"""
+    """Legacy structural analysis helper."""
     return analyze_python_code(request.code)
 
 
 @router.post("/generate-ir")
 async def generate_ir(request: CompileRequest):
-    """Generate intermediate representation"""
+    """Generate the legacy synthetic intermediate representation summary."""
     return {
         "ir_type": "SSA",
         "blocks": len(request.code.splitlines()) // 5 + 1,
@@ -193,7 +197,7 @@ async def generate_ir(request: CompileRequest):
 
 @router.post("/generate-assembly")
 async def generate_assembly(request: CompileRequest):
-    """Generate assembly representation"""
+    """Generate the legacy synthetic assembly summary."""
     lines = request.code.splitlines()
     return {
         "arch": "x86_64",
