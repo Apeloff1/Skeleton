@@ -1,4 +1,4 @@
-version: 10
+version: 11
 canonical_repository: Apeloff1/Skeleton
 strategy: selective-promotion
 rules:
@@ -43,22 +43,24 @@ sources:
     destinations:
       web: cockpit/web
   - repository: Apeloff1/Lorebuffa
-    capabilities: [lore, world-building, narrative, npc-catalog, world-map, crew, stores, quests, reputation]
+    capabilities: [lore, world-building, narrative, npc-catalog, world-map, crew, stores, quests, reputation, achievements, daily-rewards]
     disposition: adapt-unique-only
     destinations:
       domain_pack: domain-packs/lorebuffa
       npc_adapter: skeleton/frontier/npc_adapters.py
       world: skeleton/frontier/world.py
       ship_policy: skeleton/frontier/ship.py
+      achievements: skeleton/frontier/achievements.py
   - repository: Apeloff1/Openworld
-    capabilities: [world, exploration, procedural-content, npc-catalog, world-map, crew, stores, quests, reputation]
+    capabilities: [world, exploration, procedural-content, npc-catalog, world-map, crew, stores, quests, reputation, achievements, daily-rewards]
     disposition: characterize-and-deduplicate
     destinations:
       world: skeleton/frontier/world.py
       npc_adapter: skeleton/frontier/npc_adapters.py
       ship_policy: skeleton/frontier/ship.py
+      achievements: skeleton/frontier/achievements.py
 integration_wave_2:
-  status: acceptance-increment-landed
+  status: acceptance-increment-landed-and-hardened
   increments:
     - surface: memory
       primary_source: Apeloff1/Prood
@@ -71,11 +73,26 @@ integration_wave_2:
       decision: adapt-once
       target: skeleton/frontier/memory_adapters.py
       backend: skeleton.frontier.memory_adapters.SQLiteCollection
+      promoted_semantics:
+        - collection-query-filter-upsert-delete
+        - reference-persistent-behavioral-parity
+        - finite-strict-json-metadata-domain
+        - strict-json-filter-parity
+        - fail-closed-persisted-metadata-decoding
+        - duplicate-json-key-rejection
+        - provider-result-revalidation
+        - canonical-persistent-row-identity
+        - exact-id-corruption-repair-delete
+        - filtered-delete-no-partial-mutation-on-corruption
       evidence:
         - skeleton/testing/test_frontier_memory_backends.py
         - skeleton/testing/test_frontier_memory_benchmark.py
+        - skeleton/testing/test_frontier_memory_json_boundary.py
+        - skeleton/testing/test_frontier_memory_corruption.py
+        - skeleton/testing/test_frontier_memory_filter_boundary.py
+        - skeleton/testing/test_frontier_memory_row_identity.py
         - scripts/benchmark_frontier_memory.py
-      rationale: preserve collection/query/filter/relevance semantics without ChromaDB dependency
+      rationale: preserve collection/query/filter/relevance semantics without ChromaDB dependency while enforcing one strict JSON and corruption boundary across reference, SQLite and external collection adapters
     - surface: npc-generation
       primary_source: Apeloff1/Prood
       source_path: backend/routes/npc_pipeline.py
@@ -114,17 +131,22 @@ integration_wave_2:
       target: skeleton/frontier/agent_runtime.py
       evidence:
         - skeleton/testing/test_frontier_runtime.py
+        - skeleton/testing/test_frontier_runtime_input_boundary.py
       promoted_semantics:
         - duplicate-suppression
         - fail-closed-key-reuse
         - concurrent-request-coalescing
         - bounded-in-process-retention
         - backpressure-when-all-retained-executions-are-in-flight
+        - capability-container-type-validation
+        - context-mapping-validation-before-side-effects
+        - canonical-agent-task-source-boundary
+        - source-provenance-validation-before-idempotency-reservation
       deferred:
         - mongodb-duplicate-key-guard
         - mongodb-client
         - background-reconciler
-      rationale: preserve duplicate-suppression behavior at the runtime boundary without MongoDB coupling
+      rationale: preserve duplicate-suppression behavior at the runtime boundary without MongoDB coupling and reject malformed execution identity inputs before agent side effects
     - surface: capability-boundary
       primary_source: Apeloff1/hyperforge-cockpit-sota
       source_path: src/lib/preview-host-bridge.ts
@@ -189,6 +211,9 @@ integration_wave_4:
     - strict-finite-json-payload-boundary
     - fail-closed-corrupt-row-decoding
     - corrupt-rows-remain-unacknowledged
+    - canonical-uuidv4-row-token-validation
+    - duplicate-json-object-key-rejection
+    - canonical-topic-row-validation
   rejected_from-kernel:
     - mongodb-client
     - mongodb-document-types
@@ -200,10 +225,11 @@ integration_wave_4:
     - skeleton/testing/test_frontier_event_journal.py
     - skeleton/testing/test_frontier_event_json_boundary.py
     - skeleton/testing/test_frontier_event_corruption.py
+    - skeleton/testing/test_frontier_event_row_identity.py
     - skeleton/testing/test_frontier_event_benchmark.py
     - skeleton/testing/test_frontier_world_memory_runtime.py
     - scripts/benchmark_frontier_events.py
-  rationale: preserve the outbox safety invariant on the canonical EventBus using a provider-neutral journal boundary and stdlib SQLite backend; malformed persisted rows fail closed without acknowledgement and benchmark timing is observational only
+  rationale: preserve the outbox safety invariant on the canonical EventBus using a provider-neutral journal boundary and stdlib SQLite backend; malformed or ambiguous persisted rows fail closed without acknowledgement and benchmark timing is observational only
 integration_wave_5:
   status: pure-policy-promoted
   surface: crew-and-store-policy
@@ -255,6 +281,13 @@ integration_wave_6:
     - provenance-artifact-consistency
     - provenance-idempotency-consistency
     - repeat-delivery-memory-upsert
+    - producer-artifact-revalidation
+    - producer-operation-state-binding
+    - execution-time-monotonicity
+    - occurred-at-finished-at-binding
+    - provenance-task-digest-binding
+    - provenance-agent-binding
+    - success-error-state-consistency
   rejected_from-kernel:
     - second-runtime
     - second-event-bus
@@ -263,7 +296,8 @@ integration_wave_6:
   evidence:
     - skeleton/testing/test_frontier_runtime_event_recovery.py
     - skeleton/testing/test_frontier_runtime_event_integrity.py
-  rationale: bridge canonical runtime, event and memory contracts without merging their responsibilities; consumers verify identity and provenance before using the stable execution digest as an idempotent memory key
+    - skeleton/testing/test_frontier_runtime_input_boundary.py
+  rationale: bridge canonical runtime, event and memory contracts without merging their responsibilities; producers and consumers verify identity, temporal ordering and provenance before using the stable execution digest as an idempotent memory key
 integration_wave_7:
   status: shared-lineage-policy-promoted
   surface: quest-reputation-captains-log
@@ -334,6 +368,47 @@ integration_wave_7:
     - motor-mongodb-client
     - wallet-or-user-document-mutations
   rationale: the three source blobs are identical across Lorebuffa and Openworld, so each portable policy is promoted once and composed through existing frontier memory/event contracts
+integration_wave_8:
+  status: shared-lineage-policy-promoted
+  surface: achievement-progression-daily-rewards
+  primary_source: Apeloff1/Lorebuffa
+  source_path: backend/achievement_routes.py
+  source_blob: c6410bfd3bbde13454b2641a7982838893d970d9
+  equivalent_sources:
+    - repository: Apeloff1/Openworld
+      source_path: backend/achievement_routes.py
+      source_blob: c6410bfd3bbde13454b2641a7982838893d970d9
+  decision: promote-once-pure-policy-and-compose-existing-boundaries
+  targets:
+    - skeleton/frontier/achievements.py
+    - skeleton/frontier/achievement_adapters.py
+  promoted_capabilities:
+    - achievement-record-normalization
+    - additive-and-max-stat-progress
+    - stat-and-external-signal-qualification
+    - ordered-idempotent-unlock-planning
+    - one-shot-claim-planning
+    - mutation-free-reward-planning
+    - hidden-achievement-projection
+    - completion-summary
+    - daily-streak-reset-and-cycle-policy
+    - same-day-claim-rejection
+    - canonical-achievement-event-adapter
+    - stable-achievement-memory-identity
+    - crash-reopen-event-to-memory-recovery
+    - repeat-delivery-memory-upsert
+  rejected_from-kernel:
+    - source-achievement-catalog
+    - fastapi-routes
+    - motor-mongodb-client
+    - wallet-mutation
+    - inventory-mutation
+    - guild-database-lookups
+    - breeding-database-lookups
+  evidence:
+    - skeleton/testing/test_frontier_achievement_policy.py
+    - skeleton/testing/test_frontier_achievement_event_memory.py
+  rationale: Lorebuffa and Openworld carry one identical achievement implementation; promote its portable qualification, claim and daily-streak semantics once, inject external signals instead of database access, and compose transitions through canonical event/memory contracts
 source_dedup_inventory:
   - capability: quests
     sources:
@@ -365,6 +440,16 @@ source_dedup_inventory:
         blob: 5ed7efd452e7f2bb4ef7024185d66d65f1bd89d8
     decision: promoted-once-shared-lineage
     target: skeleton/frontier/logbook.py
+  - capability: achievements
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/achievement_routes.py
+        blob: c6410bfd3bbde13454b2641a7982838893d970d9
+      - repository: Apeloff1/Openworld
+        path: backend/achievement_routes.py
+        blob: c6410bfd3bbde13454b2641a7982838893d970d9
+    decision: promoted-once-shared-lineage
+    target: skeleton/frontier/achievements.py
 promotion_gates:
   - contract-tests
   - integration-tests
