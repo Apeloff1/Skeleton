@@ -221,7 +221,7 @@ class SQLiteEventJournal:
             )
         except (json.JSONDecodeError, TypeError, ValueError) as exc:
             raise EventJournalCorruptionError(
-                "event journal payload is not valid unambiguous strict JSON"
+                "event journal payload is not valid strict JSON or contains duplicate object keys"
             ) from exc
         if not isinstance(payload, dict):
             raise EventJournalCorruptionError(
