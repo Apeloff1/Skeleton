@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from skeleton.frontier.agent_runtime import AgentRuntime
@@ -18,6 +20,35 @@ class BrokenAgent:
 
     async def run(self, task, context=None):
         raise RuntimeError("boom")
+
+
+class CountingAgent:
+    name = "counting"
+    capabilities = {"text.generate"}
+
+    def __init__(self):
+        self.calls = 0
+
+    async def run(self, task, context=None):
+        self.calls += 1
+        await asyncio.sleep(0)
+        return {"task": task, "call": self.calls, "context": dict(context or {})}
+
+
+class BlockingAgent:
+    name = "blocking"
+    capabilities = {"text.generate"}
+
+    def __init__(self):
+        self.calls = 0
+        self.started = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def run(self, task, context=None):
+        self.calls += 1
+        self.started.set()
+        await self.release.wait()
+        return {"task": task, "call": self.calls}
 
 
 @pytest.mark.asyncio
@@ -48,6 +79,73 @@ async def test_runtime_contains_failures_as_results():
     result = await runtime.execute("broken", "fail safely")
     assert not result.succeeded
     assert "RuntimeError" in result.error
+
+
+@pytest.mark.asyncio
+async def test_runtime_idempotency_replays_completed_result_without_rerun():
+    runtime = AgentRuntime()
+    agent = CountingAgent()
+    runtime.register(agent)
+
+    first = await runtime.execute(
+        "counting",
+        "build once",
+        context={"world": "frontier"},
+        idempotency_key="job-42",
+    )
+    second = await runtime.execute(
+        "counting",
+        "build once",
+        context={"world": "frontier"},
+        idempotency_key="job-42",
+    )
+
+    assert first is second
+    assert agent.calls == 1
+    assert first.provenance is not None
+    assert "idempotency_key_sha256" in first.provenance.metadata
+
+
+@pytest.mark.asyncio
+async def test_runtime_idempotency_coalesces_concurrent_requests():
+    runtime = AgentRuntime()
+    agent = BlockingAgent()
+    runtime.register(agent)
+
+    first_task = asyncio.create_task(
+        runtime.execute("blocking", "shared work", idempotency_key="shared-key")
+    )
+    await agent.started.wait()
+    second_task = asyncio.create_task(
+        runtime.execute("blocking", "shared work", idempotency_key="shared-key")
+    )
+    await asyncio.sleep(0)
+
+    assert agent.calls == 1
+    agent.release.set()
+    first, second = await asyncio.gather(first_task, second_task)
+    assert first is second
+    assert agent.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_runtime_idempotency_rejects_key_reuse_for_different_payload():
+    runtime = AgentRuntime()
+    agent = CountingAgent()
+    runtime.register(agent)
+
+    await runtime.execute("counting", "first payload", idempotency_key="stable-key")
+    with pytest.raises(ValueError, match="different execution payload"):
+        await runtime.execute("counting", "second payload", idempotency_key="stable-key")
+    assert agent.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_runtime_rejects_empty_idempotency_key():
+    runtime = AgentRuntime()
+    runtime.register(EchoAgent())
+    with pytest.raises(ValueError, match="idempotency_key"):
+        await runtime.execute("echo", "build", idempotency_key="   ")
 
 
 @pytest.mark.asyncio
