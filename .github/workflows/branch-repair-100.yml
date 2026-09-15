@@ -2,6 +2,12 @@ name: Repair up to 100 stale branch refs
 
 on:
   workflow_dispatch:
+    inputs:
+      batch_offset:
+        description: 'Number of sorted non-main refs to skip before inspecting up to 100 branches'
+        required: false
+        default: '0'
+        type: string
   push:
     branches: [main]
     paths:
@@ -25,6 +31,9 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GIT_TERMINAL_PROMPT: '0'
+      # A workflow-file merge automatically advances to the next 100-ref window.
+      # Manual dispatch remains explicit and defaults to the first window.
+      REPAIR_BATCH_OFFSET: ${{ github.event_name == 'workflow_dispatch' && inputs.batch_offset || '100' }}
     steps:
       - name: Fetch repository branch graph
         shell: bash
@@ -62,8 +71,14 @@ jobs:
           cd repo
 
           inspect_limit=100
+          batch_offset="${REPAIR_BATCH_OFFSET:-0}"
           min_head_age_seconds=300
           main_ref=refs/remotes/origin/main
+
+          if [[ ! "$batch_offset" =~ ^[0-9]+$ ]]; then
+            echo "batch offset must be a non-negative integer: $batch_offset" >&2
+            exit 2
+          fi
 
           declare -A open_pr_heads=()
           while IFS= read -r branch; do
@@ -107,6 +122,7 @@ jobs:
           git fetch --quiet --no-tags --filter=blob:none origin '+refs/heads/main:refs/remotes/origin/main'
           initial_main=$(git rev-parse "$main_ref")
 
+          seen_non_main=0
           inspected=0
           updated=0
           aligned=0
@@ -123,9 +139,15 @@ jobs:
           while read -r tip branch; do
             [[ -n "$tip" && -n "$branch" ]] || continue
             [[ "$branch" != main ]] || continue
+
+            if (( seen_non_main < batch_offset )); then
+              seen_non_main=$((seen_non_main + 1))
+              continue
+            fi
             if (( inspected >= inspect_limit )); then
               break
             fi
+            seen_non_main=$((seen_non_main + 1))
             inspected=$((inspected + 1))
 
             case "$branch" in
@@ -214,6 +236,7 @@ jobs:
 
           {
             echo '## 100-branch repair sweep'
+            echo "- Batch offset: $batch_offset"
             echo "- Initial main tip: \`$initial_main\`"
             echo "- Branches inspected: $inspected / $inspect_limit"
             echo "- Safely fast-forwarded to main: $updated"
@@ -237,5 +260,5 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           if (( inspected < inspect_limit )); then
-            echo "Only $inspected non-main branches existed to inspect; requested cap was $inspect_limit." >&2
+            echo "Only $inspected branches remained after offset $batch_offset; requested cap was $inspect_limit." >&2
           fi
