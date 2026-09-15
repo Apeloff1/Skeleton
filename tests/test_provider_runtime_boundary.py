@@ -36,35 +36,41 @@ def test_google_genai_dynamic_import_is_rejected(tmp_path: Path) -> None:
     assert any("dynamic Google model SDK import" in item for item in violations)
 
 
-def test_retired_emergent_import_is_rejected_outside_legacy_server(tmp_path: Path) -> None:
+def test_local_compat_static_import_is_allowed_in_backend(tmp_path: Path) -> None:
     _write(
         tmp_path,
         "backend/routes/ai.py",
+        "from emergentintegrations.llm.chat import LlmChat, UserMessage\n"
+        "chat = LlmChat(system_message='rules')\n"
+        "message = UserMessage(text='hello')\n",
+    )
+
+    assert audit_repository(tmp_path) == []
+
+
+def test_local_compat_import_is_rejected_outside_backend(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "skeleton/service.py",
         "from emergentintegrations.llm.chat import LlmChat\n",
     )
 
     violations = audit_repository(tmp_path)
 
-    assert any("retired Emergent model shim import" in item for item in violations)
+    assert any("backend-only provider compatibility import" in item for item in violations)
 
 
-def test_legacy_server_import_is_allowed_only_while_symbols_are_unused(tmp_path: Path) -> None:
+def test_dynamic_compat_import_is_rejected(tmp_path: Path) -> None:
     _write(
         tmp_path,
-        "backend/server.py",
-        "from emergentintegrations.llm.chat import LlmChat, UserMessage\nvalue = 1\n",
-    )
-
-    assert audit_repository(tmp_path) == []
-
-    _write(
-        tmp_path,
-        "backend/server.py",
-        "from emergentintegrations.llm.chat import LlmChat, UserMessage\nclient = LlmChat()\n",
+        "backend/service.py",
+        "import importlib\n"
+        "provider = importlib.import_module('emergentintegrations.llm.chat')\n",
     )
 
     violations = audit_repository(tmp_path)
-    assert any("compatibility symbols are active" in item for item in violations)
+
+    assert any("dynamic provider compatibility import" in item for item in violations)
 
 
 def test_frontier_and_agent_core_reject_provider_sdk_imports(tmp_path: Path) -> None:

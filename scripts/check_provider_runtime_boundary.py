@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
-"""Fail closed when unaudited provider SDKs bypass the canonical runtime.
+"""Fail closed when unaudited provider SDKs bypass maintained runtimes.
 
-Issue #116 keeps model/provider execution behind ``skeleton.frontier.model_runtime``.
-This gate makes two current migration facts executable policy:
+Issue #116 keeps frontier/agent model execution behind
+``skeleton.frontier.model_runtime`` and backend provider execution behind the
+maintained backend adapter boundary.
 
-* Google GenAI has no active runtime call site. Direct or dynamic Google model
-  SDK imports are forbidden until a canonical adapter and shared contract tests
-  are added deliberately.
-* ``backend/server.py`` still carries a retired, local Emergent compatibility
-  import for boot compatibility. Those symbols must remain unused; any real
-  use, dynamic import, or import from another runtime module is a violation.
+The old third-party Emergent SDK is no longer installed.  The repository owns a
+source-compatible module at ``backend/emergentintegrations/llm/chat.py`` that
+delegates legacy *static backend imports* into ``core.ai_provider_compat`` and
+the canonical provider runtime.  Those static backend imports are therefore a
+migration surface, not vendor SDK imports. Dynamic loading of the legacy name is
+still rejected because it bypasses normal import review, and non-backend code
+must not depend on the compatibility namespace.
 
-The frontier/agent core is additionally kept free of direct provider SDK imports.
+Direct Google model SDK imports remain forbidden until a deliberate canonical
+adapter and shared contract tests are added. The frontier/agent core is also
+kept free of all direct provider SDK imports.
 """
 from __future__ import annotations
 
@@ -24,8 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_ROOTS = ("backend", "skeleton")
 SKIP_PARTS = {"tests", "test", "__pycache__", ".venv", "venv", "node_modules"}
 GOOGLE_MODULES = ("google.genai", "google.generativeai")
-RETIRED_EMERGENT_MODULE = "emergentintegrations.llm.chat"
-LEGACY_EMERGENT_IMPORT = Path("backend/server.py")
+LOCAL_EMERGENT_COMPAT_MODULE = "emergentintegrations.llm.chat"
 CORE_PROVIDER_ROOTS = {"openai", "litellm", "google", "emergentintegrations"}
 CORE_PREFIXES = (Path("skeleton/frontier"), Path("skeleton/agents"))
 
@@ -52,12 +55,8 @@ def _is_core_path(rel: Path) -> bool:
     return any(rel == prefix or prefix in rel.parents for prefix in CORE_PREFIXES)
 
 
-def _loaded_names(tree: ast.AST) -> set[str]:
-    return {
-        node.id
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
-    }
+def _is_backend_path(rel: Path) -> bool:
+    return bool(rel.parts and rel.parts[0] == "backend")
 
 
 def _dynamic_import_target(call: ast.Call) -> str | None:
@@ -89,8 +88,6 @@ def audit_file(path: Path, *, root: Path = ROOT) -> list[str]:
         return [f"{rel}: unable to audit Python source: {type(exc).__name__}: {exc}"]
 
     violations: list[str] = []
-    loaded = _loaded_names(tree)
-    legacy_aliases: set[str] = set()
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -100,13 +97,10 @@ def audit_file(path: Path, *, root: Path = ROOT) -> list[str]:
                     violations.append(
                         f"{rel}:{node.lineno}: direct Google model SDK import {module!r}"
                     )
-                if module == RETIRED_EMERGENT_MODULE:
-                    if rel != LEGACY_EMERGENT_IMPORT:
-                        violations.append(
-                            f"{rel}:{node.lineno}: retired Emergent model shim import"
-                        )
-                    else:
-                        legacy_aliases.add(alias.asname or module.split(".")[0])
+                if module == LOCAL_EMERGENT_COMPAT_MODULE and not _is_backend_path(rel):
+                    violations.append(
+                        f"{rel}:{node.lineno}: backend-only provider compatibility import"
+                    )
                 if _is_core_path(rel) and module.split(".")[0] in CORE_PROVIDER_ROOTS:
                     violations.append(
                         f"{rel}:{node.lineno}: provider SDK import {module!r} in core runtime"
@@ -123,15 +117,10 @@ def audit_file(path: Path, *, root: Path = ROOT) -> list[str]:
                     f"{rel}:{node.lineno}: direct Google model SDK import from {module!r}"
                 )
 
-            retired_from_import = module == RETIRED_EMERGENT_MODULE
-            if retired_from_import:
-                if rel != LEGACY_EMERGENT_IMPORT:
-                    violations.append(
-                        f"{rel}:{node.lineno}: retired Emergent model shim import"
-                    )
-                else:
-                    for alias in node.names:
-                        legacy_aliases.add(alias.asname or alias.name)
+            if module == LOCAL_EMERGENT_COMPAT_MODULE and not _is_backend_path(rel):
+                violations.append(
+                    f"{rel}:{node.lineno}: backend-only provider compatibility import"
+                )
 
             root_name = module.split(".")[0] if module else ""
             if _is_core_path(rel) and root_name in CORE_PROVIDER_ROOTS:
@@ -147,23 +136,16 @@ def audit_file(path: Path, *, root: Path = ROOT) -> list[str]:
                 violations.append(
                     f"{rel}:{node.lineno}: dynamic Google model SDK import {target!r}"
                 )
-            if target == RETIRED_EMERGENT_MODULE or target.startswith(
-                RETIRED_EMERGENT_MODULE + "."
+            if target == LOCAL_EMERGENT_COMPAT_MODULE or target.startswith(
+                LOCAL_EMERGENT_COMPAT_MODULE + "."
             ):
                 violations.append(
-                    f"{rel}:{node.lineno}: dynamic retired Emergent model shim import"
+                    f"{rel}:{node.lineno}: dynamic provider compatibility import"
                 )
             if _is_core_path(rel) and target.split(".")[0] in CORE_PROVIDER_ROOTS:
                 violations.append(
                     f"{rel}:{node.lineno}: dynamic provider import {target!r} in core runtime"
                 )
-
-    if rel == LEGACY_EMERGENT_IMPORT:
-        used = sorted(name for name in legacy_aliases if name in loaded)
-        if used:
-            violations.append(
-                f"{rel}: retired Emergent compatibility symbols are active: {', '.join(used)}"
-            )
 
     return violations
 
