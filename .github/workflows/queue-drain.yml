@@ -53,6 +53,7 @@ jobs:
               'X-GitHub-Api-Version': '2022-11-28',
               'User-Agent': 'skeleton-queue-drainer',
           }
+          RETRYABLE_STATUSES = frozenset({0, 429, 500, 502, 503, 504})
 
           def request(path, *, method='GET'):
               req = urllib.request.Request(
@@ -73,14 +74,13 @@ jobs:
                   return 0, None
 
           def cancel_run(run_id):
-              retryable = {0, 429, 500, 502, 503, 504}
               status = 0
               for attempt in range(1, 4):
                   status, _ = request(
                       f'/repos/{repo}/actions/runs/{run_id}/cancel',
                       method='POST',
                   )
-                  if status not in retryable:
+                  if status not in RETRYABLE_STATUSES:
                       return status
                   if attempt < 3:
                       delay = 2 ** (attempt - 1)
@@ -161,6 +161,7 @@ jobs:
               )
 
           attempted = set()
+          transient_pending = set()
           totals = {
               'queued_inspected': 0,
               'active_inspected': 0,
@@ -172,6 +173,7 @@ jobs:
               'preserved_dynamic_without_replacement': 0,
               'accepted': 0,
               'moved': 0,
+              'deferred': 0,
               'failed': 0,
           }
           pass_lines = []
@@ -195,6 +197,14 @@ jobs:
               }
               queued = list_runs('queued')
               active = list_runs('in_progress')
+              live_ids = {
+                  int(run.get('id') or 0)
+                  for run in [*queued, *active]
+                  if int(run.get('id') or 0)
+              }
+              # If a previously deferred run left the queue between passes,
+              # GitHub already moved or completed it; it is no longer unresolved.
+              transient_pending.intersection_update(live_ids)
               totals['queued_inspected'] += len(queued)
               totals['active_inspected'] += len(active)
 
@@ -262,16 +272,30 @@ jobs:
                       else:
                           preserved_dynamic_without_replacement += 1
 
-              accepted = moved = failed = 0
+              accepted = moved = deferred = failed = 0
               for run in selected:
                   run_id = int(run['id'])
-                  attempted.add(run_id)
                   status = cancel_run(run_id)
                   if status in {200, 202}:
+                      attempted.add(run_id)
+                      transient_pending.discard(run_id)
                       accepted += 1
                   elif status in {404, 409, 422}:
+                      attempted.add(run_id)
+                      transient_pending.discard(run_id)
                       moved += 1
+                  elif status in RETRYABLE_STATUSES:
+                      # Keep the run eligible for a later sweep. A short-lived
+                      # GitHub API outage is not a permanent cancellation error.
+                      transient_pending.add(run_id)
+                      deferred += 1
+                      print(
+                          f'cancel deferred: id={run_id} status={status} '
+                          f'pass={pass_number}'
+                      )
                   else:
+                      attempted.add(run_id)
+                      transient_pending.discard(run_id)
                       failed += 1
                       print(f'cancel failed: id={run_id} status={status}')
 
@@ -285,6 +309,7 @@ jobs:
               )
               totals['accepted'] += accepted
               totals['moved'] += moved
+              totals['deferred'] += deferred
               totals['failed'] += failed
 
               line = (
@@ -295,7 +320,8 @@ jobs:
                   f'preserved_last_validation={preserved_last_validation} '
                   'preserved_dynamic_without_replacement='
                   f'{preserved_dynamic_without_replacement} '
-                  f'accepted={accepted} moved={moved} failed={failed}'
+                  f'accepted={accepted} moved={moved} deferred={deferred} '
+                  f'failed={failed}'
               )
               print(line)
               pass_lines.append(line)
@@ -303,9 +329,11 @@ jobs:
               if pass_number < 4:
                   time.sleep(8)
 
+          unresolved_transient = len(transient_pending)
           print(
               'totals '
               + ' '.join(f'{key}={value}' for key, value in totals.items())
+              + f' unresolved_transient={unresolved_transient}'
           )
 
           summary = os.environ.get('GITHUB_STEP_SUMMARY')
@@ -345,7 +373,13 @@ jobs:
                       f'- Already moved/completed: {totals["moved"]}\n'
                   )
                   handle.write(
-                      f'- Cancellation failures: {totals["failed"]}\n'
+                      f'- Transient cancellations deferred: {totals["deferred"]}\n'
+                  )
+                  handle.write(
+                      f'- Transient cancellations still live: {unresolved_transient}\n'
+                  )
+                  handle.write(
+                      f'- Terminal cancellation failures: {totals["failed"]}\n'
                   )
                   handle.write(
                       '- Safety: current main HEAD, the newest outstanding '
@@ -359,6 +393,6 @@ jobs:
 
           if totals['failed']:
               raise SystemExit(
-                  f'queue drain had {totals["failed"]} cancellation failure(s)'
+                  f'queue drain had {totals["failed"]} terminal cancellation failure(s)'
               )
           PY
