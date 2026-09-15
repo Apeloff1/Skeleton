@@ -1,6 +1,6 @@
 """Cross-source consensus, source calibration, and retraction support for Jeeves absorb.
 
-The absorb engine deliberately accepts an injectable verifier.  This module
+The absorb engine deliberately accepts an injectable verifier. This module
 provides a stateful verifier that treats knowledge as claims with independent
 support/refutation evidence instead of assuming every observation is an
 isolated fact.
@@ -97,7 +97,10 @@ class SourceCalibrator:
         self._sources.setdefault(source_id, SourcePosterior()).observe(correct, weight=weight)
 
     def snapshot(self) -> Mapping[str, float]:
-        return {source_id: posterior.mean for source_id, posterior in sorted(self._sources.items())}
+        return {
+            source_id: posterior.mean
+            for source_id, posterior in sorted(self._sources.items())
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,10 +126,9 @@ class _ClaimRecord:
 class ClaimLedger:
     """Evidence ledger with source de-duplication and explicit retractions.
 
-    Each source contributes at most one effective vote per claim.  New evidence
+    Each source contributes at most one effective vote per claim. New evidence
     from the same source supersedes its previous stance instead of multiplying
-    influence, which makes trivial repeated ingestion unable to manufacture
-    consensus.
+    influence, which makes repeated ingestion unable to manufacture consensus.
     """
 
     def __init__(self, *, calibrator: SourceCalibrator | None = None) -> None:
@@ -208,7 +210,7 @@ class ConsensusVerifier:
     """Absorb verifier backed by an independent-source claim ledger.
 
     An incoming observation is first registered as support for its canonical
-    claim.  Confidence combines consensus with calibrated source reliability.
+    claim. Confidence combines consensus with calibrated source reliability.
     The challenge gate passes only with multiple independent sources, low
     contradiction, and a non-retracted claim.
     """
@@ -228,36 +230,38 @@ class ConsensusVerifier:
             "max_challenge_contradiction", max_challenge_contradiction
         )
 
-    def __call__(self, observation: Observation, signals: AbsorbSignals) -> Verification:
-        evidence_id = observation.provenance.content_sha256 if hasattr(
-            observation.provenance, "content_sha256"
-        ) else None
-        if not evidence_id:
-            evidence_id = f"{observation.provenance.source_id}:{observation.observation_id}"
+    def __call__(self, observation: Observation, _signals: AbsorbSignals) -> Verification:
         assessment = self.ledger.record(
             observation.content,
             EvidenceVote(
-                evidence_id=evidence_id,
+                evidence_id=f"{observation.provenance.source_id}:{observation.observation_id}",
                 source_id=observation.provenance.source_id,
                 stance=Stance.SUPPORT,
                 observed_at=observation.provenance.observed_at,
                 trust=observation.provenance.trust,
             ),
         )
+        if assessment.status is ClaimStatus.RETRACTED:
+            return Verification(
+                confidence=0.0,
+                contradiction=1.0,
+                integrity_risk=1.0,
+                freshness=0.0,
+                challenge_passed=False,
+            )
+
         calibrated = self.ledger.calibrator.reliability(
             observation.provenance.source_id, observation.provenance.trust
         )
         confidence = min(1.0, (assessment.confidence * 0.70) + (calibrated * 0.30))
         challenge_passed = (
-            assessment.status is not ClaimStatus.RETRACTED
-            and assessment.independent_sources >= self.min_independent_sources
+            assessment.independent_sources >= self.min_independent_sources
             and assessment.contradiction <= self.max_challenge_contradiction
         )
-        integrity_risk = 1.0 if assessment.status is ClaimStatus.RETRACTED else 0.0
         return Verification(
             confidence=confidence,
             contradiction=assessment.contradiction,
-            integrity_risk=integrity_risk,
-            freshness=0.0 if assessment.status is ClaimStatus.RETRACTED else 1.0,
+            integrity_risk=0.0,
+            freshness=1.0,
             challenge_passed=challenge_passed,
         )
