@@ -13,14 +13,20 @@ from skeleton.frontier.events import (
 )
 
 
-def _rewrite_pending_row(database, token: str, **fields: str) -> None:
-    assignments = ", ".join(f"{name} = ?" for name in fields)
-    values = [*fields.values(), token]
+_ROW_REWRITE_SQL = {
+    "payload_json": "UPDATE frontier_event_journal SET payload_json = ? WHERE token = ?",
+    "occurred_at": "UPDATE frontier_event_journal SET occurred_at = ? WHERE token = ?",
+    "topic": "UPDATE frontier_event_journal SET topic = ? WHERE token = ?",
+}
+
+
+def _rewrite_pending_row(database, token: str, column: str, value: str) -> None:
+    try:
+        statement = _ROW_REWRITE_SQL[column]
+    except KeyError as exc:
+        raise ValueError(f"unsupported event journal test column: {column}") from exc
     with sqlite3.connect(database) as connection:
-        connection.execute(
-            f"UPDATE frontier_event_journal SET {assignments} WHERE token = ?",
-            values,
-        )
+        connection.execute(statement, (value, token))
         connection.commit()
 
 
@@ -46,7 +52,7 @@ def test_corrupt_payload_stays_pending_and_replay_fails_closed(
         finally:
             journal.close()
 
-        _rewrite_pending_row(database, token, payload_json=payload_json)
+        _rewrite_pending_row(database, token, "payload_json", payload_json)
 
         reopened = SQLiteEventJournal(database)
         try:
@@ -89,7 +95,7 @@ def test_corrupt_timestamp_stays_pending_and_replay_fails_closed(
         finally:
             journal.close()
 
-        _rewrite_pending_row(database, token, occurred_at=occurred_at)
+        _rewrite_pending_row(database, token, "occurred_at", occurred_at)
 
         reopened = SQLiteEventJournal(database)
         try:
@@ -111,7 +117,7 @@ def test_empty_corrupt_topic_stays_pending(tmp_path):
         finally:
             journal.close()
 
-        _rewrite_pending_row(database, token, topic="   ")
+        _rewrite_pending_row(database, token, "topic", "   ")
 
         reopened = SQLiteEventJournal(database)
         try:
