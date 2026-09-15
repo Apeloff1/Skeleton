@@ -95,11 +95,11 @@ class Jeeves:
                  *, max_turns: int = 200,
                  max_sessions: int = 1000,
                  max_message_chars: int = 32_000) -> None:
-        if not isinstance(max_turns, int) or max_turns < 2:
+        if type(max_turns) is not int or max_turns < 2:
             raise ValueError("max_turns must be an integer >= 2")
-        if not isinstance(max_sessions, int) or max_sessions < 1:
+        if type(max_sessions) is not int or max_sessions < 1:
             raise ValueError("max_sessions must be an integer >= 1")
-        if not isinstance(max_message_chars, int) or max_message_chars < 1:
+        if type(max_message_chars) is not int or max_message_chars < 1:
             raise ValueError("max_message_chars must be an integer >= 1")
         if responder is not None and not callable(responder):
             raise TypeError("responder must be callable")
@@ -194,7 +194,7 @@ class Jeeves:
                 raise SessionError("responder returned an invalid reply",
                                    context={"session_id": session_id})
             session.add_turn("jeeves", reply)
-        except Exception:
+        except BaseException:
             del session.turns[start_turns:]
             self._bus.emit("jeeves.turn.failed", {"session_id": session_id})
             raise
