@@ -1,45 +1,43 @@
 """
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                    CODEDOCK AI PIPELINE SYSTEM v11.0.0                        ║
-║                                                                               ║
-║  Complete Text-to-Asset Pipeline with Multi-Provider AI                       ║
-║  - OpenAI GPT-4o & gpt-image-1                                               ║
-║  - Gemini Nano Banana                                                         ║
-║  - Grok Imagine API                                                           ║
+║                    CODEDOCK AI PIPELINE SYSTEM v11.0.0                     ║
+║                                                                            ║
+║  Complete Text-to-Asset Pipeline with Multi-Provider AI                    ║
+║  - OpenAI GPT-4o & gpt-image-1                                             ║
+║  - Gemini Nano Banana                                                       ║
+║  - Grok Imagine API                                                         ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
-from dotenv import load_dotenv
-import uuid
-import asyncio
+import logging
 import os
+from pathlib import Path
+from typing import Any, Dict, List, Literal, Optional
+import uuid
 
-# Load environment
-ROOT_DIR = Path(__file__).parent.parent
-load_dotenv(ROOT_DIR / '.env')
+from dotenv import load_dotenv
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 
-# AI Integrations
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 
+
+ROOT_DIR = Path(__file__).parent.parent
+load_dotenv(ROOT_DIR / ".env")
+
+log = logging.getLogger("codedock.ai_pipeline")
 router = APIRouter(prefix="/pipeline", tags=["AI Pipeline"])
+EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 
-# ============================================================================
-# CONFIGURATION
-# ============================================================================
-
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 
 class AIProvider(str, Enum):
     OPENAI = "openai"
     GEMINI = "gemini"
     GROK = "grok"
     AUTO = "auto"
+
 
 class PipelineType(str, Enum):
     TEXT_TO_CODE = "text_to_code"
@@ -53,9 +51,6 @@ class PipelineType(str, Enum):
     DEBUG = "debug"
     OPTIMIZE = "optimize"
 
-# ============================================================================
-# REQUEST/RESPONSE MODELS
-# ============================================================================
 
 class TextToCodeRequest(BaseModel):
     description: str = Field(..., min_length=10, max_length=5000)
@@ -65,6 +60,7 @@ class TextToCodeRequest(BaseModel):
     context: Optional[str] = Field(None, max_length=100000)
     provider: AIProvider = AIProvider.AUTO
 
+
 class TextToImageRequest(BaseModel):
     prompt: str = Field(..., min_length=5, max_length=2000)
     provider: AIProvider = AIProvider.AUTO
@@ -72,6 +68,7 @@ class TextToImageRequest(BaseModel):
     size: str = "1024x1024"
     quality: str = "standard"
     count: int = Field(1, ge=1, le=4)
+
 
 class CodeToAppRequest(BaseModel):
     code: str = Field(..., min_length=10, max_length=500000)
@@ -82,11 +79,13 @@ class CodeToAppRequest(BaseModel):
     include_docs: bool = True
     include_deployment: bool = True
 
+
 class CodeAnalysisRequest(BaseModel):
     code: str = Field(..., min_length=10, max_length=500000)
     analysis_type: Literal["explain", "test", "document", "debug", "optimize", "refactor"] = "explain"
     language: str = Field("python", min_length=1, max_length=100)
     detail_level: Literal["brief", "standard", "comprehensive"] = "standard"
+
 
 class PipelineResponse(BaseModel):
     id: str
@@ -96,94 +95,120 @@ class PipelineResponse(BaseModel):
     metadata: Dict[str, Any]
     timestamp: str
 
-# ============================================================================
-# AI SERVICE IMPLEMENTATIONS
-# ============================================================================
 
-async def call_gpt4o(prompt: str, system_prompt: str = None, max_tokens: int = 4096) -> str:
-    """Call GPT-4o via Emergent LLM Key"""
+def _pipeline_http_error(operation: str, exc: Exception) -> HTTPException:
+    """Create a stable public failure without exposing provider/library details."""
+    log.warning("AI pipeline %s failed: %s", operation, type(exc).__name__)
+    return HTTPException(status_code=500, detail="AI pipeline request failed")
+
+
+async def call_gpt4o(
+    prompt: str,
+    system_prompt: str | None = None,
+    max_tokens: int = 4096,
+) -> str:
+    """Call GPT-4o without exposing provider exception details."""
     try:
-        default_system = "You are an expert programmer and software architect. Provide helpful, accurate, and well-documented code and explanations."
-        
+        default_system = (
+            "You are an expert programmer and software architect. Provide helpful, "
+            "accurate, and well-documented code and explanations."
+        )
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
             session_id=f"codedock-pipeline-{uuid.uuid4().hex[:8]}",
-            system_message=system_prompt or default_system
+            system_message=system_prompt or default_system,
         ).with_model("openai", "gpt-4o")
-        
         response = await chat.send_message(UserMessage(text=prompt))
-        
-        return response.content if hasattr(response, 'content') else str(response)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"GPT-4o error: {str(e)}")
+        return response.content if hasattr(response, "content") else str(response)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.warning("AI pipeline text provider failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=500, detail="AI text generation failed") from None
+
 
 async def generate_image_openai(prompt: str, size: str = "1024x1024") -> Dict[str, Any]:
-    """Generate a REAL image (Nano Banana primary, OpenAI gpt-image-1 fallback)."""
+    """Generate an image while keeping upstream error text behind the API boundary."""
     from routes.image_generation import generate_with_gemini, generate_with_openai
-    result = await generate_with_gemini(prompt)
-    if result.get("status") == "failed":
-        result = await generate_with_openai(prompt, size, "standard", 1)
-    imgs = result.get("images", []) if isinstance(result, dict) else []
-    if imgs and imgs[0].get("data"):
-        return {"provider": result.get("provider"), "model": result.get("model"),
-                "data": imgs[0]["data"], "format": "base64", "size": size}
-    return {"error": result.get("error", "no image"), "provider": result.get("provider")}
+
+    try:
+        result = await generate_with_gemini(prompt)
+        if result.get("status") == "failed":
+            result = await generate_with_openai(prompt, size, "standard", 1)
+        imgs = result.get("images", []) if isinstance(result, dict) else []
+        if imgs and imgs[0].get("data"):
+            return {
+                "provider": result.get("provider"),
+                "model": result.get("model"),
+                "data": imgs[0]["data"],
+                "format": "base64",
+                "size": size,
+            }
+        return {
+            "error": "image generation failed",
+            "provider": result.get("provider") if isinstance(result, dict) else "openai",
+        }
+    except Exception as exc:
+        log.warning("AI pipeline image provider failed: %s", type(exc).__name__)
+        return {"error": "image generation failed", "provider": "openai"}
+
 
 async def generate_image_gemini(prompt: str) -> Dict[str, Any]:
-    """Generate a REAL image using Gemini Nano Banana."""
+    """Generate an image without forwarding Gemini failure payloads."""
     from routes.image_generation import generate_with_gemini
-    result = await generate_with_gemini(prompt)
-    imgs = result.get("images", []) if isinstance(result, dict) else []
-    if imgs and imgs[0].get("data"):
-        return {"provider": "gemini", "model": result.get("model"),
-                "data": imgs[0]["data"], "format": "base64"}
-    return {"error": result.get("error", "no image"), "provider": "gemini"}
+
+    try:
+        result = await generate_with_gemini(prompt)
+        imgs = result.get("images", []) if isinstance(result, dict) else []
+        if imgs and imgs[0].get("data"):
+            return {
+                "provider": "gemini",
+                "model": result.get("model"),
+                "data": imgs[0]["data"],
+                "format": "base64",
+            }
+        return {"error": "image generation failed", "provider": "gemini"}
+    except Exception as exc:
+        log.warning("AI pipeline Gemini image provider failed: %s", type(exc).__name__)
+        return {"error": "image generation failed", "provider": "gemini"}
+
 
 async def call_grok(prompt: str, task_type: str = "general") -> str:
-    """Call Grok API for various tasks"""
+    """Call Grok, falling back to the same sanitized GPT boundary."""
     try:
         from openai import OpenAI
-        
-        client = OpenAI(
-            api_key=EMERGENT_LLM_KEY,
-            base_url="https://api.x.ai/v1"
-        )
-        
+
+        client = OpenAI(api_key=EMERGENT_LLM_KEY, base_url="https://api.x.ai/v1")
         system_prompts = {
             "code": "You are Grok, an expert programmer. Generate clean, efficient, well-documented code.",
             "image": "You are Grok with image generation capabilities. Describe images in vivid detail.",
             "analysis": "You are Grok, a code analysis expert. Provide thorough, insightful analysis.",
-            "general": "You are Grok, a helpful AI assistant created by xAI."
+            "general": "You are Grok, a helpful AI assistant created by xAI.",
         }
-        
         response = client.chat.completions.create(
             model="grok-beta",
             messages=[
                 {"role": "system", "content": system_prompts.get(task_type, system_prompts["general"])},
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": prompt},
             ],
-            max_tokens=4096
+            max_tokens=4096,
         )
-        
         return response.choices[0].message.content
-    except Exception:
-        # Fallback to GPT-4o if Grok fails
+    except Exception as exc:
+        log.warning("AI pipeline Grok provider failed: %s", type(exc).__name__)
         return await call_gpt4o(prompt)
 
-# ============================================================================
-# PIPELINE ENDPOINTS
-# ============================================================================
 
 @router.get("/info")
 async def get_pipeline_info():
-    """Get information about the AI Pipeline system"""
+    """Get information about the AI Pipeline system."""
     return {
         "name": "CodeDock AI Pipeline",
         "version": "11.0.0",
         "providers": [
             {"id": "openai", "name": "OpenAI GPT-4o & gpt-image-1", "status": "active"},
             {"id": "gemini", "name": "Gemini 2.0 Flash & Nano Banana", "status": "active"},
-            {"id": "grok", "name": "xAI Grok Imagine", "status": "active"}
+            {"id": "grok", "name": "xAI Grok Imagine", "status": "active"},
         ],
         "pipelines": [
             {"id": "text_to_code", "name": "Text → Code", "description": "Generate code from natural language"},
@@ -195,23 +220,23 @@ async def get_pipeline_info():
             {"id": "code_to_game", "name": "Code → Game", "description": "Build games from descriptions"},
             {"id": "refactor", "name": "Refactor", "description": "Improve code structure"},
             {"id": "debug", "name": "Debug", "description": "Find and fix bugs"},
-            {"id": "optimize", "name": "Optimize", "description": "Optimize performance"}
+            {"id": "optimize", "name": "Optimize", "description": "Optimize performance"},
         ],
         "capabilities": {
             "max_code_length": 50000,
             "max_prompt_length": 5000,
             "supported_languages": 64,
-            "image_sizes": ["256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"]
-        }
+            "image_sizes": ["256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"],
+        },
     }
+
 
 @router.post("/text-to-code", response_model=PipelineResponse)
 async def text_to_code(request: TextToCodeRequest):
-    """Generate code from natural language description"""
+    """Generate code from a natural-language description."""
     request_id = str(uuid.uuid4())
-    
     system_prompt = f"""You are an expert {request.language} developer. Generate production-ready code.
-    
+
 Requirements:
 - Clean, readable, well-documented code
 - Follow best practices and design patterns
@@ -221,7 +246,6 @@ Requirements:
 
 {f'Framework: {request.framework}' if request.framework else ''}
 {f'Additional requirements: {", ".join(request.requirements)}' if request.requirements else ''}"""
-
     user_prompt = f"""Generate {request.language} code for:
 
 {request.description}
@@ -235,71 +259,67 @@ Provide complete, working code with explanations."""
             code = await call_grok(user_prompt, "code")
         else:
             code = await call_gpt4o(user_prompt, system_prompt)
-        
         return PipelineResponse(
             id=request_id,
             pipeline_type="text_to_code",
             status="success",
-            result={
-                "code": code,
-                "language": request.language,
-                "framework": request.framework
-            },
+            result={"code": code, "language": request.language, "framework": request.framework},
             metadata={
                 "provider": request.provider.value,
-                "tokens_estimated": len(code.split()) * 1.3
+                "tokens_estimated": len(code.split()) * 1.3,
             },
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.utcnow().isoformat(),
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _pipeline_http_error("text-to-code", exc) from None
+
 
 @router.post("/text-to-image", response_model=PipelineResponse)
 async def text_to_image(request: TextToImageRequest):
-    """Generate images from text descriptions"""
+    """Generate images from text descriptions."""
     request_id = str(uuid.uuid4())
-    
     enhanced_prompt = request.prompt
     if request.style:
         enhanced_prompt = f"{request.prompt}, in {request.style} style"
-    
+
     try:
-        images = []
-        
+        images: list[dict[str, Any]] = []
         if request.provider in [AIProvider.OPENAI, AIProvider.AUTO]:
-            for i in range(request.count):
+            for _ in range(request.count):
                 img = await generate_image_openai(enhanced_prompt, request.size)
                 if "error" not in img:
                     images.append(img)
-        
-        if request.provider == AIProvider.GEMINI or (request.provider == AIProvider.AUTO and len(images) == 0):
+        if request.provider == AIProvider.GEMINI or (
+            request.provider == AIProvider.AUTO and not images
+        ):
             gemini_result = await generate_image_gemini(enhanced_prompt)
-            images.append(gemini_result)
-        
+            if "error" not in gemini_result:
+                images.append(gemini_result)
+
         return PipelineResponse(
             id=request_id,
             pipeline_type="text_to_image",
             status="success" if images else "partial",
-            result={
-                "images": images,
-                "count": len(images),
-                "prompt": enhanced_prompt
-            },
+            result={"images": images, "count": len(images), "prompt": enhanced_prompt},
             metadata={
                 "provider": request.provider.value,
                 "size": request.size,
-                "style": request.style
+                "style": request.style,
             },
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.utcnow().isoformat(),
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _pipeline_http_error("text-to-image", exc) from None
+
 
 @router.post("/code-to-app", response_model=PipelineResponse)
 async def code_to_app(request: CodeToAppRequest):
-    """Transform code into a complete application package"""
+    """Transform code into a complete application package."""
     request_id = str(uuid.uuid4())
-    
     app_prompt = f"""Transform this {request.language} code into a complete {request.app_type} application:
 
 ```{request.language}
@@ -320,7 +340,6 @@ Provide the complete package with all files and their contents."""
 
     try:
         result = await call_gpt4o(app_prompt)
-        
         return PipelineResponse(
             id=request_id,
             pipeline_type="code_to_app",
@@ -332,23 +351,22 @@ Provide the complete package with all files and their contents."""
                 "features": {
                     "tests": request.include_tests,
                     "docs": request.include_docs,
-                    "deployment": request.include_deployment
-                }
+                    "deployment": request.include_deployment,
+                },
             },
-            metadata={
-                "provider": "openai",
-                "platform": request.target_platform
-            },
-            timestamp=datetime.utcnow().isoformat()
+            metadata={"provider": "openai", "platform": request.target_platform},
+            timestamp=datetime.utcnow().isoformat(),
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _pipeline_http_error("code-to-app", exc) from None
+
 
 @router.post("/code-to-game", response_model=PipelineResponse)
 async def code_to_game(request: CodeToAppRequest):
-    """Transform code/description into a complete game"""
+    """Transform code or a description into a complete game."""
     request_id = str(uuid.uuid4())
-    
     game_prompt = f"""Create a complete game based on this code/description:
 
 ```{request.language}
@@ -368,7 +386,6 @@ Make it fun, engaging, and polished!"""
 
     try:
         result = await call_gpt4o(game_prompt)
-        
         return PipelineResponse(
             id=request_id,
             pipeline_type="code_to_game",
@@ -376,22 +393,21 @@ Make it fun, engaging, and polished!"""
             result={
                 "game": result,
                 "type": request.app_type,
-                "language": request.language
+                "language": request.language,
             },
-            metadata={
-                "provider": "openai",
-                "game_type": "inferred"
-            },
-            timestamp=datetime.utcnow().isoformat()
+            metadata={"provider": "openai", "game_type": "inferred"},
+            timestamp=datetime.utcnow().isoformat(),
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _pipeline_http_error("code-to-game", exc) from None
+
 
 @router.post("/analyze", response_model=PipelineResponse)
 async def analyze_code(request: CodeAnalysisRequest):
-    """Analyze code - explain, test, document, debug, optimize, or refactor"""
+    """Analyze code: explain, test, document, debug, optimize, or refactor."""
     request_id = str(uuid.uuid4())
-    
     analysis_prompts = {
         "explain": f"""Explain this {request.language} code in detail:
 
@@ -404,7 +420,6 @@ Provide {'a brief overview' if request.detail_level == 'brief' else 'a comprehen
 - How it works step by step
 - Key concepts used
 - Potential improvements""",
-
         "test": f"""Generate comprehensive unit tests for this {request.language} code:
 
 ```{request.language}
@@ -416,7 +431,6 @@ Include:
 - Edge cases and boundary conditions
 - Mock objects where needed
 - Test documentation""",
-
         "document": f"""Generate complete documentation for this {request.language} code:
 
 ```{request.language}
@@ -430,7 +444,6 @@ Include:
 - Return value documentation
 - Usage examples
 - README content""",
-
         "debug": f"""Debug this {request.language} code and identify all issues:
 
 ```{request.language}
@@ -442,7 +455,6 @@ Provide:
 - Root cause analysis
 - Step-by-step fixes
 - Corrected code""",
-
         "optimize": f"""Optimize this {request.language} code for performance:
 
 ```{request.language}
@@ -455,7 +467,6 @@ Analyze and improve:
 - Memory usage
 - Code efficiency
 - Provide optimized version with explanations""",
-
         "refactor": f"""Refactor this {request.language} code for better structure:
 
 ```{request.language}
@@ -467,13 +478,12 @@ Apply:
 - Design patterns where appropriate
 - Clean code practices
 - Better naming conventions
-- Modular structure"""
+- Modular structure""",
     }
-    
+
     try:
         prompt = analysis_prompts.get(request.analysis_type, analysis_prompts["explain"])
         result = await call_gpt4o(prompt)
-        
         return PipelineResponse(
             id=request_id,
             pipeline_type=f"code_to_{request.analysis_type}",
@@ -482,51 +492,47 @@ Apply:
                 "analysis": result,
                 "type": request.analysis_type,
                 "language": request.language,
-                "detail_level": request.detail_level
+                "detail_level": request.detail_level,
             },
-            metadata={
-                "provider": "openai",
-                "code_length": len(request.code)
-            },
-            timestamp=datetime.utcnow().isoformat()
+            metadata={"provider": "openai", "code_length": len(request.code)},
+            timestamp=datetime.utcnow().isoformat(),
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _pipeline_http_error("analyze", exc) from None
+
 
 @router.get("/providers")
 async def get_providers():
-    """Get all available AI providers and their capabilities"""
+    """Get all available AI providers and their capabilities."""
     return {
         "providers": [
             {
                 "id": "openai",
                 "name": "OpenAI",
-                "models": {
-                    "text": "gpt-4o",
-                    "image": "gpt-image-1"
-                },
-                "capabilities": ["text_generation", "image_generation", "code_generation", "analysis"],
-                "status": "active"
+                "models": {"text": "gpt-4o", "image": "gpt-image-1"},
+                "capabilities": [
+                    "text_generation",
+                    "image_generation",
+                    "code_generation",
+                    "analysis",
+                ],
+                "status": "active",
             },
             {
                 "id": "gemini",
                 "name": "Google Gemini",
-                "models": {
-                    "text": "gemini-2.0-flash",
-                    "image": "nano-banana"
-                },
+                "models": {"text": "gemini-2.0-flash", "image": "nano-banana"},
                 "capabilities": ["text_generation", "image_generation", "multimodal"],
-                "status": "active"
+                "status": "active",
             },
             {
                 "id": "grok",
                 "name": "xAI Grok",
-                "models": {
-                    "text": "grok-beta",
-                    "image": "grok-imagine"
-                },
+                "models": {"text": "grok-beta", "image": "grok-imagine"},
                 "capabilities": ["text_generation", "image_generation", "reasoning"],
-                "status": "active"
-            }
+                "status": "active",
+            },
         ]
     }
