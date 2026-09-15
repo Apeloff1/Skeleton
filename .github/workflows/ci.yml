@@ -7,8 +7,13 @@ on:
     branches: [main, develop]
     paths-ignore:
       - '.github/workflows/branch-clean.yml'
+      - 'docs/**'
+      - '**/*.md'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
 
 # Collapse superseded validation for the same PR or branch so rapid pushes do
 # not occupy runner capacity with stale commits. Workflow name keeps unrelated
