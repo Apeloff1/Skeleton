@@ -41,6 +41,7 @@ printf '\n== Runtime, adversarial, cache, deployment, API, and observability con
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   tests/test_model_runtime.py \
   tests/test_adversarial_engine.py \
+  tests/test_adversarial_judge_isolation.py \
   tests/test_tri_adversarial_engine.py \
   skeleton/testing/test_provider_stream_reliability_profiles.py \
   tests/test_provider_runtime_boundary.py \
