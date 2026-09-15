@@ -24,6 +24,11 @@ WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 RUN_RE = re.compile(
     r"^(?P<indent>\s*)(?:-\s*)?(?:run|'run'|\"run\")\s*:\s*(?P<value>.*)$"
 )
+# GitHub Actions supports YAML anchors and aliases. An alias used as the value
+# of ``run`` hides the shell text from this lightweight scanner because resolving
+# aliases requires parsing the whole YAML document. Reject such shell aliases
+# fail-closed instead of treating the opaque alias name as trusted shell text.
+RUN_ALIAS_RE = re.compile(r"^\*[^\s#]+(?:\s+#.*)?$")
 # A GitHub expression embedded in a YAML block scalar may span physical lines.
 # DOTALL ensures the security gate inspects the expression after the full run
 # block has been reconstructed instead of only matching single-line forms.
@@ -34,12 +39,14 @@ EXPRESSION_RE = re.compile(r"\$\{\{(?P<body>.*?)\}\}", re.DOTALL)
 UNTRUSTED_INPUT_RE = re.compile(
     r"(?<![A-Za-z0-9_])(?:github\.event\.inputs|inputs)(?![A-Za-z0-9_])"
 )
-# YAML block scalars may combine a chomping indicator (+/-) and an indentation
-# indicator (1-9) in either order: |, |-, |2, |2-, |-2, >+2, and so on.
-# A trailing YAML comment is also legal after whitespace. Recognize the full
-# family so alternate scalar headers cannot hide the shell body from the gate.
+# YAML block scalars may carry node properties such as ``&anchor`` or ``!tag``
+# before the scalar indicator. They may also combine a chomping indicator (+/-)
+# and an indentation indicator (1-9) in either order: |, |-, |2, |2-, |-2,
+# >+2, and so on. A trailing YAML comment is legal after whitespace. Recognize
+# this full family so anchors, tags, and alternate headers cannot hide a run body.
 BLOCK_SCALAR_RE = re.compile(
-    r"^[|>](?:(?:[+-][1-9]?)|(?:[1-9][+-]?))?(?:\s+#.*)?$"
+    r"^(?:(?:[!&][^\s#]+)\s+)*"
+    r"[|>](?:(?:[+-][1-9]?)|(?:[1-9][+-]?))?(?:\s+#.*)?$"
 )
 
 
@@ -135,6 +142,13 @@ def violations(path: Path) -> list[str]:
 
     findings: list[str] = []
     for line_number, fragment in _run_fragments(text.splitlines()):
+        if RUN_ALIAS_RE.fullmatch(fragment.strip()):
+            findings.append(
+                f"{path.name}:{line_number}: aliased run shell is forbidden because the security gate "
+                "cannot verify the referenced shell text; inline the command or use a reusable action/workflow"
+            )
+            continue
+
         expression = _direct_input_expression(fragment)
         if expression is None:
             continue
