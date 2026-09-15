@@ -303,7 +303,7 @@ def _forbidden_trigger_violations(lines: list[str], path_name: str) -> list[str]
                     if len(event) >= 2 and event[0] == event[-1] and event[0] in {"'", '"'}:
                         event = event[1:-1]
                     if event == FORBIDDEN_TRIGGER:
-                        findings.append(f"{path_name}:{number}: pull_request_target is forbidden")
+                        findings.append(f"{path.name}:{number}: pull_request_target is forbidden")
                         break
                 continue
             continue
@@ -357,9 +357,10 @@ def violations(path: Path) -> list[str]:
     findings.extend(permission_findings)
     findings.extend(_forbidden_trigger_violations(lines, path.name))
 
+    flow_style_lines: set[int] = set()
     for number, fragment in _flow_style_steps(lines):
-        if any(USES_RE.match(source_line) for source_line in fragment.splitlines()):
-            continue
+        fragment_lines = fragment.splitlines()
+        flow_style_lines.update(range(number, number + len(fragment_lines)))
         for entry in _flow_mapping_entries(fragment):
             match = FLOW_USES_ENTRY_RE.match(entry.strip())
             if not match:
@@ -378,6 +379,8 @@ def violations(path: Path) -> list[str]:
         number = index + 1
         if re.match(r"^\s*permissions\s*:\s*write-all\s*$", line):
             findings.append(f"{path.name}:{number}: write-all permissions are forbidden")
+        if number in flow_style_lines:
+            continue
         match = USES_RE.match(line)
         if not match:
             continue
