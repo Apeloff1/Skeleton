@@ -35,6 +35,8 @@ on:
 
 permissions: {}
 
+# Supersede stale work within one event context without letting a push cancel a
+# scheduled scan (or vice versa) that happens to target the same ref.
 concurrency:
   group: codeql-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
