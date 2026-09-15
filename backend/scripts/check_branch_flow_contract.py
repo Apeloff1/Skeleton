@@ -10,6 +10,10 @@ WORKFLOW = REPO_ROOT / ".github" / "workflows" / "branch-flow.yml"
 
 REQUIRED_ACTIVE_STATUSES = {"requested", "waiting", "pending", "queued", "in_progress"}
 WRITE_SCOPE_RE = re.compile(r"^\s+([A-Za-z0-9_-]+):\s*write\s*(?:#.*)?$", re.MULTILINE)
+WORKFLOW_SCAN_RE = re.compile(
+    r"def touches_workflows\(number\):(?P<body>.*?)(?=\n\s+def live_validation\()",
+    re.DOTALL,
+)
 
 
 def violations_for_text(text: str) -> list[str]:
@@ -58,7 +62,8 @@ def violations_for_text(text: str) -> list[str]:
         findings.append("branch-flow must preserve PRs that modify workflow files")
     if "if touches_workflows(number) is not False:" not in text:
         findings.append("workflow-file exclusion must be revalidated immediately before mutation")
-    if "              return None\n\n          def live_validation" not in text:
+    workflow_scan = WORKFLOW_SCAN_RE.search(text)
+    if not workflow_scan or not workflow_scan.group("body").rstrip().endswith("return None"):
         findings.append("bounded workflow-file enumeration must fail closed when the scan limit is exhausted")
 
     if "permission_or_api_failure" not in text or "raise SystemExit" not in text:
