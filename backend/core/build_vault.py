@@ -79,7 +79,20 @@ _LOCKS: dict[str, threading.Lock] = {}
 _LOCKS_GUARD = threading.Lock()
 
 
+def _validate_build_id(build_id: str) -> str:
+    """Accept only a single safe path component for build-vault directories."""
+    if not isinstance(build_id, str) or not build_id or build_id in {".", ".."}:
+        raise ValueError("build_id must be a non-empty identifier")
+    if Path(build_id).name != build_id:
+        raise ValueError("build_id must be a single path component")
+    allowed = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-")
+    if any(ch not in allowed for ch in build_id):
+        raise ValueError("build_id contains unsupported path characters")
+    return build_id
+
+
 def _lock_for(build_id: str) -> threading.Lock:
+    build_id = _validate_build_id(build_id)
     with _LOCKS_GUARD:
         lk = _LOCKS.get(build_id)
         if lk is None:
@@ -101,9 +114,13 @@ _DECOMPRESSOR = zstd.ZstdDecompressor()
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 def _build_dir(build_id: str) -> Path:
-    p = BUILDS_ROOT / build_id
-    p.mkdir(parents=True, exist_ok=True)
-    return p
+    build_id = _validate_build_id(build_id)
+    root = BUILDS_ROOT.resolve()
+    candidate = (BUILDS_ROOT / build_id).resolve()
+    if candidate.parent != root:
+        raise ValueError("build_id resolves outside the build vault root")
+    candidate.mkdir(parents=True, exist_ok=True)
+    return candidate
 
 
 def _manifest_path(build_id: str) -> Path:
@@ -260,7 +277,12 @@ def get_stats(build_id: str) -> dict:
 
 
 def _iter_shard(build_id: str, shard_file: str) -> Iterator[Tuple[str, str]]:
-    sp = _build_dir(build_id) / shard_file
+    safe_build_id = _validate_build_id(build_id)
+    if Path(shard_file).name != shard_file or not shard_file:
+        return
+    if shard_file in {".", ".."} or any(ch in shard_file for ch in "/\\\x00"):
+        return
+    sp = _build_dir(safe_build_id) / shard_file
     if not sp.exists():
         return
     try:
@@ -351,6 +373,12 @@ def package_zip(build_id: str, out_path: Path | None = None) -> Path:
     d = _build_dir(build_id)
     if out_path is None:
         out_path = d / f"{build_id}.zip"
+    else:
+        out_path = Path(out_path)
+        root = BUILDS_ROOT.resolve()
+        resolved = out_path.resolve()
+        if resolved.parent != d.resolve():
+            raise ValueError("out_path must stay inside the build directory")
     with zipfile.ZipFile(out_path, "w", compression=zipfile.ZIP_DEFLATED,
                          compresslevel=6, allowZip64=True) as zf:
         for p, c in iter_files(build_id):
