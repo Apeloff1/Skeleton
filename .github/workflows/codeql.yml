@@ -35,12 +35,14 @@ on:
 
 permissions: {}
 
-# Supersede stale work within one event context without letting a push cancel a
-# scheduled scan (or vice versa) that happens to target the same ref. The PR
-# close event reuses the PR-number lane as a runner-free cancellation barrier.
+# PR synchronizations should supersede stale PR analysis, and the PR close event
+# must retain its runner-free cancellation barrier. Main pushes and scheduled
+# scans must not cancel analysis that has already started: frequent main updates
+# would otherwise starve CodeQL indefinitely. The queue drainer still removes
+# obsolete queued main runs while allowing an active security scan to finish.
 concurrency:
   group: codeql-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   analyze:
