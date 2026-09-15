@@ -102,9 +102,22 @@ waves:
     targets:
       - skeleton/frontier/cooking.py
       - skeleton/frontier/cooking_adapters.py
+      - skeleton/frontier/__init__.py
+    hardening:
+      - identity-aware-fish-allocation
+      - minimum-fish-size-enforcement
+      - canonical-recipe-semantic-digest
+      - start-to-claim-recipe-binding
+      - same-id-reward-and-buff-tamper-rejection
+      - strict-description-and-icon-types
+      - string-collection-type-confusion-rejection
+      - timezone-aware-job-and-buff-times
     evidence:
       - skeleton/testing/test_frontier_cooking_policy.py
       - skeleton/testing/test_frontier_cooking_integration.py
+      - skeleton/testing/test_frontier_cooking_integrity.py
+      - skeleton/testing/test_frontier_cooking_benchmark.py
+      - scripts/benchmark_frontier_cooking.py
       - docs/lineage/COOKING_PROMOTION_2026-09-15.md
 rejected_from_kernel:
   - source-catalogs
