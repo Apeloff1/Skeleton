@@ -1,0 +1,94 @@
+name: Drain superseded Actions queue
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/queue-drain.yml'
+
+concurrency:
+  group: queue-drain-${{ github.repository }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  drain:
+    # Use the ARM hosted pool so this recovery job is not competing only with
+    # the saturated ubuntu-latest queue it is intended to repair.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      CURRENT_RUN_ID: ${{ github.run_id }}
+    steps:
+      - name: Cancel only superseded queued runs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tmp=$(mktemp)
+          : > "$tmp"
+          page=1
+          while :; do
+            payload=$(gh api "/repos/${REPO}/actions/runs?status=queued&per_page=100&page=${page}")
+            count=$(jq '.workflow_runs | length' <<<"$payload")
+            [[ "$count" -gt 0 ]] || break
+            jq -c '.workflow_runs[] | {id,workflow_id,head_branch,event,created_at,name}' <<<"$payload" >> "$tmp"
+            [[ "$count" -eq 100 ]] || break
+            page=$((page + 1))
+          done
+
+          # Keep the newest queued run for every workflow/ref/event tuple.
+          # Cancel only older duplicates, and never cancel this drainer itself.
+          keep=$(mktemp)
+          cancel=$(mktemp)
+          jq -s --arg current "$CURRENT_RUN_ID" '
+            sort_by(.created_at) | reverse |
+            reduce .[] as $r (
+              {seen:{}, keep:[], cancel:[]};
+              ($r.workflow_id|tostring) + "|" + ($r.head_branch // "") + "|" + ($r.event // "") as $key |
+              if ($r.id|tostring) == $current then
+                .keep += [$r]
+              elif .seen[$key] then
+                .cancel += [$r]
+              else
+                .seen[$key] = true | .keep += [$r]
+              end
+            )
+          ' "$tmp" > "$keep"
+          jq -c '.cancel[]' "$keep" > "$cancel"
+
+          total=$(wc -l < "$tmp" | tr -d ' ')
+          doomed=$(wc -l < "$cancel" | tr -d ' ')
+          echo "queued discovered: $total"
+          echo "superseded duplicates selected: $doomed"
+
+          cancelled=0
+          failed=0
+          while IFS= read -r row; do
+            [[ -n "$row" ]] || continue
+            id=$(jq -r '.id' <<<"$row")
+            name=$(jq -r '.name' <<<"$row")
+            branch=$(jq -r '.head_branch // ""' <<<"$row")
+            if gh api --method POST "/repos/${REPO}/actions/runs/${id}/cancel" >/dev/null 2>&1; then
+              echo "cancelled: ${id} ${name} ${branch}"
+              cancelled=$((cancelled + 1))
+            else
+              echo "preserved (already moved/completed or cancellation refused): ${id} ${name} ${branch}"
+              failed=$((failed + 1))
+            fi
+          done < "$cancel"
+
+          {
+            echo '## Actions queue drain'
+            echo "- Queued runs inspected: ${total}"
+            echo "- Superseded duplicate runs selected: ${doomed}"
+            echo "- Cancel requests accepted: ${cancelled}"
+            echo "- Already moved/completed or refused: ${failed}"
+            echo '- Safety rule: newest queued run per workflow/ref/event is always preserved.'
+          } >> "$GITHUB_STEP_SUMMARY"
