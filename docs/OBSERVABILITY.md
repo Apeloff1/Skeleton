@@ -8,6 +8,10 @@ Issue #121 consolidates observability around the existing `skeleton.observabilit
 
 Correlation identifiers are operational metadata, not a place to store credentials or user payloads.
 
+`ObservableOrchestrator` is the canonical instrumentation adapter for `CanonicalOrchestrator`. It delegates every lifecycle decision to the canonical orchestrator and adds metadata-only events for run and tool start/completion/failure, capability denial, cancellation, and retry evidence. Tool arguments, tool outputs, and exception messages are never copied into those events.
+
+API integrations should resolve one request identifier with `skeleton.api.correlation.request_correlation_id()` and invoke orchestration through `run_with_request_correlation()`. A valid request-state ID wins, otherwise exactly one valid `X-Request-ID` is accepted; duplicate or malformed header values fail closed to a server-generated identifier. The request correlation ID is then preserved on every orchestration event while `run_id` and `call_id` remain explicit structured fields.
+
 ## Redaction
 
 `skeleton.observability.redaction` is the canonical telemetry sanitization boundary.
@@ -35,15 +39,30 @@ Baseline metric names are:
 
 These names are the baseline contract for future API/runtime/agent/tool instrumentation. Provider- or subsystem-specific labels belong on the metric rather than in separate registries.
 
+## Orchestration event surface
+
+The correlated orchestration adapter emits:
+
+- `orchestration.run.started`
+- `orchestration.run.completed` / `.failed` / `.cancelled`
+- `orchestration.tool.started`
+- `orchestration.tool.succeeded` / `.failed` / `.denied` / `.cancelled`
+- `orchestration.tool.retry`
+
+Every event carries the same `DomainEvent.correlation_id`. Run events include `run_id`; tool events also include `call_id` and `tool_name`. Failure events expose only stable exception type names. Timing, attempt counts, and lifecycle status may be emitted, but user/tool payloads are prohibited.
+
 ## Existing package surface
 
-The package root now exposes the canonical health, metrics-registry, structured-logging, tracing, event-bridge, and redaction primitives. Older specialist modules under `skeleton/observability/` remain implementation modules; they should converge on these shared contracts rather than define competing correlation or secret-handling rules.
+The package root exposes the canonical health, metrics-registry, structured-logging, tracing, event-bridge, orchestration-observability, and redaction primitives. Older specialist modules under `skeleton/observability/` remain implementation modules; they should converge on these shared contracts rather than define competing correlation or secret-handling rules.
 
 ## Regression policy
 
-`tests/test_observability.py` is part of `scripts/quality-gates.sh`. It pins:
+`tests/test_observability.py` and the Frontier contract suite pin:
 
 - correlation preservation through `EventBus.emit`;
+- API request ID propagation through orchestration and tool execution;
+- duplicate request-ID fail-closed behavior;
+- metadata-only tool lifecycle events with no argument/output/exception-message leakage;
 - health-probe exception redaction;
 - structured-log redaction;
 - trace failure/attribute redaction;
