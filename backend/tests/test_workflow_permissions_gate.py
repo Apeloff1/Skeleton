@@ -76,6 +76,26 @@ jobs:
         findings = permissions.violations_from_text("unsafe.yml", text)
         self.assertTrue(any("read-all" in finding for finding in findings))
 
+    def test_rejects_double_quoted_write_all_at_job_scope(self) -> None:
+        text = """name: unsafe
+permissions: {}
+jobs:
+  mutate:
+    permissions: "write-all"
+"""
+        findings = permissions.violations_from_text("unsafe.yml", text)
+        self.assertTrue(any("write-all" in finding for finding in findings))
+
+    def test_rejects_single_quoted_read_all_at_job_scope(self) -> None:
+        text = """name: unsafe
+permissions: {}
+jobs:
+  inspect:
+    permissions: 'read-all'
+"""
+        findings = permissions.violations_from_text("unsafe.yml", text)
+        self.assertTrue(any("read-all" in finding for finding in findings))
+
     def test_rejects_opaque_top_level_flow_mapping(self) -> None:
         text = """name: unsafe
 permissions: {contents: read}
