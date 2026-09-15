@@ -48,4 +48,4 @@ This is the initial promotion map. It is deliberately conservative: repository n
 
 ## Safety boundary
 
-No source repository is modified or deleted by this matrix. Consolidation happens on the `frontier/consolidation-foundation` branch until validation is complete.
+No source repository is modified or deleted by this matrix. Consolidation happens on dedicated `frontier/**` branches and lands only after validation is complete.
