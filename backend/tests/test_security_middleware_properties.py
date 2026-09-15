@@ -177,3 +177,137 @@ def test_high_cardinality_generated_identities_keep_legacy_limiter_bounded(
         assert limiter_type._saturation_rejections == 56
 
     asyncio.run(scenario())
+
+
+def test_generated_positive_integer_config_values_and_invalids(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rng = random.Random(0x1A7C0F1)
+    name = "SKELETON_TEST_POSITIVE_INT"
+
+    for _ in range(96):
+        expected = rng.randint(1, 10_000_000)
+        monkeypatch.setenv(name, str(expected))
+        assert api_middleware._positive_int_env(name, 1) == expected
+
+    for invalid in ("0", "-1", "-999", "1.5", "nan", "inf", "", "text"):
+        monkeypatch.setenv(name, invalid)
+        with pytest.raises(RuntimeError):
+            api_middleware._positive_int_env(name, 1)
+
+
+def test_generated_positive_float_config_values_and_invalids(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rng = random.Random(0xF10A7C0)
+    name = "SKELETON_TEST_POSITIVE_FLOAT"
+
+    for _ in range(96):
+        expected = rng.uniform(0.001, 100_000.0)
+        monkeypatch.setenv(name, repr(expected))
+        assert api_middleware._positive_float_env(name, 1.0) == expected
+
+    for invalid in ("0", "-1", "nan", "inf", "-inf", "", "text"):
+        monkeypatch.setenv(name, invalid)
+        with pytest.raises(RuntimeError):
+            api_middleware._positive_float_env(name, 1.0)
+
+
+async def _exercise_size_limit(
+    *,
+    content_length: bytes | None,
+    chunks: list[bytes],
+) -> tuple[int, bool, bytes]:
+    queue = [
+        {
+            "type": "http.request",
+            "body": chunk,
+            "more_body": index < len(chunks) - 1,
+        }
+        for index, chunk in enumerate(chunks)
+    ] or [{"type": "http.request", "body": b"", "more_body": False}]
+    sent: list[dict] = []
+    called = False
+    observed = bytearray()
+
+    async def receive() -> dict:
+        return queue.pop(0)
+
+    async def send(message: dict) -> None:
+        sent.append(message)
+
+    async def app(scope, bounded_receive, bounded_send) -> None:
+        nonlocal called
+        called = True
+        while True:
+            message = await bounded_receive()
+            observed.extend(message.get("body") or b"")
+            if not message.get("more_body", False):
+                break
+        response = Response(status_code=204)
+        await response(scope, bounded_receive, bounded_send)
+
+    headers = [] if content_length is None else [(b"content-length", content_length)]
+    scope = {
+        "type": "http",
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "http",
+        "path": "/api/property",
+        "raw_path": b"/api/property",
+        "query_string": b"",
+        "headers": headers,
+        "client": ("127.0.0.1", 12345),
+        "server": ("testserver", 80),
+    }
+
+    await legacy_security.SizeLimitMiddleware(app, max_mb=1)(scope, receive, send)
+    status = next(
+        message["status"]
+        for message in sent
+        if message["type"] == "http.response.start"
+    )
+    return status, called, bytes(observed)
+
+
+def test_content_length_exact_match_and_mismatch_property() -> None:
+    rng = random.Random(0xC017E18)
+
+    for _ in range(32):
+        size = rng.randint(0, 2048)
+        body = bytes(rng.getrandbits(8) for _ in range(size))
+        status, called, observed = asyncio.run(
+            _exercise_size_limit(
+                content_length=str(size).encode("ascii"),
+                chunks=[body],
+            )
+        )
+        assert status == 204
+        assert called
+        assert observed == body
+
+        status, called, _ = asyncio.run(
+            _exercise_size_limit(
+                content_length=str(size + 1).encode("ascii"),
+                chunks=[body],
+            )
+        )
+        assert status == 400
+        assert not called
+
+
+def test_streamed_body_replay_preserves_exact_bytes_property() -> None:
+    rng = random.Random(0x57AEA0D)
+
+    for _ in range(32):
+        chunks = [
+            bytes(rng.getrandbits(8) for _ in range(rng.randint(0, 512)))
+            for _ in range(rng.randint(1, 8))
+        ]
+        expected = b"".join(chunks)
+        status, called, observed = asyncio.run(
+            _exercise_size_limit(content_length=None, chunks=chunks)
+        )
+        assert status == 204
+        assert called
+        assert observed == expected
