@@ -263,7 +263,13 @@ class Coordinator:
         self._handlers: Dict[str, Callable[[Task], Any]] = {}
         self._runs: Dict[str, RunRecord] = {}
         self._tools = ToolRegistry()
-        self._orchestrator = ObservableOrchestrator(tools=self._tools, event_bus=bus)
+        effective_bus = bus
+        if effective_bus is None and pool is not None:
+            effective_bus = pool._bus
+        self._orchestrator = ObservableOrchestrator(
+            tools=self._tools,
+            event_bus=effective_bus,
+        )
         self._bus = self._orchestrator.event_bus
         self.pool = pool or AgentPool(bus=self._bus)
         self._registered_tool_types: Set[str] = set()
