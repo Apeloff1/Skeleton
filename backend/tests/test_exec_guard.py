@@ -45,24 +45,25 @@ def test_local_execution_requires_explicit_opt_in(monkeypatch: pytest.MonkeyPatc
         ("DYNO", "web.1"),
     ],
 )
-def test_production_markers_require_second_gate(
+def test_production_markers_permanently_disable_host_execution(
     monkeypatch: pytest.MonkeyPatch,
     name: str,
     value: str,
 ) -> None:
     monkeypatch.setenv("ALLOW_UNSAFE_CODE_EXECUTION", "true")
+    monkeypatch.setenv("ALLOW_PRODUCTION_HOST_CODE_EXECUTION", "true")
     monkeypatch.setenv(name, value)
     assert exec_guard.production_runtime_detected() is True
     assert exec_guard.code_execution_enabled() is False
 
 
-def test_production_execution_requires_both_explicit_overrides(
+def test_legacy_production_override_cannot_reenable_execution(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.setenv("ALLOW_UNSAFE_CODE_EXECUTION", "true")
     monkeypatch.setenv("ALLOW_PRODUCTION_HOST_CODE_EXECUTION", "true")
-    assert exec_guard.code_execution_enabled() is True
+    assert exec_guard.code_execution_enabled() is False
 
 
 def test_false_like_production_flag_does_not_enable_production_mode(
@@ -81,3 +82,13 @@ def test_disabled_response_does_not_expose_configuration_values(
     assert response["disabled"] is True
     assert "Python execution" in response["error"]
     assert "ALLOW_UNSAFE_CODE_EXECUTION=true" not in response["error"]
+    assert "ALLOW_PRODUCTION_HOST_CODE_EXECUTION" not in response["error"]
+
+
+def test_production_disabled_message_requires_isolated_worker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    message = exec_guard.execution_disabled_message("C++ execution")
+    assert "production application host" in message
+    assert "isolated sandbox worker" in message
