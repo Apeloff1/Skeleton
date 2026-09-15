@@ -123,6 +123,20 @@ DEFAULT_DOMAIN_MAP: Tuple[Tuple[str, str], ...] = (
 )
 
 
+def _path_matches_prefix(path: str, prefix: str) -> bool:
+    """Match an exact route prefix or one of its slash-delimited children.
+
+    Plain ``startswith`` is intentionally not used: ``/healthcheck`` must not
+    inherit the openness of ``/health``, and ``/api/v1/jeeves-admin`` must not
+    inherit the ``jeeves`` governance domain.
+    """
+    p = path or "/"
+    pref = (prefix or "").rstrip("/")
+    if not pref:
+        return p == "/"
+    return p == pref or p.startswith(pref + "/")
+
+
 class GatePolicy:
     """Charters at the middleware layer — open probes vs written domains.
 
@@ -141,23 +155,11 @@ class GatePolicy:
         self._domains = tuple(sorted(domains, key=lambda pd: len(pd[0]), reverse=True))
 
     def is_open_route(self, path: str) -> bool:
-        p = path or "/"
-        for pref in self._open:
-            if not pref:
-                continue
-            # Bare "/" is exact-only — never a prefix of every path.
-            if pref == "/":
-                if p == "/":
-                    return True
-                continue
-            if p == pref or p.startswith(pref.rstrip("/") + "/") or p.startswith(pref):
-                return True
-        return False
+        return any(_path_matches_prefix(path, pref) for pref in self._open if pref)
 
     def required_domain(self, path: str) -> Optional[str]:
-        p = path or "/"
         for prefix, domain in self._domains:
-            if p == prefix or p.startswith(prefix + "/") or p.startswith(prefix):
+            if _path_matches_prefix(path, prefix):
                 return domain
         return None
 
