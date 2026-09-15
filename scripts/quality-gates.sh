@@ -7,6 +7,9 @@ cd "$ROOT"
 printf '\n== Toolchain contract ==\n'
 python scripts/check_toolchain_contract.py
 
+printf '\n== Provider runtime boundary ==\n'
+python scripts/check_provider_runtime_boundary.py
+
 printf '\n== Skeleton core syntax ==\n'
 python -m compileall -q skeleton
 
@@ -16,6 +19,7 @@ python -m compileall -q backend
 printf '\n== Provider runtime and agent orchestration contracts ==\n'
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   tests/test_model_runtime.py \
+  tests/test_provider_runtime_boundary.py \
   tests/test_orchestration.py \
   tests/test_orchestration_error_redaction.py \
   tests/test_agent_coordination.py
