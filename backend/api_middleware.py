@@ -12,15 +12,21 @@ Public surface:
   • get_stats()           — observability snapshot (for the /api/_telemetry route)
 
 Tunable via env:
-  RATE_LIMIT_PER_MIN  (int)   default 600        — 10 rps per IP, generous
-  RATE_LIMIT_BURST    (int)   default 60         — initial bucket size
-  RATE_LIMIT_EXEMPT   (csv)   default "127.0.0.1,::1,localhost"
-  ACCESS_LOG          (0|1)   default 1
+  RATE_LIMIT_PER_MIN      (int)   default 600        — 10 rps per IP, generous
+  RATE_LIMIT_BURST        (int)   default 60         — initial bucket size
+  RATE_LIMIT_EXEMPT       (csv)   default "127.0.0.1,::1,localhost"
+  RATE_LIMIT_MAX_BUCKETS  (int)   default 4096       — hard cap on tracked IPs
+  RATE_LIMIT_BUCKET_TTL   (float) default 300        — idle seconds before expiry
+  TRUSTED_PROXY_CIDRS     (csv)   default ""         — proxies allowed to supply XFF
+  ACCESS_LOG              (0|1)   default 1
 """
 from __future__ import annotations
+
 import asyncio
+import ipaddress
 import logging
 import os
+import re
 import time
 import uuid
 from collections import defaultdict, deque
@@ -37,7 +43,30 @@ _RATE_PER_MIN = int(os.environ.get("RATE_LIMIT_PER_MIN", "600"))
 _RATE_BURST = int(os.environ.get("RATE_LIMIT_BURST", "60"))
 _EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "127.0.0.1,::1,localhost")
 _EXEMPT_IPS = {ip.strip() for ip in _EXEMPT_RAW.split(",") if ip.strip()}
+_MAX_BUCKETS = max(1, int(os.environ.get("RATE_LIMIT_MAX_BUCKETS", "4096")))
+_BUCKET_TTL = max(0.01, float(os.environ.get("RATE_LIMIT_BUCKET_TTL", "300")))
+_TRUSTED_PROXY_RAW = os.environ.get("TRUSTED_PROXY_CIDRS", "")
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
+_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+_MAX_XFF_HOPS = 32
+
+
+def _parse_trusted_proxy_networks(
+    raw: str,
+) -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
+    networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
+    for raw_value in raw.split(","):
+        value = raw_value.strip()
+        if not value:
+            continue
+        try:
+            networks.append(ipaddress.ip_network(value, strict=False))
+        except ValueError as exc:
+            raise ValueError("invalid TRUSTED_PROXY_CIDRS entry") from exc
+    return tuple(networks)
+
+
+_TRUSTED_PROXY_NETWORKS = _parse_trusted_proxy_networks(_TRUSTED_PROXY_RAW)
 
 # Telemetry counters (in-memory) ────────────────────────────────────
 # Last 1024 latencies as a ring buffer for p50/p95 computation.
@@ -47,11 +76,14 @@ _lat_ring: Deque[float] = deque(maxlen=1024)
 # wrong loop in K8s where uvicorn workers may use a fresh loop).
 _lat_lock: asyncio.Lock | None = None
 
+
 def _get_lat_lock() -> asyncio.Lock:
     global _lat_lock
     if _lat_lock is None:
         _lat_lock = asyncio.Lock()
     return _lat_lock
+
+
 _counts: Dict[str, int] = defaultdict(int)
 _started_at: float = time.time()
 
@@ -89,29 +121,35 @@ def get_stats() -> dict:
             "per_minute": _RATE_PER_MIN,
             "burst": _RATE_BURST,
             "exempt_ips": sorted(_EXEMPT_IPS),
+            "buckets": _counts.get("rate_limit_buckets", 0),
+            "max_buckets": _MAX_BUCKETS,
+            "evictions": _counts.get("rate_limit_evictions", 0),
+            "expired_pruned": _counts.get("rate_limit_expired_pruned", 0),
+            "saturation_rejections": _counts.get("rate_limit_saturation_rejections", 0),
+            "trusted_proxy_count": len(_TRUSTED_PROXY_NETWORKS),
         },
     }
 
 
-# ── Request ID ────────────────────────────────────────────────────────
+def _request_id(request: Request) -> str:
+    candidates = request.headers.getlist("x-request-id")
+    if len(candidates) == 1 and _REQUEST_ID_RE.fullmatch(candidates[0]):
+        return candidates[0]
+    return uuid.uuid4().hex
+
+
 class RequestIdMiddleware(BaseHTTPMiddleware):
-    """Pulls X-Request-Id from the inbound header if present, otherwise mints
-    one. The id is exposed on `request.state.request_id` and echoed back on
-    the response header. Useful for cross-service correlation."""
+    """Accept one bounded header-safe X-Request-Id or mint one."""
 
     async def dispatch(self, request: Request, call_next: Callable):
-        rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:16]
+        rid = _request_id(request)
         request.state.request_id = rid
         try:
             response: Response = await call_next(request)
         except RuntimeError as e:
-            # Starlette BaseHTTPMiddleware raises "No response returned."
-            # when the client disconnects mid-response. This is benign —
-            # there's no response object to attach the header to, so just
-            # propagate the disconnect as a 499 (nginx convention for
-            # client-closed-request). Logged at debug to avoid noise.
             if "No response returned" in str(e):
                 from fastapi.responses import Response as _Resp
+
                 log.debug("client disconnected mid-request rid=%s path=%s", rid, request.url.path)
                 resp = _Resp(status_code=499)
                 resp.headers["X-Request-Id"] = rid
@@ -119,6 +157,58 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
             raise
         response.headers["X-Request-Id"] = rid
         return response
+
+
+# ── Client identity / proxy trust ─────────────────────────────────────
+def _canonical_ip(value: str) -> str | None:
+    value = value.strip()
+    if not value:
+        return None
+    if len(value) >= 2 and value[0] == value[-1] == '"':
+        value = value[1:-1].strip()
+    try:
+        return str(ipaddress.ip_address(value))
+    except ValueError:
+        return None
+
+
+def _is_trusted_proxy(value: str) -> bool:
+    canonical = _canonical_ip(value)
+    if canonical is None:
+        return False
+    address = ipaddress.ip_address(canonical)
+    return any(address in network for network in _TRUSTED_PROXY_NETWORKS)
+
+
+def _client_ip(request: Request) -> str:
+    """Resolve the nearest untrusted client without accepting spoofed XFF."""
+    client = request.client
+    peer = client.host.strip() if client and client.host else "-"
+    canonical_peer = _canonical_ip(peer)
+    peer_identity = canonical_peer or peer
+    if peer == "-" or not _is_trusted_proxy(peer):
+        return peer_identity
+
+    xff_values = request.headers.getlist("x-forwarded-for")
+    if not xff_values:
+        return peer_identity
+    if len(xff_values) != 1:
+        return peer_identity
+
+    parts = xff_values[0].split(",")
+    if not parts or len(parts) > _MAX_XFF_HOPS:
+        return peer_identity
+
+    forwarded = [_canonical_ip(part) for part in parts]
+    if any(value is None for value in forwarded):
+        return peer_identity
+
+    for value in reversed(forwarded):
+        assert value is not None
+        if not _is_trusted_proxy(value):
+            return value
+
+    return peer_identity
 
 
 # ── Access log ────────────────────────────────────────────────────────
@@ -136,41 +226,48 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
             status = response.status_code
         except Exception:
-            # Log the failure then re-raise; the global handler will still 500.
             dur = (time.perf_counter() - t0) * 1000
             log.exception(
                 "method=%s path=%s status=500 dur_ms=%.2f rid=%s ip=%s err=unhandled",
-                request.method, request.url.path, dur, rid, _client_ip(request),
+                request.method,
+                request.url.path,
+                dur,
+                rid,
+                _client_ip(request),
             )
             raise
 
         dur = (time.perf_counter() - t0) * 1000
-        bucket = "2xx" if 200 <= status < 300 else "4xx" if 400 <= status < 500 else "5xx" if 500 <= status < 600 else "other"
+        bucket = (
+            "2xx"
+            if 200 <= status < 300
+            else "4xx"
+            if 400 <= status < 500
+            else "5xx"
+            if 500 <= status < 600
+            else "other"
+        )
         _counts["requests"] += 1
         _counts[bucket] += 1
         await _push_latency(dur)
-        # Skip the high-frequency health pings from access log to keep it clean.
         if request.url.path not in ("/api/health", "/api/_telemetry"):
             log.info(
                 "method=%s path=%s status=%d dur_ms=%.2f rid=%s ip=%s",
-                request.method, request.url.path, status, dur, rid, _client_ip(request),
+                request.method,
+                request.url.path,
+                status,
+                dur,
+                rid,
+                _client_ip(request),
             )
         return response
-
-
-def _client_ip(request: Request) -> str:
-    # Honour X-Forwarded-For when behind an ingress, fall back to peer.
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()
-    client = request.client
-    return client.host if client else "-"
 
 
 # ── Rate limiter ──────────────────────────────────────────────────────
 class _Bucket:
     """Tiny token-bucket. Refills `_refill_per_sec` tokens per second up to
     `capacity`. take() returns True if a token was consumed."""
+
     __slots__ = ("tokens", "last", "capacity", "refill_per_sec")
 
     def __init__(self, capacity: int, refill_per_sec: float):
@@ -188,45 +285,115 @@ class _Bucket:
         if self.tokens >= n:
             self.tokens -= n
             return True, 0.0
-        # Seconds until the next token will be available.
         deficit = n - self.tokens
         retry = deficit / self.refill_per_sec if self.refill_per_sec > 0 else 60.0
         return False, retry
 
 
 class RateLimiterMiddleware(BaseHTTPMiddleware):
-    """Per-IP token bucket. Exempt IPs (loopback) skip the check.
+    """Per-IP token bucket with bounded idle state.
+
+    Exempt IPs (loopback) skip the check. State is pruned after the idle TTL
+    and capped at `max_buckets`. When all slots are occupied by active
+    identities, unseen identities are rejected until a slot expires instead
+    of evicting active state and receiving a fresh burst. Mutation is
+    serialized per middleware instance so cleanup/admission cannot race.
 
     NOTE: This is *in-memory* and per-process. Sufficient for single-replica
     deployments and dev. For horizontal scaling, swap in a shared store.
     """
 
-    def __init__(self, app, per_minute: int | None = None, burst: int | None = None):
+    def __init__(
+        self,
+        app,
+        per_minute: int | None = None,
+        burst: int | None = None,
+        max_buckets: int | None = None,
+        bucket_ttl: float | None = None,
+    ):
         super().__init__(app)
-        self.per_minute = per_minute or _RATE_PER_MIN
-        self.burst = burst or _RATE_BURST
+        self.per_minute = per_minute if per_minute is not None else _RATE_PER_MIN
+        self.burst = burst if burst is not None else _RATE_BURST
+        if self.per_minute <= 0:
+            raise ValueError("per_minute must be positive")
+        if self.burst <= 0:
+            raise ValueError("burst must be positive")
+        self.max_buckets = max(1, max_buckets if max_buckets is not None else _MAX_BUCKETS)
+        self.bucket_ttl = max(0.01, bucket_ttl if bucket_ttl is not None else _BUCKET_TTL)
         self._refill_per_sec = self.per_minute / 60.0
         self._buckets: Dict[str, _Bucket] = {}
+        self._state_lock: asyncio.Lock | None = None
+        self._evictions = 0
+        self._expired_pruned = 0
+        self._saturation_rejections = 0
 
-    def _bucket_for(self, ip: str) -> _Bucket:
-        b = self._buckets.get(ip)
-        if b is None:
-            b = _Bucket(self.burst, self._refill_per_sec)
-            self._buckets[ip] = b
-        return b
+    def _get_state_lock(self) -> asyncio.Lock:
+        if self._state_lock is None:
+            self._state_lock = asyncio.Lock()
+        return self._state_lock
+
+    def _prune_expired(self, now: float) -> int:
+        expired = [
+            ip
+            for ip, bucket in self._buckets.items()
+            if now - bucket.last >= self.bucket_ttl
+        ]
+        for ip in expired:
+            del self._buckets[ip]
+        if expired:
+            pruned = len(expired)
+            self._evictions += pruned
+            self._expired_pruned += pruned
+            _counts["rate_limit_evictions"] += pruned
+            _counts["rate_limit_expired_pruned"] += pruned
+        return len(expired)
+
+    def _retry_until_capacity(self, now: float) -> float:
+        if not self._buckets:
+            return self.bucket_ttl
+        remaining = [
+            self.bucket_ttl - (now - bucket.last) for bucket in self._buckets.values()
+        ]
+        return max(0.01, min(remaining))
+
+    def _bucket_for(self, ip: str, now: float | None = None) -> Tuple[_Bucket | None, float]:
+        now = time.monotonic() if now is None else now
+        self._prune_expired(now)
+        bucket = self._buckets.get(ip)
+        if bucket is None:
+            if len(self._buckets) >= self.max_buckets:
+                self._saturation_rejections += 1
+                _counts["rate_limit_saturation_rejections"] += 1
+                _counts["rate_limit_buckets"] = len(self._buckets)
+                return None, self._retry_until_capacity(now)
+            bucket = _Bucket(self.burst, self._refill_per_sec)
+            self._buckets[ip] = bucket
+        _counts["rate_limit_buckets"] = len(self._buckets)
+        return bucket, 0.0
 
     async def dispatch(self, request: Request, call_next: Callable):
-        # Bypass non-API routes (Expo serves /, /assets, etc. from same origin)
         if not request.url.path.startswith("/api"):
             return await call_next(request)
         ip = _client_ip(request)
         if ip in _EXEMPT_IPS or ip == "-":
             return await call_next(request)
-        ok, retry = self._bucket_for(ip).take(1)
+        async with self._get_state_lock():
+            bucket, retry = self._bucket_for(ip)
+            if bucket is None:
+                ok = False
+            else:
+                ok, retry = bucket.take(1)
         if not ok:
             _counts["rate_limited"] += 1
-            rid = getattr(request.state, "request_id", "-")
-            log.warning("rate_limited ip=%s path=%s retry=%.1fs rid=%s", ip, request.url.path, retry, rid)
+            rid = _request_id(request)
+            request.state.request_id = rid
+            log.warning(
+                "rate_limited ip=%s path=%s retry=%.1fs rid=%s",
+                ip,
+                request.url.path,
+                retry,
+                rid,
+            )
             return JSONResponse(
                 {
                     "error": "rate_limited",
