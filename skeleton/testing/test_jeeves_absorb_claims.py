@@ -101,6 +101,8 @@ def test_consensus_verifier_refuses_retracted_claim() -> None:
 
     verification = verifier(observation, _signals())
 
+    assert verification.confidence == 0
+    assert verification.contradiction == 1
     assert verification.challenge_passed is False
     assert verification.integrity_risk == 1
     assert verification.freshness == 0
