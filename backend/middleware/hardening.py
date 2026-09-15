@@ -5,7 +5,7 @@ hardening middleware — additional safety nets for the FastAPI backend.
     than DEFAULT_TIMEOUT_S, returning 504 instead of letting the worker
     hang. Configurable per-path via the PATH_TIMEOUTS map. The middleware
     also protects the privileged /api/advanced surface with a server-side
-    admin token so legacy handler-level unlock logic cannot be bypassed.
+    admin token and enforces a fail-closed production CORS boundary.
   • ProcessHealthRouter — adds GET /api/health/detailed with CPU /
     memory / disk numbers so the frontend (or external monitoring)
     can detect resource exhaustion before requests start failing.
@@ -98,8 +98,53 @@ def _advanced_api_auth_failure(request: Request) -> JSONResponse | None:
     return None
 
 
+def _production_mode() -> bool:
+    environment = os.environ.get("ENVIRONMENT", "development").strip().lower()
+    return environment in {"prod", "production"}
+
+
+def _same_origin(request: Request, origin: str) -> bool:
+    """Allow same-origin browser traffic without requiring a CORS entry."""
+    host = request.headers.get("host", "").strip()
+    if not host:
+        return False
+    return origin.rstrip("/") == f"{request.url.scheme}://{host}".rstrip("/")
+
+
+def _cors_origin_failure(request: Request) -> JSONResponse | None:
+    """Enforce an explicit production cross-origin boundary before CORS runs.
+
+    CORS is a browser boundary rather than authentication. This guard prevents
+    a missing/blank/wildcard CORS_ORIGINS value from silently becoming a
+    production allow-all policy while retaining the existing permissive
+    development behavior.
+    """
+    origin = request.headers.get("origin")
+    if not origin or _same_origin(request, origin):
+        return None
+
+    raw = os.environ.get("CORS_ORIGINS", "").strip()
+    if not raw or raw == "*":
+        if not _production_mode():
+            return None
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "Cross-origin API access is not configured"},
+            headers={"Cache-Control": "no-store"},
+        )
+
+    allowed = {item.strip() for item in raw.split(",") if item.strip()}
+    if origin not in allowed:
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "Origin is not allowed"},
+            headers={"Cache-Control": "no-store"},
+        )
+    return None
+
+
 class RequestTimeoutMiddleware(BaseHTTPMiddleware):
-    """Enforce API timeout and the privileged advanced-API auth boundary."""
+    """Enforce API timeout, CORS boundary, and privileged advanced API auth."""
 
     def __init__(self, app, default_timeout_s: float = 30.0):
         super().__init__(app)
@@ -109,6 +154,10 @@ class RequestTimeoutMiddleware(BaseHTTPMiddleware):
         # Skip non-API paths (Metro / docs / etc.)
         if not request.url.path.startswith("/api/"):
             return await call_next(request)
+
+        cors_failure = _cors_origin_failure(request)
+        if cors_failure is not None:
+            return cors_failure
 
         if _is_advanced_api_path(request.url.path):
             auth_failure = _advanced_api_auth_failure(request)
