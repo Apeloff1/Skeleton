@@ -1,0 +1,231 @@
+name: Repair up to 100 stale branch refs
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/branch-repair-100.yml'
+
+concurrency:
+  group: branch-repair-100-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  repair:
+    name: Safely inspect and fast-forward 100 branches
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: write
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GIT_TERMINAL_PROMPT: '0'
+    steps:
+      - name: Fetch repository branch graph
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          auth_dir="$RUNNER_TEMP/branch-repair-auth"
+          mkdir -p "$auth_dir"
+          cat > "$auth_dir/askpass.sh" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          case "${1:-}" in
+            *Username*) printf '%s\n' 'x-access-token' ;;
+            *Password*) printf '%s\n' "$GH_TOKEN" ;;
+            *) exit 1 ;;
+          esac
+          EOF
+          chmod 700 "$auth_dir/askpass.sh"
+          export GIT_ASKPASS="$auth_dir/askpass.sh"
+          export GIT_ASKPASS_REQUIRE=force
+          {
+            echo "GIT_ASKPASS=$GIT_ASKPASS"
+            echo 'GIT_ASKPASS_REQUIRE=force'
+          } >> "$GITHUB_ENV"
+
+          git init repo
+          cd repo
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --quiet --prune --no-tags --filter=blob:none origin '+refs/heads/*:refs/remotes/origin/*'
+
+      - name: Repair stale refs without rewriting unique work
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd repo
+
+          inspect_limit=100
+          min_head_age_seconds=300
+          main_ref=refs/remotes/origin/main
+
+          declare -A open_pr_heads=()
+          while IFS= read -r branch; do
+            [[ -n "$branch" ]] || continue
+            open_pr_heads["$branch"]=1
+          done < <(
+            gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+              --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .head.ref'
+          )
+
+          has_active_ci() {
+            local sha="$1" state count
+            for state in requested waiting pending queued in_progress; do
+              count=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${sha}&status=${state}&per_page=1" \
+                --jq '.total_count' 2>/dev/null) || return 0
+              if [[ "${count:-0}" != "0" ]]; then
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          head_is_settled() {
+            local sha="$1" committed now
+            committed=$(git show -s --format=%ct "$sha" 2>/dev/null) || return 1
+            now=$(date +%s)
+            (( now - committed >= min_head_age_seconds ))
+          }
+
+          git fetch --quiet --no-tags --filter=blob:none origin '+refs/heads/main:refs/remotes/origin/main'
+          initial_main=$(git rev-parse "$main_ref")
+
+          inspected=0
+          updated=0
+          aligned=0
+          protected=0
+          open_pr=0
+          active_ci=0
+          recent=0
+          ahead=0
+          diverged=0
+          raced=0
+          failed=0
+          : > ../branch-repair-results.txt
+
+          while read -r tip branch; do
+            [[ -n "$tip" && -n "$branch" ]] || continue
+            [[ "$branch" != main ]] || continue
+
+            inspected=$((inspected + 1))
+            if (( inspected > inspect_limit )); then
+              break
+            fi
+
+            case "$branch" in
+              develop|release/*|keep/*|backup/*)
+                protected=$((protected + 1))
+                printf '%s %s preserved protected-name\n' "$branch" "$tip" >> ../branch-repair-results.txt
+                continue
+                ;;
+            esac
+
+            if [[ -n "${open_pr_heads[$branch]+x}" ]]; then
+              open_pr=$((open_pr + 1))
+              printf '%s %s preserved open-pr-head\n' "$branch" "$tip" >> ../branch-repair-results.txt
+              continue
+            fi
+
+            if has_active_ci "$tip"; then
+              active_ci=$((active_ci + 1))
+              printf '%s %s preserved active-ci\n' "$branch" "$tip" >> ../branch-repair-results.txt
+              continue
+            fi
+
+            if ! head_is_settled "$tip"; then
+              recent=$((recent + 1))
+              printf '%s %s preserved recent-head\n' "$branch" "$tip" >> ../branch-repair-results.txt
+              continue
+            fi
+
+            current_main=$(git rev-parse "$main_ref")
+            if [[ "$tip" == "$current_main" ]]; then
+              aligned=$((aligned + 1))
+              printf '%s %s already-aligned main\n' "$branch" "$tip" >> ../branch-repair-results.txt
+              continue
+            fi
+
+            if git merge-base --is-ancestor "$tip" "$current_main"; then
+              # Re-fetch both refs immediately before mutation. Ordinary push,
+              # never force, makes GitHub enforce fast-forward safety if either
+              # ref changed after classification.
+              if ! git fetch --quiet --no-tags --filter=blob:none origin \
+                "+refs/heads/main:refs/remotes/origin/main" \
+                "+refs/heads/${branch}:refs/remotes/origin/${branch}"; then
+                raced=$((raced + 1))
+                printf '%s %s preserved fetch-race\n' "$branch" "$tip" >> ../branch-repair-results.txt
+                continue
+              fi
+
+              live_main=$(git rev-parse "$main_ref")
+              live_tip=$(git rev-parse "refs/remotes/origin/${branch}")
+              if [[ "$live_tip" != "$tip" ]]; then
+                raced=$((raced + 1))
+                printf '%s %s preserved moved-before-update\n' "$branch" "$live_tip" >> ../branch-repair-results.txt
+                continue
+              fi
+              if [[ -n "${open_pr_heads[$branch]+x}" ]] || has_active_ci "$live_tip" || ! head_is_settled "$live_tip"; then
+                raced=$((raced + 1))
+                printf '%s %s preserved became-active\n' "$branch" "$live_tip" >> ../branch-repair-results.txt
+                continue
+              fi
+              if ! git merge-base --is-ancestor "$live_tip" "$live_main"; then
+                raced=$((raced + 1))
+                printf '%s %s preserved no-longer-fast-forward\n' "$branch" "$live_tip" >> ../branch-repair-results.txt
+                continue
+              fi
+
+              if git push --quiet origin "${live_main}:refs/heads/${branch}"; then
+                updated=$((updated + 1))
+                printf '%s %s repaired fast-forward-to-main=%s\n' "$branch" "$live_tip" "$live_main" >> ../branch-repair-results.txt
+              else
+                failed=$((failed + 1))
+                printf '%s %s preserved push-rejected\n' "$branch" "$live_tip" >> ../branch-repair-results.txt
+              fi
+              continue
+            fi
+
+            if git merge-base --is-ancestor "$current_main" "$tip"; then
+              ahead=$((ahead + 1))
+              printf '%s %s preserved ahead-of-main\n' "$branch" "$tip" >> ../branch-repair-results.txt
+            else
+              diverged=$((diverged + 1))
+              printf '%s %s preserved diverged-unique-work\n' "$branch" "$tip" >> ../branch-repair-results.txt
+            fi
+          done < <(
+            git for-each-ref --format='%(objectname) %(refname:strip=3)' refs/remotes/origin | sort -k2,2
+          )
+
+          {
+            echo '## 100-branch repair sweep'
+            echo "- Initial main tip: \`$initial_main\`"
+            echo "- Branches inspected: $inspected / $inspect_limit"
+            echo "- Safely fast-forwarded to main: $updated"
+            echo "- Already aligned with main: $aligned"
+            echo "- Protected long-lived/backup refs preserved: $protected"
+            echo "- Open-PR refs preserved: $open_pr"
+            echo "- Active-CI refs preserved: $active_ci"
+            echo "- Recently pushed refs preserved: $recent"
+            echo "- Ahead-only refs preserved: $ahead"
+            echo "- Diverged refs with unique work preserved: $diverged"
+            echo "- Revalidation races preserved: $raced"
+            echo "- Server-rejected updates preserved: $failed"
+            echo '- No branch is force-pushed or deleted.'
+            echo '- Every mutation must remain a server-accepted fast-forward at push time.'
+            echo '- main is read-only in this repair job.'
+            echo
+            echo '### Per-branch result'
+            echo '```text'
+            cat ../branch-repair-results.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if (( inspected < inspect_limit )); then
+            echo "Only $inspected non-main branches existed to inspect; requested cap was $inspect_limit." >&2
+          fi
