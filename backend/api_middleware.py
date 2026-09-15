@@ -22,6 +22,7 @@ Tunable via env:
 from __future__ import annotations
 import asyncio
 import logging
+import math
 import os
 import time
 import uuid
@@ -39,9 +40,10 @@ _RATE_PER_MIN = int(os.environ.get("RATE_LIMIT_PER_MIN", "600"))
 _RATE_BURST = int(os.environ.get("RATE_LIMIT_BURST", "60"))
 _EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "127.0.0.1,::1,localhost")
 _EXEMPT_IPS = {ip.strip() for ip in _EXEMPT_RAW.split(",") if ip.strip()}
-_MAX_BUCKETS = max(1, int(os.environ.get("RATE_LIMIT_MAX_BUCKETS", "4096")))
-_BUCKET_TTL = max(0.01, float(os.environ.get("RATE_LIMIT_BUCKET_TTL", "300")))
+_MAX_BUCKETS = int(os.environ.get("RATE_LIMIT_MAX_BUCKETS", "4096"))
+_BUCKET_TTL = float(os.environ.get("RATE_LIMIT_BUCKET_TTL", "300"))
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
+_MAX_RETRY_AFTER_SECONDS = 86_400
 
 # Telemetry counters (in-memory) ────────────────────────────────────
 # Last 1024 latencies as a ring buffer for p50/p95 computation.
@@ -73,6 +75,18 @@ def _percentile(sorted_vals, pct: float) -> float:
         return 0.0
     k = max(0, min(len(sorted_vals) - 1, int(pct / 100.0 * (len(sorted_vals) - 1))))
     return sorted_vals[k]
+
+
+def _is_api_path(path: str) -> bool:
+    """Match only the /api route boundary, never lookalikes such as /apiary."""
+    return path == "/api" or path.startswith("/api/")
+
+
+def _bounded_retry_after(retry: float) -> int:
+    """Return a finite advisory Retry-After value even under hostile config."""
+    if not math.isfinite(retry):
+        return _MAX_RETRY_AFTER_SECONDS
+    return max(1, min(_MAX_RETRY_AFTER_SECONDS, math.ceil(max(0.0, retry))))
 
 
 def get_stats() -> dict:
@@ -228,14 +242,22 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         bucket_ttl: float | None = None,
     ):
         super().__init__(app)
-        self.per_minute = per_minute if per_minute is not None else _RATE_PER_MIN
-        self.burst = burst if burst is not None else _RATE_BURST
-        if self.per_minute <= 0:
-            raise ValueError("per_minute must be positive")
-        if self.burst <= 0:
-            raise ValueError("burst must be positive")
-        self.max_buckets = max(1, max_buckets if max_buckets is not None else _MAX_BUCKETS)
-        self.bucket_ttl = max(0.01, bucket_ttl if bucket_ttl is not None else _BUCKET_TTL)
+        configured_rate = per_minute if per_minute is not None else _RATE_PER_MIN
+        configured_burst = burst if burst is not None else _RATE_BURST
+        configured_max = max_buckets if max_buckets is not None else _MAX_BUCKETS
+        configured_ttl = bucket_ttl if bucket_ttl is not None else _BUCKET_TTL
+        if not math.isfinite(float(configured_rate)) or configured_rate <= 0:
+            raise ValueError("per_minute must be finite and positive")
+        if not math.isfinite(float(configured_burst)) or configured_burst <= 0:
+            raise ValueError("burst must be finite and positive")
+        if configured_max <= 0:
+            raise ValueError("max_buckets must be positive")
+        if not math.isfinite(float(configured_ttl)) or configured_ttl <= 0:
+            raise ValueError("bucket_ttl must be finite and positive")
+        self.per_minute = configured_rate
+        self.burst = configured_burst
+        self.max_buckets = int(configured_max)
+        self.bucket_ttl = float(configured_ttl)
         self._refill_per_sec = self.per_minute / 60.0
         self._buckets: Dict[str, _Bucket] = {}
         self._state_lock: asyncio.Lock | None = None
@@ -283,7 +305,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable):
         # Bypass non-API routes (Expo serves /, /assets, etc. from same origin)
-        if not request.url.path.startswith("/api"):
+        if not _is_api_path(request.url.path):
             return await call_next(request)
         ip = _client_ip(request)
         if ip in _EXEMPT_IPS or ip == "-":
@@ -297,17 +319,18 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         if not ok:
             _counts["rate_limited"] += 1
             rid = getattr(request.state, "request_id", "-")
+            retry_after = _bounded_retry_after(retry)
             log.warning("rate_limited ip=%s path=%s retry=%.1fs rid=%s", ip, request.url.path, retry, rid)
             return JSONResponse(
                 {
                     "error": "rate_limited",
                     "message": "Too many requests; please slow down.",
-                    "retry_after_seconds": round(retry, 1),
+                    "retry_after_seconds": retry_after,
                     "request_id": rid,
                 },
                 status_code=429,
                 headers={
-                    "Retry-After": str(max(1, int(retry + 0.5))),
+                    "Retry-After": str(retry_after),
                     "X-Request-Id": rid,
                     "X-RateLimit-Limit": str(self.per_minute),
                 },
