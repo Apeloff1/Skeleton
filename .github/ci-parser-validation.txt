@@ -1,0 +1,1 @@
+Temporary marker used to validate GitHub Actions workflow parsing. Safe to delete after CI jobs materialize.
