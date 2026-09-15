@@ -2,6 +2,7 @@ name: Product Convergence Gates
 
 on:
   push:
+    branches: [main]
     paths:
       - "backend/core/**"
       - "backend/routes/ops.py"

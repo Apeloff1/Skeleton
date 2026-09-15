@@ -2,6 +2,7 @@ name: Product Kernel
 
 on:
   push:
+    branches: [main]
     paths:
       - "backend/core/charter_policy.py"
       - "backend/core/product_kernel.py"

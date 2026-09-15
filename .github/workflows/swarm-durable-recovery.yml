@@ -2,6 +2,7 @@ name: Swarm Durable Recovery
 
 on:
   push:
+    branches: [main]
     paths:
       - "skeleton/agents/swarm_durable.py"
       - "skeleton/agents/swarm_recovery.py"
