@@ -29,6 +29,16 @@ Two maintained dependency shapes are covered by the shared contract tests:
 
 Adapters intentionally use duck typing and do not import provider SDK packages from the frontier layer. This keeps `skeleton` importable without optional provider packages and prevents provider-specific types from leaking into orchestration code.
 
+## Current provider audit
+
+The production dependency graph previously carried `google-genai`, but the #116 audit found no active Python model-execution import or client call site for that SDK. The unused production dependency is therefore removed rather than creating an adapter for code that does not exist.
+
+`scripts/check_provider_runtime_boundary.py` makes that conclusion enforceable: direct or dynamic Google GenAI imports under runtime source roots fail CI. Adding Google later requires an intentional canonical `ProviderAdapter` plus the same shared contract tests used by the maintained adapters before the boundary gate is relaxed.
+
+`backend/server.py` still contains one legacy import of the repository-local, boot-safe `emergentintegrations.llm.chat` compatibility shim. The audit verifies that `LlmChat` and `UserMessage` are not used by the server and rejects retired Emergent imports anywhere else in runtime source. Any future attempt to turn that compatibility import into a live provider call therefore fails the canonical quality gate.
+
+The same boundary scanner rejects direct OpenAI, LiteLLM, Google, or Emergent SDK imports from `skeleton/frontier` and `skeleton/agents`, keeping provider-specific types out of core orchestration and agent execution code.
+
 ## Capability fallbacks
 
 Fallbacks are explicit rather than automatic:
