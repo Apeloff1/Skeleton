@@ -110,7 +110,9 @@ class ObservableOrchestrator(CanonicalOrchestrator):
             if topic.endswith((".failed", ".denied"))
             else self.logger.info
         )
-        log(topic, correlation_id=correlation_id, **payload)
+        log_context = dict(payload)
+        log_context["correlation_id"] = correlation_id
+        log(topic, **log_context)
 
     async def run(
         self,
@@ -167,6 +169,8 @@ class ObservableOrchestrator(CanonicalOrchestrator):
                     span.set_attribute("status", record.status.value)
                     span.set_attribute("turns", record.turns)
                     span.set_attribute("step_count", len(record.steps))
+                    if record.status is RunStatus.FAILED:
+                        span.status = "ERROR"
                     self._emit(
                         f"orchestration.run.{record.status.value}",
                         {
