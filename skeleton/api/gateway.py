@@ -7,12 +7,13 @@ transform hooks. Produces per-route stats for the dashboard.
 """
 from __future__ import annotations
 
+from collections import deque
 import hashlib
 import json
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Deque, Dict, List, Optional
 
 
 @dataclass
@@ -60,7 +61,7 @@ class APIGateway:
         self._cache = cache
         self._logger = logger
         self._transforms: List[Callable[[Any], Any]] = []
-        self._buckets: Dict[str, List[float]] = {}
+        self._buckets: Dict[str, Deque[float]] = {}
         self._last_bucket_sweep: Optional[float] = None
         self._bucket_lock = threading.Lock()
         self._stats_lock = threading.Lock()
@@ -109,8 +110,13 @@ class APIGateway:
         self._last_bucket_sweep = now
 
     def _rate_ok(self, key: str, per_s: float) -> bool:
-        now = time.monotonic()
         if per_s <= 0:
+            # Unlimited routes dominate normal traffic. Avoid a monotonic clock
+            # read and lock attempt entirely when there is no limiter state to
+            # reclaim.
+            if not self._buckets:
+                return True
+            now = time.monotonic()
             last_sweep = self._last_bucket_sweep
             sweep_due = (
                 last_sweep is None
@@ -123,18 +129,21 @@ class APIGateway:
                     self._bucket_lock.release()
             return True
 
+        now = time.monotonic()
         with self._bucket_lock:
             self._sweep_rate_buckets(now)
-            window = [
-                timestamp
-                for timestamp in self._buckets.get(key, [])
-                if now - timestamp < self._RATE_WINDOW_S
-            ]
-            if len(window) >= per_s:
+            window = self._buckets.get(key)
+            if window is None:
+                window = deque()
                 self._buckets[key] = window
+
+            cutoff = now - self._RATE_WINDOW_S
+            while window and window[0] <= cutoff:
+                window.popleft()
+
+            if len(window) >= per_s:
                 return False
             window.append(now)
-            self._buckets[key] = window
             return True
 
     def handle(self, request: GatewayRequest) -> GatewayResponse:
