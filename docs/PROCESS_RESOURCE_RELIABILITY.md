@@ -43,8 +43,37 @@ The canonical quality gate runs a smaller deterministic regression of 2,048 meas
 
 The workflow runs when its profile/workflow inputs change and can also be dispatched manually. A baseline record is not considered established until the completed workflow's commit SHA, execution class, and verbatim JSON results are copied into the reliability documentation. This keeps measured values separate from guessed or machine-independent thresholds.
 
+### Established baseline — 2026-09-15
+
+The first representative hosted baseline completed successfully in **Reliability Capacity Baseline** run `35023566880` (run #5), job `Capture ubuntu-latest capacity baseline`.
+
+Execution record:
+
+- workflow head SHA: `8db441a65a3b09bdc4f0b669d3ef30db721e6709`;
+- pull-request merge checkout SHA: `7987b554d89982db2b4a549d18df63d86a45d20b`;
+- execution class: GitHub-hosted `ubuntu-latest`;
+- runner OS/image: Ubuntu 24.04.5 LTS / `ubuntu-24.04` image `20260907.300.1`;
+- machine: x86_64 Linux, 4 CPUs;
+- Python: CPython 3.11.16.
+
+Verbatim profile JSON from the successful job:
+
+```json
+{"body_mismatches": 0, "completed": 5000, "concurrency": 32, "cpu_count": 4, "failed": 0, "invariants_passed": true, "machine": "x86_64", "max_ms": 0.137, "p50_ms": 0.001, "p95_ms": 0.003, "platform_system": "Linux", "python_implementation": "CPython", "python_version": "3.11.16", "requests": 5000, "requests_per_second": 49819.921, "route_calls": 5000, "route_errors": 0, "wall_ms": 100.361}
+```
+
+```json
+{"chunks_per_run": 4, "completed": 250, "concurrency": 16, "failed": 0, "invariants_passed": true, "max_completion_ms": 1.971, "max_provider_attempts": 3, "p50_first_event_ms": 0.63, "p95_completion_ms": 1.791, "runs": 250, "total_events": 1250, "total_provider_attempts": 750}
+```
+
+```json
+{"completed": 20000, "elapsed_ms": 1466.984, "failed": 0, "file_descriptor_delta": 0, "file_descriptors_after": 6, "file_descriptors_before": 6, "gateway_source_after_bytes": 184, "gateway_source_before_bytes": 152, "gateway_source_growth_bytes": 32, "invariants_passed": true, "iterations": 20000, "leaked_threads": 0, "rate_limit_buckets_after": 0, "rate_limit_buckets_before": 0, "requests_per_second": 13633.416, "route_calls": 20256, "route_errors": 0, "thread_delta": 0, "threads_after": 1, "threads_before": 1, "traced_current_after_bytes": 1576, "traced_current_before_bytes": 152, "traced_current_growth_bytes": 1424, "traced_peak_bytes": 3742, "warmup_requests": 256}
+```
+
+All three profiles reported `invariants_passed: true`. The process-resource profile completed with zero failed requests, zero leaked threads, zero file-descriptor growth, zero retained rate-limit buckets, zero route errors, and 32 bytes of retained allocation growth attributed to `gateway.py`, well below the 64 KiB regression bound.
+
 ## Interpreting results
 
 `requests_per_second`, `elapsed_ms`, and whole-process traced memory are telemetry, not universal pass/fail thresholds. Compare those numbers only on equivalent runtime and hardware classes. Structural invariants and retained gateway-source growth are the portable correctness gates.
 
-This profile provides the process-level soak evidence missing from #123. The remaining acceptance work is to record the first completed representative-environment capacity run produced by the hosted workflow.
+The representative baseline required by #123 is now established and recorded above. Future capacity comparisons should preserve the execution class and profile parameters or explicitly document why they differ.
