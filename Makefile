@@ -26,5 +26,8 @@ lint:
 	python -c "import skeleton; from skeleton.genesis import Genesis; Genesis(seed=42).boot()"
 
 clean:
-	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name "*.pyc" -delete
+	find . -type d -name "__pycache__" -prune -exec rm -rf {} + 2>/dev/null || true
+	find . -type d \( -name ".pytest_cache" -o -name ".mypy_cache" -o -name ".ruff_cache" \) -prune -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name "*.egg-info" -prune -exec rm -rf {} + 2>/dev/null || true
+	find . -type f \( -name "*.pyc" -o -name "*.pyo" -o -name ".coverage.*" \) -delete 2>/dev/null || true
+	rm -rf build dist htmlcov coverage_html .coverage .cache .tox .nox
