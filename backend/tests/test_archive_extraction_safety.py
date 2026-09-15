@@ -87,6 +87,18 @@ def test_allows_constructor_alias_reused_as_tarfile_handle_with_data_filter(tmp_
     assert findings == []
 
 
+def test_allows_method_alias_after_constructor_alias_rebind_with_data_filter(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import tarfile\n"
+        "archive = tarfile.open\n"
+        "archive = archive('bundle.tar')\n"
+        "extract_all = archive.extractall\n"
+        "extract_all('/tmp/out', filter=tarfile.data_filter)\n",
+    )
+    assert findings == []
+
+
 def test_rejects_extraction_method_alias(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
