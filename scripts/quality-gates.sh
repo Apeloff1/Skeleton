@@ -13,6 +13,10 @@ python -m compileall -q skeleton
 printf '\n== Backend syntax ==\n'
 python -m compileall -q backend
 
+printf '\n== Provider-neutral runtime contract ==\n'
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  tests/test_model_runtime.py
+
 printf '\n== Backend process safety ==\n'
 python backend/scripts/check_process_safety.py
 
