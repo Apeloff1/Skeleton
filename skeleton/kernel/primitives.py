@@ -45,6 +45,15 @@ class DomainEvent:
 class EventBus:
     """Lightweight pub/sub event bus for subsystem communication."""
 
+    _CORRELATION_KEYS = (
+        "correlation_id",
+        "request_id",
+        "run_id",
+        "task_id",
+        "call_id",
+        "rid",
+    )
+
     def __init__(self):
         self._subscribers: Dict[str, List[Callable[[DomainEvent], None]]] = {}
         self._stats: Dict[str, int] = {"published": 0, "subscribed": 0}
@@ -65,9 +74,28 @@ class EventBus:
                         pass  # Subscribers should not crash the bus
         self._stats["published"] += 1
 
-    def emit(self, topic: str, payload: Dict[str, Any]) -> None:
-        """Convenience: create and publish a DomainEvent."""
-        self.publish(DomainEvent(topic=topic, payload=payload))
+    def emit(
+        self,
+        topic: str,
+        payload: Dict[str, Any],
+        *,
+        correlation_id: str = "",
+    ) -> None:
+        """Create an event and preserve or infer its correlation context."""
+        resolved = correlation_id
+        if not resolved:
+            for key in self._CORRELATION_KEYS:
+                candidate = payload.get(key)
+                if isinstance(candidate, str) and candidate:
+                    resolved = candidate
+                    break
+        self.publish(
+            DomainEvent(
+                topic=topic,
+                payload=payload,
+                correlation_id=resolved,
+            )
+        )
 
     def stats(self) -> Dict[str, int]:
         return dict(self._stats)

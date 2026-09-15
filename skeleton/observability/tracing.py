@@ -14,8 +14,11 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from skeleton.observability.redaction import redact_payload, redact_text, safe_exception_text
+
 _current_span: contextvars.ContextVar[Optional["Span"]] = contextvars.ContextVar(
-    "skeleton_current_span", default=None)
+    "skeleton_current_span", default=None
+)
 
 
 @dataclass
@@ -31,17 +34,25 @@ class Span:
     status: str = "OK"
 
     def set_attribute(self, key: str, value: Any) -> "Span":
-        self.attributes[key] = value
+        sanitized = redact_payload({key: value})
+        self.attributes[key] = sanitized[key]
         return self
 
     def add_event(self, name: str, **attrs: Any) -> "Span":
-        self.events.append({"name": name, "at": time.time(), **attrs})
+        sanitized = redact_payload(attrs)
+        self.events.append(
+            {
+                "name": redact_text(name),
+                "at": time.time(),
+                **dict(sanitized),
+            }
+        )
         return self
 
     def fail(self, error: BaseException) -> "Span":
         self.status = "ERROR"
         self.attributes["error.type"] = type(error).__name__
-        self.attributes["error.message"] = str(error)
+        self.attributes["error.message"] = safe_exception_text(error)
         return self
 
     @property
@@ -51,9 +62,18 @@ class Span:
         return (self.ended_at - self.started_at) * 1000.0
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"name": self.name, "trace_id": self.trace_id, "span_id": self.span_id,
-                "parent_id": self.parent_id, "duration_ms": self.duration_ms,
-                "status": self.status, "attributes": self.attributes, "events": self.events}
+        sanitized_attributes = redact_payload(self.attributes)
+        sanitized_events = redact_payload(self.events)
+        return {
+            "name": redact_text(self.name),
+            "trace_id": redact_text(self.trace_id),
+            "span_id": self.span_id,
+            "parent_id": self.parent_id,
+            "duration_ms": self.duration_ms,
+            "status": self.status,
+            "attributes": sanitized_attributes,
+            "events": sanitized_events,
+        }
 
 
 class InMemoryExporter:
@@ -69,31 +89,50 @@ class InMemoryExporter:
     def by_trace(self, trace_id: str) -> List[Span]:
         return [s for s in self._spans if s.trace_id == trace_id]
 
-    def query(self, name: Optional[str] = None, min_duration_ms: Optional[float] = None,
-              limit: int = 50) -> List[Span]:
-        out = [s for s in reversed(self._spans)
-               if (name is None or s.name == name)
-               and (min_duration_ms is None
-                    or (s.duration_ms is not None and s.duration_ms >= min_duration_ms))]
+    def query(
+        self,
+        name: Optional[str] = None,
+        min_duration_ms: Optional[float] = None,
+        limit: int = 50,
+    ) -> List[Span]:
+        out = [
+            s
+            for s in reversed(self._spans)
+            if (name is None or s.name == name)
+            and (
+                min_duration_ms is None
+                or (s.duration_ms is not None and s.duration_ms >= min_duration_ms)
+            )
+        ]
         return out[:limit]
 
 
 class Tracer:
-    def __init__(self, service_name: str, exporter: Optional[InMemoryExporter] = None) -> None:
+    def __init__(
+        self,
+        service_name: str,
+        exporter: Optional[InMemoryExporter] = None,
+    ) -> None:
         self.service_name = service_name
         self.exporter = exporter or InMemoryExporter()
 
-    def start_span(self, name: str, trace_id: Optional[str] = None,
-                   **attributes: Any) -> Span:
+    def start_span(
+        self,
+        name: str,
+        trace_id: Optional[str] = None,
+        **attributes: Any,
+    ) -> Span:
         parent = _current_span.get()
-        span = Span(
-            name=name,
-            trace_id=trace_id or (parent.trace_id if parent else uuid.uuid4().hex),
+        sanitized = redact_payload({"service": self.service_name, **attributes})
+        return Span(
+            name=redact_text(name),
+            trace_id=redact_text(
+                trace_id or (parent.trace_id if parent else uuid.uuid4().hex)
+            ),
             span_id=uuid.uuid4().hex[:16],
             parent_id=parent.span_id if parent else None,
-            attributes={"service": self.service_name, **attributes},
+            attributes=dict(sanitized),
         )
-        return span
 
     def __call__(self, name: str, **attributes: Any) -> "SpanContext":
         return SpanContext(self, name, attributes)
