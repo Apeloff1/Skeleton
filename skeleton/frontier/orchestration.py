@@ -101,6 +101,10 @@ class CapabilityDeniedError(OrchestrationError):
     """Raised when a tool requests capabilities the run was not granted."""
 
 
+class ToolExecutionError(OrchestrationError):
+    """Stable tool failure boundary that does not persist handler messages."""
+
+
 @dataclass(frozen=True, slots=True)
 class RetryBudget:
     max_attempts: int = 1
@@ -416,7 +420,7 @@ class CanonicalOrchestrator:
                 raise
             except TransientToolError as exc:
                 last_error = exc
-                step.error = _error_text(exc)
+                step.error = f"{type(exc).__name__}: retryable tool failure"
                 if attempt >= self.tool_retry_budget.max_attempts:
                     step.transition(StepStatus.FAILED)
                     raise RetryBudgetExceeded(
@@ -433,9 +437,12 @@ class CanonicalOrchestrator:
                 if isinstance(exc, asyncio.CancelledError):
                     step.transition(StepStatus.CANCELLED)
                     raise
-                step.error = _error_text(exc)
+                error = ToolExecutionError(
+                    f"tool {call.name!r} failed with {type(exc).__name__}"
+                )
+                step.error = _error_text(error)
                 step.transition(StepStatus.FAILED)
-                raise
+                raise error from exc
             else:
                 step.error = None
                 step.result = output
