@@ -566,6 +566,12 @@ def main() -> int:
     for path in javascript_files():
         js_count += 1
         findings.extend(javascript_violations(path))
+
+    if python_count == 0:
+        findings.append("scanner coverage failure: no backend Python files were scanned")
+    if js_count == 0:
+        findings.append("scanner coverage failure: no frontend JavaScript/TypeScript files were scanned")
+
     if findings:
         print("High-confidence SAST violations detected:", file=sys.stderr)
         for finding in sorted(findings):

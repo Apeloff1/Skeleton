@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from scripts import check_sast_security as sast
 from scripts.check_sast_security import javascript_violations, violations
 
 
@@ -278,3 +279,39 @@ def test_js_comment_markers_inside_strings_do_not_hide_following_code(tmp_path: 
         'const url = "https://example.com/path";\nconst result = eval(userInput);\n',
     )
     assert any("dynamic eval() is forbidden" in finding for finding in findings)
+
+
+def test_main_fails_closed_when_backend_python_surface_is_empty(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    safe_js = tmp_path / "safe.ts"
+    safe_js.write_text("const value = 1;\n", encoding="utf-8")
+    monkeypatch.setattr(sast, "python_files", lambda: iter(()))
+    monkeypatch.setattr(sast, "javascript_files", lambda: iter((safe_js,)))
+
+    assert sast.main() == 1
+    assert "no backend Python files were scanned" in capsys.readouterr().err
+
+
+def test_main_fails_closed_when_frontend_js_surface_is_empty(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    safe_py = tmp_path / "safe.py"
+    safe_py.write_text("value = 1\n", encoding="utf-8")
+    monkeypatch.setattr(sast, "python_files", lambda: iter((safe_py,)))
+    monkeypatch.setattr(sast, "javascript_files", lambda: iter(()))
+
+    assert sast.main() == 1
+    assert "no frontend JavaScript/TypeScript files were scanned" in capsys.readouterr().err
+
+
+def test_main_accepts_nonempty_clean_scan_surfaces(tmp_path: Path, monkeypatch, capsys) -> None:
+    safe_py = tmp_path / "safe.py"
+    safe_js = tmp_path / "safe.ts"
+    safe_py.write_text("value = 1\n", encoding="utf-8")
+    safe_js.write_text("const value = 1;\n", encoding="utf-8")
+    monkeypatch.setattr(sast, "python_files", lambda: iter((safe_py,)))
+    monkeypatch.setattr(sast, "javascript_files", lambda: iter((safe_js,)))
+
+    assert sast.main() == 0
+    assert "1 Python, 1 JS/TS files" in capsys.readouterr().out
