@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import pytest
 
 from skeleton.frontier.agent_runtime import AgentRuntime
+from skeleton.frontier.events import DomainEvent, EventBus, SQLiteEventJournal
 from skeleton.frontier.memory_adapters import CollectionMemoryAdapter, SQLiteCollection
 from skeleton.frontier.world import calculate_route, project_fog_of_war, region_from_record
 
@@ -53,12 +54,16 @@ def _source_region():
 
 
 @pytest.mark.asyncio
-async def test_world_policy_persists_and_executes_through_frontier_boundaries(tmp_path):
+async def test_world_policy_persists_executes_and_emits_durable_event(tmp_path):
     region = _source_region()
     route = calculate_route((100, 400), (800, 200), [region])
     fog = project_fog_of_war([region], ["starting_dock"])
 
     collection = SQLiteCollection(tmp_path / "frontier-world.sqlite3", namespace="world")
+    journal = SQLiteEventJournal(
+        tmp_path / "frontier-events.sqlite3",
+        namespace="world-runtime",
+    )
     memory = CollectionMemoryAdapter(collection)
     try:
         await memory.put(
@@ -80,15 +85,22 @@ async def test_world_policy_persists_and_executes_through_frontier_boundaries(tm
 
         runtime = AgentRuntime()
         runtime.register(WorldMemoryIntegrator())
+        execution_args = {
+            "context": {"route": route, "fog": fog, "memory_hits": hits},
+            "required_capabilities": {
+                "world.route",
+                "world.explore",
+                "memory.search",
+            },
+            "source_repository": "Apeloff1/Lorebuffa",
+            "source_revision": "a32259d514710c3e87d7ce5fe42f6fb73e63ca1b",
+            "source_path": "backend/world_map.py",
+            "idempotency_key": "world:barnacle_bay:starting_dock:lighthouse_point",
+        }
         result = await runtime.execute(
             "world-memory-integrator",
             "summarize promoted world state",
-            context={"route": route, "fog": fog, "memory_hits": hits},
-            required_capabilities={"world.route", "world.explore", "memory.search"},
-            source_repository="Apeloff1/Lorebuffa",
-            source_revision="a32259d514710c3e87d7ce5fe42f6fb73e63ca1b",
-            source_path="backend/world_map.py",
-            idempotency_key="world:barnacle_bay:starting_dock:lighthouse_point",
+            **execution_args,
         )
 
         assert result.succeeded
@@ -114,16 +126,47 @@ async def test_world_policy_persists_and_executes_through_frontier_boundaries(tm
         repeated = await runtime.execute(
             "world-memory-integrator",
             "summarize promoted world state",
-            context={"route": route, "fog": fog, "memory_hits": hits},
-            required_capabilities={"world.route", "world.explore", "memory.search"},
-            source_repository="Apeloff1/Lorebuffa",
-            source_revision="a32259d514710c3e87d7ce5fe42f6fb73e63ca1b",
-            source_path="backend/world_map.py",
-            idempotency_key="world:barnacle_bay:starting_dock:lighthouse_point",
+            **execution_args,
         )
         assert repeated is result
+
+        bus = EventBus(journal=journal)
+        emitted = []
+
+        async def capture(event):
+            emitted.append((event.topic, dict(event.payload)))
+
+        await bus.subscribe("world.summary.completed", capture)
+        delivered = await bus.publish(
+            DomainEvent.create(
+                "world.summary.completed",
+                {
+                    "region_id": region.id,
+                    "route_distance": result.output["route_distance"],
+                    "exploration_percentage": result.output[
+                        "exploration_percentage"
+                    ],
+                    "memory_ids": result.output["memory_ids"],
+                },
+            )
+        )
+
+        assert delivered == 1
+        assert emitted == [
+            (
+                "world.summary.completed",
+                {
+                    "region_id": "barnacle_bay",
+                    "route_distance": 728.01,
+                    "exploration_percentage": 50.0,
+                    "memory_ids": ["route:barnacle-bay"],
+                },
+            )
+        ]
+        assert await journal.pending_count() == 0
     finally:
         collection.close()
+        journal.close()
 
 
 def test_world_source_clock_fixture_is_explicit():
