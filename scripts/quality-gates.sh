@@ -50,6 +50,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_process_safety_partial.py \
   backend/tests/test_process_safety_namespace_get.py \
   backend/tests/test_process_safety_getattribute.py \
+  backend/tests/test_process_safety_helper_aliases.py \
   backend/tests/test_repository_process_safety.py \
   backend/tests/test_deserialization_safety_gate.py \
   backend/tests/test_sast_security_gate.py \
