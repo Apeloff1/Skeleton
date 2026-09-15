@@ -1,6 +1,6 @@
 """Deterministic reliability profiles for canonical orchestration.
 
-The profiles deliberately avoid external providers and wall-clock sleeps so they
+The profiles deliberately avoid external providers and wall-clock delay so they
 can run in CI and on developer machines with reproducible failure patterns.
 """
 
@@ -40,7 +40,7 @@ class ProfileResult:
     p95_ms: float
     max_ms: float
 
-    def as_dict(self) -> dict[str, int | float]:
+    def as_dict(self) -> dict[str, object]:
         return asdict(self)
 
 
@@ -68,6 +68,9 @@ class _FlakyTool:
     async def __call__(self, arguments):
         del arguments
         self.calls += 1
+        # Yield without adding wall-clock delay so concurrent runs genuinely
+        # interleave instead of completing as effectively synchronous tasks.
+        await asyncio.sleep(0)
         if self.calls <= self.failures_before_success:
             raise TransientToolError("injected transient failure")
         return "recovered"
