@@ -1,4 +1,5 @@
 from core.route_policy_catalog import (
+    OPEN_EXACT_PATHS,
     OPEN_ROUTE_PREFIXES,
     ROUTE_DOMAIN_RULES,
     ROUTE_POLICY_CATALOG_VERSION,
@@ -19,12 +20,13 @@ def principal() -> VerifiedPrincipal:
 
 
 def test_catalog_version_and_summary_are_stable_and_report_only():
-    assert ROUTE_POLICY_CATALOG_VERSION == "2026-09-15.v1"
+    assert ROUTE_POLICY_CATALOG_VERSION == "2026-09-15.v2"
     summary = catalog_summary()
     assert summary["version"] == ROUTE_POLICY_CATALOG_VERSION
     assert summary["enforcement"] == "report_only"
     assert summary["fallback_domain"] == "legacy_api"
     assert summary["open_prefixes"] == list(OPEN_ROUTE_PREFIXES)
+    assert summary["exact_open_paths"] == list(OPEN_EXACT_PATHS)
     assert len(summary["domain_rules"]) == len(ROUTE_DOMAIN_RULES)
 
 
@@ -34,6 +36,7 @@ def test_open_routes_are_narrow_bootstrap_surfaces_only():
         "/api/health",
         "/api/health/live",
         "/api/ready",
+        "/api/ready/dependencies",
         "/api/auth/login",
         "/api/auth/register",
         "/api/auth/session",
@@ -42,8 +45,15 @@ def test_open_routes_are_narrow_bootstrap_surfaces_only():
         assert admitted.allowed is True
         assert admitted.open_route is True
 
-    # Adjacent identity/admin paths must not inherit public access.
-    for path in ("/api/auth/me", "/api/auth/users", "/api/auth/set-role"):
+    # Identity/admin paths and descendants of exact bootstrap routes are closed.
+    for path in (
+        "/api/auth/me",
+        "/api/auth/users",
+        "/api/auth/set-role",
+        "/api/auth/login/debug",
+        "/api/auth/register/admin",
+        "/api/auth/session/inspect",
+    ):
         admitted = policy.admit(path, None)
         assert admitted.allowed is False
         assert admitted.status_code == 401
