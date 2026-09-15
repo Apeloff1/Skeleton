@@ -20,7 +20,7 @@ permissions: {}
 
 jobs:
   consolidate-and-clean:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: write
@@ -32,11 +32,34 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          # Keep the Actions token out of .git/config and remote URLs. Git asks
+          # this helper for credentials on demand; the helper itself contains no
+          # secret and reads the already-masked GH_TOKEN environment variable.
+          auth_dir="$RUNNER_TEMP/branch-clean-auth"
+          mkdir -p "$auth_dir"
+          cat > "$auth_dir/askpass.sh" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          case "${1:-}" in
+            *Username*) printf '%s\n' 'x-access-token' ;;
+            *Password*) printf '%s\n' "$GH_TOKEN" ;;
+            *) exit 1 ;;
+          esac
+          EOF
+          chmod 700 "$auth_dir/askpass.sh"
+          export GIT_ASKPASS="$auth_dir/askpass.sh"
+          export GIT_ASKPASS_REQUIRE=force
+          {
+            echo "GIT_ASKPASS=$GIT_ASKPASS"
+            echo 'GIT_ASKPASS_REQUIRE=force'
+          } >> "$GITHUB_ENV"
+
           git init repo
           cd repo
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --quiet --prune --no-tags --filter=blob:none origin '+refs/heads/*:refs/remotes/origin/*'
 
       - name: Classify and absorb patch-equivalent stale history
