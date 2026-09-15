@@ -14,7 +14,8 @@ Public surface:
 Tunable via env:
   RATE_LIMIT_PER_MIN  (int)   default 600        — 10 rps per IP, generous
   RATE_LIMIT_BURST    (int)   default 60         — initial bucket size
-  RATE_LIMIT_EXEMPT   (csv)   default "127.0.0.1,::1,localhost"
+  RATE_LIMIT_EXEMPT   (csv)   default ""          — explicit peer/client exemptions
+  TRUSTED_PROXIES     (csv)   default ""          — proxy IPs/CIDRs allowed to supply XFF
   ACCESS_LOG          (0|1)   default 1
 """
 from __future__ import annotations
@@ -24,6 +25,7 @@ import os
 import time
 import uuid
 from collections import defaultdict, deque
+from ipaddress import ip_address, ip_network
 from typing import Callable, Deque, Dict, Tuple
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -35,9 +37,27 @@ log = logging.getLogger("api.middleware")
 # ── Configuration ─────────────────────────────────────────────────────
 _RATE_PER_MIN = int(os.environ.get("RATE_LIMIT_PER_MIN", "600"))
 _RATE_BURST = int(os.environ.get("RATE_LIMIT_BURST", "60"))
-_EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "127.0.0.1,::1,localhost")
+_EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "")
 _EXEMPT_IPS = {ip.strip() for ip in _EXEMPT_RAW.split(",") if ip.strip()}
+_TRUSTED_PROXY_RAW = os.environ.get("TRUSTED_PROXIES", "")
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
+
+
+def _parse_trusted_proxy_networks(raw: str):
+    """Parse explicitly trusted proxy IPs/CIDRs, ignoring invalid entries safely."""
+    networks = []
+    for value in raw.split(","):
+        value = value.strip()
+        if not value:
+            continue
+        try:
+            networks.append(ip_network(value, strict=False))
+        except ValueError:
+            log.warning("ignoring invalid TRUSTED_PROXIES entry: %r", value)
+    return tuple(networks)
+
+
+_TRUSTED_PROXY_NETWORKS = _parse_trusted_proxy_networks(_TRUSTED_PROXY_RAW)
 
 # Telemetry counters (in-memory) ────────────────────────────────────
 # Last 1024 latencies as a ring buffer for p50/p95 computation.
@@ -89,6 +109,7 @@ def get_stats() -> dict:
             "per_minute": _RATE_PER_MIN,
             "burst": _RATE_BURST,
             "exempt_ips": sorted(_EXEMPT_IPS),
+            "trusted_proxies": [str(network) for network in _TRUSTED_PROXY_NETWORKS],
         },
     }
 
@@ -158,13 +179,53 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
         return response
 
 
+def _is_trusted_proxy(host: str) -> bool:
+    """Return True only when *host* is an IP inside an explicitly trusted network."""
+    try:
+        addr = ip_address(host)
+    except ValueError:
+        return False
+    return any(addr in network for network in _TRUSTED_PROXY_NETWORKS)
+
+
 def _client_ip(request: Request) -> str:
-    # Honour X-Forwarded-For when behind an ingress, fall back to peer.
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()
+    """Resolve client identity without trusting attacker-controlled forwarding headers.
+
+    Forwarded addresses are honored only when the immediate TCP peer is explicitly
+    configured in TRUSTED_PROXIES.  When trusted proxies form a chain, walk XFF from
+    right to left and return the first non-proxy address.  Malformed XFF fails closed
+    to the immediate peer instead of accepting another attacker-provided value.
+    """
     client = request.client
-    return client.host if client else "-"
+    peer = client.host if client else "-"
+    if peer == "-" or not _is_trusted_proxy(peer):
+        return peer
+
+    xff = request.headers.get("x-forwarded-for")
+    if not xff:
+        return peer
+
+    forwarded = [value.strip() for value in xff.split(",") if value.strip()]
+    if not forwarded:
+        return peer
+
+    parsed = []
+    for value in forwarded:
+        try:
+            parsed.append(ip_address(value))
+        except ValueError:
+            return peer
+
+    for addr in reversed(parsed):
+        value = str(addr)
+        if not _is_trusted_proxy(value):
+            return value
+    return peer
+
+
+def _is_api_path(path: str) -> bool:
+    """Match the /api route tree without treating lookalikes such as /apiary as API."""
+    return path == "/api" or path.startswith("/api/")
 
 
 # ── Rate limiter ──────────────────────────────────────────────────────
@@ -195,10 +256,11 @@ class _Bucket:
 
 
 class RateLimiterMiddleware(BaseHTTPMiddleware):
-    """Per-IP token bucket. Exempt IPs (loopback) skip the check.
+    """Per-IP token bucket with explicit exemptions only.
 
-    NOTE: This is *in-memory* and per-process. Sufficient for single-replica
-    deployments and dev. For horizontal scaling, swap in a shared store.
+    Forwarded client IPs are used only for explicitly trusted proxies.  The limiter
+    is *in-memory* and per-process, so horizontally scaled deployments should use a
+    shared store if they need a globally enforced quota.
     """
 
     def __init__(self, app, per_minute: int | None = None, burst: int | None = None):
@@ -216,11 +278,11 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         return b
 
     async def dispatch(self, request: Request, call_next: Callable):
-        # Bypass non-API routes (Expo serves /, /assets, etc. from same origin)
-        if not request.url.path.startswith("/api"):
+        # Bypass non-API routes (Expo serves /, /assets, etc. from same origin).
+        if not _is_api_path(request.url.path):
             return await call_next(request)
         ip = _client_ip(request)
-        if ip in _EXEMPT_IPS or ip == "-":
+        if ip in _EXEMPT_IPS:
             return await call_next(request)
         ok, retry = self._bucket_for(ip).take(1)
         if not ok:
