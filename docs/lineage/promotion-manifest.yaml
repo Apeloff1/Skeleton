@@ -1,4 +1,4 @@
-version: 7
+version: 8
 canonical_repository: Apeloff1/Skeleton
 strategy: selective-promotion
 rules:
@@ -176,9 +176,12 @@ integration_wave_4:
   backend: skeleton.frontier.events.SQLiteEventJournal
   promoted_semantics:
     - journal-before-delivery
-    - confirm-after-successful-fanout
+    - confirm-after-successful-fanout-to-at-least-one-subscriber
     - failed-delivery-remains-pending
+    - no-subscriber-delivery-remains-pending
     - ordered-explicit-pending-replay
+    - stop-at-undeliverable-head-of-line
+    - serialized-concurrent-replay-per-bus
     - at-least-once-recovery-semantics
     - bounded-unconfirmed-capacity
     - backpressure-instead-of-dropping-pending-work
