@@ -6,6 +6,19 @@ from skeleton.jeeves import Jeeves, SessionMode
 from skeleton.kernel.errors import SessionError
 
 
+def test_system_exit_from_responder_rolls_back_learner_turn():
+    def stop(_message, _history, _context):
+        raise SystemExit(0)
+
+    jeeves = Jeeves(responder=stop)
+    session = jeeves.open_session("u")
+
+    with pytest.raises(SystemExit):
+        jeeves.ask(session.session_id, "hello")
+
+    assert session.turns == []
+
+
 def test_responder_cannot_mutate_committed_history_through_snapshot():
     def responder(_message, history, _context):
         if history:
