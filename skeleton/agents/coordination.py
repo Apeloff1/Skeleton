@@ -9,6 +9,7 @@ orchestrator so run/tool terminal-state handling has one authority.
 from __future__ import annotations
 
 import asyncio
+import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -35,6 +36,15 @@ class TaskStatus(Enum):
     CANCELLED = auto()
 
 
+def _positive_int(value: object, name: str) -> int:
+    """Validate positive integer configuration without accepting booleans."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError(f"{name} must be an integer")
+    if value < 1:
+        raise ValueError(f"{name} must be at least 1")
+    return value
+
+
 @dataclass
 class Task:
     """A single compatibility task projected from a canonical run when local."""
@@ -47,7 +57,7 @@ class Task:
     result: Any = None
     error: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-    created_at: float = field(default_factory=__import__("time").time)
+    created_at: float = field(default_factory=time.time)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -66,7 +76,7 @@ class AgentPool:
     """Manage legacy agent lifecycle and resource allocation."""
 
     def __init__(self, max_agents: int = 16, bus: Optional[EventBus] = None):
-        self.max_agents = max_agents
+        self.max_agents = _positive_int(max_agents, "max_agents")
         self._agents: Dict[str, Dict[str, Any]] = {}
         # Capacity ownership is keyed by logical task ID, not Task object
         # identity. This prevents two independently-created Task instances with
@@ -77,6 +87,7 @@ class AgentPool:
 
     def create(self, specialisations: Set[str], capacity: int = 5) -> str:
         """Create a new agent and return its ID."""
+        capacity = _positive_int(capacity, "capacity")
         if len(self._agents) >= self.max_agents:
             raise RuntimeError(f"Agent pool at capacity ({self.max_agents})")
 
@@ -86,7 +97,7 @@ class AgentPool:
             "capacity": capacity,
             "load": 0,
             "tasks": [],
-            "created_at": __import__("time").time(),
+            "created_at": time.time(),
         }
         self._stats["created"] += 1
 
@@ -95,7 +106,7 @@ class AgentPool:
                 "agents.pool.created",
                 {
                     "agent_id": agent_id,
-                    "specialisations": list(specialisations),
+                    "specialisations": sorted(specialisations),
                 },
             )
 
@@ -158,7 +169,7 @@ class AgentPool:
             if specialisation in agent["specialisations"]
             and agent["load"] < agent["capacity"]
         ]
-        capable.sort(key=lambda x: x[1])
+        capable.sort(key=lambda item: item[1])
         return [aid for aid, _ in capable]
 
     def destroy(self, agent_id: str) -> None:
@@ -177,7 +188,7 @@ class AgentPool:
             **self._stats,
             "active": len(self._agents),
             "max": self.max_agents,
-            "total_load": sum(a["load"] for a in self._agents.values()),
+            "total_load": sum(agent["load"] for agent in self._agents.values()),
         }
 
 
@@ -235,6 +246,8 @@ class Coordinator:
 
     def register_handler(self, task_type: str, handler: Callable[[Task], Any]) -> None:
         """Register or replace a handler for a specific compatibility task type."""
+        if not callable(handler):
+            raise TypeError("handler must be callable")
         if task_type not in self._registered_tool_types:
 
             def invoke(arguments: Dict[str, Any], *, _task_type: str = task_type) -> Any:
@@ -268,7 +281,7 @@ class Coordinator:
             task_id=str(uuid.uuid4())[:8],
             description=description,
             priority=priority,
-            metadata=metadata or {},
+            metadata=dict(metadata or {}),
         )
         self._tasks[task.task_id] = task
 
@@ -294,6 +307,9 @@ class Coordinator:
 
             assigned = self.pool.assign(agent_id, task)
             if not assigned:
+                # A newly-created agent that cannot accept its first task must
+                # not consume a pool slot indefinitely.
+                self.pool.destroy(agent_id)
                 task.status = TaskStatus.FAILED
                 task.error = "New agent could not accept task"
                 self._stats["failed"] += 1
