@@ -133,3 +133,20 @@ def test_gateway_emits_failure_and_rate_limit_baselines():
     counters = telemetry.metrics.snapshot()["counters"]
     assert any(key.startswith("skeleton_failures_total{") for key in counters)
     assert any(key.startswith("skeleton_rate_limits_total{") for key in counters)
+
+
+def test_retry_queue_and_resource_metric_families_are_emitted():
+    telemetry = reset_observability()
+
+    telemetry.emit(
+        "worker.tick",
+        component="runtime",
+        retry=True,
+        queue_depth=3,
+        resource_usage=0.5,
+    )
+
+    snapshot = telemetry.metrics.snapshot()
+    assert any(key.startswith("skeleton_retries_total{") for key in snapshot["counters"])
+    assert any(key.startswith("skeleton_queue_depth{") for key in snapshot["gauges"])
+    assert any(key.startswith("skeleton_resource_usage{") for key in snapshot["gauges"])
