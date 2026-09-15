@@ -4,6 +4,7 @@ from skeleton.frontier.achievement_adapters import (
     achievement_event,
     achievement_event_to_memory_item,
     achievement_identity,
+    achievement_spec_digest,
     achievement_state_memory_item,
 )
 from skeleton.frontier.achievements import (
@@ -180,6 +181,7 @@ __all__ = [
     "achievement_progress_percent",
     "achievement_qualifies",
     "achievement_reward_plan",
+    "achievement_spec_digest",
     "achievement_state_memory_item",
     "achievement_summary",
     "aggregate_crew",
