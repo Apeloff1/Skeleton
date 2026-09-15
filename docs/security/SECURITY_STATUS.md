@@ -9,7 +9,7 @@ This map separates repository-controlled security controls from GitHub/deploymen
 | Security objective | Canonical repository evidence | Enforcement / regression surface | Status at snapshot |
 | --- | --- | --- | --- |
 | Deterministic merge gate | `.github/workflows/merge-readiness.yml`, `docs/MERGE_READINESS.md`, `docs/CI_REQUIRED_CHECKS.md` | Merge Readiness | Implemented in repo; required-check enforcement remains external |
-| Workflow trust boundary | `scripts/check_workflow_security.py` and focused tests | Backend Quality / canonical quality gate | Implemented, including immutable CI containers and runner-escape option rejection |
+| Workflow trust boundary | `backend/scripts/check_workflow_security.py` and focused tests | Backend Quality / canonical quality gate | Implemented, including immutable CI containers and runner-escape option rejection |
 | Immutable third-party Actions | workflow-security policy | Workflow-security regression suite | Implemented policy |
 | Immutable CI job/service containers | workflow-security policy and digest-pinned current services | Workflow-security regression suite | Implemented on current main |
 | Secret detection and history hygiene | `.gitleaks.toml`, `docs/security/SECRET_HYGIENE.md`, secret-scanning workflow | Secret scanning | Implemented; confirmed findings still require operational revocation/rotation |
@@ -40,4 +40,4 @@ A security control is unhealthy if a scanner cannot initialize or finish, requir
 
 ## Maintenance rule
 
-Update this map whenever a security workflow is added, renamed, replaced, or removed; when ownership moves between repository and infrastructure; or after an incident invalidates an assumption. Keep the snapshot commit explicit so stale status is visible.
+Update this map whenever a security workflow is added, renamed, replaced, or removed; when ownership moves between repository and infrastructure; or after an incident invalidates a documented assumption. Keep the snapshot commit explicit so stale status is visible.
