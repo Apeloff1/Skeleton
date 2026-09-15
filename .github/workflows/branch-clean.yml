@@ -70,6 +70,7 @@ jobs:
 
           declare -A open_pr_heads=()
           declare -A merged_pr_tips=()
+          declare -A merged_pr_branches=()
 
           load_open_pr_heads() {
             local branch
@@ -86,9 +87,11 @@ jobs:
           load_merged_pr_tips() {
             local branch tip
             merged_pr_tips=()
+            merged_pr_branches=()
             while IFS=$'\t' read -r branch tip; do
               [[ -n "$branch" && -n "$tip" ]] || continue
               merged_pr_tips["${branch}:${tip}"]=1
+              merged_pr_branches["$branch"]=1
             done < <(
               gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=closed&per_page=100&sort=updated&direction=desc" \
                 --jq '.[] | select(.merged_at != null and .head.repo.full_name == .base.repo.full_name) | [.head.ref, .head.sha] | @tsv'
@@ -105,6 +108,7 @@ jobs:
             delete_branches=()
             delete_tips=()
             merged_pr_count=0
+            aligned_merged_count=0
             ancestor_unproven_count=0
             unique_count=0
             protected_count=0
@@ -119,10 +123,10 @@ jobs:
               [[ -n "$tip" && -n "$branch" ]] || continue
 
               # Permanent coordination/release refs are never cleanup candidates.
-              # Every other ref requires exact merged-PR head evidence before
-              # deletion. Mere ancestry is not enough: a freshly-created branch
-              # starts at an ancestor (often exactly main) before its first commit
-              # or PR exists, so ancestry-only deletion races branch creation.
+              # Every other deletion requires merged-PR history plus either an
+              # exact historical merged head or exact alignment with current main.
+              # Alignment is safe to prune because there is no unique branch commit,
+              # while the expected-tip lease below protects against a new commit race.
               case "$branch" in
                 main|develop|release/*|keep/*)
                   protected_count=$((protected_count + 1))
@@ -139,6 +143,10 @@ jobs:
 
               if [[ -n "${merged_pr_tips[${branch}:${tip}]+x}" ]]; then
                 merged_pr_count=$((merged_pr_count + 1))
+                delete_branches+=("$branch")
+                delete_tips+=("$tip")
+              elif [[ "$tip" == "$classified_main" && -n "${merged_pr_branches[$branch]+x}" ]]; then
+                aligned_merged_count=$((aligned_merged_count + 1))
                 delete_branches+=("$branch")
                 delete_tips+=("$tip")
               elif git merge-base --is-ancestor "$tip" "$main_ref"; then
@@ -228,6 +236,7 @@ jobs:
               echo "- Stable classification round: $round/$max_rounds"
               echo "- main tip: \`$current_main\`"
               echo "- Exact merged-PR head refs eligible: $merged_pr_count"
+              echo "- Main-aligned refs with merged-PR history eligible: $aligned_merged_count"
               echo "- Ancestor-only refs preserved: $ancestor_unproven_count"
               echo "- Unique/unproven branch refs preserved: $unique_count"
               echo "- Long-lived or still-unique backup refs preserved: $protected_count"
@@ -237,6 +246,7 @@ jobs:
               echo "- Moved or server-protected refs preserved at deletion time: $raced_or_blocked"
               echo '- main is never modified by this workflow.'
               echo '- Ancestry alone is never sufficient deletion proof.'
+              echo '- Main alignment requires historical merged-PR evidence for that branch name.'
               echo '- Patch-equivalence heuristics are not used for deletion.'
               echo '- Every deletion uses an expected-tip lease.'
               if [[ -s ../preserved-branches.txt ]]; then
