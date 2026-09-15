@@ -59,6 +59,38 @@ def test_rejects_concatenated_literal_string_command(tmp_path: Path) -> None:
     assert any("argument vector, not a string" in finding for finding in findings)
 
 
+def test_rejects_concatenated_dynamic_string_command(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nexecutable = 'python'\nsubprocess.run(executable + ' --version', shell=False)\n",
+    )
+    assert any("argument vector, not a string" in finding for finding in findings)
+
+
+def test_rejects_percent_formatted_string_command(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nname = 'python'\nsubprocess.run('%s --version' % name, shell=False)\n",
+    )
+    assert any("argument vector, not a string" in finding for finding in findings)
+
+
+def test_rejects_dot_format_string_command(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nname = 'python'\nsubprocess.run('{} --version'.format(name), shell=False)\n",
+    )
+    assert any("argument vector, not a string" in finding for finding in findings)
+
+
+def test_rejects_join_built_string_command(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import subprocess\nparts = ['python', '--version']\nsubprocess.run(' '.join(parts), shell=False)\n",
+    )
+    assert any("argument vector, not a string" in finding for finding in findings)
+
+
 def test_rejects_string_passed_by_args_keyword(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
