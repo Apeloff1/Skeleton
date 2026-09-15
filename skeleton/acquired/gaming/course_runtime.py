@@ -4,9 +4,10 @@ HyperForge's browser runtime contains a compact gate-crossing model for flight
 courses: each ring is a plane with a radius, and progress advances only when
 the craft crosses that plane in the intended direction inside the aperture.
 
-This port removes Three.js/UI dependencies and improves the original endpoint
-check by testing the actual segment/plane intersection.  That prevents fast
-objects from tunnelling through a gate between simulation samples.
+This port removes Three.js/UI dependencies, normalizes the source runtime's
+crossing direction so ring normals consistently point along course travel, and
+checks the actual segment/plane intersection.  The intersection check prevents
+fast objects from tunnelling through a gate between simulation samples.
 """
 
 from __future__ import annotations
@@ -96,23 +97,25 @@ def segment_crosses_ring(
     *,
     margin: float = 0.0,
 ) -> GateCrossing:
-    """Return whether a movement segment crosses a ring in its forward direction.
+    """Return whether a movement segment crosses a ring forward through its aperture.
 
-    The intended direction matches HyperForge: positive signed distance to
-    non-positive signed distance.  Intersection is computed on the segment,
-    then checked against the ring aperture rather than using only the end point.
+    Ring normals point in the intended direction of travel.  A valid crossing
+    therefore moves from the negative half-space to the non-negative half-space.
+    HyperForge's source predicate used the opposite sign transition even though
+    its course builder pointed normals forward; the mined primitive resolves that
+    inconsistency rather than preserving it.
     """
 
     margin = max(0.0, float(margin))
     d0 = ring.signed_distance(start)
     d1 = ring.signed_distance(end)
-    if not (d0 > 0.0 and d1 <= 0.0):
+    if not (d0 < 0.0 and d1 >= 0.0):
         return GateCrossing(False)
 
-    denominator = d0 - d1
+    denominator = d1 - d0
     if denominator <= 1e-12:
         return GateCrossing(False)
-    t = max(0.0, min(1.0, d0 / denominator))
+    t = max(0.0, min(1.0, -d0 / denominator))
     hit = start.lerp(end, t)
 
     nx, ny, nz = ring.normal
