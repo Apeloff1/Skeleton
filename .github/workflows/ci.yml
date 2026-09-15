@@ -13,6 +13,7 @@ on:
       - '.github/workflows/ci.yml'
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
     paths:
       - '**'
       - '!docs/**'
@@ -34,6 +35,7 @@ permissions:
   contents: read
 jobs:
   backend-lint:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Backend Lint"
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -53,6 +55,7 @@ jobs:
       - name: Process invocation safety gate
         run: python scripts/check_process_safety.py
   skeleton-test:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Skeleton GameForge"
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -104,6 +107,7 @@ jobs:
           python -m skeleton cockpit "BLEND ERA arcade_golden_age soulslike 0.5"
           python -m skeleton walk --era soulslike
   school-jeeves-test:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Jeeves School Reasoning"
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -120,6 +124,7 @@ jobs:
         env: {PYTHONPATH: "."}
         run: python -m pytest -q tests/test_jeeves_reasoning_stack.py
   cockpit-smoke:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Cockpit Smoke"
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -133,6 +138,7 @@ jobs:
       - env: {PYTHONPATH: "."}
         run: chmod +x scripts/cockpit-smoke.sh && ./scripts/cockpit-smoke.sh
   backend-test:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Backend Test"
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -158,6 +164,7 @@ jobs:
       - uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with: {files: ./backend/coverage.xml, fail_ci_if_error: false}
   backend-import-smoke:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Backend Import Smoke"
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -178,6 +185,7 @@ jobs:
         run: |
           uv run python -c "import server; assert server.app is not None; print('server import: OK')"
   frontend:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Frontend"
     runs-on: ubuntu-latest
     timeout-minutes: 15
