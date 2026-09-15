@@ -61,6 +61,12 @@ def _module_with_test_class(name: str, cls: type) -> ModuleType:
     return mod
 
 
+def _run_only(monkeypatch, mod: ModuleType) -> int:
+    monkeypatch.setattr(runner, "TEST_MODULE_NAMES", (mod.__name__,))
+    monkeypatch.setattr(runner, "_load_test_module", lambda _: mod)
+    return runner.main()
+
+
 def test_superseded_match_requires_exact_terminal_source_line() -> None:
     probe = _Probe()
     exc = _capture(probe.test_exact_legacy_failure)
@@ -136,19 +142,25 @@ def test_async_assertion_is_not_counted_as_a_pass() -> None:
         raise AssertionError("async assertion was not propagated")
 
 
+def test_generator_style_test_is_rejected_instead_of_counted_as_pass() -> None:
+    def test_generator():
+        yield "body-never-ran"
+
+    try:
+        runner._invoke_test(test_generator)
+    except RuntimeError as exc:
+        assert "generator-style" in str(exc)
+    else:
+        raise AssertionError("generator test was counted as a pass")
+
+
 def test_system_exit_zero_is_recorded_as_failure(monkeypatch, capsys) -> None:
     class TestExit:
         def test_exit_zero(self) -> None:
             raise SystemExit(0)
 
     probe = _module_with_test_class("runner_exit_probe", TestExit)
-    empty = ModuleType("runner_empty_probe")
-    monkeypatch.setattr(runner, "f", probe)
-    monkeypatch.setattr(runner, "j", empty)
-    monkeypatch.setattr(runner, "c", empty)
-    monkeypatch.setattr(runner, "x", empty)
-
-    assert runner.main() == 1
+    assert _run_only(monkeypatch, probe) == 1
     out = capsys.readouterr().out
     assert "FAIL TestExit test_exit_zero SystemExit 0" in out
     assert "RESULT 0 ok 1 fail 0 superseded" in out
@@ -162,15 +174,46 @@ def test_module_level_failure_changes_main_exit_status(monkeypatch, capsys) -> N
 
     test_failure.__module__ = probe.__name__
     probe.test_failure = test_failure
-    empty = ModuleType("runner_empty_probe")
-    monkeypatch.setattr(runner, "f", probe)
-    monkeypatch.setattr(runner, "j", empty)
-    monkeypatch.setattr(runner, "c", empty)
-    monkeypatch.setattr(runner, "x", empty)
 
-    assert runner.main() == 1
+    assert _run_only(monkeypatch, probe) == 1
     out = capsys.readouterr().out
     assert "FAIL runner_module_failure test_failure AssertionError module-regression" in out
+    assert "RESULT 0 ok 1 fail 0 superseded" in out
+
+
+def test_import_system_exit_zero_is_failure(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(runner, "TEST_MODULE_NAMES", ("runner_import_exit",))
+
+    def exit_during_import(_: str) -> ModuleType:
+        raise SystemExit(0)
+
+    monkeypatch.setattr(runner, "_load_test_module", exit_during_import)
+    assert runner.main() == 1
+    out = capsys.readouterr().out
+    assert "FAIL IMPORT runner_import_exit SystemExit 0" in out
+    assert "RESULT 0 ok 1 fail 0 superseded" in out
+
+
+def test_empty_target_module_fails_collection(monkeypatch, capsys) -> None:
+    empty = ModuleType("runner_empty_probe")
+    assert _run_only(monkeypatch, empty) == 1
+    out = capsys.readouterr().out
+    assert "FAIL COLLECT runner_empty_probe no tests collected" in out
+    assert "RESULT 0 ok 1 fail 0 superseded" in out
+
+
+def test_constructor_system_exit_cannot_escape_collection(monkeypatch, capsys) -> None:
+    class TestCtorExit:
+        def __init__(self) -> None:
+            raise SystemExit(0)
+
+        def test_never_runs(self) -> None:
+            raise AssertionError("unreachable")
+
+    probe = _module_with_test_class("runner_ctor_exit", TestCtorExit)
+    assert _run_only(monkeypatch, probe) == 1
+    out = capsys.readouterr().out
+    assert "FAIL COLLECT TestCtorExit SystemExit 0" in out
     assert "RESULT 0 ok 1 fail 0 superseded" in out
 
 
