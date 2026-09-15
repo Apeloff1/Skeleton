@@ -27,15 +27,22 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 SHA40_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
-USES_RE = re.compile(r"^\s*(?:-\s*)?(?:\{\s*)?uses\s*:\s*[\"']?([^\"'\s,}#]+)")
+USES_RE = re.compile(
+    r"^\s*(?:-\s*)?(?:\{\s*)?(?:uses|'uses'|\"uses\")\s*:\s*[\"']?([^\"'\s,}#]+)"
+)
 EXPRESSION_RE = re.compile(r"\$\{\{(?P<body>.*?)\}\}", re.DOTALL)
 PERSIST_FALSE_RE = re.compile(
-    r"\bpersist-credentials\s*:\s*(?:false|['\"]false['\"])(?=\s*[,}#]|\s*$)",
+    r"(?:persist-credentials|'persist-credentials'|\"persist-credentials\")\s*:\s*"
+    r"(?:false|['\"]false['\"])(?=\s*[,}#]|\s*$)",
     re.IGNORECASE,
 )
 PERMISSION_ENTRY_RE = re.compile(
-    r"^\s+(?P<scope>[A-Za-z0-9_-]+)\s*:\s*(?P<value>read|write|none)\s*(?:#.*)?$",
+    r"^\s+['\"]?(?P<scope>[A-Za-z0-9_-]+)['\"]?\s*:\s*"
+    r"(?P<value>read|write|none)\s*(?:#.*)?$",
     re.IGNORECASE,
+)
+PULL_REQUEST_TARGET_RE = re.compile(
+    r"^\s*(?:pull_request_target|'pull_request_target'|\"pull_request_target\")\s*:"
 )
 CHECKOUT_ACTION = "actions/checkout@"
 
@@ -182,7 +189,7 @@ def violations(path: Path) -> list[str]:
     for index, line in enumerate(lines):
         number = index + 1
 
-        if re.match(r"^\s*pull_request_target\s*:", line):
+        if PULL_REQUEST_TARGET_RE.match(line):
             findings.append(f"{path.name}:{number}: pull_request_target is forbidden")
 
         if re.match(r"^\s*permissions\s*:\s*write-all\s*$", line):
