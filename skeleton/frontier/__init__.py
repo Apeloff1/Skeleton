@@ -29,8 +29,17 @@ from skeleton.frontier.logbook import (
     timeline,
     toggle_pin,
 )
-from skeleton.frontier.memory import InMemoryStore, MemoryItem
-from skeleton.frontier.memory_adapters import CollectionMemoryAdapter, SQLiteCollection
+from skeleton.frontier.memory import (
+    InMemoryStore,
+    MemoryItem,
+    normalize_memory_filters,
+    normalize_memory_metadata,
+)
+from skeleton.frontier.memory_adapters import (
+    CollectionMemoryAdapter,
+    MemoryStoreCorruptionError,
+    SQLiteCollection,
+)
 from skeleton.frontier.npc import NPCGenerator, NPCSpec
 from skeleton.frontier.npc_adapters import npc_spec_from_domain_record
 from skeleton.frontier.npc_profiles import ArchetypeProfile, get_profile, infer_archetype
@@ -112,6 +121,7 @@ __all__ = [
     "MILESTONE_IMPORTANCE",
     "MemoryContract",
     "MemoryItem",
+    "MemoryStoreCorruptionError",
     "NPCGenerator",
     "NPCSpec",
     "ObjectiveProgress",
@@ -158,6 +168,8 @@ __all__ = [
     "log_statistics",
     "milestone_entries",
     "next_reputation_level",
+    "normalize_memory_filters",
+    "normalize_memory_metadata",
     "npc_spec_from_domain_record",
     "project_fog_of_war",
     "quest_from_record",
