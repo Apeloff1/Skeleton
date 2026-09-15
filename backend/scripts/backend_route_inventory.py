@@ -13,15 +13,26 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from scripts import backend_route_inventory_core as _core
-from scripts.backend_route_inventory_core import (
-    InventoryReport,
-    RegisteredModule,
-    RouteRecord,
-    UnresolvedRecord,
-    load_registered_modules,
-    module_file,
-)
+try:  # imported as ``scripts.backend_route_inventory`` from backend tests
+    from scripts import backend_route_inventory_core as _core
+    from scripts.backend_route_inventory_core import (
+        InventoryReport,
+        RegisteredModule,
+        RouteRecord,
+        UnresolvedRecord,
+        load_registered_modules,
+        module_file,
+    )
+except ModuleNotFoundError:  # executed directly from ``backend/`` in CI
+    import backend_route_inventory_core as _core
+    from backend_route_inventory_core import (
+        InventoryReport,
+        RegisteredModule,
+        RouteRecord,
+        UnresolvedRecord,
+        load_registered_modules,
+        module_file,
+    )
 
 _CNS_PARENT = "routes.gameforge_cns"
 _CNS_MOUNT_PREFIX = "/api/gameforge"
@@ -83,10 +94,7 @@ def _scan_backend_module(
 
 
 def _is_cns_dynamic_marker(row: UnresolvedRecord) -> bool:
-    return (
-        row.module == _CNS_PARENT
-        and "include_router uses dynamic child" in row.reason
-    )
+    return row.module == _CNS_PARENT and "include_router uses dynamic child" in row.reason
 
 
 def build_inventory(registry_path: Path, routes_root: Path) -> InventoryReport:
