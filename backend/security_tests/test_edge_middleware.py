@@ -47,7 +47,7 @@ def test_path_prefix_requires_route_segment_boundary() -> None:
 
 
 def test_forwarded_ip_is_untrusted_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("CODEDOCK_TRUST_PROXY_HEADERS", raising=False)
+    monkeypatch.delenv("CODEDOCK_TRUSTED_PROXY_CIDRS", raising=False)
     request = _request(
         "/api/run",
         client_ip="10.0.0.7",
@@ -57,12 +57,14 @@ def test_forwarded_ip_is_untrusted_by_default(monkeypatch: pytest.MonkeyPatch) -
     assert _request_client_ip(request) == "10.0.0.7"
 
 
-def test_forwarded_ip_requires_explicit_proxy_trust(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("CODEDOCK_TRUST_PROXY_HEADERS", "true")
+def test_forwarded_ip_requires_explicit_proxy_peer_trust(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CODEDOCK_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
     request = _request(
         "/api/run",
         client_ip="10.0.0.7",
-        headers=[(b"x-forwarded-for", b"203.0.113.99, 10.0.0.7")],
+        headers=[(b"x-forwarded-for", b"203.0.113.99, 10.0.0.8")],
     )
 
     assert _request_client_ip(request) == "203.0.113.99"
