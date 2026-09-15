@@ -1,16 +1,14 @@
-"""Contract tests for canonical memory/retrieval consolidation (#118)."""
+"""Shared backend contracts for canonical memory/retrieval consolidation (#118)."""
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any
 
 import pytest
 
-from skeleton.frontier.agent_runtime import AgentRuntime
 from skeleton.frontier.memory import InMemoryStore
 from skeleton.frontier.memory_adapters import CollectionMemoryAdapter, SQLiteCollection
 from skeleton.frontier.retrieval_context import MemoryRetriever, normalize_retrieval_hit
-from skeleton.frontier.retrieval_runtime import MemoryAugmentedRuntime
 from skeleton.memory.frontier_adapter import LegacyMemoryStoreAdapter
 from skeleton.memory.rag import InMemoryTFIDFStore
 
@@ -48,7 +46,11 @@ async def test_memory_backends_share_put_filter_search_delete_contract() -> None
             }
         )
 
-        hits = await backend.search("alpha retrieval", limit=5, filters={"topic": "alpha"})
+        hits = await backend.search(
+            "alpha retrieval",
+            limit=5,
+            filters={"topic": "alpha"},
+        )
         assert len(hits) == 1
         assert hits[0]["id"] == "alpha-1"
         assert hits[0]["content"] == "alpha memory about retrieval contracts"
@@ -57,7 +59,11 @@ async def test_memory_backends_share_put_filter_search_delete_contract() -> None
         assert 0.0 < float(hits[0]["relevance"]) <= 1.0
 
         await backend.delete("alpha-1")
-        assert await backend.search("alpha retrieval", limit=5, filters={"topic": "alpha"}) == []
+        assert await backend.search(
+            "alpha retrieval",
+            limit=5,
+            filters={"topic": "alpha"},
+        ) == []
 
 
 @pytest.mark.asyncio
@@ -92,67 +98,17 @@ def test_runtime_retrieval_rejects_unattributed_memory() -> None:
         )
 
 
-class _CaptureAgent:
-    name = "capture"
-    capabilities = {"retrieve"}
-
-    def __init__(self) -> None:
-        self.context: Mapping[str, Any] | None = None
-
-    async def run(self, task: str, context: Mapping[str, Any] | None = None) -> Any:
-        self.context = context
-        return {
-            "task": task,
-            "source": context["retrieved_memory"][0]["source"] if context else None,
-        }
-
-
 @pytest.mark.asyncio
-async def test_retrieval_augments_context_then_delegates_to_canonical_agent_runtime() -> None:
-    memory = InMemoryStore()
-    await memory.put(
-        {
-            "id": "runtime-1",
-            "content": "runtime retrieval context",
-            "metadata": {"topic": "runtime", **SOURCE},
-        }
-    )
+async def test_legacy_adapter_rejects_nonportable_metadata_before_store_mutation() -> None:
+    adapter = LegacyMemoryStoreAdapter(InMemoryTFIDFStore(), source_tier="rag")
 
-    agent = _CaptureAgent()
-    runtime = AgentRuntime()
-    runtime.register(agent)
-    augmented = MemoryAugmentedRuntime(runtime, MemoryRetriever(memory))
-
-    result = await augmented.execute(
-        "capture",
-        "use retrieved context",
-        retrieval_query="runtime retrieval",
-        retrieval_filters={"topic": "runtime"},
-        required_capability="retrieve",
-        source_path="skeleton/testing/test_frontier_memory_retrieval.py",
-    )
-
-    assert result.succeeded
-    assert result.output["source"] == {
-        "repository": SOURCE["source_repository"],
-        "revision": SOURCE["source_revision"],
-        "path": SOURCE["source_path"],
-    }
-    assert agent.context is not None
-    assert agent.context["retrieved_memory"][0]["id"] == "runtime-1"
-    assert agent.context["retrieved_memory"][0]["metadata"]["topic"] == "runtime"
-
-
-@pytest.mark.asyncio
-async def test_retrieval_context_key_is_reserved() -> None:
-    runtime = AgentRuntime()
-    runtime.register(_CaptureAgent())
-    augmented = MemoryAugmentedRuntime(runtime, MemoryRetriever(InMemoryStore()))
-
-    with pytest.raises(ValueError, match="reserved"):
-        await augmented.execute(
-            "capture",
-            "task",
-            context={"retrieved_memory": []},
-            retrieval_query="query",
+    with pytest.raises(TypeError, match="JSON-compatible"):
+        await adapter.put(
+            {
+                "id": "bad",
+                "content": "bad metadata",
+                "metadata": {"bad": object()},
+            }
         )
+
+    assert await adapter.search("bad", limit=5) == []
