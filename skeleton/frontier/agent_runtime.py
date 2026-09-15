@@ -203,9 +203,12 @@ class AgentRuntime:
 
         agent = self.resolve(normalized_agent_name)
 
+        required_source = (
+            required_capabilities if required_capabilities is not None else ()
+        )
         required = set(
             _normalize_capabilities(
-                required_capabilities or (),
+                required_source,
                 field_name="required_capabilities",
             )
         )
