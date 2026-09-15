@@ -8,27 +8,42 @@ attacker-controlled GitHub event fields into shell ``run`` commands.
 """
 from __future__ import annotations
 
-from collections.abc import Iterable
 from pathlib import Path
 import re
 import sys
+
+if __package__:
+    from .check_workflow_input_security import (
+        _run_fragments as hardened_run_fragments,
+        violations as input_boundary_violations,
+    )
+else:
+    from check_workflow_input_security import (
+        _run_fragments as hardened_run_fragments,
+        violations as input_boundary_violations,
+    )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 SHA40_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
-USES_RE = re.compile(r"^\s*(?:-\s*)?(?:\{\s*)?uses\s*:\s*[\"']?([^\"'\s,}#]+)")
-RUN_RE = re.compile(r"^(?P<indent>\s*)(?:-\s*)?run\s*:\s*(?P<value>.*)$")
-EXPRESSION_RE = re.compile(r"\$\{\{(?P<body>.*?)\}\}")
+USES_RE = re.compile(
+    r"^\s*(?:-\s*)?(?:\{\s*)?(?:uses|'uses'|\"uses\")\s*:\s*[\"']?([^\"'\s,}#]+)"
+)
+EXPRESSION_RE = re.compile(r"\$\{\{(?P<body>.*?)\}\}", re.DOTALL)
 PERSIST_FALSE_RE = re.compile(
-    r"\bpersist-credentials\s*:\s*(?:false|['\"]false['\"])(?=\s*[,}#]|\s*$)",
+    r"(?:persist-credentials|'persist-credentials'|\"persist-credentials\")\s*:\s*"
+    r"(?:false|['\"]false['\"])(?=\s*[,}#]|\s*$)",
     re.IGNORECASE,
 )
 PERMISSION_ENTRY_RE = re.compile(
-    r"^\s+(?P<scope>[A-Za-z0-9_-]+)\s*:\s*(?P<value>read|write|none)\s*(?:#.*)?$",
+    r"^\s+['\"]?(?P<scope>[A-Za-z0-9_-]+)['\"]?\s*:\s*"
+    r"(?P<value>read|write|none)\s*(?:#.*)?$",
     re.IGNORECASE,
 )
-BLOCK_SCALARS = {"|", ">", "|-", ">-", "|+", ">+"}
+PULL_REQUEST_TARGET_RE = re.compile(
+    r"^\s*(?:pull_request_target|'pull_request_target'|\"pull_request_target\")\s*:"
+)
 CHECKOUT_ACTION = "actions/checkout@"
 
 # These fields can be controlled by pull-request authors, issue/comment authors,
@@ -143,34 +158,6 @@ def _top_level_permission_violations(
     return has_top_level, findings
 
 
-def _run_fragments(lines: list[str]) -> Iterable[tuple[int, str]]:
-    """Yield shell source fragments with their workflow line numbers."""
-    index = 0
-    while index < len(lines):
-        line = lines[index]
-        match = RUN_RE.match(line)
-        if not match:
-            index += 1
-            continue
-
-        value = match.group("value").strip()
-        line_number = index + 1
-        if value not in BLOCK_SCALARS:
-            yield line_number, value
-            index += 1
-            continue
-
-        base_indent = len(match.group("indent"))
-        index += 1
-        while index < len(lines):
-            child = lines[index]
-            if child.strip() and _indent_width(child) <= base_indent:
-                break
-            if child.strip():
-                yield index + 1, child.strip()
-            index += 1
-
-
 def _untrusted_expression(fragment: str) -> str | None:
     for expression in EXPRESSION_RE.finditer(fragment):
         body = expression.group("body")
@@ -187,6 +174,12 @@ def violations(path: Path) -> list[str]:
         return [f"{path}: read failure: {exc}"]
 
     findings: list[str] = []
+    # Compose the dedicated workflow-input boundary checker into the canonical
+    # workflow security gate. This keeps multiline expressions, quoted run keys,
+    # block scalar variants, YAML anchors/tags, flow-style run mappings, and run
+    # aliases fail-closed in the fast Backend Quality gate.
+    findings.extend(input_boundary_violations(path))
+
     lines = text.splitlines()
     has_top_level_permissions, permission_findings = _top_level_permission_violations(
         lines, path.name
@@ -196,7 +189,7 @@ def violations(path: Path) -> list[str]:
     for index, line in enumerate(lines):
         number = index + 1
 
-        if re.match(r"^\s*pull_request_target\s*:", line):
+        if PULL_REQUEST_TARGET_RE.match(line):
             findings.append(f"{path.name}:{number}: pull_request_target is forbidden")
 
         if re.match(r"^\s*permissions\s*:\s*write-all\s*$", line):
@@ -226,7 +219,11 @@ def violations(path: Path) -> list[str]:
         if not SHA40_RE.fullmatch(revision):
             findings.append(f"{path.name}:{number}: action reference is not pinned to a 40-character commit SHA: {reference}")
 
-    for number, fragment in _run_fragments(lines):
+    # Reuse the hardened run parser from the input-boundary gate for every
+    # attacker-controlled event context too. This prevents quoted run keys,
+    # anchored/tagged block scalars, alternate scalar headers, and folded
+    # multiline expressions from creating a second parser bypass surface.
+    for number, fragment in hardened_run_fragments(lines):
         label = _untrusted_expression(fragment)
         if label:
             findings.append(
