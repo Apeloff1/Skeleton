@@ -56,6 +56,12 @@ jobs:
           --registry core/routes_registry.py
           --routes-root routes
 
+      - name: Backend route collision evidence
+        run: >-
+          python scripts/backend_route_collisions.py
+          --registry core/routes_registry.py
+          --routes-root routes
+
       - name: Process invocation safety gate
         run: python scripts/check_process_safety.py
 
