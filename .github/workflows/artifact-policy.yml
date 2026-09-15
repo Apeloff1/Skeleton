@@ -32,6 +32,13 @@ jobs:
       - name: Compile policy gate
         run: python -m compileall -q scripts/check_artifact_policy.py tests/test_artifact_policy.py
       - name: Run policy regressions
-        run: python -m unittest -q tests.test_artifact_policy
-      - name: Enforce changed-artifact policy
-        run: python scripts/check_artifact_policy.py --base "$ARTIFACT_BASE"
+        run: python -m unittest discover -s tests -p 'test_artifact_policy.py' -q
+      - name: Enforce artifact policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${ARTIFACT_BASE:-}" ]]; then
+            python scripts/check_artifact_policy.py --base "$ARTIFACT_BASE"
+          else
+            python scripts/check_artifact_policy.py --all
+          fi
