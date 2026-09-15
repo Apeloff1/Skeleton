@@ -1,0 +1,216 @@
+{
+  "expansion_phase": "71_to_100",
+  "description": "Final expansion wave to reach exactly 100 total categories. Completing the full Zaibatsu CNS category structure.",
+  "new_categories": [
+    {
+      "category_id": 71,
+      "name": "Lighting, Shadows & Global Illumination",
+      "description": "Advanced lighting systems, dynamic shadows, global illumination, and atmospheric effects.",
+      "focus": "Beautiful, performant lighting that enhances mood, readability, and gameplay.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 72,
+      "name": "Camera Systems, Cinematic & Player Control",
+      "description": "Camera design, cinematic sequences, player-controlled cameras, and smooth transitions.",
+      "focus": "Cameras that serve gameplay while enabling powerful cinematic moments.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 73,
+      "name": "UI/UX Systems, HUD & Information Design",
+      "description": "Advanced UI systems, information hierarchy, feedback design, and player communication.",
+      "focus": "Clear, beautiful, and non-intrusive interfaces that enhance player understanding.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 74,
+      "name": "Input Systems, Remapping & Accessibility Controls",
+      "description": "Input handling, full remapping, controller support, and accessibility input options.",
+      "focus": "Responsive, customizable input that works for all players.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 75,
+      "name": "Save Systems, Persistence & Cloud Sync",
+      "description": "Robust save systems, cloud synchronization, and long-term player data management.",
+      "focus": "Reliable, fast, and safe persistence across platforms and sessions.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 76,
+      "name": "Modding, Scripting & User Content Systems",
+      "description": "Mod support, scripting APIs, and user-generated content pipelines.",
+      "focus": "Powerful, safe, and accessible tools for players to create and share content.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 77,
+      "name": "Cheat Detection, Reporting & Fair Play Systems",
+      "description": "Advanced cheat detection, player reporting, and automated fair play enforcement.",
+      "focus": "Protecting competitive integrity while treating legitimate players fairly.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 78,
+      "name": "Matchmaking, Lobby & Social Systems",
+      "description": "Intelligent matchmaking, lobby systems, party formation, and social features.",
+      "focus": "Fast, fair, and enjoyable group play experiences.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 79,
+      "name": "Seasonal Events, Limited-Time Modes & Content Drops",
+      "description": "Design and operation of seasonal events, limited modes, and temporary content.",
+      "focus": "Exciting, well-paced events that bring players back without fragmenting the core game.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 80,
+      "name": "Battle Pass, Progression Tracks & Reward Systems",
+      "description": "Battle pass design, seasonal progression, and meaningful reward structures.",
+      "focus": "Reward systems that feel fair, exciting, and worth the player's time.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 81,
+      "name": "Cosmetic Systems, Customization & Player Expression",
+      "description": "Deep cosmetic systems, character customization, and player expression tools.",
+      "focus": "Rich customization that feels meaningful without affecting gameplay balance.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 82,
+      "name": "Voice Chat, Text Chat & Communication Systems",
+      "description": "Communication tools, moderation, toxicity reduction, and positive social features.",
+      "focus": "Safe, useful, and enjoyable communication between players.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 83,
+      "name": "Spectator, Replay & Content Creation Tools",
+      "description": "Spectator modes, replay systems, and tools for content creators.",
+      "focus": "Powerful tools that support streaming, analysis, and community content.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 84,
+      "name": "Esports, Tournaments & Competitive Infrastructure",
+      "description": "Tournament systems, competitive infrastructure, and esports support.",
+      "focus": "Robust systems that enable fair, high-quality competitive play at scale.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 85,
+      "name": "Analytics Dashboard, Insights & Decision Tools",
+      "description": "Advanced analytics dashboards and tools for data-driven game development.",
+      "focus": "Clear, actionable insights that help teams improve the game faster.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 86,
+      "name": "Error Handling, Crash Reporting & Stability Systems",
+      "description": "Robust error handling, crash reporting, and stability monitoring.",
+      "focus": "Fast detection and resolution of issues with minimal player impact.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 87,
+      "name": "Localization Pipeline & Cultural QA",
+      "description": "Full localization pipeline, cultural QA, and multi-language support systems.",
+      "focus": "High-quality localization that feels native in every supported language.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 88,
+      "name": "Performance Budgeting, Profiling & Optimization Pipeline",
+      "description": "Strict performance budgeting, profiling automation, and optimization workflows.",
+      "focus": "Consistent high performance across all target platforms and hardware.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 89,
+      "name": "Build Automation, CI/CD & Release Management",
+      "description": "Advanced build systems, continuous integration, and safe release processes.",
+      "focus": "Fast, reliable iteration with safe deployment at scale.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 90,
+      "name": "Player Support, Help Systems & Community Tools",
+      "description": "In-game help, support systems, FAQ, and community assistance features.",
+      "focus": "Players can quickly find answers and get help when needed.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 91,
+      "name": "Anti-Toxicity, Positive Behavior & Community Health",
+      "description": "Systems that encourage positive behavior and reduce toxicity at scale.",
+      "focus": "Healthy, welcoming community culture through smart design.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 92,
+      "name": "Long-term Player Journey & Decade-Scale Design",
+      "description": "Designing for players who will engage with the game for years or decades.",
+      "focus": "Systems that remain meaningful and engaging over very long time horizons.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 93,
+      "name": "World State, Persistence & Shared Universe Systems",
+      "description": "Persistent world state, shared universes, and long-term world evolution.",
+      "focus": "Worlds that remember player actions and evolve over time.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 94,
+      "name": "Narrative Consistency, Lore Management & Canon Systems",
+      "description": "Maintaining narrative consistency, lore integrity, and canon across all content.",
+      "focus": "Stories that remain coherent and meaningful even as the game grows massively.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 95,
+      "name": "Cross-Game Integration & Shared Universe Design",
+      "description": "Systems for connecting multiple games in a shared universe or ecosystem.",
+      "focus": "Seamless, meaningful connections between games without forcing players.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 96,
+      "name": "AI-Assisted Design, Co-Creation & Tooling",
+      "description": "AI tools that assist designers, artists, and developers in content creation.",
+      "focus": "Powerful AI assistance that amplifies human creativity without replacing it.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 97,
+      "name": "Ethical Design, Player Wellbeing & Responsible Gaming",
+      "description": "Designing for player wellbeing, ethical monetization, and responsible gaming practices.",
+      "focus": "Games that respect player time, mental health, and long-term relationship.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 98,
+      "name": "Sustainability, Carbon & Environmental Impact Systems",
+      "description": "Reducing the environmental impact of game development and live operations.",
+      "focus": "More sustainable development and operation practices at scale.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 99,
+      "name": "Knowledge Management, Documentation & Institutional Memory",
+      "description": "Systems for capturing, organizing, and sharing team knowledge over time.",
+      "focus": "Teams that learn and improve faster by retaining institutional knowledge.",
+      "target_roles_per_category": 100
+    },
+    {
+      "category_id": 100,
+      "name": "Zaibatsu CNS Core Orchestration & System Integration",
+      "description": "The central nervous system that ties all 100 categories together into one coherent whole.",
+      "focus": "Perfect integration, synergy, and emergent intelligence across the entire system.",
+      "target_roles_per_category": 100
+    }
+  ]
+}
