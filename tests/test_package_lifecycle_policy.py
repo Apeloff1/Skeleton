@@ -23,20 +23,26 @@ class PackageLifecyclePolicyTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tempdir.cleanup()
 
-    def _write_scripts(self, scripts: dict[str, object]) -> None:
-        payload = {"name": "frontend", "scripts": scripts}
-        (self.root / "frontend" / "package.json").write_text(
-            json.dumps(payload), encoding="utf-8"
-        )
+    def _write_manifest(self, package_file: str, scripts: dict[str, object]) -> None:
+        path = self.root / package_file
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {"name": "fixture", "scripts": scripts}
+        path.write_text(json.dumps(payload), encoding="utf-8")
 
-    def _violations(self) -> list[str]:
+    def _write_scripts(self, scripts: dict[str, object]) -> None:
+        self._write_manifest("frontend/package.json", scripts)
+
+    def _violations_for(self, package_files: list[str]) -> list[str]:
         with mock.patch.object(lifecycle, "REPO_ROOT", self.root):
             with mock.patch.object(
                 lifecycle,
                 "tracked_package_files",
-                return_value=["frontend/package.json"],
+                return_value=package_files,
             ):
                 return lifecycle.violations()
+
+    def _violations(self) -> list[str]:
+        return self._violations_for(["frontend/package.json"])
 
     def test_allows_exact_approved_postinstall(self) -> None:
         self._write_scripts(
@@ -63,6 +69,20 @@ class PackageLifecyclePolicyTests(unittest.TestCase):
         (self.root / "frontend" / "package.json").write_text("{broken", encoding="utf-8")
         findings = self._violations()
         self.assertTrue(any("cannot safely parse manifest" in finding for finding in findings))
+
+    def test_ignores_archived_branch_snapshot_lifecycle_hooks(self) -> None:
+        package_file = (
+            "satellites/branch-snapshots/old-feature/frontend/package.json"
+        )
+        self._write_manifest(package_file, {"postinstall": "node ./scripts/old-hook.js"})
+        self.assertEqual(self._violations_for([package_file]), [])
+
+    def test_keeps_other_tracked_manifests_fail_closed(self) -> None:
+        package_file = "tools/active-worker/package.json"
+        self._write_manifest(package_file, {"postinstall": "node ./scripts/unknown.js"})
+        findings = self._violations_for([package_file])
+        self.assertTrue(any(package_file in finding for finding in findings))
+        self.assertTrue(any("unapproved lifecycle hook" in finding for finding in findings))
 
 
 if __name__ == "__main__":
