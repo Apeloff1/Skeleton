@@ -134,6 +134,8 @@ def violations_from_text(name: str, text: str) -> list[str]:
 
 
 def violations(path: Path) -> list[str]:
+    if path.is_symlink():
+        return [f"{path.name}: workflow files must not be symlinks"]
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as exc:
@@ -142,6 +144,10 @@ def violations(path: Path) -> list[str]:
 
 
 def main() -> int:
+    if WORKFLOW_DIR.is_symlink():
+        print("GitHub Actions workflow directory must not be a symlink.", file=sys.stderr)
+        return 1
+
     workflows = workflow_files()
     if not workflows:
         print("No GitHub Actions workflows found.", file=sys.stderr)
