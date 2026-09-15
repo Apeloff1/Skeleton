@@ -114,6 +114,35 @@ def test_rate_limit_capacity_cannot_reset_existing_bucket_state() -> None:
     asyncio.run(scenario())
 
 
+def test_subnormal_rate_retry_math_stays_bounded() -> None:
+    async def scenario() -> None:
+        async def app(_scope, _receive, _send) -> None:
+            return None
+
+        async def call_next(_request: Request) -> Response:
+            return Response(status_code=204)
+
+        RateLimitMiddleware._buckets.clear()
+        RateLimitMiddleware._lock = asyncio.Lock()
+        middleware = RateLimitMiddleware(
+            app,
+            rps=5e-324,
+            burst=1,
+            max_buckets=8,
+            bucket_ttl=300,
+        )
+        request = _request(peer="198.51.100.11")
+
+        assert (await middleware.dispatch(request, call_next)).status_code == 204
+        rejected = await middleware.dispatch(request, call_next)
+
+        assert rejected.status_code == 429
+        retry_after = int(rejected.headers["retry-after"])
+        assert 1 <= retry_after <= 86_400
+
+    asyncio.run(scenario())
+
+
 def _exercise(
     *,
     headers: list[tuple[bytes, bytes]],
@@ -213,3 +242,69 @@ def test_oversized_stream_is_rejected_before_app_even_if_handler_would_not_read_
 
     assert _status(sent) == 413
     assert not called
+
+
+def test_inflight_body_budget_fails_closed_and_releases_capacity() -> None:
+    async def scenario() -> None:
+        first_entered = asyncio.Event()
+        release_first = asyncio.Event()
+        app_calls = 0
+
+        async def app(scope, bounded_receive, bounded_send) -> None:
+            nonlocal app_calls
+            app_calls += 1
+            while True:
+                message = await bounded_receive()
+                if not message.get("more_body", False):
+                    break
+            if app_calls == 1:
+                first_entered.set()
+                await release_first.wait()
+            response = Response(status_code=204)
+            await response(scope, bounded_receive, bounded_send)
+
+        middleware = SizeLimitMiddleware(app, max_mb=1, max_inflight_mb=1)
+
+        def exchange(body: bytes):
+            queue = [{"type": "http.request", "body": body, "more_body": False}]
+            sent: list[dict] = []
+
+            async def receive() -> dict:
+                return queue.pop(0)
+
+            async def send(message: dict) -> None:
+                sent.append(message)
+
+            scope = {
+                "type": "http",
+                "http_version": "1.1",
+                "method": "POST",
+                "scheme": "http",
+                "path": "/api/run",
+                "raw_path": b"/api/run",
+                "query_string": b"",
+                "headers": [],
+                "client": ("127.0.0.1", 12345),
+                "server": ("testserver", 80),
+            }
+            return scope, receive, send, sent
+
+        first = exchange(b"a" * 700_000)
+        first_task = asyncio.create_task(middleware(first[0], first[1], first[2]))
+        await first_entered.wait()
+
+        second = exchange(b"b" * 700_000)
+        await middleware(second[0], second[1], second[2])
+        assert _status(second[3]) == 503
+        assert app_calls == 1
+
+        release_first.set()
+        await first_task
+        assert _status(first[3]) == 204
+
+        third = exchange(b"c" * 700_000)
+        await middleware(third[0], third[1], third[2])
+        assert _status(third[3]) == 204
+        assert app_calls == 2
+
+    asyncio.run(scenario())
