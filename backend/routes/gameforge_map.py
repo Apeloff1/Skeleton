@@ -16,10 +16,10 @@ request/runtime strings cannot choose arbitrary import targets.
 """
 from __future__ import annotations
 
-from collections.abc import Callable
 import glob
 import json
 import os
+from collections.abc import Callable
 from typing import Any, Optional
 
 from fastapi import APIRouter
