@@ -257,6 +257,7 @@ class ModelRuntime:
         *,
         timeout_seconds: float | None = None,
         cancellation: CancellationToken | None = None,
+        retry_policy: RetryPolicy = RetryPolicy(),
         allow_nonstream_fallback: bool = False,
     ) -> AsyncIterator[StreamEvent]:
         provider = self.resolve(provider_name)
@@ -275,6 +276,7 @@ class ModelRuntime:
                 request,
                 timeout_seconds=timeout_seconds,
                 cancellation=cancellation,
+                retry_policy=retry_policy,
             )
             if response.text:
                 yield StreamEvent(kind="text_delta", text_delta=response.text)
@@ -285,25 +287,41 @@ class ModelRuntime:
             ModelCapability.STRUCTURED_OUTPUT not in provider.capabilities
         ):
             _raise_missing(provider, {ModelCapability.STRUCTURED_OUTPUT})
+        if timeout_seconds is not None and timeout_seconds <= 0:
+            raise ValueError("timeout_seconds must be positive")
+        if cancellation is not None:
+            cancellation.raise_if_cancelled()
 
         loop = asyncio.get_running_loop()
         deadline = None if timeout_seconds is None else loop.time() + timeout_seconds
-        iterator = provider.stream_chat(request).__aiter__()
-        while True:
-            if cancellation is not None:
-                cancellation.raise_if_cancelled()
-            remaining = None if deadline is None else deadline - loop.time()
-            if remaining is not None and remaining <= 0:
-                raise ProviderTimeoutError("model stream exceeded its deadline")
+        emitted_event = False
+        for attempt in range(1, retry_policy.max_attempts + 1):
+            iterator = provider.stream_chat(request).__aiter__()
             try:
-                event = await _await_with_cancel(
-                    iterator.__anext__(),
-                    timeout_seconds=remaining,
+                while True:
+                    if cancellation is not None:
+                        cancellation.raise_if_cancelled()
+                    remaining = None if deadline is None else deadline - loop.time()
+                    if remaining is not None and remaining <= 0:
+                        raise ProviderTimeoutError("model stream exceeded its deadline")
+                    try:
+                        event = await _await_with_cancel(
+                            iterator.__anext__(),
+                            timeout_seconds=remaining,
+                            cancellation=cancellation,
+                        )
+                    except StopAsyncIteration:
+                        return
+                    emitted_event = True
+                    yield event
+            except TransientProviderError:
+                if emitted_event or attempt >= retry_policy.max_attempts:
+                    raise
+                await _controlled_sleep(
+                    retry_policy.backoff_seconds,
+                    deadline=deadline,
                     cancellation=cancellation,
                 )
-            except StopAsyncIteration:
-                return
-            yield event
 
     async def _run_controlled(
         self,
