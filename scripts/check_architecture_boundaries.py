@@ -46,6 +46,14 @@ _PRODUCTION_RULES = (
     },
 )
 
+# Exact composition roots are allowed to assemble interface adapters. Keep this
+# list deliberately tiny: adding a path is an architecture decision, not a CI
+# escape hatch. Tests are handled separately through excluded_prefixes.
+_API_COMPOSITION_ROOTS = {
+    "skeleton/__main__.py",
+    "skeleton/deploy/harness.py",
+}
+
 
 @dataclass(frozen=True)
 class Violation:
@@ -145,11 +153,11 @@ def collect_violations(repo_root: Path = REPO_ROOT, *, require_roots: bool = Fal
             in_skeleton = _is_under(path, skeleton_root)
             in_kernel = in_skeleton and _is_under(path, kernel_root)
             in_api = in_skeleton and _is_under(path, api_root)
-            cli_entry = path == skeleton_root / "__main__.py"
             production_exempt = bool(
                 production_rule
                 and any(rel.startswith(prefix) for prefix in production_rule["excluded_prefixes"])
             )
+            api_composition_root = rel in _API_COMPOSITION_ROOTS
 
             for node in ast.walk(tree):
                 imports: list[tuple[str, int]] = []
@@ -170,7 +178,13 @@ def collect_violations(repo_root: Path = REPO_ROOT, *, require_roots: bool = Fal
                             )
                         )
 
-                    if in_skeleton and not in_api and not cli_entry and _imports_api(module, level):
+                    if (
+                        in_skeleton
+                        and not in_api
+                        and not production_exempt
+                        and not api_composition_root
+                        and _imports_api(module, level)
+                    ):
                         violations.append(
                             Violation(
                                 path,
