@@ -1,3 +1,5 @@
+import pytest
+
 from skeleton.retrieval.fusion import ScoredResult
 from skeleton.retrieval.pipeline import SearchPipeline
 from skeleton.retrieval.query import QueryPlanner
@@ -54,6 +56,41 @@ def test_failed_prefetch_is_retried_by_normal_execution() -> None:
 
     assert calls == 2
     assert [item.fragment_id for item in outcome.results] == ["recovered"]
+
+
+def test_replaced_retriever_invalidates_prefetched_results() -> None:
+    old_calls = []
+    new_calls = []
+
+    def old_retriever(query: str):
+        old_calls.append(query)
+        return [_result("old", "stale result")]
+
+    def new_retriever(query: str):
+        new_calls.append(query)
+        return [_result("new", "fresh result")]
+
+    planner = QueryPlanner()
+    planner.register("quad", old_retriever)
+    pipeline = SearchPipeline(planner)
+    prepared = pipeline.prepare("alpha")
+
+    planner.register("quad", new_retriever)
+    outcome = pipeline.search_prepared(prepared)
+
+    assert old_calls == ["alpha"]
+    assert new_calls == ["alpha"]
+    assert [item.fragment_id for item in outcome.results] == ["new"]
+
+
+def test_prefetched_result_mapping_shape_is_read_only() -> None:
+    planner = QueryPlanner()
+    planner.register("quad", lambda query: [_result("doc-1", query)])
+
+    prepared = SearchPipeline(planner).prepare("alpha")
+
+    with pytest.raises(TypeError):
+        prepared.results_by_retriever["quad"] = ()  # type: ignore[index]
 
 
 def test_search_plans_once_and_speculative_mode_does_not_double_fetch() -> None:
