@@ -67,6 +67,29 @@ jobs:
                       return response.status, json.loads(raw) if raw else None
               except urllib.error.HTTPError as exc:
                   return exc.code, None
+              except urllib.error.URLError:
+                  # Treat transport failures as retryable by mutation callers
+                  # instead of crashing the whole queue-drain process.
+                  return 0, None
+
+          def cancel_run(run_id):
+              retryable = {0, 429, 500, 502, 503, 504}
+              status = 0
+              for attempt in range(1, 4):
+                  status, _ = request(
+                      f'/repos/{repo}/actions/runs/{run_id}/cancel',
+                      method='POST',
+                  )
+                  if status not in retryable:
+                      return status
+                  if attempt < 3:
+                      delay = 2 ** (attempt - 1)
+                      print(
+                          f'cancel retry: id={run_id} status={status} '
+                          f'attempt={attempt}/3 sleep={delay}s'
+                      )
+                      time.sleep(delay)
+              return status
 
           def resolve_main_sha():
               status, branch = request(f'/repos/{repo}/branches/main')
@@ -243,10 +266,7 @@ jobs:
               for run in selected:
                   run_id = int(run['id'])
                   attempted.add(run_id)
-                  status, _ = request(
-                      f'/repos/{repo}/actions/runs/{run_id}/cancel',
-                      method='POST',
-                  )
+                  status = cancel_run(run_id)
                   if status in {200, 202}:
                       accepted += 1
                   elif status in {404, 409, 422}:
