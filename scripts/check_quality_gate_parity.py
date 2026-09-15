@@ -25,6 +25,7 @@ SHARED_BACKEND_MARKERS: tuple[tuple[str, str], ...] = (
     ("dynamic import regression", "test_dynamic_import_safety.py"),
     ("tar archive extraction safety", "check_archive_extraction_safety.py"),
     ("tar archive extraction regression", "test_archive_extraction_safety.py"),
+    ("live scraper network regression", "test_live_scraper_network_security.py"),
     ("high-confidence SAST", "check_sast_security.py"),
     ("repository Python SAST", "check_repository_python_sast.py"),
     ("repository Python SAST regression", "test_repository_python_sast_scope.py"),
