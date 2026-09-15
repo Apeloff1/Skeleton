@@ -82,6 +82,9 @@ class AgentPool:
         # identity. This prevents two independently-created Task instances with
         # the same ID from consuming multiple agent slots.
         self._task_owners: Dict[str, str] = {}
+        # Keep only currently-owned task objects so destructive agent lifecycle
+        # changes can terminalize the exact task before its logical ID is reused.
+        self._owned_tasks: Dict[str, Task] = {}
         self._bus = bus
         self._stats = {"created": 0, "destroyed": 0, "tasks_assigned": 0}
 
@@ -134,6 +137,7 @@ class AgentPool:
         agent["tasks"].append(task.task_id)
         agent["load"] += 1
         self._task_owners[task.task_id] = agent_id
+        self._owned_tasks[task.task_id] = task
         task.agent_id = agent_id
         task.status = TaskStatus.RUNNING
         self._stats["tasks_assigned"] += 1
@@ -160,6 +164,7 @@ class AgentPool:
         agent["tasks"].remove(task_id)
         agent["load"] = max(0, agent["load"] - 1)
         self._task_owners.pop(task_id, None)
+        self._owned_tasks.pop(task_id, None)
 
     def find_capable(self, specialisation: str) -> List[str]:
         """Find available agents with a given specialisation, sorted by load."""
@@ -173,14 +178,19 @@ class AgentPool:
         return [aid for aid, _ in capable]
 
     def destroy(self, agent_id: str) -> None:
-        """Remove an agent and release ownership of every slot it held."""
+        """Remove an agent and cancel every running task whose slot it held."""
         agent = self._agents.pop(agent_id, None)
         if agent is None:
             return
 
         for task_id in tuple(agent["tasks"]):
-            if self._task_owners.get(task_id) == agent_id:
-                self._task_owners.pop(task_id, None)
+            if self._task_owners.get(task_id) != agent_id:
+                continue
+            self._task_owners.pop(task_id, None)
+            task = self._owned_tasks.pop(task_id, None)
+            if task is not None and task.status is TaskStatus.RUNNING:
+                task.status = TaskStatus.CANCELLED
+                task.error = "Assigned agent was destroyed before task completion"
         self._stats["destroyed"] += 1
 
     def stats(self) -> Dict[str, Any]:
