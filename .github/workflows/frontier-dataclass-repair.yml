@@ -1,0 +1,89 @@
+name: Frontier Dataclass Repair
+
+on:
+  push:
+    branches:
+      - resolve/mod-regression-ci-current-main-20260915
+    paths:
+      - .github/workflows/frontier-dataclass-repair.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: true
+          ref: ${{ github.ref_name }}
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Repair immutable dataclass defaults
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          targets = {
+              Path("skeleton/frontier/commerce.py"): (
+                  "from dataclasses import dataclass, replace",
+                  "from dataclasses import dataclass, field, replace",
+              ),
+              Path("skeleton/frontier/encyclopedia.py"): (
+                  "from dataclasses import dataclass",
+                  "from dataclasses import dataclass, field",
+              ),
+              Path("skeleton/frontier/tournament.py"): (
+                  "from dataclasses import dataclass, replace",
+                  "from dataclasses import dataclass, field, replace",
+              ),
+          }
+          field_default = re.compile(
+              r"^(\s*[A-Za-z_]\w*:\s*Mapping\[[^\n]+\]\s*=\s*)"
+              r"MappingProxyType\(\{\}\)\s*$",
+              re.MULTILINE,
+          )
+          total = 0
+          for path, (old_import, new_import) in targets.items():
+              text = path.read_text(encoding="utf-8")
+              if old_import not in text and new_import not in text:
+                  raise SystemExit(f"unexpected dataclasses import in {path}")
+              text = text.replace(old_import, new_import, 1)
+              text, count = field_default.subn(
+                  r"\1field(default_factory=lambda: MappingProxyType({}))",
+                  text,
+              )
+              if count == 0:
+                  raise SystemExit(f"no MappingProxyType dataclass defaults found in {path}")
+              total += count
+              path.write_text(text, encoding="utf-8")
+              print(f"{path}: repaired {count} default(s)")
+          if total < 3:
+              raise SystemExit(f"expected at least 3 repairs, got {total}")
+          Path(".github/workflows/frontier-dataclass-repair.yml").unlink()
+          print(f"total repaired defaults: {total}")
+          PY
+
+      - name: Install frontier test runtime
+        run: python -m pip install --disable-pip-version-check -e . "pytest>=8,<10" pytest-asyncio
+
+      - name: Validate frontier contracts
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m compileall -q skeleton/frontier
+          python -m pytest -q skeleton/testing/test_frontier_*.py
+
+      - name: Commit validated repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add skeleton/frontier/commerce.py skeleton/frontier/encyclopedia.py skeleton/frontier/tournament.py .github/workflows/frontier-dataclass-repair.yml
+          git commit -s -m "fix(frontier): use factories for immutable mapping defaults"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
