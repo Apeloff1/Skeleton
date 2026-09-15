@@ -35,14 +35,13 @@ def test_sparse_depth_enforces_per_layer_capacity_and_bypasses_ffn():
     ids = [lm._id(tok) for tok in ("alpha", "beta", "gamma", "delta")]
     hidden, caches = lm._forward(ids)
     assert len(hidden) == len(ids)
-    for cache in caches:
+    for layer_index, cache in enumerate(caches):
         mask = cache["route_mask"]
+        layer_output = caches[layer_index + 1]["X"] if layer_index + 1 < len(caches) else hidden
         assert sum(mask) == math.ceil(len(ids) * 0.5)
         for t, routed in enumerate(mask):
             if not routed:
-                assert cache["U"][t] == (
-                    cache["U"][t] if cache is not caches[-1] else hidden[t]
-                ) or cache["U"][t] != hidden[t]
+                assert layer_output[t] == cache["U"][t]
                 assert cache["z"][t] == []
             else:
                 assert cache["z"][t]
