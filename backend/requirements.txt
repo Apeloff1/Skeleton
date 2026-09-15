@@ -27,7 +27,7 @@ python-dotenv==1.2.3
 # --- Auth / security ---
 # bcrypt is pinned below 4.1: passlib 1.7.4 crashes on bcrypt>=4.1
 passlib==1.7.4
-bcrypt==4.0.1
+bcrypt==4.3.0
 PyJWT==2.14.0
 # python-jose was unused and pulled python-ecdsa, whose Minerva timing issue has
 # no planned upstream fix. PyJWT is the maintained JWT boundary in this image.
@@ -38,7 +38,7 @@ cryptography==50.0.1
 # --- AI / LLM ---
 # openai 3.13.0 currently makes the pinned backend graph unresolvable in CI;
 # keep the compatible 2.x line until the provider stack is migrated together.
-openai==2.37.0
+openai==2.54.0
 litellm==1.100.1
 google-genai==2.23.0
 # The retired Emergent SDK is replaced by backend/emergentintegrations, a local
