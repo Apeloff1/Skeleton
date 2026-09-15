@@ -56,6 +56,7 @@ def test_runtime_capacity_requires_real_integer(capacity):
     ("kwargs", "error_type", "message"),
     [
         ({"required_capabilities": "text.generate"}, TypeError, "not a string"),
+        ({"required_capabilities": ""}, TypeError, "not a string"),
         ({"required_capabilities": {"   "}}, ValueError, "entries must not be empty"),
         ({"required_capability": "   "}, ValueError, "entries must not be empty"),
         ({"context": ["not", "a", "mapping"]}, TypeError, "context must be a mapping"),
@@ -67,6 +68,7 @@ def test_runtime_capacity_requires_real_integer(capacity):
     ],
     ids=[
         "capability-string",
+        "empty-capability-string",
         "blank-capability-entry",
         "blank-single-capability",
         "bad-context",
