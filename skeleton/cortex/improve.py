@@ -6,14 +6,11 @@ Order-of-magnitude is the trajectory target. Laws gate every write.
 """
 from __future__ import annotations
 
-import re
 from typing import Any, Dict, List
 
 from skeleton.cortex.antiplag import distill_dialect, guard
 from skeleton.cortex.laws import LawError, check
 from skeleton.cortex.refs import lookup, record_provenance
-
-_LIKE = re.compile(r"\blike\s+(.+)$", re.I)
 
 ASPECTS = {
     "soulslike": (
@@ -59,9 +56,9 @@ def improve(neo, stimulus: str, *, rounds: int = 16) -> Dict[str, Any]:
     stim = stimulus or ""
     ref = lookup(stim)
     if ref is None:
-        m = _LIKE.search(stim)
-        if m:
-            ref = lookup(m.group(1))
+        parts = stim.split(None, 1)
+        if len(parts) == 2 and parts[0].casefold() == "like":
+            ref = lookup(parts[1].strip())
     if ref is None:
         return {"improved": 0, "reason": "no-reference", "law": "cite-do-not-copy"}
 
