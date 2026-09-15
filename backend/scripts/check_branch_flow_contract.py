@@ -10,6 +10,10 @@ WORKFLOW = REPO_ROOT / ".github" / "workflows" / "branch-flow.yml"
 
 REQUIRED_ACTIVE_STATUSES = {"requested", "waiting", "pending", "queued", "in_progress"}
 WRITE_SCOPE_RE = re.compile(r"^\s+([A-Za-z0-9_-]+):\s*write\s*(?:#.*)?$", re.MULTILINE)
+WORKFLOW_SCAN_RE = re.compile(
+    r"def touches_workflows\(number, expected_files\):(?P<body>.*?)(?=\n\s+def live_validation\()",
+    re.DOTALL,
+)
 
 
 def violations_for_text(text: str) -> list[str]:
@@ -60,7 +64,8 @@ def violations_for_text(text: str) -> list[str]:
         findings.append("branch-flow must detect workflow files on both sides of a rename")
     if "seen >= expected_files" not in text or "for page in range(1, 31):" not in text:
         findings.append("workflow-file enumeration must prove completeness or fail closed")
-    if "              return None\n\n          def live_validation" not in text:
+    workflow_scan = WORKFLOW_SCAN_RE.search(text)
+    if not workflow_scan or not workflow_scan.group("body").rstrip().endswith("return None"):
         findings.append("bounded workflow-file enumeration must fail closed when the scan limit is exhausted")
     if "workflow_change = touches_workflows(number, pr.get('changed_files'))" not in text:
         findings.append("initial workflow-file exclusion must use the PR changed-file count")
