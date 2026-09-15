@@ -59,6 +59,7 @@ jobs:
               '.github/workflows/branch-clean.yml',
               '.github/workflows/queue-drain.yml',
           })
+          canonical_validation_path = '.github/workflows/merge-readiness.yml'
 
           def request(path, *, method='GET'):
               req = urllib.request.Request(
@@ -142,6 +143,7 @@ jobs:
               'queued_seen': 0,
               'active_seen': 0,
               'control_plane_preserved': 0,
+              'canonical_anchor_preserved': 0,
               'obsolete_main': 0,
               'duplicates': 0,
               'stale_dynamic_active': 0,
@@ -177,6 +179,26 @@ jobs:
               totals['queued_seen'] += len(queued)
               totals['active_seen'] += len(active)
 
+              # Keep exactly one oldest queued canonical Merge Readiness run as
+              # an execution anchor. Rapid main churn may replace newer queued
+              # validation runs, but it must not garbage-collect every canonical
+              # result source before a runner can allocate it.
+              canonical_candidates = [
+                  run
+                  for run in queued
+                  if (run.get('head_branch') or '') == 'main'
+                  and path(run) == canonical_validation_path
+                  and int(run.get('id') or 0) != current
+              ]
+              canonical_anchor_id = (
+                  int(min(
+                      canonical_candidates,
+                      key=lambda item: item.get('created_at') or '',
+                  ).get('id') or 0)
+                  if canonical_candidates
+                  else 0
+              )
+
               selected = []
               seen = set()
               local = {key: 0 for key in totals}
@@ -192,6 +214,10 @@ jobs:
                   if is_control_plane(run):
                       totals['control_plane_preserved'] += 1
                       local['control_plane_preserved'] += 1
+                      continue
+                  if run_id == canonical_anchor_id:
+                      totals['canonical_anchor_preserved'] += 1
+                      local['canonical_anchor_preserved'] += 1
                       continue
 
                   lane = lane_key(run)
@@ -277,6 +303,7 @@ jobs:
                   f'pass={pass_no} main={head} queued={len(queued)} '
                   f'active={len(active)} selected={len(selected)} '
                   f'control_plane_preserved={local["control_plane_preserved"]} '
+                  f'canonical_anchor_preserved={local["canonical_anchor_preserved"]} '
                   f'obsolete_main={local["obsolete_main"]} '
                   f'duplicates={local["duplicates"]} '
                   f'last_validation_preserved={local["last_validation_preserved"]} '
@@ -299,6 +326,10 @@ jobs:
                       f'{totals["control_plane_preserved"]}\n'
                   )
                   handle.write(
+                      '- Canonical Merge Readiness anchor observations preserved: '
+                      f'{totals["canonical_anchor_preserved"]}\n'
+                  )
+                  handle.write(
                       f'- Obsolete main selections: {totals["obsolete_main"]}\n'
                   )
                   handle.write(
@@ -316,9 +347,10 @@ jobs:
                   )
                   handle.write(
                       '- Safety: `branch-clean.yml` and `queue-drain.yml` are '
-                      'never cancellation targets; current main, PR work, and '
-                      'the newest path-filtered validation without a live-head '
-                      'replacement are preserved.\n\n'
+                      'never cancellation targets; the oldest queued canonical '
+                      'Merge Readiness run is preserved as an execution anchor; '
+                      'current main, PR work, and the newest path-filtered '
+                      'validation without a live-head replacement are preserved.\n\n'
                   )
                   handle.write('### Passes\n')
                   for line in pass_lines:
