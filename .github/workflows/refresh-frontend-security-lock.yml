@@ -1,0 +1,69 @@
+name: Refresh frontend security lockfile
+
+on:
+  push:
+    branches:
+      - security/frontend-dependency-hardening-2026-09-15
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.actor == 'Apeloff1'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+      - name: Apply security resolutions
+        working-directory: frontend
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          p.resolutions = {
+            ...(p.resolutions || {}),
+            'brace-expansion@^1.1.7': '1.1.18',
+            'brace-expansion@^2.0.2': '2.1.4',
+            'brace-expansion@^5.0.5': '5.0.9',
+            'shell-quote@^1.6.1': '1.10.0',
+            'tar@^7.5.2': '7.5.21',
+            'undici@^6.18.2': '6.28.0',
+            'js-yaml@^3.13.1': '3.15.2',
+            'js-yaml@^4.1.0': '4.3.2',
+            'postcss@~8.4.32': '8.5.25',
+            'ws@^6.2.3': '6.2.4',
+            'ws@^7': '7.5.11',
+            'ws@^7.5.10': '7.5.11',
+            'ws@^8.12.1': '8.21.0',
+            'nanoid@^3.3.11': '3.3.17',
+            'nanoid@^3.3.7': '3.3.17',
+            'nanoid@^3.3.8': '3.3.17',
+            'browserslist@^4.24.0': '4.28.9',
+            'browserslist@^4.25.0': '4.28.9',
+            'browserslist@^4.28.1': '4.28.9',
+            '@xmldom/xmldom@^0.9.10': '0.9.11',
+            'node-fetch@^1.0.1': '2.7.0',
+            'node-fetch@^2.7.0': '2.7.0'
+          };
+          fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+          NODE
+      - name: Regenerate lockfile
+        working-directory: frontend
+        run: yarn install --ignore-scripts --non-interactive
+      - name: Verify audit
+        working-directory: frontend
+        run: yarn audit --level high
+      - name: Commit lockfile and remove helper
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add frontend/package.json frontend/yarn.lock
+          git commit -m 'security: refresh patched frontend dependency graph'
+          git rm .github/workflows/refresh-frontend-security-lock.yml
+          git commit -m 'chore: remove temporary lockfile refresh workflow'
+          git push
