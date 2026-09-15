@@ -1,8 +1,12 @@
 """Shared fail-closed guard for user-controlled host code execution.
 
-This module deliberately separates a developer opt-in from a production override.
-User supplied code must never execute on an application host merely because a
-single permissive environment variable leaked into a deployment.
+User-supplied code is never allowed to execute on a detected production
+application host. Local/trusted development still requires an explicit opt-in,
+but production cannot be re-enabled through environment configuration alone.
+
+Production code execution belongs in a separately isolated sandbox/worker with
+an OS/container security boundary, not inside the API process that holds service
+credentials and application data access.
 """
 
 from __future__ import annotations
@@ -35,24 +39,21 @@ def production_runtime_detected() -> bool:
 def code_execution_enabled() -> bool:
     """Return whether user-controlled host execution is explicitly permitted.
 
-    Local/trusted development requires ``ALLOW_UNSAFE_CODE_EXECUTION=true``.
-    Production additionally requires ``ALLOW_PRODUCTION_HOST_CODE_EXECUTION=true``.
-    The second gate prevents accidental enablement through copied development
-    configuration and keeps the production default fail-closed.
+    Host execution is fail-closed in every detected production runtime. No
+    environment override can turn it back on inside the application process.
+    Trusted local development must still opt in with
+    ``ALLOW_UNSAFE_CODE_EXECUTION=true``.
     """
-    if not _truthy("ALLOW_UNSAFE_CODE_EXECUTION"):
-        return False
     if production_runtime_detected():
-        return _truthy("ALLOW_PRODUCTION_HOST_CODE_EXECUTION")
-    return True
+        return False
+    return _truthy("ALLOW_UNSAFE_CODE_EXECUTION")
 
 
 def execution_disabled_message(action: str = "Code execution") -> str:
     if production_runtime_detected():
         return (
-            f"{action} is disabled on the application host. "
-            "Use an isolated sandbox, or explicitly set both execution overrides "
-            "only for a deliberately isolated production worker."
+            f"{action} is disabled on the production application host. "
+            "Run untrusted code only in a separately isolated sandbox worker."
         )
     return (
         f"{action} is disabled by default. "
