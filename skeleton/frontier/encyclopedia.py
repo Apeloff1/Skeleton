@@ -8,7 +8,7 @@ only portable collection state, catch aggregation, masking and summary policy.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import math
 from types import MappingProxyType
@@ -65,6 +65,17 @@ def _id_set(values: Iterable[str], field_name: str) -> frozenset[str]:
     return frozenset(result)
 
 
+def _stats_payload(stats: FishDiscoveryStats | None) -> Mapping[str, Any]:
+    if stats is None:
+        return {}
+    return {
+        "caught": stats.caught,
+        "largest": stats.largest,
+        "smallest": stats.smallest,
+        "first_caught": stats.first_caught.isoformat(),
+    }
+
+
 @dataclass(frozen=True, slots=True)
 class FishDiscoveryStats:
     caught: int
@@ -88,7 +99,9 @@ class FishDiscoveryStats:
 @dataclass(frozen=True, slots=True)
 class FishCollectionState:
     discovered_fish: frozenset[str] = frozenset()
-    fish_stats: Mapping[str, FishDiscoveryStats] = MappingProxyType({})
+    fish_stats: Mapping[str, FishDiscoveryStats] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
 
     def __post_init__(self) -> None:
         discovered = _id_set(self.discovered_fish, "discovered fish")
@@ -245,7 +258,7 @@ def project_fish_entry(
     projected = dict(record)
     projected["discovered"] = discovered
     projected["can_discover"] = can_discover
-    projected["stats"] = collection.fish_stats.get(fish_id)
+    projected["stats"] = dict(_stats_payload(collection.fish_stats.get(fish_id)))
     if not discovered:
         projected["description"] = "???"
         projected["facts"] = []
