@@ -3,14 +3,16 @@
 `SwarmDurableBridge` composes two existing recovery layers instead of replacing either one:
 
 - `SwarmRecoveryManager` remains the canonical serializer for runtime and tenant recovery history. It owns bounded history, archive versioning, per-checkpoint checksums, the archive checksum, and restore behavior that requeues persisted leases.
-- `SQLiteRunStore` provides process-restart durability, worker lease fencing, outer-run checkpoints, and replay visibility for orchestration work after the latest durable boundary.
+- The durable checkpoint backend provides process-restart durability, worker lease fencing, outer-run checkpoints, and replay visibility for orchestration work after the latest durable boundary. `SQLiteRunStore` is the built-in tested implementation, but the bridge accepts any backend matching its narrow structural `DurableCheckpointStore` contract.
 
 The bridge stores the recovery manager's exported archive verbatim as the durable checkpoint payload and records `RECOVERY_ARCHIVE_VERSION` as the durable checkpoint `state_version`. Restore requires the outer state version and embedded archive version to agree before the archive is handed back to `SwarmRecoveryManager.from_archive()` for checksum and structural validation.
 
 ## Capture flow
 
 ```python
-from skeleton.agents import SwarmDurableBridge, SwarmRecoveryManager, SwarmRuntime
+from skeleton.agents.swarm_durable import SwarmDurableBridge
+from skeleton.agents.swarm_recovery import SwarmRecoveryManager
+from skeleton.agents.swarm_runtime import SwarmRuntime
 from skeleton.state import SQLiteRunStore
 
 store = SQLiteRunStore("var/runs.sqlite3", max_payload_bytes=8 * 1024 * 1024)
