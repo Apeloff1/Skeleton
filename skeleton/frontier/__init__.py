@@ -60,6 +60,10 @@ from skeleton.frontier.reputation import (
     standing_summary,
 )
 from skeleton.frontier.resilience import DegradationLevel, ResilienceController, ResilienceDecision
+from skeleton.frontier.runtime_events import (
+    execution_event_to_memory_item,
+    execution_result_to_event,
+)
 from skeleton.frontier.ship import (
     CrewRoleSpec,
     PurchaseQuote,
@@ -135,6 +139,8 @@ __all__ = [
     "choose_crew_name",
     "crew_role_from_record",
     "current_benefits",
+    "execution_event_to_memory_item",
+    "execution_result_to_event",
     "faction_from_record",
     "find_region_at",
     "find_region_by_id",
