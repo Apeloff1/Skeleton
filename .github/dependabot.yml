@@ -52,17 +52,49 @@ updates:
     versioning-strategy: increase-if-necessary
     # Major Expo/React/toolchain jumps require coordinated application changes.
     # Restrict routine version PRs to minor/patch while leaving security updates
-    # unaffected by this allow policy.
+    # unaffected by this allow policy. Keep framework/platform families separate
+    # from the general runtime group so large ecosystem moves stay reviewable.
     allow:
       - dependency-name: "*"
         update-types:
           - "version-update:semver-minor"
           - "version-update:semver-patch"
     groups:
+      frontend-expo-platform:
+        applies-to: version-updates
+        dependency-type: production
+        patterns:
+          - "expo"
+          - "expo-*"
+          - "@expo/*"
+        update-types: ["minor", "patch"]
+      frontend-react-native-platform:
+        applies-to: version-updates
+        dependency-type: production
+        patterns:
+          - "react"
+          - "react-dom"
+          - "react-native"
+          - "react-native-*"
+          - "@react-navigation/*"
+          - "@react-native-community/*"
+          - "@react-native-async-storage/*"
+        update-types: ["minor", "patch"]
       frontend-runtime:
         applies-to: version-updates
         dependency-type: production
         patterns: ["*"]
+        exclude-patterns:
+          - "expo"
+          - "expo-*"
+          - "@expo/*"
+          - "react"
+          - "react-dom"
+          - "react-native"
+          - "react-native-*"
+          - "@react-navigation/*"
+          - "@react-native-community/*"
+          - "@react-native-async-storage/*"
         update-types: ["minor", "patch"]
       frontend-development:
         applies-to: version-updates
