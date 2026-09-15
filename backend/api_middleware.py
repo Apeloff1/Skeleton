@@ -6,18 +6,18 @@ Everything here is dependency-free (stdlib only) so it ships with the rest
 of the FastAPI app and adds zero install steps.
 
 Public surface:
-  • RequestIdMiddleware   — adds X-Request-Id header (safe existing or generated)
+  • RequestIdMiddleware   — adds a canonical X-Request-Id header
   • AccessLogMiddleware   — single-line structured log per request
-  • RateLimiterMiddleware — per-IP token-bucket; 429 on overflow
-  • get_stats()           — observability snapshot (for the /api/_telemetry route)
+  • RateLimiterMiddleware — bounded per-IP token-bucket; 429 on overflow
+  • get_stats()           — observability snapshot (for /api/_telemetry)
 
 Tunable via env:
-  RATE_LIMIT_PER_MIN      (int)   default 600        — 10 rps per IP, generous
+  RATE_LIMIT_PER_MIN      (int)   default 600        — 10 rps per IP
   RATE_LIMIT_BURST        (int)   default 60         — initial bucket size
   RATE_LIMIT_EXEMPT       (csv)   default "127.0.0.1,::1,localhost"
   RATE_LIMIT_MAX_BUCKETS  (int)   default 4096       — hard cap on tracked IPs
   RATE_LIMIT_BUCKET_TTL   (float) default 300        — idle seconds before expiry
-  TRUSTED_PROXY_CIDRS     (csv)   default ""         — proxies allowed to supply XFF
+  TRUSTED_PROXY_CIDRS     (csv)   default ""         — peers allowed to supply XFF
   ACCESS_LOG              (0|1)   default 1
 """
 from __future__ import annotations
@@ -38,22 +38,34 @@ from starlette.responses import JSONResponse, Response
 
 log = logging.getLogger("api.middleware")
 
+
 # ── Configuration ─────────────────────────────────────────────────────
-_RATE_PER_MIN = int(os.environ.get("RATE_LIMIT_PER_MIN", "600"))
-_RATE_BURST = int(os.environ.get("RATE_LIMIT_BURST", "60"))
-_EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "127.0.0.1,::1,localhost")
-_EXEMPT_IPS = {ip.strip() for ip in _EXEMPT_RAW.split(",") if ip.strip()}
-_MAX_BUCKETS = max(1, int(os.environ.get("RATE_LIMIT_MAX_BUCKETS", "4096")))
-_BUCKET_TTL = max(0.01, float(os.environ.get("RATE_LIMIT_BUCKET_TTL", "300")))
-_ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
-_TRUSTED_PROXY_RAW = os.environ.get("TRUSTED_PROXY_CIDRS", "")
-_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+def _positive_int_env(name: str, default: int) -> int:
+    raw = os.environ.get(name, str(default))
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise RuntimeError(f"{name} must be a positive integer") from exc
+    if value <= 0:
+        raise RuntimeError(f"{name} must be a positive integer")
+    return value
+
+
+def _positive_float_env(name: str, default: float) -> float:
+    raw = os.environ.get(name, str(default))
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise RuntimeError(f"{name} must be a positive finite number") from exc
+    if value <= 0 or not (value < float("inf")):
+        raise RuntimeError(f"{name} must be a positive finite number")
+    return value
 
 
 def _parse_trusted_proxy_networks(
     raw: str,
 ) -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
-    """Parse explicitly trusted ingress/proxy CIDRs without widening trust."""
+    """Parse proxy CIDRs fail-closed: one malformed entry disables XFF trust."""
     networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
     for value in raw.split(","):
         value = value.strip()
@@ -62,12 +74,22 @@ def _parse_trusted_proxy_networks(
         try:
             networks.append(ipaddress.ip_network(value, strict=False))
         except ValueError:
-            # Invalid entries are never interpreted as broader trust.
-            log.warning("ignoring invalid TRUSTED_PROXY_CIDRS entry")
+            log.error("invalid TRUSTED_PROXY_CIDRS configuration; disabling proxy trust")
+            return ()
     return tuple(networks)
 
 
-_TRUSTED_PROXY_NETWORKS = _parse_trusted_proxy_networks(_TRUSTED_PROXY_RAW)
+_RATE_PER_MIN = _positive_int_env("RATE_LIMIT_PER_MIN", 600)
+_RATE_BURST = _positive_int_env("RATE_LIMIT_BURST", 60)
+_EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "127.0.0.1,::1,localhost")
+_EXEMPT_IPS = {ip.strip() for ip in _EXEMPT_RAW.split(",") if ip.strip()}
+_MAX_BUCKETS = _positive_int_env("RATE_LIMIT_MAX_BUCKETS", 4096)
+_BUCKET_TTL = _positive_float_env("RATE_LIMIT_BUCKET_TTL", 300.0)
+_TRUSTED_PROXY_NETWORKS = _parse_trusted_proxy_networks(
+    os.environ.get("TRUSTED_PROXY_CIDRS", "")
+)
+_ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
+_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 
 # Telemetry counters (in-memory) ───────────────────────────────────────
 _lat_ring: Deque[float] = deque(maxlen=1024)
@@ -91,15 +113,12 @@ async def _push_latency(ms: float) -> None:
 def _percentile(sorted_vals, pct: float) -> float:
     if not sorted_vals:
         return 0.0
-    k = max(
-        0,
-        min(len(sorted_vals) - 1, int(pct / 100.0 * (len(sorted_vals) - 1))),
-    )
+    k = max(0, min(len(sorted_vals) - 1, int(pct / 100.0 * (len(sorted_vals) - 1))))
     return sorted_vals[k]
 
 
 def get_stats() -> dict:
-    """Snapshot for /api/_telemetry. Cheap O(n log n) sort over ≤1024 samples."""
+    """Snapshot for /api/_telemetry. Cheap O(n log n) over ≤1024 samples."""
     vals = sorted(_lat_ring)
     return {
         "uptime_seconds": round(time.time() - _started_at, 1),
@@ -123,35 +142,31 @@ def get_stats() -> dict:
             "max_buckets": _MAX_BUCKETS,
             "evictions": _counts.get("rate_limit_evictions", 0),
             "expired_pruned": _counts.get("rate_limit_expired_pruned", 0),
-            "saturation_rejections": _counts.get(
-                "rate_limit_saturation_rejections", 0
-            ),
-            "trusted_proxy_cidrs": [
-                str(network) for network in _TRUSTED_PROXY_NETWORKS
-            ],
+            "saturation_rejections": _counts.get("rate_limit_saturation_rejections", 0),
+            "trusted_proxy_cidrs": [str(network) for network in _TRUSTED_PROXY_NETWORKS],
         },
     }
 
 
+# ── Request identity ──────────────────────────────────────────────────
 def _request_id(request: Request) -> str:
-    """Return a bounded, header-safe request id or mint a new one."""
-    candidate = request.headers.get("x-request-id", "")
-    if candidate and _REQUEST_ID_RE.fullmatch(candidate):
-        return candidate
-    return uuid.uuid4().hex[:16]
+    """Return one bounded header-safe request ID or mint a full UUID4 hex ID."""
+    candidates = request.headers.getlist("x-request-id")
+    if len(candidates) == 1 and _REQUEST_ID_RE.fullmatch(candidates[0]):
+        return candidates[0]
+    return uuid.uuid4().hex
 
 
-# ── Request ID ────────────────────────────────────────────────────────
 class RequestIdMiddleware(BaseHTTPMiddleware):
-    """Accept a safe X-Request-Id or mint one and echo it on the response."""
+    """Canonicalize request identity and echo it on the response."""
 
     async def dispatch(self, request: Request, call_next: Callable):
         rid = _request_id(request)
         request.state.request_id = rid
         try:
             response: Response = await call_next(request)
-        except RuntimeError as e:
-            if "No response returned" in str(e):
+        except RuntimeError as exc:
+            if "No response returned" in str(exc):
                 from fastapi.responses import Response as _Resp
 
                 log.debug(
@@ -159,9 +174,9 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
                     rid,
                     request.url.path,
                 )
-                resp = _Resp(status_code=499)
-                resp.headers["X-Request-Id"] = rid
-                return resp
+                response = _Resp(status_code=499)
+                response.headers["X-Request-Id"] = rid
+                return response
             raise
         response.headers["X-Request-Id"] = rid
         return response
@@ -184,18 +199,17 @@ def _is_trusted_proxy(value: str) -> bool:
     canonical = _canonical_ip(value)
     if canonical is None:
         return False
-    addr = ipaddress.ip_address(canonical)
-    return any(addr in network for network in _TRUSTED_PROXY_NETWORKS)
+    address = ipaddress.ip_address(canonical)
+    return any(address in network for network in _TRUSTED_PROXY_NETWORKS)
 
 
 def _client_ip(request: Request) -> str:
     """Resolve client identity without trusting attacker-controlled XFF.
 
-    The direct peer is authoritative by default. X-Forwarded-For is considered
-    only when the immediate peer is explicitly configured as a trusted proxy.
-    The forwarded chain is walked right-to-left, skipping trusted proxy hops and
-    returning the nearest untrusted address. Malformed or fully trusted chains
-    fail closed to the direct peer.
+    The direct peer is authoritative unless it is explicitly trusted. For a
+    trusted peer, a single well-formed XFF chain is walked right-to-left,
+    skipping trusted proxy hops and selecting the nearest untrusted address.
+    Ambiguous or malformed forwarded headers fail closed to the direct peer.
     """
     client = request.client
     peer = client.host.strip() if client and client.host else "-"
@@ -203,25 +217,27 @@ def _client_ip(request: Request) -> str:
     if peer == "-" or not _is_trusted_proxy(peer):
         return canonical_peer or peer
 
-    xff = request.headers.get("x-forwarded-for", "")
-    if not xff:
+    forwarded_headers = request.headers.getlist("x-forwarded-for")
+    if len(forwarded_headers) != 1:
+        return canonical_peer or peer
+    parts = [part.strip() for part in forwarded_headers[0].split(",")]
+    if not parts or any(not part for part in parts):
         return canonical_peer or peer
 
-    forwarded = [_canonical_ip(part) for part in xff.split(",")]
-    if not forwarded or any(value is None for value in forwarded):
+    forwarded = [_canonical_ip(part) for part in parts]
+    if any(value is None for value in forwarded):
         return canonical_peer or peer
 
     for value in reversed(forwarded):
         assert value is not None
         if not _is_trusted_proxy(value):
             return value
-
     return canonical_peer or peer
 
 
-def _is_api_path(path: str) -> bool:
-    """Match the /api route boundary without accepting lookalike prefixes."""
-    return path == "/api" or path.startswith("/api/")
+def _matches_path_prefix(path: str, prefix: str = "/api") -> bool:
+    """Match a route root exactly or one of its descendants, never lookalikes."""
+    return path == prefix or path.startswith(prefix + "/")
 
 
 # ── Access log ────────────────────────────────────────────────────────
@@ -237,18 +253,18 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
             status = response.status_code
         except Exception:
-            dur = (time.perf_counter() - t0) * 1000
+            duration = (time.perf_counter() - t0) * 1000
             log.exception(
                 "method=%s path=%s status=500 dur_ms=%.2f rid=%s ip=%s err=unhandled",
                 request.method,
                 request.url.path,
-                dur,
+                duration,
                 rid,
                 _client_ip(request),
             )
             raise
 
-        dur = (time.perf_counter() - t0) * 1000
+        duration = (time.perf_counter() - t0) * 1000
         bucket = (
             "2xx"
             if 200 <= status < 300
@@ -260,14 +276,14 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
         )
         _counts["requests"] += 1
         _counts[bucket] += 1
-        await _push_latency(dur)
+        await _push_latency(duration)
         if request.url.path not in ("/api/health", "/api/_telemetry"):
             log.info(
                 "method=%s path=%s status=%d dur_ms=%.2f rid=%s ip=%s",
                 request.method,
                 request.url.path,
                 status,
-                dur,
+                duration,
                 rid,
                 _client_ip(request),
             )
@@ -276,7 +292,7 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
 
 # ── Rate limiter ──────────────────────────────────────────────────────
 class _Bucket:
-    """Tiny token-bucket with monotonic refill accounting."""
+    """Small monotonic token bucket."""
 
     __slots__ = ("tokens", "last", "capacity", "refill_per_sec")
 
@@ -290,25 +306,23 @@ class _Bucket:
         now = time.monotonic()
         elapsed = now - self.last
         if elapsed > 0:
-            self.tokens = min(
-                self.capacity, self.tokens + elapsed * self.refill_per_sec
-            )
+            self.tokens = min(self.capacity, self.tokens + elapsed * self.refill_per_sec)
             self.last = now
         if self.tokens >= n:
             self.tokens -= n
             return True, 0.0
         deficit = n - self.tokens
-        retry = (
-            deficit / self.refill_per_sec if self.refill_per_sec > 0 else 60.0
-        )
+        retry = deficit / self.refill_per_sec if self.refill_per_sec > 0 else 60.0
         return False, retry
 
 
 class RateLimiterMiddleware(BaseHTTPMiddleware):
-    """Per-IP token bucket with bounded, serialized identity state.
+    """Per-IP token bucket with bounded, fail-closed identity state.
 
-    New identities are rejected when all slots are active rather than evicting
-    active state and giving churned identities a fresh burst.
+    Idle buckets expire after `bucket_ttl`; total identity state is capped by
+    `max_buckets`. At saturation, unseen identities are rejected instead of
+    evicting active buckets and gaining a fresh burst. Admission, pruning and
+    token consumption are serialized per middleware instance.
     """
 
     def __init__(
@@ -322,16 +336,17 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.per_minute = per_minute if per_minute is not None else _RATE_PER_MIN
         self.burst = burst if burst is not None else _RATE_BURST
+        self.max_buckets = max_buckets if max_buckets is not None else _MAX_BUCKETS
+        self.bucket_ttl = bucket_ttl if bucket_ttl is not None else _BUCKET_TTL
         if self.per_minute <= 0:
             raise ValueError("per_minute must be positive")
         if self.burst <= 0:
             raise ValueError("burst must be positive")
-        self.max_buckets = max(
-            1, max_buckets if max_buckets is not None else _MAX_BUCKETS
-        )
-        self.bucket_ttl = max(
-            0.01, bucket_ttl if bucket_ttl is not None else _BUCKET_TTL
-        )
+        if self.max_buckets <= 0:
+            raise ValueError("max_buckets must be positive")
+        if self.bucket_ttl <= 0 or not (self.bucket_ttl < float("inf")):
+            raise ValueError("bucket_ttl must be a positive finite number")
+
         self._refill_per_sec = self.per_minute / 60.0
         self._buckets: Dict[str, _Bucket] = {}
         self._state_lock: asyncio.Lock | None = None
@@ -364,8 +379,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         if not self._buckets:
             return self.bucket_ttl
         remaining = [
-            self.bucket_ttl - (now - bucket.last)
-            for bucket in self._buckets.values()
+            self.bucket_ttl - (now - bucket.last) for bucket in self._buckets.values()
         ]
         return max(0.01, min(remaining))
 
@@ -387,9 +401,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         return bucket, 0.0
 
     async def dispatch(self, request: Request, call_next: Callable):
-        # Match only the real /api route boundary; /apiary and similar paths
-        # must not consume or bypass API security state unexpectedly.
-        if not _is_api_path(request.url.path):
+        if not _matches_path_prefix(request.url.path):
             return await call_next(request)
 
         ip = _client_ip(request)
@@ -405,7 +417,8 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
 
         if not ok:
             _counts["rate_limited"] += 1
-            rid = getattr(request.state, "request_id", "-")
+            rid = _request_id(request)
+            request.state.request_id = rid
             log.warning(
                 "rate_limited ip=%s path=%s retry=%.1fs rid=%s",
                 ip,
@@ -431,12 +444,10 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
 
 
 def install_middleware(app) -> None:
-    """Idempotent wiring helper with request IDs outside security rejections.
+    """Install middleware in the intentional Starlette LIFO order.
 
-    Starlette wraps middleware in reverse-add order (LIFO), producing:
-        Client → RequestId → RateLimiter → AccessLog → handler
-    This ensures both accepted and rate-limited requests receive a safe trace id.
+    Client → RateLimiter → RequestId → AccessLog → handler
     """
     app.add_middleware(AccessLogMiddleware)
-    app.add_middleware(RateLimiterMiddleware)
     app.add_middleware(RequestIdMiddleware)
+    app.add_middleware(RateLimiterMiddleware)
