@@ -253,3 +253,63 @@ def test_registry_contract_validation_happens_before_attachment():
 
     with pytest.raises(TypeError, match="invoker must be callable"):
         core.attach_capability_registry(FakeRegistry([]), object())
+
+
+@pytest.mark.parametrize(
+    ("replacement", "expected_error"),
+    [
+        (FakeSpec("lookup", mutates=True), "capability_became_mutating"),
+        (FakeSpec("lookup", approval_required=True), "capability_requires_approval"),
+    ],
+)
+def test_live_registry_policy_is_revalidated_before_each_invocation(
+    replacement,
+    expected_error,
+):
+    core, session, _ = _core()
+    registry = FakeRegistry([FakeSpec("lookup")])
+    calls = []
+
+    core.attach_capability_registry(
+        registry,
+        lambda name, arguments, request: calls.append(name) or {"ok": True},
+    )
+    registry._specs["lookup"] = replacement
+
+    result = core.ask_with_evidence(
+        session.session_id,
+        "Use lookup after policy changed.",
+        context={"tool_calls": [{"name": "lookup"}]},
+        allowed_tools=["lookup"],
+    )
+
+    assert calls == []
+    assert result["tools"] == []
+    assert result["evidence"] == []
+    assert result["evidence_receipts"] == []
+    assert result["tool_errors"] == [{"name": "lookup", "error": expected_error}]
+    assert core.stats()["evidence_policy_failures"] == 1
+
+
+def test_removed_registry_capability_fails_closed_before_invoker():
+    core, session, _ = _core()
+    registry = FakeRegistry([FakeSpec("lookup")])
+    calls = []
+
+    core.attach_capability_registry(
+        registry,
+        lambda name, arguments, request: calls.append(name) or {"ok": True},
+    )
+    registry._specs.pop("lookup")
+
+    result = core.ask_with_evidence(
+        session.session_id,
+        "Use a removed lookup.",
+        context={"tool_calls": [{"name": "lookup"}]},
+        allowed_tools=["lookup"],
+    )
+
+    assert calls == []
+    assert result["tool_errors"] == [{"name": "lookup", "error": "capability_unavailable"}]
+    assert result["evidence"] == []
+    assert core.stats()["evidence_policy_failures"] == 1
