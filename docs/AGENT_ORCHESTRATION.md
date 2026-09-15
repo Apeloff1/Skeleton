@@ -45,6 +45,14 @@ External `asyncio` task cancellation is not swallowed: active internal work is c
 
 `max_turns` is mandatory and positive. A driver that continues requesting tools beyond this bound terminates the run as failed with a turn-budget error. This prevents unbounded model/tool loops even when every individual operation succeeds.
 
+## Legacy coordinator adapter
+
+`skeleton.agents.coordination.Coordinator` routes registered legacy handlers through `CanonicalOrchestrator` instead of owning an independent handler success/failure loop. A thin two-turn compatibility driver requests the registered handler as a normalized tool call and then returns its result as the terminal turn.
+
+Synchronous callers keep using `Coordinator.dispatch()`. Async callers use `await Coordinator.dispatch_async(...)`, which also permits asynchronous registered handlers without nesting an event loop. Handler-backed tasks expose their canonical `RunRecord` through `Coordinator.get_run(task_id)` for diagnostics and tests.
+
+`TaskStatus` and `Task.error` remain compatibility projections for existing callers. Canonical run/step state is authoritative for handler execution, including cancellation and typed failure context, and assigned agent capacity is released on every handler terminal path.
+
 ## Migration rule
 
 New agent/orchestration paths should adapt to `OrchestrationDriver` and register tools through `ToolRegistry`. Existing coordinators should migrate state mutation and retry logic behind `CanonicalOrchestrator`; adding another independent run-status/retry loop is not an accepted migration path.
