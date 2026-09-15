@@ -7,6 +7,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GATE_PATH = REPO_ROOT / "scripts" / "check_repository_process_safety.py"
 SPEC = importlib.util.spec_from_file_location("repository_process_safety", GATE_PATH)
@@ -108,3 +110,82 @@ def test_metacharacters_are_literal_runtime_arguments() -> None:
         text=True,
     )
     assert result.stdout.strip() == payload
+
+
+def test_scan_fails_closed_when_required_root_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(GATE, "SCAN_ROOTS", (tmp_path / "missing",))
+
+    with pytest.raises(GATE.ScanCoverageError, match="scan root metadata failure"):
+        list(GATE.python_files())
+
+
+def test_scan_fails_closed_when_required_root_has_no_python_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "runtime"
+    root.mkdir()
+    (root / "README.txt").write_text("not code\n", encoding="utf-8")
+    monkeypatch.setattr(GATE, "SCAN_ROOTS", (root,))
+
+    with pytest.raises(GATE.ScanCoverageError, match="no regular Python files"):
+        list(GATE.python_files())
+
+
+def test_scan_skips_symlinked_python_files_and_directories(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "runtime"
+    root.mkdir()
+    real = root / "real.py"
+    real.write_text("x = 1\n", encoding="utf-8")
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    secret = outside / "secret.py"
+    secret.write_text("raise RuntimeError('must not be scanned')\n", encoding="utf-8")
+    (root / "linked.py").symlink_to(secret)
+    (root / "linked_dir").symlink_to(outside, target_is_directory=True)
+    monkeypatch.setattr(GATE, "SCAN_ROOTS", (root,))
+
+    assert list(GATE.python_files()) == [real]
+
+
+def test_traversal_failure_is_sanitized_and_fail_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "runtime"
+    root.mkdir()
+    (root / "real.py").write_text("x = 1\n", encoding="utf-8")
+    monkeypatch.setattr(GATE, "SCAN_ROOTS", (root,))
+
+    def broken_walk(*args, onerror=None, **kwargs):
+        assert onerror is not None
+        onerror(PermissionError(13, "sensitive raw detail", str(root / "private")))
+        return iter(())
+
+    monkeypatch.setattr(GATE.os, "walk", broken_walk)
+
+    with pytest.raises(GATE.ScanCoverageError) as caught:
+        list(GATE.python_files())
+
+    message = str(caught.value)
+    assert "PermissionError" in message
+    assert "sensitive raw detail" not in message
+    assert str(tmp_path) not in message
+
+
+def test_main_returns_distinct_code_for_incomplete_scan(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def incomplete_scan():
+        raise GATE.ScanCoverageError("coverage lost")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(GATE, "python_files", incomplete_scan)
+
+    assert GATE.main() == 2
+    captured = capsys.readouterr()
+    assert "scan incomplete" in captured.err
+    assert "coverage lost" in captured.err
