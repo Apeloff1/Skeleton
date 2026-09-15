@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import random
 from datetime import datetime, timezone
 
@@ -93,6 +94,11 @@ def test_region_lookup_fails_closed_for_ambiguous_catalogs():
         find_region_at([overlap_a, overlap_b], (75, 50))
 
 
+def test_region_lookup_rejects_non_finite_coordinates():
+    with pytest.raises(ValueError, match="finite numeric coordinates"):
+        find_region_at([_region()], (math.inf, 50))
+
+
 def test_route_policy_uses_two_dimensional_region_intersection():
     traversed = _region(region_id="traversed", dangers=["storm", "reef"])
     same_x_wrong_y = _region(
@@ -114,6 +120,14 @@ def test_route_policy_uses_two_dimensional_region_intersection():
         "recommended_rum": 0,
         "recommended_oranges": 0,
     }
+
+
+def test_route_policy_rejects_non_finite_inputs():
+    region = _region()
+    with pytest.raises(ValueError, match="start must contain finite numeric coordinates"):
+        calculate_route((math.nan, 0), (1, 1), [region])
+    with pytest.raises(ValueError, match="units_per_minute must be finite and positive"):
+        calculate_route((0, 0), (1, 1), [region], units_per_minute=math.inf)
 
 
 def test_supply_policy_rejects_negative_time_and_preserves_source_formula():
@@ -175,3 +189,23 @@ def test_random_island_generation_injects_rng_clock_and_identity():
     assert 200 <= first["position"]["y"] <= 300
     assert 1 <= len(first["features"]) <= 3
     assert 1 <= len(first["fish_types"]) <= 3
+
+
+def test_random_island_generation_rejects_ambiguous_clock_and_identity():
+    region = _region()
+    with pytest.raises(ValueError, match="id_factory must return a non-empty identifier"):
+        generate_random_island(
+            region,
+            "user-7",
+            rng=random.Random(7),
+            id_factory=lambda: " ",
+        )
+
+    with pytest.raises(ValueError, match="timezone-aware"):
+        generate_random_island(
+            region,
+            "user-7",
+            rng=random.Random(7),
+            id_factory=lambda: "island-7",
+            now=lambda: datetime(2026, 9, 15, 9, 45),
+        )
