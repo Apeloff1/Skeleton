@@ -1,11 +1,4 @@
-"""Static GitHub Actions policy gate.
-
-The checker is dependency-free so it can run in the earliest CI phase. It
-requires immutable action references, explicit workflow permissions, hardened
-checkout credential handling, rejects workflow-wide token elevation and
-high-risk event/permission patterns, and prevents direct interpolation of
-attacker-controlled GitHub event fields into shell ``run`` commands.
-"""
+"""Static GitHub Actions policy gate."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -48,8 +41,9 @@ PERMISSION_ENTRY_RE = re.compile(
     r"(?P<value>read|write|none)\s*(?:#.*)?$",
     re.IGNORECASE,
 )
-TOP_LEVEL_ON_RE = re.compile(
-    r"^(?:on|'on'|\"on\")\s*:\s*(?P<value>.*)$"
+TOP_LEVEL_ON_RE = re.compile(r"^(?:on|'on'|\"on\")\s*:\s*(?P<value>.*)$")
+NODE_PROPERTIES_RE = re.compile(
+    r"^(?:(?:[!&][^\s#]+)\s+)*(?P<value>.*)$"
 )
 PULL_REQUEST_TARGET_KEY_RE = re.compile(
     r"^\s*(?:pull_request_target|'pull_request_target'|\"pull_request_target\")\s*:"
@@ -60,9 +54,6 @@ PULL_REQUEST_TARGET_SEQUENCE_RE = re.compile(
 CHECKOUT_ACTION = "actions/checkout@"
 FORBIDDEN_TRIGGER = "pull_request_target"
 
-# These fields can be controlled by pull-request authors, issue/comment authors,
-# or commit authors. They must cross the shell boundary through env/input data,
-# never by direct expression interpolation inside a run command.
 UNTRUSTED_RUN_CONTEXTS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("pull request title/body", re.compile(r"\bgithub\.event\.pull_request\.(?:title|body)\b")),
     ("pull request head ref/label", re.compile(r"\bgithub\.event\.pull_request\.head\.(?:ref|label)\b")),
@@ -99,7 +90,6 @@ def _indent_width(line: str) -> int:
 
 
 def _checkout_credentials_disabled(lines: list[str], uses_index: int) -> bool:
-    """Return whether a checkout step explicitly disables credential persistence."""
     base_indent = _indent_width(lines[uses_index])
     index = uses_index + 1
     while index < len(lines):
@@ -122,14 +112,11 @@ def _action_reference_findings(
     *,
     checkout_hardened: bool,
 ) -> list[str]:
-    """Apply immutable-pin and checkout credential policy to one action reference."""
     findings: list[str] = []
-
     if reference.startswith(CHECKOUT_ACTION) and not checkout_hardened:
         findings.append(
             f"{path_name}:{number}: actions/checkout must set persist-credentials: false"
         )
-
     if _is_local(reference):
         return findings
     if reference.startswith("docker://"):
@@ -153,27 +140,16 @@ def _action_reference_findings(
 def _top_level_permission_violations(
     lines: list[str], path_name: str
 ) -> tuple[bool, list[str]]:
-    """Require explicit read/none workflow defaults and job-local write elevation.
-
-    GitHub applies workflow-level permissions to every job unless overridden.
-    A global ``*: write`` therefore widens the token for unrelated jobs. This
-    gate requires all write scopes to be granted inside the specific job that
-    needs them. ``read-all`` is rejected for the same least-privilege reason:
-    workflows should name the read scopes they actually consume (or use ``{}``).
-    """
     findings: list[str] = []
     has_top_level = False
-
     for index, line in enumerate(lines):
         stripped = line.strip()
         if line != stripped or not stripped.startswith("permissions:"):
             continue
-
         has_top_level = True
         number = index + 1
         declaration = stripped.split("#", 1)[0].strip()
         inline = declaration.partition(":")[2].strip().lower()
-
         if inline in {"write-all", "write"}:
             findings.append(
                 f"{path_name}:{number}: workflow-wide write permissions are forbidden; grant write scopes only to the job that needs them"
@@ -185,13 +161,11 @@ def _top_level_permission_violations(
             )
             continue
         if inline:
-            # ``permissions: {}`` is an intentional no-permissions default.
             if inline != "{}":
                 findings.append(
                     f"{path_name}:{number}: unsupported top-level permissions scalar; use a scoped mapping or {{}}"
                 )
             continue
-
         child_index = index + 1
         while child_index < len(lines):
             child = lines[child_index]
@@ -203,22 +177,26 @@ def _top_level_permission_violations(
                     f"{path_name}:{child_index + 1}: workflow-wide {match.group('scope')}: write is forbidden; move elevation to the specific job"
                 )
             child_index += 1
-
     return has_top_level, findings
 
 
 def _yaml_key_name(entry: str) -> str:
-    """Return a simple YAML mapping key name with optional quotes removed."""
     key = entry.partition(":")[0].strip()
     if len(key) >= 2 and key[0] == key[-1] and key[0] in {"'", '"'}:
         return key[1:-1]
     return key
 
 
-def _forbidden_trigger_violations(lines: list[str], path_name: str) -> list[str]:
-    """Reject pull_request_target across equivalent YAML event encodings."""
-    findings: list[str] = []
+def _strip_node_properties(value: str) -> str:
+    """Remove YAML tag/anchor properties that precede an inline node value."""
+    match = NODE_PROPERTIES_RE.fullmatch(value.strip())
+    if match is None:
+        return value.strip()
+    return match.group("value").strip()
 
+
+def _forbidden_trigger_violations(lines: list[str], path_name: str) -> list[str]:
+    findings: list[str] = []
     for index, line in enumerate(lines):
         if line != line.lstrip(" "):
             continue
@@ -229,6 +207,13 @@ def _forbidden_trigger_violations(lines: list[str], path_name: str) -> list[str]
         number = index + 1
         value = match.group("value").split("#", 1)[0].strip()
         if value:
+            value = _strip_node_properties(value)
+            if value.startswith("*"):
+                findings.append(
+                    f"{path_name}:{number}: aliased workflow trigger configuration is forbidden because the security gate cannot resolve the referenced events"
+                )
+                continue
+
             scalar = value
             if len(scalar) >= 2 and scalar[0] == scalar[-1] and scalar[0] in {"'", '"'}:
                 scalar = scalar[1:-1]
@@ -245,8 +230,7 @@ def _forbidden_trigger_violations(lines: list[str], path_name: str) -> list[str]
                 continue
 
             if value.startswith("[") and value.endswith("]"):
-                items = value[1:-1].split(",")
-                for item in items:
+                for item in value[1:-1].split(","):
                     event = item.strip()
                     if len(event) >= 2 and event[0] == event[-1] and event[0] in {"'", '"'}:
                         event = event[1:-1]
@@ -254,7 +238,6 @@ def _forbidden_trigger_violations(lines: list[str], path_name: str) -> list[str]
                         findings.append(f"{path_name}:{number}: pull_request_target is forbidden")
                         break
                 continue
-
             continue
 
         children: list[tuple[int, str, int]] = []
@@ -268,14 +251,8 @@ def _forbidden_trigger_violations(lines: list[str], path_name: str) -> list[str]
             if stripped_child and not stripped_child.startswith("#"):
                 children.append((child_index + 1, child, indent))
             child_index += 1
-
         if not children:
             continue
-
-        # Only direct children of top-level ``on`` define events. Nested values
-        # such as ``push.branches: [pull_request_target]`` are filters, not event
-        # declarations, and must not be rejected merely because they share the
-        # forbidden event's spelling.
         direct_indent = min(indent for _line_number, _child, indent in children)
         for child_number, child, indent in children:
             if indent != direct_indent:
@@ -284,7 +261,6 @@ def _forbidden_trigger_violations(lines: list[str], path_name: str) -> list[str]
                 findings.append(
                     f"{path_name}:{child_number}: pull_request_target is forbidden"
                 )
-
     return findings
 
 
@@ -304,12 +280,7 @@ def violations(path: Path) -> list[str]:
         return [f"{path}: read failure: {exc}"]
 
     findings: list[str] = []
-    # Compose the dedicated workflow-input boundary checker into the canonical
-    # workflow security gate. This keeps multiline expressions, quoted run keys,
-    # block scalar variants, YAML anchors/tags, flow-style run mappings, and run
-    # aliases fail-closed in the fast Backend Quality gate.
     findings.extend(input_boundary_violations(path))
-
     lines = text.splitlines()
     has_top_level_permissions, permission_findings = _top_level_permission_violations(
         lines, path.name
@@ -317,11 +288,6 @@ def violations(path: Path) -> list[str]:
     findings.extend(permission_findings)
     findings.extend(_forbidden_trigger_violations(lines, path.name))
 
-    # Compact flow mappings can place ``uses`` after another key on the same
-    # physical line, where the line-anchored action parser cannot see it. Inspect
-    # only top-level flow entries and apply the same action policy. If any source
-    # line in the flow mapping already starts with ``uses``, the normal parser
-    # below will handle it and we avoid duplicate findings.
     for number, fragment in _flow_style_steps(lines):
         if any(USES_RE.match(source_line) for source_line in fragment.splitlines()):
             continue
@@ -341,10 +307,8 @@ def violations(path: Path) -> list[str]:
 
     for index, line in enumerate(lines):
         number = index + 1
-
         if re.match(r"^\s*permissions\s*:\s*write-all\s*$", line):
             findings.append(f"{path.name}:{number}: write-all permissions are forbidden")
-
         match = USES_RE.match(line)
         if not match:
             continue
@@ -358,10 +322,6 @@ def violations(path: Path) -> list[str]:
             )
         )
 
-    # Reuse the hardened run parser from the input-boundary gate for every
-    # attacker-controlled event context too. This prevents quoted run keys,
-    # anchored/tagged block scalars, alternate scalar headers, and folded
-    # multiline expressions from creating a second parser bypass surface.
     for number, fragment in hardened_run_fragments(lines):
         label = _untrusted_expression(fragment)
         if label:

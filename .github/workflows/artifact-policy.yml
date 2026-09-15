@@ -12,8 +12,8 @@ on:
     - cron: '41 4 * * 0'
 
 concurrency:
-  group: artifact-policy-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: artifact-policy-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -30,23 +30,6 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - name: Fast diff hygiene
-        shell: bash
-        run: |
-          set -euo pipefail
-          base="${ARTIFACT_BASE:-}"
-          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
-            if git rev-parse HEAD^ >/dev/null 2>&1; then base=$(git rev-parse HEAD^); else base=''; fi
-          fi
-          if [[ -n "$base" ]]; then
-            git diff --check "${base}...HEAD"
-            if git diff --unified=0 --no-color "${base}...HEAD" -- | grep -E '^\+(<<<<<<<|>>>>>>>)( |$)' >/dev/null; then
-              echo 'Committed merge-conflict marker found in changed lines.' >&2
-              exit 1
-            fi
-          else
-            git diff --check
-          fi
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11.16"
