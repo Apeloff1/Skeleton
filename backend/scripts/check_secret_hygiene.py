@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+import stat
 import sys
 from typing import Iterable
 
@@ -107,19 +108,33 @@ PLACEHOLDER_MARKERS = (
 )
 
 
+def _is_text_candidate(path: Path) -> bool:
+    return path.name.startswith(".env") or path.suffix.lower() in TEXT_SUFFIXES
+
+
 def candidate_files() -> Iterable[Path]:
+    """Yield repository text candidates without silently dropping stat failures.
+
+    A path that looks security-relevant is still yielded when metadata lookup
+    fails. The downstream reader can then either scan it successfully or emit a
+    fail-closed read finding instead of treating an inaccessible candidate as
+    clean.
+    """
     for path in REPO_ROOT.rglob("*"):
-        if not path.is_file():
-            continue
         if any(part in SKIP_DIRS for part in path.parts):
             continue
-        try:
-            if path.stat().st_size > MAX_FILE_BYTES:
-                continue
-        except OSError:
+        if not _is_text_candidate(path):
             continue
-        if path.name.startswith(".env") or path.suffix.lower() in TEXT_SUFFIXES:
+        try:
+            metadata = path.stat()
+        except OSError:
             yield path
+            continue
+        if not stat.S_ISREG(metadata.st_mode):
+            continue
+        if metadata.st_size > MAX_FILE_BYTES:
+            continue
+        yield path
 
 
 def _is_placeholder(candidate: str) -> bool:
@@ -129,14 +144,16 @@ def _is_placeholder(candidate: str) -> bool:
 
 def violations(path: Path) -> list[str]:
     try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeError):
-        return []
-
-    try:
         label = path.relative_to(REPO_ROOT)
     except ValueError:
         label = path
+
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        # Secret scanning must fail closed on inaccessible/undecodable candidates,
+        # but never echo raw exception text that may contain sensitive paths/data.
+        return [f"{label}: read failure: {type(exc).__name__}"]
 
     findings: list[str] = []
     for number, line in enumerate(text.splitlines(), 1):
