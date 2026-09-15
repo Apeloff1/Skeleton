@@ -36,7 +36,6 @@ import { StabilityBanner } from '../src/components/StabilityBanner';
 import { installGlobalErrorHandlers } from '../src/utils/globalErrors';
 import { startTunnelHeartbeat } from '../src/utils/tunnelHeartbeat';
 import { initSkin, useActiveSkin } from '../src/utils/skinStore';
-import DevLogOverlay from '../components/DevLogOverlay';
 
 // Module-eval marker — proves the root layout module was reached on the JS
 // thread (fires before React even renders). Install the durable crash trap
@@ -45,10 +44,24 @@ installCrashTrace();
 installMemoryGuard();
 traceStepSync('layout_module_eval');
 
+// The visual boot log is useful during development and field diagnostics, but
+// keeping it mounted in every production session means every trace event also
+// causes React work in the overlay. Make production opt-in while preserving the
+// existing always-available behaviour in development builds.
+const SHOW_DEV_LOG_OVERLAY = __DEV__ || process.env.EXPO_PUBLIC_DEV_LOG_OVERLAY === '1';
+
+function DiagnosticsOverlay() {
+  if (!SHOW_DEV_LOG_OVERLAY) return null;
+  // Keep the diagnostics module out of the normal runtime path. The require is
+  // only evaluated when the overlay is actually enabled.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const DevLogOverlay = require('../components/DevLogOverlay').default;
+  return <DevLogOverlay />;
+}
+
 export default function RootLayout() {
   const pathname = usePathname();
   const { version: skinVersion } = useActiveSkin();
-  traceStepSync('layout_render');
 
   useEffect(() => {
     // Silence a deprecation warning emitted by a 3rd-party RN/Expo internal shim
@@ -88,9 +101,7 @@ export default function RootLayout() {
           <OfflineBanner />
           <ToastHost />
           <ActionSheetHost />
-          {/* Always-on visual boot/diagnostics log — overlays EVERY page so
-              the live trace is visible on-device without a cable. */}
-          <DevLogOverlay />
+          <DiagnosticsOverlay />
         </View>
       </FeatureFlagProvider>
     </SafeAreaProvider>
