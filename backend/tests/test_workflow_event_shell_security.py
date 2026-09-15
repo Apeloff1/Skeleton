@@ -63,6 +63,23 @@ def test_rejects_dynamic_github_context_indexing_fail_closed(tmp_path: Path) -> 
     assert _has_shell_boundary_finding(findings)
 
 
+def test_rejects_mutable_github_ref_properties_in_run_shell(tmp_path: Path) -> None:
+    for expression in (
+        "github.ref",
+        "github.ref_name",
+        "github.head_ref",
+        "github.base_ref",
+        "github.workflow_ref",
+        "github['ref']",
+    ):
+        findings = _scan(
+            tmp_path,
+            "name: test\non: pull_request\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n"
+            f"      - run: printf '%s\\n' \"${{{{ {expression} }}}}\"\n",
+        )
+        assert _has_shell_boundary_finding(findings), expression
+
+
 def test_allows_event_payload_through_environment_boundary(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
@@ -71,10 +88,18 @@ def test_allows_event_payload_through_environment_boundary(tmp_path: Path) -> No
     assert findings == []
 
 
+def test_allows_ref_through_environment_boundary(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: pull_request\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - env:\n          PR_HEAD_REF: ${{ github.head_ref }}\n        run: printf '%s\\n' \"$PR_HEAD_REF\"\n",
+    )
+    assert findings == []
+
+
 def test_allows_platform_owned_github_properties(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
-        "name: test\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo \"${{ github.repository }}:${{ github['ref'] }}\"\n",
+        "name: test\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo \"${{ github.repository }}:${{ github.sha }}\"\n",
     )
     assert findings == []
 
