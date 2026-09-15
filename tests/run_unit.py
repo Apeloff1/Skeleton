@@ -10,8 +10,8 @@ in the same test remains a hard failure.
 This runner intentionally stays lightweight, but it also preserves pytest's
 important per-test instance isolation, executes awaitable test results to
 completion, collects module-level and descriptor-backed tests, and fails closed
-when imports, collection, or explicit ``SystemExit`` attempts short-circuit the
-suite.
+when imports, collection, unsupported lifecycle hooks, or explicit
+``SystemExit`` attempts short-circuit the suite.
 """
 from __future__ import annotations
 
@@ -35,6 +35,19 @@ TEST_MODULE_NAMES = (
     "tests.test_cortex",
 )
 
+UNSUPPORTED_MODULE_LIFECYCLE_HOOKS = (
+    "setup_module",
+    "teardown_module",
+    "setup_function",
+    "teardown_function",
+)
+UNSUPPORTED_CLASS_LIFECYCLE_HOOKS = (
+    "setup_class",
+    "teardown_class",
+    "setup_method",
+    "teardown_method",
+)
+
 # These are not generic skips. The method is executed and suppression is
 # permitted only when the terminal traceback frame is the test method itself
 # and the failing source line exactly matches the documented obsolete assert.
@@ -47,6 +60,7 @@ SUPERSEDED_ASSERTIONS = {
 
 T = TypeVar("T")
 TestCallable = Callable[[], object]
+_MISSING = object()
 
 
 def _terminal_traceback(exc: BaseException) -> TracebackType | None:
@@ -81,6 +95,13 @@ def _matches_superseded_assertion(
 
 def _load_test_module(name: str) -> ModuleType:
     return importlib.import_module(name)
+
+
+def _first_unsupported_hook(target: object, names: tuple[str, ...]) -> str | None:
+    for name in names:
+        if inspect.getattr_static(target, name, _MISSING) is not _MISSING:
+            return name
+    return None
 
 
 def _iter_module_test_functions(mod: ModuleType) -> Iterator[tuple[str, TestCallable]]:
@@ -162,6 +183,11 @@ def _run_module(mod: ModuleType) -> tuple[int, int, int]:
     collected = 0
     collection_failed = False
 
+    hook = _first_unsupported_hook(mod, UNSUPPORTED_MODULE_LIFECYCLE_HOOKS)
+    if hook is not None:
+        print("FAIL COLLECT", mod.__name__, "unsupported lifecycle hook", hook)
+        return 0, 1, 0
+
     try:
         module_tests = list(_iter_module_test_functions(mod))
     except SystemExit as exc:
@@ -190,6 +216,14 @@ def _run_module(mod: ModuleType) -> tuple[int, int, int]:
     for name, cls in classes:
         if not name.startswith("Test") or cls.__module__ != mod.__name__:
             continue
+
+        hook = _first_unsupported_hook(cls, UNSUPPORTED_CLASS_LIFECYCLE_HOOKS)
+        if hook is not None:
+            print("FAIL COLLECT", name, "unsupported lifecycle hook", hook)
+            fails += 1
+            collection_failed = True
+            continue
+
         try:
             methods = list(_iter_test_methods(cls))
         except SystemExit as exc:
