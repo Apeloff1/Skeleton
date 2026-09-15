@@ -1,6 +1,6 @@
 import pytest
 
-from core.world_graph import WorldEdge, WorldGraph, WorldNode
+from core.world_graph import PatchOp, WorldEdge, WorldGraph, WorldNode, WorldPatch
 from core.world_graph_projection import project_world_graph
 
 
@@ -56,20 +56,20 @@ def test_projection_matches_frontend_cockpit_state_contract_without_graph_conten
 def test_projection_observes_new_revision_and_hash_after_canonical_patch():
     source = graph()
     before = project_world_graph(source)
-    source.apply_patch(
-        {
-            "patch_id": "rename-player",
-            "base_revision": source.revision,
-            "base_semantic_hash": source.semantic_hash(),
-            "operations": [
-                {
-                    "op": "set_name",
-                    "target": "player",
-                    "payload": {"name": "Hero"},
-                    "expected_revision": 1,
-                }
-            ],
-        }
+    source.apply(
+        WorldPatch(
+            patch_id="rename-player",
+            base_revision=source.revision,
+            expected_semantic_hash=source.semantic_hash(),
+            operations=(
+                PatchOp(
+                    op="set_name",
+                    target="player",
+                    payload={"name": "Hero"},
+                    expected_revision=1,
+                ),
+            ),
+        )
     )
     after = project_world_graph(source)
 
