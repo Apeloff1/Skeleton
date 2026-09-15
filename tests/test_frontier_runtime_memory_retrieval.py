@@ -9,6 +9,7 @@ import pytest
 from skeleton.frontier.agent_runtime import AgentRuntime
 from skeleton.frontier.contracts import stable_content_digest
 from skeleton.frontier.memory import InMemoryStore
+from skeleton.frontier.retrieval_context import MemoryRetriever
 
 
 class _RecordingAgent:
@@ -28,7 +29,11 @@ class _RecordingAgent:
         }
 
 
-def test_runtime_uses_memory_contract_and_preserves_source_provenance() -> None:
+def _runtime_with_memory(memory: InMemoryStore) -> AgentRuntime:
+    return AgentRuntime(retriever=MemoryRetriever(memory))
+
+
+def test_runtime_uses_retriever_contract_and_preserves_source_provenance() -> None:
     async def scenario() -> None:
         memory = InMemoryStore()
         await memory.put(
@@ -45,7 +50,7 @@ def test_runtime_uses_memory_contract_and_preserves_source_provenance() -> None:
         )
 
         agent = _RecordingAgent()
-        runtime = AgentRuntime(memory=memory)
+        runtime = _runtime_with_memory(memory)
         runtime.register(agent)
 
         result = await runtime.execute(
@@ -113,7 +118,7 @@ def test_runtime_retrieval_fails_closed_without_source_provenance() -> None:
         )
 
         agent = _RecordingAgent()
-        runtime = AgentRuntime(memory=memory)
+        runtime = _runtime_with_memory(memory)
         runtime.register(agent)
 
         result = await runtime.execute(
@@ -146,7 +151,7 @@ def test_retrieval_request_is_part_of_idempotency_identity() -> None:
             )
 
         agent = _RecordingAgent()
-        runtime = AgentRuntime(memory=memory)
+        runtime = _runtime_with_memory(memory)
         runtime.register(agent)
 
         first = await runtime.execute(
@@ -170,7 +175,7 @@ def test_retrieval_request_is_part_of_idempotency_identity() -> None:
     asyncio.run(scenario())
 
 
-def test_runtime_returns_failure_when_retrieval_is_requested_without_memory() -> None:
+def test_runtime_returns_failure_when_retrieval_is_requested_without_retriever() -> None:
     async def scenario() -> None:
         agent = _RecordingAgent()
         runtime = AgentRuntime()
@@ -184,7 +189,27 @@ def test_runtime_returns_failure_when_retrieval_is_requested_without_memory() ->
 
         assert not result.succeeded
         assert result.error is not None
-        assert "configured canonical MemoryContract" in result.error
+        assert "configured canonical RetrieverContract" in result.error
+        assert agent.calls == 0
+
+    asyncio.run(scenario())
+
+
+def test_runtime_reserves_retrieved_context_key() -> None:
+    async def scenario() -> None:
+        memory = InMemoryStore()
+        agent = _RecordingAgent()
+        runtime = _runtime_with_memory(memory)
+        runtime.register(agent)
+
+        with pytest.raises(ValueError, match="reserved for runtime retrieval"):
+            await runtime.execute(
+                "memory-agent",
+                "answer",
+                context={"retrieved_context": []},
+                memory_query="alpha",
+            )
+
         assert agent.calls == 0
 
     asyncio.run(scenario())
