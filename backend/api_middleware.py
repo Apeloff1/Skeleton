@@ -12,10 +12,12 @@ Public surface:
   • get_stats()           — observability snapshot (for the /api/_telemetry route)
 
 Tunable via env:
-  RATE_LIMIT_PER_MIN  (int)   default 600        — 10 rps per IP, generous
-  RATE_LIMIT_BURST    (int)   default 60         — initial bucket size
-  RATE_LIMIT_EXEMPT   (csv)   default "127.0.0.1,::1,localhost"
-  ACCESS_LOG          (0|1)   default 1
+  RATE_LIMIT_PER_MIN      (int)   default 600        — 10 rps per IP, generous
+  RATE_LIMIT_BURST        (int)   default 60         — initial bucket size
+  RATE_LIMIT_EXEMPT       (csv)   default "127.0.0.1,::1,localhost"
+  RATE_LIMIT_MAX_BUCKETS  (int)   default 4096       — hard cap on tracked IPs
+  RATE_LIMIT_BUCKET_TTL   (float) default 300        — idle seconds before expiry
+  ACCESS_LOG              (0|1)   default 1
 """
 from __future__ import annotations
 import asyncio
@@ -37,6 +39,8 @@ _RATE_PER_MIN = int(os.environ.get("RATE_LIMIT_PER_MIN", "600"))
 _RATE_BURST = int(os.environ.get("RATE_LIMIT_BURST", "60"))
 _EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "127.0.0.1,::1,localhost")
 _EXEMPT_IPS = {ip.strip() for ip in _EXEMPT_RAW.split(",") if ip.strip()}
+_MAX_BUCKETS = max(1, int(os.environ.get("RATE_LIMIT_MAX_BUCKETS", "4096")))
+_BUCKET_TTL = max(1.0, float(os.environ.get("RATE_LIMIT_BUCKET_TTL", "300")))
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
 
 # Telemetry counters (in-memory) ────────────────────────────────────
@@ -89,6 +93,9 @@ def get_stats() -> dict:
             "per_minute": _RATE_PER_MIN,
             "burst": _RATE_BURST,
             "exempt_ips": sorted(_EXEMPT_IPS),
+            "buckets": _counts.get("rate_limit_buckets", 0),
+            "max_buckets": _MAX_BUCKETS,
+            "evictions": _counts.get("rate_limit_evictions", 0),
         },
     }
 
@@ -195,24 +202,58 @@ class _Bucket:
 
 
 class RateLimiterMiddleware(BaseHTTPMiddleware):
-    """Per-IP token bucket. Exempt IPs (loopback) skip the check.
+    """Per-IP token bucket with bounded idle state.
+
+    Exempt IPs (loopback) skip the check. State is pruned after the idle TTL
+    and capped at `max_buckets`; when the cap is reached, the stalest bucket
+    is evicted before a new one is created. Mutation is serialized per
+    middleware instance so cleanup/eviction cannot race bucket creation.
 
     NOTE: This is *in-memory* and per-process. Sufficient for single-replica
     deployments and dev. For horizontal scaling, swap in a shared store.
     """
 
-    def __init__(self, app, per_minute: int | None = None, burst: int | None = None):
+    def __init__(
+        self,
+        app,
+        per_minute: int | None = None,
+        burst: int | None = None,
+        max_buckets: int | None = None,
+        bucket_ttl: float | None = None,
+    ):
         super().__init__(app)
         self.per_minute = per_minute or _RATE_PER_MIN
         self.burst = burst or _RATE_BURST
+        self.max_buckets = max(1, max_buckets if max_buckets is not None else _MAX_BUCKETS)
+        self.bucket_ttl = max(1.0, bucket_ttl if bucket_ttl is not None else _BUCKET_TTL)
         self._refill_per_sec = self.per_minute / 60.0
         self._buckets: Dict[str, _Bucket] = {}
+        self._state_lock: asyncio.Lock | None = None
+        self._evictions = 0
 
-    def _bucket_for(self, ip: str) -> _Bucket:
+    def _get_state_lock(self) -> asyncio.Lock:
+        if self._state_lock is None:
+            self._state_lock = asyncio.Lock()
+        return self._state_lock
+
+    def _prune_expired(self, now: float) -> None:
+        expired = [ip for ip, bucket in self._buckets.items() if now - bucket.last >= self.bucket_ttl]
+        for ip in expired:
+            del self._buckets[ip]
+
+    def _bucket_for(self, ip: str, now: float | None = None) -> _Bucket:
+        now = time.monotonic() if now is None else now
+        self._prune_expired(now)
         b = self._buckets.get(ip)
         if b is None:
+            if len(self._buckets) >= self.max_buckets:
+                evict_ip, _ = min(self._buckets.items(), key=lambda item: item[1].last)
+                del self._buckets[evict_ip]
+                self._evictions += 1
+                _counts["rate_limit_evictions"] += 1
             b = _Bucket(self.burst, self._refill_per_sec)
             self._buckets[ip] = b
+        _counts["rate_limit_buckets"] = len(self._buckets)
         return b
 
     async def dispatch(self, request: Request, call_next: Callable):
@@ -222,7 +263,8 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         ip = _client_ip(request)
         if ip in _EXEMPT_IPS or ip == "-":
             return await call_next(request)
-        ok, retry = self._bucket_for(ip).take(1)
+        async with self._get_state_lock():
+            ok, retry = self._bucket_for(ip).take(1)
         if not ok:
             _counts["rate_limited"] += 1
             rid = getattr(request.state, "request_id", "-")
