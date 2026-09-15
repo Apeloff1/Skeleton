@@ -160,6 +160,7 @@ def _run_module(mod: ModuleType) -> tuple[int, int, int]:
     fails = 0
     superseded = 0
     collected = 0
+    collection_failed = False
 
     try:
         module_tests = list(_iter_module_test_functions(mod))
@@ -194,10 +195,12 @@ def _run_module(mod: ModuleType) -> tuple[int, int, int]:
         except SystemExit as exc:
             print("FAIL COLLECT", name, type(exc).__name__, exc)
             fails += 1
+            collection_failed = True
             continue
         except Exception as exc:
             print("FAIL COLLECT", name, type(exc).__name__, exc)
             fails += 1
+            collection_failed = True
             continue
 
         for mname, meth in methods:
@@ -207,7 +210,7 @@ def _run_module(mod: ModuleType) -> tuple[int, int, int]:
             fails += failed
             superseded += s
 
-    if collected == 0:
+    if collected == 0 and not collection_failed:
         print("FAIL COLLECT", mod.__name__, "no tests collected")
         fails += 1
 
