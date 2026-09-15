@@ -135,7 +135,10 @@ class IntelligenceOrchestrator:
         self._policies: Dict[str, HandlerPolicy] = {}
         self._telemetry: Dict[str, HandlerTelemetry] = {}
         self._registration_order: Dict[str, int] = {}
+        self._handler_versions: Dict[str, int] = {}
         self._next_registration_order = 0
+        self._next_handler_version = 0
+        self._routing_epoch = 0
         self._min_confidence = min_confidence
         self._max_attempts = max_attempts
         self._selection_mode = selection_mode
@@ -153,6 +156,14 @@ class IntelligenceOrchestrator:
             "cache_hits": 0,
             "cache_misses": 0,
         }
+
+    def _invalidate_routing_locked(self, capability: Optional[str] = None) -> None:
+        """Advance the routing contract and invalidate answers derived from the old route."""
+        self._routing_epoch += 1
+        self._cache.clear()
+        if capability is not None:
+            self._next_handler_version += 1
+            self._handler_versions[capability] = self._next_handler_version
 
     def register_handler(
         self,
@@ -185,23 +196,31 @@ class IntelligenceOrchestrator:
             self._handlers[capability] = handler
             self._policies[capability] = policy
             self._telemetry[capability] = HandlerTelemetry()
+            self._invalidate_routing_locked(capability)
 
     def unregister_handler(self, capability: str) -> bool:
         """Remove a capability and its routing state."""
         with self._lock:
             existed = capability in self._handlers
+            if not existed:
+                return False
             self._handlers.pop(capability, None)
             self._policies.pop(capability, None)
             self._telemetry.pop(capability, None)
             self._registration_order.pop(capability, None)
-            return existed
+            self._handler_versions.pop(capability, None)
+            self._invalidate_routing_locked()
+            return True
 
     def set_handler_enabled(self, capability: str, enabled: bool) -> None:
         """Enable or disable a registered capability without losing telemetry."""
         with self._lock:
             if capability not in self._policies:
                 raise KeyError(capability)
+            if self._policies[capability].enabled == enabled:
+                return
             self._policies[capability].enabled = enabled
+            self._invalidate_routing_locked(capability)
 
     def clear_cache(self) -> None:
         with self._lock:
@@ -263,9 +282,18 @@ class IntelligenceOrchestrator:
             self._stats["submitted"] += 1
 
         effective_min_confidence = self._min_confidence if min_confidence is None else min_confidence
-        cache_key = self._cache_key(query, normalized_context, effective_min_confidence, mode)
+        attempt_limit = max_attempts if max_attempts is not None else self._max_attempts
+        routing_epoch, route = self._eligible_route()
+        cache_key = self._cache_key(
+            query,
+            normalized_context,
+            effective_min_confidence,
+            mode,
+            attempt_limit,
+            routing_epoch,
+        )
         if use_cache and self._result_cache_ttl_seconds > 0:
-            cached = self._cache_get(cache_key)
+            cached = self._cache_get(cache_key, routing_epoch)
             if cached is not None:
                 cached["task_id"] = task.task_id
                 cached["cached"] = True
@@ -274,8 +302,6 @@ class IntelligenceOrchestrator:
                     self._stats["completed"] += 1
                 return cached
 
-        route = self._eligible_route()
-        attempt_limit = max_attempts if max_attempts is not None else self._max_attempts
         if attempt_limit is not None:
             route = route[:attempt_limit]
 
@@ -283,7 +309,7 @@ class IntelligenceOrchestrator:
         attempts: List[Dict[str, Any]] = []
         accepted: List[Tuple[str, ReasoningResult]] = []
 
-        for capability in route:
+        for capability, handler, handler_threshold, handler_version in route:
             if deadline is not None and time.time() >= deadline:
                 with self._lock:
                     self._stats["deadline_exceeded"] += 1
@@ -294,17 +320,23 @@ class IntelligenceOrchestrator:
                 )
                 break
 
-            handler = self._handlers[capability]
             handler_started = time.perf_counter()
             try:
                 result = handler(task)
                 handler_latency_ms = (time.perf_counter() - handler_started) * 1000.0
                 self._validate_result(result)
                 result.latency_ms = handler_latency_ms
-                threshold = self._handler_threshold(capability, effective_min_confidence)
+                threshold = max(
+                    effective_min_confidence,
+                    handler_threshold if handler_threshold is not None else 0.0,
+                )
 
                 if result.confidence < threshold:
-                    self._record_rejection(capability, result, handler_latency_ms)
+                    if not self._record_rejection(
+                        capability, handler_version, result, handler_latency_ms
+                    ):
+                        attempts.append({"handler": capability, "status": "stale"})
+                        continue
                     attempts.append(
                         {
                             "handler": capability,
@@ -326,7 +358,11 @@ class IntelligenceOrchestrator:
                     )
                     continue
 
-                self._record_success(capability, result, handler_latency_ms)
+                if not self._record_success(
+                    capability, handler_version, result, handler_latency_ms
+                ):
+                    attempts.append({"handler": capability, "status": "stale"})
+                    continue
                 attempts.append(
                     {"handler": capability, "status": "accepted", "confidence": result.confidence}
                 )
@@ -335,7 +371,15 @@ class IntelligenceOrchestrator:
                     break
             except Exception as exc:
                 handler_latency_ms = (time.perf_counter() - handler_started) * 1000.0
-                self._record_failure(capability, exc, handler_latency_ms)
+                if not self._record_failure(capability, handler_version, exc, handler_latency_ms):
+                    attempts.append(
+                        {
+                            "handler": capability,
+                            "status": "stale",
+                            "error_type": type(exc).__name__,
+                        }
+                    )
+                    continue
                 attempts.append(
                     {
                         "handler": capability,
@@ -374,7 +418,7 @@ class IntelligenceOrchestrator:
                     0,
                 )
                 if any(
-                    attempt.get("status") in {"failed", "rejected"}
+                    attempt.get("status") in {"failed", "rejected", "stale"}
                     for attempt in attempts[:chosen_index]
                 ):
                     self._stats["fallbacks"] += 1
@@ -399,7 +443,7 @@ class IntelligenceOrchestrator:
                 },
             )
             if use_cache and self._result_cache_ttl_seconds > 0:
-                self._cache_put(cache_key, payload)
+                self._cache_put(cache_key, payload, routing_epoch)
             return payload
 
         with self._lock:
@@ -427,7 +471,19 @@ class IntelligenceOrchestrator:
                 "cache_entries": len(self._cache),
             }
 
-    def _eligible_route(self) -> List[str]:
+    def _eligible_route(
+        self,
+    ) -> Tuple[
+        int,
+        List[
+            Tuple[
+                str,
+                Callable[[ReasoningTask], ReasoningResult],
+                Optional[float],
+                int,
+            ]
+        ],
+    ]:
         now = time.time()
         with self._lock:
             candidates = [
@@ -441,7 +497,16 @@ class IntelligenceOrchestrator:
                     self._registration_order[capability],
                 )
             )
-            return candidates
+            route = [
+                (
+                    capability,
+                    self._handlers[capability],
+                    self._policies[capability].min_confidence,
+                    self._handler_versions[capability],
+                )
+                for capability in candidates
+            ]
+            return self._routing_epoch, route
 
     def _route_score(self, capability: str) -> float:
         policy = self._policies[capability]
@@ -452,10 +517,6 @@ class IntelligenceOrchestrator:
             quality = 0.65 * telemetry.success_rate + 0.35 * telemetry.avg_confidence
         latency_penalty = min(0.25, telemetry.avg_latency_ms / 20_000.0) if telemetry.attempts else 0.0
         return policy.priority + quality - latency_penalty
-
-    def _handler_threshold(self, capability: str, global_threshold: float) -> float:
-        handler_threshold = self._policies[capability].min_confidence
-        return max(global_threshold, handler_threshold if handler_threshold is not None else 0.0)
 
     @staticmethod
     def _validate_result(result: ReasoningResult) -> None:
@@ -468,9 +529,32 @@ class IntelligenceOrchestrator:
         if result.sources is None:
             result.sources = []
 
-    def _record_success(self, capability: str, result: ReasoningResult, latency_ms: float) -> None:
+    def _current_handler_state(
+        self, capability: str, handler_version: int
+    ) -> Optional[Tuple[HandlerPolicy, HandlerTelemetry]]:
+        policy = self._policies.get(capability)
+        telemetry = self._telemetry.get(capability)
+        if (
+            policy is None
+            or telemetry is None
+            or not policy.enabled
+            or self._handler_versions.get(capability) != handler_version
+        ):
+            return None
+        return policy, telemetry
+
+    def _record_success(
+        self,
+        capability: str,
+        handler_version: int,
+        result: ReasoningResult,
+        latency_ms: float,
+    ) -> bool:
         with self._lock:
-            telemetry = self._telemetry[capability]
+            state = self._current_handler_state(capability, handler_version)
+            if state is None:
+                return False
+            _, telemetry = state
             telemetry.attempts += 1
             telemetry.successes += 1
             telemetry.consecutive_failures = 0
@@ -482,10 +566,20 @@ class IntelligenceOrchestrator:
             telemetry.avg_confidence = self._running_average(
                 telemetry.avg_confidence, float(result.confidence), telemetry.successes
             )
+            return True
 
-    def _record_rejection(self, capability: str, result: ReasoningResult, latency_ms: float) -> None:
+    def _record_rejection(
+        self,
+        capability: str,
+        handler_version: int,
+        result: ReasoningResult,
+        latency_ms: float,
+    ) -> bool:
         with self._lock:
-            telemetry = self._telemetry[capability]
+            state = self._current_handler_state(capability, handler_version)
+            if state is None:
+                return False
+            _, telemetry = state
             telemetry.attempts += 1
             telemetry.rejected += 1
             telemetry.consecutive_failures = 0
@@ -496,14 +590,23 @@ class IntelligenceOrchestrator:
             telemetry.avg_confidence = self._running_average(
                 telemetry.avg_confidence, float(result.confidence), observed
             )
+            return True
 
-    def _record_failure(self, capability: str, exc: Exception, latency_ms: float) -> None:
+    def _record_failure(
+        self,
+        capability: str,
+        handler_version: int,
+        exc: Exception,
+        latency_ms: float,
+    ) -> bool:
         circuit_opened = False
         cooldown_seconds = 0.0
         failures = 0
         with self._lock:
-            telemetry = self._telemetry[capability]
-            policy = self._policies[capability]
+            state = self._current_handler_state(capability, handler_version)
+            if state is None:
+                return False
+            policy, telemetry = state
             telemetry.attempts += 1
             telemetry.failures += 1
             telemetry.consecutive_failures += 1
@@ -525,6 +628,7 @@ class IntelligenceOrchestrator:
                     "cooldown_seconds": cooldown_seconds,
                 },
             )
+        return True
 
     @staticmethod
     def _running_average(current: float, new_value: float, count: int) -> float:
@@ -536,17 +640,26 @@ class IntelligenceOrchestrator:
         context: Dict[str, Any],
         min_confidence: float,
         selection_mode: str,
+        max_attempts: Optional[int],
+        routing_epoch: int,
     ) -> str:
         try:
             context_blob = json.dumps(context, sort_keys=True, separators=(",", ":"), default=repr)
         except (TypeError, ValueError):
             context_blob = repr(sorted(context.items(), key=lambda item: str(item[0])))
-        payload = f"v2\0{query}\0{context_blob}\0{min_confidence:.6f}\0{selection_mode}"
+        attempt_contract = "all" if max_attempts is None else str(max_attempts)
+        payload = (
+            f"v3\0{query}\0{context_blob}\0{min_confidence:.6f}\0{selection_mode}"
+            f"\0{attempt_contract}\0{routing_epoch}"
+        )
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
-    def _cache_get(self, key: str) -> Optional[Dict[str, Any]]:
+    def _cache_get(self, key: str, routing_epoch: int) -> Optional[Dict[str, Any]]:
         now = time.time()
         with self._lock:
+            if self._routing_epoch != routing_epoch:
+                self._stats["cache_misses"] += 1
+                return None
             entry = self._cache.get(key)
             if entry is None:
                 self._stats["cache_misses"] += 1
@@ -559,8 +672,10 @@ class IntelligenceOrchestrator:
             self._stats["cache_hits"] += 1
             return dict(entry.payload)
 
-    def _cache_put(self, key: str, payload: Dict[str, Any]) -> None:
+    def _cache_put(self, key: str, payload: Dict[str, Any], routing_epoch: int) -> bool:
         with self._lock:
+            if self._routing_epoch != routing_epoch:
+                return False
             cached_payload = dict(payload)
             cached_payload.pop("attempts", None)
             self._cache[key] = _CacheEntry(
@@ -570,6 +685,7 @@ class IntelligenceOrchestrator:
             self._cache.move_to_end(key)
             while len(self._cache) > self._max_cache_entries:
                 self._cache.popitem(last=False)
+            return True
 
     def _emit(self, topic: str, payload: Dict[str, Any]) -> None:
         if self._bus is None:
@@ -593,7 +709,7 @@ class MetaGrid:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "learning_rate": self.learning_rate,
-            "exploration_rate": self.exploration_rate,
+            "exploration_rate": self.grid.exploration_rate,
             "discount_factor": self.discount_factor,
             "batch_size": self.batch_size,
             "memory_window": self.memory_window,
