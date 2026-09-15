@@ -76,7 +76,7 @@ def test_malformed_trusted_proxy_configuration_disables_forwarded_trust(
     assert _request_client_ip(request) == "10.0.0.2"
 
 
-def test_rate_limit_eviction_is_lru_not_linear_oldest_scan() -> None:
+def test_rate_limit_capacity_cannot_reset_existing_bucket_state() -> None:
     async def scenario() -> None:
         async def app(_scope, _receive, _send) -> None:
             return None
@@ -86,7 +86,15 @@ def test_rate_limit_eviction_is_lru_not_linear_oldest_scan() -> None:
 
         RateLimitMiddleware._buckets.clear()
         RateLimitMiddleware._lock = asyncio.Lock()
-        middleware = RateLimitMiddleware(app, rps=1, burst=3, max_buckets=2)
+        RateLimitMiddleware._capacity_rejections = 0
+        RateLimitMiddleware._expired_prunes = 0
+        middleware = RateLimitMiddleware(
+            app,
+            rps=1,
+            burst=3,
+            max_buckets=2,
+            bucket_ttl=300,
+        )
 
         first = _request(peer="198.51.100.1")
         second = _request(peer="198.51.100.2")
@@ -94,12 +102,14 @@ def test_rate_limit_eviction_is_lru_not_linear_oldest_scan() -> None:
         await middleware.dispatch(first, call_next)
         await middleware.dispatch(second, call_next)
         await middleware.dispatch(first, call_next)
-        await middleware.dispatch(third, call_next)
+        rejected = await middleware.dispatch(third, call_next)
 
         keys = list(RateLimitMiddleware._buckets)
+        assert rejected.status_code == 429
         assert any(key[0] == "198.51.100.1" for key in keys)
-        assert any(key[0] == "198.51.100.3" for key in keys)
-        assert not any(key[0] == "198.51.100.2" for key in keys)
+        assert any(key[0] == "198.51.100.2" for key in keys)
+        assert not any(key[0] == "198.51.100.3" for key in keys)
+        assert RateLimitMiddleware._capacity_rejections == 1
 
     asyncio.run(scenario())
 
