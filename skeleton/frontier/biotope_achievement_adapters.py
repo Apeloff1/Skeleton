@@ -272,7 +272,11 @@ def record_biotope_catch(
         families = tuple(
             dict.fromkeys(_token(value, "caught fish family token") for value in family_tokens)
         )
+
+    canonical_family_tokens = {biotope, stage, rarity_token}
     for family in families:
+        if family in canonical_family_tokens:
+            continue
         increment(f"{family}_catches")
 
     species_by_stage = {key: set(values) for key, values in evidence.species_by_stage.items()}
