@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 
 from scripts.check_secret_hygiene import violations
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _scan(tmp_path: Path, source: str) -> list[str]:
@@ -91,3 +95,31 @@ def test_does_not_echo_secret_value_in_finding(tmp_path: Path) -> None:
     findings = _scan(tmp_path, f"TOKEN={token}\n")
     assert findings
     assert all(token not in finding for finding in findings)
+
+
+def test_gitleaks_policy_extends_default_detectors() -> None:
+    config = tomllib.loads((REPO_ROOT / ".gitleaks.toml").read_text(encoding="utf-8"))
+    assert config["extend"]["useDefault"] is True
+
+
+def test_secret_scanning_workflow_hardening_contract() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "secret-scanning.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "  pull_request:\n" in workflow
+    assert "  push:\n" in workflow
+    assert "branches:" not in workflow
+    assert "permissions:\n  contents: read\n" in workflow
+    assert "persist-credentials: false" in workflow
+    assert 'GITLEAKS_VERSION: "8.24.3"' in workflow
+    assert 'GITLEAKS_CONFIG: ".gitleaks.toml"' in workflow
+    assert 'GITLEAKS_ENABLE_COMMENTS: "false"' in workflow
+
+
+def test_gitleaks_remains_complementary_to_local_secret_hygiene_gate() -> None:
+    precommit = (REPO_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+    hook_start = precommit.index("- id: repository-secret-hygiene")
+    hook_end = precommit.index("- id: backend-security-regressions", hook_start)
+    hook = precommit[hook_start:hook_end]
+    assert "check_secret_hygiene.py" in hook
+    assert "always_run: true" in hook
