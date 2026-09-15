@@ -280,7 +280,18 @@ class HardenedSwarmRuntime(SwarmRuntime):
     def health(self, *, stale_after: float = 90.0):
         stale_after = self._positive_finite(stale_after, "stale_after")
         with self._lock:
-            return super().health(stale_after=stale_after)
+            result = super().health(stale_after=stale_after)
+            snapshot = result.get("snapshot", {})
+            workers = int(snapshot.get("workers", 0))
+            queued = int(snapshot.get("queued", 0))
+            if result.get("status") == "critical" and queued > 0 and workers == 0:
+                result["status"] = "degraded"
+                result["availability"] = "awaiting_workers"
+            elif workers > 0:
+                result["availability"] = "available"
+            else:
+                result["availability"] = "idle"
+            return result
 
     def export_state(self) -> dict[str, object]:
         with self._lock:
