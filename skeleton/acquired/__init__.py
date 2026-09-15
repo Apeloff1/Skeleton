@@ -5,12 +5,6 @@ mined from older Apeloff1 projects. Capabilities live here until they are
 proven stable enough to move into a canonical Skeleton subsystem.
 """
 
-from skeleton.acquired.audit_ledger import (
-    AuditChainError,
-    AuditEntry,
-    GENESIS_HASH,
-    TamperEvidentAuditLog,
-)
 from skeleton.acquired.ingest import (
     Asset,
     AssetIngestor,
@@ -44,20 +38,16 @@ __all__ = [
     "AssetIngestor",
     "AssetLibrary",
     "AssetValidator",
-    "AuditChainError",
-    "AuditEntry",
     "CacheResult",
     "ChaosGovernor",
     "DegradationRung",
     "DifficultyZone",
-    "GENESIS_HASH",
     "LearningSignal",
     "ProgressionTracker",
     "ResilientTTLCache",
     "RuntimePolicy",
     "Scaffold",
     "ScaffoldType",
-    "TamperEvidentAuditLog",
     "WorkPriority",
     "ZPDResult",
 ]
