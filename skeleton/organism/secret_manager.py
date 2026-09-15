@@ -130,7 +130,7 @@ class SecretManager:
         return {
             "kind": "secret-manager-card",
             "secrets": len(self._secrets),
-            "encrypted": self._fernet is not None and self._storage_state in {"ready", "legacy_cleartext"},
+            "encrypted": self._fernet is not None and self._storage_state == "ready",
             "master_key_configured": self._master_configured,
             "storage_state": self._storage_state,
         }
