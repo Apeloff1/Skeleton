@@ -107,10 +107,9 @@ class CausalGraph:
 
         self._require(event_id)
         base = self._nodes[event_id]
-        resolved_parent = base.parent_id if base.parent_id in self._nodes else None
         return CausalNode(
             event=base.event,
-            parent_id=resolved_parent,
+            parent_id=self._resolved_parent_id(event_id),
             child_ids=tuple(self._children.get(event_id, ())),
             depth=self._depth(event_id),
         )
@@ -118,7 +117,11 @@ class CausalGraph:
     def roots(self) -> list[CausalNode]:
         """Return events with no currently known parent."""
 
-        return [self.node(event_id) for event_id in self._nodes if self.node(event_id).is_root]
+        return [
+            self.node(event_id)
+            for event_id in self._nodes
+            if self._resolved_parent_id(event_id) is None
+        ]
 
     def leaves(self) -> list[CausalNode]:
         """Return events that currently cause no further retained event."""
@@ -150,8 +153,7 @@ class CausalGraph:
                 )
             seen.add(current)
             chain.append(current)
-            parent_id = self._nodes[current].parent_id
-            current = parent_id if parent_id in self._nodes else None
+            current = self._resolved_parent_id(current)
 
         chain.reverse()
         events = [self._nodes[item].event for item in chain]
@@ -206,7 +208,9 @@ class CausalGraph:
         return {
             "events": len(self._nodes),
             "edges": sum(len(children) for children in self._children.values()),
-            "roots": sum(1 for event_id in self._nodes if self.node(event_id).is_root),
+            "roots": sum(
+                1 for event_id in self._nodes if self._resolved_parent_id(event_id) is None
+            ),
             "leaves": sum(1 for event_id in self._nodes if not self._children.get(event_id)),
             "max_depth": max(depths),
             "correlations": len(self._correlations),
@@ -237,6 +241,10 @@ class CausalGraph:
         if child_id not in children:
             children.append(child_id)
 
+    def _resolved_parent_id(self, event_id: str) -> str | None:
+        parent_id = self._nodes[event_id].parent_id
+        return parent_id if parent_id in self._nodes else None
+
     def _require(self, event_id: str) -> None:
         if event_id not in self._nodes:
             raise CausalGraphError(
@@ -252,8 +260,8 @@ class CausalGraph:
             if current in seen:
                 return depth
             seen.add(current)
-            parent_id = self._nodes[current].parent_id
-            if parent_id is None or parent_id not in self._nodes:
+            parent_id = self._resolved_parent_id(current)
+            if parent_id is None:
                 return depth
             depth += 1
             current = parent_id
