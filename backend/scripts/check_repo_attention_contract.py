@@ -153,6 +153,7 @@ def violations_for_text(text: str) -> list[str]:
         "managed label exclusion": '$kind == "labeled"',
         "managed unlabel exclusion": '$kind == "unlabeled"',
         "bot exclusion": '!= "Bot"',
+        "commit timestamp extraction": "$e.committer.date // $e.author.date",
         "two-pass convergence": "for pass in 1 2; do",
         "closed-item repair": "state=closed&labels=${label}",
     }
