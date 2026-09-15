@@ -71,4 +71,5 @@ jobs:
       - name: Run absorption control-plane contract
         env:
           PYTHONPATH: "backend"
-        run: python -m pytest -q backend/tests/test_adaptive_absorption_fabric.py
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest -q --noconftest backend/tests/test_adaptive_absorption_fabric.py
