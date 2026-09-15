@@ -17,6 +17,7 @@ on:
       - '.github/codeql/**'
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, closed]
     paths:
       - '**/*.py'
       - '**/*.pyi'
@@ -40,6 +41,7 @@ concurrency:
 
 jobs:
   analyze:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     name: Analyze ${{ matrix.language }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
