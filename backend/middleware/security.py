@@ -63,7 +63,7 @@ def _canonical_ip(value: str) -> str | None:
 def _parse_trusted_proxy_networks(
     raw: str,
 ) -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
-    """Parse only explicit trusted proxy CIDRs; invalid entries never widen trust."""
+    """Parse proxy CIDRs fail-closed: one malformed entry disables XFF trust."""
     networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
     for entry in raw.split(","):
         entry = entry.strip()
@@ -72,7 +72,10 @@ def _parse_trusted_proxy_networks(
         try:
             networks.append(ipaddress.ip_network(entry, strict=False))
         except ValueError:
-            log.warning("ignoring invalid CODEDOCK_TRUSTED_PROXY_CIDRS entry")
+            log.error(
+                "invalid CODEDOCK_TRUSTED_PROXY_CIDRS configuration; disabling proxy trust"
+            )
+            return ()
     return tuple(networks)
 
 

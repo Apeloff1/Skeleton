@@ -86,6 +86,13 @@ def test_proxy_bounds_stay_aligned_between_active_security_stacks() -> None:
     assert legacy_security._MAX_XFF_CHARS == api_middleware._MAX_XFF_CHARS
 
 
+def test_malformed_proxy_cidr_disables_trust_in_both_active_stacks() -> None:
+    raw = "10.0.0.0/8, definitely-not-a-cidr, 2001:db8::/32"
+
+    assert api_middleware._parse_trusted_proxy_networks(raw) == ()
+    assert legacy_security._parse_trusted_proxy_networks(raw) == ()
+
+
 def test_telemetry_reports_proxy_count_without_disclosing_networks(monkeypatch) -> None:
     monkeypatch.setattr(
         api_middleware,
