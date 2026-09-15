@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import logging
+import math
 import os
 import re
 import time
@@ -37,6 +38,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 log = logging.getLogger("api.middleware")
+_MAX_RETRY_AFTER_SECONDS = 86_400
 
 
 # ── Configuration ─────────────────────────────────────────────────────
@@ -57,7 +59,7 @@ def _positive_float_env(name: str, default: float) -> float:
         value = float(raw)
     except ValueError as exc:
         raise RuntimeError(f"{name} must be a positive finite number") from exc
-    if value <= 0 or not (value < float("inf")):
+    if value <= 0 or not math.isfinite(value):
         raise RuntimeError(f"{name} must be a positive finite number")
     return value
 
@@ -115,6 +117,13 @@ def _percentile(sorted_vals, pct: float) -> float:
         return 0.0
     k = max(0, min(len(sorted_vals) - 1, int(pct / 100.0 * (len(sorted_vals) - 1))))
     return sorted_vals[k]
+
+
+def _bounded_retry_after(retry: float) -> int:
+    """Return a finite advisory Retry-After value for every numeric path."""
+    if not math.isfinite(retry):
+        return _MAX_RETRY_AFTER_SECONDS
+    return max(1, min(_MAX_RETRY_AFTER_SECONDS, math.ceil(max(0.0, retry))))
 
 
 def get_stats() -> dict:
@@ -187,8 +196,6 @@ def _canonical_ip(value: str) -> str | None:
     value = value.strip()
     if not value:
         return None
-    if len(value) >= 2 and value[0] == value[-1] == '"':
-        value = value[1:-1].strip()
     try:
         return str(ipaddress.ip_address(value))
     except ValueError:
@@ -338,14 +345,14 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         self.burst = burst if burst is not None else _RATE_BURST
         self.max_buckets = max_buckets if max_buckets is not None else _MAX_BUCKETS
         self.bucket_ttl = bucket_ttl if bucket_ttl is not None else _BUCKET_TTL
-        if self.per_minute <= 0:
-            raise ValueError("per_minute must be positive")
-        if self.burst <= 0:
-            raise ValueError("burst must be positive")
-        if self.max_buckets <= 0:
-            raise ValueError("max_buckets must be positive")
-        if self.bucket_ttl <= 0 or not (self.bucket_ttl < float("inf")):
-            raise ValueError("bucket_ttl must be a positive finite number")
+        if not math.isfinite(float(self.per_minute)) or self.per_minute <= 0:
+            raise ValueError("per_minute must be finite and positive")
+        if not math.isfinite(float(self.burst)) or self.burst <= 0:
+            raise ValueError("burst must be finite and positive")
+        if not math.isfinite(float(self.max_buckets)) or self.max_buckets <= 0:
+            raise ValueError("max_buckets must be finite and positive")
+        if not math.isfinite(float(self.bucket_ttl)) or self.bucket_ttl <= 0:
+            raise ValueError("bucket_ttl must be finite and positive")
 
         self._refill_per_sec = self.per_minute / 60.0
         self._buckets: Dict[str, _Bucket] = {}
@@ -419,6 +426,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
             _counts["rate_limited"] += 1
             rid = _request_id(request)
             request.state.request_id = rid
+            retry_after = _bounded_retry_after(retry)
             log.warning(
                 "rate_limited ip=%s path=%s retry=%.1fs rid=%s",
                 ip,
@@ -430,12 +438,12 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
                 {
                     "error": "rate_limited",
                     "message": "Too many requests; please slow down.",
-                    "retry_after_seconds": round(retry, 1),
+                    "retry_after_seconds": retry_after,
                     "request_id": rid,
                 },
                 status_code=429,
                 headers={
-                    "Retry-After": str(max(1, int(retry + 0.5))),
+                    "Retry-After": str(retry_after),
                     "X-Request-Id": rid,
                     "X-RateLimit-Limit": str(self.per_minute),
                 },
