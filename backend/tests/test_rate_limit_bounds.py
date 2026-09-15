@@ -4,11 +4,24 @@ import asyncio
 
 import pytest
 
-from api_middleware import RateLimiterMiddleware
+from api_middleware import (
+    RateLimiterMiddleware,
+    _bounded_retry_after,
+    _is_api_path,
+)
 
 
 class _App:
     pass
+
+
+def test_api_path_matching_requires_segment_boundary():
+    assert _is_api_path("/api")
+    assert _is_api_path("/api/run")
+    assert _is_api_path("/api/run/deep")
+    assert not _is_api_path("/apiary")
+    assert not _is_api_path("/apis")
+    assert not _is_api_path("/API/run")
 
 
 @pytest.mark.asyncio
@@ -139,12 +152,38 @@ async def test_expiry_reopens_capacity_without_active_eviction():
 @pytest.mark.parametrize(
     ("kwargs", "message"),
     [
-        ({"per_minute": 0}, "per_minute must be positive"),
-        ({"per_minute": -1}, "per_minute must be positive"),
-        ({"burst": 0}, "burst must be positive"),
-        ({"burst": -1}, "burst must be positive"),
+        ({"per_minute": 0}, "per_minute must be finite and positive"),
+        ({"per_minute": -1}, "per_minute must be finite and positive"),
+        ({"per_minute": float("nan")}, "per_minute must be finite and positive"),
+        ({"per_minute": float("inf")}, "per_minute must be finite and positive"),
+        ({"burst": 0}, "burst must be finite and positive"),
+        ({"burst": -1}, "burst must be finite and positive"),
+        ({"burst": float("nan")}, "burst must be finite and positive"),
+        ({"burst": float("inf")}, "burst must be finite and positive"),
+        ({"max_buckets": 0}, "max_buckets must be positive"),
+        ({"max_buckets": -1}, "max_buckets must be positive"),
+        ({"bucket_ttl": 0}, "bucket_ttl must be finite and positive"),
+        ({"bucket_ttl": -1}, "bucket_ttl must be finite and positive"),
+        ({"bucket_ttl": float("nan")}, "bucket_ttl must be finite and positive"),
+        ({"bucket_ttl": float("inf")}, "bucket_ttl must be finite and positive"),
     ],
 )
-def test_rate_limiter_rejects_non_positive_rate_configuration(kwargs, message):
+def test_rate_limiter_rejects_invalid_configuration(kwargs, message):
     with pytest.raises(ValueError, match=message):
         RateLimiterMiddleware(_App(), **kwargs)
+
+
+@pytest.mark.parametrize(
+    ("retry", "expected"),
+    [
+        (0.0, 1),
+        (0.1, 1),
+        (1.2, 2),
+        (86_399.1, 86_400),
+        (90_000.0, 86_400),
+        (float("inf"), 86_400),
+        (float("nan"), 86_400),
+    ],
+)
+def test_retry_after_is_finite_and_bounded(retry, expected):
+    assert _bounded_retry_after(retry) == expected
