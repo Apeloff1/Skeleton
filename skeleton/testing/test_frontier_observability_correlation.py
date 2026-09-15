@@ -121,6 +121,17 @@ def test_observable_runtime_attaches_metrics_bridge_by_default() -> None:
             "observability.events_total",
             labels={"topic": "orchestration.run.completed"},
         ) == 1.0
+        assert [event.message for event in orchestrator.logger.events] == [
+            "orchestration.run.started",
+            "orchestration.run.completed",
+        ]
+        run_span = orchestrator.tracer.exporter.query(
+            name="orchestration.run", limit=1
+        )[0]
+        assert run_span.trace_id == "req-default-observability"
+        assert run_span.attributes["run_id"] == "run-default-observability"
+        assert run_span.attributes["correlation_id"] == "req-default-observability"
+        assert run_span.attributes["status"] == RunStatus.COMPLETED.value
 
     asyncio.run(scenario())
 
@@ -172,6 +183,31 @@ def test_request_id_survives_api_to_run_to_tool_without_payload_leakage() -> Non
             assert "secret_input" not in rendered
             assert "secret_output" not in rendered
 
+        logs = orchestrator.logger.events
+        assert [event.message for event in logs] == topics
+        assert {event.context["correlation_id"] for event in logs} == {"req-abc-123"}
+        assert "do-not-log" not in repr(logs)
+        assert "secret_input" not in repr(logs)
+        assert "secret_output" not in repr(logs)
+
+        run_span = orchestrator.tracer.exporter.query(
+            name="orchestration.run", limit=1
+        )[0]
+        tool_span = orchestrator.tracer.exporter.query(
+            name="orchestration.tool", limit=1
+        )[0]
+        assert run_span.trace_id == "req-abc-123"
+        assert tool_span.trace_id == "req-abc-123"
+        assert tool_span.parent_id == run_span.span_id
+        assert run_span.attributes["run_id"] == "run-123"
+        assert tool_span.attributes["run_id"] == "run-123"
+        assert tool_span.attributes["call_id"] == "call-123"
+        assert tool_span.attributes["tool_name"] == "lookup"
+        rendered_spans = repr([run_span.to_dict(), tool_span.to_dict()])
+        assert "do-not-log" not in rendered_spans
+        assert "secret_input" not in rendered_spans
+        assert "secret_output" not in rendered_spans
+
     asyncio.run(scenario())
 
 
@@ -216,6 +252,10 @@ def test_retry_event_is_correlated_and_does_not_store_exception_message() -> Non
         assert retry_events[0].correlation_id == "req-retry"
         assert retry_events[0].payload["retry_count"] == 1
         assert "retry-secret" not in repr(retry_events[0].payload)
+        assert "retry-secret" not in repr(orchestrator.logger.events)
+        assert "retry-secret" not in repr(
+            [span.to_dict() for span in orchestrator.tracer.exporter.query(limit=10)]
+        )
 
     asyncio.run(scenario())
 
@@ -243,6 +283,27 @@ def test_tool_failure_event_exposes_type_not_secret_message() -> None:
         assert failed[0].payload["error_type"] == "ToolExecutionError"
         assert "failure-secret" not in repr(failed[0].payload)
         assert "password" not in repr(failed[0].payload)
+
+        failed_logs = [
+            event
+            for event in orchestrator.logger.events
+            if event.message == "orchestration.tool.failed"
+        ]
+        assert len(failed_logs) == 1
+        assert failed_logs[0].level == "ERROR"
+        assert failed_logs[0].context["error_type"] == "ToolExecutionError"
+        assert "failure-secret" not in repr(failed_logs[0])
+        assert "password" not in repr(failed_logs[0])
+
+        tool_span = orchestrator.tracer.exporter.query(
+            name="orchestration.tool", limit=1
+        )[0]
+        assert tool_span.trace_id == "req-fail"
+        assert tool_span.status == "ERROR"
+        assert tool_span.attributes["error.type"] == "ToolExecutionError"
+        assert tool_span.attributes["error.message"] == "ToolExecutionError"
+        assert "failure-secret" not in repr(tool_span.to_dict())
+        assert "password" not in repr(tool_span.to_dict())
 
     asyncio.run(scenario())
 
