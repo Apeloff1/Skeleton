@@ -34,6 +34,16 @@ DEFAULT_REQUIREMENT_STAGE_ALIASES: Mapping[str, str] = MappingProxyType(
     }
 )
 
+# Source catalog requirement names do not always match the stats emitted by the
+# source recorder. Keep those compatibility bindings explicit instead of
+# silently inventing generic aliases from names.
+DEFAULT_REQUIREMENT_COUNT_ALIASES: Mapping[str, str] = MappingProxyType(
+    {
+        "lake_catches": "freshwater_lake_catches",
+        "arctic_catches": "arctic_ocean_catches",
+    }
+)
+
 
 def _text(value: object, field_name: str) -> str:
     if not isinstance(value, str):
@@ -304,6 +314,7 @@ def biotope_requirement_value(
     evidence: BiotopeCatchEvidence,
     *,
     stage_aliases: Mapping[str, str] = DEFAULT_REQUIREMENT_STAGE_ALIASES,
+    count_aliases: Mapping[str, str] = DEFAULT_REQUIREMENT_COUNT_ALIASES,
 ) -> int:
     """Resolve one source requirement from derived catch evidence."""
 
@@ -331,6 +342,10 @@ def biotope_requirement_value(
         biotope = _token(achievement.metadata.get("biotope"), "achievement biotope metadata")
         return evidence.max_size_by_biotope.get(biotope, 0)
 
+    if kind in count_aliases:
+        alias = _token(count_aliases[kind], f"count alias for {kind}")
+        return evidence.counts.get(alias, 0)
+
     return evidence.counts.get(kind, 0)
 
 
@@ -340,6 +355,7 @@ def synchronize_biotope_achievement_state(
     evidence: BiotopeCatchEvidence,
     *,
     stage_aliases: Mapping[str, str] = DEFAULT_REQUIREMENT_STAGE_ALIASES,
+    count_aliases: Mapping[str, str] = DEFAULT_REQUIREMENT_COUNT_ALIASES,
 ) -> tuple[AchievementState, tuple[AchievementSpec, ...]]:
     """Merge derived evidence into canonical stats, then use the existing engine."""
 
@@ -353,6 +369,7 @@ def synchronize_biotope_achievement_state(
             achievement,
             evidence,
             stage_aliases=stage_aliases,
+            count_aliases=count_aliases,
         )
         kind = achievement.requirement.kind
         stats[kind] = max(stats.get(kind, 0), derived)
