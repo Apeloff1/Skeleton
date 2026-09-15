@@ -64,7 +64,8 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_workflow_security_gate.py \
   backend/tests/test_secret_hygiene_gate.py \
   backend/tests/test_malware_ioc_gate.py \
-  backend/tests/test_incident_response_runbook.py
+  backend/tests/test_incident_response_runbook.py \
+  backend/tests/test_webhook_cron_security.py
 
 if command -v yarn >/dev/null 2>&1; then
   printf '\n== Frontend lint ==\n'
