@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import time
 
 import api_middleware
 from starlette.requests import Request
@@ -46,14 +45,14 @@ def test_high_cardinality_state_is_bounded(monkeypatch):
 
 def test_idle_buckets_are_expired_and_counted(monkeypatch):
     limiter = _limiter(monkeypatch, max_buckets=16, ttl=1)
-    stale = limiter._bucket_for("stale", now=10.0)
-    active = limiter._bucket_for("active", now=10.5)
-    assert stale is not active
+    limiter._bucket_for("stale", now=10.0)
+    limiter._bucket_for("active", now=10.5)
 
-    limiter._bucket_for("stale", now=12.0)
+    limiter._bucket_for("new-client", now=12.0)
 
-    assert "stale" in limiter._buckets
+    assert "stale" not in limiter._buckets
     assert "active" in limiter._buckets
+    assert "new-client" in limiter._buckets
     assert limiter._evictions == 1
 
 
