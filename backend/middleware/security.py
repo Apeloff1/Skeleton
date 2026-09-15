@@ -30,6 +30,7 @@ from starlette.responses import JSONResponse
 
 
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")
+_MAX_RETRY_AFTER_SECONDS = 86_400
 
 
 def _matches_path_prefix(path: str, prefix: str) -> bool:
@@ -242,10 +243,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             )
             bucket.last_refill = now
             if bucket.tokens < 1.0:
-                retry_after = max(
-                    1,
-                    math.ceil((1.0 - bucket.tokens) / RateLimitMiddleware._rps),
-                )
+                retry_delay = (1.0 - bucket.tokens) / RateLimitMiddleware._rps
+                if math.isfinite(retry_delay):
+                    retry_after = max(
+                        1,
+                        min(_MAX_RETRY_AFTER_SECONDS, math.ceil(retry_delay)),
+                    )
+                else:
+                    retry_after = _MAX_RETRY_AFTER_SECONDS
                 return JSONResponse(
                     status_code=429,
                     content={
@@ -388,16 +393,46 @@ class AuditMiddleware(BaseHTTPMiddleware):
 # Body-size cap
 # ─────────────────────────────────────────────────────────────────
 class SizeLimitMiddleware:
-    """Enforce the body limit before application code can observe the request."""
+    """Enforce per-request and aggregate in-flight body limits before app code."""
 
-    def __init__(self, app, max_mb: int | None = None):
+    def __init__(
+        self,
+        app,
+        max_mb: int | None = None,
+        max_inflight_mb: int | None = None,
+    ):
         self.app = app
         configured_mb = max_mb if max_mb is not None else int(
             os.environ.get("CODEDOCK_MAX_BODY_MB", "25")
         )
+        configured_inflight_mb = (
+            max_inflight_mb
+            if max_inflight_mb is not None
+            else int(os.environ.get("CODEDOCK_MAX_INFLIGHT_BODY_MB", "128"))
+        )
         if configured_mb <= 0:
             raise ValueError("maximum body size must be positive")
+        if configured_inflight_mb <= 0:
+            raise ValueError("maximum in-flight body budget must be positive")
         self.max_bytes = int(configured_mb) * 1024 * 1024
+        self.max_inflight_bytes = int(configured_inflight_mb) * 1024 * 1024
+        self._inflight_body_bytes = 0
+        self._inflight_lock = asyncio.Lock()
+
+    async def _reserve_body_bytes(self, amount: int) -> bool:
+        if amount <= 0:
+            return True
+        async with self._inflight_lock:
+            if amount > self.max_inflight_bytes - self._inflight_body_bytes:
+                return False
+            self._inflight_body_bytes += amount
+            return True
+
+    async def _release_body_bytes(self, amount: int) -> None:
+        if amount <= 0:
+            return
+        async with self._inflight_lock:
+            self._inflight_body_bytes = max(0, self._inflight_body_bytes - amount)
 
     async def __call__(self, scope, receive, send):
         if scope.get("type") != "http":
@@ -462,48 +497,71 @@ class SizeLimitMiddleware:
 
         buffered: list[dict] = []
         seen = 0
-        while True:
-            message = await receive()
-            if message.get("type") == "http.disconnect":
-                return
-            buffered.append(message)
-            if message.get("type") != "http.request":
-                continue
-            seen += len(message.get("body") or b"")
-            if seen > self.max_bytes:
+        reserved = 0
+        try:
+            while True:
+                message = await receive()
+                if message.get("type") == "http.disconnect":
+                    return
+                if message.get("type") != "http.request":
+                    buffered.append(message)
+                    continue
+
+                body = message.get("body") or b""
+                chunk_size = len(body)
+                if seen + chunk_size > self.max_bytes:
+                    response = JSONResponse(
+                        status_code=413,
+                        content={
+                            "error": "payload_too_large",
+                            "detail": f"body exceeds {self.max_bytes // 1024 // 1024} MB",
+                            "limit_bytes": self.max_bytes,
+                            "got_bytes": seen + chunk_size,
+                        },
+                    )
+                    await response(scope, receive, send)
+                    return
+
+                if not await self._reserve_body_bytes(chunk_size):
+                    response = JSONResponse(
+                        status_code=503,
+                        content={
+                            "error": "body_capacity_exhausted",
+                            "detail": "in-flight request body budget exhausted",
+                            "limit_bytes": self.max_inflight_bytes,
+                        },
+                        headers={"Retry-After": "1"},
+                    )
+                    await response(scope, receive, send)
+                    return
+
+                reserved += chunk_size
+                seen += chunk_size
+                buffered.append(message)
+                if not message.get("more_body", False):
+                    break
+
+            if declared is not None and seen != declared:
                 response = JSONResponse(
-                    status_code=413,
-                    content={
-                        "error": "payload_too_large",
-                        "detail": f"body exceeds {self.max_bytes // 1024 // 1024} MB",
-                        "limit_bytes": self.max_bytes,
-                        "got_bytes": seen,
-                    },
+                    status_code=400,
+                    content={"error": "invalid_content_length"},
                 )
                 await response(scope, receive, send)
                 return
-            if not message.get("more_body", False):
-                break
 
-        if declared is not None and seen != declared:
-            response = JSONResponse(
-                status_code=400,
-                content={"error": "invalid_content_length"},
-            )
-            await response(scope, receive, send)
-            return
+            index = 0
 
-        index = 0
+            async def replay_receive():
+                nonlocal index
+                if index < len(buffered):
+                    message = buffered[index]
+                    index += 1
+                    return message
+                return {"type": "http.request", "body": b"", "more_body": False}
 
-        async def replay_receive():
-            nonlocal index
-            if index < len(buffered):
-                message = buffered[index]
-                index += 1
-                return message
-            return {"type": "http.request", "body": b"", "more_body": False}
-
-        await self.app(scope, replay_receive, send)
+            await self.app(scope, replay_receive, send)
+        finally:
+            await self._release_body_bytes(reserved)
 
 
 # ─────────────────────────────────────────────────────────────────
