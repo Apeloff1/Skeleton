@@ -8,6 +8,7 @@ interchange between cortices. Specialist heads, corpus callosum, MoE
 experts, sleep consolidation and REINFORCE are how neo acquires the
 MODELS themselves and builds a system that surpasses them.
 """
+import copy
 import json
 import math
 
@@ -124,32 +125,55 @@ def _tract_error(message: str, **context):
     raise CortexError(message, context=context or None)
 
 
+def _json_atom_size(value) -> int:
+    try:
+        # ensure_ascii=True is the default, so character count is the encoded
+        # byte count and includes quotes plus all JSON escaping overhead.
+        return len(json.dumps(value, allow_nan=False, separators=(",", ":")))
+    except (TypeError, ValueError, OverflowError):
+        _tract_error("tract payload is not finite JSON data")
+
+
 def _validate_json_tree(value) -> None:
-    budget = [_TRACT_MAX_NODES]
+    nodes_left = [_TRACT_MAX_NODES]
+    bytes_left = [_TRACT_MAX_BYTES]
+
+    def consume_bytes(amount: int) -> None:
+        bytes_left[0] -= int(amount)
+        if bytes_left[0] < 0:
+            _tract_error("tract payload byte limit exceeded", max_bytes=_TRACT_MAX_BYTES)
 
     def walk(node, depth: int) -> None:
         if depth > _TRACT_MAX_DEPTH:
             _tract_error("tract payload nesting limit exceeded", max_depth=_TRACT_MAX_DEPTH)
-        budget[0] -= 1
-        if budget[0] < 0:
+        nodes_left[0] -= 1
+        if nodes_left[0] < 0:
             _tract_error("tract payload node limit exceeded", max_nodes=_TRACT_MAX_NODES)
+
         if node is None or isinstance(node, (bool, int)):
+            consume_bytes(_json_atom_size(node))
             return
         if isinstance(node, float):
             if not math.isfinite(node):
                 _tract_error("tract payload contains non-finite number")
+            consume_bytes(_json_atom_size(node))
             return
         if isinstance(node, str):
             if len(node) > _TRACT_MAX_ATOM_TEXT:
                 _tract_error("tract payload string is too large", max_chars=_TRACT_MAX_ATOM_TEXT)
+            consume_bytes(_json_atom_size(node))
             return
         if isinstance(node, dict):
+            # Braces, commas, and key/value colons are charged before children.
+            consume_bytes(2 + max(0, len(node) - 1) + len(node))
             for key, child in node.items():
                 if not isinstance(key, str) or len(key) > 256:
                     _tract_error("tract payload contains invalid key")
+                consume_bytes(_json_atom_size(key))
                 walk(child, depth + 1)
             return
         if isinstance(node, (list, tuple)):
+            consume_bytes(2 + max(0, len(node) - 1))
             for child in node:
                 walk(child, depth + 1)
             return
@@ -162,7 +186,10 @@ def _validate_tract_payload(payload) -> None:
     if not isinstance(payload, dict):
         _tract_error("tract payload must be an object")
 
-    slot = str(payload.get("slot") or "").lower()
+    raw_slot = payload.get("slot")
+    if not isinstance(raw_slot, str):
+        _tract_error("tract payload has invalid slot")
+    slot = raw_slot.lower()
     if slot not in _ALLOWED_TRACT_SLOTS:
         _tract_error("tract payload has unknown slot", slot=slot, known=sorted(_ALLOWED_TRACT_SLOTS))
 
@@ -171,7 +198,7 @@ def _validate_tract_payload(payload) -> None:
         if value is not None and (not isinstance(value, str) or len(value) > 128):
             _tract_error("tract payload has invalid metadata", field=field)
 
-    exemplars = payload.get("exemplars") or []
+    exemplars = payload.get("exemplars", [])
     if not isinstance(exemplars, (list, tuple)):
         _tract_error("tract exemplars must be a list")
     if len(exemplars) > _TRACT_MAX_EXEMPLARS:
@@ -185,7 +212,7 @@ def _validate_tract_payload(payload) -> None:
     ):
         _tract_error("tract size does not match exemplars")
 
-    capabilities = payload.get("capabilities") or []
+    capabilities = payload.get("capabilities", [])
     if not isinstance(capabilities, (list, tuple)) or len(capabilities) > _TRACT_MAX_CAPABILITIES:
         _tract_error("tract capability limit exceeded", max_capabilities=_TRACT_MAX_CAPABILITIES)
     if any(not isinstance(cap, str) or len(cap) > 128 for cap in capabilities):
@@ -194,27 +221,43 @@ def _validate_tract_payload(payload) -> None:
     for exemplar in exemplars:
         if not isinstance(exemplar, dict):
             _tract_error("tract exemplar must be an object")
-        ex_slot = str(exemplar.get("slot") or "neo").lower()
+        raw_ex_slot = exemplar.get("slot", "neo")
+        if not isinstance(raw_ex_slot, str):
+            _tract_error("tract exemplar has invalid slot")
+        ex_slot = raw_ex_slot.lower()
         if ex_slot not in _ALLOWED_TRACT_SLOTS:
             _tract_error("tract exemplar has unknown slot", slot=ex_slot)
-        text = exemplar.get("text") or ""
+        text = exemplar.get("text", "")
         if not isinstance(text, str) or len(text) > _TRACT_MAX_TEXT:
             _tract_error("tract exemplar text limit exceeded", max_chars=_TRACT_MAX_TEXT)
+
+        sequences = {}
         for field, maximum in (("tags", _TRACT_MAX_TAGS), ("tokens", _TRACT_MAX_TOKENS), ("numbers", _TRACT_MAX_NUMBERS)):
-            seq = exemplar.get(field) or []
+            seq = exemplar.get(field, [])
             if not isinstance(seq, (list, tuple)) or len(seq) > maximum:
                 _tract_error("tract exemplar sequence limit exceeded", field=field, maximum=maximum)
-        if any(not isinstance(tag, str) or len(tag) > 128 for tag in (exemplar.get("tags") or [])):
+            sequences[field] = seq
+        if any(not isinstance(tag, str) or len(tag) > 128 for tag in sequences["tags"]):
             _tract_error("tract exemplar contains invalid tag")
-        if any(not isinstance(tok, str) or len(tok) > 128 for tok in (exemplar.get("tokens") or [])):
+        if any(not isinstance(tok, str) or len(tok) > 128 for tok in sequences["tokens"]):
             _tract_error("tract exemplar contains invalid token")
-        for number in exemplar.get("numbers") or []:
-            if not isinstance(number, (int, float)) or isinstance(number, bool) or not math.isfinite(float(number)):
+        for number in sequences["numbers"]:
+            if not isinstance(number, (int, float)) or isinstance(number, bool):
                 _tract_error("tract exemplar contains invalid number")
+            try:
+                finite = math.isfinite(float(number))
+            except (OverflowError, ValueError):
+                finite = False
+            if not finite:
+                _tract_error("tract exemplar contains invalid number")
+
         confidence = exemplar.get("confidence", 0.0)
         if not isinstance(confidence, (int, float)) or isinstance(confidence, bool):
             _tract_error("tract exemplar confidence is invalid")
-        confidence = float(confidence)
+        try:
+            confidence = float(confidence)
+        except (OverflowError, ValueError):
+            _tract_error("tract exemplar confidence is invalid")
         if not math.isfinite(confidence) or not 0.0 <= confidence <= 1.0:
             _tract_error("tract exemplar confidence is out of range")
         seen = exemplar.get("seen", 1)
@@ -230,13 +273,47 @@ def _validate_tract_payload(payload) -> None:
         if state is not None and not isinstance(state, dict):
             _tract_error("tract model state must be an object", field=field)
 
+    # Count the serialized representation incrementally instead of first
+    # allocating an attacker-sized duplicate with json.dumps(payload).
     _validate_json_tree(payload)
+
+
+def _preflight_tract_restore(self, payload):
+    """Exercise every input-controlled restore path without mutating live state."""
     try:
-        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
-    except (TypeError, ValueError, OverflowError):
-        _tract_error("tract payload is not finite JSON data")
-    if len(encoded) > _TRACT_MAX_BYTES:
-        _tract_error("tract payload byte limit exceeded", max_bytes=_TRACT_MAX_BYTES)
+        tract = Tract.from_dict(payload)
+    except Exception:
+        _tract_error("tract exemplars are invalid")
+
+    weights = payload.get("weights")
+    if weights:
+        try:
+            port = self.slots.get(tract.slot)
+            w = getattr(port, "weights", None)
+            if tract.slot == "pfc":
+                from skeleton.cortex.lm import LanguageModelBackend
+                ngram = {k: v for k, v in weights.items() if k not in {"neural", "transformer"}}
+                LanguageModelBackend.from_snapshot(ngram, slot=tract.slot)
+            elif w is not None:
+                shadow_weights = copy.deepcopy(w)
+                shadow_weights.restore(weights)
+        except Exception:
+            _tract_error("tract model state is invalid", field="weights")
+
+    expert = payload.get("expert")
+    if expert and tract.slot in self.moe.experts:
+        try:
+            from skeleton.cortex.moe import Expert
+            Expert.from_snapshot(expert)
+        except Exception:
+            _tract_error("tract model state is invalid", field="expert")
+
+    callosum = payload.get("callosum")
+    if callosum:
+        try:
+            CorpusCallosum.from_snapshot(callosum)
+        except Exception:
+            _tract_error("tract model state is invalid", field="callosum")
 
 
 _cortex_import_tract = JeevesCortex.import_tract
@@ -244,6 +321,7 @@ _cortex_import_tract = JeevesCortex.import_tract
 
 def _validated_import_tract(self, payload):
     _validate_tract_payload(payload)
+    _preflight_tract_restore(self, payload)
     return _cortex_import_tract(self, payload)
 
 
