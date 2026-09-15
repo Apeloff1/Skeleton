@@ -16,7 +16,8 @@ python -m compileall -q backend
 printf '\n== Provider runtime and orchestration contracts ==\n'
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   tests/test_model_runtime.py \
-  tests/test_orchestration.py
+  tests/test_orchestration.py \
+  tests/test_orchestration_error_redaction.py
 
 printf '\n== Backend process safety ==\n'
 python backend/scripts/check_process_safety.py
@@ -33,7 +34,7 @@ python backend/scripts/check_sast_security.py
 printf '\n== JavaScript child_process alias safety ==\n'
 python backend/scripts/check_js_process_alias_safety.py
 
-printf '\n== GitHub Actions workflow security ==\n'
+printf '\n== GitHub Actions workflow security gate ==\n'
 python backend/scripts/check_workflow_security.py
 
 printf '\n== Repository secret hygiene ==\n'
