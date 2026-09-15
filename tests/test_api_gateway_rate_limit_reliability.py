@@ -1,6 +1,8 @@
 """Reliability regressions for API-gateway rate-limit state."""
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 from skeleton.api.gateway import APIGateway, GatewayRequest
 
 
@@ -58,3 +60,19 @@ def test_bucket_sweep_is_throttled_between_windows(monkeypatch) -> None:
 
     assert gateway._last_bucket_sweep == first_sweep
     assert set(gateway._buckets) == {"a:/limited", "b:/limited"}
+
+
+def test_rate_limit_budget_is_exact_under_concurrent_callers(monkeypatch) -> None:
+    monkeypatch.setattr("skeleton.api.gateway.time.monotonic", lambda: 400.0)
+
+    gateway = APIGateway()
+    gateway.route("/limited", lambda payload: payload, rate_limit_per_s=8)
+    request = GatewayRequest("/limited", actor="shared-actor", payload={"value": 1})
+
+    with ThreadPoolExecutor(max_workers=32) as pool:
+        statuses = list(pool.map(lambda _: gateway.handle(request).status, range(32)))
+
+    assert statuses.count(200) == 8
+    assert statuses.count(429) == 24
+    assert len(gateway._buckets["shared-actor:/limited"]) == 8
+    assert gateway.card()["routes"]["/limited"]["calls"] == 8
