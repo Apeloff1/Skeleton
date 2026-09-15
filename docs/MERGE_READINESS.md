@@ -34,6 +34,24 @@ protected `main` branch should require the canonical CI/security checks exposed
 by workflows under `.github/workflows/`, including the repository's core
 CI/quality jobs and dedicated security/policy jobs that apply to the change.
 
+The repository-level deterministic merge gate is implemented by
+`.github/workflows/merge-readiness.yml`. Its final job name is **Merge Readiness**
+and it fails unless all of these constituent gates succeed for the same head:
+
+- **Quarantine Policy** — validates the machine-readable flaky-test registry;
+- **Unit** — compiles the canonical package and runs `tests/run_unit.py`;
+- **Integration Smoke** — installs the backend runtime and imports the live app
+  against the workflow MongoDB service;
+- **Lint Type Security** — runs backend Ruff, the canonical frontend lint/type
+  and high-confidence security gates, plus the pinned full-history Gitleaks scan.
+
+`main` branch protection should require the stable **Merge Readiness** job. The
+existing dedicated workflows remain valuable defense in depth and may also be
+required, but the aggregate job is the one deterministic repository summary for
+merge authorization. Superseded pull-request runs are cancelled by workflow
+concurrency so a stale head cannot consume capacity or be mistaken for current
+evidence.
+
 Workflow/job names should remain stable once configured as required. Renaming a
 required job is a policy change: update branch/ruleset configuration in the
 same maintenance window and verify a fresh pull request is blocked while the
@@ -67,6 +85,14 @@ unrelated work and the quarantine is explicit. A quarantine change must:
 - preserve a non-blocking execution path so failures stay visible; and
 - avoid reducing coverage of security-critical behavior without an equivalent
   deterministic gate.
+
+The canonical registry is `.github/ci/flaky-quarantine.json`. Every entry is
+validated by `scripts/check_flaky_quarantine.py` on every Merge Readiness run.
+Entries must include an exact test/check identifier, linked issue, explicit
+`@owner`, explanation, and ISO expiry date. Expired entries fail the gate and a
+new quarantine cannot be created more than 30 days ahead, preventing silent or
+indefinite exclusions. `non_blocking_check` may name the check that continues to
+execute the quarantined test visibly.
 
 Repeatedly pressing **Re-run jobs** until a failure disappears is never a valid
 quarantine mechanism.
