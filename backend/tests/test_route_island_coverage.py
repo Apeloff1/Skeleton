@@ -8,13 +8,18 @@ from core.routes_registry import KNOWN_ROUTES, KNOWN_ROUTES_WITH_PREFIX
 
 ROUTES_DIR = Path(__file__).resolve().parents[1] / "routes"
 SPECIAL_MOUNTS = {"routes.registry_health"}
+# ``academy.py`` is the retired in-memory v2 surface. ``academy_v3.py`` owns
+# the same /api/academy prefix and is the registered MongoDB-backed successor;
+# mounting both would create ambiguous duplicate routes rather than reconnect
+# useful functionality.
+INTENTIONAL_UNMOUNTED = {"routes.academy"}
 
 
 def _declared_modules() -> set[str]:
     return {
         entry[0]
         for entry in (*KNOWN_ROUTES, *KNOWN_ROUTES_WITH_PREFIX)
-    } | SPECIAL_MOUNTS
+    } | SPECIAL_MOUNTS | INTENTIONAL_UNMOUNTED
 
 
 def _defines_api_router(path: Path) -> bool:
@@ -35,7 +40,10 @@ def _defines_api_router(path: Path) -> bool:
             targets = [node.target]
         if value is None or not isinstance(value, ast.Call):
             continue
-        if not any(isinstance(target, ast.Name) and target.id == "router" for target in targets):
+        if not any(
+            isinstance(target, ast.Name) and target.id == "router"
+            for target in targets
+        ):
             continue
         func = value.func
         if isinstance(func, ast.Name) and func.id == "APIRouter":
