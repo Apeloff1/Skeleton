@@ -72,6 +72,9 @@ python scripts/check_repository_process_safety.py
 printf '\n== Backend unsafe deserialization safety ==\n'
 python backend/scripts/check_deserialization_safety.py
 
+printf '\n== Backend tar archive extraction safety ==\n'
+python backend/scripts/check_archive_extraction_safety.py
+
 printf '\n== Backend/frontend high-confidence SAST ==\n'
 python backend/scripts/check_sast_security.py
 
@@ -101,6 +104,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_process_safety_helper_aliases.py \
   backend/tests/test_repository_process_safety.py \
   backend/tests/test_deserialization_safety_gate.py \
+  backend/tests/test_archive_extraction_safety.py \
   backend/tests/test_sast_security_gate.py \
   backend/tests/test_repository_python_sast_scope.py \
   backend/tests/test_js_process_alias_safety.py \
