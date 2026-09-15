@@ -35,6 +35,22 @@ def test_rejects_bracket_notation_input_interpolation(tmp_path: Path) -> None:
     assert any("direct workflow input interpolation" in finding for finding in findings)
 
 
+def test_rejects_whole_inputs_object_transform(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: workflow_dispatch\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo '${{ toJSON(inputs) }}'\n",
+    )
+    assert any("direct workflow input interpolation" in finding for finding in findings)
+
+
+def test_rejects_whole_event_inputs_object_transform(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: workflow_dispatch\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo '${{ toJSON(github.event.inputs) }}'\n",
+    )
+    assert any("direct workflow input interpolation" in finding for finding in findings)
+
+
 def test_rejects_single_quoted_run_key_bypass(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
@@ -73,6 +89,22 @@ def test_rejects_commented_block_scalar_header_bypass(tmp_path: Path) -> None:
         "name: test\non: workflow_dispatch\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |2- # explicit indentation and chomp\n          printf '%s\\n' '${{ inputs.payload }}'\n",
     )
     assert any("direct workflow input interpolation" in finding for finding in findings)
+
+
+def test_ignores_input_words_inside_expression_string_literals(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo \"${{ contains('inputs.payload', 'payload') }}\"\n",
+    )
+    assert findings == []
+
+
+def test_ignores_escaped_quotes_inside_expression_string_literals(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo \"${{ contains('it''s inputs.payload', 'payload') }}\"\n",
+    )
+    assert findings == []
 
 
 def test_allows_input_through_environment_boundary(tmp_path: Path) -> None:
