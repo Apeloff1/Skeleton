@@ -21,8 +21,8 @@ def test_cns_runtime_manifest_expands_dynamic_child_routers_without_boot(tmp_pat
         routes / "gameforge_cns.py",
         "from fastapi import APIRouter\n"
         "router = APIRouter(prefix='/api/gameforge')\n"
-        "for child in []:\n"
-        "    router.include_router(child)\n",
+        "for module in []:\n"
+        "    router.include_router(module.router)\n",
     )
 
     # Materialize the fixed in-repo CNS modules expected by the inventory
