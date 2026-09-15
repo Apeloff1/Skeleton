@@ -61,10 +61,10 @@ services:
     environment:
       - MONGO_URL=mongodb://mongo:27017/tutolage
       - ENVIRONMENT=${ENVIRONMENT:-development}
-      - DEBUG=${DEBUG:-true}
+      - DEBUG=${DEBUG:-false}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - EMERGENT_LLM_KEY=${EMERGENT_LLM_KEY:-}
-      - JWT_SECRET=${JWT_SECRET:-change-me}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set to a high-entropy value}
       - STRIPE_API_KEY=${STRIPE_API_KEY:-}
       - CHROMA_PERSIST_DIR=/app/data/chroma
     volumes:
@@ -119,11 +119,13 @@ services:
     image: mongo:7.0
     container_name: tutolage-mongo
     restart: unless-stopped
+    # Database access is intentionally host-local. Application containers use
+    # the internal tutolage network and do not need a publicly bound DB port.
     ports:
-      - "27017:27017"
+      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME:-admin}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:-changeme}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:?MONGO_INITDB_ROOT_PASSWORD must be set}
       - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-tutolage}
     volumes:
       - mongo_data:/data/db
@@ -144,8 +146,9 @@ services:
     image: chromadb/chroma:latest
     container_name: tutolage-chroma
     restart: unless-stopped
+    # Chroma runs without an auth boundary here; keep host access loopback-only.
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${CHROMA_PORT:-8000}:8000"
     volumes:
       - chroma_data:/chroma/chroma
     environment:
