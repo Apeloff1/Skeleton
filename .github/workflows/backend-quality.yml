@@ -86,3 +86,4 @@ jobs:
           tests/test_secret_hygiene_gate.py
           tests/test_api_middleware_adversarial.py
           tests/test_api_middleware_residual_squash.py
+          tests/test_api_middleware_regression_gaps.py
