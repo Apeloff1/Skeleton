@@ -7,6 +7,7 @@ import ipaddress
 from starlette.requests import Request
 
 import api_middleware
+import middleware.security as legacy_security
 
 
 def _request(client_host: str, xff: str) -> Request:
@@ -26,38 +27,63 @@ def _request(client_host: str, xff: str) -> Request:
     )
 
 
+def _trusted_test_networks():
+    return (ipaddress.ip_network("10.0.0.0/8"),)
+
+
 def _trust_test_proxy(monkeypatch) -> None:
     monkeypatch.setattr(
         api_middleware,
         "_TRUSTED_PROXY_NETWORKS",
-        (ipaddress.ip_network("10.0.0.0/8"),),
+        _trusted_test_networks(),
     )
 
 
 def test_xff_chain_has_hard_hop_bound(monkeypatch) -> None:
     _trust_test_proxy(monkeypatch)
+    trusted = _trusted_test_networks()
     peer = "10.0.0.5"
     within_bound = ",".join(f"198.51.100.{index}" for index in range(1, 33))
     over_bound = within_bound + ",198.51.100.33"
 
-    assert api_middleware._client_ip(_request(peer, within_bound)) == "198.51.100.32"
-    assert api_middleware._client_ip(_request(peer, over_bound)) == peer
+    request = _request(peer, within_bound)
+    assert api_middleware._client_ip(request) == "198.51.100.32"
+    assert legacy_security._client_ip(request, trusted) == "198.51.100.32"
+
+    request = _request(peer, over_bound)
+    assert api_middleware._client_ip(request) == peer
+    assert legacy_security._client_ip(request, trusted) == peer
 
 
 def test_xff_value_has_hard_character_bound_before_ip_parsing(monkeypatch) -> None:
     _trust_test_proxy(monkeypatch)
+    trusted = _trusted_test_networks()
     peer = "10.0.0.5"
-    original = api_middleware._canonical_ip
+    original_primary = api_middleware._canonical_ip
+    original_legacy = legacy_security._canonical_ip
 
-    def guarded_canonical_ip(value: str):
+    def guarded_primary_canonical_ip(value: str):
         if len(value) > 1000:
-            raise AssertionError("oversized forwarded value reached the IP parser")
-        return original(value)
+            raise AssertionError("oversized forwarded value reached the primary IP parser")
+        return original_primary(value)
 
-    monkeypatch.setattr(api_middleware, "_canonical_ip", guarded_canonical_ip)
+    def guarded_legacy_canonical_ip(value: str):
+        if len(value) > 1000:
+            raise AssertionError("oversized forwarded value reached the legacy IP parser")
+        return original_legacy(value)
+
+    monkeypatch.setattr(api_middleware, "_canonical_ip", guarded_primary_canonical_ip)
+    monkeypatch.setattr(legacy_security, "_canonical_ip", guarded_legacy_canonical_ip)
     oversized = "1" * (api_middleware._MAX_XFF_CHARS + 1)
 
-    assert api_middleware._client_ip(_request(peer, oversized)) == peer
+    request = _request(peer, oversized)
+    assert api_middleware._client_ip(request) == peer
+    assert legacy_security._client_ip(request, trusted) == peer
+
+
+def test_proxy_bounds_stay_aligned_between_active_security_stacks() -> None:
+    assert legacy_security._MAX_XFF_HOPS == api_middleware._MAX_XFF_HOPS
+    assert legacy_security._MAX_XFF_CHARS == api_middleware._MAX_XFF_CHARS
 
 
 def test_telemetry_reports_proxy_count_without_disclosing_networks(monkeypatch) -> None:
