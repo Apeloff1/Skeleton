@@ -1,5 +1,5 @@
 name: One-shot merged branch cleanup
-# Sweep trigger: 2026-09-15 omnidirectional cleanup
+# Sweep trigger: 2026-09-15 consolidated-main cleanup
 
 on:
   workflow_dispatch:
