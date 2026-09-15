@@ -1,0 +1,137 @@
+name: Repository Attention Sweep
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 5 * * *'
+
+concurrency:
+  group: repository-attention-sweep
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  sweep:
+    name: Flag quiet work without auto-closing it
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR_QUIET_DAYS: '14'
+      DRAFT_QUIET_DAYS: '21'
+      ISSUE_QUIET_DAYS: '30'
+    steps:
+      - name: Ensure managed labels exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh label create 'needs-attention' --repo "$REPO" --color 'fbca04' --description 'Quiet item that may need a human decision' --force >/dev/null
+          gh label create 'stale-draft' --repo "$REPO" --color 'd4c5f9' --description 'Draft pull request quiet for an extended period' --force >/dev/null
+
+      - name: Sweep pull requests
+        shell: bash
+        run: |
+          set -euo pipefail
+          now=$(date -u +%s)
+          attention_cutoff=$((now - PR_QUIET_DAYS * 86400))
+          draft_cutoff=$((now - DRAFT_QUIET_DAYS * 86400))
+          added_attention=0
+          removed_attention=0
+          added_draft=0
+          removed_draft=0
+
+          gh api --paginate "/repos/${REPO}/pulls?state=open&per_page=100" \
+            --jq '.[] | [.number, .updated_at, .draft] | @tsv' |
+          while IFS=$'\t' read -r number updated draft; do
+            [[ -n "${number:-}" ]] || continue
+            updated_epoch=$(date -u -d "$updated" +%s)
+            labels=$(gh api "/repos/${REPO}/issues/${number}/labels" --jq '.[].name')
+
+            has_attention=false
+            has_draft=false
+            grep -Fxq 'needs-attention' <<<"$labels" && has_attention=true || true
+            grep -Fxq 'stale-draft' <<<"$labels" && has_draft=true || true
+
+            if [[ "$draft" == 'true' ]]; then
+              if (( updated_epoch < draft_cutoff )); then
+                if [[ "$has_draft" == 'false' ]]; then
+                  gh api --method POST "/repos/${REPO}/issues/${number}/labels" -f 'labels[]=stale-draft' >/dev/null
+                  added_draft=$((added_draft + 1))
+                fi
+              elif [[ "$has_draft" == 'true' ]]; then
+                gh api --method DELETE "/repos/${REPO}/issues/${number}/labels/stale-draft" >/dev/null || true
+                removed_draft=$((removed_draft + 1))
+              fi
+
+              if [[ "$has_attention" == 'true' ]]; then
+                gh api --method DELETE "/repos/${REPO}/issues/${number}/labels/needs-attention" >/dev/null || true
+                removed_attention=$((removed_attention + 1))
+              fi
+            else
+              if (( updated_epoch < attention_cutoff )); then
+                if [[ "$has_attention" == 'false' ]]; then
+                  gh api --method POST "/repos/${REPO}/issues/${number}/labels" -f 'labels[]=needs-attention' >/dev/null
+                  added_attention=$((added_attention + 1))
+                fi
+              elif [[ "$has_attention" == 'true' ]]; then
+                gh api --method DELETE "/repos/${REPO}/issues/${number}/labels/needs-attention" >/dev/null || true
+                removed_attention=$((removed_attention + 1))
+              fi
+
+              if [[ "$has_draft" == 'true' ]]; then
+                gh api --method DELETE "/repos/${REPO}/issues/${number}/labels/stale-draft" >/dev/null || true
+                removed_draft=$((removed_draft + 1))
+              fi
+            fi
+          done
+
+          {
+            echo '## Pull request attention sweep'
+            echo "- Added needs-attention: $added_attention"
+            echo "- Removed needs-attention: $removed_attention"
+            echo "- Added stale-draft: $added_draft"
+            echo "- Removed stale-draft: $removed_draft"
+            echo "- Regular PR quiet threshold: ${PR_QUIET_DAYS} days"
+            echo "- Draft PR quiet threshold: ${DRAFT_QUIET_DAYS} days"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Sweep issues
+        shell: bash
+        run: |
+          set -euo pipefail
+          now=$(date -u +%s)
+          cutoff=$((now - ISSUE_QUIET_DAYS * 86400))
+          added=0
+          removed=0
+
+          gh api --paginate "/repos/${REPO}/issues?state=open&per_page=100" \
+            --jq '.[] | select(.pull_request | not) | [.number, .updated_at, ([.labels[].name] | join(","))] | @tsv' |
+          while IFS=$'\t' read -r number updated labels_csv; do
+            [[ -n "${number:-}" ]] || continue
+            updated_epoch=$(date -u -d "$updated" +%s)
+            has_attention=false
+            tr ',' '\n' <<<"$labels_csv" | grep -Fxq 'needs-attention' && has_attention=true || true
+
+            if (( updated_epoch < cutoff )); then
+              if [[ "$has_attention" == 'false' ]]; then
+                gh api --method POST "/repos/${REPO}/issues/${number}/labels" -f 'labels[]=needs-attention' >/dev/null
+                added=$((added + 1))
+              fi
+            elif [[ "$has_attention" == 'true' ]]; then
+              gh api --method DELETE "/repos/${REPO}/issues/${number}/labels/needs-attention" >/dev/null || true
+              removed=$((removed + 1))
+            fi
+          done
+
+          {
+            echo '## Issue attention sweep'
+            echo "- Added needs-attention: $added"
+            echo "- Removed needs-attention: $removed"
+            echo "- Issue quiet threshold: ${ISSUE_QUIET_DAYS} days"
+            echo '- This workflow never closes issues or pull requests.'
+          } >> "$GITHUB_STEP_SUMMARY"
