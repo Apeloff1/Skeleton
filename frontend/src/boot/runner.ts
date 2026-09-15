@@ -210,8 +210,6 @@ export class BootRunner {
     const state = this.states[def.id];
     const signal = this.aborter?.signal;
 
-    // The phase gate is separate from explicit dependency semantics: every
-    // phase-1 task waits for all phase-0 work, and phase 2 waits for phases 0+1.
     await this.waitForEarlierPhases(def);
 
     for (const depId of def.deps) {
@@ -238,7 +236,8 @@ export class BootRunner {
 
     const maxAttempts = 1 + Math.max(0, def.retries ?? 0);
     const backoffBase = def.backoffMs ?? 250;
-    state.startedAt = Date.now();
+    const startedAt = Date.now();
+    state.startedAt = startedAt;
     let lastResult: TimeoutResult<StageRun> = { ok: false, reason: 'init' };
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -247,7 +246,7 @@ export class BootRunner {
         state.error = 'cancelled';
         state.attempts = attempt - 1;
         state.endedAt = Date.now();
-        state.durationMs = state.endedAt - state.startedAt;
+        state.durationMs = state.endedAt - startedAt;
         this.emit();
         return;
       }
@@ -261,7 +260,7 @@ export class BootRunner {
 
       if (lastResult.ok && lastResult.v?.ok) {
         state.endedAt = Date.now();
-        state.durationMs = state.endedAt - state.startedAt;
+        state.durationMs = state.endedAt - startedAt;
         state.status = 'ok';
         trail.add('boot', `stage_ok ${def.id}`, { ms: state.durationMs, attempts: attempt }, 'info');
         this.emit();
@@ -270,7 +269,7 @@ export class BootRunner {
 
       if (lastResult.reason === 'aborted' || signal?.aborted) {
         state.endedAt = Date.now();
-        state.durationMs = state.endedAt - state.startedAt;
+        state.durationMs = state.endedAt - startedAt;
         state.status = 'skipped';
         state.error = 'cancelled';
         this.emit();
@@ -290,7 +289,7 @@ export class BootRunner {
           await sleep(wait, signal);
         } catch {
           state.endedAt = Date.now();
-          state.durationMs = state.endedAt - state.startedAt;
+          state.durationMs = state.endedAt - startedAt;
           state.status = 'skipped';
           state.error = 'cancelled';
           this.emit();
@@ -300,7 +299,7 @@ export class BootRunner {
     }
 
     state.endedAt = Date.now();
-    state.durationMs = state.endedAt - state.startedAt;
+    state.durationMs = state.endedAt - startedAt;
     if (lastResult.reason === 'timeout') {
       state.status = 'timed_out';
       state.error = 'timeout';
@@ -324,8 +323,6 @@ export class BootRunner {
     if (this.runPromise) return this.runPromise;
     this.started = true;
 
-    // Populate every task synchronously so waitForPhase() can always see the
-    // complete task map. Execution itself is gated by waitForEarlierPhases().
     const ordered = [...this.stages].sort((a, b) => a.phase - b.phase);
     for (const def of ordered) {
       this.resolvedTasks[def.id] = this.runOne(def);
