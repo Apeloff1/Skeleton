@@ -33,6 +33,7 @@ python -m compileall -q backend
 printf '\n== Runtime, cache, deployment, API, and observability contracts ==\n'
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   tests/test_model_runtime.py \
+  skeleton/testing/test_provider_stream_reliability_profiles.py \
   tests/test_provider_runtime_boundary.py \
   tests/test_orchestration.py \
   tests/test_orchestration_error_redaction.py \
