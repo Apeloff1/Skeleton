@@ -22,12 +22,15 @@ def _request(
     path: str = "/api/test",
     xff: str | None = None,
     request_id: str | None = None,
+    extra_headers: list[tuple[bytes, bytes]] | None = None,
 ) -> Request:
     headers: list[tuple[bytes, bytes]] = []
     if xff is not None:
         headers.append((b"x-forwarded-for", xff.encode("latin-1")))
     if request_id is not None:
         headers.append((b"x-request-id", request_id.encode("latin-1")))
+    if extra_headers:
+        headers.extend(extra_headers)
 
     scope = {
         "type": "http",
@@ -73,10 +76,34 @@ def test_malformed_forwarded_chain_falls_back_to_peer(monkeypatch) -> None:
     assert api_middleware._client_ip(request) == "10.0.0.5"
 
 
+def test_empty_forwarded_hop_falls_back_to_peer(monkeypatch) -> None:
+    _trust(monkeypatch, "10.0.0.0/8")
+    request = _request("10.0.0.5", xff="198.51.100.24,,10.0.0.7")
+    assert api_middleware._client_ip(request) == "10.0.0.5"
+
+
+def test_duplicate_xff_field_lines_fail_closed_to_peer(monkeypatch) -> None:
+    _trust(monkeypatch, "10.0.0.0/8")
+    request = _request(
+        "10.0.0.5",
+        extra_headers=[
+            (b"x-forwarded-for", b"198.51.100.24"),
+            (b"x-forwarded-for", b"203.0.113.7"),
+        ],
+    )
+    assert api_middleware._client_ip(request) == "10.0.0.5"
+
+
 def test_all_trusted_forwarded_hops_fail_closed_to_peer(monkeypatch) -> None:
     _trust(monkeypatch, "10.0.0.0/8", "203.0.113.0/24")
     request = _request("10.0.0.5", xff="203.0.113.7")
     assert api_middleware._client_ip(request) == "10.0.0.5"
+
+
+def test_malformed_proxy_allowlist_disables_forwarded_trust_entirely() -> None:
+    assert api_middleware._parse_trusted_proxy_networks(
+        "10.0.0.0/8, definitely-not-a-cidr"
+    ) == ()
 
 
 def test_request_id_accepts_only_bounded_header_safe_values() -> None:
@@ -118,6 +145,30 @@ async def test_rate_limiter_prunes_expired_state_and_stays_bounded() -> None:
     assert len(limiter._buckets) == 3
     assert "10.0.0.1" not in limiter._buckets
     assert "10.0.0.4" in limiter._buckets
+    assert limiter._expired_pruned == 1
+
+
+@pytest.mark.asyncio
+async def test_recent_access_reorders_bucket_for_constant_time_expiry_pruning() -> None:
+    limiter = RateLimiterMiddleware(
+        _App(), per_minute=60, burst=2, max_buckets=2, bucket_ttl=30
+    )
+
+    async with limiter._get_state_lock():
+        first, _ = limiter._bucket_for("198.51.100.1")
+        second, _ = limiter._bucket_for("198.51.100.2")
+        assert first is not None and second is not None
+
+        first_again, _ = limiter._bucket_for("198.51.100.1")
+        assert first_again is first
+        assert list(limiter._buckets) == ["198.51.100.2", "198.51.100.1"]
+
+        second.last -= 31
+        admitted, retry = limiter._bucket_for("198.51.100.3")
+
+    assert admitted is not None
+    assert retry == 0.0
+    assert list(limiter._buckets) == ["198.51.100.1", "198.51.100.3"]
     assert limiter._expired_pruned == 1
 
 
@@ -179,8 +230,38 @@ async def test_saturation_does_not_evict_active_exhausted_bucket() -> None:
     assert len(limiter._buckets) == 2
 
 
-def test_rate_limiter_rejects_non_positive_configuration() -> None:
-    with pytest.raises(ValueError):
-        RateLimiterMiddleware(_App(), per_minute=0)
-    with pytest.raises(ValueError):
-        RateLimiterMiddleware(_App(), burst=0)
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"per_minute": 0}, "per_minute must be finite and positive"),
+        ({"per_minute": float("nan")}, "per_minute must be finite and positive"),
+        ({"per_minute": float("inf")}, "per_minute must be finite and positive"),
+        ({"burst": 0}, "burst must be finite and positive"),
+        ({"burst": float("nan")}, "burst must be finite and positive"),
+        ({"max_buckets": 0}, "max_buckets must be finite and positive"),
+        ({"max_buckets": float("inf")}, "max_buckets must be finite and positive"),
+        ({"max_buckets": 1.5}, "max_buckets must be an integer"),
+        ({"bucket_ttl": 0}, "bucket_ttl must be finite and positive"),
+        ({"bucket_ttl": float("nan")}, "bucket_ttl must be finite and positive"),
+        ({"bucket_ttl": float("inf")}, "bucket_ttl must be finite and positive"),
+    ],
+)
+def test_rate_limiter_rejects_hostile_configuration(kwargs, message) -> None:
+    with pytest.raises(ValueError, match=message):
+        RateLimiterMiddleware(_App(), **kwargs)
+
+
+@pytest.mark.parametrize(
+    ("retry", "expected"),
+    [
+        (0.0, 1),
+        (0.1, 1),
+        (1.2, 2),
+        (86_399.1, 86_400),
+        (90_000.0, 86_400),
+        (float("inf"), 86_400),
+        (float("nan"), 86_400),
+    ],
+)
+def test_retry_after_is_finite_and_bounded(retry, expected) -> None:
+    assert api_middleware._bounded_retry_after(retry) == expected
