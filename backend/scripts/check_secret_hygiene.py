@@ -1,9 +1,9 @@
-"""Fail CI when tracked text files contain high-confidence secret material.
+"""Fail CI when tracked-style text files contain high-confidence secret material.
 
 This repository-native gate intentionally focuses on patterns with low false
 positive rates so it can run on every pull request without external services.
-It complements platform secret scanning; it does not replace history scanning
-or credential rotation after a confirmed exposure.
+It complements Gitleaks history scanning; it does not replace credential
+rotation after a confirmed exposure.
 """
 from __future__ import annotations
 
@@ -44,6 +44,18 @@ PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "GitHub fine-grained token",
         re.compile(r"\bgithub_pat_[A-Za-z0-9_]{40,255}\b"),
+    ),
+    (
+        "GitLab personal access token",
+        re.compile(r"\bglpat-[A-Za-z0-9_-]{20,255}\b"),
+    ),
+    (
+        "npm access token",
+        re.compile(r"\bnpm_[A-Za-z0-9]{36}\b"),
+    ),
+    (
+        "PyPI API token",
+        re.compile(r"\bpypi-AgEIcHlwaS5vcmc[A-Za-z0-9_-]{40,255}\b"),
     ),
     (
         "AWS access key",
@@ -150,7 +162,10 @@ def main() -> int:
         print("Potential committed secrets detected:", file=sys.stderr)
         for finding in sorted(findings):
             print(f"  - {finding}", file=sys.stderr)
-        print("Do not paste secret values into CI logs. Rotate confirmed credentials.", file=sys.stderr)
+        print(
+            "Do not paste secret values into CI logs. Revoke and rotate confirmed credentials.",
+            file=sys.stderr,
+        )
         return 1
     print(f"Secret hygiene gate passed across {scanned} tracked-style text files.")
     return 0
