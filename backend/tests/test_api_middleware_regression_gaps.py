@@ -335,10 +335,10 @@ def test_timeout_overrides_require_route_boundary(path: str, expected: float) ->
 
 
 def test_detailed_health_redacts_dependency_error_details(monkeypatch) -> None:
-    secret = "postgresql://admin:super-secret@internal-db.example/private"
+    sensitive_detail = "SENSITIVE_RUNTIME_DETAIL:/srv/internal/private-metrics-source"
 
     def fail_process(_pid: int):
-        raise RuntimeError(secret)
+        raise RuntimeError(sensitive_detail)
 
     monkeypatch.setitem(sys.modules, "psutil", SimpleNamespace(Process=fail_process))
 
@@ -346,4 +346,4 @@ def test_detailed_health_redacts_dependency_error_details(monkeypatch) -> None:
 
     assert payload["psutil_error"] == "health metrics unavailable"
     assert payload["degraded"] is False
-    assert secret not in repr(payload)
+    assert sensitive_detail not in repr(payload)
