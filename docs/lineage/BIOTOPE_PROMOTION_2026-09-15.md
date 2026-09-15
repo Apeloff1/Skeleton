@@ -15,7 +15,7 @@ The two repositories therefore provide one lineage source, not two independent f
 
 - `skeleton/frontier/biotope.py` — canonical dependency-free progression policy
 - `skeleton/frontier/biotope_adapters.py` — event/memory integrity boundary
-- `skeleton/testing/test_frontier_biotope_policy.py` — progression and topology correctness
+- `skeleton/testing/test_frontier_biotope_policy.py` — progression, topology, and stage-identity correctness
 - `skeleton/testing/test_frontier_biotope_event_memory.py` — persistence-boundary integrity
 - `skeleton/testing/test_frontier_biotope_benchmark.py` — observational benchmark correctness
 - `scripts/benchmark_frontier_biotope.py` — observational workload
@@ -39,6 +39,10 @@ The frontier core retains only portable behavior:
 ### Stage topology validation
 
 Stage catalogs fail closed on duplicate stage identifiers, duplicate stage numbers, gaps, or progression that does not begin at stage one. A caller cannot use an ambiguous or malformed stage graph to bypass sequential progression.
+
+### Canonical stage identity binding
+
+Active-stage entry is bound to the supplied canonical stage catalog. The requested `BiotopeStageSpec` must exactly match the catalog entry for its identifier and its target-biotope topology must validate before location state changes. A caller therefore cannot reuse a globally unlocked stage identifier and rebind it to another unlocked biotope to create an inconsistent active stage/biotope pair. The adversarial regression in `test_frontier_biotope_policy.py` covers this cross-biotope identity-rebinding attempt.
 
 ### Sequential unlock enforcement
 
