@@ -11,6 +11,7 @@ from skeleton.observability import (
     Tracer,
     probe,
     redact_payload,
+    redact_text,
 )
 
 
@@ -118,6 +119,13 @@ def test_structured_logger_redacts_messages_and_context() -> None:
     assert event.context["request_id"] == "req-7"
     assert "very-secret" not in lines[0]
     assert json.loads(lines[0])["context"]["safe"] == "visible"
+
+
+def test_text_redaction_removes_full_basic_authorization_credential() -> None:
+    rendered = redact_text("request failed Authorization: Basic dXNlcjpwYXNz trace=req-1")
+
+    assert rendered == "request failed authorization=[REDACTED] trace=req-1"
+    assert "dXNlcjpwYXNz" not in rendered
 
 
 def test_tracer_failure_never_persists_exception_message() -> None:
