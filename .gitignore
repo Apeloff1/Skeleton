@@ -1,5 +1,5 @@
 # ============================================================================
-# Git Ignore for Tutolage
+# Git Ignore for Skeleton
 # ============================================================================
 
 # ==========================================================================
@@ -55,7 +55,7 @@ web-build/
 *.orig.*
 
 # ==========================================================================
-# IDE
+# IDE / local tooling
 # ==========================================================================
 .idea/
 .vscode/
@@ -63,6 +63,10 @@ web-build/
 *.swo
 *~
 .DS_Store
+.gitconfig
+
+# Generated agent handoff state; source/config under .emergent stays tracked.
+.emergent/summary.txt
 
 # ==========================================================================
 # Environment & Secrets (NEVER commit real env files — keep only .env.example)
