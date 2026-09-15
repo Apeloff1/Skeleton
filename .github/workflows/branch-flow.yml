@@ -1,0 +1,239 @@
+name: Keep pull-request branches flowing
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+# One updater is enough. New schedule/PR events coalesce instead of killing the
+# active pass while it is evaluating a rapidly moving repository.
+concurrency:
+  group: branch-flow-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  refresh-behind-branches:
+    name: Refresh safe branches behind main
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 8
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Advance only safe same-repository PR branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          repo = os.environ['REPO']
+          token = os.environ['GH_TOKEN']
+          api = 'https://api.github.com'
+          headers = {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': f'Bearer {token}',
+              'Content-Type': 'application/json',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'skeleton-branch-flow-watchdog',
+          }
+          retryable = frozenset({0, 429, 500, 502, 503, 504})
+          max_updates = 4
+
+          def request(path, *, method='GET', payload=None):
+              data = None
+              if payload is not None:
+                  data = json.dumps(payload).encode('utf-8')
+              elif method != 'GET':
+                  data = b''
+              req = urllib.request.Request(
+                  api + path,
+                  data=data,
+                  headers=headers,
+                  method=method,
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as response:
+                      raw = response.read()
+                      return response.status, json.loads(raw) if raw else None
+              except urllib.error.HTTPError as exc:
+                  body = exc.read().decode('utf-8', errors='replace')
+                  try:
+                      parsed = json.loads(body) if body else None
+                  except json.JSONDecodeError:
+                      parsed = {'message': body[:500]}
+                  return exc.code, parsed
+              except urllib.error.URLError as exc:
+                  return 0, {'message': str(exc)}
+
+          def retry(path, *, method='GET', payload=None, attempts=3):
+              status = 0
+              body = None
+              for attempt in range(attempts):
+                  status, body = request(path, method=method, payload=payload)
+                  if status not in retryable:
+                      return status, body
+                  if attempt + 1 < attempts:
+                      time.sleep(2 ** attempt)
+              return status, body
+
+          def list_open_prs():
+              pulls = []
+              for page in range(1, 11):
+                  query = urllib.parse.urlencode({
+                      'state': 'open',
+                      'base': 'main',
+                      'per_page': 100,
+                      'page': page,
+                  })
+                  status, body = retry(f'/repos/{repo}/pulls?{query}')
+                  if status != 200 or not isinstance(body, list):
+                      raise SystemExit(f'failed to list open pull requests: HTTP {status}')
+                  pulls.extend(body)
+                  if len(body) < 100:
+                      break
+              return pulls
+
+          def live_validation(head_sha):
+              for run_status in ('in_progress', 'queued'):
+                  query = urllib.parse.urlencode({
+                      'head_sha': head_sha,
+                      'status': run_status,
+                      'per_page': 1,
+                  })
+                  status, body = retry(f'/repos/{repo}/actions/runs?{query}')
+                  if status != 200 or not isinstance(body, dict):
+                      # A transient Actions-read problem should preserve the PR,
+                      # not cause us to mutate it without knowing CI activity.
+                      return True
+                  if body.get('workflow_runs'):
+                      return True
+              return False
+
+          status, main = retry(f'/repos/{repo}/branches/main')
+          main_sha = ((main or {}).get('commit') or {}).get('sha', '')
+          if status != 200 or not main_sha:
+              raise SystemExit(f'failed to resolve main HEAD: HTTP {status}')
+
+          candidates = []
+          counts = {
+              'open': 0,
+              'fork': 0,
+              'draft': 0,
+              'not_behind': 0,
+              'conflicted_or_unknown': 0,
+              'active_ci': 0,
+              'updated': 0,
+              'raced': 0,
+              'permission_or_api_failure': 0,
+          }
+
+          for listed in list_open_prs():
+              counts['open'] += 1
+              number = int(listed.get('number') or 0)
+              if not number:
+                  continue
+
+              status, pr = retry(f'/repos/{repo}/pulls/{number}')
+              if status != 200 or not isinstance(pr, dict):
+                  counts['conflicted_or_unknown'] += 1
+                  continue
+
+              head = pr.get('head') or {}
+              head_repo = (head.get('repo') or {}).get('full_name')
+              head_sha = head.get('sha') or ''
+              if head_repo != repo:
+                  counts['fork'] += 1
+                  continue
+              if pr.get('draft'):
+                  counts['draft'] += 1
+                  continue
+
+              state = pr.get('mergeable_state') or 'unknown'
+              mergeable = pr.get('mergeable')
+              if state != 'behind':
+                  if state in {'dirty', 'unknown'} or mergeable is False:
+                      counts['conflicted_or_unknown'] += 1
+                  else:
+                      counts['not_behind'] += 1
+                  continue
+              if mergeable is False or not head_sha:
+                  counts['conflicted_or_unknown'] += 1
+                  continue
+              if live_validation(head_sha):
+                  counts['active_ci'] += 1
+                  continue
+
+              candidates.append((number, head_sha))
+
+          # Oldest PR numbers first gives long-lived work a deterministic chance
+          # to advance while bounding CI fanout from a single watchdog pass.
+          candidates.sort(key=lambda item: item[0])
+          attempted = []
+          for number, expected_head in candidates[:max_updates]:
+              status, body = retry(
+                  f'/repos/{repo}/pulls/{number}/update-branch',
+                  method='PUT',
+                  payload={'expected_head_sha': expected_head},
+              )
+              if status in {200, 202}:
+                  counts['updated'] += 1
+                  attempted.append(f'#{number}: updated from {expected_head[:12]}')
+              elif status in {409, 422}:
+                  # The branch moved or became unmergeable between observation
+                  # and update. Preserve it and let a later pass re-evaluate.
+                  counts['raced'] += 1
+                  attempted.append(f'#{number}: raced/blocked (HTTP {status})')
+              else:
+                  counts['permission_or_api_failure'] += 1
+                  message = (body or {}).get('message', '') if isinstance(body, dict) else ''
+                  attempted.append(f'#{number}: API failure HTTP {status} {message[:120]}')
+
+          summary = os.environ.get('GITHUB_STEP_SUMMARY')
+          if summary:
+              with open(summary, 'a', encoding='utf-8') as handle:
+                  handle.write('## Continuous branch flow\n')
+                  handle.write(f'- Live main: `{main_sha}`\n')
+                  handle.write(f'- Open PRs inspected: {counts["open"]}\n')
+                  handle.write(f'- Safe behind branches refreshed: {counts["updated"]}\n')
+                  handle.write(f'- Branches with active CI preserved: {counts["active_ci"]}\n')
+                  handle.write(f'- Draft PRs preserved: {counts["draft"]}\n')
+                  handle.write(f'- Fork PRs preserved: {counts["fork"]}\n')
+                  handle.write(
+                      '- Conflicted/unresolved branches preserved: '
+                      f'{counts["conflicted_or_unknown"]}\n'
+                  )
+                  handle.write(f'- Compare/update races preserved: {counts["raced"]}\n')
+                  handle.write(
+                      '- API/permission failures: '
+                      f'{counts["permission_or_api_failure"]}\n'
+                  )
+                  handle.write('- Per-pass refresh cap: 4 branches\n')
+                  handle.write(
+                      '- Safety: this workflow never merges a PR, never force-pushes, '
+                      'never checks out PR code, and never resolves conflicts.\n'
+                  )
+                  if attempted:
+                      handle.write('\n### Update attempts\n')
+                      for line in attempted:
+                          handle.write(f'- {line}\n')
+
+          if counts['permission_or_api_failure']:
+              raise SystemExit(
+                  'branch-flow watchdog encountered '
+                  f'{counts["permission_or_api_failure"]} terminal API failure(s)'
+              )
+          PY
