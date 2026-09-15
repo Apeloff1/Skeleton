@@ -13,6 +13,11 @@ from pathlib import Path
 import re
 import sys
 
+if __package__:
+    from .check_workflow_input_security import violations as input_boundary_violations
+else:
+    from check_workflow_input_security import violations as input_boundary_violations
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 SHA40_RE = re.compile(r"^[0-9a-fA-F]{40}$")
@@ -187,6 +192,12 @@ def violations(path: Path) -> list[str]:
         return [f"{path}: read failure: {exc}"]
 
     findings: list[str] = []
+    # Compose the dedicated workflow-input boundary checker into the canonical
+    # workflow security gate. This keeps multiline expressions, quoted run keys,
+    # block scalar variants, YAML anchors/tags, and run aliases fail-closed in
+    # the fast Backend Quality gate instead of relying on a separate invocation.
+    findings.extend(input_boundary_violations(path))
+
     lines = text.splitlines()
     has_top_level_permissions, permission_findings = _top_level_permission_violations(
         lines, path.name

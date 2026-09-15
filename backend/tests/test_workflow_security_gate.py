@@ -197,3 +197,35 @@ def test_allows_trusted_expression_in_run(tmp_path: Path) -> None:
         "name: test\non: [push]\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - run: echo '${{ github.repository }}'\n",
     )
     assert findings == []
+
+
+def test_composes_direct_dispatch_input_boundary_gate(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: workflow_dispatch\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - run: echo \"${{ inputs.payload }}\"\n",
+    )
+    assert any("direct workflow input interpolation" in finding for finding in findings)
+
+
+def test_composes_multiline_dispatch_input_boundary_gate(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: workflow_dispatch\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - run: >\n          echo \"${{\n            github.event.inputs.payload\n          }}\"\n",
+    )
+    assert any("direct workflow input interpolation" in finding for finding in findings)
+
+
+def test_composes_run_alias_boundary_gate(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: workflow_dispatch\npermissions:\n  contents: read\nenv:\n  COMMAND: &command \"echo safe\"\njobs:\n  test:\n    steps:\n      - run: *command\n",
+    )
+    assert any("aliased run shell is forbidden" in finding for finding in findings)
+
+
+def test_allows_dispatch_input_through_environment_boundary(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: workflow_dispatch\npermissions:\n  contents: read\njobs:\n  test:\n    steps:\n      - env:\n          PAYLOAD: ${{ inputs.payload }}\n        run: printf '%s\\n' \"$PAYLOAD\"\n",
+    )
+    assert findings == []
