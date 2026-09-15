@@ -124,7 +124,7 @@ def test_runtime_memory_adapter_rejects_non_runtime_or_incomplete_events():
     with pytest.raises(ValueError, match="runtime outcome event"):
         execution_event_to_memory_item(DomainEvent.create("world.updated", {"value": 1}))
 
-    incomplete = DomainEvent.create(
+    invalid_execution_digest = DomainEvent.create(
         "runtime.completed",
         {
             "execution_identity_sha256": "execution",
@@ -133,5 +133,17 @@ def test_runtime_memory_adapter_rejects_non_runtime_or_incomplete_events():
             "provenance": {},
         },
     )
-    with pytest.raises(ValueError, match="requires execution identity"):
-        execution_event_to_memory_item(incomplete)
+    with pytest.raises(ValueError, match="lowercase SHA-256 digest"):
+        execution_event_to_memory_item(invalid_execution_digest)
+
+    missing_artifact_digest = DomainEvent.create(
+        "runtime.completed",
+        {
+            "execution_identity_sha256": "0" * 64,
+            "agent": "agent",
+            "artifact_sha256": "",
+            "provenance": {},
+        },
+    )
+    with pytest.raises(ValueError, match="artifact_sha256 must be a non-empty string"):
+        execution_event_to_memory_item(missing_artifact_digest)
