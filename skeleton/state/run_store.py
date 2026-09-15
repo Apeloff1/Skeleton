@@ -1,6 +1,6 @@
 """Durable run, step, and checkpoint persistence for restart-safe execution.
 
-The store is deliberately provider-neutral and stdlib-only.  It uses SQLite
+The store is deliberately provider-neutral and stdlib-only. It uses SQLite
 transactions as the authoritative coordination boundary, leases to prevent two
 workers from owning the same live run, idempotency keys to protect external
 side effects during replay, and explicit checkpoints to make crash recovery
@@ -121,7 +121,7 @@ class ResumeState:
 
 
 _ALLOWED_TRANSITIONS: dict[RunStatus, frozenset[RunStatus]] = {
-    RunStatus.PENDING: frozenset({RunStatus.RUNNING, RunStatus.CANCELLED}),
+    RunStatus.PENDING: frozenset({RunStatus.CANCELLED}),
     RunStatus.RUNNING: frozenset({
         RunStatus.SUCCEEDED,
         RunStatus.FAILED,
@@ -136,9 +136,9 @@ _ALLOWED_TRANSITIONS: dict[RunStatus, frozenset[RunStatus]] = {
 class SQLiteRunStore:
     """Transactional SQLite persistence for resumable runs.
 
-    A store instance opens short-lived database connections per operation.  That
+    A store instance opens short-lived database connections per operation. That
     keeps restart behavior honest and permits multiple processes to coordinate
-    through SQLite's locking rather than through process-local state.
+    through SQLite locking rather than process-local state.
     """
 
     def __init__(
@@ -189,10 +189,11 @@ class SQLiteRunStore:
                     self._verify_schema(conn)
                     return
 
-                conn.execute("BEGIN IMMEDIATE")
                 try:
                     conn.executescript(
-                        """
+                        f"""
+                        BEGIN IMMEDIATE;
+
                         CREATE TABLE runs (
                             run_id TEXT PRIMARY KEY,
                             status TEXT NOT NULL,
@@ -248,13 +249,16 @@ class SQLiteRunStore:
                             ON steps(run_id, sequence);
                         CREATE INDEX idx_runs_recovery
                             ON runs(status, lease_until, updated_at);
+
+                        PRAGMA user_version = {SCHEMA_VERSION};
+                        COMMIT;
                         """
                     )
-                    conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
-                    conn.execute("COMMIT")
                 except Exception:
-                    conn.execute("ROLLBACK")
+                    if conn.in_transaction:
+                        conn.execute("ROLLBACK")
                     raise
+                self._verify_schema(conn)
             finally:
                 conn.close()
 
@@ -282,10 +286,20 @@ class SQLiteRunStore:
     @staticmethod
     def _identifier(value: str, field: str) -> str:
         if not isinstance(value, str) or not _IDENTIFIER.fullmatch(value):
-            raise ValueError(
-                f"{field} must be 1-128 safe identifier characters"
-            )
+            raise ValueError(f"{field} must be 1-128 safe identifier characters")
         return value
+
+    @staticmethod
+    def _duration(value: float, field: str) -> float:
+        if isinstance(value, bool):
+            raise ValueError(f"{field} must be finite and > 0")
+        try:
+            duration = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{field} must be finite and > 0") from exc
+        if not math.isfinite(duration) or duration <= 0:
+            raise ValueError(f"{field} must be finite and > 0")
+        return duration
 
     def _json(self, value: Any, field: str) -> str:
         try:
@@ -371,6 +385,20 @@ class SQLiteRunStore:
                 f"stale run revision: expected {expected_revision}, found {actual}"
             )
 
+    @staticmethod
+    def _require_live_owner(
+        row: sqlite3.Row,
+        worker_id: str,
+        now: float,
+    ) -> None:
+        if RunStatus(row["status"]) is not RunStatus.RUNNING:
+            raise InvalidTransition("operation requires a running run")
+        if row["worker_id"] != worker_id:
+            raise StateConflict("worker does not own this run")
+        lease_until = row["lease_until"]
+        if lease_until is None or float(lease_until) <= now:
+            raise StateConflict("worker lease has expired")
+
     def create_run(self, run_id: str, input: Any | None = None) -> RunRecord:
         run_id = self._identifier(run_id, "run_id")
         input_json = self._json({} if input is None else input, "input")
@@ -417,9 +445,7 @@ class SQLiteRunStore:
     ) -> RunRecord:
         run_id = self._identifier(run_id, "run_id")
         worker_id = self._identifier(worker_id, "worker_id")
-        lease_seconds = float(lease_seconds)
-        if not math.isfinite(lease_seconds) or lease_seconds <= 0:
-            raise ValueError("lease_seconds must be finite and > 0")
+        lease_seconds = self._duration(lease_seconds, "lease_seconds")
         now = self._now()
         lease_until = now + lease_seconds
 
@@ -473,9 +499,7 @@ class SQLiteRunStore:
     ) -> RunRecord:
         run_id = self._identifier(run_id, "run_id")
         worker_id = self._identifier(worker_id, "worker_id")
-        lease_seconds = float(lease_seconds)
-        if not math.isfinite(lease_seconds) or lease_seconds <= 0:
-            raise ValueError("lease_seconds must be finite and > 0")
+        lease_seconds = self._duration(lease_seconds, "lease_seconds")
         now = self._now()
 
         conn = self._connect()
@@ -484,14 +508,7 @@ class SQLiteRunStore:
             try:
                 row = self._require_run(conn, run_id)
                 self._require_revision(row, expected_revision)
-                if RunStatus(row["status"]) is not RunStatus.RUNNING:
-                    raise InvalidTransition("only running runs can heartbeat")
-                if row["worker_id"] != worker_id:
-                    raise StateConflict("worker does not own this run")
-                current_lease = row["lease_until"]
-                if current_lease is None or float(current_lease) <= now:
-                    raise StateConflict("worker lease has expired")
-
+                self._require_live_owner(row, worker_id, now)
                 conn.execute(
                     """
                     UPDATE runs
@@ -544,13 +561,19 @@ class SQLiteRunStore:
                     raise InvalidTransition(
                         f"invalid run transition {current.value} -> {target.value}"
                     )
-                owner = row["worker_id"]
-                lease_until = row["lease_until"]
                 if current is RunStatus.RUNNING:
-                    if worker_id is None or owner != worker_id:
+                    if worker_id is None:
                         raise StateConflict("terminal transition requires the owning worker")
-                    if lease_until is None or float(lease_until) <= now:
-                        raise StateConflict("worker lease has expired")
+                    self._require_live_owner(row, worker_id, now)
+                if target is RunStatus.SUCCEEDED:
+                    unfinished = conn.execute(
+                        "SELECT 1 FROM steps WHERE run_id=? AND status='running' LIMIT 1",
+                        (run_id,),
+                    ).fetchone()
+                    if unfinished is not None:
+                        raise InvalidTransition(
+                            "cannot succeed a run with unfinished steps"
+                        )
 
                 conn.execute(
                     """
@@ -576,17 +599,16 @@ class SQLiteRunStore:
         step_id: str,
         kind: str,
         *,
+        worker_id: str,
         payload: Any | None = None,
         effect_key: str | None = None,
-        worker_id: str | None = None,
     ) -> StepRecord:
         run_id = self._identifier(run_id, "run_id")
         step_id = self._identifier(step_id, "step_id")
         kind = self._identifier(kind, "kind")
+        worker_id = self._identifier(worker_id, "worker_id")
         if effect_key is not None:
             effect_key = self._identifier(effect_key, "effect_key")
-        if worker_id is not None:
-            worker_id = self._identifier(worker_id, "worker_id")
         payload_json = self._json({} if payload is None else payload, "payload")
         now = self._now()
 
@@ -595,15 +617,7 @@ class SQLiteRunStore:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 run = self._require_run(conn, run_id)
-                status = RunStatus(run["status"])
-                if status is not RunStatus.RUNNING:
-                    raise InvalidTransition("steps can start only on running runs")
-                if worker_id is not None:
-                    if run["worker_id"] != worker_id:
-                        raise StateConflict("worker does not own this run")
-                    lease_until = run["lease_until"]
-                    if lease_until is None or float(lease_until) <= now:
-                        raise StateConflict("worker lease has expired")
+                self._require_live_owner(run, worker_id, now)
 
                 existing = conn.execute(
                     "SELECT * FROM steps WHERE run_id=? AND step_id=?",
@@ -674,20 +688,19 @@ class SQLiteRunStore:
         step_id: str,
         status: StepStatus | str,
         *,
+        worker_id: str,
         result: Any | None = None,
         error: str | None = None,
-        worker_id: str | None = None,
     ) -> StepRecord:
         run_id = self._identifier(run_id, "run_id")
         step_id = self._identifier(step_id, "step_id")
+        worker_id = self._identifier(worker_id, "worker_id")
         try:
             target = StepStatus(status)
         except ValueError as exc:
             raise ValueError(f"unknown step status: {status!r}") from exc
         if not target.terminal:
             raise InvalidTransition("finish_step requires a terminal step status")
-        if worker_id is not None:
-            worker_id = self._identifier(worker_id, "worker_id")
         result_json = None if result is None else self._json(result, "result")
         if error is not None and (not isinstance(error, str) or len(error) > 4096):
             raise ValueError("error must be text of at most 4096 characters")
@@ -698,13 +711,7 @@ class SQLiteRunStore:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 run = self._require_run(conn, run_id)
-                if worker_id is not None:
-                    if run["worker_id"] != worker_id:
-                        raise StateConflict("worker does not own this run")
-                    lease_until = run["lease_until"]
-                    if lease_until is None or float(lease_until) <= now:
-                        raise StateConflict("worker lease has expired")
-
+                self._require_live_owner(run, worker_id, now)
                 row = conn.execute(
                     "SELECT * FROM steps WHERE run_id=? AND step_id=?",
                     (run_id, step_id),
@@ -748,17 +755,16 @@ class SQLiteRunStore:
         run_id: str,
         state: Any,
         *,
+        worker_id: str,
         after_step_id: str | None = None,
         state_version: int = 1,
-        worker_id: str | None = None,
     ) -> CheckpointRecord:
         run_id = self._identifier(run_id, "run_id")
+        worker_id = self._identifier(worker_id, "worker_id")
         if after_step_id is not None:
             after_step_id = self._identifier(after_step_id, "after_step_id")
         if isinstance(state_version, bool) or not isinstance(state_version, int) or state_version < 1:
             raise ValueError("state_version must be a positive integer")
-        if worker_id is not None:
-            worker_id = self._identifier(worker_id, "worker_id")
         state_json = self._json(state, "checkpoint state")
         now = self._now()
 
@@ -767,15 +773,9 @@ class SQLiteRunStore:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 run = self._require_run(conn, run_id)
-                if RunStatus(run["status"]).terminal:
-                    raise InvalidTransition("cannot checkpoint a terminal run")
-                if worker_id is not None:
-                    if run["worker_id"] != worker_id:
-                        raise StateConflict("worker does not own this run")
-                    lease_until = run["lease_until"]
-                    if lease_until is None or float(lease_until) <= now:
-                        raise StateConflict("worker lease has expired")
+                self._require_live_owner(run, worker_id, now)
 
+                boundary = 0
                 if after_step_id is not None:
                     step = conn.execute(
                         "SELECT * FROM steps WHERE run_id=? AND step_id=?",
@@ -790,14 +790,33 @@ class SQLiteRunStore:
                         raise InvalidTransition(
                             "checkpoint boundary must follow a succeeded or skipped step"
                         )
+                    boundary = int(step["sequence"])
 
-                revision = int(
-                    conn.execute(
-                        "SELECT COALESCE(MAX(revision), 0) + 1 "
-                        "FROM checkpoints WHERE run_id=?",
-                        (run_id,),
-                    ).fetchone()[0]
-                )
+                previous = conn.execute(
+                    """
+                    SELECT * FROM checkpoints
+                    WHERE run_id=? ORDER BY revision DESC LIMIT 1
+                    """,
+                    (run_id,),
+                ).fetchone()
+                if previous is not None:
+                    previous_boundary = 0
+                    if previous["after_step_id"] is not None:
+                        previous_step = conn.execute(
+                            "SELECT sequence FROM steps WHERE run_id=? AND step_id=?",
+                            (run_id, previous["after_step_id"]),
+                        ).fetchone()
+                        if previous_step is None:
+                            raise SchemaVersionError(
+                                "checkpoint references a missing step"
+                            )
+                        previous_boundary = int(previous_step["sequence"])
+                    if boundary < previous_boundary:
+                        raise InvalidTransition(
+                            "checkpoint boundary cannot move backwards"
+                        )
+
+                revision = 1 if previous is None else int(previous["revision"]) + 1
                 checkpoint_id = str(uuid.uuid4())
                 conn.execute(
                     """
