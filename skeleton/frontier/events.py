@@ -51,12 +51,21 @@ class EventJournal(Protocol):
     async def confirm(self, token: str) -> None:
         ...
 
+    async def pending(self, *, limit: int = 100) -> tuple[JournalEntry, ...]:
+        ...
+
 
 Handler = Callable[[DomainEvent], Awaitable[None]]
 
 
 class EventBus:
-    """Ordered async fan-out bus with optional journal-before-delivery semantics."""
+    """Ordered async fan-out bus with optional journal-before-delivery semantics.
+
+    Recovery is explicit rather than backgrounded. ``replay_pending`` processes
+    journal entries oldest-first and confirms each only after successful fan-
+    out. Handler side effects therefore have at-least-once semantics if a prior
+    delivery partially completed before failing.
+    """
 
     def __init__(self, *, journal: EventJournal | None = None) -> None:
         self._handlers: dict[str, list[Handler]] = {}
@@ -69,8 +78,7 @@ class EventBus:
         async with self._lock:
             self._handlers.setdefault(topic, []).append(handler)
 
-    async def publish(self, event: DomainEvent) -> int:
-        token = await self._journal.journal(event) if self._journal else None
+    async def _deliver(self, event: DomainEvent) -> int:
         async with self._lock:
             handlers = tuple(self._handlers.get(event.topic, ()))
 
@@ -78,10 +86,35 @@ class EventBus:
         for handler in handlers:
             await handler(event)
             delivered += 1
+        return delivered
 
+    async def publish(self, event: DomainEvent) -> int:
+        token = await self._journal.journal(event) if self._journal else None
+        delivered = await self._deliver(event)
         if self._journal is not None and token is not None:
             await self._journal.confirm(token)
         return delivered
+
+    async def replay_pending(self, *, limit: int = 100) -> int:
+        """Replay pending durable events in journal order.
+
+        A failing handler aborts the replay immediately and leaves that entry
+        plus all later entries pending, preserving source order and avoiding
+        silent skips.
+        """
+
+        if limit < 1:
+            return 0
+        if self._journal is None:
+            return 0
+
+        entries = await self._journal.pending(limit=limit)
+        replayed = 0
+        for entry in entries:
+            await self._deliver(entry.event)
+            await self._journal.confirm(entry.token)
+            replayed += 1
+        return replayed
 
 
 class SQLiteEventJournal:
