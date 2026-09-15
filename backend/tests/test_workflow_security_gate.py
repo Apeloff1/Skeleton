@@ -119,6 +119,14 @@ def test_rejects_missing_top_level_permissions(tmp_path: Path) -> None:
     assert any("missing explicit top-level permissions" in finding for finding in findings)
 
 
+def test_accepts_empty_top_level_permissions(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions: {}\njobs:\n  test:\n    steps:\n      - run: echo safe\n",
+    )
+    assert findings == []
+
+
 def test_rejects_pull_request_target(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
@@ -133,6 +141,30 @@ def test_rejects_write_all_permissions(tmp_path: Path) -> None:
         "name: test\non: [push]\npermissions: write-all\njobs: {}\n",
     )
     assert any("write permissions are forbidden" in finding or "write-all" in finding for finding in findings)
+
+
+def test_rejects_workflow_wide_individual_write_scope(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions:\n  contents: read\n  id-token: write\njobs:\n  release:\n    steps:\n      - run: echo release\n",
+    )
+    assert any("workflow-wide id-token: write is forbidden" in finding for finding in findings)
+
+
+def test_rejects_workflow_wide_read_all(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions: read-all\njobs:\n  test:\n    steps:\n      - run: echo safe\n",
+    )
+    assert any("workflow-wide read-all is forbidden" in finding for finding in findings)
+
+
+def test_allows_job_local_write_elevation(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: [push]\npermissions:\n  contents: read\njobs:\n  release:\n    permissions:\n      contents: write\n      id-token: write\n    steps:\n      - run: echo release\n",
+    )
+    assert findings == []
 
 
 def test_rejects_direct_pr_title_interpolation_in_inline_run(tmp_path: Path) -> None:
