@@ -13,99 +13,63 @@ waves:
       - repository: Apeloff1/Openworld
         path: backend/energy_routes.py
         blob: cd6fd76d71e3a9b3e4e5abf5cc0fc1e5cf584788
-    targets:
-      - skeleton/frontier/energy.py
-      - skeleton/frontier/energy_adapters.py
-    evidence:
-      - skeleton/testing/test_frontier_energy_policy.py
-      - skeleton/testing/test_frontier_energy_event_memory.py
-      - skeleton/testing/test_frontier_energy_benchmark.py
-      - scripts/benchmark_frontier_energy.py
+    targets: [skeleton/frontier/energy.py, skeleton/frontier/energy_adapters.py]
+    evidence: [skeleton/testing/test_frontier_energy_policy.py, skeleton/testing/test_frontier_energy_event_memory.py, skeleton/testing/test_frontier_energy_benchmark.py, scripts/benchmark_frontier_energy.py]
   - wave: 10
     surface: crafting-workshop
     decision: promote-once-exact-shared-lineage
     source_blob: 9a9b159588605b8658b8d6043f62622c401dd8ba
     sources:
-      - repository: Apeloff1/Lorebuffa
-        path: backend/crafting_routes.py
-      - repository: Apeloff1/Openworld
-        path: backend/crafting_routes.py
-    targets:
-      - skeleton/frontier/crafting.py
-      - skeleton/frontier/crafting_adapters.py
-    evidence:
-      - skeleton/testing/test_frontier_crafting_policy.py
-      - skeleton/testing/test_frontier_crafting_energy_adapter.py
-      - skeleton/testing/test_frontier_crafting_benchmark.py
-      - scripts/benchmark_frontier_crafting.py
+      - {repository: Apeloff1/Lorebuffa, path: backend/crafting_routes.py}
+      - {repository: Apeloff1/Openworld, path: backend/crafting_routes.py}
+    targets: [skeleton/frontier/crafting.py, skeleton/frontier/crafting_adapters.py]
+    evidence: [skeleton/testing/test_frontier_crafting_policy.py, skeleton/testing/test_frontier_crafting_energy_adapter.py, skeleton/testing/test_frontier_crafting_benchmark.py, scripts/benchmark_frontier_crafting.py]
   - wave: 11
     surface: equipment-loadout
     decision: promote-once-exact-shared-lineage
     source_blob: 037724170943e13e237336f0df4631e2a81dd9d3
     sources:
-      - repository: Apeloff1/Lorebuffa
-        path: backend/equipment_routes.py
-      - repository: Apeloff1/Openworld
-        path: backend/equipment_routes.py
-    targets:
-      - skeleton/frontier/equipment.py
-    evidence:
-      - skeleton/testing/test_frontier_equipment_policy.py
-      - skeleton/testing/test_frontier_equipment_benchmark.py
-      - scripts/benchmark_frontier_equipment.py
+      - {repository: Apeloff1/Lorebuffa, path: backend/equipment_routes.py}
+      - {repository: Apeloff1/Openworld, path: backend/equipment_routes.py}
+    targets: [skeleton/frontier/equipment.py]
+    evidence: [skeleton/testing/test_frontier_equipment_policy.py, skeleton/testing/test_frontier_equipment_benchmark.py, scripts/benchmark_frontier_equipment.py]
   - wave: 12
     surface: breeding-genetics
     decision: promote-once-exact-shared-lineage
     source_blob: 8f016084c60b44a4d3d09d16f6e5076722355212
     sources:
-      - repository: Apeloff1/Lorebuffa
-        path: backend/breeding_routes.py
-      - repository: Apeloff1/Openworld
-        path: backend/breeding_routes.py
-    targets:
-      - skeleton/frontier/breeding.py
-      - skeleton/frontier/breeding_adapters.py
-    evidence:
-      - skeleton/testing/test_frontier_breeding_policy.py
-      - skeleton/testing/test_frontier_breeding_event_memory.py
-      - skeleton/testing/test_frontier_breeding_benchmark.py
-      - scripts/benchmark_frontier_breeding.py
+      - {repository: Apeloff1/Lorebuffa, path: backend/breeding_routes.py}
+      - {repository: Apeloff1/Openworld, path: backend/breeding_routes.py}
+    targets: [skeleton/frontier/breeding.py, skeleton/frontier/breeding_adapters.py]
+    evidence: [skeleton/testing/test_frontier_breeding_policy.py, skeleton/testing/test_frontier_breeding_event_memory.py, skeleton/testing/test_frontier_breeding_benchmark.py, scripts/benchmark_frontier_breeding.py]
   - wave: 13
     surface: bait-fishing-spots
     decision: promote-once-exact-shared-lineage
     source_blob: 9963db63e814d84b6292ecc0cc4fe3c2b2b077e8
     sources:
-      - repository: Apeloff1/Lorebuffa
-        path: backend/bait_routes.py
-      - repository: Apeloff1/Openworld
-        path: backend/bait_routes.py
-    targets:
-      - skeleton/frontier/bait.py
-      - skeleton/frontier/gameplay.py
-    evidence:
-      - skeleton/testing/test_frontier_bait_policy.py
-      - skeleton/testing/test_frontier_bait_equipment_integration.py
-      - skeleton/testing/test_frontier_bait_benchmark.py
-      - skeleton/testing/test_frontier_gameplay_facade.py
-      - scripts/benchmark_frontier_bait.py
+      - {repository: Apeloff1/Lorebuffa, path: backend/bait_routes.py}
+      - {repository: Apeloff1/Openworld, path: backend/bait_routes.py}
+    targets: [skeleton/frontier/bait.py, skeleton/frontier/gameplay.py]
+    evidence: [skeleton/testing/test_frontier_bait_policy.py, skeleton/testing/test_frontier_bait_equipment_integration.py, skeleton/testing/test_frontier_bait_benchmark.py, skeleton/testing/test_frontier_gameplay_facade.py, scripts/benchmark_frontier_bait.py]
   - wave: 14
     surface: cooking-kitchen
     decision: promote-shared-policy-after-semantic-comparison
     sources:
-      - repository: Apeloff1/Lorebuffa
-        path: backend/cooking_routes.py
-        blob: 4c366d1c0baa89223758c28f0d4217d1dfa49bc9
-      - repository: Apeloff1/Openworld
-        path: backend/cooking_routes.py
-        blob: 24575861b7120f036bd646a4ed94950ce27d45ce
+      - {repository: Apeloff1/Lorebuffa, path: backend/cooking_routes.py, blob: 4c366d1c0baa89223758c28f0d4217d1dfa49bc9}
+      - {repository: Apeloff1/Openworld, path: backend/cooking_routes.py, blob: 24575861b7120f036bd646a4ed94950ce27d45ce}
     divergence: presentation-only-constant-error-string-f-prefix
-    targets:
-      - skeleton/frontier/cooking.py
-      - skeleton/frontier/cooking_adapters.py
-    evidence:
-      - skeleton/testing/test_frontier_cooking_policy.py
-      - skeleton/testing/test_frontier_cooking_integration.py
-      - docs/lineage/COOKING_PROMOTION_2026-09-15.md
+    targets: [skeleton/frontier/cooking.py, skeleton/frontier/cooking_adapters.py]
+    evidence: [skeleton/testing/test_frontier_cooking_policy.py, skeleton/testing/test_frontier_cooking_integration.py, docs/lineage/COOKING_PROMOTION_2026-09-15.md]
+  - wave: 15
+    surface: aquarium-display
+    decision: promote-once-exact-shared-lineage-with-hardening
+    source_blob: 223f65a8b8cb4c60528e6c4cc585a01296178ea0
+    sources:
+      - {repository: Apeloff1/Lorebuffa, path: backend/aquarium_routes.py}
+      - {repository: Apeloff1/Openworld, path: backend/aquarium_routes.py}
+    targets: [skeleton/frontier/aquarium_models.py, skeleton/frontier/aquarium_state.py, skeleton/frontier/aquarium.py]
+    evidence: [skeleton/testing/test_frontier_aquarium_policy.py, docs/lineage/AQUARIUM_PROMOTION_2026-09-15.md]
+    evolved_invariants: [bounded-position, exact-one-decoration-consumption, globally-unique-displayed-fish-identity, finite-fish-size, state-count-consistency, persistence-mutation-excluded]
 rejected_from_kernel:
   - source-catalogs
   - fastapi-routes
@@ -113,16 +77,15 @@ rejected_from_kernel:
   - motor-mongodb-clients
   - wallet-mutation
   - inventory-persistence
+  - social-visit-like-persistence
   - provider-specific-background-workers
 benchmark_policy:
   timing: observational-only
   correctness: gated
 next_candidate:
-  surface: aquarium-display
-  disposition: promote-once-exact-shared-lineage
-  shared_blob: 223f65a8b8cb4c60528e6c4cc585a01296178ea0
+  surface: biotope
+  disposition: inspect-before-promotion
+  shared_blob: b79a167a3b568477e7db1fa95d64fc3949171a7e
   compared_sources:
-    - repository: Apeloff1/Lorebuffa
-      path: backend/aquarium_routes.py
-    - repository: Apeloff1/Openworld
-      path: backend/aquarium_routes.py
+    - {repository: Apeloff1/Lorebuffa, path: backend/biotope_routes.py}
+    - {repository: Apeloff1/Openworld, path: backend/biotope_routes.py}
