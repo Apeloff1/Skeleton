@@ -22,6 +22,14 @@ class RecordingProvider:
         return "provider-ok"
 
 
+class OversizedProvider:
+    name = "oversized"
+    supports_system_prompt = True
+
+    def complete(self, prompt, context=None, max_tokens=512, system=None):
+        return "x" * 300_000
+
+
 class _FakeResponse:
     def __init__(self, payload: bytes):
         self.payload = payload
@@ -152,6 +160,18 @@ def test_provider_response_reader_redacts_malformed_body_contents():
         _read_json_response(response)
 
     assert "do-not-echo" not in str(excinfo.value)
+
+
+def test_oversized_provider_output_is_redacted_before_session_persistence():
+    core = JeevesCore(provider=OversizedProvider())
+    session = core.open_session("u")
+
+    result = core.ask(session.session_id, "hello")
+
+    assert result["provider_failed"] is True
+    assert result["content"] == "[provider unavailable]"
+    assert session.turns[-1].content == "[provider unavailable]"
+    assert len(session.turns[-1].content) < 100
 
 
 @pytest.mark.parametrize("preferred", ["", "   "])
