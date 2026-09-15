@@ -9,6 +9,7 @@ work unchanged.
 """
 from __future__ import annotations
 
+import html
 import re
 from datetime import datetime
 
@@ -48,8 +49,8 @@ class ImportExportService:
         if format == "txt":
             return {"content": code, "mime_type": "text/plain", "extension": ".txt"}
         if format == "html":
-            html = self._code_to_html(code, language, options)
-            return {"content": html, "mime_type": "text/html", "extension": ".html"}
+            html_content = self._code_to_html(code, language, options)
+            return {"content": html_content, "mime_type": "text/html", "extension": ".html"}
         if format == "md":
             md = f"```{language}\n{code}\n```"
             return {"content": md, "mime_type": "text/markdown", "extension": ".md"}
@@ -121,10 +122,11 @@ class ImportExportService:
         return metadata
 
     def _code_to_html(self, code: str, language: str, options: dict) -> str:
-        theme      = options.get("theme", "dark")
-        bg_color   = "#1E1E1E" if theme == "dark" else "#FFFFFF"
-        text_color = "#D4D4D4" if theme == "dark" else "#000000"
-        escaped    = code.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        theme         = options.get("theme", "dark")
+        bg_color      = "#1E1E1E" if theme == "dark" else "#FFFFFF"
+        text_color    = "#D4D4D4" if theme == "dark" else "#000000"
+        escaped_code  = html.escape(str(code), quote=True)
+        safe_language = html.escape(str(language), quote=True)
         return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -137,8 +139,8 @@ class ImportExportService:
     </style>
 </head>
 <body>
-    <div class="header">Language: {language} | Exported from CodeDock v9.0.0</div>
-    <pre><code>{escaped}</code></pre>
+    <div class="header">Language: {safe_language} | Exported from CodeDock v9.0.0</div>
+    <pre><code>{escaped_code}</code></pre>
 </body>
 </html>"""
 
