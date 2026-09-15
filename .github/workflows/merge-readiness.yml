@@ -13,6 +13,12 @@ on:
 permissions:
   contents: read
 
+# Only the newest validation for a PR or branch can become authoritative.
+# Cancel superseded fanout early so stale commits do not occupy runner slots.
+concurrency:
+  group: merge-readiness-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   PYTHON_VERSION: "3.11.16"
   NODE_VERSION: "24.20.0"
