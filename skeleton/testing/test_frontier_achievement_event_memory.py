@@ -8,6 +8,7 @@ import pytest
 from skeleton.frontier.achievement_adapters import (
     achievement_event,
     achievement_event_to_memory_item,
+    achievement_spec_digest,
     achievement_state_memory_item,
 )
 from skeleton.frontier.achievements import (
@@ -51,6 +52,9 @@ def test_achievement_unlock_survives_event_reopen_and_memory_upsert(tmp_path):
             action="unlocked",
             occurred_at=occurred_at,
         )
+        assert event.payload["achievement_spec_sha256"] == achievement_spec_digest(
+            achievement
+        )
 
         journal_path = tmp_path / "achievement-events.sqlite3"
         journal = SQLiteEventJournal(journal_path, namespace="achievement-events")
@@ -89,6 +93,9 @@ def test_achievement_unlock_survives_event_reopen_and_memory_upsert(tmp_path):
             )
             assert len(hits) == 1
             assert hits[0]["metadata"]["achievement_action"] == "unlocked"
+            assert hits[0]["metadata"]["achievement_spec_sha256"] == event.payload[
+                "achievement_spec_sha256"
+            ]
         finally:
             reopened_journal.close()
             collection.close()
@@ -111,6 +118,9 @@ def test_achievement_unlock_survives_event_reopen_and_memory_upsert(tmp_path):
                 filters={"claimed": True},
             )
             assert [hit["id"] for hit in hits] == [state_item["id"]]
+            assert hits[0]["metadata"]["achievement_spec_sha256"] == achievement_spec_digest(
+                achievement
+            )
         finally:
             reopened_memory.close()
 
@@ -134,6 +144,37 @@ def test_achievement_event_identity_fails_closed_when_subject_is_tampered():
     )
 
     with pytest.raises(ValueError, match="identity digest mismatch"):
+        achievement_event_to_memory_item(tampered)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("name", "Altered Name"),
+        ("category", "altered-category"),
+        ("hidden", True),
+        ("requirement_type", "other_progress"),
+        ("requirement_count", 99),
+    ],
+    ids=["name", "category", "hidden", "requirement-type", "requirement-count"],
+)
+def test_achievement_event_spec_digest_rejects_tampered_policy_fields(field, value):
+    achievement = _achievement()
+    event = achievement_event(
+        achievement,
+        subject_id="captain-1",
+        action="unlocked",
+        occurred_at=datetime(2026, 9, 15, 11, 30, tzinfo=timezone.utc),
+    )
+    payload = dict(event.payload)
+    payload[field] = value
+    tampered = DomainEvent(
+        topic=event.topic,
+        payload=payload,
+        occurred_at=event.occurred_at,
+    )
+
+    with pytest.raises(ValueError, match="spec digest mismatch"):
         achievement_event_to_memory_item(tampered)
 
 
