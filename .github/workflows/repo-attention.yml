@@ -1,13 +1,19 @@
-name: Repository Attention Sweep
+name: Repository Attention
 
 on:
   workflow_dispatch:
   schedule:
     - cron: '17 5 * * *'
+  issues:
+    types: [edited, reopened]
+  issue_comment:
+    types: [created]
+  pull_request_target:
+    types: [synchronize, edited, reopened, ready_for_review, converted_to_draft]
 
 concurrency:
-  group: repository-attention-sweep
-  cancel-in-progress: false
+  group: repository-attention-${{ github.event_name }}-${{ github.event.issue.number || github.event.pull_request.number || 'sweep' }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -17,6 +23,7 @@ permissions:
 jobs:
   sweep:
     name: Flag quiet work without auto-closing it
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
@@ -41,62 +48,34 @@ jobs:
           attention_cutoff=$((now - PR_QUIET_DAYS * 86400))
           draft_cutoff=$((now - DRAFT_QUIET_DAYS * 86400))
           added_attention=0
-          removed_attention=0
           added_draft=0
-          removed_draft=0
 
-          while IFS=$'\t' read -r number updated draft; do
+          while IFS=$'\t' read -r number updated draft labels_csv; do
             [[ -n "${number:-}" ]] || continue
             updated_epoch=$(date -u -d "$updated" +%s)
-            labels=$(gh api "/repos/${REPO}/issues/${number}/labels" --jq '.[].name')
-
             has_attention=false
             has_draft=false
-            grep -Fxq 'needs-attention' <<<"$labels" && has_attention=true || true
-            grep -Fxq 'stale-draft' <<<"$labels" && has_draft=true || true
+            tr ',' '\n' <<<"$labels_csv" | grep -Fxq 'needs-attention' && has_attention=true || true
+            tr ',' '\n' <<<"$labels_csv" | grep -Fxq 'stale-draft' && has_draft=true || true
 
             if [[ "$draft" == 'true' ]]; then
-              if (( updated_epoch < draft_cutoff )); then
-                if [[ "$has_draft" == 'false' ]]; then
-                  gh api --method POST "/repos/${REPO}/issues/${number}/labels" -f 'labels[]=stale-draft' >/dev/null
-                  added_draft=$((added_draft + 1))
-                fi
-              elif [[ "$has_draft" == 'true' ]]; then
-                gh api --method DELETE "/repos/${REPO}/issues/${number}/labels/stale-draft" >/dev/null || true
-                removed_draft=$((removed_draft + 1))
+              if (( updated_epoch < draft_cutoff )) && [[ "$has_draft" == 'false' ]]; then
+                gh api --method POST "/repos/${REPO}/issues/${number}/labels" -f 'labels[]=stale-draft' >/dev/null
+                added_draft=$((added_draft + 1))
               fi
-
-              if [[ "$has_attention" == 'true' ]]; then
-                gh api --method DELETE "/repos/${REPO}/issues/${number}/labels/needs-attention" >/dev/null || true
-                removed_attention=$((removed_attention + 1))
-              fi
-            else
-              if (( updated_epoch < attention_cutoff )); then
-                if [[ "$has_attention" == 'false' ]]; then
-                  gh api --method POST "/repos/${REPO}/issues/${number}/labels" -f 'labels[]=needs-attention' >/dev/null
-                  added_attention=$((added_attention + 1))
-                fi
-              elif [[ "$has_attention" == 'true' ]]; then
-                gh api --method DELETE "/repos/${REPO}/issues/${number}/labels/needs-attention" >/dev/null || true
-                removed_attention=$((removed_attention + 1))
-              fi
-
-              if [[ "$has_draft" == 'true' ]]; then
-                gh api --method DELETE "/repos/${REPO}/issues/${number}/labels/stale-draft" >/dev/null || true
-                removed_draft=$((removed_draft + 1))
-              fi
+            elif (( updated_epoch < attention_cutoff )) && [[ "$has_attention" == 'false' ]]; then
+              gh api --method POST "/repos/${REPO}/issues/${number}/labels" -f 'labels[]=needs-attention' >/dev/null
+              added_attention=$((added_attention + 1))
             fi
           done < <(
             gh api --paginate "/repos/${REPO}/pulls?state=open&per_page=100" \
-              --jq '.[] | [.number, .updated_at, .draft] | @tsv'
+              --jq '.[] | [.number, .updated_at, .draft, ([.labels[].name] | join(","))] | @tsv'
           )
 
           {
             echo '## Pull request attention sweep'
             echo "- Added needs-attention: $added_attention"
-            echo "- Removed needs-attention: $removed_attention"
             echo "- Added stale-draft: $added_draft"
-            echo "- Removed stale-draft: $removed_draft"
             echo "- Regular PR quiet threshold: ${PR_QUIET_DAYS} days"
             echo "- Draft PR quiet threshold: ${DRAFT_QUIET_DAYS} days"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -108,7 +87,6 @@ jobs:
           now=$(date -u +%s)
           cutoff=$((now - ISSUE_QUIET_DAYS * 86400))
           added=0
-          removed=0
 
           while IFS=$'\t' read -r number updated labels_csv; do
             [[ -n "${number:-}" ]] || continue
@@ -116,14 +94,9 @@ jobs:
             has_attention=false
             tr ',' '\n' <<<"$labels_csv" | grep -Fxq 'needs-attention' && has_attention=true || true
 
-            if (( updated_epoch < cutoff )); then
-              if [[ "$has_attention" == 'false' ]]; then
-                gh api --method POST "/repos/${REPO}/issues/${number}/labels" -f 'labels[]=needs-attention' >/dev/null
-                added=$((added + 1))
-              fi
-            elif [[ "$has_attention" == 'true' ]]; then
-              gh api --method DELETE "/repos/${REPO}/issues/${number}/labels/needs-attention" >/dev/null || true
-              removed=$((removed + 1))
+            if (( updated_epoch < cutoff )) && [[ "$has_attention" == 'false' ]]; then
+              gh api --method POST "/repos/${REPO}/issues/${number}/labels" -f 'labels[]=needs-attention' >/dev/null
+              added=$((added + 1))
             fi
           done < <(
             gh api --paginate "/repos/${REPO}/issues?state=open&per_page=100" \
@@ -133,7 +106,56 @@ jobs:
           {
             echo '## Issue attention sweep'
             echo "- Added needs-attention: $added"
-            echo "- Removed needs-attention: $removed"
             echo "- Issue quiet threshold: ${ISSUE_QUIET_DAYS} days"
             echo '- This workflow never closes issues or pull requests.'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  clear-pr-attention:
+    name: Clear attention after PR activity
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - name: Clear managed attention labels
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --method DELETE "/repos/${REPO}/issues/${NUMBER}/labels/needs-attention" >/dev/null 2>&1 || true
+          gh api --method DELETE "/repos/${REPO}/issues/${NUMBER}/labels/stale-draft" >/dev/null 2>&1 || true
+
+  clear-issue-attention:
+    name: Clear attention after issue activity
+    if: github.event_name == 'issues'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      NUMBER: ${{ github.event.issue.number }}
+    steps:
+      - name: Clear managed attention label
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --method DELETE "/repos/${REPO}/issues/${NUMBER}/labels/needs-attention" >/dev/null 2>&1 || true
+
+  clear-comment-attention:
+    name: Clear attention after new discussion
+    if: github.event_name == 'issue_comment'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      NUMBER: ${{ github.event.issue.number }}
+    steps:
+      - name: Clear managed attention labels
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --method DELETE "/repos/${REPO}/issues/${NUMBER}/labels/needs-attention" >/dev/null 2>&1 || true
+          gh api --method DELETE "/repos/${REPO}/issues/${NUMBER}/labels/stale-draft" >/dev/null 2>&1 || true
