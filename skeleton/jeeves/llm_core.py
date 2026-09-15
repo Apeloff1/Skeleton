@@ -13,6 +13,7 @@ matrices observe every turn:
 
 from __future__ import annotations
 
+import copy
 import re
 import time
 import uuid
@@ -165,7 +166,7 @@ class JeevesCore:
             self._provider = get_provider(retriever=retriever)
 
     def register_tool(self, name: str, handler: Callable[[Dict[str, Any]], Any]) -> None:
-        """Register a capability under a canonical, bounded identifier."""
+        """Register a capability once under a canonical, bounded identifier."""
         if not isinstance(name, str):
             raise TypeError("tool name must be a string")
         normalized = name.strip().lower()
@@ -173,10 +174,14 @@ class JeevesCore:
             raise ValueError("invalid tool name")
         if not callable(handler):
             raise TypeError("tool handler must be callable")
+        if normalized in self._tools:
+            raise ValueError("tool already registered")
         self._tools[normalized] = handler
 
     def _requested_tool_calls(self, context: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Validate explicit tool-call requests before any session mutation."""
+        if context is not None and not isinstance(context, dict):
+            raise ValueError("context must be an object")
         raw = (context or {}).get("tool_calls", [])
         if raw is None:
             return []
@@ -198,7 +203,7 @@ class JeevesCore:
                 raise ValueError("unknown or invalid tool")
             if not isinstance(arguments, dict):
                 raise ValueError("tool call arguments must be an object")
-            calls.append({"name": normalized, "arguments": dict(arguments)})
+            calls.append({"name": normalized, "arguments": copy.deepcopy(arguments)})
         return calls
 
     def _provider_complete(self, prompt: str, prior_context: List[str], system: str) -> str:
@@ -229,7 +234,9 @@ class JeevesCore:
 
         requested_tool_calls = self._requested_tool_calls(context)
         prior_context = session.context_window()
-        session.add_turn("user", input_text, **(context or {}))
+        user_metadata = copy.deepcopy(context or {})
+        user_metadata.pop("tool_calls", None)
+        session.add_turn("user", input_text, **user_metadata)
 
         self.sam.observe(input_text)
         for term in self.sam._terms(input_text):
