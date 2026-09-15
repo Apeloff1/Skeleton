@@ -13,6 +13,7 @@ on:
       - "backend/scripts/backend_route_inventory.py"
       - "backend/scripts/backend_route_inventory_core.py"
       - "backend/scripts/backend_route_policy_report.py"
+      - "backend/scripts/backend_route_policy_debt.py"
       - "backend/tests/**"
       - "frontend/src/product/productCatalog.ts"
       - ".github/workflows/product-convergence.yml"
@@ -29,6 +30,7 @@ on:
       - "backend/scripts/backend_route_inventory.py"
       - "backend/scripts/backend_route_inventory_core.py"
       - "backend/scripts/backend_route_policy_report.py"
+      - "backend/scripts/backend_route_policy_debt.py"
       - "backend/tests/**"
       - "frontend/src/product/productCatalog.ts"
       - ".github/workflows/product-convergence.yml"
@@ -72,6 +74,7 @@ jobs:
           tests/test_jeeves_memory_and_evolution.py
           tests/test_world_graph.py
           tests/test_world_graph_projection.py
+          tests/test_cockpit_execution_projection.py
           tests/test_live_session.py
           tests/test_model_router.py
           tests/test_jeeves_control_plane.py
@@ -158,3 +161,4 @@ jobs:
           tests/test_backend_route_inventory.py
           tests/test_backend_route_inventory_cns.py
           tests/test_backend_route_policy_report.py
+          tests/test_backend_route_policy_debt.py
