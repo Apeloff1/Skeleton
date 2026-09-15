@@ -3,6 +3,7 @@ name: Workflow Input Security
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, closed]
     paths:
       - '.github/workflows/**'
       - 'backend/scripts/check_workflow_input_security.py'
@@ -33,6 +34,7 @@ permissions:
 
 jobs:
   workflow-input-shell-boundary:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     name: Workflow input shell boundary
     runs-on: ubuntu-latest
     timeout-minutes: 5
