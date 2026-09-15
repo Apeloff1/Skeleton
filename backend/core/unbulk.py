@@ -8,10 +8,10 @@ cache), on top of the existing primitives:
   • core.cold_storage       — freeze/thaw Mongo collections to zstd
   • this module             — transparent gzip codec for doc fields + on-disk
                               build manifests + a unified savings report + a
-                              source-module inventory + a lazy code-module loader.
+                              source-module inventory.
 
 Design goals (per product spec):
-  1c — compress large DATA *and* lazy-load heavy CODE modules.
+  1c — compress large DATA while leaving heavy seed imports deferred by callers.
   2b+2c — target big knowledge/seed data + API responses (GZip middleware, on).
   4a — TRANSPARENT: pack on write, unpack on read; callers never think about it.
 """
@@ -20,7 +20,6 @@ from __future__ import annotations
 import base64
 import gzip
 import hashlib
-import importlib
 import json
 import os
 import threading
@@ -111,29 +110,6 @@ def decompress_doc(doc: dict, fields: list[str] | None = None) -> dict:
         if is_packed(doc.get(f)):
             doc[f] = unpack(doc[f])
     return doc
-
-
-# ── lazy code-module loader (defer heavy imports → lower startup RAM) ─────────
-class _LazyModule:
-    """Imports the real module on first attribute access."""
-    def __init__(self, name: str):
-        object.__setattr__(self, "_name", name)
-        object.__setattr__(self, "_mod", None)
-
-    def _load(self):
-        mod = object.__getattribute__(self, "_mod")
-        if mod is None:
-            mod = importlib.import_module(object.__getattribute__(self, "_name"))
-            object.__setattr__(self, "_mod", mod)
-        return mod
-
-    def __getattr__(self, item):
-        return getattr(self._load(), item)
-
-
-def lazy_import(name: str) -> _LazyModule:
-    """Return a proxy that imports `name` only when first used."""
-    return _LazyModule(name)
 
 
 # ── on-disk build-manifest gzip (transparent, decompress-on-demand) ──────────
