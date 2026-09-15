@@ -151,6 +151,7 @@ jobs:
           tests/test_process_safety_namespace_get.py
           tests/test_process_safety_getattribute.py
           tests/test_process_safety_helper_aliases.py
+          tests/test_process_safety_scanner_coverage.py
           tests/test_deserialization_safety_gate.py
           tests/test_dynamic_import_safety.py
           tests/test_scanner_nonempty_contract.py
