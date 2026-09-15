@@ -1,0 +1,46 @@
+name: Mixture of Depths
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "skeleton/cortex/mixture_depth.py"
+      - "skeleton/testing/test_mixture_depth.py"
+      - "scripts/profile_mixture_depth.py"
+      - "docs/MIXTURE_OF_DEPTHS.md"
+      - ".github/workflows/mixture-depth.yml"
+  push:
+    branches: [main]
+    paths:
+      - "skeleton/cortex/mixture_depth.py"
+      - "skeleton/testing/test_mixture_depth.py"
+      - "scripts/profile_mixture_depth.py"
+      - ".github/workflows/mixture-depth.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  mixture-depth:
+    name: "Cortex MoD"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: {python-version: "3.11"}
+      - name: Install test dependency
+        run: python -m pip install "pytest>=8,<9"
+      - name: Compile adaptive inference slice
+        run: |
+          python -m compileall -q skeleton/cortex/mixture_depth.py scripts/profile_mixture_depth.py
+      - name: Run deterministic routing tests
+        env: {PYTHONPATH: "."}
+        run: python -m pytest -q skeleton/testing/test_mixture_depth.py
+      - name: Profile smoke
+        env: {PYTHONPATH: "."}
+        run: >-
+          python scripts/profile_mixture_depth.py
+          --layers 3 --dim 8 --ctx 4 --d-ff 12
+          --threshold 0.02 --min-depth 1 --repeats 2
