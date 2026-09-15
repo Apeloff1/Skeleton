@@ -51,6 +51,15 @@ def test_compose_pins_stateful_images_and_hardens_non_root_app_services() -> Non
         assert "cap_drop:\n      - ALL" in service
 
 
+def test_skeleton_runtime_has_read_only_root_and_bounded_tmpfs() -> None:
+    compose = (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    skeleton = _service_block(compose, "skeleton")
+
+    assert "read_only: true" in skeleton
+    assert "tmpfs:\n      - /tmp:rw,nosuid,nodev,noexec,size=64m" in skeleton
+    assert "\n    volumes:" not in skeleton
+
+
 def test_compose_healthchecks_use_runtime_available_tools_and_canonical_routes() -> None:
     compose = (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
     skeleton = _service_block(compose, "skeleton")
