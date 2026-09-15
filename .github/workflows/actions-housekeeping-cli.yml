@@ -13,15 +13,18 @@ concurrency:
   group: actions-housekeeping-cli-${{ github.repository }}
   cancel-in-progress: false
 
-permissions:
-  actions: write
-  contents: read
+# Fail closed at workflow scope. Only the cleanup job below receives the
+# Actions write capability required to purge caches, artifacts, and stale runs.
+permissions: {}
 
 jobs:
   cleanup:
     name: Purge caches and stale Actions data with gh CLI
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      actions: write
+      contents: read
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
