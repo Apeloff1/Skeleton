@@ -167,6 +167,7 @@ waves:
       - explicit-boat-gating
       - contiguous-stage-topology-validation
       - sequential-stage-unlock
+      - canonical-stage-catalog-binding-on-entry
       - all-crossed-mastery-threshold-drain
       - canonical-progress-digest
       - exact-unlocked-progress-map-coverage-at-boundary
@@ -191,6 +192,7 @@ waves:
         path: backend/biotope_achievements_routes.py
     targets:
       - skeleton/frontier/biotope_achievement_adapters.py
+      - skeleton/frontier/gameplay.py
     hardening:
       - nested-source-reward-normalization
       - count-or-size-threshold-normalization
@@ -205,6 +207,72 @@ waves:
       - skeleton/testing/test_frontier_biotope_achievement_benchmark.py
       - scripts/benchmark_frontier_biotope_achievements.py
       - docs/lineage/BIOTOPE_ACHIEVEMENTS_PROMOTION_2026-09-15.md
+  - wave: 18
+    surface: fish-encyclopedia-collection
+    decision: promote-state-policy-not-source-catalog
+    source_blob: e842d3697187503b1e1da2df3563d797777c6bfb
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/encyclopedia_routes.py
+      - repository: Apeloff1/Openworld
+        path: backend/encyclopedia_routes.py
+    targets:
+      - skeleton/frontier/encyclopedia.py
+      - skeleton/frontier/encyclopedia_adapters.py
+      - skeleton/frontier/gameplay.py
+    hardening:
+      - exact-discovered-stat-identity-consistency
+      - finite-positive-fish-measurements
+      - replay-convergent-earliest-first-catch
+      - deterministic-summary-tie-breaking
+      - caller-owned-catalog-completion-boundary
+      - caller-owned-rarity-mapping-boundary
+      - non-mutating-undiscovered-catalog-masking
+      - json-safe-stat-projections
+      - canonical-collection-identity-and-state-digests
+      - fail-closed-event-state-rehydration
+      - recomputed-digest-malformed-state-rejection
+    evidence:
+      - skeleton/testing/test_frontier_encyclopedia_policy.py
+      - skeleton/testing/test_frontier_encyclopedia_event_memory.py
+      - skeleton/testing/test_frontier_encyclopedia_gameplay_facade.py
+      - skeleton/testing/test_frontier_encyclopedia_benchmark.py
+      - scripts/benchmark_frontier_encyclopedia.py
+      - docs/lineage/ENCYCLOPEDIA_PROMOTION_2026-09-15.md
+  - wave: 19
+    surface: limited-time-gameplay-events
+    decision: promote-gameplay-policy-not-duplicate-event-transport
+    source_blob: 6e7d62f7c5310374a3dad9cfdf22c1c28efc0cba
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/event_routes.py
+      - repository: Apeloff1/Openworld
+        path: backend/event_routes.py
+    targets:
+      - skeleton/frontier/gameplay_events.py
+      - skeleton/frontier/gameplay_event_adapters.py
+      - skeleton/frontier/gameplay.py
+    hardening:
+      - deterministic-season-selection
+      - half-open-event-time-windows
+      - midnight-wraparound-hour-restrictions
+      - nonnegative-progress-deltas
+      - single-shot-challenge-rewards
+      - wallet-neutral-milestone-claim-plans
+      - canonical-achievement-reward-plan-reuse
+      - gameplay-event-namespaced-public-surface
+      - canonical-subject-spec-progress-digests
+      - full-spec-and-progress-rehydration
+      - completed-challenge-target-revalidation
+      - claimed-milestone-point-revalidation
+      - duplicate-domain-event-bus-rejection
+    evidence:
+      - skeleton/testing/test_frontier_gameplay_events_policy.py
+      - skeleton/testing/test_frontier_gameplay_event_memory.py
+      - skeleton/testing/test_frontier_gameplay_events_facade.py
+      - skeleton/testing/test_frontier_gameplay_events_benchmark.py
+      - scripts/benchmark_frontier_gameplay_events.py
+      - docs/lineage/GAMEPLAY_EVENTS_PROMOTION_2026-09-15.md
 post_v11_hardening:
   - surface: runtime-idempotency-identity
     decision: harden-promoted-gameforge-idempotency-semantics
@@ -241,16 +309,18 @@ rejected_from_kernel:
   - provider-specific-background-workers
   - duplicate-domain-primitives
   - duplicate-achievement-engine
+  - duplicate-domain-event-bus
   - fish-database-registry
+  - gameplay-event-shops-and-leaderboards
 benchmark_policy:
   timing: observational-only
   correctness: gated
 next_candidate:
-  surface: fish-encyclopedia-collection
+  surface: tournament-scheduling-scoring
   disposition: promote-once-exact-shared-lineage
-  shared_blob: e842d3697187503b1e1da2df3563d797777c6bfb
+  shared_blob: 14d5c55aba152c7a6000c8fea7da8603dbdf18cf
   compared_sources:
     - repository: Apeloff1/Lorebuffa
-      path: backend/encyclopedia_routes.py
+      path: backend/tournament_routes.py
     - repository: Apeloff1/Openworld
-      path: backend/encyclopedia_routes.py
+      path: backend/tournament_routes.py
