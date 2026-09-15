@@ -3,6 +3,7 @@ name: Dependency Review
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, closed]
     paths:
       - '**/requirements*.txt'
       - '**/pyproject.toml'
@@ -50,6 +51,7 @@ concurrency:
 
 jobs:
   dependency-review:
+    if: github.event.action != 'closed'
     name: Reject vulnerable dependency additions
     runs-on: ubuntu-latest
     timeout-minutes: 10
