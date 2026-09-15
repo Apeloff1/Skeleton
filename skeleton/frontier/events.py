@@ -183,6 +183,7 @@ class SQLiteEventJournal:
                 sort_keys=True,
                 separators=(",", ":"),
                 ensure_ascii=False,
+                allow_nan=False,
             )
         except (TypeError, ValueError) as exc:
             raise TypeError("event payload must be JSON serializable") from exc
