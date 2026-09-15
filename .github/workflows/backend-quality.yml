@@ -7,6 +7,7 @@ on:
   push:
     branches: [main, master]
     paths:
+      - ".emergent/cron/**"
       - "backend/**"
       - "skeleton/**"
       - "frontend/**"
@@ -21,6 +22,7 @@ on:
       - "!.github/workflows/branch-clean.yml"
   pull_request:
     paths:
+      - ".emergent/cron/**"
       - "backend/**"
       - "skeleton/**"
       - "frontend/**"
@@ -136,3 +138,4 @@ jobs:
           tests/test_proxy_header_bounds.py
           tests/test_request_identity_logging_security.py
           tests/test_security_middleware_properties.py
+          tests/test_webhook_cron_security.py
