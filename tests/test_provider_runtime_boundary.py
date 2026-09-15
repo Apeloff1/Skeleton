@@ -3,10 +3,17 @@ from pathlib import Path
 from scripts.check_provider_runtime_boundary import audit_repository
 
 
+ROOT = Path(__file__).resolve().parents[1]
+
+
 def _write(root: Path, relative: str, content: str) -> None:
     path = root / relative
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+
+
+def test_repository_provider_runtime_boundary_is_clean() -> None:
+    assert audit_repository(ROOT) == []
 
 
 def test_google_genai_direct_import_is_rejected(tmp_path: Path) -> None:
