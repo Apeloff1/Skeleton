@@ -108,7 +108,7 @@ jobs:
             delete_branches=()
             delete_tips=()
             merged_pr_count=0
-            aligned_merged_count=0
+            ancestor_merged_count=0
             ancestor_unproven_count=0
             unique_count=0
             protected_count=0
@@ -122,13 +122,13 @@ jobs:
             while read -r tip branch; do
               [[ -n "$tip" && -n "$branch" ]] || continue
 
-              # Permanent coordination/release refs are never cleanup candidates.
-              # Every other deletion requires merged-PR history plus either an
-              # exact historical merged head or exact alignment with current main.
-              # Alignment is safe to prune because there is no unique branch commit,
-              # while the expected-tip lease below protects against a new commit race.
+              # Permanent coordination/release/backup refs are never cleanup
+              # candidates. Every other deletion needs merged-PR history plus
+              # proof that the live tip carries no unique work: either it is the
+              # exact historical merged head or it is already an ancestor of main.
+              # Expected-tip leases below protect against a new commit race.
               case "$branch" in
-                main|develop|release/*|keep/*)
+                main|develop|release/*|keep/*|backup/*)
                   protected_count=$((protected_count + 1))
                   printf '%s %s protected-name\n' "$branch" "$tip" >> ../preserved-branches.txt
                   continue
@@ -145,16 +145,13 @@ jobs:
                 merged_pr_count=$((merged_pr_count + 1))
                 delete_branches+=("$branch")
                 delete_tips+=("$tip")
-              elif [[ "$tip" == "$classified_main" && -n "${merged_pr_branches[$branch]+x}" ]]; then
-                aligned_merged_count=$((aligned_merged_count + 1))
+              elif [[ -n "${merged_pr_branches[$branch]+x}" ]] && git merge-base --is-ancestor "$tip" "$main_ref"; then
+                ancestor_merged_count=$((ancestor_merged_count + 1))
                 delete_branches+=("$branch")
                 delete_tips+=("$tip")
               elif git merge-base --is-ancestor "$tip" "$main_ref"; then
                 ancestor_unproven_count=$((ancestor_unproven_count + 1))
                 printf '%s %s ancestor-without-merged-pr-proof\n' "$branch" "$tip" >> ../preserved-branches.txt
-              elif [[ "$branch" == backup/* ]]; then
-                protected_count=$((protected_count + 1))
-                printf '%s %s protected-backup-unmerged\n' "$branch" "$tip" >> ../preserved-branches.txt
               else
                 unique_count=$((unique_count + 1))
                 printf '%s %s unique-or-unproven\n' "$branch" "$tip" >> ../preserved-branches.txt
@@ -236,17 +233,17 @@ jobs:
               echo "- Stable classification round: $round/$max_rounds"
               echo "- main tip: \`$current_main\`"
               echo "- Exact merged-PR head refs eligible: $merged_pr_count"
-              echo "- Main-aligned refs with merged-PR history eligible: $aligned_merged_count"
-              echo "- Ancestor-only refs preserved: $ancestor_unproven_count"
+              echo "- Ancestor refs with merged-PR history eligible: $ancestor_merged_count"
+              echo "- Ancestor refs without merged-PR proof preserved: $ancestor_unproven_count"
               echo "- Unique/unproven branch refs preserved: $unique_count"
-              echo "- Long-lived or still-unique backup refs preserved: $protected_count"
+              echo "- Long-lived/release/backup refs preserved: $protected_count"
               echo "- Open-PR branch refs preserved during classification: $open_pr_count"
               echo "- Newly-opened PR branch refs preserved before deletion: $late_open_pr_count"
               echo "- Branch refs deleted: $deleted"
               echo "- Moved or server-protected refs preserved at deletion time: $raced_or_blocked"
               echo '- main is never modified by this workflow.'
-              echo '- Ancestry alone is never sufficient deletion proof.'
-              echo '- Main alignment requires historical merged-PR evidence for that branch name.'
+              echo '- Ancestry alone is never sufficient deletion proof: the branch name must also have merged-PR history.'
+              echo '- Protected names and open-PR heads are never cleanup candidates.'
               echo '- Patch-equivalence heuristics are not used for deletion.'
               echo '- Every deletion uses an expected-tip lease.'
               if [[ -s ../preserved-branches.txt ]]; then
