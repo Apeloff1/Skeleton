@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import os
 from pathlib import Path
+import stat
 import sys
 from types import ModuleType
 from typing import Iterable
@@ -38,27 +40,52 @@ BACKEND_GATE = _load_backend_gate()
 SUBPROCESS_CALLS = {f"subprocess.{name}" for name in BACKEND_GATE.SUBPROCESS_CALLS}
 
 
-def python_files() -> Iterable[Path]:
-    """Yield every Python file in the active runtime/security roots exactly once."""
-    seen: set[Path] = set()
-    for root in SCAN_ROOTS:
-        if not root.exists():
-            continue
-        for path in root.rglob("*.py"):
-            if any(part in SKIP_DIRS for part in path.parts):
-                continue
-            resolved = path.resolve()
-            if resolved in seen:
-                continue
-            seen.add(resolved)
-            yield path
-
-
 def display_path(path: Path) -> Path:
     try:
         return path.relative_to(REPO_ROOT)
     except ValueError:
         return path
+
+
+def _validate_scan_root(root: Path) -> None:
+    """Reject missing, symlinked, or non-directory runtime roots."""
+    metadata = root.lstat()
+    if stat.S_ISLNK(metadata.st_mode):
+        raise OSError(f"scan root is a symlink: {display_path(root)}")
+    if not stat.S_ISDIR(metadata.st_mode):
+        raise OSError(f"scan root is not a directory: {display_path(root)}")
+
+
+def iter_python_files(root: Path) -> Iterable[Path]:
+    """Yield Python files using observable, non-symlink-following traversal."""
+    _validate_scan_root(root)
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                path = Path(entry.path)
+                if path.name in SKIP_DIRS:
+                    continue
+                if entry.is_symlink():
+                    continue
+                if entry.is_dir(follow_symlinks=False):
+                    pending.append(path)
+                    continue
+                if entry.is_file(follow_symlinks=False) and path.suffix == ".py":
+                    yield path
+
+
+def python_files() -> Iterable[Path]:
+    """Yield every Python file in required runtime/security roots exactly once."""
+    seen: set[Path] = set()
+    for root in SCAN_ROOTS:
+        for path in iter_python_files(root):
+            resolved = path.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            yield path
 
 
 def _definitely_string_command(node: ast.AST) -> bool:
@@ -90,19 +117,17 @@ def _command_argument(node: ast.Call) -> ast.AST | None:
     return None
 
 
-def argv_violations(path: Path) -> list[str]:
-    """Reject subprocess calls that are provably single-string commands.
-
-    Dynamic values are left to the existing policy scanner and normal type/tests;
-    this check is deliberately high-confidence so it does not reject variables
-    that hold validated argument vectors.
-    """
+def _parse_tree(path: Path) -> tuple[ast.AST | None, list[str]]:
     label = display_path(path)
     try:
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        source = path.read_text(encoding="utf-8")
+        return ast.parse(source, filename=str(path)), []
     except (OSError, UnicodeError, SyntaxError) as exc:
-        return [f"{label}: parse failure: {exc}"]
+        return None, [f"{label}: parse failure: {type(exc).__name__}"]
 
+
+def _argv_violations_from_tree(path: Path, tree: ast.AST) -> list[str]:
+    label = display_path(path)
     aliases = BACKEND_GATE.assignment_aliases(tree, BACKEND_GATE.import_aliases(tree))
     findings: list[str] = []
     for node in ast.walk(tree):
@@ -119,16 +144,35 @@ def argv_violations(path: Path) -> list[str]:
     return findings
 
 
+def argv_violations(path: Path) -> list[str]:
+    """Reject subprocess calls that are provably single-string commands."""
+    tree, parse_findings = _parse_tree(path)
+    if tree is None:
+        return parse_findings
+    return _argv_violations_from_tree(path, tree)
+
+
 def violations(path: Path) -> list[str]:
-    return [*BACKEND_GATE.violations(path), *argv_violations(path)]
+    # Parse once before invoking the backend analyzer so malformed/unreadable
+    # evidence is reported with a redacted exception class rather than raw text.
+    tree, parse_findings = _parse_tree(path)
+    if tree is None:
+        return parse_findings
+    return [*BACKEND_GATE.violations(path), *_argv_violations_from_tree(path, tree)]
 
 
 def main() -> int:
     findings: list[str] = []
     scanned = 0
-    for path in python_files():
-        scanned += 1
-        findings.extend(violations(path))
+    try:
+        for path in python_files():
+            scanned += 1
+            findings.extend(violations(path))
+    except OSError as exc:
+        findings.append(f"repository traversal failure: {type(exc).__name__}")
+
+    if scanned == 0:
+        findings.append("scanner coverage failure: no Python files were scanned")
 
     if findings:
         print("Repository process-safety violations detected:", file=sys.stderr)
