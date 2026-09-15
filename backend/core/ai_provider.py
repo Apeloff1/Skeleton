@@ -96,8 +96,12 @@ def normalize_history(
     for item in history:
         if not isinstance(item, Mapping):
             continue
-        role = str(item.get("role", "")).strip().lower()
-        content = str(item.get("content", "")).strip()
+        raw_role = item.get("role")
+        raw_content = item.get("content")
+        if not isinstance(raw_role, str) or not isinstance(raw_content, str):
+            continue
+        role = raw_role.strip().lower()
+        content = raw_content.strip()
         if role not in _ALLOWED_HISTORY_ROLES or not content:
             continue
         normalized.append(AIMessage(role=role, content=content))
@@ -115,6 +119,40 @@ def normalize_history(
         used += len(content)
 
     return tuple(reversed(kept_reversed))
+
+
+def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
+    """Validate provider-neutral request fields before any provider I/O."""
+
+    if not isinstance(request.prompt, str) or not request.prompt.strip():
+        raise ProviderInvocationError("model provider prompt must be non-empty text")
+
+    for message in request.history:
+        if not isinstance(message, AIMessage):
+            raise ProviderInvocationError("model provider history contains an invalid message")
+        if message.role not in _ALLOWED_HISTORY_ROLES:
+            raise ProviderInvocationError("model provider history contains an invalid role")
+        if not isinstance(message.content, str) or not message.content.strip():
+            raise ProviderInvocationError("model provider history contains empty content")
+
+    max_output_tokens = request.max_output_tokens
+    if max_output_tokens is not None and (
+        isinstance(max_output_tokens, bool)
+        or not isinstance(max_output_tokens, int)
+        or max_output_tokens <= 0
+    ):
+        raise ProviderInvocationError("max_output_tokens must be a positive integer")
+
+    if request.model is None:
+        model = default_model
+    elif not isinstance(request.model, str) or not request.model.strip():
+        raise ProviderInvocationError("model provider model must be non-empty text")
+    else:
+        model = request.model.strip()
+
+    if not model:
+        raise ProviderInvocationError("model provider model must be non-empty text")
+    return model
 
 
 class OpenAIProviderAdapter(ProviderAdapter):
@@ -180,12 +218,13 @@ class OpenAIProviderAdapter(ProviderAdapter):
         return self._client
 
     async def generate(self, request: ProviderRequest) -> ProviderResponse:
+        model = _validate_request(request, default_model=self.model)
         client = self._get_client()
         messages: list[dict[str, str]] = [message.as_openai_input() for message in request.history]
         messages.append({"role": "user", "content": request.prompt})
 
         kwargs: dict[str, Any] = {
-            "model": request.model or self.model,
+            "model": model,
             "instructions": request.instructions,
             "input": messages,
         }
@@ -209,7 +248,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
         return ProviderResponse(
             text=text,
             provider=self.provider_id,
-            model=str(kwargs["model"]),
+            model=model,
             request_id=str(request_id) if request_id else None,
             latency_ms=round(latency_ms, 2),
         )
