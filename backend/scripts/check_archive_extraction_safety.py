@@ -153,6 +153,12 @@ def _callable_aliases(scope: ast.AST, aliases: dict[str, str]) -> dict[str, str]
             if canonical not in TARFILE_SAFE_CALLABLES:
                 continue
             for name in names:
+                # TarFile instance provenance is intentionally sticky within a
+                # scope. A prior constructor-alias assignment must not downgrade
+                # a symbol that another assignment proved holds a TarFile; doing
+                # so would hide later ``archive.extractall`` method provenance.
+                if current.get(name) == "tarfile.TarFile" and canonical != "tarfile.TarFile":
+                    continue
                 if current.get(name) == canonical:
                     continue
                 inferred[name] = canonical

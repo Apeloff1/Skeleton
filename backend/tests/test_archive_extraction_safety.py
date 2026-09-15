@@ -53,6 +53,29 @@ def test_rejects_constructor_alias(tmp_path: Path) -> None:
     assert _unsafe(findings)
 
 
+def test_rejects_reused_constructor_alias_as_tarfile_instance(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import tarfile\n"
+        "archive = tarfile.open\n"
+        "archive = archive('bundle.tar')\n"
+        "archive.extractall('/tmp/out')\n",
+    )
+    assert _unsafe(findings)
+
+
+def test_rejects_method_alias_after_reused_constructor_alias(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import tarfile\n"
+        "archive = tarfile.open\n"
+        "archive = archive('bundle.tar')\n"
+        "extract_all = archive.extractall\n"
+        "extract_all('/tmp/out')\n",
+    )
+    assert _unsafe(findings)
+
+
 def test_rejects_extraction_method_alias(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
@@ -106,10 +129,33 @@ def test_allows_literal_data_filter(tmp_path: Path) -> None:
     assert findings == []
 
 
+def test_allows_reused_constructor_alias_with_literal_data_filter(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import tarfile\n"
+        "archive = tarfile.open\n"
+        "archive = archive('bundle.tar')\n"
+        "archive.extractall('/tmp/out', filter='data')\n",
+    )
+    assert findings == []
+
+
 def test_allows_tarfile_data_filter_callable(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
         "import tarfile\nwith tarfile.open('bundle.tar') as archive:\n    archive.extractall('/tmp/out', filter=tarfile.data_filter)\n",
+    )
+    assert findings == []
+
+
+def test_allows_reused_constructor_method_alias_with_data_filter(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import tarfile\n"
+        "archive = tarfile.open\n"
+        "archive = archive('bundle.tar')\n"
+        "extract_all = archive.extractall\n"
+        "extract_all('/tmp/out', filter=tarfile.data_filter)\n",
     )
     assert findings == []
 
