@@ -1,0 +1,39 @@
+name: Provider Runtime Migration Codemod
+
+on:
+  push:
+    branches:
+      - fix/provider-runtime-migration-20260915
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Rewrite retired provider imports
+        run: python scripts/migrate_legacy_llm_imports.py
+      - name: Validate provider boundary after rewrite
+        run: python scripts/check_provider_runtime_boundary.py
+      - name: Compile migrated backend
+        run: python -m compileall -q backend
+      - name: Commit migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- backend; then
+            echo 'No migration changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend
+          git commit -m 'ai: route legacy chat imports through provider facade'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
