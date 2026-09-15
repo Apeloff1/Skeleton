@@ -8,9 +8,8 @@ on:
   schedule:
     - cron: "*/5 * * * *"
 
-# Keep one cleanup run alive while main is moving rapidly. GitHub still keeps
-# at most one pending run for this group, so newer pushes coalesce without
-# killing the active drainer before it can finish its multi-pass sweep.
+# One live drainer plus one coalesced pending run. The active worker is never
+# killed merely because main advances while it is sweeping delayed fanout.
 concurrency:
   group: queue-drain-${{ github.repository }}
   cancel-in-progress: false
@@ -19,8 +18,6 @@ permissions: {}
 
 jobs:
   drain:
-    # Run cleanup off the normal x64 pool. The write token exists only for this
-    # job and is used only to cancel obsolete or duplicate Actions runs.
     permissions:
       actions: write
       contents: read
@@ -31,7 +28,7 @@ jobs:
       REPO: ${{ github.repository }}
       CURRENT_RUN_ID: ${{ github.run_id }}
     steps:
-      - name: Cancel obsolete and superseded Actions runs
+      - name: Cancel obsolete workload runs without killing the control plane
         shell: bash
         run: |
           set -euo pipefail
@@ -53,7 +50,15 @@ jobs:
               'X-GitHub-Api-Version': '2022-11-28',
               'User-Agent': 'skeleton-queue-drainer',
           }
-          RETRYABLE_STATUSES = frozenset({0, 429, 500, 502, 503, 504})
+          retryable = frozenset({0, 429, 500, 502, 503, 504})
+
+          # These workflows are the branch-flow control plane. They are designed
+          # to follow a moving main and must never be garbage-collected as stale
+          # workload just because a newer commit appears while they are queued.
+          control_plane_paths = frozenset({
+              '.github/workflows/branch-clean.yml',
+              '.github/workflows/queue-drain.yml',
+          })
 
           def request(path, *, method='GET'):
               req = urllib.request.Request(
@@ -69,152 +74,112 @@ jobs:
               except urllib.error.HTTPError as exc:
                   return exc.code, None
               except urllib.error.URLError:
-                  # Treat transport failures as retryable by mutation callers
-                  # instead of crashing the whole queue-drain process.
                   return 0, None
 
-          def cancel_run(run_id):
+          def cancel(run_id):
               status = 0
-              for attempt in range(1, 4):
+              for attempt in range(3):
                   status, _ = request(
                       f'/repos/{repo}/actions/runs/{run_id}/cancel',
                       method='POST',
                   )
-                  if status not in RETRYABLE_STATUSES:
+                  if status not in retryable:
                       return status
-                  if attempt < 3:
-                      delay = 2 ** (attempt - 1)
-                      print(
-                          f'cancel retry: id={run_id} status={status} '
-                          f'attempt={attempt}/3 sleep={delay}s'
-                      )
-                      time.sleep(delay)
+                  if attempt < 2:
+                      time.sleep(2 ** attempt)
               return status
 
-          def resolve_main_sha():
-              status, branch = request(f'/repos/{repo}/branches/main')
-              if status != 200 or not isinstance(branch, dict):
+          def main_sha():
+              status, payload = request(f'/repos/{repo}/branches/main')
+              sha = ((payload or {}).get('commit') or {}).get('sha', '')
+              if status != 200 or not sha:
                   raise SystemExit(f'failed to resolve main HEAD: HTTP {status}')
-              sha = ((branch.get('commit') or {}).get('sha') or '').strip()
-              if not sha:
-                  raise SystemExit('failed to resolve main HEAD SHA')
               return sha
 
-          def list_runs(run_status):
-              runs = []
+          def list_runs(run_status=None, head_sha=None):
+              out = []
               for page in range(1, 11):
-                  query = urllib.parse.urlencode({
-                      'status': run_status,
-                      'per_page': 100,
-                      'page': page,
-                  })
+                  params = {'per_page': 100, 'page': page}
+                  if run_status:
+                      params['status'] = run_status
+                  if head_sha:
+                      params['head_sha'] = head_sha
+                  query = urllib.parse.urlencode(params)
                   status, payload = request(f'/repos/{repo}/actions/runs?{query}')
                   if status != 200 or not isinstance(payload, dict):
-                      raise SystemExit(
-                          f'failed to list {run_status} runs: HTTP {status}'
-                      )
+                      raise SystemExit(f'failed to list Actions runs: HTTP {status}')
                   batch = payload.get('workflow_runs') or []
-                  runs.extend(batch)
+                  out.extend(batch)
                   if len(batch) < 100:
                       break
-              return runs
+              return out
 
-          def list_head_runs(head_sha):
-              runs = []
-              for page in range(1, 11):
-                  query = urllib.parse.urlencode({
-                      'head_sha': head_sha,
-                      'per_page': 100,
-                      'page': page,
-                  })
-                  status, payload = request(f'/repos/{repo}/actions/runs?{query}')
-                  if status != 200 or not isinstance(payload, dict):
-                      raise SystemExit(
-                          f'failed to list current-head runs: HTTP {status}'
-                      )
-                  batch = payload.get('workflow_runs') or []
-                  runs.extend(batch)
-                  if len(batch) < 100:
-                      break
-              return runs
+          def path(run):
+              return run.get('path') or ''
+
+          def is_control_plane(run):
+              return path(run) in control_plane_paths
 
           def workflow_event_key(run):
-              return (
-                  int(run.get('workflow_id') or 0),
-                  run.get('event') or '',
-              )
+              return (int(run.get('workflow_id') or 0), run.get('event') or '')
 
-          def queue_key(run):
+          def lane_key(run):
               return (
                   int(run.get('workflow_id') or 0),
                   run.get('head_branch') or '',
                   run.get('event') or '',
               )
 
-          def is_usable_replacement(run):
-              # A failed current-head validation is still authoritative and
-              # supersedes older code. A cancelled run produced no usable
-              # validation result and therefore must not evict the last one.
+          def usable_replacement(run):
               return not (
                   run.get('status') == 'completed'
                   and run.get('conclusion') == 'cancelled'
               )
 
           attempted = set()
-          transient_pending = set()
+          transient = set()
           totals = {
-              'queued_inspected': 0,
-              'active_inspected': 0,
-              'selected': 0,
+              'queued_seen': 0,
+              'active_seen': 0,
+              'control_plane_preserved': 0,
               'obsolete_main': 0,
-              'duplicate': 0,
+              'duplicates': 0,
               'stale_dynamic_active': 0,
-              'preserved_last_validation': 0,
-              'preserved_dynamic_without_replacement': 0,
+              'last_validation_preserved': 0,
               'accepted': 0,
               'moved': 0,
               'deferred': 0,
               'failed': 0,
           }
           pass_lines = []
-          latest_main_sha = ''
+          latest_main = ''
 
-          # GitHub-managed security and dependency runs can arrive several
-          # seconds after a push. Sweep repeatedly so delayed fanout is folded
-          # into one cleanup run. Path-filtered workflows need extra care: an
-          # older SHA is cancellable only when current HEAD has a replacement
-          # run for that workflow/event. Otherwise preserve the newest pending
-          # validation so a test/docs-only push cannot erase the last relevant
-          # code validation merely by advancing main.
-          for pass_number in range(1, 5):
-              main_sha = resolve_main_sha()
-              latest_main_sha = main_sha
-              head_runs = list_head_runs(main_sha)
+          # Four passes catch GitHub-managed fanout that arrives seconds after a
+          # push. Each pass resolves main again, so the drainer follows the live
+          # repository rather than a stale workflow-event SHA.
+          for pass_no in range(1, 5):
+              head = main_sha()
+              latest_main = head
+              head_runs = list_runs(head_sha=head)
               replacement_keys = {
                   workflow_event_key(run)
                   for run in head_runs
-                  if is_usable_replacement(run)
+                  if usable_replacement(run)
               }
-              queued = list_runs('queued')
-              active = list_runs('in_progress')
+              queued = list_runs(run_status='queued')
+              active = list_runs(run_status='in_progress')
               live_ids = {
                   int(run.get('id') or 0)
-                  for run in [*queued, *active]
+                  for run in (*queued, *active)
                   if int(run.get('id') or 0)
               }
-              # If a previously deferred run left the queue between passes,
-              # GitHub already moved or completed it; it is no longer unresolved.
-              transient_pending.intersection_update(live_ids)
-              totals['queued_inspected'] += len(queued)
-              totals['active_inspected'] += len(active)
+              transient.intersection_update(live_ids)
+              totals['queued_seen'] += len(queued)
+              totals['active_seen'] += len(active)
 
-              seen = set()
               selected = []
-              obsolete_main = 0
-              duplicate = 0
-              stale_dynamic_active = 0
-              preserved_last_validation = 0
-              preserved_dynamic_without_replacement = 0
+              seen = set()
+              local = {key: 0 for key in totals}
 
               for run in sorted(
                   queued,
@@ -224,170 +189,138 @@ jobs:
                   run_id = int(run.get('id') or 0)
                   if not run_id or run_id == current or run_id in attempted:
                       continue
+                  if is_control_plane(run):
+                      totals['control_plane_preserved'] += 1
+                      local['control_plane_preserved'] += 1
+                      continue
 
-                  key = queue_key(run)
-                  replacement_key = workflow_event_key(run)
-                  branch = run.get('head_branch') or ''
+                  lane = lane_key(run)
+                  replacement = workflow_event_key(run)
                   old_main = (
-                      branch == 'main'
-                      and (run.get('head_sha') or '') != main_sha
+                      (run.get('head_branch') or '') == 'main'
+                      and (run.get('head_sha') or '') != head
                   )
 
                   if old_main:
-                      if replacement_key in replacement_keys:
+                      if replacement in replacement_keys:
                           selected.append(run)
-                          obsolete_main += 1
+                          totals['obsolete_main'] += 1
+                          local['obsolete_main'] += 1
                           continue
 
-                      # No current-head replacement exists. Preserve the newest
-                      # outstanding run for this workflow/ref/event and cancel
-                      # only older copies of that same validation lane.
-                      if key in seen:
+                      # For path-filtered validation lanes with no current-head
+                      # replacement, keep the newest outstanding result source.
+                      if lane in seen:
                           selected.append(run)
-                          duplicate += 1
+                          totals['duplicates'] += 1
+                          local['duplicates'] += 1
                       else:
-                          seen.add(key)
-                          preserved_last_validation += 1
+                          seen.add(lane)
+                          totals['last_validation_preserved'] += 1
+                          local['last_validation_preserved'] += 1
                       continue
 
-                  if key in seen:
+                  if lane in seen:
                       selected.append(run)
-                      duplicate += 1
+                      totals['duplicates'] += 1
+                      local['duplicates'] += 1
                   else:
-                      seen.add(key)
+                      seen.add(lane)
 
+              # Only dynamic generated workflows are cancelled while already
+              # running. Ordinary CI and both control-plane workflows finish.
               for run in active:
                   run_id = int(run.get('id') or 0)
-                  path = run.get('path') or ''
                   if not run_id or run_id == current or run_id in attempted:
+                      continue
+                  if is_control_plane(run):
+                      totals['control_plane_preserved'] += 1
+                      local['control_plane_preserved'] += 1
                       continue
                   if (
                       (run.get('head_branch') or '') == 'main'
-                      and (run.get('head_sha') or '') != main_sha
-                      and path.startswith('dynamic/')
+                      and (run.get('head_sha') or '') != head
+                      and path(run).startswith('dynamic/')
+                      and workflow_event_key(run) in replacement_keys
                   ):
-                      if workflow_event_key(run) in replacement_keys:
-                          selected.append(run)
-                          stale_dynamic_active += 1
-                      else:
-                          preserved_dynamic_without_replacement += 1
+                      selected.append(run)
+                      totals['stale_dynamic_active'] += 1
+                      local['stale_dynamic_active'] += 1
 
               accepted = moved = deferred = failed = 0
               for run in selected:
                   run_id = int(run['id'])
-                  status = cancel_run(run_id)
+                  status = cancel(run_id)
                   if status in {200, 202}:
                       attempted.add(run_id)
-                      transient_pending.discard(run_id)
+                      transient.discard(run_id)
                       accepted += 1
                   elif status in {404, 409, 422}:
                       attempted.add(run_id)
-                      transient_pending.discard(run_id)
+                      transient.discard(run_id)
                       moved += 1
-                  elif status in RETRYABLE_STATUSES:
-                      # Keep the run eligible for a later sweep. A short-lived
-                      # GitHub API outage is not a permanent cancellation error.
-                      transient_pending.add(run_id)
+                  elif status in retryable:
+                      transient.add(run_id)
                       deferred += 1
-                      print(
-                          f'cancel deferred: id={run_id} status={status} '
-                          f'pass={pass_number}'
-                      )
                   else:
                       attempted.add(run_id)
-                      transient_pending.discard(run_id)
+                      transient.discard(run_id)
                       failed += 1
                       print(f'cancel failed: id={run_id} status={status}')
 
-              totals['selected'] += len(selected)
-              totals['obsolete_main'] += obsolete_main
-              totals['duplicate'] += duplicate
-              totals['stale_dynamic_active'] += stale_dynamic_active
-              totals['preserved_last_validation'] += preserved_last_validation
-              totals['preserved_dynamic_without_replacement'] += (
-                  preserved_dynamic_without_replacement
-              )
               totals['accepted'] += accepted
               totals['moved'] += moved
               totals['deferred'] += deferred
               totals['failed'] += failed
 
               line = (
-                  f'pass={pass_number} main_sha={main_sha} queued={len(queued)} '
+                  f'pass={pass_no} main={head} queued={len(queued)} '
                   f'active={len(active)} selected={len(selected)} '
-                  f'obsolete_main={obsolete_main} duplicate={duplicate} '
-                  f'stale_dynamic_active={stale_dynamic_active} '
-                  f'preserved_last_validation={preserved_last_validation} '
-                  'preserved_dynamic_without_replacement='
-                  f'{preserved_dynamic_without_replacement} '
+                  f'control_plane_preserved={local["control_plane_preserved"]} '
+                  f'obsolete_main={local["obsolete_main"]} '
+                  f'duplicates={local["duplicates"]} '
+                  f'last_validation_preserved={local["last_validation_preserved"]} '
                   f'accepted={accepted} moved={moved} deferred={deferred} '
                   f'failed={failed}'
               )
               print(line)
               pass_lines.append(line)
-
-              if pass_number < 4:
+              if pass_no < 4:
                   time.sleep(8)
-
-          unresolved_transient = len(transient_pending)
-          print(
-              'totals '
-              + ' '.join(f'{key}={value}' for key, value in totals.items())
-              + f' unresolved_transient={unresolved_transient}'
-          )
 
           summary = os.environ.get('GITHUB_STEP_SUMMARY')
           if summary:
               with open(summary, 'a', encoding='utf-8') as handle:
                   handle.write('## Actions queue drain\n')
-                  handle.write(f'- Latest live main SHA: `{latest_main_sha}`\n')
+                  handle.write(f'- Latest live main SHA: `{latest_main}`\n')
                   handle.write('- Sweep passes: 4 over ~24 seconds\n')
                   handle.write(
-                      f'- Queued observations: {totals["queued_inspected"]}\n'
-                  )
-                  handle.write(
-                      f'- Active observations: {totals["active_inspected"]}\n'
+                      '- Branch control-plane observations preserved: '
+                      f'{totals["control_plane_preserved"]}\n'
                   )
                   handle.write(
                       f'- Obsolete main selections: {totals["obsolete_main"]}\n'
                   )
                   handle.write(
-                      f'- Duplicate selections: {totals["duplicate"]}\n'
-                  )
-                  handle.write(
-                      '- Stale dynamic in-progress selections: '
-                      f'{totals["stale_dynamic_active"]}\n'
+                      f'- Duplicate selections: {totals["duplicates"]}\n'
                   )
                   handle.write(
                       '- Last path-filtered validations preserved: '
-                      f'{totals["preserved_last_validation"]}\n'
-                  )
-                  handle.write(
-                      '- Dynamic active runs preserved without replacement: '
-                      f'{totals["preserved_dynamic_without_replacement"]}\n'
+                      f'{totals["last_validation_preserved"]}\n'
                   )
                   handle.write(
                       f'- Cancel requests accepted: {totals["accepted"]}\n'
                   )
                   handle.write(
-                      f'- Already moved/completed: {totals["moved"]}\n'
-                  )
-                  handle.write(
-                      f'- Transient cancellations deferred: {totals["deferred"]}\n'
-                  )
-                  handle.write(
-                      f'- Transient cancellations still live: {unresolved_transient}\n'
-                  )
-                  handle.write(
                       f'- Terminal cancellation failures: {totals["failed"]}\n'
                   )
                   handle.write(
-                      '- Safety: current main HEAD, the newest outstanding '
-                      'validation for path-filtered workflows without a HEAD '
-                      'replacement, normal in-progress CI/deployments, and PR '
-                      'work are preserved.\n'
+                      '- Safety: `branch-clean.yml` and `queue-drain.yml` are '
+                      'never cancellation targets; current main, PR work, and '
+                      'the newest path-filtered validation without a live-head '
+                      'replacement are preserved.\n\n'
                   )
-                  handle.write('\n### Passes\n')
+                  handle.write('### Passes\n')
                   for line in pass_lines:
                       handle.write(f'- `{line}`\n')
 
