@@ -20,6 +20,7 @@ import hashlib
 import hmac
 import json
 import os
+from copy import deepcopy
 from dataclasses import asdict, dataclass, is_dataclass, replace
 from enum import Enum
 from typing import Any, Callable, Dict, Iterable, Mapping, Optional, Sequence, Tuple
@@ -228,31 +229,34 @@ class TriAdversarialEngine:
             )
 
     def evaluate(self, ctx: AdversarialContext) -> TriReleaseDecision:
-        candidate = ctx.candidate
-        lane_decisions = []
-        flat_results = []
+        lanes_tuple, results_tuple, candidate = self._evaluate_lanes(
+            ctx, ctx.candidate, self.engines, propagate_candidate=True
+        )
+        repair_rounds = sum(item.decision.repair_rounds for item in lanes_tuple)
 
-        for lane in TRI_LANES:
-            lane_ctx = self._lane_context(ctx, lane, candidate)
-            decision = self.engines[lane].evaluate(lane_ctx)
-            if len(decision.results) != 100:
-                raise RuntimeError(
-                    f"tri-engine invariant violated: {lane.value} returned "
-                    f"{len(decision.results)} gates instead of 100"
+        # Any repair changes the artifact under review. The lane decisions from
+        # before that change cannot be treated as seals for the final artifact.
+        # Re-run all three lanes once, with repair disabled, over the exact final
+        # candidate. This is the authoritative release pass and fails closed if
+        # any lane still asks for repair or blocks.
+        if repair_rounds:
+            validation_engines = {
+                lane: AdversarialEngine(
+                    threshold=engine.threshold,
+                    max_repair_rounds=0,
+                    judge=engine.judge,
+                    repairer=None,
+                    seal_key=self.seal_key,
                 )
-            lane_decisions.append(LaneDecision(lane, decision))
-            flat_results.extend(TriGateResult(lane, result) for result in decision.results)
-            # Repairs are allowed to improve the candidate before the next lane.
-            # A blocked lane still passes its final candidate forward so later lanes
-            # can collect complete diagnostics rather than short-circuiting.
-            candidate = decision.candidate
+                for lane, engine in self.engines.items()
+            }
+            lanes_tuple, results_tuple, candidate = self._evaluate_lanes(
+                ctx, candidate, validation_engines, propagate_candidate=False
+            )
 
-        lanes_tuple = tuple(lane_decisions)
-        results_tuple = tuple(flat_results)
         allowed = all(item.allowed for item in lanes_tuple)
         score = float(sum(item.score for item in lanes_tuple))
         normalized = score / float(len(TRI_LANES))
-        repair_rounds = sum(item.decision.repair_rounds for item in lanes_tuple)
         seal = self._make_seal(ctx, lanes_tuple, candidate, repair_rounds) if allowed else None
         return TriReleaseDecision(
             allowed=allowed,
@@ -265,6 +269,33 @@ class TriAdversarialEngine:
             seal=seal,
         )
 
+    def _evaluate_lanes(
+        self,
+        ctx: AdversarialContext,
+        candidate: Any,
+        engines: Mapping[TriLane, AdversarialEngine],
+        *,
+        propagate_candidate: bool,
+    ) -> Tuple[Tuple[LaneDecision, ...], Tuple[TriGateResult, ...], Any]:
+        lane_decisions = []
+        flat_results = []
+        current_candidate = candidate
+
+        for lane in TRI_LANES:
+            lane_ctx = self._lane_context(ctx, lane, current_candidate)
+            decision = engines[lane].evaluate(lane_ctx)
+            if len(decision.results) != 100:
+                raise RuntimeError(
+                    f"tri-engine invariant violated: {lane.value} returned "
+                    f"{len(decision.results)} gates instead of 100"
+                )
+            lane_decisions.append(LaneDecision(lane, decision))
+            flat_results.extend(TriGateResult(lane, result) for result in decision.results)
+            if propagate_candidate:
+                current_candidate = decision.candidate
+
+        return tuple(lane_decisions), tuple(flat_results), current_candidate
+
     def guard(self, ctx: AdversarialContext) -> Any:
         decision = self.evaluate(ctx)
         if not decision.allowed:
@@ -273,7 +304,10 @@ class TriAdversarialEngine:
 
     @staticmethod
     def _lane_context(ctx: AdversarialContext, lane: TriLane, candidate: Any) -> AdversarialContext:
-        metadata = dict(ctx.metadata)
+        # Every lane receives a deep-isolated metadata graph. Judges are external
+        # callbacks and may mutate nested structures; such mutation must never
+        # leak to sibling lanes or back to caller-owned metadata.
+        metadata = deepcopy(dict(ctx.metadata))
         lane_overlays = metadata.pop("tri_lanes", {})
         overlay: Mapping[str, Any] = {}
         if isinstance(lane_overlays, Mapping):
