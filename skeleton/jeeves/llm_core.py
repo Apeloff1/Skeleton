@@ -28,11 +28,35 @@ from skeleton.jeeves.matrices_llm import (
 )
 
 
+MAX_INPUT_CHARS = 32_000
+
+
 class SessionMode(Enum):
     TUTORING = "tutoring"
+    CO_CODING = "co_coding"
+    TACTICAL = "tactical"
+    BUILDER = "builder"
+    CORTEX = "cortex"
     CREATIVE = "creative"
     ANALYTICAL = "analytical"
     DEBUG = "debug"
+
+
+def _normalise_mode(mode: Any) -> SessionMode:
+    """Normalize sibling/legacy enums and strings onto JeevesCore's enum.
+
+    The HTTP API historically imported ``SessionMode`` from ``jeeves.core``
+    while the provider-backed JeevesCore owns the enum in this module. Enum
+    instances from different classes do not compare equal even when their
+    values match, which silently disabled mode-specific system prompts.
+    """
+    if isinstance(mode, SessionMode):
+        return mode
+    raw = getattr(mode, "value", mode)
+    try:
+        return SessionMode(str(raw))
+    except (TypeError, ValueError):
+        return SessionMode.TUTORING
 
 
 @dataclass
@@ -84,7 +108,12 @@ class MemoryManager:
         self._stats["created"] += 1
         if len(self._sessions) > self._max_sessions:
             oldest = min(self._sessions.keys(), key=lambda s: self._sessions[s].created_at)
-            del self._sessions[oldest]
+            evicted = self._sessions.pop(oldest)
+            history = self._user_sessions.get(evicted.user_id)
+            if history is not None:
+                self._user_sessions[evicted.user_id] = [sid for sid in history if sid != oldest]
+                if not self._user_sessions[evicted.user_id]:
+                    del self._user_sessions[evicted.user_id]
         return session
 
     def get_session(self, session_id: str) -> Optional[Session]:
@@ -105,6 +134,10 @@ class MemoryManager:
 
 MODE_SYSTEM_PROMPTS: Dict[SessionMode, str] = {
     SessionMode.TUTORING: "You are a patient tutor. Explain step by step.",
+    SessionMode.CO_CODING: "You are a co-coding partner. Review, explain, and keep the learner in control.",
+    SessionMode.TACTICAL: "You are a tactical systems advisor. Prioritize the highest-impact next action.",
+    SessionMode.BUILDER: "You are a builder. Turn goals into concrete architecture and implementation steps.",
+    SessionMode.CORTEX: "You are a systems reasoning cortex. Integrate evidence across subsystems before answering.",
     SessionMode.CREATIVE: "You are a creative collaborator. Offer vivid ideas.",
     SessionMode.ANALYTICAL: "You are a precise analyst. Be structured and cite evidence.",
     SessionMode.DEBUG: "You are a debugging assistant. Find the root cause.",
@@ -153,12 +186,14 @@ class JeevesCore:
         return getattr(self._provider, "name", "unknown")
 
     def open_session(self, user_id: str, mode: SessionMode = SessionMode.TUTORING) -> Session:
-        session = self._memory.create_session(user_id, mode)
+        normalized_user = str(user_id or "").strip() or "anonymous"
+        normalized_mode = _normalise_mode(mode)
+        session = self._memory.create_session(normalized_user, normalized_mode)
         if self._bus:
             self._bus.emit("jeeves.session.opened", {
                 "session_id": session.session_id,
-                "user_id": user_id,
-                "mode": mode.value,
+                "user_id": normalized_user,
+                "mode": normalized_mode.value,
             })
         return session
 
@@ -167,31 +202,47 @@ class JeevesCore:
         if not session:
             return {"error": "Session not found", "session_id": session_id}
 
-        session.add_turn("user", input_text, **(context or {}))
+        text = str(input_text or "").strip()
+        if not text:
+            return {"error": "Input must be non-empty", "session_id": session_id}
+        if len(text) > MAX_INPUT_CHARS:
+            return {
+                "error": "Input too large",
+                "session_id": session_id,
+                "max_input_chars": MAX_INPUT_CHARS,
+            }
+
+        safe_context = context if isinstance(context, dict) else {}
+        session.add_turn("user", text, **safe_context)
 
         # Matrices observe the input
-        self.sam.observe(input_text)
-        for term in self.sam._terms(input_text):
+        self.sam.observe(text)
+        for term in self.sam._terms(text):
             self.krem.observe(term)
 
         # SAM expansion enriches the prompt with associated concepts
-        expansions = self.sam.expand(input_text)
+        expansions = self.sam.expand(text)
         system = MODE_SYSTEM_PROMPTS.get(session.mode, "")
-        prompt = f"{system}\n\n{input_text}" if system else input_text
+        prompt = f"{system}\n\n{text}" if system else text
         if expansions:
             prompt += f"\n\nRelated concepts: {', '.join(expansions[:5])}"
 
         # Citations: graph facts supporting this query (+ SAM context)
-        cited = self.citations.cite(input_text, context_terms=expansions)
+        cited = self.citations.cite(text, context_terms=expansions)
         if cited:
             prompt += "\n\nKnown facts:\n" + "\n".join(f"- {c.render()}" for c in cited[:5])
 
         start = time.time()
+        provider_error = None
         try:
             content = self._provider.complete(prompt, context=session.context_window())
             success = True
-        except Exception as e:
-            content = f"[provider error: {e}]"
+        except Exception as exc:
+            # Provider exceptions can contain API keys, URLs, raw payloads, or
+            # other deployment details. Keep the client response deterministic
+            # and expose only the exception class for operator diagnostics.
+            content = "[provider unavailable]"
+            provider_error = type(exc).__name__
             success = False
         latency_ms = (time.time() - start) * 1000
 
@@ -201,10 +252,10 @@ class JeevesCore:
         # Matrices observe the response too (assistant language feeds SAM)
         self.sam.observe(content)
 
-        tools_used = [t for t in self._tools if t in input_text.lower()]
+        tools_used = [t for t in self._tools if t in text.lower()]
         for tool in tools_used:
             try:
-                self._tools[tool]({"input": input_text, "session": session.to_dict()})
+                self._tools[tool]({"input": text, "session": session.to_dict()})
                 self._stats["tool_calls"] += 1
             except Exception:
                 pass
@@ -220,20 +271,31 @@ class JeevesCore:
             token_count = max(1, len(content) // 4)  # rough token estimate
             cycle_report = self._cycle.after_reply(content, token_count)
 
-        session.add_turn("assistant", content, tools_used=tools_used,
-                         provider=self.provider_name, citations=len(cited))
+        turn_metadata: Dict[str, Any] = {
+            "tools_used": tools_used,
+            "provider": self.provider_name,
+            "citations": len(cited),
+            "success": success,
+        }
+        if provider_error:
+            turn_metadata["provider_error"] = provider_error
+        session.add_turn("assistant", content, **turn_metadata)
         self._stats["interactions"] += 1
 
         if self._bus:
-            self._bus.emit("jeeves.interaction", {
+            event = {
                 "session_id": session_id,
                 "provider": self.provider_name,
-                "input_length": len(input_text),
+                "input_length": len(text),
                 "response_length": len(content),
                 "sam_expansions": len(expansions),
                 "citations": len(cited),
                 "latency_ms": latency_ms,
-            })
+                "success": success,
+            }
+            if provider_error:
+                event["provider_error"] = provider_error
+            self._bus.emit("jeeves.interaction", event)
 
         result: Dict[str, Any] = {
             "content": content,
@@ -244,6 +306,8 @@ class JeevesCore:
             "citations": [c.to_dict() for c in cited],
             "latency_ms": round(latency_ms, 1),
         }
+        if provider_error:
+            result["provider_error"] = provider_error
         if interjection:
             result["interjection"] = interjection
         if cycle_report is not None:
