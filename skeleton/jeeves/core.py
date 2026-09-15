@@ -477,3 +477,8 @@ class Jeeves:
         if session is None:
             raise SessionError("unknown session", context={"session_id": session_id})
         return session
+
+
+# CI-1 compatibility: pipeline and older imports expect JeevesCore from this module.
+# Keep this at module scope so the tutor Jeeves remains the canonical implementation.
+JeevesCore = Jeeves
