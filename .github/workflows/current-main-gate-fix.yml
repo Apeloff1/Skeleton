@@ -79,7 +79,7 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
-          python scripts/check_workflow_security.py
+          python backend/scripts/check_workflow_security.py
           python -m pytest -q skeleton/testing/test_gate_policy_boundaries.py
           python -m pytest -q skeleton/testing/test_frontier_biotope_achievement_adapters.py
           python -m pytest -q skeleton/testing/test_frontier_*.py
