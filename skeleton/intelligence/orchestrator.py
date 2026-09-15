@@ -709,7 +709,7 @@ class MetaGrid:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "learning_rate": self.learning_rate,
-            "exploration_rate": self.grid.exploration_rate,
+            "exploration_rate": self.exploration_rate,
             "discount_factor": self.discount_factor,
             "batch_size": self.batch_size,
             "memory_window": self.memory_window,
