@@ -82,10 +82,10 @@
       "source_blob": "b67167f1135744e74827ce03b0bf5d766e800cf4",
       "destination_path": "skeleton/frontier/memory_adapters.py",
       "license": {"status": "owner-controlled", "spdx": null},
-      "maturity": "characterized",
-      "test_status": "characterized",
-      "canonical_status": "candidate",
-      "evidence": []
+      "maturity": "promoted",
+      "test_status": "passing",
+      "canonical_status": "canonical",
+      "evidence": ["tests/test_frontier_memory_adapters.py"]
     },
     {
       "id": "prood-npc-generation",
