@@ -79,7 +79,8 @@ def _sha(value: Any) -> str:
 def _clean(text: str) -> str:
     text = text.casefold().replace("−", "-").replace("–", "-").replace("—", "-")
     text = re.sub(r"(?<=\d)\s*%", " percent", text)
-    text = re.sub(r"[^a-z0-9.%+\-/]+", " ", text)
+    allowed = frozenset("abcdefghijklmnopqrstuvwxyz0123456789.%+-/")
+    text = "".join(ch if ch in allowed else " " for ch in text)
     return " ".join(text.split())
 
 
