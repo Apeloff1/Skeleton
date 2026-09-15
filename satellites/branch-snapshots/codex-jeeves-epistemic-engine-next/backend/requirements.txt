@@ -1,0 +1,60 @@
+# ============================================================================
+# Tutolage Backend - Production Dependencies
+# (dev/test tools live in pyproject.toml [project.optional-dependencies] dev)
+# ============================================================================
+
+# --- Web framework ---
+fastapi==0.136.1
+uvicorn[standard]==0.25.0
+python-multipart==0.0.22
+websockets==15.0.1
+orjson==3.11.7
+aiofiles==25.1.0
+httpx==0.28.1
+requests==2.32.5
+
+# --- Database ---
+motor==3.7.1
+pymongo==4.13.0
+aiosqlite==0.22.1
+
+# --- Validation / config ---
+pydantic==2.12.5
+pydantic-settings==2.13.1
+email-validator==2.3.0
+python-dotenv==1.2.1
+
+# --- Auth / security ---
+# bcrypt is pinned below 4.1: passlib 1.7.4 crashes on bcrypt>=4.1
+passlib==1.7.4
+bcrypt==4.0.1
+PyJWT==2.11.0
+python-jose==3.5.0
+
+# --- AI / LLM ---
+openai==2.37.0
+litellm==1.85.0
+google-genai==2.4.0
+emergentintegrations==0.1.2
+tenacity==9.1.4
+tiktoken==0.12.0
+
+# --- RAG / vector store ---
+chromadb==1.5.5
+
+# --- Search ---
+ddgs==9.14.4
+
+# --- Scheduling ---
+APScheduler==3.11.3
+
+# --- Payments ---
+stripe==15.1.0
+
+# --- Documents / media ---
+reportlab==5.0.0
+pillow==12.2.0
+numpy==2.4.4
+
+# --- Logging ---
+loguru==0.7.3

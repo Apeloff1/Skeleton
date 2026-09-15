@@ -1,0 +1,696 @@
+"""Organismer 10x path + ArchiveX / social SOTA pointers."""
+from __future__ import annotations
+
+from urllib.parse import urlparse
+
+from skeleton.cortex.deck import CommandDeck
+from skeleton.organism.organismer import Organismer, reset_organismer
+from skeleton.social.archivex import parse_x_status, pointer
+from skeleton.social.ingest import ingest
+from skeleton.social.sota import sota_card
+from skeleton.social.sources import catalog, classify
+from skeleton.testing.test_cortex_deck import _Dummy
+
+
+def test_classify_arxiv_and_xarchive():
+    assert classify("https://arxiv.org/abs/2608.24876")["id"] == "arxiv"
+    assert classify("https://xarchive.net/about")["id"] == "xarchive"
+    assert classify("https://web.archive.org/web/2026/https://x.com/a/status/1")["id"] == "wayback"
+    assert len(catalog()) >= 10
+
+
+def test_archivex_status_pointer_stores_no_prose():
+    raw = "see https://x.com/AleiahLock/status/2093311693010894922 on second brain"
+    card = parse_x_status(raw)
+    assert card is not None
+    assert card["post_id"] == "2093311693010894922"
+    xarchive_host = (urlparse(card["xarchive"]).hostname or "").lower()
+    assert xarchive_host == "xarchive.net" or xarchive_host.endswith(".xarchive.net")
+    cdx_host = (urlparse(card["cdx"]).hostname or "").lower()
+    assert cdx_host == "web.archive.org" or cdx_host.endswith(".web.archive.org")
+    assert card["stored_prose"] == "0"
+    p = pointer(raw)
+    assert p["kind"] == "x-status"
+
+
+def test_ingest_mixes_paper_and_post():
+    stim = (
+        "field https://arxiv.org/abs/2607.08716 and "
+        "https://x.com/DhravyaShah/status/2035517012647272689"
+    )
+    card = ingest(stim)
+    assert card["papers"] == 1
+    assert card["x_posts"] == 1
+    assert "arxiv" in card["houses"]
+    assert "x-status" in card["houses"]
+    assert card["stored_prose"] == 0
+
+
+def test_sota_card_has_seeded_field_pointers():
+    card = sota_card("https://arxiv.org/abs/2608.12428", G=1.4)
+    assert card["kind"] == "social-sota"
+    assert card["coverage"]["arxiv_seeded"] >= 6
+    assert card["coverage"]["archive_seeded"] >= 2
+    assert any("xarchive" in p["url"] for p in card["field_pointers"])
+    assert card["stored_prose"] == 0
+    assert card["toward_10x_pct"] > 0
+    assert card["coverage_score"] >= 0
+    assert card["coverage"]["pointers"] >= 16
+
+
+def test_laws_scan_flags_long_dialect():
+    from skeleton.galaxy.atoms import Atom
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.laws import laws_card, scan_prose
+    gxy = GalaxySystem()
+    assert scan_prose(gxy.mesh) == 0
+    fat = Atom.mint(
+        kind="capture", tier="T3_SEMANTIC", topic="x",
+        dialect="word " * 40, brain="memory", color="#00e5ff",
+    )
+    gxy.mesh.brains["memory"].shelf[fat.id] = fat
+    assert scan_prose(gxy.mesh) >= 1
+    assert laws_card(gxy.mesh)["ok"] == 0
+    from skeleton.organism.laws import clip_fat
+    clip_fat(gxy.mesh)
+    assert scan_prose(gxy.mesh) == 0
+
+
+def test_standin_teacher_is_contactable():
+    from types import SimpleNamespace
+    from skeleton.cortex.contact import is_teacher
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.standin import StandinTeacher, bind
+    from skeleton.organism.teachers import slots_of
+    from skeleton.organism.writeback import absorb
+    port = StandinTeacher("right")
+    assert is_teacher(port)
+    neo = SimpleNamespace(slots={})
+    card = bind(neo, slot="right")
+    assert card["bound"] == 1
+    assert "right" in slots_of(neo)
+    wb = absorb(GalaxySystem().mesh, neo=neo)
+    assert wb["mouth"] == 1
+    assert wb["stored_prose"] == 0
+
+
+def test_writeback_fail_closed_without_mouth():
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.writeback import absorb
+    card = absorb(GalaxySystem().mesh, neo=None)
+    assert card["kind"] == "write-back"
+    assert card["mouth"] == 0
+    assert card["stored_prose"] == 0
+
+
+def test_scope_composes_queue(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.organismer import Organismer
+    from skeleton.organism.scope import card as scope_card, compose
+    org = Organismer(root=tmp_path, persist=False, galaxy=GalaxySystem())
+    planned = compose(org)
+    assert planned["kind"] == "scope-compose"
+    assert 2 <= planned["n"] <= 12
+    assert planned["queue"]
+    view = scope_card(org)
+    assert view["horizons"] == ["step", "walk", "season", "decade"]
+    assert view["target"] == 10.0
+    assert view["stored_prose"] == 0
+
+
+def test_chronicle_records_and_indexes(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.chronicle import card, record, seed
+    from skeleton.organism.chronicle.dump import dump, inventory
+    from skeleton.organism.organismer import Organismer
+    org = Organismer(root=tmp_path, persist=True, galaxy=GalaxySystem())
+    seed(org)
+    out = record(org, {"topic": "mem0 graph", "decision": "pulse", "code": "pulse", "G": 1.0})
+    assert out["kind"] == "chronicle"
+    assert out["rolodex_n"] >= 1
+    view = card(org, cue="mem0")
+    assert view["horizon_years"] == 10
+    assert view["index"]["n"] >= 1
+    assert view["stored_prose"] == 0
+    forced = dump(tmp_path, force=True)
+    assert forced["kind"] == "decade-dump"
+    assert inventory(tmp_path)["horizon_years"] == 10
+
+
+def test_nervous_slos_ok(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.nervous import nervous_card
+    from skeleton.organism.organismer import Organismer
+    org = Organismer(root=tmp_path, persist=False, galaxy=GalaxySystem())
+    card = nervous_card(org)
+    assert card["kind"] == "nervous"
+    assert card["ok"] == 1
+    assert "prose" in card["slos"]
+    assert "temporal" in card["intelligence"]
+    assert card["stored_prose"] == 0
+
+
+def test_kv_unbound_does_not_write(tmp_path):
+    from skeleton.galaxy.kv import persist
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.paths import kv_path
+    card = persist(GalaxySystem().mesh, neo=None, root=tmp_path)
+    assert card["bound"] == 0
+    assert card.get("persisted") == 0
+    assert not kv_path(tmp_path).exists()
+
+
+def test_satellites_cards_are_dry():
+    from skeleton.organism.satellites import satellites_card
+    card = satellites_card()
+    assert card["kind"] == "satellites"
+    assert card["jeeves"]["stored_prose"] == 0
+    assert card["vault"]["secrets"] == 0
+    assert card["retrieve"]["n"] >= 1
+    assert "urandom" in card["vault"]["entropy"]
+
+
+def test_modality_base_does_not_raise():
+    from skeleton.cortex.multimodal import ModalityPort
+    thought = ModalityPort("right").decode_thought("plan tensor", {})
+    assert thought.text
+
+
+def test_doctor_carries_helix(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.doctor import doctor_card
+    from skeleton.organism.organismer import Organismer
+    org = Organismer(root=tmp_path, persist=False, galaxy=GalaxySystem())
+    card = doctor_card(org)
+    assert "helix_ok" in card
+    assert card["ok"] == 1
+
+
+def test_helix_stamps_and_recalls(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.helix import recall, stamp, verify
+    from skeleton.organism.organismer import Organismer
+    from skeleton.social.seed import seed_field
+    gxy = GalaxySystem()
+    seed_field(gxy)
+    org = Organismer(root=tmp_path, persist=True, galaxy=gxy)
+    card = stamp(org, {"kind": "test", "topic": "mem0 graph", "G": org.G}, root=tmp_path)
+    assert card["sense"]["sha"]
+    assert card["snap"]["merkle"]
+    assert verify(tmp_path)["ok"] == 1
+    hit = recall("mem0", root=tmp_path)
+    assert hit["n"] >= 1
+    assert card["stored_prose"] == 0
+
+
+def test_forget_decays_and_wakes():
+    from skeleton.galaxy.atoms import Atom
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.forget import reconsolidate, sweep
+    gxy = GalaxySystem()
+    cold = Atom.mint(
+        kind="capture", tier="T0_FLASH", topic="old trace",
+        dialect="old trace", brain="memory", color="#00e5ff",
+        confidence=0.20,
+    )
+    gxy.mesh.brains["memory"].shelf[cold.id] = cold
+    card = sweep(gxy.mesh, cue="")
+    assert card["kind"] == "forget"
+    assert cold.superseded_by == "forget-retire" or "retired" in (cold.tags or ())
+    woke = reconsolidate(gxy.mesh, "old trace")
+    assert woke["woke"] >= 1
+    assert cold.superseded_by == ""
+    assert card["stored_prose"] == 0
+
+
+def test_sleep_is_gated_then_forced(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.organismer import Organismer
+    from skeleton.organism.sleep import cycle
+    org = Organismer(root=tmp_path, persist=False, galaxy=GalaxySystem())
+    gated = cycle(org, persist=False)
+    assert gated["kind"] == "sleep"
+    assert gated["ran"] == 0
+    forced = cycle(org, persist=False, force=True)
+    assert forced["ran"] == 1
+    assert forced["nrem"]["kind"] == "nrem"
+    assert forced["rem"]["kind"] == "rem"
+    assert forced["stored_prose"] == 0
+    assert cycle(org, persist=False)["ran"] == 0
+
+
+def test_persist_clip_writes_when_on(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.laws import persist_clip
+    from skeleton.organism.organismer import Organismer
+    from skeleton.organism.paths import galaxy_path
+    org = Organismer(root=tmp_path, persist=True, galaxy=GalaxySystem())
+    card = persist_clip(org)
+    assert card.get("persisted") == 1
+    assert galaxy_path(tmp_path).exists()
+
+
+def test_doctor_ok(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.doctor import doctor_card
+    from skeleton.organism.organismer import Organismer
+    org = Organismer(root=tmp_path, persist=False, galaxy=GalaxySystem())
+    card = doctor_card(org)
+    assert card["kind"] == "doctor"
+    assert card["ok"] == 1
+    assert card["field_n"] >= 16
+    assert card["stored_prose"] == 0
+    fixed = doctor_card(org, fix=True)
+    assert fixed["ok"] == 1
+    assert fixed.get("fix") is not None
+
+
+def test_field_card_lists_pointers():
+    from skeleton.social.field import field_card
+    card = field_card()
+    assert card["n"] >= 16
+    assert "arXiv" in card["houses"]
+    assert card["stored_prose"] == 0
+
+
+def test_budget_choose_splits():
+    from skeleton.organism.budget import choose, walk_limit
+    tight = choose(0.80, stale_n=0, atoms=90, atom_cap=100)
+    slack = choose(0.10, stale_n=0, atoms=10, atom_cap=100)
+    assert tight["op"] == "consolidate"
+    assert slack["op"] == "retain"
+    assert walk_limit("tiny", 8) == 3
+    assert walk_limit("max", 8) == 8
+    assert tight["stored_prose"] == 0
+
+
+def test_nucleus_bind_and_mhc(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.mhc import mhc_card
+    from skeleton.organism.organismer import Organismer
+    from skeleton.social.nucleus import bind_if_empty, wiki_urls
+    from skeleton.social.seed import seed_field
+    gxy = GalaxySystem()
+    seed_field(gxy)
+    assert wiki_urls(gxy.mesh)
+    filled = bind_if_empty({"cards": []}, gxy.mesh)
+    assert filled.get("cards")
+    org = Organismer(root=tmp_path, persist=False, galaxy=gxy)
+    card = mhc_card(org)
+    assert card["kind"] == "mhc"
+    assert card["stored_prose"] == 0
+
+
+def test_walk_is_bounded(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.organismer import Organismer
+    from skeleton.organism.runloop import walk
+    org = Organismer(root=tmp_path, persist=False, galaxy=GalaxySystem())
+    card = walk(org, persist=False, n=3)
+    assert card["kind"] == "run"
+    assert card["n"] <= 3
+    assert card["limit"] == 3
+    assert card.get("topics")
+    assert card["stored_prose"] == 0
+
+
+def test_rotate_stimulus_uses_field():
+    from skeleton.organism.runloop import rotate_stimulus
+    a = rotate_stimulus(0)
+    b = rotate_stimulus(1)
+    assert "http" in a
+    assert a != b
+
+
+def test_pulse_obeys_next(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.organismer import Organismer
+    from skeleton.organism.pulse import pulse
+    org = Organismer(root=tmp_path, persist=False, galaxy=GalaxySystem())
+    card = pulse(org, persist=False)
+    assert card["kind"] == "pulse"
+    assert card["acted"]["code"] in {"tighten", "dream", "bind-source", "contact", "hold", "pulse"}
+    assert card["stored_prose"] == 0
+    again = pulse(org, persist=False, stimulus="plan tensor")
+    assert again["kind"] == "pulse"
+
+
+def test_ready_card_seeds_then_reports(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.organismer import Organismer
+    from skeleton.organism.ready import ready_card
+    org = Organismer(root=tmp_path, persist=False, galaxy=GalaxySystem())
+    card = ready_card(org)
+    assert card["kind"] == "ready"
+    assert card["ok"] == 1
+    assert card.get("doctor", {}).get("ok") == 1
+    assert card["seed"]["minted"] >= 1
+    again = ready_card(org)
+    assert again["seed"]["minted"] == 0
+    assert card["stored_prose"] == 0
+    walked = ready_card(org, walk=True, n=2)
+    assert walked.get("walk")
+    assert walked["walk"]["n"] <= 2
+
+
+def test_seed_field_is_idempotent():
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.social.seed import seed_field
+    gxy = GalaxySystem()
+    a = seed_field(gxy)
+    b = seed_field(gxy)
+    assert a["minted"] >= 1
+    assert b["minted"] == 0
+    assert b["skipped"] >= a["minted"]
+    assert a["stored_prose"] == 0
+
+
+def test_next_hint_and_journal(tmp_path):
+    from skeleton.organism.journal import append, tail
+    from skeleton.organism.next import hint
+    from skeleton.organism.organismer import Organismer
+    org = Organismer(root=tmp_path, persist=False)
+    card = hint(org)
+    assert card["kind"] == "next"
+    assert card["code"] in {"tighten", "dream", "bind-source", "contact", "hold", "pulse"}
+    assert card["stored_prose"] == 0
+    append({"step": 1, "G": 1.0, "decision": "new", "coverage": 0.2, "pressure": 0.1}, root=tmp_path)
+    rows = tail(2, root=tmp_path)
+    assert rows and rows[-1]["decision"] == "new"
+
+
+def test_context_loop_fresh_on_empty(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.context_loop import assess, should_dream
+    from skeleton.organism.organismer import Organismer
+    from skeleton.social.seed import seed_field
+    gxy = GalaxySystem()
+    seed_field(gxy)
+    org = Organismer(root=tmp_path, persist=False, galaxy=gxy)
+    card = assess(org, cue="memory graph")
+    assert card["kind"] == "context-loop"
+    assert card["rot"] in {"fresh", "watch", "rot"}
+    assert card["stored_prose"] == 0
+    assert should_dream({"rot": "rot", "compacted": 0}) is True
+    assert should_dream({"rot": "fresh", "compacted": 0}) is False
+
+
+def test_reconstruct_forest_from_seeded_wiki():
+    from skeleton.galaxy.graph import card, reconstruct
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.social.seed import seed_field
+    gxy = GalaxySystem()
+    seed_field(gxy)
+    rec = reconstruct(gxy.mesh, "memory graph")
+    assert rec["kind"] == "reconstruct"
+    assert rec["stored_prose"] == 0
+    gcard = card(gxy.mesh, "memory")
+    assert gcard["atoms"] >= 1
+
+
+def test_wiki_bound_coverage_after_seed():
+    from skeleton.galaxy.system import live_galaxy, reset_galaxy
+    from skeleton.social.coverage import coverage_card
+    from skeleton.social.seed import seed_field
+    reset_galaxy()
+    seed_field(live_galaxy())
+    cov = coverage_card("")
+    assert cov["mode"] == "wiki-bound"
+    assert cov["wiki_bound"]
+    assert cov["stored_prose"] == 0
+    reset_galaxy()
+
+
+def test_coverage_and_path10_and_freshness():
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.organismer import Organismer
+    from skeleton.organism.path10 import path_card
+    from skeleton.social.coverage import coverage_card
+    cov = coverage_card("https://arxiv.org/abs/2608.26983")
+    assert cov["kind"] == "field-coverage"
+    assert cov["score"] > 0
+    assert "arXiv" in cov["bound"]
+    assert "wiki_bound" in cov
+    org = Organismer()
+    p = path_card(org)
+    assert p["target"] == 10.0
+    assert p["gap"] >= 0
+    gxy = GalaxySystem()
+    gxy.pulse("index freshness topic")
+    fresh = gxy.editor.freshness(max_age=10**12)
+    assert fresh["kind"] == "editor-freshness"
+    assert fresh["stored_prose"] == 0
+
+
+def test_organismer_grows_but_does_not_overshoot():
+    reset_organismer()
+    org = Organismer()
+    g0 = org.G
+    card = org.step(
+        "like Elden Ring https://arxiv.org/abs/2608.24876 https://x.com/a/status/1",
+        neo=_Dummy(),
+    )
+    assert card["kind"] == "organismer"
+    assert card["G"] >= g0
+    assert card["G"] < 2.5
+    assert card["toward_10x_pct"] < 20
+    assert card["S"] >= 1.0
+    assert card["social"]["papers"] == 1
+    assert card["stored_prose"] == 0
+    snap = org.snapshot()
+    assert snap["target"] == 10.0
+
+
+def test_deck_organismer_and_social():
+    reset_organismer()
+    deck = CommandDeck(_Dummy())
+    soc = deck.social("https://xarchive.net/about")
+    assert soc["bound_now"]["houses"]
+    out = deck.organismer("plan tensor https://arxiv.org/abs/2509.24704")
+    assert out["kind"] == "organismer"
+    assert out["G"] >= 1.0
+    assert out.get("write", {}).get("decision") in {"new", "update", "skip"}
+
+
+def test_write_route_second_pulse_skips():
+    from skeleton.organism.router import NEW, SKIP, route
+    d1, _, _ = route("dual layer write routing CLS", [])
+    assert d1 == NEW
+    d2, score, _ = route("dual layer write routing CLS", ["dual layer write routing CLS"])
+    assert d2 == SKIP
+    assert score >= 0.72
+
+
+def test_persist_and_ledger(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem, reset_galaxy
+    from skeleton.organism.shelf import load
+    reset_galaxy()
+    org = Organismer(persist=True, root=tmp_path, galaxy=GalaxySystem())
+    a = org.step("like Elden Ring https://arxiv.org/abs/2608.22215")
+    assert a["write"]["decision"] == "new"
+    assert a["ledger"]["sha"]
+    b = org.step("like Elden Ring https://arxiv.org/abs/2608.22215")
+    assert b["write"]["decision"] in {"skip", "update"}
+    org2 = Organismer(persist=False, root=tmp_path)
+    loaded = load(org2, root=tmp_path)
+    assert loaded["loaded"] == 1
+    assert org2.G >= 1.0
+    assert a["galaxy"]["atom_ids"]
+    from skeleton.galaxy.shelf import load as gload
+    g2 = GalaxySystem()
+    info = gload(g2, root=tmp_path)
+    assert info["loaded"] == 1
+    assert info["n"] >= 1
+    assert len(g2.mesh.wiki.topics) >= 1
+
+
+def test_cdx_probe_parses_rows_without_body():
+    from skeleton.social.cdx import probe, reset_throttle
+    reset_throttle()
+    sample = '[["timestamp","original","statuscode","mimetype"],["20260830112233","https://x.com/a/status/1","200","text/html"]]'
+    card = probe("https://x.com/a/status/1", live=True, opener=lambda url: sample)
+    assert card["live"] == 1
+    assert card["timestamp"] == "20260830112233"
+    assert card["status"] == "200"
+    assert card["stored_prose"] == 0
+    again = probe("https://x.com/a/status/1", live=True, opener=lambda url: sample)
+    assert again.get("reason") == "throttled"
+
+
+def test_teacher_sync_fail_closed_and_glean():
+    from skeleton.cortex.contact import ContactEngine
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.teachers import glean_rule, sync
+
+    class _LM:
+        lora = None
+
+        def perplexity(self, texts):
+            return 3.5
+
+        def fit(self, texts, lr=0.05, schedule="cosine"):
+            return 1
+
+        def hidden(self, s):
+            return [0.1] * 8
+
+    class _Port:
+        name = "huggingface"
+        standin = _LM()
+
+        def snapshot(self):
+            return {"kind": "standin"}
+
+    class _Neo(_Dummy):
+        slots = {"hf": _Port()}
+
+        def contact(self, slot, stimulus=""):
+            self.contact_engine = getattr(self, "contact_engine", ContactEngine())
+            return self.contact_engine.touch(self, slot, stimulus)
+
+    card = sync(_Neo(), "plan tensor ttk")
+    assert card["contacted"] == 1
+    assert card["magnitude"] > 0
+    rule = glean_rule(GalaxySystem(), stimulus="plan tensor ttk", contact=card)
+    assert rule and rule["kind"] == "principle"
+    assert rule["stored_prose"] == 0
+    empty = sync(_Dummy(), "plan tensor ttk")
+    assert empty["contacted"] == 0
+
+
+def test_product_card_shape():
+    reset_organismer()
+    deck = CommandDeck(_Dummy())
+    card = deck.product()
+    assert card["kind"] == "product"
+    assert card["target"] == 10.0
+    assert "GET /cortex/product" in card["endpoints"]
+    assert "GET /cortex/ready" in card["endpoints"]
+    assert card.get("version")
+    assert any(p["topic"] == "mem0" for p in card["field"])
+    assert card["stored_prose"] == 0
+
+
+def test_mad_kills_near_duplicate_principle():
+    from skeleton.galaxy.atoms import Atom
+    from skeleton.galaxy.mad import audit
+    a = Atom.mint(kind="principle", tier="T4_PRINCIPLE", topic="contact rule mag house",
+                  dialect="house:contact rule mag", brain="distiller", color="gold")
+    b = Atom.mint(kind="principle", tier="T4_PRINCIPLE", topic="contact rule mag house",
+                  dialect="house:contact rule mag", brain="distiller", color="gold")
+    a.confidence = 0.9
+    b.confidence = 0.4
+    card = audit([a, b])
+    assert card["killed"] >= 1
+    assert a.superseded_by or b.superseded_by
+    assert card["stored_prose"] == 0
+
+
+def test_idle_due_cadence():
+    from skeleton.organism.idle import due
+    assert due(0, 0, cadence=4) is False
+    assert due(4, 0, cadence=4) is True
+    assert due(5, 4, cadence=4) is False
+    assert due(8, 4, cadence=4) is True
+
+
+def test_ccl_vault_roundtrip(tmp_path):
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.galaxy.vault import dump, load
+    gxy = GalaxySystem()
+    gxy.pulse("plan tensor ttk lattice")
+    card = dump(gxy.mesh, root=tmp_path)
+    assert card["n"] >= 1
+    rows = load(root=tmp_path)
+    assert rows and "kind" in rows[0]
+    assert card["stored_prose"] == 0
+
+
+def test_prior_stays_cpu_without_mouth():
+    from skeleton.galaxy.atoms import Atom
+    from skeleton.galaxy.prior import blend
+    atom = Atom.mint(kind="capture", tier="T0_FLASH", topic="plan tensor",
+                     dialect="house:plan tensor", brain="memory", color="cyan")
+    card = blend("plan tensor", [atom])
+    assert card["prior"] == "cpu-jaccard"
+    assert card["device"] == "cpu"
+    assert card["stored_prose"] == 0
+
+
+def test_caps_headroom_below_wall():
+    from skeleton.organism.caps import compute
+    tiny = compute(avail_mb=900, ram_mb=1024, cpus=2, gpu=False, headroom=0.62, tier="tiny")
+    huge = compute(avail_mb=48000, ram_mb=65536, cpus=16, gpu=True, headroom=0.62, tier="max")
+    assert tiny.atoms < huge.atoms
+    assert tiny.rules < huge.rules
+    assert tiny.growth_clip <= huge.growth_clip
+    assert tiny.headroom <= 0.85
+    assert huge.atoms <= 1800
+    assert tiny.tier == "tiny"
+    tight = compute(avail_mb=900, ram_mb=1024, cpus=2, gpu=False, headroom=0.62, tier="tiny", load=8.0)
+    calm = compute(avail_mb=900, ram_mb=1024, cpus=2, gpu=False, headroom=0.62, tier="tiny", load=0.1)
+    assert tight.pressure > calm.pressure
+    assert tight.atoms <= calm.atoms
+
+
+def test_health_ok_on_fresh_organism(tmp_path):
+    from skeleton.organism.health import health_card
+    from skeleton.organism.organismer import Organismer
+    org = Organismer(root=tmp_path, persist=False)
+    card = health_card(org)
+    assert card["kind"] == "health"
+    assert card["ok"] == 1
+    assert card["stored_prose"] == 0
+    assert card["kv_bound"] == 0
+
+
+def test_lattice_and_unbound_kv():
+    from skeleton.galaxy.kv import archive
+    from skeleton.galaxy.lattice import card as lcard
+    from skeleton.galaxy.system import GalaxySystem
+    gxy = GalaxySystem()
+    gxy.pulse("plan tensor ttk")
+    lat = lcard(gxy.mesh)
+    assert lat["kind"] == "lattice"
+    assert "nucleus" in lat["ascii"]
+    assert lat["stored_prose"] == 0
+    kv = archive(gxy.mesh, neo=None)
+    assert kv["bound"] == 0
+    assert kv["n"] == 0
+
+
+def test_caps_adapt_hysteresis():
+    from skeleton.organism.caps import adapt, compute, reset_caps
+    reset_caps()
+    wide = compute(avail_mb=20000, ram_mb=32000, cpus=8, gpu=False, headroom=0.62, tier="large", load=0.2)
+    adapt(probe=wide)
+    thin = compute(avail_mb=800, ram_mb=32000, cpus=8, gpu=False, headroom=0.62, tier="tiny", load=6.0)
+    card = adapt(probe=thin)
+    assert card["action"] == "tighten"
+    reset_caps()
+
+
+def test_wiki_query_selects_principle():
+    from skeleton.galaxy.query import run
+    from skeleton.galaxy.system import GalaxySystem
+    gxy = GalaxySystem()
+    gxy.pulse("law like Elden Ring contact rule")
+    card = run(gxy.mesh, "SELECT * WHERE kind=principle")
+    assert card["kind"] == "wiki-query"
+    assert card["stored_prose"] == 0
+
+
+def test_banks_and_writeback_mark():
+    from skeleton.galaxy.banks import card as bcard
+    from skeleton.galaxy.system import GalaxySystem
+    from skeleton.organism.writeback import absorb, should_suppress, topics
+    gxy = GalaxySystem()
+    gxy.pulse("law principle house contact mag")
+    wb = absorb(gxy.mesh)
+    assert wb["marked"] >= 1
+    banks = bcard(gxy.mesh)
+    assert banks["kind"] == "memory-banks"
+    assert banks["stored_prose"] == 0
+    held = topics(gxy.mesh)
+    assert held
+    assert should_suppress(next(iter(held)), held)

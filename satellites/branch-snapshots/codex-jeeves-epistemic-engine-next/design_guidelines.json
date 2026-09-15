@@ -1,0 +1,155 @@
+{
+  "app_name": "Tutolage / Galaxy Studio",
+  "personality": "Fusion: 6 Glass / Luxe structure and surfaces + 7 Dark-First Utility typography and metrics",
+  "personality_one_liner": "A cinematic, premium command center that balances high-end gaming aesthetics with tactical, dark-first utility.",
+  "color": {
+    "surface": "#0A0A0A",
+    "onSurface": "#E5E5E5",
+    "surfaceSecondary": "#141414",
+    "onSurfaceSecondary": "#CCCCCC",
+    "surfaceTertiary": "#1F1F1F",
+    "onSurfaceTertiary": "#A3A3A3",
+    "surfaceInverse": "#FAFAFA",
+    "onSurfaceInverse": "#0A0A0A",
+    "brand": "#8B5CF6",
+    "brandPrimary": "#8B5CF6",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#A78BFA",
+    "onBrandSecondary": "#0A0A0A",
+    "brandTertiary": "#2E1B5B",
+    "onBrandTertiary": "#DDD6FE",
+    "success": "#10B981",
+    "onSuccess": "#FFFFFF",
+    "warning": "#F59E0B",
+    "onWarning": "#0A0A0A",
+    "error": "#EF4444",
+    "onError": "#FFFFFF",
+    "info": "#3B82F6",
+    "onInfo": "#FFFFFF",
+    "border": "#262626",
+    "borderStrong": "#404040",
+    "divider": "#1F1F1F"
+  },
+  "typography": {
+    "displayFontFamily": "Rajdhani",
+    "textFontFamily": "Satoshi",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Generous vertical breathing room for cinematic feel, tighter modular spacing for KPI metrics and utility rows.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": "0",
+  "navigation": "bottom_tabs",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": true,
+    "do's": [
+      "Use heavily on sticky headers, bottom tab bar, and modal scrims.",
+      "Use frosted glass overlays on top of the abstract purple gradient background for the Creator Dashboard hero section.",
+      "Ensure underlying tinted bases are \u226575% opacity to guarantee text readability.",
+      "Use glass for premium 'Tournament Bracket' active state containers."
+    ],
+    "dont's": [
+      "Do not use glass for simple list items or form inputs.",
+      "Do not apply glass where underlying elements are entirely solid #0A0A0A (it just looks like a gray box).",
+      "Avoid stacking more than 2 blurred surfaces on one screen."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-blur",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "haptics": {
+    "events": {
+      "primary_action": "impactMedium",
+      "tab_change": "selection",
+      "tier_unlock": "notificationSuccess",
+      "game_publish": "notificationSuccess",
+      "tournament_vote": "impactLight"
+    }
+  },
+  "screens": [
+    {
+      "name": "Creator Dashboard",
+      "purpose": "A premium control center showing the creator's listed games, total revenue, sales KPIs, and Battle Pass tier.",
+      "states": {
+        "loading": "Skeleton grids with a subtle dark shimmer over #141414.",
+        "empty": "Brand-tinted SVG illustration of a cosmic studio, inviting the user to generate their first game.",
+        "error": "Readable text with off-white typography and a muted secondary Retry button."
+      },
+      "layout": "Use a mobile-first stacked layout. Top: Cinematic glassmorphism hero showing Battle Pass Tier progress over an abstract neon background. Below hero: 2-column grid of KPI cards (Revenue, Sales, Plays). Below KPIs: A horizontal scrolling section or vertical list for 'Listed Games' with game cover images, titles, and live status badges."
+    },
+    {
+      "name": "Live-Ops Battle Pass",
+      "purpose": "Visualizes the current season's rewards, XP progression, and available tier unlocks.",
+      "states": {
+        "loading": "Dark shimmer skeletons for the reward track.",
+        "empty": "No active season message with a countdown to the next season.",
+        "error": "Error loading season data with a Retry CTA."
+      },
+      "layout": "Off-black background. A large vertical or horizontal scrolling track. Active/unlocked items use high-contrast desaturated colors. Locked items use dark gray (#262626) with low opacity. Progress bar uses a desaturated violet with a subtle glow, filling an off-black track. No pure white text."
+    },
+    {
+      "name": "Tournament Bracket",
+      "purpose": "Displays single-elimination brackets, match-ups, and voting for AI generated games.",
+      "states": {
+        "loading": "Skeleton bracket nodes.",
+        "empty": "Illustration indicating tournament registration is open.",
+        "error": "Error loading bracket data with a Retry CTA."
+      },
+      "layout": "Pan-and-zoom or horizontally scrolling tree layout. Matchup cards use surfaceSecondary with borderStrong. The 'active' match up glows with a brandPrimary 1px border. Focus heavily on dense, tactical typography (Rajdhani) for scores and game names to allow fast scanning."
+    }
+  ],
+  "images": {
+    "dashboard_hero_bg": {
+      "url": "https://images.unsplash.com/photo-1637825891028-564f672aa42c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzl8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMGdyYWRpZW50JTIwZGFyayUyMHB1cnBsZSUyMG5lb24lMjB0ZXh0dXJlfGVufDB8fHx8MTc4MTg4NTA4MHww&ixlib=rb-4.1.0&q=85",
+      "alt": "Abstract dark purple wave gradient"
+    },
+    "game_cover_generic": {
+      "url": "https://images.pexels.com/photos/13930769/pexels-photo-13930769.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "Glowing neon game controller icon floating above dark foliage"
+    },
+    "avatar_default": {
+      "url": "https://images.unsplash.com/photo-1740252117012-bb53ad05e370?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODh8MHwxfHNlYXJjaHwxfHxnYW1lJTIwY2hhcmFjdGVyJTIwM2QlMjBhdmF0YXIlMjBuZW9ufGVufDB8fHx8MTc4MTg4NTA4MHww&ixlib=rb-4.1.0&q=85",
+      "alt": "Cartoon character 3D avatar"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Apply a Fusion personality: Mix the premium, cinematic depth of Glass / Luxe (Personality 6) with the tactical, information-dense typography of Dark-First Utility (Personality 7).",
+    "Use Rajdhani for all headings, scores, KPI values, and bracket metrics. Use Satoshi for labels, body text, and metadata to maintain readability.",
+    "Do NOT use pure black (#000000). Use the defined #0A0A0A for the main background to avoid OLED smearing and harsh contrast fatigue.",
+    "For the Creator Dashboard: Place the `dashboard_hero_bg` behind the top section. Overlay a vertical linear gradient (transparent to #0A0A0A at the bottom) over the image so it fades into the rest of the screen. Place the Battle Pass Tier progress and high-level creator stats inside a glassmorphism container on top of this.",
+    "For the Live-Ops Battle Pass: Make the UI feel athletic and durable. The progress line should use the brand color with an off-black unfilled track. Avoid heavy drop shadows; use border highlights (#404040) or subtle surface lightening to indicate elevation.",
+    "For Tournaments: Use compact `surfaceSecondary` cards for the bracket nodes. The currently active/voting match should have a 1pt `brandPrimary` border to draw the eye immediately.",
+    "Always apply haptic feedback (using expo-haptics) to all key interactions: voting, claiming rewards, tab changes, and publishing games.",
+    "Use Phosphor icons consistently. Ensure they are all the same weight (either all 'regular' or all 'fill').",
+    "Preserve existing functionality and testIDs. You are elevating the design system, not tearing down the core logic."
+  ]
+}
