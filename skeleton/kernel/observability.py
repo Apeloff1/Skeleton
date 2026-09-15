@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter, deque
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -19,7 +19,7 @@ _TRUNCATED = "[TRUNCATED]"
 _SENSITIVE_KEYS = {
     "authorization",
     "cookie",
-    "set-cookie",
+    "set_cookie",
     "password",
     "passwd",
     "secret",
@@ -46,7 +46,9 @@ def _normalize_key(key: object) -> str:
 def redact_text(value: str) -> str:
     """Redact common credential shapes without otherwise rewriting log text."""
     value = _BEARER_RE.sub("Bearer [REDACTED]", value)
-    return _SECRET_ASSIGNMENT_RE.sub(lambda match: f"{match.group(1)}={_REDACTED}", value)
+    return _SECRET_ASSIGNMENT_RE.sub(
+        lambda match: f"{match.group(1)}={_REDACTED}", value
+    )
 
 
 def redact_payload(value: Any, *, max_depth: int = 8) -> Any:
@@ -56,6 +58,10 @@ def redact_payload(value: Any, *, max_depth: int = 8) -> Any:
     scrubbed for common inline secret assignments/Bearer tokens, and excessive
     nesting is bounded so attacker-controlled payloads cannot recurse forever.
     """
+    if isinstance(max_depth, bool) or not isinstance(max_depth, int):
+        raise TypeError("max_depth must be an integer")
+    if max_depth < 1:
+        raise ValueError("max_depth must be at least 1")
 
     def visit(item: Any, depth: int, key: object | None = None) -> Any:
         if key is not None and _normalize_key(key) in _SENSITIVE_KEYS:
@@ -127,19 +133,31 @@ class OperationalMetrics:
             self.rate_limits_total += 1
 
         duration = payload.get("duration_ms")
-        if isinstance(duration, (int, float)) and not isinstance(duration, bool) and duration >= 0:
+        if (
+            isinstance(duration, (int, float))
+            and not isinstance(duration, bool)
+            and duration >= 0
+        ):
             duration = float(duration)
             self._latency_count += 1
             self._latency_total_ms += duration
             self._latency_max_ms = max(self._latency_max_ms, duration)
 
         queue_depth = payload.get("queue_depth")
-        if isinstance(queue_depth, int) and not isinstance(queue_depth, bool) and queue_depth >= 0:
+        if (
+            isinstance(queue_depth, int)
+            and not isinstance(queue_depth, bool)
+            and queue_depth >= 0
+        ):
             self._queue_depth = queue_depth
             self._queue_depth_max = max(self._queue_depth_max, queue_depth)
 
         memory_bytes = payload.get("memory_bytes")
-        if isinstance(memory_bytes, int) and not isinstance(memory_bytes, bool) and memory_bytes >= 0:
+        if (
+            isinstance(memory_bytes, int)
+            and not isinstance(memory_bytes, bool)
+            and memory_bytes >= 0
+        ):
             self._memory_bytes = memory_bytes
             self._memory_bytes_max = max(self._memory_bytes_max, memory_bytes)
 
