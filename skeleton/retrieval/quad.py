@@ -12,8 +12,10 @@ extracted from the text, so the knowledge graph self-populates.
 from __future__ import annotations
 
 from collections import deque
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, replace
+from threading import RLock
+from typing import Any, Callable, Dict, List, Optional
 
 from skeleton.kernel.events import EventBus
 from skeleton.retrieval.cache import ResultCache
@@ -39,9 +41,14 @@ class QuadRetriever:
     - CAG (Context-Augmented Generation): contextual associative memory
     - MAG (Multi-Agent Generation): episodic agent memory
     - KAG (Knowledge-Augmented Generation): structured knowledge graph
+
+    Registered planes execute concurrently. Results are collected in registration
+    order so equal-score fusion ties remain deterministic even when faster planes
+    finish first.
     """
 
     _PLANE_HISTORY_LIMIT = 64
+    _MAX_PARALLEL_PLANES = 4
 
     def __init__(
         self,
@@ -55,17 +62,37 @@ class QuadRetriever:
         self._cache = cache if cache is not None else ResultCache()
         self._extractor = extractor or TripleExtractor()
         self._plane_history: deque[str] = deque(maxlen=self._PLANE_HISTORY_LIMIT)
+        self._state_lock = RLock()
+        self._cache_generation = 0
         self._stats = {
             "queries": 0,
             "cache_hits": 0,
+            "plane_failures": 0,
             "ingested": 0,
             "triples_extracted": 0,
         }
 
     def register_plane(self, name: str, retriever: Any) -> None:
-        """Register a retrieval plane."""
-        if retriever is not None:
+        """Register or replace a retrieval plane and invalidate cached rankings."""
+        if retriever is None:
+            return
+        with self._state_lock:
             self._planes[name] = retriever
+            self._cache_generation += 1
+            self._cache.clear()
+
+    def as_retriever(
+        self,
+        *,
+        k: int = 8,
+        use_cache: bool = True,
+    ) -> Callable[[str], List[ScoredResult]]:
+        """Return a single-argument adapter suitable for ``QueryPlanner.register``."""
+
+        def _retrieve(query: str) -> List[ScoredResult]:
+            return self.retrieve(query, k=k, use_cache=use_cache)
+
+        return _retrieve
 
     @staticmethod
     def _metadata_provenance(metadata: Dict[str, Any]) -> str:
@@ -92,10 +119,13 @@ class QuadRetriever:
         ``ScoredResult``. Crossing that boundary without normalization leaves the
         fuser looking for ``fragment_id``/``content`` on a ``ScoredChunk`` and
         breaks API retrieval after successful ingestion.
+
+        Existing ``ScoredResult`` instances are never mutated. A plane correction
+        returns a shallow dataclass copy so callers can safely reuse their result.
         """
         if isinstance(result, ScoredResult):
             if result.plane in (None, "", "rag") and plane_name != "rag":
-                result.plane = plane_name
+                return replace(result, plane=plane_name)
             return result
 
         chunk = getattr(result, "chunk", None)
@@ -138,46 +168,103 @@ class QuadRetriever:
 
         return None
 
-    def retrieve(self, query: str, k: int = 8, use_cache: bool = True) -> List[ScoredResult]:
-        """Query all registered planes and fuse results."""
-        cache_key = f"{query}:{k}"
+    def _query_plane(
+        self,
+        plane_name: str,
+        retriever: Any,
+        query: str,
+        k: int,
+    ) -> List[ScoredResult]:
+        """Execute one plane and normalize its native result objects."""
+        if hasattr(retriever, "query"):
+            if plane_name == "cag":
+                plane_results = retriever.query(query)
+            else:
+                plane_results = retriever.query(query, top_k=k)
+        elif hasattr(retriever, "retrieve"):
+            plane_results = retriever.retrieve(query, k=k)
+        else:
+            return []
 
+        return [
+            item
+            for raw in plane_results
+            if (item := self._normalize_result(plane_name, raw)) is not None
+        ]
+
+    def retrieve(self, query: str, k: int = 8, use_cache: bool = True) -> List[ScoredResult]:
+        """Query registered planes concurrently and fuse deterministic results."""
+        with self._state_lock:
+            generation = self._cache_generation
+            plane_items = tuple(self._planes.items())
+
+        cache_key = f"{generation}:{k}:{query}"
         if use_cache:
             cached = self._cache.get(cache_key)
             if cached is not None:
-                self._stats["cache_hits"] += 1
+                with self._state_lock:
+                    self._stats["cache_hits"] += 1
                 return list(cached)
 
-        self._stats["queries"] += 1
+        with self._state_lock:
+            self._stats["queries"] += 1
+
         results_by_plane: Dict[str, List[ScoredResult]] = {}
+        failures: List[str] = []
 
-        for plane_name, retriever in self._planes.items():
+        if len(plane_items) == 1:
+            plane_name, retriever = plane_items[0]
             try:
-                if hasattr(retriever, "query"):
-                    if plane_name == "cag":
-                        plane_results = retriever.query(query)
-                    else:
-                        plane_results = retriever.query(query, top_k=k)
-                elif hasattr(retriever, "retrieve"):
-                    plane_results = retriever.retrieve(query, k=k)
-                else:
-                    continue
-
-                normalized = [
-                    item
-                    for raw in plane_results
-                    if (item := self._normalize_result(plane_name, raw)) is not None
-                ]
+                normalized = self._query_plane(plane_name, retriever, query, k)
+            except Exception:
+                failures.append(plane_name)
+            else:
                 if normalized:
                     results_by_plane[plane_name] = normalized
-                    self._plane_history.append(plane_name)
-            except Exception:
-                continue
+        elif plane_items:
+            with ThreadPoolExecutor(
+                max_workers=min(len(plane_items), self._MAX_PARALLEL_PLANES),
+                thread_name_prefix="skeleton-retrieval",
+            ) as executor:
+                futures = [
+                    (
+                        plane_name,
+                        executor.submit(
+                            self._query_plane,
+                            plane_name,
+                            retriever,
+                            query,
+                            k,
+                        ),
+                    )
+                    for plane_name, retriever in plane_items
+                ]
+
+                # Consume in registration order, not completion order. The work
+                # still overlaps, while RRF tie ordering stays deterministic.
+                for plane_name, future in futures:
+                    try:
+                        normalized = future.result()
+                    except Exception:
+                        failures.append(plane_name)
+                        continue
+                    if normalized:
+                        results_by_plane[plane_name] = normalized
+
+        with self._state_lock:
+            self._stats["plane_failures"] += len(failures)
+            for plane_name in results_by_plane:
+                self._plane_history.append(plane_name)
 
         fused = self._fuser.fuse(results_by_plane, top_k=k)
 
+        # Generation checking closes a subtle invalidation race: a query that
+        # started before register_plane()/ingest_document() may finish after the
+        # cache was cleared. It must not repopulate that cache with stale results.
         if use_cache:
-            self._cache.put(cache_key, tuple(fused))
+            with self._state_lock:
+                if generation == self._cache_generation:
+                    self._cache.put(cache_key, tuple(fused))
 
         if self._bus:
             self._bus.emit(
@@ -185,6 +272,7 @@ class QuadRetriever:
                 {
                     "query": query,
                     "planes": list(results_by_plane.keys()),
+                    "failed_planes": list(failures),
                     "results": len(fused),
                 },
             )
@@ -200,11 +288,20 @@ class QuadRetriever:
     ) -> int:
         """Ingest a document: chunk into RAG and extract triples into KAG.
 
-        Returns the number of chunks ingested into RAG.
+        Returns the number of chunks ingested into RAG. Cache generations are
+        advanced before and after mutation so neither pre-ingest nor partially
+        ingested results can survive as reusable cached rankings.
         """
-        chunks = 0
+        with self._state_lock:
+            rag = self._planes.get("rag")
+            kag = self._planes.get("kag")
+            mag = self._planes.get("mag")
+            self._cache_generation += 1
+            self._cache.clear()
 
-        rag = self._planes.get("rag")
+        chunks = 0
+        triples_extracted = 0
+
         if rag and hasattr(rag, "add"):
             from skeleton.memory.core import Chunk
 
@@ -212,22 +309,23 @@ class QuadRetriever:
             rag.add(chunk)
             chunks += 1
 
-        # Self-populate the KAG plane from the same text
-        kag = self._planes.get("kag")
+        # Self-populate the KAG plane from the same text.
         if kag is not None and hasattr(kag, "graph"):
             triples = self._extractor.extract(text)
             for subject, predicate, obj in triples:
                 kag.graph.add(subject, predicate, obj)
-            self._stats["triples_extracted"] += len(triples)
+            triples_extracted = len(triples)
 
-        # MAG episodic trace for high-salience documents
-        mag = self._planes.get("mag")
+        # MAG episodic trace for high-salience documents.
         if mag is not None and hasattr(mag, "record") and salience >= 0.7:
             mag.record(doc_id, text[:500], tags=(metadata or {}).get("tags", []))
 
-        # New content can change rankings, so all cached query results are stale.
-        self._cache.clear()
-        self._stats["ingested"] += chunks
+        with self._state_lock:
+            self._stats["triples_extracted"] += triples_extracted
+            self._stats["ingested"] += chunks
+            self._cache_generation += 1
+            self._cache.clear()
+            total_triples = self._stats["triples_extracted"]
 
         if self._bus:
             self._bus.emit(
@@ -235,7 +333,7 @@ class QuadRetriever:
                 {
                     "doc_id": doc_id,
                     "chunks": chunks,
-                    "triples": self._stats["triples_extracted"],
+                    "triples": total_triples,
                     "salience": salience,
                 },
             )
@@ -243,9 +341,11 @@ class QuadRetriever:
         return chunks
 
     def stats(self) -> Dict[str, Any]:
-        return {
-            **self._stats,
-            "planes_used": list(self._plane_history),
-            "planes_registered": len(self._planes),
-            "cache_size": self._cache.size(),
-        }
+        with self._state_lock:
+            return {
+                **self._stats,
+                "planes_used": list(self._plane_history),
+                "planes_registered": len(self._planes),
+                "cache_size": self._cache.size(),
+                "cache_generation": self._cache_generation,
+            }
