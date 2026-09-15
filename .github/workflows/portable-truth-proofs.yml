@@ -2,6 +2,7 @@ name: Portable Truth Proofs
 
 on:
   push:
+    branches: [main]
     paths:
       - "backend/core/sparse_merkle.py"
       - "backend/core/epistemic_claim_index.py"

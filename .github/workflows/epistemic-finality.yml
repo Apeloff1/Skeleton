@@ -2,6 +2,7 @@ name: Epistemic Witness Finality
 
 on:
   push:
+    branches: [main]
     paths:
       - "backend/core/transparency_witness.py"
       - "backend/core/transparency_witness_config.py"

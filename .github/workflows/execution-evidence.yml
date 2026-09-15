@@ -2,6 +2,7 @@ name: Execution Evidence Gates
 
 on:
   push:
+    branches: [main]
     paths:
       - "backend/core/execution_evidence.py"
       - "backend/core/execution_receipts.py"

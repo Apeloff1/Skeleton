@@ -2,6 +2,7 @@ name: Durable State
 
 on:
   push:
+    branches: [main]
     paths:
       - "skeleton/state/**"
       - "skeleton/testing/test_durable_run_store.py"

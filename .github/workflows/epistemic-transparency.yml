@@ -2,6 +2,7 @@ name: Epistemic Transparency
 
 on:
   push:
+    branches: [main]
     paths:
       - "backend/core/transparency_log.py"
       - "backend/core/epistemic_transparency.py"
