@@ -61,11 +61,16 @@ class AquariumState:
         if isinstance(self.owned_tanks, (str, bytes)):
             raise TypeError("owned_tanks must be a collection")
         owned = frozenset(text(item, "owned tank") for item in self.owned_tanks)
+        global_fish_ids: set[str] = set()
         for key, tank in tanks.items():
             if not isinstance(tank, AquariumTankState):
                 raise TypeError("tanks must contain AquariumTankState")
             if text(key, "tank key") != tank.tank_id:
                 raise ValueError("tank key must match tank_id")
+            for fish in tank.fish:
+                if fish.id in global_fish_ids:
+                    raise ValueError(f"duplicate fish identity across aquarium: {fish.id}")
+                global_fish_ids.add(fish.id)
         if not set(tanks).issubset(owned):
             raise ValueError("every tank state must be owned")
         total = count(self.total_fish_displayed, "total fish displayed")
