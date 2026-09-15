@@ -144,8 +144,16 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Enforce JavaScript vulnerability policy
-        if: always()
+      - name: Enforce non-zero JavaScript audit result
+        if: steps.yarn-audit.outputs.status != '0' && always()
+        env:
+          IMAGE_SIZE_SECURITY_VERIFIED: ${{ steps.image-size-security.outcome }}
+          YARN_AUDIT_STATUS: ${{ steps.yarn-audit.outputs.status }}
+        working-directory: frontend
+        run: node scripts/enforce-yarn-audit.js "$RUNNER_TEMP/yarn-audit.json"
+
+      - name: Enforce successful JavaScript audit result
+        if: steps.yarn-audit.outputs.status == '0' && always()
         env:
           IMAGE_SIZE_SECURITY_VERIFIED: ${{ steps.image-size-security.outcome }}
           YARN_AUDIT_STATUS: ${{ steps.yarn-audit.outputs.status }}
