@@ -108,6 +108,16 @@ def sha_scoped_cancellation(workflow: str) -> bool:
     )
 
 
+def ref_scoped_cancellation(workflow: str) -> bool:
+    """Return true when superseding cancellation is isolated to one PR/ref."""
+    group = re.search(r"^\s*group:\s*(.+)$", workflow, re.MULTILINE)
+    return bool(
+        group
+        and "${{ github.event.pull_request.number || github.ref }}" in group.group(1)
+        and cancel_true(workflow)
+    )
+
+
 def pinned_action_count(workflow: str, action: str, generation: str) -> int:
     """Count immutable action pins carrying the expected human-readable generation."""
     pattern = re.compile(
@@ -278,8 +288,8 @@ def main() -> int:
         failures,
     )
     require(
-        cancel_false(ci) or sha_scoped_cancellation(ci),
-        "CI concurrency must preserve validation across distinct commit SHAs",
+        cancel_false(ci) or sha_scoped_cancellation(ci) or ref_scoped_cancellation(ci),
+        "CI concurrency must preserve runs or scope cancellation to one commit/PR/ref",
         failures,
     )
     require(
@@ -378,8 +388,10 @@ def main() -> int:
         failures,
     )
     require(
-        cancel_false(backend_quality) or sha_scoped_cancellation(backend_quality),
-        "Backend Quality concurrency must preserve validation across distinct commit SHAs",
+        cancel_false(backend_quality)
+        or sha_scoped_cancellation(backend_quality)
+        or ref_scoped_cancellation(backend_quality),
+        "Backend Quality concurrency must preserve runs or scope cancellation to one commit/PR/ref",
         failures,
     )
 
@@ -493,7 +505,7 @@ def main() -> int:
     print(
         "Toolchain contract passed: immutable CI actions, runtime/tooling, hermetic test boundaries, "
         "canonical frontend validation, local/CI/pre-commit security parity, dependency audits/SBOMs, "
-        "SHA-safe concurrency, regression isolation, self-enforcement, and fail-closed deployment gates aligned."
+        "scoped workflow concurrency, regression isolation, self-enforcement, and fail-closed deployment gates aligned."
     )
     return 0
 

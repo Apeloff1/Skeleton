@@ -7,11 +7,25 @@ cd "$ROOT"
 printf '\n== Toolchain contract ==\n'
 python scripts/check_toolchain_contract.py
 
+printf '\n== Canonical local/CI quality parity ==\n'
+python scripts/check_quality_gate_parity.py
+
 printf '\n== Provider runtime boundary ==\n'
 python scripts/check_provider_runtime_boundary.py
 
+printf '\n== Architecture boundaries ==\n'
+python scripts/check_architecture_boundaries.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  tests/test_architecture_boundaries.py
+
 printf '\n== Skeleton core syntax ==\n'
 python -m compileall -q skeleton
+
+printf '\n== Backend Ruff ==\n'
+(
+  cd backend
+  python -m ruff check . --output-format=github
+)
 
 printf '\n== Backend syntax ==\n'
 python -m compileall -q backend
