@@ -124,6 +124,31 @@ def _portable_json_metadata(metadata: Mapping[Any, Any]) -> dict[str, Any]:
     return normalized
 
 
+def normalize_memory_metadata(metadata: Mapping[Any, Any]) -> dict[str, Any]:
+    """Normalize one metadata object to the finite strict-JSON data model."""
+
+    if not isinstance(metadata, Mapping):
+        raise TypeError("memory metadata must be a mapping")
+    return _portable_json_metadata(metadata)
+
+
+def normalize_memory_filters(
+    filters: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Normalize query filters using the same boundary as stored metadata.
+
+    This prevents reference/persistent backend drift such as a tuple matching in
+    memory while becoming a list after JSON persistence, and rejects non-finite
+    numeric filters consistently before any backend query is executed.
+    """
+
+    if filters is None:
+        return {}
+    if not isinstance(filters, Mapping):
+        raise TypeError("memory filters must be a mapping")
+    return normalize_memory_metadata(filters)
+
+
 def portable_memory_metadata(item: Mapping[str, Any]) -> dict[str, Any]:
     """Flatten portable filter fields into one strict JSON metadata mapping.
 
@@ -148,7 +173,7 @@ def portable_memory_metadata(item: Mapping[str, Any]) -> dict[str, Any]:
         if key in metadata and metadata[key] != value:
             raise ValueError(f"conflicting memory metadata field: {key}")
         metadata[key] = value
-    return _portable_json_metadata(metadata)
+    return normalize_memory_metadata(metadata)
 
 
 def normalize_memory_item(
@@ -221,7 +246,7 @@ class InMemoryStore:
         if limit < 1:
             return []
 
-        where = dict(filters or {})
+        where = normalize_memory_filters(filters)
         ranked: list[tuple[float, int, Mapping[str, Any]]] = []
         for item_id, item in self._items.items():
             payload = item.payload
