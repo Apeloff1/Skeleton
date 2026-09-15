@@ -3,7 +3,7 @@ api_middleware — request ID injection, structured logging, and an in-memory
 token-bucket rate limiter.
 
 Public surface:
-  • RequestIdMiddleware   — adds X-Request-Id header (existing or generated)
+  • RequestIdMiddleware   — adds X-Request-Id header (existing safe ID or generated)
   • AccessLogMiddleware   — single-line structured log per request
   • RateLimiterMiddleware — per-IP token-bucket; 429 on overflow
   • get_stats()           — observability snapshot (for the /api/_telemetry route)
@@ -20,7 +20,6 @@ import asyncio
 import logging
 import os
 import time
-import uuid
 from collections import defaultdict, deque
 from typing import Callable, Deque, Dict, Tuple
 
@@ -29,17 +28,16 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from middleware import client_identity
+from middleware.request_id import normalize_request_id
 
 log = logging.getLogger("api.middleware")
 
-# ── Configuration ─────────────────────────────────────────────────────
 _RATE_PER_MIN = int(os.environ.get("RATE_LIMIT_PER_MIN", "600"))
 _RATE_BURST = int(os.environ.get("RATE_LIMIT_BURST", "60"))
 _EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "")
 _EXEMPT_IPS = {ip.strip() for ip in _EXEMPT_RAW.split(",") if ip.strip()}
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
 
-# Telemetry counters (in-memory) ────────────────────────────────────
 _lat_ring: Deque[float] = deque(maxlen=1024)
 _lat_lock: asyncio.Lock | None = None
 
@@ -94,10 +92,10 @@ def get_stats() -> dict:
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
-    """Populate request.state.request_id and echo it on the response."""
+    """Populate request.state.request_id and echo a log-safe ID on the response."""
 
     async def dispatch(self, request: Request, call_next: Callable):
-        rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:16]
+        rid = normalize_request_id(request.headers.get("x-request-id"))
         request.state.request_id = rid
         try:
             response: Response = await call_next(request)
@@ -146,18 +144,15 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
 
 
 def _client_ip(request: Request) -> str:
-    """Compatibility wrapper around the repository-wide trust policy."""
     value = client_identity.resolve_client_ip(request)
     return "-" if value == "unknown" else value
 
 
 def _is_api_path(path: str) -> bool:
-    """Match the /api route tree without treating lookalikes such as /apiary as API."""
     return path == "/api" or path.startswith("/api/")
 
 
 class _Bucket:
-    """Tiny token-bucket."""
     __slots__ = ("tokens", "last", "capacity", "refill_per_sec")
 
     def __init__(self, capacity: int, refill_per_sec: float):
@@ -228,7 +223,6 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
 
 
 def install_middleware(app) -> None:
-    """Install request logging and rate limiting in the intended LIFO order."""
     app.add_middleware(AccessLogMiddleware)
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(RateLimiterMiddleware)
