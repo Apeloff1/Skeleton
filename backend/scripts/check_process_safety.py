@@ -351,17 +351,22 @@ def violations(path: Path) -> list[str]:
 
 def main() -> int:
     findings: list[str] = []
+    scanned = 0
     for path in python_files():
+        scanned += 1
         findings.extend(violations(path))
+    if scanned == 0:
+        findings.append("scanner coverage failure: no backend Python files were scanned")
     if findings:
         print("Unsafe process invocation patterns detected:", file=sys.stderr)
         for finding in sorted(findings):
             print(f"  - {finding}", file=sys.stderr)
         return 1
     print(
-        "Process safety gate passed: no unsafe shell execution, statically obvious string-shaped subprocess commands, "
-        "opaque subprocess kwargs, dynamic process lookup, process-sensitive star imports, unsafe process partials, "
-        "unsafe process namespace get()/__getattribute__(), os.system(), or os.popen() calls found."
+        f"Process safety gate passed across {scanned} backend Python files: no unsafe shell execution, "
+        "statically obvious string-shaped subprocess commands, opaque subprocess kwargs, dynamic process lookup, "
+        "process-sensitive star imports, unsafe process partials, unsafe process namespace get()/__getattribute__(), "
+        "os.system(), or os.popen() calls found."
     )
     return 0
 
