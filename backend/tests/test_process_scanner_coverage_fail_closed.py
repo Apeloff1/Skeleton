@@ -6,6 +6,8 @@ import importlib.util
 import os
 from pathlib import Path
 
+import pytest
+
 from scripts import check_process_safety as backend_gate
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -27,6 +29,13 @@ def _nested_failure_scandir(blocked: Path):
         return real_scandir(path)
 
     return scan
+
+
+def _make_directory_symlink(link: Path, target: Path) -> None:
+    try:
+        link.symlink_to(target, target_is_directory=True)
+    except (NotImplementedError, OSError) as exc:
+        pytest.skip(f"directory symlinks unavailable on this platform: {type(exc).__name__}")
 
 
 def test_backend_gate_fails_closed_on_nested_traversal_error(tmp_path, monkeypatch, capsys) -> None:
@@ -90,6 +99,15 @@ def test_repository_gate_redacts_read_failure_details(tmp_path, monkeypatch) -> 
     assert all(SENTINEL not in finding for finding in findings)
 
 
+def test_backend_gate_fails_closed_on_zero_python_coverage(tmp_path, monkeypatch, capsys) -> None:
+    empty_root = tmp_path / "empty-backend"
+    empty_root.mkdir()
+    monkeypatch.setattr(backend_gate, "ROOT", empty_root)
+
+    assert backend_gate.main() == 1
+    assert "no backend Python files were scanned" in capsys.readouterr().err
+
+
 def test_repository_gate_fails_closed_when_required_root_is_missing(tmp_path, monkeypatch, capsys) -> None:
     monkeypatch.setattr(repository_gate, "SCAN_ROOTS", (tmp_path / "missing",))
 
@@ -105,3 +123,31 @@ def test_repository_gate_fails_closed_on_zero_python_coverage(tmp_path, monkeypa
 
     assert repository_gate.main() == 1
     assert "no repository Python files were scanned" in capsys.readouterr().err
+
+
+def test_backend_gate_does_not_follow_directory_symlinks(tmp_path, monkeypatch) -> None:
+    root = tmp_path / "backend"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (root / "safe.py").write_text("value = 1\n", encoding="utf-8")
+    (outside / "unsafe.py").write_text("import os\nos.system('echo unsafe')\n", encoding="utf-8")
+    _make_directory_symlink(root / "linked", outside)
+    monkeypatch.setattr(backend_gate, "ROOT", root)
+
+    discovered = {path.relative_to(root) for path in backend_gate.python_files()}
+    assert discovered == {Path("safe.py")}
+
+
+def test_repository_gate_does_not_follow_directory_symlinks(tmp_path, monkeypatch) -> None:
+    root = tmp_path / "runtime"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (root / "safe.py").write_text("value = 1\n", encoding="utf-8")
+    (outside / "unsafe.py").write_text("import os\nos.system('echo unsafe')\n", encoding="utf-8")
+    _make_directory_symlink(root / "linked", outside)
+    monkeypatch.setattr(repository_gate, "SCAN_ROOTS", (root,))
+
+    discovered = {path.relative_to(root) for path in repository_gate.python_files()}
+    assert discovered == {Path("safe.py")}
