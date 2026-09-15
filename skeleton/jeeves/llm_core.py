@@ -145,12 +145,10 @@ class JeevesCore:
         self._tools: Dict[str, Callable[[Dict[str, Any]], Any]] = {}
         self._stats = {"interactions": 0, "tool_calls": 0, "tool_failures": 0}
 
-        # Memory matrices
         self.sam = SemanticAssociationMap()
         self.clom = CompressedLearnedOutcomeModel()
         self.krem = KnowledgeRetentionMatrix()
 
-        # Citations: grounded in the retriever's KAG plane when available
         kag = None
         if retriever is not None:
             planes = getattr(retriever, "_planes", None) or {}
@@ -158,8 +156,6 @@ class JeevesCore:
             if kag is None and hasattr(retriever, "graph"):
                 kag = retriever
         self.citations = CitationEngine(kag=kag)
-
-        # ResponseCycle: distills replies into work orders between turns
         self._cycle = cycle
 
         if provider is not None:
@@ -180,11 +176,7 @@ class JeevesCore:
         self._tools[normalized] = handler
 
     def _requested_tool_calls(self, context: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Validate explicit tool-call requests before any session mutation.
-
-        Accepted forms are ``{"name": "tool", "arguments": {...}}`` entries.
-        Unknown tools, malformed arguments, and over-budget requests fail closed.
-        """
+        """Validate explicit tool-call requests before any session mutation."""
         raw = (context or {}).get("tool_calls", [])
         if raw is None:
             return []
@@ -209,6 +201,13 @@ class JeevesCore:
             calls.append({"name": normalized, "arguments": dict(arguments)})
         return calls
 
+    def _provider_complete(self, prompt: str, prior_context: List[str], system: str) -> str:
+        """Use a real provider-native system channel when the adapter supports it."""
+        if getattr(self._provider, "supports_system_prompt", False):
+            return self._provider.complete(prompt, context=prior_context, system=system)
+        legacy_prompt = f"{system}\n\n{prompt}" if system else prompt
+        return self._provider.complete(legacy_prompt, context=prior_context)
+
     @property
     def provider_name(self) -> str:
         return getattr(self._provider, "name", "unknown")
@@ -228,26 +227,20 @@ class JeevesCore:
         if not session:
             return {"error": "Session not found", "session_id": session_id}
 
-        # Capability requests are validated before recording or provider work so
-        # malformed requests cannot create partial turns or side effects.
         requested_tool_calls = self._requested_tool_calls(context)
         prior_context = session.context_window()
         session.add_turn("user", input_text, **(context or {}))
 
-        # Matrices observe the input
         self.sam.observe(input_text)
         for term in self.sam._terms(input_text):
             self.krem.observe(term)
 
-        # SAM expansion enriches the prompt with associated concepts
         expansions = self.sam.expand(input_text)
         system = MODE_SYSTEM_PROMPTS.get(session.mode, "")
-        prompt = f"{system}\n\n{input_text}" if system else input_text
+        prompt = input_text
         if expansions:
             prompt += f"\n\nRelated concepts: {', '.join(expansions[:5])}"
 
-        # Citations: graph facts supporting this query (+ SAM context). Retrieved
-        # text is data, never an instruction source, and is explicitly delimited.
         cited = self.citations.cite(input_text, context_terms=expansions)
         if cited:
             facts = "\n".join(f"- {c.render()}" for c in cited[:5])
@@ -262,21 +255,15 @@ class JeevesCore:
         start = time.time()
         provider_failed = False
         try:
-            content = self._provider.complete(prompt, context=prior_context)
+            content = self._provider_complete(prompt, prior_context, system)
             success = True
         except Exception:
-            # Never echo provider exception strings into the user-visible reply or
-            # long-lived matrices/session memory; they can contain credentials,
-            # request fragments, endpoints, or implementation details.
             content = _PROVIDER_ERROR_CONTENT
             success = False
             provider_failed = True
         latency_ms = (time.time() - start) * 1000
 
-        # CLOM tracks the outcome for this intent (= session mode)
         self.clom.observe(session.mode.value, success, latency_ms)
-
-        # Only successful model language is allowed to feed semantic memory.
         if success:
             self.sam.observe(content)
 
@@ -297,15 +284,13 @@ class JeevesCore:
                 self._stats["tool_calls"] += 1
                 tools_used.append(name)
 
-        # Context fabric: consume the interjection earned last turn, then
-        # run the between-turns cycle on this reply (distill → execute → guide)
         cycle_report = None
         interjection = None
         if self._cycle is not None:
             interjection = self._cycle.before_reply()
             if interjection:
                 content = interjection + "\n\n" + content
-            token_count = max(1, len(content) // 4)  # rough token estimate
+            token_count = max(1, len(content) // 4)
             cycle_report = self._cycle.after_reply(content, token_count)
 
         session.add_turn("assistant", content, tools_used=tools_used,
