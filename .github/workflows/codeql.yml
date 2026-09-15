@@ -8,6 +8,13 @@ on:
   schedule:
     - cron: "41 7 * * 5"
 
+# Only the newest validation for a branch or PR is useful. CodeQL fans out to
+# eight language jobs, so allowing obsolete heads to remain queued multiplies
+# runner pressure without adding coverage for the live head.
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 # Deny token capabilities by default. The analysis job receives only the
 # minimum write scope required to upload code-scanning results.
 permissions: {}

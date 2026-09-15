@@ -14,6 +14,10 @@ on:
       - 'backend/scripts/check_workflow_input_security.py'
       - 'backend/tests/test_workflow_input_security_gate.py'
 
+concurrency:
+  group: workflow-input-security-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
