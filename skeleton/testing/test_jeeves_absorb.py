@@ -50,6 +50,22 @@ def test_submit_is_orthogonal_to_promotion() -> None:
     assert engine.metrics.knowledge_gain_per_compute > 0
 
 
+def test_queued_exact_duplicate_is_rechecked_before_promotion() -> None:
+    engine = AbsorbEngine()
+    engine.submit(_observation("dup-a", "Same queued knowledge"))
+    engine.submit(_observation("dup-b", "Same queued knowledge"))
+
+    assert engine.backlog == 2
+
+    snapshot = engine.process()
+
+    assert snapshot is not None
+    assert [entry.observation_id for entry in snapshot.entries] == ["dup-a"]
+    assert engine.metrics.promoted == 1
+    assert engine.metrics.exact_duplicates == 1
+    assert engine.metrics.processed == 2
+
+
 def test_low_confidence_is_deferred_not_served() -> None:
     engine = AbsorbEngine()
     engine.submit(_observation("weak", "Weakly supported claim", trust=0.30))
