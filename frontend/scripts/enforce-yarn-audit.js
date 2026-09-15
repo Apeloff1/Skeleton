@@ -33,6 +33,7 @@ const severityBits = Object.freeze({
   critical: 16,
 });
 const blockingSeverityMask = severityBits.high | severityBits.critical;
+const severityNames = Object.keys(severityBits);
 
 const allowedMitigatedAdvisories = new Set([
   // image-size has no patched npm release. These two parser-progress flaws are
@@ -45,7 +46,8 @@ const allowedMitigatedAdvisories = new Set([
 const findings = [];
 const mitigated = [];
 let observedBlockingMask = 0;
-let sawAuditSummary = false;
+let auditSummaryCount = 0;
+let summaryVulnerabilities = null;
 
 let auditText;
 try {
@@ -65,18 +67,41 @@ for (const line of auditText.split(/\r?\n/)) {
     process.exit(2);
   }
 
+  if (!record || typeof record !== 'object' || Array.isArray(record)) {
+    console.error('[yarn-audit-policy] malformed audit record');
+    process.exit(2);
+  }
+
   if (record.type === 'error') {
     console.error('[yarn-audit-policy] yarn emitted an audit error record');
     process.exit(2);
   }
   if (record.type === 'auditSummary') {
-    sawAuditSummary = true;
+    auditSummaryCount += 1;
+    if (auditSummaryCount > 1) {
+      console.error('[yarn-audit-policy] multiple audit summaries emitted; refusing ambiguous output');
+      process.exit(2);
+    }
+
+    const vulnerabilities = record.data && record.data.vulnerabilities;
+    if (!vulnerabilities || typeof vulnerabilities !== 'object' || Array.isArray(vulnerabilities)) {
+      console.error('[yarn-audit-policy] malformed audit summary vulnerabilities');
+      process.exit(2);
+    }
+    for (const severity of severityNames) {
+      const count = vulnerabilities[severity];
+      if (!Number.isInteger(count) || count < 0) {
+        console.error(`[yarn-audit-policy] incomplete audit summary severity count: ${severity}`);
+        process.exit(2);
+      }
+    }
+    summaryVulnerabilities = vulnerabilities;
     continue;
   }
   if (record.type !== 'auditAdvisory') continue;
 
   const advisory = record.data && record.data.advisory;
-  if (!advisory) {
+  if (!advisory || typeof advisory !== 'object' || Array.isArray(advisory)) {
     console.error('[yarn-audit-policy] malformed audit advisory record');
     process.exit(2);
   }
@@ -108,7 +133,7 @@ for (const line of auditText.split(/\r?\n/)) {
   }
 }
 
-if (!sawAuditSummary) {
+if (auditSummaryCount !== 1 || !summaryVulnerabilities) {
   console.error('[yarn-audit-policy] audit summary missing; refusing to treat incomplete output as clean');
   process.exit(2);
 }
@@ -117,6 +142,16 @@ const reportedBlockingMask = auditStatus & blockingSeverityMask;
 if (reportedBlockingMask !== observedBlockingMask) {
   console.error(
     `[yarn-audit-policy] yarn blocking-severity mask ${reportedBlockingMask} does not match parsed mask ${observedBlockingMask}`,
+  );
+  process.exit(2);
+}
+
+const summaryBlockingMask =
+  (summaryVulnerabilities.high > 0 ? severityBits.high : 0) |
+  (summaryVulnerabilities.critical > 0 ? severityBits.critical : 0);
+if (summaryBlockingMask !== reportedBlockingMask) {
+  console.error(
+    `[yarn-audit-policy] audit summary blocking-severity mask ${summaryBlockingMask} does not match process mask ${reportedBlockingMask}`,
   );
   process.exit(2);
 }
