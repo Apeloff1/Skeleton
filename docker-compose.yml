@@ -85,7 +85,6 @@ services:
       - ./backend:/app:ro
       - ./skeleton:/app/skeleton:ro
       - backend_data:/app/data
-      - /app/__pycache__
     depends_on:
       mongo:
         condition: service_healthy
@@ -108,7 +107,7 @@ services:
     container_name: tutolage-frontend
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "${FRONTEND_PORT:-3001}:3000"
       - "8081:8081"      # Metro bundler
       - "19000:19000"    # Expo
       - "19001:19001"    # Expo DevTools
