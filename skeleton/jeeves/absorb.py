@@ -593,6 +593,25 @@ class AbsorbEngine:
         for _ in range(min(max_items, len(self._queue))):
             _, _, record, signals, similarity = heapq.heappop(self._queue)
             observation = record.observation
+
+            # Novelty can change while work waits in the queue.  Re-check it at
+            # execution time so observations submitted concurrently cannot both
+            # cross the promotion boundary with stale duplicate state.
+            exact, current_similarity = self._novelty.inspect(observation.content)
+            self.metrics.processed += 1
+            if exact:
+                self.metrics.exact_duplicates += 1
+                continue
+            updated_similarity = max(similarity, current_similarity)
+            if (
+                similarity < self.gate.config.max_duplicate_similarity
+                <= updated_similarity
+            ):
+                self.metrics.near_duplicates += 1
+            if updated_similarity != similarity:
+                similarity = updated_similarity
+                signals = self._signals(observation, similarity)
+
             verification = self._verify(observation, signals)
             lanes = self.router.lanes(signals, verification)
             if AbsorbLane.CHALLENGE in lanes:
@@ -607,7 +626,6 @@ class AbsorbEngine:
                 lanes=lanes,
             )
             decision = self.gate.evaluate(candidate)
-            self.metrics.processed += 1
             self.metrics.compute_spent += signals.estimated_compute_cost
             if decision.disposition is Disposition.QUARANTINE:
                 self.metrics.quarantined += 1
