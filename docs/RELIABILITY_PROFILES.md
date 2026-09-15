@@ -71,9 +71,48 @@ The lifecycle and heartbeat helpers also report p50, p95, and maximum operation 
 
 Healthy structure after expiry is zero retained stale buckets. A companion regression proves the existing two-requests-per-second behavior still returns `429` for the third request inside the active window, then admits traffic again after expiry. Bucket sweeping is throttled to at most once per limiter window so ordinary request handling does not scan the full key map on every call.
 
+The same regression suite also drives 32 callers against one actor/route budget in a thread pool. Exactly eight requests must be admitted and 24 rejected for an eight-request window, proving limiter admission and retained-bucket cardinality stay exact under concurrent callers.
+
+## API gateway concurrent throughput profile
+
+`skeleton/testing/api_gateway_reliability_profiles.py` measures the real in-process `APIGateway` dispatch path with a thread pool. It intentionally disables cache, rate limiting, providers, and network I/O so the result isolates gateway routing, middleware bookkeeping, and shared-state synchronization.
+
+Capture a comparable baseline with:
+
+```bash
+python -m skeleton.testing.api_gateway_reliability_profiles \
+  --requests 5000 \
+  --concurrency 32 \
+  --json
+```
+
+The JSON result includes:
+
+- completed/failed request counts and body-integrity mismatches;
+- route call/error accounting;
+- p50, p95, and maximum per-request gateway latency;
+- total wall time and requests/second;
+- Python version/implementation, operating-system family, machine architecture, and logical CPU count;
+- `invariants_passed`, which is true only when every request succeeds with exact response and route accounting.
+
+CI regression coverage uses a smaller 256-request, concurrency-8 profile and gates only on deterministic correctness. Do **not** add a universal requests/second or latency threshold to CI: GitHub-hosted runner hardware varies. For performance regression comparison, record the JSON result together with the commit SHA and runner/execution class, then compare only runs with matching Python/runtime and equivalent hardware class.
+
+A representative capacity baseline should therefore record at minimum:
+
+```text
+commit_sha=<tested commit>
+execution_class=<runner or host class>
+profile=api_gateway_throughput
+requests=5000
+concurrency=32
+<verbatim JSON result>
+```
+
+This protocol makes future capacity numbers attributable and comparable without turning noisy shared-runner timing into a correctness gate.
+
 ## CI regression baseline
 
-The canonical quality gate runs orchestration, durable-state, and API limiter reliability regressions:
+The canonical quality gate runs orchestration, durable-state, and API reliability regressions:
 
 | Scenario | Pressure | Expected structural result |
 | --- | --- | --- |
@@ -83,9 +122,11 @@ The canonical quality gate runs orchestration, durable-state, and API limiter re
 | State heartbeat soak | 128 renewals | 1 run row, 0 steps, 0 checkpoints, revision 130 |
 | State lease contention | 12 contenders | 1 live owner, 11 conflicts, successful post-expiry takeover |
 | API limiter cardinality | 1,000 unique actors | 1,000 active buckets during window, 0 stale buckets after expiry |
+| API limiter concurrency | 32 callers, shared 8-request budget | 8 admitted, 24 rate-limited, 8 retained timestamps |
+| API gateway throughput | 256 requests, concurrency 8 | 256 completed, 0 failed/mismatched, 256 route calls, 0 route errors |
 
-The regression baseline intentionally asserts retry counts, terminal states, durable row cardinality, and bounded in-memory state rather than machine-dependent latency thresholds. Larger performance baselines should be captured on a stable execution class and compared only against equivalent hardware/runtime configuration.
+The regression baseline intentionally asserts retry counts, terminal states, durable row cardinality, bounded in-memory state, response integrity, and exact route accounting rather than machine-dependent latency thresholds. Larger performance baselines should be captured on a stable execution class and compared only against equivalent hardware/runtime configuration.
 
 ## Remaining #123 coverage
 
-The repository now has repeatable orchestration retry/chaos evidence, durable-state concurrent load/soak/lease recovery, and an API cardinality-soak invariant for limiter memory. Issue #123 remains open for streaming load, provider/storage failure injection beyond state lease conflicts, broader process-level memory/resource soak evidence, and representative environment capacity baselines.
+The repository now has repeatable orchestration retry/chaos evidence, durable-state concurrent load/soak/lease recovery, API limiter soak/concurrency invariants, and a repeatable API gateway throughput profile with environment-tagged latency/throughput output. Issue #123 remains open for streaming load, provider/storage failure injection beyond state lease conflicts, broader process-level memory/resource soak evidence, and an actual representative-environment capacity result captured with the protocol above.
