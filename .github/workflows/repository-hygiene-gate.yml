@@ -9,7 +9,7 @@ on:
       - '.github/workflows/repository-hygiene-gate.yml'
 
 concurrency:
-  group: repository-hygiene-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
+  group: repository-hygiene-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
