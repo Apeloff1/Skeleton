@@ -231,6 +231,8 @@ class JeevesCore:
             return set()
         if not isinstance(allowed_tools, list):
             raise ValueError("allowed_tools must be a list")
+        if len(allowed_tools) > _MAX_TOOL_CALLS_PER_TURN:
+            raise ValueError("allowed_tools budget exceeded")
 
         authorized = set()
         for name in allowed_tools:
