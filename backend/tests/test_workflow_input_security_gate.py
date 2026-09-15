@@ -51,6 +51,22 @@ def test_rejects_double_quoted_run_key_bypass(tmp_path: Path) -> None:
     assert any("direct workflow input interpolation" in finding for finding in findings)
 
 
+def test_rejects_indented_literal_block_scalar_bypass(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: workflow_dispatch\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |2-\n          printf '%s\\n' '${{ inputs.payload }}'\n",
+    )
+    assert any("direct workflow input interpolation" in finding for finding in findings)
+
+
+def test_rejects_chomped_folded_block_scalar_bypass(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: workflow_dispatch\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: >+2\n          printf '%s\\n' '${{ github.event.inputs.payload }}'\n",
+    )
+    assert any("direct workflow input interpolation" in finding for finding in findings)
+
+
 def test_allows_input_through_environment_boundary(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
