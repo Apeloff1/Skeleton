@@ -153,6 +153,10 @@ def _callable_aliases(scope: ast.AST, aliases: dict[str, str]) -> dict[str, str]
             if canonical not in TARFILE_SAFE_CALLABLES:
                 continue
             for name in names:
+                # A proven instance binding is stronger than a callable alias.
+                # Never let an earlier constructor-alias assignment downgrade it.
+                if current.get(name) == "tarfile.TarFile":
+                    continue
                 if current.get(name) == canonical:
                     continue
                 inferred[name] = canonical
