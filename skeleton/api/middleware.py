@@ -270,11 +270,14 @@ class BodyBoundMiddleware:
             await self.app(scope, receive, send)
             return
 
-        headers = {
-            k.decode("latin-1").lower(): v.decode("latin-1")
-            for k, v in scope.get("headers") or []
-        }
-        cl = headers.get("content-length")
+        # ASGI already gives us byte headers. Scan only for the one value we
+        # need instead of allocating and decoding a complete header mapping on
+        # every request.
+        cl = None
+        for key, value in scope.get("headers") or ():
+            if key == b"content-length" or key.lower() == b"content-length":
+                cl = value
+                break
         if cl is not None:
             try:
                 declared = int(cl)
@@ -314,9 +317,13 @@ class BodyBoundMiddleware:
 
 
 class WormAuditMiddleware:
-    """WORM-before-service: append + verify_chain_or_refuse; audit-fail → 503.
+    """WORM-before-service: append a hash-linked event; audit-fail → 503.
 
-    Reuses #22 ``skeleton.vault.audit.AuditLog`` — does not fork the chain.
+    ``AuditLog`` verifies durable history when it is restored/opened, and
+    ``append`` computes the new hash link before publishing the new head. A
+    second full-chain scan after every request made total request-path hashing
+    quadratic in the number of audit entries, so full verification remains an
+    explicit boot/diagnostic operation rather than per-request work.
     """
 
     def __init__(self, app, *, audit_log: Any = None) -> None:
@@ -354,7 +361,6 @@ class WormAuditMiddleware:
                     "seal": seal,
                 },
             )
-            log.verify_chain_or_refuse()
         except AuditChainBroken:
             resp = _json_response(503, {"error": "audit_unavailable"})
             await resp(scope, receive, send)
