@@ -56,6 +56,40 @@ def achievement_identity(subject_id: str, achievement_id: str) -> str:
     )
 
 
+def _spec_material(
+    *,
+    achievement_id: str,
+    name: str,
+    category: str,
+    hidden: bool,
+    requirement_type: str,
+    requirement_count: int,
+) -> Mapping[str, Any]:
+    return {
+        "achievement_id": achievement_id,
+        "name": name,
+        "category": category,
+        "hidden": hidden,
+        "requirement_type": requirement_type,
+        "requirement_count": requirement_count,
+    }
+
+
+def achievement_spec_digest(achievement: AchievementSpec) -> str:
+    """Digest the policy fields carried across achievement event boundaries."""
+
+    return stable_content_digest(
+        _spec_material(
+            achievement_id=achievement.id,
+            name=achievement.name,
+            category=achievement.category,
+            hidden=achievement.hidden,
+            requirement_type=achievement.requirement.kind,
+            requirement_count=achievement.requirement.count,
+        )
+    )
+
+
 def achievement_event(
     achievement: AchievementSpec,
     *,
@@ -71,11 +105,13 @@ def achievement_event(
         raise ValueError(f"unsupported achievement action: {normalized_action}")
     occurred = _aware(occurred_at, "achievement occurred_at")
     identity = achievement_identity(subject, achievement.id)
+    spec_digest = achievement_spec_digest(achievement)
 
     return DomainEvent(
         topic=f"achievement.{normalized_action}",
         payload={
             "achievement_identity_sha256": identity,
+            "achievement_spec_sha256": spec_digest,
             "achievement_id": achievement.id,
             "subject_id": subject,
             "name": achievement.name,
@@ -92,12 +128,14 @@ def achievement_event_to_memory_item(event: DomainEvent) -> Mapping[str, Any]:
     """Validate an achievement transition and project it to canonical memory.
 
     The stable subject+achievement digest is revalidated before it becomes the
-    memory id, so at-least-once replay converges through ordinary memory upsert.
+    memory id, while a separate spec digest binds the descriptive policy fields.
+    At-least-once replay therefore converges through ordinary memory upsert
+    without allowing altered achievement content to reuse the same entity id.
     """
 
     if event.topic not in {"achievement.unlocked", "achievement.claimed"}:
         raise ValueError("expected an achievement transition event")
-    _aware(event.occurred_at, "achievement event occurred_at")
+    occurred = _aware(event.occurred_at, "achievement event occurred_at")
 
     payload = event.payload
     if not isinstance(payload, Mapping):
@@ -105,6 +143,10 @@ def achievement_event_to_memory_item(event: DomainEvent) -> Mapping[str, Any]:
     identity = _sha256(
         payload.get("achievement_identity_sha256"),
         "achievement_identity_sha256",
+    )
+    spec_digest = _sha256(
+        payload.get("achievement_spec_sha256"),
+        "achievement_spec_sha256",
     )
     achievement_id = _text(payload.get("achievement_id"), "achievement_id")
     subject_id = _text(payload.get("subject_id"), "subject_id")
@@ -123,9 +165,22 @@ def achievement_event_to_memory_item(event: DomainEvent) -> Mapping[str, Any]:
     if requirement_count < 1:
         raise ValueError("achievement requirement_count must be positive")
 
-    expected = achievement_identity(subject_id, achievement_id)
-    if identity != expected:
+    expected_identity = achievement_identity(subject_id, achievement_id)
+    if identity != expected_identity:
         raise ValueError("achievement event identity digest mismatch")
+
+    expected_spec_digest = stable_content_digest(
+        _spec_material(
+            achievement_id=achievement_id,
+            name=name,
+            category=category,
+            hidden=hidden,
+            requirement_type=requirement_type,
+            requirement_count=requirement_count,
+        )
+    )
+    if spec_digest != expected_spec_digest:
+        raise ValueError("achievement event spec digest mismatch")
 
     action = event.topic.removeprefix("achievement.")
     return {
@@ -135,12 +190,13 @@ def achievement_event_to_memory_item(event: DomainEvent) -> Mapping[str, Any]:
             "achievement_id": achievement_id,
             "subject_id": subject_id,
             "achievement_identity_sha256": identity,
+            "achievement_spec_sha256": spec_digest,
             "achievement_action": action,
             "achievement_category": category,
             "hidden": hidden,
             "requirement_type": requirement_type,
             "requirement_count": requirement_count,
-            "occurred_at": event.occurred_at.astimezone(timezone.utc).isoformat(),
+            "occurred_at": occurred.isoformat(),
         },
     }
 
@@ -156,6 +212,7 @@ def achievement_state_memory_item(
     if achievement.id not in state.unlocked:
         raise ValueError("achievement must be unlocked before memory projection")
     identity = achievement_identity(subject_id, achievement.id)
+    spec_digest = achievement_spec_digest(achievement)
     return {
         "id": identity,
         "content": f"achievement {achievement.name} {achievement.category}",
@@ -163,6 +220,7 @@ def achievement_state_memory_item(
             "achievement_id": achievement.id,
             "subject_id": subject_id,
             "achievement_identity_sha256": identity,
+            "achievement_spec_sha256": spec_digest,
             "achievement_category": achievement.category,
             "unlocked": True,
             "claimed": achievement.id in state.claimed,
