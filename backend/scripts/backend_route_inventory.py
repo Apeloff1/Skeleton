@@ -7,7 +7,9 @@ SDKs, or optional integrations.
 
 Supported static composition includes:
 * module-level ``APIRouter(prefix=...)`` declarations;
-* registered root routers that ``include_router`` child routers;
+* registered root routers that ``include_router`` local child routers;
+* directly imported child routers (``from routes.x import router as child``)
+  followed recursively across modules;
 * decorators on module-scope route functions;
 * literal ``add_api_route`` registrations;
 * router-factory functions such as ``_make_router(router, kind)`` whose route
@@ -99,6 +101,14 @@ class IncludeEdge:
     parent: str
     child: str
     prefix: str
+    source_line: int
+
+
+@dataclass(frozen=True, slots=True)
+class ImportedRouter:
+    alias: str
+    module: str
+    router_attr: str
     source_line: int
 
 
@@ -240,6 +250,24 @@ def _module_scope_statements(statements: Iterable[ast.stmt]) -> Iterable[ast.stm
                 yield from _module_scope_statements(case.body)
 
 
+def _imported_routers(tree: ast.Module) -> dict[str, ImportedRouter]:
+    imported: dict[str, ImportedRouter] = {}
+    for node in tree.body:
+        if not isinstance(node, ast.ImportFrom) or not node.module or not node.module.startswith("routes."):
+            continue
+        for alias in node.names:
+            if alias.name != "router":
+                continue
+            local_name = alias.asname or alias.name
+            imported[local_name] = ImportedRouter(
+                alias=local_name,
+                module=node.module,
+                router_attr=alias.name,
+                source_line=getattr(node, "lineno", 0),
+            )
+    return imported
+
+
 def _router_declarations(
     tree: ast.Module,
     resolver: StaticStringResolver,
@@ -307,6 +335,7 @@ def _reachable_router_prefixes(
     root: RegisteredModule,
     routers: dict[str, RouterDecl],
     edges: list[IncludeEdge],
+    imported: dict[str, ImportedRouter],
 ) -> tuple[dict[str, str], list[UnresolvedRecord]]:
     unresolved: list[UnresolvedRecord] = []
     root_decl = routers.get(root.router_attr)
@@ -327,10 +356,12 @@ def _reachable_router_prefixes(
         for edge in by_parent.get(parent, []):
             child_decl = routers.get(edge.child)
             if child_decl is None:
+                if edge.child in imported:
+                    continue
                 unresolved.append(
                     UnresolvedRecord(
                         root.module,
-                        f"included router {edge.child!r} is not a static APIRouter declaration",
+                        f"included router {edge.child!r} is not a static or imported APIRouter",
                         edge.source_line,
                     )
                 )
@@ -512,8 +543,9 @@ def _scan_module(
     tree: ast.Module,
     module: RegisteredModule,
     resolver: StaticStringResolver,
-) -> tuple[list[RouteRecord], list[UnresolvedRecord]]:
+) -> tuple[list[RouteRecord], list[UnresolvedRecord], list[tuple[ImportedRouter, str, int]]]:
     routers, router_unresolved = _router_declarations(tree, resolver)
+    imported = _imported_routers(tree)
     unresolved = [
         UnresolvedRecord(module.module, row.reason, row.source_line) for row in router_unresolved
     ]
@@ -521,10 +553,12 @@ def _scan_module(
     unresolved.extend(
         UnresolvedRecord(module.module, reason, line) for line, reason in dynamic_edges
     )
-    effective, reachability_unresolved = _reachable_router_prefixes(module, routers, edges)
+    effective, reachability_unresolved = _reachable_router_prefixes(
+        module, routers, edges, imported
+    )
     unresolved.extend(reachability_unresolved)
     if not effective:
-        return [], unresolved
+        return [], unresolved, []
 
     routes: list[RouteRecord] = []
     templates, dynamic_routes = _module_route_templates(tree, resolver)
@@ -577,7 +611,17 @@ def _scan_module(
                     source_line=template.source_line,
                 )
             )
-    return routes, unresolved
+
+    imported_mounts: list[tuple[ImportedRouter, str, int]] = []
+    for edge in edges:
+        child = imported.get(edge.child)
+        parent_prefix = effective.get(edge.parent)
+        if child is None or parent_prefix is None:
+            continue
+        imported_mounts.append(
+            (child, _normalize_path(parent_prefix, edge.prefix), edge.source_line)
+        )
+    return routes, unresolved, imported_mounts
 
 
 def module_file(routes_root: Path, module_name: str) -> Path:
@@ -585,6 +629,52 @@ def module_file(routes_root: Path, module_name: str) -> Path:
         raise ValueError(f"unsupported registered module namespace: {module_name}")
     relative = module_name.removeprefix("routes.").replace(".", "/") + ".py"
     return routes_root / relative
+
+
+def _scan_registered_module(
+    module: RegisteredModule,
+    routes_root: Path,
+    *,
+    stack: tuple[tuple[str, str], ...] = (),
+) -> tuple[list[RouteRecord], list[UnresolvedRecord]]:
+    identity = (module.module, module.router_attr)
+    if identity in stack:
+        chain = " -> ".join(f"{name}:{attr}" for name, attr in (*stack, identity))
+        return [], [UnresolvedRecord(module.module, f"router include cycle: {chain}")]
+
+    path = module_file(routes_root, module.module)
+    if not path.is_file():
+        return [], [UnresolvedRecord(module.module, f"module file missing: {path}")]
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    except (OSError, UnicodeError, SyntaxError) as exc:
+        return [], [
+            UnresolvedRecord(module.module, f"module parse failed: {type(exc).__name__}: {exc}")
+        ]
+
+    resolver = StaticStringResolver(tree)
+    routes, unresolved, imported_mounts = _scan_module(tree, module, resolver)
+    next_stack = (*stack, identity)
+    for imported, mount_prefix, source_line in imported_mounts:
+        child = RegisteredModule(
+            module=imported.module,
+            router_attr=imported.router_attr,
+            mount_prefix=mount_prefix,
+        )
+        child_routes, child_unresolved = _scan_registered_module(
+            child, routes_root, stack=next_stack
+        )
+        routes.extend(child_routes)
+        unresolved.extend(child_unresolved)
+        if not child_routes and not child_unresolved:
+            unresolved.append(
+                UnresolvedRecord(
+                    module.module,
+                    f"imported router {imported.alias!r} resolved to no routes",
+                    source_line,
+                )
+            )
+    return routes, unresolved
 
 
 def build_inventory(registry_path: Path, routes_root: Path) -> InventoryReport:
@@ -595,22 +685,14 @@ def build_inventory(registry_path: Path, routes_root: Path) -> InventoryReport:
 
     for module in registered:
         path = module_file(routes_root, module.module)
-        if not path.is_file():
-            unresolved.append(UnresolvedRecord(module.module, f"module file missing: {path}"))
-            continue
-        try:
-            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        except (OSError, UnicodeError, SyntaxError) as exc:
-            unresolved.append(
-                UnresolvedRecord(module.module, f"module parse failed: {type(exc).__name__}: {exc}")
-            )
-            continue
-        scanned += 1
-        resolver = StaticStringResolver(tree)
-        module_routes, module_unresolved = _scan_module(tree, module, resolver)
+        if path.is_file():
+            scanned += 1
+        module_routes, module_unresolved = _scan_registered_module(module, routes_root)
         routes.extend(module_routes)
         unresolved.extend(module_unresolved)
 
+    # A child router may be mounted through several registered parents; those are
+    # distinct effective paths. Exact duplicate evidence is intentionally kept.
     routes.sort(key=lambda row: (row.path, row.method, row.module, row.router_attr, row.source_line))
     unresolved.sort(key=lambda row: (row.module, row.source_line or 0, row.reason))
     keys = [(route.method, route.path) for route in routes]
