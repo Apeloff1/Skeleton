@@ -12,6 +12,7 @@ import ast
 from collections.abc import Iterable
 import os
 from pathlib import Path
+import stat
 import sys
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -39,6 +40,13 @@ class ArchiveExtractionScanError(RuntimeError):
 def production_python_files(root: Path | None = None) -> Iterable[Path]:
     """Yield production Python files without following symlinks, failing on coverage loss."""
     scan_root = BACKEND_ROOT if root is None else root
+    try:
+        root_metadata = scan_root.lstat()
+    except OSError as exc:
+        raise ArchiveExtractionScanError("source traversal failed") from exc
+    if stat.S_ISLNK(root_metadata.st_mode) or not stat.S_ISDIR(root_metadata.st_mode):
+        raise ArchiveExtractionScanError("source traversal failed")
+
     files: list[Path] = []
     pending = [scan_root]
 
