@@ -7,6 +7,16 @@ from skeleton.context.ledger import ContextLedger, LedgerError
 from skeleton.context.oracle import Magic8Ball, OracleReading
 from skeleton.context.pipeline import GameForgeRun
 from skeleton.context.questionnaire import Intake, IntakeResult, Questionnaire, intake, BEATS
+from skeleton.context.skills_files import (
+    ContextCard,
+    IterationReport,
+    SkillBank,
+    SkillSpec,
+    SkillsContextLoop,
+    SkillsFilesError,
+    TaskState,
+    mastery_to_skill_file,
+)
 from skeleton.context.snowball import Snowball, STAGES as SNOWBALL_STAGES
 from skeleton.context.tensor import AXES, ContextTensor, detect_era
 
@@ -32,4 +42,12 @@ __all__ = [
     "Questionnaire",
     "intake",
     "BEATS",
+    "SkillsFilesError",
+    "SkillSpec",
+    "TaskState",
+    "ContextCard",
+    "IterationReport",
+    "SkillBank",
+    "SkillsContextLoop",
+    "mastery_to_skill_file",
 ]
