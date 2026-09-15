@@ -51,6 +51,72 @@ class QuadRetriever:
         if retriever is not None:
             self._planes[name] = retriever
 
+    @staticmethod
+    def _metadata_provenance(metadata: Dict[str, Any]) -> str:
+        explicit = metadata.get("provenance")
+        if isinstance(explicit, str) and explicit:
+            return explicit
+        repository = metadata.get("source_repository")
+        revision = metadata.get("source_revision")
+        path = metadata.get("source_path")
+        if not any(isinstance(value, str) and value for value in (repository, revision, path)):
+            return ""
+        source = str(repository or "unknown")
+        if revision:
+            source += f"@{revision}"
+        if path:
+            source += f":{path}"
+        return source
+
+    @classmethod
+    def _normalize_result(cls, plane_name: str, result: Any) -> Optional[ScoredResult]:
+        """Normalize plane-native results into the fusion contract.
+
+        Memory stores return ``ScoredChunk`` while retrieval-native planes return
+        ``ScoredResult``. Crossing that boundary without normalization leaves the
+        fuser looking for ``fragment_id``/``content`` on a ``ScoredChunk`` and
+        breaks API retrieval after successful ingestion.
+        """
+        if isinstance(result, ScoredResult):
+            if result.plane in (None, "", "rag") and plane_name != "rag":
+                result.plane = plane_name
+            return result
+
+        chunk = getattr(result, "chunk", None)
+        if chunk is not None:
+            fragment_id = str(getattr(chunk, "chunk_id", "") or "")
+            content = str(getattr(chunk, "text", "") or "")
+            if not fragment_id:
+                return None
+            raw_metadata = getattr(chunk, "metadata", {}) or {}
+            metadata = dict(raw_metadata) if isinstance(raw_metadata, dict) else {}
+            return ScoredResult(
+                fragment_id=fragment_id,
+                content=content,
+                score=float(getattr(result, "score", 0.0)),
+                plane=str(getattr(result, "plane", "") or plane_name),
+                provenance=str(getattr(result, "provenance", "") or cls._metadata_provenance(metadata)),
+                metadata=metadata,
+            )
+
+        if isinstance(result, dict):
+            fragment_id = result.get("fragment_id") or result.get("id") or result.get("key")
+            if not fragment_id:
+                return None
+            content = result.get("content") or result.get("text") or result.get("value") or ""
+            raw_metadata = result.get("metadata") or {}
+            metadata = dict(raw_metadata) if isinstance(raw_metadata, dict) else {}
+            return ScoredResult(
+                fragment_id=str(fragment_id),
+                content=str(content),
+                score=float(result.get("score", 0.0)),
+                plane=str(result.get("plane") or plane_name),
+                provenance=str(result.get("provenance") or cls._metadata_provenance(metadata)),
+                metadata=metadata,
+            )
+
+        return None
+
     def retrieve(self, query: str, k: int = 8, use_cache: bool = True) -> List[ScoredResult]:
         """Query all registered planes and fuse results."""
         cache_key = f"{query}:{k}"
@@ -66,19 +132,22 @@ class QuadRetriever:
         for plane_name, retriever in self._planes.items():
             try:
                 if hasattr(retriever, "query"):
-                    plane_results = retriever.query(query, top_k=k)
+                    if plane_name == "cag":
+                        plane_results = retriever.query(query)
+                    else:
+                        plane_results = retriever.query(query, top_k=k)
                 elif hasattr(retriever, "retrieve"):
                     plane_results = retriever.retrieve(query, k=k)
                 else:
                     continue
 
-                # Normalize plane tags for fusion provenance
-                for r in plane_results:
-                    if getattr(r, "plane", None) in (None, "", "rag") and plane_name != "rag":
-                        r.plane = plane_name
-
-                if plane_results:
-                    results_by_plane[plane_name] = plane_results
+                normalized = [
+                    item
+                    for raw in plane_results
+                    if (item := self._normalize_result(plane_name, raw)) is not None
+                ]
+                if normalized:
+                    results_by_plane[plane_name] = normalized
                     self._stats["planes_used"].append(plane_name)
             except Exception:
                 continue
