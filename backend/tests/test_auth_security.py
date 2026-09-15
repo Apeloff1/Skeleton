@@ -143,6 +143,19 @@ def test_active_auth_route_uses_shared_fail_closed_configuration_contract():
     assert 'SEED_ADMIN_EMAIL = "admin@gameforge.io"' not in source
 
 
+def test_active_auth_route_retires_persisted_legacy_bootstrap_state():
+    route_path = Path(__file__).parents[1] / "routes" / "gameforge_auth.py"
+    source = route_path.read_text(encoding="utf-8")
+
+    assert '_LEGACY_PUBLIC_SEED_EMAIL = "admin@gameforge.io"' in source
+    assert '"security_migration": "legacy_public_seed_disabled"' in source
+    assert "verify_password(" in source
+    assert "seed.password" in source
+    assert '"$setOnInsert"' in source
+    assert 'detail=f"Auth provider unreachable' not in source
+    assert 'detail="Auth provider unreachable"' in source
+
+
 def _decorated_route_roles(source: str) -> dict[str, str]:
     """Extract role dependencies from router.get/post decorators without imports."""
     roles: dict[str, str] = {}
