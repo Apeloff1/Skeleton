@@ -126,7 +126,9 @@ def test_api_route_matching_is_segment_aware() -> None:
 
 
 def test_rate_limiter_prunes_only_expired_state() -> None:
-    limiter = RateLimiterMiddleware(object(), per_minute=60, burst=1, max_buckets=3, bucket_ttl=300)
+    limiter = RateLimiterMiddleware(
+        object(), per_minute=60, burst=1, max_buckets=3, bucket_ttl=300
+    )
     for ip in ("10.0.0.1", "10.0.0.2", "10.0.0.3"):
         bucket, retry = limiter._bucket_for(ip)
         assert bucket is not None and retry == 0.0
@@ -138,7 +140,9 @@ def test_rate_limiter_prunes_only_expired_state() -> None:
 
 
 def test_rate_limiter_saturation_preserves_active_state() -> None:
-    limiter = RateLimiterMiddleware(object(), per_minute=1, burst=1, max_buckets=2, bucket_ttl=300)
+    limiter = RateLimiterMiddleware(
+        object(), per_minute=1, burst=1, max_buckets=2, bucket_ttl=300
+    )
     tracked, _ = limiter._bucket_for("203.0.113.10")
     other, _ = limiter._bucket_for("203.0.113.11")
     assert tracked is not None and other is not None
@@ -155,15 +159,15 @@ def test_rate_limiter_saturation_preserves_active_state() -> None:
 
 
 def test_rate_limiter_serializes_concurrent_cardinality_admission() -> None:
-    limiter = RateLimiterMiddleware(object(), per_minute=600, burst=1, max_buckets=8, bucket_ttl=300)
+    limiter = RateLimiterMiddleware(
+        object(), per_minute=600, burst=1, max_buckets=8, bucket_ttl=300
+    )
 
     async def add(i: int) -> bool:
         async with limiter._get_state_lock():
             bucket, _ = limiter._bucket_for(f"192.0.2.{i}")
             return bucket is not None
 
-    admitted = asyncio.run(asyncio.gather(*(add(i) for i in range(64)))) if False else None
-    # asyncio.gather needs a running loop; keep the test independent of pytest-asyncio.
     async def exercise() -> list[bool]:
         return await asyncio.gather(*(add(i) for i in range(64)))
 
@@ -185,6 +189,7 @@ def test_rate_limiter_serializes_concurrent_cardinality_admission() -> None:
         {"bucket_ttl": 0},
         {"bucket_ttl": math.inf},
         {"max_buckets": 0},
+        {"max_buckets": math.inf},
     ],
 )
 def test_rate_limiter_rejects_invalid_configuration(kwargs) -> None:
