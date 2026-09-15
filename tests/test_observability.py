@@ -45,7 +45,7 @@ def test_metrics_registry_counter_and_rollup() -> None:
     assert registry.rollup()["counters"]["http.requests"] == 3
 
 
-def test_event_bus_emit_preserves_correlation_id() -> None:
+def test_event_bus_emit_preserves_and_infers_correlation_id() -> None:
     bus = EventBus()
     events: list[DomainEvent] = []
     bus.subscribe("runtime.*", events.append)
@@ -55,10 +55,12 @@ def test_event_bus_emit_preserves_correlation_id() -> None:
         {"run_id": "run-1"},
         correlation_id="request-123",
     )
+    bus.emit("runtime.agent.assigned", {"task_id": "task-9"})
 
-    assert len(events) == 1
+    assert len(events) == 2
     assert events[0].correlation_id == "request-123"
     assert events[0].payload == {"run_id": "run-1"}
+    assert events[1].correlation_id == "task-9"
 
 
 def test_event_metrics_bridge_redacts_and_collects_baseline_metrics() -> None:
