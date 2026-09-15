@@ -375,24 +375,42 @@ class KVCacheManager:
             / max(1.0, math.sqrt(page.size_bytes))
         )
 
+    def _pin_protected_keys(self) -> set[str]:
+        """Return pages whose subtree contains at least one pinned page.
+
+        Each pinned page walks toward its root only until it reaches an already
+        protected ancestor, so shared ancestry is processed once and long
+        prefix chains never consume Python recursion depth.
+        """
+
+        protected: set[str] = set()
+        for key, page in self._pages.items():
+            if not page.pin_count:
+                continue
+            current = key
+            while current in self._pages and current not in protected:
+                protected.add(current)
+                current = self._pages[current].parent_key
+        return protected
+
     def _subtree_pinned(self, key: str) -> bool:
-        page = self._pages.get(key)
-        return bool(
-            (page is not None and page.pin_count)
-            or any(self._subtree_pinned(child) for child in self._children.get(key, ()))
-        )
+        return key in self._pin_protected_keys()
 
     def _candidate(self, trust_domain: str | None) -> _Page | None:
         now = self._clock()
-        pages = [
-            page
-            for page in self._pages.values()
-            if not self._subtree_pinned(page.key)
-            and (trust_domain is None or page.namespace.trust_domain == trust_domain)
-        ]
-        if not pages:
-            return None
-        return min(pages, key=lambda page: (self._retention_score(page, now), page.last_access, page.key))
+        protected = self._pin_protected_keys()
+        candidate: _Page | None = None
+        candidate_rank: tuple[float, float, str] | None = None
+        for page in self._pages.values():
+            if page.key in protected:
+                continue
+            if trust_domain is not None and page.namespace.trust_domain != trust_domain:
+                continue
+            rank = (self._retention_score(page, now), page.last_access, page.key)
+            if candidate_rank is None or rank < candidate_rank:
+                candidate = page
+                candidate_rank = rank
+        return candidate
 
     def _enforce_limits(self, trust_domain: str | None) -> None:
         limit = self.config.trust_domain_max_bytes
@@ -413,35 +431,49 @@ class KVCacheManager:
         if page is None or (eviction and self._subtree_pinned(key)):
             return 0
 
-        removed = sum(self._drop(child, eviction=eviction) for child in tuple(self._children.get(key, ())))
-        page = self._pages.pop(key, None)
-        if page is None:
-            return removed
-        self._children.pop(key, None)
-        siblings = self._children.get(page.parent_key)
-        if siblings is not None:
-            siblings.discard(key)
-            if not siblings:
-                self._children.pop(page.parent_key, None)
-        namespace_keys = self._namespace_pages.get(page.namespace_fp)
-        if namespace_keys is not None:
-            namespace_keys.discard(key)
-            if not namespace_keys:
-                self._namespace_pages.pop(page.namespace_fp, None)
+        order: list[str] = []
+        stack = [key]
+        seen: set[str] = set()
+        while stack:
+            current = stack.pop()
+            if current in seen or current not in self._pages:
+                continue
+            seen.add(current)
+            order.append(current)
+            stack.extend(self._children.get(current, ()))
 
-        self._resident_bytes -= page.size_bytes
-        self._trust_bytes[page.namespace.trust_domain] -= page.size_bytes
-        if self._trust_bytes[page.namespace.trust_domain] <= 0:
-            self._trust_bytes.pop(page.namespace.trust_domain, None)
-        if self._storage is not None:
-            try:
-                self._storage.release(page.handle, page.tier)
-            except Exception:
-                self._counters["storage_errors"] += 1
-        if eviction:
-            self._counters["evictions"] += 1
-            self._counters["evicted_bytes"] += page.size_bytes
-        return removed + 1
+        removed = 0
+        for current in reversed(order):
+            page = self._pages.pop(current, None)
+            if page is None:
+                continue
+            self._children.pop(current, None)
+            siblings = self._children.get(page.parent_key)
+            if siblings is not None:
+                siblings.discard(current)
+                if not siblings:
+                    self._children.pop(page.parent_key, None)
+            namespace_keys = self._namespace_pages.get(page.namespace_fp)
+            if namespace_keys is not None:
+                namespace_keys.discard(current)
+                if not namespace_keys:
+                    self._namespace_pages.pop(page.namespace_fp, None)
+
+            self._frequency.pop(current, None)
+            self._resident_bytes -= page.size_bytes
+            self._trust_bytes[page.namespace.trust_domain] -= page.size_bytes
+            if self._trust_bytes[page.namespace.trust_domain] <= 0:
+                self._trust_bytes.pop(page.namespace.trust_domain, None)
+            if self._storage is not None:
+                try:
+                    self._storage.release(page.handle, page.tier)
+                except Exception:
+                    self._counters["storage_errors"] += 1
+            if eviction:
+                self._counters["evictions"] += 1
+                self._counters["evicted_bytes"] += page.size_bytes
+            removed += 1
+        return removed
 
     def audit(self) -> KVIntegrityReport:
         with self._lock:
