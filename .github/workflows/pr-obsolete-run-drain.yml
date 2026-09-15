@@ -20,8 +20,11 @@ on:
 permissions: {}
 
 concurrency:
+  # Lifecycle signals for the same PR may supersede one another immediately.
+  # Main/scheduled backlog sweeps must not kill an active cleanup worker merely
+  # because main advances again while the repository is under queue pressure.
   group: pr-run-drain-${{ github.event_name }}-${{ github.event.workflow_run.head_branch || github.ref_name }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'workflow_run' }}
 
 jobs:
   drain:
