@@ -97,7 +97,7 @@ def _tool_handler(state: Any):
             tools = []
             for capability in registry.list():
                 tools.append(capability.to_dict() if hasattr(capability, "to_dict") else {"name": str(capability)})
-        return {"action": "list", "tools": tools, "count": len(tools), "tool_id": tool_id}
+        return {"action": "list", "tools": tools, "count": len(tools)}
 
     return handle
 
