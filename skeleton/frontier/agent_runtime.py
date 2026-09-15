@@ -28,6 +28,11 @@ class AgentFailure(RuntimeError):
     """Raised when an agent cannot complete a task."""
 
 
+def _public_agent_failure(error: BaseException) -> str:
+    """Return stable diagnostics without exposing arbitrary exception text."""
+    return f"AgentFailure: agent execution failed with {type(error).__name__}"
+
+
 class AgentLike(AgentContract, Protocol):
     async def run(self, task: str, context: Mapping[str, Any] | None = None) -> Any: ...
 
@@ -409,7 +414,7 @@ class AgentRuntime:
                 output = await agent.run(normalized_task, execution_context)
             except Exception as exc:
                 finished = datetime.now(timezone.utc)
-                error = f"{type(exc).__name__}: {exc}"
+                error = _public_agent_failure(exc)
                 result = ExecutionResult(
                     task=normalized_task,
                     agent=agent.name,
