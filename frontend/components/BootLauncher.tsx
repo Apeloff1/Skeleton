@@ -1,32 +1,22 @@
 /**
- * BootLauncher — First-boot orchestrator with progress bar + readiness checks.
+ * BootLauncher — local-first startup orchestrator.
  *
- * Design goals (Feb 2026):
- *   1. SOLIDIFY launch — every step has a hard timeout and a graceful fallback.
- *      The user always reaches an interactive state, no matter what fails.
- *   2. NON-BLOCKING visuals — Starfall plays as pure decoration; animations
- *      are deferred via InteractionManager so they NEVER compete with React
- *      mount work for JS-thread time.
- *   3. HONEST progress — the progress bar reflects ACTUAL readiness checks
- *      (storage, bootGuard, backend, hub-preload), not a fake timer. Users
- *      see what's happening; if a step stalls, the UI says so.
- *   4. AUTO-ADVANCE — once all checks pass, navigate to /hub. Returning
- *      users (welcome_seen flag set) skip the welcome copy entirely.
- *   5. DIAGNOSTICS — long-press the logo on any boot screen to see the last
- *      10 trace steps for crash investigation.
- *
- * Public API: <BootLauncher onReady={() => void} onEscalate={(why: string) => void} />
- *
- * - onReady is called when ALL checks succeed and the user is ready to enter.
- *   The parent typically routes to /hub at this point.
- * - onEscalate is called when a check hard-fails or the user explicitly
- *   requests safe mode. The parent should swap to a simpler layer.
+ * Phase 0 contains only the work required to make the app interactive.
+ * Network/prewarm work continues in later phases and never blocks entry.
  */
 import { NATIVE_DRIVER } from '../src/utils/platformStyles';
 import React from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, Platform,
-  InteractionManager, Animated, Easing, ScrollView, AccessibilityInfo,
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  InteractionManager,
+  Animated,
+  Easing,
+  ScrollView,
+  AccessibilityInfo,
 } from 'react-native';
 import { safeGetItem, safeSetItem } from '../utils/safeStorage';
 import { traceStep, getMemoryTrace, clearCrashes } from '../utils/bootTracer';
@@ -35,203 +25,82 @@ import api from '../src/utils/apiClient';
 import { onMemoryPressure, getMemTier } from '../utils/memoryGuard';
 
 const WELCOME_FLAG_KEY = '@codedock:welcome_seen:v1';
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const WARM_BOOT_MAX_AGE_MS = 90_000;
+const WARM_BOOT_MIN_SCORE = 95;
+const BOOT_WATCHDOG_NORMAL_MS = 6_000;
+const BOOT_WATCHDOG_LOW_MEM_MS = 4_500;
 
-// ─────────────────────────────────────────────────────────────────────
-//  Exhaustive boot logging (2026-06)
-//  --------------------------------------------------------------------
-//  `blog()` logs to the JS console ALWAYS (visible in `adb logcat` /
-//  Metro / Flipper) with a high-visibility tag + monotonic timestamp, so
-//  even a hard native close on a physical device leaves a breadcrumb in
-//  logcat right up to the last frame before the crash.
-//
-//  `bdurable()` ALSO persists the step to AsyncStorage via traceStep so
-//  it survives a process kill and shows up on the in-app boot-log screen.
-//  Use bdurable() only for milestones (not per-frame ticks) to avoid
-//  thrashing AsyncStorage.
-// ─────────────────────────────────────────────────────────────────────
-const _BOOT_T0 = Date.now();
-function blog(msg: string, data?: any) {
-  const dt = Date.now() - _BOOT_T0;
+type CheckResult = {
+  id: string;
+  label: string;
+  ok: boolean;
+  ms: number;
+  note?: string;
+};
+
+interface Props {
+  onReady: () => void;
+  onEscalate: (reason: string) => void;
+}
+
+const BOOT_T0 = Date.now();
+
+function blog(message: string, data?: unknown) {
+  const elapsed = Date.now() - BOOT_T0;
   try {
-    if (data !== undefined) {
-      console.log(`[BootLauncher +${dt}ms] ${msg}`, data);
-    } else {
-      console.log(`[BootLauncher +${dt}ms] ${msg}`);
-    }
+    if (data !== undefined) console.log(`[BootLauncher +${elapsed}ms] ${message}`, data);
+    else console.log(`[BootLauncher +${elapsed}ms] ${message}`);
   } catch {}
 }
-function bdurable(step: string, data?: any) {
+
+function durable(step: string, data?: Record<string, unknown>) {
   blog(step, data);
   try { traceStep(`bl:${step}`, data).catch(() => {}); } catch {}
 }
-/**
- * Warm-boot fast path: if the previous successful boot happened within
- * this window, skip the full check battery and go straight to "Ready".
- * Tuned conservatively — long enough to feel instant on rapid app
- * switches, short enough that a stale backend/auth state still gets
- * caught on the next boot.
- */
-const WARM_BOOT_MAX_AGE_MS = 90_000;       // 90 seconds
-const WARM_BOOT_MIN_SCORE  = 95;           // require near-perfect previous score
 
-/** Each check returns true if it succeeded. False = soft fail (continue). */
-type CheckResult = { id: string; label: string; ok: boolean; ms: number; note?: string };
-type CheckFn = () => Promise<{ ok: boolean; note?: string }>;
-
-interface BootCheck { id: string; label: string; weight: number; fn: CheckFn; timeoutMs: number; critical?: boolean }
-
-// ─────────────────────────────────────────────────────────────────────
-//  Lightweight, lazy-loaded Starfall — runs ONLY after the UI mounts.
-//  Respects user's Reduce Motion preference (skips Starfall entirely).
-// ─────────────────────────────────────────────────────────────────────
 function DecorativeStarfall({ enabled }: { enabled: boolean }) {
-  const [mounted, setMounted] = React.useState(false);
-  const [Comp, setComp] = React.useState<any>(null);
+  const [Component, setComponent] = React.useState<React.ComponentType<any> | null>(null);
 
   React.useEffect(() => {
-    if (!enabled) { blog('starfall skipped (reduce-motion)'); return; }
-    // Defer ALL starfall work until after the launcher has painted.
+    if (!enabled) return;
     const handle = InteractionManager.runAfterInteractions(() => {
       try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const mod = require('../src/components/StarfallBackground');
-        setComp(() => mod.StarfallBackground);
-        setMounted(true);
-        blog('starfall mounted');
+        const module = require('../src/components/StarfallBackground');
+        setComponent(() => module.StarfallBackground);
       } catch {
-        blog('starfall load failed (decorative — ignored)');
+        blog('starfall_load_failed');
       }
     });
     return () => { try { (handle as any)?.cancel?.(); } catch {} };
   }, [enabled]);
 
-  if (!enabled || !mounted || !Comp) return null;
-  // Reduced streak count to 10 (was 18) — purely decorative, low cost.
-  return <Comp count={10} colorBase="#a78bfa" speedMs={[2400, 5200]} />;
+  if (!enabled || !Component) return null;
+  return <Component count={10} colorBase="#a78bfa" speedMs={[2400, 5200]} />;
 }
 
-// ─────────────────────────────────────────────────────────────────────
-//  Animated progress bar (native-driver scaleX, single frame budget)
-// ─────────────────────────────────────────────────────────────────────
 function ProgressBar({ pct }: { pct: number }) {
-  const w = React.useRef(new Animated.Value(0)).current;
+  const value = React.useRef(new Animated.Value(0)).current;
+
   React.useEffect(() => {
-    Animated.timing(w, {
+    Animated.timing(value, {
       toValue: Math.max(0, Math.min(1, pct / 100)),
       duration: 280,
       easing: Easing.out(Easing.quad),
-      useNativeDriver: false, // width interpolation can't use native driver
+      useNativeDriver: false,
     }).start();
-  }, [pct, w]);
+  }, [pct, value]);
 
   return (
     <View style={styles.barOuter}>
       <Animated.View
         style={[
           styles.barInner,
-          { width: w.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) },
+          { width: value.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) },
         ]}
       />
     </View>
   );
-}
-
-// ─────────────────────────────────────────────────────────────────────
-//  Boot checks — each one has a hard timeout and is best-effort.
-// ─────────────────────────────────────────────────────────────────────
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function timeoutWrap<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
-  return new Promise(resolve => {
-    let done = false;
-    const t = setTimeout(() => { if (!done) { done = true; resolve(fallback); } }, ms);
-    p.then(v => { if (!done) { done = true; clearTimeout(t); resolve(v); } })
-     .catch(() => { if (!done) { done = true; clearTimeout(t); resolve(fallback); } });
-  });
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const CHECKS: BootCheck[] = [
-  {
-    id: 'storage',
-    label: 'Local storage',
-    weight: 20,
-    timeoutMs: 900,
-    fn: async () => {
-      // Read-back round-trip on a throwaway key.
-      const probe = `__boot_probe_${Date.now() % 1e6}`;
-      await safeSetItem(probe, '1', 600);
-      const v = await safeGetItem(probe, null, 600);
-      return { ok: v === '1', note: v === '1' ? undefined : 'read-back failed' };
-    },
-  },
-  {
-    id: 'crash_guard',
-    label: 'Crash-loop guard',
-    weight: 10,
-    timeoutMs: 700,
-    fn: async () => {
-      const raw = await safeGetItem('@boot/crash_count', '0', 500);
-      const n = parseInt(raw || '0', 10) || 0;
-      return { ok: n < 3, note: n >= 3 ? `count=${n}` : undefined };
-    },
-  },
-  {
-    id: 'backend',
-    label: 'Backend connection',
-    weight: 30,
-    timeoutMs: 2500,
-    fn: async () => {
-      if (!BACKEND) return { ok: false, note: 'no URL' };
-      try {
-        const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-        const t = setTimeout(() => { try { ctrl?.abort(); } catch {} }, 2300);
-        const res = await fetch(`${BACKEND}/api/health`, { signal: ctrl?.signal as any });
-        clearTimeout(t);
-        return { ok: res.ok, note: res.ok ? undefined : `HTTP ${res.status}` };
-      } catch (e: any) {
-        return { ok: false, note: e?.message?.slice(0, 32) || 'fetch failed' };
-      }
-    },
-  },
-  {
-    id: 'preload_hub',
-    label: 'Workspace assets',
-    weight: 25,
-    timeoutMs: 1500,
-    fn: async () => {
-      // Touch a cheap manifest endpoint so the hub feels instant on click.
-      if (!BACKEND) return { ok: true }; // no backend = skip
-      try {
-        const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-        const t = setTimeout(() => { try { ctrl?.abort(); } catch {} }, 1300);
-        const res = await fetch(`${BACKEND}/api/languages`, { signal: ctrl?.signal as any });
-        clearTimeout(t);
-        return { ok: res.ok, note: res.ok ? undefined : `HTTP ${res.status}` };
-      } catch {
-        // Non-critical — skipping preload doesn't block boot.
-        return { ok: true, note: 'skipped' };
-      }
-    },
-  },
-  {
-    id: 'finalize',
-    label: 'Finalizing',
-    weight: 15,
-    timeoutMs: 400,
-    fn: async () => {
-      await new Promise(r => setTimeout(r, 250)); // visual breather
-      return { ok: true };
-    },
-  },
-];
-
-// ─────────────────────────────────────────────────────────────────────
-//  Main component
-// ─────────────────────────────────────────────────────────────────────
-interface Props {
-  onReady: () => void;
-  onEscalate: (reason: string) => void;
 }
 
 export default function BootLauncher({ onReady, onEscalate }: Props) {
@@ -244,68 +113,52 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
   const [showDiag, setShowDiag] = React.useState(false);
   const [, setLongPressCount] = React.useState(0);
   const [reduceMotion, setReduceMotion] = React.useState(false);
-  const [retryKey, setRetryKey] = React.useState(0);          // bump to remount boot effect
+  const [retryKey, setRetryKey] = React.useState(0);
   const [failedStages, setFailedStages] = React.useState<CheckResult[]>([]);
   const [warmBoot, setWarmBoot] = React.useState(false);
+
   const runnerRef = React.useRef<BootRunner | null>(null);
-  // Tracks last-seen status per stage so we only DURABLY log transitions.
   const stageStatusRef = React.useRef<Record<string, string>>({});
-  // Single-shot guard so the warm-boot fast path AND the cold-boot
-  // completion path can never both set phase='ready' (which used to be
-  // a benign re-render but, with the new failure UI + retryKey, could
-  // briefly flicker stages back on screen).
   const phaseLockedRef = React.useRef(false);
-  // OOM guardrails: track primary readiness, whether we've been asked to shed
-  // non-critical boot work, and the device RAM tier (drives up-front caps).
   const phase0DoneRef = React.useRef(false);
   const shedRef = React.useRef(false);
   const memTier = React.useRef(getMemTier()).current;
-
   const fadeIn = React.useRef(new Animated.Value(0)).current;
 
-  // Safe phase setter — first writer wins for 'ready'/'failed', so once
-  // the launcher commits to an outcome it cannot be flipped back to
-  // 'running'.
-  const commitPhase = React.useCallback((p: 'running' | 'ready' | 'failed') => {
+  const commitPhase = React.useCallback((next: 'running' | 'ready' | 'failed') => {
     if (phaseLockedRef.current) {
-      blog(`commitPhase(${p}) IGNORED — already locked`);
+      blog(`commitPhase(${next}) ignored`);
       return;
     }
-    if (p === 'ready' || p === 'failed') phaseLockedRef.current = true;
-    bdurable(`commit_phase_${p}`);
-    setPhase(p);
+    if (next === 'ready' || next === 'failed') phaseLockedRef.current = true;
+    durable(`commit_phase_${next}`);
+    setPhase(next);
   }, []);
 
-  // Read welcome flag (parallel with checks, doesn't block boot)
   React.useEffect(() => {
-    bdurable('mount');
-    safeGetItem(WELCOME_FLAG_KEY, null, 400).then(v => {
-      bdurable(`welcome_flag_${!!v}`);
-      setWelcomeSeen(!!v);
+    durable('mount');
+    safeGetItem(WELCOME_FLAG_KEY, null, 400).then(value => {
+      durable(`welcome_flag_${!!value}`);
+      setWelcomeSeen(!!value);
     });
-    return () => { bdurable('unmount'); };
+    return () => { durable('unmount'); };
   }, []);
 
-  // Detect Reduce Motion preference (accessibility + low-end devices).
   React.useEffect(() => {
     let mounted = true;
-    (async () => {
-      try {
-        const rm = await AccessibilityInfo.isReduceMotionEnabled();
-        if (mounted) { bdurable(`reduce_motion_${!!rm}`); setReduceMotion(!!rm); }
-      } catch { /* not all platforms */ }
-    })();
-    const sub = AccessibilityInfo.addEventListener?.(
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then(value => { if (mounted) setReduceMotion(!!value); })
+      .catch(() => {});
+    const subscription = AccessibilityInfo.addEventListener?.(
       'reduceMotionChanged',
-      (v: boolean) => { if (mounted) setReduceMotion(!!v); },
+      (value: boolean) => { if (mounted) setReduceMotion(!!value); },
     );
     return () => {
       mounted = false;
-      try { (sub as any)?.remove?.(); } catch {}
+      try { (subscription as any)?.remove?.(); } catch {}
     };
   }, []);
 
-  // Fade in the launcher chrome once mounted.
   React.useEffect(() => {
     Animated.timing(fadeIn, {
       toValue: 1,
@@ -315,268 +168,257 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
     }).start();
   }, [fadeIn, reduceMotion]);
 
-  // SOTA boot — parallel DAG runner over the declarative STAGES.
-  // Each stage emits live progress via the runner's pub/sub, so the
-  // progress bar reflects ACTUAL parallel work, not a fake serial timer.
-  //
-  // 2026-05 upgrades:
-  //   • Warm-boot fast path: if previous boot was healthy < 90s ago,
-  //     skip the full check battery (the cache implies the world is ok).
-  //   • Cancellation on unmount: aborts in-flight stages via the runner's
-  //     internal AbortController.
-  //   • Tracks `failedStages` separately so the failure UI can list them.
-  //   • `retryKey` is a dependency — bumping it restarts the whole boot.
   React.useEffect(() => {
-    const mountTs = Date.now();
-    const MIN_VISIBLE_MS = reduceMotion ? 200 : (memTier === 'low' ? 400 : 800);
+    const mountedAt = Date.now();
+    const minimumVisibleMs = reduceMotion ? 200 : (memTier === 'low' ? 400 : 800);
     let cancelled = false;
 
-    // ── OOM guardrail (boot) ───────────────────────────────────────
-    // On a low-RAM device, proactively free disk/cache BEFORE the heavy boot
-    // stages run so the JS-thread eval spikes have more headroom.
+    phase0DoneRef.current = false;
+    shedRef.current = false;
+    stageStatusRef.current = {};
+
     if (memTier === 'low') {
-      bdurable('boot_low_tier_preclean');
-      try { import('../utils/selfCleaner').then(m => m.runSelfCleaner('boot_low_tier')).catch(() => {}); } catch {}
+      durable('boot_low_tier_preclean');
+      try {
+        import('../utils/selfCleaner')
+          .then(module => module.runSelfCleaner('boot_low_tier'))
+          .catch(() => {});
+      } catch {}
     }
-    // Subscribe to OS memory-pressure for the duration of boot. If pressure
-    // hits while we're still cranking through stages, SHED all non-critical
-    // background work; and if primary readiness is already done, get the user
-    // into the (offline-capable) Hub immediately rather than risk a hard OOM.
-    const offMem = onMemoryPressure(() => {
+
+    const offMemoryPressure = onMemoryPressure(() => {
       if (cancelled) return;
       shedRef.current = true;
-      bdurable('boot_mem_pressure_shed', { phase0: phase0DoneRef.current });
+      durable('boot_mem_pressure_shed', { phase0: phase0DoneRef.current });
       if (phase0DoneRef.current && !phaseLockedRef.current) {
         clearCrashes().catch(() => {});
         commitPhase('ready');
       }
     });
 
-    // ── Warm-boot fast path ────────────────────────────────────────
-    (async () => {
+    void (async () => {
       try {
         const cache = await readBootCache();
         const age = cache ? Date.now() - cache.ts : -1;
-        bdurable('warm_cache_read', { hit: !!cache, score: cache?.score, backendOk: cache?.backendOk, age });
+        durable('warm_cache_read', {
+          hit: !!cache,
+          score: cache?.score,
+          backendOk: cache?.backendOk,
+          age,
+        });
         if (
           cache &&
           cache.backendOk &&
           cache.score >= WARM_BOOT_MIN_SCORE &&
-          (Date.now() - cache.ts) < WARM_BOOT_MAX_AGE_MS
+          age >= 0 &&
+          age < WARM_BOOT_MAX_AGE_MS
         ) {
           if (cancelled) return;
-          bdurable('warm_boot_fastpath');
           setWarmBoot(true);
           setProgress(100);
           setActiveLabel('Resuming session');
           commitPhase('ready');
-          // BOOT-LOOP FIX: clear the crash counter the moment boot
-          // orchestration succeeds — do NOT wait for the Hub to finish
-          // loading data (a cold-start/unreachable backend must never trip
-          // safe-mode once we've successfully reached 'ready').
           clearCrashes().catch(() => {});
-          await traceStep(`bootlauncher_warm_score${cache.score}_age${Date.now() - cache.ts}ms`);
-          // Still kick the full runner in the BACKGROUND so phase-1 work
-          // (feature-flag refresh etc.) happens; user just doesn't wait.
+          await traceStep(`bootlauncher_warm_score${cache.score}_age${age}ms`);
         }
-      } catch { /* fall through to cold boot */ }
+      } catch {}
     })();
 
     const runner = new BootRunner(STAGES);
     runnerRef.current = runner;
+    void runner.run();
 
-    // Kick off the parallel DAG IMMEDIATELY, before subscribing or awaiting
-    // any phase. `waitForPhase()` reads `resolvedTasks`, which is only
-    // populated by `run()`; calling run() first removes a fatal ordering
-    // race where waitForPhase(0) saw an empty task map and resolved
-    // instantly with criticalOk=false → a false "failed" boot.
-    runner.run();
-
-    const off = runner.on((snap: RunnerSnapshot) => {
+    const unsubscribe = runner.on((snapshot: RunnerSnapshot) => {
       if (cancelled) return;
-      // Drive the progress bar off the boot-score (weighted).
-      setProgress(Math.min(100, Math.round(snap.bootScore)));
-      setPhase1Pct(Math.min(100, Math.round(snap.phaseProgress[1] || 0)));
-      // Surface the most-recently-started running label.
-      const running = Object.values(snap.stages).filter(s => s.status === 'running');
-      if (running.length) setActiveLabel(running[running.length - 1].label);
-      // Durable log on stage status TRANSITIONS only (avoids AsyncStorage
-      // thrash from per-frame progress ticks). Console gets every tick.
-      blog(`snapshot score=${Math.round(snap.bootScore)} criticalOk=${snap.criticalOk} ok=${snap.counts.ok}/${snap.counts.total}`);
-      Object.values(snap.stages).forEach(s => {
-        const prev = stageStatusRef.current[s.id];
-        if (prev !== s.status && (s.status === 'ok' || s.status === 'failed' || s.status === 'timed_out' || s.status === 'skipped')) {
-          stageStatusRef.current[s.id] = s.status;
-          bdurable(`stage_${s.id}_${s.status}`, { ms: s.durationMs, err: s.error });
-        } else {
-          stageStatusRef.current[s.id] = s.status;
+
+      // The primary progress bar represents only work that blocks entry.
+      // Once phase 0 is terminal and its critical stages are healthy, the
+      // local-start contract is complete regardless of network state.
+      const localProgress = snapshot.phaseDone[0] && snapshot.criticalOk
+        ? 100
+        : Math.min(100, Math.round(snapshot.phaseProgress[0] || 0));
+      setProgress(localProgress);
+
+      // Background prep represents completion, not only successful weight.
+      // A soft-failed optional stage must not leave this chip stuck forever.
+      setPhase1Pct(
+        snapshot.phaseDone[1]
+          ? 100
+          : Math.min(100, Math.round(snapshot.phaseProgress[1] || 0)),
+      );
+
+      const localRunning = Object.values(snapshot.stages)
+        .filter(stage => stage.status === 'running' && stage.phase === 0);
+      if (localRunning.length) setActiveLabel(localRunning[localRunning.length - 1].label);
+
+      blog(
+        `snapshot local=${localProgress} score=${Math.round(snapshot.bootScore)} ` +
+        `criticalOk=${snapshot.criticalOk} ok=${snapshot.counts.ok}/${snapshot.counts.total}`,
+      );
+
+      Object.values(snapshot.stages).forEach(stage => {
+        const previous = stageStatusRef.current[stage.id];
+        const terminal = ['ok', 'failed', 'timed_out', 'skipped'].includes(stage.status);
+        if (previous !== stage.status && terminal) {
+          durable(`stage_${stage.id}_${stage.status}`, {
+            ms: stage.durationMs,
+            err: stage.error,
+          });
         }
+        stageStatusRef.current[stage.id] = stage.status;
       });
-      // Mirror into the diagnostics list (for long-press debug).
-      const newResults: CheckResult[] = Object.values(snap.stages)
-        .filter(s => s.status !== 'pending' && s.status !== 'running')
-        .map(s => ({
-          id: s.id, label: s.label,
-          ok: s.status === 'ok',
-          ms: s.durationMs || 0,
-          note: s.error || (s.status !== 'ok' ? s.status : undefined),
+
+      const completed: CheckResult[] = Object.values(snapshot.stages)
+        .filter(stage => stage.status !== 'pending' && stage.status !== 'running')
+        .map(stage => ({
+          id: stage.id,
+          label: stage.label,
+          ok: stage.status === 'ok',
+          ms: stage.durationMs || 0,
+          note: stage.error || (stage.status !== 'ok' ? stage.status : undefined),
         }));
-      setResults(newResults);
-      // Build failure list for the failure UI (critical-fail stages first).
-      const fails = newResults
-        .filter(r => !r.ok)
-        .sort((a, b) => Number(b.ok === false) - Number(a.ok === false));
-      setFailedStages(fails);
+      setResults(completed);
+      setFailedStages(completed.filter(result => !result.ok));
     });
 
-    (async () => {
+    void (async () => {
       try {
-        bdurable('boot_start');
-        // Phase 0 = block-on-ready. Phase 1+ continues in the background.
+        durable('boot_start');
         await runner.waitForPhase(0);
-        const snap = runner.snapshot();
+        const localSnapshot = runner.snapshot();
         phase0DoneRef.current = true;
-        bdurable('phase0_done', { score: snap.bootScore, criticalOk: snap.criticalOk, elapsed: snap.elapsedMs });
+        setProgress(localSnapshot.criticalOk ? 100 : Math.round(localSnapshot.phaseProgress[0] || 0));
+        durable('phase0_done', {
+          phase0: localSnapshot.phaseProgress[0],
+          score: localSnapshot.bootScore,
+          criticalOk: localSnapshot.criticalOk,
+          elapsed: localSnapshot.elapsedMs,
+        });
 
-        if (!snap.criticalOk) {
+        if (!localSnapshot.criticalOk) {
           if (cancelled) return;
           commitPhase('failed');
           await traceStep('bootlauncher_critical_fail');
-          // Fire-and-forget: ship the trail so we can debug
           try {
             api.post('/api/telemetry/boot', {
-              boot_score: snap.bootScore, counts: snap.counts,
-              elapsed_ms: snap.elapsedMs, stages: snap.stages, ok: false,
+              boot_score: localSnapshot.bootScore,
+              counts: localSnapshot.counts,
+              elapsed_ms: localSnapshot.elapsedMs,
+              stages: localSnapshot.stages,
+              ok: false,
             }, { timeoutMs: 3000, retries: 0 }).catch(() => {});
           } catch {}
           return;
         }
 
-        // Cache the warm-boot snapshot for next launch.
-        writeBootCache({ ts: Date.now(), score: snap.bootScore, backendOk: true }).catch(() => {});
-
-        const elapsed = Date.now() - mountTs;
-        if (elapsed < MIN_VISIBLE_MS) {
-          await new Promise(r => setTimeout(r, MIN_VISIBLE_MS - elapsed));
+        // Do not overwrite a previously healthy warm cache with a local-only
+        // snapshot. Backend health is not known until phase 1 has run.
+        const elapsed = Date.now() - mountedAt;
+        if (elapsed < minimumVisibleMs) {
+          await new Promise(resolve => setTimeout(resolve, minimumVisibleMs - elapsed));
         }
         if (cancelled) return;
+
         commitPhase('ready');
-        // BOOT-LOOP FIX: clear crash counter on successful boot orchestration
-        // (independent of Hub data load — see warm-boot path above).
         clearCrashes().catch(() => {});
-        await traceStep(`bootlauncher_ready_score${snap.bootScore}_${snap.elapsedMs}ms`);
-        // Phase 1+ runs in the background — but we still report when complete.
-        // Under memory pressure we SHED this: abort the runner so background
-        // stages stop competing for RAM the instant the user is interactive.
+        await traceStep(
+          `bootlauncher_ready_phase0_${Math.round(localSnapshot.phaseProgress[0] || 0)}_${localSnapshot.elapsedMs}ms`,
+        );
+
         if (shedRef.current) {
-          bdurable('boot_shed_background_phases');
+          durable('boot_shed_background_phases');
           try { runner.cancel(); } catch {}
           return;
         }
-        runner.waitForPhase(2).then(final => {
-          // Refresh the cache with the final score (includes phase 1+).
+
+        runner.waitForPhase(2).then(finalSnapshot => {
+          const backendOk = finalSnapshot.stages.backend?.status === 'ok';
           writeBootCache({
-            ts: Date.now(), score: final.bootScore, backendOk: final.criticalOk,
+            ts: Date.now(),
+            score: finalSnapshot.bootScore,
+            backendOk,
           }).catch(() => {});
           try {
             api.post('/api/telemetry/boot', {
-              boot_score: final.bootScore, counts: final.counts,
-              elapsed_ms: final.elapsedMs, stages: final.stages, ok: final.ok,
+              boot_score: finalSnapshot.bootScore,
+              counts: finalSnapshot.counts,
+              elapsed_ms: finalSnapshot.elapsedMs,
+              stages: finalSnapshot.stages,
+              ok: finalSnapshot.ok,
+              backend_ok: backendOk,
             }, { timeoutMs: 3000, retries: 0 }).catch(() => {});
           } catch {}
         }).catch(() => {});
-      } catch (e: any) {
-        await traceStep(`bootlauncher_exception_${String(e?.message || e).slice(0, 60)}`);
+      } catch (error: any) {
+        await traceStep(`bootlauncher_exception_${String(error?.message || error).slice(0, 60)}`);
         if (!cancelled) commitPhase('failed');
       }
     })();
 
-    // ── Hard watchdog ────────────────────────────────────────────────
-    // The runner has per-stage timeouts AND a layer timeout in the
-    // cascade above us, but those rely on individual code paths firing
-    // their callbacks. If for ANY reason (busy main thread, runaway
-    // sleep, etc.) the launcher is still 'running' after this budget,
-    // declare a fatal escalation so the user is never stuck.
-    // 2026-06: lowered 9s → 6s. With the recursive Starfall loop removed
-    // the JS thread is no longer starved, so the watchdog timer fires
-    // reliably and the user reaches the Hub (offline/degraded) far sooner.
-    const WATCHDOG_MS = memTier === 'low' ? 4_500 : 6_000;
-    bdurable('watchdog_scheduled', { ms: WATCHDOG_MS, tier: memTier });
-    const wd = setTimeout(() => {
-      if (cancelled || phaseLockedRef.current) {
-        blog(`watchdog skipped (cancelled=${cancelled} locked=${phaseLockedRef.current})`);
-        return;
-      }
-      bdurable('watchdog_fired_force_ready');
-      // The backend / health probe is NON-CRITICAL. If an unreachable or 520
-      // backend is the only thing keeping us from 'ready', do NOT dead-end in
-      // safe-mode — clear crashes and advance into the Hub in OFFLINE/degraded
-      // mode so the app is always usable. (Hub + boot-log handle offline.)
+    const watchdogMs = memTier === 'low' ? BOOT_WATCHDOG_LOW_MEM_MS : BOOT_WATCHDOG_NORMAL_MS;
+    durable('watchdog_scheduled', { ms: watchdogMs, tier: memTier });
+    const watchdog = setTimeout(() => {
+      if (cancelled || phaseLockedRef.current) return;
+      durable('watchdog_fired_force_ready');
       clearCrashes().catch(() => {});
       commitPhase('ready');
-    }, WATCHDOG_MS);
+    }, watchdogMs);
 
     return () => {
       cancelled = true;
-      clearTimeout(wd);
-      off();
-      try { offMem(); } catch {}
-      // Abort any in-flight stages so they don't keep hammering the
-      // network after the user navigated away or hit Retry.
+      clearTimeout(watchdog);
+      unsubscribe();
+      try { offMemoryPressure(); } catch {}
       try { runner.cancel(); } catch {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retryKey, reduceMotion]);
 
-  // Auto-advance returning users as soon as ready.
   React.useEffect(() => {
-    if (phase !== 'ready') return;
-    if (welcomeSeen === null) return; // still loading flag
-    if (welcomeSeen) {
-      // Small delay so user sees 100% land before transition.
-      const t = setTimeout(() => { bdurable('auto_advance_onReady'); onReady(); }, 350);
-      return () => clearTimeout(t);
-    }
-    // First-timer: stay on launcher; show Enter the Hub button.
+    if (phase !== 'ready' || welcomeSeen === null || !welcomeSeen) return;
+    const timer = setTimeout(() => {
+      durable('auto_advance_onReady');
+      onReady();
+    }, 350);
+    return () => clearTimeout(timer);
   }, [phase, welcomeSeen, onReady]);
 
   const handleEnterPress = React.useCallback(async () => {
-    bdurable('user_enter_hub_press');
+    durable('user_enter_hub_press');
     try { await safeSetItem(WELCOME_FLAG_KEY, '1'); } catch {}
     onReady();
   }, [onReady]);
 
   const handleLogoLongPress = React.useCallback(() => {
-    setLongPressCount(c => {
-      const next = c + 1;
+    setLongPressCount(count => {
+      const next = count + 1;
       if (next >= 2) setShowDiag(true);
       return next;
     });
   }, []);
 
   const handleRetryBoot = React.useCallback(async () => {
-    bdurable('user_retry');
+    durable('user_retry');
     try { await safeSetItem('@boot/crash_count', '0'); } catch {}
     await traceStep('bootlauncher_user_retry');
-    // Reset visible state then bump retryKey to remount the boot effect.
-    setProgress(0); setPhase1Pct(0); setActiveLabel('Starting up…');
-    setResults([]); setFailedStages([]);
+    setProgress(0);
+    setPhase1Pct(0);
+    setActiveLabel('Starting up…');
+    setResults([]);
+    setFailedStages([]);
     setWarmBoot(false);
-    phaseLockedRef.current = false;   // unlock so commitPhase can fire again
+    phaseLockedRef.current = false;
     setPhase('running');
-    setRetryKey(k => k + 1);
+    setRetryKey(key => key + 1);
   }, []);
 
-  // ──────────────────────────────────────────────────────────────────
-  //  Render
-  // ──────────────────────────────────────────────────────────────────
   return (
     <View style={styles.fill}>
       <View style={[styles.bg, { pointerEvents: 'none' }]}>
         <DecorativeStarfall enabled={!reduceMotion && memTier !== 'low'} />
       </View>
 
-      <Animated.View style={[[styles.center, { opacity: fadeIn }], { pointerEvents: 'box-none' }]}>
+      <Animated.View style={[styles.center, { opacity: fadeIn, pointerEvents: 'box-none' }]}>
         <TouchableOpacity onLongPress={handleLogoLongPress} delayLongPress={500} activeOpacity={1}>
           <View style={styles.logoBubble}>
             <Text style={styles.logoGlyph}>{'</>'}</Text>
@@ -621,36 +463,33 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
             </Text>
             {failedStages.length > 0 && (
               <View style={styles.failList}>
-                {failedStages.slice(0, 4).map((f, i) => (
-                  <Text key={i} style={styles.failRow}>
-                    ✗ {f.label}{f.note ? ` — ${f.note}` : ''}
+                {failedStages.slice(0, 4).map(failure => (
+                  <Text key={failure.id} style={styles.failRow}>
+                    ✗ {failure.label}{failure.note ? ` — ${failure.note}` : ''}
                   </Text>
                 ))}
               </View>
             )}
-            <TouchableOpacity
-              style={styles.primaryBtn}
-              onPress={handleRetryBoot}
-              activeOpacity={0.85}>
+            <TouchableOpacity style={styles.primaryBtn} onPress={handleRetryBoot} activeOpacity={0.85}>
               <Text style={styles.primaryBtnText}>Retry boot</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.secondaryBtn, { marginTop: 10 }]}
               onPress={() => onEscalate('bootlauncher_user_continue')}
-              activeOpacity={0.85}>
+              activeOpacity={0.85}
+            >
               <Text style={styles.secondaryBtnText}>Continue anyway</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.secondaryBtn, { marginTop: 10 }]}
               onPress={() => onEscalate('bootlauncher_user_safe_mode')}
-              activeOpacity={0.85}>
+              activeOpacity={0.85}
+            >
               <Text style={styles.secondaryBtnText}>Open Safe Mode</Text>
             </TouchableOpacity>
           </>
         )}
 
-        {/* Background-prep chip — only visible while phase-1 work is still
-            in flight after primary readiness is achieved. */}
         {phase === 'ready' && phase1Pct < 100 && (
           <View style={styles.phase1Chip}>
             <View style={styles.phase1Dot} />
@@ -662,16 +501,17 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
       {showDiag && (
         <View style={styles.diagSheet}>
           <Text style={styles.diagTitle}>Boot diagnostics</Text>
-          <ScrollView style={{ maxHeight: 260 }}>
-            {results.map((r, i) => (
-              <Text key={i} style={styles.diagRow}>
-                {r.ok ? '✓' : '✗'} {r.label}  ({r.ms}ms){r.note ? `  — ${r.note}` : ''}
+          <ScrollView style={styles.diagScroll}>
+            {results.map(result => (
+              <Text key={result.id} style={styles.diagRow}>
+                {result.ok ? '✓' : '✗'} {result.label} ({result.ms}ms)
+                {result.note ? ` — ${result.note}` : ''}
               </Text>
             ))}
-            <Text style={[styles.diagRow, { marginTop: 10, opacity: 0.7 }]}>Last trace:</Text>
-            {getMemoryTrace().slice(-10).map((t, i) => (
-              <Text key={`tr-${i}`} style={[styles.diagRow, { opacity: 0.8 }]}>
-                {new Date(t.ts).toISOString().slice(11, 19)}  {t.step}
+            <Text style={[styles.diagRow, styles.traceHeading]}>Last trace:</Text>
+            {getMemoryTrace().slice(-10).map((trace, index) => (
+              <Text key={`${trace.ts}-${index}`} style={[styles.diagRow, styles.traceRow]}>
+                {new Date(trace.ts).toISOString().slice(11, 19)} {trace.step}
               </Text>
             ))}
           </ScrollView>
@@ -684,75 +524,133 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: '#0a0a14' },
-  bg:   { ...StyleSheet.absoluteFillObject },
+  bg: { ...StyleSheet.absoluteFillObject },
   center: {
-    flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
   },
   logoBubble: {
-    width: 84, height: 84, borderRadius: 22,
-    backgroundColor: '#1f1733', borderColor: '#7c3aed55', borderWidth: 1,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 18,
+    width: 84,
+    height: 84,
+    borderRadius: 22,
+    backgroundColor: '#1f1733',
+    borderColor: '#7c3aed55',
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
     ...(Platform.OS === 'ios'
       ? { shadowColor: '#7c3aed', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 14 }
       : { elevation: 6 }),
   },
   logoGlyph: { color: '#a78bfa', fontSize: 30, fontWeight: '900' },
-  title: {
-    color: '#fff', fontSize: 38, fontWeight: '900', letterSpacing: -1, textAlign: 'center',
-  },
+  title: { color: '#fff', fontSize: 38, fontWeight: '900', letterSpacing: -1, textAlign: 'center' },
   tagline: {
-    color: '#a78bfa', fontSize: 12, fontWeight: '700', letterSpacing: 4,
-    textTransform: 'uppercase', marginTop: 6, marginBottom: 28, textAlign: 'center',
+    color: '#a78bfa',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 4,
+    textTransform: 'uppercase',
+    marginTop: 6,
+    marginBottom: 28,
+    textAlign: 'center',
   },
   subtitle: {
-    color: '#d1d5db', fontSize: 13, textAlign: 'center', lineHeight: 20,
-    maxWidth: 320, marginBottom: 20,
+    color: '#d1d5db',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 20,
+    maxWidth: 320,
+    marginBottom: 20,
   },
   barOuter: {
-    width: 260, height: 8, backgroundColor: '#1f1733', borderRadius: 99,
-    overflow: 'hidden', marginTop: 6,
+    width: 260,
+    height: 8,
+    backgroundColor: '#1f1733',
+    borderRadius: 99,
+    overflow: 'hidden',
+    marginTop: 6,
   },
-  barInner: {
-    height: '100%', backgroundColor: '#a78bfa', borderRadius: 99,
-  },
+  barInner: { height: '100%', backgroundColor: '#a78bfa', borderRadius: 99 },
   pctLabel: { color: '#9ca3af', fontSize: 12, marginTop: 12, marginBottom: 20, fontWeight: '600' },
   primaryBtn: {
-    backgroundColor: '#7c3aed', paddingHorizontal: 32, paddingVertical: 16,
-    borderRadius: 999, alignItems: 'center', minHeight: 52, justifyContent: 'center',
+    backgroundColor: '#7c3aed',
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 999,
+    alignItems: 'center',
+    minHeight: 52,
+    justifyContent: 'center',
     marginTop: 6,
   },
   primaryBtnText: { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.5 },
   secondaryBtn: {
-    borderColor: '#a78bfa55', borderWidth: 1, paddingHorizontal: 24, paddingVertical: 13,
-    borderRadius: 999, alignItems: 'center', minHeight: 46, justifyContent: 'center',
+    borderColor: '#a78bfa55',
+    borderWidth: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 13,
+    borderRadius: 999,
+    alignItems: 'center',
+    minHeight: 46,
+    justifyContent: 'center',
   },
   secondaryBtnText: { color: '#a78bfa', fontSize: 13, fontWeight: '700' },
   diagSheet: {
-    position: 'absolute', left: 12, right: 12, bottom: 24,
-    backgroundColor: '#1c1330ee', borderRadius: 16, padding: 16,
-    borderColor: '#7c3aed44', borderWidth: 1,
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 24,
+    backgroundColor: '#1c1330ee',
+    borderRadius: 16,
+    padding: 16,
+    borderColor: '#7c3aed44',
+    borderWidth: 1,
   },
   diagTitle: { color: '#fff', fontWeight: '800', fontSize: 14, marginBottom: 10 },
-  diagRow: { color: '#cbd5e1', fontSize: 11, marginVertical: 2, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  diagScroll: { maxHeight: 260 },
+  diagRow: {
+    color: '#cbd5e1',
+    fontSize: 11,
+    marginVertical: 2,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  traceHeading: { marginTop: 10, opacity: 0.7 },
+  traceRow: { opacity: 0.8 },
   failList: {
-    alignSelf: 'stretch', marginHorizontal: 16, marginBottom: 18,
-    paddingVertical: 10, paddingHorizontal: 14,
-    backgroundColor: '#1c1330aa', borderColor: '#fbbf2433', borderWidth: 1,
+    alignSelf: 'stretch',
+    marginHorizontal: 16,
+    marginBottom: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: '#1c1330aa',
+    borderColor: '#fbbf2433',
+    borderWidth: 1,
     borderRadius: 12,
   },
   failRow: { color: '#fde68a', fontSize: 12, marginVertical: 2 },
   phase1Chip: {
-    position: 'absolute', bottom: 28, alignSelf: 'center',
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 12, paddingVertical: 6,
-    backgroundColor: '#1c1330cc', borderRadius: 999,
-    borderColor: '#7c3aed33', borderWidth: 1,
+    position: 'absolute',
+    bottom: 28,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#1c1330cc',
+    borderRadius: 999,
+    borderColor: '#7c3aed33',
+    borderWidth: 1,
   },
   phase1Dot: {
-    width: 6, height: 6, borderRadius: 3, backgroundColor: '#a78bfa', marginRight: 8,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#a78bfa',
+    marginRight: 8,
   },
   phase1Text: { color: '#cbd5e1', fontSize: 11, fontWeight: '700' },
 });
