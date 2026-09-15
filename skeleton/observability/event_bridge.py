@@ -43,7 +43,7 @@ class EventMetricsBridge:
         if not isinstance(payload, Mapping):
             payload = {"value": payload}
         observed = ObservedEvent(
-            topic=event.topic,
+            topic=redact_text(event.topic),
             payload=dict(payload),
             correlation_id=redact_text(event.correlation_id),
             timestamp=event.timestamp,
@@ -57,11 +57,16 @@ class EventMetricsBridge:
         self.registry.counter("observability.events_total", labels=labels)
 
         status = payload.get("status")
-        if (
-            event.topic.endswith(".failed")
-            or status in {"failed", "error"}
-            or (isinstance(status, int) and not isinstance(status, bool) and status >= 500)
-        ):
+        failed_status = isinstance(status, str) and status.lower() in {
+            "failed",
+            "error",
+        }
+        failed_code = (
+            isinstance(status, int)
+            and not isinstance(status, bool)
+            and status >= 500
+        )
+        if event.topic.endswith(".failed") or failed_status or failed_code:
             self.registry.counter("observability.failures_total", labels=labels)
         if "retry" in event.topic or payload.get("retrying") is True:
             self.registry.counter("observability.retries_total", labels=labels)
@@ -74,7 +79,11 @@ class EventMetricsBridge:
             and not isinstance(duration, bool)
             and duration >= 0
         ):
-            self.registry.observe("observability.latency_ms", float(duration), labels=labels)
+            self.registry.observe(
+                "observability.latency_ms",
+                float(duration),
+                labels=labels,
+            )
 
         queue_depth = payload.get("queue_depth")
         if (
