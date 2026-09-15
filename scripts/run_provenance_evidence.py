@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -57,6 +58,15 @@ def canonical_test_paths(payload: object) -> list[Path]:
     return selected
 
 
+def _python_env() -> dict[str, str]:
+    """Ensure evidence files can import the checked-out repository root."""
+    env = dict(os.environ)
+    existing = env.get("PYTHONPATH")
+    root = str(REPO_ROOT)
+    env["PYTHONPATH"] = root if not existing else root + os.pathsep + existing
+    return env
+
+
 def main() -> int:
     payload = json.loads(MANIFEST.read_text(encoding="utf-8"))
     try:
@@ -65,12 +75,14 @@ def main() -> int:
         print(f"provenance-evidence: rejected: {exc}", file=sys.stderr)
         return 1
 
+    env = _python_env()
     for path in tests:
         relative = path.relative_to(REPO_ROOT)
         print(f"provenance-evidence: running {relative}")
         completed = subprocess.run(
             [sys.executable, str(relative)],
             cwd=REPO_ROOT,
+            env=env,
             check=False,
         )
         if completed.returncode != 0:
