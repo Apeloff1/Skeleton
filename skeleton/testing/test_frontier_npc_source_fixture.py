@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from skeleton.frontier.npc_adapters import npc_spec_from_domain_record
 
 
@@ -67,3 +69,43 @@ def test_npc_serialization_keeps_promoted_metadata_shape():
     assert serialized["metadata"]["schedule"] == source["schedule"]
     assert serialized["metadata"]["quests_offered"] == source["quests_offered"]
     assert serialized["metadata"]["shop_inventory"] == source["shop_inventory"]
+
+
+def test_npc_adapter_normalizes_and_deduplicates_string_fields():
+    npc = npc_spec_from_domain_record(
+        {
+            "name": "Mara",
+            "role": "Scholar",
+            "traits": ["Wise", "wise", " Patient "],
+            "tags": ["Archivist", "archivist"],
+            "personality": "WISE",
+            "faction": "Keepers",
+            "stats": {"focus": "7"},
+            "initial_disposition": "12",
+        }
+    )
+
+    assert npc.archetype == "scholar"
+    assert npc.traits == ("wise", "patient")
+    assert npc.tags == ("archivist", "faction:keepers")
+    assert npc.stats == {"focus": 7, "disposition": 12}
+
+
+def test_npc_adapter_rejects_malformed_domain_fields():
+    with pytest.raises(TypeError, match="traits must be a string or sequence"):
+        npc_spec_from_domain_record({"name": "Mara", "traits": {"wise": True}})
+
+    with pytest.raises(TypeError, match="stats must be a mapping"):
+        npc_spec_from_domain_record({"name": "Mara", "stats": ["not", "mapping"]})
+
+    with pytest.raises(ValueError, match="initial_disposition must be an integer"):
+        npc_spec_from_domain_record({"name": "Mara", "initial_disposition": "unknown"})
+
+    with pytest.raises(ValueError, match="disposition conflicts"):
+        npc_spec_from_domain_record(
+            {
+                "name": "Mara",
+                "stats": {"disposition": 5},
+                "initial_disposition": 10,
+            }
+        )
