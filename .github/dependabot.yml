@@ -15,6 +15,28 @@ updates:
         update-types: ["minor", "patch"]
 
   - package-ecosystem: pip
+    directory: /
+    exclude-paths:
+      - "backend/**"
+      - "satellites/branch-snapshots/**"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:10"
+      timezone: Europe/Oslo
+    open-pull-requests-limit: 3
+    allow:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
+    groups:
+      root-python:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: pip
     directory: /backend
     schedule:
       interval: weekly
