@@ -7,6 +7,7 @@ storage concerns do not leak into the runtime contract.
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
@@ -48,17 +49,94 @@ def memory_content(item: Mapping[str, Any]) -> str:
     raise ValueError("memory item requires non-empty content/text/document")
 
 
+def _portable_json_value(
+    value: Any,
+    *,
+    path: str,
+    active_containers: set[int],
+) -> Any:
+    """Return a strict JSON-domain copy of one memory metadata value.
+
+    Both the reference and persistent backends consume this normalized shape so
+    values cannot change type merely because they crossed a JSON persistence
+    boundary. Lists and objects are copied recursively, object keys must already
+    be strings, numeric values must be finite, and cycles fail closed.
+    """
+
+    if value is None or isinstance(value, (str, bool, int)):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError(f"memory metadata value at {path} must be finite")
+        return value
+
+    if isinstance(value, Mapping):
+        identity = id(value)
+        if identity in active_containers:
+            raise ValueError(f"memory metadata at {path} must not contain cycles")
+        active_containers.add(identity)
+        try:
+            normalized: dict[str, Any] = {}
+            for key, child in value.items():
+                if not isinstance(key, str):
+                    raise TypeError(
+                        f"memory metadata object key at {path} must be a string"
+                    )
+                normalized[key] = _portable_json_value(
+                    child,
+                    path=f"{path}.{key}",
+                    active_containers=active_containers,
+                )
+            return normalized
+        finally:
+            active_containers.remove(identity)
+
+    if isinstance(value, list):
+        identity = id(value)
+        if identity in active_containers:
+            raise ValueError(f"memory metadata at {path} must not contain cycles")
+        active_containers.add(identity)
+        try:
+            return [
+                _portable_json_value(
+                    child,
+                    path=f"{path}[{index}]",
+                    active_containers=active_containers,
+                )
+                for index, child in enumerate(value)
+            ]
+        finally:
+            active_containers.remove(identity)
+
+    raise TypeError(
+        f"memory metadata value at {path} must be JSON-compatible, got {type(value).__name__}"
+    )
+
+
+def _portable_json_metadata(metadata: Mapping[Any, Any]) -> dict[str, Any]:
+    normalized = _portable_json_value(
+        metadata,
+        path="metadata",
+        active_containers=set(),
+    )
+    if not isinstance(normalized, dict):
+        raise TypeError("memory metadata must normalize to an object")
+    return normalized
+
+
 def portable_memory_metadata(item: Mapping[str, Any]) -> dict[str, Any]:
-    """Flatten portable filter fields into one metadata mapping.
+    """Flatten portable filter fields into one strict JSON metadata mapping.
 
     The promoted Prood/Tutolage RAG surface stores filter state as collection
     metadata while historical callers may put filterable fields at the top
     level. Conflicting representations fail closed rather than selecting one.
+    Values are normalized to the JSON data model before either the reference or
+    persistent backend sees them, preventing backend-specific type drift.
     """
 
     raw_metadata = item.get("metadata")
     if raw_metadata is None:
-        metadata: dict[str, Any] = {}
+        metadata: dict[Any, Any] = {}
     elif isinstance(raw_metadata, Mapping):
         metadata = dict(raw_metadata)
     else:
@@ -70,7 +148,7 @@ def portable_memory_metadata(item: Mapping[str, Any]) -> dict[str, Any]:
         if key in metadata and metadata[key] != value:
             raise ValueError(f"conflicting memory metadata field: {key}")
         metadata[key] = value
-    return metadata
+    return _portable_json_metadata(metadata)
 
 
 def normalize_memory_item(
