@@ -4,6 +4,7 @@ import asyncio
 import sys
 from pathlib import Path
 
+from starlette.requests import Request
 from starlette.responses import Response
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -11,6 +12,25 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 from middleware.security import AuditMiddleware, SizeLimitMiddleware  # noqa: E402
+
+
+def _scope(
+    headers: list[tuple[bytes, bytes]],
+    *,
+    path: str = "/api/run",
+) -> dict:
+    return {
+        "type": "http",
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "http",
+        "path": path,
+        "raw_path": path.encode("ascii"),
+        "query_string": b"",
+        "headers": headers,
+        "client": ("127.0.0.1", 12345),
+        "server": ("testserver", 80),
+    }
 
 
 def _exercise(
@@ -31,22 +51,9 @@ def _exercise(
         response = Response(status_code=204)
         await response(scope, receive, send)
 
-    scope = {
-        "type": "http",
-        "http_version": "1.1",
-        "method": "POST",
-        "scheme": "http",
-        "path": path,
-        "raw_path": path.encode("ascii"),
-        "query_string": b"",
-        "headers": headers,
-        "client": ("127.0.0.1", 12345),
-        "server": ("testserver", 80),
-    }
-
     AuditMiddleware._buf.clear()
     stack = AuditMiddleware(SizeLimitMiddleware(app, max_mb=1))
-    asyncio.run(stack(scope, receive, send))
+    asyncio.run(stack(_scope(headers, path=path), receive, send))
 
     status = next(
         message["status"]
@@ -55,6 +62,30 @@ def _exercise(
     )
     rows = AuditMiddleware.snapshot(limit=1)["entries"]
     return status, rows[-1] if rows else None
+
+
+def _exercise_failure(message: str) -> dict:
+    async def app(scope, receive, send) -> None:
+        raise AssertionError("unused")
+
+    async def fail(_request: Request):
+        raise RuntimeError(message)
+
+    async def scenario() -> None:
+        middleware = AuditMiddleware(app)
+        request = Request(_scope([(b"content-length", b"0")]))
+        try:
+            await middleware.dispatch(request, fail)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("expected downstream failure")
+
+    AuditMiddleware._buf.clear()
+    asyncio.run(scenario())
+    rows = AuditMiddleware.snapshot(limit=1)["entries"]
+    assert rows
+    return rows[-1]
 
 
 def test_malformed_content_length_is_rejected_without_audit_crash() -> None:
@@ -93,3 +124,13 @@ def test_api_lookalike_is_not_added_to_audit_ring() -> None:
 
     assert status == 204
     assert audit is None
+
+
+def test_audit_failure_records_type_without_exception_message() -> None:
+    secret = "authorization=Bearer do-not-persist"
+
+    audit = _exercise_failure(secret)
+
+    assert audit["status"] == 500
+    assert audit["error"] == "RuntimeError"
+    assert secret not in str(audit)
