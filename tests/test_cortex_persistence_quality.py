@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from skeleton.cortex import JeevesCortex
 from skeleton.cortex.callosum import CorpusCallosum
+from skeleton.cortex.midbrain import Midbrain
 
 
 def test_cuda_request_contract_is_exact_even_when_hardware_degrades() -> None:
@@ -28,6 +29,21 @@ def test_bilateral_callosum_fusion_changes_the_fused_residual() -> None:
     assert bilateral != unilateral
     assert cc.last_attn_lr
     assert cc.last_attn_rl
+
+
+def test_midbrain_fit_advances_steps_and_mutates_transformer_weights() -> None:
+    midbrain = Midbrain()
+    transformer = midbrain.transformer
+    assert transformer is not None
+
+    steps_before = transformer.steps
+    weights_before = [row[:] for row in transformer.layers[0].Wq]
+
+    midbrain.fit("plan tensor ttk lattice oracle")
+    midbrain.fit("compile ttk hp dps recipe sim")
+
+    assert transformer.steps > steps_before
+    assert transformer.layers[0].Wq != weights_before
 
 
 def test_sleep_state_roundtrips_non_default_values(tmp_path) -> None:
