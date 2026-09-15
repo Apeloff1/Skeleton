@@ -27,6 +27,14 @@ def test_rejects_extract_without_filter(tmp_path: Path) -> None:
     assert any("must use filter='data'" in finding for finding in findings)
 
 
+def test_rejects_simple_tarfile_handle_alias_without_filter(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import tarfile\nwith tarfile.open('bundle.tar') as archive:\n    alias = archive\n    alias.extractall('/tmp/out')\n",
+    )
+    assert any("must use filter='data'" in finding for finding in findings)
+
+
 def test_allows_literal_data_filter(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
