@@ -199,9 +199,11 @@ class EvidenceJeevesCore(JeevesCore):
         ``(registry_name, arguments, request_payload)`` and should route execution
         through the canonical runtime (for example ``ExecutionContext.invoke``).
 
-        Mutating or approval-required capabilities are never attached. The entire
-        registry snapshot is preflighted before registration so malformed input,
-        duplicate normalized names, and conflicts fail without partial attachment.
+        Mutating or approval-required capabilities are never attached, and the live
+        spec is revalidated immediately before every invocation to close registry
+        replacement races. The entire registry snapshot is preflighted before
+        registration so malformed input, duplicate normalized names, and conflicts
+        fail without partial attachment.
         """
         if not callable(invoker):
             raise TypeError("capability invoker must be callable")
@@ -264,6 +266,13 @@ class EvidenceJeevesCore(JeevesCore):
                 *,
                 _registry_name: str = registry_name,
             ) -> Any:
+                live_spec = registry.get(_registry_name)
+                if live_spec is None:
+                    raise _EvidencePolicyError("capability_unavailable")
+                if bool(getattr(live_spec, "mutates", False)):
+                    raise _EvidencePolicyError("capability_became_mutating")
+                if bool(getattr(live_spec, "approval_required", False)):
+                    raise _EvidencePolicyError("capability_requires_approval")
                 return invoker(
                     _registry_name,
                     dict(payload.get("arguments") or {}),
@@ -410,6 +419,14 @@ class EvidenceJeevesCore(JeevesCore):
                         "arguments": call["arguments"],
                     }
                 )
+            except _EvidencePolicyError as exc:
+                self._record_evidence_failure(
+                    errors,
+                    name=name,
+                    code=exc.code,
+                    policy=True,
+                )
+                continue
             except Exception:
                 self._record_evidence_failure(errors, name=name, code="execution_failed")
                 continue
