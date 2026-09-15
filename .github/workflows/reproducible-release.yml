@@ -1,0 +1,141 @@
+name: Reproducible Release
+
+on:
+  pull_request:
+    paths:
+      - "pyproject.toml"
+      - "requirements.txt"
+      - "requirements-build.txt"
+      - "scripts/release_provenance.py"
+      - "skeleton/testing/test_release_provenance.py"
+      - ".github/workflows/reproducible-release.yml"
+      - "docs/REPRODUCIBLE_RELEASES.md"
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths:
+      - "pyproject.toml"
+      - "requirements.txt"
+      - "requirements-build.txt"
+      - "scripts/release_provenance.py"
+      - "skeleton/testing/test_release_provenance.py"
+      - ".github/workflows/reproducible-release.yml"
+      - "docs/REPRODUCIBLE_RELEASES.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reproducible-release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11.11"
+  PYTHONHASHSEED: "0"
+  TZ: "UTC"
+  LANG: "C.UTF-8"
+  LC_ALL: "C.UTF-8"
+
+jobs:
+  reproducible-release:
+    name: Reproducible Release
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout build A
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: source-a
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout clean build B
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: source-b
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up pinned Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: source-a/requirements-build.txt
+
+      - name: Install pinned build toolchain
+        run: python -m pip install --disable-pip-version-check -r source-a/requirements-build.txt
+
+      - name: Run release provenance regression tests
+        run: |
+          python -m pip install --disable-pip-version-check \
+            "pytest==8.4.2" \
+            "fastapi>=0.110,<1" \
+            "pydantic>=2.5,<3" \
+            "pydantic-settings>=2.1,<3"
+          python -m pytest -q source-a/skeleton/testing/test_release_provenance.py
+
+      - name: Build release A
+        working-directory: source-a
+        shell: bash
+        run: |
+          set -euo pipefail
+          export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
+          python -m build --no-isolation --outdir dist
+          python scripts/release_provenance.py sbom \
+            --pyproject pyproject.toml \
+            --output dist/release-sbom.cdx.json \
+            --source-commit "$GITHUB_SHA"
+          mkdir -p release-meta
+          python scripts/release_provenance.py emit \
+            --artifacts-dir dist \
+            --output release-meta/release-provenance.json \
+            --checksums release-meta/SHA256SUMS \
+            --source-commit "$GITHUB_SHA" \
+            --source-date-epoch "$SOURCE_DATE_EPOCH" \
+            --input pyproject.toml \
+            --input requirements-build.txt \
+            --input requirements.txt \
+            --sbom-ref dist/release-sbom.cdx.json
+
+      - name: Build release B from clean checkout
+        working-directory: source-b
+        shell: bash
+        run: |
+          set -euo pipefail
+          export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
+          python -m build --no-isolation --outdir dist
+          python scripts/release_provenance.py sbom \
+            --pyproject pyproject.toml \
+            --output dist/release-sbom.cdx.json \
+            --source-commit "$GITHUB_SHA"
+          mkdir -p release-meta
+          python scripts/release_provenance.py emit \
+            --artifacts-dir dist \
+            --output release-meta/release-provenance.json \
+            --checksums release-meta/SHA256SUMS \
+            --source-commit "$GITHUB_SHA" \
+            --source-date-epoch "$SOURCE_DATE_EPOCH" \
+            --input pyproject.toml \
+            --input requirements-build.txt \
+            --input requirements.txt \
+            --sbom-ref dist/release-sbom.cdx.json
+
+      - name: Verify byte-for-byte reproducibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          python source-a/scripts/release_provenance.py compare \
+            source-a/release-meta/release-provenance.json \
+            source-b/release-meta/release-provenance.json
+          diff -u source-a/release-meta/SHA256SUMS source-b/release-meta/SHA256SUMS
+
+      - name: Publish verified release evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: reproducible-release-${{ github.sha }}
+          path: |
+            source-a/dist/
+            source-a/release-meta/
+          if-no-files-found: error
+          retention-days: 30

@@ -10,7 +10,9 @@ updates:
     open-pull-requests-limit: 5
     groups:
       actions:
+        applies-to: version-updates
         patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: pip
     directory: /backend
@@ -20,13 +22,24 @@ updates:
       time: "06:15"
       timezone: Europe/Oslo
     open-pull-requests-limit: 5
+    # Keep routine version-update PRs inside the current major line. Security
+    # updates are not restricted by allow.update-types and continue to surface.
+    allow:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
     groups:
       backend-runtime:
+        applies-to: version-updates
         dependency-type: production
         patterns: ["*"]
+        update-types: ["minor", "patch"]
       backend-development:
+        applies-to: version-updates
         dependency-type: development
         patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: npm
     directory: /frontend
@@ -37,13 +50,25 @@ updates:
       timezone: Europe/Oslo
     open-pull-requests-limit: 5
     versioning-strategy: increase-if-necessary
+    # Major Expo/React/toolchain jumps require coordinated application changes.
+    # Restrict routine version PRs to minor/patch while leaving security updates
+    # unaffected by this allow policy.
+    allow:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
     groups:
       frontend-runtime:
+        applies-to: version-updates
         dependency-type: production
         patterns: ["*"]
+        update-types: ["minor", "patch"]
       frontend-development:
+        applies-to: version-updates
         dependency-type: development
         patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: docker
     directory: /
@@ -55,7 +80,9 @@ updates:
     open-pull-requests-limit: 3
     groups:
       root-images:
+        applies-to: version-updates
         patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: docker
     directory: /backend
@@ -67,7 +94,9 @@ updates:
     open-pull-requests-limit: 3
     groups:
       backend-images:
+        applies-to: version-updates
         patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: docker
     directory: /frontend
@@ -79,4 +108,6 @@ updates:
     open-pull-requests-limit: 3
     groups:
       frontend-images:
+        applies-to: version-updates
         patterns: ["*"]
+        update-types: ["minor", "patch"]

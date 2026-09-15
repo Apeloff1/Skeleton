@@ -15,13 +15,37 @@ safe "disabled" stub so the mesh still exercises concurrency without egress.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import os
+import socket
 import time
+from urllib.parse import urlsplit
 from typing import Any
 
 _EXTERNAL_ENABLED = os.getenv("GAMEFORGE_ENABLE_EXTERNAL_APIS", "0") == "1"
+_EXTERNAL_API_HOSTS = frozenset(
+    host.strip().lower()
+    for host in os.getenv("GAMEFORGE_EXTERNAL_API_HOSTS", "").split(",")
+    if host.strip()
+)
 
 _mcp = None
+
+
+def _validate_external_url(url: str) -> None:
+    """Allow only explicitly configured HTTPS hosts resolving to public IPs."""
+    parsed = urlsplit(url)
+    hostname = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or not hostname or hostname not in _EXTERNAL_API_HOSTS:
+        raise ValueError("external API URL is not on the HTTPS host allowlist")
+    try:
+        addresses = socket.getaddrinfo(hostname, 443, type=socket.SOCK_STREAM)
+    except OSError as exc:
+        raise ValueError("external API host could not be resolved") from exc
+    for address in addresses:
+        ip = ipaddress.ip_address(address[4][0])
+        if not ip.is_global:
+            raise ValueError("external API host resolves to a non-public address")
 
 
 def _get_mcp():
@@ -43,15 +67,16 @@ async def _mcp_query(query: str, sources: list[str] | None) -> dict:
 
 
 async def _api_query(target: dict) -> dict:
-    """Call one external API. Gated behind GAMEFORGE_ENABLE_EXTERNAL_APIS (inward-focus)."""
+    """Call one explicitly allowlisted external API."""
     url = target.get("url", "")
     name = target.get("name", url)
     if not _EXTERNAL_ENABLED:
         return {"channel": "api", "target": name, "ok": True, "disabled": True,
                 "note": "external APIs disabled (inward-focused); set GAMEFORGE_ENABLE_EXTERNAL_APIS=1"}
     try:
+        _validate_external_url(url)
         import httpx
-        async with httpx.AsyncClient(timeout=target.get("timeout", 8)) as c:
+        async with httpx.AsyncClient(timeout=target.get("timeout", 8), follow_redirects=False) as c:
             r = await c.request(target.get("method", "GET"), url,
                                 params=target.get("params"), headers=target.get("headers"),
                                 json=target.get("json"))

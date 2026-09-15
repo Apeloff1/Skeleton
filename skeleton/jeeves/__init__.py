@@ -2,6 +2,7 @@
 
 from .core import Jeeves, Session, SessionMode, SYSTEM_LAWS, Turn
 from .llm_core import JeevesCore, MemoryManager
+from .evidence_core import EvidenceJeevesCore, EvidenceResult
 from .matrices import ClomMatrix, KremMatrix, SamMatrix
 from .matrices_llm import (
     CompressedLearnedOutcomeModel,
@@ -72,6 +73,8 @@ Jeeves.think = _jeeves_think_lazy_cortex
 __all__ = [
     "Jeeves",
     "JeevesCore",
+    "EvidenceJeevesCore",
+    "EvidenceResult",
     "Session",
     "SessionMode",
     "SYSTEM_LAWS",

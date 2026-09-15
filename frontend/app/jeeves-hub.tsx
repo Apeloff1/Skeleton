@@ -1,433 +1,582 @@
 /**
- * /jeeves-hub — Unified Jeeves Powerhouse Hub.
+ * /jeeves-hub — Jeeves operator console.
  *
- * Surfaces 9 backend-only Jeeves powerhouses + gamification feeds as a single
- * tappable dashboard. Each card fetches live data on mount and lets the user
- * drill in for the full payload.
- *
- * Endpoints surfaced:
- *   /api/jeeves/persona         (biography + stats)
- *   /api/jeeves-eq/info         (emotion-aware AI tutor)
- *   /api/jeeves-voice/personality
- *   /api/jeeves-hyperion/knowledge-base/stats
- *   /api/jeeves-synergy/overview
- *   /api/jeeves-build/genres    (master game-builder)
- *   /api/jeeves/camera/knowledge
- *   /api/daily/challenge
- *   /api/leaderboards/boards
- *   /api/gamification/profile/<user>
+ * Probes the public Jeeves service surface, records latency, classifies service
+ * health and gives the operator focused retry/inspection controls. This stays
+ * on the already-registered /jeeves-hub route so route coverage and existing
+ * deep links remain stable.
  */
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity,
-  RefreshControl, StyleSheet, StatusBar, SafeAreaView, Modal,
+  Modal,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { ModalErrorBoundary } from '../components/ModalErrorBoundary';
-import { jeevesSpeak } from '../features/Academy/jeevesTts';
+import { useRouter } from 'expo-router';
 import { useFeatureFlag } from '../utils/featureFlags';
-import Skeleton from '../components/UI/Skeleton';
-import RetryBanner from '../components/UI/RetryBanner';
+import { jeevesSpeak } from '../features/Academy/jeevesTts';
 
 const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 const USER_ID = 'default_user';
+const REQUEST_TIMEOUT_MS = 10_000;
+const SLOW_THRESHOLD_MS = 1_500;
 
-type Tile = {
+type Health = 'loading' | 'healthy' | 'slow' | 'down';
+type Filter = 'all' | 'healthy' | 'issues';
+
+type Service = {
   id: string;
   title: string;
+  description: string;
+  endpoint: string;
   icon: keyof typeof Ionicons.glyphMap;
   accent: string;
-  endpoint: string;
-  describe: (j: any) => string;
-  details?: (j: any) => { label: string; value: string }[];
-  speakIntro?: (j: any) => string;
+  voiceOnly?: boolean;
 };
 
-const TILES: Tile[] = [
+type Result = {
+  loading: boolean;
+  data?: unknown;
+  error?: string;
+  latencyMs?: number;
+  checkedAt?: number;
+};
+
+const SERVICES: Service[] = [
   {
-    id: 'persona', title: 'Jeeves Persona', icon: 'happy-outline', accent: '#a78bfa',
+    id: 'persona',
+    title: 'Jeeves Persona',
+    description: 'Biography, mannerisms, catchphrases and persona knowledge.',
     endpoint: '/api/jeeves/persona',
-    describe: j => {
-      const s = j?.stats || {};
-      return `${s.total_catchphrases ?? 0} catchphrases · ${s.total_quirks ?? 0} quirks · ${s.total_knowledge_entries ?? 0} knowledge entries`;
-    },
-    details: j => {
-      const bio = j?.biography || {};
-      const s = j?.stats || {};
-      return [
-        { label: 'Name',         value: bio.full_title || bio.name || '—' },
-        { label: 'Origin',       value: bio.origin || '—' },
-        { label: 'Voice tone',   value: bio.voice_template?.tone || '—' },
-        { label: 'Catchphrases', value: String(s.total_catchphrases ?? '—') },
-        { label: 'Mannerisms',   value: String(s.total_mannerisms ?? '—') },
-        { label: 'Quirks',       value: String(s.total_quirks ?? '—') },
-        { label: 'Knowledge',    value: String(s.total_knowledge_entries ?? '—') },
-        { label: 'Quotes',       value: String(s.total_famous_quotes ?? '—') },
-      ];
-    },
-    speakIntro: () => 'A pleasure to make your acquaintance again. Behold the persona dossier.',
+    icon: 'happy-outline',
+    accent: '#A78BFA',
   },
   {
-    id: 'eq', title: 'Jeeves EQ', icon: 'heart-outline', accent: '#8B5CF6',
+    id: 'eq',
+    title: 'Jeeves EQ',
+    description: 'Emotion-aware tutoring and response capabilities.',
     endpoint: '/api/jeeves-eq/info',
-    describe: j => j?.description || j?.tagline || 'Emotion-aware tutoring & therapeutic responses',
-    details: j => {
-      const out: { label: string; value: string }[] = [];
-      if (j?.capabilities) {
-        const caps = Array.isArray(j.capabilities) ? j.capabilities : Object.keys(j.capabilities);
-        caps.slice(0, 8).forEach((c: any, i: number) =>
-          out.push({ label: `Capability ${i + 1}`, value: String(c) })
-        );
-      }
-      if (j?.emotions) out.push({ label: 'Emotion classes', value: String((j.emotions || []).length || Object.keys(j.emotions || {}).length) });
-      return out;
-    },
-    speakIntro: () => 'Emotion module ready. Should you grow weary, I shall notice.',
+    icon: 'heart-outline',
+    accent: '#8B5CF6',
   },
   {
-    id: 'voice', title: 'Jeeves Voice', icon: 'mic-outline', accent: '#3B82F6',
+    id: 'voice',
+    title: 'Jeeves Voice',
+    description: 'Voice personality and synthesis configuration.',
     endpoint: '/api/jeeves-voice/personality',
-    describe: j => {
-      const traits = (j?.traits || j?.personality || []);
-      const n = Array.isArray(traits) ? traits.length : Object.keys(traits || {}).length;
-      return `${n} personality dimensions · voice synthesis ready`;
-    },
-    details: j => {
-      const out: { label: string; value: string }[] = [];
-      if (j?.voice_id)   out.push({ label: 'Default voice', value: String(j.voice_id) });
-      if (j?.tone)       out.push({ label: 'Tone', value: String(j.tone) });
-      if (j?.accent)     out.push({ label: 'Accent', value: String(j.accent) });
-      const traits = j?.traits || j?.personality || {};
-      Object.entries(traits).slice(0, 6).forEach(([k, v]) =>
-        out.push({ label: k, value: String(v).slice(0, 60) })
-      );
-      return out;
-    },
-    speakIntro: () => 'Voice synthesiser primed — ready for instruction.',
+    icon: 'mic-outline',
+    accent: '#3B82F6',
+    voiceOnly: true,
   },
   {
-    id: 'hyperion', title: 'Jeeves Hyperion', icon: 'planet-outline', accent: '#fbbf24',
+    id: 'hyperion',
+    title: 'Jeeves Hyperion',
+    description: 'Knowledge-base domains and archive statistics.',
     endpoint: '/api/jeeves-hyperion/knowledge-base/stats',
-    describe: j => {
-      const dom = j?.total_domains ?? j?.domains_count ?? 0;
-      const ent = j?.total_entries ?? j?.entries ?? j?.row_count ?? 0;
-      return `${dom} domains · ${ent.toLocaleString?.() || ent} entries in the hyperion knowledge base`;
-    },
-    details: j => {
-      const out: { label: string; value: string }[] = [];
-      Object.entries(j || {}).forEach(([k, v]) => {
-        if (typeof v === 'number' || typeof v === 'string') {
-          out.push({ label: k.replace(/_/g, ' '), value: String(v) });
-        }
-      });
-      return out.slice(0, 10);
-    },
-    speakIntro: () => 'The Hyperion archives stand ready — every domain catalogued.',
+    icon: 'planet-outline',
+    accent: '#FBBF24',
   },
   {
-    id: 'synergy', title: 'Jeeves Synergy', icon: 'git-network-outline', accent: '#10B981',
+    id: 'synergy',
+    title: 'Jeeves Synergy',
+    description: 'Cross-module orchestration overview.',
     endpoint: '/api/jeeves-synergy/overview',
-    describe: j => j?.description || `${j?.modules?.length || j?.total_modules || 'Multiple'} modules orchestrated together`,
-    details: j => {
-      const out: { label: string; value: string }[] = [];
-      const mods = j?.modules || [];
-      if (Array.isArray(mods)) {
-        mods.slice(0, 10).forEach((m: any, i: number) =>
-          out.push({ label: `Module ${i + 1}`, value: typeof m === 'string' ? m : (m?.name || JSON.stringify(m).slice(0, 60)) })
-        );
-      }
-      return out;
-    },
-    speakIntro: () => 'Synergy engine engaged — all modules harmonised.',
+    icon: 'git-network-outline',
+    accent: '#10B981',
   },
   {
-    id: 'masterbuild', title: 'Master Game Builder', icon: 'planet', accent: '#8b5cf6',
+    id: 'masterbuild',
+    title: 'Master Game Builder',
+    description: 'Genre catalogue for the spec-to-playable pipeline.',
     endpoint: '/api/jeeves-build/genres',
-    describe: j => {
-      const arr = Array.isArray(j) ? j : j?.genres || [];
-      return `${arr.length} genres available · spec-to-playable pipeline`;
-    },
-    details: j => {
-      const arr = Array.isArray(j) ? j : j?.genres || [];
-      return arr.slice(0, 12).map((g: any, i: number) => ({
-        label: `Genre ${i + 1}`,
-        value: typeof g === 'string' ? g : (g?.name || g?.id || JSON.stringify(g).slice(0, 50)),
-      }));
-    },
-    speakIntro: () => 'Master builder online — every genre at our disposal.',
+    icon: 'build-outline',
+    accent: '#8B5CF6',
   },
   {
-    id: 'camera', title: 'Jeeves Camera', icon: 'camera-outline', accent: '#f472b6',
+    id: 'camera',
+    title: 'Jeeves Camera',
+    description: 'Camera-driven learning and visual knowledge topics.',
     endpoint: '/api/jeeves/camera/knowledge',
-    describe: j => {
-      const arr = Array.isArray(j) ? j : j?.topics || j?.knowledge || [];
-      return `${arr.length} camera-driven learning topics`;
-    },
-    details: j => {
-      const arr = Array.isArray(j) ? j : j?.topics || j?.knowledge || [];
-      return arr.slice(0, 8).map((t: any, i: number) => ({
-        label: `Topic ${i + 1}`,
-        value: typeof t === 'string' ? t : (t?.title || t?.name || JSON.stringify(t).slice(0, 60)),
-      }));
-    },
-    speakIntro: () => 'Point a lens at the world — I shall narrate what we see.',
+    icon: 'camera-outline',
+    accent: '#F472B6',
   },
   {
-    id: 'daily', title: 'Daily Challenge', icon: 'flame-outline', accent: '#ef4444',
+    id: 'daily',
+    title: 'Daily Challenge',
+    description: 'Current challenge feed for the default operator profile.',
     endpoint: `/api/daily/challenge?user_id=${USER_ID}`,
-    describe: j => {
-      const c = j?.challenge || j;
-      const title = c?.title || c?.problem_title || 'Today\'s coding challenge';
-      const diff = c?.difficulty || '';
-      return `${title}${diff ? ' · ' + diff : ''}`;
-    },
-    details: j => {
-      const c = j?.challenge || j || {};
-      const out: { label: string; value: string }[] = [];
-      ['title', 'difficulty', 'language', 'category', 'time_estimate_min', 'xp_reward'].forEach(k => {
-        if (c[k] != null) out.push({ label: k.replace(/_/g, ' '), value: String(c[k]) });
-      });
-      if (typeof c?.description === 'string') {
-        out.push({ label: 'Description', value: c.description.slice(0, 240) });
-      }
-      return out;
-    },
-    speakIntro: () => 'Today\'s challenge awaits — sleeves up.',
+    icon: 'flame-outline',
+    accent: '#EF4444',
   },
   {
-    id: 'leaderboards', title: 'Leaderboards', icon: 'trophy-outline', accent: '#fbbf24',
+    id: 'leaderboards',
+    title: 'Leaderboards',
+    description: 'Live leaderboard definitions and periods.',
     endpoint: '/api/leaderboards/boards',
-    describe: j => {
-      const arr = j?.boards || j || [];
-      const n = Array.isArray(arr) ? arr.length : 0;
-      return `${n} leaderboards live · weekly · monthly · all-time`;
-    },
-    details: j => {
-      const arr = j?.boards || j || [];
-      if (!Array.isArray(arr)) return [];
-      return arr.slice(0, 8).map((b: any, i: number) => ({
-        label: b?.name || b?.id || `Board ${i + 1}`,
-        value: `${b?.metric || ''} ${b?.period ? `· ${b.period}` : ''}`.trim() || '—',
-      }));
-    },
-    speakIntro: () => 'The leaderboards beckon — climb at your leisure.',
+    icon: 'trophy-outline',
+    accent: '#FBBF24',
   },
   {
-    id: 'gamification', title: 'XP · Level · Achievements', icon: 'medal-outline', accent: '#a3e635',
+    id: 'gamification',
+    title: 'XP · Level · Achievements',
+    description: 'Gamification profile, progression and achievements.',
     endpoint: `/api/gamification/profile/${USER_ID}`,
-    describe: j => {
-      const xp = j?.xp ?? j?.total_xp ?? 0;
-      const lvl = j?.level ?? 1;
-      return `Level ${lvl} · ${xp.toLocaleString?.() || xp} XP`;
-    },
-    details: j => {
-      const out: { label: string; value: string }[] = [];
-      ['level', 'xp', 'total_xp', 'next_level_xp', 'streak', 'rank'].forEach(k => {
-        if (j?.[k] != null) out.push({ label: k.replace(/_/g, ' '), value: String(j[k]) });
-      });
-      if (Array.isArray(j?.achievements)) {
-        out.push({ label: 'Achievements', value: `${j.achievements.length} unlocked` });
-      }
-      return out;
-    },
-    speakIntro: () => 'Your XP and level — most respectable.',
+    icon: 'medal-outline',
+    accent: '#A3E635',
   },
 ];
 
-interface TileResult { tile: Tile; loading: boolean; data?: any; error?: string; }
+function healthFor(result?: Result): Health {
+  if (!result || result.loading) return 'loading';
+  if (result.error) return 'down';
+  if ((result.latencyMs ?? 0) > SLOW_THRESHOLD_MS) return 'slow';
+  return 'healthy';
+}
+
+function healthColor(health: Health): string {
+  if (health === 'healthy') return '#10B981';
+  if (health === 'slow') return '#F59E0B';
+  if (health === 'down') return '#EF4444';
+  return '#64748B';
+}
+
+function healthLabel(health: Health): string {
+  if (health === 'healthy') return 'HEALTHY';
+  if (health === 'slow') return 'SLOW';
+  if (health === 'down') return 'DOWN';
+  return 'CHECKING';
+}
+
+function compactJson(value: unknown, limit = 180): string {
+  try {
+    const encoded = JSON.stringify(value);
+    return (encoded ?? String(value)).slice(0, limit);
+  } catch {
+    return String(value).slice(0, limit);
+  }
+}
+
+function payloadSummary(data: unknown): string {
+  if (Array.isArray(data)) return `${data.length} record${data.length === 1 ? '' : 's'} returned`;
+  if (data && typeof data === 'object') {
+    const count = Object.keys(data as Record<string, unknown>).length;
+    return `${count} top-level field${count === 1 ? '' : 's'} returned`;
+  }
+  if (data == null) return 'No payload returned';
+  return String(data).slice(0, 120);
+}
+
+function payloadRows(data: unknown): { label: string; value: string }[] {
+  if (Array.isArray(data)) {
+    return data.slice(0, 8).map((item, index) => ({
+      label: `Item ${index + 1}`,
+      value: typeof item === 'string' ? item.slice(0, 180) : compactJson(item),
+    }));
+  }
+  if (!data || typeof data !== 'object') {
+    return data == null ? [] : [{ label: 'Value', value: String(data) }];
+  }
+  return Object.entries(data as Record<string, unknown>)
+    .slice(0, 12)
+    .map(([key, value]) => {
+      let rendered: string;
+      if (value == null) rendered = '—';
+      else if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') rendered = String(value);
+      else if (Array.isArray(value)) rendered = `${value.length} item${value.length === 1 ? '' : 's'}`;
+      else rendered = compactJson(value);
+      return { label: key.replace(/_/g, ' '), value: rendered };
+    });
+}
+
+function formatCheckedAt(timestamp?: number): string {
+  if (!timestamp) return 'Not checked yet';
+  try {
+    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  } catch {
+    return 'Checked recently';
+  }
+}
+
+async function fetchJsonWithTimeout(url: string): Promise<unknown> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } catch (error: any) {
+    if (error?.name === 'AbortError') throw new Error(`Timed out after ${REQUEST_TIMEOUT_MS / 1000}s`);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export default function JeevesHubScreen() {
   const router = useRouter();
-  const flagVoice    = useFeatureFlag('experimental_voice');
+  const flagVoice = useFeatureFlag('experimental_voice');
   const flagAudioTest = useFeatureFlag('jeeves_audio_test');
-  /** Visible tiles depend on feature flags — Voice tile hides when experimental_voice is off. */
-  const visibleTiles = useMemo(
-    () => TILES.filter(t => (t.id === 'voice' ? flagVoice : true)),
-    [flagVoice],
-  );
-  const [results, setResults] = useState<Record<string, TileResult>>(() =>
-    Object.fromEntries(TILES.map(t => [t.id, { tile: t, loading: true }]))
+  const generations = useRef<Record<string, number>>({});
+  const [results, setResults] = useState<Record<string, Result>>(() =>
+    Object.fromEntries(SERVICES.map(service => [service.id, { loading: true }])),
   );
   const [refreshing, setRefreshing] = useState(false);
-  const [open, setOpen] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>('all');
+  const [openId, setOpenId] = useState<string | null>(null);
 
-  const fetchAll = useCallback(async () => {
-    setRefreshing(true);
-    await Promise.all(visibleTiles.map(async (t) => {
-      try {
-        const r = await fetch(`${BACKEND}${t.endpoint}`);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const j = await r.json();
-        setResults(prev => ({ ...prev, [t.id]: { tile: t, loading: false, data: j } }));
-      } catch (e: any) {
-        setResults(prev => ({ ...prev, [t.id]: { tile: t, loading: false, error: String(e?.message || e).slice(0, 80) } }));
-      }
-    }));
-    setRefreshing(false);
-  }, [visibleTiles]);
-
-  useEffect(() => { fetchAll(); }, [fetchAll]);
-
-  const stats = useMemo(() => {
-    const total = visibleTiles.length;
-    const live = visibleTiles.filter(t => {
-      const r = results[t.id];
-      return r && !r.loading && !r.error;
-    }).length;
-    return { total, live };
-  }, [results, visibleTiles]);
-
-  /** Tiles that errored on the last fetch — drives the inline RetryBanner. */
-  const failedCount = useMemo(
-    () => visibleTiles.filter(t => results[t.id]?.error).length,
-    [results, visibleTiles],
+  const visibleServices = useMemo(
+    () => SERVICES.filter(service => !service.voiceOnly || flagVoice),
+    [flagVoice],
   );
 
-  const openTile = (id: string) => {
-    setOpen(id);
-    const r = results[id];
-    if (r?.data && r.tile.speakIntro) {
-      try { jeevesSpeak(r.tile.speakIntro(r.data), { context: 'lesson', prependCatchphrase: false }); } catch {}
+  const checkService = useCallback(async (service: Service) => {
+    const generation = (generations.current[service.id] ?? 0) + 1;
+    generations.current[service.id] = generation;
+
+    setResults(previous => ({
+      ...previous,
+      [service.id]: {
+        ...previous[service.id],
+        loading: true,
+        error: undefined,
+      },
+    }));
+
+    const startedAt = Date.now();
+    try {
+      const data = await fetchJsonWithTimeout(`${BACKEND}${service.endpoint}`);
+      if (generations.current[service.id] !== generation) return;
+      setResults(previous => ({
+        ...previous,
+        [service.id]: {
+          loading: false,
+          data,
+          latencyMs: Date.now() - startedAt,
+          checkedAt: Date.now(),
+        },
+      }));
+    } catch (error: any) {
+      if (generations.current[service.id] !== generation) return;
+      setResults(previous => ({
+        ...previous,
+        [service.id]: {
+          loading: false,
+          error: String(error?.message || error || 'Unknown error').slice(0, 120),
+          latencyMs: Date.now() - startedAt,
+          checkedAt: Date.now(),
+        },
+      }));
     }
+  }, []);
+
+  const checkAll = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all(visibleServices.map(checkService));
+    } finally {
+      setRefreshing(false);
+    }
+  }, [checkService, visibleServices]);
+
+  useEffect(() => {
+    checkAll().catch(() => {});
+  }, [checkAll]);
+
+  const stats = useMemo(() => {
+    let healthy = 0;
+    let slow = 0;
+    let down = 0;
+    const latencies: number[] = [];
+
+    visibleServices.forEach(service => {
+      const result = results[service.id];
+      const health = healthFor(result);
+      if (health === 'healthy') healthy += 1;
+      if (health === 'slow') slow += 1;
+      if (health === 'down') down += 1;
+      if (!result?.error && typeof result?.latencyMs === 'number' && !result.loading) {
+        latencies.push(result.latencyMs);
+      }
+    });
+
+    const averageMs = latencies.length
+      ? Math.round(latencies.reduce((sum, value) => sum + value, 0) / latencies.length)
+      : null;
+
+    return { healthy, slow, down, total: visibleServices.length, averageMs };
+  }, [results, visibleServices]);
+
+  const filteredServices = useMemo(() => {
+    if (filter === 'all') return visibleServices;
+    if (filter === 'healthy') {
+      return visibleServices.filter(service => healthFor(results[service.id]) === 'healthy');
+    }
+    return visibleServices.filter(service => {
+      const health = healthFor(results[service.id]);
+      return health === 'slow' || health === 'down';
+    });
+  }, [filter, results, visibleServices]);
+
+  const openService = useMemo(
+    () => visibleServices.find(service => service.id === openId) || null,
+    [openId, visibleServices],
+  );
+  const openResult = openService ? results[openService.id] : undefined;
+  const openHealth = healthFor(openResult);
+
+  const openDetails = (service: Service) => {
+    setOpenId(service.id);
+    const health = healthFor(results[service.id]);
+    try {
+      jeevesSpeak(
+        `${service.title}. Service status ${healthLabel(health).toLowerCase()}.`,
+        { context: 'lesson', prependCatchphrase: false },
+      );
+    } catch {}
   };
 
-  const openModalData = open ? results[open] : null;
-
   return (
-    <SafeAreaView style={s.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" />
+    <SafeAreaView style={styles.root}>
+      <StatusBar barStyle="light-content" backgroundColor="#08090B" />
 
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="chevron-back" size={22} color="#a78bfa" />
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.headerButton}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Ionicons name="chevron-back" size={22} color="#A78BFA" />
         </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={s.title}>🎩 Jeeves Powerhouse Hub</Text>
-          <Text style={s.subtitle}>
-            {stats.live}/{stats.total} services live · all dials at your disposal
-          </Text>
+        <View style={styles.headerCopy}>
+          <Text style={styles.eyebrow}>JEEVES CONTROL PLANE</Text>
+          <Text style={styles.title}>Powerhouse Operator Hub</Text>
+          <Text style={styles.subtitle}>Live health, latency and recovery controls</Text>
         </View>
-        <TouchableOpacity onPress={fetchAll} style={s.refreshBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="refresh" size={18} color="#a78bfa" />
+        <TouchableOpacity
+          onPress={() => checkAll()}
+          style={styles.headerButton}
+          accessibilityRole="button"
+          accessibilityLabel="Refresh all Jeeves services"
+          disabled={refreshing}
+        >
+          <Ionicons name={refreshing ? 'sync' : 'refresh'} size={20} color="#A78BFA" />
         </TouchableOpacity>
       </View>
 
       <ScrollView
-        contentContainerStyle={s.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchAll} tintColor="#a78bfa" />}
-      >
-        {/* Harden — inline retry banner shows when any tile errored. */}
-        {failedCount > 0 && !refreshing && (
-          <RetryBanner
-            error={`${failedCount} service${failedCount === 1 ? '' : 's'} unreachable — pull to refresh or tap retry.`}
-            onRetry={fetchAll}
-            retryLabel="Retry all"
+        contentContainerStyle={styles.content}
+        refreshControl={(
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={checkAll}
+            tintColor="#A78BFA"
           />
         )}
-        {visibleTiles.map(t => {
-          const r = results[t.id];
-          const live = !r?.loading && !r?.error;
-          return (
-            <TouchableOpacity
-              key={t.id}
-              activeOpacity={0.85}
-              onPress={() => openTile(t.id)}
-              style={[s.card, { borderColor: t.accent + '55' }]}
-            >
-              <View style={[s.iconCircle, { backgroundColor: t.accent + '22', borderColor: t.accent }]}>
-                <Ionicons name={t.icon} size={22} color={t.accent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={s.cardHeader}>
-                  <Text style={s.cardTitle} numberOfLines={1}>{t.title}</Text>
-                  <View style={[s.statusDot, { backgroundColor: live ? '#10B981' : (r?.error ? '#f87171' : '#94a3b8') }]} />
-                </View>
-                {r?.loading ? (
-                  <View style={{ gap: 6, marginTop: 4 }}>
-                    <Skeleton width="90%" height={11} />
-                    <Skeleton width="60%" height={11} />
-                  </View>
-                ) : r?.error ? (
-                  <Text style={s.errText}>⚠ {r.error}</Text>
-                ) : (
-                  <Text style={s.cardDesc} numberOfLines={2}>{t.describe(r?.data)}</Text>
-                )}
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#64748b" />
-            </TouchableOpacity>
-          );
-        })}
-
-        <View style={{ height: 30 }} />
-
-        {/* P2 Audio diagnostics shortcut — feature-flag gated. */}
-        {flagAudioTest && (
-        <TouchableOpacity
-          onPress={() => router.push('/jeeves-audio-test' as any)}
-          activeOpacity={0.85}
-          style={[s.card, { borderColor: '#3B82F666', backgroundColor: '#3B82F614' }]}
-        >
-          <View style={[s.iconCircle, { backgroundColor: '#3B82F622', borderColor: '#3B82F6' }]}>
-            <Ionicons name="volume-high" size={22} color="#3B82F6" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={s.cardHeader}>
-              <Text style={s.cardTitle}>🎤 Audio Diagnostics</Text>
-              <View style={[s.statusDot, { backgroundColor: '#3B82F6' }]} />
+      >
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryTopRow}>
+            <View>
+              <Text style={styles.summaryLabel}>Fleet health</Text>
+              <Text style={styles.summaryValue}>{stats.healthy}/{stats.total} healthy</Text>
             </View>
-            <Text style={s.cardDesc} numberOfLines={2}>
-              Verify Jeeves TTS plays across all 19 personality contexts · catchphrase + mannerism preview
-            </Text>
+            <View style={styles.latencyBox}>
+              <Text style={styles.latencyLabel}>AVG LATENCY</Text>
+              <Text style={styles.latencyValue}>{stats.averageMs == null ? '—' : `${stats.averageMs} ms`}</Text>
+            </View>
           </View>
-          <Ionicons name="chevron-forward" size={18} color="#64748b" />
-        </TouchableOpacity>
+
+          <View style={styles.meterTrack}>
+            <View
+              style={[
+                styles.meterFill,
+                {
+                  width: `${stats.total ? Math.round((stats.healthy / stats.total) * 100) : 0}%` as `${number}%`,
+                },
+              ]}
+            />
+          </View>
+
+          <View style={styles.summaryStatusRow}>
+            <Text style={styles.healthyText}>● {stats.healthy} healthy</Text>
+            <Text style={styles.slowText}>● {stats.slow} slow</Text>
+            <Text style={styles.downText}>● {stats.down} down</Text>
+          </View>
+        </View>
+
+        <View style={styles.quickActions}>
+          <QuickAction
+            icon="chatbubble-ellipses-outline"
+            label="Chat"
+            onPress={() => router.push('/jeeves' as any)}
+          />
+          <QuickAction
+            icon="analytics-outline"
+            label="Telemetry"
+            onPress={() => router.push('/telemetry' as any)}
+          />
+          <QuickAction
+            icon="options-outline"
+            label="Settings"
+            onPress={() => router.push('/settings/jeeves' as any)}
+          />
+          {flagAudioTest && (
+            <QuickAction
+              icon="volume-high-outline"
+              label="Audio"
+              onPress={() => router.push('/jeeves-audio-test' as any)}
+            />
+          )}
+        </View>
+
+        <View style={styles.filterRow}>
+          <FilterChip label={`All ${stats.total}`} active={filter === 'all'} onPress={() => setFilter('all')} />
+          <FilterChip label={`Healthy ${stats.healthy}`} active={filter === 'healthy'} onPress={() => setFilter('healthy')} />
+          <FilterChip label={`Issues ${stats.slow + stats.down}`} active={filter === 'issues'} onPress={() => setFilter('issues')} />
+        </View>
+
+        {filteredServices.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="checkmark-circle-outline" size={28} color="#10B981" />
+            <Text style={styles.emptyTitle}>No services in this view</Text>
+            <Text style={styles.emptyText}>Change the filter or run another health check.</Text>
+          </View>
+        ) : (
+          filteredServices.map(service => {
+            const result = results[service.id];
+            const health = healthFor(result);
+            const color = healthColor(health);
+            return (
+              <TouchableOpacity
+                key={service.id}
+                activeOpacity={0.84}
+                onPress={() => openDetails(service)}
+                style={[styles.serviceCard, { borderColor: `${service.accent}55` }]}
+                accessibilityRole="button"
+                accessibilityLabel={`${service.title}, ${healthLabel(health)}`}
+              >
+                <View style={[styles.serviceIcon, { borderColor: service.accent, backgroundColor: `${service.accent}1F` }]}>
+                  <Ionicons name={service.icon} size={21} color={service.accent} />
+                </View>
+
+                <View style={styles.serviceBody}>
+                  <View style={styles.serviceTitleRow}>
+                    <Text style={styles.serviceTitle} numberOfLines={1}>{service.title}</Text>
+                    <View style={[styles.statusPill, { borderColor: `${color}66`, backgroundColor: `${color}1A` }]}>
+                      <View style={[styles.statusDot, { backgroundColor: color }]} />
+                      <Text style={[styles.statusText, { color }]}>{healthLabel(health)}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.serviceDescription} numberOfLines={2}>{service.description}</Text>
+                  <View style={styles.serviceMetaRow}>
+                    <Text style={styles.serviceMeta} numberOfLines={1}>{service.endpoint}</Text>
+                    <Text style={[styles.serviceLatency, { color }]}>
+                      {result?.loading ? 'checking…' : typeof result?.latencyMs === 'number' ? `${result.latencyMs} ms` : '—'}
+                    </Text>
+                  </View>
+                  {result?.error ? <Text style={styles.errorText} numberOfLines={2}>⚠ {result.error}</Text> : null}
+                </View>
+
+                <TouchableOpacity
+                  onPress={event => {
+                    event.stopPropagation();
+                    checkService(service).catch(() => {});
+                  }}
+                  style={styles.retryButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Retry ${service.title}`}
+                >
+                  <Ionicons name="refresh" size={17} color="#CBD5E1" />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            );
+          })
         )}
 
-        <Text style={s.footer}>All endpoints live · pull-to-refresh for fresh data</Text>
+        <Text style={styles.footerText}>
+          Slow threshold {SLOW_THRESHOLD_MS} ms · request timeout {REQUEST_TIMEOUT_MS / 1000}s
+        </Text>
       </ScrollView>
 
-      {/* Detail modal — wrapped in ModalErrorBoundary so a bad payload from one
-          tile doesn't take down the entire hub. The boundary's "Try again"
-          re-runs the modal subtree from scratch. */}
-      <Modal visible={!!open} transparent animationType="slide" onRequestClose={() => setOpen(null)}>
-        <View style={s.modalBackdrop}>
-          <View style={s.modalCard}>
-            <ModalErrorBoundary name={openModalData?.tile.title || 'Jeeves tile'} onClose={() => setOpen(null)}>
-            <View style={s.modalHeader}>
-              <View style={[s.iconCircle, { backgroundColor: (openModalData?.tile.accent || '#a78bfa') + '22', borderColor: openModalData?.tile.accent || '#a78bfa' }]}>
-                <Ionicons name={openModalData?.tile.icon || 'happy-outline'} size={18} color={openModalData?.tile.accent || '#a78bfa'} />
+      <Modal
+        visible={!!openService}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setOpenId(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={[styles.serviceIcon, { borderColor: openService?.accent || '#A78BFA', backgroundColor: `${openService?.accent || '#A78BFA'}1F` }]}>
+                <Ionicons name={openService?.icon || 'pulse-outline'} size={20} color={openService?.accent || '#A78BFA'} />
               </View>
-              <Text style={s.modalTitle}>{openModalData?.tile.title}</Text>
-              <TouchableOpacity onPress={() => setOpen(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Ionicons name="close" size={22} color="#94a3b8" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalTitle}>{openService?.title}</Text>
+                <Text style={[styles.modalStatus, { color: healthColor(openHealth) }]}>
+                  {healthLabel(openHealth)}{typeof openResult?.latencyMs === 'number' ? ` · ${openResult.latencyMs} ms` : ''}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setOpenId(null)}
+                style={styles.modalClose}
+                accessibilityRole="button"
+                accessibilityLabel="Close service details"
+              >
+                <Ionicons name="close" size={22} color="#94A3B8" />
               </TouchableOpacity>
             </View>
-            <ScrollView style={{ maxHeight: 440 }} contentContainerStyle={{ padding: 12 }}>
-              {openModalData?.error ? (
-                <Text style={s.errText}>⚠ {openModalData.error}</Text>
-              ) : openModalData?.data ? (
+
+            <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalContent}>
+              <Text style={styles.modalDescription}>{openService?.description}</Text>
+              <Text style={styles.endpointLabel}>ENDPOINT</Text>
+              <Text style={styles.endpointText}>{openService?.endpoint}</Text>
+              <Text style={styles.checkedText}>{formatCheckedAt(openResult?.checkedAt)}</Text>
+
+              {openResult?.error ? (
+                <View style={styles.errorBox}>
+                  <Text style={styles.errorBoxTitle}>Probe failed</Text>
+                  <Text style={styles.errorBoxText}>{openResult.error}</Text>
+                </View>
+              ) : openResult?.data !== undefined ? (
                 <>
-                  <Text style={s.modalDesc}>{openModalData.tile.describe(openModalData.data)}</Text>
-                  {(openModalData.tile.details?.(openModalData.data) || []).map((d, i) => (
-                    <View key={i} style={s.detailRow}>
-                      <Text style={s.detailLabel}>{d.label}</Text>
-                      <Text style={s.detailValue} numberOfLines={3}>{d.value}</Text>
+                  <Text style={styles.payloadSummary}>{payloadSummary(openResult.data)}</Text>
+                  {payloadRows(openResult.data).map((row, index) => (
+                    <View key={`${row.label}-${index}`} style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>{row.label}</Text>
+                      <Text style={styles.detailValue} numberOfLines={4}>{row.value}</Text>
                     </View>
                   ))}
                 </>
               ) : (
-                /* Skeleton paragraph beats a spinner for perceived speed. */
-                <Skeleton.Block rows={5} gap={10} lastWidth="40%" />
+                <Text style={styles.payloadSummary}>No payload captured yet.</Text>
               )}
             </ScrollView>
-            <View style={s.modalFooter}>
-              <Text style={s.modalEndpoint} numberOfLines={1}>
-                <Ionicons name="link" size={11} color="#64748b" /> {openModalData?.tile.endpoint}
-              </Text>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={() => openService && checkService(openService).catch(() => {})}
+                accessibilityRole="button"
+              >
+                <Ionicons name="refresh" size={17} color="#FFFFFF" />
+                <Text style={styles.primaryButtonText}>Retry service</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={() => router.push('/telemetry' as any)}
+                accessibilityRole="button"
+              >
+                <Ionicons name="analytics-outline" size={17} color="#A78BFA" />
+                <Text style={styles.secondaryButtonText}>Open telemetry</Text>
+              </TouchableOpacity>
             </View>
-            </ModalErrorBoundary>
           </View>
         </View>
       </Modal>
@@ -435,54 +584,194 @@ export default function JeevesHubScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0A0A0A' },
+function QuickAction({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={styles.quickAction}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <Ionicons name={icon} size={18} color="#A78BFA" />
+      <Text style={styles.quickActionText}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function FilterChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[styles.filterChip, active && styles.filterChipActive]}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+    >
+      <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#08090B' },
   header: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 14, paddingVertical: 10,
-    borderBottomColor: '#1F1F1F', borderBottomWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1B1D22',
   },
-  backBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  refreshBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  title: { color: '#f1f5f9', fontSize: 16, fontWeight: '900' },
-  subtitle: { color: '#94a3b8', fontSize: 11, marginTop: 2 },
-  content: { padding: 12, paddingBottom: 30 },
-  card: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: '#141414', borderRadius: 12, padding: 12,
-    marginBottom: 8, borderWidth: 1,
-  },
-  iconCircle: {
-    width: 40, height: 40, borderRadius: 20,
-    alignItems: 'center', justifyContent: 'center',
+  headerButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#12141A',
     borderWidth: 1,
+    borderColor: '#242731',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  cardTitle: { color: '#f1f5f9', fontSize: 14, fontWeight: '800', flex: 1 },
-  cardDesc: { color: '#94a3b8', fontSize: 11, marginTop: 3, lineHeight: 15 },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
-  errText: { color: '#f87171', fontSize: 11, marginTop: 4 },
-  footer: { color: '#64748b', fontSize: 10, textAlign: 'center', marginTop: 6, fontStyle: 'italic' },
-  modalBackdrop: { flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' },
+  headerCopy: { flex: 1 },
+  eyebrow: { color: '#7C6CA8', fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
+  title: { color: '#F8FAFC', fontSize: 18, fontWeight: '900', marginTop: 1 },
+  subtitle: { color: '#94A3B8', fontSize: 10, marginTop: 1 },
+  content: { padding: 12, paddingBottom: 34 },
+  summaryCard: {
+    backgroundColor: '#11131A',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#2B2540',
+    padding: 14,
+    marginBottom: 10,
+  },
+  summaryTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  summaryLabel: { color: '#94A3B8', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  summaryValue: { color: '#F8FAFC', fontSize: 22, fontWeight: '900', marginTop: 2 },
+  latencyBox: { alignItems: 'flex-end' },
+  latencyLabel: { color: '#64748B', fontSize: 9, fontWeight: '800', letterSpacing: 0.7 },
+  latencyValue: { color: '#C4B5FD', fontSize: 15, fontWeight: '900', marginTop: 3 },
+  meterTrack: { height: 7, borderRadius: 999, backgroundColor: '#232631', overflow: 'hidden', marginTop: 13 },
+  meterFill: { height: '100%', borderRadius: 999, backgroundColor: '#10B981' },
+  summaryStatusRow: { flexDirection: 'row', gap: 13, marginTop: 10, flexWrap: 'wrap' },
+  healthyText: { color: '#6EE7B7', fontSize: 10, fontWeight: '700' },
+  slowText: { color: '#FBBF24', fontSize: 10, fontWeight: '700' },
+  downText: { color: '#F87171', fontSize: 10, fontWeight: '700' },
+  quickActions: { flexDirection: 'row', gap: 7, marginBottom: 10, flexWrap: 'wrap' },
+  quickAction: {
+    minWidth: 74,
+    flexGrow: 1,
+    flexBasis: 74,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 9,
+    backgroundColor: '#11131A',
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: '#242731',
+  },
+  quickActionText: { color: '#CBD5E1', fontSize: 10, fontWeight: '800' },
+  filterRow: { flexDirection: 'row', gap: 7, marginBottom: 10 },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#2A2D36',
+    backgroundColor: '#111318',
+  },
+  filterChipActive: { borderColor: '#7C5CE7', backgroundColor: '#6D4FD322' },
+  filterChipText: { color: '#94A3B8', fontSize: 10, fontWeight: '800' },
+  filterChipTextActive: { color: '#C4B5FD' },
+  serviceCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 11,
+    marginBottom: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    backgroundColor: '#111318',
+  },
+  serviceIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  serviceBody: { flex: 1, minWidth: 0 },
+  serviceTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  serviceTitle: { color: '#F1F5F9', fontSize: 13, fontWeight: '900', flex: 1 },
+  serviceDescription: { color: '#94A3B8', fontSize: 10, lineHeight: 14, marginTop: 3 },
+  serviceMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+  serviceMeta: { color: '#596273', fontSize: 9, fontFamily: 'monospace', flex: 1 },
+  serviceLatency: { fontSize: 9, fontWeight: '900' },
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 3 },
+  statusDot: { width: 5, height: 5, borderRadius: 3 },
+  statusText: { fontSize: 8, fontWeight: '900', letterSpacing: 0.45 },
+  errorText: { color: '#F87171', fontSize: 9, lineHeight: 13, marginTop: 5 },
+  retryButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#1A1D24',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+    backgroundColor: '#111318',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#232631',
+  },
+  emptyTitle: { color: '#E2E8F0', fontSize: 13, fontWeight: '900', marginTop: 8 },
+  emptyText: { color: '#64748B', fontSize: 10, marginTop: 3, textAlign: 'center' },
+  footerText: { color: '#475569', fontSize: 9, textAlign: 'center', marginTop: 10 },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#000000B8' },
   modalCard: {
-    backgroundColor: '#141414', borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    borderTopWidth: 1, borderColor: '#1F1F1F',
-    paddingBottom: 24,
+    maxHeight: '80%',
+    backgroundColor: '#111318',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderTopWidth: 1,
+    borderColor: '#2C303A',
   },
-  modalHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 14, paddingVertical: 14,
-    borderBottomColor: '#1F1F1F', borderBottomWidth: 1,
-  },
-  modalTitle: { flex: 1, color: '#f1f5f9', fontSize: 15, fontWeight: '800' },
-  modalDesc: { color: '#cbd5e1', fontSize: 12, lineHeight: 18, marginBottom: 10 },
-  detailRow: {
-    flexDirection: 'row', justifyContent: 'space-between', gap: 10,
-    paddingVertical: 7,
-    borderBottomColor: '#1F1F1F', borderBottomWidth: 0.5,
-  },
-  detailLabel: { color: '#94a3b8', fontSize: 11, fontWeight: '600', textTransform: 'capitalize' },
-  detailValue: { color: '#f1f5f9', fontSize: 11, fontWeight: '700', flex: 1, textAlign: 'right' },
-  modalFooter: { paddingHorizontal: 14, paddingTop: 8 },
-  modalEndpoint: { color: '#64748b', fontSize: 10, fontFamily: 'monospace' },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderBottomWidth: 1, borderBottomColor: '#242731' },
+  modalTitle: { color: '#F8FAFC', fontSize: 15, fontWeight: '900' },
+  modalStatus: { fontSize: 9, fontWeight: '900', marginTop: 2, letterSpacing: 0.55 },
+  modalClose: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  modalScroll: { maxHeight: 470 },
+  modalContent: { padding: 14, paddingBottom: 18 },
+  modalDescription: { color: '#CBD5E1', fontSize: 11, lineHeight: 17, marginBottom: 12 },
+  endpointLabel: { color: '#64748B', fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
+  endpointText: { color: '#A78BFA', fontSize: 10, fontFamily: 'monospace', marginTop: 3 },
+  checkedText: { color: '#64748B', fontSize: 9, marginTop: 4, marginBottom: 12 },
+  payloadSummary: { color: '#94A3B8', fontSize: 10, marginBottom: 8 },
+  detailRow: { flexDirection: 'row', gap: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#20232A' },
+  detailLabel: { width: '34%', color: '#94A3B8', fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
+  detailValue: { flex: 1, color: '#E2E8F0', fontSize: 10, lineHeight: 14, textAlign: 'right' },
+  errorBox: { padding: 12, backgroundColor: '#EF444414', borderWidth: 1, borderColor: '#EF444444', borderRadius: 12 },
+  errorBoxTitle: { color: '#FCA5A5', fontSize: 11, fontWeight: '900' },
+  errorBoxText: { color: '#F87171', fontSize: 10, lineHeight: 15, marginTop: 4 },
+  modalActions: { flexDirection: 'row', gap: 8, padding: 12, paddingBottom: 22, borderTopWidth: 1, borderTopColor: '#242731' },
+  primaryButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 11, borderRadius: 11, backgroundColor: '#6D4FD3' },
+  primaryButtonText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
+  secondaryButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 11, borderRadius: 11, backgroundColor: '#181B22', borderWidth: 1, borderColor: '#2B2F39' },
+  secondaryButtonText: { color: '#C4B5FD', fontSize: 11, fontWeight: '900' },
 });

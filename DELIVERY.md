@@ -101,3 +101,12 @@ CORS_ORIGINS        default "*"
 - **Rate limiter is in-process** — sufficient for single-replica
   deploys. Swap to Redis-backed for horizontal scaling.
 - **Scheduler uses local notifications only** (no remote push).
+
+## 🛡️ Operational controls
+
+- Merge authorization and flaky/quarantine handling are defined in
+  `docs/MERGE_READINESS.md`; green checks must belong to the current PR head.
+- Security/reliability incident handling, rollback triggers, evidence retention,
+  and recovery exit criteria are defined in `docs/SECURITY_INCIDENT_RESPONSE.md`.
+- Live middleware code and environment validation are authoritative when they
+  differ from historical defaults documented in this delivery checklist.

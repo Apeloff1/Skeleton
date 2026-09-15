@@ -1,5 +1,5 @@
 # ============================================================================
-# Git Ignore for Tutolage
+# Git Ignore for Skeleton
 # ============================================================================
 
 # ==========================================================================
@@ -55,7 +55,7 @@ web-build/
 *.orig.*
 
 # ==========================================================================
-# IDE
+# IDE / local tooling
 # ==========================================================================
 .idea/
 .vscode/
@@ -63,6 +63,13 @@ web-build/
 *.swo
 *~
 .DS_Store
+.gitconfig
+.claude/settings.local.json
+
+# Generated agent handoff / local runtime state; source/config under .emergent stays tracked.
+.emergent/summary.txt
+.emergent/emergent.yml
+.emergent/cron/applied.hash
 
 # ==========================================================================
 # Environment & Secrets (NEVER commit real env files — keep only .env.example)
@@ -123,6 +130,8 @@ chroma_data/
 backend/.git_workspaces/
 
 # Generated build / vault artifacts — never commit (large binaries)
+backend/artifacts/
+backend/artifacts_media/
 backend/data/builds_vault/
 backend/data/galaxy_vault/
 backend/data/**/zips/

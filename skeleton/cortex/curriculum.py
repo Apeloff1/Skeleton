@@ -9,12 +9,16 @@ generalizes instead of parroting an exact fingerprint.
 """
 from __future__ import annotations
 
+from itertools import islice
 from typing import Any, Dict, List, Sequence, Tuple
 import re
 
 from skeleton.forge.eras import ERA_IDS
 
 Pair = Tuple[str, str]
+MAX_TRAIN_EPOCHS = 64
+MAX_CURRICULUM_PAIRS = 2048
+MAX_CURRICULUM_TEXT_CHARS = 32_768
 
 
 def _era_pairs() -> List[Pair]:
@@ -68,6 +72,38 @@ _MIX_RE = re.compile(r"mix trash=(\d+) elite=(\d+) boss=(\d+) slack=([0-9.]+)")
 _NEO_FIT = {a for a, _ in CORE_PAIRS} | {a for a, _ in WALK_PAIRS}
 
 
+def _bounded_epochs(value: int) -> int:
+    if isinstance(value, bool):
+        raise ValueError("epochs must be an integer")
+    try:
+        epochs = int(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("epochs must be an integer") from exc
+    epochs = max(1, epochs)
+    if epochs > MAX_TRAIN_EPOCHS:
+        raise ValueError(f"epochs exceeds safety budget ({MAX_TRAIN_EPOCHS})")
+    return epochs
+
+
+def _bounded_curriculum(pairs: Sequence[Pair] | None) -> List[Pair]:
+    source = default_curriculum() if pairs is None else pairs
+    materialized = list(islice(iter(source), MAX_CURRICULUM_PAIRS + 1))
+    if len(materialized) > MAX_CURRICULUM_PAIRS:
+        raise ValueError(f"curriculum exceeds safety budget ({MAX_CURRICULUM_PAIRS} pairs)")
+
+    validated: List[Pair] = []
+    for pair in materialized:
+        if not isinstance(pair, (list, tuple)) or len(pair) != 2:
+            raise ValueError("curriculum items must be (train, held-out) pairs")
+        train_s, held = pair
+        if not isinstance(train_s, str) or not isinstance(held, str):
+            raise ValueError("curriculum pair values must be strings")
+        if len(train_s) > MAX_CURRICULUM_TEXT_CHARS or len(held) > MAX_CURRICULUM_TEXT_CHARS:
+            raise ValueError(f"curriculum text exceeds safety budget ({MAX_CURRICULUM_TEXT_CHARS} chars)")
+        validated.append((train_s, held))
+    return validated
+
+
 def _ingest_observed_mix(neo, train_s: str) -> None:
     m = _MIX_RE.search(train_s or "")
     if not m or neo is None or not hasattr(neo, "own"):
@@ -108,11 +144,11 @@ def default_curriculum() -> List[Pair]:
 
 def train(neo, *, epochs: int = 1, pairs: Sequence[Pair] | None = None,
           auto_surpass: bool = True) -> Dict[str, Any]:
-    """One or more epochs. Returns held-out recall metrics."""
+    """Run a bounded curriculum and return held-out recall metrics."""
     from skeleton.cortex.port import SLOTS
 
-    curriculum = list(pairs or default_curriculum())
-    epochs = max(1, int(epochs))
+    curriculum = _bounded_curriculum(pairs)
+    epochs = _bounded_epochs(epochs)
     held_hits = 0
     held_total = 0
     last_status: Dict[str, Any] = {}

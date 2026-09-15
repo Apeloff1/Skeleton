@@ -136,9 +136,6 @@ def call_violation(node: ast.Call, aliases: dict[str, str]) -> str | None:
             return f"{name}() requires literal SafeLoader/CSafeLoader"
 
     if name == "numpy.load":
-        # NumPy defaults allow_pickle=False. Preserve the safe default, but if
-        # callers explicitly override it they must prove it remains disabled;
-        # dynamic expressions are fail-open otherwise.
         if has_keyword(node, "allow_pickle"):
             allow_pickle = keyword_value(node, "allow_pickle")
             if not is_literal_false(allow_pickle):

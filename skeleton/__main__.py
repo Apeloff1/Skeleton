@@ -13,6 +13,10 @@ Commands:
     plan        Jeeves BuildPlan for a vision / era
     cockpit     Apply one cockpit command
     walk        Prove spawn→extract on the emitted door graph
+    contracts   Show the shared API/CLI feature-parity contract
+    command     Execute a shared command: command <name> ['{...json...}']
+    status      Shared runtime status command
+    config      Shared non-secret configuration command
     help        Show this help message
 """
 
@@ -21,6 +25,61 @@ from __future__ import annotations
 import json
 import sys
 from typing import List, Optional
+
+
+def _cmd_contracts(_rest: List[str]) -> int:
+    from skeleton.application import parity_matrix
+
+    print(json.dumps(parity_matrix(), indent=2, default=str))
+    return 0
+
+
+def _cmd_shared_command(rest: List[str]) -> int:
+    from skeleton.api.server import get_state
+    from skeleton.application import CONTRACT_VERSION, build_runtime_command_service
+
+    if not rest:
+        print(json.dumps({
+            "contract_version": CONTRACT_VERSION,
+            "command": "",
+            "ok": False,
+            "error": {"code": "invalid_command", "message": "command name is required"},
+        }, indent=2))
+        return 2
+
+    command = rest[0].strip().lower()
+    payload = {}
+    if len(rest) > 1:
+        raw_payload = " ".join(rest[1:]).strip()
+        try:
+            decoded = json.loads(raw_payload)
+        except json.JSONDecodeError as exc:
+            print(json.dumps({
+                "contract_version": CONTRACT_VERSION,
+                "command": command,
+                "ok": False,
+                "error": {"code": "invalid_argument", "message": f"invalid JSON payload: {exc.msg}"},
+            }, indent=2))
+            return 2
+        if not isinstance(decoded, dict):
+            print(json.dumps({
+                "contract_version": CONTRACT_VERSION,
+                "command": command,
+                "ok": False,
+                "error": {"code": "invalid_argument", "message": "command payload must be a JSON object"},
+            }, indent=2))
+            return 2
+        payload = decoded
+
+    state = get_state()
+    if command in {"run", "tool", "memory", "admin"} and state.genesis is None:
+        from skeleton.genesis import Genesis
+
+        state.wire_from_genesis(Genesis(seed=42).boot())
+
+    result = build_runtime_command_service(state).execute(command, payload)
+    print(json.dumps(result.to_payload(), indent=2, default=str))
+    return result.exit_code
 
 
 def _cmd_eras(_rest: List[str]) -> int:
@@ -195,6 +254,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "plan": return _cmd_plan(rest)
     if cmd == "cockpit": return _cmd_cockpit(rest)
     if cmd == "walk": return _cmd_walk(rest)
+    if cmd == "contracts": return _cmd_contracts(rest)
+    if cmd == "command": return _cmd_shared_command(rest)
+    if cmd == "status": return _cmd_shared_command(["status"])
+    if cmd == "config": return _cmd_shared_command(["configuration"])
     if cmd in ("help", "-h", "--help"): print(__doc__); return 0
     print(f"Unknown command: {cmd}"); print(__doc__); return 1
 

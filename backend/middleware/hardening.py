@@ -3,7 +3,9 @@ hardening middleware — additional safety nets for the FastAPI backend.
 
   • RequestTimeoutMiddleware — kills any /api/* request running longer
     than DEFAULT_TIMEOUT_S, returning 504 instead of letting the worker
-    hang. Configurable per-path via the PATH_TIMEOUTS map.
+    hang. Configurable per-path via the PATH_TIMEOUTS map. The middleware
+    also protects the privileged /api/advanced surface with a server-side
+    admin token and enforces a fail-closed production CORS boundary.
   • ProcessHealthRouter — adds GET /api/health/detailed with CPU /
     memory / disk numbers so the frontend (or external monitoring)
     can detect resource exhaustion before requests start failing.
@@ -15,6 +17,7 @@ Wired into server.py via:
 """
 from __future__ import annotations
 import asyncio
+import hmac
 import logging
 import os
 import time
@@ -26,6 +29,14 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
 log = logging.getLogger("api.hardening")
+
+# Privileged API boundary. Keep the secret server-side; do not embed it in
+# browser/mobile bundles. An unset or obviously weak token intentionally
+# disables the advanced API instead of falling back to legacy unlock logic.
+ADVANCED_API_PREFIX = "/api/advanced"
+ADVANCED_ADMIN_TOKEN_ENV = "CODEDOCK_ADVANCED_ADMIN_TOKEN"
+ADVANCED_ADMIN_TOKEN_HEADER = "x-codedock-admin-token"
+MIN_ADVANCED_ADMIN_TOKEN_BYTES = 32
 
 # Per-path overrides (longest-prefix match). Paths NOT listed use the
 # middleware-level default_timeout_s. Tune for known slow endpoints.
@@ -52,8 +63,88 @@ def _resolve_timeout(path: str, default: float) -> float:
     return PATH_TIMEOUTS.get(best_key, default)
 
 
+def _is_advanced_api_path(path: str) -> bool:
+    """Match only the privileged route namespace, not look-alike prefixes."""
+    return path == ADVANCED_API_PREFIX or path.startswith(f"{ADVANCED_API_PREFIX}/")
+
+
+def _advanced_api_auth_failure(request: Request) -> JSONResponse | None:
+    """Return a fail-closed auth response, or None for an authorized request."""
+    configured = os.environ.get(ADVANCED_ADMIN_TOKEN_ENV, "").strip()
+    if len(configured.encode("utf-8")) < MIN_ADVANCED_ADMIN_TOKEN_BYTES:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": (
+                    "Advanced API is disabled until a strong "
+                    f"{ADVANCED_ADMIN_TOKEN_ENV} is configured"
+                )
+            },
+            headers={"Cache-Control": "no-store"},
+        )
+
+    supplied = request.headers.get(ADVANCED_ADMIN_TOKEN_HEADER, "")
+    if not supplied or not hmac.compare_digest(
+        supplied.encode("utf-8"), configured.encode("utf-8")
+    ):
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Invalid or missing advanced admin token"},
+            headers={
+                "Cache-Control": "no-store",
+                "WWW-Authenticate": "Bearer",
+            },
+        )
+    return None
+
+
+def _production_mode() -> bool:
+    environment = os.environ.get("ENVIRONMENT", "development").strip().lower()
+    return environment in {"prod", "production"}
+
+
+def _same_origin(request: Request, origin: str) -> bool:
+    """Allow same-origin browser traffic without requiring a CORS entry."""
+    host = request.headers.get("host", "").strip()
+    if not host:
+        return False
+    return origin.rstrip("/") == f"{request.url.scheme}://{host}".rstrip("/")
+
+
+def _cors_origin_failure(request: Request) -> JSONResponse | None:
+    """Enforce an explicit production cross-origin boundary before CORS runs.
+
+    CORS is a browser boundary rather than authentication. This guard prevents
+    a missing/blank/wildcard CORS_ORIGINS value from silently becoming a
+    production allow-all policy while retaining the existing permissive
+    development behavior.
+    """
+    origin = request.headers.get("origin")
+    if not origin or _same_origin(request, origin):
+        return None
+
+    raw = os.environ.get("CORS_ORIGINS", "").strip()
+    if not raw or raw == "*":
+        if not _production_mode():
+            return None
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "Cross-origin API access is not configured"},
+            headers={"Cache-Control": "no-store"},
+        )
+
+    allowed = {item.strip() for item in raw.split(",") if item.strip()}
+    if origin not in allowed:
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "Origin is not allowed"},
+            headers={"Cache-Control": "no-store"},
+        )
+    return None
+
+
 class RequestTimeoutMiddleware(BaseHTTPMiddleware):
-    """Enforce a hard wall-clock timeout on every /api/* request."""
+    """Enforce API timeout, CORS boundary, and privileged advanced API auth."""
 
     def __init__(self, app, default_timeout_s: float = 30.0):
         super().__init__(app)
@@ -63,6 +154,16 @@ class RequestTimeoutMiddleware(BaseHTTPMiddleware):
         # Skip non-API paths (Metro / docs / etc.)
         if not request.url.path.startswith("/api/"):
             return await call_next(request)
+
+        cors_failure = _cors_origin_failure(request)
+        if cors_failure is not None:
+            return cors_failure
+
+        if _is_advanced_api_path(request.url.path):
+            auth_failure = _advanced_api_auth_failure(request)
+            if auth_failure is not None:
+                return auth_failure
+
         timeout = _resolve_timeout(request.url.path, self.default)
         try:
             return await asyncio.wait_for(call_next(request), timeout=timeout)

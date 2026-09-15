@@ -9,13 +9,16 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
+from skeleton.api.command_routes import router as command_router
 from skeleton.api.hmac_seal import require_seal
 from skeleton.api.idempotency import IdempotencyGuard
 from skeleton.api.server import get_state
+from skeleton.application import build_runtime_command_service
 
 router = APIRouter()
+router.include_router(command_router)
 _idempotency = IdempotencyGuard()
 
 
@@ -35,21 +38,25 @@ async def gameforge_intake(request: Dict[str, Any], state=Depends(_state)) -> Di
 
 
 @router.post("/gameforge/run")
-async def gameforge_run(http_request: Request, request: Dict[str, Any], state=Depends(_state), attester: str = Depends(require_seal)) -> Dict[str, Any]:
-    """Run the full game generation pipeline (HMAC sealed, idempotent)."""
+async def gameforge_run(
+    http_request: Request,
+    request: Dict[str, Any],
+    state=Depends(_state),
+    attester: str = Depends(require_seal),
+) -> Dict[str, Any]:
+    """Run GameForge through the shared API/CLI application command service."""
     replay = _idempotency.replay(dict(http_request.headers))
     if replay is not None:
         return replay  # type: ignore[return-value]
 
-    from skeleton.pipelines import GameForge
+    result = build_runtime_command_service(state).execute("run", request)
+    if not result.ok:
+        error = result.error
+        raise HTTPException(
+            status_code=result.http_status,
+            detail=error.to_dict() if error is not None else {"code": "internal_error", "message": "run failed"},
+        )
 
-    forge = GameForge(genesis=state.genesis, bus=state.genesis.bus if state.genesis else None)
-    spec = forge.run(
-        request.get("answers", {}),
-        title=request.get("title"),
-        target=request.get("target", "json"),
-        repair=bool(request.get("repair", False)),
-    )
-    response = {"game": spec.to_dict(), "status": "generated"}
+    response = dict(result.data)
     _idempotency.remember(dict(http_request.headers), response)
     return response

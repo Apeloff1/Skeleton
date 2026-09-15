@@ -77,14 +77,21 @@ def _sha(value: Any) -> str:
 
 
 def _clean(text: str) -> str:
+    """Normalize claim text in linear time while preserving decimal points."""
     text = text.casefold().replace("−", "-").replace("–", "-").replace("—", "-")
-    text = re.sub(r"(?<=\d)\s*%", " percent", text)
-    text = re.sub(r"[^a-z0-9.%+\-/]+", " ", text)
-    # Keep decimal points only when they are between digits. Sentence punctuation
-    # must not become part of a unit token (for example ``milliseconds.``), or a
-    # same-number/different-unit citation can evade structural comparison.
-    text = re.sub(r"(?<!\d)\.|\.(?!\d)", " ", text)
-    return " ".join(text.split())
+    allowed = frozenset("abcdefghijklmnopqrstuvwxyz0123456789+-/")
+    cleaned: list[str] = []
+    last = len(text) - 1
+    for idx, ch in enumerate(text):
+        if ch == "%":
+            cleaned.append(" percent ")
+            continue
+        if ch == ".":
+            is_decimal = idx > 0 and idx < last and text[idx - 1].isdigit() and text[idx + 1].isdigit()
+            cleaned.append("." if is_decimal else " ")
+            continue
+        cleaned.append(ch if ch in allowed else " ")
+    return " ".join("".join(cleaned).split())
 
 
 def _stem(token: str) -> str:

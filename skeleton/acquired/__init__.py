@@ -1,11 +1,8 @@
-"""
-Skeleton Acquired Package
+"""Skeleton acquired capabilities.
 
-Exports:
-- AssetIngestor: Batch asset ingestion
-- AssetLibrary: Asset catalog
-- AssetValidator: Format validation
-- Asset: Asset data type
+The acquired namespace is the quarantine/integration seam for reusable systems
+mined from older Apeloff1 projects. Capabilities live here until they are
+proven stable enough to move into a canonical Skeleton subsystem.
 """
 
 from skeleton.acquired.ingest import (
@@ -14,10 +11,43 @@ from skeleton.acquired.ingest import (
     AssetLibrary,
     AssetValidator,
 )
+from skeleton.acquired.learning import (
+    AdaptiveLearningEngine,
+    DifficultyZone,
+    LearningSignal,
+    ProgressionTracker,
+    Scaffold,
+    ScaffoldType,
+    ZPDResult,
+)
+from skeleton.acquired.resilient_cache import CacheResult, ResilientTTLCache
+from skeleton.acquired.runtime_guard import (
+    AdaptiveGate,
+    AdmissionVerdict,
+    ChaosGovernor,
+    DegradationRung,
+    RuntimePolicy,
+    WorkPriority,
+)
 
 __all__ = [
+    "AdaptiveGate",
+    "AdaptiveLearningEngine",
+    "AdmissionVerdict",
+    "Asset",
     "AssetIngestor",
     "AssetLibrary",
     "AssetValidator",
-    "Asset",
+    "CacheResult",
+    "ChaosGovernor",
+    "DegradationRung",
+    "DifficultyZone",
+    "LearningSignal",
+    "ProgressionTracker",
+    "ResilientTTLCache",
+    "RuntimePolicy",
+    "Scaffold",
+    "ScaffoldType",
+    "WorkPriority",
+    "ZPDResult",
 ]

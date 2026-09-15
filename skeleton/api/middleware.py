@@ -85,11 +85,8 @@ def get_request_id(header_value: Optional[str] = None) -> str:
 DEFAULT_OPEN_PREFIXES: Tuple[str, ...] = (
     "/health",
     "/ready",
-    "/api/v1/health",
     "/api/v1/health/live",
     "/api/v1/health/ready",
-    "/metrics",
-    "/api/v1/metrics",
 )
 
 # Route prefix → governance domain (longest-prefix match).
@@ -111,6 +108,8 @@ DEFAULT_DOMAIN_MAP: Tuple[Tuple[str, str], ...] = (
     ("/api/v1/interface", "interface"),
     ("/api/v1/auth", "auth"),
     ("/api/v1/cortex", "cognition"),
+    ("/api/v1/health", "observability"),
+    ("/api/v1/metrics", "observability"),
     ("/api/fabric", "fabric"),
     ("/api/legions", "legions"),
     ("/api/swarm", "swarm"),
@@ -120,7 +119,28 @@ DEFAULT_DOMAIN_MAP: Tuple[Tuple[str, str], ...] = (
     ("/api/studio", "studio"),
     ("/api/sagas", "fabric"),
     ("/api/court", "court"),
+    ("/cortex", "cognition"),
+    ("/cockpit", "interface"),
+    ("/docs", "interface"),
+    ("/openapi.json", "interface"),
+    ("/redoc", "interface"),
 )
+
+
+def _matches_path_prefix(path: str, prefix: str) -> bool:
+    """Match an exact route or a true child route, never a lookalike prefix.
+
+    Security decisions must respect URL path-segment boundaries: ``/health``
+    may match ``/health/live`` but must not match ``/healthcare``.  The root
+    path is exact-only so configuring ``/`` cannot accidentally unseal the
+    entire application.
+    """
+
+    p = path or "/"
+    pref = (prefix or "").rstrip("/") or "/"
+    if pref == "/":
+        return p == "/"
+    return p == pref or p.startswith(pref + "/")
 
 
 class GatePolicy:
@@ -141,23 +161,11 @@ class GatePolicy:
         self._domains = tuple(sorted(domains, key=lambda pd: len(pd[0]), reverse=True))
 
     def is_open_route(self, path: str) -> bool:
-        p = path or "/"
-        for pref in self._open:
-            if not pref:
-                continue
-            # Bare "/" is exact-only — never a prefix of every path.
-            if pref == "/":
-                if p == "/":
-                    return True
-                continue
-            if p == pref or p.startswith(pref.rstrip("/") + "/") or p.startswith(pref):
-                return True
-        return False
+        return any(pref and _matches_path_prefix(path, pref) for pref in self._open)
 
     def required_domain(self, path: str) -> Optional[str]:
-        p = path or "/"
         for prefix, domain in self._domains:
-            if p == prefix or p.startswith(prefix + "/") or p.startswith(prefix):
+            if prefix and _matches_path_prefix(path, prefix):
                 return domain
         return None
 
@@ -233,33 +241,69 @@ class RequestSealMiddleware:
         await self.app(scope, receive, send_with_seal)
 
 
+class _BodyLimitExceeded(Exception):
+    pass
+
+
 class BodyBoundMiddleware:
-    """Reject oversized bodies with 413 — empire does not read unbounded scrolls."""
+    """Reject bodies that exceed the configured limit, including streamed bodies."""
 
     def __init__(self, app, *, max_body_bytes: Optional[int] = None) -> None:
         self.app = app
         env = os.environ.get("SKELETON_GATE_MAX_BODY_BYTES")
-        self.max_body = (
-            int(env) if env else (max_body_bytes if max_body_bytes is not None else _DEFAULT_MAX_BODY)
+        configured = int(env) if env else (
+            max_body_bytes if max_body_bytes is not None else _DEFAULT_MAX_BODY
         )
+        if configured <= 0:
+            raise ValueError("max body size must be positive")
+        self.max_body = configured
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope.get("headers") or []}
+
+        headers = {
+            k.decode("latin-1").lower(): v.decode("latin-1")
+            for k, v in scope.get("headers") or []
+        }
         cl = headers.get("content-length")
         if cl is not None:
             try:
-                if int(cl) > self.max_body:
-                    resp = _json_response(
-                        413, {"error": "scroll_too_large", "limit": self.max_body}
-                    )
-                    await resp(scope, receive, send)
-                    return
+                declared = int(cl)
             except ValueError:
-                pass
-        await self.app(scope, receive, send)
+                resp = _json_response(400, {"error": "invalid_content_length"})
+                await resp(scope, receive, send)
+                return
+            if declared < 0:
+                resp = _json_response(400, {"error": "invalid_content_length"})
+                await resp(scope, receive, send)
+                return
+            if declared > self.max_body:
+                resp = _json_response(
+                    413, {"error": "scroll_too_large", "limit": self.max_body}
+                )
+                await resp(scope, receive, send)
+                return
+
+        seen = 0
+
+        async def bounded_receive():
+            nonlocal seen
+            message = await receive()
+            if message.get("type") == "http.request":
+                seen += len(message.get("body") or b"")
+                if seen > self.max_body:
+                    raise _BodyLimitExceeded
+            return message
+
+        try:
+            await self.app(scope, bounded_receive, send)
+        except _BodyLimitExceeded:
+            resp = _json_response(
+                413, {"error": "scroll_too_large", "limit": self.max_body}
+            )
+            await resp(scope, receive, send)
 
 
 class WormAuditMiddleware:

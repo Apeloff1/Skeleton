@@ -6,14 +6,14 @@ Order-of-magnitude is the trajectory target. Laws gate every write.
 """
 from __future__ import annotations
 
-import re
 from typing import Any, Dict, List
 
 from skeleton.cortex.antiplag import distill_dialect, guard
 from skeleton.cortex.laws import LawError, check
 from skeleton.cortex.refs import lookup, record_provenance
 
-_LIKE = re.compile(r"\blike\s+(.+)$", re.I)
+MAX_IMPROVE_ROUNDS = 256
+MAX_IMPROVE_STIMULUS_CHARS = 32_768
 
 ASPECTS = {
     "soulslike": (
@@ -49,6 +49,19 @@ ASPECTS = {
 }
 
 
+def _bounded_rounds(value: int) -> int:
+    if isinstance(value, bool):
+        raise ValueError("rounds must be an integer")
+    try:
+        rounds = int(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("rounds must be an integer") from exc
+    rounds = max(1, rounds)
+    if rounds > MAX_IMPROVE_ROUNDS:
+        raise ValueError(f"rounds exceeds safety budget ({MAX_IMPROVE_ROUNDS})")
+    return rounds
+
+
 def _aspects(era: str, title: str) -> List[str]:
     pack = list(ASPECTS.get(era, ASPECTS["soulslike"]))
     pack.append(distill_dialect(title, era))
@@ -56,12 +69,18 @@ def _aspects(era: str, title: str) -> List[str]:
 
 
 def improve(neo, stimulus: str, *, rounds: int = 16) -> Dict[str, Any]:
+    if not isinstance(stimulus, str):
+        raise ValueError("stimulus must be a string")
+    if len(stimulus) > MAX_IMPROVE_STIMULUS_CHARS:
+        raise ValueError(f"stimulus exceeds safety budget ({MAX_IMPROVE_STIMULUS_CHARS} chars)")
+    rounds = _bounded_rounds(rounds)
+
     stim = stimulus or ""
     ref = lookup(stim)
     if ref is None:
-        m = _LIKE.search(stim)
-        if m:
-            ref = lookup(m.group(1))
+        parts = stim.split(None, 1)
+        if len(parts) == 2 and parts[0].casefold() == "like":
+            ref = lookup(parts[1].strip())
     if ref is None:
         return {"improved": 0, "reason": "no-reference", "law": "cite-do-not-copy"}
 
@@ -84,10 +103,10 @@ def improve(neo, stimulus: str, *, rounds: int = 16) -> Dict[str, Any]:
         "rms_steps": int(getattr(rms, "steps", 0) or 0),
     }
     if xf is not None:
-        for _ in range(max(4, int(rounds))):
+        for _ in range(max(4, rounds)):
             xf.fit(texts, lr=0.05, schedule="cosine")
     if rms is not None:
-        for _ in range(max(2, int(rounds) // 2)):
+        for _ in range(max(2, rounds // 2)):
             rms.fit(texts, lr=0.05, schedule="cosine")
     for slot, port in (getattr(neo, "slots", {}) or {}).items():
         xf_s = getattr(port, "transformer", None)
@@ -111,7 +130,7 @@ def improve(neo, stimulus: str, *, rounds: int = 16) -> Dict[str, Any]:
         "citation": ref.get("citation"),
         "stored_prose": 0,
         "law": "ok",
-        "rounds": int(rounds),
+        "rounds": rounds,
         "G0": round(before["G"], 6),
         "G": round(after_g, 6),
         "ratio": round(ratio, 4),

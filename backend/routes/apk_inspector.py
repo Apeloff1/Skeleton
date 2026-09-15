@@ -16,6 +16,7 @@ import zipfile
 import hashlib
 import subprocess
 import shutil
+import tempfile
 from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -30,6 +31,8 @@ router = APIRouter()
 _MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 _DB_NAME = os.environ.get("DB_NAME", "test_database")
 _client: AsyncIOMotorClient | None = None
+_MAX_BUILD_ID_LENGTH = 128
+_SAFE_BUILD_ID_CHARS = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-")
 
 
 def _db():
@@ -37,6 +40,42 @@ def _db():
     if _client is None:
         _client = _SHARED_MONGO_CLIENT  # consolidated → core.databases.client
     return _client[_DB_NAME]
+
+
+def _validate_build_id(build_id: str) -> str:
+    """Accept one bounded artifact identifier and reject path syntax."""
+    value = str(build_id)
+    if value != value.strip() or not value or len(value) > _MAX_BUILD_ID_LENGTH:
+        raise HTTPException(400, "invalid build_id")
+    basename = os.path.basename(value)
+    if basename != value or value in {".", ".."}:
+        raise HTTPException(400, "invalid build_id")
+    if any(ch not in _SAFE_BUILD_ID_CHARS for ch in value):
+        raise HTTPException(400, "invalid build_id")
+    return basename
+
+
+def _artifact_path(build_id: str, kind: str) -> Path:
+    """Resolve a build artifact and prove containment below ARTIFACTS_ROOT."""
+    if kind not in {"apk", "zip"}:
+        raise ValueError("unsupported artifact kind")
+    safe_id = _validate_build_id(build_id)
+    root = os.path.realpath(os.fspath(binary_builder.ARTIFACTS_ROOT))
+    candidate = os.path.realpath(os.path.normpath(os.path.join(root, f"{safe_id}.{kind}")))
+    if not candidate.startswith(root + os.sep):
+        raise HTTPException(400, "artifact path escapes artifact root")
+    return Path(candidate)
+
+
+def _confined_apk_path(apk_path: Path) -> Path:
+    """Normalize and re-check filesystem confinement before APK access."""
+    root = os.path.realpath(os.fspath(binary_builder.ARTIFACTS_ROOT))
+    requested = os.fspath(apk_path)
+    candidate = requested if os.path.isabs(requested) else os.path.join(root, requested)
+    normalized = os.path.realpath(os.path.normpath(candidate))
+    if not normalized.startswith(root + os.sep) or not normalized.endswith(".apk"):
+        raise ValueError("APK path is outside the artifact root")
+    return Path(normalized)
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -50,20 +89,23 @@ async def install_toolchain():
     if not code_execution_enabled():
         return execution_disabled_response("Android toolchain installation")
 
-    import subprocess
-    import os
     installer = "/app/scripts/install_android_toolchain.sh"
     if not os.path.exists(installer):
         raise HTTPException(500, "installer script missing")
     if binary_builder._have_full_apk_toolchain():
         return {"status": "already_installed", "message": "toolchain is fully present"}
-    # Fire and forget
-    subprocess.Popen(
-        ["bash", installer],
-        stdout=open("/tmp/android_install.log", "ab"),
-        stderr=subprocess.STDOUT,
-        start_new_session=True,
-    )
+    # Fire and forget. Keep the command fixed and avoid shell parsing.
+    log_handle = open("/tmp/android_install.log", "ab")
+    try:
+        subprocess.Popen(
+            ["/bin/bash", installer],
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+            shell=False,
+        )
+    finally:
+        log_handle.close()
     return {"status": "started", "message": "installer running in background — poll /api/binary/toolchain or /api/binary/install-toolchain/status"}
 
 
@@ -80,7 +122,7 @@ async def install_toolchain_status():
             fh.seek(max(0, size - 4096))
             tail = fh.read().decode("utf-8", errors="replace")
     except Exception as e:
-        tail = f"(log read error: {e})"
+        tail = f"(log read error: {type(e).__name__})"
     return {
         "running":   not binary_builder._have_full_apk_toolchain() and "=== DONE ===" not in tail,
         "complete":  binary_builder._have_full_apk_toolchain(),
@@ -92,9 +134,10 @@ async def install_toolchain_status():
 async def delete_artifact(build_id: str):
     """Delete the on-disk zip+apk artifacts for build_id. Used to clear out
     stale/non-runnable placeholders from /api/binary/list."""
+    build_id = _validate_build_id(build_id)
     deleted = []
     for kind in ("zip", "apk"):
-        p = binary_builder.ARTIFACTS_ROOT / f"{build_id}.{kind}"
+        p = _artifact_path(build_id, kind)
         if p.exists():
             p.unlink()
             deleted.append(kind)
@@ -111,14 +154,16 @@ async def list_apks():
         for p in sorted(root.glob("*.apk"), key=lambda x: x.stat().st_mtime, reverse=True):
             build_id = p.stem
             try:
+                build_id = _validate_build_id(build_id)
+                if _artifact_path(build_id, "apk") != p.resolve(strict=False):
+                    continue
                 with zipfile.ZipFile(p) as zf:
                     names = set(zf.namelist())
                     has_dex = "classes.dex" in names
                     has_manifest = "AndroidManifest.xml" in names
                     dex_size = zf.getinfo("classes.dex").file_size if has_dex else 0
             except Exception:
-                has_dex = has_manifest = False
-                dex_size = 0
+                continue
             rows.append({
                 "build_id":    build_id,
                 "size_bytes":  p.stat().st_size,
@@ -142,15 +187,18 @@ async def recent_artifacts(limit: int = 5):
         for kind, pattern in (("apk", "*.apk"), ("zip", "*.zip")):
             for p in root.glob(pattern):
                 try:
+                    build_id = _validate_build_id(p.stem)
+                    if _artifact_path(build_id, kind) != p.resolve(strict=False):
+                        continue
                     st = p.stat()
                 except Exception:
                     continue
                 rows.append({
-                    "build_id":     p.stem,
+                    "build_id":     build_id,
                     "kind":         kind,
                     "size_bytes":   st.st_size,
                     "modified_at":  st.st_mtime,
-                    "download_url": f"/api/binary/download/{p.stem}/{kind}",
+                    "download_url": f"/api/binary/download/{build_id}/{kind}",
                 })
     rows.sort(key=lambda r: r["modified_at"], reverse=True)
     sliced = rows[: max(1, min(limit, 20))]
@@ -200,6 +248,10 @@ async def toolchain_status():
 # ─────────────────────────────────────────────────────────────────
 def _inspect_apk(apk_path: Path) -> dict:
     """Pull structural facts out of an APK without unpacking it."""
+    try:
+        apk_path = _confined_apk_path(apk_path)
+    except ValueError:
+        return {"exists": False, "error": "invalid APK path"}
     if not apk_path.exists():
         return {"exists": False}
 
@@ -234,6 +286,9 @@ def _inspect_apk(apk_path: Path) -> dict:
                     out["dex_version"] = head[4:7].decode("latin1", errors="replace") if head[:3] == b"dex" else ""
 
             if out["has_manifest"]:
+                manifest_info = zf.getinfo("AndroidManifest.xml")
+                if manifest_info.file_size > 8 * 1024 * 1024:
+                    raise ValueError("AndroidManifest.xml exceeds inspection limit")
                 mfx = zf.read("AndroidManifest.xml")
                 # AAPT2 binary XML — strings encoded UTF-16LE
                 def _has(s: str) -> bool:
@@ -256,12 +311,26 @@ def _inspect_apk(apk_path: Path) -> dict:
 def _apksigner_verify(apk_path: Path) -> dict:
     if not binary_builder._have_full_apk_toolchain():
         return {"available": False}
-    cmd = [
-        str(binary_builder.BUILD_TOOLS / "apksigner"),
-        "verify", "--verbose", str(apk_path),
-    ]
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        apk_path = _confined_apk_path(apk_path)
+    except ValueError:
+        return {"available": True, "error": "invalid APK path"}
+    apksigner = (binary_builder.BUILD_TOOLS / "apksigner").resolve(strict=False)
+    if not apksigner.exists() or not apksigner.is_file():
+        return {"available": False}
+
+    # Do not feed a request-derived artifact path to a subprocess. Copy the
+    # already-confined APK to an OS-generated temporary path first, so the
+    # command line contains no user-controlled argument.
+    temp_path: str | None = None
+    try:
+        with apk_path.open("rb") as source, tempfile.NamedTemporaryFile(
+            prefix="galaxy-apk-verify-", suffix=".apk", delete=False
+        ) as staged:
+            shutil.copyfileobj(source, staged)
+            temp_path = staged.name
+        cmd = [str(apksigner), "verify", "--verbose", temp_path]
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=30, shell=False, check=False)
         return {
             "available": True,
             "exit_code": r.returncode,
@@ -271,12 +340,19 @@ def _apksigner_verify(apk_path: Path) -> dict:
         }
     except Exception as e:
         return {"available": True, "error": f"{type(e).__name__}: {e}"}
+    finally:
+        if temp_path:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
 
 
 @router.get("/binary/inspect/{build_id}")
 async def inspect_apk(build_id: str):
     """Structural + signature analysis of the most recent APK for build_id."""
-    apk_path = binary_builder.ARTIFACTS_ROOT / f"{build_id}.apk"
+    build_id = _validate_build_id(build_id)
+    apk_path = _artifact_path(build_id, "apk")
     structure = _inspect_apk(apk_path)
     if not structure.get("exists"):
         raise HTTPException(404, f"no apk for build_id {build_id} — call /api/binary/package first")
@@ -331,7 +407,8 @@ def _diagnostic(structure: dict, sig: dict) -> list[str]:
 
 @router.get("/binary/verify/{build_id}")
 async def verify_apk(build_id: str):
-    apk_path = binary_builder.ARTIFACTS_ROOT / f"{build_id}.apk"
+    build_id = _validate_build_id(build_id)
+    apk_path = _artifact_path(build_id, "apk")
     if not apk_path.exists():
         raise HTTPException(404, f"no apk for build_id {build_id}")
     return _apksigner_verify(apk_path)
@@ -340,13 +417,14 @@ async def verify_apk(build_id: str):
 @router.post("/binary/rebuild/{build_id}")
 async def rebuild_apk(build_id: str):
     """Force a fresh re-package (deletes existing artifacts first).
-    
+
     Falls back to a synthesized minimal build dict if galaxy_builds is missing
     the source doc — useful for APKs that were created via the direct
     binary_builder path (test harness, ad-hoc builds)."""
     if not code_execution_enabled():
         return execution_disabled_response("APK rebuild")
 
+    build_id = _validate_build_id(build_id)
     db = _db()
     build = await db.galaxy_builds.find_one({"build_id": build_id}, {"_id": 0})
     if not build:
@@ -372,7 +450,7 @@ async def rebuild_apk(build_id: str):
             }
     # Delete existing artifacts on disk
     for kind in ("zip", "apk"):
-        p = binary_builder.ARTIFACTS_ROOT / f"{build_id}.{kind}"
+        p = _artifact_path(build_id, kind)
         if p.exists():
             p.unlink()
     out = await binary_builder.package_build(build, kinds=["zip", "apk"])

@@ -10,6 +10,11 @@ import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 FULL_DEPLOY_NEEDS = "needs: [skeleton-test, school-jeeves-test, cockpit-smoke, backend-test, backend-import-smoke, frontend]"
+PYTHON_VERSION = "3.11.16"
+NODE_VERSION = "24.20.0"
+UV_REQUIRED_VERSION = "==0.12.15"
+RUFF_CI_VERSION = "0.9.10"
+RUFF_DEV_REQUIREMENT = "ruff>=0.9,<0.17"
 
 PROCESS_TESTS = (
     "test_process_safety_gate.py",
@@ -51,7 +56,7 @@ DEPENDENCY_SECURITY_MARKERS = (
     "python-sbom.cdx.json",
     "Enforce Python vulnerability policy",
     "yarn audit --groups dependencies --level high --json",
-    "anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610",
+    "anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26",
     "format: cyclonedx-json",
     "frontend-sbom.cdx.json",
     "Enforce JavaScript vulnerability policy",
@@ -86,10 +91,18 @@ def pinned_action_count(workflow: str, action: str, generation: str) -> int:
 def main() -> int:
     failures: list[str] = []
 
+    root_project = tomllib.loads(read("pyproject.toml"))
+    require(
+        root_project.get("tool", {}).get("uv", {}).get("required-version") == UV_REQUIRED_VERSION,
+        f"repository uv must be pinned to {UV_REQUIRED_VERSION}",
+        failures,
+    )
+
     backend = tomllib.loads(read("backend/pyproject.toml"))
     project = backend.get("project", {})
     tool = backend.get("tool", {})
     dev = project.get("optional-dependencies", {}).get("dev", [])
+    uv_dev = tool.get("uv", {}).get("dev-dependencies", [])
     test_deps = project.get("optional-dependencies", {}).get("test", [])
     runtime_deps = project.get("dependencies", [])
     requirements = read("backend/requirements.txt")
@@ -100,7 +113,8 @@ def main() -> int:
     require(project.get("requires-python") == ">=3.11", "backend requires Python >=3.11", failures)
     require(tool.get("ruff", {}).get("target-version") == "py311", "Ruff target must be py311", failures)
     require(str(tool.get("mypy", {}).get("python_version")) == "3.11", "mypy target must be 3.11", failures)
-    require(any(re.fullmatch(r"ruff>=0\.9,<0\.10", item) for item in dev), "dev Ruff must be 0.9.x", failures)
+    require(RUFF_DEV_REQUIREMENT in dev, "backend dev Ruff compatibility range drifted", failures)
+    require(RUFF_DEV_REQUIREMENT in uv_dev, "uv dev Ruff compatibility range drifted", failures)
     require(
         any(str(item).startswith("pytest-timeout>=") for item in dev)
         and any(str(item).startswith("pytest-timeout>=") for item in test_deps),
@@ -132,23 +146,45 @@ def main() -> int:
     require("ghcr.io/astral-sh/uv:latest" not in read("backend/Dockerfile"), "backend Docker must not use uv:latest", failures)
 
     ci = read(".github/workflows/ci.yml")
-    require(re.search(r'^\s*PYTHON_VERSION:\s*"3\.11"\s*$', ci, re.MULTILINE) is not None, "CI Python must be 3.11", failures)
-    require(re.search(r'^\s*NODE_VERSION:\s*"24"\s*$', ci, re.MULTILINE) is not None, "CI Node must be 24", failures)
-    require(ci.count('python-version: "3.11"') >= 6, "CI Python jobs must provision Python 3.11", failures)
-    require('node-version: "24"' in ci, "CI frontend must provision Node 24", failures)
+    require(
+        re.search(rf'^\s*PYTHON_VERSION:\s*"{re.escape(PYTHON_VERSION)}"\s*$', ci, re.MULTILINE) is not None,
+        f"CI Python must be pinned to {PYTHON_VERSION}",
+        failures,
+    )
+    require(
+        re.search(rf'^\s*NODE_VERSION:\s*"{re.escape(NODE_VERSION)}"\s*$', ci, re.MULTILINE) is not None,
+        f"CI Node must be pinned to {NODE_VERSION}",
+        failures,
+    )
+    require(
+        ci.count('python-version: "${{ env.PYTHON_VERSION }}"') >= 6,
+        "CI Python jobs must consume the canonical pinned Python version",
+        failures,
+    )
+    require(
+        'node-version: "${{ env.NODE_VERSION }}"' in ci,
+        "CI frontend must consume the canonical pinned Node version",
+        failures,
+    )
     require_all(ci, ("yarn lint:ci", "yarn typecheck", "yarn export:web"), "CI frontend scripts drifted", failures)
     require("python ../scripts/check_toolchain_contract.py" in ci, "CI backend lint must execute the repository toolchain contract", failures)
     require(cancel_false(ci), "CI must keep active validation alive", failures)
     require(
-        pinned_action_count(ci, "actions/checkout", "v4") > 0
-        and pinned_action_count(ci, "actions/setup-python", "v5") > 0
-        and pinned_action_count(ci, "actions/setup-node", "v4") > 0,
+        pinned_action_count(ci, "actions/checkout", "v7.0.1") > 0
+        and pinned_action_count(ci, "actions/setup-python", "v7.0.0") > 0
+        and pinned_action_count(ci, "actions/setup-node", "v7.0.0") > 0,
         "CI must use immutable proven core action generations",
         failures,
     )
-    require(pinned_action_count(ci, "astral-sh/setup-uv", "v4") > 0, "CI uv setup drifted", failures)
-    require(pinned_action_count(ci, "docker/setup-buildx-action", "v3") == 1, "Buildx version/count drifted", failures)
-    require(pinned_action_count(ci, "docker/build-push-action", "v5") == 3, "build-push version/count drifted", failures)
+    require(
+        pinned_action_count(ci, "astral-sh/setup-uv", "v10.1.0") == 3,
+        "CI must use exactly three immutable setup-uv v10.1.0 sites backed by the repository uv pin",
+        failures,
+    )
+    require(ci.count(f'"ruff=={RUFF_CI_VERSION}"') == 2, f"CI Ruff execution must be pinned to {RUFF_CI_VERSION}", failures)
+    require("ruff==0.9.*" not in ci, "CI must not use wildcard Ruff execution", failures)
+    require(pinned_action_count(ci, "docker/setup-buildx-action", "v4.3.0") == 1, "Buildx version/count drifted", failures)
+    require(pinned_action_count(ci, "docker/build-push-action", "v7.3.0") == 3, "build-push version/count drifted", failures)
     require(ci.count('"pydantic>=2.5,<3"') >= 3, "Skeleton/Jeeves/Cockpit CI jobs must install pydantic runtime slice", failures)
     require(ci.count('"pydantic-settings>=2.1,<3"') >= 3, "Skeleton/Jeeves/Cockpit CI jobs must install pydantic-settings runtime slice", failures)
     for required_job in ("skeleton-test", "school-jeeves-test", "cockpit-smoke", "backend-test", "backend-import-smoke", "frontend"):
@@ -156,14 +192,24 @@ def main() -> int:
     require(FULL_DEPLOY_NEEDS in ci, "Docker publishing must fail closed on every critical test/smoke gate", failures)
 
     backend_quality = read(".github/workflows/backend-quality.yml")
-    require('python-version: "3.11"' in backend_quality and '"ruff==0.9.*"' in backend_quality, "Backend Quality toolchain drifted", failures)
+    require(
+        f'python-version: "{PYTHON_VERSION}"' in backend_quality and f'"ruff=={RUFF_CI_VERSION}"' in backend_quality,
+        f"Backend Quality must use Python {PYTHON_VERSION} and Ruff {RUFF_CI_VERSION}",
+        failures,
+    )
+    require("ruff==0.9.*" not in backend_quality, "Backend Quality must not use wildcard Ruff execution", failures)
     require_all(backend_quality, SECURITY_SCRIPTS, "Backend Quality scanner coverage drifted", failures)
     require_all(backend_quality, SECURITY_TESTS, "Backend Quality security regression coverage drifted", failures)
     require("--noconftest" in backend_quality and 'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in backend_quality, "Backend Quality security isolation drifted", failures)
     require(cancel_false(backend_quality), "Backend Quality concurrency drifted", failures)
 
     lint = read(".github/workflows/lint.yml")
-    require(re.search(r"^\s*node-version:\s*24\s*$", lint, re.MULTILINE) is not None and "yarn lint:ci" in lint, "Lint toolchain drifted", failures)
+    require(
+        re.search(rf'^\s*node-version:\s*"?{re.escape(NODE_VERSION)}"?\s*$', lint, re.MULTILINE) is not None
+        and "yarn lint:ci" in lint,
+        f"Lint must use Node {NODE_VERSION} and the canonical lint command",
+        failures,
+    )
     require(cancel_false(lint), "Lint concurrency drifted", failures)
 
     dependency_security = read(".github/workflows/dependency-security.yml")

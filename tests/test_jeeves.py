@@ -34,7 +34,7 @@ class TestJeevesCore:
         reply = j.ask(s.session_id, "What is recursion?")
         assert isinstance(reply, str) and reply
         j.close_session(s.session_id)
-        assert not j.get_session(s.session_id).is_open if hasattr(j, "get_session") else True
+        assert not j.get_session(s.session_id).is_open
 
     def test_turn_limit(self):
         j = Jeeves(max_turns=2)
@@ -200,4 +200,3 @@ class TestBuilder:
         assert "moe" in st and "callosum" in st and "sleep" in st and "rl" in st
         assert st["moe"]["experts"]["left"]["head_kind"] == "numeric"
         assert st["moe"]["experts"]["right"]["head_kind"] == "bias"
-

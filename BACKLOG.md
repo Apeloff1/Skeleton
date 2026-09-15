@@ -1,6 +1,6 @@
 # Skeleton Backlog — failed-commit register + forward work
 
-Updated 2026-09-12 (gap hunt refresh). Original register dated 2026-09-01. Two sections: things that failed and were recovered
+Updated 2026-09-15 (F-6/F-13 reconciliation). Original register dated 2026-09-01. Two sections: things that failed and were recovered
 (so the failure modes stay visible), and the frontier backlog (what to
 build next, ordered).
 
@@ -31,8 +31,9 @@ Those planes are out-of-scope for this register — audit separately.
 
 ## 2. Frontier backlog — ordered by leverage
 
-Updated 2026-09-12 (Lany gap hunt). Tier-1 seams F-1..F-5 and Tier-2
-F-8..F-10 are **landed**; do not re-open them without a regression.
+Updated 2026-09-15. Tier-1 seams F-1..F-10, the Tier-2 F-6 frontier push,
+and F-13 economic/cascade reconciliation are **landed**; do not re-open them
+without a regression.
 
 ### Landed (keep visible — failure modes + PR anchors)
 
@@ -43,47 +44,55 @@ F-8..F-10 are **landed**; do not re-open them without a regression.
 | F-3 Rot-triggered compaction | #4 | `/memory/query` + `RotGuardedCompactor` |
 | F-4 HandoffRegistry × AgentMesh | #6 | `skeleton/swarm/mesh_handoff.py` |
 | F-5 forge VerificationLoop | #7 / #28 | materialise revise-until-green + E2E deepen |
+| F-6 Mixture-of-Depths | #290 | opt-in residual-RMS per-token depth routing + depth telemetry/profiler |
+| F-7 skills-as-files context | #224 | fresh disk reload loop + bounded context cards + GameForge bank bridge |
 | F-8 blackboard poison guards | #18 | provenance + quarantine |
 | F-9 N+1 tool-call suppression | #20 | compose `kernel/dedup.py` |
 | F-10 PromptImproveDriver | #31 | ImproveLoop over prefix variants |
+| F-13 EconomicOptimiser × CascadeRouter | #277 | shared economic model registry, cascade planning, real model IDs, budget/cost accounting |
 | P6 policy enforcement | #13 | CodeVerifier + repair/verify gates |
 
-### Live ops gaps (block merges — fill before new frontier)
+### Live ops state — resolved blockers, keep green
 
-1. **CI-1. Jeeves import + CLI shims** — `pipeline` imports `Jeeves` but
-   `jeeves.core` only exports `JeevesCore`; CLI lost `eras`/`plan`/`cockpit`/`walk`.
-   Owned by Not Soo Old Git (extend-only PR in flight). Blocks PR #29.
-2. **CI-2. Draft PR #25 cortex restore** — still GameForge-red + conflicting
-   with main; rebase after CI-1.
-3. **CI-3. PR #29 cockpit-smoke CI wire** — ready once CI-1 lands.
+The previous CI-1..CI-3 blockers are no longer active backlog items. Keep
+them as regression contracts rather than re-opening stale branches.
 
-### Tier 2 — frontier pushes (next differentiating work)
+1. **CI-1. Jeeves import + CLI shims — RESOLVED.** Current main exports
+   `Jeeves` from `skeleton/jeeves/core.py`, and the canonical CI job executes
+   `python -m skeleton eras`, `plan`, `cockpit`, and `walk` as smoke gates.
+2. **CI-2. Cortex restore — RESOLVED.** PR #25 merged on 2026-09-12,
+   restoring the full cortex API and the GameForge-facing compatibility path.
+3. **CI-3. Cockpit smoke CI wire — RESOLVED ON MAIN.** PR #29 itself was
+   closed without merge, but current `.github/workflows/ci.yml` contains the
+   dedicated `cockpit-smoke` job and runs `scripts/cockpit-smoke.sh`.
 
-4. **F-6. Mixture-of-depths for the neo transformer** — dynamic per-token
-   compute allocation in `cortex/transformer.py`. Note: `cortex/moe.py` is
-   Mixture-of-*Experts* (different); MoD is still open.
-5. **F-7. Skills-as-files context architecture** — reload task state from
-   disk each fresh-context iteration instead of growing one context forever.
-   Adjacent: `organism/context_loop.py` + gameforge skill banks; no skeleton
-   skills-as-files reload loop yet.
+Recent backlog hygiene on 2026-09-15 also retired stale overlapping work:
+issue #255 was completed by merged PR #257, PR #237 was superseded by merged
+#247, and the competing F-6 branches #133/#260 were retired in favor of merged
+#290.
 
-### Tier 3 — structural (bigger, schedule carefully)
+### Tier 2 — frontier push — LANDED
 
-6. **F-11. Track E cleanup** — root sprawl moves, SEVEN_BY physical moves,
+**F-6. Mixture-of-Depths for the neo transformer — LANDED via #290.** The
+current implementation adds dynamic per-token inference depth while preserving
+the full-depth path, training/backprop, and snapshot interchange. `cortex/moe.py`
+remains Mixture-of-*Experts* and is a separate mechanism.
+
+### Tier 3 — structural (next work, schedule carefully)
+
+1. **F-11. Track E cleanup** — root sprawl moves, SEVEN_BY physical moves,
    godot binary to LFS, shim deletion. Local git ops.
-7. **F-12. H5.4 cortex persistence** — genesis twin vs live singleton once
+2. **F-12. H5.4 cortex persistence** — genesis twin vs live singleton once
    `$SKELETON_OWN` exists in the container.
-8. **F-13. EconomicOptimiser audit** — `intelligence/economic.py` predates
-   the cascade router; reconcile the two routing contracts.
-9. **F-14. Speculative RAG** — pre-fetch likely-needed documents during
+3. **F-14. Speculative RAG** — pre-fetch likely-needed documents during
    the planning phase of a pipeline run (compose quad + composer).
    Adjacent: `cortex/speculate.py` is token continuation, not RAG prefetch.
-10. **F-15. Organism/social/galaxy plane audit** — the repo grew three
-    planes while the waves landed (see §1 drift note). Same size-filtered
-    read methodology as the deep-cut campaign, when their churn settles.
+4. **F-15. Organism/social/galaxy plane audit** — the repo grew three
+   planes while the waves landed (see §1 drift note). Same size-filtered
+   read methodology as the deep-cut campaign, when their churn settles.
 
 ## Definition of SOTA (working)
 
-Tier-1 SOTA seams (F-2..F-5, F-10) are landed in code. Remaining bar:
-main CI green (CI-1..CI-3), then Tier-2 differentiation (F-6 MoD, F-7
-skills-as-files) where the system stops catching up and starts pushing.
+Tier-1 SOTA seams, F-6 Mixture-of-Depths, and F-13 economic/cascade
+reconciliation are landed in code. The former CI-1..CI-3 blockers are resolved
+on main; the remaining structural queue is F-11, F-12, F-14, then F-15.

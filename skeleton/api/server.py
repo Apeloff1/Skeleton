@@ -4,6 +4,7 @@ Skeleton API Server — FastAPI application factory and state management.
 
 from __future__ import annotations
 
+import os
 from dataclasses import asdict, is_dataclass
 from threading import RLock
 from typing import Any, Dict, Optional
@@ -229,6 +230,33 @@ def get_state() -> ServerState:
     return _state
 
 
+_DEV_OPEN_PREFIXES = (
+    "/cortex/status",
+    "/cockpit",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+    "/api/v1/health",
+    "/api/v1/metrics",
+    "/api/v1/genesis",
+)
+
+
+def _public_dev_surfaces_enabled() -> bool:
+    return os.environ.get("SKELETON_PUBLIC_DEV_SURFACES", "").strip().lower() in {
+        "1", "true", "yes", "on",
+    }
+
+
+def _gate_open_prefixes() -> tuple[str, ...]:
+    from skeleton.api.middleware import DEFAULT_OPEN_PREFIXES
+
+    prefixes = DEFAULT_OPEN_PREFIXES + ("/",)
+    if _public_dev_surfaces_enabled():
+        prefixes += _DEV_OPEN_PREFIXES
+    return prefixes
+
+
 def create_app() -> Any:
     fastapi = _get_fastapi()
     app = fastapi.FastAPI(title="Skeleton API", version="16.0.0", description="AI game engine / agent orchestration framework")
@@ -264,8 +292,8 @@ def create_app() -> Any:
     app.include_router(swarm_recovery_archive_router, prefix="/api/v1")
     app.include_router(cockpit_router)
 
-    from skeleton.api.middleware import DEFAULT_OPEN_PREFIXES, GatePolicy, install_gate
-    gate_policy = GatePolicy(open_prefixes=DEFAULT_OPEN_PREFIXES + ("/", "/cortex/status", "/cockpit", "/docs", "/openapi.json", "/redoc"))
+    from skeleton.api.middleware import GatePolicy, install_gate
+    gate_policy = GatePolicy(open_prefixes=_gate_open_prefixes())
     install_gate(app, policy=gate_policy)
 
     @app.on_event("startup")
@@ -277,23 +305,25 @@ def create_app() -> Any:
 
     @app.get("/")
     async def root():
-        state = get_state()
-        return {
-            "name": "Skeleton", "version": "16.0.0", "status": "running",
-            "jeeves_provider": state.jeeves.provider_name if state.jeeves else None,
-            "cockpit": "/cockpit", "swarm": "/api/v1/swarm/status",
-            "swarm_operator": "/api/v1/swarm/operator/overview",
-            "swarm_policy": "/api/v1/swarm/policy/admission-preview",
-            "swarm_lifecycle": "/api/v1/swarm/lifecycle/pressure",
-            "swarm_integrity": "/api/v1/swarm/integrity/audit",
-            "swarm_fenced": "/api/v1/swarm/fenced/workers/{worker_id}/tasks/{task_id}/success",
-            "swarm_supervisor": "/api/v1/swarm/supervisor/status",
-            "swarm_broker": "/api/v1/swarm/broker/status",
-            "swarm_batch": "/api/v1/swarm/batch/submit",
-            "swarm_ingress": "/api/v1/swarm/ingress/status",
-            "swarm_tenant_broker": "/api/v1/swarm/tenant-broker/status",
-            "swarm_recovery_archive": "/api/v1/swarm/recovery/archive",
-        }
+        body = {"name": "Skeleton", "version": "16.0.0", "status": "running"}
+        if _public_dev_surfaces_enabled():
+            state = get_state()
+            body.update({
+                "jeeves_provider": state.jeeves.provider_name if state.jeeves else None,
+                "cockpit": "/cockpit", "swarm": "/api/v1/swarm/status",
+                "swarm_operator": "/api/v1/swarm/operator/overview",
+                "swarm_policy": "/api/v1/swarm/policy/admission-preview",
+                "swarm_lifecycle": "/api/v1/swarm/lifecycle/pressure",
+                "swarm_integrity": "/api/v1/swarm/integrity/audit",
+                "swarm_fenced": "/api/v1/swarm/fenced/workers/{worker_id}/tasks/{task_id}/success",
+                "swarm_supervisor": "/api/v1/swarm/supervisor/status",
+                "swarm_broker": "/api/v1/swarm/broker/status",
+                "swarm_batch": "/api/v1/swarm/batch/submit",
+                "swarm_ingress": "/api/v1/swarm/ingress/status",
+                "swarm_tenant_broker": "/api/v1/swarm/tenant-broker/status",
+                "swarm_recovery_archive": "/api/v1/swarm/recovery/archive",
+            })
+        return body
 
     @app.get("/cortex/status")
     async def cortex_status():

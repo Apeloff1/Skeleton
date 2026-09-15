@@ -18,14 +18,14 @@ fakes. Cost accounting is included so routing decisions are auditable.
 
 from __future__ import annotations
 
-import math
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any, Callable, Dict
 
 
 @dataclass(frozen=True)
 class ModelResponse:
     """One model's answer with its self-reported confidence."""
+
     text: str
     confidence: float
 
@@ -35,6 +35,7 @@ ModelFn = Callable[[str], ModelResponse]
 
 def difficulty_estimate(query: str) -> float:
     """0..1 difficulty from surface features — no model call required."""
+
     q = (query or "").strip()
     if not q:
         return 0.0
@@ -47,16 +48,28 @@ def difficulty_estimate(query: str) -> float:
         structure += 0.25
     if "?" in q:
         structure += 0.15
-    if any(w.lower() in {"prove", "derive", "optimize", "debug", "refactor",
-                         "architect", "formal", "theorem", "constraint"}
-           for w in words):
+    if any(
+        w.lower()
+        in {
+            "prove",
+            "derive",
+            "optimize",
+            "debug",
+            "refactor",
+            "architect",
+            "formal",
+            "theorem",
+            "constraint",
+        }
+        for w in words
+    ):
         structure += 0.35
     return min(1.0, 0.45 * length_score + 0.30 * vocab_score + structure)
 
 
 @dataclass
 class RouteDecision:
-    model: str                      # which model actually answered
+    model: str
     text: str
     confidence: float
     escalated: bool
@@ -74,7 +87,13 @@ class RouteDecision:
 
 
 class CascadeRouter:
-    """Cheap-first routing with difficulty pre-check and confidence escalation."""
+    """Cheap-first routing with difficulty pre-check and confidence escalation.
+
+    ``cheap_name`` and ``strong_name`` default to the historical role labels,
+    but callers that own a model registry can provide stable model IDs.  This
+    keeps route telemetry aligned with economic/model-registry decisions while
+    preserving the original API for existing callers.
+    """
 
     def __init__(
         self,
@@ -85,13 +104,26 @@ class CascadeRouter:
         escalate_below: float = 0.55,
         cheap_cost: float = 1.0,
         strong_cost: float = 10.0,
+        cheap_name: str = "cheap",
+        strong_name: str = "strong",
     ) -> None:
+        if not 0.0 <= route_threshold <= 1.0:
+            raise ValueError("route_threshold must be in [0, 1]")
+        if not 0.0 <= escalate_below <= 1.0:
+            raise ValueError("escalate_below must be in [0, 1]")
+        if cheap_cost < 0 or strong_cost < 0:
+            raise ValueError("model costs must be non-negative")
+        if not cheap_name or not strong_name:
+            raise ValueError("model names must be non-empty")
+
         self.cheap = cheap
         self.strong = strong
         self.route_threshold = route_threshold
         self.escalate_below = escalate_below
         self.cheap_cost = cheap_cost
         self.strong_cost = strong_cost
+        self.cheap_name = cheap_name
+        self.strong_name = strong_name
         self.decisions = 0
         self.escalations = 0
         self.strong_direct = 0
@@ -99,6 +131,7 @@ class CascadeRouter:
 
     def route(self, query: str) -> RouteDecision:
         """Answer the query with the cheapest model that can handle it."""
+
         self.decisions += 1
         difficulty = difficulty_estimate(query)
 
@@ -107,24 +140,36 @@ class CascadeRouter:
             self.total_cost += self.strong_cost
             resp = self.strong(query)
             return RouteDecision(
-                model="strong", text=resp.text, confidence=resp.confidence,
-                escalated=False, difficulty=difficulty, reason="difficulty_threshold",
+                model=self.strong_name,
+                text=resp.text,
+                confidence=resp.confidence,
+                escalated=False,
+                difficulty=difficulty,
+                reason="difficulty_threshold",
             )
 
         self.total_cost += self.cheap_cost
         resp = self.cheap(query)
         if resp.confidence >= self.escalate_below:
             return RouteDecision(
-                model="cheap", text=resp.text, confidence=resp.confidence,
-                escalated=False, difficulty=difficulty, reason="cheap_confident",
+                model=self.cheap_name,
+                text=resp.text,
+                confidence=resp.confidence,
+                escalated=False,
+                difficulty=difficulty,
+                reason="cheap_confident",
             )
 
         self.escalations += 1
         self.total_cost += self.strong_cost
         resp = self.strong(query)
         return RouteDecision(
-            model="strong", text=resp.text, confidence=resp.confidence,
-            escalated=True, difficulty=difficulty, reason="confidence_escalation",
+            model=self.strong_name,
+            text=resp.text,
+            confidence=resp.confidence,
+            escalated=True,
+            difficulty=difficulty,
+            reason="confidence_escalation",
         )
 
     def stats(self) -> Dict[str, Any]:

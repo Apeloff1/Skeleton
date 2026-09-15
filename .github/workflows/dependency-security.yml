@@ -8,6 +8,10 @@ on:
       - "backend/pyproject.toml"
       - "frontend/package.json"
       - "frontend/yarn.lock"
+      - "frontend/scripts/patch-node-modules.js"
+      - "frontend/scripts/verify-image-size-security.js"
+      - "frontend/scripts/enforce-yarn-audit.js"
+      - "frontend/scripts/test-enforce-yarn-audit.js"
       - ".github/workflows/dependency-security.yml"
   pull_request:
     paths:
@@ -15,6 +19,10 @@ on:
       - "backend/pyproject.toml"
       - "frontend/package.json"
       - "frontend/yarn.lock"
+      - "frontend/scripts/patch-node-modules.js"
+      - "frontend/scripts/verify-image-size-security.js"
+      - "frontend/scripts/enforce-yarn-audit.js"
+      - "frontend/scripts/test-enforce-yarn-audit.js"
       - ".github/workflows/dependency-security.yml"
   workflow_dispatch:
 
@@ -61,7 +69,7 @@ jobs:
 
       - name: Upload Python SBOM
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: python-cyclonedx-sbom
           path: ${{ runner.temp }}/python-sbom.cdx.json
@@ -92,19 +100,28 @@ jobs:
         working-directory: frontend
         run: yarn install --frozen-lockfile --non-interactive
 
+      - name: Test JavaScript audit policy parser
+        working-directory: frontend
+        run: yarn audit:policy:test
+
+      - name: Verify image-size parser progress mitigation
+        id: image-size-security
+        working-directory: frontend
+        run: node scripts/verify-image-size-security.js
+
       - name: Audit production JavaScript dependencies
         id: yarn-audit
         working-directory: frontend
         shell: bash
         run: |
           set +e
-          yarn audit --groups dependencies --level high --json > "$RUNNER_TEMP/yarn-audit.json"
-          status=$?
+          yarn audit --groups dependencies --level high --json | tee "$RUNNER_TEMP/yarn-audit.json"
+          status=${PIPESTATUS[0]}
           echo "status=$status" >> "$GITHUB_OUTPUT"
           exit 0
 
       - name: Generate Yarn-aware CycloneDX SBOM
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0 / Syft v1.42.3
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0 / Syft v1.42.3
         with:
           path: frontend
           format: cyclonedx-json
@@ -115,7 +132,7 @@ jobs:
 
       - name: Upload frontend audit and SBOM
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: frontend-dependency-security
           path: |
@@ -124,8 +141,23 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Enforce JavaScript vulnerability policy
+      - name: Validate nonzero Yarn audit status before policy evaluation
         if: steps.yarn-audit.outputs.status != '0'
+        env:
+          YARN_AUDIT_STATUS: ${{ steps.yarn-audit.outputs.status }}
+        shell: bash
         run: |
-          echo "JavaScript dependency audit reported vulnerabilities." >&2
-          exit 1
+          case "$YARN_AUDIT_STATUS" in
+            ''|*[!0-9]*)
+              echo "Yarn audit did not produce a numeric severity mask." >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Enforce JavaScript vulnerability policy
+        if: always()
+        env:
+          IMAGE_SIZE_SECURITY_VERIFIED: ${{ steps.image-size-security.outcome }}
+          YARN_AUDIT_STATUS: ${{ steps.yarn-audit.outputs.status }}
+        working-directory: frontend
+        run: node scripts/enforce-yarn-audit.js "$RUNNER_TEMP/yarn-audit.json"
