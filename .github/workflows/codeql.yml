@@ -6,8 +6,13 @@ on:
     paths:
       - '**/*.py'
       - '**/*.pyi'
+      - '**/*.js'
+      - '**/*.jsx'
+      - '**/*.mjs'
+      - '**/*.cjs'
+      - '**/*.ts'
+      - '**/*.tsx'
       - '!satellites/branch-snapshots/**'
-      - '!satellites/**/branch-snapshots/**'
       - '.github/workflows/codeql.yml'
       - '.github/codeql/**'
   pull_request:
@@ -15,8 +20,13 @@ on:
     paths:
       - '**/*.py'
       - '**/*.pyi'
+      - '**/*.js'
+      - '**/*.jsx'
+      - '**/*.mjs'
+      - '**/*.cjs'
+      - '**/*.ts'
+      - '**/*.tsx'
       - '!satellites/branch-snapshots/**'
-      - '!satellites/**/branch-snapshots/**'
       - '.github/workflows/codeql.yml'
       - '.github/codeql/**'
   schedule:
@@ -30,9 +40,13 @@ concurrency:
 
 jobs:
   analyze:
-    name: Analyze Python
+    name: Analyze ${{ matrix.language }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
     permissions:
       contents: read
       security-events: write
@@ -43,8 +57,8 @@ jobs:
           persist-credentials: false
       - uses: github/codeql-action/init@1924dbb54c8599653d1df67c56e12c9c2637a997 # v4.1.1
         with:
-          languages: python
+          languages: ${{ matrix.language }}
           config-file: ./.github/codeql/codeql-config.yml
       - uses: github/codeql-action/analyze@1924dbb54c8599653d1df67c56e12c9c2637a997 # v4.1.1
         with:
-          category: "/language:python"
+          category: "/language:${{ matrix.language }}"
