@@ -133,6 +133,7 @@ jobs:
           tests/test_workflow_event_context_security.py
           tests/test_workflow_quoted_key_security.py
           tests/test_workflow_flow_uses_security.py
+          tests/test_workflow_trigger_security.py
           tests/test_secret_hygiene_gate.py
           tests/test_malware_ioc_gate.py
           tests/test_developer_tooling_security.py
