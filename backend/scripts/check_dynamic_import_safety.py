@@ -238,14 +238,18 @@ def violations(path: Path) -> list[str]:
 
 def main() -> int:
     findings: list[str] = []
+    scanned = 0
     for path in python_files():
+        scanned += 1
         findings.extend(violations(path))
+    if scanned == 0:
+        findings.append("scanner coverage failure: no backend Python files were scanned")
     if findings:
         print("Dynamic import safety violations detected:", file=sys.stderr)
         for finding in findings:
             print(f"  - {finding}", file=sys.stderr)
         return 1
-    print("Dynamic import safety gate passed.")
+    print(f"Dynamic import safety gate passed across {scanned} backend Python files.")
     return 0
 
 
