@@ -43,3 +43,4 @@ jobs:
           python -m pytest -q --noconftest
           backend/security_tests/test_edge_middleware.py
           backend/security_tests/test_edge_middleware_hardening.py
+          backend/security_tests/test_edge_middleware_properties.py
