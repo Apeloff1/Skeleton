@@ -8,9 +8,11 @@ Provides project templates and scaffolding for:
   - api-gateway        : REST API service template
 """
 
-import os
-import shutil
-from typing import Dict, Any
+from __future__ import annotations
+
+import re
+from pathlib import Path
+from typing import Any, Dict
 
 
 TEMPLATES: Dict[str, Dict[str, Any]] = {
@@ -160,34 +162,84 @@ python main.py
     },
 }
 
+_PROJECT_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
 
 def list_templates() -> Dict[str, Dict[str, Any]]:
     """Return available template metadata."""
-    return {k: {"description": v["description"]} for k, v in TEMPLATES.items()}
+    return {key: {"description": value["description"]} for key, value in TEMPLATES.items()}
+
+
+def _validate_project_name(name: str) -> str:
+    """Return a safe single-directory project name or raise ValueError."""
+    if name in {".", ".."} or not _PROJECT_NAME.fullmatch(name):
+        raise ValueError(
+            "project name must be a single path-safe name using letters, numbers, '.', '_' or '-'"
+        )
+    return name
 
 
 class ScaffoldEngine:
     """Engine for scaffolding new projects from templates."""
 
-    def __init__(self, output_dir: str = "."):
-        self.output_dir = output_dir
+    def __init__(self, output_dir: str | Path = "."):
+        self.output_dir = Path(output_dir)
+
+    def list_templates(self) -> Dict[str, Dict[str, Any]]:
+        """Return template metadata through the engine API."""
+        return list_templates()
+
+    def _project_dir(self, name: str) -> Path:
+        safe_name = _validate_project_name(name)
+        root = self.output_dir.expanduser().resolve()
+        candidate = (root / safe_name).resolve()
+        if candidate.parent != root:
+            raise ValueError("project path escapes configured output directory")
+        return candidate
+
+    def scaffold(self, template: str, name: str, *, force: bool = False) -> Path:
+        """Materialize a template and return the created project directory."""
+        if template not in TEMPLATES:
+            available = ", ".join(sorted(TEMPLATES))
+            raise ValueError(f"unknown template {template!r}; available: {available}")
+
+        project_dir = self._project_dir(name)
+        if project_dir.is_symlink():
+            raise ValueError("refusing to scaffold through a symlinked project path")
+        if project_dir.exists() and not force:
+            raise FileExistsError(f"directory {str(project_dir)!r} already exists")
+        if project_dir.exists() and not project_dir.is_dir():
+            raise ValueError("project destination exists and is not a directory")
+
+        project_dir.mkdir(parents=True, exist_ok=True)
+        template_spec = TEMPLATES[template]
+        for filename, content in template_spec["files"].items():
+            target = project_dir / filename
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content, encoding="utf-8")
+
+        return project_dir
+
+    def validate_project(self, project_dir: str | Path) -> Dict[str, Any]:
+        """Return deterministic structural validation for a generated project."""
+        path = Path(project_dir)
+        required = ("main.py", "README.md")
+        missing = [name for name in required if not (path / name).is_file()]
+        python_files = sorted(
+            child.relative_to(path).as_posix()
+            for child in path.rglob("*.py")
+            if child.is_file()
+        ) if path.is_dir() else []
+        return {
+            "valid": path.is_dir() and not missing and bool(python_files),
+            "missing": missing,
+            "python_files": python_files,
+        }
 
     def create_project(self, template: str, name: str, force: bool = False) -> str:
-        """Create a new project from a template."""
-        if template not in TEMPLATES:
-            available = ", ".join(TEMPLATES.keys())
-            return f"Unknown template '{template}'. Available: {available}"
-
-        project_dir = os.path.join(self.output_dir, name)
-        if os.path.exists(project_dir) and not force:
-            return f"Directory '{project_dir}' exists. Use --force to overwrite."
-
-        os.makedirs(project_dir, exist_ok=True)
-        tmpl = TEMPLATES[template]
-
-        for filename, content in tmpl["files"].items():
-            filepath = os.path.join(project_dir, filename)
-            with open(filepath, "w") as f:
-                f.write(content)
-
+        """Backward-compatible string-returning wrapper around :meth:`scaffold`."""
+        try:
+            project_dir = self.scaffold(template, name, force=force)
+        except (FileExistsError, ValueError) as exc:
+            return str(exc)
         return f"Created '{template}' project at {project_dir}"
