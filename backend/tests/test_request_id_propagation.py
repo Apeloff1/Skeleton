@@ -1,11 +1,12 @@
 """Regression coverage for request ID validation and propagation."""
 
 import asyncio
+import json
 
 from starlette.requests import Request
 from starlette.responses import Response
 
-from api_middleware import RequestIdMiddleware
+from api_middleware import RateLimiterMiddleware, RequestIdMiddleware
 
 
 def _request(request_ids: str | list[str] | None) -> Request:
@@ -49,12 +50,39 @@ def _run(request_ids: str | list[str] | None) -> tuple[str, str, str]:
     return asyncio.run(exercise())
 
 
+def _run_rate_limited(request_ids: str | list[str] | None) -> tuple[str, str, str]:
+    request = _request(request_ids)
+    limiter = RateLimiterMiddleware(object(), per_minute=1, burst=1)
+    consumed, _ = limiter._bucket_for("192.0.2.10").take()
+    assert consumed
+
+    async def should_not_run(_request: Request) -> Response:
+        raise AssertionError("rate-limited request reached the downstream app")
+
+    response = asyncio.run(limiter.dispatch(request, should_not_run))
+    payload = json.loads(response.body)
+    assert response.status_code == 429
+    return (
+        request.state.request_id,
+        response.headers["x-request-id"],
+        payload["request_id"],
+    )
+
+
 def _assert_generated(request_ids: str | list[str] | None) -> str:
     state_id, response_id, handler_id = _run(request_ids)
     assert response_id == state_id == handler_id
     assert len(state_id) == 32
     assert state_id.isascii()
     assert state_id.isalnum()
+    int(state_id, 16)
+    return state_id
+
+
+def _assert_generated_triplet(values: tuple[str, str, str]) -> str:
+    state_id, response_id, body_id = values
+    assert response_id == state_id == body_id
+    assert len(state_id) == 32
     int(state_id, 16)
     return state_id
 
@@ -101,3 +129,18 @@ def test_identical_duplicate_request_id_headers_are_still_ambiguous() -> None:
 def test_generated_ids_do_not_repeat_across_small_adversarial_sample() -> None:
     generated = {_assert_generated(None) for _ in range(128)}
     assert len(generated) == 128
+
+
+def test_rate_limit_short_circuit_preserves_safe_request_id() -> None:
+    state_id, response_id, body_id = _run_rate_limited("trace-rate-limit:1")
+    assert state_id == "trace-rate-limit:1"
+    assert response_id == state_id == body_id
+
+
+def test_rate_limit_short_circuit_rejects_duplicate_request_ids() -> None:
+    generated = _assert_generated_triplet(_run_rate_limited(["first", "second"]))
+    assert generated not in {"first", "second"}
+
+
+def test_rate_limit_short_circuit_generates_id_when_missing() -> None:
+    _assert_generated_triplet(_run_rate_limited(None))
