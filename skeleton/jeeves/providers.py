@@ -88,7 +88,9 @@ class LocalEchoProvider:
     """
 
     name = "local-echo"
-    supports_system_prompt = True
+    # This provider does not interpret a separate system channel. Advertising
+    # native support causes JeevesCore to drop the mode policy on fallback.
+    supports_system_prompt = False
 
     def __init__(self, retriever: Optional[Any] = None):
         self._retriever = retriever  # QuadRetriever or MemoryTrinity
