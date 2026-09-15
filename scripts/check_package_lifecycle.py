@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
+"""Reject unreviewed package-manager lifecycle hooks in tracked manifests."""
+
 from __future__ import annotations
 
 import json
 import subprocess
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
 LIFECYCLE_NAMES = {
     "preinstall",
     "install",
@@ -20,22 +23,47 @@ ALLOWED = {
 
 
 def tracked_package_files() -> list[str]:
-    output = subprocess.check_output(["git", "ls-files", "*package.json"], text=True)
-    return [line for line in output.splitlines() if line]
+    result = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=REPO_ROOT,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    return [
+        entry.decode("utf-8", errors="surrogateescape")
+        for entry in result.stdout.split(b"\0")
+        if entry and entry.decode("utf-8", errors="surrogateescape").endswith("package.json")
+    ]
 
 
 def violations() -> list[str]:
     findings: list[str] = []
     for package_file in tracked_package_files():
-        payload = json.loads(Path(package_file).read_text(encoding="utf-8"))
+        path = REPO_ROOT / package_file
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            findings.append(f"{package_file}: cannot safely parse manifest: {exc}")
+            continue
+
+        if not isinstance(payload, dict):
+            findings.append(f"{package_file}: manifest root must be an object")
+            continue
+
         scripts = payload.get("scripts", {})
         if not isinstance(scripts, dict):
             findings.append(f"{package_file}: scripts must be an object")
             continue
-        for name in LIFECYCLE_NAMES:
+
+        for name in sorted(LIFECYCLE_NAMES):
             if name not in scripts:
                 continue
-            if ALLOWED.get((package_file, name)) != scripts[name]:
+            command = scripts[name]
+            if not isinstance(command, str):
+                findings.append(f"{package_file}: lifecycle hook {name!r} must be a string")
+                continue
+            if ALLOWED.get((package_file, name)) != command:
                 findings.append(f"{package_file}: unapproved lifecycle hook {name!r}")
     return findings
 
