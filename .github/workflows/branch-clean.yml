@@ -104,8 +104,8 @@ jobs:
 
             delete_branches=()
             delete_tips=()
-            ancestor_count=0
             merged_pr_count=0
+            ancestor_unproven_count=0
             unique_count=0
             protected_count=0
             open_pr_count=0
@@ -119,9 +119,10 @@ jobs:
               [[ -n "$tip" && -n "$branch" ]] || continue
 
               # Permanent coordination/release refs are never cleanup candidates.
-              # Backup refs are different: keep them while they are unique, but
-              # allow deletion once their exact tip is provably represented by main
-              # or by a merged PR. This prevents absorbed backups becoming immortal.
+              # Every other ref requires exact merged-PR head evidence before
+              # deletion. Mere ancestry is not enough: a freshly-created branch
+              # starts at an ancestor (often exactly main) before its first commit
+              # or PR exists, so ancestry-only deletion races branch creation.
               case "$branch" in
                 main|develop|release/*|keep/*)
                   protected_count=$((protected_count + 1))
@@ -136,14 +137,13 @@ jobs:
                 continue
               fi
 
-              if git merge-base --is-ancestor "$tip" "$main_ref"; then
-                ancestor_count=$((ancestor_count + 1))
-                delete_branches+=("$branch")
-                delete_tips+=("$tip")
-              elif [[ -n "${merged_pr_tips[${branch}:${tip}]+x}" ]]; then
+              if [[ -n "${merged_pr_tips[${branch}:${tip}]+x}" ]]; then
                 merged_pr_count=$((merged_pr_count + 1))
                 delete_branches+=("$branch")
                 delete_tips+=("$tip")
+              elif git merge-base --is-ancestor "$tip" "$main_ref"; then
+                ancestor_unproven_count=$((ancestor_unproven_count + 1))
+                printf '%s %s ancestor-without-merged-pr-proof\n' "$branch" "$tip" >> ../preserved-branches.txt
               elif [[ "$branch" == backup/* ]]; then
                 protected_count=$((protected_count + 1))
                 printf '%s %s protected-backup-unmerged\n' "$branch" "$tip" >> ../preserved-branches.txt
@@ -227,8 +227,8 @@ jobs:
               echo '## Safe branch pruning'
               echo "- Stable classification round: $round/$max_rounds"
               echo "- main tip: \`$current_main\`"
-              echo "- Fully merged branch refs eligible: $ancestor_count"
               echo "- Exact merged-PR head refs eligible: $merged_pr_count"
+              echo "- Ancestor-only refs preserved: $ancestor_unproven_count"
               echo "- Unique/unproven branch refs preserved: $unique_count"
               echo "- Long-lived or still-unique backup refs preserved: $protected_count"
               echo "- Open-PR branch refs preserved during classification: $open_pr_count"
@@ -236,6 +236,7 @@ jobs:
               echo "- Branch refs deleted: $deleted"
               echo "- Moved or server-protected refs preserved at deletion time: $raced_or_blocked"
               echo '- main is never modified by this workflow.'
+              echo '- Ancestry alone is never sufficient deletion proof.'
               echo '- Patch-equivalence heuristics are not used for deletion.'
               echo '- Every deletion uses an expected-tip lease.'
               if [[ -s ../preserved-branches.txt ]]; then
