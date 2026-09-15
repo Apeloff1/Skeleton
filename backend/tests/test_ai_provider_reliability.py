@@ -4,11 +4,14 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
+import pytest
+
 from core.ai_provider import (
     OpenAIProviderAdapter,
     ProviderInvocationError,
     ProviderRegistry,
     ProviderRequest,
+    ProviderUnavailableError,
 )
 from routes import ai as ai_routes
 
@@ -92,6 +95,54 @@ def test_sdk_client_receives_explicit_timeout_and_retry_bounds(monkeypatch) -> N
         "max_retries": 3,
         "base_url": "https://provider.invalid/v1",
     }
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "http://api.openai.com/v1",
+        "https://user:password@provider.invalid/v1",
+        "https://localhost/v1",
+        "https://service.localhost/v1",
+        "https://127.0.0.1/v1",
+        "https://[::1]/v1",
+        "https://169.254.169.254/latest/meta-data",
+        "https://10.0.0.1/v1",
+        "https://2130706433/v1",
+        "https://metadata.google.internal/computeMetadata/v1",
+        "https://provider.invalid/v1?target=internal",
+        "https://provider.invalid/v1#fragment",
+    ],
+)
+def test_sdk_client_rejects_unsafe_custom_base_urls(base_url, monkeypatch) -> None:
+    adapter = OpenAIProviderAdapter(
+        api_key="test-key",
+        model="test-model",
+        base_url=base_url,
+    )
+
+    def _must_not_load_sdk():
+        pytest.fail("provider SDK must not load before base URL validation")
+
+    monkeypatch.setattr(adapter, "_load_client_class", _must_not_load_sdk)
+
+    with pytest.raises(ProviderUnavailableError, match="base URL"):
+        adapter._get_client()
+
+
+def test_invalid_custom_base_url_marks_provider_unavailable(monkeypatch) -> None:
+    adapter = OpenAIProviderAdapter(
+        api_key="test-key",
+        model="test-model",
+        base_url="https://127.0.0.1/v1",
+    )
+
+    def _must_not_load_sdk():
+        pytest.fail("provider SDK must not load for an invalid base URL")
+
+    monkeypatch.setattr(adapter, "_load_client_class", _must_not_load_sdk)
+
+    assert adapter.available is False
 
 
 def test_route_boundary_hides_provider_failure_details(monkeypatch, caplog) -> None:
