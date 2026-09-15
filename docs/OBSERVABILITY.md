@@ -19,11 +19,21 @@ Correlation identifiers are operational metadata, not a place to store credentia
 
 `StructuredLogger`, `Tracer`, health probes, and the event-to-metrics bridge all use the same redaction helpers. Callers should sanitize before exporting any additional telemetry surface.
 
+## Canonical runtime logging and tracing
+
+`ObservableOrchestrator` is the canonical observable execution boundary for API-, agent-, and tool-backed orchestration. It owns a `StructuredLogger` and `Tracer` by default, while allowing callers to inject shared instances when a larger runtime owns those sinks/exporters.
+
+Lifecycle logging is metadata-only. The structured logger records the same run/tool lifecycle topics emitted onto the event bus together with correlation, run, call, tool, status, attempt, duration, and stable error-type fields. Tool arguments, tool outputs, and arbitrary exception messages are not copied into the log context. In-memory log retention is bounded, and sink failures are isolated from the instrumented execution path.
+
+Each orchestration run creates an `orchestration.run` span whose trace ID is the canonical correlation ID. Tool execution creates child `orchestration.tool` spans, preserving the same trace ID and parent/child relation. Trace attributes remain metadata-only and use the shared redaction boundary. Failed tool spans retain stable exception types rather than exception messages supplied by handlers. Trace export is best-effort so collector/exporter failures cannot turn successful runtime work into application failures.
+
+Because the API correlation adapter and Genesis `Coordinator` both execute registered work through `ObservableOrchestrator`, the shared logging/tracing helpers now cover the canonical API → agent → tool execution path rather than existing only as standalone package utilities.
+
 ## Structured event bridge
 
 `EventMetricsBridge` subscribes to kernel events without mutating the source event. It retains a bounded redacted event window and feeds the existing `MetricsRegistry`.
 
-`ObservableOrchestrator` is the canonical observable orchestration runtime. It now owns an `EventBus` plus an attached `EventMetricsBridge` by default, which means selecting the observable runtime cannot silently discard lifecycle metrics. Callers with shared runtime infrastructure may inject an existing bus and bridge; the orchestrator reuses and attaches those supplied primitives instead of creating a parallel metrics path.
+`ObservableOrchestrator` owns an `EventBus` plus an attached `EventMetricsBridge` by default, which means selecting the observable runtime cannot silently discard lifecycle metrics. Callers with shared runtime infrastructure may inject an existing bus and bridge. When the supplied bus already owns the canonical bridge (for example the Genesis `JournaledBus`), the orchestrator reuses it instead of creating a parallel metrics path.
 
 Baseline metric names are:
 
@@ -39,17 +49,20 @@ These names are the baseline contract for future API/runtime/agent/tool instrume
 
 ## Existing package surface
 
-The package root now exposes the canonical health, metrics-registry, structured-logging, tracing, event-bridge, and redaction primitives. Older specialist modules under `skeleton/observability/` remain implementation modules; they should converge on these shared contracts rather than define competing correlation or secret-handling rules.
+The package root exposes the canonical health, metrics-registry, structured-logging, tracing, event-bridge, and redaction primitives. Older specialist modules under `skeleton/observability/` remain implementation modules; they should converge on these shared contracts rather than define competing correlation or secret-handling rules.
 
 ## Regression policy
 
-`tests/test_observability.py` and `skeleton/testing/test_frontier_observability_correlation.py` are part of `scripts/quality-gates.sh`. Together they pin:
+`tests/test_observability.py`, `skeleton/testing/test_frontier_observability_correlation.py`, and `tests/test_runtime_observability_bridge.py` are part of `scripts/quality-gates.sh`. Together they pin:
 
 - correlation preservation through `EventBus.emit`;
-- default runtime attachment of the event-to-metrics bridge;
-- API request correlation through run and tool lifecycle events;
+- default runtime attachment and Genesis reuse of the event-to-metrics bridge;
+- API request correlation through run, agent, and tool lifecycle events;
+- structured lifecycle logs with shared correlation and no tool payload leakage;
+- bounded structured-log retention and isolation of failing sinks;
+- correlated run/tool trace parentage and metadata-only attributes;
+- stable, redacted failure diagnostics in logs and traces;
+- isolation of failing trace exporters from runtime execution;
 - health-probe exception redaction;
-- structured-log redaction;
-- trace failure/attribute redaction;
 - bounded event collection and baseline metric classification;
 - compatibility with the current `MetricsRegistry` API.

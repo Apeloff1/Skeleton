@@ -6,6 +6,7 @@ from skeleton.kernel.events import DomainEvent, EventBus
 from skeleton.observability import (
     EventMetricsBridge,
     HealthRegistry,
+    InMemoryExporter,
     MetricsRegistry,
     StructuredLogger,
     Tracer,
@@ -137,6 +138,19 @@ def test_structured_logger_redacts_messages_and_context() -> None:
     assert json.loads(lines[0])["context"]["safe"] == "visible"
 
 
+def test_structured_logger_retention_is_bounded_and_sink_failure_isolated() -> None:
+    def broken_sink(_line: str) -> None:
+        raise RuntimeError("telemetry backend unavailable")
+
+    logger = StructuredLogger(broken_sink, capacity=2)
+
+    logger.info("one")
+    logger.info("two")
+    logger.info("three")
+
+    assert [event.message for event in logger.events] == ["two", "three"]
+
+
 def test_text_redaction_removes_full_basic_authorization_credential() -> None:
     rendered = redact_text(
         "request failed Authorization: Basic example-credential trace=req-1"
@@ -162,6 +176,21 @@ def test_tracer_failure_never_persists_exception_message() -> None:
     assert rendered["attributes"]["error.message"] == "RuntimeError"
     assert "leaked-value" not in str(rendered)
     assert "secret-value" not in str(rendered)
+
+
+def test_trace_export_failure_does_not_escape_instrumented_code() -> None:
+    class BrokenExporter(InMemoryExporter):
+        def export(self, span) -> None:
+            del span
+            raise RuntimeError("collector unavailable")
+
+    tracer = Tracer("test-service", exporter=BrokenExporter())
+
+    with tracer("runtime.operation") as span:
+        span.set_attribute("status", "ok")
+
+    assert span.status == "OK"
+    assert span.ended_at is not None
 
 
 def test_redaction_depth_is_bounded() -> None:

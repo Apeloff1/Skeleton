@@ -139,7 +139,7 @@ class Tracer:
 
 
 class SpanContext:
-    """Context manager: sets the span current, ends and exports it on exit."""
+    """Context manager: sets the current span and exports it best-effort."""
 
     def __init__(self, tracer: Tracer, name: str, attributes: Dict[str, Any]) -> None:
         self._tracer, self._name, self._attributes = tracer, name, attributes
@@ -156,7 +156,10 @@ class SpanContext:
         if exc is not None:
             self.span.fail(exc)
         self.span.ended_at = time.time()
-        self._tracer.exporter.export(self.span)
+        try:
+            self._tracer.exporter.export(self.span)
+        except Exception:
+            pass
         if self._token is not None:
             _current_span.reset(self._token)
         return False

@@ -1,8 +1,8 @@
 """Structured logging — JSON-lines events with levels and bound context.
 
-Observability has metrics/tracing/health but no logger; this one writes
-one JSON object per line to a sink you control (tests collect them,
-production ships them to stdout/file).
+Writes one JSON object per line to a caller-controlled sink while retaining a
+bounded in-memory event window for diagnostics and tests. Sink failures are
+isolated so observability cannot break the instrumented runtime.
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ class LogEvent:
 
 
 class StructuredLogger:
-    """Level-filtered JSON-lines logger with redacted bound context."""
+    """Level-filtered JSON-lines logger with bounded, redacted retention."""
 
     def __init__(
         self,
@@ -51,17 +51,26 @@ class StructuredLogger:
         *,
         min_level: str = "INFO",
         clock: Optional[Callable[[], float]] = None,
+        capacity: int = 8192,
     ) -> None:
+        if isinstance(capacity, bool) or not isinstance(capacity, int):
+            raise TypeError("capacity must be an integer")
+        if capacity < 1:
+            raise ValueError("capacity must be at least 1")
         self._sink = sink or (lambda line: None)
         self._min_index = _LEVELS.index(min_level) if min_level in _LEVELS else 1
         self._now = clock or time.time
+        self._capacity = capacity
         self._context: Dict[str, Any] = {}
         self.events: List[LogEvent] = []
 
     def bind(self, **context: Any) -> "StructuredLogger":
         """Return a child logger with additional redacted context merged."""
         child = StructuredLogger(
-            sink=self._sink, min_level=_LEVELS[self._min_index], clock=self._now
+            sink=self._sink,
+            min_level=_LEVELS[self._min_index],
+            clock=self._now,
+            capacity=self._capacity,
         )
         merged = redact_payload({**self._context, **context})
         child._context = dict(merged) if isinstance(merged, dict) else {}
@@ -83,7 +92,12 @@ class StructuredLogger:
             context=safe_context,
         )
         self.events.append(event)
-        self._sink(event.to_json())
+        if len(self.events) > self._capacity:
+            del self.events[: len(self.events) - self._capacity]
+        try:
+            self._sink(event.to_json())
+        except Exception:
+            pass
         return event
 
     def debug(self, message: str, **context: Any) -> LogEvent:
