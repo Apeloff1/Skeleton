@@ -1,5 +1,26 @@
 """Frontier consolidation contracts and program metadata."""
 
+from skeleton.frontier.achievements import (
+    AchievementRequirement,
+    AchievementRewardPlan,
+    AchievementSpec,
+    AchievementState,
+    DailyClaimPlan,
+    DailyRewardSpec,
+    DailyRewardStatus,
+    achievement_from_record,
+    achievement_summary,
+    claim_achievement,
+    claim_daily_reward,
+    daily_reward_from_record,
+    daily_reward_status,
+    progress_percent as achievement_progress_percent,
+    project_achievement,
+    qualifies as achievement_qualifies,
+    reward_plan as achievement_reward_plan,
+    unlock_qualified,
+    update_stat as update_achievement_stat,
+)
 from skeleton.frontier.agent_runtime import AgentRuntime, ExecutionResult
 from skeleton.frontier.contracts import (
     AgentContract,
@@ -101,6 +122,10 @@ from skeleton.frontier.world import (
 )
 
 __all__ = [
+    "AchievementRequirement",
+    "AchievementRewardPlan",
+    "AchievementSpec",
+    "AchievementState",
     "AgentContract",
     "AgentRuntime",
     "ArchetypeProfile",
@@ -108,6 +133,9 @@ __all__ = [
     "CollectionMemoryAdapter",
     "CrewRoleSpec",
     "DEFAULT_REPUTATION_LEVELS",
+    "DailyClaimPlan",
+    "DailyRewardSpec",
+    "DailyRewardStatus",
     "DegradationLevel",
     "DomainEvent",
     "EventBus",
@@ -139,6 +167,11 @@ __all__ = [
     "SQLiteEventJournal",
     "WorldBounds",
     "WorldRegion",
+    "achievement_from_record",
+    "achievement_progress_percent",
+    "achievement_qualifies",
+    "achievement_reward_plan",
+    "achievement_summary",
     "aggregate_crew",
     "apply_reputation_change",
     "available_quests",
@@ -149,8 +182,12 @@ __all__ = [
     "can_delete",
     "can_hire",
     "choose_crew_name",
+    "claim_achievement",
+    "claim_daily_reward",
     "crew_role_from_record",
     "current_benefits",
+    "daily_reward_from_record",
+    "daily_reward_status",
     "execution_event_to_memory_item",
     "execution_result_to_event",
     "faction_from_record",
@@ -171,6 +208,7 @@ __all__ = [
     "normalize_memory_filters",
     "normalize_memory_metadata",
     "npc_spec_from_domain_record",
+    "project_achievement",
     "project_fog_of_war",
     "quest_from_record",
     "quote_purchase",
@@ -185,5 +223,7 @@ __all__ = [
     "stores_for_location",
     "timeline",
     "toggle_pin",
+    "unlock_qualified",
+    "update_achievement_stat",
     "update_objective_progress",
 ]
