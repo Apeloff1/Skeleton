@@ -52,14 +52,18 @@ def violations_for_text(text: str) -> list[str]:
     if "pr.get('draft')" not in text:
         findings.append("branch-flow must preserve draft PR branches")
 
-    if "def touches_workflows(number):" not in text:
-        findings.append("branch-flow must inspect changed files for workflow control-plane changes")
+    if "def touches_workflows(number, expected_files):" not in text:
+        findings.append("branch-flow must inspect the complete changed-file set for workflow changes")
     if "startswith('.github/workflows/')" not in text:
         findings.append("branch-flow must preserve PRs that modify workflow files")
-    if "if touches_workflows(number) is not False:" not in text:
+    if "('filename', 'previous_filename')" not in text:
+        findings.append("branch-flow must detect workflow files on both sides of a rename")
+    if "seen >= expected_files" not in text or "for page in range(1, 31):" not in text:
+        findings.append("workflow-file enumeration must prove completeness or fail closed")
+    if "workflow_change = touches_workflows(number, pr.get('changed_files'))" not in text:
+        findings.append("initial workflow-file exclusion must use the PR changed-file count")
+    if "if touches_workflows(number, fresh.get('changed_files')) is not False:" not in text:
         findings.append("workflow-file exclusion must be revalidated immediately before mutation")
-    if "              return None\n\n          def live_validation" not in text:
-        findings.append("bounded workflow-file enumeration must fail closed when the scan limit is exhausted")
 
     if "permission_or_api_failure" not in text or "raise SystemExit" not in text:
         findings.append("terminal branch-flow API/permission failures must fail the run")
