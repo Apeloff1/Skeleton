@@ -67,3 +67,5 @@ jobs:
           git rm .github/workflows/refresh-frontend-security-lock.yml
           git commit -m 'chore: remove temporary lockfile refresh workflow'
           git push
+
+# trigger lockfile refresh
