@@ -12,6 +12,7 @@ NODE_VERSION = "24.20.0"
 RUFF_VERSION = "0.9.10"
 GITLEAKS_PIN = "gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e"
 REQUIRED_NEEDS = ("quarantine_policy", "unit", "integration_smoke", "quality_security")
+CONCURRENCY_GROUP = "group: merge-readiness-${{ github.event.pull_request.number || github.ref }}"
 
 
 def require(condition: bool, message: str, failures: list[str]) -> None:
@@ -26,7 +27,17 @@ def main() -> int:
     except (OSError, UnicodeError) as exc:
         raise SystemExit(f"merge-readiness contract: cannot read workflow: {exc}")
 
-    require("concurrency:" not in text, "merge-readiness must not cancel in-flight required gates", failures)
+    require("concurrency:" in text, "merge-readiness concurrency policy missing", failures)
+    require(
+        CONCURRENCY_GROUP in text,
+        "merge-readiness concurrency group must be scoped to the PR or branch ref",
+        failures,
+    )
+    require(
+        "cancel-in-progress: true" in text,
+        "superseded merge-readiness runs must be cancelled",
+        failures,
+    )
     require(
         re.search(r'^\s*PYTHON_VERSION:\s*"3\.11\.16"\s*$', text, re.MULTILINE) is not None,
         f"Python must be pinned to {PYTHON_VERSION}",
@@ -84,7 +95,7 @@ def main() -> int:
         return 1
 
     print(
-        "Merge-readiness contract passed: stable aggregate, exact toolchain, uncancelled required gates, "
+        "Merge-readiness contract passed: stable aggregate, exact toolchain, supersession-safe concurrency, "
         "quarantine/security/secret gates, and explicit fail-closed result aggregation are aligned."
     )
     return 0
