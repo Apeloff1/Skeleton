@@ -12,7 +12,13 @@ import os
 import urllib.parse
 from typing import Any
 
-from scripts.pr_obsolete_run_drain import GitHubApi, main as drain_main
+if __package__:
+    from .pr_obsolete_run_drain import GitHubApi, main as drain_main
+else:
+    # The Actions workflow executes this file directly from the repository root.
+    # In that mode Python puts backend/scripts on sys.path, not backend, so the
+    # package-qualified ``scripts.*`` import is unavailable.
+    from pr_obsolete_run_drain import GitHubApi, main as drain_main
 
 
 def _repo_full_name(obj: Any) -> str:
