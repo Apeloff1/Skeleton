@@ -7,15 +7,19 @@
 
 ARG UV_VERSION=0.12.4
 
+# Resolve the versioned uv image in a FROM instruction. Docker does not expand
+# build arguments in COPY --from image references, so give the image a stage
+# name and copy from that stable stage instead.
+FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
+
 # Official Python multi-platform index pinned for reproducible rebuilds.
 # Refresh this digest deliberately alongside dependency/security review.
 # Stage 1: Builder with uv
 FROM python:3.14-slim@sha256:cad9a2c871761c413caa6fdd6441c783451e740a48aaeba60ae62a8b53525ef6 AS builder
-ARG UV_VERSION
 
 WORKDIR /app
 
-COPY --from=ghcr.io/astral-sh/uv:${UV_VERSION} /uv /usr/local/bin/uv
+COPY --from=uv /uv /usr/local/bin/uv
 COPY backend/pyproject.toml ./
 COPY backend/requirements.txt ./
 
