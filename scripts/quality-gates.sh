@@ -34,7 +34,7 @@ python backend/scripts/check_sast_security.py
 printf '\n== JavaScript child_process alias safety ==\n'
 python backend/scripts/check_js_process_alias_safety.py
 
-printf '\n== GitHub Actions workflow security gate ==\n'
+printf '\n== GitHub Actions workflow security ==\n'
 python backend/scripts/check_workflow_security.py
 
 printf '\n== Repository secret hygiene ==\n'
