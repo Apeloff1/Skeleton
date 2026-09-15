@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import logging
+import math
 import os
 import re
 import time
@@ -90,6 +91,7 @@ _TRUSTED_PROXY_NETWORKS = _parse_trusted_proxy_networks(
 )
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+_MAX_RETRY_AFTER_SECONDS = 86_400
 
 # Telemetry counters (in-memory) ───────────────────────────────────────
 _lat_ring: Deque[float] = deque(maxlen=1024)
@@ -115,6 +117,13 @@ def _percentile(sorted_vals, pct: float) -> float:
         return 0.0
     k = max(0, min(len(sorted_vals) - 1, int(pct / 100.0 * (len(sorted_vals) - 1))))
     return sorted_vals[k]
+
+
+def _bounded_retry_after(retry: float) -> int:
+    """Return a finite, practical Retry-After value for untrusted arithmetic."""
+    if not math.isfinite(retry):
+        return _MAX_RETRY_AFTER_SECONDS
+    return max(1, min(_MAX_RETRY_AFTER_SECONDS, math.ceil(max(0.0, retry))))
 
 
 def get_stats() -> dict:
@@ -338,13 +347,13 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         self.burst = burst if burst is not None else _RATE_BURST
         self.max_buckets = max_buckets if max_buckets is not None else _MAX_BUCKETS
         self.bucket_ttl = bucket_ttl if bucket_ttl is not None else _BUCKET_TTL
-        if self.per_minute <= 0:
-            raise ValueError("per_minute must be positive")
-        if self.burst <= 0:
-            raise ValueError("burst must be positive")
-        if self.max_buckets <= 0:
-            raise ValueError("max_buckets must be positive")
-        if self.bucket_ttl <= 0 or not (self.bucket_ttl < float("inf")):
+        if self.per_minute <= 0 or not math.isfinite(float(self.per_minute)):
+            raise ValueError("per_minute must be a positive finite number")
+        if self.burst <= 0 or not math.isfinite(float(self.burst)):
+            raise ValueError("burst must be a positive finite number")
+        if self.max_buckets <= 0 or not math.isfinite(float(self.max_buckets)):
+            raise ValueError("max_buckets must be a positive finite number")
+        if self.bucket_ttl <= 0 or not math.isfinite(float(self.bucket_ttl)):
             raise ValueError("bucket_ttl must be a positive finite number")
 
         self._refill_per_sec = self.per_minute / 60.0
@@ -419,6 +428,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
             _counts["rate_limited"] += 1
             rid = _request_id(request)
             request.state.request_id = rid
+            retry_after = _bounded_retry_after(retry)
             log.warning(
                 "rate_limited ip=%s path=%s retry=%.1fs rid=%s",
                 ip,
@@ -430,12 +440,12 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
                 {
                     "error": "rate_limited",
                     "message": "Too many requests; please slow down.",
-                    "retry_after_seconds": round(retry, 1),
+                    "retry_after_seconds": retry_after,
                     "request_id": rid,
                 },
                 status_code=429,
                 headers={
-                    "Retry-After": str(max(1, int(retry + 0.5))),
+                    "Retry-After": str(retry_after),
                     "X-Request-Id": rid,
                     "X-RateLimit-Limit": str(self.per_minute),
                 },
