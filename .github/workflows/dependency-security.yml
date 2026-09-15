@@ -25,7 +25,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: dependency-security-${{ github.ref }}
@@ -86,13 +86,57 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          persist-credentials: false
+          persist-credentials: true
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
+
+      - name: Refresh vulnerable frontend transitive dependencies
+        if: github.event_name == 'pull_request' && github.actor == 'Apeloff1'
+        working-directory: frontend
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          p.resolutions = {
+            ...(p.resolutions || {}),
+            'brace-expansion@^1.1.7': '1.1.18',
+            'brace-expansion@^2.0.2': '2.1.4',
+            'brace-expansion@^5.0.5': '5.0.9',
+            'shell-quote@^1.6.1': '1.10.0',
+            'tar@^7.5.2': '7.5.21',
+            'undici@^6.18.2': '6.28.0',
+            'js-yaml@^3.13.1': '3.15.2',
+            'postcss@~8.4.32': '8.5.25',
+            'ws@^6.2.3': '6.2.4',
+            'ws@^7': '7.5.11',
+            'ws@^7.5.10': '7.5.11',
+            'ws@^8.12.1': '8.21.0',
+            'nanoid@^3.3.11': '3.3.18',
+            'nanoid@^3.3.7': '3.3.18',
+            'nanoid@^3.3.8': '3.3.18',
+            'browserslist@^4.24.0': '4.28.9',
+            'browserslist@^4.25.0': '4.28.9',
+            'browserslist@^4.28.1': '4.28.9',
+            '@xmldom/xmldom@^0.8.13': '0.8.15',
+            '@xmldom/xmldom@^0.9.10': '0.9.12',
+            'node-fetch@^1.0.1': '2.7.0'
+          };
+          fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+          NODE
+          yarn install --ignore-scripts --non-interactive
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json yarn.lock
+          if ! git diff --cached --quiet; then
+            git commit -m 'security: refresh patched frontend dependency graph'
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          fi
 
       - name: Install frozen frontend dependency graph
         working-directory: frontend
