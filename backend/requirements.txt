@@ -15,7 +15,7 @@ requests==2.34.2
 
 # --- Database ---
 motor==3.7.1
-pymongo==4.13.0
+pymongo==4.18.1
 aiosqlite==0.22.1
 
 # --- Validation / config ---
