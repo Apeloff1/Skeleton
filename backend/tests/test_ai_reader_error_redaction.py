@@ -1,0 +1,54 @@
+from __future__ import annotations
+
+import ast
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+AI_READER = REPO_ROOT / "backend" / "routes" / "ai_reader.py"
+
+
+def _is_exception_handler(handler: ast.ExceptHandler) -> bool:
+    if isinstance(handler.type, ast.Name):
+        return handler.type.id == "Exception"
+    return False
+
+
+def _http_exception_calls(node: ast.AST):
+    for child in ast.walk(node):
+        if (
+            isinstance(child, ast.Call)
+            and isinstance(child.func, ast.Name)
+            and child.func.id == "HTTPException"
+        ):
+            yield child
+
+
+def _references_name(node: ast.AST, name: str) -> bool:
+    return any(
+        isinstance(child, ast.Name)
+        and isinstance(child.ctx, ast.Load)
+        and child.id == name
+        for child in ast.walk(node)
+    )
+
+
+def test_ai_reader_broad_failures_cannot_reach_http_error_detail() -> None:
+    tree = ast.parse(AI_READER.read_text(encoding="utf-8"), filename=str(AI_READER))
+    leaks: list[int] = []
+    for handler in (node for node in ast.walk(tree) if isinstance(node, ast.ExceptHandler)):
+        if not _is_exception_handler(handler) or not handler.name:
+            continue
+        for statement in handler.body:
+            for call in _http_exception_calls(statement):
+                if _references_name(call, handler.name):
+                    leaks.append(call.lineno)
+    assert leaks == [], f"AI Reader exposes caught exception data in HTTP responses at lines {leaks}"
+
+
+def test_ai_reader_provider_failures_use_stable_generic_details() -> None:
+    source = AI_READER.read_text(encoding="utf-8")
+    assert 'detail="Expressive TTS failed"' in source
+    assert source.count('detail="TTS generation failed"') == 3
+    assert "str(e)" not in source
+    assert "str(exc)" not in source
