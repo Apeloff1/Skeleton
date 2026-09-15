@@ -282,17 +282,29 @@ class TriAdversarialEngine:
         current_candidate = candidate
 
         for lane in TRI_LANES:
-            lane_ctx = self._lane_context(ctx, lane, current_candidate)
+            # Judges are external callbacks. Give every lane its own candidate
+            # graph so an in-place mutation cannot alter the caller's artifact or
+            # bleed into a sibling lane without going through the bounded repairer.
+            lane_candidate = deepcopy(current_candidate)
+            candidate_before = _snapshot(lane_candidate)
+            lane_ctx = self._lane_context(ctx, lane, lane_candidate)
             decision = engines[lane].evaluate(lane_ctx)
             if len(decision.results) != 100:
                 raise RuntimeError(
                     f"tri-engine invariant violated: {lane.value} returned "
                     f"{len(decision.results)} gates instead of 100"
                 )
+            if decision.repair_rounds == 0 and _snapshot(decision.candidate) != candidate_before:
+                raise RuntimeError(
+                    f"tri-engine invariant violated: {lane.value} mutated candidate outside repairer"
+                )
             lane_decisions.append(LaneDecision(lane, decision))
             flat_results.extend(TriGateResult(lane, result) for result in decision.results)
-            if propagate_candidate:
-                current_candidate = decision.candidate
+            # Only the explicitly bounded repair path is authorized to change the
+            # artifact reviewed by later lanes. Ordinary judge evaluation is
+            # observational and cannot become an implicit transformer.
+            if propagate_candidate and decision.repair_rounds:
+                current_candidate = deepcopy(decision.candidate)
 
         return tuple(lane_decisions), tuple(flat_results), current_candidate
 
