@@ -17,7 +17,7 @@ on:
       - '.github/codeql/**'
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened]
     paths:
       - '**/*.py'
       - '**/*.pyi'
@@ -36,12 +36,11 @@ on:
 permissions: {}
 
 concurrency:
-  group: codeql-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: codeql-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   analyze:
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     name: Analyze ${{ matrix.language }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
