@@ -125,7 +125,10 @@ jobs:
                       return True
                   if len(body) < 100:
                       return False
-              return False
+              # GitHub may expose a changed-file set larger than this bounded scan.
+              # Preserve the branch rather than falsely claiming there is no
+              # workflow control-plane change when enumeration is incomplete.
+              return None
 
           def live_validation(head_sha):
               for run_status in active_run_statuses:
