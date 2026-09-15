@@ -43,6 +43,14 @@ class JournalEntry:
     event: DomainEvent
 
 
+class EventJournalCorruptionError(ValueError):
+    """Raised when a persisted event row cannot safely become a DomainEvent."""
+
+
+def _reject_json_constant(value: str) -> object:
+    raise ValueError(f"non-finite JSON numeric constant: {value}")
+
+
 class EventJournal(Protocol):
     """Minimal durability boundary consumed by ``EventBus``."""
 
@@ -127,7 +135,9 @@ class SQLiteEventJournal:
 
     Entries are inserted before delivery and retained until confirmed. Capacity
     applies only to unconfirmed entries: when full, the journal backpressures
-    publishers instead of dropping pending work.
+    publishers instead of dropping pending work. Persisted rows are decoded
+    fail-closed: malformed JSON, non-object payloads and invalid timestamps are
+    never exposed to subscribers or acknowledged by replay.
     """
 
     def __init__(
@@ -188,6 +198,53 @@ class SQLiteEventJournal:
         except (TypeError, ValueError) as exc:
             raise TypeError("event payload must be JSON serializable") from exc
 
+    @staticmethod
+    def _deserialize_payload(payload_json: object) -> Mapping[str, object]:
+        if not isinstance(payload_json, str):
+            raise EventJournalCorruptionError(
+                "event journal payload must be stored as text"
+            )
+        try:
+            payload = json.loads(
+                payload_json,
+                parse_constant=_reject_json_constant,
+            )
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            raise EventJournalCorruptionError(
+                "event journal payload is not valid strict JSON"
+            ) from exc
+        if not isinstance(payload, dict):
+            raise EventJournalCorruptionError(
+                "event journal payload must decode to a JSON object"
+            )
+        return payload
+
+    @staticmethod
+    def _deserialize_occurred_at(value: object) -> datetime:
+        if not isinstance(value, str):
+            raise EventJournalCorruptionError(
+                "event journal occurred_at must be stored as text"
+            )
+        try:
+            occurred_at = datetime.fromisoformat(value)
+        except ValueError as exc:
+            raise EventJournalCorruptionError(
+                "event journal occurred_at must be ISO-8601"
+            ) from exc
+        if occurred_at.tzinfo is None or occurred_at.utcoffset() is None:
+            raise EventJournalCorruptionError(
+                "event journal occurred_at must be timezone-aware"
+            )
+        return occurred_at.astimezone(timezone.utc)
+
+    @staticmethod
+    def _deserialize_topic(value: object) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise EventJournalCorruptionError(
+                "event journal topic must be a non-empty string"
+            )
+        return value
+
     def _pending_count_sync(self) -> int:
         with self._lock:
             row = self._connection.execute(
@@ -201,9 +258,11 @@ class SQLiteEventJournal:
             return int(row[0])
 
     def _journal_sync(self, event: DomainEvent) -> str:
-        if not event.topic.strip():
+        if not isinstance(event.topic, str) or not event.topic.strip():
             raise ValueError("event topic must not be empty")
-        if event.occurred_at.tzinfo is None:
+        if not isinstance(event.occurred_at, datetime):
+            raise TypeError("event occurred_at must be a datetime")
+        if event.occurred_at.tzinfo is None or event.occurred_at.utcoffset() is None:
             raise ValueError("event occurred_at must be timezone-aware")
 
         payload_json = self._serialize_payload(event.payload)
@@ -280,17 +339,20 @@ class SQLiteEventJournal:
                     (self.namespace, limit),
                 )
             )
-        return tuple(
-            JournalEntry(
-                token=row["token"],
-                event=DomainEvent(
-                    topic=row["topic"],
-                    payload=json.loads(row["payload_json"]),
-                    occurred_at=datetime.fromisoformat(row["occurred_at"]),
-                ),
+
+        entries: list[JournalEntry] = []
+        for row in rows:
+            entries.append(
+                JournalEntry(
+                    token=row["token"],
+                    event=DomainEvent(
+                        topic=self._deserialize_topic(row["topic"]),
+                        payload=self._deserialize_payload(row["payload_json"]),
+                        occurred_at=self._deserialize_occurred_at(row["occurred_at"]),
+                    ),
+                )
             )
-            for row in rows
-        )
+        return tuple(entries)
 
     async def pending(self, *, limit: int = 100) -> tuple[JournalEntry, ...]:
         return await asyncio.to_thread(self._pending_sync, limit)
