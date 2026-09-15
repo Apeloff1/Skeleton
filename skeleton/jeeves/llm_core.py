@@ -82,9 +82,31 @@ def _copy_bounded_json(value: Any, *, depth: int = 0, budget: Optional[List[int]
 
 class SessionMode(Enum):
     TUTORING = "tutoring"
+    CO_CODING = "co_coding"
+    TACTICAL = "tactical"
+    BUILDER = "builder"
+    CORTEX = "cortex"
     CREATIVE = "creative"
     ANALYTICAL = "analytical"
     DEBUG = "debug"
+
+
+def _normalize_mode(mode: Any) -> SessionMode:
+    """Normalize sibling/legacy mode enums onto the provider-backed enum.
+
+    The public API historically imports SessionMode from ``jeeves.core`` while
+    provider-backed sessions use the enum defined in this module. Different
+    Enum classes do not compare equal even when their values match, so normalize
+    by value at the boundary and reject unknown modes rather than silently
+    dropping mode-specific policy.
+    """
+    if isinstance(mode, SessionMode):
+        return mode
+    raw = getattr(mode, "value", mode)
+    try:
+        return SessionMode(str(raw))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("invalid session mode") from exc
 
 
 @dataclass
@@ -124,8 +146,8 @@ class Session:
 
 class MemoryManager:
     def __init__(self, max_sessions: int = 1000):
-        if max_sessions < 1:
-            raise ValueError("max_sessions must be at least 1")
+        if type(max_sessions) is not int or max_sessions < 1:
+            raise ValueError("max_sessions must be a positive integer")
         self._sessions: Dict[str, Session] = {}
         self._user_sessions: Dict[str, List[str]] = {}
         self._max_sessions = max_sessions
@@ -170,6 +192,10 @@ class MemoryManager:
 
 MODE_SYSTEM_PROMPTS: Dict[SessionMode, str] = {
     SessionMode.TUTORING: "You are a patient tutor. Explain step by step.",
+    SessionMode.CO_CODING: "You are a co-coding partner. Review, explain, and keep the learner in control.",
+    SessionMode.TACTICAL: "You are a tactical systems advisor. Prioritize the highest-impact next action.",
+    SessionMode.BUILDER: "You are a builder. Turn goals into concrete architecture and implementation steps.",
+    SessionMode.CORTEX: "You are a systems reasoning cortex. Integrate evidence across subsystems before answering.",
     SessionMode.CREATIVE: "You are a creative collaborator. Offer vivid ideas.",
     SessionMode.ANALYTICAL: "You are a precise analyst. Be structured and cite evidence.",
     SessionMode.DEBUG: "You are a debugging assistant. Find the root cause.",
@@ -296,13 +322,14 @@ class JeevesCore:
     def provider_name(self) -> str:
         return getattr(self._provider, "name", "unknown")
 
-    def open_session(self, user_id: str, mode: SessionMode = SessionMode.TUTORING) -> Session:
-        session = self._memory.create_session(user_id, mode)
+    def open_session(self, user_id: str, mode: Any = SessionMode.TUTORING) -> Session:
+        normalized_mode = _normalize_mode(mode)
+        session = self._memory.create_session(user_id, normalized_mode)
         if self._bus:
             self._bus.emit("jeeves.session.opened", {
                 "session_id": session.session_id,
                 "user_id": user_id,
-                "mode": mode.value,
+                "mode": normalized_mode.value,
             })
         return session
 
