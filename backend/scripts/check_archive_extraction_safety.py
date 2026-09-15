@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ast
 from collections.abc import Iterable
+import os
 from pathlib import Path
 import sys
 
@@ -31,13 +32,41 @@ TARFILE_EXTRACTION_CALLS = {"tarfile.TarFile.extract", "tarfile.TarFile.extracta
 TARFILE_SAFE_CALLABLES = TARFILE_CONSTRUCTORS | TARFILE_EXTRACTION_CALLS | {"tarfile.data_filter"}
 
 
-def production_python_files() -> Iterable[Path]:
-    if not BACKEND_ROOT.exists():
-        return
-    for path in BACKEND_ROOT.rglob("*.py"):
-        if any(part in SKIP_DIRS for part in path.parts):
-            continue
-        yield path
+class ArchiveExtractionScanError(RuntimeError):
+    """Raised when the scanner cannot prove complete source discovery."""
+
+
+def production_python_files(root: Path | None = None) -> Iterable[Path]:
+    """Yield production Python files without following symlinks, failing on coverage loss."""
+    scan_root = BACKEND_ROOT if root is None else root
+    files: list[Path] = []
+    pending = [scan_root]
+
+    while pending:
+        directory = pending.pop()
+        try:
+            with os.scandir(directory) as iterator:
+                entries = sorted(iterator, key=lambda entry: entry.name)
+        except OSError as exc:
+            raise ArchiveExtractionScanError("source traversal failed") from exc
+
+        child_dirs: list[Path] = []
+        for entry in entries:
+            try:
+                if entry.is_symlink():
+                    continue
+                if entry.is_dir(follow_symlinks=False):
+                    if entry.name not in SKIP_DIRS:
+                        child_dirs.append(Path(entry.path))
+                    continue
+                if entry.is_file(follow_symlinks=False) and entry.name.endswith(".py"):
+                    files.append(Path(entry.path))
+            except OSError as exc:
+                raise ArchiveExtractionScanError("source traversal failed") from exc
+
+        pending.extend(reversed(child_dirs))
+
+    yield from sorted(files)
 
 
 def display_path(path: Path) -> Path:
@@ -85,9 +114,6 @@ def canonical_name(node: ast.AST, aliases: dict[str, str]) -> str | None:
     if not name:
         return None
 
-    # Prefer the longest exact/prefix binding so instance attributes such as
-    # ``holder.archive.extractall`` can resolve through ``holder.archive``
-    # before a shorter import alias is considered.
     for alias in sorted(aliases, key=len, reverse=True):
         if name == alias:
             return aliases[alias]
@@ -144,8 +170,6 @@ def _callable_aliases(scope: ast.AST, aliases: dict[str, str]) -> dict[str, str]
     """Infer simple aliases to tarfile constructors, extraction methods, and data_filter."""
     inferred: dict[str, str] = {}
     current = dict(aliases)
-    # A small bounded fixpoint handles chains such as ``open_tar = tarfile.open``
-    # followed by ``open_again = open_tar`` without turning this into dataflow.
     for _ in range(4):
         changed = False
         for names, value in _assignment_pairs(scope):
@@ -153,10 +177,6 @@ def _callable_aliases(scope: ast.AST, aliases: dict[str, str]) -> dict[str, str]
             if canonical not in TARFILE_SAFE_CALLABLES:
                 continue
             for name in names:
-                # TarFile instance provenance is intentionally sticky within a
-                # scope. A prior constructor-alias assignment must not downgrade
-                # a symbol that another assignment proved holds a TarFile; doing
-                # so would hide later ``archive.extractall`` method provenance.
                 if current.get(name) == "tarfile.TarFile" and canonical != "tarfile.TarFile":
                     continue
                 if current.get(name) == canonical:
@@ -201,7 +221,6 @@ def _scope_aliases(scope: ast.AST, import_map: dict[str, str]) -> dict[str, str]
         before = dict(aliases)
         aliases.update(_callable_aliases(scope, aliases))
         aliases.update(_tarfile_bindings(scope, aliases))
-        # Instance bindings can make method aliases resolvable on the next pass.
         aliases.update(_callable_aliases(scope, aliases))
         if aliases == before:
             break
@@ -239,7 +258,7 @@ def violations(path: Path) -> list[str]:
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     except (OSError, UnicodeError, SyntaxError) as exc:
-        return [f"{label}: parse failure: {exc}"]
+        return [f"{label}: parse failure: {type(exc).__name__}"]
 
     import_map = import_aliases(tree)
     findings: list[str] = []
@@ -257,9 +276,12 @@ def violations(path: Path) -> list[str]:
 
 def repository_violations() -> list[str]:
     findings: list[str] = []
-    files = list(production_python_files())
+    try:
+        files = list(production_python_files())
+    except ArchiveExtractionScanError as exc:
+        return [f"scanner coverage failure: {exc}"]
     if not files:
-        return ["no backend production Python files found"]
+        return ["scanner coverage failure: no backend production Python files found"]
     for path in files:
         findings.extend(violations(path))
     return findings
