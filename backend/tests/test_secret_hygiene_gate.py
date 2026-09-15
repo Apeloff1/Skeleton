@@ -3,6 +3,7 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
+from scripts import check_secret_hygiene as secret_hygiene
 from scripts.check_secret_hygiene import violations
 
 
@@ -13,6 +14,42 @@ def _scan(tmp_path: Path, source: str) -> list[str]:
     path = tmp_path / "sample.env"
     path.write_text(source, encoding="utf-8")
     return violations(path)
+
+
+def test_read_failure_fails_closed_without_raw_exception_text(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    path = tmp_path / "blocked.env"
+    path.write_text("TOKEN=hidden\n", encoding="utf-8")
+    original_read_text = Path.read_text
+
+    def blocked_read(self: Path, *args, **kwargs):
+        if self == path:
+            raise PermissionError("sensitive filesystem detail")
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", blocked_read)
+    findings = violations(path)
+
+    assert len(findings) == 1
+    assert "read failure: PermissionError" in findings[0]
+    assert "sensitive filesystem detail" not in findings[0]
+
+
+def test_stat_failure_does_not_drop_secret_candidate(tmp_path: Path, monkeypatch) -> None:
+    path = tmp_path / "blocked.env"
+    path.write_text("TOKEN=value\n", encoding="utf-8")
+    original_stat = Path.stat
+
+    def blocked_stat(self: Path, *args, **kwargs):
+        if self == path:
+            raise PermissionError("metadata unavailable")
+        return original_stat(self, *args, **kwargs)
+
+    monkeypatch.setattr(secret_hygiene, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(Path, "stat", blocked_stat)
+
+    assert path in list(secret_hygiene.candidate_files())
 
 
 def test_detects_private_key_material(tmp_path: Path) -> None:
