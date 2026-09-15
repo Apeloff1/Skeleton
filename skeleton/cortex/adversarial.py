@@ -244,14 +244,57 @@ def _review_state(ctx: AdversarialContext) -> Dict[str, Any]:
     }
 
 
+_REVIEW_IMMUTABLE_ATOMS = (type(None), bool, int, float, complex, str, bytes, range)
+
+
+def _mutable_graph_ids(value: Any, seen: Optional[set[int]] = None) -> set[int]:
+    """Collect mutable/opaque identities so deceptive deepcopy aliases fail closed."""
+    if isinstance(value, _REVIEW_IMMUTABLE_ATOMS):
+        return set()
+    if seen is None:
+        seen = set()
+    object_id = id(value)
+    if object_id in seen:
+        return set()
+    seen.add(object_id)
+
+    identities: set[int] = set()
+    children: Iterable[Any] = ()
+    if isinstance(value, Mapping):
+        identities.add(object_id)
+        children = tuple(value.keys()) + tuple(value.values())
+    elif isinstance(value, (list, set, bytearray)):
+        identities.add(object_id)
+        children = value
+    elif isinstance(value, (tuple, frozenset)):
+        children = value
+    else:
+        # Unknown non-primitive objects are treated as mutable security state.
+        # If deepcopy intentionally returns the same instance, the overlap below
+        # proves the isolation boundary is not trustworthy.
+        identities.add(object_id)
+        try:
+            children = tuple(vars(value).values())
+        except (TypeError, AttributeError):
+            children = ()
+
+    for child in children:
+        identities.update(_mutable_graph_ids(child, seen))
+    return identities
+
+
 def _isolated_review_context(ctx: AdversarialContext) -> AdversarialContext:
     """Deep-isolate untrusted judge callbacks from caller and repairer state."""
     isolated: Optional[AdversarialContext]
     try:
         isolated = deepcopy(ctx)
+        shared_mutable = _mutable_graph_ids(ctx) & _mutable_graph_ids(isolated)
+        semantically_equal = _review_state(ctx) == _review_state(isolated)
     except Exception:
         isolated = None
-    if isolated is None:
+        shared_mutable = set()
+        semantically_equal = False
+    if isolated is None or shared_mutable or not semantically_equal:
         raise RuntimeError(
             "adversarial invariant violated: judge review context isolation failed"
         )
