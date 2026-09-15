@@ -46,6 +46,22 @@ def test_midbrain_fit_advances_steps_and_mutates_transformer_weights() -> None:
     assert transformer.layers[0].Wq != weights_before
 
 
+def test_teacher_distill_trains_both_neo_mouths() -> None:
+    neo = JeevesCortex()
+    neo.bind_hf("left")
+    gelu_before = neo.transformer.steps
+    rms_before = neo.neo_rms.steps
+
+    result = neo.distill("left", "plan tensor ttk lattice oracle")
+
+    assert result["distilled"] == 1
+    assert result["neo_steps"] > 0
+    assert result["rms_steps"] > 0
+    assert neo.transformer.steps > gelu_before
+    assert neo.neo_rms.steps > rms_before
+    assert "left" in neo.own.models
+
+
 def test_teacher_contact_advances_lora_adapter_state() -> None:
     neo = JeevesCortex()
     neo.bind_hf("left")
