@@ -25,10 +25,14 @@ LFS_REQUIRED_SUFFIXES = {
     ".pt", ".pth", ".ckpt", ".onnx", ".safetensors", ".h5", ".hdf5",
     ".npy", ".npz", ".parquet", ".arrow", ".bin",
 }
+LOCAL_JUNK_FILENAMES = {".DS_Store", "Thumbs.db"}
+LOCAL_JUNK_SUFFIXES = {".log"}
+ENV_TEMPLATE_FILENAMES = {".env.example", ".env.sample", ".env.template"}
 FORBIDDEN_PATH_FRAGMENTS = (
     "backend/data/builds_vault/", "backend/data/galaxy_vault/",
     "backend/data/build_artifacts/", "/node_modules/", "/__pycache__/",
-    "/.pytest_cache/", "/.mypy_cache/", "/.ruff_cache/",
+    "/.pytest_cache/", "/.mypy_cache/", "/.ruff_cache/", "/.venv/",
+    "/coverage/",
 )
 SHA256_RE = re.compile(r"[0-9a-f]{64}")
 LFS_OID_RE = re.compile(rb"^oid sha256:([0-9a-f]{64})$", re.MULTILINE)
@@ -66,6 +70,11 @@ def is_lfs_tracked(path: Path) -> bool:
 def is_small_test_fixture(path: Path, size: int) -> bool:
     parts = set(path.parts)
     return size <= FIXTURE_MAX_BYTES and "fixtures" in parts and bool({"tests", "testing"} & parts)
+
+
+def is_environment_state(path: Path) -> bool:
+    name = path.name
+    return name == ".env" or (name.startswith(".env.") and name not in ENV_TEMPLATE_FILENAMES)
 
 
 def artifact_digest(path: Path) -> str:
@@ -119,6 +128,10 @@ def validate_path(relative_path: Path) -> list[str]:
     errors: list[str] = []
     if any(fragment in padded for fragment in FORBIDDEN_PATH_FRAGMENTS):
         errors.append(f"{rel}: generated/cache path is forbidden in source Git")
+    if relative_path.name in LOCAL_JUNK_FILENAMES or suffix in LOCAL_JUNK_SUFFIXES:
+        errors.append(f"{rel}: machine-local/generated state is forbidden in source Git")
+    if is_environment_state(relative_path):
+        errors.append(f"{rel}: environment state is forbidden; commit only .env.example/.sample/.template files")
     if suffix in NEVER_GIT_SUFFIXES:
         errors.append(f"{rel}: build/archive output belongs in CI/release artifacts, not source Git")
     if suffix in LFS_REQUIRED_SUFFIXES and not lfs and not is_small_test_fixture(relative_path, size):
