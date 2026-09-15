@@ -3,9 +3,21 @@ name: Frontier Contracts
 on:
   pull_request:
     branches: [main]
+    paths:
+      - 'skeleton/**'
+      - 'pyproject.toml'
+      - '.github/workflows/frontier-contracts.yml'
   push:
     branches:
       - 'frontier/**'
+    paths:
+      - 'skeleton/**'
+      - 'pyproject.toml'
+      - '.github/workflows/frontier-contracts.yml'
+
+concurrency:
+  group: frontier-contracts-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
