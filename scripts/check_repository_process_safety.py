@@ -39,18 +39,14 @@ SUBPROCESS_CALLS = {f"subprocess.{name}" for name in BACKEND_GATE.SUBPROCESS_CAL
 
 
 def python_files() -> Iterable[Path]:
-    """Yield every Python file in the active runtime/security roots exactly once."""
+    """Yield every Python file in required runtime/security roots exactly once."""
     seen: set[Path] = set()
     for root in SCAN_ROOTS:
-        if not root.exists():
-            continue
-        for path in root.rglob("*.py"):
-            if any(part in SKIP_DIRS for part in path.parts):
+        for path in BACKEND_GATE.walk_python_files(root, SKIP_DIRS):
+            absolute = path.absolute()
+            if absolute in seen:
                 continue
-            resolved = path.resolve()
-            if resolved in seen:
-                continue
-            seen.add(resolved)
+            seen.add(absolute)
             yield path
 
 
@@ -101,7 +97,7 @@ def argv_violations(path: Path) -> list[str]:
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     except (OSError, UnicodeError, SyntaxError) as exc:
-        return [f"{label}: parse failure: {exc}"]
+        return [f"{label}: parse failure: {type(exc).__name__}"]
 
     aliases = BACKEND_GATE.assignment_aliases(tree, BACKEND_GATE.import_aliases(tree))
     findings: list[str] = []
@@ -126,10 +122,17 @@ def violations(path: Path) -> list[str]:
 def main() -> int:
     findings: list[str] = []
     scanned = 0
-    for path in python_files():
-        scanned += 1
-        findings.extend(violations(path))
+    try:
+        for path in python_files():
+            scanned += 1
+            findings.extend(violations(path))
+    except OSError as exc:
+        print(f"Repository process-safety scan failed: {type(exc).__name__}", file=sys.stderr)
+        return 1
 
+    if scanned == 0:
+        print("Repository process-safety scan failed: zero Python files scanned.", file=sys.stderr)
+        return 1
     if findings:
         print("Repository process-safety violations detected:", file=sys.stderr)
         for finding in sorted(set(findings)):

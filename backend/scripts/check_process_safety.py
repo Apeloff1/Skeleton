@@ -10,6 +10,7 @@ command strings are rejected in favor of explicit argument vectors.
 from __future__ import annotations
 
 import ast
+import os
 from pathlib import Path
 import sys
 from typing import Iterable
@@ -27,11 +28,30 @@ UNSAFE_CALLS = {
 }
 
 
+def walk_python_files(root: Path, skip_dirs: set[str]) -> Iterable[Path]:
+    """Walk Python files without following symlinks and without hiding I/O errors."""
+    if root.is_symlink():
+        raise OSError("scan root must not be a symlink")
+
+    stack = [root]
+    while stack:
+        current = stack.pop()
+        child_dirs: list[Path] = []
+        python_paths: list[Path] = []
+        with os.scandir(current) as entries:
+            for entry in sorted(entries, key=lambda item: item.name):
+                if entry.name in skip_dirs:
+                    continue
+                if entry.is_dir(follow_symlinks=False):
+                    child_dirs.append(Path(entry.path))
+                elif entry.is_file(follow_symlinks=False) and entry.name.endswith(".py"):
+                    python_paths.append(Path(entry.path))
+        yield from python_paths
+        stack.extend(reversed(child_dirs))
+
+
 def python_files() -> Iterable[Path]:
-    for path in ROOT.rglob("*.py"):
-        if any(part in SKIP_DIRS for part in path.parts):
-            continue
-        yield path
+    yield from walk_python_files(ROOT, SKIP_DIRS)
 
 
 def display_path(path: Path) -> Path:
@@ -307,7 +327,7 @@ def violations(path: Path) -> list[str]:
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     except (OSError, UnicodeError, SyntaxError) as exc:
-        return [f"{label}: parse failure: {exc}"]
+        return [f"{label}: parse failure: {type(exc).__name__}"]
 
     aliases = assignment_aliases(tree, import_aliases(tree))
     findings = star_import_violations(tree, label)
@@ -352,9 +372,13 @@ def violations(path: Path) -> list[str]:
 def main() -> int:
     findings: list[str] = []
     scanned = 0
-    for path in python_files():
-        scanned += 1
-        findings.extend(violations(path))
+    try:
+        for path in python_files():
+            scanned += 1
+            findings.extend(violations(path))
+    except OSError as exc:
+        print(f"Process safety scan failed: {type(exc).__name__}", file=sys.stderr)
+        return 1
     if scanned == 0:
         findings.append("scanner coverage failure: no backend Python files were scanned")
     if findings:
