@@ -64,6 +64,17 @@ def test_rejects_extraction_method_alias(tmp_path: Path) -> None:
     assert _unsafe(findings)
 
 
+def test_rejects_simple_tarfile_handle_alias_without_filter(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import tarfile\n"
+        "with tarfile.open('bundle.tar') as archive:\n"
+        "    alias = archive\n"
+        "    alias.extractall('/tmp/out')\n",
+    )
+    assert _unsafe(findings)
+
+
 def test_rejects_attribute_bound_tarfile_handle(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
