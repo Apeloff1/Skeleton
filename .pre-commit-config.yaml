@@ -35,6 +35,13 @@ repos:
         pass_filenames: false
         files: ^(backend/pyproject\.toml|frontend/(package\.json|Dockerfile|scripts/(enforce-yarn-audit|test-enforce-yarn-audit)\.js)|\.github/workflows/(ci|lint|backend-quality|dependency-security)\.yml|scripts/(check_toolchain_contract\.py|quality-gates\.sh)|\.pre-commit-config\.yaml)$
 
+      - id: repository-artifact-policy
+        name: repository artifact placement and provenance policy
+        entry: python scripts/check_artifact_policy.py --staged
+        language: system
+        pass_filenames: false
+        always_run: true
+
       - id: backend-ruff
         name: backend ruff correctness gate
         entry: bash -c 'cd backend && python -m ruff check . --output-format=github'
@@ -161,5 +168,5 @@ ci:
   autoupdate_schedule: monthly
   # Local hooks depend on project environments unavailable to pre-commit.ci;
   # GitHub Actions enforces them authoritatively.
-  skip: [mypy, repo-toolchain-contract, backend-ruff, backend-compile, backend-process-safety, backend-deserialization-safety, repository-sast-safety, javascript-process-alias-safety, workflow-security, repository-secret-hygiene, backend-security-regressions, frontend-dependency-audit-policy, frontend-lint, frontend-typecheck]
+  skip: [mypy, repo-toolchain-contract, repository-artifact-policy, backend-ruff, backend-compile, backend-process-safety, backend-deserialization-safety, repository-sast-safety, javascript-process-alias-safety, workflow-security, repository-secret-hygiene, backend-security-regressions, frontend-dependency-audit-policy, frontend-lint, frontend-typecheck]
   submodules: false
