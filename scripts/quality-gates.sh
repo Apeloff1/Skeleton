@@ -26,6 +26,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   tests/test_agent_coordination.py \
   skeleton/testing/test_tiered_cache.py \
   skeleton/testing/test_deployment_security_defaults.py \
+  skeleton/testing/test_frontier_observability_correlation.py \
   tests/test_observability.py
 
 printf '\n== Backend process safety ==\n'
