@@ -1,6 +1,6 @@
 # Skeleton Backlog — failed-commit register + forward work
 
-Updated 2026-09-15 (F-7 revival). Original register dated 2026-09-01. Two sections: things that failed and were recovered
+Updated 2026-09-15 (backlog reconciliation). Original register dated 2026-09-01. Two sections: things that failed and were recovered
 (so the failure modes stay visible), and the frontier backlog (what to
 build next, ordered).
 
@@ -49,38 +49,47 @@ Updated 2026-09-15. Tier-1 seams F-1..F-5, F-7 and F-8..F-10 are
 | F-10 PromptImproveDriver | #31 | ImproveLoop over prefix variants |
 | P6 policy enforcement | #13 | CodeVerifier + repair/verify gates |
 
-### Live ops gaps (block merges — fill before new frontier)
+### Live ops state — resolved blockers, keep green
 
-1. **CI-1. Jeeves import + CLI shims** — `pipeline` imports `Jeeves` but
-   `jeeves.core` only exports `JeevesCore`; CLI lost `eras`/`plan`/`cockpit`/`walk`.
-   Owned by Not Soo Old Git (extend-only PR in flight). Blocks PR #29.
-2. **CI-2. Draft PR #25 cortex restore** — still GameForge-red + conflicting
-   with main; rebase after CI-1.
-3. **CI-3. PR #29 cockpit-smoke CI wire** — ready once CI-1 lands.
+The previous CI-1..CI-3 blockers are no longer active backlog items. Keep
+them as regression contracts rather than re-opening stale branches.
+
+1. **CI-1. Jeeves import + CLI shims — RESOLVED.** Current main exports
+   `Jeeves` from `skeleton/jeeves/core.py`, and the canonical CI job executes
+   `python -m skeleton eras`, `plan`, `cockpit`, and `walk` as smoke gates.
+2. **CI-2. Cortex restore — RESOLVED.** PR #25 merged on 2026-09-12,
+   restoring the full cortex API and the GameForge-facing compatibility path.
+3. **CI-3. Cockpit smoke CI wire — RESOLVED ON MAIN.** PR #29 itself was
+   closed without merge, but current `.github/workflows/ci.yml` contains the
+   dedicated `cockpit-smoke` job and runs `scripts/cockpit-smoke.sh`.
+
+Recent backlog hygiene on 2026-09-15 also retired stale overlapping work:
+issue #255 was completed by merged PR #257, and open PR #237 was closed as
+superseded by merged PR #247.
 
 ### Tier 2 — frontier pushes (next differentiating work)
 
-4. **F-6. Mixture-of-depths for the neo transformer** — dynamic per-token
+1. **F-6. Mixture-of-depths for the neo transformer** — dynamic per-token
    compute allocation in `cortex/transformer.py`. Note: `cortex/moe.py` is
    Mixture-of-*Experts* (different); MoD is still open.
 
 ### Tier 3 — structural (bigger, schedule carefully)
 
-5. **F-11. Track E cleanup** — root sprawl moves, SEVEN_BY physical moves,
+2. **F-11. Track E cleanup** — root sprawl moves, SEVEN_BY physical moves,
    godot binary to LFS, shim deletion. Local git ops.
-6. **F-12. H5.4 cortex persistence** — genesis twin vs live singleton once
+3. **F-12. H5.4 cortex persistence** — genesis twin vs live singleton once
    `$SKELETON_OWN` exists in the container.
-7. **F-13. EconomicOptimiser audit** — `intelligence/economic.py` predates
+4. **F-13. EconomicOptimiser audit** — `intelligence/economic.py` predates
    the cascade router; reconcile the two routing contracts.
-8. **F-14. Speculative RAG** — pre-fetch likely-needed documents during
+5. **F-14. Speculative RAG** — pre-fetch likely-needed documents during
    the planning phase of a pipeline run (compose quad + composer).
    Adjacent: `cortex/speculate.py` is token continuation, not RAG prefetch.
-9. **F-15. Organism/social/galaxy plane audit** — the repo grew three
-    planes while the waves landed (see §1 drift note). Same size-filtered
-    read methodology as the deep-cut campaign, when their churn settles.
+6. **F-15. Organism/social/galaxy plane audit** — the repo grew three
+   planes while the waves landed (see §1 drift note). Same size-filtered
+   read methodology as the deep-cut campaign, when their churn settles.
 
 ## Definition of SOTA (working)
 
-Tier-1 SOTA seams (F-2..F-5, F-7, F-10) are landed in code. Remaining bar:
-main CI green (CI-1..CI-3), then Tier-2 differentiation (F-6 MoD) where the
-system stops catching up and starts pushing.
+Tier-1 SOTA seams (F-2..F-5, F-7, F-10) are landed in code. The former
+CI-1..CI-3 blockers are resolved on main; the next differentiation target is
+F-6 Mixture-of-Depths, with Tier-3 cleanup and persistence work following.
