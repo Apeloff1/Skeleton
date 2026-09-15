@@ -3,7 +3,8 @@
 Dependency-free by design so it can run before application imports. The scanner
 tracks common import, assignment, destructuring, walrus, getattr, module
 __getattribute__, namespace-mapping, mapping-get, and functools.partial aliases
-to prevent trivial process policy bypasses.
+to prevent trivial process policy bypasses. Statically obvious subprocess
+command strings are rejected in favor of explicit argument vectors.
 """
 
 from __future__ import annotations
@@ -59,6 +60,35 @@ def literal_false(node: ast.AST) -> bool:
 def literal_string(node: ast.AST) -> str | None:
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         return node.value
+    return None
+
+
+def obvious_command_string(node: ast.AST) -> bool:
+    """Return True when an argv expression is statically string-shaped.
+
+    This intentionally handles only cases that are safe to classify without
+    data-flow guessing: string literals, f-strings, concatenations containing a
+    string-shaped operand, and common string-building methods. Unknown names
+    remain allowed so legitimate dynamically assembled argument vectors are not
+    falsely rejected by this lightweight gate.
+    """
+    if literal_string(node) is not None or isinstance(node, ast.JoinedStr):
+        return True
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        return obvious_command_string(node.left) or obvious_command_string(node.right)
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+        if node.func.attr in {"format", "join"}:
+            return True
+    return False
+
+
+def command_argument(node: ast.Call) -> ast.AST | None:
+    """Return the subprocess argv argument from positional or keyword form."""
+    if node.args:
+        return node.args[0]
+    for keyword in node.keywords:
+        if keyword.arg == "args":
+            return keyword.value
     return None
 
 
@@ -249,18 +279,26 @@ def dynamic_namespace_get_violation(node: ast.Call, aliases: dict[str, str]) -> 
 
 
 def partial_policy_violations(node: ast.Call, aliases: dict[str, str]) -> list[str]:
-    """Validate process-sensitive keywords pre-bound through functools.partial."""
+    """Validate process-sensitive arguments pre-bound through functools.partial."""
     if canonical_name(node.func, aliases) != "functools.partial" or not node.args:
         return []
     target = canonical_name(node.args[0], aliases)
     if target not in {f"subprocess.{call}" for call in SUBPROCESS_CALLS}:
         return []
     findings: list[str] = []
+    if len(node.args) > 1 and obvious_command_string(node.args[1]):
+        findings.append(
+            f"{target} partial command must be an argument vector, not a string-shaped command"
+        )
     for keyword in node.keywords:
         if keyword.arg is None:
             findings.append(f"{target} partial(..., **kwargs) is forbidden because shell policy cannot be statically proven")
         elif keyword.arg == "shell" and not literal_false(keyword.value):
             findings.append(f"{target} partial(..., shell=...) is forbidden unless shell=False is literal")
+        elif keyword.arg == "args" and obvious_command_string(keyword.value):
+            findings.append(
+                f"{target} partial args= must be an argument vector, not a string-shaped command"
+            )
     return findings
 
 
@@ -297,6 +335,11 @@ def violations(path: Path) -> list[str]:
             findings.append(f"{label}:{node.lineno}: {UNSAFE_CALLS[name]}")
             continue
         if name in {f"subprocess.{call}" for call in SUBPROCESS_CALLS}:
+            argv = command_argument(node)
+            if argv is not None and obvious_command_string(argv):
+                findings.append(
+                    f"{label}:{node.lineno}: {name} command must be an argument vector, not a string-shaped command"
+                )
             for keyword in node.keywords:
                 if keyword.arg is None:
                     findings.append(f"{label}:{node.lineno}: {name}(..., **kwargs) is forbidden because shell policy cannot be statically proven")
@@ -316,8 +359,8 @@ def main() -> int:
             print(f"  - {finding}", file=sys.stderr)
         return 1
     print(
-        "Process safety gate passed: no unsafe shell execution, opaque subprocess kwargs, "
-        "dynamic process lookup, process-sensitive star imports, unsafe process partials, "
+        "Process safety gate passed: no unsafe shell execution, statically obvious string-shaped subprocess commands, "
+        "opaque subprocess kwargs, dynamic process lookup, process-sensitive star imports, unsafe process partials, "
         "unsafe process namespace get()/__getattribute__(), os.system(), or os.popen() calls found."
     )
     return 0
