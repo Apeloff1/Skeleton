@@ -222,7 +222,8 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         ok, retry = self._bucket_for(ip).take(1)
         if not ok:
             _counts["rate_limited"] += 1
-            rid = getattr(request.state, "request_id", "-")
+            rid = _request_id(request)
+            request.state.request_id = rid
             log.warning("rate_limited ip=%s path=%s retry=%.1fs rid=%s", ip, request.url.path, retry, rid)
             return JSONResponse(
                 {
