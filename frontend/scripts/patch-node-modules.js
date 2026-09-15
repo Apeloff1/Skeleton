@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 /* eslint-disable */
 /**
- * patch-node-modules.js — strip `import.meta.env` from third-party packages
- * that ship ESM bundles with ESM-only syntax. Metro's web bundler treats these
- * as scripts and throws `Cannot use 'import.meta' outside a module`, which
- * crashes the whole React tree before render (black screen / blank UI).
+ * patch-node-modules.js — deterministic, fail-closed compatibility/security
+ * patches for third-party packages that cannot currently be fixed solely by a
+ * compatible dependency bump.
  *
  * Runs automatically as a postinstall hook after every `yarn install` /
- * `yarn add` so patches survive package reinstalls.
+ * `yarn add` so patches survive package reinstalls. Security patches below are
+ * deliberately version- and pattern-aware: if the installed package changes
+ * shape, installation fails and requires explicit review instead of silently
+ * leaving a known vulnerability unpatched.
  */
 const fs = require('fs');
 const path = require('path');
@@ -54,7 +56,7 @@ for (const rel of TARGETS) {
     missing++;
     continue;
   }
-  let src = fs.readFileSync(abs, 'utf8');
+  const src = fs.readFileSync(abs, 'utf8');
   if (!/import\.meta/.test(src)) {
     skipped++;
     continue;
@@ -76,6 +78,62 @@ for (const rel of TARGETS) {
   }
 }
 
+function patchSecurityFile(rel, vulnerablePattern, replacement, hardenedPattern) {
+  const abs = path.join(ROOT, rel);
+  if (!fs.existsSync(abs)) {
+    throw new Error(`[patch-node-modules] security target missing: ${rel}`);
+  }
+  const src = fs.readFileSync(abs, 'utf8');
+  if (hardenedPattern.test(src)) {
+    skipped++;
+    return;
+  }
+  if (!vulnerablePattern.test(src)) {
+    throw new Error(`[patch-node-modules] security target changed shape; review required: ${rel}`);
+  }
+  const out = src.replace(vulnerablePattern, replacement);
+  if (out === src || !hardenedPattern.test(out)) {
+    throw new Error(`[patch-node-modules] failed to harden: ${rel}`);
+  }
+  fs.writeFileSync(abs, out, 'utf8');
+  patched++;
+  console.log(`[patch-node-modules] ✓ security ${rel}`);
+}
+
+function patchImageSizeDoS() {
+  const pkgPath = path.join(ROOT, 'node_modules/image-size/package.json');
+  if (!fs.existsSync(pkgPath)) {
+    return;
+  }
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  const version = String(pkg.version || '');
+  // Current locked version. If this changes, force a review so a future package
+  // layout cannot silently bypass the compensating control.
+  if (version !== '1.2.1') {
+    throw new Error(`[patch-node-modules] image-size ${version} requires security patch review`);
+  }
+
+  // CVE-2025-71329 / GHSA-5p2g-fcmc-qvqq: JXL/HEIF/JP2 box walks
+  // must make forward progress even when a crafted box declares size zero.
+  patchSecurityFile(
+    'node_modules/image-size/dist/types/utils.js',
+    /offset \+= box\.size;/,
+    'offset += box.size > 0 ? box.size : 8;',
+    /offset \+= box\.size > 0 \? box\.size : 8;/,
+  );
+
+  // CVE-2025-71330 / GHSA-w3rx-r6r6-pgpr: ICNS entries with a zero
+  // declared length otherwise leave imageOffset unchanged forever.
+  patchSecurityFile(
+    'node_modules/image-size/dist/types/icns.js',
+    /imageOffset \+= imageHeader\[1\];/g,
+    'imageOffset += imageHeader[1] > 0 ? imageHeader[1] : inputLength;',
+    /imageOffset \+= imageHeader\[1\] > 0 \? imageHeader\[1\] : inputLength;/,
+  );
+}
+
+patchImageSizeDoS();
+
 console.log(
-  `[patch-node-modules] done: ${patched} patched, ${skipped} already-clean, ${missing} missing`
+  `[patch-node-modules] done: ${patched} patched, ${skipped} already-clean, ${missing} missing`,
 );
