@@ -1,7 +1,7 @@
 name: Backend Quality
 
 # Fast, fail-closed backend/security gate: lint, syntax compilation,
-# security-policy scanners, and focused regression tests.
+# security-policy scanners, route-surface inventory, and focused regressions.
 
 on:
   push:
@@ -50,6 +50,12 @@ jobs:
       - name: Syntax check (full backend)
         run: python -m compileall -q .
 
+      - name: Backend route inventory audit
+        run: >-
+          python scripts/backend_route_inventory.py
+          --registry core/routes_registry.py
+          --routes-root routes
+
       - name: Process invocation safety gate
         run: python scripts/check_process_safety.py
 
@@ -68,7 +74,7 @@ jobs:
       - name: Repository secret hygiene gate
         run: python scripts/check_secret_hygiene.py
 
-      - name: Security scanner regression tests
+      - name: Security and inventory regression tests
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: >-
@@ -84,3 +90,4 @@ jobs:
           tests/test_js_process_alias_safety.py
           tests/test_workflow_security_gate.py
           tests/test_secret_hygiene_gate.py
+          tests/test_backend_route_inventory.py
