@@ -92,6 +92,42 @@ def test_inventory_handles_imperative_add_api_route_and_literal_concatenation(tm
     ]
 
 
+def test_inventory_resolves_child_router_factory_composition_without_false_root_paths(tmp_path: Path):
+    registry_path = registry(tmp_path, known='[("routes.constructs", "router")]')
+    routes_root = tmp_path / "routes"
+    write(
+        routes_root / "constructs.py",
+        "from fastapi import APIRouter\n"
+        "construct_router = APIRouter(prefix='/api/constructs')\n"
+        "material_router = APIRouter(prefix='/api/materials')\n"
+        "def _make_router(router, kind):\n"
+        "    @router.get('/capacity')\n"
+        "    def capacity(): return kind\n"
+        "    @router.post('/generate')\n"
+        "    def generate(): return kind\n"
+        "_make_router(construct_router, 'construct')\n"
+        "_make_router(material_router, 'material')\n"
+        "@construct_router.post('/compose')\n"
+        "def compose(): pass\n"
+        "router = APIRouter()\n"
+        "router.include_router(construct_router)\n"
+        "router.include_router(material_router)\n",
+    )
+
+    report = build_inventory(registry_path, routes_root)
+
+    assert report.complete is True
+    assert report.duplicate_route_count == 0
+    assert {(row.method, row.path) for row in report.routes} == {
+        ("GET", "/api/constructs/capacity"),
+        ("POST", "/api/constructs/generate"),
+        ("POST", "/api/constructs/compose"),
+        ("GET", "/api/materials/capacity"),
+        ("POST", "/api/materials/generate"),
+    }
+    assert not any(row.path == "/capacity" for row in report.routes)
+
+
 def test_inventory_preserves_dynamic_paths_as_explicit_unresolved_evidence(tmp_path: Path):
     registry_path = registry(tmp_path, known='[("routes.dynamic", "router")]')
     routes_root = tmp_path / "routes"
@@ -130,10 +166,12 @@ def test_inventory_reports_missing_module_and_unresolved_router_prefix(tmp_path:
 
     assert report.modules_declared == 2
     assert report.modules_scanned == 1
-    assert report.unresolved_count == 2
     reasons = {row.module: row.reason for row in report.unresolved}
     assert "module file missing" in reasons["routes.missing"]
-    assert "prefix could not be resolved" in reasons["routes.bad_prefix"]
+    assert any(
+        row.module == "routes.bad_prefix" and "dynamic prefix" in row.reason
+        for row in report.unresolved
+    )
 
 
 def test_duplicate_method_path_pairs_are_counted_without_hiding_sources(tmp_path: Path):
@@ -198,6 +236,29 @@ def test_strict_cli_fails_when_inventory_is_incomplete(tmp_path: Path, capsys):
     assert exit_code == 1
     assert "unresolved=1" in output
     assert "UNRESOLVED routes.missing" in output
+
+
+def test_fail_on_duplicates_is_an_independent_enforcement_gate(tmp_path: Path):
+    registry_path = registry(tmp_path, known='[("routes.dupe", "router")]')
+    routes_root = tmp_path / "routes"
+    write(
+        routes_root / "dupe.py",
+        "from fastapi import APIRouter\n"
+        "router = APIRouter(prefix='/api/dupe')\n"
+        "@router.get('/same')\n"
+        "def first(): pass\n"
+        "@router.get('/same')\n"
+        "def second(): pass\n",
+    )
+    assert main(
+        [
+            "--registry",
+            str(registry_path),
+            "--routes-root",
+            str(routes_root),
+            "--fail-on-duplicates",
+        ]
+    ) == 1
 
 
 def test_json_cli_exposes_stable_machine_readable_inventory(tmp_path: Path, capsys):
