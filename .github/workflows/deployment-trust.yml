@@ -99,6 +99,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: deployment-trust-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   deployment-trust:
     runs-on: ubuntu-latest
