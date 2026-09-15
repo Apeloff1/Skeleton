@@ -109,3 +109,47 @@ def test_payload_must_be_json_shaped():
 
     with pytest.raises(CortexError, match="unsupported value type"):
         JeevesCortex().import_tract(payload)
+
+
+@pytest.mark.parametrize("field", ["exemplars", "capabilities"])
+def test_explicit_empty_wrong_sequence_types_are_rejected(field):
+    payload = _valid_payload()
+    payload[field] = {}
+
+    with pytest.raises(CortexError):
+        JeevesCortex().import_tract(payload)
+
+
+def test_explicit_empty_wrong_exemplar_sequence_type_is_rejected():
+    payload = _valid_payload()
+    payload["exemplars"][0]["tags"] = {}
+
+    with pytest.raises(CortexError, match="sequence limit"):
+        JeevesCortex().import_tract(payload)
+
+
+def test_aggregate_serialized_size_is_bounded_incrementally():
+    payload = {
+        "slot": "left",
+        "backend": "test",
+        "scale": "hemisphere",
+        "exemplars": [],
+        "capabilities": [],
+        "size": 0,
+        "weights": {"blobs": ["x" * 262_144 for _ in range(40)]},
+    }
+
+    with pytest.raises(CortexError, match="byte limit"):
+        JeevesCortex().import_tract(payload)
+
+
+def test_invalid_weight_restore_cannot_partially_import_own_state():
+    payload = _valid_payload()
+    payload["weights"] = {"unigrams": "not-a-mapping"}
+    target = JeevesCortex()
+    before = target.own.size
+
+    with pytest.raises(CortexError, match="model state"):
+        target.import_tract(payload)
+
+    assert target.own.size == before
