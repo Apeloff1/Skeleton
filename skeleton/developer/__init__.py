@@ -1,27 +1,34 @@
-"""
-Skeleton Developer CLI Package
+"""Skeleton developer CLI package.
 
-Provides developer tooling for the Skeleton platform:
-  - scaffold: Project templates and generation
-  - wizard:   Interactive project builder
-  - commands: Command registry and dispatch
-  - cli:      Main entry point
-
-Usage:
-    from skeleton.developer import ScaffoldEngine, Wizard
-    engine = ScaffoldEngine()
-    engine.create_project("minimal-agent", "my-project")
+Provides the public developer-tooling surface for scaffolding, interactive
+project planning, subsystem inspection, and command dispatch.
 """
 
 from skeleton.developer.scaffold import ScaffoldEngine, list_templates
-from skeleton.developer.wizard import Wizard, WizardMode, SubsystemExplorer
-from skeleton.developer.commands import CommandRegistry
+from skeleton.developer.wizard import (
+    BlueprintVisualizer,
+    ProjectWizard,
+    SubsystemCard,
+    SubsystemExplorer,
+    WizardStep,
+)
+from skeleton.developer.commands import DevCommandRegistry, run_dev_command
+
+# Compatibility aliases for the historical package-level names.  The current
+# implementations are ProjectWizard and DevCommandRegistry respectively.
+Wizard = ProjectWizard
+CommandRegistry = DevCommandRegistry
 
 __all__ = [
     "ScaffoldEngine",
     "list_templates",
+    "ProjectWizard",
     "Wizard",
-    "WizardMode",
+    "WizardStep",
+    "SubsystemCard",
     "SubsystemExplorer",
+    "BlueprintVisualizer",
+    "DevCommandRegistry",
     "CommandRegistry",
+    "run_dev_command",
 ]
