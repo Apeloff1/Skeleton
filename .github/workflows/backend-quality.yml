@@ -16,6 +16,7 @@ on:
       - "scripts/check_architecture_boundaries.py"
       - "tests/test_architecture_boundaries.py"
       - ".github/workflows/**"
+      - "!.github/workflows/branch-clean.yml"
   pull_request:
     paths:
       - "backend/**"
@@ -27,13 +28,14 @@ on:
       - "scripts/check_architecture_boundaries.py"
       - "tests/test_architecture_boundaries.py"
       - ".github/workflows/**"
+      - "!.github/workflows/branch-clean.yml"
 
 permissions:
   contents: read
 
 concurrency:
   group: backend-quality-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   ruff:
