@@ -105,6 +105,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_repository_python_sast_scope.py \
   backend/tests/test_js_process_alias_safety.py \
   backend/tests/test_workflow_security_gate.py \
+  backend/tests/test_workflow_security_checkout_credentials.py \
   backend/tests/test_workflow_input_security_gate.py \
   backend/tests/test_workflow_event_shell_security.py \
   backend/tests/test_secret_hygiene_gate.py \

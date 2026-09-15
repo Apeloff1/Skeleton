@@ -32,12 +32,18 @@ USES_RE = re.compile(
 FLOW_USES_ENTRY_RE = re.compile(
     r"^(?:uses|'uses'|\"uses\")\s*:\s*[\"']?([^\"'\s,}#]+)"
 )
-EXPRESSION_RE = re.compile(r"\$\{\{(?P<body>.*?)\}\}", re.DOTALL)
+FLOW_WITH_ENTRY_RE = re.compile(
+    r"^(?:with|'with'|\"with\")\s*:\s*(?P<value>.*)$"
+)
+WITH_ENTRY_RE = re.compile(
+    r"^\s*(?:with|'with'|\"with\")\s*:\s*(?P<value>.*)$"
+)
 PERSIST_FALSE_RE = re.compile(
-    r"(?:persist-credentials|'persist-credentials'|\"persist-credentials\")\s*:\s*"
-    r"(?:false|['\"]false['\"])(?=\s*[,}#]|\s*$)",
+    r"^(?:persist-credentials|'persist-credentials'|\"persist-credentials\")\s*:\s*"
+    r"(?:false|['\"]false['\"])(?:\s*#.*)?$",
     re.IGNORECASE,
 )
+EXPRESSION_RE = re.compile(r"\$\{\{(?P<body>.*?)\}\}", re.DOTALL)
 PERMISSION_ENTRY_RE = re.compile(
     r"^\s+['\"]?(?P<scope>[A-Za-z0-9_-]+)['\"]?\s*:\s*"
     r"(?P<value>read|write|none)\s*(?:#.*)?$",
@@ -91,19 +97,79 @@ def _indent_width(line: str) -> int:
     return len(line) - len(line.lstrip(" "))
 
 
+def _flow_mapping_has_disabled_checkout_credentials(value: str) -> bool:
+    value = value.strip()
+    if not (value.startswith("{") and value.endswith("}")):
+        return False
+    return any(
+        PERSIST_FALSE_RE.fullmatch(entry.strip()) is not None
+        for entry in _flow_mapping_entries(value)
+    )
+
+
+def _flow_checkout_credentials_disabled(fragment: str) -> bool:
+    for entry in _flow_mapping_entries(fragment):
+        match = FLOW_WITH_ENTRY_RE.match(entry.strip())
+        if not match:
+            continue
+        return _flow_mapping_has_disabled_checkout_credentials(match.group("value"))
+    return False
+
+
 def _checkout_credentials_disabled(lines: list[str], uses_index: int) -> bool:
     base_indent = _indent_width(lines[uses_index])
+    uses_is_sequence_key = lines[uses_index].lstrip().startswith("- ")
+    step_lines: list[tuple[int, str, int]] = []
     index = uses_index + 1
     while index < len(lines):
         line = lines[index]
         stripped = line.strip()
-        if stripped:
-            indent = _indent_width(line)
-            if indent < base_indent or (indent == base_indent and stripped.startswith("- ")):
-                break
-            if PERSIST_FALSE_RE.search(line):
-                return True
+        indent = _indent_width(line)
+        if stripped and indent < base_indent:
+            break
+        if stripped and indent == base_indent and stripped.startswith("- "):
+            break
+
+        minimum_property_indent = base_indent + 1 if uses_is_sequence_key else base_indent
+        if (
+            stripped
+            and not stripped.startswith("#")
+            and indent >= minimum_property_indent
+        ):
+            step_lines.append((index, line, indent))
         index += 1
+
+    if not step_lines:
+        return False
+
+    direct_indent = min(indent for _number, _line, indent in step_lines)
+    for position, (_number, line, indent) in enumerate(step_lines):
+        if indent != direct_indent:
+            continue
+        match = WITH_ENTRY_RE.match(line)
+        if not match:
+            continue
+
+        inline_value = match.group("value").split("#", 1)[0].strip()
+        if inline_value:
+            return _flow_mapping_has_disabled_checkout_credentials(inline_value)
+
+        children: list[tuple[str, int]] = []
+        for _child_number, child, child_indent in step_lines[position + 1 :]:
+            if child_indent <= direct_indent:
+                break
+            if child.strip() and not child.strip().startswith("#"):
+                children.append((child, child_indent))
+        if not children:
+            return False
+
+        input_indent = min(child_indent for _child, child_indent in children)
+        return any(
+            child_indent == input_indent
+            and PERSIST_FALSE_RE.fullmatch(child.strip()) is not None
+            for child, child_indent in children
+        )
+
     return False
 
 
@@ -291,9 +357,10 @@ def violations(path: Path) -> list[str]:
     findings.extend(permission_findings)
     findings.extend(_forbidden_trigger_violations(lines, path.name))
 
+    flow_style_lines: set[int] = set()
     for number, fragment in _flow_style_steps(lines):
-        if any(USES_RE.match(source_line) for source_line in fragment.splitlines()):
-            continue
+        fragment_lines = fragment.splitlines()
+        flow_style_lines.update(range(number, number + len(fragment_lines)))
         for entry in _flow_mapping_entries(fragment):
             match = FLOW_USES_ENTRY_RE.match(entry.strip())
             if not match:
@@ -304,7 +371,7 @@ def violations(path: Path) -> list[str]:
                     path.name,
                     number,
                     reference,
-                    checkout_hardened=bool(PERSIST_FALSE_RE.search(fragment)),
+                    checkout_hardened=_flow_checkout_credentials_disabled(fragment),
                 )
             )
 
@@ -312,6 +379,8 @@ def violations(path: Path) -> list[str]:
         number = index + 1
         if re.match(r"^\s*permissions\s*:\s*write-all\s*$", line):
             findings.append(f"{path.name}:{number}: write-all permissions are forbidden")
+        if number in flow_style_lines:
+            continue
         match = USES_RE.match(line)
         if not match:
             continue
