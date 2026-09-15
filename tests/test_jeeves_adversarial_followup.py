@@ -97,6 +97,23 @@ def test_allowed_tools_must_be_a_bounded_name_list():
     assert session.turns == []
 
 
+def test_allowed_tools_budget_fails_before_session_mutation():
+    core = _core()
+    session = core.open_session("u")
+    core.register_tool("lookup", lambda _payload: None)
+
+    with pytest.raises(ValueError, match="allowed_tools budget"):
+        core.ask(
+            session.session_id,
+            "run lookup",
+            context={"tool_calls": [{"name": "lookup", "arguments": {}}]},
+            allowed_tools=["lookup"] * 5,
+        )
+
+    assert session.turns == []
+    assert core.stats()["tool_calls"] == 0
+
+
 @pytest.mark.parametrize("preferred", ["", "   "])
 def test_explicit_blank_provider_fails_closed(monkeypatch, preferred):
     monkeypatch.delenv("SKELETON_LLM_PROVIDER", raising=False)
