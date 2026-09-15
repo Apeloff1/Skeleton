@@ -8,17 +8,19 @@ suppress only that exact obsolete assertion.  Any different assertion failure
 in the same test remains a hard failure.
 
 This runner intentionally stays lightweight, but it also preserves pytest's
-important per-test instance isolation so state cannot leak between methods of
-the same test class.
+important per-test instance isolation, executes awaitable test results to
+completion, and treats an explicit ``SystemExit`` as a test failure rather than
+allowing ``SystemExit(0)`` to turn the whole runner falsely green.
 """
 from __future__ import annotations
 
+import asyncio
 import inspect
 import linecache
 import sys
 from pathlib import Path
 from types import TracebackType
-from typing import Iterator
+from typing import Awaitable, Iterator, TypeVar
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -38,6 +40,8 @@ SUPERSEDED_ASSERTIONS = {
         "assertion": 'assert lms["pfc"]["transformer_steps"] == 0',
     },
 }
+
+T = TypeVar("T")
 
 
 def _terminal_traceback(exc: BaseException) -> TracebackType | None:
@@ -80,6 +84,19 @@ def _iter_test_methods(cls: type) -> Iterator[tuple[str, object]]:
         yield mname, getattr(inst, mname)
 
 
+async def _await_result(awaitable: Awaitable[T]) -> T:
+    return await awaitable
+
+
+def _invoke_test(meth: object) -> object:
+    """Invoke one test and synchronously complete any awaitable it returns."""
+
+    result = meth()  # type: ignore[operator]
+    if inspect.isawaitable(result):
+        return asyncio.run(_await_result(result))
+    return result
+
+
 def main() -> int:
     fails = 0
     passes = 0
@@ -91,7 +108,7 @@ def main() -> int:
             for mname, meth in _iter_test_methods(cls):
                 key = (name, mname)
                 try:
-                    meth()
+                    _invoke_test(meth)
                     print("PASS", name, mname)
                     passes += 1
                 except AssertionError as exc:
@@ -100,6 +117,9 @@ def main() -> int:
                         superseded += 1
                         print("SUPERSEDED", name, mname, "->", spec["successor"], repr(exc))
                         continue
+                    fails += 1
+                    print("FAIL", name, mname, type(exc).__name__, exc)
+                except SystemExit as exc:
                     fails += 1
                     print("FAIL", name, mname, type(exc).__name__, exc)
                 except Exception as exc:
