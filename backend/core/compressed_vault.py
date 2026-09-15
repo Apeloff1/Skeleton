@@ -40,22 +40,17 @@ def _json_default(obj: Any):
     if isinstance(obj, bytes):
         import base64
         return {"__b64__": base64.b64encode(obj).decode("ascii")}
-    # Last resort — stringify (ObjectId, UUID, etc.)
     try:
         return str(obj)
     except Exception:
         return None
 
+
 # ── Paths ───────────────────────────────────────────────────────────────
-# Production k8s containers may mount /app read-only. Try the configured
-# path first, then fall back to a writable /tmp location so deployment
-# health-check never fails on a directory-creation error. Same safety net
-# applied to SCRATCH_ROOT.
 def _resolve_writable_dir(preferred: str, fallback: str) -> Path:
     try:
         p = Path(preferred)
         p.mkdir(parents=True, exist_ok=True)
-        # Sanity write test
         test_file = p / ".writable_test"
         test_file.write_text("ok")
         test_file.unlink(missing_ok=True)
@@ -65,30 +60,25 @@ def _resolve_writable_dir(preferred: str, fallback: str) -> Path:
         fp.mkdir(parents=True, exist_ok=True)
         return fp
 
+
 VAULT_ROOT = _resolve_writable_dir(
     os.environ.get("HYPERSCALE_VAULT_DIR", "/app/backend/data/vault/compressed"),
     "/tmp/hyperscale_vault",
 )
 
-# Scratch path — always /tmp (guaranteed writable in k8s)
 SCRATCH_ROOT = _resolve_writable_dir(
     os.environ.get("HYPERSCALE_SCRATCH_DIR", "/tmp/hyperscale_scratch"),
     "/tmp/hyperscale_scratch",
 )
 
-# Zstd compression: level 21 — near-maximum ratio with moderate speed penalty.
-# threads=-1 uses all available CPU cores per-shard (keeps seeds within minutes).
 _COMPRESSION_LEVEL = int(os.environ.get("HYPERSCALE_ZSTD_LEVEL", "21"))
 _COMPRESSOR = zstd.ZstdCompressor(level=_COMPRESSION_LEVEL, threads=-1, write_content_size=True)
 _DECOMPRESSOR = zstd.ZstdDecompressor()
 
-# LRU cache for decompressed shard payloads (max ~64 MB in RAM)
 _CACHE: dict[str, tuple[float, list[dict]]] = {}
 _CACHE_LOCK = threading.Lock()
 _CACHE_MAX_BYTES = 64 * 1024 * 1024
 _CACHE_SIZE_EST: dict[str, int] = {}
-
-# Manifest in-memory index: shard_name -> entry
 _MANIFEST: dict[str, dict] = {}
 _MANIFEST_FILE = VAULT_ROOT / "_manifest.json"
 
@@ -113,6 +103,21 @@ def _save_manifest() -> None:
 _load_manifest()
 
 
+def _safe_name(name: str) -> str:
+    """Accept only a single filename component for shard names."""
+    if not name or Path(name).name != name or name in {".", ".."}:
+        raise ValueError("invalid shard name")
+    if any(ch in name for ch in ("/", "\\", "\x00")):
+        raise ValueError("invalid shard name")
+    return name
+
+
+def _shard_path(name: str, scratch: bool = False) -> Path:
+    safe = _safe_name(name)
+    root = SCRATCH_ROOT if scratch else VAULT_ROOT
+    return root / f"{safe}.jsonl.zst"
+
+
 # ── Core write/read ─────────────────────────────────────────────────────
 def write_shard(
     name: str,
@@ -123,16 +128,11 @@ def write_shard(
     description: str = "",
     scratch: bool = False,
 ) -> dict:
-    """Write an iterable of JSON rows to a compressed shard.
-
-    Returns a manifest entry describing the archive.
-    When scratch=True, writes to /tmp (overlay) instead of persistent vault.
-    """
-    root = SCRATCH_ROOT if scratch else VAULT_ROOT
-    shard_path = root / f"{name}.jsonl.zst"
+    """Write an iterable of JSON rows to a compressed shard."""
+    name = _safe_name(name)
+    shard_path = _shard_path(name, scratch)
     shard_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Stream JSON-lines through zstd straight to disk (no full buffer)
     count = 0
     raw_bytes = 0
     hasher = hashlib.sha1()
@@ -170,7 +170,6 @@ def _cache_evict_if_needed() -> None:
     total = sum(_CACHE_SIZE_EST.values())
     if total <= _CACHE_MAX_BYTES:
         return
-    # simple LRU by last-access time
     items = sorted(_CACHE.items(), key=lambda kv: kv[1][0])
     while total > _CACHE_MAX_BYTES and items:
         key, _ = items.pop(0)
@@ -179,10 +178,10 @@ def _cache_evict_if_needed() -> None:
 
 
 def _load_full(name: str) -> list[dict]:
-    entry = _MANIFEST.get(name)
-    if not entry:
+    name = _safe_name(name)
+    if name not in _MANIFEST:
         raise KeyError(f"Shard '{name}' not in manifest")
-    path = Path(entry["path"])
+    path = _shard_path(name)
     if not path.exists():
         raise FileNotFoundError(f"Archive missing on disk: {path}")
     with open(path, "rb") as fh:
@@ -200,7 +199,7 @@ def _load_full(name: str) -> list[dict]:
 
 
 def read_shard(name: str, limit: int = 50, offset: int = 0) -> list[dict]:
-    """Read a paginated slice from a compressed shard (cached)."""
+    name = _safe_name(name)
     with _CACHE_LOCK:
         cached = _CACHE.get(name)
         if cached is not None:
@@ -216,11 +215,10 @@ def read_shard(name: str, limit: int = 50, offset: int = 0) -> list[dict]:
 
 
 def iter_shard(name: str) -> Iterator[dict]:
-    """Stream rows from a shard without materializing entire payload in cache."""
-    entry = _MANIFEST.get(name)
-    if not entry:
+    name = _safe_name(name)
+    if name not in _MANIFEST:
         raise KeyError(f"Shard '{name}' not in manifest")
-    path = Path(entry["path"])
+    path = _shard_path(name)
     with open(path, "rb") as fh:
         with _DECOMPRESSOR.stream_reader(fh) as zr:
             buf = io.TextIOWrapper(zr, encoding="utf-8")
@@ -235,7 +233,6 @@ def iter_shard(name: str) -> Iterator[dict]:
 
 
 def sample_shard(name: str, k: int = 5) -> list[dict]:
-    """Return first k rows from a shard (lightweight probe; no full decompress cache)."""
     out: list[dict] = []
     for row in iter_shard(name):
         out.append(row)
@@ -249,11 +246,10 @@ def list_shards() -> list[dict]:
 
 
 def get_shard_entry(name: str) -> dict | None:
-    return _MANIFEST.get(name)
+    return _MANIFEST.get(_safe_name(name))
 
 
 def vault_stats() -> dict:
-    # Refresh manifest from disk so external seed processes are picked up
     _load_manifest()
     shards = list(_MANIFEST.values())
     total_raw = sum(s.get("raw_bytes", 0) for s in shards)
@@ -279,11 +275,12 @@ def purge_cache() -> int:
 
 
 def delete_shard(name: str) -> bool:
+    name = _safe_name(name)
     entry = _MANIFEST.pop(name, None)
     if not entry:
         return False
     try:
-        Path(entry["path"]).unlink(missing_ok=True)
+        _shard_path(name).unlink(missing_ok=True)
     except Exception:
         pass
     _save_manifest()

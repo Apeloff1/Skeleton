@@ -155,43 +155,14 @@ class InterpReq(BaseModel):
 
 @router.post("/interpreter/run")
 async def interpreter_run(req: InterpReq):
+    """Refuse in-process Python execution; arbitrary request code must not reach exec()."""
     if not code_execution_enabled():
         return execution_disabled_response("Interpreter execution")
-
-    if req.language != "python":
-        # Forward via the tool registry (which spawns subprocesses for compiled
-        # langs and uses the playground for the rest).
-        if req.language in ("c", "cpp", "cxx", "go", "rust"):
-            return await tool_registry.invoke("compile_code", {"language": req.language, "code": req.code})
-        return await tool_registry.invoke("run_code", {"language": req.language, "code": req.code})
-
-    # Python — persistent globals/locals per session
-    import io, contextlib
-    state = _REPL_STATE.setdefault(req.session_id, {"globals": {"__name__": "__interp__"}, "history": []})
-    buf_out, buf_err = io.StringIO(), io.StringIO()
-    try:
-        if not code_execution_enabled():
-            return execution_disabled_response("Interpreter execution")
-        import builtins
-        with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
-            builtins.exec(builtins.compile(req.code, "<interp>", "exec"), state["globals"])
-        state["history"].append({"code": req.code, "ok": True})
-        return {
-            "ok": True,
-            "stdout": buf_out.getvalue()[-8000:],
-            "stderr": buf_err.getvalue()[-8000:],
-            "session_id": req.session_id,
-            "history_length": len(state["history"]),
-        }
-    except Exception as e:
-        state["history"].append({"code": req.code, "ok": False, "error": str(e)})
-        return {
-            "ok": False,
-            "stdout": buf_out.getvalue()[-8000:],
-            "stderr": f"{buf_err.getvalue()}\n{type(e).__name__}: {e}"[-8000:],
-            "session_id": req.session_id,
-            "history_length": len(state["history"]),
-        }
+    if req.language == "python":
+        return execution_disabled_response("In-process Python interpreter execution")
+    if req.language in ("c", "cpp", "cxx", "go", "rust"):
+        return await tool_registry.invoke("compile_code", {"language": req.language, "code": req.code})
+    return await tool_registry.invoke("run_code", {"language": req.language, "code": req.code})
 
 
 @router.get("/interpreter/state/{session_id}")

@@ -42,6 +42,7 @@ class ExecutionReceipt:
 
 class ExecutionReceiptStore:
     VERSION = 2
+    MAX_OPERATION_ID_LENGTH = 128
 
     def __init__(self, directory: str | os.PathLike[str]) -> None:
         self.directory = Path(directory)
@@ -67,10 +68,21 @@ class ExecutionReceiptStore:
         return summary
 
     def _path(self, operation_id: str) -> Path:
-        operation_id = operation_id.strip()
-        if not operation_id or any(ch not in "0123456789abcdef" for ch in operation_id.lower()):
+        operation_id = str(operation_id)
+        if operation_id != operation_id.strip():
             raise ValueError("operation_id must be a hexadecimal identifier")
-        return self.directory / f"{operation_id}.json"
+        if not operation_id or len(operation_id) > self.MAX_OPERATION_ID_LENGTH:
+            raise ValueError("operation_id must be a hexadecimal identifier")
+        if any(ch not in "0123456789abcdefABCDEF" for ch in operation_id):
+            raise ValueError("operation_id must be a hexadecimal identifier")
+
+        requested = f"{operation_id}.json"
+        root = os.path.realpath(os.fspath(self.directory))
+        fullpath = os.path.realpath(os.path.normpath(os.path.join(root, requested)))
+        root_prefix = root + os.sep
+        if not fullpath.startswith(root_prefix):
+            raise ValueError("operation_id escapes the receipt directory")
+        return Path(fullpath)
 
     def write(
         self,

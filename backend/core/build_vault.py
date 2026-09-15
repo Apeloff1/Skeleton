@@ -30,7 +30,7 @@ import time
 import zipfile
 import threading
 import logging
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Iterator, Tuple
 
 import zstandard as zstd
@@ -77,9 +77,37 @@ _TLS = threading.local()
 # Per-build locks so concurrent phases don't corrupt the manifest.
 _LOCKS: dict[str, threading.Lock] = {}
 _LOCKS_GUARD = threading.Lock()
+_MAX_BUILD_ID_LENGTH = 128
+_MAX_ARCHIVE_MEMBER_LENGTH = 4096
+
+
+def _validate_build_id(build_id: str) -> str:
+    """Accept only a bounded single safe path component for build directories."""
+    if not isinstance(build_id, str) or not build_id or len(build_id) > _MAX_BUILD_ID_LENGTH:
+        raise ValueError("build_id must be a non-empty bounded identifier")
+    if build_id != build_id.strip() or build_id in {".", ".."}:
+        raise ValueError("build_id must be a canonical identifier")
+    if Path(build_id).name != build_id:
+        raise ValueError("build_id must be a single path component")
+    allowed = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-")
+    if any(ch not in allowed for ch in build_id):
+        raise ValueError("build_id contains unsupported path characters")
+    return build_id
+
+
+def _safe_archive_member(path: str) -> str:
+    """Reject archive member names that could escape a later extraction root."""
+    value = str(path)
+    if not value or len(value) > _MAX_ARCHIVE_MEMBER_LENGTH or "\x00" in value or "\\" in value:
+        raise ValueError("unsafe archive member path")
+    member = PurePosixPath(value)
+    if member.is_absolute() or any(part in {"", ".", ".."} for part in member.parts):
+        raise ValueError("unsafe archive member path")
+    return member.as_posix()
 
 
 def _lock_for(build_id: str) -> threading.Lock:
+    build_id = _validate_build_id(build_id)
     with _LOCKS_GUARD:
         lk = _LOCKS.get(build_id)
         if lk is None:
@@ -101,9 +129,15 @@ _DECOMPRESSOR = zstd.ZstdDecompressor()
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 def _build_dir(build_id: str) -> Path:
-    p = BUILDS_ROOT / build_id
-    p.mkdir(parents=True, exist_ok=True)
-    return p
+    build_id = _validate_build_id(build_id)
+    root = os.path.realpath(os.fspath(BUILDS_ROOT))
+    candidate = os.path.realpath(os.path.normpath(os.path.join(root, build_id)))
+    root_prefix = root + os.sep
+    if not candidate.startswith(root_prefix):
+        raise ValueError("build_id resolves outside the build vault root")
+    path = Path(candidate)
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def _manifest_path(build_id: str) -> Path:
@@ -147,7 +181,10 @@ def _rebuild_manifest(build_id: str) -> dict:
                 "path_index": {}, "created_at": time.time(),
                 "rebuilt": True}
     for sp in shards:
-        idx = int(sp.stem.split("_")[1])
+        try:
+            idx = int(sp.name.removeprefix("shard_").removesuffix(".jsonl.zst"))
+        except ValueError:
+            continue
         count = 0
         paths = []
         raw = 0
@@ -260,7 +297,12 @@ def get_stats(build_id: str) -> dict:
 
 
 def _iter_shard(build_id: str, shard_file: str) -> Iterator[Tuple[str, str]]:
-    sp = _build_dir(build_id) / shard_file
+    safe_build_id = _validate_build_id(build_id)
+    if not shard_file or Path(shard_file).name != shard_file:
+        return
+    if shard_file in {".", ".."} or any(ch in shard_file for ch in "/\\\x00"):
+        return
+    sp = _build_dir(safe_build_id) / shard_file
     if not sp.exists():
         return
     try:
@@ -350,13 +392,22 @@ def package_zip(build_id: str, out_path: Path | None = None) -> Path:
     """Stream vault contents into a ZIP file on disk (no full in-RAM copy)."""
     d = _build_dir(build_id)
     if out_path is None:
-        out_path = d / f"{build_id}.zip"
+        out_path = d / f"{_validate_build_id(build_id)}.zip"
+    else:
+        root = os.path.realpath(os.fspath(d))
+        requested = os.fspath(out_path)
+        candidate = os.path.realpath(os.path.normpath(
+            requested if os.path.isabs(requested) else os.path.join(root, requested)
+        ))
+        if not candidate.startswith(root + os.sep):
+            raise ValueError("out_path must stay inside the build directory")
+        out_path = Path(candidate)
     with zipfile.ZipFile(out_path, "w", compression=zipfile.ZIP_DEFLATED,
                          compresslevel=6, allowZip64=True) as zf:
         for p, c in iter_files(build_id):
             try:
-                zf.writestr(p, c)
-            except Exception:
+                zf.writestr(_safe_archive_member(p), c)
+            except (ValueError, OSError, RuntimeError, zipfile.BadZipFile):
                 continue
     return out_path
 
