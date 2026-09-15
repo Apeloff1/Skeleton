@@ -13,7 +13,6 @@ matrices observe every turn:
 
 from __future__ import annotations
 
-import copy
 import math
 import re
 import time
@@ -37,6 +36,7 @@ _MAX_REQUEST_DEPTH = 8
 _MAX_REQUEST_NODES = 512
 _MAX_REQUEST_STRING_CHARS = 16_384
 _MAX_INPUT_CHARS = 32_768
+_MAX_PROVIDER_OUTPUT_CHARS = 262_144
 _PROVIDER_ERROR_CONTENT = "[provider unavailable]"
 
 
@@ -289,6 +289,8 @@ class JeevesCore:
             content = self._provider.complete(legacy_prompt, context=prior_context)
         if not isinstance(content, str):
             raise TypeError("provider must return text")
+        if len(content) > _MAX_PROVIDER_OUTPUT_CHARS:
+            raise ValueError("provider response too large")
         return content
 
     @property
