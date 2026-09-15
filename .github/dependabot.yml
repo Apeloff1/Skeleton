@@ -22,6 +22,13 @@ updates:
       time: "06:15"
       timezone: Europe/Oslo
     open-pull-requests-limit: 5
+    # Keep routine version-update PRs inside the current major line. Security
+    # updates are not restricted by allow.update-types and continue to surface.
+    allow:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
     groups:
       backend-runtime:
         applies-to: version-updates
@@ -43,6 +50,14 @@ updates:
       timezone: Europe/Oslo
     open-pull-requests-limit: 5
     versioning-strategy: increase-if-necessary
+    # Major Expo/React/toolchain jumps require coordinated application changes.
+    # Restrict routine version PRs to minor/patch while leaving security updates
+    # unaffected by this allow policy.
+    allow:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
     groups:
       frontend-runtime:
         applies-to: version-updates
