@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import time
 import uuid
 from collections import defaultdict, deque
@@ -32,19 +33,14 @@ from starlette.responses import JSONResponse, Response
 
 log = logging.getLogger("api.middleware")
 
-# ── Configuration ─────────────────────────────────────────────────────
 _RATE_PER_MIN = int(os.environ.get("RATE_LIMIT_PER_MIN", "600"))
 _RATE_BURST = int(os.environ.get("RATE_LIMIT_BURST", "60"))
 _EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "127.0.0.1,::1,localhost")
 _EXEMPT_IPS = {ip.strip() for ip in _EXEMPT_RAW.split(",") if ip.strip()}
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
+_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 
-# Telemetry counters (in-memory) ────────────────────────────────────
-# Last 1024 latencies as a ring buffer for p50/p95 computation.
 _lat_ring: Deque[float] = deque(maxlen=1024)
-# Lazy-init Lock to avoid event-loop binding issues in production
-# (creating asyncio primitives at module import time can bind to the
-# wrong loop in K8s where uvicorn workers may use a fresh loop).
 _lat_lock: asyncio.Lock | None = None
 
 def _get_lat_lock() -> asyncio.Lock:
@@ -93,23 +89,22 @@ def get_stats() -> dict:
     }
 
 
-# ── Request ID ────────────────────────────────────────────────────────
+def _request_id(request: Request) -> str:
+    candidate = request.headers.get("x-request-id", "")
+    if candidate and _REQUEST_ID_RE.fullmatch(candidate):
+        return candidate
+    return uuid.uuid4().hex[:16]
+
+
 class RequestIdMiddleware(BaseHTTPMiddleware):
-    """Pulls X-Request-Id from the inbound header if present, otherwise mints
-    one. The id is exposed on `request.state.request_id` and echoed back on
-    the response header. Useful for cross-service correlation."""
+    """Accept a bounded header-safe X-Request-Id or mint one."""
 
     async def dispatch(self, request: Request, call_next: Callable):
-        rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:16]
+        rid = _request_id(request)
         request.state.request_id = rid
         try:
             response: Response = await call_next(request)
         except RuntimeError as e:
-            # Starlette BaseHTTPMiddleware raises "No response returned."
-            # when the client disconnects mid-response. This is benign —
-            # there's no response object to attach the header to, so just
-            # propagate the disconnect as a 499 (nginx convention for
-            # client-closed-request). Logged at debug to avoid noise.
             if "No response returned" in str(e):
                 from fastapi.responses import Response as _Resp
                 log.debug("client disconnected mid-request rid=%s path=%s", rid, request.url.path)
@@ -121,11 +116,8 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         return response
 
 
-# ── Access log ────────────────────────────────────────────────────────
 class AccessLogMiddleware(BaseHTTPMiddleware):
-    """Single structured log line per request. Format:
-       method=GET path=/api/health status=200 dur_ms=3.21 rid=abcd1234 ip=10.0.0.5
-    """
+    """Single structured log line per request."""
 
     async def dispatch(self, request: Request, call_next: Callable):
         if not _ACCESS_LOG:
@@ -136,7 +128,6 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
             status = response.status_code
         except Exception:
-            # Log the failure then re-raise; the global handler will still 500.
             dur = (time.perf_counter() - t0) * 1000
             log.exception(
                 "method=%s path=%s status=500 dur_ms=%.2f rid=%s ip=%s err=unhandled",
@@ -149,7 +140,6 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
         _counts["requests"] += 1
         _counts[bucket] += 1
         await _push_latency(dur)
-        # Skip the high-frequency health pings from access log to keep it clean.
         if request.url.path not in ("/api/health", "/api/_telemetry"):
             log.info(
                 "method=%s path=%s status=%d dur_ms=%.2f rid=%s ip=%s",
@@ -159,7 +149,6 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
 
 
 def _client_ip(request: Request) -> str:
-    # Honour X-Forwarded-For when behind an ingress, fall back to peer.
     xff = request.headers.get("x-forwarded-for")
     if xff:
         return xff.split(",")[0].strip()
@@ -167,10 +156,8 @@ def _client_ip(request: Request) -> str:
     return client.host if client else "-"
 
 
-# ── Rate limiter ──────────────────────────────────────────────────────
 class _Bucket:
-    """Tiny token-bucket. Refills `_refill_per_sec` tokens per second up to
-    `capacity`. take() returns True if a token was consumed."""
+    """Tiny token-bucket."""
     __slots__ = ("tokens", "last", "capacity", "refill_per_sec")
 
     def __init__(self, capacity: int, refill_per_sec: float):
@@ -188,18 +175,13 @@ class _Bucket:
         if self.tokens >= n:
             self.tokens -= n
             return True, 0.0
-        # Seconds until the next token will be available.
         deficit = n - self.tokens
         retry = deficit / self.refill_per_sec if self.refill_per_sec > 0 else 60.0
         return False, retry
 
 
 class RateLimiterMiddleware(BaseHTTPMiddleware):
-    """Per-IP token bucket. Exempt IPs (loopback) skip the check.
-
-    NOTE: This is *in-memory* and per-process. Sufficient for single-replica
-    deployments and dev. For horizontal scaling, swap in a shared store.
-    """
+    """Per-IP token bucket. Exempt IPs (loopback) skip the check."""
 
     def __init__(self, app, per_minute: int | None = None, burst: int | None = None):
         super().__init__(app)
@@ -216,7 +198,6 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         return b
 
     async def dispatch(self, request: Request, call_next: Callable):
-        # Bypass non-API routes (Expo serves /, /assets, etc. from same origin)
         if not request.url.path.startswith("/api"):
             return await call_next(request)
         ip = _client_ip(request)
@@ -228,32 +209,15 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
             rid = getattr(request.state, "request_id", "-")
             log.warning("rate_limited ip=%s path=%s retry=%.1fs rid=%s", ip, request.url.path, retry, rid)
             return JSONResponse(
-                {
-                    "error": "rate_limited",
-                    "message": "Too many requests; please slow down.",
-                    "retry_after_seconds": round(retry, 1),
-                    "request_id": rid,
-                },
+                {"error": "rate_limited", "message": "Too many requests; please slow down.", "retry_after_seconds": round(retry, 1), "request_id": rid},
                 status_code=429,
-                headers={
-                    "Retry-After": str(max(1, int(retry + 0.5))),
-                    "X-Request-Id": rid,
-                    "X-RateLimit-Limit": str(self.per_minute),
-                },
+                headers={"Retry-After": str(max(1, int(retry + 0.5))), "X-Request-Id": rid, "X-RateLimit-Limit": str(self.per_minute)},
             )
         return await call_next(request)
 
 
 def install_middleware(app) -> None:
-    """Idempotent wiring helper. Order matters: rate limit OUTERMOST so we
-    short-circuit cheap; request-id MUST wrap access-log so the log line
-    can read request.state.request_id (set by RequestIdMiddleware).
-
-    Starlette wraps middleware in reverse-add order (LIFO), so calling
-    add_middleware in the order below results in:
-        Client → RateLimiter → RequestId → AccessLog → handler
-    (AccessLog runs INSIDE RequestId so request_id is populated by then.)
-    """
-    app.add_middleware(AccessLogMiddleware)   # add 1st → innermost
-    app.add_middleware(RequestIdMiddleware)   # add 2nd → wraps AccessLog
-    app.add_middleware(RateLimiterMiddleware) # add 3rd → outermost
+    """Install rate limiting, request IDs, and access logging."""
+    app.add_middleware(AccessLogMiddleware)
+    app.add_middleware(RequestIdMiddleware)
+    app.add_middleware(RateLimiterMiddleware)
