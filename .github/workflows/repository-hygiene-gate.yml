@@ -30,11 +30,22 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Resolve changed-file diff base
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            diff_base=$(git merge-base "$BASE_SHA" "$HEAD_SHA")
+          else
+            diff_base="$BASE_SHA"
+          fi
+          echo "DIFF_BASE=$diff_base" >> "$GITHUB_ENV"
+
       - name: Reject whitespace errors and conflict markers
         shell: bash
         run: |
           set -euo pipefail
-          git diff --check "$BASE_SHA" "$HEAD_SHA"
+          git diff --check "$DIFF_BASE" "$HEAD_SHA"
 
       - name: Reject generated junk and accidental local state
         shell: bash
@@ -73,7 +84,7 @@ jobs:
                 esac
                 ;;
             esac
-          done < <(git diff --name-only -z --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA")
+          done < <(git diff --name-only -z --diff-filter=ACMR "$DIFF_BASE" "$HEAD_SHA")
 
           exit "$failed"
 
@@ -101,7 +112,7 @@ jobs:
             mib=$(awk -v bytes="$size" 'BEGIN { printf "%.2f", bytes / 1048576 }')
             echo "::error file=${path}::File is ${mib} MiB. Keep source files below 10 MiB or store large assets with Git LFS/artifact storage."
             failed=1
-          done < <(git diff --name-only -z --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA")
+          done < <(git diff --name-only -z --diff-filter=ACMR "$DIFF_BASE" "$HEAD_SHA")
 
           exit "$failed"
 
@@ -110,7 +121,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          changed=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" | wc -l | tr -d ' ')
+          changed=$(git diff --name-only --diff-filter=ACMR "$DIFF_BASE" "$HEAD_SHA" | wc -l | tr -d ' ')
           {
             echo '## Repository hygiene gate'
             echo "- Changed files inspected: $changed"
