@@ -1,0 +1,50 @@
+base_manifest_version: 11
+predecessor: docs/lineage/promotion-manifest-v13-supplement.yaml
+canonical_repository: Apeloff1/Skeleton
+strategy: selective-promotion
+status: post-v11-supplement-wave-20
+waves:
+  - wave: 20
+    surface: lucky-wheel-policy
+    decision: promote-hardened-policy-not-route-or-rng
+    source_blob: 27df9034118b9c5960668a231aed6d75385f8a9e
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/rewards_routes.py
+      - repository: Apeloff1/Openworld
+        path: backend/rewards_routes.py
+    targets:
+      - skeleton/frontier/lucky_wheel.py
+    hardening:
+      - explicit-spin-type-allowlist
+      - verified-ad-completion-boundary
+      - exact-probability-mass-validation
+      - duplicate-slot-rejection
+      - finite-injected-random-draw
+      - gem-balance-preflight
+      - wallet-neutral-debit-and-reward-plans
+    evidence:
+      - skeleton/testing/test_frontier_lucky_wheel_policy.py
+      - docs/lineage/LUCKY_WHEEL_PROMOTION_2026-09-15.md
+rejected_from_kernel:
+  - global-random-module-ownership
+  - fastapi-routes
+  - motor-mongodb-clients
+  - ad-provider-integration
+  - spin-history-persistence
+  - direct-wallet-energy-bait-item-mutation
+benchmark_policy:
+  timing: observational-only
+  correctness: gated
+next_candidate:
+  surface: shop-commerce-policy
+  disposition: inspect-before-promotion
+  compared_sources:
+    - repository: Apeloff1/Lorebuffa
+      path: backend/shop_routes.py
+    - repository: Apeloff1/Openworld
+      path: backend/shop_routes.py
+  caution:
+    - do-not-promote-payment-or-database-side-effects
+    - reuse-existing-wallet-neutral-plan-shapes-where-possible
+    - reject-client-controlled-pricing

@@ -1,0 +1,145 @@
+base_manifest_version: 14
+canonical_repository: Apeloff1/Skeleton
+strategy: selective-promotion
+status: post-v14-supplement
+waves:
+  - wave: 21
+    surface: commerce-shop-iap
+    decision: promote-once-exact-shared-lineage-with-trust-boundary-hardening
+    source_blob: c7bb3661f98642bc0e4220b624bcc7fd71e25d25
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/shop_routes.py
+      - repository: Apeloff1/Openworld
+        path: backend/shop_routes.py
+    targets:
+      - skeleton/frontier/commerce.py
+    hardening:
+      - positive-purchase-quantity
+      - wallet-neutral-debit-and-reward-plans
+      - semantic-catalog-digest-binding
+      - deterministic-local-rng-daily-deals
+      - subject-and-expiry-bound-daily-deals
+      - provider-verified-iap-boundary
+      - exact-product-price-currency-binding
+      - transaction-replay-protection
+      - one-time-bundle-enforcement
+      - repeatable-bundle-cooldown-enforcement
+    source_flaws_closed:
+      - negative-quantity-wallet-credit
+      - simulated-iap-self-authorization
+      - global-rng-state-mutation
+    evidence:
+      - skeleton/testing/test_frontier_commerce_policy.py
+      - docs/lineage/COMMERCE_VIP_TOURNAMENT_PROMOTION_2026-09-15.md
+  - wave: 22
+    surface: vip-entitlement
+    decision: promote-once-exact-shared-lineage-reuse-commerce-verification
+    source_blob: f67aedc7877bf6e8c9e6bf11d97507f426383ac1
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/vip_routes.py
+      - repository: Apeloff1/Openworld
+        path: backend/vip_routes.py
+    targets:
+      - skeleton/frontier/vip.py
+    hardening:
+      - positive-duration-months
+      - closed-payment-method-set
+      - exact-usd-product-price-subject-binding
+      - provider-transaction-replay-protection
+      - one-time-three-day-bronze-trial
+      - gem-debit-plan-without-wallet-side-effects
+      - expiry-normalization-before-benefit-use
+      - deterministic-entitlement-extension
+      - idempotent-daily-vip-claim-plan
+    source_flaws_closed:
+      - usd-subscription-without-payment-verification
+      - unknown-payment-method-entitlement-bypass
+      - negative-duration-gem-credit
+    evidence:
+      - skeleton/testing/test_frontier_vip_policy.py
+      - docs/lineage/COMMERCE_VIP_TOURNAMENT_PROMOTION_2026-09-15.md
+  - wave: 23
+    surface: vip-daily-points
+    decision: promote-once-exact-shared-lineage
+    source_blob: 3d23e083f91053d9df6450043fc12bad7829aa51
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/vip_daily_routes.py
+      - repository: Apeloff1/Openworld
+        path: backend/vip_daily_routes.py
+    targets:
+      - skeleton/frontier/vip_daily.py
+    hardening:
+      - isolated-sha256-seeded-rng
+      - exact-fish-identity
+      - subject-and-date-bound-challenge
+      - bounded-progress
+      - single-use-reward-claim
+      - cumulative-one-time-point-milestones
+      - wallet-neutral-milestone-reward-plans
+    source_flaws_closed:
+      - repeatable-catch-of-day-reward-mint
+      - fuzzy-substring-fish-match
+      - global-rng-state-mutation
+    evidence:
+      - skeleton/testing/test_frontier_vip_daily_policy.py
+      - docs/lineage/COMMERCE_VIP_TOURNAMENT_PROMOTION_2026-09-15.md
+  - wave: 24
+    surface: tournament-lifecycle
+    decision: promote-once-exact-shared-lineage
+    source_blob: 14d5c55aba152c7a6000c8fea7da8603dbdf18cf
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/tournament_routes.py
+      - repository: Apeloff1/Openworld
+        path: backend/tournament_routes.py
+    targets:
+      - skeleton/frontier/tournament.py
+    hardening:
+      - positive-duration-and-capacity
+      - nonnegative-entry-fee
+      - entry-currency-allowlist
+      - active-window-join-and-score-gating
+      - nonnegative-score-and-stat-deltas
+      - canonical-score-biggest-fish-user-id-ranking
+      - minimum-cast-payout-qualification
+      - end-time-finalization-gate
+      - stable-finalization-digest
+      - wallet-neutral-entry-and-payout-plans
+    source_flaws_closed:
+      - negative-score-stat-mutation
+      - live-vs-final-ranking-divergence
+      - premature-finalization
+      - payout-before-durable-finalization-retry-risk
+    evidence:
+      - skeleton/testing/test_frontier_tournament_policy.py
+      - docs/lineage/COMMERCE_VIP_TOURNAMENT_PROMOTION_2026-09-15.md
+rejected_from_kernel:
+  - fastapi-routes
+  - pydantic-request-models
+  - motor-mongodb-clients
+  - direct-wallet-mutation
+  - direct-inventory-persistence
+  - client-self-asserted-payment-success
+  - provider-receipt-validation-implementation
+  - presentation-catalog-copying
+  - payment-sdk-coupling
+trust_boundaries:
+  payment_verification:
+    disposition: external
+    kernel_input: VerifiedPurchaseEvidence
+    required_properties:
+      - subject-bound
+      - product-bound
+      - transaction-bound
+      - exact-price-and-currency
+      - replay-protected
+benchmark_policy:
+  timing: observational-only
+  correctness: gated
+next_candidates:
+  - encyclopedia-collection-policy
+  - event-liveops-policy
+  - sea-voyage-expedition-policy

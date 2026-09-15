@@ -1,0 +1,77 @@
+{
+  "source": {
+    "repository": "Apeloff1/Lorebuffa",
+    "path": "backend/expanded_npcs.py",
+    "blob": "a232cb0991657998bb339d34b9321a16e4203aa9"
+  },
+  "equivalent_source": {
+    "repository": "Apeloff1/Openworld",
+    "path": "backend/expanded_npcs.py",
+    "blob": "a232cb0991657998bb339d34b9321a16e4203aa9"
+  },
+  "records": [
+    {
+      "id": "barnacle_bill",
+      "name": "Barnacle Bill",
+      "title": "Legendary Fisherman",
+      "role": "mentor",
+      "personality": "wise_gruff",
+      "description": "An ancient fisherman covered in barnacles. His eyes have seen every fish in every sea.",
+      "faction": "fishermen_guild",
+      "initial_disposition": 50,
+      "voice_style": "gruff_but_kind",
+      "schedule": {
+        "morning": "docks",
+        "afternoon": "tavern",
+        "evening": "docks",
+        "night": "home"
+      },
+      "skills_taught": [
+        "basic_fishing",
+        "fish_identification",
+        "weather_reading"
+      ],
+      "quests_offered": [
+        "first_catch",
+        "golden_mackerel_hunt",
+        "leviathan_tale"
+      ],
+      "shop_inventory": null,
+      "romance_available": false,
+      "backstory": "Sailed for 70 years. Lost his ship in the Storm of '82 but gained wisdom."
+    },
+    {
+      "id": "harbor_master_jenkins",
+      "name": "Harbor Master Jenkins",
+      "title": "Port Authority",
+      "role": "official",
+      "personality": "bureaucratic_fair",
+      "description": "A stern man with immaculate uniform and endless paperwork.",
+      "faction": "port_authority",
+      "initial_disposition": 40,
+      "voice_style": "formal_clipped",
+      "schedule": {
+        "morning": "office",
+        "afternoon": "docks",
+        "evening": "office",
+        "night": "home"
+      },
+      "skills_taught": [
+        "navigation_permits",
+        "trade_licenses"
+      ],
+      "quests_offered": [
+        "smuggler_investigation",
+        "dock_repairs",
+        "missing_shipment"
+      ],
+      "shop_inventory": [
+        "permits",
+        "licenses",
+        "maps"
+      ],
+      "romance_available": false,
+      "backstory": "Former naval officer who values order above all else."
+    }
+  ]
+}

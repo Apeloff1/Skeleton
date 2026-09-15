@@ -1,0 +1,75 @@
+base_manifest_version: 11
+predecessor: docs/lineage/promotion-manifest-v12-supplement.yaml
+canonical_repository: Apeloff1/Skeleton
+strategy: selective-promotion
+status: post-v11-supplement-wave-19
+waves:
+  - wave: 18
+    surface: biotope-achievement-evidence
+    decision: promote-adapter-not-second-achievement-engine
+    source_blob: 5a06312eebf8bb21fef28b1010dfc3ccff6b6500
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/biotope_achievements_routes.py
+      - repository: Apeloff1/Openworld
+        path: backend/biotope_achievements_routes.py
+    targets:
+      - skeleton/frontier/biotope_achievement_adapters.py
+    hardening:
+      - nested-reward-and-size-threshold-normalization
+      - explicit-lake-and-arctic-requirement-stat-aliases
+      - distinct-stage-species-evidence
+      - species-family-token-evidence
+      - per-biotope-each-qualifier-enforcement
+      - trophy-and-legendary-biotope-coverage
+      - canonical-achievement-kernel-delegation
+    evidence:
+      - skeleton/testing/test_frontier_biotope_achievement_adapters.py
+      - docs/lineage/BIOTOPE_ACHIEVEMENT_PROMOTION_2026-09-15.md
+  - wave: 19
+    surface: season-pass-policy
+    decision: promote-shared-policy-not-rewards-route
+    source_blob: 27df9034118b9c5960668a231aed6d75385f8a9e
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/rewards_routes.py
+      - repository: Apeloff1/Openworld
+        path: backend/rewards_routes.py
+    targets:
+      - skeleton/frontier/season_pass.py
+    hardening:
+      - contiguous-tier-topology
+      - season-progress-catalog-binding
+      - normalized-tier-xp-state
+      - multi-threshold-xp-rollover
+      - idempotent-track-specific-claims
+      - verified-premium-entitlement-boundary
+      - wallet-neutral-reward-plans
+    evidence:
+      - skeleton/testing/test_frontier_season_pass_policy.py
+      - docs/lineage/SEASON_PASS_PROMOTION_2026-09-15.md
+rejected_from_kernel:
+  - fastapi-routes
+  - pydantic-request-models
+  - motor-mongodb-clients
+  - direct-wallet-mutation
+  - simulated-iap-entitlements
+  - source-catalog-persistence
+  - lucky-wheel-persistence
+  - duplicate-daily-streak-policy
+benchmark_policy:
+  timing: observational-only
+  correctness: gated
+next_candidate:
+  surface: lucky-wheel-policy
+  disposition: compare-weighted-selection-and-spin-budget-semantics-before-promotion
+  shared_blob: 27df9034118b9c5960668a231aed6d75385f8a9e
+  compared_sources:
+    - repository: Apeloff1/Lorebuffa
+      path: backend/rewards_routes.py
+    - repository: Apeloff1/Openworld
+      path: backend/rewards_routes.py
+  caution:
+    - inject-random-draw-never-own-global-rng
+    - validate-probability-mass-and-slot-identity
+    - keep-wallet-debit-and-reward-application-transactional
