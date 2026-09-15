@@ -72,7 +72,10 @@ printf '\n== JavaScript child_process alias safety ==\n'
 python backend/scripts/check_js_process_alias_safety.py
 
 printf '\n== GitHub Actions workflow security ==\n'
-python backend/scripts/check_workflow_security.py
+python backend/scripts/check_workflow_security_policy.py
+
+printf '\n== GitHub Actions container security ==\n'
+python backend/scripts/check_workflow_container_security.py
 
 printf '\n== Repository secret hygiene ==\n'
 python backend/scripts/check_secret_hygiene.py
@@ -95,6 +98,8 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_repository_python_sast_scope.py \
   backend/tests/test_js_process_alias_safety.py \
   backend/tests/test_workflow_security_gate.py \
+  backend/tests/test_workflow_privileged_trigger_security.py \
+  backend/tests/test_workflow_container_security.py \
   backend/tests/test_secret_hygiene_gate.py \
   backend/tests/test_malware_ioc_gate.py \
   backend/tests/test_incident_response_runbook.py \

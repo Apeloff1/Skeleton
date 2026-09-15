@@ -23,7 +23,8 @@ SHARED_BACKEND_MARKERS: tuple[tuple[str, str], ...] = (
     ("unsafe deserialization safety", "check_deserialization_safety.py"),
     ("high-confidence SAST", "check_sast_security.py"),
     ("JavaScript process alias safety", "check_js_process_alias_safety.py"),
-    ("workflow security", "check_workflow_security.py"),
+    ("workflow security", "check_workflow_security_policy.py"),
+    ("workflow container security", "check_workflow_container_security.py"),
     ("secret hygiene", "check_secret_hygiene.py"),
     ("malware/IOC policy", "check_malware_iocs.py"),
 )
