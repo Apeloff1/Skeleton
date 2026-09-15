@@ -217,6 +217,41 @@ def test_constructor_system_exit_cannot_escape_collection(monkeypatch, capsys) -
     assert "RESULT 0 ok 1 fail 0 superseded" in out
 
 
+def test_class_lifecycle_hooks_are_rejected_instead_of_ignored(monkeypatch, capsys) -> None:
+    class TestLifecycle:
+        def setup_method(self) -> None:
+            raise AssertionError("setup-regression")
+
+        def test_would_look_green_without_setup(self) -> None:
+            pass
+
+    probe = _module_with_test_class("runner_lifecycle_probe", TestLifecycle)
+    assert _run_only(monkeypatch, probe) == 1
+    out = capsys.readouterr().out
+    assert "FAIL COLLECT TestLifecycle unsupported lifecycle hook setup_method" in out
+    assert "RESULT 0 ok 1 fail 0 superseded" in out
+
+
+def test_module_lifecycle_hooks_are_rejected_instead_of_ignored(monkeypatch, capsys) -> None:
+    probe = ModuleType("runner_module_lifecycle_probe")
+
+    def setup_function() -> None:
+        raise AssertionError("setup-regression")
+
+    def test_would_look_green_without_setup() -> None:
+        pass
+
+    setup_function.__module__ = probe.__name__
+    test_would_look_green_without_setup.__module__ = probe.__name__
+    probe.setup_function = setup_function
+    probe.test_would_look_green_without_setup = test_would_look_green_without_setup
+
+    assert _run_only(monkeypatch, probe) == 1
+    out = capsys.readouterr().out
+    assert "FAIL COLLECT runner_module_lifecycle_probe unsupported lifecycle hook setup_function" in out
+    assert "RESULT 0 ok 1 fail 0 superseded" in out
+
+
 def test_superseded_registry_has_no_stale_jeeves_escape_hatch() -> None:
     assert ("TestJeevesLM", "test_unfitted_does_not_speak") not in runner.SUPERSEDED_ASSERTIONS
 
