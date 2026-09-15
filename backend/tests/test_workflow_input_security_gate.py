@@ -35,6 +35,22 @@ def test_rejects_bracket_notation_input_interpolation(tmp_path: Path) -> None:
     assert any("direct workflow input interpolation" in finding for finding in findings)
 
 
+def test_rejects_single_quoted_run_key_bypass(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: workflow_dispatch\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - 'run': echo \"${{ inputs.payload }}\"\n",
+    )
+    assert any("direct workflow input interpolation" in finding for finding in findings)
+
+
+def test_rejects_double_quoted_run_key_bypass(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "name: test\non: workflow_dispatch\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - \"run\": |\n          printf '%s\\n' '${{ github.event.inputs.payload }}'\n",
+    )
+    assert any("direct workflow input interpolation" in finding for finding in findings)
+
+
 def test_allows_input_through_environment_boundary(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
