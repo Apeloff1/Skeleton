@@ -1,0 +1,8 @@
+name: Skeleton CodeQL
+
+# Frozen branch snapshots are not production code. Scanning them
+# duplicates every historical sink (apk_inspector, build_pipeline exec)
+# hundreds of times and is what produced the 664 open alerts on main.
+paths-ignore:
+  - satellites/branch-snapshots/**
+  - satellites/**/branch-snapshots/**
