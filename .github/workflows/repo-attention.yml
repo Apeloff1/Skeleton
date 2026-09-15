@@ -5,14 +5,15 @@ on:
   schedule:
     - cron: '17 5 * * *'
   issues:
-    types: [edited, reopened, assigned, unassigned, milestoned, demilestoned]
+    types: [edited, reopened, closed, assigned, unassigned, milestoned, demilestoned, locked, unlocked]
   issue_comment:
-    types: [created]
+    types: [created, edited]
   pull_request:
     types:
       - synchronize
       - edited
       - reopened
+      - closed
       - ready_for_review
       - converted_to_draft
       - assigned
@@ -21,20 +22,32 @@ on:
       - demilestoned
       - review_requested
       - review_request_removed
+      - locked
+      - unlocked
+      - auto_merge_enabled
+      - auto_merge_disabled
+      - enqueued
+      - dequeued
+  pull_request_review:
+    types: [submitted, edited]
+  pull_request_review_comment:
+    types: [created, edited]
 
+# Serialize all event handlers for the same issue/PR. Never let an untrusted or
+# lower-value event cancel a trusted clear that is already in flight.
 concurrency:
-  group: repository-attention-${{ github.event_name }}-${{ github.event.issue.number || github.event.pull_request.number || 'sweep' }}
-  cancel-in-progress: true
+  group: repository-attention-${{ github.event.issue.number || github.event.pull_request.number || 'sweep' }}
+  cancel-in-progress: false
 
 # Fail closed at workflow scope. Jobs receive only the permissions they need.
 permissions: {}
 
 jobs:
   sweep:
-    name: Flag quiet work without closing it
+    name: Reconcile quiet work without closing it
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       issues: write
       pull-requests: read
@@ -52,74 +65,201 @@ jobs:
           gh label create 'needs-attention' --repo "$REPO" --color 'fbca04' --description 'Quiet item that may need a human decision' --force >/dev/null
           gh label create 'stale-draft' --repo "$REPO" --color 'd4c5f9' --description 'Draft pull request quiet for an extended period' --force >/dev/null
 
-      - name: Sweep pull requests
+      - name: Reconcile open issue and pull-request attention
         shell: bash
         run: |
           set -euo pipefail
+
           now=$(date -u +%s)
           attention_cutoff=$((now - PR_QUIET_DAYS * 86400))
           draft_cutoff=$((now - DRAFT_QUIET_DAYS * 86400))
+          issue_cutoff=$((now - ISSUE_QUIET_DAYS * 86400))
           added_attention=0
           added_draft=0
-          while IFS=$'\t' read -r number updated draft labels_csv; do
-            [[ -n "${number:-}" ]] || continue
-            updated_epoch=$(date -u -d "$updated" +%s)
-            has_attention=false
-            has_draft=false
-            tr ',' '\n' <<<"$labels_csv" | grep -Fxq 'needs-attention' && has_attention=true || true
-            tr ',' '\n' <<<"$labels_csv" | grep -Fxq 'stale-draft' && has_draft=true || true
-            if [[ "$draft" == 'true' ]]; then
-              if (( updated_epoch < draft_cutoff )) && [[ "$has_draft" == 'false' ]]; then
-                gh api --method POST "/repos/${REPO}/issues/${number}/labels" -f 'labels[]=stale-draft' >/dev/null
-                added_draft=$((added_draft + 1))
-              fi
-            elif (( updated_epoch < attention_cutoff )) && [[ "$has_attention" == 'false' ]]; then
-              gh api --method POST "/repos/${REPO}/issues/${number}/labels" -f 'labels[]=needs-attention' >/dev/null
-              added_attention=$((added_attention + 1))
+          removed_attention=0
+          removed_draft=0
+
+          labels_for() {
+            local number="$1"
+            gh api --paginate "/repos/${REPO}/issues/${number}/labels?per_page=100" --jq '.[].name'
+          }
+
+          add_label_if_missing() {
+            local number="$1" label="$2" labels
+            labels=$(labels_for "$number")
+            if grep -Fxq "$label" <<<"$labels"; then
+              return 0
             fi
-          done < <(gh api --paginate "/repos/${REPO}/pulls?state=open&per_page=100" --jq '.[] | [.number, .updated_at, .draft, ([.labels[].name] | join(","))] | @tsv')
+            gh api --method POST "/repos/${REPO}/issues/${number}/labels" -f "labels[]=${label}" >/dev/null
+            if [[ "$label" == 'needs-attention' ]]; then
+              added_attention=$((added_attention + 1))
+            else
+              added_draft=$((added_draft + 1))
+            fi
+          }
+
+          remove_label_if_present() {
+            local number="$1" label="$2" labels
+            labels=$(labels_for "$number")
+            if ! grep -Fxq "$label" <<<"$labels"; then
+              return 0
+            fi
+            if ! gh api --method DELETE "/repos/${REPO}/issues/${number}/labels/${label}" >/dev/null 2>&1; then
+              # Tolerate only the benign race where another handler already
+              # removed the label. Auth/network/API failures remain fatal.
+              labels=$(labels_for "$number")
+              if grep -Fxq "$label" <<<"$labels"; then
+                echo "Failed to remove ${label} from #${number}." >&2
+                return 1
+              fi
+            fi
+            if [[ "$label" == 'needs-attention' ]]; then
+              removed_attention=$((removed_attention + 1))
+            else
+              removed_draft=$((removed_draft + 1))
+            fi
+          }
+
+          last_meaningful_activity() {
+            local number="$1" fallback="$2" latest
+            latest=$(
+              gh api --paginate \
+                -H 'Accept: application/vnd.github+json' \
+                "/repos/${REPO}/issues/${number}/timeline?per_page=100" \
+                --jq '
+                  def trusted:
+                    . == "OWNER" or . == "MEMBER" or . == "COLLABORATOR";
+                  .[]
+                  | . as $e
+                  | ($e.event // "") as $kind
+                  | select(
+                      if ($kind == "labeled" or
+                          $kind == "unlabeled" or
+                          $kind == "subscribed" or
+                          $kind == "unsubscribed" or
+                          $kind == "mentioned" or
+                          $kind == "referenced" or
+                          $kind == "cross-referenced" or
+                          $kind == "connected" or
+                          $kind == "disconnected") then
+                        false
+                      elif $kind == "commented" then
+                        (($e.user.type // "") != "Bot" and
+                         (($e.author_association // "") | trusted))
+                      elif $kind == "reviewed" then
+                        (($e.user.type // "") != "Bot" and
+                         (($e.author_association // "") | trusted))
+                      elif $kind == "committed" then
+                        true
+                      else
+                        (($e.actor.login // "") != "" and
+                         ($e.actor.type // "") != "Bot")
+                      end
+                    )
+                  | (.updated_at // .submitted_at // .created_at // empty)
+                ' \
+                | sort \
+                | tail -n 1
+            )
+            printf '%s\n' "${latest:-$fallback}"
+          }
+
+          reconcile_pr() {
+            local number="$1" pass snapshot state created draft activity activity_epoch
+            # Two passes converge if activity lands while the first mutation is
+            # in flight. Managed label events are excluded from the activity
+            # clock, so this workflow cannot refresh its own stale timer.
+            for pass in 1 2; do
+              snapshot=$(gh api "/repos/${REPO}/pulls/${number}" --jq '[.state, .created_at, .draft] | @tsv')
+              IFS=$'\t' read -r state created draft <<<"$snapshot"
+              if [[ "$state" != 'open' ]]; then
+                remove_label_if_present "$number" 'needs-attention'
+                remove_label_if_present "$number" 'stale-draft'
+                return 0
+              fi
+
+              activity=$(last_meaningful_activity "$number" "$created")
+              activity_epoch=$(date -u -d "$activity" +%s)
+              if [[ "$draft" == 'true' ]]; then
+                remove_label_if_present "$number" 'needs-attention'
+                if (( activity_epoch < draft_cutoff )); then
+                  add_label_if_missing "$number" 'stale-draft'
+                else
+                  remove_label_if_present "$number" 'stale-draft'
+                fi
+              else
+                remove_label_if_present "$number" 'stale-draft'
+                if (( activity_epoch < attention_cutoff )); then
+                  add_label_if_missing "$number" 'needs-attention'
+                else
+                  remove_label_if_present "$number" 'needs-attention'
+                fi
+              fi
+            done
+          }
+
+          reconcile_issue() {
+            local number="$1" pass snapshot state created activity activity_epoch
+            for pass in 1 2; do
+              snapshot=$(gh api "/repos/${REPO}/issues/${number}" --jq '[.state, .created_at] | @tsv')
+              IFS=$'\t' read -r state created <<<"$snapshot"
+              if [[ "$state" != 'open' ]]; then
+                remove_label_if_present "$number" 'needs-attention'
+                return 0
+              fi
+
+              activity=$(last_meaningful_activity "$number" "$created")
+              activity_epoch=$(date -u -d "$activity" +%s)
+              if (( activity_epoch < issue_cutoff )); then
+                add_label_if_missing "$number" 'needs-attention'
+              else
+                remove_label_if_present "$number" 'needs-attention'
+              fi
+            done
+          }
+
+          while IFS= read -r number; do
+            [[ -n "${number:-}" ]] || continue
+            reconcile_pr "$number"
+          done < <(gh api --paginate "/repos/${REPO}/pulls?state=open&per_page=100" --jq '.[].number')
+
+          while IFS= read -r number; do
+            [[ -n "${number:-}" ]] || continue
+            reconcile_issue "$number"
+          done < <(gh api --paginate "/repos/${REPO}/issues?state=open&per_page=100" --jq '.[] | select(.pull_request | not) | .number')
+
+          # Closed items should never retain attention labels. This also repairs
+          # fork PRs whose close event could not receive a write-capable token.
+          for label in needs-attention stale-draft; do
+            while IFS= read -r number; do
+              [[ -n "${number:-}" ]] || continue
+              remove_label_if_present "$number" "$label"
+            done < <(gh api --paginate "/repos/${REPO}/issues?state=closed&labels=${label}&per_page=100" --jq '.[].number')
+          done
+
           {
-            echo '## Pull-request attention sweep'
+            echo '## Repository attention reconciliation'
             echo "- Added needs-attention: $added_attention"
             echo "- Added stale-draft: $added_draft"
+            echo "- Removed needs-attention: $removed_attention"
+            echo "- Removed stale-draft: $removed_draft"
             echo "- Regular PR quiet threshold: ${PR_QUIET_DAYS} days"
             echo "- Draft PR quiet threshold: ${DRAFT_QUIET_DAYS} days"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Sweep issues
-        shell: bash
-        run: |
-          set -euo pipefail
-          now=$(date -u +%s)
-          cutoff=$((now - ISSUE_QUIET_DAYS * 86400))
-          added=0
-          while IFS=$'\t' read -r number updated labels_csv; do
-            [[ -n "${number:-}" ]] || continue
-            updated_epoch=$(date -u -d "$updated" +%s)
-            has_attention=false
-            tr ',' '\n' <<<"$labels_csv" | grep -Fxq 'needs-attention' && has_attention=true || true
-            if (( updated_epoch < cutoff )) && [[ "$has_attention" == 'false' ]]; then
-              gh api --method POST "/repos/${REPO}/issues/${number}/labels" -f 'labels[]=needs-attention' >/dev/null
-              added=$((added + 1))
-            fi
-          done < <(gh api --paginate "/repos/${REPO}/issues?state=open&per_page=100" --jq '.[] | select(.pull_request | not) | [.number, .updated_at, ([.labels[].name] | join(","))] | @tsv')
-          {
-            echo '## Issue attention sweep'
-            echo "- Added needs-attention: $added"
             echo "- Issue quiet threshold: ${ISSUE_QUIET_DAYS} days"
+            echo '- Activity time excludes managed-label churn and untrusted/bot-only discussion.'
             echo '- This workflow never auto-closes issues or pull requests.'
           } >> "$GITHUB_STEP_SUMMARY"
 
   clear-pr-attention:
-    name: Clear attention after PR activity
+    name: Clear attention after PR lifecycle activity
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 3
     # SECURITY: ordinary pull_request plus a same-repository guard keeps label
-    # mutation write access away from untrusted fork pull requests. This job
-    # never checks out, sources, or executes pull-request head content.
+    # mutation write access away from untrusted fork pull requests. No job in
+    # this workflow checks out, sources, or executes pull-request head content.
     permissions:
       issues: write
     env:
@@ -131,11 +271,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh api --method DELETE "/repos/${REPO}/issues/${NUMBER}/labels/needs-attention" >/dev/null 2>&1 || true
-          gh api --method DELETE "/repos/${REPO}/issues/${NUMBER}/labels/stale-draft" >/dev/null 2>&1 || true
+          remove_label() {
+            local label="$1" labels
+            labels=$(gh api --paginate "/repos/${REPO}/issues/${NUMBER}/labels?per_page=100" --jq '.[].name')
+            if ! grep -Fxq "$label" <<<"$labels"; then return 0; fi
+            if ! gh api --method DELETE "/repos/${REPO}/issues/${NUMBER}/labels/${label}" >/dev/null 2>&1; then
+              labels=$(gh api --paginate "/repos/${REPO}/issues/${NUMBER}/labels?per_page=100" --jq '.[].name')
+              if grep -Fxq "$label" <<<"$labels"; then
+                echo "Failed to remove ${label} from #${NUMBER}." >&2
+                return 1
+              fi
+            fi
+          }
+          remove_label 'needs-attention'
+          remove_label 'stale-draft'
 
   clear-issue-attention:
-    name: Clear attention after issue activity
+    name: Clear attention after human issue activity
     if: github.event_name == 'issues' && github.event.sender.type != 'Bot'
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 3
@@ -150,7 +302,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh api --method DELETE "/repos/${REPO}/issues/${NUMBER}/labels/needs-attention" >/dev/null 2>&1 || true
+          labels=$(gh api --paginate "/repos/${REPO}/issues/${NUMBER}/labels?per_page=100" --jq '.[].name')
+          if grep -Fxq 'needs-attention' <<<"$labels"; then
+            if ! gh api --method DELETE "/repos/${REPO}/issues/${NUMBER}/labels/needs-attention" >/dev/null 2>&1; then
+              labels=$(gh api --paginate "/repos/${REPO}/issues/${NUMBER}/labels?per_page=100" --jq '.[].name')
+              if grep -Fxq 'needs-attention' <<<"$labels"; then
+                echo "Failed to remove needs-attention from #${NUMBER}." >&2
+                exit 1
+              fi
+            fi
+          fi
 
   clear-comment-attention:
     name: Clear attention after trusted human discussion
@@ -173,11 +334,70 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh api --method DELETE "/repos/${REPO}/issues/${NUMBER}/labels/needs-attention" >/dev/null 2>&1 || true
+          labels=$(gh api --paginate "/repos/${REPO}/issues/${NUMBER}/labels?per_page=100" --jq '.[].name')
+          if grep -Fxq 'needs-attention' <<<"$labels"; then
+            if ! gh api --method DELETE "/repos/${REPO}/issues/${NUMBER}/labels/needs-attention" >/dev/null 2>&1; then
+              labels=$(gh api --paginate "/repos/${REPO}/issues/${NUMBER}/labels?per_page=100" --jq '.[].name')
+              if grep -Fxq 'needs-attention' <<<"$labels"; then
+                echo "Failed to remove needs-attention from #${NUMBER}." >&2
+                exit 1
+              fi
+            fi
+          fi
 
       - name: Clear stale-draft for pull-request discussion
         if: github.event.issue.pull_request != null
         shell: bash
         run: |
           set -euo pipefail
-          gh api --method DELETE "/repos/${REPO}/issues/${NUMBER}/labels/stale-draft" >/dev/null 2>&1 || true
+          labels=$(gh api --paginate "/repos/${REPO}/issues/${NUMBER}/labels?per_page=100" --jq '.[].name')
+          if grep -Fxq 'stale-draft' <<<"$labels"; then
+            if ! gh api --method DELETE "/repos/${REPO}/issues/${NUMBER}/labels/stale-draft" >/dev/null 2>&1; then
+              labels=$(gh api --paginate "/repos/${REPO}/issues/${NUMBER}/labels?per_page=100" --jq '.[].name')
+              if grep -Fxq 'stale-draft' <<<"$labels"; then
+                echo "Failed to remove stale-draft from #${NUMBER}." >&2
+                exit 1
+              fi
+            fi
+          fi
+
+  clear-review-attention:
+    name: Clear attention after trusted same-repository review activity
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.sender.type != 'Bot' &&
+      ((github.event_name == 'pull_request_review' &&
+        (github.event.review.author_association == 'OWNER' ||
+         github.event.review.author_association == 'MEMBER' ||
+         github.event.review.author_association == 'COLLABORATOR')) ||
+       (github.event_name == 'pull_request_review_comment' &&
+        (github.event.comment.author_association == 'OWNER' ||
+         github.event.comment.author_association == 'MEMBER' ||
+         github.event.comment.author_association == 'COLLABORATOR')))
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 3
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - name: Clear managed attention labels
+        shell: bash
+        run: |
+          set -euo pipefail
+          remove_label() {
+            local label="$1" labels
+            labels=$(gh api --paginate "/repos/${REPO}/issues/${NUMBER}/labels?per_page=100" --jq '.[].name')
+            if ! grep -Fxq "$label" <<<"$labels"; then return 0; fi
+            if ! gh api --method DELETE "/repos/${REPO}/issues/${NUMBER}/labels/${label}" >/dev/null 2>&1; then
+              labels=$(gh api --paginate "/repos/${REPO}/issues/${NUMBER}/labels?per_page=100" --jq '.[].name')
+              if grep -Fxq "$label" <<<"$labels"; then
+                echo "Failed to remove ${label} from #${NUMBER}." >&2
+                return 1
+              fi
+            fi
+          }
+          remove_label 'needs-attention'
+          remove_label 'stale-draft'
