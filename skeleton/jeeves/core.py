@@ -95,11 +95,13 @@ class Jeeves:
                  *, max_turns: int = 200,
                  max_sessions: int = 1000,
                  max_message_chars: int = 32_000) -> None:
-        if not isinstance(max_turns, int) or max_turns < 2:
+        if isinstance(max_turns, bool) or not isinstance(max_turns, int) or max_turns < 2:
             raise ValueError("max_turns must be an integer >= 2")
-        if not isinstance(max_sessions, int) or max_sessions < 1:
+        if isinstance(max_sessions, bool) or not isinstance(max_sessions, int) or max_sessions < 1:
             raise ValueError("max_sessions must be an integer >= 1")
-        if not isinstance(max_message_chars, int) or max_message_chars < 1:
+        if (isinstance(max_message_chars, bool)
+                or not isinstance(max_message_chars, int)
+                or max_message_chars < 1):
             raise ValueError("max_message_chars must be an integer >= 1")
         if responder is not None and not callable(responder):
             raise TypeError("responder must be callable")
@@ -118,6 +120,12 @@ class Jeeves:
     @property
     def laws(self) -> tuple[str, ...]:
         return SYSTEM_LAWS
+
+    @staticmethod
+    def _require_mode(mode: SessionMode) -> SessionMode:
+        if not isinstance(mode, SessionMode):
+            raise SessionError("invalid session mode", context={"mode": str(mode)[:64]})
+        return mode
 
     def _reclaim_closed_session(self) -> bool:
         closed = [s for s in self._sessions.values() if not s.is_open]
@@ -138,6 +146,7 @@ class Jeeves:
                                         "max_turns": self._max_turns})
 
     def open_session(self, user_id: str | UserId, *, mode: SessionMode = SessionMode.TUTORING) -> Session:
+        mode = self._require_mode(mode)
         if len(self._sessions) >= self._max_sessions and not self._reclaim_closed_session():
             raise SessionError("session capacity reached",
                                context={"max_sessions": self._max_sessions})
@@ -157,6 +166,7 @@ class Jeeves:
 
     def set_mode(self, session_id: str, mode: SessionMode) -> Session:
         session = self._get(session_id)
+        mode = self._require_mode(mode)
         if not session.is_open:
             raise SessionError("session is closed", context={"session_id": session_id})
         session.mode = mode
@@ -176,7 +186,7 @@ class Jeeves:
 
         session = self._get(session_id)
         self._ensure_turn_capacity(session, 2)
-        prior_history = list(session.turns)
+        prior_history = [Turn(role=t.role, content=t.content, at=t.at) for t in session.turns]
         start_turns = len(session.turns)
         session.add_turn("learner", message)
         ctx = dict(context or {})
@@ -194,7 +204,7 @@ class Jeeves:
                 raise SessionError("responder returned an invalid reply",
                                    context={"session_id": session_id})
             session.add_turn("jeeves", reply)
-        except Exception:
+        except BaseException:
             del session.turns[start_turns:]
             self._bus.emit("jeeves.turn.failed", {"session_id": session_id})
             raise
