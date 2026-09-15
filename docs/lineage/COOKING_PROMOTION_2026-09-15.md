@@ -13,6 +13,7 @@ The relevant portable execution path is semantically equivalent. The observed di
 
 - `skeleton/frontier/cooking.py`
 - `skeleton/frontier/cooking_adapters.py`
+- `skeleton/frontier/__init__.py` public frontier surface
 
 ## Promoted policy
 
@@ -31,13 +32,19 @@ The source recipes contain fish `min_size` requirements, but the source start-co
 
 The source route counts each fish requirement independently and then deletes matching records. Overlapping requirements can therefore reason about the same pool multiple times. The frontier allocator consumes fish identities once and prevents reuse across requirements.
 
+Cooking jobs now bind the executable recipe semantics with the canonical frontier SHA-256 content digest when cooking starts. Collection recomputes that digest and fails closed if a caller supplies the same recipe ID with changed rewards, buffs, ingredients, timing, unlock level, station, category, difficulty, or name. This prevents claim-time catalog substitution from increasing rewards or injecting stronger effects after the job has already begun.
+
 Additional boundary hardening:
 
 - duplicate fish identities fail closed;
 - booleans cannot silently coerce to integer quantities;
 - NaN and Infinity fail closed in numeric buff metadata;
 - job and buff times must be timezone-aware;
-- recipe/job mismatch fails closed at collection;
+- recipe ID mismatch fails closed at collection;
+- same-ID recipe semantic mismatch also fails closed at collection;
+- job recipe digests must be normalized lowercase SHA-256 hex;
+- string values cannot masquerade as recipe-ID collections;
+- recipe `description` and `icon` fields reject non-string coercion;
 - timed buffs expire through pure projection rather than database side effects.
 
 ## Rejected from kernel
@@ -54,6 +61,11 @@ Additional boundary hardening:
 
 - `skeleton/testing/test_frontier_cooking_policy.py`
 - `skeleton/testing/test_frontier_cooking_integration.py`
+- `skeleton/testing/test_frontier_cooking_integrity.py`
+- `skeleton/testing/test_frontier_cooking_benchmark.py`
+- `scripts/benchmark_frontier_cooking.py`
+
+The benchmark treats timings as observational evidence only. Correctness invariants — including same-ID reward tamper rejection, recipe-digest stability, reward accounting, fish consumption, and buff creation — are gated.
 
 ## Selective-promotion boundary
 
