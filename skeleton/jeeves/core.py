@@ -95,13 +95,11 @@ class Jeeves:
                  *, max_turns: int = 200,
                  max_sessions: int = 1000,
                  max_message_chars: int = 32_000) -> None:
-        if isinstance(max_turns, bool) or not isinstance(max_turns, int) or max_turns < 2:
+        if type(max_turns) is not int or max_turns < 2:
             raise ValueError("max_turns must be an integer >= 2")
-        if isinstance(max_sessions, bool) or not isinstance(max_sessions, int) or max_sessions < 1:
+        if type(max_sessions) is not int or max_sessions < 1:
             raise ValueError("max_sessions must be an integer >= 1")
-        if (isinstance(max_message_chars, bool)
-                or not isinstance(max_message_chars, int)
-                or max_message_chars < 1):
+        if type(max_message_chars) is not int or max_message_chars < 1:
             raise ValueError("max_message_chars must be an integer >= 1")
         if responder is not None and not callable(responder):
             raise TypeError("responder must be callable")
