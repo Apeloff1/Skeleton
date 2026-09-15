@@ -42,11 +42,7 @@ def python_files() -> Iterable[Path]:
     """Yield every Python file in the active runtime/security roots exactly once."""
     seen: set[Path] = set()
     for root in SCAN_ROOTS:
-        if not root.exists():
-            continue
-        for path in root.rglob("*.py"):
-            if any(part in SKIP_DIRS for part in path.parts):
-                continue
+        for path in BACKEND_GATE.walk_python_files(root, SKIP_DIRS):
             resolved = path.resolve()
             if resolved in seen:
                 continue
@@ -69,11 +65,8 @@ def _definitely_string_command(node: ast.AST) -> bool:
         return True
     if isinstance(node, ast.BinOp):
         if isinstance(node.op, ast.Add):
-            # If either operand is definitely string-like, successful + evaluation
-            # yields a string/bytes command (otherwise Python raises before spawn).
             return _definitely_string_command(node.left) or _definitely_string_command(node.right)
         if isinstance(node.op, ast.Mod):
-            # Percent-formatting a literal/f-string-like left operand yields text.
             return _definitely_string_command(node.left)
     if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
         if node.func.attr in {"format", "join"}:
@@ -91,17 +84,14 @@ def _command_argument(node: ast.Call) -> ast.AST | None:
 
 
 def argv_violations(path: Path) -> list[str]:
-    """Reject subprocess calls that are provably single-string commands.
-
-    Dynamic values are left to the existing policy scanner and normal type/tests;
-    this check is deliberately high-confidence so it does not reject variables
-    that hold validated argument vectors.
-    """
+    """Reject subprocess calls that are provably single-string commands."""
     label = display_path(path)
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     except (OSError, UnicodeError, SyntaxError) as exc:
-        return [f"{label}: parse failure: {exc}"]
+        line = getattr(exc, "lineno", None)
+        location = f"{label}:{line}" if line else str(label)
+        return [f"{location}: parse failure: {exc.__class__.__name__}"]
 
     aliases = BACKEND_GATE.assignment_aliases(tree, BACKEND_GATE.import_aliases(tree))
     findings: list[str] = []
@@ -126,9 +116,20 @@ def violations(path: Path) -> list[str]:
 def main() -> int:
     findings: list[str] = []
     scanned = 0
-    for path in python_files():
-        scanned += 1
-        findings.extend(violations(path))
+    try:
+        for path in python_files():
+            scanned += 1
+            findings.extend(violations(path))
+    except OSError as exc:
+        print(
+            f"Repository process safety failed closed: source discovery failed ({exc.__class__.__name__}).",
+            file=sys.stderr,
+        )
+        return 1
+
+    if scanned == 0:
+        print("Repository process safety failed closed: zero Python files discovered.", file=sys.stderr)
+        return 1
 
     if findings:
         print("Repository process-safety violations detected:", file=sys.stderr)
