@@ -379,11 +379,23 @@ def unlock_stage(
 def enter_stage(
     progress: BiotopeProgress,
     stage: BiotopeStageSpec,
+    *,
+    stages: Iterable[BiotopeStageSpec],
 ) -> BiotopeProgress:
     if not isinstance(progress, BiotopeProgress):
         raise TypeError("progress must be BiotopeProgress")
     if not isinstance(stage, BiotopeStageSpec):
         raise TypeError("stage must be BiotopeStageSpec")
+
+    catalog = _catalog_by_id(stages)
+    candidates = _stages_for_biotope(stage.biotope_id, catalog.values())
+    catalog_stage = next(
+        (candidate for candidate in candidates if candidate.id == stage.id),
+        None,
+    )
+    if catalog_stage is None or catalog_stage != stage:
+        raise ValueError("stage must match the supplied biotope stage catalog")
+
     if stage.biotope_id not in progress.unlocked_biotopes:
         raise PermissionError("stage biotope is not unlocked")
     if stage.id not in progress.unlocked_stages:

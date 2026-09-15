@@ -139,13 +139,39 @@ def test_enter_stage_requires_unlock_and_updates_location_atomically():
     progress = initial_progress()
 
     with pytest.raises(PermissionError, match="not unlocked"):
-        enter_stage(progress, stages[1])
+        enter_stage(progress, stages[1], stages=stages)
 
     progress = unlock_stage(progress, stages[1], stages=stages, player_level=10)
-    entered = enter_stage(progress, stages[1])
+    entered = enter_stage(progress, stages[1], stages=stages)
 
     assert entered.current_biotope == "freshwater_lake"
     assert entered.current_stage == "shallow_lake"
+
+
+def test_enter_stage_rejects_cross_biotope_stage_identity_rebinding():
+    lake_stages = _lake_stages()
+    salt_stages = _salt_stages()
+    catalog = lake_stages + salt_stages
+    progress = unlock_biotope(
+        initial_progress(),
+        BiotopeSpec(id="saltwater", unlock_level=15, required_boat=True),
+        stages=salt_stages,
+        player_level=15,
+        has_boat=True,
+    )
+
+    forged = BiotopeStageSpec(
+        id="pond",
+        biotope_id="saltwater",
+        stage_number=1,
+        unlock_level=15,
+    )
+    with pytest.raises(ValueError, match="supplied biotope stage catalog"):
+        enter_stage(progress, forged, stages=catalog)
+
+    entered = enter_stage(progress, salt_stages[0], stages=catalog)
+    assert entered.current_biotope == "saltwater"
+    assert entered.current_stage == "coastal_shallows"
 
 
 def test_record_catch_drains_all_crossed_mastery_thresholds():
