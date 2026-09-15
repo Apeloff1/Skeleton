@@ -252,6 +252,16 @@ class _BodyLimitExceeded(Exception):
     pass
 
 
+def _content_length(scope) -> bytes | None:
+    """Read Content-Length from raw ASGI headers without decoding all headers."""
+    content_length = None
+    for name, value in scope.get("headers") or ():
+        if name.lower() == b"content-length":
+            # Preserve the previous dict-comprehension behavior: last value wins.
+            content_length = value
+    return content_length
+
+
 class BodyBoundMiddleware:
     """Reject bodies that exceed the configured limit, including streamed bodies."""
 
@@ -270,11 +280,7 @@ class BodyBoundMiddleware:
             await self.app(scope, receive, send)
             return
 
-        headers = {
-            k.decode("latin-1").lower(): v.decode("latin-1")
-            for k, v in scope.get("headers") or []
-        }
-        cl = headers.get("content-length")
+        cl = _content_length(scope)
         if cl is not None:
             try:
                 declared = int(cl)
