@@ -18,6 +18,19 @@ def test_cuda_request_contract_is_exact_even_when_hardware_degrades() -> None:
         assert neo.status()["lm"]["device"] == "cpu"
 
 
+def test_explicit_cpu_request_pins_both_neo_mouths_to_cpu() -> None:
+    neo = JeevesCortex()
+
+    result = neo.to("cpu")
+
+    assert result["requested"] == "cpu"
+    assert result["actual"] == "cpu"
+    assert result["neo_rms_device"] == "cpu"
+    assert neo.transformer.device == "cpu"
+    assert neo.neo_rms.device == "cpu"
+    assert result["degraded"] is False
+
+
 def test_bilateral_callosum_fusion_changes_the_fused_residual() -> None:
     cc = CorpusCallosum(dim=8, seed=8)
     hidden = [0.3, 0.1, -0.2, 0.4, 0.0, 0.2, -0.1, 0.5]
