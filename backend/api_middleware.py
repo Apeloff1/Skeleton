@@ -97,21 +97,13 @@ _MAX_XFF_CHARS = 2048
 
 # Telemetry counters (in-memory) ───────────────────────────────────────
 _lat_ring: Deque[float] = deque(maxlen=1024)
-_lat_lock: asyncio.Lock | None = None
 _counts: Dict[str, int] = defaultdict(int)
 _started_at: float = time.time()
 
 
-def _get_lat_lock() -> asyncio.Lock:
-    global _lat_lock
-    if _lat_lock is None:
-        _lat_lock = asyncio.Lock()
-    return _lat_lock
-
-
-async def _push_latency(ms: float) -> None:
-    async with _get_lat_lock():
-        _lat_ring.append(ms)
+def _push_latency(ms: float) -> None:
+    """Record one sample without scheduling or lock contention."""
+    _lat_ring.append(ms)
 
 
 def _percentile(sorted_vals, pct: float) -> float:
@@ -212,15 +204,8 @@ def _is_trusted_proxy(value: str) -> bool:
     return any(address in network for network in _TRUSTED_PROXY_NETWORKS)
 
 
-def _client_ip(request: Request) -> str:
-    """Resolve client identity without trusting attacker-controlled XFF.
-
-    The direct peer is authoritative unless it is explicitly trusted. For a
-    trusted peer, one bounded well-formed XFF chain is walked right-to-left,
-    skipping trusted proxy hops and selecting the nearest untrusted address.
-    Ambiguous, malformed, oversized, or overlong forwarded headers fail closed
-    to the direct peer.
-    """
+def _resolve_client_ip(request: Request) -> str:
+    """Resolve client identity without trusting attacker-controlled XFF."""
     client = request.client
     peer = client.host.strip() if client and client.host else "-"
     canonical_peer = _canonical_ip(peer)
@@ -246,6 +231,16 @@ def _client_ip(request: Request) -> str:
         if not _is_trusted_proxy(value):
             return value
     return canonical_peer or peer
+
+
+def _client_ip(request: Request) -> str:
+    """Resolve once per request and reuse across rate limiting and logging."""
+    cached = getattr(request.state, "_middleware_client_ip", None)
+    if cached is not None:
+        return cached
+    resolved = _resolve_client_ip(request)
+    request.state._middleware_client_ip = resolved
+    return resolved
 
 
 def _matches_path_prefix(path: str, prefix: str = "/api") -> bool:
@@ -289,7 +284,7 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
         )
         _counts["requests"] += 1
         _counts[bucket] += 1
-        await _push_latency(duration)
+        _push_latency(duration)
         if request.url.path not in ("/api/health", "/api/_telemetry"):
             log.info(
                 "method=%s path=%s status=%d dur_ms=%.2f rid=%s ip=%s",
@@ -315,8 +310,8 @@ class _Bucket:
         self.tokens = float(capacity)
         self.last = time.monotonic()
 
-    def take(self, n: int = 1) -> Tuple[bool, float]:
-        now = time.monotonic()
+    def take(self, n: int = 1, *, now: float | None = None) -> Tuple[bool, float]:
+        now = time.monotonic() if now is None else now
         elapsed = now - self.last
         if elapsed > 0:
             self.tokens = min(self.capacity, self.tokens + elapsed * self.refill_per_sec)
@@ -428,11 +423,12 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         async with self._get_state_lock():
-            bucket, retry = self._bucket_for(ip)
+            now = time.monotonic()
+            bucket, retry = self._bucket_for(ip, now)
             if bucket is None:
                 ok = False
             else:
-                ok, retry = bucket.take(1)
+                ok, retry = bucket.take(1, now=now)
 
         if not ok:
             _counts["rate_limited"] += 1
