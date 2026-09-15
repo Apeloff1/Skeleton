@@ -156,7 +156,10 @@ jobs:
                          ($e.actor.type // "") != "Bot")
                       end
                     )
-                  | (.updated_at // .submitted_at // .created_at // empty)
+                  # Commit timeline items use author/committer.date rather than
+                  # created_at. The remaining event families use the latter.
+                  | ($e.committer.date // $e.author.date //
+                     $e.updated_at // $e.submitted_at // $e.created_at // empty)
                 ' \
                 | sort \
                 | tail -n 1
