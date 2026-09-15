@@ -1,8 +1,8 @@
 """Fail closed on runtime-selected Python module imports in backend production code.
 
-Literal module names remain allowed. Runtime-selected module names must be replaced
-with an explicit allowlist/dispatch table so untrusted input cannot choose import
-execution paths.
+Literal absolute module names remain allowed. Runtime-selected module names,
+callable aliases, and runtime-selected relative-import context must use an
+explicit allowlist/dispatch table so untrusted input cannot choose import paths.
 """
 from __future__ import annotations
 
@@ -14,25 +14,15 @@ from typing import Iterable
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_ROOT = REPO_ROOT / "backend"
 SKIP_DIRS = {
-    ".git",
-    ".venv",
-    "venv",
-    "__pycache__",
-    "node_modules",
-    "dist",
-    "build",
-    ".next",
-    ".expo",
-    "coverage",
-    "tests",
+    ".git", ".venv", "venv", "__pycache__", "node_modules", "dist", "build",
+    ".next", ".expo", "coverage", "tests",
 }
 
 
 def python_files() -> Iterable[Path]:
     for path in BACKEND_ROOT.rglob("*.py"):
-        if any(part in SKIP_DIRS for part in path.parts):
-            continue
-        yield path
+        if not any(part in SKIP_DIRS for part in path.parts):
+            yield path
 
 
 def display_path(path: Path) -> Path:
@@ -42,15 +32,18 @@ def display_path(path: Path) -> Path:
         return path
 
 
-def _literal_module_name(node: ast.AST | None) -> bool:
-    return isinstance(node, ast.Constant) and isinstance(node.value, str) and bool(node.value.strip())
+def _literal_text(node: ast.AST | None) -> str | None:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        value = node.value.strip()
+        return value or None
+    return None
 
 
-def _call_name_argument(node: ast.Call) -> ast.AST | None:
-    if node.args:
-        return node.args[0]
+def _argument(node: ast.Call, position: int, keyword_name: str) -> ast.AST | None:
+    if len(node.args) > position:
+        return node.args[position]
     for keyword in node.keywords:
-        if keyword.arg == "name":
+        if keyword.arg == keyword_name:
             return keyword.value
     return None
 
@@ -78,12 +71,6 @@ def _import_aliases(tree: ast.AST) -> tuple[set[str], set[str], dict[str, str]]:
     return importlib_modules, builtins_modules, function_aliases
 
 
-def _literal_text(node: ast.AST | None) -> str | None:
-    if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        return node.value
-    return None
-
-
 def _dynamic_import_callable(
     node: ast.AST,
     importlib_modules: set[str],
@@ -94,7 +81,6 @@ def _dynamic_import_callable(
         if node.id == "__import__":
             return "__import__"
         return function_aliases.get(node.id)
-
     if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
         if node.attr == "import_module" and node.value.id in importlib_modules:
             return "importlib.import_module"
@@ -102,11 +88,9 @@ def _dynamic_import_callable(
             node.value.id in builtins_modules or node.value.id == "__builtins__"
         ):
             return "__import__"
-
     if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name):
         if node.value.id == "__builtins__" and _literal_text(node.slice) == "__import__":
             return "__import__"
-
     if (
         isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
@@ -120,7 +104,6 @@ def _dynamic_import_callable(
             return "importlib.import_module"
         if (owner in builtins_modules or owner == "__builtins__") and attribute == "__import__":
             return "__import__"
-
     return None
 
 
@@ -159,8 +142,8 @@ def _propagate_aliases(
     builtins_modules: set[str],
     function_aliases: dict[str, str],
 ) -> None:
-    """Conservatively follow simple module/callable aliases to import primitives."""
-    for _ in range(6):
+    """Conservatively follow simple aliases until the finite alias sets stop growing."""
+    while True:
         changed = False
         for targets, value in _assignment_pairs(tree):
             if isinstance(value, ast.Name):
@@ -174,36 +157,51 @@ def _propagate_aliases(
                     builtins_modules.update(targets)
                     changed |= len(builtins_modules) != before
                     continue
-
             primitive = _dynamic_import_callable(
-                value,
-                importlib_modules,
-                builtins_modules,
-                function_aliases,
+                value, importlib_modules, builtins_modules, function_aliases
             )
             if primitive is None:
                 continue
             for target in targets:
-                if function_aliases.get(target) == primitive:
-                    continue
-                function_aliases[target] = primitive
-                changed = True
+                if function_aliases.get(target) != primitive:
+                    function_aliases[target] = primitive
+                    changed = True
         if not changed:
             return
 
 
-def _called_dynamic_import(
+def _call_violation(
     node: ast.Call,
     importlib_modules: set[str],
     builtins_modules: set[str],
     function_aliases: dict[str, str],
 ) -> str | None:
-    return _dynamic_import_callable(
-        node.func,
-        importlib_modules,
-        builtins_modules,
-        function_aliases,
+    primitive = _dynamic_import_callable(
+        node.func, importlib_modules, builtins_modules, function_aliases
     )
+    if primitive is None:
+        return None
+    name = _literal_text(_argument(node, 0, "name"))
+    if name is None:
+        return (
+            f"{primitive}() module name must be a non-empty literal string; "
+            "use an explicit allowlist/dispatch table for runtime selection"
+        )
+    if primitive == "importlib.import_module" and name.startswith("."):
+        if _literal_text(_argument(node, 1, "package")) is None:
+            return (
+                "importlib.import_module() relative import package must be a non-empty "
+                "literal string; use an explicit allowlist/dispatch table"
+            )
+    if primitive == "__import__":
+        level = _argument(node, 4, "level")
+        if level is not None and not (
+            isinstance(level, ast.Constant)
+            and type(level.value) is int
+            and level.value == 0
+        ):
+            return "__import__() relative import level must be literal 0"
+    return None
 
 
 def violations(path: Path) -> list[str]:
@@ -212,27 +210,16 @@ def violations(path: Path) -> list[str]:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     except (OSError, UnicodeError, SyntaxError) as exc:
         return [f"{label}: parse failure: {exc}"]
-
     importlib_modules, builtins_modules, function_aliases = _import_aliases(tree)
     _propagate_aliases(tree, importlib_modules, builtins_modules, function_aliases)
     findings: list[str] = []
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        primitive = _called_dynamic_import(
-            node,
-            importlib_modules,
-            builtins_modules,
-            function_aliases,
-        )
-        if primitive is None:
-            continue
-        name = _call_name_argument(node)
-        if not _literal_module_name(name):
-            findings.append(
-                f"{label}:{node.lineno}: {primitive}() module name must be a non-empty literal string; "
-                "use an explicit allowlist/dispatch table for runtime selection"
+        if isinstance(node, ast.Call):
+            violation = _call_violation(
+                node, importlib_modules, builtins_modules, function_aliases
             )
+            if violation:
+                findings.append(f"{label}:{node.lineno}: {violation}")
     return findings
 
 
