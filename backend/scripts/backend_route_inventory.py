@@ -98,19 +98,23 @@ def _is_cns_dynamic_marker(row: UnresolvedRecord) -> bool:
 
 
 def build_inventory(registry_path: Path, routes_root: Path) -> InventoryReport:
+    registered = load_registered_modules(registry_path)
+    cns_registered = any(row.module == _CNS_PARENT for row in registered)
     base = _core.build_inventory(registry_path, routes_root)
     routes = list(base.routes)
-    unresolved = [row for row in base.unresolved if not _is_cns_dynamic_marker(row)]
+    unresolved = list(base.unresolved)
 
-    backend_root = routes_root.parent
-    for module_name in _CNS_STATIC_SUBROUTERS:
-        child_routes, child_unresolved = _scan_backend_module(
-            backend_root,
-            module_name,
-            mount_prefix=_CNS_MOUNT_PREFIX,
-        )
-        routes.extend(child_routes)
-        unresolved.extend(child_unresolved)
+    if cns_registered:
+        unresolved = [row for row in unresolved if not _is_cns_dynamic_marker(row)]
+        backend_root = routes_root.parent
+        for module_name in _CNS_STATIC_SUBROUTERS:
+            child_routes, child_unresolved = _scan_backend_module(
+                backend_root,
+                module_name,
+                mount_prefix=_CNS_MOUNT_PREFIX,
+            )
+            routes.extend(child_routes)
+            unresolved.extend(child_unresolved)
 
     routes.sort(key=lambda row: (row.path, row.method, row.module, row.router_attr, row.source_line))
     unresolved.sort(key=lambda row: (row.module, row.source_line or 0, row.reason))
