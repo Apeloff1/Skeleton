@@ -79,9 +79,14 @@ def test_projection_observes_new_revision_and_hash_after_canonical_patch():
     assert after.edge_count == before.edge_count
 
 
+def test_projection_trims_valid_project_identifiers():
+    projection = project_world_graph(graph(), project_id="  projects/demo-1  ")
+    assert projection.project_id == "projects/demo-1"
+
+
 def test_projection_rejects_invalid_metadata_and_non_worldgraph_inputs():
     source = graph()
-    for invalid in ("", " spaces ", "https://evil.example/x", "a" * 257):
+    for invalid in ("", "has spaces", "https://evil.example/x", "a" * 257):
         with pytest.raises(ValueError, match="project_id"):
             project_world_graph(source, project_id=invalid)
 
