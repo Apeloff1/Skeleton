@@ -26,6 +26,7 @@ from skeleton.acquired.learning import (
     ScaffoldType,
     ZPDResult,
 )
+from skeleton.acquired.resilient_cache import CacheResult, ResilientTTLCache
 from skeleton.acquired.runtime_guard import (
     AdaptiveGate,
     AdmissionVerdict,
@@ -45,12 +46,14 @@ __all__ = [
     "AssetValidator",
     "AuditChainError",
     "AuditEntry",
+    "CacheResult",
     "ChaosGovernor",
     "DegradationRung",
     "DifficultyZone",
     "GENESIS_HASH",
     "LearningSignal",
     "ProgressionTracker",
+    "ResilientTTLCache",
     "RuntimePolicy",
     "Scaffold",
     "ScaffoldType",
