@@ -26,9 +26,16 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
-      - name: Compile provenance gate
-        run: python -m compileall -q scripts/check_provenance_manifest.py tests/test_provenance_manifest.py
+      - name: Compile provenance gate and evidence
+        run: >-
+          python -m compileall -q
+          scripts/check_provenance_manifest.py
+          scripts/run_provenance_evidence.py
+          tests/test_provenance_manifest.py
+          tests/test_frontier_memory_adapters.py
       - name: Run provenance policy regressions
         run: python -m unittest discover -s tests -p 'test_provenance_manifest.py' -q
       - name: Validate consolidation inventory and canonical promotions
         run: python scripts/check_provenance_manifest.py
+      - name: Execute canonical promotion evidence
+        run: python scripts/run_provenance_evidence.py
