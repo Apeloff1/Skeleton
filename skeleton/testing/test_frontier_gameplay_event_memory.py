@@ -150,11 +150,11 @@ def test_recomputed_spec_digest_still_rejects_invalid_multiplier():
     )
     payload = dict(event.payload)
     spec_payload = dict(payload["spec"])
-    spec_payload["multipliers"] = {"xp": float("inf")}
+    spec_payload["multipliers"] = {"xp": 0}
     payload["spec"] = spec_payload
     payload["gameplay_event_spec_sha256"] = stable_content_digest(spec_payload)
 
-    with pytest.raises(ValueError, match="finite"):
+    with pytest.raises(ValueError, match="positive"):
         gameplay_event_to_memory_item(
             DomainEvent(event.topic, payload, event.occurred_at)
         )
