@@ -14,12 +14,15 @@ def _request(
     *,
     xff: str | None = None,
     request_id: str | None = None,
+    extra_headers: list[tuple[bytes, bytes]] | None = None,
 ) -> Request:
     headers: list[tuple[bytes, bytes]] = []
     if xff is not None:
         headers.append((b"x-forwarded-for", xff.encode("latin-1")))
     if request_id is not None:
         headers.append((b"x-request-id", request_id.encode("latin-1")))
+    if extra_headers:
+        headers.extend(extra_headers)
 
     scope = {
         "type": "http",
@@ -75,11 +78,39 @@ def test_malformed_forwarded_chain_falls_back_to_peer(monkeypatch) -> None:
     assert api_middleware._client_ip(request) == "10.0.0.5"
 
 
+def test_empty_forwarded_hop_falls_back_to_peer(monkeypatch) -> None:
+    _trust(monkeypatch, "10.0.0.0/8")
+    request = _request("10.0.0.5", xff="198.51.100.24,,10.0.0.7")
+
+    assert api_middleware._client_ip(request) == "10.0.0.5"
+
+
+def test_duplicate_xff_field_lines_fail_closed_to_peer(monkeypatch) -> None:
+    _trust(monkeypatch, "10.0.0.0/8")
+    request = _request(
+        "10.0.0.5",
+        extra_headers=[
+            (b"x-forwarded-for", b"198.51.100.24"),
+            (b"x-forwarded-for", b"203.0.113.7"),
+        ],
+    )
+
+    assert api_middleware._client_ip(request) == "10.0.0.5"
+
+
 def test_all_trusted_forwarded_hops_fail_closed_to_peer(monkeypatch) -> None:
     _trust(monkeypatch, "10.0.0.0/8", "203.0.113.0/24")
     request = _request("10.0.0.5", xff="203.0.113.7")
 
     assert api_middleware._client_ip(request) == "10.0.0.5"
+
+
+def test_malformed_proxy_allowlist_disables_all_forwarded_trust() -> None:
+    parsed = api_middleware._parse_trusted_proxy_networks(
+        "10.0.0.0/8, definitely-not-a-cidr"
+    )
+
+    assert parsed == ()
 
 
 def test_request_id_accepts_only_bounded_header_safe_values() -> None:
