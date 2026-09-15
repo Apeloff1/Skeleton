@@ -98,9 +98,9 @@ jobs:
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
 
-      - name: Install frozen frontend dependency graph
+      - name: Install frozen frontend dependency graph without lifecycle scripts
         working-directory: frontend
-        run: yarn install --frozen-lockfile --non-interactive
+        run: yarn install --frozen-lockfile --non-interactive --ignore-scripts
 
       - name: Test JavaScript audit policy parser
         working-directory: frontend
