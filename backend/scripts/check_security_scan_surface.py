@@ -11,7 +11,6 @@ import os
 from pathlib import Path
 import stat
 import sys
-from typing import Iterable
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SKIP_DIRS = {
