@@ -98,6 +98,7 @@ def get_stats() -> dict:
             "exempt_ips": sorted(_EXEMPT_IPS),
             "buckets": _counts.get("rate_limit_buckets", 0),
             "max_buckets": _MAX_BUCKETS,
+            "evictions": _counts.get("rate_limit_evictions", 0),
             "expired_pruned": _counts.get("rate_limit_expired_pruned", 0),
             "saturation_rejections": _counts.get("rate_limit_saturation_rejections", 0),
         },
@@ -238,6 +239,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         self._refill_per_sec = self.per_minute / 60.0
         self._buckets: Dict[str, _Bucket] = {}
         self._state_lock: asyncio.Lock | None = None
+        self._evictions = 0
         self._expired_pruned = 0
         self._saturation_rejections = 0
 
@@ -252,7 +254,9 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
             del self._buckets[ip]
         if expired:
             pruned = len(expired)
+            self._evictions += pruned
             self._expired_pruned += pruned
+            _counts["rate_limit_evictions"] += pruned
             _counts["rate_limit_expired_pruned"] += pruned
         return len(expired)
 
