@@ -24,7 +24,11 @@ def _backends() -> list[Any]:
     return [
         InMemoryStore(),
         CollectionMemoryAdapter(SQLiteCollection()),
-        LegacyMemoryStoreAdapter(InMemoryTFIDFStore(), source_tier="rag"),
+        LegacyMemoryStoreAdapter(
+            InMemoryTFIDFStore(),
+            source_repository=SOURCE["source_repository"],
+            source_tier="rag",
+        ),
     ]
 
 
@@ -100,7 +104,11 @@ def test_runtime_retrieval_rejects_unattributed_memory() -> None:
 
 @pytest.mark.asyncio
 async def test_legacy_adapter_rejects_nonportable_metadata_before_store_mutation() -> None:
-    adapter = LegacyMemoryStoreAdapter(InMemoryTFIDFStore(), source_tier="rag")
+    adapter = LegacyMemoryStoreAdapter(
+        InMemoryTFIDFStore(),
+        source_repository=SOURCE["source_repository"],
+        source_tier="rag",
+    )
 
     with pytest.raises(TypeError, match="JSON-compatible"):
         await adapter.put(
