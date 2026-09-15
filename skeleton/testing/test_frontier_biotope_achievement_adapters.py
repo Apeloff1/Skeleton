@@ -76,6 +76,38 @@ def test_catch_evidence_repairs_source_family_tracking_gap():
     assert evidence.counts["shallow_lake_catches"] == 1
 
 
+def test_source_requirement_count_aliases_repair_lake_and_arctic_mismatches():
+    lake = _achievement(
+        "lake_beginner",
+        {"type": "lake_catches", "count": 1},
+        biotope="freshwater_lake",
+    )
+    arctic = _achievement(
+        "arctic_fisher",
+        {"type": "arctic_catches", "count": 1},
+        biotope="saltwater",
+    )
+    evidence = record_biotope_catch(
+        empty_biotope_catch_evidence(),
+        fish_id="bluegill",
+        biotope_id="freshwater_lake",
+        stage_id="pond",
+        size=20,
+        rarity="common",
+    )
+    evidence = record_biotope_catch(
+        evidence,
+        fish_id="arctic_cod",
+        biotope_id="saltwater",
+        stage_id="arctic_ocean",
+        size=80,
+        rarity="common",
+    )
+
+    assert biotope_requirement_value(lake, evidence) == 1
+    assert biotope_requirement_value(arctic, evidence) == 1
+
+
 def test_distinct_stage_species_requirement_is_derived_not_manually_mutated():
     achievement = _achievement(
         "reef_diver",
@@ -227,7 +259,7 @@ def test_delta_legendary_is_derived_from_stage_and_rarity():
 def test_synchronization_delegates_claim_semantics_to_canonical_kernel():
     achievement = _achievement(
         "lake_beginner",
-        {"type": "freshwater_lake_catches", "count": 1},
+        {"type": "lake_catches", "count": 1},
         biotope="freshwater_lake",
         rewards={"xp": 100, "coins": 500},
     )
