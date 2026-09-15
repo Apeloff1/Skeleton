@@ -45,33 +45,41 @@ class TieredCache:
         now = time.monotonic()
         with self._lock:
             e = self._l1.get(key)
-            if e is not None and (now - e.inserted) < L1_TTL_S:
-                self._hits += 1
-                return e.value
+            if e is not None:
+                if (now - e.inserted) < L1_TTL_S:
+                    self._hits += 1
+                    return e.value
+                self._remove_l1_unlocked(key)
+
             e2 = self._l2.get(key)
-            if e2 is not None and (now - e2.inserted) < L2_TTL_S:
-                e2.hits += 1
-                value = e2.value
-                promote = e2.hits >= 2
-                self._hits += 1
-                if promote:
-                    self._put_l1_unlocked(key, value)
-                return value
+            if e2 is not None:
+                if (now - e2.inserted) < L2_TTL_S:
+                    e2.hits += 1
+                    value = e2.value
+                    promote = e2.hits >= 2
+                    self._hits += 1
+                    if promote:
+                        self._put_l1_unlocked(key, value)
+                    return value
+                self._remove_l2_unlocked(key)
+
             self._misses += 1
             return None
 
     def put(self, key: str, value: Any) -> None:
         with self._lock:
+            # L2 remains the warm source, but an already-hot key must be updated
+            # atomically as well or reads could return the stale L1 value until
+            # its TTL expires.
+            was_hot = key in self._l1
             self._put_l2_unlocked(key, value)
+            if was_hot:
+                self._put_l1_unlocked(key, value)
 
     def invalidate(self, key: str) -> None:
         with self._lock:
-            self._l1.pop(key, None)
-            self._l2.pop(key, None)
-            if key in self._l1_order:
-                self._l1_order.remove(key)
-            if key in self._l2_order:
-                self._l2_order.remove(key)
+            self._remove_l1_unlocked(key)
+            self._remove_l2_unlocked(key)
 
     def stats(self) -> Dict[str, Any]:
         with self._lock:
@@ -83,6 +91,16 @@ class TieredCache:
                 "l1_cap": L1_CAP,
                 "l2_cap": L2_CAP,
             }
+
+    def _remove_l1_unlocked(self, key: str) -> None:
+        self._l1.pop(key, None)
+        if key in self._l1_order:
+            self._l1_order.remove(key)
+
+    def _remove_l2_unlocked(self, key: str) -> None:
+        self._l2.pop(key, None)
+        if key in self._l2_order:
+            self._l2_order.remove(key)
 
     def _put_l1_unlocked(self, key: str, value: Any) -> None:
         if len(self._l1) >= L1_CAP and key not in self._l1:
