@@ -1,0 +1,13 @@
+{
+  "integration": "Agent Map + MasterMap with Knowledge Nexus",
+  "description": "Both maps have been upgraded to reflect the new central role of the Multi-Agent Knowledge Nexus.",
+  "key_changes": [
+    "Juror Room elevated to central hub in MasterMap",
+    "Librarian Agent added as core sub-agent in both maps",
+    "AAAHRAG shown as the unified layer across all agents and systems",
+    "14 Database Styles and Wiki Memory explicitly included",
+    "Clear data flow showing everything passes through the Nexus for permanent memory",
+    "Jeeves and Exocortex shown with strong Nexus integration"
+  ],
+  "benefit": "The maps now accurately represent the evolved architecture where the Knowledge Nexus acts as the quality-controlled permanent memory layer for the entire system."
+}

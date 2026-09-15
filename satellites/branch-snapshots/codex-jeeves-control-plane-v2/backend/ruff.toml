@@ -1,0 +1,23 @@
+# Ruff config for the FastAPI backend.
+#
+# We intentionally scope CI to the high-signal "real bug" pyflakes/syntax tier
+# (not stylistic noise) so the guard is GREEN on the existing codebase today and
+# only goes red on genuine regressions:
+#
+#   E9   — syntax errors
+#   F63  — invalid comparisons / assert-on-tuple
+#   F7   — misplaced statements (break/continue/return/yield out of place)
+#   F706 — return outside function
+#   F823 — local variable referenced before assignment
+#   F502 — string-formatting argument errors
+#
+# Broader hygiene (F401 unused-import, F841 unused-var, etc.) can be tightened
+# incrementally later via `ruff check --fix`.
+target-version = "py311"
+line-length = 120
+
+[lint]
+select = ["E9", "F63", "F7", "F706", "F823", "F502"]
+
+[lint.per-file-ignores]
+"tests/*" = ["E9"]
