@@ -62,6 +62,12 @@ jobs:
           --registry core/routes_registry.py
           --routes-root routes
 
+      - name: Route-domain policy migration report
+        run: >-
+          python scripts/backend_route_policy_report.py
+          --registry core/routes_registry.py
+          --routes-root routes
+
       - name: Process invocation safety gate
         run: python scripts/check_process_safety.py
 
@@ -98,3 +104,5 @@ jobs:
           tests/test_secret_hygiene_gate.py
           tests/test_backend_route_inventory.py
           tests/test_backend_route_inventory_cns.py
+          tests/test_route_policy_catalog.py
+          tests/test_backend_route_policy_report.py
