@@ -1,1 +1,0 @@
-Repository-wide IOC coverage is enforced by the dedicated security workflow on pull requests and pushes, while scheduled and manual runs add a full tracked-file payload-policy sweep.
