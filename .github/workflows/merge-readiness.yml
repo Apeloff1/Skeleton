@@ -13,10 +13,10 @@ env:
   PYTHON_VERSION: "3.11.16"
   NODE_VERSION: "24.20.0"
 
-# Cancel stale PR validation, but let push validation finish so rapid main
-# activity cannot starve the repository of completed merge-readiness evidence.
+# PRs cancel superseded heads. Pushes key by SHA so rapid main commits
+# cannot share one refs/heads/main slot and drop as zero-job failures.
 concurrency:
-  group: merge-readiness-${{ github.event.pull_request.number || github.ref }}
+  group: merge-readiness-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
