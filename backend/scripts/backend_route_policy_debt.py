@@ -39,13 +39,15 @@ def build_debt_report(
     inventory = build_inventory(registry, routes_root)
     policy = default_route_domain_policy()
 
-    # Unique paths are the policy migration unit. Multiple methods on the same
-    # path should not inflate domain-debt counts.
+    # Unique protected paths are the policy migration unit. Public/bootstrap
+    # paths may still have a fallback required_domain(), but are not migration
+    # debt because admission resolves is_open() before domain policy.
     legacy_paths = sorted(
         {
             route.path
             for route in inventory.routes
-            if policy.required_domain(route.path) == "legacy_api"
+            if not policy.is_open(route.path)
+            and policy.required_domain(route.path) == "legacy_api"
         }
     )
     groups = Counter(_group_prefix(path, depth) for path in legacy_paths)
