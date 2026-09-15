@@ -26,4 +26,4 @@ jobs:
       - name: Run frontier contract tests
         env:
           PYTHONPATH: .
-        run: python -m pytest -q skeleton/testing/test_frontier_contracts.py skeleton/testing/test_frontier_npc.py skeleton/testing/test_frontier_runtime.py
+        run: python -m pytest -q skeleton/testing/test_frontier_*.py
