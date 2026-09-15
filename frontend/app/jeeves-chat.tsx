@@ -163,6 +163,7 @@ export default function JeevesChat() {
     return () => {
       active = false;
       abortRef.current?.abort();
+      abortRef.current = null;
     };
   }, []);
 
@@ -221,8 +222,12 @@ export default function JeevesChat() {
       }
       return false;
     } finally {
-      if (abortRef.current === controller) abortRef.current = null;
-      setBusy(false);
+      // Only the request that still owns the active controller may clear busy.
+      // A cleared/aborted request must not race a newer request back to idle.
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        setBusy(false);
+      }
     }
   }, []);
 
