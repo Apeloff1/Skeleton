@@ -19,6 +19,20 @@ def test_responder_failure_rolls_back_learner_turn():
     assert session.turns == []
 
 
+def test_system_exit_rolls_back_learner_turn_and_is_reraised():
+    def exit_responder(_message, _history, _context):
+        raise SystemExit(7)
+
+    jeeves = Jeeves(responder=exit_responder)
+    session = jeeves.open_session("u")
+
+    with pytest.raises(SystemExit) as exc_info:
+        jeeves.ask(session.session_id, "hello")
+
+    assert exc_info.value.code == 7
+    assert session.turns == []
+
+
 @pytest.mark.parametrize("reply", [None, "", "   ", 123])
 def test_invalid_responder_reply_rolls_back_turn(reply):
     jeeves = Jeeves(responder=lambda *_args: reply)
@@ -106,6 +120,9 @@ def test_closed_session_is_reclaimed_at_capacity():
         {"max_turns": 0},
         {"max_sessions": 0},
         {"max_message_chars": 0},
+        {"max_turns": True},
+        {"max_sessions": True},
+        {"max_message_chars": True},
     ],
 )
 def test_invalid_resource_limits_fail_fast(kwargs):
