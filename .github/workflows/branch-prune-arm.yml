@@ -1,0 +1,100 @@
+name: Prune fully merged branches on ARM
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/branch-prune-arm.yml'
+
+concurrency:
+  group: branch-prune-arm-${{ github.repository }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  prune:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GIT_TERMINAL_PROMPT: '0'
+    steps:
+      - name: Delete only refs fully contained in main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init repo
+          cd repo
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --quiet --prune --no-tags --filter=blob:none origin '+refs/heads/*:refs/remotes/origin/*'
+
+          main_ref=refs/remotes/origin/main
+          branches=()
+          tips=()
+          protected=0
+
+          while read -r tip branch; do
+            [[ -n "$tip" && -n "$branch" ]] || continue
+            case "$branch" in
+              main|backup/*)
+                protected=$((protected + 1))
+                continue
+                ;;
+            esac
+            branches+=("$branch")
+            tips+=("$tip")
+          done < <(
+            git for-each-ref --merged "$main_ref" \
+              --format='%(objectname) %(refname:strip=3)' refs/remotes/origin \
+              | sort -k2,2 -u
+          )
+
+          echo "fully merged refs selected: ${#branches[@]}"
+          deleted=0
+          moved_or_blocked=0
+          batch_size=32
+
+          for ((offset=0; offset<${#branches[@]}; offset+=batch_size)); do
+            batch_branches=("${branches[@]:offset:batch_size}")
+            batch_tips=("${tips[@]:offset:batch_size}")
+            leases=()
+            refspecs=()
+            for ((i=0; i<${#batch_branches[@]}; i++)); do
+              leases+=("--force-with-lease=refs/heads/${batch_branches[$i]}:${batch_tips[$i]}")
+              refspecs+=(":refs/heads/${batch_branches[$i]}")
+            done
+
+            if git push --quiet --atomic "${leases[@]}" origin "${refspecs[@]}"; then
+              for branch in "${batch_branches[@]}"; do
+                echo "deleted: $branch"
+              done
+              deleted=$((deleted + ${#batch_branches[@]}))
+              continue
+            fi
+
+            for ((i=0; i<${#batch_branches[@]}; i++)); do
+              branch="${batch_branches[$i]}"
+              tip="${batch_tips[$i]}"
+              if git push --quiet "--force-with-lease=refs/heads/${branch}:${tip}" origin ":refs/heads/${branch}"; then
+                echo "deleted: $branch"
+                deleted=$((deleted + 1))
+              else
+                echo "preserved (moved/protected): $branch"
+                moved_or_blocked=$((moved_or_blocked + 1))
+              fi
+            done
+          done
+
+          {
+            echo '## ARM merged-branch prune'
+            echo "- Fully merged refs selected: ${#branches[@]}"
+            echo "- Deleted: ${deleted}"
+            echo "- Moved/protected refs preserved: ${moved_or_blocked}"
+            echo "- Protected refs skipped: ${protected}"
+            echo '- Safety: only refs already reachable from main are candidates; deletion uses expected-tip leases.'
+          } >> "$GITHUB_STEP_SUMMARY"
