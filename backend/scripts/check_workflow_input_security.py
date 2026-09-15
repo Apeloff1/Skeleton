@@ -18,7 +18,12 @@ import sys
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
-RUN_RE = re.compile(r"^(?P<indent>\s*)(?:-\s*)?run\s*:\s*(?P<value>.*)$")
+# YAML permits plain, single-quoted, and double-quoted mapping keys. Treat all
+# legal spellings of the GitHub Actions ``run`` key as shell boundaries so a
+# quoted key cannot bypass the interpolation gate.
+RUN_RE = re.compile(
+    r"^(?P<indent>\s*)(?:-\s*)?(?:run|'run'|\"run\")\s*:\s*(?P<value>.*)$"
+)
 EXPRESSION_RE = re.compile(r"\$\{\{(?P<body>.*?)\}\}")
 UNTRUSTED_INPUT_RE = re.compile(
     r"(?<![A-Za-z0-9_])(?:github\.event\.inputs|inputs)\s*(?:\.|\[)"
