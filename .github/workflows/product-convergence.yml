@@ -71,6 +71,7 @@ jobs:
           tests/test_autonomous_orchestrator_runtime.py
           tests/test_jeeves_memory_and_evolution.py
           tests/test_world_graph.py
+          tests/test_world_graph_projection.py
           tests/test_live_session.py
           tests/test_model_router.py
           tests/test_jeeves_control_plane.py
