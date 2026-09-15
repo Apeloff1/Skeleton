@@ -18,6 +18,7 @@ import {
   Modal, ActivityIndicator, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 
 import { apiFetch } from '../../utils/apiController';
 import { toast } from '../../components/Toast';
@@ -30,7 +31,7 @@ interface AIGameGeneratorModalProps {
   onGenerated?: (data: any, type: string) => void;
 }
 
-type CategoryType = 'npc' | 'world' | 'combat' | 'narrative' | 'animation' | 'vfx' | 'bot' | 'economy' | 'testing';
+type CategoryType = 'npc' | 'world' | 'combat' | 'narrative' | 'animation' | 'vfx' | 'bot' | 'economy' | 'systems' | 'testing';
 
 interface GenerationResult {
   success: boolean;
@@ -48,6 +49,7 @@ const CATEGORIES = [
   { key: 'vfx', label: '✨ VFX', icon: 'sparkles', desc: 'Effects & Particles' },
   { key: 'bot', label: '🤖 Bots', icon: 'hardware-chip', desc: 'AI Personas' },
   { key: 'economy', label: '💰 Economy', icon: 'cash', desc: 'Monetization' },
+  { key: 'systems', label: '⚙️ Systems', icon: 'cog', desc: 'Server Architecture' },
   { key: 'testing', label: '🧪 Testing', icon: 'flask', desc: 'QA & Test Cases' },
 ];
 
@@ -720,7 +722,6 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
     </View>
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const renderSystemsForm = () => (
     <View style={styles.formContainer}>
       <Text style={[styles.formTitle, { color: colors.text }]}>⚙️ AI Systems Architect</Text>
@@ -869,15 +870,17 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
       displayText = displayText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
     }
 
+    const modelLabel = result.model?.trim() || 'AI';
+
     return (
       <View style={[styles.resultContainer, { backgroundColor: colors.codeBackground, borderColor: colors.border }]}>
         <View style={styles.resultHeader}>
           <Text style={[styles.resultTitle, { color: colors.text }]}>
-            ✅ Generated Result
+            {result.success ? '✅ Generated Result' : '⚠️ Generation Result'}
           </Text>
           {result.ai_generated && (
             <View style={[styles.aiBadge, { backgroundColor: colors.primary }]}>
-              <Text style={styles.aiBadgeText}>🤖 GPT-4o</Text>
+              <Text style={styles.aiBadgeText}>🤖 {modelLabel}</Text>
             </View>
           )}
         </View>
@@ -888,11 +891,16 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         </ScrollView>
         <TouchableOpacity
           style={[styles.copyBtn, { backgroundColor: colors.success }]}
-          onPress={() => {
-            if (onGenerated) {
-              onGenerated(result.data, activeCategory);
+          onPress={async () => {
+            try {
+              await Clipboard.setStringAsync(displayText);
+              if (onGenerated) {
+                onGenerated(result.data, activeCategory);
+              }
+              toast.success('Result copied to clipboard');
+            } catch {
+              toast.error('Unable to copy result to clipboard');
             }
-            toast.success('Result copied to clipboard');
           }}
         >
           <Ionicons name="copy" size={16} color="#FFF" />
@@ -912,6 +920,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
       case 'vfx': return renderVFXForm();
       case 'bot': return renderBotForm();
       case 'economy': return renderEconomyForm();
+      case 'systems': return renderSystemsForm();
       case 'testing': return renderTestingForm();
       default: return renderNPCForm();
     }
@@ -926,7 +935,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
           </TouchableOpacity>
           <View style={styles.headerTitle}>
             <Text style={[styles.title, { color: colors.text }]}>🎮 AI Game Generator</Text>
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Powered by GPT-4o</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Connected model shown per result</Text>
           </View>
           <View style={styles.placeholder} />
         </View>
