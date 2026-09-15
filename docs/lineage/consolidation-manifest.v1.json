@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "canonical_repository": "Apeloff1/Skeleton",
+  "inventory_scope": "curated frontier consolidation sources",
+  "inventory_date": "2026-09-15",
+  "license_policy": {
+    "owner_controlled_status": "owner-controlled",
+    "unknown_blocks_canonical_release": true,
+    "third_party_requires_spdx": true
+  },
+  "sources": [
+    {
+      "repository": "Apeloff1/Prood",
+      "default_branch": "main",
+      "revision": "aa33a5c9cfaf5558df4144b4ffa016055f401a3a",
+      "ownership": "owner-controlled",
+      "license": {"status": "owner-controlled", "spdx": null},
+      "disposition": "promote-unique-only",
+      "capabilities": ["jeeves", "rag", "learning", "text-to-npc", "game-pipelines"]
+    },
+    {
+      "repository": "Apeloff1/Tutolage",
+      "default_branch": "main",
+      "revision": "d94030b6d4c75a7cdb4cf4fadfe9ff7e2ca635bf",
+      "ownership": "owner-controlled",
+      "license": {"status": "owner-controlled", "spdx": null},
+      "disposition": "promote-unique-only",
+      "capabilities": ["tutoring", "rag", "gamification", "npc-pipeline", "game-logic-pipeline", "animation-pipeline"]
+    },
+    {
+      "repository": "Apeloff1/gameforge-rs",
+      "default_branch": "main",
+      "revision": "669b99d068fc532d4c4111bcb8ef187ea872c109",
+      "ownership": "owner-controlled",
+      "license": {"status": "owner-controlled", "spdx": null},
+      "disposition": "promote-unique-only",
+      "capabilities": ["gameforge", "simulation", "generation", "digest", "idempotency", "outbox"]
+    },
+    {
+      "repository": "Apeloff1/gameforge-middleware",
+      "default_branch": "main",
+      "revision": "282b0af7cf39ca989a274c3f004217e135d9bbd7",
+      "ownership": "owner-controlled",
+      "license": {"status": "owner-controlled", "spdx": null},
+      "disposition": "promote",
+      "capabilities": ["middleware", "orchestration"]
+    },
+    {
+      "repository": "Apeloff1/hyperforge-cockpit-sota",
+      "default_branch": "main",
+      "revision": "161c12634a2193e2b3024635205eac325d37fc8e",
+      "ownership": "owner-controlled",
+      "license": {"status": "owner-controlled", "spdx": null},
+      "disposition": "boundary-consumer",
+      "capabilities": ["cockpit", "visualization", "telemetry", "validated-bridge"]
+    },
+    {
+      "repository": "Apeloff1/Lorebuffa",
+      "default_branch": "main",
+      "revision": "279539fc299f5fe67a139b335ddc74fec0eccbdc",
+      "ownership": "owner-controlled",
+      "license": {"status": "owner-controlled", "spdx": null},
+      "disposition": "adapt-unique-only",
+      "capabilities": ["lore", "world-building", "narrative", "npc-catalog", "world-map", "quests", "reputation"]
+    },
+    {
+      "repository": "Apeloff1/Openworld",
+      "default_branch": "main",
+      "revision": "8324f0f889697ff0329120a61711f5fc4ae95b1d",
+      "ownership": "owner-controlled",
+      "license": {"status": "owner-controlled", "spdx": null},
+      "disposition": "characterize-and-deduplicate",
+      "capabilities": ["world", "exploration", "procedural-content", "npc-catalog", "world-map", "quests", "reputation"]
+    }
+  ],
+  "components": [
+    {
+      "id": "prood-rag-memory",
+      "source_repository": "Apeloff1/Prood",
+      "source_revision": "aa33a5c9cfaf5558df4144b4ffa016055f401a3a",
+      "source_path": "backend/services/rag_service.py",
+      "source_blob": "b67167f1135744e74827ce03b0bf5d766e800cf4",
+      "destination_path": "skeleton/frontier/memory_adapters.py",
+      "license": {"status": "owner-controlled", "spdx": null},
+      "maturity": "characterized",
+      "test_status": "characterized",
+      "canonical_status": "candidate",
+      "evidence": []
+    },
+    {
+      "id": "prood-npc-generation",
+      "source_repository": "Apeloff1/Prood",
+      "source_revision": "aa33a5c9cfaf5558df4144b4ffa016055f401a3a",
+      "source_path": "backend/routes/npc_pipeline.py",
+      "source_blob": "b769cdce92e1036320c8e5743d72e8cc90326dc7",
+      "destination_path": "skeleton/frontier/npc_profiles.py",
+      "license": {"status": "owner-controlled", "spdx": null},
+      "maturity": "characterized",
+      "test_status": "characterized",
+      "canonical_status": "candidate",
+      "evidence": []
+    },
+    {
+      "id": "gameforge-runtime-semantics",
+      "source_repository": "Apeloff1/gameforge-rs",
+      "source_revision": "669b99d068fc532d4c4111bcb8ef187ea872c109",
+      "source_path": "crates/gf-core/src/lib.rs",
+      "source_blob": "481fcfca5a23272b70353eb09b7c3406bbc9bdd9",
+      "destination_path": "skeleton/frontier",
+      "license": {"status": "owner-controlled", "spdx": null},
+      "maturity": "characterized",
+      "test_status": "characterized",
+      "canonical_status": "candidate",
+      "evidence": []
+    },
+    {
+      "id": "hyperforge-capability-boundary",
+      "source_repository": "Apeloff1/hyperforge-cockpit-sota",
+      "source_revision": "161c12634a2193e2b3024635205eac325d37fc8e",
+      "source_path": "src/lib/preview-host-bridge.ts",
+      "source_blob": "ef40a5e8c789a49d7f927894396cf7b96b078dd7",
+      "destination_path": "skeleton/frontier/agent_runtime.py",
+      "license": {"status": "owner-controlled", "spdx": null},
+      "maturity": "characterized",
+      "test_status": "characterized",
+      "canonical_status": "candidate",
+      "evidence": []
+    },
+    {
+      "id": "lorebuffa-openworld-world-policy",
+      "source_repository": "Apeloff1/Lorebuffa",
+      "source_revision": "279539fc299f5fe67a139b335ddc74fec0eccbdc",
+      "source_path": "backend/world_map.py",
+      "source_blob": "a32259d514710c3e87d7ce5fe42f6fb73e63ca1b",
+      "equivalent_sources": [
+        {
+          "repository": "Apeloff1/Openworld",
+          "revision": "8324f0f889697ff0329120a61711f5fc4ae95b1d",
+          "source_path": "backend/world_map.py",
+          "source_blob": "a32259d514710c3e87d7ce5fe42f6fb73e63ca1b"
+        }
+      ],
+      "destination_path": "skeleton/frontier/world.py",
+      "license": {"status": "owner-controlled", "spdx": null},
+      "maturity": "characterized",
+      "test_status": "characterized",
+      "canonical_status": "candidate",
+      "evidence": []
+    },
+    {
+      "id": "gameforge-middleware-service",
+      "source_repository": "Apeloff1/gameforge-middleware",
+      "source_revision": "282b0af7cf39ca989a274c3f004217e135d9bbd7",
+      "source_path": null,
+      "source_blob": null,
+      "destination_path": "services/gameforge",
+      "license": {"status": "owner-controlled", "spdx": null},
+      "maturity": "candidate",
+      "test_status": "not-run",
+      "canonical_status": "candidate",
+      "evidence": []
+    },
+    {
+      "id": "tutolage-learning-unique",
+      "source_repository": "Apeloff1/Tutolage",
+      "source_revision": "d94030b6d4c75a7cdb4cf4fadfe9ff7e2ca635bf",
+      "source_path": null,
+      "source_blob": null,
+      "destination_path": "skeleton/learning",
+      "license": {"status": "owner-controlled", "spdx": null},
+      "maturity": "candidate",
+      "test_status": "not-run",
+      "canonical_status": "candidate",
+      "evidence": []
+    }
+  ]
+}
