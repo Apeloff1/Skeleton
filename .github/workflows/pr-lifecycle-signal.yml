@@ -1,0 +1,22 @@
+name: PR Lifecycle Signal
+
+on:
+  pull_request:
+    types: [synchronize, closed]
+
+# This workflow is deliberately unprivileged. It exists only to produce a
+# workflow_run event that trusted default-branch automation can consume.
+permissions: {}
+
+concurrency:
+  group: pr-lifecycle-signal-${{ github.event.pull_request.number }}-${{ github.event.action }}
+  cancel-in-progress: false
+
+jobs:
+  signal:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 2
+    steps:
+      - name: Emit lifecycle signal
+        shell: bash
+        run: printf '%s\n' 'PR lifecycle signal emitted.'
