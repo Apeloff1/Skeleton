@@ -68,6 +68,25 @@ jobs:
 
       - name: Run release provenance regression tests
         run: |
+          python - <<'PY'
+          import subprocess
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          project = tomllib.loads(Path("source-a/pyproject.toml").read_text(encoding="utf-8"))["project"]
+          dependencies = project.get("dependencies", [])
+          if not isinstance(dependencies, list) or not all(isinstance(item, str) for item in dependencies):
+              raise SystemExit("project.dependencies must be a list of strings")
+          subprocess.check_call([
+              sys.executable,
+              "-m",
+              "pip",
+              "install",
+              "--disable-pip-version-check",
+              *dependencies,
+          ])
+          PY
           python -m pip install --disable-pip-version-check "pytest==8.4.2"
           python -m pytest -q source-a/skeleton/testing/test_release_provenance.py
 
