@@ -58,9 +58,9 @@ class ObservableOrchestrator(CanonicalOrchestrator):
 
     Every instance owns an event bus and an attached :class:`EventMetricsBridge`
     by default, so choosing the observable runtime cannot silently drop lifecycle
-    metrics. Callers that already own either primitive may inject them; the
-    supplied bridge is attached to the supplied (or generated) bus exactly once
-    by this runtime boundary.
+    metrics. Callers that already own either primitive may inject them. When the
+    supplied bus already owns the canonical bridge (for example ``JournaledBus``),
+    that bridge is reused without creating or subscribing a second metrics plane.
     """
 
     def __init__(
@@ -78,8 +78,16 @@ class ObservableOrchestrator(CanonicalOrchestrator):
             max_turns=max_turns,
         )
         self.event_bus = event_bus or EventBus()
-        self.metrics_bridge = metrics_bridge or EventMetricsBridge()
-        self.metrics_bridge.attach(self.event_bus)
+        bus_metrics_bridge = getattr(self.event_bus, "metrics_bridge", None)
+        if metrics_bridge is None and isinstance(
+            bus_metrics_bridge, EventMetricsBridge
+        ):
+            self.metrics_bridge = bus_metrics_bridge
+        elif metrics_bridge is not None and metrics_bridge is bus_metrics_bridge:
+            self.metrics_bridge = metrics_bridge
+        else:
+            self.metrics_bridge = metrics_bridge or EventMetricsBridge()
+            self.metrics_bridge.attach(self.event_bus)
 
     def _emit(self, topic: str, payload: dict[str, object]) -> None:
         self.event_bus.emit(
