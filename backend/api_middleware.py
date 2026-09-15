@@ -58,7 +58,7 @@ def _parse_trusted_proxy_networks(
         try:
             networks.append(ipaddress.ip_network(value, strict=False))
         except ValueError:
-            log.warning("ignoring invalid TRUSTED_PROXY_CIDRS entry: %r", value)
+            log.warning("ignoring invalid TRUSTED_PROXY_CIDRS entry")
     return tuple(networks)
 
 
