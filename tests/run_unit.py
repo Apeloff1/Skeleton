@@ -9,13 +9,14 @@ in the same test remains a hard failure.
 
 This runner intentionally stays lightweight, but it also preserves pytest's
 important per-test instance isolation, executes awaitable test results to
-completion, collects module-level and descriptor-backed tests, and treats an
-explicit ``SystemExit`` as a test failure rather than allowing ``SystemExit(0)``
-to turn the whole runner falsely green.
+completion, collects module-level and descriptor-backed tests, and fails closed
+when imports, collection, or explicit ``SystemExit`` attempts short-circuit the
+suite.
 """
 from __future__ import annotations
 
 import asyncio
+import importlib
 import inspect
 import linecache
 import sys
@@ -27,10 +28,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import tests.test_context as c  # noqa: E402
-import tests.test_cortex as x  # noqa: E402
-import tests.test_forge as f  # noqa: E402
-import tests.test_jeeves as j  # noqa: E402
+TEST_MODULE_NAMES = (
+    "tests.test_forge",
+    "tests.test_jeeves",
+    "tests.test_context",
+    "tests.test_cortex",
+)
 
 # These are not generic skips. The method is executed and suppression is
 # permitted only when the terminal traceback frame is the test method itself
@@ -76,6 +79,10 @@ def _matches_superseded_assertion(
     return actual_line == expected_line
 
 
+def _load_test_module(name: str) -> ModuleType:
+    return importlib.import_module(name)
+
+
 def _iter_module_test_functions(mod: ModuleType) -> Iterator[tuple[str, TestCallable]]:
     """Yield test functions defined by ``mod``, excluding imported helpers."""
 
@@ -116,6 +123,8 @@ def _invoke_test(meth: TestCallable) -> object:
     result = meth()
     if inspect.isawaitable(result):
         return asyncio.run(_await_result(result))
+    if inspect.isgenerator(result) or inspect.isasyncgen(result):
+        raise RuntimeError("legacy runner does not support generator-style tests")
     return result
 
 
@@ -146,25 +155,86 @@ def _run_case(
         return 0, 1, 0
 
 
-def main() -> int:
-    fails = 0
+def _run_module(mod: ModuleType) -> tuple[int, int, int]:
     passes = 0
+    fails = 0
     superseded = 0
-    for mod in (f, j, c, x):
-        for name, meth in _iter_module_test_functions(mod):
-            p, failed, s = _run_case(mod.__name__, name, meth)
+    collected = 0
+
+    try:
+        module_tests = list(_iter_module_test_functions(mod))
+    except SystemExit as exc:
+        print("FAIL COLLECT", mod.__name__, type(exc).__name__, exc)
+        return 0, 1, 0
+    except Exception as exc:
+        print("FAIL COLLECT", mod.__name__, type(exc).__name__, exc)
+        return 0, 1, 0
+
+    for name, meth in module_tests:
+        collected += 1
+        p, failed, s = _run_case(mod.__name__, name, meth)
+        passes += p
+        fails += failed
+        superseded += s
+
+    try:
+        classes = inspect.getmembers_static(mod, inspect.isclass)
+    except SystemExit as exc:
+        print("FAIL COLLECT", mod.__name__, type(exc).__name__, exc)
+        return passes, fails + 1, superseded
+    except Exception as exc:
+        print("FAIL COLLECT", mod.__name__, type(exc).__name__, exc)
+        return passes, fails + 1, superseded
+
+    for name, cls in classes:
+        if not name.startswith("Test") or cls.__module__ != mod.__name__:
+            continue
+        try:
+            methods = list(_iter_test_methods(cls))
+        except SystemExit as exc:
+            print("FAIL COLLECT", name, type(exc).__name__, exc)
+            fails += 1
+            continue
+        except Exception as exc:
+            print("FAIL COLLECT", name, type(exc).__name__, exc)
+            fails += 1
+            continue
+
+        for mname, meth in methods:
+            collected += 1
+            p, failed, s = _run_case(name, mname, meth, (name, mname))
             passes += p
             fails += failed
             superseded += s
 
-        for name, cls in inspect.getmembers_static(mod, inspect.isclass):
-            if not name.startswith("Test") or cls.__module__ != mod.__name__:
-                continue
-            for mname, meth in _iter_test_methods(cls):
-                p, failed, s = _run_case(name, mname, meth, (name, mname))
-                passes += p
-                fails += failed
-                superseded += s
+    if collected == 0:
+        print("FAIL COLLECT", mod.__name__, "no tests collected")
+        fails += 1
+
+    return passes, fails, superseded
+
+
+def main() -> int:
+    fails = 0
+    passes = 0
+    superseded = 0
+
+    for module_name in TEST_MODULE_NAMES:
+        try:
+            mod = _load_test_module(module_name)
+        except SystemExit as exc:
+            fails += 1
+            print("FAIL IMPORT", module_name, type(exc).__name__, exc)
+            continue
+        except Exception as exc:
+            fails += 1
+            print("FAIL IMPORT", module_name, type(exc).__name__, exc)
+            continue
+
+        p, failed, s = _run_module(mod)
+        passes += p
+        fails += failed
+        superseded += s
 
     print(f"RESULT {passes} ok {fails} fail {superseded} superseded")
     return 1 if fails else 0
