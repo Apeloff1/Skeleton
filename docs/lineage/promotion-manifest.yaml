@@ -1,4 +1,4 @@
-version: 2
+version: 3
 canonical_repository: Apeloff1/Skeleton
 strategy: selective-promotion
 rules:
@@ -43,18 +43,20 @@ sources:
     destinations:
       web: cockpit/web
   - repository: Apeloff1/Lorebuffa
-    capabilities: [lore, world-building, narrative, npc-catalog]
+    capabilities: [lore, world-building, narrative, npc-catalog, world-map]
     disposition: adapt-unique-only
     destinations:
       domain_pack: domain-packs/lorebuffa
       npc_adapter: skeleton/frontier/npc_adapters.py
+      world: characterize-before-promotion
   - repository: Apeloff1/Openworld
-    capabilities: [world, exploration, procedural-content, npc-catalog]
+    capabilities: [world, exploration, procedural-content, npc-catalog, world-map]
     disposition: characterize-and-deduplicate
     destinations:
-      world: skeleton/game/world
+      world: characterize-before-promotion
       npc_adapter: skeleton/frontier/npc_adapters.py
 integration_wave_2:
+  status: acceptance-increment-landed
   - surface: memory
     primary_source: Apeloff1/Prood
     source_path: backend/services/rag_service.py
@@ -65,6 +67,11 @@ integration_wave_2:
         source_blob: b67167f1135744e74827ce03b0bf5d766e800cf4
     decision: adapt-once
     target: skeleton/frontier/memory_adapters.py
+    backend: skeleton.frontier.memory_adapters.SQLiteCollection
+    evidence:
+      - skeleton/testing/test_frontier_memory_backends.py
+      - skeleton/testing/test_frontier_memory_benchmark.py
+      - scripts/benchmark_frontier_memory.py
     rationale: preserve collection/query/filter/relevance semantics without ChromaDB dependency
   - surface: npc-generation
     primary_source: Apeloff1/Prood
@@ -85,6 +92,9 @@ integration_wave_2:
         source_blob: a232cb0991657998bb339d34b9321a16e4203aa9
     decision: adapt-once-no-catalog-copy
     target: skeleton/frontier/npc_adapters.py
+    evidence:
+      - skeleton/testing/data/frontier_npc_source_fixture.json
+      - skeleton/testing/test_frontier_npc_source_fixture.py
     rationale: preserve faction/schedule/quests/disposition as NPCSpec metadata without duplicating source catalogs
   - surface: runtime-provenance
     primary_source: Apeloff1/gameforge-rs
@@ -100,6 +110,32 @@ integration_wave_2:
     decision: no-kernel-copy
     target: skeleton/frontier/agent_runtime.py
     rationale: retain fail-closed explicit boundary semantics while capability sets remain the canonical runtime primitive
+integration_wave_3_candidate:
+  surface: world-policy
+  primary_source: Apeloff1/Lorebuffa
+  source_path: backend/world_map.py
+  source_blob: a32259d514710c3e87d7ce5fe42f6fb73e63ca1b
+  equivalent_sources:
+    - repository: Apeloff1/Openworld
+      source_path: backend/world_map.py
+      source_blob: a32259d514710c3e87d7ce5fe42f6fb73e63ca1b
+  decision: characterize-pure-policy-before-promotion
+  portable_candidates:
+    - region-lookup
+    - route-distance
+    - voyage-supply-policy
+    - fog-of-war-projection
+    - random-island-policy
+  reject_from-kernel:
+    - fastapi-routes
+    - motor-mongodb-client
+    - persistence-handlers
+    - full-world-catalog
+  promotion_preconditions:
+    - no-incumbent-world-primitive
+    - inject-randomness-and-clock
+    - deterministic-tests
+    - single-shared-lineage
 promotion_gates:
   - contract-tests
   - integration-tests
