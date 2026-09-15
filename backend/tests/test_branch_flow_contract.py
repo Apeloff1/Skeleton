@@ -55,26 +55,48 @@ def test_rejects_loss_of_fresh_head_revalidation() -> None:
 
 
 def test_rejects_loss_of_workflow_file_filter() -> None:
-    source = _replace_once(_source(), "          def touches_workflows(number):", "          def touches_other_files(number):")
-    assert "inspect changed files for workflow control-plane changes" in _messages(source)
+    source = _replace_once(
+        _source(),
+        "          def touches_workflows(number, expected_files):",
+        "          def touches_other_files(number, expected_files):",
+    )
+    assert "complete changed-file set" in _messages(source)
+
+
+def test_rejects_loss_of_workflow_rename_detection() -> None:
+    source = _replace_once(
+        _source(),
+        "for field in ('filename', 'previous_filename')",
+        "for field in ('filename',)",
+    )
+    assert "both sides of a rename" in _messages(source)
+
+
+def test_rejects_incomplete_workflow_file_enumeration() -> None:
+    source = _replace_once(
+        _source(),
+        "                  if seen >= expected_files:\n",
+        "                  if body:\n",
+    )
+    assert "prove completeness or fail closed" in _messages(source)
+
+
+def test_rejects_loss_of_changed_file_count_contract() -> None:
+    source = _replace_once(
+        _source(),
+        "              workflow_change = touches_workflows(number, pr.get('changed_files'))\n",
+        "              workflow_change = touches_workflows(number, 1)\n",
+    )
+    assert "initial workflow-file exclusion must use the PR changed-file count" in _messages(source)
 
 
 def test_rejects_loss_of_workflow_filter_recheck() -> None:
     source = _replace_once(
         _source(),
-        "              if touches_workflows(number) is not False:\n",
+        "              if touches_workflows(number, fresh.get('changed_files')) is not False:\n",
         "              if False:\n",
     )
     assert "revalidated immediately before mutation" in _messages(source)
-
-
-def test_rejects_fail_open_workflow_file_pagination_limit() -> None:
-    source = _replace_once(
-        _source(),
-        "              return None\n\n          def live_validation",
-        "              return False\n\n          def live_validation",
-    )
-    assert "scan limit is exhausted" in _messages(source)
 
 
 def test_rejects_missing_active_ci_state() -> None:
