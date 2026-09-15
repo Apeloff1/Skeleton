@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
-"""Runner used by CI when pytest is not installed.
+"""Small dependency-free runner for the legacy GameForge unit modules.
 
-The GameForge cortex grew a stronger owned-mouth contract in Queue25/Queue28:
-acquiring a model is now a learned-state transfer that arms Neo decoding, and
-PFC's internal transformer is trained while its birth-state public visibility
-remains compatibility-gated.  Two older assertions in ``test_cortex`` encode
-the superseded pre-transfer contract.  We still execute those tests so every
-preceding assertion is checked, but an AssertionError at the obsolete terminal
-expectation is recorded separately instead of pretending the newer contract is
-a regression.  The replacement Queue tests run in the same suite and remain
-hard failures.
+The GameForge cortex grew a stronger owned-mouth contract in Queue28/Queue29:
+PFC's internal transformer is now trained, while one older assertion still
+encodes the superseded pre-transfer contract.  We execute that test and may
+suppress only that exact obsolete assertion.  Any different assertion failure
+in the same test remains a hard failure.
+
+This runner intentionally stays lightweight, but it also preserves pytest's
+important per-test instance isolation so state cannot leak between methods of
+the same test class.
 """
 from __future__ import annotations
 
 import inspect
+import linecache
 import sys
 from pathlib import Path
+from types import TracebackType
+from typing import Iterator
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -26,13 +29,55 @@ import tests.test_cortex as x  # noqa: E402
 import tests.test_forge as f  # noqa: E402
 import tests.test_jeeves as j  # noqa: E402
 
-# These are not generic skips.  Both methods are executed, and only the exact
-# legacy terminal AssertionError is tolerated because stronger successor
-# contracts are also executed as hard tests in this same module.
+# These are not generic skips. The method is executed and suppression is
+# permitted only when the terminal traceback frame is the test method itself
+# and the failing source line exactly matches the documented obsolete assert.
 SUPERSEDED_ASSERTIONS = {
-    ("TestJeevesLM", "test_unfitted_does_not_speak"): "TestQueue25.test_surpass_is_neo_decode",
-    ("TestNeural", "test_train_fits_all_four_neurals"): "TestQueue28Queue29.test_tied_cosine_all_slot_lms",
+    ("TestNeural", "test_train_fits_all_four_neurals"): {
+        "successor": "TestQueue28Queue29.test_tied_cosine_all_slot_lms",
+        "assertion": 'assert lms["pfc"]["transformer_steps"] == 0',
+    },
 }
+
+
+def _terminal_traceback(exc: BaseException) -> TracebackType | None:
+    tb = exc.__traceback__
+    if tb is None:
+        return None
+    while tb.tb_next is not None:
+        tb = tb.tb_next
+    return tb
+
+
+def _matches_superseded_assertion(
+    meth: object,
+    exc: AssertionError,
+    expected_line: str,
+) -> bool:
+    """Return true only for the exact documented assertion in ``meth``.
+
+    Matching both the terminal code object and source line prevents a new
+    regression in a helper or an earlier assertion from being hidden merely
+    because it happened inside a historically superseded test method.
+    """
+
+    tb = _terminal_traceback(exc)
+    func = getattr(meth, "__func__", meth)
+    code = getattr(func, "__code__", None)
+    if tb is None or code is None or tb.tb_frame.f_code is not code:
+        return False
+    actual_line = linecache.getline(code.co_filename, tb.tb_lineno).strip()
+    return actual_line == expected_line
+
+
+def _iter_test_methods(cls: type) -> Iterator[tuple[str, object]]:
+    """Yield test methods with a fresh class instance for every test."""
+
+    for mname, _ in inspect.getmembers(cls, inspect.isfunction):
+        if not mname.startswith("test_"):
+            continue
+        inst = cls()
+        yield mname, getattr(inst, mname)
 
 
 def main() -> int:
@@ -41,22 +86,19 @@ def main() -> int:
     superseded = 0
     for mod in (f, j, c, x):
         for name, cls in inspect.getmembers(mod, inspect.isclass):
-            if not name.startswith("Test"):
+            if not name.startswith("Test") or cls.__module__ != mod.__name__:
                 continue
-            inst = cls()
-            for mname, meth in inspect.getmembers(inst, inspect.ismethod):
-                if not mname.startswith("test_"):
-                    continue
+            for mname, meth in _iter_test_methods(cls):
                 key = (name, mname)
                 try:
                     meth()
                     print("PASS", name, mname)
                     passes += 1
                 except AssertionError as exc:
-                    successor = SUPERSEDED_ASSERTIONS.get(key)
-                    if successor:
+                    spec = SUPERSEDED_ASSERTIONS.get(key)
+                    if spec and _matches_superseded_assertion(meth, exc, spec["assertion"]):
                         superseded += 1
-                        print("SUPERSEDED", name, mname, "->", successor, repr(exc))
+                        print("SUPERSEDED", name, mname, "->", spec["successor"], repr(exc))
                         continue
                     fails += 1
                     print("FAIL", name, mname, type(exc).__name__, exc)
