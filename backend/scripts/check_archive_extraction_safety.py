@@ -126,36 +126,49 @@ def _parameter_names(scope: ast.AST) -> set[str]:
 
 
 def _tarfile_bindings(scope: ast.AST, aliases: dict[str, str]) -> dict[str, str]:
-    """Infer stable names bound directly to a TarFile instance."""
+    """Infer stable names bound directly or by simple alias to a TarFile instance."""
     nodes = list(_scope_nodes(scope))
     stores = Counter(
         node.id
         for node in nodes
         if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
     )
-    candidates: set[str] = set()
+    direct_candidates: set[str] = set()
+    alias_edges: list[tuple[str, str]] = []
 
     for node in nodes:
         if isinstance(node, (ast.Assign, ast.AnnAssign)):
             value = node.value
             targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            target_names = set().union(*(_target_names(target) for target in targets))
             if isinstance(value, ast.Call) and canonical_name(value.func, aliases) in TARFILE_CONSTRUCTORS:
-                for target in targets:
-                    candidates.update(_target_names(target))
+                direct_candidates.update(target_names)
+            elif isinstance(value, ast.Name):
+                alias_edges.extend((target, value.id) for target in target_names)
         elif isinstance(node, (ast.With, ast.AsyncWith)):
             for item in node.items:
                 if (
                     isinstance(item.context_expr, ast.Call)
                     and canonical_name(item.context_expr.func, aliases) in TARFILE_CONSTRUCTORS
                 ):
-                    candidates.update(_target_names(item.optional_vars))
+                    direct_candidates.update(_target_names(item.optional_vars))
 
     parameters = _parameter_names(scope)
-    return {
-        name: "tarfile.TarFile"
-        for name in candidates
-        if stores[name] == 1 and name not in parameters
-    }
+
+    def stable(name: str) -> bool:
+        return stores[name] == 1 and name not in parameters
+
+    candidates = {name for name in direct_candidates if stable(name)}
+    changed = True
+    while changed:
+        changed = False
+        for target, source in alias_edges:
+            if target in candidates or source not in candidates or not stable(target):
+                continue
+            candidates.add(target)
+            changed = True
+
+    return {name: "tarfile.TarFile" for name in candidates}
 
 
 def _keyword(node: ast.Call, name: str) -> ast.AST | None:
