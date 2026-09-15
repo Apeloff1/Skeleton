@@ -2,9 +2,9 @@
 
 The checker is dependency-free so it can run in the earliest CI phase. It
 requires immutable action references, explicit workflow permissions, hardened
-checkout credential handling, rejects high-risk event/permission patterns, and
-prevents direct interpolation of attacker-controlled GitHub event fields into
-shell ``run`` commands.
+checkout credential handling, rejects workflow-wide token elevation and
+high-risk event/permission patterns, and prevents direct interpolation of
+attacker-controlled GitHub event fields into shell ``run`` commands.
 """
 from __future__ import annotations
 
@@ -22,6 +22,10 @@ RUN_RE = re.compile(r"^(?P<indent>\s*)(?:-\s*)?run\s*:\s*(?P<value>.*)$")
 EXPRESSION_RE = re.compile(r"\$\{\{(?P<body>.*?)\}\}")
 PERSIST_FALSE_RE = re.compile(
     r"\bpersist-credentials\s*:\s*(?:false|['\"]false['\"])(?=\s*[,}#]|\s*$)",
+    re.IGNORECASE,
+)
+PERMISSION_ENTRY_RE = re.compile(
+    r"^\s+(?P<scope>[A-Za-z0-9_-]+)\s*:\s*(?P<value>read|write|none)\s*(?:#.*)?$",
     re.IGNORECASE,
 )
 BLOCK_SCALARS = {"|", ">", "|-", ">-", "|+", ">+"}
@@ -82,6 +86,63 @@ def _checkout_credentials_disabled(lines: list[str], uses_index: int) -> bool:
     return False
 
 
+def _top_level_permission_violations(
+    lines: list[str], path_name: str
+) -> tuple[bool, list[str]]:
+    """Require explicit read/none workflow defaults and job-local write elevation.
+
+    GitHub applies workflow-level permissions to every job unless overridden.
+    A global ``*: write`` therefore widens the token for unrelated jobs. This
+    gate requires all write scopes to be granted inside the specific job that
+    needs them. ``read-all`` is rejected for the same least-privilege reason:
+    workflows should name the read scopes they actually consume (or use ``{}``).
+    """
+    findings: list[str] = []
+    has_top_level = False
+
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if line != stripped or not stripped.startswith("permissions:"):
+            continue
+
+        has_top_level = True
+        number = index + 1
+        declaration = stripped.split("#", 1)[0].strip()
+        inline = declaration.partition(":")[2].strip().lower()
+
+        if inline in {"write-all", "write"}:
+            findings.append(
+                f"{path_name}:{number}: workflow-wide write permissions are forbidden; grant write scopes only to the job that needs them"
+            )
+            continue
+        if inline == "read-all":
+            findings.append(
+                f"{path_name}:{number}: workflow-wide read-all is forbidden; declare only required read scopes"
+            )
+            continue
+        if inline:
+            # ``permissions: {}`` is an intentional no-permissions default.
+            if inline != "{}":
+                findings.append(
+                    f"{path_name}:{number}: unsupported top-level permissions scalar; use a scoped mapping or {{}}"
+                )
+            continue
+
+        child_index = index + 1
+        while child_index < len(lines):
+            child = lines[child_index]
+            if child.strip() and _indent_width(child) == 0:
+                break
+            match = PERMISSION_ENTRY_RE.match(child)
+            if match and match.group("value").lower() == "write":
+                findings.append(
+                    f"{path_name}:{child_index + 1}: workflow-wide {match.group('scope')}: write is forbidden; move elevation to the specific job"
+                )
+            child_index += 1
+
+    return has_top_level, findings
+
+
 def _run_fragments(lines: list[str]) -> Iterable[tuple[int, str]]:
     """Yield shell source fragments with their workflow line numbers."""
     index = 0
@@ -127,15 +188,13 @@ def violations(path: Path) -> list[str]:
 
     findings: list[str] = []
     lines = text.splitlines()
-    has_top_level_permissions = False
+    has_top_level_permissions, permission_findings = _top_level_permission_violations(
+        lines, path.name
+    )
+    findings.extend(permission_findings)
 
     for index, line in enumerate(lines):
         number = index + 1
-        stripped = line.strip()
-        if line == stripped and stripped.startswith("permissions:"):
-            has_top_level_permissions = True
-            if stripped in {"permissions: write-all", "permissions: write"}:
-                findings.append(f"{path.name}:{number}: workflow-wide write permissions are forbidden")
 
         if re.match(r"^\s*pull_request_target\s*:", line):
             findings.append(f"{path.name}:{number}: pull_request_target is forbidden")
