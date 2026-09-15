@@ -9,6 +9,7 @@ from __future__ import annotations
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
+from threading import RLock
 from typing import Optional, Tuple
 
 from skeleton.retrieval.fusion import ScoredResult
@@ -21,7 +22,12 @@ class CacheEntry:
 
 
 class ResultCache:
-    """TTL cache with LRU eviction and a hard entry bound."""
+    """TTL cache with LRU eviction and a hard entry bound.
+
+    Cache operations are synchronized so the same instance can safely back
+    concurrent retrieval requests. ``RLock`` keeps compound LRU operations
+    (lookup + recency update, expiry scan + eviction) atomic.
+    """
 
     def __init__(self, *, ttl_s: float = 60.0, max_entries: int = 512) -> None:
         if isinstance(ttl_s, bool) or not isinstance(ttl_s, (int, float)):
@@ -36,50 +42,56 @@ class ResultCache:
         self.ttl_s = float(ttl_s)
         self.max_entries = max_entries
         self._entries: OrderedDict[str, CacheEntry] = OrderedDict()
+        self._lock = RLock()
 
     def get(self, query: str) -> Optional[Tuple[ScoredResult, ...]]:
-        now = time.monotonic()
-        entry = self._entries.get(query)
-        if entry is None:
-            return None
-        if entry.expires_at <= now:
-            del self._entries[query]
-            return None
+        with self._lock:
+            now = time.monotonic()
+            entry = self._entries.get(query)
+            if entry is None:
+                return None
+            if entry.expires_at <= now:
+                del self._entries[query]
+                return None
 
-        # A hot query should not be evicted before colder entries.
-        self._entries.move_to_end(query)
-        return entry.results
+            # A hot query should not be evicted before colder entries.
+            self._entries.move_to_end(query)
+            return entry.results
 
     def put(self, query: str, results: Tuple[ScoredResult, ...]) -> None:
-        now = time.monotonic()
+        with self._lock:
+            now = time.monotonic()
 
-        # Updating an existing key refreshes both TTL and LRU position.
-        self._entries.pop(query, None)
+            # Updating an existing key refreshes both TTL and LRU position.
+            self._entries.pop(query, None)
 
-        # Avoid evicting a live entry while expired entries are still occupying
-        # capacity. The bounded scan runs only when the cache is full.
-        if len(self._entries) >= self.max_entries:
-            expired = [
-                key
-                for key, entry in self._entries.items()
-                if entry.expires_at <= now
-            ]
-            for key in expired:
-                self._entries.pop(key, None)
+            # Avoid evicting a live entry while expired entries are still occupying
+            # capacity. The bounded scan runs only when the cache is full.
+            if len(self._entries) >= self.max_entries:
+                expired = [
+                    key
+                    for key, entry in self._entries.items()
+                    if entry.expires_at <= now
+                ]
+                for key in expired:
+                    self._entries.pop(key, None)
 
-        while len(self._entries) >= self.max_entries:
-            self._entries.popitem(last=False)
+            while len(self._entries) >= self.max_entries:
+                self._entries.popitem(last=False)
 
-        self._entries[query] = CacheEntry(
-            results=results,
-            expires_at=now + self.ttl_s,
-        )
+            self._entries[query] = CacheEntry(
+                results=results,
+                expires_at=now + self.ttl_s,
+            )
 
     def invalidate(self, query: str) -> bool:
-        return self._entries.pop(query, None) is not None
+        with self._lock:
+            return self._entries.pop(query, None) is not None
 
     def clear(self) -> None:
-        self._entries.clear()
+        with self._lock:
+            self._entries.clear()
 
     def size(self) -> int:
-        return len(self._entries)
+        with self._lock:
+            return len(self._entries)
