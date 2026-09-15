@@ -1,4 +1,4 @@
-version: 4
+version: 5
 canonical_repository: Apeloff1/Skeleton
 strategy: selective-promotion
 rules:
@@ -48,12 +48,12 @@ sources:
     destinations:
       domain_pack: domain-packs/lorebuffa
       npc_adapter: skeleton/frontier/npc_adapters.py
-      world: characterize-before-promotion
+      world: skeleton/frontier/world.py
   - repository: Apeloff1/Openworld
     capabilities: [world, exploration, procedural-content, npc-catalog, world-map]
-    disposition: characterize-and-deduplicate
+    disposition: deduplicate-shared-lineage
     destinations:
-      world: characterize-before-promotion
+      world: skeleton/frontier/world.py
       npc_adapter: skeleton/frontier/npc_adapters.py
 integration_wave_2:
   status: acceptance-increment-landed
@@ -131,7 +131,8 @@ integration_wave_2:
       decision: no-kernel-copy
       target: skeleton/frontier/agent_runtime.py
       rationale: retain fail-closed explicit boundary semantics while capability sets remain the canonical runtime primitive
-integration_wave_3_candidate:
+integration_wave_3:
+  status: pure-policy-promoted
   surface: world-policy
   primary_source: Apeloff1/Lorebuffa
   source_path: backend/world_map.py
@@ -140,23 +141,25 @@ integration_wave_3_candidate:
     - repository: Apeloff1/Openworld
       source_path: backend/world_map.py
       source_blob: a32259d514710c3e87d7ce5fe42f6fb73e63ca1b
-  decision: characterize-pure-policy-before-promotion
-  portable_candidates:
-    - region-lookup
-    - route-distance
+  decision: promote-once-pure-policy-only
+  target: skeleton/frontier/world.py
+  promoted_capabilities:
+    - region-normalization
+    - route-distance-and-danger-policy
     - voyage-supply-policy
     - fog-of-war-projection
-    - random-island-policy
-  reject_from-kernel:
+    - injected-random-island-policy
+  rejected_from-kernel:
     - fastapi-routes
     - motor-mongodb-client
     - persistence-handlers
     - full-world-catalog
-  promotion_preconditions:
-    - no-incumbent-world-primitive
-    - inject-randomness-and-clock
-    - deterministic-tests
-    - single-shared-lineage
+  evidence:
+    - skeleton/testing/test_frontier_world_policy.py
+  notes:
+    - randomness-clock-and-identity-are-injected
+    - route-danger-intersection-is-two-dimensional
+    - source-world-map-is-one-shared-lineage-not-two-promotions
 promotion_gates:
   - contract-tests
   - integration-tests
