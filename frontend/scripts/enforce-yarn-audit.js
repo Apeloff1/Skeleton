@@ -13,6 +13,13 @@ if (process.env.IMAGE_SIZE_SECURITY_VERIFIED !== 'success') {
   process.exit(1);
 }
 
+const rawAuditStatus = process.env.YARN_AUDIT_STATUS;
+if (!rawAuditStatus || !/^\d+$/.test(rawAuditStatus)) {
+  console.error('[yarn-audit-policy] missing or invalid YARN_AUDIT_STATUS; blocking');
+  process.exit(2);
+}
+const auditStatus = Number(rawAuditStatus);
+
 const allowedMitigatedAdvisories = new Set([
   // image-size has no patched npm release. These two parser-progress flaws are
   // patched fail-closed by scripts/patch-node-modules.js and verified by
@@ -21,10 +28,23 @@ const allowedMitigatedAdvisories = new Set([
   'GHSA-w3rx-r6r6-pgpr',
 ]);
 
+let auditText;
+try {
+  auditText = fs.readFileSync(auditPath, 'utf8');
+} catch (error) {
+  console.error(`[yarn-audit-policy] unable to read audit transcript: ${error.message}`);
+  process.exit(2);
+}
+
 const findings = [];
 const mitigated = [];
-for (const line of fs.readFileSync(auditPath, 'utf8').split(/\r?\n/)) {
+const auditErrors = [];
+let sawRecord = false;
+let summary = null;
+
+for (const line of auditText.split(/\r?\n/)) {
   if (!line.trim()) continue;
+  sawRecord = true;
   let record;
   try {
     record = JSON.parse(line);
@@ -32,6 +52,27 @@ for (const line of fs.readFileSync(auditPath, 'utf8').split(/\r?\n/)) {
     console.error('[yarn-audit-policy] invalid JSON audit record');
     process.exit(2);
   }
+
+  if (record.type === 'error') {
+    auditErrors.push(record);
+    continue;
+  }
+
+  if (record.type === 'auditSummary') {
+    const data = record.data;
+    if (
+      !data ||
+      typeof data !== 'object' ||
+      !data.vulnerabilities ||
+      typeof data.vulnerabilities !== 'object'
+    ) {
+      console.error('[yarn-audit-policy] malformed audit summary; blocking');
+      process.exit(2);
+    }
+    summary = data;
+    continue;
+  }
+
   if (record.type !== 'auditAdvisory') continue;
   const advisory = record.data && record.data.advisory;
   if (!advisory) continue;
@@ -48,6 +89,37 @@ for (const line of fs.readFileSync(auditPath, 'utf8').split(/\r?\n/)) {
   } else {
     findings.push(item);
   }
+}
+
+if (!sawRecord) {
+  console.error('[yarn-audit-policy] empty audit transcript; blocking');
+  process.exit(2);
+}
+if (auditErrors.length) {
+  console.error(`[yarn-audit-policy] yarn audit emitted ${auditErrors.length} error record(s); blocking`);
+  process.exit(2);
+}
+if (!summary) {
+  console.error('[yarn-audit-policy] audit transcript ended without auditSummary; blocking');
+  process.exit(2);
+}
+
+const severityCount = (name) => {
+  const value = Number(summary.vulnerabilities[name] || 0);
+  return Number.isFinite(value) && value >= 0 ? value : 0;
+};
+const blockingSummaryCount = severityCount('high') + severityCount('critical');
+if (auditStatus !== 0 && blockingSummaryCount === 0) {
+  console.error(
+    `[yarn-audit-policy] yarn audit exited ${auditStatus} without high/critical findings; treating as execution failure`,
+  );
+  process.exit(2);
+}
+if (auditStatus === 0 && blockingSummaryCount > 0) {
+  console.error(
+    '[yarn-audit-policy] audit status contradicts high/critical summary; blocking',
+  );
+  process.exit(2);
 }
 
 const unique = (items) => {
@@ -73,4 +145,9 @@ if (remaining.length) {
   process.exit(1);
 }
 
+if (auditStatus !== 0) {
+  console.log(
+    `[yarn-audit-policy] yarn audit exited ${auditStatus}; complete transcript contains only policy-mitigated high/critical advisories`,
+  );
+}
 console.log('[yarn-audit-policy] no unmitigated high/critical advisories');
