@@ -19,9 +19,17 @@ def test_close_barrier_workflows_cancel_stranded_pr_runs_without_runner_work() -
     for name in CLOSE_BARRIER_WORKFLOWS:
         text = (WORKFLOWS / name).read_text(encoding="utf-8")
 
-        assert "closed" in text, f"{name} must listen for pull_request closed"
+        assert "types: [opened, synchronize, reopened, closed]" in text, (
+            f"{name} must listen for the normal PR lifecycle plus closed"
+        )
         assert "concurrency:" in text, f"{name} must use workflow concurrency"
-        assert "cancel-in-progress:" in text, f"{name} must cancel the prior PR lane"
+        assert "github.event.pull_request.number" in text, (
+            f"{name} concurrency must key the close barrier to the same PR lane"
+        )
+        assert (
+            "cancel-in-progress: true" in text
+            or "cancel-in-progress: ${{ github.event_name == 'pull_request' }}" in text
+        ), f"{name} must actively cancel the prior PR lane"
         assert "github.event.action != 'closed'" in text, (
             f"{name} must skip validation work on the close-only barrier run"
         )
