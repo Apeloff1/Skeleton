@@ -51,7 +51,7 @@ jobs:
       - name: Run workflow security contract regression suite
         working-directory: backend
         run: >-
-          python -m pytest -q
+          python -m pytest -q --noconftest
           tests/test_workflow_input_security_gate.py
           tests/test_workflow_event_shell_security.py
           tests/test_repo_attention_contract.py
