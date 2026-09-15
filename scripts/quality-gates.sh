@@ -34,8 +34,11 @@ python scripts/check_repository_process_safety.py
 printf '\n== Backend unsafe deserialization safety ==\n'
 python backend/scripts/check_deserialization_safety.py
 
-printf '\n== Repository high-confidence SAST ==\n'
+printf '\n== Backend/frontend high-confidence SAST ==\n'
 python backend/scripts/check_sast_security.py
+
+printf '\n== Core/tooling Python high-confidence SAST ==\n'
+python scripts/check_repository_python_sast.py
 
 printf '\n== JavaScript child_process alias safety ==\n'
 python backend/scripts/check_js_process_alias_safety.py
@@ -61,6 +64,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_repository_process_safety.py \
   backend/tests/test_deserialization_safety_gate.py \
   backend/tests/test_sast_security_gate.py \
+  backend/tests/test_repository_python_sast_scope.py \
   backend/tests/test_js_process_alias_safety.py \
   backend/tests/test_workflow_security_gate.py \
   backend/tests/test_secret_hygiene_gate.py \
