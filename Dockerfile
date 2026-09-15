@@ -8,9 +8,8 @@ WORKDIR /app
 
 COPY pyproject.toml README.md ./
 COPY skeleton ./skeleton
-COPY tests ./tests
 
-RUN pip install --no-cache-dir -e ".[dev]" \
+RUN pip install --no-cache-dir . \
     && useradd --create-home --uid 10001 appuser \
     && chown -R appuser:appuser /app
 
