@@ -362,6 +362,8 @@ def generate_random_island(
     user_id = user_id.strip()
     if not user_id:
         raise ValueError("user_id must not be empty")
+    if region.bounds.width <= 0 or region.bounds.height <= 0:
+        raise ValueError("world region requires positive-area bounds for island generation")
     vocabulary.validate()
 
     island_id = str(id_factory()).strip()
@@ -384,8 +386,8 @@ def generate_random_island(
         "name": name,
         "region": region.id,
         "position": {
-            "x": rng.randint(region.bounds.x, region.bounds.max_x),
-            "y": rng.randint(region.bounds.y, region.bounds.max_y),
+            "x": rng.randrange(region.bounds.x, region.bounds.max_x),
+            "y": rng.randrange(region.bounds.y, region.bounds.max_y),
         },
         "size": rng.choice(vocabulary.sizes),
         "features": list(features),
