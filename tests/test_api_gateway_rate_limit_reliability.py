@@ -1,6 +1,7 @@
 """Reliability regressions for API-gateway rate-limit state."""
 from __future__ import annotations
 
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 
 from skeleton.api.gateway import APIGateway, GatewayRequest
@@ -59,3 +60,38 @@ def test_rate_limit_budget_is_exact_under_concurrent_callers(monkeypatch) -> Non
     assert statuses.count(429) == 24
     assert len(gateway._buckets["shared-actor:/limited"]) == 8
     assert gateway.card()["routes"]["/limited"]["calls"] == 8
+
+
+def test_rate_limit_window_is_pruned_in_place(monkeypatch) -> None:
+    now = [500.0]
+    monkeypatch.setattr("skeleton.api.gateway.time.monotonic", lambda: now[0])
+    gateway = APIGateway()
+    gateway.route("/limited", lambda payload: payload, rate_limit_per_s=4)
+    request = GatewayRequest("/limited", actor="steady", payload={"value": 1})
+
+    assert gateway.handle(request).status == 200
+    bucket = gateway._buckets["steady:/limited"]
+    assert isinstance(bucket, deque)
+
+    now[0] += 0.25
+    assert gateway.handle(request).status == 200
+    assert gateway._buckets["steady:/limited"] is bucket
+
+    now[0] += 0.80
+    assert gateway.handle(request).status == 200
+    assert gateway._buckets["steady:/limited"] is bucket
+    assert list(bucket) == [500.25, now[0]]
+
+
+def test_unlimited_route_skips_clock_without_limiter_state(monkeypatch) -> None:
+    def unexpected_clock_read() -> float:
+        raise AssertionError("unlimited hot path must not read the limiter clock")
+
+    monkeypatch.setattr("skeleton.api.gateway.time.monotonic", unexpected_clock_read)
+    gateway = APIGateway()
+    gateway.route("/unlimited", lambda payload: payload)
+
+    response = gateway.handle(GatewayRequest("/unlimited", payload={"ok": True}))
+    assert response.status == 200
+    assert response.body == {"ok": True}
+    assert gateway._buckets == {}
