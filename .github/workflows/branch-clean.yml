@@ -1,7 +1,7 @@
 name: Consolidate and clean merged branches
 # Repository-wide safe branch sweep. Patch-equivalent history is absorbed; unique work is preserved.
 # Optimized to collapse history convergence into one main push and lease-protect branch deletion.
-# Direct queue initialization: 2026-09-15.
+# Cleanup sweep trigger: 2026-09-15.
 
 on:
   workflow_dispatch:
