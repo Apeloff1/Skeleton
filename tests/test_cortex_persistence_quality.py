@@ -3,6 +3,19 @@ from __future__ import annotations
 from skeleton.cortex import JeevesCortex
 
 
+def test_cuda_request_contract_is_exact_even_when_hardware_degrades() -> None:
+    neo = JeevesCortex()
+
+    result = neo.to("cuda")
+
+    assert result["requested"] == "cuda"
+    assert result["cuda"] in {True, False}
+    assert result["degraded"] is (not result["cuda"])
+    if not result["cuda"]:
+        assert result["actual"] == "cpu"
+        assert neo.status()["lm"]["device"] == "cpu"
+
+
 def test_sleep_state_roundtrips_non_default_values(tmp_path) -> None:
     neo = JeevesCortex()
     neo.sleep.record("persist-me", [0.125] * 8, slack=0.75)
