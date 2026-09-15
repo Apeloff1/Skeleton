@@ -16,6 +16,9 @@ python -m compileall -q backend
 printf '\n== Backend process safety ==\n'
 python backend/scripts/check_process_safety.py
 
+printf '\n== Repository process safety ==\n'
+python scripts/check_repository_process_safety.py
+
 printf '\n== Backend unsafe deserialization safety ==\n'
 python backend/scripts/check_deserialization_safety.py
 
@@ -39,6 +42,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_process_safety_partial.py \
   backend/tests/test_process_safety_namespace_get.py \
   backend/tests/test_process_safety_getattribute.py \
+  backend/tests/test_repository_process_safety.py \
   backend/tests/test_deserialization_safety_gate.py \
   backend/tests/test_sast_security_gate.py \
   backend/tests/test_js_process_alias_safety.py \
