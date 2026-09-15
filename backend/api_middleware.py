@@ -2,9 +2,6 @@
 api_middleware — request ID injection, structured logging, and an in-memory
 token-bucket rate limiter.
 
-Everything here is dependency-free (stdlib only) so it ships with the rest
-of the FastAPI app and adds zero install steps.
-
 Public surface:
   • RequestIdMiddleware   — adds X-Request-Id header (existing or generated)
   • AccessLogMiddleware   — single-line structured log per request
@@ -25,12 +22,13 @@ import os
 import time
 import uuid
 from collections import defaultdict, deque
-from ipaddress import ip_address, ip_network
 from typing import Callable, Deque, Dict, Tuple
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
+
+from middleware import client_identity
 
 log = logging.getLogger("api.middleware")
 
@@ -39,39 +37,20 @@ _RATE_PER_MIN = int(os.environ.get("RATE_LIMIT_PER_MIN", "600"))
 _RATE_BURST = int(os.environ.get("RATE_LIMIT_BURST", "60"))
 _EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "")
 _EXEMPT_IPS = {ip.strip() for ip in _EXEMPT_RAW.split(",") if ip.strip()}
-_TRUSTED_PROXY_RAW = os.environ.get("TRUSTED_PROXIES", "")
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
 
-
-def _parse_trusted_proxy_networks(raw: str):
-    """Parse explicitly trusted proxy IPs/CIDRs, ignoring invalid entries safely."""
-    networks = []
-    for value in raw.split(","):
-        value = value.strip()
-        if not value:
-            continue
-        try:
-            networks.append(ip_network(value, strict=False))
-        except ValueError:
-            log.warning("ignoring invalid TRUSTED_PROXIES entry: %r", value)
-    return tuple(networks)
-
-
-_TRUSTED_PROXY_NETWORKS = _parse_trusted_proxy_networks(_TRUSTED_PROXY_RAW)
-
 # Telemetry counters (in-memory) ────────────────────────────────────
-# Last 1024 latencies as a ring buffer for p50/p95 computation.
 _lat_ring: Deque[float] = deque(maxlen=1024)
-# Lazy-init Lock to avoid event-loop binding issues in production
-# (creating asyncio primitives at module import time can bind to the
-# wrong loop in K8s where uvicorn workers may use a fresh loop).
 _lat_lock: asyncio.Lock | None = None
+
 
 def _get_lat_lock() -> asyncio.Lock:
     global _lat_lock
     if _lat_lock is None:
         _lat_lock = asyncio.Lock()
     return _lat_lock
+
+
 _counts: Dict[str, int] = defaultdict(int)
 _started_at: float = time.time()
 
@@ -109,16 +88,13 @@ def get_stats() -> dict:
             "per_minute": _RATE_PER_MIN,
             "burst": _RATE_BURST,
             "exempt_ips": sorted(_EXEMPT_IPS),
-            "trusted_proxies": [str(network) for network in _TRUSTED_PROXY_NETWORKS],
+            "trusted_proxies": client_identity.trusted_proxy_strings(),
         },
     }
 
 
-# ── Request ID ────────────────────────────────────────────────────────
 class RequestIdMiddleware(BaseHTTPMiddleware):
-    """Pulls X-Request-Id from the inbound header if present, otherwise mints
-    one. The id is exposed on `request.state.request_id` and echoed back on
-    the response header. Useful for cross-service correlation."""
+    """Populate request.state.request_id and echo it on the response."""
 
     async def dispatch(self, request: Request, call_next: Callable):
         rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:16]
@@ -126,11 +102,6 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         try:
             response: Response = await call_next(request)
         except RuntimeError as e:
-            # Starlette BaseHTTPMiddleware raises "No response returned."
-            # when the client disconnects mid-response. This is benign —
-            # there's no response object to attach the header to, so just
-            # propagate the disconnect as a 499 (nginx convention for
-            # client-closed-request). Logged at debug to avoid noise.
             if "No response returned" in str(e):
                 from fastapi.responses import Response as _Resp
                 log.debug("client disconnected mid-request rid=%s path=%s", rid, request.url.path)
@@ -142,11 +113,8 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         return response
 
 
-# ── Access log ────────────────────────────────────────────────────────
 class AccessLogMiddleware(BaseHTTPMiddleware):
-    """Single structured log line per request. Format:
-       method=GET path=/api/health status=200 dur_ms=3.21 rid=abcd1234 ip=10.0.0.5
-    """
+    """Emit one structured access-log line per request."""
 
     async def dispatch(self, request: Request, call_next: Callable):
         if not _ACCESS_LOG:
@@ -157,7 +125,6 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
             status = response.status_code
         except Exception:
-            # Log the failure then re-raise; the global handler will still 500.
             dur = (time.perf_counter() - t0) * 1000
             log.exception(
                 "method=%s path=%s status=500 dur_ms=%.2f rid=%s ip=%s err=unhandled",
@@ -170,7 +137,6 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
         _counts["requests"] += 1
         _counts[bucket] += 1
         await _push_latency(dur)
-        # Skip the high-frequency health pings from access log to keep it clean.
         if request.url.path not in ("/api/health", "/api/_telemetry"):
             log.info(
                 "method=%s path=%s status=%d dur_ms=%.2f rid=%s ip=%s",
@@ -179,48 +145,10 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def _is_trusted_proxy(host: str) -> bool:
-    """Return True only when *host* is an IP inside an explicitly trusted network."""
-    try:
-        addr = ip_address(host)
-    except ValueError:
-        return False
-    return any(addr in network for network in _TRUSTED_PROXY_NETWORKS)
-
-
 def _client_ip(request: Request) -> str:
-    """Resolve client identity without trusting attacker-controlled forwarding headers.
-
-    Forwarded addresses are honored only when the immediate TCP peer is explicitly
-    configured in TRUSTED_PROXIES.  When trusted proxies form a chain, walk XFF from
-    right to left and return the first non-proxy address.  Malformed XFF fails closed
-    to the immediate peer instead of accepting another attacker-provided value.
-    """
-    client = request.client
-    peer = client.host if client else "-"
-    if peer == "-" or not _is_trusted_proxy(peer):
-        return peer
-
-    xff = request.headers.get("x-forwarded-for")
-    if not xff:
-        return peer
-
-    forwarded = [value.strip() for value in xff.split(",") if value.strip()]
-    if not forwarded:
-        return peer
-
-    parsed = []
-    for value in forwarded:
-        try:
-            parsed.append(ip_address(value))
-        except ValueError:
-            return peer
-
-    for addr in reversed(parsed):
-        value = str(addr)
-        if not _is_trusted_proxy(value):
-            return value
-    return peer
+    """Compatibility wrapper around the repository-wide trust policy."""
+    value = client_identity.resolve_client_ip(request)
+    return "-" if value == "unknown" else value
 
 
 def _is_api_path(path: str) -> bool:
@@ -228,10 +156,8 @@ def _is_api_path(path: str) -> bool:
     return path == "/api" or path.startswith("/api/")
 
 
-# ── Rate limiter ──────────────────────────────────────────────────────
 class _Bucket:
-    """Tiny token-bucket. Refills `_refill_per_sec` tokens per second up to
-    `capacity`. take() returns True if a token was consumed."""
+    """Tiny token-bucket."""
     __slots__ = ("tokens", "last", "capacity", "refill_per_sec")
 
     def __init__(self, capacity: int, refill_per_sec: float):
@@ -249,24 +175,20 @@ class _Bucket:
         if self.tokens >= n:
             self.tokens -= n
             return True, 0.0
-        # Seconds until the next token will be available.
         deficit = n - self.tokens
         retry = deficit / self.refill_per_sec if self.refill_per_sec > 0 else 60.0
         return False, retry
 
 
 class RateLimiterMiddleware(BaseHTTPMiddleware):
-    """Per-IP token bucket with explicit exemptions only.
-
-    Forwarded client IPs are used only for explicitly trusted proxies.  The limiter
-    is *in-memory* and per-process, so horizontally scaled deployments should use a
-    shared store if they need a globally enforced quota.
-    """
+    """Per-IP token bucket with explicit exemptions only."""
 
     def __init__(self, app, per_minute: int | None = None, burst: int | None = None):
         super().__init__(app)
-        self.per_minute = per_minute or _RATE_PER_MIN
-        self.burst = burst or _RATE_BURST
+        self.per_minute = per_minute if per_minute is not None else _RATE_PER_MIN
+        self.burst = burst if burst is not None else _RATE_BURST
+        if self.per_minute < 0 or self.burst < 1:
+            raise ValueError("rate-limit configuration must be non-negative with burst >= 1")
         self._refill_per_sec = self.per_minute / 60.0
         self._buckets: Dict[str, _Bucket] = {}
 
@@ -278,7 +200,6 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         return b
 
     async def dispatch(self, request: Request, call_next: Callable):
-        # Bypass non-API routes (Expo serves /, /assets, etc. from same origin).
         if not _is_api_path(request.url.path):
             return await call_next(request)
         ip = _client_ip(request)
@@ -307,15 +228,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
 
 
 def install_middleware(app) -> None:
-    """Idempotent wiring helper. Order matters: rate limit OUTERMOST so we
-    short-circuit cheap; request-id MUST wrap access-log so the log line
-    can read request.state.request_id (set by RequestIdMiddleware).
-
-    Starlette wraps middleware in reverse-add order (LIFO), so calling
-    add_middleware in the order below results in:
-        Client → RateLimiter → RequestId → AccessLog → handler
-    (AccessLog runs INSIDE RequestId so request_id is populated by then.)
-    """
-    app.add_middleware(AccessLogMiddleware)   # add 1st → innermost
-    app.add_middleware(RequestIdMiddleware)   # add 2nd → wraps AccessLog
-    app.add_middleware(RateLimiterMiddleware) # add 3rd → outermost
+    """Install request logging and rate limiting in the intended LIFO order."""
+    app.add_middleware(AccessLogMiddleware)
+    app.add_middleware(RequestIdMiddleware)
+    app.add_middleware(RateLimiterMiddleware)
