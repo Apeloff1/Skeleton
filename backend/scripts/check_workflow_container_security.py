@@ -13,6 +13,9 @@ CONTAINER_RE = re.compile(KEY_RE_TEMPLATE.format(plain="container"))
 SERVICES_RE = re.compile(KEY_RE_TEMPLATE.format(plain="services"))
 IMAGE_RE = re.compile(KEY_RE_TEMPLATE.format(plain="image"))
 OPTIONS_RE = re.compile(KEY_RE_TEMPLATE.format(plain="options"))
+SERVICE_ENTRY_RE = re.compile(
+    r"^(?P<indent>\s*)(?:[A-Za-z0-9_.-]+|'[^']+'|\"[^\"]+\")\s*:\s*(?P<value>.*)$"
+)
 
 DANGEROUS_OPTION_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("privileged mode", re.compile(r"(?:^|\s)--privileged(?:\s|$|=)", re.IGNORECASE)),
@@ -164,6 +167,40 @@ def _services_block_findings(
         return findings, covered
 
     end = _block_end(lines, start, base_indent)
+    content_lines = [
+        (index, line)
+        for index, line in enumerate(lines[start + 1 : end], start + 1)
+        if line.strip() and not line.lstrip().startswith("#") and _indent_width(line) > base_indent
+    ]
+    if not content_lines:
+        return findings, covered
+
+    service_indent = min(_indent_width(line) for _index, line in content_lines)
+    service_entries: list[tuple[int, re.Match[str]]] = []
+    for index, line in content_lines:
+        if _indent_width(line) != service_indent:
+            continue
+        entry_match = SERVICE_ENTRY_RE.match(line)
+        if entry_match:
+            service_entries.append((index, entry_match))
+
+    for position, (service_index, service_match) in enumerate(service_entries):
+        raw_value = service_match.group("value").strip()
+        service_end = service_entries[position + 1][0] if position + 1 < len(service_entries) else end
+        if raw_value and not raw_value.startswith("#"):
+            findings.append(
+                f"{path_name}:{service_index + 1}: flow-style, aliased, or scalar service container configuration is forbidden; use an auditable block mapping with a digest-pinned image"
+            )
+            continue
+        image_seen = any(
+            IMAGE_RE.match(lines[index]) and _indent_width(lines[index]) > service_indent
+            for index in range(service_index + 1, service_end)
+        )
+        if not image_seen:
+            findings.append(
+                f"{path_name}:{service_index + 1}: service container block must declare a digest-pinned image"
+            )
+
     for index in range(start + 1, end):
         line = lines[index]
         if not line.strip() or _indent_width(line) <= base_indent:
