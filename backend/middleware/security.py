@@ -414,7 +414,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
             status = response.status_code
         except Exception as exc:
-            error = _bounded_text(f"{type(exc).__name__}: {exc}", 500)
+            error = type(exc).__name__
             status = 500
             raise
         finally:
