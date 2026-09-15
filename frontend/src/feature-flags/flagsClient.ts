@@ -28,24 +28,31 @@ export interface LoadFlagsOptions {
 }
 
 const CACHE_TTL_MS = 60_000;
-let cache: FlagsSnapshot | null = null;
-let cacheKey: string | null = null;
-let inflight: { key: string; promise: Promise<FlagsSnapshot> } | null = null;
+const cacheByKey = new Map<string, FlagsSnapshot>();
+const inflightByKey = new Map<string, Promise<FlagsSnapshot>>();
+let lastCacheKey: string | null = null;
+let generation = 0;
 
 function keyFor(userId: string | null): string {
   return userId || '_anon_';
 }
 
-/** Reads the last successful cached snapshot without I/O. */
-export function snapshot(): FlagsSnapshot | null {
-  return cache;
+/**
+ * Reads the last successful cached snapshot without I/O.
+ * Pass a user id to avoid ever consuming another user's resolved rollout.
+ * Calling without an argument preserves the legacy "last snapshot" behavior.
+ */
+export function snapshot(userId?: string | null): FlagsSnapshot | null {
+  if (arguments.length > 0) return cacheByKey.get(keyFor(userId ?? null)) || null;
+  return lastCacheKey ? cacheByKey.get(lastCacheKey) || null : null;
 }
 
-/** Forces a refetch on the next loadFlags call. */
+/** Forces a refetch on the next loadFlags call and invalidates stale inflight ownership. */
 export function invalidate(): void {
-  cache = null;
-  cacheKey = null;
-  inflight = null;
+  generation += 1;
+  cacheByKey.clear();
+  inflightByKey.clear();
+  lastCacheKey = null;
 }
 
 export async function loadFlags(
@@ -53,17 +60,15 @@ export async function loadFlags(
   opts: LoadFlagsOptions = {},
 ): Promise<FlagsSnapshot> {
   const key = keyFor(userId);
-  if (
-    !opts.force &&
-    cache &&
-    cacheKey === key &&
-    (Date.now() - cache.fetched_at) < CACHE_TTL_MS
-  ) {
-    return cache;
+  const cached = cacheByKey.get(key);
+  if (!opts.force && cached && (Date.now() - cached.fetched_at) < CACHE_TTL_MS) {
+    return cached;
   }
 
-  if (inflight?.key === key) return inflight.promise;
+  const existing = inflightByKey.get(key);
+  if (existing) return existing;
 
+  const requestGeneration = generation;
   const path = userId
     ? `/api/feature-flags?user_id=${encodeURIComponent(userId)}`
     : '/api/feature-flags';
@@ -90,24 +95,24 @@ export async function loadFlags(
       fetched_at: Date.now(),
     };
 
-    // A transient network failure must not poison the 60s cache or replace a
-    // previously healthy snapshot with an empty one. The provider can retry in
-    // the background while continuing to render its bundled/last-known flags.
-    if (result.ok) {
-      cache = result;
-      cacheKey = key;
+    // Never cache a transient failure, and never let a request that started
+    // before invalidate() repopulate a cache that an explicit refresh cleared.
+    if (result.ok && requestGeneration === generation) {
+      cacheByKey.set(key, result);
+      lastCacheKey = key;
     }
     return result;
   })().finally(() => {
-    if (inflight?.promise === request) inflight = null;
+    if (inflightByKey.get(key) === request) inflightByKey.delete(key);
   });
 
-  inflight = { key, promise: request };
+  inflightByKey.set(key, request);
   return request;
 }
 
 export function isEnabledCached(name: string, fallback: boolean = false): boolean {
-  if (!cache) return fallback;
-  const flag = cache.flags.find(item => item.name === name);
+  const cached = lastCacheKey ? cacheByKey.get(lastCacheKey) : null;
+  if (!cached) return fallback;
+  const flag = cached.flags.find(item => item.name === name);
   return flag ? flag.resolved : fallback;
 }
