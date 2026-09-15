@@ -43,6 +43,20 @@ jobs:
           failed=0
 
           while IFS= read -r -d '' path; do
+            # Extensionless files created directly at repository root are a
+            # common scratch/debug artifact. Keep the intentional root files
+            # explicit so a stray `foo`, `tmp`, or similar file fails closed.
+            if [[ "$path" != */* && "$path" != *.* ]]; then
+              case "$path" in
+                Dockerfile|Makefile|LICENSE)
+                  ;;
+                *)
+                  echo "::error file=${path}::Unexpected extensionless file at repository root. Add an explicit allowlist entry only for intentional project files."
+                  failed=1
+                  ;;
+              esac
+            fi
+
             case "$path" in
               */.DS_Store|.DS_Store|*/Thumbs.db|Thumbs.db|*.log|__pycache__/*|*/__pycache__/*|.pytest_cache/*|*/.pytest_cache/*|.mypy_cache/*|*/.mypy_cache/*|.ruff_cache/*|*/.ruff_cache/*|node_modules/*|*/node_modules/*|.venv/*|*/.venv/*|coverage/*|*/coverage/*)
                 echo "::error file=${path}::Generated or machine-local file should not be committed."
@@ -100,6 +114,6 @@ jobs:
           {
             echo '## Repository hygiene gate'
             echo "- Changed files inspected: $changed"
-            echo '- Checks: whitespace/conflict markers, generated junk/local state, accidental files larger than 10 MiB'
+            echo '- Checks: whitespace/conflict markers, generated junk/local state, unexpected extensionless root files, accidental files larger than 10 MiB'
             echo '- Large files represented by Git LFS pointers are allowed.'
           } >> "$GITHUB_STEP_SUMMARY"
