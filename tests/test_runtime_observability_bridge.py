@@ -5,6 +5,7 @@ from __future__ import annotations
 from skeleton.foundation.journal import EventJournal, JournaledBus
 from skeleton.genesis import Genesis
 from skeleton.kernel.events import EventBus
+from skeleton.observability.orchestration import ObservableOrchestrator
 
 
 def test_journaled_bus_preserves_correlation_and_emits_baseline_metrics() -> None:
@@ -75,3 +76,16 @@ def test_genesis_runtime_attaches_shared_event_metrics_bridge() -> None:
     assert event.topic == "runtime.capacity.sample"
     assert bridge.registry.get_gauge("observability.queue_depth") == 7.0
     assert bridge.registry.get_gauge("observability.memory_bytes") == 4096.0
+
+
+def test_observable_orchestrator_reuses_genesis_runtime_bridge() -> None:
+    genesis = Genesis(seed=42).boot()
+
+    assert isinstance(genesis.bus, JournaledBus)
+    bridge = genesis.bus.metrics_bridge
+    subscriptions_before = genesis.bus.stats()["bus"]["subscribed"]
+
+    orchestrator = ObservableOrchestrator(event_bus=genesis.bus)
+
+    assert orchestrator.metrics_bridge is bridge
+    assert genesis.bus.stats()["bus"]["subscribed"] == subscriptions_before
