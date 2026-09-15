@@ -6,11 +6,10 @@ on:
     - cron: '*/5 * * * *'
   push:
     branches: [main]
-  pull_request:
-    types: [opened, reopened, synchronize, ready_for_review]
 
-# One updater is enough. New schedule/push/PR events coalesce instead of killing
-# the active pass while it is evaluating a rapidly moving repository.
+# One trusted-base updater is enough. PR events intentionally do not execute
+# this write-capable workflow; push/schedule cover main movement and the
+# five-minute sweep catches newly opened or newly quiet pull requests.
 concurrency:
   group: branch-flow-${{ github.repository }}
   cancel-in-progress: false
@@ -20,21 +19,23 @@ permissions: {}
 jobs:
   refresh-behind-branches:
     name: Refresh safe branches behind main
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 8
     permissions:
       actions: read
-      contents: read
-      pull-requests: write
+      contents: write
+      pull-requests: read
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
     steps:
-      - name: Advance only safe same-repository PR branches
+      - name: Advance only stable same-repository PR branches
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
+          from datetime import datetime, timezone
           import json
           import os
           import time
@@ -53,7 +54,9 @@ jobs:
               'User-Agent': 'skeleton-branch-flow-watchdog',
           }
           retryable = frozenset({0, 429, 500, 502, 503, 504})
+          active_run_statuses = ('requested', 'waiting', 'pending', 'queued', 'in_progress')
           max_updates = 4
+          min_head_age_seconds = 180
 
           def request(path, *, method='GET', payload=None):
               data = None
@@ -110,7 +113,7 @@ jobs:
               return pulls
 
           def live_validation(head_sha):
-              for run_status in ('in_progress', 'queued'):
+              for run_status in active_run_statuses:
                   query = urllib.parse.urlencode({
                       'head_sha': head_sha,
                       'status': run_status,
@@ -118,12 +121,26 @@ jobs:
                   })
                   status, body = retry(f'/repos/{repo}/actions/runs?{query}')
                   if status != 200 or not isinstance(body, dict):
-                      # A transient Actions-read problem should preserve the PR,
-                      # not cause us to mutate it without knowing CI activity.
+                      # A transient Actions-read problem preserves the branch.
                       return True
                   if body.get('workflow_runs'):
                       return True
               return False
+
+          def head_is_settled(head_sha):
+              status, body = retry(f'/repos/{repo}/commits/{head_sha}')
+              if status != 200 or not isinstance(body, dict):
+                  return False
+              commit = body.get('commit') or {}
+              stamp = ((commit.get('committer') or {}).get('date') or
+                       (commit.get('author') or {}).get('date') or '')
+              if not stamp:
+                  return False
+              try:
+                  committed = datetime.fromisoformat(stamp.replace('Z', '+00:00'))
+              except ValueError:
+                  return False
+              return (datetime.now(timezone.utc) - committed).total_seconds() >= min_head_age_seconds
 
           status, main = retry(f'/repos/{repo}/branches/main')
           main_sha = ((main or {}).get('commit') or {}).get('sha', '')
@@ -135,6 +152,7 @@ jobs:
               'open': 0,
               'fork': 0,
               'draft': 0,
+              'recent_head': 0,
               'not_behind': 0,
               'conflicted_or_unknown': 0,
               'active_ci': 0,
@@ -156,6 +174,7 @@ jobs:
 
               head = pr.get('head') or {}
               head_repo = (head.get('repo') or {}).get('full_name')
+              head_ref = head.get('ref') or ''
               head_sha = head.get('sha') or ''
               if head_repo != repo:
                   counts['fork'] += 1
@@ -172,33 +191,71 @@ jobs:
                   else:
                       counts['not_behind'] += 1
                   continue
-              if mergeable is False or not head_sha:
+              if mergeable is False or not head_ref or not head_sha:
                   counts['conflicted_or_unknown'] += 1
                   continue
               if live_validation(head_sha):
                   counts['active_ci'] += 1
                   continue
+              if not head_is_settled(head_sha):
+                  counts['recent_head'] += 1
+                  continue
 
-              candidates.append((number, head_sha))
+              candidates.append((number, head_ref, head_sha))
 
           # Oldest PR numbers first gives long-lived work a deterministic chance
           # to advance while bounding CI fanout from a single watchdog pass.
           candidates.sort(key=lambda item: item[0])
           attempted = []
-          for number, expected_head in candidates[:max_updates]:
-              status, body = retry(
-                  f'/repos/{repo}/pulls/{number}/update-branch',
-                  method='PUT',
-                  payload={'expected_head_sha': expected_head},
-              )
-              if status in {200, 202}:
-                  counts['updated'] += 1
-                  attempted.append(f'#{number}: updated from {expected_head[:12]}')
-              elif status in {409, 422}:
-                  # The branch moved or became unmergeable between observation
-                  # and update. Preserve it and let a later pass re-evaluate.
+          for number, head_ref, expected_head in candidates[:max_updates]:
+              # Revalidate immediately before mutation. The five-minute sweep is
+              # cheap; losing a pass is always preferable to racing a fresh push.
+              status, fresh = retry(f'/repos/{repo}/pulls/{number}')
+              if status != 200 or not isinstance(fresh, dict):
                   counts['raced'] += 1
-                  attempted.append(f'#{number}: raced/blocked (HTTP {status})')
+                  attempted.append(f'#{number}: vanished/unreadable before refresh')
+                  continue
+              fresh_head = fresh.get('head') or {}
+              if ((fresh_head.get('repo') or {}).get('full_name') != repo or
+                      fresh_head.get('ref') != head_ref or
+                      fresh_head.get('sha') != expected_head or
+                      fresh.get('draft') or
+                      fresh.get('mergeable_state') != 'behind' or
+                      fresh.get('mergeable') is False):
+                  counts['raced'] += 1
+                  attempted.append(f'#{number}: changed before refresh; preserved')
+                  continue
+              if live_validation(expected_head) or not head_is_settled(expected_head):
+                  counts['raced'] += 1
+                  attempted.append(f'#{number}: became active/recent before refresh; preserved')
+                  continue
+
+              # Use the synchronous branch-merge endpoint rather than the
+              # asynchronous update-branch endpoint. The server merges captured
+              # main into the branch's live tip in one request, so a concurrent
+              # normal push cannot be silently replaced by a delayed updater.
+              status, body = retry(
+                  f'/repos/{repo}/merges',
+                  method='POST',
+                  payload={
+                      'base': head_ref,
+                      'head': main_sha,
+                      'commit_message': f'ci: refresh PR #{number} with current main',
+                  },
+              )
+              if status == 201:
+                  counts['updated'] += 1
+                  merged_sha = (body or {}).get('sha', '') if isinstance(body, dict) else ''
+                  attempted.append(
+                      f'#{number}: synchronously merged main into {head_ref} '
+                      f'({merged_sha[:12] or "new tip"})'
+                  )
+              elif status == 204:
+                  counts['not_behind'] += 1
+                  attempted.append(f'#{number}: already current at mutation time')
+              elif status in {409, 422}:
+                  counts['raced'] += 1
+                  attempted.append(f'#{number}: raced/conflicted; preserved (HTTP {status})')
               else:
                   counts['permission_or_api_failure'] += 1
                   message = (body or {}).get('message', '') if isinstance(body, dict) else ''
@@ -208,10 +265,11 @@ jobs:
           if summary:
               with open(summary, 'a', encoding='utf-8') as handle:
                   handle.write('## Continuous branch flow\n')
-                  handle.write(f'- Live main: `{main_sha}`\n')
+                  handle.write(f'- Captured main: `{main_sha}`\n')
                   handle.write(f'- Open PRs inspected: {counts["open"]}\n')
                   handle.write(f'- Safe behind branches refreshed: {counts["updated"]}\n')
                   handle.write(f'- Branches with active CI preserved: {counts["active_ci"]}\n')
+                  handle.write(f'- Recently pushed branches preserved: {counts["recent_head"]}\n')
                   handle.write(f'- Draft PRs preserved: {counts["draft"]}\n')
                   handle.write(f'- Fork PRs preserved: {counts["fork"]}\n')
                   handle.write(
@@ -223,10 +281,14 @@ jobs:
                       '- API/permission failures: '
                       f'{counts["permission_or_api_failure"]}\n'
                   )
+                  handle.write(f'- Head settle window: {min_head_age_seconds}s\n')
                   handle.write('- Per-pass refresh cap: 4 branches\n')
                   handle.write(
-                      '- Safety: this workflow never merges a PR, never force-pushes, '
-                      'never checks out PR code, and never resolves conflicts.\n'
+                      '- Safety: write permission is available only from trusted-base '
+                      'push/schedule/manual-main runs; PR events do not execute this workflow.\n'
+                  )
+                  handle.write(
+                      '- Branch refresh is synchronous; delayed update-branch operations are not used.\n'
                   )
                   if attempted:
                       handle.write('\n### Update attempts\n')
