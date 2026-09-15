@@ -12,6 +12,7 @@ Install with :func:`install_gate` (Starlette LIFO: last added = outermost).
 from __future__ import annotations
 
 import os
+import re
 import time
 import uuid
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -73,9 +74,14 @@ class RateLimiter:
         self._buckets[key] = (current - tokens, now)
 
 
+_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+
+
 def get_request_id(header_value: Optional[str] = None) -> str:
-    """Provide or generate a request correlation id."""
-    return header_value or uuid.uuid4().hex[:16]
+    """Provide one normalized request correlation ID or mint a safe one."""
+    if isinstance(header_value, str) and _REQUEST_ID_RE.fullmatch(header_value):
+        return header_value
+    return uuid.uuid4().hex[:16]
 
 
 # ---------------------------------------------------------------------------
@@ -204,8 +210,9 @@ class RequestSealMiddleware:
 
         request = Request(scope, receive=receive)
         path = request.url.path
-        header_val = request.headers.get("x-request-id")
-        seal = get_request_id(header_val if header_val and len(header_val) <= 128 else None)
+        request_ids = request.headers.getlist("x-request-id")
+        header_val = request_ids[0] if len(request_ids) == 1 else None
+        seal = get_request_id(header_val)
         scope.setdefault("state", {})
         # Starlette request.state is a State object once bound; stash on scope.
         if "state" not in scope or not hasattr(scope.get("state", None), "seal"):

@@ -16,7 +16,7 @@ python -m compileall -q skeleton
 printf '\n== Backend syntax ==\n'
 python -m compileall -q backend
 
-printf '\n== Runtime, cache, deployment, and observability contracts ==\n'
+printf '\n== Runtime, cache, deployment, API, and observability contracts ==\n'
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   tests/test_model_runtime.py \
   tests/test_provider_runtime_boundary.py \
@@ -27,6 +27,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_tiered_cache.py \
   skeleton/testing/test_deployment_security_defaults.py \
   skeleton/testing/test_frontier_observability_correlation.py \
+  skeleton/testing/test_request_seal_id_validation.py \
   tests/test_observability.py
 
 printf '\n== Backend process safety ==\n'
