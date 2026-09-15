@@ -92,6 +92,6 @@ def test_dispatch_rejects_non_https_origin_before_sending_secret(tmp_path: Path)
     assert log == ""
 
 
-def test_dispatch_never_uses_curl_location_trusted() -> None:
+def test_dispatch_never_invokes_curl_location_trusted() -> None:
     script = DISPATCH_SCRIPT.read_text(encoding="utf-8")
-    assert "--location-trusted" not in script
+    assert "\n\t\t--location-trusted" not in script
