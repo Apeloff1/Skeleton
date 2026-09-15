@@ -3,11 +3,13 @@ name: Drain obsolete PR Actions
 on:
   workflow_run:
     workflows: ["PR Lifecycle Signal"]
-    types: [completed]
+    types: [requested]
 
 # Privilege separation: the pull-request workflow is read-only and executes no
 # repository code. This privileged drainer is loaded from the default branch by
-# workflow_run and checks out only the trusted default-branch SHA.
+# workflow_run and checks out only the trusted default-branch SHA. Trigger on
+# requested so cleanup can begin when the signal run is created instead of
+# waiting for that read-only signal to consume runner capacity first.
 permissions: {}
 
 concurrency:
