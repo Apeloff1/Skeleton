@@ -90,6 +90,7 @@ _TRUSTED_PROXY_NETWORKS = _parse_trusted_proxy_networks(
 )
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+_MAX_XFF_HOPS = 32
 
 # Telemetry counters (in-memory) ───────────────────────────────────────
 _lat_ring: Deque[float] = deque(maxlen=1024)
@@ -143,7 +144,7 @@ def get_stats() -> dict:
             "evictions": _counts.get("rate_limit_evictions", 0),
             "expired_pruned": _counts.get("rate_limit_expired_pruned", 0),
             "saturation_rejections": _counts.get("rate_limit_saturation_rejections", 0),
-            "trusted_proxy_cidrs": [str(network) for network in _TRUSTED_PROXY_NETWORKS],
+            "trusted_proxy_count": len(_TRUSTED_PROXY_NETWORKS),
         },
     }
 
@@ -221,7 +222,7 @@ def _client_ip(request: Request) -> str:
     if len(forwarded_headers) != 1:
         return canonical_peer or peer
     parts = [part.strip() for part in forwarded_headers[0].split(",")]
-    if not parts or any(not part for part in parts):
+    if not parts or len(parts) > _MAX_XFF_HOPS or any(not part for part in parts):
         return canonical_peer or peer
 
     forwarded = [_canonical_ip(part) for part in parts]
