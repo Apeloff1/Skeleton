@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Mapping
 
+from skeleton.observability.contract import annotate_context, get_observability
+
 from .command_contracts import CONTRACT_VERSION, CommandError, CommandService
 
 APP_VERSION = "16.0.0"
@@ -72,16 +74,30 @@ def _tool_handler(state: Any):
         if registry is None:
             raise CommandError("unavailable", "tool registry is not initialized")
         action = str(payload.get("action", "list")).strip().lower()
+        tool_id = str(payload.get("tool_id") or f"registry.{action}")[:128]
+        annotate_context(tool_id=tool_id)
+        observability = get_observability()
         if action != "list":
+            observability.emit(
+                "runtime.tool",
+                component="tool",
+                status="error",
+                attrs={"action": action, "tool_id": tool_id},
+            )
             raise CommandError(
                 "unsupported_operation",
                 "shared tool contract currently supports action=list only",
                 details={"action": action},
             )
-        tools = []
-        for capability in registry.list():
-            tools.append(capability.to_dict() if hasattr(capability, "to_dict") else {"name": str(capability)})
-        return {"action": "list", "tools": tools, "count": len(tools)}
+        with observability.operation(
+            "runtime.tool",
+            component="tool",
+            attrs={"action": action, "tool_id": tool_id},
+        ):
+            tools = []
+            for capability in registry.list():
+                tools.append(capability.to_dict() if hasattr(capability, "to_dict") else {"name": str(capability)})
+        return {"action": "list", "tools": tools, "count": len(tools), "tool_id": tool_id}
 
     return handle
 
