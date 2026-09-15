@@ -30,10 +30,10 @@ UNTRUSTED_INPUT_RE = re.compile(
 )
 # YAML block scalars may combine a chomping indicator (+/-) and an indentation
 # indicator (1-9) in either order: |, |-, |2, |2-, |-2, >+2, and so on.
-# Recognize the full legal family so non-default scalar headers cannot hide the
-# shell body from this security gate.
+# A trailing YAML comment is also legal after whitespace. Recognize the full
+# family so alternate scalar headers cannot hide the shell body from the gate.
 BLOCK_SCALAR_RE = re.compile(
-    r"^[|>](?:(?:[+-][1-9]?)|(?:[1-9][+-]?))?$"
+    r"^[|>](?:(?:[+-][1-9]?)|(?:[1-9][+-]?))?(?:\s+#.*)?$"
 )
 
 
