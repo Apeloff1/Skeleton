@@ -8,6 +8,8 @@ import pytest
 from skeleton.frontier.world import (
     calculate_route,
     calculate_supplies_needed,
+    find_region_at,
+    find_region_by_id,
     generate_random_island,
     project_fog_of_war,
     region_from_record,
@@ -31,6 +33,19 @@ def _region(*, region_id="harbor", x=0, y=0, dangers=None):
     )
 
 
+def _record(**overrides):
+    record = {
+        "id": "harbor",
+        "name": "Harbor",
+        "difficulty": 3,
+        "bounds": {"x": 0, "y": 0, "width": 100, "height": 100},
+        "dangers": ["storm"],
+        "points_of_interest": [{"id": "dock", "name": "Dock"}],
+    }
+    record.update(overrides)
+    return record
+
+
 def test_region_adapter_preserves_domain_metadata_without_catalog_copy():
     region = _region()
 
@@ -39,6 +54,43 @@ def test_region_adapter_preserves_domain_metadata_without_catalog_copy():
     assert region.bounds.max_x == 100
     assert region.metadata["theme"] == "coastal"
     assert region.points_of_interest[0]["id"] == "harbor-dock"
+
+
+def test_region_adapter_rejects_string_dangers_instead_of_splitting_characters():
+    with pytest.raises(TypeError, match="dangers must be a sequence"):
+        region_from_record(_record(dangers="storm"))
+
+
+def test_region_adapter_rejects_malformed_point_records_instead_of_dropping_them():
+    with pytest.raises(TypeError, match=r"points_of_interest\[1\] must be a mapping"):
+        region_from_record(
+            _record(points_of_interest=[{"id": "dock"}, "not-a-point"])
+        )
+
+
+def test_region_lookup_uses_half_open_edges_for_adjacent_regions():
+    west = _region(region_id="west", x=0)
+    east = _region(region_id="east", x=100)
+    regions = [west, east]
+
+    assert find_region_at(regions, (0, 50)) is west
+    assert find_region_at(regions, (99.999, 50)) is west
+    assert find_region_at(regions, (100, 50)) is east
+    assert find_region_at(regions, (200, 50)) is None
+    assert find_region_by_id(regions, "east") is east
+    assert find_region_by_id(regions, "missing") is None
+
+
+def test_region_lookup_fails_closed_for_ambiguous_catalogs():
+    duplicate_a = _region(region_id="duplicate", x=0)
+    duplicate_b = _region(region_id="duplicate", x=200)
+    with pytest.raises(ValueError, match="duplicate world region id"):
+        find_region_by_id([duplicate_a, duplicate_b], "duplicate")
+
+    overlap_a = _region(region_id="overlap-a", x=0)
+    overlap_b = _region(region_id="overlap-b", x=50)
+    with pytest.raises(ValueError, match="overlapping world regions"):
+        find_region_at([overlap_a, overlap_b], (75, 50))
 
 
 def test_route_policy_uses_two_dimensional_region_intersection():
