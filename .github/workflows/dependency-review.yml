@@ -3,6 +3,41 @@ name: Dependency Review
 on:
   pull_request:
     branches: [main]
+    paths:
+      - '**/requirements*.txt'
+      - '**/pyproject.toml'
+      - '**/poetry.lock'
+      - '**/Pipfile'
+      - '**/Pipfile.lock'
+      - '**/setup.py'
+      - '**/setup.cfg'
+      - '**/package.json'
+      - '**/package-lock.json'
+      - '**/yarn.lock'
+      - '**/pnpm-lock.yaml'
+      - '**/go.mod'
+      - '**/go.sum'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - '**/pom.xml'
+      - '**/build.gradle'
+      - '**/build.gradle.kts'
+      - '**/gradle.lockfile'
+      - '**/composer.json'
+      - '**/composer.lock'
+      - '**/Gemfile'
+      - '**/Gemfile.lock'
+      - '**/*.csproj'
+      - '**/packages.lock.json'
+      - '**/Directory.Packages.props'
+      - '**/Package.swift'
+      - '**/Package.resolved'
+      - '**/action.yml'
+      - '**/action.yaml'
+      - '.github/workflows/**'
+      - '.github/dependabot.yml'
+      - '!satellites/branch-snapshots/**'
+      - '!satellites/**/branch-snapshots/**'
 
 # Dependency review only needs read access to repository metadata/content.
 # Keep the token fail-closed so this workflow cannot mutate the repository.
