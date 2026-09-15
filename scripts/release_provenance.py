@@ -8,12 +8,16 @@ metadata path itself is small, auditable, and reproducible.
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import importlib.metadata
 import json
+import os
 import platform
 import re
 import sys
+import tarfile
+import tempfile
 import tomllib
 from pathlib import Path
 from typing import Any, Iterable
@@ -91,6 +95,69 @@ def _write_checksums(path: Path, records: Iterable[dict[str, Any]]) -> None:
     lines = [f"{record['sha256']}  {record['name']}" for record in records]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _normalized_member_mode(member: tarfile.TarInfo) -> int:
+    """Return a deterministic mode without changing executable intent."""
+
+    if member.isdir():
+        return 0o755
+    if member.isfile():
+        return 0o755 if member.mode & 0o111 else 0o644
+    if member.issym() or member.islnk():
+        return 0o777
+    return member.mode & 0o7777
+
+
+def normalize_sdist(args: argparse.Namespace) -> int:
+    """Rewrite a gzip-compressed source distribution with deterministic metadata."""
+
+    source = Path(args.path)
+    if not source.is_file():
+        raise FileNotFoundError(source)
+    if not source.name.endswith(".tar.gz"):
+        raise ValueError("source distribution must use the .tar.gz format")
+    epoch = _validate_epoch(args.source_date_epoch)
+
+    file_descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{source.name}.",
+        suffix=".tmp",
+        dir=source.parent,
+    )
+    os.close(file_descriptor)
+    temporary = Path(temporary_name)
+
+    try:
+        with tarfile.open(source, mode="r:gz") as archive_in:
+            members = sorted(archive_in.getmembers(), key=lambda item: item.name)
+            with temporary.open("wb") as raw_output:
+                with gzip.GzipFile(
+                    filename="",
+                    mode="wb",
+                    compresslevel=9,
+                    fileobj=raw_output,
+                    mtime=epoch,
+                ) as gzip_output:
+                    with tarfile.open(
+                        fileobj=gzip_output,
+                        mode="w",
+                        format=tarfile.PAX_FORMAT,
+                    ) as archive_out:
+                        for member in members:
+                            member.mtime = epoch
+                            member.uid = 0
+                            member.gid = 0
+                            member.uname = ""
+                            member.gname = ""
+                            member.mode = _normalized_member_mode(member)
+                            member.pax_headers = {}
+                            payload = archive_in.extractfile(member) if member.isfile() else None
+                            archive_out.addfile(member, payload)
+        os.replace(temporary, source)
+        source.chmod(0o644)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return 0
 
 
 def emit_provenance(args: argparse.Namespace) -> int:
@@ -201,6 +268,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    normalize = subparsers.add_parser(
+        "normalize-sdist",
+        help="rewrite a .tar.gz source distribution with deterministic archive metadata",
+    )
+    normalize.add_argument("--path", required=True)
+    normalize.add_argument("--source-date-epoch", required=True)
+    normalize.set_defaults(func=normalize_sdist)
+
     emit = subparsers.add_parser("emit", help="write provenance and SHA-256 checksums")
     emit.add_argument("--artifacts-dir", required=True)
     emit.add_argument("--output", required=True)
@@ -229,7 +304,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return int(args.func(args))
-    except (FileNotFoundError, ValueError, json.JSONDecodeError) as exc:
+    except (FileNotFoundError, ValueError, json.JSONDecodeError, tarfile.TarError) as exc:
         parser.error(str(exc))
         return 2
 
