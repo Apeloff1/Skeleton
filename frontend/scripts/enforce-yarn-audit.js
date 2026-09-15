@@ -8,6 +8,11 @@ if (!auditPath) {
   process.exit(2);
 }
 
+if (process.env.IMAGE_SIZE_SECURITY_VERIFIED !== 'success') {
+  console.error('[yarn-audit-policy] image-size security verifier did not succeed; blocking');
+  process.exit(1);
+}
+
 const allowedMitigatedAdvisories = new Set([
   // image-size has no patched npm release. These two parser-progress flaws are
   // patched fail-closed by scripts/patch-node-modules.js and verified by
