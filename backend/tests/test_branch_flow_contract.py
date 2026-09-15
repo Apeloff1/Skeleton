@@ -81,6 +81,15 @@ def test_rejects_incomplete_workflow_file_enumeration() -> None:
     assert "prove completeness or fail closed" in _messages(source)
 
 
+def test_rejects_fail_open_workflow_file_pagination_limit() -> None:
+    source = _replace_once(
+        _source(),
+        "              return None\n\n          def live_validation",
+        "              return False\n\n          def live_validation",
+    )
+    assert "scan limit is exhausted" in _messages(source)
+
+
 def test_rejects_loss_of_changed_file_count_contract() -> None:
     source = _replace_once(
         _source(),

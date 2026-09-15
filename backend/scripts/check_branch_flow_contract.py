@@ -60,6 +60,8 @@ def violations_for_text(text: str) -> list[str]:
         findings.append("branch-flow must detect workflow files on both sides of a rename")
     if "seen >= expected_files" not in text or "for page in range(1, 31):" not in text:
         findings.append("workflow-file enumeration must prove completeness or fail closed")
+    if "              return None\n\n          def live_validation" not in text:
+        findings.append("bounded workflow-file enumeration must fail closed when the scan limit is exhausted")
     if "workflow_change = touches_workflows(number, pr.get('changed_files'))" not in text:
         findings.append("initial workflow-file exclusion must use the PR changed-file count")
     if "if touches_workflows(number, fresh.get('changed_files')) is not False:" not in text:
