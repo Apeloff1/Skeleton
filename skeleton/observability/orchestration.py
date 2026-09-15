@@ -30,6 +30,8 @@ from skeleton.frontier.orchestration import (
 )
 from skeleton.kernel.events import EventBus
 from skeleton.observability.event_bridge import EventMetricsBridge
+from skeleton.observability.logging import StructuredLogger
+from skeleton.observability.tracing import Tracer
 
 
 _CURRENT_CORRELATION_ID: ContextVar[str] = ContextVar(
@@ -54,13 +56,16 @@ def _normalized_correlation_id(value: str | None, *, fallback: str) -> str:
 
 
 class ObservableOrchestrator(CanonicalOrchestrator):
-    """Canonical orchestrator with metadata-only lifecycle events attached.
+    """Canonical orchestrator with the shared observability primitives attached.
 
-    Every instance owns an event bus and an attached :class:`EventMetricsBridge`
-    by default, so choosing the observable runtime cannot silently drop lifecycle
-    metrics. Callers that already own either primitive may inject them. When the
+    Every instance owns an event bus, event-to-metrics bridge, structured logger,
+    and tracer by default. Callers may inject any of those primitives. When the
     supplied bus already owns the canonical bridge (for example ``JournaledBus``),
     that bridge is reused without creating or subscribing a second metrics plane.
+
+    Lifecycle logs, spans, and events contain operational metadata only. Tool
+    arguments, outputs, and arbitrary exception messages stay outside these
+    telemetry surfaces.
     """
 
     def __init__(
@@ -71,6 +76,8 @@ class ObservableOrchestrator(CanonicalOrchestrator):
         max_turns: int = 16,
         event_bus: EventBus | None = None,
         metrics_bridge: EventMetricsBridge | None = None,
+        logger: StructuredLogger | None = None,
+        tracer: Tracer | None = None,
     ) -> None:
         super().__init__(
             tools=tools or ToolRegistry(),
@@ -88,13 +95,22 @@ class ObservableOrchestrator(CanonicalOrchestrator):
         else:
             self.metrics_bridge = metrics_bridge or EventMetricsBridge()
             self.metrics_bridge.attach(self.event_bus)
+        self.logger = logger or StructuredLogger()
+        self.tracer = tracer or Tracer("skeleton.orchestration")
 
     def _emit(self, topic: str, payload: dict[str, object]) -> None:
+        correlation_id = _CURRENT_CORRELATION_ID.get()
         self.event_bus.emit(
             topic,
             payload,
-            correlation_id=_CURRENT_CORRELATION_ID.get(),
+            correlation_id=correlation_id,
         )
+        log = (
+            self.logger.error
+            if topic.endswith((".failed", ".denied"))
+            else self.logger.info
+        )
+        log(topic, correlation_id=correlation_id, **payload)
 
     async def run(
         self,
@@ -112,43 +128,58 @@ class ObservableOrchestrator(CanonicalOrchestrator):
         )
         token = _CURRENT_CORRELATION_ID.set(effective_correlation_id)
         started = time.perf_counter()
-        self._emit(
-            "orchestration.run.started",
-            {
-                "run_id": effective_run_id,
-                "status": RunStatus.RUNNING.value,
-            },
-        )
         try:
-            record = await super().run(
-                driver,
-                cancellation=cancellation,
+            with self.tracer(
+                "orchestration.run",
+                trace_id=effective_correlation_id,
                 run_id=effective_run_id,
-                capabilities=capabilities,
-            )
-        except asyncio.CancelledError:
-            self._emit(
-                "orchestration.run.cancelled",
-                {
-                    "run_id": effective_run_id,
-                    "status": RunStatus.CANCELLED.value,
-                    "duration_ms": round((time.perf_counter() - started) * 1000, 3),
-                    "error_type": "CancelledError",
-                },
-            )
-            raise
-        else:
-            self._emit(
-                f"orchestration.run.{record.status.value}",
-                {
-                    "run_id": record.run_id,
-                    "status": record.status.value,
-                    "turns": record.turns,
-                    "step_count": len(record.steps),
-                    "duration_ms": round((time.perf_counter() - started) * 1000, 3),
-                },
-            )
-            return record
+                correlation_id=effective_correlation_id,
+            ) as span:
+                self._emit(
+                    "orchestration.run.started",
+                    {
+                        "run_id": effective_run_id,
+                        "status": RunStatus.RUNNING.value,
+                    },
+                )
+                try:
+                    record = await super().run(
+                        driver,
+                        cancellation=cancellation,
+                        run_id=effective_run_id,
+                        capabilities=capabilities,
+                    )
+                except asyncio.CancelledError:
+                    span.set_attribute("status", RunStatus.CANCELLED.value)
+                    self._emit(
+                        "orchestration.run.cancelled",
+                        {
+                            "run_id": effective_run_id,
+                            "status": RunStatus.CANCELLED.value,
+                            "duration_ms": round(
+                                (time.perf_counter() - started) * 1000, 3
+                            ),
+                            "error_type": "CancelledError",
+                        },
+                    )
+                    raise
+                else:
+                    span.set_attribute("status", record.status.value)
+                    span.set_attribute("turns", record.turns)
+                    span.set_attribute("step_count", len(record.steps))
+                    self._emit(
+                        f"orchestration.run.{record.status.value}",
+                        {
+                            "run_id": record.run_id,
+                            "status": record.status.value,
+                            "turns": record.turns,
+                            "step_count": len(record.steps),
+                            "duration_ms": round(
+                                (time.perf_counter() - started) * 1000, 3
+                            ),
+                        },
+                    )
+                    return record
         finally:
             _CURRENT_CORRELATION_ID.reset(token)
 
@@ -161,82 +192,97 @@ class ObservableOrchestrator(CanonicalOrchestrator):
         granted_capabilities: frozenset[ToolCapability],
     ) -> ToolResult:
         started = time.perf_counter()
-        self._emit(
-            "orchestration.tool.started",
-            {
-                "run_id": record.run_id,
-                "call_id": call.call_id,
-                "tool_name": call.name,
-                "status": "running",
-            },
-        )
-        try:
-            result = await super()._execute_tool(
-                record,
-                call,
-                cancellation=cancellation,
-                granted_capabilities=granted_capabilities,
-            )
-        except BaseException as exc:
-            step = next(
-                (
-                    candidate
-                    for candidate in reversed(record.steps)
-                    if candidate.kind is StepKind.TOOL and candidate.name == call.name
-                ),
-                None,
-            )
-            attempts = step.attempt if step is not None else 0
-            if isinstance(exc, CapabilityDeniedError):
-                suffix = "denied"
-            elif isinstance(exc, (asyncio.CancelledError, ProviderCancelledError)):
-                suffix = "cancelled"
-            else:
-                suffix = "failed"
+        with self.tracer(
+            "orchestration.tool",
+            trace_id=_CURRENT_CORRELATION_ID.get(),
+            run_id=record.run_id,
+            call_id=call.call_id,
+            tool_name=call.name,
+        ) as span:
             self._emit(
-                f"orchestration.tool.{suffix}",
+                "orchestration.tool.started",
                 {
                     "run_id": record.run_id,
                     "call_id": call.call_id,
                     "tool_name": call.name,
-                    "status": suffix,
-                    "attempts": attempts,
-                    "duration_ms": round((time.perf_counter() - started) * 1000, 3),
-                    "error_type": type(exc).__name__,
+                    "status": "running",
                 },
             )
-            raise
-        else:
-            step = next(
-                (
-                    candidate
-                    for candidate in reversed(record.steps)
-                    if candidate.kind is StepKind.TOOL and candidate.name == call.name
-                ),
-                None,
-            )
-            attempts = step.attempt if step is not None else 1
-            if attempts > 1:
+            try:
+                result = await super()._execute_tool(
+                    record,
+                    call,
+                    cancellation=cancellation,
+                    granted_capabilities=granted_capabilities,
+                )
+            except BaseException as exc:
+                step = next(
+                    (
+                        candidate
+                        for candidate in reversed(record.steps)
+                        if candidate.kind is StepKind.TOOL and candidate.name == call.name
+                    ),
+                    None,
+                )
+                attempts = step.attempt if step is not None else 0
+                if isinstance(exc, CapabilityDeniedError):
+                    suffix = "denied"
+                elif isinstance(exc, (asyncio.CancelledError, ProviderCancelledError)):
+                    suffix = "cancelled"
+                else:
+                    suffix = "failed"
+                span.set_attribute("status", suffix)
+                span.set_attribute("attempts", attempts)
                 self._emit(
-                    "orchestration.tool.retry",
+                    f"orchestration.tool.{suffix}",
+                    {
+                        "run_id": record.run_id,
+                        "call_id": call.call_id,
+                        "tool_name": call.name,
+                        "status": suffix,
+                        "attempts": attempts,
+                        "duration_ms": round(
+                            (time.perf_counter() - started) * 1000, 3
+                        ),
+                        "error_type": type(exc).__name__,
+                    },
+                )
+                raise
+            else:
+                step = next(
+                    (
+                        candidate
+                        for candidate in reversed(record.steps)
+                        if candidate.kind is StepKind.TOOL and candidate.name == call.name
+                    ),
+                    None,
+                )
+                attempts = step.attempt if step is not None else 1
+                span.set_attribute("status", "succeeded")
+                span.set_attribute("attempts", attempts)
+                if attempts > 1:
+                    self._emit(
+                        "orchestration.tool.retry",
+                        {
+                            "run_id": record.run_id,
+                            "call_id": call.call_id,
+                            "tool_name": call.name,
+                            "status": "succeeded",
+                            "retrying": True,
+                            "retry_count": attempts - 1,
+                        },
+                    )
+                self._emit(
+                    "orchestration.tool.succeeded",
                     {
                         "run_id": record.run_id,
                         "call_id": call.call_id,
                         "tool_name": call.name,
                         "status": "succeeded",
-                        "retrying": True,
-                        "retry_count": attempts - 1,
+                        "attempts": attempts,
+                        "duration_ms": round(
+                            (time.perf_counter() - started) * 1000, 3
+                        ),
                     },
                 )
-            self._emit(
-                "orchestration.tool.succeeded",
-                {
-                    "run_id": record.run_id,
-                    "call_id": call.call_id,
-                    "tool_name": call.name,
-                    "status": "succeeded",
-                    "attempts": attempts,
-                    "duration_ms": round((time.perf_counter() - started) * 1000, 3),
-                },
-            )
-            return result
+                return result
