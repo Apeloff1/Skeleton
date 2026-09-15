@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from core.auth_security import (
@@ -122,3 +124,19 @@ def test_security_summary_never_exposes_secret_or_seed_password():
     rendered = repr(summary)
     assert STRONG_SECRET not in rendered
     assert STRONG_PASSWORD not in rendered
+
+
+def test_active_auth_route_uses_shared_fail_closed_configuration_contract():
+    route_path = Path(__file__).parents[1] / "routes" / "gameforge_auth.py"
+    source = route_path.read_text(encoding="utf-8")
+
+    assert "from core.auth_security import" in source
+    assert "resolve_jwt_secret" in source
+    assert "resolve_seed_admin" in source
+    assert "resolve_session_api" in source
+    assert "auth_enforced" in source
+
+    # The active HTTP surface must never regress to the retired public defaults.
+    assert "dev-insecure-secret-change-me" not in source
+    assert "GameForge#Admin2026" not in source
+    assert 'SEED_ADMIN_EMAIL = "admin@gameforge.io"' not in source
