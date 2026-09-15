@@ -59,6 +59,7 @@ jobs:
           python -m compileall -q skeleton
           python tests/run_unit.py
           python -m pytest -q \
+            tests/test_run_unit_runner.py \
             skeleton/testing/test_swarm_ingress.py \
             skeleton/testing/test_swarm_policy_atomicity.py \
             skeleton/testing/test_swarm_policy_snapshots.py \
