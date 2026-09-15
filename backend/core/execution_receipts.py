@@ -42,6 +42,7 @@ class ExecutionReceipt:
 
 class ExecutionReceiptStore:
     VERSION = 2
+    MAX_OPERATION_ID_LENGTH = 128
 
     def __init__(self, directory: str | os.PathLike[str]) -> None:
         self.directory = Path(directory)
@@ -67,10 +68,25 @@ class ExecutionReceiptStore:
         return summary
 
     def _path(self, operation_id: str) -> Path:
-        operation_id = operation_id.strip()
-        if not operation_id or any(ch not in "0123456789abcdef" for ch in operation_id.lower()):
+        operation_id = str(operation_id)
+        if operation_id != operation_id.strip():
             raise ValueError("operation_id must be a hexadecimal identifier")
-        return self.directory / f"{operation_id}.json"
+        if not operation_id or len(operation_id) > self.MAX_OPERATION_ID_LENGTH:
+            raise ValueError("operation_id must be a hexadecimal identifier")
+        if any(ch not in "0123456789abcdefABCDEF" for ch in operation_id):
+            raise ValueError("operation_id must be a hexadecimal identifier")
+
+        # basename() creates an explicit path boundary that static analyzers and
+        # reviewers can verify. The equality check prevents silent normalization
+        # from turning a traversal attempt into an alias for another receipt.
+        requested = f"{operation_id}.json"
+        filename = os.path.basename(requested)
+        if filename != requested or filename in {"", ".", ".."}:
+            raise ValueError("operation_id does not map to a safe receipt path")
+        path = self.directory / filename
+        if path.resolve(strict=False).parent != self.directory.resolve():
+            raise ValueError("operation_id escapes the receipt directory")
+        return path
 
     def write(
         self,
