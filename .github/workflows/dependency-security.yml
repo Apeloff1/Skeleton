@@ -99,6 +99,7 @@ jobs:
         run: yarn install --frozen-lockfile --non-interactive
 
       - name: Verify image-size parser progress mitigation
+        id: image-size-security
         working-directory: frontend
         run: node scripts/verify-image-size-security.js
 
@@ -133,5 +134,7 @@ jobs:
 
       - name: Enforce JavaScript vulnerability policy
         if: always()
+        env:
+          IMAGE_SIZE_SECURITY_VERIFIED: ${{ steps.image-size-security.outcome }}
         working-directory: frontend
         run: node scripts/enforce-yarn-audit.js "$RUNNER_TEMP/yarn-audit.json"
