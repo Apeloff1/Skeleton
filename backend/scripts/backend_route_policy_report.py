@@ -4,8 +4,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections import Counter
 from pathlib import Path
+
+# Direct ``python scripts/foo.py`` execution places backend/scripts on sys.path,
+# not backend/. Add the parent only for that execution mode so imports behave
+# exactly like package-based test imports.
+if __package__ in {None, ""}:
+    backend_root = str(Path(__file__).resolve().parents[1])
+    if backend_root not in sys.path:
+        sys.path.insert(0, backend_root)
 
 try:
     from scripts.backend_route_inventory import build_inventory
