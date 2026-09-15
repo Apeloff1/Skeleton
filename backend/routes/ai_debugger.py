@@ -12,29 +12,28 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any, Literal
+import logging
+import os
+import re
+import uuid
 from datetime import datetime
 from pathlib import Path
-from dotenv import load_dotenv
-import uuid
-import re
-import os
+from typing import Any, Dict, List, Literal, Optional
 
-# Load environment
-ROOT_DIR = Path(__file__).parent.parent
-load_dotenv(ROOT_DIR / '.env')
+from dotenv import load_dotenv
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 
+
+ROOT_DIR = Path(__file__).parent.parent
+load_dotenv(ROOT_DIR / ".env")
+
+log = logging.getLogger("codedock.ai_debugger")
 router = APIRouter(prefix="/debugger", tags=["AI Debugger"])
+EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
 
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
-
-# ============================================================================
-# REQUEST/RESPONSE MODELS
-# ============================================================================
 
 class DebugRequest(BaseModel):
     code: str = Field(..., min_length=1, max_length=500000, description="Code to debug")
@@ -43,15 +42,18 @@ class DebugRequest(BaseModel):
     context: Optional[str] = Field(None, max_length=100000, description="Additional context about the issue")
     debug_level: Literal["quick", "standard", "deep"] = "standard"
 
+
 class SecurityScanRequest(BaseModel):
     code: str = Field(..., min_length=1, max_length=500000)
     language: str = Field("python", max_length=100)
     scan_type: Literal["quick", "full", "owasp"] = "full"
 
+
 class PerformanceAnalysisRequest(BaseModel):
     code: str = Field(..., min_length=1, max_length=500000)
     language: str = Field("python", max_length=100)
     focus: Optional[List[str]] = Field(default_factory=lambda: ["time", "memory", "cpu"], max_length=20)
+
 
 class BugFix(BaseModel):
     line: Optional[int]
@@ -59,6 +61,7 @@ class BugFix(BaseModel):
     fixed: str
     explanation: str
     confidence: float
+
 
 class DebugResult(BaseModel):
     id: str
@@ -71,51 +74,63 @@ class DebugResult(BaseModel):
     recommendations: List[str]
     timestamp: str
 
-# ============================================================================
-# AI HELPER
-# ============================================================================
+
+def _debugger_http_error(operation: str, exc: Exception) -> HTTPException:
+    """Create a stable public failure without exposing provider/runtime details."""
+    log.warning("AI debugger %s failed: %s", operation, type(exc).__name__)
+    return HTTPException(status_code=500, detail="AI debugger request failed")
+
 
 async def call_debugger_ai(prompt: str, system_prompt: str) -> str:
+    """Call the debugger model while keeping provider failures behind the API boundary."""
     try:
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
             session_id=f"debugger-{uuid.uuid4().hex[:8]}",
-            system_message=system_prompt
+            system_message=system_prompt,
         ).with_model("openai", "gpt-4o")
-        
         response = await chat.send_message(UserMessage(text=prompt))
-        return response.content if hasattr(response, 'content') else str(response)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}")
+        return response.content if hasattr(response, "content") else str(response)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _debugger_http_error("provider request", exc) from None
 
-# ============================================================================
-# DEBUGGER ENDPOINTS
-# ============================================================================
 
 @router.get("/info")
 async def get_debugger_info():
-    """Get AI Debugger capabilities and info"""
+    """Get AI Debugger capabilities and info."""
     return {
         "name": "CodeDock AI Debugger",
         "version": "11.0.0",
         "capabilities": [
             "Autonomous error detection",
-            "Stack trace interpretation", 
+            "Stack trace interpretation",
             "One-click fix suggestions",
             "Security vulnerability scanning",
             "Performance analysis",
             "Memory leak detection",
             "Code smell detection",
-            "Best practice recommendations"
+            "Best practice recommendations",
         ],
         "supported_languages": [
-            "python", "javascript", "typescript", "java", "cpp", "c",
-            "rust", "go", "swift", "kotlin", "ruby", "php"
+            "python",
+            "javascript",
+            "typescript",
+            "java",
+            "cpp",
+            "c",
+            "rust",
+            "go",
+            "swift",
+            "kotlin",
+            "ruby",
+            "php",
         ],
         "debug_levels": {
             "quick": "Fast scan for obvious errors (< 5 seconds)",
             "standard": "Comprehensive analysis with fixes (< 15 seconds)",
-            "deep": "Full audit with security + performance (< 30 seconds)"
+            "deep": "Full audit with security + performance (< 30 seconds)",
         },
         "ai_models": ["GPT-4o", "Claude 3.5", "Gemini Pro"],
         "features": {
@@ -124,15 +139,16 @@ async def get_debugger_info():
             "security_scan": True,
             "performance_analysis": True,
             "memory_analysis": True,
-            "code_smell_detection": True
-        }
+            "code_smell_detection": True,
+        },
     }
+
 
 @router.post("/analyze", response_model=DebugResult)
 async def analyze_and_debug(request: DebugRequest):
-    """Analyze code for bugs and provide fixes"""
+    """Analyze code for bugs and provide fixes."""
     request_id = str(uuid.uuid4())
-    
+
     system_prompt = """You are an elite AI debugger with expertise in all programming languages.
 You analyze code with the precision of a senior engineer at Google/Meta.
 Your goal is to find ALL issues: bugs, potential errors, edge cases, and improvements.
@@ -175,7 +191,7 @@ Provide your analysis as:
 [For each issue, provide:
 - Line number
 - Original code
-- Fixed code  
+- Fixed code
 - Explanation
 - Confidence (0.0-1.0)]
 
@@ -187,8 +203,7 @@ Provide your analysis as:
 
     try:
         result = await call_debugger_ai(debug_prompt, system_prompt)
-        
-        # Parse severity from response
+
         severity = "low"
         if "critical" in result.lower():
             severity = "critical"
@@ -196,20 +211,18 @@ Provide your analysis as:
             severity = "high"
         elif "medium" in result.lower():
             severity = "medium"
-        
-        # Count issues
+
         issues_count = result.lower().count("issue") + result.lower().count("error") + result.lower().count("bug")
-        issues_count = min(max(issues_count // 2, 1), 20)  # Reasonable bounds
-        
-        # Extract fixed code if present
+        issues_count = min(max(issues_count // 2, 1), 20)
+
         fixed_code = None
         if "## FIXED CODE" in result:
             fixed_section = result.split("## FIXED CODE")[1]
             if "```" in fixed_section:
-                code_match = re.search(r'```[\w]*\n([\s\S]*?)```', fixed_section)
+                code_match = re.search(r"```[\w]*\n([\s\S]*?)```", fixed_section)
                 if code_match:
                     fixed_code = code_match.group(1).strip()
-        
+
         return DebugResult(
             id=request_id,
             status="complete",
@@ -220,25 +233,28 @@ Provide your analysis as:
                 "language": request.language,
                 "debug_level": request.debug_level,
                 "code_length": len(request.code),
-                "has_error_context": bool(request.error_message)
+                "has_error_context": bool(request.error_message),
             },
-            fixes=[],  # Could parse structured fixes from response
+            fixes=[],
             fixed_code=fixed_code,
             recommendations=[
                 "Review the fixed code before applying",
                 "Test edge cases after fixes",
-                "Consider adding unit tests"
+                "Consider adding unit tests",
             ],
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.utcnow().isoformat(),
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _debugger_http_error("analysis", exc) from None
+
 
 @router.post("/interpret-error")
 async def interpret_error(error_message: str, language: str = "python", code: Optional[str] = None):
-    """Interpret an error message or stack trace"""
+    """Interpret an error message or stack trace."""
     request_id = str(uuid.uuid4())
-    
+
     prompt = f"""Interpret this {language} error message/stack trace:
 
 ```
@@ -256,25 +272,27 @@ Provide:
 
     try:
         result = await call_debugger_ai(prompt, "You are an expert at interpreting error messages and stack traces.")
-        
         return {
             "id": request_id,
             "interpretation": result,
             "error_type": error_message.split(":")[0] if ":" in error_message else "Unknown",
             "language": language,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _debugger_http_error("error interpretation", exc) from None
+
 
 @router.post("/security-scan")
 async def security_scan(request: SecurityScanRequest):
-    """Scan code for security vulnerabilities"""
+    """Scan code for security vulnerabilities."""
     request_id = str(uuid.uuid4())
-    
+
     owasp_categories = """
 - A01: Broken Access Control
-- A02: Cryptographic Failures  
+- A02: Cryptographic Failures
 - A03: Injection (SQL, XSS, Command)
 - A04: Insecure Design
 - A05: Security Misconfiguration
@@ -283,7 +301,7 @@ async def security_scan(request: SecurityScanRequest):
 - A08: Data Integrity Failures
 - A09: Security Logging Failures
 - A10: Server-Side Request Forgery"""
-    
+
     prompt = f"""Perform a {request.scan_type} security scan on this {request.language} code:
 
 ```{request.language}
@@ -316,13 +334,12 @@ For each vulnerability found:
 
     try:
         result = await call_debugger_ai(prompt, "You are a senior security engineer specializing in code auditing.")
-        
-        # Count vulnerabilities by severity
+
         critical = result.lower().count("critical")
         high = result.lower().count("high severity") + result.lower().count("severity: high")
         medium = result.lower().count("medium severity") + result.lower().count("severity: medium")
         low = result.lower().count("low severity") + result.lower().count("severity: low")
-        
+
         return {
             "id": request_id,
             "scan_type": request.scan_type,
@@ -332,7 +349,7 @@ For each vulnerability found:
                 "high": high,
                 "medium": medium,
                 "low": low,
-                "total": critical + high + medium + low
+                "total": critical + high + medium + low,
             },
             "risk_score": min(100, critical * 25 + high * 15 + medium * 5 + low * 2),
             "analysis": result,
@@ -341,18 +358,21 @@ For each vulnerability found:
                 "Review all input validation",
                 "Implement proper error handling",
                 "Use parameterized queries for database access",
-                "Enable security headers"
+                "Enable security headers",
             ],
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _debugger_http_error("security scan", exc) from None
+
 
 @router.post("/performance-analysis")
 async def performance_analysis(request: PerformanceAnalysisRequest):
-    """Analyze code for performance issues"""
+    """Analyze code for performance issues."""
     request_id = str(uuid.uuid4())
-    
+
     prompt = f"""Analyze this {request.language} code for performance issues:
 
 ```{request.language}
@@ -381,7 +401,6 @@ async def performance_analysis(request: PerformanceAnalysisRequest):
 
     try:
         result = await call_debugger_ai(prompt, "You are a performance optimization expert.")
-        
         return {
             "id": request_id,
             "language": request.language,
@@ -390,24 +409,27 @@ async def performance_analysis(request: PerformanceAnalysisRequest):
             "metrics": {
                 "time_complexity_issues": result.lower().count("o(n") + result.lower().count("o(2"),
                 "memory_issues": result.lower().count("memory") + result.lower().count("leak"),
-                "bottlenecks_found": result.lower().count("bottleneck") + result.lower().count("slow")
+                "bottlenecks_found": result.lower().count("bottleneck") + result.lower().count("slow"),
             },
             "recommendations": [
                 "Profile code to identify actual bottlenecks",
                 "Consider caching frequent operations",
                 "Use appropriate data structures",
-                "Batch database operations where possible"
+                "Batch database operations where possible",
             ],
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _debugger_http_error("performance analysis", exc) from None
+
 
 @router.post("/quick-fix")
 async def quick_fix(code: str, language: str = "python"):
-    """Get immediate fixes for common issues"""
+    """Get immediate fixes for common issues."""
     request_id = str(uuid.uuid4())
-    
+
     prompt = f"""Quick-fix this {language} code. Focus on:
 1. Syntax errors
 2. Obvious bugs
@@ -423,29 +445,31 @@ Return ONLY the fixed code with brief inline comments for changes."""
 
     try:
         result = await call_debugger_ai(prompt, "You are a fast code fixer. Return fixed code only.")
-        
-        # Extract code from response
+
         if "```" in result:
-            code_match = re.search(r'```[\w]*\n([\s\S]*?)```', result)
+            code_match = re.search(r"```[\w]*\n([\s\S]*?)```", result)
             fixed = code_match.group(1).strip() if code_match else result
         else:
             fixed = result
-        
+
         return {
             "id": request_id,
             "original_code": code,
             "fixed_code": fixed,
             "language": language,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _debugger_http_error("quick fix", exc) from None
+
 
 @router.post("/explain-code")
 async def explain_code(code: str, language: str = "python", detail_level: str = "standard"):
-    """Get detailed explanation of what code does"""
+    """Get detailed explanation of what code does."""
     request_id = str(uuid.uuid4())
-    
+
     prompt = f"""Explain this {language} code at {detail_level} detail level:
 
 ```{language}
@@ -461,13 +485,14 @@ Provide:
 
     try:
         result = await call_debugger_ai(prompt, "You explain code clearly for developers of all levels.")
-        
         return {
             "id": request_id,
             "explanation": result,
             "language": language,
             "detail_level": detail_level,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _debugger_http_error("code explanation", exc) from None
