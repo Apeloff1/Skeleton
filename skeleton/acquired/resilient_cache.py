@@ -1,10 +1,10 @@
 """Bounded resilient TTL cache evolved from Newsay's weather-cache pattern.
 
 Newsay cached external weather data for a fixed TTL and fell back to defaults
-when the upstream request failed.  This module generalizes the useful part
-without hiding total upstream failure: fresh values are served immediately,
-stale values may be served only inside an explicit stale-on-error window, and
-callers still receive the original exception when no safe cached value exists.
+when the upstream request failed. This module generalizes that idea without
+hiding total upstream failure: fresh values are served immediately, stale
+values may be served only inside an explicit stale-on-error window, and the
+original exception propagates when no safe cached value exists.
 """
 
 from __future__ import annotations
@@ -118,8 +118,7 @@ class ResilientTTLCache(Generic[K, V]):
         return entry, age
 
     def get(self, key: K) -> Optional[CacheResult[V]]:
-        """Return only a fresh value. Stale entries remain for error fallback."""
-
+        """Return only a fresh value; stale entries remain for error fallback."""
         with self._lock:
             now = self._now()
             entry, age = self._candidate(key, now)
@@ -130,8 +129,7 @@ class ResilientTTLCache(Generic[K, V]):
             return CacheResult(entry.value, "fresh", round(age, 6))
 
     def get_or_load(self, key: K, loader: Callable[[], V]) -> CacheResult[V]:
-        """Load a value, serving bounded stale data only when the load fails."""
-
+        """Load a value, serving bounded stale data only on ordinary failures."""
         with self._lock:
             now = self._now()
             entry, age = self._candidate(key, now)
@@ -141,7 +139,7 @@ class ResilientTTLCache(Generic[K, V]):
 
         try:
             value = loader()
-        except BaseException:
+        except Exception:
             with self._lock:
                 self._stats["load_errors"] += 1
                 now = self._now()
