@@ -25,11 +25,12 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import logging
+import math
 import os
 import re
 import time
 import uuid
-from collections import defaultdict, deque
+from collections import OrderedDict, defaultdict, deque
 from typing import Callable, Deque, Dict, Tuple
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -57,7 +58,7 @@ def _positive_float_env(name: str, default: float) -> float:
         value = float(raw)
     except ValueError as exc:
         raise RuntimeError(f"{name} must be a positive finite number") from exc
-    if value <= 0 or not (value < float("inf")):
+    if value <= 0 or not math.isfinite(value):
         raise RuntimeError(f"{name} must be a positive finite number")
     return value
 
@@ -90,6 +91,7 @@ _TRUSTED_PROXY_NETWORKS = _parse_trusted_proxy_networks(
 )
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+_MAX_RETRY_AFTER_SECONDS = 86_400
 
 # Telemetry counters (in-memory) ───────────────────────────────────────
 _lat_ring: Deque[float] = deque(maxlen=1024)
@@ -115,6 +117,13 @@ def _percentile(sorted_vals, pct: float) -> float:
         return 0.0
     k = max(0, min(len(sorted_vals) - 1, int(pct / 100.0 * (len(sorted_vals) - 1))))
     return sorted_vals[k]
+
+
+def _bounded_retry_after(retry: float) -> int:
+    """Return a finite advisory Retry-After value under all internal states."""
+    if not math.isfinite(retry):
+        return _MAX_RETRY_AFTER_SECONDS
+    return max(1, min(_MAX_RETRY_AFTER_SECONDS, math.ceil(max(0.0, retry))))
 
 
 def get_stats() -> dict:
@@ -322,7 +331,9 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
     Idle buckets expire after `bucket_ttl`; total identity state is capped by
     `max_buckets`. At saturation, unseen identities are rejected instead of
     evicting active buckets and gaining a fresh burst. Admission, pruning and
-    token consumption are serialized per middleware instance.
+    token consumption are serialized per middleware instance. Buckets are kept
+    in last-consumption order so expiry and saturation do not scan the entire
+    attacker-fillable table on every request.
     """
 
     def __init__(
@@ -334,21 +345,28 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         bucket_ttl: float | None = None,
     ):
         super().__init__(app)
-        self.per_minute = per_minute if per_minute is not None else _RATE_PER_MIN
-        self.burst = burst if burst is not None else _RATE_BURST
-        self.max_buckets = max_buckets if max_buckets is not None else _MAX_BUCKETS
-        self.bucket_ttl = bucket_ttl if bucket_ttl is not None else _BUCKET_TTL
-        if self.per_minute <= 0:
-            raise ValueError("per_minute must be positive")
-        if self.burst <= 0:
-            raise ValueError("burst must be positive")
-        if self.max_buckets <= 0:
-            raise ValueError("max_buckets must be positive")
-        if self.bucket_ttl <= 0 or not (self.bucket_ttl < float("inf")):
-            raise ValueError("bucket_ttl must be a positive finite number")
+        configured_rate = per_minute if per_minute is not None else _RATE_PER_MIN
+        configured_burst = burst if burst is not None else _RATE_BURST
+        configured_max = max_buckets if max_buckets is not None else _MAX_BUCKETS
+        configured_ttl = bucket_ttl if bucket_ttl is not None else _BUCKET_TTL
 
+        if not math.isfinite(float(configured_rate)) or configured_rate <= 0:
+            raise ValueError("per_minute must be finite and positive")
+        if not math.isfinite(float(configured_burst)) or configured_burst <= 0:
+            raise ValueError("burst must be finite and positive")
+        if not math.isfinite(float(configured_max)) or configured_max <= 0:
+            raise ValueError("max_buckets must be finite and positive")
+        if int(configured_max) != configured_max:
+            raise ValueError("max_buckets must be an integer")
+        if not math.isfinite(float(configured_ttl)) or configured_ttl <= 0:
+            raise ValueError("bucket_ttl must be finite and positive")
+
+        self.per_minute = configured_rate
+        self.burst = configured_burst
+        self.max_buckets = int(configured_max)
+        self.bucket_ttl = float(configured_ttl)
         self._refill_per_sec = self.per_minute / 60.0
-        self._buckets: Dict[str, _Bucket] = {}
+        self._buckets: "OrderedDict[str, _Bucket]" = OrderedDict()
         self._state_lock: asyncio.Lock | None = None
         self._evictions = 0
         self._expired_pruned = 0
@@ -360,28 +378,25 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         return self._state_lock
 
     def _prune_expired(self, now: float) -> int:
-        expired = [
-            ip
-            for ip, bucket in self._buckets.items()
-            if now - bucket.last >= self.bucket_ttl
-        ]
-        for ip in expired:
-            del self._buckets[ip]
-        if expired:
-            pruned = len(expired)
+        pruned = 0
+        while self._buckets:
+            oldest = next(iter(self._buckets.values()))
+            if now - oldest.last < self.bucket_ttl:
+                break
+            self._buckets.popitem(last=False)
+            pruned += 1
+        if pruned:
             self._evictions += pruned
             self._expired_pruned += pruned
             _counts["rate_limit_evictions"] += pruned
             _counts["rate_limit_expired_pruned"] += pruned
-        return len(expired)
+        return pruned
 
     def _retry_until_capacity(self, now: float) -> float:
         if not self._buckets:
             return self.bucket_ttl
-        remaining = [
-            self.bucket_ttl - (now - bucket.last) for bucket in self._buckets.values()
-        ]
-        return max(0.01, min(remaining))
+        oldest = next(iter(self._buckets.values()))
+        return max(0.01, self.bucket_ttl - (now - oldest.last))
 
     def _bucket_for(
         self, ip: str, now: float | None = None
@@ -414,11 +429,13 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
                 ok = False
             else:
                 ok, retry = bucket.take(1)
+                self._buckets.move_to_end(ip)
 
         if not ok:
             _counts["rate_limited"] += 1
             rid = _request_id(request)
             request.state.request_id = rid
+            retry_after = _bounded_retry_after(retry)
             log.warning(
                 "rate_limited ip=%s path=%s retry=%.1fs rid=%s",
                 ip,
@@ -430,12 +447,12 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
                 {
                     "error": "rate_limited",
                     "message": "Too many requests; please slow down.",
-                    "retry_after_seconds": round(retry, 1),
+                    "retry_after_seconds": retry_after,
                     "request_id": rid,
                 },
                 status_code=429,
                 headers={
-                    "Retry-After": str(max(1, int(retry + 0.5))),
+                    "Retry-After": str(retry_after),
                     "X-Request-Id": rid,
                     "X-RateLimit-Limit": str(self.per_minute),
                 },
