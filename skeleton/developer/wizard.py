@@ -9,19 +9,16 @@ Provides:
 
 from __future__ import annotations
 
-import json
 import sys
 from dataclasses import asdict, dataclass, field
-from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
-
-from skeleton.api.server import get_state
-from skeleton.kernel.events import EventBus
 
 
 @dataclass
 class WizardStep:
     """Single step in an interactive wizard."""
+
     id: str
     question: str
     options: List[str]
@@ -118,7 +115,9 @@ class ProjectWizard:
         return {
             "project_name": self.answers.get("project_name", "my-project"),
             "template": self.answers.get("project_type", "minimal-agent"),
-            "subsystems": self._parse_subsystems(self.answers.get("subsystem_bundle", "all")),
+            "subsystems": self._parse_subsystems(
+                self.answers.get("subsystem_bundle", "all")
+            ),
             "target": self.answers.get("target_platform", "json"),
             "next_steps": [
                 f"Run: skeleton dev scaffold {self.answers.get('project_name')} --template {self.answers.get('project_type')}",
@@ -130,13 +129,21 @@ class ProjectWizard:
     @staticmethod
     def _parse_subsystems(bundle: str) -> List[str]:
         if bundle == "all":
-            return ["memory", "intelligence", "swarm", "resilience", "observability", "cortex"]
+            return [
+                "memory",
+                "intelligence",
+                "swarm",
+                "resilience",
+                "observability",
+                "cortex",
+            ]
         return [s.strip().split()[0] for s in bundle.split(",") if s.strip()]
 
 
 @dataclass
 class SubsystemCard:
     """Health card for a single subsystem."""
+
     name: str
     status: str  # healthy, degraded, failed, unknown
     phase: str
@@ -145,13 +152,28 @@ class SubsystemCard:
     last_event: Optional[str] = None
 
 
+def _default_explorer_state() -> Any:
+    """Build a CLI-local runtime view without depending on the HTTP adapter."""
+    from skeleton.genesis import Genesis
+
+    return SimpleNamespace(genesis=Genesis(seed=42).boot())
+
+
 class SubsystemExplorer:
     """Discover and report on all wired subsystems."""
 
-    PHASE_ORDER = ["kernel", "memory", "intelligence", "swarm", "resilience", "interface", "cortex"]
+    PHASE_ORDER = [
+        "kernel",
+        "memory",
+        "intelligence",
+        "swarm",
+        "resilience",
+        "interface",
+        "cortex",
+    ]
 
     def __init__(self, state: Any = None):
-        self.state = state or get_state()
+        self.state = state if state is not None else _default_explorer_state()
 
     def discover(self) -> List[SubsystemCard]:
         """Build health cards for all wired subsystems."""
@@ -159,20 +181,29 @@ class SubsystemExplorer:
 
         genesis = getattr(self.state, "genesis", None)
         if genesis is None:
-            return [SubsystemCard(name="genesis", status="failed", phase="kernel", handles=[])]
+            return [
+                SubsystemCard(
+                    name="genesis",
+                    status="failed",
+                    phase="kernel",
+                    handles=[],
+                )
+            ]
 
         for phase in genesis.report.phases:
             wired = genesis.report.wired.get(phase, [])
             for handle_name in wired:
                 handle = genesis.handles.get(handle_name)
                 status = self._check_handle(handle)
-                cards.append(SubsystemCard(
-                    name=handle_name,
-                    status=status,
-                    phase=phase,
-                    handles=[h for h in wired],
-                    metrics=self._gather_metrics(handle),
-                ))
+                cards.append(
+                    SubsystemCard(
+                        name=handle_name,
+                        status=status,
+                        phase=phase,
+                        handles=list(wired),
+                        metrics=self._gather_metrics(handle),
+                    )
+                )
 
         return cards
 
@@ -182,8 +213,8 @@ class SubsystemExplorer:
             return "failed"
         if hasattr(handle, "health"):
             try:
-                h = handle.health()
-                return "healthy" if h.get("healthy", True) else "degraded"
+                health = handle.health()
+                return "healthy" if health.get("healthy", True) else "degraded"
             except Exception:
                 return "degraded"
         if hasattr(handle, "stats"):
@@ -206,15 +237,20 @@ class SubsystemExplorer:
         """Aggregate health summary."""
         cards = self.discover()
         by_status: Dict[str, int] = {}
-        for c in cards:
-            by_status[c.status] = by_status.get(c.status, 0) + 1
+        for card in cards:
+            by_status[card.status] = by_status.get(card.status, 0) + 1
 
         return {
             "total_subsystems": len(cards),
-            "phases_booted": len({c.phase for c in cards}),
+            "phases_booted": len({card.phase for card in cards}),
             "status_breakdown": by_status,
-            "overall": "healthy" if by_status.get("failed", 0) == 0 and by_status.get("degraded", 0) == 0 else "degraded",
-            "cards": [asdict(c) for c in cards],
+            "overall": (
+                "healthy"
+                if by_status.get("failed", 0) == 0
+                and by_status.get("degraded", 0) == 0
+                else "degraded"
+            ),
+            "cards": [asdict(card) for card in cards],
         }
 
     def render_table(self) -> str:
@@ -227,7 +263,12 @@ class SubsystemExplorer:
         ]
 
         for card in cards:
-            status_icon = {"healthy": "✓", "degraded": "⚠", "failed": "✗", "unknown": "?"}.get(card.status, "?")
+            status_icon = {
+                "healthy": "✓",
+                "degraded": "⚠",
+                "failed": "✗",
+                "unknown": "?",
+            }.get(card.status, "?")
             handles_str = ", ".join(card.handles[:3])
             if len(card.handles) > 3:
                 handles_str += f" (+{len(card.handles) - 3})"
@@ -260,11 +301,12 @@ class BlueprintVisualizer:
 
         if compact:
             for cid, comp in blueprint.components.items():
-                ports = ", ".join(f"{p.name}({p.direction})" for p in comp.ports)
+                ports = ", ".join(
+                    f"{port.name}({port.direction})" for port in comp.ports
+                )
                 lines.append(f"  [{comp.kind}] {cid}: {ports}")
             return "\n".join(lines)
 
-        # Full rendering with wire diagram
         lines.append("Components:")
         for cid, comp in blueprint.components.items():
             lines.append(f"  □ {cid} ({comp.kind})")
@@ -276,7 +318,9 @@ class BlueprintVisualizer:
             lines.append("")
             lines.append("Wires:")
             for wire in blueprint.wires:
-                lines.append(f"  {wire.src[0]}.{wire.src[1]} ──→ {wire.dst[0]}.{wire.dst[1]}")
+                lines.append(
+                    f"  {wire.src[0]}.{wire.src[1]} ──→ {wire.dst[0]}.{wire.dst[1]}"
+                )
 
         return "\n".join(lines)
 
