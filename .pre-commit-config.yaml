@@ -91,6 +91,14 @@ repos:
         pass_filenames: false
         always_run: true
 
+      - id: gitleaks-history
+        name: Gitleaks full-history secret scan
+        entry: bash scripts/security/run-secret-scan.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [manual]
+
       - id: backend-security-regressions
         name: backend security scanner regression suite
         entry: bash -c 'cd backend && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest tests/test_exec_guard.py tests/test_process_safety_gate.py tests/test_process_safety_destructuring.py tests/test_process_safety_partial.py tests/test_process_safety_namespace_get.py tests/test_process_safety_getattribute.py tests/test_deserialization_safety_gate.py tests/test_sast_security_gate.py tests/test_js_process_alias_safety.py tests/test_workflow_security_gate.py tests/test_secret_hygiene_gate.py'
