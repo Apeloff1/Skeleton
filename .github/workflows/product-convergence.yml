@@ -10,6 +10,7 @@ on:
       - "backend/routes/jeeves_evolution.py"
       - "backend/routes/gameforge_auth.py"
       - "backend/routes/deployment_checkpoint_trust.py"
+      - "backend/scripts/backend_route_inventory.py"
       - "backend/tests/**"
       - "frontend/src/product/productCatalog.ts"
       - ".github/workflows/product-convergence.yml"
@@ -23,6 +24,7 @@ on:
       - "backend/routes/jeeves_evolution.py"
       - "backend/routes/gameforge_auth.py"
       - "backend/routes/deployment_checkpoint_trust.py"
+      - "backend/scripts/backend_route_inventory.py"
       - "backend/tests/**"
       - "frontend/src/product/productCatalog.ts"
       - ".github/workflows/product-convergence.yml"
@@ -146,3 +148,4 @@ jobs:
           tests/test_route_policy_coverage.py
           tests/test_auth_security.py
           tests/test_gameforge_auth_hardening.py
+          tests/test_backend_route_inventory.py
