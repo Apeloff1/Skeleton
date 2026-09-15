@@ -1,0 +1,128 @@
+name: Actions Housekeeping CLI
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 4 * * 0'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/actions-housekeeping-cli.yml'
+
+concurrency:
+  group: actions-housekeeping-cli-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    name: Purge caches and stale Actions data with gh CLI
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      RETENTION_DAYS: '7'
+      MAX_RUN_DELETES: '1000'
+    steps:
+      - name: Verify GitHub CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh --version
+          gh auth status
+
+      - name: Purge all Actions caches with gh cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          before=$(gh cache list --repo "$REPO" --limit 10000 --json id --jq 'length')
+          echo "Caches before purge: $before"
+          if [[ "$before" -gt 0 ]]; then
+            gh cache delete --all --repo "$REPO" --confirm
+          fi
+          after=$(gh cache list --repo "$REPO" --limit 10000 --json id --jq 'length')
+          echo "Caches after purge: $after"
+          {
+            echo '## Actions housekeeping (GitHub CLI)'
+            echo "- Caches before: $before"
+            echo "- Caches after: $after"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Delete stale workflow artifacts with gh api
+        shell: bash
+        run: |
+          set -euo pipefail
+          cutoff=$(date -u -d "${RETENTION_DAYS} days ago" +%s)
+          deleted=0
+          failed=0
+          kept=0
+          artifact_file="$RUNNER_TEMP/artifacts.tsv"
+
+          gh api --paginate "/repos/${REPO}/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | [.id, .created_at, .expired] | @tsv' > "$artifact_file"
+
+          while IFS=$'\t' read -r id created_at expired; do
+            [[ -n "${id:-}" && -n "${created_at:-}" ]] || continue
+            created_epoch=$(date -u -d "$created_at" +%s)
+            if [[ "$expired" == "true" || "$created_epoch" -lt "$cutoff" ]]; then
+              if gh api --method DELETE "/repos/${REPO}/actions/artifacts/${id}" >/dev/null 2>&1; then
+                deleted=$((deleted + 1))
+              else
+                failed=$((failed + 1))
+              fi
+            else
+              kept=$((kept + 1))
+            fi
+          done < "$artifact_file"
+
+          {
+            echo "- Stale/expired artifacts deleted: $deleted"
+            echo "- Recent artifacts kept: $kept"
+            echo "- Artifact deletion failures: $failed"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Prune stale failed runs with gh run
+        shell: bash
+        run: |
+          set -euo pipefail
+          cutoff=$(date -u -d "${RETENTION_DAYS} days ago" +%s)
+          run_file="$RUNNER_TEMP/runs.tsv"
+          : > "$run_file"
+
+          for status in failure cancelled timed_out action_required stale; do
+            gh run list --repo "$REPO" --limit 1000 --status "$status" \
+              --json databaseId,createdAt,conclusion,name \
+              --jq '.[] | [.databaseId, .createdAt, .conclusion, .name] | @tsv' >> "$run_file" || true
+          done
+
+          sort -u -o "$run_file" "$run_file"
+          deleted=0
+          failed=0
+          kept=0
+
+          while IFS=$'\t' read -r id created_at conclusion name; do
+            [[ -n "${id:-}" && -n "${created_at:-}" ]] || continue
+            [[ "$id" != "$GITHUB_RUN_ID" ]] || continue
+            created_epoch=$(date -u -d "$created_at" +%s)
+            if [[ "$created_epoch" -ge "$cutoff" || "$deleted" -ge "$MAX_RUN_DELETES" ]]; then
+              kept=$((kept + 1))
+              continue
+            fi
+            if gh run delete "$id" --repo "$REPO"; then
+              deleted=$((deleted + 1))
+            else
+              failed=$((failed + 1))
+            fi
+          done < "$run_file"
+
+          {
+            echo "- Failed/cancelled/timed-out/stale runs deleted: $deleted"
+            echo "- Recent/over-cap runs kept: $kept"
+            echo "- Run deletion failures: $failed"
+            echo "- Retention window: ${RETENTION_DAYS} days"
+            echo "- Per-sweep run deletion cap: ${MAX_RUN_DELETES}"
+          } >> "$GITHUB_STEP_SUMMARY"
