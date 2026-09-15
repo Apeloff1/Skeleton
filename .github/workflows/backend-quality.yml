@@ -102,6 +102,9 @@ jobs:
       - name: Production layer boundary gate
         run: python scripts/check_architecture_boundaries.py
 
+      - name: Security scanner surface preflight
+        run: python scripts/check_security_scan_surface.py
+
       - name: Process invocation safety gate
         run: python scripts/check_process_safety.py
 
@@ -113,9 +116,6 @@ jobs:
 
       - name: Tar archive extraction safety gate
         run: python scripts/check_archive_extraction_safety.py
-
-      - name: Security scanner surface preflight
-        run: python scripts/check_security_scan_surface.py
 
       - name: High-confidence Python and JavaScript SAST gate
         run: python scripts/check_sast_security.py
@@ -159,6 +159,7 @@ jobs:
           tests/test_live_scraper_network_security.py
           tests/test_ai_reader_error_redaction.py
           tests/test_sast_security_gate.py
+          tests/test_sast_scan_coverage.py
           tests/test_repository_python_sast_scope.py
           tests/test_js_process_alias_safety.py
           tests/test_workflow_security_gate.py
