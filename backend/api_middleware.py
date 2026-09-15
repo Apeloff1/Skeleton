@@ -92,6 +92,8 @@ _TRUSTED_PROXY_NETWORKS = _parse_trusted_proxy_networks(
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 _MAX_RETRY_AFTER_SECONDS = 86_400
+_MAX_XFF_HOPS = 32
+_MAX_XFF_CHARS = 2048
 
 # Telemetry counters (in-memory) ───────────────────────────────────────
 _lat_ring: Deque[float] = deque(maxlen=1024)
@@ -152,7 +154,7 @@ def get_stats() -> dict:
             "evictions": _counts.get("rate_limit_evictions", 0),
             "expired_pruned": _counts.get("rate_limit_expired_pruned", 0),
             "saturation_rejections": _counts.get("rate_limit_saturation_rejections", 0),
-            "trusted_proxy_cidrs": [str(network) for network in _TRUSTED_PROXY_NETWORKS],
+            "trusted_proxy_count": len(_TRUSTED_PROXY_NETWORKS),
         },
     }
 
@@ -196,8 +198,6 @@ def _canonical_ip(value: str) -> str | None:
     value = value.strip()
     if not value:
         return None
-    if len(value) >= 2 and value[0] == value[-1] == '"':
-        value = value[1:-1].strip()
     try:
         return str(ipaddress.ip_address(value))
     except ValueError:
@@ -216,9 +216,10 @@ def _client_ip(request: Request) -> str:
     """Resolve client identity without trusting attacker-controlled XFF.
 
     The direct peer is authoritative unless it is explicitly trusted. For a
-    trusted peer, a single well-formed XFF chain is walked right-to-left,
+    trusted peer, one bounded well-formed XFF chain is walked right-to-left,
     skipping trusted proxy hops and selecting the nearest untrusted address.
-    Ambiguous or malformed forwarded headers fail closed to the direct peer.
+    Ambiguous, malformed, oversized, or overlong forwarded headers fail closed
+    to the direct peer.
     """
     client = request.client
     peer = client.host.strip() if client and client.host else "-"
@@ -229,8 +230,11 @@ def _client_ip(request: Request) -> str:
     forwarded_headers = request.headers.getlist("x-forwarded-for")
     if len(forwarded_headers) != 1:
         return canonical_peer or peer
-    parts = [part.strip() for part in forwarded_headers[0].split(",")]
-    if not parts or any(not part for part in parts):
+    forwarded_value = forwarded_headers[0]
+    if len(forwarded_value) > _MAX_XFF_CHARS:
+        return canonical_peer or peer
+    parts = [part.strip() for part in forwarded_value.split(",")]
+    if not parts or len(parts) > _MAX_XFF_HOPS or any(not part for part in parts):
         return canonical_peer or peer
 
     forwarded = [_canonical_ip(part) for part in parts]
