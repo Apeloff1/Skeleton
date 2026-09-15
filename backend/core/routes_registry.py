@@ -262,6 +262,7 @@ KNOWN_ROUTES: List[RouteEntry] = [
     ("routes.ai_bible_enhanced",                "router"),
     # ── Academy / curriculum / camera ──────────────────────────────────
     ("routes.academy_v3",                       "router"),
+    ("routes.academy_legacy_compat",            "router"),
     ("routes.reading_content",                  "router"),
     ("routes.git_operations",                   "router"),
     ("routes.camera_director",                  "router"),
