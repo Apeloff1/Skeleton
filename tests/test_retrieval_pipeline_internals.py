@@ -1,0 +1,138 @@
+from skeleton.retrieval.fusion import ScoredResult
+from skeleton.retrieval.pipeline import SearchPipeline
+from skeleton.retrieval.query import QueryPlanner
+from skeleton.retrieval.reranker import FeatureReranker
+
+
+def _result(fragment_id: str, content: str, score: float = 1.0) -> ScoredResult:
+    return ScoredResult(
+        fragment_id=fragment_id,
+        content=content,
+        score=score,
+        plane="rag",
+        provenance="test",
+    )
+
+
+def test_prepare_then_search_reuses_prefetched_retrieval_work() -> None:
+    calls = []
+
+    def retrieve(query: str):
+        calls.append(query)
+        return [_result("doc-1", "alpha document")]
+
+    planner = QueryPlanner()
+    planner.register("quad", retrieve)
+    pipeline = SearchPipeline(planner)
+
+    prepared = pipeline.prepare("alpha")
+    outcome = pipeline.search_prepared(prepared)
+
+    assert calls == ["alpha"]
+    assert prepared.failures == ()
+    assert [item.fragment_id for item in outcome.results] == ["doc-1"]
+
+
+def test_failed_prefetch_is_retried_by_normal_execution() -> None:
+    calls = 0
+
+    def flaky_retrieve(query: str):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise RuntimeError("transient prefetch failure")
+        return [_result("recovered", query)]
+
+    planner = QueryPlanner()
+    planner.register("quad", flaky_retrieve)
+    pipeline = SearchPipeline(planner)
+
+    prepared = pipeline.prepare("recover")
+    assert prepared.failures == ("quad",)
+
+    outcome = pipeline.search_prepared(prepared)
+
+    assert calls == 2
+    assert [item.fragment_id for item in outcome.results] == ["recovered"]
+
+
+def test_search_plans_once_and_speculative_mode_does_not_double_fetch() -> None:
+    class CountingPlanner(QueryPlanner):
+        def __init__(self) -> None:
+            super().__init__()
+            self.plan_calls = 0
+
+        def plan(self, query: str):
+            self.plan_calls += 1
+            return super().plan(query)
+
+    fetches = []
+    planner = CountingPlanner()
+    planner.register(
+        "quad",
+        lambda query: fetches.append(query) or [_result("doc-1", query)],
+    )
+    pipeline = SearchPipeline(planner, speculative_prefetch=True)
+
+    outcome = pipeline.search("single pass")
+
+    assert planner.plan_calls == 1
+    assert fetches == ["single pass"]
+    assert outcome.results[0].fragment_id == "doc-1"
+
+
+def test_default_top_k_path_uses_planner_limit_without_fuser_attribute() -> None:
+    planner = QueryPlanner()
+    planner.register(
+        "rag",
+        lambda query: [
+            _result(f"doc-{index}", f"{query} {index}", score=20.0 - index)
+            for index in range(20)
+        ],
+    )
+
+    results = planner.execute("limit")
+
+    assert len(results) == 10
+
+
+def test_feature_reranker_receives_and_returns_scored_results() -> None:
+    planner = QueryPlanner()
+    planner.register(
+        "rag",
+        lambda query: [
+            _result("weak", "unrelated words", score=0.2),
+            _result("strong", "alpha alpha exact", score=0.2),
+        ],
+    )
+    pipeline = SearchPipeline(planner, feature_reranker=FeatureReranker())
+
+    outcome = pipeline.search("alpha", top_k=2)
+
+    assert all(isinstance(item, ScoredResult) for item in outcome.results)
+    assert {item.fragment_id for item in outcome.results} == {"weak", "strong"}
+    assert outcome.results[0].fragment_id == "strong"
+
+
+def test_render_uses_current_fragment_and_content_contract() -> None:
+    planner = QueryPlanner()
+    planner.register("rag", lambda query: [_result("frag-7", "alpha body")])
+    pipeline = SearchPipeline(planner)
+
+    outcome = pipeline.search("alpha", render=True)
+
+    assert "frag-7" in outcome.rendered
+    assert "alpha" in outcome.rendered.lower()
+
+
+def test_custom_renderer_is_honored() -> None:
+    planner = QueryPlanner()
+    planner.register("rag", lambda query: [_result("frag-1", "body")])
+    pipeline = SearchPipeline(
+        planner,
+        renderer=lambda query, results, terms: f"custom:{query}:{len(results)}",
+    )
+
+    outcome = pipeline.search("alpha", render=True)
+
+    assert outcome.rendered == "custom:alpha:1"
