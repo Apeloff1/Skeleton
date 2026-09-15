@@ -119,29 +119,49 @@ def test_lane_metadata_is_isolated_and_merged_with_global_metadata() -> None:
     ]
 
 
-def test_nested_metadata_mutation_does_not_leak_between_lanes_or_to_caller() -> None:
+def test_nested_judge_mutation_is_rejected_and_does_not_leak_to_caller() -> None:
     metadata = {"nested": {"value": "original"}}
-    seen = []
 
     def judge(ctx, batch):
-        if batch[0].gate_id != 1:
-            return {}
-        lane = ctx.metadata["tri_lane"]
-        if lane == TriLane.QUALITY.value:
+        if batch[0].gate_id == 1:
             ctx.metadata["nested"]["value"] = "mutated-in-quality"
-        else:
-            seen.append((lane, ctx.metadata["nested"]["value"]))
         return {}
 
-    decision = TriAdversarialEngine(judge=judge).evaluate(
-        _ctx(metadata=metadata)
-    )
+    with pytest.raises(
+        RuntimeError,
+        match=r"quality judge mutated review context",
+    ):
+        TriAdversarialEngine(judge=judge).evaluate(_ctx(metadata=metadata))
 
-    assert decision.allowed is True
-    assert seen == [
-        (TriLane.ADVERSARIAL_QUALITY.value, "original"),
-        (TriLane.INTEGRITY.value, "original"),
-    ]
+    assert metadata == {"nested": {"value": "original"}}
+
+
+def test_judge_mutation_is_rejected_before_repairer_runs() -> None:
+    metadata = {"nested": {"value": "original"}}
+    repair_calls = []
+
+    def judge(ctx, batch):
+        if (
+            ctx.metadata["tri_lane"] == TriLane.QUALITY.value
+            and batch[0].gate_id == 1
+        ):
+            ctx.metadata["nested"]["value"] = "mutated-before-repair"
+            return {1: {"status": "repair", "reason": "repair requested after mutation"}}
+        return {}
+
+    def repairer(ctx, repairs):
+        repair_calls.append((ctx, repairs))
+        return {"version": 2}
+
+    with pytest.raises(
+        RuntimeError,
+        match=r"quality judge mutated review context",
+    ):
+        TriAdversarialEngine(judge=judge, repairer=repairer).evaluate(
+            _ctx(candidate={"version": 1}, metadata=metadata)
+        )
+
+    assert repair_calls == []
     assert metadata == {"nested": {"value": "original"}}
 
 
