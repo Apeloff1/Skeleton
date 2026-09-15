@@ -10,10 +10,6 @@ on:
     paths-ignore:
       - '.github/workflows/branch-clean.yml'
 
-concurrency:
-  group: merge-readiness-${{ github.event.pull_request.number || github.ref }}-${{ github.sha }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
 
