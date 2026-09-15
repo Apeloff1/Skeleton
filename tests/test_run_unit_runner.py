@@ -7,13 +7,13 @@ import tests.test_cortex as cortex_tests
 
 
 class _Probe:
-    def exact_legacy_failure(self) -> None:
+    def test_exact_legacy_failure(self) -> None:
         assert False, "legacy-terminal"
 
-    def different_failure(self) -> None:
+    def test_different_failure(self) -> None:
         assert False, "different"
 
-    def nested_failure(self) -> None:
+    def test_nested_failure(self) -> None:
         _raise_nested()
 
 
@@ -31,14 +31,14 @@ def _capture(bound_method) -> AssertionError:
 
 def test_superseded_match_requires_exact_terminal_source_line() -> None:
     probe = _Probe()
-    exc = _capture(probe.exact_legacy_failure)
+    exc = _capture(probe.test_exact_legacy_failure)
     assert runner._matches_superseded_assertion(
-        probe.exact_legacy_failure,
+        probe.test_exact_legacy_failure,
         exc,
         'assert False, "legacy-terminal"',
     )
     assert not runner._matches_superseded_assertion(
-        probe.exact_legacy_failure,
+        probe.test_exact_legacy_failure,
         exc,
         'assert False, "different"',
     )
@@ -46,9 +46,9 @@ def test_superseded_match_requires_exact_terminal_source_line() -> None:
 
 def test_nested_assertion_cannot_be_suppressed_by_method_name() -> None:
     probe = _Probe()
-    exc = _capture(probe.nested_failure)
+    exc = _capture(probe.test_nested_failure)
     assert not runner._matches_superseded_assertion(
-        probe.nested_failure,
+        probe.test_nested_failure,
         exc,
         'assert False, "legacy-terminal"',
     )
