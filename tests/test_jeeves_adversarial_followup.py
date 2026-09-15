@@ -32,6 +32,7 @@ def test_duplicate_canonical_tool_registration_is_rejected():
         session.session_id,
         "look this up",
         context={"tool_calls": [{"name": "lookup", "arguments": {}}]},
+        allowed_tools=["lookup"],
     )
 
     assert len(original_calls) == 1
@@ -58,7 +59,12 @@ def test_tool_capability_requests_are_not_persisted_or_aliased():
         ],
     }
 
-    core.ask(session.session_id, "run lookup", context=context)
+    core.ask(
+        session.session_id,
+        "run lookup",
+        context=context,
+        allowed_tools=["lookup"],
+    )
 
     assert session.turns[0].metadata == {"trace_id": "trace-1"}
     assert context["tool_calls"][0]["arguments"]["nested"]["secret"] == "do-not-store"
@@ -71,6 +77,22 @@ def test_non_object_context_fails_before_session_mutation():
 
     with pytest.raises(ValueError, match="context"):
         core.ask(session.session_id, "hello", context=["bad"])  # type: ignore[arg-type]
+
+    assert session.turns == []
+
+
+def test_allowed_tools_must_be_a_bounded_name_list():
+    core = _core()
+    session = core.open_session("u")
+    core.register_tool("lookup", lambda _payload: None)
+
+    with pytest.raises(ValueError, match="allowed_tools"):
+        core.ask(
+            session.session_id,
+            "run lookup",
+            context={"tool_calls": [{"name": "lookup", "arguments": {}}]},
+            allowed_tools="lookup",  # type: ignore[arg-type]
+        )
 
     assert session.turns == []
 
