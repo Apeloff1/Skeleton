@@ -5,12 +5,9 @@
 # skeleton/ alongside backend/.
 # ============================================================================
 
-ARG UV_VERSION=0.12.4
-
-# Resolve the versioned uv image in a FROM instruction. Docker does not expand
-# build arguments in COPY --from image references, so give the image a stage
-# name and copy from that stable stage instead.
-FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
+# Resolve the versioned uv image by immutable multi-platform digest. Refresh
+# the tag+digest pair deliberately alongside dependency/security review.
+FROM ghcr.io/astral-sh/uv:0.12.4@sha256:d0a6eca6c669dc7e9c51218707b8438a3d30402733d739dcc00adb3e213e8f5c AS uv
 
 # Official Python multi-platform index pinned for reproducible rebuilds.
 # Refresh this digest deliberately alongside dependency/security review.
