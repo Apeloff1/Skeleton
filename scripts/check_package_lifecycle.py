@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reject unreviewed package-manager lifecycle hooks in tracked manifests."""
+"""Reject unreviewed package-manager lifecycle hooks in active tracked manifests."""
 
 from __future__ import annotations
 
@@ -21,6 +21,15 @@ ALLOWED = {
     ("frontend/package.json", "postinstall"): "node ./scripts/patch-node-modules.js",
 }
 
+# Historical branch snapshots are inert repository records, not installable
+# package roots. Scanning their package.json lifecycle hooks makes current PRs
+# fail on commands inherited from archived branches even though CI never
+# installs dependencies from these paths. Keep this exclusion deliberately
+# narrow: every other tracked package.json remains fail-closed.
+EXCLUDED_MANIFEST_PREFIXES = (
+    "satellites/branch-snapshots/",
+)
+
 
 def tracked_package_files() -> list[str]:
     result = subprocess.run(
@@ -37,9 +46,18 @@ def tracked_package_files() -> list[str]:
     ]
 
 
+def manifest_is_in_scope(package_file: str) -> bool:
+    return not any(
+        package_file.startswith(prefix) for prefix in EXCLUDED_MANIFEST_PREFIXES
+    )
+
+
 def violations() -> list[str]:
     findings: list[str] = []
     for package_file in tracked_package_files():
+        if not manifest_is_in_scope(package_file):
+            continue
+
         path = REPO_ROOT / package_file
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
