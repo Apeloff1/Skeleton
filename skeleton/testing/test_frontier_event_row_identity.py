@@ -31,7 +31,7 @@ def _rewrite_row(database, token: str, *, field: str, value: str) -> None:
     [
         "not-a-uuid",
         "00000000-0000-1000-8000-000000000000",
-        "00000000-0000-4000-8000-000000000000".upper(),
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa".upper(),
     ],
     ids=["invalid", "wrong-version", "non-canonical-case"],
 )
@@ -85,7 +85,7 @@ def test_duplicate_event_payload_key_is_rejected_as_ambiguous(tmp_path):
 
         reopened = SQLiteEventJournal(database)
         try:
-            with pytest.raises(EventJournalCorruptionError, match="unambiguous strict JSON"):
+            with pytest.raises(EventJournalCorruptionError, match="duplicate object keys"):
                 await reopened.pending()
             assert await reopened.pending_count() == 1
         finally:
