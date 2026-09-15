@@ -17,7 +17,7 @@ permissions: {}
 jobs:
   drain:
     # Run cleanup off the normal x64 pool. The write token exists only for this
-    # job and is used only to cancel older queued duplicates.
+    # job and is used only to cancel obsolete or duplicate queued runs.
     permissions:
       actions: write
       contents: read
@@ -28,7 +28,7 @@ jobs:
       REPO: ${{ github.repository }}
       CURRENT_RUN_ID: ${{ github.run_id }}
     steps:
-      - name: Cancel only superseded queued duplicates
+      - name: Cancel obsolete and superseded queued runs
         shell: bash
         run: |
           set -euo pipefail
@@ -64,6 +64,14 @@ jobs:
               except urllib.error.HTTPError as exc:
                   return exc.code, None
 
+          # Resolve the only SHA that queued main-branch work is allowed to keep.
+          status, branch = request(f'/repos/{repo}/branches/main')
+          if status != 200 or not isinstance(branch, dict):
+              raise SystemExit(f'failed to resolve main HEAD: HTTP {status}')
+          main_sha = ((branch.get('commit') or {}).get('sha') or '').strip()
+          if not main_sha:
+              raise SystemExit('failed to resolve main HEAD SHA')
+
           queued = []
           for page in range(1, 11):
               query = urllib.parse.urlencode({
@@ -79,14 +87,27 @@ jobs:
               if len(batch) < 100:
                   break
 
-          # Newest run for each workflow/ref/event tuple is always preserved.
-          # Only older runs that are still queued are eligible for cancellation.
+          # Policy:
+          # 1. Any queued main run not targeting live main HEAD is obsolete.
+          # 2. On every other ref/event tuple, preserve only the newest queued run.
+          # 3. Never cancel this drainer's own current run.
           seen = set()
           selected = []
+          obsolete_main = 0
+          duplicate = 0
           for run in sorted(queued, key=lambda item: item.get('created_at') or '', reverse=True):
               run_id = int(run.get('id') or 0)
               if run_id == current:
                   continue
+
+              if (
+                  (run.get('head_branch') or '') == 'main'
+                  and (run.get('head_sha') or '') != main_sha
+              ):
+                  selected.append(run)
+                  obsolete_main += 1
+                  continue
+
               key = (
                   int(run.get('workflow_id') or 0),
                   run.get('head_branch') or '',
@@ -94,6 +115,7 @@ jobs:
               )
               if key in seen:
                   selected.append(run)
+                  duplicate += 1
               else:
                   seen.add(key)
 
@@ -113,7 +135,8 @@ jobs:
                   print(f'cancel failed: id={run_id} status={status}')
 
           print(
-              f'inspected={len(queued)} selected={len(selected)} '
+              f'main_sha={main_sha} inspected={len(queued)} selected={len(selected)} '
+              f'obsolete_main={obsolete_main} duplicate={duplicate} '
               f'accepted={accepted} moved={moved} failed={failed}'
           )
 
@@ -121,12 +144,14 @@ jobs:
           if summary:
               with open(summary, 'a', encoding='utf-8') as handle:
                   handle.write('## Actions queue drain\n')
+                  handle.write(f'- Live main SHA: `{main_sha}`\n')
                   handle.write(f'- Queued runs inspected: {len(queued)}\n')
-                  handle.write(f'- Older duplicate runs selected: {len(selected)}\n')
+                  handle.write(f'- Obsolete main runs selected: {obsolete_main}\n')
+                  handle.write(f'- Older duplicate runs selected: {duplicate}\n')
                   handle.write(f'- Cancel requests accepted: {accepted}\n')
                   handle.write(f'- Already moved/completed: {moved}\n')
                   handle.write(f'- Cancellation failures: {failed}\n')
-                  handle.write('- Safety: in-progress work is never cancelled; the newest queued run for every workflow/ref/event tuple is always preserved.\n')
+                  handle.write('- Safety: current main HEAD and newest queued run for every remaining workflow/ref/event tuple are preserved; in-progress work is never cancelled.\n')
 
           if failed:
               raise SystemExit(f'queue drain had {failed} cancellation failure(s)')
