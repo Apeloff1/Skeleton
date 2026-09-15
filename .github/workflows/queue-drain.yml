@@ -52,14 +52,16 @@ jobs:
           }
           retryable = frozenset({0, 429, 500, 502, 503, 504})
 
-          # These workflows form the branch-flow control plane. They are
-          # designed either to follow a moving main or to provide canonical
-          # post-merge evidence. They must never be garbage-collected as stale
-          # workload merely because a newer commit appears while they are queued.
+          # These workflows form the branch-flow / queue-recovery control plane.
+          # They are designed either to follow a moving main, provide canonical
+          # post-merge evidence, or reclaim stale queue capacity. They must never
+          # be garbage-collected as stale workload merely because a newer commit
+          # appears while they are queued.
           control_plane_paths = frozenset({
               '.github/workflows/branch-clean.yml',
               '.github/workflows/branch-flow.yml',
               '.github/workflows/merge-readiness.yml',
+              '.github/workflows/pr-obsolete-run-drain.yml',
               '.github/workflows/queue-drain.yml',
           })
 
@@ -319,10 +321,10 @@ jobs:
                   )
                   handle.write(
                       '- Safety: `branch-clean.yml`, `branch-flow.yml`, '
-                      '`merge-readiness.yml`, and `queue-drain.yml` are never '
-                      'cancellation targets; current main, PR work, and the newest '
-                      'path-filtered validation without a live-head replacement are '
-                      'preserved.\n\n'
+                      '`merge-readiness.yml`, `pr-obsolete-run-drain.yml`, and '
+                      '`queue-drain.yml` are never cancellation targets; current '
+                      'main, PR work, and the newest path-filtered validation '
+                      'without a live-head replacement are preserved.\n\n'
                   )
                   handle.write('### Passes\n')
                   for line in pass_lines:
