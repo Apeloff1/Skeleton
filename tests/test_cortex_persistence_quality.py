@@ -46,6 +46,17 @@ def test_midbrain_fit_advances_steps_and_mutates_transformer_weights() -> None:
     assert transformer.layers[0].Wq != weights_before
 
 
+def test_curriculum_train_advances_both_neo_mouths() -> None:
+    neo = JeevesCortex()
+    gelu_before = neo.transformer.steps
+    rms_before = neo.neo_rms.steps
+
+    neo.train(epochs=1)
+
+    assert neo.transformer.steps > gelu_before
+    assert neo.neo_rms.steps > rms_before
+
+
 def test_teacher_distill_trains_both_neo_mouths() -> None:
     neo = JeevesCortex()
     neo.bind_hf("left")
