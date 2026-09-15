@@ -66,7 +66,15 @@ def _strings(value: Any, *, field_name: str) -> tuple[str, ...]:
         return ()
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
         raise TypeError(f"{field_name} must be a sequence")
-    return tuple(text for item in value if (text := str(item).strip().lower()))
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        text = str(item).strip().lower()
+        if text and text not in seen:
+            seen.add(text)
+            normalized.append(text)
+    return tuple(normalized)
 
 
 def faction_from_record(record: Mapping[str, Any]) -> FactionSpec:
@@ -74,6 +82,14 @@ def faction_from_record(record: Mapping[str, Any]) -> FactionSpec:
     name = str(record.get("name") or "").strip()
     if not faction_id or not name:
         raise ValueError("faction requires non-empty id and name")
+
+    allies = _strings(record.get("allies"), field_name="allies")
+    enemies = _strings(record.get("enemies"), field_name="enemies")
+    if faction_id in allies or faction_id in enemies:
+        raise ValueError("faction cannot be allied with or hostile to itself")
+    overlap = sorted(set(allies).intersection(enemies))
+    if overlap:
+        raise ValueError(f"faction allies and enemies overlap: {', '.join(overlap)}")
 
     raw_benefits = record.get("benefits") or {}
     if not isinstance(raw_benefits, Mapping):
@@ -94,8 +110,8 @@ def faction_from_record(record: Mapping[str, Any]) -> FactionSpec:
         id=faction_id,
         name=name,
         benefits=benefits,
-        allies=_strings(record.get("allies"), field_name="allies"),
-        enemies=_strings(record.get("enemies"), field_name="enemies"),
+        allies=allies,
+        enemies=enemies,
         metadata=metadata,
     )
 
@@ -108,8 +124,15 @@ def _validated_levels(
     ordered = tuple(sorted(levels, key=lambda level: level.min_rep))
     if len({level.min_rep for level in ordered}) != len(ordered):
         raise ValueError("reputation level min_rep thresholds must be unique")
+    if len({level.rank for level in ordered}) != len(ordered):
+        raise ValueError("reputation level ranks must be unique")
+    if any(not level.name.strip() for level in ordered):
+        raise ValueError("reputation level names must not be empty")
     if len({level.name.casefold() for level in ordered}) != len(ordered):
         raise ValueError("reputation level names must be unique")
+    ranks = [level.rank for level in ordered]
+    if ranks != sorted(ranks):
+        raise ValueError("reputation level ranks must increase with min_rep")
     return ordered
 
 
@@ -162,6 +185,8 @@ def current_benefits(
 
     normalized = level_name.strip().lower()
     order = tuple(str(level).strip().lower() for level in cumulative_order)
+    if any(not level for level in order):
+        raise ValueError("benefit level order must not contain empty values")
     if len(set(order)) != len(order):
         raise ValueError("benefit level order must not contain duplicates")
     if normalized not in order:
@@ -250,9 +275,27 @@ def standing_summary(
 ) -> dict[str, Any]:
     """Build source-style standings while counting untracked factions Neutral."""
 
-    canonical_ids = tuple(dict.fromkeys(str(value).strip().lower() for value in faction_ids if str(value).strip()))
-    known = set(canonical_ids)
-    unknown = sorted(set(reputation_by_faction).difference(known))
+    canonical_ids: list[str] = []
+    known: set[str] = set()
+    for value in faction_ids:
+        faction_id = str(value).strip().lower()
+        if not faction_id:
+            raise ValueError("faction id must not be empty")
+        if faction_id in known:
+            raise ValueError(f"duplicate faction id: {faction_id}")
+        known.add(faction_id)
+        canonical_ids.append(faction_id)
+
+    canonical_reputation: dict[str, int] = {}
+    for raw_id, score in reputation_by_faction.items():
+        faction_id = str(raw_id).strip().lower()
+        if not faction_id:
+            raise ValueError("reputation faction id must not be empty")
+        if faction_id in canonical_reputation:
+            raise ValueError(f"duplicate reputation faction id: {faction_id}")
+        canonical_reputation[faction_id] = int(score)
+
+    unknown = sorted(set(canonical_reputation).difference(known))
     if unknown:
         raise KeyError(f"unknown reputation factions: {', '.join(unknown)}")
 
@@ -262,10 +305,10 @@ def standing_summary(
     worst: dict[str, Any] | None = None
 
     for faction_id in canonical_ids:
-        if faction_id not in reputation_by_faction:
+        if faction_id not in canonical_reputation:
             standings["neutral"] = standings.get("neutral", 0) + 1
             continue
-        score = int(reputation_by_faction[faction_id])
+        score = canonical_reputation[faction_id]
         level = reputation_level(score, levels=ordered_levels)
         standings[level.name.lower()] = standings.get(level.name.lower(), 0) + 1
         candidate = {
