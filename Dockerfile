@@ -20,4 +20,9 @@ USER appuser
 
 EXPOSE 8001
 
+# Probe only the public liveness contract and use Python's standard library so
+# the runtime image does not gain curl/apt packages solely for health checks.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/v1/health/live', timeout=5).read()" || exit 1
+
 CMD ["uvicorn", "skeleton.api.server:create_app", "--factory", "--host", "0.0.0.0", "--port", "8001"]
