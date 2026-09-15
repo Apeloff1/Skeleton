@@ -1,4 +1,4 @@
-version: 1
+version: 2
 canonical_repository: Apeloff1/Skeleton
 strategy: selective-promotion
 rules:
@@ -7,28 +7,30 @@ rules:
   - no-secrets-or-generated-caches
   - adapters-at-boundaries
   - tests-before-promotion
+  - deduplicate-by-source-blob
 sources:
   - repository: Apeloff1/Prood
     capabilities: [jeeves, rag, learning, text-to-npc, text-to-game-logic, text-to-animation]
     disposition: promote
     destinations:
       jeeves: skeleton/ai
-      rag: skeleton/frontier/memory.py
+      rag: skeleton/frontier/memory_adapters.py
       text-to-npc: skeleton/frontier/npc.py
       learning: skeleton/learning
       game-pipelines: skeleton/game
   - repository: Apeloff1/Tutolage
     capabilities: [tutoring, rag, gamification, npc-pipeline, game-logic-pipeline, animation-pipeline]
-    disposition: promote
+    disposition: promote-unique-only
     destinations:
       tutoring: skeleton/learning
-      rag: skeleton/frontier/memory.py
+      rag: skeleton/frontier/memory_adapters.py
       pipelines: skeleton/game
   - repository: Apeloff1/gameforge-rs
-    capabilities: [gameforge, simulation, generation]
-    disposition: promote
+    capabilities: [gameforge, simulation, generation, digest, outbox]
+    disposition: promote-unique-only
     destinations:
       engine: skeleton/game
+      runtime: skeleton/frontier
       rust: packages/rust
   - repository: Apeloff1/gameforge-middleware
     capabilities: [middleware, orchestration]
@@ -36,20 +38,68 @@ sources:
     destinations:
       services: services/gameforge
   - repository: Apeloff1/hyperforge-cockpit-sota
-    capabilities: [cockpit, visualization, telemetry]
-    disposition: promote
+    capabilities: [cockpit, visualization, telemetry, validated-bridge]
+    disposition: boundary-consumer
     destinations:
       web: cockpit/web
   - repository: Apeloff1/Lorebuffa
-    capabilities: [lore, world-building, narrative]
-    disposition: promote
+    capabilities: [lore, world-building, narrative, npc-catalog]
+    disposition: adapt-unique-only
     destinations:
       domain_pack: domain-packs/lorebuffa
-  - repository: Apeloff1/Openworld4
-    capabilities: [world, exploration, procedural-content]
-    disposition: characterize
+      npc_adapter: skeleton/frontier/npc_adapters.py
+  - repository: Apeloff1/Openworld
+    capabilities: [world, exploration, procedural-content, npc-catalog]
+    disposition: characterize-and-deduplicate
     destinations:
       world: skeleton/game/world
+      npc_adapter: skeleton/frontier/npc_adapters.py
+integration_wave_2:
+  - surface: memory
+    primary_source: Apeloff1/Prood
+    source_path: backend/services/rag_service.py
+    source_blob: b67167f1135744e74827ce03b0bf5d766e800cf4
+    equivalent_sources:
+      - repository: Apeloff1/Tutolage
+        source_path: backend/services/rag_service.py
+        source_blob: b67167f1135744e74827ce03b0bf5d766e800cf4
+    decision: adapt-once
+    target: skeleton/frontier/memory_adapters.py
+    rationale: preserve collection/query/filter/relevance semantics without ChromaDB dependency
+  - surface: npc-generation
+    primary_source: Apeloff1/Prood
+    source_path: backend/routes/npc_pipeline.py
+    source_blob: b769cdce92e1036320c8e5743d72e8cc90326dc7
+    compared_source: Apeloff1/Tutolage
+    compared_blob: ea140f1a1d9745e2491d792b94c9fe07db941de8
+    decision: retain-existing-promotion
+    target: skeleton/frontier/npc_profiles.py
+    rationale: Prood v15.5 remains the stronger semantic source; do not add a second generator primitive
+  - surface: npc-domain-records
+    primary_source: Apeloff1/Lorebuffa
+    source_path: backend/expanded_npcs.py
+    source_blob: a232cb0991657998bb339d34b9321a16e4203aa9
+    equivalent_sources:
+      - repository: Apeloff1/Openworld
+        source_path: backend/expanded_npcs.py
+        source_blob: a232cb0991657998bb339d34b9321a16e4203aa9
+    decision: adapt-once-no-catalog-copy
+    target: skeleton/frontier/npc_adapters.py
+    rationale: preserve faction/schedule/quests/disposition as NPCSpec metadata without duplicating source catalogs
+  - surface: runtime-provenance
+    primary_source: Apeloff1/gameforge-rs
+    source_path: crates/gf-core/src/lib.rs
+    source_blob: 481fcfca5a23272b70353eb09b7c3406bbc9bdd9
+    decision: promote-digest-semantics-only
+    target: skeleton/frontier/contracts.py
+    rationale: adopt one SHA-256 content digest contract; defer MongoDB outbox and persistence plumbing
+  - surface: capability-boundary
+    primary_source: Apeloff1/hyperforge-cockpit-sota
+    source_path: src/lib/preview-host-bridge.ts
+    source_blob: ef40a5e8c789a49d7f927894396cf7b96b078dd7
+    decision: no-kernel-copy
+    target: skeleton/frontier/agent_runtime.py
+    rationale: retain fail-closed explicit boundary semantics while capability sets remain the canonical runtime primitive
 promotion_gates:
   - contract-tests
   - integration-tests
