@@ -5,7 +5,7 @@
  * Goodies on top of bare fetch():
  *   • Retries (1 retry on 5xx / network error, exponential backoff).
  *   • Abort on unmount via the optional signal argument.
- *   • Per-call timeout (default 15 s).
+ *   • Per-call timeout (default 15 s), even when a caller signal is supplied.
  *   • Auto X-Request-Id correlation header.
  *   • 304 / ETag honouring (uses sessionStorage cache).
  *   • Per-host CIRCUIT BREAKER — after 5 consecutive failures within
@@ -13,7 +13,6 @@
  *   • BREADCRUMB integration — every error (status ≥ 400 OR network)
  *     is added to the global breadcrumb trail so error reports carry
  *     "what the user did last".
- *   • Centralised error shape: { ok, status, data, error, rid }.
  */
 import { trail } from './breadcrumbs';
 
@@ -104,6 +103,12 @@ function _cbCheck(bucket: string): { allowed: boolean; isProbe: boolean } {
   const cutoff = now - CB_WINDOW_MS;
   if (e.failures.length) e.failures = e.failures.filter(t => t > cutoff);
   return { allowed: true, isProbe: false };
+}
+
+function _cbReleaseProbe(bucket: string, isProbe: boolean) {
+  if (!isProbe) return;
+  const e = _cb.get(bucket);
+  if (e?.state === 'half_open') e.probeInFlight = false;
 }
 
 function _cbRecordFail(bucket: string, isProbe: boolean) {
@@ -201,20 +206,50 @@ async function _doFetch<T>(
 
   let lastErr: any = null;
   let lastStatus = 0;
+  let lastTimedOut = false;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const ac = opts.signal ? null : (typeof AbortController !== 'undefined' ? new AbortController() : null);
-    const signal = opts.signal || ac?.signal;
+    if (opts.signal?.aborted) {
+      _cbReleaseProbe(bucket, isProbe);
+      return { ok: false, status: 0, data: null, error: 'aborted', rid };
+    }
+
+    // Always own an attempt-level controller so our timeout still works when
+    // the caller also supplied a cancellation signal. Forward caller aborts
+    // into this controller rather than choosing one signal or the other.
+    const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    let callerAborted = false;
+    const abortFromCaller = () => {
+      callerAborted = true;
+      try { ac?.abort(); } catch {}
+    };
+    if (opts.signal) opts.signal.addEventListener('abort', abortFromCaller, { once: true });
+    const signal = ac?.signal || opts.signal;
     let timedOut = false;
-    const timer = setTimeout(() => { timedOut = true; try { ac?.abort(); } catch {} }, perAttemptTimeout);
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try { ac?.abort(); } catch {}
+    }, perAttemptTimeout);
+    const cleanup = () => {
+      clearTimeout(timer);
+      if (opts.signal) opts.signal.removeEventListener('abort', abortFromCaller);
+    };
 
     try {
       const res = await fetch(url, {
         method, headers, signal,
         body: body == null ? undefined : JSON.stringify(body),
       });
-      clearTimeout(timer);
       const text = await res.text();
+      cleanup();
+
+      // If cancellation raced a completed fetch/body read, cancellation wins:
+      // callers that have left the screen should never receive stale success.
+      if (callerAborted || opts.signal?.aborted) {
+        _cbReleaseProbe(bucket, isProbe);
+        return { ok: false, status: 0, data: null, error: 'aborted', rid };
+      }
+
       let data: any = null;
       try { data = text ? JSON.parse(text) : null; } catch { data = text; }
 
@@ -247,12 +282,20 @@ async function _doFetch<T>(
         rid: res.headers.get('x-request-id') || rid,
       };
     } catch (e: any) {
-      clearTimeout(timer);
+      cleanup();
       lastErr = e;
-      // A user-supplied signal abort is intentional → stop. Our own timeout
-      // (timedOut) or a network error is a BLIP → retry while attempts remain.
-      const userAbort = e?.name === 'AbortError' && !timedOut;
-      if (userAbort) break;
+      lastTimedOut = timedOut;
+
+      // Caller cancellation is intentional. It must neither retry nor poison
+      // the circuit breaker. A half-open probe is released for the next caller.
+      const userAbort = callerAborted || (!!opts.signal?.aborted && !timedOut);
+      if (userAbort) {
+        _cbReleaseProbe(bucket, isProbe);
+        return { ok: false, status: 0, data: null, error: 'aborted', rid };
+      }
+
+      // Our own timeout or a network error is a transient blip: retry while
+      // attempts remain, preserving the same request id for correlation.
       if (attempt < maxAttempts - 1) {
         trail.add('api', `${method} ${path} ${timedOut ? 'timeout' : 'network_error'} (retry ${attempt + 1}/${maxAttempts - 1})`,
           { rid }, 'warn');
@@ -262,11 +305,12 @@ async function _doFetch<T>(
     }
   }
   _cbRecordFail(bucket, isProbe);
+  const finalError = lastTimedOut ? 'timeout' : (lastErr?.message || (lastStatus ? `HTTP ${lastStatus}` : 'network_error'));
   trail.add('api', `${method} ${path} failed_after_retries`,
-    { rid, lastStatus, error: lastErr?.message || `HTTP ${lastStatus || 0}` }, 'error');
+    { rid, lastStatus, error: finalError }, 'error');
   return {
     ok: false, status: lastStatus || 0, data: null,
-    error: lastErr?.message || (lastStatus ? `HTTP ${lastStatus}` : 'network_error'), rid,
+    error: finalError, rid,
   };
 }
 
