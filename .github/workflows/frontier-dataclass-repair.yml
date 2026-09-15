@@ -24,7 +24,7 @@ jobs:
         with:
           python-version: "3.11.16"
 
-      - name: Repair immutable dataclass defaults
+      - name: Repair frontier invariants
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -66,8 +66,24 @@ jobs:
               print(f"{path}: repaired {count} default(s)")
           if total < 3:
               raise SystemExit(f"expected at least 3 repairs, got {total}")
+
+          adapter = Path("skeleton/frontier/biotope_achievement_adapters.py")
+          text = adapter.read_text(encoding="utf-8")
+          old = '    for family in families:\n        increment(f"{family}_catches")\n'
+          new = (
+              '    for family in families:\n'
+              '        # A fish-id family token may equal its biotope/stage name. Avoid\n'
+              '        # double-counting the canonical location counter in that case.\n'
+              '        if family in {biotope, stage}:\n'
+              '            continue\n'
+              '        increment(f"{family}_catches")\n'
+          )
+          if old not in text:
+              raise SystemExit("expected family counter loop not found")
+          adapter.write_text(text.replace(old, new, 1), encoding="utf-8")
+
           Path(".github/workflows/frontier-dataclass-repair.yml").unlink()
-          print(f"total repaired defaults: {total}")
+          print(f"total repaired dataclass defaults: {total}")
           PY
 
       - name: Install frontier test runtime
@@ -84,6 +100,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add skeleton/frontier/commerce.py skeleton/frontier/encyclopedia.py skeleton/frontier/tournament.py .github/workflows/frontier-dataclass-repair.yml
-          git commit -s -m "fix(frontier): use factories for immutable mapping defaults"
+          git add skeleton/frontier/commerce.py skeleton/frontier/encyclopedia.py skeleton/frontier/tournament.py skeleton/frontier/biotope_achievement_adapters.py .github/workflows/frontier-dataclass-repair.yml
+          git commit -s -m "fix(frontier): enforce immutable defaults and counter separation"
           git push origin "HEAD:${GITHUB_REF_NAME}"
