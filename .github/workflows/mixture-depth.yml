@@ -1,0 +1,61 @@
+name: Mixture of Depths
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "skeleton/cortex/mixture_depth.py"
+      - "skeleton/cortex/transformer.py"
+      - "skeleton/cortex/attn.py"
+      - "skeleton/testing/test_mixture_depth.py"
+      - "scripts/profile_mixture_depth.py"
+      - ".github/workflows/mixture-depth.yml"
+  push:
+    branches: [main]
+    paths:
+      - "skeleton/cortex/mixture_depth.py"
+      - "skeleton/cortex/transformer.py"
+      - "skeleton/cortex/attn.py"
+      - "skeleton/testing/test_mixture_depth.py"
+      - "scripts/profile_mixture_depth.py"
+      - ".github/workflows/mixture-depth.yml"
+
+concurrency:
+  group: mixture-depth-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  adaptive-depth:
+    name: Adaptive inference invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Install focused test runtime
+        run: python -m pip install "pytest>=8,<9"
+      - name: Compile adaptive-depth slice
+        run: >-
+          python -m compileall -q
+          skeleton/cortex/mixture_depth.py
+          skeleton/testing/test_mixture_depth.py
+          scripts/profile_mixture_depth.py
+      - name: Run adaptive-depth regressions
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest -q skeleton/testing/test_mixture_depth.py
+      - name: Smoke-test profiler
+        env:
+          PYTHONPATH: "."
+        run: >-
+          python scripts/profile_mixture_depth.py
+          --layers 3 --dim 8 --ctx 4 --d-ff 12
+          --threshold inf --min-depth 2 --repeats 2
