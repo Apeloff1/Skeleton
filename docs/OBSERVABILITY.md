@@ -23,6 +23,8 @@ Correlation identifiers are operational metadata, not a place to store credentia
 
 `EventMetricsBridge` subscribes to kernel events without mutating the source event. It retains a bounded redacted event window and feeds the existing `MetricsRegistry`.
 
+`ObservableOrchestrator` is the canonical observable orchestration runtime. It now owns an `EventBus` plus an attached `EventMetricsBridge` by default, which means selecting the observable runtime cannot silently discard lifecycle metrics. Callers with shared runtime infrastructure may inject an existing bus and bridge; the orchestrator reuses and attaches those supplied primitives instead of creating a parallel metrics path.
+
 Baseline metric names are:
 
 - `observability.events_total` — event count by topic;
@@ -41,9 +43,11 @@ The package root now exposes the canonical health, metrics-registry, structured-
 
 ## Regression policy
 
-`tests/test_observability.py` is part of `scripts/quality-gates.sh`. It pins:
+`tests/test_observability.py` and `skeleton/testing/test_frontier_observability_correlation.py` are part of `scripts/quality-gates.sh`. Together they pin:
 
 - correlation preservation through `EventBus.emit`;
+- default runtime attachment of the event-to-metrics bridge;
+- API request correlation through run and tool lifecycle events;
 - health-probe exception redaction;
 - structured-log redaction;
 - trace failure/attribute redaction;
