@@ -1,0 +1,40 @@
+{
+  "map_name": "Agent Map - Knowledge Nexus Edition",
+  "description": "Updated map of all agents and their relationships with the Multi-Agent Knowledge Nexus, AAAHRAG, and Wiki Memory system.",
+  "core_agents": {
+    "Jeeves": {
+      "role": "Top-level Orchestrator & Knowledge Nexus Master",
+      "connections": ["Juror Room (Knowledge Nexus)", "Exocortex", "Librarian Agent", "Tool Bank", "GitHub Augmentation Pipeline"],
+      "new_capabilities": "Heavy delegation to the Nexus, AAAHRAG mastery, long-term strategy using Jury-approved knowledge"
+    },
+    "LibrarianAgent_KnowledgeNexus": {
+      "role": "Core Sub-Agent inside the Knowledge Nexus",
+      "connections": ["Juror Room (Bookshelf with 14 Database Styles)", "Wiki Memory", "Knowledge Graph", "AAAHRAG across all data", "Judge (Orchestrator)"],
+      "new_capabilities": "Expert AAAHRAG extraction, Wiki Memory orchestration (/build-wiki, /sync-wiki), Fast Travel management, evidence package preparation for Jury"
+    },
+    "Judge_Orchestrator": {
+      "role": "Lead Agent / Orchestrator of the Multi-Agent Knowledge Nexus",
+      "connections": ["12 Specialized Juror Sub-Agents", "Librarian Agent", "Jeeves", "Wiki Memory"],
+      "new_capabilities": "Coordinates the entire Jury, breaks ties, makes final calls on high-impact knowledge"
+    }
+  },
+  "specialized_juror_sub_agents": [
+    "Quality & Coherence Juror",
+    "Long-Term Value Juror",
+    "Contradiction Detection Juror",
+    "GitHub Skill Integration Juror",
+    "Personal Reflection Synthesis Juror",
+    "Security & Integrity Juror",
+    "Performance & Scalability Juror",
+    "Narrative & Thematic Cohesion Juror",
+    "Tool Augmentation Validator Juror",
+    "Knowledge Graph Curator Juror",
+    "Fast Travel Optimization Juror",
+    "Bias & Fairness Juror"
+  ],
+  "other_agents": {
+    "All Specialized Room Agents": "Now have direct AAAHRAG access to the Knowledge Nexus and can submit high-value reflections/tools for Jury evaluation",
+    "Tool Bank Agents": "Closely integrated with GitHub Augmentation and Librarian Agent for skill validation"
+  },
+  "key_connections": "All agents now route important learning through AAAHRAG → Librarian Agent / Jury for potential permanent storage in Wiki Memory"
+}
