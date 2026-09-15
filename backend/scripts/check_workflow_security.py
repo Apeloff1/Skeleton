@@ -6,6 +6,7 @@ import re
 import sys
 
 if __package__:
+    from .check_workflow_container_security import violations as container_runtime_violations
     from .check_workflow_input_security import (
         _flow_mapping_entries,
         _flow_style_steps,
@@ -13,6 +14,7 @@ if __package__:
         violations as input_boundary_violations,
     )
 else:
+    from check_workflow_container_security import violations as container_runtime_violations
     from check_workflow_input_security import (
         _flow_mapping_entries,
         _flow_style_steps,
@@ -281,6 +283,7 @@ def violations(path: Path) -> list[str]:
 
     findings: list[str] = []
     findings.extend(input_boundary_violations(path))
+    findings.extend(container_runtime_violations(path))
     lines = text.splitlines()
     has_top_level_permissions, permission_findings = _top_level_permission_violations(
         lines, path.name

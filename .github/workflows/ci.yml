@@ -130,7 +130,8 @@ jobs:
     defaults: {run: {working-directory: ./backend}}
     services:
       mongodb:
-        image: mongo:7.0
+        # Docker Official Image mongo:7.0.41, pinned to the multi-platform index digest.
+        image: mongo@sha256:b096b4cb9269f3ebcf363be63f1c50920f786879d03a1890347a3bf33f1f0df0
         ports: [27017:27017]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
