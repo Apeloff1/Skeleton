@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import time
 import uuid
 from collections import defaultdict, deque
@@ -38,6 +39,7 @@ _RATE_BURST = int(os.environ.get("RATE_LIMIT_BURST", "60"))
 _EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "127.0.0.1,::1,localhost")
 _EXEMPT_IPS = {ip.strip() for ip in _EXEMPT_RAW.split(",") if ip.strip()}
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
+_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 
 # Telemetry counters (in-memory) ────────────────────────────────────
 # Last 1024 latencies as a ring buffer for p50/p95 computation.
@@ -93,23 +95,22 @@ def get_stats() -> dict:
     }
 
 
-# ── Request ID ────────────────────────────────────────────────────────
+def _request_id(request: Request) -> str:
+    candidate = request.headers.get("x-request-id", "")
+    if candidate and _REQUEST_ID_RE.fullmatch(candidate):
+        return candidate
+    return uuid.uuid4().hex[:16]
+
+
 class RequestIdMiddleware(BaseHTTPMiddleware):
-    """Pulls X-Request-Id from the inbound header if present, otherwise mints
-    one. The id is exposed on `request.state.request_id` and echoed back on
-    the response header. Useful for cross-service correlation."""
+    """Accept a bounded header-safe X-Request-Id or mint one."""
 
     async def dispatch(self, request: Request, call_next: Callable):
-        rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:16]
+        rid = _request_id(request)
         request.state.request_id = rid
         try:
             response: Response = await call_next(request)
         except RuntimeError as e:
-            # Starlette BaseHTTPMiddleware raises "No response returned."
-            # when the client disconnects mid-response. This is benign —
-            # there's no response object to attach the header to, so just
-            # propagate the disconnect as a 499 (nginx convention for
-            # client-closed-request). Logged at debug to avoid noise.
             if "No response returned" in str(e):
                 from fastapi.responses import Response as _Resp
                 log.debug("client disconnected mid-request rid=%s path=%s", rid, request.url.path)
@@ -136,7 +137,6 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
             status = response.status_code
         except Exception:
-            # Log the failure then re-raise; the global handler will still 500.
             dur = (time.perf_counter() - t0) * 1000
             log.exception(
                 "method=%s path=%s status=500 dur_ms=%.2f rid=%s ip=%s err=unhandled",
@@ -149,7 +149,6 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
         _counts["requests"] += 1
         _counts[bucket] += 1
         await _push_latency(dur)
-        # Skip the high-frequency health pings from access log to keep it clean.
         if request.url.path not in ("/api/health", "/api/_telemetry"):
             log.info(
                 "method=%s path=%s status=%d dur_ms=%.2f rid=%s ip=%s",
@@ -188,7 +187,6 @@ class _Bucket:
         if self.tokens >= n:
             self.tokens -= n
             return True, 0.0
-        # Seconds until the next token will be available.
         deficit = n - self.tokens
         retry = deficit / self.refill_per_sec if self.refill_per_sec > 0 else 60.0
         return False, retry
@@ -216,7 +214,6 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         return b
 
     async def dispatch(self, request: Request, call_next: Callable):
-        # Bypass non-API routes (Expo serves /, /assets, etc. from same origin)
         if not request.url.path.startswith("/api"):
             return await call_next(request)
         ip = _client_ip(request)
