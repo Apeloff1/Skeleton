@@ -19,6 +19,19 @@ if (!rawAuditStatus || !/^\d+$/.test(rawAuditStatus)) {
   process.exit(2);
 }
 const auditStatus = Number(rawAuditStatus);
+if (!Number.isSafeInteger(auditStatus) || auditStatus < 0 || auditStatus > 31) {
+  console.error('[yarn-audit-policy] YARN_AUDIT_STATUS is outside the Yarn severity bitmask; blocking');
+  process.exit(2);
+}
+
+const severities = ['info', 'low', 'moderate', 'high', 'critical'];
+const severityBits = {
+  info: 1,
+  low: 2,
+  moderate: 4,
+  high: 8,
+  critical: 16,
+};
 
 const allowedMitigatedAdvisories = new Set([
   // image-size has no patched npm release. These two parser-progress flaws are
@@ -41,6 +54,7 @@ const mitigated = [];
 const auditErrors = [];
 let sawRecord = false;
 let summary = null;
+let summaryCount = 0;
 
 for (const line of auditText.split(/\r?\n/)) {
   if (!line.trim()) continue;
@@ -53,21 +67,40 @@ for (const line of auditText.split(/\r?\n/)) {
     process.exit(2);
   }
 
+  if (!record || typeof record !== 'object' || Array.isArray(record) || typeof record.type !== 'string') {
+    console.error('[yarn-audit-policy] malformed audit record; blocking');
+    process.exit(2);
+  }
+
   if (record.type === 'error') {
     auditErrors.push(record);
     continue;
   }
 
   if (record.type === 'auditSummary') {
+    summaryCount += 1;
+    if (summaryCount !== 1) {
+      console.error('[yarn-audit-policy] multiple auditSummary records; blocking');
+      process.exit(2);
+    }
     const data = record.data;
     if (
       !data ||
       typeof data !== 'object' ||
+      Array.isArray(data) ||
       !data.vulnerabilities ||
-      typeof data.vulnerabilities !== 'object'
+      typeof data.vulnerabilities !== 'object' ||
+      Array.isArray(data.vulnerabilities)
     ) {
       console.error('[yarn-audit-policy] malformed audit summary; blocking');
       process.exit(2);
+    }
+    for (const severity of severities) {
+      const value = data.vulnerabilities[severity];
+      if (!Number.isSafeInteger(value) || value < 0) {
+        console.error(`[yarn-audit-policy] invalid ${severity} vulnerability count; blocking`);
+        process.exit(2);
+      }
     }
     summary = data;
     continue;
@@ -75,12 +108,20 @@ for (const line of auditText.split(/\r?\n/)) {
 
   if (record.type !== 'auditAdvisory') continue;
   const advisory = record.data && record.data.advisory;
-  if (!advisory) continue;
-  if (!['high', 'critical'].includes(String(advisory.severity))) continue;
+  if (!advisory || typeof advisory !== 'object' || Array.isArray(advisory)) {
+    console.error('[yarn-audit-policy] malformed audit advisory; blocking');
+    process.exit(2);
+  }
+  const severity = String(advisory.severity || '');
+  if (!severities.includes(severity)) {
+    console.error('[yarn-audit-policy] audit advisory has unknown severity; blocking');
+    process.exit(2);
+  }
+  if (!['high', 'critical'].includes(severity)) continue;
   const ghsa = String(advisory.github_advisory_id || '');
   const item = {
     module: String(advisory.module_name || 'unknown'),
-    severity: String(advisory.severity || 'unknown'),
+    severity,
     ghsa,
     title: String(advisory.title || ''),
   };
@@ -104,27 +145,23 @@ if (!summary) {
   process.exit(2);
 }
 
-const severityCount = (name) => {
-  const value = Number(summary.vulnerabilities[name] || 0);
-  return Number.isFinite(value) && value >= 0 ? value : 0;
-};
-const blockingSummaryCount = severityCount('high') + severityCount('critical');
+const vulnerabilityCounts = summary.vulnerabilities;
+const expectedStatus = severities.reduce(
+  (mask, severity) => mask | (vulnerabilityCounts[severity] > 0 ? severityBits[severity] : 0),
+  0,
+);
+if (auditStatus !== expectedStatus) {
+  console.error(
+    `[yarn-audit-policy] yarn audit status ${auditStatus} disagrees with summary severity mask ${expectedStatus}; blocking`,
+  );
+  process.exit(2);
+}
+
+const blockingSummaryCount = vulnerabilityCounts.high + vulnerabilityCounts.critical;
 const observedBlockingAdvisories = findings.length + mitigated.length;
 if ((blockingSummaryCount > 0) !== (observedBlockingAdvisories > 0)) {
   console.error(
     '[yarn-audit-policy] high/critical audit summary and advisory detail disagree; blocking',
-  );
-  process.exit(2);
-}
-if (auditStatus !== 0 && blockingSummaryCount === 0) {
-  console.error(
-    `[yarn-audit-policy] yarn audit exited ${auditStatus} without high/critical findings; treating as execution failure`,
-  );
-  process.exit(2);
-}
-if (auditStatus === 0 && blockingSummaryCount > 0) {
-  console.error(
-    '[yarn-audit-policy] audit status contradicts high/critical summary; blocking',
   );
   process.exit(2);
 }
@@ -154,7 +191,7 @@ if (remaining.length) {
 
 if (auditStatus !== 0) {
   console.log(
-    `[yarn-audit-policy] yarn audit exited ${auditStatus}; complete transcript contains only policy-mitigated high/critical advisories`,
+    `[yarn-audit-policy] yarn audit exited ${auditStatus}; complete transcript contains only policy-allowed findings at the blocking severities`,
   );
 }
 console.log('[yarn-audit-policy] no unmitigated high/critical advisories');
