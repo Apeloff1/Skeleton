@@ -11,6 +11,7 @@ on:
       - "frontend/scripts/patch-node-modules.js"
       - "frontend/scripts/verify-image-size-security.js"
       - "frontend/scripts/enforce-yarn-audit.js"
+      - "frontend/scripts/test-enforce-yarn-audit.js"
       - ".github/workflows/dependency-security.yml"
   pull_request:
     paths:
@@ -21,6 +22,7 @@ on:
       - "frontend/scripts/patch-node-modules.js"
       - "frontend/scripts/verify-image-size-security.js"
       - "frontend/scripts/enforce-yarn-audit.js"
+      - "frontend/scripts/test-enforce-yarn-audit.js"
       - ".github/workflows/dependency-security.yml"
   workflow_dispatch:
 
@@ -98,17 +100,24 @@ jobs:
         working-directory: frontend
         run: yarn install --frozen-lockfile --non-interactive
 
+      - name: Test JavaScript audit policy parser
+        working-directory: frontend
+        run: yarn audit:policy:test
+
       - name: Verify image-size parser progress mitigation
         id: image-size-security
         working-directory: frontend
         run: node scripts/verify-image-size-security.js
 
       - name: Audit production JavaScript dependencies
+        id: yarn-audit
         working-directory: frontend
         shell: bash
         run: |
           set +e
           yarn audit --groups dependencies --level high --json > "$RUNNER_TEMP/yarn-audit.json"
+          status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
           exit 0
 
       - name: Generate Yarn-aware CycloneDX SBOM
@@ -132,9 +141,23 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Validate nonzero Yarn audit status before policy evaluation
+        if: steps.yarn-audit.outputs.status != '0'
+        env:
+          YARN_AUDIT_STATUS: ${{ steps.yarn-audit.outputs.status }}
+        shell: bash
+        run: |
+          case "$YARN_AUDIT_STATUS" in
+            ''|*[!0-9]*)
+              echo "Yarn audit did not produce a numeric severity mask." >&2
+              exit 1
+              ;;
+          esac
+
       - name: Enforce JavaScript vulnerability policy
         if: always()
         env:
           IMAGE_SIZE_SECURITY_VERIFIED: ${{ steps.image-size-security.outcome }}
+          YARN_AUDIT_STATUS: ${{ steps.yarn-audit.outputs.status }}
         working-directory: frontend
         run: node scripts/enforce-yarn-audit.js "$RUNNER_TEMP/yarn-audit.json"
