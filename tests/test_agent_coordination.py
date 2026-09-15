@@ -1,6 +1,11 @@
 """Regression tests for agent-pool coordination lifecycle."""
 
+import asyncio
+
+import pytest
+
 from skeleton.agents.coordination import AgentPool, Coordinator, Task, TaskStatus
+from skeleton.frontier.orchestration import RunStatus, StepKind, StepStatus
 
 
 def test_failed_handler_releases_agent_capacity() -> None:
@@ -17,6 +22,12 @@ def test_failed_handler_releases_agent_capacity() -> None:
     assert first.status is TaskStatus.FAILED
     assert first.error == "boom"
     assert pool.stats()["total_load"] == 0
+
+    first_run = coordinator.get_run_record(first.task_id)
+    assert first_run is not None
+    assert first_run.status is RunStatus.FAILED
+    assert first_run.steps[-1].kind is StepKind.TOOL
+    assert first_run.steps[-1].status is StepStatus.FAILED
 
     second = coordinator.dispatch("second", task_type="work")
     assert second.status is TaskStatus.FAILED
@@ -36,6 +47,17 @@ def test_successful_handler_still_releases_agent_capacity() -> None:
     assert task.status is TaskStatus.COMPLETED
     assert task.result == "done:job"
     assert pool.stats()["total_load"] == 0
+
+    run = coordinator.get_run_record(task.task_id)
+    assert run is not None
+    assert run.status is RunStatus.COMPLETED
+    assert run.output == "done:job"
+    assert [step.kind for step in run.steps] == [
+        StepKind.MODEL,
+        StepKind.TOOL,
+        StepKind.MODEL,
+    ]
+    assert all(step.status is StepStatus.SUCCEEDED for step in run.steps)
 
 
 def test_assign_rejects_duplicate_running_task_without_leaking_capacity() -> None:
@@ -98,3 +120,46 @@ def test_dispatch_expands_pool_when_all_capable_agents_are_saturated() -> None:
     assert task.agent_id != saturated
     assert task.result == "done:job"
     assert pool.stats()["active"] == 2
+
+
+def test_async_dispatch_uses_same_canonical_run() -> None:
+    pool = AgentPool(max_agents=1)
+    pool.create({"work"}, capacity=1)
+    coordinator = Coordinator(pool=pool)
+    coordinator.register_handler("work", lambda task: task.description.upper())
+
+    async def scenario():
+        return await coordinator.dispatch_async("job", task_type="work")
+
+    task = asyncio.run(scenario())
+
+    assert task.status is TaskStatus.COMPLETED
+    assert task.result == "JOB"
+    assert pool.stats()["total_load"] == 0
+    run = coordinator.get_run_record(task.task_id)
+    assert run is not None
+    assert run.status is RunStatus.COMPLETED
+
+
+def test_sync_registered_dispatch_fails_before_mutation_inside_event_loop() -> None:
+    coordinator = Coordinator()
+    coordinator.register_handler("work", lambda task: task.description)
+
+    async def scenario():
+        with pytest.raises(RuntimeError, match="use await dispatch_async"):
+            coordinator.dispatch("job", task_type="work")
+
+    asyncio.run(scenario())
+
+    assert coordinator.list_tasks() == []
+    assert coordinator.stats()["total"] == 0
+
+
+def test_unhandled_task_preserves_external_running_compatibility() -> None:
+    coordinator = Coordinator()
+
+    task = coordinator.dispatch("external", task_type="remote")
+
+    assert task.status is TaskStatus.RUNNING
+    assert task.agent_id is not None
+    assert coordinator.get_run_record(task.task_id) is None
