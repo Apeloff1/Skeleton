@@ -41,6 +41,14 @@ class FailingProvider:
         raise RuntimeError("secret-token=do-not-leak")
 
 
+class NonTextProvider:
+    name = "non-text"
+    supports_system_prompt = True
+
+    def complete(self, prompt, context=None, max_tokens=512, system=None):
+        return {"unexpected": "object"}
+
+
 def _core(provider=None):
     return JeevesCore(provider=provider or RecordingProvider())
 
@@ -134,6 +142,77 @@ def test_unknown_tool_fails_before_provider_or_session_mutation():
     assert session.turns == []
 
 
+def test_tool_arguments_reject_non_json_objects_without_deepcopy_execution():
+    core = _core()
+    session = core.open_session("u")
+    core.register_tool("safe", lambda _payload: None)
+
+    class DeepcopyTrap:
+        touched = False
+
+        def __deepcopy__(self, _memo):
+            self.touched = True
+            raise AssertionError("deepcopy should never run")
+
+    trap = DeepcopyTrap()
+    with pytest.raises(ValueError, match="JSON-compatible"):
+        core.ask(
+            session.session_id,
+            "run",
+            context={"tool_calls": [{"name": "safe", "arguments": {"payload": trap}}]},
+        )
+
+    assert trap.touched is False
+    assert session.turns == []
+
+
+def test_tool_arguments_reject_excessive_nesting_before_session_mutation():
+    core = _core()
+    session = core.open_session("u")
+    core.register_tool("safe", lambda _payload: None)
+    nested = {}
+    cursor = nested
+    for _ in range(10):
+        cursor["next"] = {}
+        cursor = cursor["next"]
+
+    with pytest.raises(ValueError, match="deep"):
+        core.ask(
+            session.session_id,
+            "run",
+            context={"tool_calls": [{"name": "safe", "arguments": nested}]},
+        )
+
+    assert session.turns == []
+
+
+def test_nonfinite_tool_numbers_fail_closed():
+    core = _core()
+    session = core.open_session("u")
+    core.register_tool("safe", lambda _payload: None)
+
+    with pytest.raises(ValueError, match="finite"):
+        core.ask(
+            session.session_id,
+            "run",
+            context={"tool_calls": [{"name": "safe", "arguments": {"value": float("nan")}}]},
+        )
+
+    assert session.turns == []
+
+
+def test_oversized_input_fails_before_provider_or_session_mutation():
+    provider = RecordingProvider()
+    core = _core(provider)
+    session = core.open_session("u")
+
+    with pytest.raises(ValueError, match="too large"):
+        core.ask(session.session_id, "x" * 32_769)
+
+    assert provider.calls == []
+    assert session.turns == []
+
+
 def test_provider_exception_is_redacted_from_reply_and_memory():
     core = _core(FailingProvider())
     session = core.open_session("u")
@@ -144,6 +223,17 @@ def test_provider_exception_is_redacted_from_reply_and_memory():
     assert result["content"] == "[provider unavailable]"
     assert "secret-token" not in str(result)
     assert "secret-token" not in " ".join(turn.content for turn in session.turns)
+
+
+def test_non_text_provider_output_fails_closed():
+    core = _core(NonTextProvider())
+    session = core.open_session("u")
+
+    result = core.ask(session.session_id, "hello")
+
+    assert result["provider_failed"] is True
+    assert result["content"] == "[provider unavailable]"
+    assert "unexpected" not in str(result)
 
 
 def test_system_prompt_uses_native_provider_channel():
@@ -193,6 +283,18 @@ def test_memory_eviction_cleans_user_index():
     assert memory.stats()["active_sessions"] == 1
     assert memory.stats()["users"] == 1
     assert memory.stats()["evicted"] == 1
+
+
+def test_session_ids_keep_full_uuid_entropy():
+    memory = MemoryManager()
+    first = memory.create_session("u").session_id
+    second = memory.create_session("u").session_id
+
+    assert len(first) == 32
+    assert len(second) == 32
+    assert first != second
+    int(first, 16)
+    int(second, 16)
 
 
 @pytest.mark.parametrize("limit", [0, -1])
