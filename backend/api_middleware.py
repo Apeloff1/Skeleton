@@ -186,51 +186,66 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
 
 
 # ── Client identity / proxy trust ─────────────────────────────────────
-def _canonical_ip(value: str) -> str | None:
+def _parse_ip(value: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
     value = value.strip()
     if not value:
         return None
     try:
-        return str(ipaddress.ip_address(value))
+        return ipaddress.ip_address(value)
     except ValueError:
         return None
 
 
-def _is_trusted_proxy(value: str) -> bool:
-    canonical = _canonical_ip(value)
-    if canonical is None:
-        return False
-    address = ipaddress.ip_address(canonical)
+def _canonical_ip(value: str) -> str | None:
+    address = _parse_ip(value)
+    return str(address) if address is not None else None
+
+
+def _is_trusted_address(
+    address: ipaddress.IPv4Address | ipaddress.IPv6Address,
+) -> bool:
     return any(address in network for network in _TRUSTED_PROXY_NETWORKS)
+
+
+def _is_trusted_proxy(value: str) -> bool:
+    address = _parse_ip(value)
+    return address is not None and _is_trusted_address(address)
 
 
 def _resolve_client_ip(request: Request) -> str:
     """Resolve client identity without trusting attacker-controlled XFF."""
     client = request.client
     peer = client.host.strip() if client and client.host else "-"
-    canonical_peer = _canonical_ip(peer)
-    if peer == "-" or not _is_trusted_proxy(peer):
-        return canonical_peer or peer
+    if peer == "-":
+        return peer
+
+    peer_address = _parse_ip(peer)
+    canonical_peer = str(peer_address) if peer_address is not None else peer
+    if peer_address is None or not _is_trusted_address(peer_address):
+        return canonical_peer
 
     forwarded_headers = request.headers.getlist("x-forwarded-for")
     if len(forwarded_headers) != 1:
-        return canonical_peer or peer
+        return canonical_peer
     forwarded_value = forwarded_headers[0]
     if len(forwarded_value) > _MAX_XFF_CHARS:
-        return canonical_peer or peer
-    parts = [part.strip() for part in forwarded_value.split(",")]
-    if not parts or len(parts) > _MAX_XFF_HOPS or any(not part for part in parts):
-        return canonical_peer or peer
+        return canonical_peer
 
-    forwarded = [_canonical_ip(part) for part in parts]
-    if any(value is None for value in forwarded):
-        return canonical_peer or peer
+    parts = forwarded_value.split(",")
+    if not parts or len(parts) > _MAX_XFF_HOPS:
+        return canonical_peer
 
-    for value in reversed(forwarded):
-        assert value is not None
-        if not _is_trusted_proxy(value):
-            return value
-    return canonical_peer or peer
+    forwarded: list[ipaddress.IPv4Address | ipaddress.IPv6Address] = []
+    for part in parts:
+        address = _parse_ip(part)
+        if address is None:
+            return canonical_peer
+        forwarded.append(address)
+
+    for address in reversed(forwarded):
+        if not _is_trusted_address(address):
+            return str(address)
+    return canonical_peer
 
 
 def _client_ip(request: Request) -> str:
