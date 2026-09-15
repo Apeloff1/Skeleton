@@ -1,0 +1,30 @@
+name: Workflow Input Security
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+      - 'backend/scripts/check_workflow_input_security.py'
+      - 'backend/tests/test_workflow_input_security_gate.py'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+      - 'backend/scripts/check_workflow_input_security.py'
+      - 'backend/tests/test_workflow_input_security_gate.py'
+
+permissions:
+  contents: read
+
+jobs:
+  workflow-input-shell-boundary:
+    name: Workflow input shell boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Reject direct workflow input interpolation in run shells
+        run: python backend/scripts/check_workflow_input_security.py
