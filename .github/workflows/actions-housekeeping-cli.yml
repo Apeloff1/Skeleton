@@ -77,7 +77,7 @@ jobs:
           before=$(retry_capture gh cache list --repo "$REPO" --limit 10000 --json id --jq 'length')
           echo "Caches before purge: $before"
           if [[ "$before" -gt 0 ]]; then
-            gh cache delete --all --repo "$REPO" --confirm
+            gh cache delete --all --repo "$REPO" --succeed-on-no-caches
           fi
           after=$(retry_capture gh cache list --repo "$REPO" --limit 10000 --json id --jq 'length')
           echo "Caches after purge: $after"
