@@ -1,9 +1,10 @@
-"""Reject direct GitHub Actions workflow inputs interpolated into shell commands.
+"""Reject untrusted GitHub Actions event data interpolated into shell commands.
 
-Workflow-dispatch and reusable-workflow inputs are attacker- or caller-controlled
-strings from the shell's perspective. They must cross the shell boundary through
-an environment variable (or another non-code channel), never through direct
-`${{ ... }}` interpolation inside a ``run:`` command.
+Workflow-dispatch/reusable-workflow inputs and GitHub event payload fields may
+contain attacker- or caller-controlled strings from the shell's perspective.
+They must cross the shell boundary through an environment variable (or another
+non-code channel), never through direct `${{ ... }}` interpolation inside a
+``run:`` command.
 
 This checker intentionally uses only the Python standard library so it can run in
 an early CI phase without installing project dependencies.
@@ -35,11 +36,13 @@ RUN_ALIAS_RE = re.compile(r"^\*[^\s#]+(?:\s+#.*)?$")
 # DOTALL ensures the security gate inspects the expression after the full run
 # block has been reconstructed instead of only matching single-line forms.
 EXPRESSION_RE = re.compile(r"\$\{\{(?P<body>.*?)\}\}", re.DOTALL)
-# Match the input contexts as expression tokens, not only property access.
-# Whole-object transforms such as toJSON(inputs) remain attacker-controlled and
-# must not be interpolated directly into a shell command either.
+# Match untrusted workflow contexts as expression tokens, not only property
+# access. Whole-object transforms such as toJSON(inputs) or toJSON(github.event)
+# remain attacker-controlled and must not be interpolated directly into a shell
+# command either. Platform-owned contexts such as github.repository remain
+# allowed because they are not event-payload data.
 UNTRUSTED_INPUT_RE = re.compile(
-    r"(?<![A-Za-z0-9_])(?:github\.event\.inputs|inputs)(?![A-Za-z0-9_])"
+    r"(?<![A-Za-z0-9_])(?:github\.event|inputs)(?![A-Za-z0-9_])"
 )
 # YAML block scalars may carry node properties such as ``&anchor`` or ``!tag``
 # before the scalar indicator. They may also combine a chomping indicator (+/-)
@@ -326,14 +329,14 @@ def main() -> int:
         findings.extend(violations(path))
 
     if findings:
-        print("GitHub Actions workflow input shell-boundary violations detected:", file=sys.stderr)
+        print("GitHub Actions workflow shell-boundary violations detected:", file=sys.stderr)
         for finding in sorted(findings):
             print(f"  - {finding}", file=sys.stderr)
         return 1
 
     print(
         f"Workflow input security gate passed for {len(workflows)} workflow files: "
-        "no direct inputs or github.event.inputs interpolation in run shells."
+        "no direct inputs or github.event interpolation in run shells."
     )
     return 0
 
