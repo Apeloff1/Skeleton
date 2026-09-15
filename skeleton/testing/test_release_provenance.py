@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import importlib.util
+import io
 import json
+import tarfile
 from pathlib import Path
 
 import pytest
@@ -16,6 +19,89 @@ release_provenance = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(release_provenance)
 
 COMMIT = "0123456789abcdef0123456789abcdef01234567"
+
+
+def _write_sdist(
+    path: Path,
+    *,
+    gzip_mtime: int,
+    member_mtime: int,
+    uid: int,
+    gid: int,
+    uname: str,
+    gname: str,
+) -> None:
+    payload = b"Metadata-Version: 2.4\nName: skeleton\nVersion: 16.0.0\n"
+    with path.open("wb") as raw_output:
+        with gzip.GzipFile(
+            filename="source-name-that-must-not-survive.tar",
+            mode="wb",
+            fileobj=raw_output,
+            mtime=gzip_mtime,
+        ) as gzip_output:
+            with tarfile.open(fileobj=gzip_output, mode="w", format=tarfile.PAX_FORMAT) as archive:
+                directory = tarfile.TarInfo("skeleton-16.0.0")
+                directory.type = tarfile.DIRTYPE
+                directory.mode = 0o775
+                directory.mtime = member_mtime
+                directory.uid = uid
+                directory.gid = gid
+                directory.uname = uname
+                directory.gname = gname
+                archive.addfile(directory)
+
+                metadata = tarfile.TarInfo("skeleton-16.0.0/PKG-INFO")
+                metadata.size = len(payload)
+                metadata.mode = 0o664
+                metadata.mtime = member_mtime
+                metadata.uid = uid
+                metadata.gid = gid
+                metadata.uname = uname
+                metadata.gname = gname
+                archive.addfile(metadata, io.BytesIO(payload))
+
+
+def test_normalize_sdist_removes_archive_metadata_nondeterminism(tmp_path: Path) -> None:
+    first = tmp_path / "first.tar.gz"
+    second = tmp_path / "second.tar.gz"
+    _write_sdist(
+        first,
+        gzip_mtime=1_700_000_001,
+        member_mtime=1_700_000_011,
+        uid=1000,
+        gid=1000,
+        uname="runner-a",
+        gname="runner-a",
+    )
+    _write_sdist(
+        second,
+        gzip_mtime=1_700_000_099,
+        member_mtime=1_700_000_199,
+        uid=2000,
+        gid=3000,
+        uname="runner-b",
+        gname="runner-c",
+    )
+    assert first.read_bytes() != second.read_bytes()
+
+    epoch = 1_699_999_999
+    for path in (first, second):
+        args = argparse.Namespace(path=str(path), source_date_epoch=str(epoch))
+        assert release_provenance.normalize_sdist(args) == 0
+
+    assert first.read_bytes() == second.read_bytes()
+    assert int.from_bytes(first.read_bytes()[4:8], "little") == epoch
+    with tarfile.open(first, mode="r:gz") as archive:
+        members = archive.getmembers()
+    assert [member.name for member in members] == [
+        "skeleton-16.0.0",
+        "skeleton-16.0.0/PKG-INFO",
+    ]
+    assert all(member.mtime == epoch for member in members)
+    assert all(member.uid == 0 and member.gid == 0 for member in members)
+    assert all(member.uname == "" and member.gname == "" for member in members)
+    assert members[0].mode == 0o755
+    assert members[1].mode == 0o644
 
 
 def test_emit_provenance_is_deterministic_and_hashes_release_inputs(tmp_path: Path) -> None:
