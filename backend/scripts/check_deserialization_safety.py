@@ -13,6 +13,7 @@ import ast
 from collections import Counter
 import os
 from pathlib import Path
+import stat
 import sys
 from typing import Iterable
 
@@ -60,6 +61,13 @@ class DeserializationScanError(RuntimeError):
 def python_files(root: Path | None = None) -> Iterable[Path]:
     """Yield backend Python sources without following symlinks, failing on coverage loss."""
     scan_root = ROOT if root is None else root
+    try:
+        root_metadata = scan_root.lstat()
+    except OSError as exc:
+        raise DeserializationScanError("source traversal failed") from exc
+    if stat.S_ISLNK(root_metadata.st_mode) or not stat.S_ISDIR(root_metadata.st_mode):
+        raise DeserializationScanError("source traversal failed")
+
     files: list[Path] = []
     pending = [scan_root]
 
