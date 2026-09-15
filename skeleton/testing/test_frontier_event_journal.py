@@ -32,7 +32,7 @@ def test_event_journal_confirms_after_successful_delivery(tmp_path):
     asyncio.run(scenario())
 
 
-def test_event_journal_leaves_failed_delivery_pending_for_recovery(tmp_path):
+def test_event_journal_leaves_failed_delivery_pending_and_replays_after_reopen(tmp_path):
     async def scenario():
         database = tmp_path / "failed.sqlite3"
         journal = SQLiteEventJournal(database)
@@ -57,13 +57,47 @@ def test_event_journal_leaves_failed_delivery_pending_for_recovery(tmp_path):
 
         reopened = SQLiteEventJournal(database)
         try:
-            pending = await reopened.pending()
-            assert len(pending) == 1
-            assert pending[0].event.topic == "runtime.failed"
-            await reopened.confirm(pending[0].token)
+            recovered = EventBus(journal=reopened)
+            seen = []
+
+            async def recovered_handler(event):
+                seen.append((event.topic, event.payload["reason"]))
+
+            await recovered.subscribe("runtime.failed", recovered_handler)
+            assert await recovered.replay_pending() == 1
+            assert seen == [("runtime.failed", "boom")]
             assert await reopened.pending_count() == 0
         finally:
             reopened.close()
+
+    asyncio.run(scenario())
+
+
+def test_event_journal_replay_preserves_order_and_stops_on_failure(tmp_path):
+    async def scenario():
+        journal = SQLiteEventJournal(tmp_path / "replay.sqlite3")
+        try:
+            await journal.journal(DomainEvent.create("ordered", {"seq": 1}))
+            await journal.journal(DomainEvent.create("ordered", {"seq": 2}))
+            await journal.journal(DomainEvent.create("ordered", {"seq": 3}))
+
+            bus = EventBus(journal=journal)
+            seen = []
+
+            async def handler(event):
+                seen.append(event.payload["seq"])
+                if event.payload["seq"] == 2:
+                    raise RuntimeError("stop at second")
+
+            await bus.subscribe("ordered", handler)
+            with pytest.raises(RuntimeError, match="stop at second"):
+                await bus.replay_pending()
+
+            assert seen == [1, 2]
+            pending = await journal.pending()
+            assert [entry.event.payload["seq"] for entry in pending] == [2, 3]
+        finally:
+            journal.close()
 
     asyncio.run(scenario())
 
