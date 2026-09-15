@@ -1,10 +1,14 @@
 """
-Ultimate Hub Routes - Language Packs, Expansions, Algorithms
+Legacy Ultimate Hub catalogue routes.
+
+The canonical public hub surface is owned by ``routes.hub_tools``. These older
+static catalogue handlers remain available under a hidden legacy prefix so
+router registration order cannot shadow the live server-backed implementation.
 """
 
 from fastapi import APIRouter, HTTPException
 
-router = APIRouter(tags=["Hub"])
+router = APIRouter(prefix="/_legacy/hub", tags=["Hub Legacy"], include_in_schema=False)
 
 # Language Packs by Category
 LANGUAGE_PACKS = {
@@ -118,10 +122,9 @@ ALGORITHM_REGISTRY = {
 
 @router.get("/v9/info")
 async def get_hub_info():
-    """Get Ultimate Hub information"""
+    """Get legacy Ultimate Hub information."""
     total_languages = sum(len(packs) for packs in LANGUAGE_PACKS.values())
     total_algorithms = sum(len(algs) for algs in ALGORITHM_REGISTRY.values())
-    
     return {
         "name": "CodeDock Ultimate Hub",
         "version": "9.0.0",
@@ -134,7 +137,7 @@ async def get_hub_info():
 
 @router.get("/language-packs")
 async def get_language_packs():
-    """Get all language packs by category"""
+    """Get legacy language packs by category."""
     return {
         "categories": LANGUAGE_PACKS,
         "total": sum(len(packs) for packs in LANGUAGE_PACKS.values())
@@ -143,7 +146,7 @@ async def get_language_packs():
 
 @router.get("/language-packs/{category}")
 async def get_language_pack_by_category(category: str):
-    """Get language packs for a specific category"""
+    """Get a legacy language-pack category."""
     if category not in LANGUAGE_PACKS:
         raise HTTPException(status_code=404, detail="Category not found")
     return {"category": category, "languages": LANGUAGE_PACKS[category]}
@@ -151,13 +154,13 @@ async def get_language_pack_by_category(category: str):
 
 @router.get("/expansions")
 async def get_expansions():
-    """Get all expansion packs"""
+    """Get legacy expansion packs."""
     return {"expansions": EXPANSION_PACKS, "total": len(EXPANSION_PACKS)}
 
 
 @router.get("/expansions/{pack_id}")
 async def get_expansion(pack_id: str):
-    """Get specific expansion pack"""
+    """Get a legacy expansion pack."""
     for pack in EXPANSION_PACKS:
         if pack["id"] == pack_id:
             return pack
@@ -166,7 +169,7 @@ async def get_expansion(pack_id: str):
 
 @router.post("/expansions/{pack_id}/install")
 async def install_expansion(pack_id: str):
-    """Install an expansion pack"""
+    """Legacy no-op expansion install response."""
     for pack in EXPANSION_PACKS:
         if pack["id"] == pack_id:
             return {"status": "installed", "pack": pack}
@@ -175,7 +178,7 @@ async def install_expansion(pack_id: str):
 
 @router.get("/algorithms")
 async def get_algorithms():
-    """Get all algorithms by category"""
+    """Get legacy algorithms by category."""
     return {
         "categories": ALGORITHM_REGISTRY,
         "total": sum(len(algs) for algs in ALGORITHM_REGISTRY.values())
@@ -184,7 +187,7 @@ async def get_algorithms():
 
 @router.get("/algorithms/{category}")
 async def get_algorithms_by_category(category: str):
-    """Get algorithms for a specific category"""
+    """Get a legacy algorithm category."""
     if category not in ALGORITHM_REGISTRY:
         raise HTTPException(status_code=404, detail="Category not found")
     return {"category": category, "algorithms": ALGORITHM_REGISTRY[category]}
