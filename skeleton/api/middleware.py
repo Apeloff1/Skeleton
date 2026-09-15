@@ -85,11 +85,8 @@ def get_request_id(header_value: Optional[str] = None) -> str:
 DEFAULT_OPEN_PREFIXES: Tuple[str, ...] = (
     "/health",
     "/ready",
-    "/api/v1/health",
     "/api/v1/health/live",
     "/api/v1/health/ready",
-    "/metrics",
-    "/api/v1/metrics",
 )
 
 # Route prefix → governance domain (longest-prefix match).
@@ -111,6 +108,8 @@ DEFAULT_DOMAIN_MAP: Tuple[Tuple[str, str], ...] = (
     ("/api/v1/interface", "interface"),
     ("/api/v1/auth", "auth"),
     ("/api/v1/cortex", "cognition"),
+    ("/api/v1/health", "observability"),
+    ("/api/v1/metrics", "observability"),
     ("/api/fabric", "fabric"),
     ("/api/legions", "legions"),
     ("/api/swarm", "swarm"),
@@ -120,6 +119,11 @@ DEFAULT_DOMAIN_MAP: Tuple[Tuple[str, str], ...] = (
     ("/api/studio", "studio"),
     ("/api/sagas", "fabric"),
     ("/api/court", "court"),
+    ("/cortex", "cognition"),
+    ("/cockpit", "interface"),
+    ("/docs", "interface"),
+    ("/openapi.json", "interface"),
+    ("/redoc", "interface"),
 )
 
 
