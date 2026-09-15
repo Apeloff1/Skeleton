@@ -88,3 +88,5 @@ jobs:
           tests/test_api_middleware_adversarial.py
           tests/test_api_middleware_regression_gaps.py
           tests/test_proxy_header_bounds.py
+          tests/test_request_identity_logging_security.py
+          tests/test_security_middleware_properties.py
