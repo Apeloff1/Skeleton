@@ -20,7 +20,7 @@ permissions: {}
 jobs:
   cleanup:
     name: Purge caches and stale Actions data with gh CLI
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       actions: write
@@ -42,12 +42,44 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          before=$(gh cache list --repo "$REPO" --limit 10000 --json id --jq 'length')
+
+          retry_capture() {
+            local attempt=1
+            local max_attempts=4
+            local delay=2
+            local tmp
+            local status
+            tmp=$(mktemp)
+
+            while true; do
+              : > "$tmp"
+              if "$@" > "$tmp"; then
+                cat "$tmp"
+                rm -f "$tmp"
+                return 0
+              else
+                status=$?
+              fi
+
+              if (( attempt >= max_attempts )); then
+                rm -f "$tmp"
+                echo "GitHub CLI inventory command failed after ${attempt} attempts (exit ${status})." >&2
+                return "$status"
+              fi
+
+              echo "GitHub CLI inventory retry ${attempt}/${max_attempts} in ${delay}s." >&2
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay * 2))
+            done
+          }
+
+          before=$(retry_capture gh cache list --repo "$REPO" --limit 10000 --json id --jq 'length')
           echo "Caches before purge: $before"
           if [[ "$before" -gt 0 ]]; then
             gh cache delete --all --repo "$REPO" --confirm
           fi
-          after=$(gh cache list --repo "$REPO" --limit 10000 --json id --jq 'length')
+          after=$(retry_capture gh cache list --repo "$REPO" --limit 10000 --json id --jq 'length')
           echo "Caches after purge: $after"
           {
             echo '## Actions housekeeping (GitHub CLI)'
@@ -65,8 +97,37 @@ jobs:
           kept=0
           artifact_file="$RUNNER_TEMP/artifacts.tsv"
 
-          gh api --paginate "/repos/${REPO}/actions/artifacts?per_page=100" \
-            --jq '.artifacts[] | [.id, .created_at, .expired] | @tsv' > "$artifact_file"
+          fetch_artifact_inventory() {
+            local attempt=1
+            local max_attempts=4
+            local delay=2
+            local tmp="${artifact_file}.candidate"
+            local status
+
+            while true; do
+              : > "$tmp"
+              if gh api --paginate "/repos/${REPO}/actions/artifacts?per_page=100" \
+                --jq '.artifacts[] | [.id, .created_at, .expired] | @tsv' > "$tmp"; then
+                mv "$tmp" "$artifact_file"
+                return 0
+              else
+                status=$?
+              fi
+
+              if (( attempt >= max_attempts )); then
+                rm -f "$tmp"
+                echo "Failed to fetch complete artifact inventory after ${attempt} attempts (exit ${status})." >&2
+                return "$status"
+              fi
+
+              echo "Artifact inventory retry ${attempt}/${max_attempts} in ${delay}s." >&2
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay * 2))
+            done
+          }
+
+          fetch_artifact_inventory
 
           while IFS=$'\t' read -r id created_at expired; do
             [[ -n "${id:-}" && -n "${created_at:-}" ]] || continue
@@ -96,10 +157,41 @@ jobs:
           run_file="$RUNNER_TEMP/runs.tsv"
           : > "$run_file"
 
+          fetch_run_inventory() {
+            local status_name="$1"
+            local attempt=1
+            local max_attempts=4
+            local delay=2
+            local tmp="$RUNNER_TEMP/runs-${status_name}.candidate.tsv"
+            local status
+
+            while true; do
+              : > "$tmp"
+              if gh run list --repo "$REPO" --limit 1000 --status "$status_name" \
+                --json databaseId,createdAt,conclusion,name \
+                --jq '.[] | [.databaseId, .createdAt, .conclusion, .name] | @tsv' > "$tmp"; then
+                cat "$tmp" >> "$run_file"
+                rm -f "$tmp"
+                return 0
+              else
+                status=$?
+              fi
+
+              if (( attempt >= max_attempts )); then
+                rm -f "$tmp"
+                echo "Failed to fetch ${status_name} run inventory after ${attempt} attempts (exit ${status})." >&2
+                return "$status"
+              fi
+
+              echo "Run inventory (${status_name}) retry ${attempt}/${max_attempts} in ${delay}s." >&2
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay * 2))
+            done
+          }
+
           for status in failure cancelled timed_out action_required stale; do
-            gh run list --repo "$REPO" --limit 1000 --status "$status" \
-              --json databaseId,createdAt,conclusion,name \
-              --jq '.[] | [.databaseId, .createdAt, .conclusion, .name] | @tsv' >> "$run_file" || true
+            fetch_run_inventory "$status"
           done
 
           sort -u -o "$run_file" "$run_file"
