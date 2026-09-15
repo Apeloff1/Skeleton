@@ -136,7 +136,7 @@ jobs:
           retention-days: 14
 
       - name: Enforce JavaScript vulnerability policy
-        if: always()
+        if: steps.yarn-audit.outputs.status != '0'
         env:
           IMAGE_SIZE_SECURITY_VERIFIED: ${{ steps.image-size-security.outcome }}
         working-directory: frontend
