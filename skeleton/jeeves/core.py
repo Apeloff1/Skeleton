@@ -75,7 +75,6 @@ def _cortex_can_think(cortex: Any) -> bool:
     return cortex is not None and callable(getattr(cortex, "think", None))
 
 
-
 def _local_responder(message: str, history: list[Turn], context: dict[str, Any]) -> str:
     """Fallback responder: Socratic scaffolding without an LLM backend."""
     topic = message.strip().rstrip("?")[:80]
@@ -93,10 +92,22 @@ class Jeeves:
 
     def __init__(self, bus: EventBus | None = None,
                  responder: ResponderFn | None = None,
-                 *, max_turns: int = 200) -> None:
+                 *, max_turns: int = 200,
+                 max_sessions: int = 1000,
+                 max_message_chars: int = 32_000) -> None:
+        if not isinstance(max_turns, int) or max_turns < 2:
+            raise ValueError("max_turns must be an integer >= 2")
+        if not isinstance(max_sessions, int) or max_sessions < 1:
+            raise ValueError("max_sessions must be an integer >= 1")
+        if not isinstance(max_message_chars, int) or max_message_chars < 1:
+            raise ValueError("max_message_chars must be an integer >= 1")
+        if responder is not None and not callable(responder):
+            raise TypeError("responder must be callable")
         self._bus = bus or EventBus()
         self._responder = responder or _local_responder
         self._max_turns = max_turns
+        self._max_sessions = max_sessions
+        self._max_message_chars = max_message_chars
         self._sessions: dict[str, Session] = {}
         self._brain = None  # lazy TacticalBrain
         self._cortex = None  # lazy JeevesCortex — the model in training
@@ -108,7 +119,28 @@ class Jeeves:
     def laws(self) -> tuple[str, ...]:
         return SYSTEM_LAWS
 
+    def _reclaim_closed_session(self) -> bool:
+        closed = [s for s in self._sessions.values() if not s.is_open]
+        if not closed:
+            return False
+        victim = min(closed, key=lambda s: s.closed_at or s.opened_at)
+        self._sessions.pop(victim.session_id, None)
+        self._bus.emit("jeeves.session.evicted", {
+            "session_id": victim.session_id,
+            "turns": len(victim.turns),
+        })
+        return True
+
+    def _ensure_turn_capacity(self, session: Session, needed: int) -> None:
+        if len(session.turns) + needed > self._max_turns:
+            raise SessionError("session turn limit reached",
+                               context={"session_id": session.session_id,
+                                        "max_turns": self._max_turns})
+
     def open_session(self, user_id: str | UserId, *, mode: SessionMode = SessionMode.TUTORING) -> Session:
+        if len(self._sessions) >= self._max_sessions and not self._reclaim_closed_session():
+            raise SessionError("session capacity reached",
+                               context={"max_sessions": self._max_sessions})
         session = Session(session_id=str(SessionId.new()), user_id=str(user_id), mode=mode)
         self._sessions[session.session_id] = session
         self._bus.emit("jeeves.session.opened",
@@ -133,24 +165,40 @@ class Jeeves:
         return session
 
     def ask(self, session_id: str, message: str, *, context: dict[str, Any] | None = None) -> str:
-        """Take a learner turn, produce the tutor's reply."""
-        if not message or not message.strip():
-            raise SessionError("message must be non-empty")
+        """Take a learner turn and commit it only when a valid reply exists."""
+        if not isinstance(message, str) or not message.strip():
+            raise SessionError("message must be a non-empty string")
+        if len(message) > self._max_message_chars:
+            raise SessionError("message exceeds size limit",
+                               context={"max_message_chars": self._max_message_chars})
+        if context is not None and not isinstance(context, dict):
+            raise SessionError("context must be an object")
+
         session = self._get(session_id)
-        if len(session.turns) >= self._max_turns:
-            raise SessionError("session turn limit reached",
-                               context={"session_id": session_id, "max_turns": self._max_turns})
+        self._ensure_turn_capacity(session, 2)
+        prior_history = list(session.turns)
+        start_turns = len(session.turns)
         session.add_turn("learner", message)
         ctx = dict(context or {})
         ctx["mode"] = session.mode.value
-        if session.mode in (SessionMode.TACTICAL, SessionMode.BUILDER):
-            tel = ctx.get("telemetry") or {}
-            reply = self._brain_get().recommend_next(tel).text
-        elif session.mode is SessionMode.CORTEX:
-            reply = self.think(message, context=ctx).amalgam.text
-        else:
-            reply = self._responder(message, session.turns, ctx)
-        session.add_turn("jeeves", reply)
+
+        try:
+            if session.mode in (SessionMode.TACTICAL, SessionMode.BUILDER):
+                tel = ctx.get("telemetry") or {}
+                reply = self._brain_get().recommend_next(tel).text
+            elif session.mode is SessionMode.CORTEX:
+                reply = self.think(message, context=ctx).amalgam.text
+            else:
+                reply = self._responder(message, prior_history, ctx)
+            if not isinstance(reply, str) or not reply.strip():
+                raise SessionError("responder returned an invalid reply",
+                                   context={"session_id": session_id})
+            session.add_turn("jeeves", reply)
+        except Exception:
+            del session.turns[start_turns:]
+            self._bus.emit("jeeves.turn.failed", {"session_id": session_id})
+            raise
+
         self._bus.emit("jeeves.turn.completed",
                        {"session_id": session_id, "turns": len(session.turns)})
         return reply
@@ -410,6 +458,7 @@ class Jeeves:
     def advise(self, session_id: str, telemetry: dict[str, Any] | None = None) -> dict[str, Any]:
         """Tactical cascade. Opens nothing; uses bound era + live telemetry."""
         session = self._get(session_id)
+        self._ensure_turn_capacity(session, 1)
         brain = self._brain_get()
         advice = brain.advise(telemetry or {})
         top = advice[0]
@@ -428,4 +477,3 @@ class Jeeves:
         if session is None:
             raise SessionError("unknown session", context={"session_id": session_id})
         return session
-
