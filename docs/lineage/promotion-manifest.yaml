@@ -1,0 +1,264 @@
+version: 8
+canonical_repository: Apeloff1/Skeleton
+strategy: selective-promotion
+rules:
+  - preserve-provenance
+  - prefer-working-behavior
+  - no-secrets-or-generated-caches
+  - adapters-at-boundaries
+  - tests-before-promotion
+  - deduplicate-by-source-blob
+sources:
+  - repository: Apeloff1/Prood
+    capabilities: [jeeves, rag, learning, text-to-npc, text-to-game-logic, text-to-animation]
+    disposition: promote
+    destinations:
+      jeeves: skeleton/ai
+      rag: skeleton/frontier/memory_adapters.py
+      text-to-npc: skeleton/frontier/npc.py
+      learning: skeleton/learning
+      game-pipelines: skeleton/game
+  - repository: Apeloff1/Tutolage
+    capabilities: [tutoring, rag, gamification, npc-pipeline, game-logic-pipeline, animation-pipeline]
+    disposition: promote-unique-only
+    destinations:
+      tutoring: skeleton/learning
+      rag: skeleton/frontier/memory_adapters.py
+      pipelines: skeleton/game
+  - repository: Apeloff1/gameforge-rs
+    capabilities: [gameforge, simulation, generation, digest, idempotency, outbox]
+    disposition: promote-unique-only
+    destinations:
+      engine: skeleton/game
+      runtime: skeleton/frontier
+      rust: packages/rust
+  - repository: Apeloff1/gameforge-middleware
+    capabilities: [middleware, orchestration]
+    disposition: promote
+    destinations:
+      services: services/gameforge
+  - repository: Apeloff1/hyperforge-cockpit-sota
+    capabilities: [cockpit, visualization, telemetry, validated-bridge]
+    disposition: boundary-consumer
+    destinations:
+      web: cockpit/web
+  - repository: Apeloff1/Lorebuffa
+    capabilities: [lore, world-building, narrative, npc-catalog, world-map, crew, stores, quests, reputation]
+    disposition: adapt-unique-only
+    destinations:
+      domain_pack: domain-packs/lorebuffa
+      npc_adapter: skeleton/frontier/npc_adapters.py
+      world: skeleton/frontier/world.py
+      ship_policy: skeleton/frontier/ship.py
+  - repository: Apeloff1/Openworld
+    capabilities: [world, exploration, procedural-content, npc-catalog, world-map, crew, stores, quests, reputation]
+    disposition: characterize-and-deduplicate
+    destinations:
+      world: skeleton/frontier/world.py
+      npc_adapter: skeleton/frontier/npc_adapters.py
+      ship_policy: skeleton/frontier/ship.py
+integration_wave_2:
+  status: acceptance-increment-landed
+  increments:
+    - surface: memory
+      primary_source: Apeloff1/Prood
+      source_path: backend/services/rag_service.py
+      source_blob: b67167f1135744e74827ce03b0bf5d766e800cf4
+      equivalent_sources:
+        - repository: Apeloff1/Tutolage
+          source_path: backend/services/rag_service.py
+          source_blob: b67167f1135744e74827ce03b0bf5d766e800cf4
+      decision: adapt-once
+      target: skeleton/frontier/memory_adapters.py
+      backend: skeleton.frontier.memory_adapters.SQLiteCollection
+      evidence:
+        - skeleton/testing/test_frontier_memory_backends.py
+        - skeleton/testing/test_frontier_memory_benchmark.py
+        - scripts/benchmark_frontier_memory.py
+      rationale: preserve collection/query/filter/relevance semantics without ChromaDB dependency
+    - surface: npc-generation
+      primary_source: Apeloff1/Prood
+      source_path: backend/routes/npc_pipeline.py
+      source_blob: b769cdce92e1036320c8e5743d72e8cc90326dc7
+      compared_source: Apeloff1/Tutolage
+      compared_blob: ea140f1a1d9745e2491d792b94c9fe07db941de8
+      decision: retain-existing-promotion
+      target: skeleton/frontier/npc_profiles.py
+      rationale: Prood v15.5 remains the stronger semantic source; do not add a second generator primitive
+    - surface: npc-domain-records
+      primary_source: Apeloff1/Lorebuffa
+      source_path: backend/expanded_npcs.py
+      source_blob: a232cb0991657998bb339d34b9321a16e4203aa9
+      equivalent_sources:
+        - repository: Apeloff1/Openworld
+          source_path: backend/expanded_npcs.py
+          source_blob: a232cb0991657998bb339d34b9321a16e4203aa9
+      decision: adapt-once-no-catalog-copy
+      target: skeleton/frontier/npc_adapters.py
+      evidence:
+        - skeleton/testing/data/frontier_npc_source_fixture.json
+        - skeleton/testing/test_frontier_npc_source_fixture.py
+      rationale: preserve faction/schedule/quests/disposition as NPCSpec metadata without duplicating source catalogs
+    - surface: runtime-provenance
+      primary_source: Apeloff1/gameforge-rs
+      source_path: crates/gf-core/src/lib.rs
+      source_blob: 481fcfca5a23272b70353eb09b7c3406bbc9bdd9
+      decision: promote-digest-semantics-only
+      target: skeleton/frontier/contracts.py
+      rationale: adopt one SHA-256 content digest contract without importing GameForge persistence infrastructure
+    - surface: runtime-idempotency
+      primary_source: Apeloff1/gameforge-rs
+      source_path: crates/gf-core/src/lib.rs
+      source_blob: 481fcfca5a23272b70353eb09b7c3406bbc9bdd9
+      decision: promote-idempotency-semantics-only
+      target: skeleton/frontier/agent_runtime.py
+      evidence:
+        - skeleton/testing/test_frontier_runtime.py
+      promoted_semantics:
+        - duplicate-suppression
+        - fail-closed-key-reuse
+        - concurrent-request-coalescing
+        - bounded-in-process-retention
+        - backpressure-when-all-retained-executions-are-in-flight
+      deferred:
+        - mongodb-duplicate-key-guard
+        - mongodb-client
+        - background-reconciler
+      rationale: preserve duplicate-suppression behavior at the runtime boundary without MongoDB coupling
+    - surface: capability-boundary
+      primary_source: Apeloff1/hyperforge-cockpit-sota
+      source_path: src/lib/preview-host-bridge.ts
+      source_blob: ef40a5e8c789a49d7f927894396cf7b96b078dd7
+      decision: no-kernel-copy
+      target: skeleton/frontier/agent_runtime.py
+      rationale: retain fail-closed explicit boundary semantics while capability sets remain the canonical runtime primitive
+integration_wave_3:
+  status: pure-policy-promoted
+  surface: world-policy
+  primary_source: Apeloff1/Lorebuffa
+  source_path: backend/world_map.py
+  source_blob: a32259d514710c3e87d7ce5fe42f6fb73e63ca1b
+  equivalent_sources:
+    - repository: Apeloff1/Openworld
+      source_path: backend/world_map.py
+      source_blob: a32259d514710c3e87d7ce5fe42f6fb73e63ca1b
+  decision: promote-once-pure-policy-only
+  target: skeleton/frontier/world.py
+  promoted_capabilities:
+    - region-normalization
+    - region-id-and-coordinate-lookup
+    - route-distance-and-danger-policy
+    - voyage-supply-policy
+    - fog-of-war-projection
+    - injected-random-island-policy
+  rejected_from-kernel:
+    - fastapi-routes
+    - motor-mongodb-client
+    - persistence-handlers
+    - full-world-catalog
+  evidence:
+    - skeleton/testing/test_frontier_world_policy.py
+    - skeleton/testing/test_frontier_world_memory_runtime.py
+  notes:
+    - randomness-clock-and-identity-are-injected
+    - route-danger-intersection-is-two-dimensional
+    - malformed-and-non-finite-inputs-fail-closed
+    - source-world-map-is-one-shared-lineage-not-two-promotions
+    - world-memory-runtime-event-cross-contract-seam-is-covered
+integration_wave_4:
+  status: journal-semantics-promoted
+  surface: event-durability
+  primary_source: Apeloff1/gameforge-rs
+  source_path: crates/gf-core/src/lib.rs
+  source_blob: 481fcfca5a23272b70353eb09b7c3406bbc9bdd9
+  decision: fold-portable-outbox-invariant-into-existing-event-bus
+  target: skeleton/frontier/events.py
+  backend: skeleton.frontier.events.SQLiteEventJournal
+  promoted_semantics:
+    - journal-before-delivery
+    - confirm-after-successful-fanout-to-at-least-one-subscriber
+    - failed-delivery-remains-pending
+    - no-subscriber-delivery-remains-pending
+    - ordered-explicit-pending-replay
+    - stop-at-undeliverable-head-of-line
+    - serialized-concurrent-replay-per-bus
+    - at-least-once-recovery-semantics
+    - bounded-unconfirmed-capacity
+    - backpressure-instead-of-dropping-pending-work
+    - persistent-pending-recovery-evidence
+  rejected_from-kernel:
+    - mongodb-client
+    - mongodb-document-types
+    - second-event-bus
+    - background-reconciler
+    - source-database-singleton
+  evidence:
+    - skeleton/testing/test_frontier_events.py
+    - skeleton/testing/test_frontier_event_journal.py
+    - skeleton/testing/test_frontier_world_memory_runtime.py
+  rationale: preserve the outbox safety invariant on the canonical EventBus using a provider-neutral journal boundary and stdlib SQLite backend
+integration_wave_5:
+  status: pure-policy-promoted
+  surface: crew-and-store-policy
+  compared_sources:
+    - repository: Apeloff1/Lorebuffa
+      source_path: backend/ship_system.py
+      source_blob: ef37a57f3851b84f11f83c99ec60d59b34d64806
+    - repository: Apeloff1/Openworld
+      source_path: backend/ship_system.py
+      source_blob: 9ddbd1df0a1279f062c769872140fff550b69283
+  decision: promote-shared-policy-not-source-file
+  target: skeleton/frontier/ship.py
+  promoted_capabilities:
+    - crew-role-normalization
+    - hiring-cost-and-role-limit-policy
+    - injected-random-crew-name-policy
+    - crew-bonus-and-salary-aggregation
+    - morale-band-dialogue-policy
+    - store-purchase-quote-policy
+    - affordability-check
+    - location-store-selection
+  rejected_from-kernel:
+    - source-crew-catalog
+    - source-store-catalog
+    - fastapi-routes
+    - motor-mongodb-client
+    - user-wallet-mutation
+    - inventory-persistence
+  evidence:
+    - skeleton/testing/test_frontier_ship_policy.py
+  rationale: the source blobs differ, but the portable policy inspected across both is shared; promote policy once and keep source catalogs authoritative
+source_dedup_inventory:
+  - capability: quests
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/quest_system.py
+        blob: c572dcc8919d342a8febb224e0131047b47c2644
+      - repository: Apeloff1/Openworld
+        path: backend/quest_system.py
+        blob: c572dcc8919d342a8febb224e0131047b47c2644
+    decision: one-shared-lineage-before-any-promotion
+  - capability: reputation
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/reputation_system.py
+        blob: 1ee119789969f963d258128ff544ea81bfd86526
+      - repository: Apeloff1/Openworld
+        path: backend/reputation_system.py
+        blob: 1ee119789969f963d258128ff544ea81bfd86526
+    decision: one-shared-lineage-before-any-promotion
+  - capability: captains-log
+    sources:
+      - repository: Apeloff1/Lorebuffa
+        path: backend/captains_log.py
+        blob: 5ed7efd452e7f2bb4ef7024185d66d65f1bd89d8
+      - repository: Apeloff1/Openworld
+        path: backend/captains_log.py
+        blob: 5ed7efd452e7f2bb4ef7024185d66d65f1bd89d8
+    decision: one-shared-lineage-before-any-promotion
+promotion_gates:
+  - contract-tests
+  - integration-tests
+  - provenance-check
+  - security-check
+  - benchmark
