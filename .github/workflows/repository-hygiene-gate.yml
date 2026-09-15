@@ -3,6 +3,7 @@ name: Repository Hygiene Gate
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, closed]
   push:
     branches: [main]
     paths-ignore:
@@ -17,6 +18,7 @@ permissions:
 
 jobs:
   hygiene:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     name: Changed-files hygiene
     runs-on: ubuntu-24.04
     timeout-minutes: 8
