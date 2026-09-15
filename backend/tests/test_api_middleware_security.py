@@ -8,6 +8,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 import api_middleware
+from middleware import client_identity
 
 
 def _request(
@@ -37,7 +38,7 @@ def _request(
 
 
 def test_untrusted_peer_cannot_spoof_loopback_with_x_forwarded_for(monkeypatch):
-    monkeypatch.setattr(api_middleware, "_TRUSTED_PROXY_NETWORKS", ())
+    monkeypatch.setattr(client_identity, "TRUSTED_PROXY_NETWORKS", ())
     request = _request(forwarded_for="127.0.0.1")
 
     assert api_middleware._client_ip(request) == "198.51.100.20"
@@ -45,8 +46,8 @@ def test_untrusted_peer_cannot_spoof_loopback_with_x_forwarded_for(monkeypatch):
 
 def test_trusted_proxy_chain_resolves_first_untrusted_hop_from_the_right(monkeypatch):
     monkeypatch.setattr(
-        api_middleware,
-        "_TRUSTED_PROXY_NETWORKS",
+        client_identity,
+        "TRUSTED_PROXY_NETWORKS",
         (ip_network("10.0.0.0/8"),),
     )
     request = _request(
@@ -59,8 +60,8 @@ def test_trusted_proxy_chain_resolves_first_untrusted_hop_from_the_right(monkeyp
 
 def test_malformed_forwarded_chain_fails_closed_to_immediate_peer(monkeypatch):
     monkeypatch.setattr(
-        api_middleware,
-        "_TRUSTED_PROXY_NETWORKS",
+        client_identity,
+        "TRUSTED_PROXY_NETWORKS",
         (ip_network("10.0.0.0/8"),),
     )
     request = _request(
@@ -80,9 +81,7 @@ def test_api_path_matcher_rejects_prefix_lookalikes():
 
 
 def test_spoofed_exempt_forwarded_ip_does_not_bypass_rate_limit(monkeypatch):
-    monkeypatch.setattr(api_middleware, "_TRUSTED_PROXY_NETWORKS", ())
-    # Preserve the historical dangerous configuration as an explicit regression:
-    # even if loopback is exempt, an untrusted peer must not be able to claim it.
+    monkeypatch.setattr(client_identity, "TRUSTED_PROXY_NETWORKS", ())
     monkeypatch.setattr(api_middleware, "_EXEMPT_IPS", {"127.0.0.1"})
     limiter = api_middleware.RateLimiterMiddleware(
         app=lambda scope, receive, send: None,
