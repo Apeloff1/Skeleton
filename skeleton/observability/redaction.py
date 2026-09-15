@@ -24,8 +24,11 @@ _SENSITIVE_KEYS = {
     "credential",
     "credentials",
 }
+_AUTHORIZATION_RE = re.compile(
+    r"(?i)\bauthorization\b\s*[:=]\s*(?:(?:basic|bearer)\s+)?[^\s,;]+"
+)
 _SECRET_ASSIGNMENT_RE = re.compile(
-    r"(?i)\b(api[-_]?key|access[-_]?token|refresh[-_]?token|token|secret|password|authorization)"
+    r"(?i)\b(api[-_]?key|access[-_]?token|refresh[-_]?token|token|secret|password)"
     r"\b\s*[:=]\s*([^\s,;]+)"
 )
 _BEARER_RE = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
@@ -37,6 +40,7 @@ def _normalize_key(key: object) -> str:
 
 def redact_text(value: str) -> str:
     """Redact common inline credential shapes while preserving safe context."""
+    value = _AUTHORIZATION_RE.sub(f"authorization={REDACTED}", value)
     value = _BEARER_RE.sub("Bearer [REDACTED]", value)
     return _SECRET_ASSIGNMENT_RE.sub(
         lambda match: f"{match.group(1)}={REDACTED}", value
