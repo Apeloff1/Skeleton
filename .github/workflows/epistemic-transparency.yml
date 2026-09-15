@@ -31,6 +31,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: epistemic-transparency-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   transparency:
     runs-on: ubuntu-latest
