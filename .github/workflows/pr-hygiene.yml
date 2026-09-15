@@ -19,8 +19,9 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     permissions:
-      contents: read
-      issues: write
+      # This job only reads PR metadata/files and mutates repository/PR labels.
+      # GitHub exposes those shared label endpoints through pull-request write
+      # permission, so no contents or issues write access is required here.
       pull-requests: write
     env:
       GH_TOKEN: ${{ github.token }}
