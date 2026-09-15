@@ -9,6 +9,7 @@ import { Platform } from 'react-native';
 import { safeGetItem, safeSetItem, pruneExpired } from '../../utils/safeStorage';
 import api from '../utils/apiClient';
 import { probeBackend } from '../utils/bootHealth';
+import { loadFlags } from '../feature-flags/flagsClient';
 
 export interface StageRun { ok: boolean; note?: string }
 export interface BootStageDef {
@@ -36,16 +37,16 @@ export async function readBootCache(): Promise<CachedBoot | null> {
   try {
     const raw = await safeGetItem(BOOT_CACHE_KEY, null, 500);
     if (!raw) return null;
-    const c = JSON.parse(raw as string);
-    return c && typeof c === 'object' ? c as CachedBoot : null;
+    const parsed = JSON.parse(raw as string);
+    return parsed && typeof parsed === 'object' ? parsed as CachedBoot : null;
   } catch { return null; }
 }
 
-export async function writeBootCache(snap: CachedBoot): Promise<void> {
-  try { await safeSetItem(BOOT_CACHE_KEY, JSON.stringify(snap)); } catch { /* swallow */ }
+export async function writeBootCache(snapshot: CachedBoot): Promise<void> {
+  try { await safeSetItem(BOOT_CACHE_KEY, JSON.stringify(snapshot)); } catch {}
 }
 
-function _sleep(ms: number, signal?: AbortSignal): Promise<void> {
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(new Error('aborted'));
@@ -75,17 +76,17 @@ export const STAGES: BootStageDef[] = [
     retries: 1, backoffMs: 200,
     run: async (signal) => {
       if (signal?.aborted) return { ok: false, note: 'aborted' };
-      const k = `__boot_probe_${Date.now() % 1e6}`;
-      await safeSetItem(k, '1', 600);
-      const v = await safeGetItem(k, null, 600);
-      return v === '1' ? { ok: true } : { ok: false, note: 'read-back failed' };
+      const key = `__boot_probe_${Date.now() % 1e6}`;
+      await safeSetItem(key, '1', 600);
+      const value = await safeGetItem(key, null, 600);
+      return value === '1' ? { ok: true } : { ok: false, note: 'read-back failed' };
     },
   },
   {
     id: 'finalize', label: 'Finalizing', deps: ['storage'],
     timeoutMs: 200, critical: false, weight: 10, phase: 0,
     run: async (signal) => {
-      try { await _sleep(60, signal); } catch { return { ok: false, note: 'aborted' }; }
+      try { await sleep(60, signal); } catch { return { ok: false, note: 'aborted' }; }
       return { ok: true };
     },
   },
@@ -95,8 +96,8 @@ export const STAGES: BootStageDef[] = [
     run: async (signal) => {
       if (signal?.aborted) return { ok: false, note: 'aborted' };
       const raw = await safeGetItem('@boot/crash_count', '0', 500);
-      const n = parseInt((raw as string) || '0', 10) || 0;
-      return n < 3 ? { ok: true } : { ok: false, note: `count=${n}` };
+      const count = parseInt((raw as string) || '0', 10) || 0;
+      return count < 3 ? { ok: true } : { ok: false, note: `count=${count}` };
     },
   },
   {
@@ -105,18 +106,21 @@ export const STAGES: BootStageDef[] = [
     retries: 0,
     run: async (signal) => {
       if (signal?.aborted) return { ok: false, note: 'aborted' };
-      const r = await probeBackend(1, signal, 3_000);
-      return r.ok ? { ok: true } : { ok: false, note: r.lastError || 'no response' };
+      const result = await probeBackend(1, signal, 3_000);
+      return result.ok ? { ok: true } : { ok: false, note: result.lastError || 'no response' };
     },
   },
   {
     id: 'feature_flags', label: 'Feature flags', deps: ['backend'],
     timeoutMs: 4_000, critical: false, weight: 10, phase: 1,
-    retries: 1, backoffMs: 300,
+    retries: 0,
     run: async (signal) => {
       if (signal?.aborted) return { ok: false, note: 'aborted' };
-      const r = await api.get('/api/feature-flags', { timeoutMs: 4_000, retries: 1 });
-      return r.ok ? { ok: true } : { ok: false, note: r.error || 'flags_failed' };
+      // Use the same user/keyed client as FeatureFlagProvider. If the provider
+      // asks for flags while this request is running it reuses the in-flight
+      // promise; if this finishes first, the provider consumes the warm cache.
+      const snapshot = await loadFlags('default_user', { timeoutMs: 3_500, retries: 0 });
+      return snapshot.ok ? { ok: true } : { ok: false, note: 'flags_failed' };
     },
   },
   {
@@ -124,11 +128,11 @@ export const STAGES: BootStageDef[] = [
     timeoutMs: 3_000, critical: false, weight: 15, phase: 1,
     run: async (signal) => {
       if (signal?.aborted) return { ok: false, note: 'aborted' };
-      const r = await api.get('/api/languages', {
+      const result = await api.get('/api/languages', {
         timeoutMs: 2_500, retries: 0,
         cacheKey: 'languages', cacheTtlMs: 60_000,
       });
-      return r.ok ? { ok: true } : { ok: true, note: 'skipped' };
+      return result.ok ? { ok: true } : { ok: true, note: 'skipped' };
     },
   },
   {
@@ -136,8 +140,8 @@ export const STAGES: BootStageDef[] = [
     timeoutMs: 3_000, critical: false, weight: 5, phase: 1,
     run: async (signal) => {
       if (signal?.aborted) return { ok: false, note: 'aborted' };
-      const r = await api.get('/api/health/tunnel', { timeoutMs: 2_500, retries: 0 });
-      return r.ok ? { ok: true } : { ok: true, note: 'skipped' };
+      const result = await api.get('/api/health/tunnel', { timeoutMs: 2_500, retries: 0 });
+      return result.ok ? { ok: true } : { ok: true, note: 'skipped' };
     },
   },
   {
@@ -146,15 +150,15 @@ export const STAGES: BootStageDef[] = [
     run: async (signal) => {
       if (signal?.aborted) return { ok: false, note: 'aborted' };
       try {
-        const r = await pruneExpired({ ttlMs: 7 * 24 * 60 * 60 * 1000 });
+        const result = await pruneExpired({ ttlMs: 7 * 24 * 60 * 60 * 1000 });
         return {
           ok: true,
-          note: r.pruned > 0
-            ? `pruned ${r.pruned}/${r.scanned} in ${r.elapsedMs}ms`
-            : `clean (${r.scanned} keys, ${r.elapsedMs}ms)`,
+          note: result.pruned > 0
+            ? `pruned ${result.pruned}/${result.scanned} in ${result.elapsedMs}ms`
+            : `clean (${result.scanned} keys, ${result.elapsedMs}ms)`,
         };
-      } catch (e: any) {
-        return { ok: true, note: `skipped: ${e?.message || 'error'}` };
+      } catch (error: any) {
+        return { ok: true, note: `skipped: ${error?.message || 'error'}` };
       }
     },
   },
