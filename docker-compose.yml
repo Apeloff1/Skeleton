@@ -27,6 +27,9 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m
     ports:
       - "${SKELETON_PORT:-8010}:8001"
     environment:
@@ -104,7 +107,7 @@ services:
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
       - "8081:8081"      # Metro bundler
-      - "19000:19000"    # Expo
+      - "19000:19000"    # Expo DevTools
       - "19001:19001"    # Expo DevTools
       - "19002:19002"    # Expo DevTools
     environment:
