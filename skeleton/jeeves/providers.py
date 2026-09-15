@@ -135,7 +135,7 @@ class OpenAIProvider:
 
     def __init__(self, model: str = "gpt-4o-mini"):
         self.model = model
-        self._key = os.getenv("SKELETON_OPENAI_API_KEY", "")
+        self._key = os.getenv("SKELETON_OPENAI_API_KEY", "").strip()
 
     def available(self) -> bool:
         return bool(self._key)
@@ -172,7 +172,7 @@ class AnthropicProvider:
 
     def __init__(self, model: str = "claude-haiku-4-5"):
         self.model = model
-        self._key = os.getenv("SKELETON_ANTHROPIC_API_KEY", "")
+        self._key = os.getenv("SKELETON_ANTHROPIC_API_KEY", "").strip()
 
     def available(self) -> bool:
         return bool(self._key)
@@ -212,10 +212,20 @@ def get_provider(retriever: Optional[Any] = None, preferred: Optional[str] = Non
     """Pick a provider by explicit policy or automatic availability.
 
     An explicit ``preferred`` value or SKELETON_LLM_PROVIDER setting is an
-    operator policy boundary and therefore fails closed when unknown or
-    unavailable. Automatic fallback is used only when no provider was selected.
+    operator policy boundary and therefore fails closed when unknown, empty,
+    or unavailable. Automatic fallback is used only when no provider was selected.
     """
-    configured = preferred if preferred is not None else os.getenv("SKELETON_LLM_PROVIDER", "")
+    env_configured = os.environ.get("SKELETON_LLM_PROVIDER")
+    if preferred is not None:
+        configured = preferred
+        explicit = True
+    elif env_configured is not None:
+        configured = env_configured
+        explicit = True
+    else:
+        configured = ""
+        explicit = False
+
     choice = configured.strip().lower()
 
     candidates: Dict[str, Any] = {
@@ -225,7 +235,9 @@ def get_provider(retriever: Optional[Any] = None, preferred: Optional[str] = Non
         "local-echo": LocalEchoProvider(retriever),
     }
 
-    if choice:
+    if explicit:
+        if not choice:
+            raise ValueError("configured LLM provider must not be empty")
         if choice not in candidates:
             raise ValueError("unknown configured LLM provider")
         provider = candidates[choice]
