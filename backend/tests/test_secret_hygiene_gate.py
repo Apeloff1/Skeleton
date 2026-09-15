@@ -27,6 +27,24 @@ def test_detects_github_token_shape(tmp_path: Path) -> None:
     assert any("GitHub token" in finding for finding in findings)
 
 
+def test_detects_gitlab_token_shape(tmp_path: Path) -> None:
+    token = "glpat-" + ("A" * 24)
+    findings = _scan(tmp_path, f"TOKEN={token}\n")
+    assert any("GitLab personal access token" in finding for finding in findings)
+
+
+def test_detects_npm_token_shape(tmp_path: Path) -> None:
+    token = "npm_" + ("A" * 36)
+    findings = _scan(tmp_path, f"TOKEN={token}\n")
+    assert any("npm access token" in finding for finding in findings)
+
+
+def test_detects_pypi_token_shape(tmp_path: Path) -> None:
+    token = "pypi-" + "AgEIcHlwaS5vcmc" + ("A" * 48)
+    findings = _scan(tmp_path, f"TOKEN={token}\n")
+    assert any("PyPI API token" in finding for finding in findings)
+
+
 def test_detects_aws_access_key_shape(tmp_path: Path) -> None:
     key = "AKIA" + ("A" * 16)
     findings = _scan(tmp_path, f"AWS_ACCESS_KEY_ID={key}\n")
@@ -119,7 +137,40 @@ def test_secret_scanning_workflow_hardening_contract() -> None:
 def test_gitleaks_remains_complementary_to_local_secret_hygiene_gate() -> None:
     precommit = (REPO_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
     hook_start = precommit.index("- id: repository-secret-hygiene")
-    hook_end = precommit.index("- id: backend-security-regressions", hook_start)
+    hook_end = precommit.index("- id: gitleaks-history", hook_start)
     hook = precommit[hook_start:hook_end]
     assert "check_secret_hygiene.py" in hook
     assert "always_run: true" in hook
+
+
+def test_full_history_gitleaks_hook_is_manual_and_non_optional() -> None:
+    precommit = (REPO_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+    hook_start = precommit.index("- id: gitleaks-history")
+    hook_end = precommit.index("- id: backend-security-regressions", hook_start)
+    hook = precommit[hook_start:hook_end]
+    assert "bash scripts/security/run-secret-scan.sh" in hook
+    assert "always_run: true" in hook
+    assert "stages: [manual]" in hook
+
+
+def test_local_secret_scan_runner_matches_ci_policy() -> None:
+    runner = (REPO_ROOT / "scripts" / "security" / "run-secret-scan.sh").read_text(
+        encoding="utf-8"
+    )
+    assert 'EXPECTED_GITLEAKS_VERSION="8.24.3"' in runner
+    assert "python backend/scripts/check_secret_hygiene.py" in runner
+    assert "gitleaks git" in runner
+    assert "--config=.gitleaks.toml" in runner
+    assert "--redact=100" in runner
+
+
+def test_secret_hygiene_runbook_requires_revocation_and_rescan() -> None:
+    runbook = (REPO_ROOT / "docs" / "security" / "SECRET_HYGIENE.md").read_text(
+        encoding="utf-8"
+    )
+    assert "Revoke first" in runbook
+    assert "Purge history when required" in runbook
+    assert "Invalidate artifacts" in runbook
+    assert "Re-scan" in runbook
+    assert "Do not paste the credential value" in runbook
+    assert "Repository-wide regex exemptions" in runbook
