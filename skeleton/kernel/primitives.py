@@ -65,9 +65,21 @@ class EventBus:
                         pass  # Subscribers should not crash the bus
         self._stats["published"] += 1
 
-    def emit(self, topic: str, payload: Dict[str, Any]) -> None:
-        """Convenience: create and publish a DomainEvent."""
-        self.publish(DomainEvent(topic=topic, payload=payload))
+    def emit(
+        self,
+        topic: str,
+        payload: Dict[str, Any],
+        *,
+        correlation_id: str = "",
+    ) -> None:
+        """Create and publish an event while preserving correlation context."""
+        self.publish(
+            DomainEvent(
+                topic=topic,
+                payload=payload,
+                correlation_id=correlation_id,
+            )
+        )
 
     def stats(self) -> Dict[str, int]:
         return dict(self._stats)
