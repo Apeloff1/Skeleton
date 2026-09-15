@@ -14,7 +14,7 @@ on:
 
 concurrency:
   group: branch-clean-${{ github.repository }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions: {}
 
