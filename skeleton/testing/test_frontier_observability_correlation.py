@@ -97,6 +97,7 @@ def test_request_id_survives_api_to_run_to_tool_without_payload_leakage() -> Non
         )
 
         assert record.status is RunStatus.COMPLETED
+        assert request.state.seal == "req-abc-123"
         assert request.state.request_id == "req-abc-123"
 
         events = bridge.events()
@@ -121,6 +122,16 @@ def test_request_id_survives_api_to_run_to_tool_without_payload_leakage() -> Non
             assert "secret_output" not in rendered
 
     asyncio.run(scenario())
+
+
+def test_existing_gate_seal_wins_over_request_header() -> None:
+    request = _Request(["header-id"])
+    request.state.seal = "gate-seal-123"
+
+    resolved = request_correlation_id(request)
+
+    assert resolved == "gate-seal-123"
+    assert request.state.seal == "gate-seal-123"
 
 
 def test_retry_event_is_correlated_and_does_not_store_exception_message() -> None:
@@ -190,5 +201,6 @@ def test_duplicate_request_id_headers_fail_closed_to_generated_id() -> None:
     resolved = request_correlation_id(request)
 
     assert resolved not in {"one", "two"}
-    assert len(resolved) == 32
+    assert len(resolved) == 16
+    assert request.state.seal == resolved
     assert request.state.request_id == resolved
