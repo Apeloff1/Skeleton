@@ -15,13 +15,19 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import sqlite3
 import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Protocol, Sequence
 
-from skeleton.frontier.memory import lexical_relevance, normalize_memory_item
+from skeleton.frontier.memory import (
+    lexical_relevance,
+    normalize_memory_filters,
+    normalize_memory_item,
+    normalize_memory_metadata,
+)
 
 
 class CollectionLike(Protocol):
@@ -54,6 +60,23 @@ class CollectionLike(Protocol):
         ...
 
 
+class MemoryStoreCorruptionError(ValueError):
+    """Raised when persisted memory cannot safely cross the memory boundary."""
+
+
+def _reject_json_constant(value: str) -> object:
+    raise ValueError(f"non-finite JSON numeric constant: {value}")
+
+
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON object key: {key}")
+        result[key] = value
+    return result
+
+
 def _first_row(value: Any) -> list[Any]:
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
         return []
@@ -70,9 +93,10 @@ class CollectionMemoryAdapter:
     """Adapt a Chroma-like collection to ``MemoryContract``.
 
     All input normalization is shared with ``InMemoryStore``: ids are
-    non-empty, content comes from content/text/document, metadata must be a
-    mapping, and conflicting top-level/nested filter fields fail closed.
-    Search results preserve source ids, metadata and relevance when available.
+    non-empty, content comes from content/text/document, metadata and filters
+    stay inside the strict finite-JSON domain, and conflicting top-level/nested
+    filter fields fail closed. Provider results are normalized again on ingress
+    so an external backend cannot silently widen the canonical memory contract.
     """
 
     collection: CollectionLike
@@ -96,11 +120,12 @@ class CollectionMemoryAdapter:
     ) -> Sequence[Mapping[str, Any]]:
         if limit < 1:
             return []
+        where = normalize_memory_filters(filters)
         raw = await asyncio.to_thread(
             self.collection.query,
             query_texts=[query],
             n_results=limit,
-            where=dict(filters) if filters else None,
+            where=where or None,
         )
         documents = _first_row(raw.get("documents", []))
         metadatas = _first_row(raw.get("metadatas", []))
@@ -109,17 +134,26 @@ class CollectionMemoryAdapter:
 
         hits: list[Mapping[str, Any]] = []
         for index, document in enumerate(documents[:limit]):
-            hit: dict[str, Any] = {"content": document}
+            hit: dict[str, Any] = {"content": str(document)}
             if index < len(ids):
-                hit["id"] = ids[index]
+                item_id = str(ids[index]).strip()
+                if not item_id:
+                    raise ValueError("collection result memory id must not be empty")
+                hit["id"] = item_id
             if index < len(metadatas):
-                hit["metadata"] = metadatas[index] or {}
+                raw_metadata = metadatas[index] or {}
+                if not isinstance(raw_metadata, Mapping):
+                    raise TypeError("collection result metadata must be a mapping")
+                hit["metadata"] = normalize_memory_metadata(raw_metadata)
             if index < len(distances):
                 try:
-                    relevance = 1.0 - float(distances[index])
-                    hit["relevance"] = max(0.0, min(1.0, relevance))
-                except (TypeError, ValueError):
-                    pass
+                    distance = float(distances[index])
+                except (TypeError, ValueError) as exc:
+                    raise ValueError("collection result distance must be numeric") from exc
+                if not math.isfinite(distance):
+                    raise ValueError("collection result distance must be finite")
+                relevance = 1.0 - distance
+                hit["relevance"] = max(0.0, min(1.0, relevance))
             hits.append(hit)
         return hits
 
@@ -136,7 +170,9 @@ class SQLiteCollection:
     The class intentionally exposes the same tiny synchronous collection shape
     consumed by ``CollectionMemoryAdapter``. It provides deterministic lexical
     retrieval, exact metadata filtering, namespace isolation and idempotent
-    upsert behavior without becoming the canonical retrieval engine.
+    upsert behavior without becoming the canonical retrieval engine. Persisted
+    metadata is decoded fail-closed; malformed/non-finite/non-object JSON never
+    becomes a memory hit or participates in a filtered mutation.
     """
 
     def __init__(
@@ -181,12 +217,44 @@ class SQLiteCollection:
 
     @staticmethod
     def _metadata_json(metadata: Mapping[str, Any]) -> str:
-        return json.dumps(
-            dict(metadata),
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-        )
+        normalized = normalize_memory_metadata(metadata)
+        try:
+            return json.dumps(
+                normalized,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            )
+        except (TypeError, ValueError) as exc:
+            raise TypeError("memory metadata must be JSON serializable") from exc
+
+    @staticmethod
+    def _metadata_from_json(value: object) -> Mapping[str, Any]:
+        if not isinstance(value, str):
+            raise MemoryStoreCorruptionError(
+                "memory metadata must be stored as JSON text"
+            )
+        try:
+            metadata = json.loads(
+                value,
+                parse_constant=_reject_json_constant,
+                object_pairs_hook=_unique_json_object,
+            )
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            raise MemoryStoreCorruptionError(
+                "memory metadata is not valid strict JSON"
+            ) from exc
+        if not isinstance(metadata, dict):
+            raise MemoryStoreCorruptionError(
+                "memory metadata must decode to a JSON object"
+            )
+        try:
+            return normalize_memory_metadata(metadata)
+        except (TypeError, ValueError) as exc:
+            raise MemoryStoreCorruptionError(
+                "memory metadata violates the canonical JSON boundary"
+            ) from exc
 
     @staticmethod
     def _matches(
@@ -194,6 +262,18 @@ class SQLiteCollection:
         where: Mapping[str, Any] | None,
     ) -> bool:
         return not where or all(metadata.get(key) == value for key, value in where.items())
+
+    @staticmethod
+    def _normalized_ids(ids: Sequence[str] | None) -> set[str] | None:
+        if ids is None:
+            return None
+        normalized: set[str] = set()
+        for item_id in ids:
+            value = str(item_id).strip()
+            if not value:
+                raise ValueError("memory id must not be empty")
+            normalized.add(value)
+        return normalized
 
     def _rows(self) -> list[sqlite3.Row]:
         with self._lock:
@@ -264,11 +344,12 @@ class SQLiteCollection:
                 "distances": [[]],
             }
 
+        normalized_where = normalize_memory_filters(where)
         query = str(query_texts[0]) if query_texts else ""
         ranked: list[tuple[float, int, str, str, Mapping[str, Any]]] = []
         for row in self._rows():
-            metadata = json.loads(row["metadata_json"])
-            if not self._matches(metadata, where):
+            metadata = self._metadata_from_json(row["metadata_json"])
+            if not self._matches(metadata, normalized_where):
                 continue
             score = lexical_relevance(row["document"], query)
             if query.strip() and score <= 0.0:
@@ -298,13 +379,14 @@ class SQLiteCollection:
         ids: Sequence[str] | None = None,
         where: Mapping[str, Any] | None = None,
     ) -> Mapping[str, Any]:
-        wanted = {str(item_id) for item_id in ids} if ids is not None else None
+        wanted = self._normalized_ids(ids)
+        normalized_where = normalize_memory_filters(where)
         selected: list[tuple[str, str, Mapping[str, Any]]] = []
         for row in self._rows():
-            metadata = json.loads(row["metadata_json"])
             if wanted is not None and row["item_id"] not in wanted:
                 continue
-            if not self._matches(metadata, where):
+            metadata = self._metadata_from_json(row["metadata_json"])
+            if not self._matches(metadata, normalized_where):
                 continue
             selected.append((row["item_id"], row["document"], metadata))
         return {
@@ -319,13 +401,35 @@ class SQLiteCollection:
         ids: Sequence[str] | None = None,
         where: Mapping[str, Any] | None = None,
     ) -> None:
-        wanted = {str(item_id) for item_id in ids} if ids is not None else None
+        wanted = self._normalized_ids(ids)
+
+        # Exact or full deletion is also the repair path for corrupt rows and
+        # therefore deliberately does not require metadata deserialization.
+        if where is None:
+            with self._lock:
+                if wanted is None:
+                    self._connection.execute(
+                        "DELETE FROM frontier_memory_items WHERE namespace = ?",
+                        (self.namespace,),
+                    )
+                elif wanted:
+                    self._connection.executemany(
+                        """
+                        DELETE FROM frontier_memory_items
+                        WHERE namespace = ? AND item_id = ?
+                        """,
+                        [(self.namespace, item_id) for item_id in wanted],
+                    )
+                self._connection.commit()
+            return
+
+        normalized_where = normalize_memory_filters(where)
         targets: list[str] = []
         for row in self._rows():
-            metadata = json.loads(row["metadata_json"])
             if wanted is not None and row["item_id"] not in wanted:
                 continue
-            if not self._matches(metadata, where):
+            metadata = self._metadata_from_json(row["metadata_json"])
+            if not self._matches(metadata, normalized_where):
                 continue
             targets.append(row["item_id"])
 
