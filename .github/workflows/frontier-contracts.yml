@@ -3,9 +3,31 @@ name: Frontier Contracts
 on:
   pull_request:
     branches: [main]
+    paths:
+      - 'skeleton/**'
+      - 'backend/requirements.txt'
+      - 'backend/server.py'
+      - 'scripts/check_provider_runtime_boundary.py'
+      - 'tests/test_provider_runtime_boundary.py'
+      - 'docs/PROVIDER_RUNTIME.md'
+      - 'pyproject.toml'
+      - '.github/workflows/frontier-contracts.yml'
   push:
     branches:
       - 'frontier/**'
+    paths:
+      - 'skeleton/**'
+      - 'backend/requirements.txt'
+      - 'backend/server.py'
+      - 'scripts/check_provider_runtime_boundary.py'
+      - 'tests/test_provider_runtime_boundary.py'
+      - 'docs/PROVIDER_RUNTIME.md'
+      - 'pyproject.toml'
+      - '.github/workflows/frontier-contracts.yml'
+
+concurrency:
+  group: frontier-contracts-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -25,6 +47,12 @@ jobs:
         run: python -m pip install --disable-pip-version-check -e . pytest pytest-asyncio
       - name: Compile frontier package
         run: python -m compileall -q skeleton/frontier
+      - name: Enforce provider runtime boundary
+        run: python scripts/check_provider_runtime_boundary.py
+      - name: Run provider boundary regressions
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_provider_runtime_boundary.py
       - name: Run frontier contract tests
         env:
           PYTHONPATH: .
