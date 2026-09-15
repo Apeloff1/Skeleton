@@ -53,6 +53,28 @@ def test_rejects_constructor_alias(tmp_path: Path) -> None:
     assert _unsafe(findings)
 
 
+def test_rejects_constructor_alias_reused_as_tarfile_handle(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import tarfile\n"
+        "opener = tarfile.open\n"
+        "opener = opener('bundle.tar')\n"
+        "opener.extractall('/tmp/out')\n",
+    )
+    assert _unsafe(findings)
+
+
+def test_allows_constructor_alias_reused_as_tarfile_handle_with_data_filter(tmp_path: Path) -> None:
+    findings = _scan(
+        tmp_path,
+        "import tarfile\n"
+        "opener = tarfile.open\n"
+        "opener = opener('bundle.tar')\n"
+        "opener.extractall('/tmp/out', filter='data')\n",
+    )
+    assert findings == []
+
+
 def test_rejects_extraction_method_alias(tmp_path: Path) -> None:
     findings = _scan(
         tmp_path,
