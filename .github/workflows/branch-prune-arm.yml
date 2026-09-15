@@ -1,4 +1,4 @@
-name: Prune fully merged branches on ARM
+name: Consolidate and prune branches on ARM
 
 on:
   workflow_dispatch:
@@ -15,14 +15,14 @@ permissions:
   contents: write
 
 jobs:
-  prune:
+  consolidate-and-prune:
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       GH_TOKEN: ${{ github.token }}
       GIT_TERMINAL_PROMPT: '0'
     steps:
-      - name: Delete only refs fully contained in main
+      - name: Absorb patch-equivalent history and delete fully merged refs
         shell: bash
         run: |
           set -euo pipefail
@@ -34,9 +34,33 @@ jobs:
           git fetch --quiet --prune --no-tags --filter=blob:none origin '+refs/heads/*:refs/remotes/origin/*'
 
           main_ref=refs/remotes/origin/main
-          branches=()
-          tips=()
+          candidates=()
+          declare -A seen=()
+          already_merged=0
+          preserved_unique=0
           protected=0
+          : > ../preserved-unique.txt
+
+          is_safe_tip() {
+            local base="$1"
+            local tip="$2"
+            local merge_base
+
+            if git merge-base --is-ancestor "$tip" "$base"; then
+              return 0
+            fi
+            if git diff --quiet "$base" "$tip"; then
+              return 0
+            fi
+            merge_base=$(git merge-base "$base" "$tip" || true)
+            [[ -n "$merge_base" ]] || return 1
+            # Preserve branch-local merge topology unless it is already ancestry.
+            if git rev-list --merges "${merge_base}..${tip}" | grep -q .; then
+              return 1
+            fi
+            # No '+' means every branch patch already has an equivalent in base.
+            ! git cherry "$base" "$tip" | grep -q '^+'
+          }
 
           while read -r tip branch; do
             [[ -n "$tip" && -n "$branch" ]] || continue
@@ -46,22 +70,107 @@ jobs:
                 continue
                 ;;
             esac
+
+            if git merge-base --is-ancestor "$tip" "$main_ref"; then
+              already_merged=$((already_merged + 1))
+              continue
+            fi
+
+            if [[ -n "${seen[$tip]:-}" ]]; then
+              continue
+            fi
+            seen[$tip]=1
+
+            if is_safe_tip "$main_ref" "$tip"; then
+              candidates+=("$tip")
+            else
+              printf '%s %s unique-or-complex\n' "$branch" "$tip" >> ../preserved-unique.txt
+              preserved_unique=$((preserved_unique + 1))
+            fi
+          done < <(
+            git for-each-ref --format='%(objectname) %(refname:strip=3)' refs/remotes/origin \
+              | sort -k2,2 -u
+          )
+
+          echo "already merged refs before absorption: $already_merged"
+          echo "patch-equivalent tip groups selected: ${#candidates[@]}"
+          echo "unique/complex tip groups preserved: $preserved_unique"
+
+          absorbed=0
+          if [[ ${#candidates[@]} -gt 0 ]]; then
+            pushed=0
+            parent_batch=32
+            for attempt in 1 2 3 4 5; do
+              git fetch --quiet --no-tags --filter=blob:none origin '+refs/heads/main:refs/remotes/origin/main'
+              remote_main=$(git rev-parse refs/remotes/origin/main)
+              local_head="$remote_main"
+              tree=$(git rev-parse "${remote_main}^{tree}")
+              included_total=0
+
+              for ((offset=0; offset<${#candidates[@]}; offset+=parent_batch)); do
+                batch=("${candidates[@]:offset:parent_batch}")
+                parents=(-p "$local_head")
+                included=()
+                for tip in "${batch[@]}"; do
+                  if git merge-base --is-ancestor "$tip" "$local_head"; then
+                    continue
+                  fi
+                  if is_safe_tip "$local_head" "$tip"; then
+                    parents+=(-p "$tip")
+                    included+=("$tip")
+                  fi
+                done
+
+                if [[ ${#included[@]} -gt 0 ]]; then
+                  local_head=$(printf '%s\n\nPreserve the current main tree while recording patch-equivalent stale branch tips as parents. Unique branch patches remain untouched.\n' \
+                    'consolidate: absorb patch-equivalent branch history' \
+                    | git commit-tree "$tree" "${parents[@]}")
+                  included_total=$((included_total + ${#included[@]}))
+                fi
+              done
+
+              if [[ "$local_head" == "$remote_main" ]]; then
+                pushed=1
+                absorbed=0
+                break
+              fi
+
+              if git push --quiet origin "${local_head}:refs/heads/main"; then
+                pushed=1
+                absorbed=$included_total
+                break
+              fi
+              echo "main moved during consolidation; rebuilding (${attempt}/5)"
+            done
+
+            if [[ "$pushed" -ne 1 ]]; then
+              echo 'failed to advance main safely after retries' >&2
+              exit 1
+            fi
+          fi
+
+          git fetch --quiet --prune --no-tags --filter=blob:none origin '+refs/heads/*:refs/remotes/origin/*'
+          branches=()
+          tips=()
+          while read -r tip branch; do
+            [[ -n "$tip" && -n "$branch" ]] || continue
+            case "$branch" in
+              main|backup/*) continue ;;
+            esac
             branches+=("$branch")
             tips+=("$tip")
           done < <(
-            git for-each-ref --merged "$main_ref" \
+            git for-each-ref --merged refs/remotes/origin/main \
               --format='%(objectname) %(refname:strip=3)' refs/remotes/origin \
               | sort -k2,2 -u
           )
 
-          echo "fully merged refs selected: ${#branches[@]}"
           deleted=0
           moved_or_blocked=0
-          batch_size=32
-
-          for ((offset=0; offset<${#branches[@]}; offset+=batch_size)); do
-            batch_branches=("${branches[@]:offset:batch_size}")
-            batch_tips=("${tips[@]:offset:batch_size}")
+          delete_batch=32
+          for ((offset=0; offset<${#branches[@]}; offset+=delete_batch)); do
+            batch_branches=("${branches[@]:offset:delete_batch}")
+            batch_tips=("${tips[@]:offset:delete_batch}")
             leases=()
             refspecs=()
             for ((i=0; i<${#batch_branches[@]}; i++)); do
@@ -70,9 +179,6 @@ jobs:
             done
 
             if git push --quiet --atomic "${leases[@]}" origin "${refspecs[@]}"; then
-              for branch in "${batch_branches[@]}"; do
-                echo "deleted: $branch"
-              done
               deleted=$((deleted + ${#batch_branches[@]}))
               continue
             fi
@@ -81,20 +187,32 @@ jobs:
               branch="${batch_branches[$i]}"
               tip="${batch_tips[$i]}"
               if git push --quiet "--force-with-lease=refs/heads/${branch}:${tip}" origin ":refs/heads/${branch}"; then
-                echo "deleted: $branch"
                 deleted=$((deleted + 1))
               else
-                echo "preserved (moved/protected): $branch"
                 moved_or_blocked=$((moved_or_blocked + 1))
               fi
             done
           done
 
+          echo "absorbed tip groups: $absorbed"
+          echo "merged refs deleted: $deleted"
+          echo "moved/protected refs preserved at deletion: $moved_or_blocked"
+
           {
-            echo '## ARM merged-branch prune'
-            echo "- Fully merged refs selected: ${#branches[@]}"
-            echo "- Deleted: ${deleted}"
-            echo "- Moved/protected refs preserved: ${moved_or_blocked}"
-            echo "- Protected refs skipped: ${protected}"
-            echo '- Safety: only refs already reachable from main are candidates; deletion uses expected-tip leases.'
+            echo '## ARM branch consolidation'
+            echo "- Already merged refs seen before absorption: ${already_merged}"
+            echo "- Patch-equivalent tip groups selected: ${#candidates[@]}"
+            echo "- Patch-equivalent tip groups absorbed: ${absorbed}"
+            echo "- Unique/complex tip groups preserved: ${preserved_unique}"
+            echo "- Fully merged refs deleted after absorption: ${deleted}"
+            echo "- Moved/protected refs preserved at deletion: ${moved_or_blocked}"
+            echo "- Protected refs skipped during classification: ${protected}"
+            echo '- Safety: main tree is preserved during history absorption; unique patches are never merged by this workflow; ref deletion uses expected-tip leases.'
+            if [[ -s ../preserved-unique.txt ]]; then
+              echo
+              echo '### Preserved unique branch representatives'
+              echo '```text'
+              head -100 ../preserved-unique.txt
+              echo '```'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
