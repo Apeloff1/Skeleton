@@ -58,7 +58,7 @@ export const FeatureFlagProvider: React.FC<ProviderProps> = ({
   initialFlags,
   children,
 }) => {
-  const initialSnapshot = React.useRef(snapshot()).current;
+  const initialSnapshot = React.useRef(snapshot(initialUserId)).current;
   const cold = initialFlags || initialSnapshot?.flags || BUNDLED_FALLBACK_FLAGS;
   const [userId, setUserId] = React.useState<string | null>(initialUserId);
   const [flags, setFlags] = React.useState<ResolvedFlag[]>(cold);
@@ -99,12 +99,10 @@ export const FeatureFlagProvider: React.FC<ProviderProps> = ({
     setLoading(true);
     setError(null);
 
-    // Local/query overrides are startup-safe and should affect bundled or
-    // cached flags as soon as storage resolves. They do not wait for network.
     void loadLocalOverrides()
       .then(() => {
         if (cancelled) return;
-        const warmed = snapshot();
+        const warmed = snapshot(userId);
         if (warmed?.ok) ingest(warmed);
         else setFlags(current => applyOverrides(current));
         setLoading(false);
@@ -115,9 +113,6 @@ export const FeatureFlagProvider: React.FC<ProviderProps> = ({
         setLoading(false);
       });
 
-    // Remote refresh is intentionally background-only. Boot phase 1 may have
-    // already started the same request; loadFlags then reuses that in-flight
-    // promise or its successful cache instead of issuing a duplicate fetch.
     remoteTimer = setTimeout(() => {
       void loadFlags(userId)
         .then(next => {
