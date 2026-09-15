@@ -1,6 +1,7 @@
 name: One-shot merged branch cleanup
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
