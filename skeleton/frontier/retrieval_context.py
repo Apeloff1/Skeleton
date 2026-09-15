@@ -1,18 +1,19 @@
 """Canonical retrieval boundary for frontier agent/runtime execution.
 
-The runtime consumes ``MemoryContract`` rather than storage-specific APIs. This
-module normalizes retrieval hits once, requires traceable source provenance, and
-separates the content passed to an agent from the digest-only metadata recorded
-in execution provenance.
+Storage backends implement ``MemoryContract``. Runtime consumers depend on the
+smaller ``RetrieverContract`` defined here, so ranking/provenance policy stays
+separate from persistence. Retrieval hits are normalized once, require a
+traceable source, and expose a content-free audit shape for execution records.
 """
 
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Mapping, Protocol, Sequence
 
 from skeleton.frontier.contracts import MemoryContract, stable_content_digest
+from skeleton.frontier.memory import normalize_memory_metadata
 
 
 def _require_text(value: object, field_name: str) -> str:
@@ -61,7 +62,7 @@ class RetrievedMemory:
         return payload
 
     def audit_summary(self) -> dict[str, Any]:
-        """Return a content-free trace used in execution provenance."""
+        """Return a content-free trace suitable for logs/provenance metadata."""
         payload: dict[str, Any] = {
             "id": self.item_id,
             "content_sha256": stable_content_digest(self.content),
@@ -72,6 +73,18 @@ class RetrievedMemory:
         if self.relevance is not None:
             payload["relevance"] = self.relevance
         return payload
+
+
+class RetrieverContract(Protocol):
+    """Storage-neutral retrieval policy consumed by runtime composition."""
+
+    async def retrieve(
+        self,
+        query: str,
+        *,
+        limit: int = 5,
+        filters: Mapping[str, Any] | None = None,
+    ) -> Sequence[RetrievedMemory]: ...
 
 
 def normalize_retrieval_hit(hit: Mapping[str, Any]) -> RetrievedMemory:
@@ -91,7 +104,7 @@ def normalize_retrieval_hit(hit: Mapping[str, Any]) -> RetrievedMemory:
     raw_metadata = hit.get("metadata")
     if not isinstance(raw_metadata, Mapping):
         raise TypeError("retrieval hit metadata must be a mapping")
-    metadata = dict(raw_metadata)
+    metadata = normalize_memory_metadata(raw_metadata)
 
     source_repository = _require_text(
         metadata.get("source_repository"),
@@ -161,8 +174,29 @@ async def retrieve_memory_context(
     return tuple(normalize_retrieval_hit(hit) for hit in hits)
 
 
+@dataclass(frozen=True, slots=True)
+class MemoryRetriever:
+    """Canonical retrieval policy over any ``MemoryContract`` backend."""
+
+    memory: MemoryContract
+
+    async def retrieve(
+        self,
+        query: str,
+        *,
+        limit: int = 5,
+        filters: Mapping[str, Any] | None = None,
+    ) -> tuple[RetrievedMemory, ...]:
+        return await retrieve_memory_context(
+            self.memory,
+            query,
+            limit=limit,
+            filters=filters,
+        )
+
+
 def retrieval_audit_summary(
-    hits: tuple[RetrievedMemory, ...],
+    hits: Sequence[RetrievedMemory],
 ) -> list[dict[str, Any]]:
     """Return stable digest/source metadata without retrieved document text."""
     return [hit.audit_summary() for hit in hits]
