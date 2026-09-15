@@ -1,13 +1,22 @@
 """Static inventory for the registered FastAPI route surface.
 
 The scanner intentionally does not import route modules. It reads the canonical
-``core/routes_registry.py`` declarations, parses each referenced Python module
-with ``ast``, resolves literal ``APIRouter(prefix=...)`` declarations, and
-collects decorator/add_api_route paths. This keeps the inventory usable in CI
-without booting databases, provider SDKs, model stacks, or optional routers.
+``core/routes_registry.py`` declarations and parses route modules with ``ast``
+so CI can inventory the API without booting databases, model stacks, provider
+SDKs, or optional integrations.
 
-The output is evidence for staged fail-closed route-policy rollout; unresolved
-static expressions remain explicit instead of being guessed.
+Supported static composition includes:
+* module-level ``APIRouter(prefix=...)`` declarations;
+* registered root routers that ``include_router`` child routers;
+* decorators on module-scope route functions;
+* literal ``add_api_route`` registrations;
+* router-factory functions such as ``_make_router(router, kind)`` whose route
+  decorators target a router parameter and are invoked at module scope with a
+  statically named child router.
+
+Anything outside that intentionally bounded model is emitted as unresolved
+evidence rather than guessed. This makes the output suitable for staged,
+fail-closed route-policy rollout.
 """
 
 from __future__ import annotations
@@ -15,6 +24,7 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -77,8 +87,39 @@ class InventoryReport:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class RouterDecl:
+    name: str
+    prefix: str
+    source_line: int
+
+
+@dataclass(frozen=True, slots=True)
+class IncludeEdge:
+    parent: str
+    child: str
+    prefix: str
+    source_line: int
+
+
+@dataclass(frozen=True, slots=True)
+class RouteTemplate:
+    router_name: str
+    method: str
+    path: str
+    source_line: int
+
+
+@dataclass(frozen=True, slots=True)
+class FactoryRouteTemplate:
+    router_parameter: str
+    method: str
+    path: str
+    source_line: int
+
+
 class StaticStringResolver:
-    """Resolve a deliberately small, deterministic subset of string ASTs."""
+    """Resolve a deliberately small deterministic subset of string ASTs."""
 
     def __init__(self, tree: ast.Module) -> None:
         self._values: dict[str, str] = {}
@@ -167,34 +208,148 @@ def _normalize_path(*parts: str) -> str:
     return "/" + "/".join(part for part in cleaned if part)
 
 
-def _router_prefix(
+def _call_name(node: ast.AST) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return None
+
+
+def _module_scope_statements(statements: Iterable[ast.stmt]) -> Iterable[ast.stmt]:
+    """Yield module-scope statements, descending control flow but never functions/classes."""
+
+    for node in statements:
+        yield node
+        if isinstance(node, ast.If):
+            yield from _module_scope_statements(node.body)
+            yield from _module_scope_statements(node.orelse)
+        elif isinstance(node, (ast.For, ast.AsyncFor, ast.While)):
+            yield from _module_scope_statements(node.body)
+            yield from _module_scope_statements(node.orelse)
+        elif isinstance(node, (ast.With, ast.AsyncWith)):
+            yield from _module_scope_statements(node.body)
+        elif isinstance(node, ast.Try):
+            yield from _module_scope_statements(node.body)
+            for handler in node.handlers:
+                yield from _module_scope_statements(handler.body)
+            yield from _module_scope_statements(node.orelse)
+            yield from _module_scope_statements(node.finalbody)
+        elif isinstance(node, ast.Match):
+            for case in node.cases:
+                yield from _module_scope_statements(case.body)
+
+
+def _router_declarations(
     tree: ast.Module,
-    router_attr: str,
     resolver: StaticStringResolver,
-) -> tuple[str | None, int | None]:
-    for node in tree.body:
+) -> tuple[dict[str, RouterDecl], list[UnresolvedRecord]]:
+    routers: dict[str, RouterDecl] = {}
+    unresolved: list[UnresolvedRecord] = []
+    for node in _module_scope_statements(tree.body):
         target: ast.expr | None = None
         value: ast.expr | None = None
         if isinstance(node, ast.Assign) and len(node.targets) == 1:
             target, value = node.targets[0], node.value
         elif isinstance(node, ast.AnnAssign):
             target, value = node.target, node.value
-        if not isinstance(target, ast.Name) or target.id != router_attr:
+        if not isinstance(target, ast.Name) or not isinstance(value, ast.Call):
             continue
-        if not isinstance(value, ast.Call):
-            return None, getattr(node, "lineno", None)
-        function_name = None
-        if isinstance(value.func, ast.Name):
-            function_name = value.func.id
-        elif isinstance(value.func, ast.Attribute):
-            function_name = value.func.attr
-        if function_name != "APIRouter":
-            return None, getattr(node, "lineno", None)
-        prefix_node = next((kw.value for kw in value.keywords if kw.arg == "prefix"), None)
-        if prefix_node is None:
-            return "", getattr(node, "lineno", None)
-        return resolver.resolve(prefix_node), getattr(node, "lineno", None)
-    return None, None
+        if _call_name(value.func) != "APIRouter":
+            continue
+        prefix_node = next((keyword.value for keyword in value.keywords if keyword.arg == "prefix"), None)
+        prefix = "" if prefix_node is None else resolver.resolve(prefix_node)
+        if prefix is None:
+            unresolved.append(
+                UnresolvedRecord(
+                    module="<pending>",
+                    reason=f"router {target.id!r} uses a dynamic prefix",
+                    source_line=getattr(node, "lineno", None),
+                )
+            )
+            continue
+        routers[target.id] = RouterDecl(target.id, prefix, getattr(node, "lineno", 0))
+    return routers, unresolved
+
+
+def _include_edges(
+    tree: ast.Module,
+    resolver: StaticStringResolver,
+) -> tuple[list[IncludeEdge], list[tuple[int, str]]]:
+    edges: list[IncludeEdge] = []
+    dynamic: list[tuple[int, str]] = []
+    for node in _module_scope_statements(tree.body):
+        if not isinstance(node, ast.Expr) or not isinstance(node.value, ast.Call):
+            continue
+        call = node.value
+        if not isinstance(call.func, ast.Attribute) or call.func.attr != "include_router":
+            continue
+        if not isinstance(call.func.value, ast.Name):
+            continue
+        parent = call.func.value.id
+        child_node = call.args[0] if call.args else next(
+            (keyword.value for keyword in call.keywords if keyword.arg == "router"),
+            None,
+        )
+        if not isinstance(child_node, ast.Name):
+            dynamic.append((getattr(call, "lineno", 0), f"{parent}.include_router uses dynamic child"))
+            continue
+        prefix_node = next((keyword.value for keyword in call.keywords if keyword.arg == "prefix"), None)
+        prefix = "" if prefix_node is None else resolver.resolve(prefix_node)
+        if prefix is None:
+            dynamic.append((getattr(call, "lineno", 0), f"{parent}.include_router uses dynamic prefix"))
+            continue
+        edges.append(IncludeEdge(parent, child_node.id, prefix, getattr(call, "lineno", 0)))
+    return edges, dynamic
+
+
+def _reachable_router_prefixes(
+    root: RegisteredModule,
+    routers: dict[str, RouterDecl],
+    edges: list[IncludeEdge],
+) -> tuple[dict[str, str], list[UnresolvedRecord]]:
+    unresolved: list[UnresolvedRecord] = []
+    root_decl = routers.get(root.router_attr)
+    if root_decl is None:
+        return {}, [
+            UnresolvedRecord(root.module, f"router {root.router_attr!r} is not a static APIRouter declaration")
+        ]
+
+    by_parent: dict[str, list[IncludeEdge]] = {}
+    for edge in edges:
+        by_parent.setdefault(edge.parent, []).append(edge)
+
+    prefixes = {root.router_attr: _normalize_path(root.mount_prefix, root_decl.prefix)}
+    queue = [root.router_attr]
+    while queue:
+        parent = queue.pop(0)
+        parent_prefix = prefixes[parent]
+        for edge in by_parent.get(parent, []):
+            child_decl = routers.get(edge.child)
+            if child_decl is None:
+                unresolved.append(
+                    UnresolvedRecord(
+                        root.module,
+                        f"included router {edge.child!r} is not a static APIRouter declaration",
+                        edge.source_line,
+                    )
+                )
+                continue
+            effective = _normalize_path(parent_prefix, edge.prefix, child_decl.prefix)
+            previous = prefixes.get(edge.child)
+            if previous is not None and previous != effective:
+                unresolved.append(
+                    UnresolvedRecord(
+                        root.module,
+                        f"router {edge.child!r} is included at multiple effective prefixes",
+                        edge.source_line,
+                    )
+                )
+                continue
+            if previous is None:
+                prefixes[edge.child] = effective
+                queue.append(edge.child)
+    return prefixes, unresolved
 
 
 def _methods_from_api_route(call: ast.Call, resolver: StaticStringResolver) -> tuple[str, ...]:
@@ -212,100 +367,214 @@ def _methods_from_api_route(call: ast.Call, resolver: StaticStringResolver) -> t
     return tuple(sorted(set(methods))) or ("ANY",)
 
 
-def _decorated_routes(
-    tree: ast.Module,
-    module: RegisteredModule,
-    router_prefix: str,
+def _route_from_decorator(
+    decorator: ast.AST,
     resolver: StaticStringResolver,
-) -> tuple[list[RouteRecord], list[UnresolvedRecord]]:
-    routes: list[RouteRecord] = []
-    unresolved: list[UnresolvedRecord] = []
-    for node in ast.walk(tree):
+) -> tuple[str, tuple[str, ...], str, int] | None:
+    if not isinstance(decorator, ast.Call) or not isinstance(decorator.func, ast.Attribute):
+        return None
+    owner = decorator.func.value
+    if not isinstance(owner, ast.Name):
+        return None
+    verb = decorator.func.attr.lower()
+    if verb not in _HTTP_METHODS and verb != "api_route":
+        return None
+    path_node = decorator.args[0] if decorator.args else next(
+        (keyword.value for keyword in decorator.keywords if keyword.arg in {"path", "url"}),
+        None,
+    )
+    path = resolver.resolve(path_node)
+    if path is None:
+        return owner.id, (), "", getattr(decorator, "lineno", 0)
+    methods = _methods_from_api_route(decorator, resolver) if verb == "api_route" else (verb.upper(),)
+    return owner.id, methods, path, getattr(decorator, "lineno", 0)
+
+
+def _module_route_templates(
+    tree: ast.Module,
+    resolver: StaticStringResolver,
+) -> tuple[list[RouteTemplate], list[tuple[str, int]]]:
+    templates: list[RouteTemplate] = []
+    dynamic: list[tuple[str, int]] = []
+    for node in _module_scope_statements(tree.body):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
         for decorator in node.decorator_list:
-            if not isinstance(decorator, ast.Call) or not isinstance(decorator.func, ast.Attribute):
+            parsed = _route_from_decorator(decorator, resolver)
+            if parsed is None:
                 continue
-            owner = decorator.func.value
-            if not isinstance(owner, ast.Name) or owner.id != module.router_attr:
+            owner, methods, path, line = parsed
+            if not methods:
+                dynamic.append((f"dynamic decorator path on {node.name}", line))
                 continue
-            verb = decorator.func.attr.lower()
-            if verb not in _HTTP_METHODS and verb != "api_route":
-                continue
-            path_node = decorator.args[0] if decorator.args else next(
-                (keyword.value for keyword in decorator.keywords if keyword.arg in {"path", "url"}),
-                None,
-            )
-            path = resolver.resolve(path_node)
-            if path is None:
-                unresolved.append(
-                    UnresolvedRecord(
-                        module=module.module,
-                        reason=f"dynamic decorator path on {node.name}",
-                        source_line=getattr(decorator, "lineno", None),
-                    )
-                )
-                continue
-            methods = (
-                _methods_from_api_route(decorator, resolver)
-                if verb == "api_route"
-                else (verb.upper(),)
-            )
-            full_path = _normalize_path(module.mount_prefix, router_prefix, path)
-            for method in methods:
-                routes.append(
-                    RouteRecord(
-                        module=module.module,
-                        router_attr=module.router_attr,
-                        method=method,
-                        path=full_path,
-                        source_line=getattr(decorator, "lineno", 0),
-                    )
-                )
-    return routes, unresolved
+            templates.extend(RouteTemplate(owner, method, path, line) for method in methods)
+    return templates, dynamic
 
 
-def _imperative_routes(
+def _factory_route_templates(
     tree: ast.Module,
-    module: RegisteredModule,
-    router_prefix: str,
     resolver: StaticStringResolver,
-) -> tuple[list[RouteRecord], list[UnresolvedRecord]]:
-    routes: list[RouteRecord] = []
-    unresolved: list[UnresolvedRecord] = []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+) -> dict[str, tuple[FactoryRouteTemplate, ...]]:
+    factories: dict[str, tuple[FactoryRouteTemplate, ...]] = {}
+    for factory in tree.body:
+        if not isinstance(factory, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
-        owner = node.func.value
-        if (
-            not isinstance(owner, ast.Name)
-            or owner.id != module.router_attr
-            or node.func.attr != "add_api_route"
-        ):
+        parameters = {argument.arg for argument in factory.args.args}
+        templates: list[FactoryRouteTemplate] = []
+        for node in ast.walk(factory):
+            if node is factory or not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            for decorator in node.decorator_list:
+                parsed = _route_from_decorator(decorator, resolver)
+                if parsed is None:
+                    continue
+                owner, methods, path, line = parsed
+                if owner not in parameters or not methods:
+                    continue
+                templates.extend(
+                    FactoryRouteTemplate(owner, method, path, line) for method in methods
+                )
+        if templates:
+            factories[factory.name] = tuple(templates)
+    return factories
+
+
+def _factory_bindings(
+    tree: ast.Module,
+    factories: dict[str, tuple[FactoryRouteTemplate, ...]],
+) -> list[tuple[str, ast.Call]]:
+    calls: list[tuple[str, ast.Call]] = []
+    for node in _module_scope_statements(tree.body):
+        if not isinstance(node, ast.Expr) or not isinstance(node.value, ast.Call):
             continue
-        path_node = node.args[0] if node.args else next(
-            (keyword.value for keyword in node.keywords if keyword.arg == "path"),
+        name = _call_name(node.value.func)
+        if name in factories:
+            calls.append((name, node.value))
+    return calls
+
+
+def _factory_parameter_router(
+    tree: ast.Module,
+    factory_name: str,
+    parameter: str,
+    call: ast.Call,
+) -> str | None:
+    factory = next(
+        (
+            node
+            for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == factory_name
+        ),
+        None,
+    )
+    if factory is None:
+        return None
+    parameter_names = [argument.arg for argument in factory.args.args]
+    try:
+        index = parameter_names.index(parameter)
+    except ValueError:
+        return None
+    value: ast.AST | None = call.args[index] if index < len(call.args) else None
+    if value is None:
+        value = next((keyword.value for keyword in call.keywords if keyword.arg == parameter), None)
+    return value.id if isinstance(value, ast.Name) else None
+
+
+def _imperative_templates(
+    tree: ast.Module,
+    resolver: StaticStringResolver,
+) -> tuple[list[RouteTemplate], list[tuple[str, int]]]:
+    templates: list[RouteTemplate] = []
+    dynamic: list[tuple[str, int]] = []
+    for node in _module_scope_statements(tree.body):
+        if not isinstance(node, ast.Expr) or not isinstance(node.value, ast.Call):
+            continue
+        call = node.value
+        if not isinstance(call.func, ast.Attribute) or call.func.attr != "add_api_route":
+            continue
+        if not isinstance(call.func.value, ast.Name):
+            continue
+        owner = call.func.value.id
+        path_node = call.args[0] if call.args else next(
+            (keyword.value for keyword in call.keywords if keyword.arg == "path"),
             None,
         )
         path = resolver.resolve(path_node)
         if path is None:
-            unresolved.append(
-                UnresolvedRecord(
-                    module=module.module,
-                    reason="dynamic add_api_route path",
-                    source_line=getattr(node, "lineno", None),
-                )
-            )
+            dynamic.append(("dynamic add_api_route path", getattr(call, "lineno", 0)))
             continue
-        full_path = _normalize_path(module.mount_prefix, router_prefix, path)
-        for method in _methods_from_api_route(node, resolver):
+        for method in _methods_from_api_route(call, resolver):
+            templates.append(RouteTemplate(owner, method, path, getattr(call, "lineno", 0)))
+    return templates, dynamic
+
+
+def _scan_module(
+    tree: ast.Module,
+    module: RegisteredModule,
+    resolver: StaticStringResolver,
+) -> tuple[list[RouteRecord], list[UnresolvedRecord]]:
+    routers, router_unresolved = _router_declarations(tree, resolver)
+    unresolved = [
+        UnresolvedRecord(module.module, row.reason, row.source_line) for row in router_unresolved
+    ]
+    edges, dynamic_edges = _include_edges(tree, resolver)
+    unresolved.extend(
+        UnresolvedRecord(module.module, reason, line) for line, reason in dynamic_edges
+    )
+    effective, reachability_unresolved = _reachable_router_prefixes(module, routers, edges)
+    unresolved.extend(reachability_unresolved)
+    if not effective:
+        return [], unresolved
+
+    routes: list[RouteRecord] = []
+    templates, dynamic_routes = _module_route_templates(tree, resolver)
+    imperative, dynamic_imperative = _imperative_templates(tree, resolver)
+    templates.extend(imperative)
+    unresolved.extend(
+        UnresolvedRecord(module.module, reason, line)
+        for reason, line in (*dynamic_routes, *dynamic_imperative)
+    )
+
+    for template in templates:
+        prefix = effective.get(template.router_name)
+        if prefix is None:
+            continue
+        routes.append(
+            RouteRecord(
+                module=module.module,
+                router_attr=template.router_name,
+                method=template.method,
+                path=_normalize_path(prefix, template.path),
+                source_line=template.source_line,
+            )
+        )
+
+    factories = _factory_route_templates(tree, resolver)
+    for factory_name, call in _factory_bindings(tree, factories):
+        for template in factories[factory_name]:
+            router_name = _factory_parameter_router(
+                tree, factory_name, template.router_parameter, call
+            )
+            if router_name is None:
+                unresolved.append(
+                    UnresolvedRecord(
+                        module.module,
+                        f"factory {factory_name!r} binds router parameter "
+                        f"{template.router_parameter!r} dynamically",
+                        getattr(call, "lineno", None),
+                    )
+                )
+                continue
+            prefix = effective.get(router_name)
+            if prefix is None:
+                continue
             routes.append(
                 RouteRecord(
                     module=module.module,
-                    router_attr=module.router_attr,
-                    method=method,
-                    path=full_path,
-                    source_line=getattr(node, "lineno", 0),
+                    router_attr=router_name,
+                    method=template.method,
+                    path=_normalize_path(prefix, template.path),
+                    source_line=template.source_line,
                 )
             )
     return routes, unresolved
@@ -338,24 +607,11 @@ def build_inventory(registry_path: Path, routes_root: Path) -> InventoryReport:
             continue
         scanned += 1
         resolver = StaticStringResolver(tree)
-        prefix, prefix_line = _router_prefix(tree, module.router_attr, resolver)
-        if prefix is None:
-            unresolved.append(
-                UnresolvedRecord(
-                    module.module,
-                    f"router {module.router_attr!r} prefix could not be resolved",
-                    prefix_line,
-                )
-            )
-            continue
-        decorated, decorated_unresolved = _decorated_routes(tree, module, prefix, resolver)
-        imperative, imperative_unresolved = _imperative_routes(tree, module, prefix, resolver)
-        routes.extend(decorated)
-        routes.extend(imperative)
-        unresolved.extend(decorated_unresolved)
-        unresolved.extend(imperative_unresolved)
+        module_routes, module_unresolved = _scan_module(tree, module, resolver)
+        routes.extend(module_routes)
+        unresolved.extend(module_unresolved)
 
-    routes.sort(key=lambda row: (row.path, row.method, row.module, row.source_line))
+    routes.sort(key=lambda row: (row.path, row.method, row.module, row.router_attr, row.source_line))
     unresolved.sort(key=lambda row: (row.module, row.source_line or 0, row.reason))
     keys = [(route.method, route.path) for route in routes]
     duplicate_count = len(keys) - len(set(keys))
@@ -392,6 +648,11 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="exit non-zero when any route/module expression is unresolved",
     )
+    parser.add_argument(
+        "--fail-on-duplicates",
+        action="store_true",
+        help="exit non-zero when duplicate method+path registrations exist",
+    )
     return parser
 
 
@@ -412,7 +673,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"UNRESOLVED {unresolved.module}{location}: {unresolved.reason}")
         if report.unresolved_count > 20:
             print(f"... {report.unresolved_count - 20} additional unresolved record(s)")
-    return 1 if args.strict and not report.complete else 0
+    failed = (args.strict and not report.complete) or (
+        args.fail_on_duplicates and report.duplicate_route_count > 0
+    )
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
