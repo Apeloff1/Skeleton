@@ -66,6 +66,26 @@ def test_plain_user_text_never_invokes_registered_tool():
     assert core.stats()["tool_calls"] == 0
 
 
+def test_context_tool_call_requires_separate_authorization():
+    provider = RecordingProvider()
+    core = _core(provider)
+    session = core.open_session("u")
+    calls = []
+    core.register_tool("delete", lambda payload: calls.append(payload))
+
+    with pytest.raises(ValueError, match="not authorized"):
+        core.ask(
+            session.session_id,
+            "run it",
+            context={"tool_calls": [{"name": "delete", "arguments": {}}]},
+        )
+
+    assert calls == []
+    assert provider.calls == []
+    assert session.turns == []
+    assert core.stats()["tool_calls"] == 0
+
+
 def test_explicit_tool_call_executes_once_and_forwards_arguments():
     core = _core()
     session = core.open_session("u")
@@ -76,6 +96,7 @@ def test_explicit_tool_call_executes_once_and_forwards_arguments():
         session.session_id,
         "look this up",
         context={"tool_calls": [{"name": "LOOKUP", "arguments": {"id": 7}}]},
+        allowed_tools=[" LOOKUP "],
     )
 
     assert result["tools"] == ["lookup"]
@@ -96,6 +117,7 @@ def test_failed_tool_is_not_reported_as_successful():
         session.session_id,
         "run it",
         context={"tool_calls": [{"name": "explode", "arguments": {}}]},
+        allowed_tools=["explode"],
     )
 
     assert result["tools"] == []
@@ -136,6 +158,7 @@ def test_unknown_tool_fails_before_provider_or_session_mutation():
             session.session_id,
             "run",
             context={"tool_calls": [{"name": "missing", "arguments": {}}]},
+            allowed_tools=["missing"],
         )
 
     assert provider.calls == []
