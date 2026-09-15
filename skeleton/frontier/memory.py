@@ -18,6 +18,22 @@ class MemoryItem:
     payload: Mapping[str, Any]
 
 
+def _matches_filters(
+    payload: Mapping[str, Any],
+    filters: Mapping[str, Any],
+) -> bool:
+    metadata = payload.get("metadata")
+    nested = metadata if isinstance(metadata, Mapping) else {}
+    for key, expected in filters.items():
+        if key in payload:
+            actual = payload[key]
+        else:
+            actual = nested.get(key)
+        if actual != expected:
+            return False
+    return True
+
+
 class InMemoryStore:
     """Small reference implementation suitable for tests and local runs."""
 
@@ -42,7 +58,7 @@ class InMemoryStore:
         filters = filters or {}
         hits: list[Mapping[str, Any]] = []
         for item in self._items.values():
-            if any(item.payload.get(k) != v for k, v in filters.items()):
+            if not _matches_filters(item.payload, filters):
                 continue
             haystack = repr(dict(item.payload)).casefold()
             if not needle or needle in haystack:
