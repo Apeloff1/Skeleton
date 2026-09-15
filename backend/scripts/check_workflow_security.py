@@ -64,7 +64,7 @@ FORBIDDEN_TRIGGER = "pull_request_target"
 # until the security policy is reviewed and this digest is deliberately updated.
 TRUSTED_PULL_REQUEST_TARGET_SHA256 = {
     "pr-obsolete-run-drain.yml": (
-        "dff208e01fcb638184f67b1029014653a000c43908467a60f18f225976b7634d"
+        "bc9e6ee637d8c8acdeeedae9718cee85d582e61d664c4758c23183db2dc2507a"
     ),
 }
 
