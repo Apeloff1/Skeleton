@@ -1,0 +1,126 @@
+name: PR Hygiene
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+
+concurrency:
+  group: pr-hygiene-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  label:
+    name: Keep pull requests easy to scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      - name: Ensure managed labels exist
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ensure_label() {
+            local name="$1"
+            local color="$2"
+            local description="$3"
+            gh label create "$name" --repo "$REPO" --color "$color" --description "$description" --force >/dev/null
+          }
+
+          ensure_label 'size/xs' 'c5def5' 'Very small pull request (0-50 changed lines)'
+          ensure_label 'size/s' 'bfdadc' 'Small pull request (51-200 changed lines)'
+          ensure_label 'size/m' 'fef2c0' 'Medium pull request (201-500 changed lines)'
+          ensure_label 'size/l' 'f9d0c4' 'Large pull request (501-1000 changed lines)'
+          ensure_label 'size/xl' 'd93f0b' 'Extra-large pull request (more than 1000 changed lines)'
+          ensure_label 'area/backend' '1d76db' 'Touches backend code'
+          ensure_label 'area/frontend' '5319e7' 'Touches frontend code'
+          ensure_label 'area/core' '0e8a16' 'Touches Skeleton core/runtime code'
+          ensure_label 'area/tests' '7057ff' 'Touches tests or test fixtures'
+          ensure_label 'area/automation' '6f42c1' 'Touches GitHub automation or repository tooling'
+          ensure_label 'area/docs' '0075ca' 'Touches documentation'
+          ensure_label 'area/infrastructure' 'b60205' 'Touches containers or infrastructure files'
+
+      - name: Calculate and apply size label
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          meta=$(gh pr view "$PR" --repo "$REPO" --json additions,deletions,labels)
+          additions=$(jq -r '.additions' <<<"$meta")
+          deletions=$(jq -r '.deletions' <<<"$meta")
+          changed=$((additions + deletions))
+
+          if (( changed <= 50 )); then
+            target='size/xs'
+          elif (( changed <= 200 )); then
+            target='size/s'
+          elif (( changed <= 500 )); then
+            target='size/m'
+          elif (( changed <= 1000 )); then
+            target='size/l'
+          else
+            target='size/xl'
+          fi
+
+          for label in size/xs size/s size/m size/l size/xl; do
+            if jq -e --arg label "$label" '.labels[]? | select(.name == $label)' <<<"$meta" >/dev/null; then
+              gh pr edit "$PR" --repo "$REPO" --remove-label "$label" >/dev/null
+            fi
+          done
+          gh pr edit "$PR" --repo "$REPO" --add-label "$target" >/dev/null
+
+          {
+            echo '## PR hygiene'
+            echo "- Changed lines: $changed (+$additions / -$deletions)"
+            echo "- Size label: $target"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply area labels from changed paths
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          managed=(
+            area/backend
+            area/frontend
+            area/core
+            area/tests
+            area/automation
+            area/docs
+            area/infrastructure
+          )
+
+          current=$(gh pr view "$PR" --repo "$REPO" --json labels)
+          for label in "${managed[@]}"; do
+            if jq -e --arg label "$label" '.labels[]? | select(.name == $label)' <<<"$current" >/dev/null; then
+              gh pr edit "$PR" --repo "$REPO" --remove-label "$label" >/dev/null
+            fi
+          done
+
+          files=$(gh pr view "$PR" --repo "$REPO" --json files --jq '.files[].path')
+          labels=()
+
+          grep -Eq '^backend/' <<<"$files" && labels+=(area/backend) || true
+          grep -Eq '^frontend/' <<<"$files" && labels+=(area/frontend) || true
+          grep -Eq '^skeleton/' <<<"$files" && labels+=(area/core) || true
+          grep -Eq '(^|/)(tests?|testing|fixtures?)/|(^|/)test_[^/]+\.py$|\.test\.[jt]sx?$|\.spec\.[jt]sx?$' <<<"$files" && labels+=(area/tests) || true
+          grep -Eq '^\.github/|^scripts/' <<<"$files" && labels+=(area/automation) || true
+          grep -Eqi '(^|/)(docs?|documentation)/|(^|/)(README|CONTRIBUTING|SECURITY|CODE_OF_CONDUCT)(\.|$)|\.md$' <<<"$files" && labels+=(area/docs) || true
+          grep -Eqi '(^|/)(Dockerfile|docker-compose[^/]*\.ya?ml)$|(^|/)(infra|infrastructure|deploy|deployment)/' <<<"$files" && labels+=(area/infrastructure) || true
+
+          if ((${#labels[@]} > 0)); then
+            for label in "${labels[@]}"; do
+              gh pr edit "$PR" --repo "$REPO" --add-label "$label" >/dev/null
+            done
+            printf '%s\n' "${labels[@]}" | sed 's/^/- Area: /' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '- Area: unclassified' >> "$GITHUB_STEP_SUMMARY"
+          fi
