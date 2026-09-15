@@ -1,5 +1,11 @@
 """Frontier consolidation contracts and program metadata."""
 
+from skeleton.frontier.achievement_adapters import (
+    achievement_event,
+    achievement_event_to_memory_item,
+    achievement_identity,
+    achievement_state_memory_item,
+)
 from skeleton.frontier.achievements import (
     AchievementRequirement,
     AchievementRewardPlan,
@@ -167,10 +173,14 @@ __all__ = [
     "SQLiteEventJournal",
     "WorldBounds",
     "WorldRegion",
+    "achievement_event",
+    "achievement_event_to_memory_item",
     "achievement_from_record",
+    "achievement_identity",
     "achievement_progress_percent",
     "achievement_qualifies",
     "achievement_reward_plan",
+    "achievement_state_memory_item",
     "achievement_summary",
     "aggregate_crew",
     "apply_reputation_change",
