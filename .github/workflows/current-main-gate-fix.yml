@@ -1,0 +1,97 @@
+name: Current Main Gate Fix
+
+on:
+  push:
+    branches:
+      - resolve/current-main-gate-fixes-20260915
+    paths:
+      - .github/workflows/current-main-gate-fix.yml
+
+permissions:
+  contents: read
+
+jobs:
+  repair:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: true
+          ref: ${{ github.ref_name }}
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Apply constrained gate fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          adapter = Path("skeleton/frontier/biotope_achievement_adapters.py")
+          text = adapter.read_text(encoding="utf-8")
+          old = '    for family in families:\n        increment(f"{family}_catches")\n'
+          new = (
+              '    for family in families:\n'
+              '        # A family token can equal its biotope or stage. Those canonical\n'
+              '        # location counters were already incremented above, so skip them.\n'
+              '        if family in {biotope, stage}:\n'
+              '            continue\n'
+              '        increment(f"{family}_catches")\n'
+          )
+          if old not in text:
+              raise SystemExit("expected biotope family-counter loop not found")
+          adapter.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          prune = Path(".github/workflows/branch-prune-arm.yml")
+          text = prune.read_text(encoding="utf-8")
+          old = "permissions:\n  contents: write\n\njobs:\n  consolidate-and-prune:\n"
+          new = (
+              "permissions:\n  contents: read\n\njobs:\n"
+              "  consolidate-and-prune:\n"
+              "    permissions:\n      contents: write\n"
+          )
+          if old not in text:
+              raise SystemExit("expected branch-prune permission block not found")
+          prune.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          gate = Path(".github/workflows/gate-boundary-security.yml")
+          text = gate.read_text(encoding="utf-8")
+          old = 'run: python -m pip install "pytest>=8,<9" "starlette>=0.27,<1" "pydantic>=2.0,<3" "pydantic-settings>=2.0,<3"'
+          new = (
+              'run: python -m pip install "pytest>=8,<9" "starlette>=0.27,<1" '
+              '"fastapi>=0.100,<1" "pydantic>=2.0,<3" "pydantic-settings>=2.0,<3"'
+          )
+          if old not in text:
+              raise SystemExit("expected Gate Boundary dependency command not found")
+          gate.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          Path(".github/workflows/current-main-gate-fix.yml").unlink()
+          PY
+
+      - name: Install validation runtime
+        run: python -m pip install --disable-pip-version-check -e . "pytest>=8,<10" pytest-asyncio
+
+      - name: Validate security and frontier gates
+        env:
+          PYTHONPATH: .
+        run: |
+          python scripts/check_workflow_security.py
+          python -m pytest -q skeleton/testing/test_gate_policy_boundaries.py
+          python -m pytest -q skeleton/testing/test_frontier_biotope_achievement_adapters.py
+          python -m pytest -q skeleton/testing/test_frontier_*.py
+
+      - name: Commit validated fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            skeleton/frontier/biotope_achievement_adapters.py \
+            .github/workflows/branch-prune-arm.yml \
+            .github/workflows/gate-boundary-security.yml \
+            .github/workflows/current-main-gate-fix.yml
+          git commit -s -m "fix(ci): repair current-main gate failures"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
