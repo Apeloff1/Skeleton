@@ -38,4 +38,8 @@ yarn-error.*
 
 app-example
 .metro-cache/
+
+# Generated local UI captures
+.screenshots/
+
 # Prevent corrupted filenames from being tracked
