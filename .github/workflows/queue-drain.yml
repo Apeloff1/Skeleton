@@ -17,7 +17,7 @@ permissions: {}
 jobs:
   drain:
     # Run cleanup off the normal x64 pool. The write token exists only for this
-    # job and is used only to cancel obsolete or duplicate queued runs.
+    # job and is used only to cancel obsolete or duplicate Actions runs.
     permissions:
       actions: write
       contents: read
@@ -28,7 +28,7 @@ jobs:
       REPO: ${{ github.repository }}
       CURRENT_RUN_ID: ${{ github.run_id }}
     steps:
-      - name: Cancel obsolete and superseded queued runs
+      - name: Cancel obsolete and superseded Actions runs
         shell: bash
         run: |
           set -euo pipefail
@@ -74,29 +74,33 @@ jobs:
                   raise SystemExit('failed to resolve main HEAD SHA')
               return sha
 
-          def list_queued():
-              queued = []
+          def list_runs(run_status):
+              runs = []
               for page in range(1, 11):
                   query = urllib.parse.urlencode({
-                      'status': 'queued',
+                      'status': run_status,
                       'per_page': 100,
                       'page': page,
                   })
                   status, payload = request(f'/repos/{repo}/actions/runs?{query}')
                   if status != 200 or not isinstance(payload, dict):
-                      raise SystemExit(f'failed to list queued runs: HTTP {status}')
+                      raise SystemExit(
+                          f'failed to list {run_status} runs: HTTP {status}'
+                      )
                   batch = payload.get('workflow_runs') or []
-                  queued.extend(batch)
+                  runs.extend(batch)
                   if len(batch) < 100:
                       break
-              return queued
+              return runs
 
           attempted = set()
           totals = {
-              'inspected': 0,
+              'queued_inspected': 0,
+              'active_inspected': 0,
               'selected': 0,
               'obsolete_main': 0,
               'duplicate': 0,
+              'stale_dynamic_active': 0,
               'accepted': 0,
               'moved': 0,
               'failed': 0,
@@ -106,17 +110,22 @@ jobs:
 
           # GitHub-managed security and dependency runs can arrive several
           # seconds after a push. Sweep repeatedly so delayed fanout is folded
-          # into the same cleanup run instead of requiring another commit.
+          # into one cleanup run. Stale in-progress work is only reclaimed when
+          # it is a GitHub-managed dynamic run on an obsolete main SHA; normal
+          # CI, deployments, PR work, and current-head jobs are never stopped.
           for pass_number in range(1, 5):
               main_sha = resolve_main_sha()
               latest_main_sha = main_sha
-              queued = list_queued()
-              totals['inspected'] += len(queued)
+              queued = list_runs('queued')
+              active = list_runs('in_progress')
+              totals['queued_inspected'] += len(queued)
+              totals['active_inspected'] += len(active)
 
               seen = set()
               selected = []
               obsolete_main = 0
               duplicate = 0
+              stale_dynamic_active = 0
 
               for run in sorted(
                   queued,
@@ -146,6 +155,19 @@ jobs:
                   else:
                       seen.add(key)
 
+              for run in active:
+                  run_id = int(run.get('id') or 0)
+                  path = run.get('path') or ''
+                  if not run_id or run_id == current or run_id in attempted:
+                      continue
+                  if (
+                      (run.get('head_branch') or '') == 'main'
+                      and (run.get('head_sha') or '') != main_sha
+                      and path.startswith('dynamic/')
+                  ):
+                      selected.append(run)
+                      stale_dynamic_active += 1
+
               accepted = moved = failed = 0
               for run in selected:
                   run_id = int(run['id'])
@@ -165,15 +187,17 @@ jobs:
               totals['selected'] += len(selected)
               totals['obsolete_main'] += obsolete_main
               totals['duplicate'] += duplicate
+              totals['stale_dynamic_active'] += stale_dynamic_active
               totals['accepted'] += accepted
               totals['moved'] += moved
               totals['failed'] += failed
 
               line = (
-                  f'pass={pass_number} main_sha={main_sha} inspected={len(queued)} '
-                  f'selected={len(selected)} obsolete_main={obsolete_main} '
-                  f'duplicate={duplicate} accepted={accepted} moved={moved} '
-                  f'failed={failed}'
+                  f'pass={pass_number} main_sha={main_sha} queued={len(queued)} '
+                  f'active={len(active)} selected={len(selected)} '
+                  f'obsolete_main={obsolete_main} duplicate={duplicate} '
+                  f'stale_dynamic_active={stale_dynamic_active} '
+                  f'accepted={accepted} moved={moved} failed={failed}'
               )
               print(line)
               pass_lines.append(line)
@@ -192,13 +216,35 @@ jobs:
                   handle.write('## Actions queue drain\n')
                   handle.write(f'- Latest live main SHA: `{latest_main_sha}`\n')
                   handle.write('- Sweep passes: 4 over ~24 seconds\n')
-                  handle.write(f'- Queued observations: {totals["inspected"]}\n')
-                  handle.write(f'- Obsolete main selections: {totals["obsolete_main"]}\n')
-                  handle.write(f'- Duplicate selections: {totals["duplicate"]}\n')
-                  handle.write(f'- Cancel requests accepted: {totals["accepted"]}\n')
-                  handle.write(f'- Already moved/completed: {totals["moved"]}\n')
-                  handle.write(f'- Cancellation failures: {totals["failed"]}\n')
-                  handle.write('- Safety: current main HEAD, unique current-head work, PR work, and all in-progress runs are preserved.\n')
+                  handle.write(
+                      f'- Queued observations: {totals["queued_inspected"]}\n'
+                  )
+                  handle.write(
+                      f'- Active observations: {totals["active_inspected"]}\n'
+                  )
+                  handle.write(
+                      f'- Obsolete main selections: {totals["obsolete_main"]}\n'
+                  )
+                  handle.write(
+                      f'- Duplicate selections: {totals["duplicate"]}\n'
+                  )
+                  handle.write(
+                      '- Stale dynamic in-progress selections: '
+                      f'{totals["stale_dynamic_active"]}\n'
+                  )
+                  handle.write(
+                      f'- Cancel requests accepted: {totals["accepted"]}\n'
+                  )
+                  handle.write(
+                      f'- Already moved/completed: {totals["moved"]}\n'
+                  )
+                  handle.write(
+                      f'- Cancellation failures: {totals["failed"]}\n'
+                  )
+                  handle.write(
+                      '- Safety: current main HEAD, unique current-head work, '
+                      'normal in-progress CI/deployments, and PR work are preserved.\n'
+                  )
                   handle.write('\n### Passes\n')
                   for line in pass_lines:
                       handle.write(f'- `{line}`\n')
