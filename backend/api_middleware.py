@@ -26,7 +26,7 @@ import math
 import os
 import time
 import uuid
-from collections import defaultdict, deque
+from collections import OrderedDict, defaultdict, deque
 from typing import Callable, Deque, Dict, Tuple
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -226,7 +226,9 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
     Exempt IPs (loopback) skip the check. State is pruned after the idle TTL
     and capped at `max_buckets`. When all slots are occupied by active
     identities, unseen identities are rejected until a slot expires instead
-    of evicting active state and receiving a fresh burst. Mutation is
+    of evicting active state and receiving a fresh burst. Buckets are kept in
+    least-recently-used activity order so expiry and saturation checks do not
+    scan the entire attacker-fillable table on every request. Mutation is
     serialized per middleware instance so cleanup/admission cannot race.
 
     NOTE: This is *in-memory* and per-process. Sufficient for single-replica
@@ -259,7 +261,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         self.max_buckets = int(configured_max)
         self.bucket_ttl = float(configured_ttl)
         self._refill_per_sec = self.per_minute / 60.0
-        self._buckets: Dict[str, _Bucket] = {}
+        self._buckets: "OrderedDict[str, _Bucket]" = OrderedDict()
         self._state_lock: asyncio.Lock | None = None
         self._evictions = 0
         self._expired_pruned = 0
@@ -271,22 +273,26 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         return self._state_lock
 
     def _prune_expired(self, now: float) -> int:
-        expired = [ip for ip, bucket in self._buckets.items() if now - bucket.last >= self.bucket_ttl]
-        for ip in expired:
-            del self._buckets[ip]
-        if expired:
-            pruned = len(expired)
+        pruned = 0
+        while self._buckets:
+            oldest_ip = next(iter(self._buckets))
+            oldest = self._buckets[oldest_ip]
+            if now - oldest.last < self.bucket_ttl:
+                break
+            self._buckets.popitem(last=False)
+            pruned += 1
+        if pruned:
             self._evictions += pruned
             self._expired_pruned += pruned
             _counts["rate_limit_evictions"] += pruned
             _counts["rate_limit_expired_pruned"] += pruned
-        return len(expired)
+        return pruned
 
     def _retry_until_capacity(self, now: float) -> float:
         if not self._buckets:
             return self.bucket_ttl
-        remaining = [self.bucket_ttl - (now - bucket.last) for bucket in self._buckets.values()]
-        return max(0.01, min(remaining))
+        oldest = next(iter(self._buckets.values()))
+        return max(0.01, self.bucket_ttl - (now - oldest.last))
 
     def _bucket_for(self, ip: str, now: float | None = None) -> Tuple[_Bucket | None, float]:
         now = time.monotonic() if now is None else now
@@ -300,6 +306,8 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
                 return None, self._retry_until_capacity(now)
             bucket = _Bucket(self.burst, self._refill_per_sec)
             self._buckets[ip] = bucket
+        else:
+            self._buckets.move_to_end(ip)
         _counts["rate_limit_buckets"] = len(self._buckets)
         return bucket, 0.0
 
