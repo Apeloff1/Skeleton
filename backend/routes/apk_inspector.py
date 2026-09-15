@@ -16,6 +16,7 @@ import zipfile
 import hashlib
 import subprocess
 import shutil
+import tempfile
 from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -55,25 +56,26 @@ def _validate_build_id(build_id: str) -> str:
 
 
 def _artifact_path(build_id: str, kind: str) -> Path:
-    """Resolve a build artifact without permitting traversal or symlink escape."""
+    """Resolve a build artifact and prove containment below ARTIFACTS_ROOT."""
     if kind not in {"apk", "zip"}:
         raise ValueError("unsupported artifact kind")
     safe_id = _validate_build_id(build_id)
-    root = binary_builder.ARTIFACTS_ROOT.resolve()
-    candidate = root / f"{safe_id}.{kind}"
-    resolved = candidate.resolve(strict=False)
-    if resolved.parent != root:
+    root = os.path.realpath(os.fspath(binary_builder.ARTIFACTS_ROOT))
+    candidate = os.path.realpath(os.path.normpath(os.path.join(root, f"{safe_id}.{kind}")))
+    if not candidate.startswith(root + os.sep):
         raise HTTPException(400, "artifact path escapes artifact root")
-    return resolved
+    return Path(candidate)
 
 
 def _confined_apk_path(apk_path: Path) -> Path:
-    """Re-check filesystem confinement immediately before reading/executing tools."""
-    root = binary_builder.ARTIFACTS_ROOT.resolve()
-    resolved = Path(apk_path).resolve(strict=False)
-    if resolved.parent != root or resolved.suffix != ".apk":
+    """Normalize and re-check filesystem confinement before APK access."""
+    root = os.path.realpath(os.fspath(binary_builder.ARTIFACTS_ROOT))
+    requested = os.fspath(apk_path)
+    candidate = requested if os.path.isabs(requested) else os.path.join(root, requested)
+    normalized = os.path.realpath(os.path.normpath(candidate))
+    if not normalized.startswith(root + os.sep) or not normalized.endswith(".apk"):
         raise ValueError("APK path is outside the artifact root")
-    return resolved
+    return Path(normalized)
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -96,7 +98,7 @@ async def install_toolchain():
     log_handle = open("/tmp/android_install.log", "ab")
     try:
         subprocess.Popen(
-            ["bash", installer],
+            ["/bin/bash", installer],
             stdout=log_handle,
             stderr=subprocess.STDOUT,
             start_new_session=True,
@@ -316,8 +318,18 @@ def _apksigner_verify(apk_path: Path) -> dict:
     apksigner = (binary_builder.BUILD_TOOLS / "apksigner").resolve(strict=False)
     if not apksigner.exists() or not apksigner.is_file():
         return {"available": False}
-    cmd = [str(apksigner), "verify", "--verbose", str(apk_path)]
+
+    # Do not feed a request-derived artifact path to a subprocess. Copy the
+    # already-confined APK to an OS-generated temporary path first, so the
+    # command line contains no user-controlled argument.
+    temp_path: str | None = None
     try:
+        with apk_path.open("rb") as source, tempfile.NamedTemporaryFile(
+            prefix="galaxy-apk-verify-", suffix=".apk", delete=False
+        ) as staged:
+            shutil.copyfileobj(source, staged)
+            temp_path = staged.name
+        cmd = [str(apksigner), "verify", "--verbose", temp_path]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=30, shell=False, check=False)
         return {
             "available": True,
@@ -328,6 +340,12 @@ def _apksigner_verify(apk_path: Path) -> dict:
         }
     except Exception as e:
         return {"available": True, "error": f"{type(e).__name__}: {e}"}
+    finally:
+        if temp_path:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
 
 
 @router.get("/binary/inspect/{build_id}")
