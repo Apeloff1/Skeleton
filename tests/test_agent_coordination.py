@@ -1,6 +1,9 @@
 """Regression tests for agent-pool coordination lifecycle."""
 
+import asyncio
+
 from skeleton.agents.coordination import AgentPool, Coordinator, Task, TaskStatus
+from skeleton.frontier.orchestration import RunStatus, StepKind, StepStatus
 
 
 def test_failed_handler_releases_agent_capacity() -> None:
@@ -17,6 +20,12 @@ def test_failed_handler_releases_agent_capacity() -> None:
     assert first.status is TaskStatus.FAILED
     assert first.error == "boom"
     assert pool.stats()["total_load"] == 0
+
+    first_run = coordinator.get_run_record(first.task_id)
+    assert first_run is not None
+    assert first_run.status is RunStatus.FAILED
+    assert [step.kind for step in first_run.steps] == [StepKind.MODEL, StepKind.TOOL]
+    assert first_run.steps[-1].status is StepStatus.FAILED
 
     second = coordinator.dispatch("second", task_type="work")
     assert second.status is TaskStatus.FAILED
@@ -36,6 +45,41 @@ def test_successful_handler_still_releases_agent_capacity() -> None:
     assert task.status is TaskStatus.COMPLETED
     assert task.result == "done:job"
     assert pool.stats()["total_load"] == 0
+
+    run = coordinator.get_run_record(task.task_id)
+    assert run is not None
+    assert run.status is RunStatus.COMPLETED
+    assert run.output == "done:job"
+    assert [step.kind for step in run.steps] == [
+        StepKind.MODEL,
+        StepKind.TOOL,
+        StepKind.MODEL,
+    ]
+    assert all(step.status is StepStatus.SUCCEEDED for step in run.steps)
+
+
+def test_dispatch_remains_compatible_inside_running_event_loop() -> None:
+    pool = AgentPool(max_agents=1)
+    pool.create({"work"}, capacity=1)
+    coordinator = Coordinator(pool=pool)
+
+    async def handler(task):
+        await asyncio.sleep(0)
+        return f"async:{task.description}"
+
+    coordinator.register_handler("work", handler)
+
+    async def exercise():
+        return coordinator.dispatch("job", task_type="work")
+
+    task = asyncio.run(exercise())
+
+    assert task.status is TaskStatus.COMPLETED
+    assert task.result == "async:job"
+    assert pool.stats()["total_load"] == 0
+    run = coordinator.get_run_record(task.task_id)
+    assert run is not None
+    assert run.status is RunStatus.COMPLETED
 
 
 def test_find_capable_skips_saturated_agents() -> None:
