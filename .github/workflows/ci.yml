@@ -179,7 +179,10 @@ jobs:
           node-version: "${{ env.NODE_VERSION }}"
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
-      - run: yarn install --frozen-lockfile
+      - name: Install frontend dependencies without third-party lifecycle scripts
+        run: yarn install --frozen-lockfile --ignore-scripts
+      - name: Apply reviewed local node_modules patches
+        run: node ./scripts/patch-node-modules.js
       - run: yarn lint:ci
       - run: yarn typecheck
       - run: yarn export:web
