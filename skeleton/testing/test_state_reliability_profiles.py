@@ -10,6 +10,7 @@ from skeleton.state import RunStatus, SQLiteRunStore, StateConflict
 from skeleton.testing.state_reliability_profiles import (
     run_state_heartbeat_soak_profile,
     run_state_lifecycle_pressure_profile,
+    run_state_storage_failure_recovery_profile,
 )
 
 
@@ -44,6 +45,22 @@ def test_heartbeat_soak_updates_in_place_without_state_row_growth() -> None:
     assert result.step_rows == 0
     assert result.checkpoint_rows == 0
     assert result.recoverable == 0
+
+
+def test_storage_unavailability_is_atomic_and_recovers_on_retry() -> None:
+    result = run_state_storage_failure_recovery_profile()
+
+    assert result.injected_failures == 5
+    assert result.observed_failures == 5
+    assert result.successful_retries == 5
+    assert result.run_rows == 1
+    assert result.step_rows == 1
+    assert result.checkpoint_rows == 1
+    assert result.checkpoint_revision == 1
+    assert result.replay_steps == 0
+    assert result.recoverable == 0
+    assert result.terminal_status is RunStatus.SUCCEEDED
+    assert result.terminal_revision == 2
 
 
 class _Clock:

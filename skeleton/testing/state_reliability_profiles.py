@@ -29,6 +29,40 @@ class StateProfileResult:
     max_ms: float
 
 
+@dataclass(frozen=True, slots=True)
+class StorageFailureProfileResult:
+    """Outcome of deterministic storage-unavailability injection and recovery."""
+
+    injected_failures: int
+    observed_failures: int
+    successful_retries: int
+    run_rows: int
+    step_rows: int
+    checkpoint_rows: int
+    checkpoint_revision: int
+    replay_steps: int
+    recoverable: int
+    terminal_status: RunStatus
+    terminal_revision: int
+
+
+class _ConnectFailureStore(SQLiteRunStore):
+    """SQLite store that can fail exactly the next connection attempt."""
+
+    def __init__(self, path: str | Path) -> None:
+        self._connect_failures_remaining = 0
+        super().__init__(path)
+
+    def fail_next_connect(self) -> None:
+        self._connect_failures_remaining += 1
+
+    def _connect(self) -> sqlite3.Connection:
+        if self._connect_failures_remaining:
+            self._connect_failures_remaining -= 1
+            raise sqlite3.OperationalError("injected storage unavailable")
+        return super()._connect()
+
+
 def _positive(value: object, name: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise TypeError(f"{name} must be an integer")
@@ -175,4 +209,100 @@ def run_state_heartbeat_soak_profile(*, heartbeats: int = 500) -> StateProfileRe
             store=store,
             revision=record.revision,
             durations=durations,
+        )
+
+
+def run_state_storage_failure_recovery_profile() -> StorageFailureProfileResult:
+    """Inject connection failures at each write stage and prove clean retry recovery.
+
+    The fault is raised before a SQLite connection is returned, modeling a
+    temporarily unavailable storage boundary. Every interrupted operation is
+    retried once with the same semantic identity so the profile also proves
+    that recovery does not duplicate durable rows or advance revisions twice.
+    """
+
+    with tempfile.TemporaryDirectory(prefix="skeleton-state-storage-chaos-") as tmp:
+        path = Path(tmp) / "runs.sqlite3"
+        store = _ConnectFailureStore(path)
+        run_id = "storage-chaos"
+        worker = "worker"
+        observed_failures = 0
+        successful_retries = 0
+
+        store.create_run(run_id, {"profile": "storage-failure"})
+
+        def interrupted(operation):
+            nonlocal observed_failures, successful_retries
+            store.fail_next_connect()
+            try:
+                operation()
+            except sqlite3.OperationalError as exc:
+                if str(exc) != "injected storage unavailable":
+                    raise
+                observed_failures += 1
+            else:
+                raise AssertionError("injected storage failure was not observed")
+            result = operation()
+            successful_retries += 1
+            return result
+
+        claimed = interrupted(
+            lambda: store.claim_run(
+                run_id,
+                worker,
+                lease_seconds=300.0,
+                expected_revision=0,
+            )
+        )
+        interrupted(
+            lambda: store.start_step(
+                run_id,
+                "step-1",
+                "reliability",
+                worker_id=worker,
+                payload={"attempt": 1},
+                effect_key="storage-chaos-effect",
+            )
+        )
+        interrupted(
+            lambda: store.finish_step(
+                run_id,
+                "step-1",
+                StepStatus.SUCCEEDED,
+                worker_id=worker,
+                result={"ok": True},
+            )
+        )
+        checkpoint = interrupted(
+            lambda: store.checkpoint(
+                run_id,
+                {"step": 1},
+                worker_id=worker,
+                after_step_id="step-1",
+            )
+        )
+        terminal = interrupted(
+            lambda: store.transition_run(
+                run_id,
+                RunStatus.SUCCEEDED,
+                worker_id=worker,
+                expected_revision=claimed.revision,
+                output={"recovered": True},
+            )
+        )
+
+        run_rows, step_rows, checkpoint_rows = _counts(path)
+        resume = store.resume_state(run_id)
+        return StorageFailureProfileResult(
+            injected_failures=5,
+            observed_failures=observed_failures,
+            successful_retries=successful_retries,
+            run_rows=run_rows,
+            step_rows=step_rows,
+            checkpoint_rows=checkpoint_rows,
+            checkpoint_revision=checkpoint.revision,
+            replay_steps=len(resume.replay_steps),
+            recoverable=len(store.list_recoverable(limit=10_000)),
+            terminal_status=terminal.status,
+            terminal_revision=terminal.revision,
         )
