@@ -30,6 +30,7 @@ from skeleton.cortex.adversarial import (
     AdversarialEngine,
     BatchJudge,
     GateResult,
+    GateSpec,
     GateStatus,
     ReleaseDecision,
     Repairer,
@@ -190,6 +191,38 @@ def _snapshot(value: Any) -> Any:
     return repr(value)
 
 
+def _review_state(ctx: AdversarialContext) -> Dict[str, Any]:
+    """Snapshot all nested state a semantic judge is allowed to observe, not edit."""
+    return {
+        "candidate": _snapshot(ctx.candidate),
+        "evidence": _snapshot(ctx.evidence),
+        "tool_outputs": _snapshot(ctx.tool_outputs),
+        "external_content": _snapshot(ctx.external_content),
+        "metadata": _snapshot(ctx.metadata),
+        "confidence": float(ctx.confidence),
+        "requires_evidence": bool(ctx.requires_evidence),
+        "is_prediction": bool(ctx.is_prediction),
+        "has_side_effects": bool(ctx.has_side_effects),
+    }
+
+
+def _guard_judge(judge: Optional[BatchJudge], lane: TriLane) -> Optional[BatchJudge]:
+    """Make judge callbacks observational even when they request a repair round."""
+    if judge is None:
+        return None
+
+    def guarded(ctx: AdversarialContext, batch: Tuple[GateSpec, ...]) -> Mapping[int, Any]:
+        before = _review_state(ctx)
+        verdicts = judge(ctx, batch)
+        if _review_state(ctx) != before:
+            raise RuntimeError(
+                f"tri-engine invariant violated: {lane.value} judge mutated review context"
+            )
+        return verdicts
+
+    return guarded
+
+
 class TriAdversarialEngine:
     """Run three independent 100-gate release lanes and require unanimity."""
 
@@ -223,7 +256,7 @@ class TriAdversarialEngine:
             self.engines[lane] = AdversarialEngine(
                 threshold=lane_threshold,
                 max_repair_rounds=max_repair_rounds,
-                judge=_lookup(judges, lane, judge),
+                judge=_guard_judge(_lookup(judges, lane, judge), lane),
                 repairer=_lookup(repairers, lane, repairer),
                 seal_key=seal_key,
             )
@@ -316,9 +349,8 @@ class TriAdversarialEngine:
 
     @staticmethod
     def _lane_context(ctx: AdversarialContext, lane: TriLane, candidate: Any) -> AdversarialContext:
-        # Every lane receives a deep-isolated metadata graph. Judges are external
-        # callbacks and may mutate nested structures; such mutation must never
-        # leak to sibling lanes or back to caller-owned metadata.
+        # Every lane receives a deep-isolated review graph. Judges are external
+        # callbacks and must never be able to mutate caller-owned nested state.
         metadata = deepcopy(dict(ctx.metadata))
         lane_overlays = metadata.pop("tri_lanes", {})
         overlay: Mapping[str, Any] = {}
@@ -330,7 +362,14 @@ class TriAdversarialEngine:
         metadata["tri_lane"] = lane.value
         metadata["tri_focus_gates"] = TRI_FOCUS_GATES[lane]
         metadata["tri_gate_count"] = 100
-        return replace(ctx, candidate=candidate, metadata=metadata)
+        return replace(
+            ctx,
+            candidate=candidate,
+            evidence=deepcopy(ctx.evidence),
+            tool_outputs=deepcopy(ctx.tool_outputs),
+            external_content=deepcopy(ctx.external_content),
+            metadata=metadata,
+        )
 
     def _make_seal(
         self,
