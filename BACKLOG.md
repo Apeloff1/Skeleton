@@ -1,6 +1,6 @@
 # Skeleton Backlog — failed-commit register + forward work
 
-Updated 2026-09-15 (backlog reconciliation). Original register dated 2026-09-01. Two sections: things that failed and were recovered
+Updated 2026-09-15 (F-6/F-13 reconciliation). Original register dated 2026-09-01. Two sections: things that failed and were recovered
 (so the failure modes stay visible), and the frontier backlog (what to
 build next, ordered).
 
@@ -31,8 +31,9 @@ Those planes are out-of-scope for this register — audit separately.
 
 ## 2. Frontier backlog — ordered by leverage
 
-Updated 2026-09-15. Tier-1 seams F-1..F-10 and the Tier-2 F-6 frontier push
-are **landed**; do not re-open them without a regression.
+Updated 2026-09-15. Tier-1 seams F-1..F-10, the Tier-2 F-6 frontier push,
+and F-13 economic/cascade reconciliation are **landed**; do not re-open them
+without a regression.
 
 ### Landed (keep visible — failure modes + PR anchors)
 
@@ -48,6 +49,7 @@ are **landed**; do not re-open them without a regression.
 | F-8 blackboard poison guards | #18 | provenance + quarantine |
 | F-9 N+1 tool-call suppression | #20 | compose `kernel/dedup.py` |
 | F-10 PromptImproveDriver | #31 | ImproveLoop over prefix variants |
+| F-13 EconomicOptimiser × CascadeRouter | #277 | shared economic model registry, cascade planning, real model IDs, budget/cost accounting |
 | P6 policy enforcement | #13 | CodeVerifier + repair/verify gates |
 
 ### Live ops state — resolved blockers, keep green
@@ -82,17 +84,15 @@ remains Mixture-of-*Experts* and is a separate mechanism.
    godot binary to LFS, shim deletion. Local git ops.
 2. **F-12. H5.4 cortex persistence** — genesis twin vs live singleton once
    `$SKELETON_OWN` exists in the container.
-3. **F-13. EconomicOptimiser audit** — `intelligence/economic.py` predates
-   the cascade router; reconcile the two routing contracts.
-4. **F-14. Speculative RAG** — pre-fetch likely-needed documents during
+3. **F-14. Speculative RAG** — pre-fetch likely-needed documents during
    the planning phase of a pipeline run (compose quad + composer).
    Adjacent: `cortex/speculate.py` is token continuation, not RAG prefetch.
-5. **F-15. Organism/social/galaxy plane audit** — the repo grew three
+4. **F-15. Organism/social/galaxy plane audit** — the repo grew three
    planes while the waves landed (see §1 drift note). Same size-filtered
    read methodology as the deep-cut campaign, when their churn settles.
 
 ## Definition of SOTA (working)
 
-Tier-1 SOTA seams and F-6 Mixture-of-Depths are landed in code. The former
-CI-1..CI-3 blockers are resolved on main; the next differentiation work is the
-Tier-3 structural queue, starting with F-11 cleanup and F-12 cortex persistence.
+Tier-1 SOTA seams, F-6 Mixture-of-Depths, and F-13 economic/cascade
+reconciliation are landed in code. The former CI-1..CI-3 blockers are resolved
+on main; the remaining structural queue is F-11, F-12, F-14, then F-15.
