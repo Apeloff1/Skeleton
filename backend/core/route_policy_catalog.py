@@ -11,22 +11,32 @@ fail-closed adapter, but should be promoted into narrower domains over time.
 
 from __future__ import annotations
 
-from core.principal_seal import RouteDomainPolicy, RouteRule
+from collections.abc import Sequence
 
-ROUTE_POLICY_CATALOG_VERSION = "2026-09-15.v1"
+from core.principal_seal import (
+    RouteAdmission,
+    RouteDomainPolicy,
+    RouteRule,
+    VerifiedPrincipal,
+)
 
-# Public/bootstrap surfaces. Prefix semantics are intentional and bounded to
-# narrow endpoint roots; broad application areas are never declared open.
+ROUTE_POLICY_CATALOG_VERSION = "2026-09-15.v2"
+
+# Health/readiness may expose nested probe paths. Authentication bootstrap
+# endpoints are exact-only so future descendants cannot accidentally inherit
+# public admission.
 OPEN_ROUTE_PREFIXES: tuple[str, ...] = (
     "/api/health",
     "/api/ready",
+)
+OPEN_EXACT_PATHS: tuple[str, ...] = (
     "/api/auth/login",
     "/api/auth/register",
     "/api/auth/session",
 )
 
-# Longest-prefix matching in RouteDomainPolicy means specialized control-plane
-# domains win before broader product domains and finally the migration bucket.
+# Longest-prefix matching means specialized control-plane domains win before
+# broader product domains and finally the explicit migration bucket.
 ROUTE_DOMAIN_RULES: tuple[RouteRule, ...] = (
     RouteRule("/api/deployment", "deployment"),
     RouteRule("/api/ops", "operations"),
@@ -51,10 +61,53 @@ ROUTE_DOMAIN_RULES: tuple[RouteRule, ...] = (
 )
 
 
-def default_route_domain_policy() -> RouteDomainPolicy:
+class CatalogRouteDomainPolicy(RouteDomainPolicy):
+    """Route policy with both prefix-open and exact-open public surfaces."""
+
+    def __init__(
+        self,
+        *,
+        exact_open_paths: Sequence[str],
+        open_prefixes: Sequence[str],
+        domain_rules: Sequence[RouteRule],
+    ) -> None:
+        super().__init__(open_prefixes=open_prefixes, domain_rules=domain_rules)
+        self._exact_open_paths = frozenset(
+            self._normalize_path(path) for path in exact_open_paths
+        )
+
+    @property
+    def exact_open_paths(self) -> tuple[str, ...]:
+        return tuple(sorted(self._exact_open_paths))
+
+    def is_open(self, path: str) -> bool:
+        normalized = self._normalize_path(path)
+        return normalized in self._exact_open_paths or super().is_open(normalized)
+
+    def admit(self, path: str, principal: VerifiedPrincipal | None) -> RouteAdmission:
+        normalized = self._normalize_path(path)
+        if self.is_open(normalized):
+            return RouteAdmission(True, 200, "open route", open_route=True)
+        domain = self.required_domain(normalized)
+        if domain is None:
+            return RouteAdmission(False, 404, "unwritten route is sealed")
+        if principal is None:
+            return RouteAdmission(False, 401, "verified principal required", domain=domain)
+        return RouteAdmission(
+            True,
+            200,
+            "verified principal admitted to written route",
+            domain=domain,
+            principal_id=principal.principal_id,
+            attester_id=principal.attester_id,
+        )
+
+
+def default_route_domain_policy() -> CatalogRouteDomainPolicy:
     """Build the immutable default report-only domain policy."""
 
-    return RouteDomainPolicy(
+    return CatalogRouteDomainPolicy(
+        exact_open_paths=OPEN_EXACT_PATHS,
         open_prefixes=OPEN_ROUTE_PREFIXES,
         domain_rules=ROUTE_DOMAIN_RULES,
     )
@@ -66,6 +119,7 @@ def catalog_summary() -> dict[str, object]:
     return {
         "version": ROUTE_POLICY_CATALOG_VERSION,
         "open_prefixes": list(OPEN_ROUTE_PREFIXES),
+        "exact_open_paths": list(OPEN_EXACT_PATHS),
         "domain_rules": [
             {"prefix": rule.prefix, "domain": rule.domain} for rule in ROUTE_DOMAIN_RULES
         ],
