@@ -95,6 +95,38 @@ def resolve_pr_number(
     return next(iter(candidates))
 
 
+def live_pr_head_converged(
+    api: GitHubApi,
+    *,
+    repo: str,
+    pr_number: int,
+    signal_head_sha: str,
+) -> bool:
+    """Return whether live PR state is safe to use for this lifecycle signal.
+
+    ``workflow_run: requested`` can arrive before the pull-request REST endpoint
+    exposes a synchronize event's new head. Running cleanup in that window can
+    cancel the new head's CodeQL/CI jobs as obsolete. Closed PRs are safe to
+    drain immediately; open PRs must first match the immutable signal head.
+    Any other/missing state is ambiguous and therefore fails closed.
+    """
+    status, payload, _ = api.request(f"/repos/{repo}/pulls/{pr_number}")
+    if status != 200 or not isinstance(payload, dict):
+        raise RuntimeError(f"failed to refresh PR #{pr_number}: HTTP {status}")
+
+    state = str(payload.get("state") or "").lower()
+    if state == "closed":
+        return True
+    if state != "open":
+        raise RuntimeError(f"PR #{pr_number} response has unknown state {state!r}")
+
+    head = payload.get("head") or {}
+    live_head_sha = str(head.get("sha") or "")
+    if not live_head_sha:
+        raise RuntimeError(f"open PR #{pr_number} response is missing head.sha")
+    return live_head_sha == signal_head_sha
+
+
 def main() -> int:
     token = os.environ["GH_TOKEN"]
     repo = os.environ["REPO"]
@@ -118,6 +150,17 @@ def main() -> int:
             head_ref=head_ref,
             default_branch=default_branch,
         )
+        if not live_pr_head_converged(
+            api,
+            repo=repo,
+            pr_number=pr_number,
+            signal_head_sha=head_sha,
+        ):
+            print(
+                "obsolete-run drain deferred: live pull-request head has not "
+                "converged to the lifecycle signal head"
+            )
+            return 0
     except RuntimeError as exc:
         print(f"drain failed: {exc}")
         return 1
