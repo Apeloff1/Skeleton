@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import ast
 from collections import Counter
+import os
 from pathlib import Path
 import re
 import sys
@@ -95,22 +96,37 @@ CHILD_PROCESS_REFERENCE_RE = re.compile(
 )
 
 
+def walk_source_files(root: Path, suffixes: set[str]) -> Iterable[Path]:
+    """Walk source files without following symlinks or suppressing traversal errors."""
+    if root.is_symlink():
+        raise OSError("scan root must not be a symlink")
+
+    stack = [root]
+    while stack:
+        current = stack.pop()
+        child_dirs: list[Path] = []
+        source_paths: list[Path] = []
+        with os.scandir(current) as entries:
+            for entry in sorted(entries, key=lambda item: item.name):
+                if entry.name in SKIP_DIRS:
+                    continue
+                if entry.is_dir(follow_symlinks=False):
+                    child_dirs.append(Path(entry.path))
+                elif (
+                    entry.is_file(follow_symlinks=False)
+                    and Path(entry.name).suffix.lower() in suffixes
+                ):
+                    source_paths.append(Path(entry.path))
+        yield from source_paths
+        stack.extend(reversed(child_dirs))
+
+
 def python_files() -> Iterable[Path]:
-    for path in BACKEND_ROOT.rglob("*.py"):
-        if any(part in SKIP_DIRS for part in path.parts):
-            continue
-        yield path
+    yield from walk_source_files(BACKEND_ROOT, {".py"})
 
 
 def javascript_files() -> Iterable[Path]:
-    if not FRONTEND_ROOT.exists():
-        return
-    for path in FRONTEND_ROOT.rglob("*"):
-        if not path.is_file() or path.suffix.lower() not in JS_SUFFIXES:
-            continue
-        if any(part in SKIP_DIRS for part in path.parts):
-            continue
-        yield path
+    yield from walk_source_files(FRONTEND_ROOT, JS_SUFFIXES)
 
 
 def display_path(path: Path) -> Path:
@@ -295,7 +311,7 @@ def violations(path: Path) -> list[str]:
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     except (OSError, UnicodeError, SyntaxError) as exc:
-        return [f"{label}: parse failure: {exc}"]
+        return [f"{label}: parse failure: {type(exc).__name__}"]
 
     import_map = import_aliases(tree)
     findings: list[str] = []
@@ -520,7 +536,7 @@ def javascript_violations(path: Path) -> list[str]:
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as exc:
-        return [f"{label}: read failure: {exc}"]
+        return [f"{label}: read failure: {type(exc).__name__}"]
 
     scan_text = _mask_js_comments(text)
     code_positions = _js_code_positions(text)
@@ -560,12 +576,16 @@ def main() -> int:
     findings: list[str] = []
     python_count = 0
     js_count = 0
-    for path in python_files():
-        python_count += 1
-        findings.extend(violations(path))
-    for path in javascript_files():
-        js_count += 1
-        findings.extend(javascript_violations(path))
+    try:
+        for path in python_files():
+            python_count += 1
+            findings.extend(violations(path))
+        for path in javascript_files():
+            js_count += 1
+            findings.extend(javascript_violations(path))
+    except OSError as exc:
+        print(f"High-confidence SAST scan failed: {type(exc).__name__}", file=sys.stderr)
+        return 1
 
     if python_count == 0:
         findings.append("scanner coverage failure: no backend Python files were scanned")
