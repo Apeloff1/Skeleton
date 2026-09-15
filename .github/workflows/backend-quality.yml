@@ -96,7 +96,7 @@ jobs:
       - name: Repository malware and IOC gate
         run: python scripts/check_malware_iocs.py
 
-      - name: Security scanner and middleware adversarial regression tests
+      - name: Security and developer-tooling adversarial regression tests
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: >-
@@ -115,6 +115,7 @@ jobs:
           tests/test_workflow_security_gate.py
           tests/test_secret_hygiene_gate.py
           tests/test_malware_ioc_gate.py
+          tests/test_developer_tooling_security.py
           tests/test_incident_response_runbook.py
           tests/test_api_middleware_adversarial.py
           tests/test_api_middleware_regression_gaps.py
