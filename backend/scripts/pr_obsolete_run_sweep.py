@@ -72,14 +72,15 @@ def _fetch_pr(
     *,
     repo: str,
     number: int,
-    cache: dict[int, dict[str, Any]],
+    cache: dict[int, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    if number in cache:
+    if cache is not None and number in cache:
         return cache[number]
     status, payload, _ = api.request(f"/repos/{repo}/pulls/{number}")
     if status != 200 or not isinstance(payload, dict):
         raise RuntimeError(f"failed to resolve PR #{number}: HTTP {status}")
-    cache[number] = payload
+    if cache is not None:
+        cache[number] = payload
     return payload
 
 
@@ -98,6 +99,71 @@ def _matches_run_identity(
         and str(head.get("ref") or "") == branch
         and str(base.get("ref") or "") == default_branch
     )
+
+
+def _candidate_state(
+    candidates: list[dict[str, Any]], *, run_sha: str
+) -> tuple[bool, bool]:
+    """Return (unknown, authoritative) for matching PR candidates."""
+    unknown = False
+    authoritative = False
+    for pr in candidates:
+        state = str(pr.get("state") or "")
+        head_sha = str((pr.get("head") or {}).get("sha") or "")
+        if state == "open":
+            if not head_sha:
+                unknown = True
+                break
+            if head_sha == run_sha:
+                authoritative = True
+                break
+        elif state != "closed":
+            unknown = True
+            break
+    return unknown, authoritative
+
+
+def _fresh_candidates(
+    api: GitHubApi,
+    *,
+    repo: str,
+    run: dict[str, Any],
+    branch: str,
+    sha: str,
+    default_branch: str,
+) -> list[dict[str, Any]]:
+    """Re-resolve associations and PR state immediately before mutation.
+
+    This intentionally bypasses the scan caches: a PR can reopen or an open PR
+    can move its head back to the run SHA after the first classification pass.
+    Cancellation authority must therefore be based on a fresh live read.
+    """
+    numbers = _explicit_pr_numbers(run)
+    numbers.update(
+        _commit_pr_numbers(
+            api,
+            repo=repo,
+            sha=sha,
+            cache={},
+        )
+    )
+    if not numbers:
+        return []
+
+    candidates = [
+        _fetch_pr(api, repo=repo, number=number, cache=None)
+        for number in sorted(numbers)
+    ]
+    return [
+        pr
+        for pr in candidates
+        if _matches_run_identity(
+            pr,
+            repo=repo,
+            branch=branch,
+            default_branch=default_branch,
+        )
+    ]
 
 
 def sweep(
@@ -120,6 +186,7 @@ def sweep(
         "unclassified": 0,
         "resolution_failed": 0,
         "obsolete": 0,
+        "race_preserved": 0,
         "over_cap": 0,
         "accepted": 0,
         "forced": 0,
@@ -189,23 +256,8 @@ def sweep(
                 counts["unclassified"] += 1
                 continue
 
-            unknown_open = False
-            authoritative = False
-            for pr in candidates:
-                state = str(pr.get("state") or "")
-                head_sha = str((pr.get("head") or {}).get("sha") or "")
-                if state == "open":
-                    if not head_sha:
-                        unknown_open = True
-                        break
-                    if head_sha == sha:
-                        authoritative = True
-                        break
-                elif state != "closed":
-                    unknown_open = True
-                    break
-
-            if unknown_open:
+            unknown, authoritative = _candidate_state(candidates, run_sha=sha)
+            if unknown:
                 counts["unclassified"] += 1
                 continue
             if authoritative:
@@ -224,6 +276,37 @@ def sweep(
                 counts["over_cap"] += 1
                 continue
 
+            # The scan above can be minutes old in a large backlog. Re-resolve
+            # both commit associations and PR state immediately before mutation.
+            try:
+                fresh = _fresh_candidates(
+                    api,
+                    repo=repo,
+                    run=run,
+                    branch=branch,
+                    sha=sha,
+                    default_branch=default_branch,
+                )
+            except RuntimeError as exc:
+                counts["resolution_failed"] += 1
+                counts["race_preserved"] += 1
+                print(f"sweep preserve before cancel: run={run_id} reason={exc}")
+                continue
+            if not fresh:
+                counts["unclassified"] += 1
+                counts["race_preserved"] += 1
+                continue
+
+            fresh_unknown, fresh_authoritative = _candidate_state(fresh, run_sha=sha)
+            if fresh_unknown:
+                counts["unclassified"] += 1
+                counts["race_preserved"] += 1
+                continue
+            if fresh_authoritative:
+                counts["authoritative"] += 1
+                counts["race_preserved"] += 1
+                continue
+
             result = cancel_run(api, repo, run_id)
             counts[result.outcome] += 1
             if result.outcome == "failed":
@@ -240,7 +323,8 @@ def _write_summary(summary: dict[str, int]) -> None:
         f"- Current authoritative runs preserved: {summary['authoritative']}\n"
         f"- Unclassified runs preserved: {summary['unclassified']}\n"
         f"- Association/API resolution failures preserved: {summary['resolution_failed']}\n"
-        f"- Obsolete runs proven: {summary['obsolete']}\n"
+        f"- Initially obsolete runs proven: {summary['obsolete']}\n"
+        f"- Runs preserved by pre-cancel live revalidation: {summary['race_preserved']}\n"
         f"- Obsolete runs deferred by sweep cap: {summary['over_cap']}\n"
         f"- Cancel requests accepted: {summary['accepted']}\n"
         f"- Force-cancel requests accepted: {summary['forced']}\n"
