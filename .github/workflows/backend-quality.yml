@@ -50,23 +50,27 @@ jobs:
       - name: Syntax check (full backend)
         run: python -m compileall -q .
 
-      - name: Backend route inventory audit
+      - name: Backend route inventory gate
         run: >-
           python scripts/backend_route_inventory.py
           --registry core/routes_registry.py
           --routes-root routes
+          --strict
+          --fail-on-duplicates
 
-      - name: Backend route collision evidence
+      - name: Backend route collision gate
         run: >-
           python scripts/backend_route_collisions.py
           --registry core/routes_registry.py
           --routes-root routes
+          --fail
 
-      - name: Route-domain policy migration report
+      - name: Route-domain policy readiness gate
         run: >-
           python scripts/backend_route_policy_report.py
           --registry core/routes_registry.py
           --routes-root routes
+          --require-inventory-clean
 
       - name: Process invocation safety gate
         run: python scripts/check_process_safety.py
@@ -90,7 +94,7 @@ jobs:
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: >-
-          python -m pytest -q --noconftest
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
           tests/test_exec_guard.py
           tests/test_process_safety_gate.py
           tests/test_process_safety_destructuring.py
