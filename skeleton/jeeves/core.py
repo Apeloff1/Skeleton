@@ -119,6 +119,12 @@ class Jeeves:
     def laws(self) -> tuple[str, ...]:
         return SYSTEM_LAWS
 
+    @staticmethod
+    def _require_mode(mode: SessionMode) -> SessionMode:
+        if not isinstance(mode, SessionMode):
+            raise SessionError("invalid session mode", context={"mode": str(mode)[:64]})
+        return mode
+
     def _reclaim_closed_session(self) -> bool:
         closed = [s for s in self._sessions.values() if not s.is_open]
         if not closed:
@@ -138,6 +144,7 @@ class Jeeves:
                                         "max_turns": self._max_turns})
 
     def open_session(self, user_id: str | UserId, *, mode: SessionMode = SessionMode.TUTORING) -> Session:
+        mode = self._require_mode(mode)
         if len(self._sessions) >= self._max_sessions and not self._reclaim_closed_session():
             raise SessionError("session capacity reached",
                                context={"max_sessions": self._max_sessions})
@@ -157,6 +164,7 @@ class Jeeves:
 
     def set_mode(self, session_id: str, mode: SessionMode) -> Session:
         session = self._get(session_id)
+        mode = self._require_mode(mode)
         if not session.is_open:
             raise SessionError("session is closed", context={"session_id": session_id})
         session.mode = mode
@@ -176,7 +184,7 @@ class Jeeves:
 
         session = self._get(session_id)
         self._ensure_turn_capacity(session, 2)
-        prior_history = list(session.turns)
+        prior_history = [Turn(role=t.role, content=t.content, at=t.at) for t in session.turns]
         start_turns = len(session.turns)
         session.add_turn("learner", message)
         ctx = dict(context or {})
