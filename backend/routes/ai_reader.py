@@ -5,14 +5,17 @@
 ║  Converts book content to audio for an immersive reading experience    ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 """
+import logging
+import os
+
+from dotenv import load_dotenv
 from fastapi import APIRouter, Query, HTTPException
 from fastapi.responses import Response
-import os
-from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 
 load_dotenv()
 
+log = logging.getLogger("ai.reader")
 router = APIRouter(prefix="/api/reader", tags=["ai-reader"])
 
 # reading_library now lives in content_db (regenerable). Use centralized handles.
@@ -58,8 +61,9 @@ async def speak_text(
             )
             out["status"] = "success"
             return out
-        except Exception as e:
-            raise HTTPException(500, f"Expressive TTS failed: {str(e)}")
+        except Exception as exc:
+            log.warning("Expressive TTS failed: %s", type(exc).__name__)
+            raise HTTPException(status_code=500, detail="Expressive TTS failed") from None
     if voice not in VOICE_OPTIONS:
         raise HTTPException(400, f"Voice '{voice}' not available. Choose from: {list(VOICE_OPTIONS.keys())}")
 
@@ -84,10 +88,13 @@ async def speak_text(
             "model": model,
             "text_length": len(text),
         }
+    except HTTPException:
+        raise
     except ImportError:
-        raise HTTPException(500, "TTS library not installed")
-    except Exception as e:
-        raise HTTPException(500, f"TTS generation failed: {str(e)}")
+        raise HTTPException(500, "TTS library not installed") from None
+    except Exception as exc:
+        log.warning("TTS generation failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=500, detail="TTS generation failed") from None
 
 
 @router.post("/read-chapter")
@@ -145,10 +152,13 @@ async def read_book_chapter(
             "text_length": len(reading_text),
             "voice": voice,
         }
+    except HTTPException:
+        raise
     except ImportError:
-        raise HTTPException(500, "TTS library not installed")
-    except Exception as e:
-        raise HTTPException(500, f"TTS generation failed: {str(e)}")
+        raise HTTPException(500, "TTS library not installed") from None
+    except Exception as exc:
+        log.warning("TTS generation failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=500, detail="TTS generation failed") from None
 
 
 @router.post("/read-knowledge")
@@ -194,7 +204,10 @@ async def read_knowledge_entry(
             "text_length": len(reading_text),
             "voice": voice,
         }
+    except HTTPException:
+        raise
     except ImportError:
-        raise HTTPException(500, "TTS library not installed")
-    except Exception as e:
-        raise HTTPException(500, f"TTS generation failed: {str(e)}")
+        raise HTTPException(500, "TTS library not installed") from None
+    except Exception as exc:
+        log.warning("TTS generation failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=500, detail="TTS generation failed") from None
