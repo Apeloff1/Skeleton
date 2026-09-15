@@ -179,12 +179,19 @@ def test_content_length_plus_transfer_encoding_fails_closed() -> None:
     assert not called
 
 
-@pytest.mark.parametrize("bad", [b"+1", b" 1", b"1 ", b"1.0", b"0x10"])
+@pytest.mark.parametrize("bad", [b"+1", b"1.0", b"0x10"])
 def test_non_decimal_content_length_forms_are_rejected(bad: bytes) -> None:
     sent, called = _exercise(headers=[(b"content-length", bad)], chunks=[b"x"])
 
     assert _status(sent) == 400
     assert not called
+
+
+def test_optional_whitespace_around_content_length_is_normalized() -> None:
+    sent, called = _exercise(headers=[(b"content-length", b" 1 ")], chunks=[b"x"])
+
+    assert _status(sent) == 204
+    assert called
 
 
 def test_oversized_stream_is_rejected_before_app_even_if_handler_would_not_read_body() -> None:
