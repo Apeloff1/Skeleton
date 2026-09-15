@@ -14,11 +14,15 @@ import sys
 
 if __package__:
     from .check_workflow_input_security import (
+        _flow_mapping_entries,
+        _flow_style_steps,
         _run_fragments as hardened_run_fragments,
         violations as input_boundary_violations,
     )
 else:
     from check_workflow_input_security import (
+        _flow_mapping_entries,
+        _flow_style_steps,
         _run_fragments as hardened_run_fragments,
         violations as input_boundary_violations,
     )
@@ -29,6 +33,9 @@ SHA40_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 USES_RE = re.compile(
     r"^\s*(?:-\s*)?(?:\{\s*)?(?:uses|'uses'|\"uses\")\s*:\s*[\"']?([^\"'\s,}#]+)"
+)
+FLOW_USES_ENTRY_RE = re.compile(
+    r"^(?:uses|'uses'|\"uses\")\s*:\s*[\"']?([^\"'\s,}#]+)"
 )
 EXPRESSION_RE = re.compile(r"\$\{\{(?P<body>.*?)\}\}", re.DOTALL)
 PERSIST_FALSE_RE = re.compile(
@@ -99,6 +106,41 @@ def _checkout_credentials_disabled(lines: list[str], uses_index: int) -> bool:
                 return True
         index += 1
     return False
+
+
+def _action_reference_findings(
+    path_name: str,
+    number: int,
+    reference: str,
+    *,
+    checkout_hardened: bool,
+) -> list[str]:
+    """Apply immutable-pin and checkout credential policy to one action reference."""
+    findings: list[str] = []
+
+    if reference.startswith(CHECKOUT_ACTION) and not checkout_hardened:
+        findings.append(
+            f"{path_name}:{number}: actions/checkout must set persist-credentials: false"
+        )
+
+    if _is_local(reference):
+        return findings
+    if reference.startswith("docker://"):
+        container_violation = _container_violation(reference)
+        if container_violation:
+            findings.append(f"{path_name}:{number}: {container_violation}: {reference}")
+        return findings
+    if "@" not in reference:
+        findings.append(
+            f"{path_name}:{number}: action reference must be pinned to an immutable commit SHA: {reference}"
+        )
+        return findings
+    _action, revision = reference.rsplit("@", 1)
+    if not SHA40_RE.fullmatch(revision):
+        findings.append(
+            f"{path_name}:{number}: action reference is not pinned to a 40-character commit SHA: {reference}"
+        )
+    return findings
 
 
 def _top_level_permission_violations(
@@ -186,6 +228,28 @@ def violations(path: Path) -> list[str]:
     )
     findings.extend(permission_findings)
 
+    # Compact flow mappings can place ``uses`` after another key on the same
+    # physical line, where the line-anchored action parser cannot see it. Inspect
+    # only top-level flow entries and apply the same action policy. If any source
+    # line in the flow mapping already starts with ``uses``, the normal parser
+    # below will handle it and we avoid duplicate findings.
+    for number, fragment in _flow_style_steps(lines):
+        if any(USES_RE.match(source_line) for source_line in fragment.splitlines()):
+            continue
+        for entry in _flow_mapping_entries(fragment):
+            match = FLOW_USES_ENTRY_RE.match(entry.strip())
+            if not match:
+                continue
+            reference = match.group(1).strip("\"'")
+            findings.extend(
+                _action_reference_findings(
+                    path.name,
+                    number,
+                    reference,
+                    checkout_hardened=bool(PERSIST_FALSE_RE.search(fragment)),
+                )
+            )
+
     for index, line in enumerate(lines):
         number = index + 1
 
@@ -199,25 +263,14 @@ def violations(path: Path) -> list[str]:
         if not match:
             continue
         reference = match.group(1).strip("\"'")
-
-        if reference.startswith(CHECKOUT_ACTION) and not _checkout_credentials_disabled(lines, index):
-            findings.append(
-                f"{path.name}:{number}: actions/checkout must set persist-credentials: false"
+        findings.extend(
+            _action_reference_findings(
+                path.name,
+                number,
+                reference,
+                checkout_hardened=_checkout_credentials_disabled(lines, index),
             )
-
-        if _is_local(reference):
-            continue
-        if reference.startswith("docker://"):
-            container_violation = _container_violation(reference)
-            if container_violation:
-                findings.append(f"{path.name}:{number}: {container_violation}: {reference}")
-            continue
-        if "@" not in reference:
-            findings.append(f"{path.name}:{number}: action reference must be pinned to an immutable commit SHA: {reference}")
-            continue
-        _action, revision = reference.rsplit("@", 1)
-        if not SHA40_RE.fullmatch(revision):
-            findings.append(f"{path.name}:{number}: action reference is not pinned to a 40-character commit SHA: {reference}")
+        )
 
     # Reuse the hardened run parser from the input-boundary gate for every
     # attacker-controlled event context too. This prevents quoted run keys,
