@@ -48,17 +48,37 @@ A healthy exhaustion result has:
 
 This proves that concurrent transient failures cannot create unbounded retry loops. The canonical orchestrator terminates each run at the configured retry budget.
 
+## Durable state pressure and soak profiles
+
+`skeleton/testing/state_reliability_profiles.py` exercises the real `SQLiteRunStore` instead of an in-memory fake. The required regression baseline is:
+
+```bash
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_state_reliability_profiles.py
+```
+
+The state suite covers three deterministic pressure modes:
+
+- **Concurrent lifecycle pressure:** 24 runs at concurrency 6, each with three durable steps and one checkpoint. Healthy structure is exactly 24 run rows, 72 step rows, 24 checkpoint rows, zero failed runs, and zero recoverable leftovers.
+- **Heartbeat soak:** 128 lease renewals on one running record. Healthy structure remains exactly one run row with zero step/checkpoint growth, and the final revision is 130 (claim + 128 heartbeats + terminal transition).
+- **Lease-contention chaos:** 12 workers race for one live lease. Exactly one may acquire it; the other 11 must fail with `StateConflict`. After deterministic lease expiry a recovery worker must claim the run and terminate it successfully.
+
+The lifecycle and heartbeat helpers also report p50, p95, and maximum operation latency. CI asserts structural correctness rather than machine-dependent latency ceilings. This makes accidental duplicate writes, leaked recoverable runs, or unbounded heartbeat state growth deterministic failures while still preserving timing data for comparable-environment capacity baselines.
+
 ## CI regression baseline
 
-`skeleton/testing/test_orchestration_reliability_profiles.py` pins a small deterministic baseline suitable for the required quality gate:
+The canonical quality gate runs both orchestration and durable-state reliability regressions:
 
-| Scenario | Runs | Concurrency | Injected failures | Retry budget | Expected result |
-| --- | ---: | ---: | ---: | ---: | --- |
-| Recovery pressure | 32 | 8 | 2 | 3 | 32 completed, 96 tool attempts |
-| Exhaustion pressure | 24 | 6 | 5 | 2 | 24 failed, 48 tool attempts |
+| Scenario | Pressure | Expected structural result |
+| --- | --- | --- |
+| Orchestration recovery | 32 runs, concurrency 8, 2 transient failures, retry budget 3 | 32 completed, 96 tool attempts |
+| Orchestration exhaustion | 24 runs, concurrency 6, 5 transient failures, retry budget 2 | 24 failed, 48 tool attempts |
+| State lifecycle | 24 runs, concurrency 6, 3 steps/run | 24 runs, 72 steps, 24 checkpoints, 0 recoverable |
+| State heartbeat soak | 128 renewals | 1 run row, 0 steps, 0 checkpoints, revision 130 |
+| State lease contention | 12 contenders | 1 live owner, 11 conflicts, successful post-expiry takeover |
 
-The regression baseline intentionally asserts retry counts and terminal states, not machine-dependent latency thresholds. Larger performance baselines should be captured from the CLI profile and compared within the same execution class.
+The regression baseline intentionally asserts retry counts, terminal states, and durable row cardinality rather than machine-dependent latency thresholds. Larger performance baselines should be captured on a stable execution class and compared only against equivalent hardware/runtime configuration.
 
 ## Remaining #123 coverage
 
-This profile covers canonical orchestration retry pressure and graceful tool-failure degradation. Issue #123 remains open until equivalent repeatable evidence covers API/streaming/state paths, broader soak/resource growth, provider/storage/queue failure injection, and a documented capacity baseline from representative execution environments.
+The repository now has repeatable orchestration retry/chaos evidence plus durable-state concurrent load, heartbeat soak, and lease-contention recovery coverage. Issue #123 remains open for API/streaming load, provider/storage failure injection beyond state lease conflicts, broader process-level memory/resource soak evidence, and representative environment capacity baselines.
