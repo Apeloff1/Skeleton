@@ -82,7 +82,11 @@ def main() -> int:
     require(readiness_start >= 0, "readiness job missing", failures)
     readiness = text[readiness_start:] if readiness_start >= 0 else ""
     require("name: Merge Readiness" in readiness, "stable Merge Readiness job name missing", failures)
-    require("if: always()" in readiness, "Merge Readiness must always emit a result", failures)
+    require(
+        re.search(r"^\s*if:\s*.*\balways\(\)", readiness, re.MULTILINE) is not None,
+        "Merge Readiness aggregate must use always() so upstream failures are observed",
+        failures,
+    )
     require('result != "success"' in readiness, "Merge Readiness must fail on every non-success result", failures)
     for job in REQUIRED_NEEDS:
         require(
