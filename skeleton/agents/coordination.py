@@ -249,13 +249,7 @@ class Coordinator:
                     raise RuntimeError(
                         f"legacy coordinator handler not found: {_task_type}"
                     )
-                try:
-                    return current_handler(task)
-                except Exception as exc:
-                    # Preserve the historical public error string while the
-                    # canonical run/step record retains the typed error text.
-                    task.error = str(exc)
-                    raise
+                return current_handler(task)
 
             self._tools.register(task_type, invoke)
             self._registered_tool_types.add(task_type)
@@ -332,8 +326,7 @@ class Coordinator:
             return
 
         task.status = TaskStatus.FAILED
-        if task.error is None:
-            task.error = record.error
+        task.error = record.error
         self._stats["failed"] += 1
 
     async def dispatch_async(
