@@ -124,7 +124,7 @@ jobs:
       - env: {PYTHONPATH: "."}
         run: chmod +x scripts/cockpit-smoke.sh && ./scripts/cockpit-smoke.sh
   backend-test:
-    name: "Backend Test"
+    name: "Backend Test + Import Smoke"
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: backend-lint
@@ -139,34 +139,21 @@ jobs:
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with: {python-version: "${{ env.PYTHON_VERSION }}"}
-      - run: |
+      - name: Install backend runtime and test tools
+        run: |
           uv venv
           uv pip install -r requirements.txt
           uv pip install "pytest>=8,<9" pytest-asyncio pytest-cov pytest-xdist
-      - env: {MONGO_URL: mongodb://localhost:27017/test}
+      - name: Import application with live Mongo
+        env:
+          MONGO_URL: mongodb://localhost:27017/test
+          SKIP_HEAVY_SEED: "true"
+        run: uv run python -c "import server; assert server.app is not None; print('server import: OK')"
+      - name: Run backend regression suite
+        env: {MONGO_URL: mongodb://localhost:27017/test}
         run: uv run pytest tests/ -v --cov=. --cov-report=xml
       - uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with: {files: ./backend/coverage.xml, fail_ci_if_error: false}
-  backend-import-smoke:
-    name: "Backend Import Smoke"
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: backend-lint
-    defaults: {run: {working-directory: ./backend}}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: {persist-credentials: false}
-      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with: {python-version: "${{ env.PYTHON_VERSION }}"}
-      - run: |
-          uv venv
-          uv pip install -r requirements.txt
-      - env:
-          MONGO_URL: mongodb://localhost:27017/test
-          SKIP_HEAVY_SEED: "true"
-        run: |
-          uv run python -c "import server; assert server.app is not None; print('server import: OK')"
   frontend:
     name: "Frontend"
     runs-on: ubuntu-latest
@@ -188,7 +175,7 @@ jobs:
     name: "Docker Build"
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    needs: [skeleton-test, school-jeeves-test, cockpit-smoke, backend-test, backend-import-smoke, frontend]
+    needs: [skeleton-test, school-jeeves-test, cockpit-smoke, backend-test, frontend]
     if: github.ref == 'refs/heads/main'
     permissions: {contents: read, packages: write}
     steps:
@@ -207,17 +194,21 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: ${{ env.IMAGE }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=root-image
+          cache-to: type=gha,mode=max,scope=root-image
       - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: ./backend/Dockerfile
           push: true
           tags: ${{ env.IMAGE }}/backend:latest
+          cache-from: type=gha,scope=backend-image
+          cache-to: type=gha,mode=max,scope=backend-image
       - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: ./frontend
           target: production
           push: true
           tags: ${{ env.IMAGE }}/frontend:latest
+          cache-from: type=gha,scope=frontend-image
+          cache-to: type=gha,mode=max,scope=frontend-image
