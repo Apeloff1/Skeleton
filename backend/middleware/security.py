@@ -10,7 +10,7 @@ Provides independent edge controls wired by server.py:
 
 Proxy-provided client identity is trusted only when the immediate peer is in
 ``CODEDOCK_TRUSTED_PROXY_CIDRS``. Forwarding chains are parsed right-to-left
-and malformed chains fail closed to the immediate peer.
+and malformed or ambiguous chains fail closed to the immediate peer.
 """
 from __future__ import annotations
 
@@ -31,6 +31,7 @@ from starlette.responses import JSONResponse
 
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")
 _MAX_RETRY_AFTER_SECONDS = 86_400
+_monotonic = time.monotonic
 
 
 def _matches_path_prefix(path: str, prefix: str) -> bool:
@@ -71,16 +72,11 @@ def _request_client_ip(request: Request) -> str:
     if not any(peer_addr in network for network in networks):
         return peer
 
-    # Multiple XFF field-lines or empty chain elements are ambiguous across
-    # intermediaries. Do not normalize attacker-controlled ambiguity into trust.
-    forwarded_headers = request.headers.getlist("x-forwarded-for")
-    if len(forwarded_headers) != 1:
-        return peer
-    forwarded = forwarded_headers[0]
-    if not forwarded:
+    forwarded_values = request.headers.getlist("x-forwarded-for")
+    if len(forwarded_values) != 1:
         return peer
 
-    values = [value.strip() for value in forwarded.split(",")]
+    values = [value.strip() for value in forwarded_values[0].split(",")]
     if not values or any(not value for value in values):
         return peer
 
@@ -94,10 +90,13 @@ def _request_client_ip(request: Request) -> str:
     for address in reversed(parsed):
         if not any(address in network for network in networks):
             return str(address)
+
+    # A chain containing only trusted proxies has no trustworthy client identity.
     return peer
 
 
 def _safe_content_length(raw: str | None) -> int:
+    """Parse audit metadata without ever raising on hostile header values."""
     if not raw:
         return 0
     value = raw.strip(" \t")
@@ -173,16 +172,28 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         RateLimitMiddleware._burst = int(configured_burst)
         RateLimitMiddleware._max_buckets = int(configured_max)
         RateLimitMiddleware._bucket_ttl = float(configured_ttl)
+        # Keep the advertised hard cap true even when a live process reloads with
+        # a smaller configured maximum. This is configuration-time pruning only;
+        # request-driven churn never evicts active buckets.
+        while len(RateLimitMiddleware._buckets) > RateLimitMiddleware._max_buckets:
+            RateLimitMiddleware._buckets.popitem(last=False)
+
         self.prefix = prefix
-        self._whitelist = (
+        # Leaf endpoints are exact exemptions. Only namespaces that are
+        # intentionally exempt as a subtree are prefix-matched.
+        self._exact_whitelist = frozenset(
+            {
+                "/api/binary/download",
+                "/api/binary/inspect",
+                "/api/binary/toolchain",
+                "/api/binary/list",
+                "/api/telemetry/event",
+                "/api/telemetry/batch",
+            }
+        )
+        self._prefix_whitelist = (
             "/api/health",
-            "/api/binary/download",
-            "/api/binary/inspect",
-            "/api/binary/toolchain",
-            "/api/binary/list",
             "/api/security",
-            "/api/telemetry/event",
-            "/api/telemetry/batch",
         )
 
     def _key(self, request: Request) -> Tuple[str, str]:
@@ -191,12 +202,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         route = "/".join(parts[:4]) if len(parts) >= 4 else request.url.path
         return ip, route
 
+    def _is_whitelisted(self, path: str) -> bool:
+        return path in self._exact_whitelist or any(
+            _matches_path_prefix(path, allowed) for allowed in self._prefix_whitelist
+        )
+
     @classmethod
     def _prune_expired_buckets(cls, now: float) -> None:
         while cls._buckets:
             key = next(iter(cls._buckets))
             bucket = cls._buckets[key]
-            if now - bucket.last_refill < cls._bucket_ttl:
+            if max(0.0, now - bucket.last_refill) < cls._bucket_ttl:
                 break
             cls._buckets.popitem(last=False)
             cls._expired_prunes += 1
@@ -205,10 +221,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         if not _matches_path_prefix(path, self.prefix):
             return await call_next(request)
-        if any(_matches_path_prefix(path, allowed) for allowed in self._whitelist):
+        if self._is_whitelisted(path):
             return await call_next(request)
 
-        now = time.monotonic()
+        now = _monotonic()
         ip, route = self._key(request)
         key = (ip, route)
         async with RateLimitMiddleware._lock:
@@ -216,9 +232,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             bucket = RateLimitMiddleware._buckets.get(key)
             if bucket is None:
                 if len(RateLimitMiddleware._buckets) >= RateLimitMiddleware._max_buckets:
-                    # Evicting an active bucket to admit attacker-chosen new state
-                    # resets that bucket's tokens and turns the memory cap into a
-                    # rate-limit bypass. At capacity, fail closed instead.
+                    # Never evict active state to admit attacker-chosen new keys: that
+                    # would mint a fresh burst and turn the memory cap into a bypass.
                     RateLimitMiddleware._capacity_rejections += 1
                     return JSONResponse(
                         status_code=429,
@@ -236,12 +251,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 RateLimitMiddleware._buckets[key] = bucket
             else:
                 RateLimitMiddleware._buckets.move_to_end(key)
+
             elapsed = max(0.0, now - bucket.last_refill)
             bucket.tokens = min(
                 float(RateLimitMiddleware._burst),
                 bucket.tokens + elapsed * RateLimitMiddleware._rps,
             )
-            bucket.last_refill = now
+            # Do not move refill state backwards if a clock seam/mock regresses.
+            bucket.last_refill = max(bucket.last_refill, now)
             if bucket.tokens < 1.0:
                 retry_delay = (1.0 - bucket.tokens) / RateLimitMiddleware._rps
                 if math.isfinite(retry_delay):
@@ -434,6 +451,22 @@ class SizeLimitMiddleware:
         async with self._inflight_lock:
             self._inflight_body_bytes = max(0, self._inflight_body_bytes - amount)
 
+    async def _reject_too_large(
+        self, scope, receive, send, *, got_bytes: int | None = None,
+        got_bytes_at_least: int | None = None,
+    ) -> None:
+        content = {
+            "error": "payload_too_large",
+            "detail": f"body exceeds {self.max_bytes // 1024 // 1024} MB",
+            "limit_bytes": self.max_bytes,
+        }
+        if got_bytes is not None:
+            content["got_bytes"] = got_bytes
+        if got_bytes_at_least is not None:
+            content["got_bytes_at_least"] = got_bytes_at_least
+        response = JSONResponse(status_code=413, content=content)
+        await response(scope, receive, send)
+
     async def __call__(self, scope, receive, send):
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
@@ -451,12 +484,24 @@ class SizeLimitMiddleware:
             if key.lower() == b"content-length"
         ]
         transfer_encodings = [
-            value.decode("latin-1").strip(" \t")
+            value.decode("latin-1").strip(" \t").lower()
             for key, value in raw_headers
             if key.lower() == b"transfer-encoding"
         ]
 
-        if len(content_lengths) > 1 or (content_lengths and transfer_encodings):
+        # Reject ambiguous or unsupported HTTP framing before consuming a body.
+        if (
+            len(content_lengths) > 1
+            or (content_lengths and transfer_encodings)
+            or len(transfer_encodings) > 1
+        ):
+            response = JSONResponse(
+                status_code=400,
+                content={"error": "invalid_request_framing"},
+            )
+            await response(scope, receive, send)
+            return
+        if transfer_encodings and transfer_encodings[0] != "chunked":
             response = JSONResponse(
                 status_code=400,
                 content={"error": "invalid_request_framing"},
@@ -475,53 +520,51 @@ class SizeLimitMiddleware:
                 await response(scope, receive, send)
                 return
 
+            # Compare as a normalized decimal string before int() so hostile
+            # multi-kilobyte digit strings cannot trigger Python's parse limit.
             normalized_declared = raw_declared.lstrip("0") or "0"
             limit_text = str(self.max_bytes)
             if len(normalized_declared) > len(limit_text) or (
                 len(normalized_declared) == len(limit_text)
                 and normalized_declared > limit_text
             ):
-                response = JSONResponse(
-                    status_code=413,
-                    content={
-                        "error": "payload_too_large",
-                        "detail": f"body exceeds {self.max_bytes // 1024 // 1024} MB",
-                        "limit_bytes": self.max_bytes,
-                        "got_bytes_at_least": self.max_bytes + 1,
-                    },
+                await self._reject_too_large(
+                    scope,
+                    receive,
+                    send,
+                    got_bytes_at_least=self.max_bytes + 1,
                 )
-                await response(scope, receive, send)
                 return
-
             declared = int(normalized_declared, 10)
 
+        # Drain and count the complete API body before application code sees it.
+        # This prevents endpoints that read only one chunk (or no body at all) from
+        # bypassing the cap with an oversized unread tail. Reservations bound
+        # aggregate memory across concurrent request prebuffers.
         buffered: list[dict] = []
         seen = 0
         reserved = 0
         try:
             while True:
                 message = await receive()
-                if message.get("type") == "http.disconnect":
+                message_type = message.get("type")
+                if message_type == "http.disconnect":
                     return
-                if message.get("type") != "http.request":
-                    buffered.append(message)
-                    continue
-
-                body = message.get("body") or b""
-                chunk_size = len(body)
-                if seen + chunk_size > self.max_bytes:
+                if message_type != "http.request":
                     response = JSONResponse(
-                        status_code=413,
-                        content={
-                            "error": "payload_too_large",
-                            "detail": f"body exceeds {self.max_bytes // 1024 // 1024} MB",
-                            "limit_bytes": self.max_bytes,
-                            "got_bytes": seen + chunk_size,
-                        },
+                        status_code=400,
+                        content={"error": "invalid_request_body"},
                     )
                     await response(scope, receive, send)
                     return
 
+                body = message.get("body") or b""
+                chunk_size = len(body)
+                if seen + chunk_size > self.max_bytes:
+                    await self._reject_too_large(
+                        scope, receive, send, got_bytes=seen + chunk_size
+                    )
+                    return
                 if not await self._reserve_body_bytes(chunk_size):
                     response = JSONResponse(
                         status_code=503,
@@ -557,7 +600,7 @@ class SizeLimitMiddleware:
                     message = buffered[index]
                     index += 1
                     return message
-                return {"type": "http.request", "body": b"", "more_body": False}
+                return await receive()
 
             await self.app(scope, replay_receive, send)
         finally:
