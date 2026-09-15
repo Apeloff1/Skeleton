@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import json
+import sys
+from types import SimpleNamespace
 
 import pytest
 from starlette.requests import Request
@@ -330,3 +332,18 @@ def test_api_lookalike_path_remains_outside_api_hardening(monkeypatch) -> None:
 )
 def test_timeout_overrides_require_route_boundary(path: str, expected: float) -> None:
     assert hardening._resolve_timeout(path, 30.0) == expected
+
+
+def test_detailed_health_redacts_dependency_error_details(monkeypatch) -> None:
+    sensitive_detail = "SENSITIVE_RUNTIME_DETAIL:/srv/internal/private-metrics-source"
+
+    def fail_process(_pid: int):
+        raise RuntimeError(sensitive_detail)
+
+    monkeypatch.setitem(sys.modules, "psutil", SimpleNamespace(Process=fail_process))
+
+    payload = hardening.health_detailed()
+
+    assert payload["psutil_error"] == "health metrics unavailable"
+    assert payload["degraded"] is False
+    assert sensitive_detail not in repr(payload)

@@ -225,7 +225,8 @@ def health_detailed():
             out["disk_pct"]   > 95.0 or
             out.get("cpu_percent", 0) > 95.0
         )
-    except Exception as e:
-        out["psutil_error"] = str(e)[:120]
+    except Exception as exc:
+        log.warning("health_metrics_unavailable error=%s", type(exc).__name__)
+        out["psutil_error"] = "health metrics unavailable"
         out["degraded"] = False
     return out
