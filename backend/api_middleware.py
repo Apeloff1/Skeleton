@@ -25,11 +25,12 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import logging
+import math
 import os
 import re
 import time
 import uuid
-from collections import defaultdict, deque
+from collections import OrderedDict, defaultdict, deque
 from typing import Callable, Deque, Dict, Tuple
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -43,17 +44,27 @@ _RATE_PER_MIN = int(os.environ.get("RATE_LIMIT_PER_MIN", "600"))
 _RATE_BURST = int(os.environ.get("RATE_LIMIT_BURST", "60"))
 _EXEMPT_RAW = os.environ.get("RATE_LIMIT_EXEMPT", "127.0.0.1,::1,localhost")
 _EXEMPT_IPS = {ip.strip() for ip in _EXEMPT_RAW.split(",") if ip.strip()}
-_MAX_BUCKETS = max(1, int(os.environ.get("RATE_LIMIT_MAX_BUCKETS", "4096")))
-_BUCKET_TTL = max(0.01, float(os.environ.get("RATE_LIMIT_BUCKET_TTL", "300")))
+_MAX_BUCKETS = int(os.environ.get("RATE_LIMIT_MAX_BUCKETS", "4096"))
+_BUCKET_TTL = float(os.environ.get("RATE_LIMIT_BUCKET_TTL", "300"))
+if _MAX_BUCKETS <= 0:
+    raise ValueError("RATE_LIMIT_MAX_BUCKETS must be positive")
+if not math.isfinite(_BUCKET_TTL) or _BUCKET_TTL <= 0:
+    raise ValueError("RATE_LIMIT_BUCKET_TTL must be finite and positive")
 _ACCESS_LOG = os.environ.get("ACCESS_LOG", "1") != "0"
 _TRUSTED_PROXY_RAW = os.environ.get("TRUSTED_PROXY_CIDRS", "")
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+_MAX_RETRY_AFTER_SECONDS = 86_400
 
 
 def _parse_trusted_proxy_networks(
     raw: str,
 ) -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
-    """Parse explicitly trusted ingress/proxy CIDRs without widening trust."""
+    """Parse explicitly trusted ingress/proxy CIDRs fail-closed.
+
+    A partially valid allowlist is ambiguous operationally. Any malformed entry
+    disables forwarded-header trust rather than silently trusting the remaining
+    networks while an operator believes the full boundary is active.
+    """
     networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
     for value in raw.split(","):
         value = value.strip()
@@ -62,8 +73,8 @@ def _parse_trusted_proxy_networks(
         try:
             networks.append(ipaddress.ip_network(value, strict=False))
         except ValueError:
-            # Invalid entries are never interpreted as broader trust.
-            log.warning("ignoring invalid TRUSTED_PROXY_CIDRS entry")
+            log.error("invalid TRUSTED_PROXY_CIDRS configuration; disabling proxy trust")
+            return ()
     return tuple(networks)
 
 
@@ -96,6 +107,13 @@ def _percentile(sorted_vals, pct: float) -> float:
         min(len(sorted_vals) - 1, int(pct / 100.0 * (len(sorted_vals) - 1))),
     )
     return sorted_vals[k]
+
+
+def _bounded_retry_after(retry: float) -> int:
+    """Return a finite advisory Retry-After value under all internal states."""
+    if not math.isfinite(retry):
+        return _MAX_RETRY_AFTER_SECONDS
+    return max(1, min(_MAX_RETRY_AFTER_SECONDS, math.ceil(max(0.0, retry))))
 
 
 def get_stats() -> dict:
@@ -194,8 +212,8 @@ def _client_ip(request: Request) -> str:
     The direct peer is authoritative by default. X-Forwarded-For is considered
     only when the immediate peer is explicitly configured as a trusted proxy.
     The forwarded chain is walked right-to-left, skipping trusted proxy hops and
-    returning the nearest untrusted address. Malformed or fully trusted chains
-    fail closed to the direct peer.
+    returning the nearest untrusted address. Malformed or ambiguous chains fail
+    closed to the direct peer.
     """
     client = request.client
     peer = client.host.strip() if client and client.host else "-"
@@ -203,12 +221,19 @@ def _client_ip(request: Request) -> str:
     if peer == "-" or not _is_trusted_proxy(peer):
         return canonical_peer or peer
 
-    xff = request.headers.get("x-forwarded-for", "")
+    forwarded_headers = request.headers.getlist("x-forwarded-for")
+    if len(forwarded_headers) != 1:
+        return canonical_peer or peer
+    xff = forwarded_headers[0]
     if not xff:
         return canonical_peer or peer
 
-    forwarded = [_canonical_ip(part) for part in xff.split(",")]
-    if not forwarded or any(value is None for value in forwarded):
+    parts = [part.strip() for part in xff.split(",")]
+    if not parts or any(not part for part in parts):
+        return canonical_peer or peer
+
+    forwarded = [_canonical_ip(part) for part in parts]
+    if any(value is None for value in forwarded):
         return canonical_peer or peer
 
     for value in reversed(forwarded):
@@ -308,7 +333,9 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
     """Per-IP token bucket with bounded, serialized identity state.
 
     New identities are rejected when all slots are active rather than evicting
-    active state and giving churned identities a fresh burst.
+    active state and giving churned identities a fresh burst. Buckets are kept
+    in activity order so steady-state expiry and saturation checks are O(1)
+    plus the number of buckets that actually expire.
     """
 
     def __init__(
@@ -320,20 +347,28 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         bucket_ttl: float | None = None,
     ):
         super().__init__(app)
-        self.per_minute = per_minute if per_minute is not None else _RATE_PER_MIN
-        self.burst = burst if burst is not None else _RATE_BURST
-        if self.per_minute <= 0:
-            raise ValueError("per_minute must be positive")
-        if self.burst <= 0:
-            raise ValueError("burst must be positive")
-        self.max_buckets = max(
-            1, max_buckets if max_buckets is not None else _MAX_BUCKETS
-        )
-        self.bucket_ttl = max(
-            0.01, bucket_ttl if bucket_ttl is not None else _BUCKET_TTL
-        )
+        configured_rate = per_minute if per_minute is not None else _RATE_PER_MIN
+        configured_burst = burst if burst is not None else _RATE_BURST
+        configured_max = max_buckets if max_buckets is not None else _MAX_BUCKETS
+        configured_ttl = bucket_ttl if bucket_ttl is not None else _BUCKET_TTL
+
+        if not math.isfinite(float(configured_rate)) or configured_rate <= 0:
+            raise ValueError("per_minute must be finite and positive")
+        if not math.isfinite(float(configured_burst)) or configured_burst <= 0:
+            raise ValueError("burst must be finite and positive")
+        if not math.isfinite(float(configured_max)) or configured_max <= 0:
+            raise ValueError("max_buckets must be finite and positive")
+        if int(configured_max) != configured_max:
+            raise ValueError("max_buckets must be an integer")
+        if not math.isfinite(float(configured_ttl)) or configured_ttl <= 0:
+            raise ValueError("bucket_ttl must be finite and positive")
+
+        self.per_minute = configured_rate
+        self.burst = configured_burst
+        self.max_buckets = int(configured_max)
+        self.bucket_ttl = float(configured_ttl)
         self._refill_per_sec = self.per_minute / 60.0
-        self._buckets: Dict[str, _Bucket] = {}
+        self._buckets: "OrderedDict[str, _Bucket]" = OrderedDict()
         self._state_lock: asyncio.Lock | None = None
         self._evictions = 0
         self._expired_pruned = 0
@@ -345,29 +380,27 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         return self._state_lock
 
     def _prune_expired(self, now: float) -> int:
-        expired = [
-            ip
-            for ip, bucket in self._buckets.items()
-            if now - bucket.last >= self.bucket_ttl
-        ]
-        for ip in expired:
-            del self._buckets[ip]
-        if expired:
-            pruned = len(expired)
+        pruned = 0
+        while self._buckets:
+            oldest_ip = next(iter(self._buckets))
+            oldest = self._buckets[oldest_ip]
+            if now - oldest.last < self.bucket_ttl:
+                break
+            self._buckets.popitem(last=False)
+            pruned += 1
+
+        if pruned:
             self._evictions += pruned
             self._expired_pruned += pruned
             _counts["rate_limit_evictions"] += pruned
             _counts["rate_limit_expired_pruned"] += pruned
-        return len(expired)
+        return pruned
 
     def _retry_until_capacity(self, now: float) -> float:
         if not self._buckets:
             return self.bucket_ttl
-        remaining = [
-            self.bucket_ttl - (now - bucket.last)
-            for bucket in self._buckets.values()
-        ]
-        return max(0.01, min(remaining))
+        oldest = next(iter(self._buckets.values()))
+        return max(0.01, self.bucket_ttl - (now - oldest.last))
 
     def _bucket_for(
         self, ip: str, now: float | None = None
@@ -383,12 +416,12 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
                 return None, self._retry_until_capacity(now)
             bucket = _Bucket(self.burst, self._refill_per_sec)
             self._buckets[ip] = bucket
+        else:
+            self._buckets.move_to_end(ip)
         _counts["rate_limit_buckets"] = len(self._buckets)
         return bucket, 0.0
 
     async def dispatch(self, request: Request, call_next: Callable):
-        # Match only the real /api route boundary; /apiary and similar paths
-        # must not consume or bypass API security state unexpectedly.
         if not _is_api_path(request.url.path):
             return await call_next(request)
 
@@ -406,6 +439,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         if not ok:
             _counts["rate_limited"] += 1
             rid = getattr(request.state, "request_id", "-")
+            retry_after = _bounded_retry_after(retry)
             log.warning(
                 "rate_limited ip=%s path=%s retry=%.1fs rid=%s",
                 ip,
@@ -417,12 +451,12 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
                 {
                     "error": "rate_limited",
                     "message": "Too many requests; please slow down.",
-                    "retry_after_seconds": round(retry, 1),
+                    "retry_after_seconds": retry_after,
                     "request_id": rid,
                 },
                 status_code=429,
                 headers={
-                    "Retry-After": str(max(1, int(retry + 0.5))),
+                    "Retry-After": str(retry_after),
                     "X-Request-Id": rid,
                     "X-RateLimit-Limit": str(self.per_minute),
                 },
