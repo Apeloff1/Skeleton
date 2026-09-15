@@ -68,6 +68,15 @@ def test_rejects_loss_of_workflow_filter_recheck() -> None:
     assert "revalidated immediately before mutation" in _messages(source)
 
 
+def test_rejects_fail_open_workflow_file_pagination_limit() -> None:
+    source = _replace_once(
+        _source(),
+        "              return None\n\n          def live_validation",
+        "              return False\n\n          def live_validation",
+    )
+    assert "scan limit is exhausted" in _messages(source)
+
+
 def test_rejects_missing_active_ci_state() -> None:
     source = _replace_once(_source(), "'waiting', ", "")
     assert "active CI detection missing status: waiting" in _messages(source)
