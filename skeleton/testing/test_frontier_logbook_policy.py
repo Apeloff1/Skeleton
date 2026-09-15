@@ -6,6 +6,7 @@ import pytest
 
 from skeleton.frontier.events import EventBus, SQLiteEventJournal
 from skeleton.frontier.logbook import (
+    CaptainLogEntry,
     can_delete,
     log_entry_event,
     log_entry_from_record,
@@ -40,7 +41,7 @@ def _entry(**overrides):
 
 
 def test_log_entry_adapter_normalizes_source_shape():
-    entry = _entry()
+    entry = _entry(tags=["exploration", " exploration ", "coastal"])
 
     assert entry.entry_id == "entry-1"
     assert entry.log_type == "discovery"
@@ -48,6 +49,51 @@ def test_log_entry_adapter_normalizes_source_shape():
     assert entry.tags == ("exploration", "coastal")
     assert entry.created_at == datetime(2026, 9, 15, 10, 0, tzinfo=timezone.utc)
     assert entry.as_dict()["location"] == "barnacle_bay"
+
+
+def test_log_entry_adapter_rejects_ambiguous_boolean_source_values():
+    with pytest.raises(TypeError, match="is_pinned must be a boolean"):
+        _entry(is_pinned="false")
+    with pytest.raises(TypeError, match="is_auto_generated must be a boolean"):
+        _entry(is_auto_generated=1)
+
+
+def test_log_entry_direct_construction_enforces_domain_invariants():
+    with pytest.raises(ValueError, match="user_id must not be empty"):
+        CaptainLogEntry(
+            entry_id="entry-1",
+            user_id="   ",
+            title="Title",
+            content="Content",
+            log_type="Discovery",
+            created_at=datetime(2026, 9, 15, 10, 0, tzinfo=timezone.utc),
+        )
+
+    with pytest.raises(ValueError, match="created_at must be timezone-aware"):
+        CaptainLogEntry(
+            entry_id="entry-1",
+            user_id="user-1",
+            title="Title",
+            content="Content",
+            log_type="Discovery",
+            created_at=datetime(2026, 9, 15, 10, 0),
+        )
+
+    entry = CaptainLogEntry(
+        entry_id=" entry-1 ",
+        user_id=" user-1 ",
+        title=" Title ",
+        content=" Content ",
+        log_type=" Discovery ",
+        importance=" MILESTONE ",
+        tags=("tag", "tag"),
+        created_at=datetime(2026, 9, 15, 12, 0, tzinfo=timezone.utc),
+    )
+    assert entry.entry_id == "entry-1"
+    assert entry.user_id == "user-1"
+    assert entry.log_type == "discovery"
+    assert entry.importance == "milestone"
+    assert entry.tags == ("tag",)
 
 
 def test_auto_log_template_rendering_injects_clock_and_identity():
@@ -136,6 +182,15 @@ def test_logbook_projection_search_milestones_stats_and_timeline():
     }
     september = timeline(entries, year=2026, month=9)
     assert list(september) == ["2026-09-15", "2026-09-16"]
+
+
+def test_logbook_projection_rejects_ambiguous_parameters():
+    with pytest.raises(ValueError, match="duplicate known log type"):
+        log_statistics([_entry()], known_types=["discovery", "DISCOVERY"])
+    with pytest.raises(ValueError, match="timeline year"):
+        timeline([_entry()], year=0)
+    with pytest.raises(ValueError, match="timeline month requires year"):
+        timeline([_entry()], month=9)
 
 
 def test_pin_toggle_and_delete_policy_are_pure():
