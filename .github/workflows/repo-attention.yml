@@ -45,8 +45,6 @@ jobs:
           added_draft=0
           removed_draft=0
 
-          gh api --paginate "/repos/${REPO}/pulls?state=open&per_page=100" \
-            --jq '.[] | [.number, .updated_at, .draft] | @tsv' |
           while IFS=$'\t' read -r number updated draft; do
             [[ -n "${number:-}" ]] || continue
             updated_epoch=$(date -u -d "$updated" +%s)
@@ -88,7 +86,10 @@ jobs:
                 removed_draft=$((removed_draft + 1))
               fi
             fi
-          done
+          done < <(
+            gh api --paginate "/repos/${REPO}/pulls?state=open&per_page=100" \
+              --jq '.[] | [.number, .updated_at, .draft] | @tsv'
+          )
 
           {
             echo '## Pull request attention sweep'
@@ -109,8 +110,6 @@ jobs:
           added=0
           removed=0
 
-          gh api --paginate "/repos/${REPO}/issues?state=open&per_page=100" \
-            --jq '.[] | select(.pull_request | not) | [.number, .updated_at, ([.labels[].name] | join(","))] | @tsv' |
           while IFS=$'\t' read -r number updated labels_csv; do
             [[ -n "${number:-}" ]] || continue
             updated_epoch=$(date -u -d "$updated" +%s)
@@ -126,7 +125,10 @@ jobs:
               gh api --method DELETE "/repos/${REPO}/issues/${number}/labels/needs-attention" >/dev/null || true
               removed=$((removed + 1))
             fi
-          done
+          done < <(
+            gh api --paginate "/repos/${REPO}/issues?state=open&per_page=100" \
+              --jq '.[] | select(.pull_request | not) | [.number, .updated_at, ([.labels[].name] | join(","))] | @tsv'
+          )
 
           {
             echo '## Issue attention sweep'
