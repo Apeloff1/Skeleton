@@ -21,6 +21,8 @@ SHARED_BACKEND_MARKERS: tuple[tuple[str, str], ...] = (
     ("provider runtime boundary regression", "test_provider_runtime_boundary.py"),
     ("process invocation safety", "check_process_safety.py"),
     ("unsafe deserialization safety", "check_deserialization_safety.py"),
+    ("dynamic import safety", "check_dynamic_import_safety.py"),
+    ("dynamic import regression", "test_dynamic_import_safety.py"),
     ("tar archive extraction safety", "check_archive_extraction_safety.py"),
     ("tar archive extraction regression", "test_archive_extraction_safety.py"),
     ("high-confidence SAST", "check_sast_security.py"),
