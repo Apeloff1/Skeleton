@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
 from skeleton.kernel.errors import KernelError
+from skeleton.observability.redaction import redact_payload, redact_text
 
 
 class LogError(KernelError):
@@ -42,7 +43,7 @@ class LogEvent:
 
 
 class StructuredLogger:
-    """Level-filtered JSON-lines logger with a pluggable sink."""
+    """Level-filtered JSON-lines logger with redacted bound context."""
 
     def __init__(
         self,
@@ -58,22 +59,28 @@ class StructuredLogger:
         self.events: List[LogEvent] = []
 
     def bind(self, **context: Any) -> "StructuredLogger":
-        """Return a child logger with additional context merged."""
+        """Return a child logger with additional redacted context merged."""
         child = StructuredLogger(
             sink=self._sink, min_level=_LEVELS[self._min_index], clock=self._now
         )
-        child._context = {**self._context, **context}
+        merged = redact_payload({**self._context, **context})
+        child._context = dict(merged) if isinstance(merged, dict) else {}
         child.events = self.events
         return child
 
     def log(self, level: str, message: str, **context: Any) -> LogEvent:
         if level not in _LEVELS:
             raise LogError("unknown level", context={"level": level})
+        safe_message = redact_text(message)
         if _LEVELS.index(level) < self._min_index:
-            return LogEvent(level=level, message=message, timestamp=self._now())
-        merged = {**self._context, **context}
+            return LogEvent(level=level, message=safe_message, timestamp=self._now())
+        merged = redact_payload({**self._context, **context})
+        safe_context = dict(merged) if isinstance(merged, dict) else {}
         event = LogEvent(
-            level=level, message=message, timestamp=self._now(), context=merged
+            level=level,
+            message=safe_message,
+            timestamp=self._now(),
+            context=safe_context,
         )
         self.events.append(event)
         self._sink(event.to_json())
