@@ -1,10 +1,5 @@
 /**
- * src/feature-flags/flagsClient.ts — talks to /api/feature-flags.
- *
- * Wraps the shared `apiClient` so feature-flag reads pick up the same
- * retry / abort / RID instrumentation everything else uses. Results are
- * cached in-memory for `CACHE_TTL_MS` so the same screen doesn't refetch
- * on every mount.
+ * Feature-flag client with short-lived, user-scoped in-memory deduplication.
  */
 import api from '../utils/apiClient';
 
@@ -26,57 +21,98 @@ export interface FlagsSnapshot {
   fetched_at: number;
 }
 
-const CACHE_TTL_MS = 60_000;
-let _cache: FlagsSnapshot | null = null;
-let _inflight: Promise<FlagsSnapshot> | null = null;
-
-/** Reads the cached snapshot (no I/O). Returns null if cold. */
-export function snapshot(): FlagsSnapshot | null {
-  return _cache;
+export interface LoadFlagsOptions {
+  force?: boolean;
+  timeoutMs?: number;
+  retries?: number;
 }
 
-/** Forces a refetch on the next ``loadFlags`` call. */
+const CACHE_TTL_MS = 60_000;
+const cacheByKey = new Map<string, FlagsSnapshot>();
+const inflightByKey = new Map<string, Promise<FlagsSnapshot>>();
+let lastCacheKey: string | null = null;
+let generation = 0;
+
+function keyFor(userId: string | null): string {
+  return userId || '_anon_';
+}
+
+/**
+ * Reads the last successful cached snapshot without I/O.
+ * Pass a user id to avoid ever consuming another user's resolved rollout.
+ * Calling without an argument preserves the legacy "last snapshot" behavior.
+ */
+export function snapshot(userId?: string | null): FlagsSnapshot | null {
+  if (arguments.length > 0) return cacheByKey.get(keyFor(userId ?? null)) || null;
+  return lastCacheKey ? cacheByKey.get(lastCacheKey) || null : null;
+}
+
+/** Forces a refetch on the next loadFlags call and invalidates stale inflight ownership. */
 export function invalidate(): void {
-  _cache = null;
-  _inflight = null;
+  generation += 1;
+  cacheByKey.clear();
+  inflightByKey.clear();
+  lastCacheKey = null;
 }
 
 export async function loadFlags(
   userId: string | null = null,
-  opts: { force?: boolean } = {},
+  opts: LoadFlagsOptions = {},
 ): Promise<FlagsSnapshot> {
-  if (!opts.force && _cache && (Date.now() - _cache.fetched_at) < CACHE_TTL_MS) {
-    return _cache;
+  const key = keyFor(userId);
+  const cached = cacheByKey.get(key);
+  if (!opts.force && cached && (Date.now() - cached.fetched_at) < CACHE_TTL_MS) {
+    return cached;
   }
-  if (_inflight) return _inflight;
 
+  const existing = inflightByKey.get(key);
+  if (existing) return existing;
+
+  const requestGeneration = generation;
   const path = userId
     ? `/api/feature-flags?user_id=${encodeURIComponent(userId)}`
-    : `/api/feature-flags`;
+    : '/api/feature-flags';
 
-  _inflight = (async () => {
-    const r = await api.get<{ ok: boolean; environment: string; user_id: string | null; flags: ResolvedFlag[] }>(
-      path,
-      { cacheKey: `ff:${userId || '_anon_'}`, cacheTtlMs: CACHE_TTL_MS, timeoutMs: 6000, retries: 1 },
-    );
-    const snap: FlagsSnapshot = {
-      ok: !!r.ok,
-      environment: r.data?.environment || 'unknown',
-      user_id: userId,
-      flags: Array.isArray(r.data?.flags) ? r.data!.flags : [],
+  let request!: Promise<FlagsSnapshot>;
+  request = (async () => {
+    const response = await api.get<{
+      ok: boolean;
+      environment: string;
+      user_id: string | null;
+      flags: ResolvedFlag[];
+    }>(path, {
+      cacheKey: `ff:${key}`,
+      cacheTtlMs: CACHE_TTL_MS,
+      timeoutMs: opts.timeoutMs ?? 6_000,
+      retries: opts.retries ?? 1,
+    });
+
+    const result: FlagsSnapshot = {
+      ok: !!response.ok,
+      environment: response.data?.environment || 'unknown',
+      user_id: response.data?.user_id ?? userId,
+      flags: Array.isArray(response.data?.flags) ? response.data!.flags : [],
       fetched_at: Date.now(),
     };
-    _cache = snap;
-    _inflight = null;
-    return snap;
-  })();
 
-  return _inflight;
+    // Never cache a transient failure, and never let a request that started
+    // before invalidate() repopulate a cache that an explicit refresh cleared.
+    if (result.ok && requestGeneration === generation) {
+      cacheByKey.set(key, result);
+      lastCacheKey = key;
+    }
+    return result;
+  })().finally(() => {
+    if (inflightByKey.get(key) === request) inflightByKey.delete(key);
+  });
+
+  inflightByKey.set(key, request);
+  return request;
 }
 
-/** Synchronous read against the warmed cache only. */
 export function isEnabledCached(name: string, fallback: boolean = false): boolean {
-  if (!_cache) return fallback;
-  const f = _cache.flags.find(x => x.name === name);
-  return f ? f.resolved : fallback;
+  const cached = lastCacheKey ? cacheByKey.get(lastCacheKey) : null;
+  if (!cached) return fallback;
+  const flag = cached.flags.find(item => item.name === name);
+  return flag ? flag.resolved : fallback;
 }
