@@ -119,6 +119,32 @@ def test_lane_metadata_is_isolated_and_merged_with_global_metadata() -> None:
     ]
 
 
+def test_nested_metadata_mutation_does_not_leak_between_lanes_or_to_caller() -> None:
+    metadata = {"nested": {"value": "original"}}
+    seen = []
+
+    def judge(ctx, batch):
+        if batch[0].gate_id != 1:
+            return {}
+        lane = ctx.metadata["tri_lane"]
+        if lane == TriLane.QUALITY.value:
+            ctx.metadata["nested"]["value"] = "mutated-in-quality"
+        else:
+            seen.append((lane, ctx.metadata["nested"]["value"]))
+        return {}
+
+    decision = TriAdversarialEngine(judge=judge).evaluate(
+        _ctx(metadata=metadata)
+    )
+
+    assert decision.allowed is True
+    assert seen == [
+        (TriLane.ADVERSARIAL_QUALITY.value, "original"),
+        (TriLane.INTEGRITY.value, "original"),
+    ]
+    assert metadata == {"nested": {"value": "original"}}
+
+
 def test_batched_judging_caps_at_ten_calls_per_lane() -> None:
     calls = []
 
@@ -155,6 +181,40 @@ def test_lane_specific_judge_can_block_only_its_lane() -> None:
     gate43 = decision.lane(TriLane.ADVERSARIAL_QUALITY).results[42]
     assert gate43.status is GateStatus.BLOCK
     assert gate43.reason == "false-premise attack succeeded"
+
+
+def test_repaired_candidate_is_revalidated_by_all_lanes_before_sealing() -> None:
+    seen = []
+
+    def judge(ctx, batch):
+        if batch[0].gate_id == 1:
+            seen.append((ctx.metadata["tri_lane"], ctx.candidate["version"]))
+        if (
+            ctx.metadata["tri_lane"] == TriLane.ADVERSARIAL_QUALITY.value
+            and ctx.candidate["version"] == 1
+            and any(spec.gate_id == 35 for spec in batch)
+        ):
+            return {35: {"status": "repair", "reason": "repair candidate"}}
+        return {}
+
+    def repairer(ctx, repairs):
+        assert repairs
+        return {"version": 2}
+
+    engine = TriAdversarialEngine(
+        judge=judge,
+        repairers={TriLane.ADVERSARIAL_QUALITY: repairer},
+        seal_key=b"tri-test-key",
+    )
+    decision = engine.evaluate(_ctx(candidate={"version": 1}))
+
+    assert decision.allowed is True
+    assert decision.candidate == {"version": 2}
+    assert decision.repair_rounds == 1
+    assert decision.seal is not None
+    assert all(lane.decision.candidate == {"version": 2} for lane in decision.lanes)
+    assert (TriLane.QUALITY.value, 1) in seen
+    assert (TriLane.QUALITY.value, 2) in seen
 
 
 def test_tri_seal_is_deterministic_and_lane_bound() -> None:

@@ -256,6 +256,13 @@ def _result(spec: GateSpec, status: GateStatus, reason: str, confidence: float =
 
 
 def _override(spec: GateSpec, meta: Mapping[str, Any]) -> Optional[GateResult]:
+    """Return only fail-closed explicit overrides.
+
+    Overrides are diagnostic/test inputs, not an authorization path. Accepting
+    PASS or REPAIR here would bypass deterministic blockers because overrides are
+    evaluated before the baseline gate logic. Therefore overrides may only make a
+    gate stricter by forcing BLOCK; weaker statuses are ignored.
+    """
     values = meta.get("gate_overrides", {})
     if not isinstance(values, Mapping):
         return None
@@ -270,7 +277,9 @@ def _override(spec: GateSpec, meta: Mapping[str, Any]) -> Optional[GateResult]:
         status = _status(raw) or GateStatus.BLOCK
         reason = "explicit gate override"
         confidence = 1.0
-    return _result(spec, status, reason, confidence)
+    if status is not GateStatus.BLOCK:
+        return None
+    return _result(spec, GateStatus.BLOCK, reason, confidence)
 
 
 def _adverse(spec: GateSpec, meta: Mapping[str, Any], *aliases: str) -> bool:
