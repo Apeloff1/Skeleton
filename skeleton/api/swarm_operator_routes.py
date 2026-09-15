@@ -189,7 +189,9 @@ def gc(keep_terminal: int = Query(default=10_000, ge=0, le=1_000_000), runtime: 
         tenant_repair = _publish_runtime(rebuilt)
     except (AdmissionError, KeyError, ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=409, detail=f"staged compaction rejected: {exc}") from exc
-    return {"result": asdict(result), "tenant_repair": tenant_repair, "capacity": capacity(rebuilt), "snapshot": asdict(rebuilt.snapshot())}
+    result_payload = asdict(result)
+    result_payload["removed_terminal"] = result.removed
+    return {"result": result_payload, "tenant_repair": tenant_repair, "capacity": capacity(rebuilt), "snapshot": asdict(rebuilt.snapshot())}
 
 
 @router.post("/checkpoint")
