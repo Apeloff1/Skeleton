@@ -8,7 +8,7 @@ on:
     types: [edited, reopened, assigned, unassigned, milestoned, demilestoned]
   issue_comment:
     types: [created]
-  pull_request_target:
+  pull_request:
     types:
       - synchronize
       - edited
@@ -112,11 +112,14 @@ jobs:
 
   clear-pr-attention:
     name: Clear attention after PR activity
-    if: github.event_name == 'pull_request_target'
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 3
-    # SECURITY: pull_request_target is intentionally metadata-only here.
-    # Never checkout, source, or execute pull-request head content in this job.
+    # SECURITY: ordinary pull_request plus a same-repository guard keeps label
+    # mutation write access away from untrusted fork pull requests. This job
+    # never checks out, sources, or executes pull-request head content.
     permissions:
       issues: write
     env:
