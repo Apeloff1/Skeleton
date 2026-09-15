@@ -31,13 +31,17 @@ jobs:
       - name: Compile provenance gate and evidence
         run: >-
           python -m compileall -q
+          scripts/check_repository_inventory.py
           scripts/check_provenance_manifest.py
           scripts/run_provenance_evidence.py
+          tests/test_provenance_repository_inventory.py
           tests/test_provenance_manifest.py
           tests/test_provenance_evidence_runner.py
           tests/test_frontier_memory_adapters.py
       - name: Run provenance policy regressions
         run: python -m unittest discover -s tests -p 'test_provenance_*.py' -q
+      - name: Validate repository inventory coverage
+        run: python scripts/check_repository_inventory.py
       - name: Validate consolidation inventory and canonical promotions
         run: python scripts/check_provenance_manifest.py
       - name: Execute canonical promotion evidence
