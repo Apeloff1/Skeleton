@@ -141,16 +141,31 @@ class AuditMiddleware(BaseHTTPMiddleware):
             AuditMiddleware._buf = deque(old, maxlen=max_entries)
 
     async def dispatch(self, request: Request, call_next):
-        if not request.url.path.startswith("/api"):
+        if not _matches_api_boundary(request.url.path):
             return await call_next(request)
 
         start = time.perf_counter()
-        ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
-            request.client.host if request.client else "unknown"
-        )
+        # Audit data must not trust attacker-controlled forwarding headers. The
+        # canonical proxy-aware middleware records the resolved client identity;
+        # this legacy audit layer uses the direct peer as a safe fallback.
+        ip = request.client.host if request.client else "unknown"
         ua = request.headers.get("user-agent", "")[:200]
-        rid = request.headers.get("x-request-id") or os.urandom(4).hex()
-        body_size = int(request.headers.get("content-length", "0") or 0)
+        rid = getattr(request.state, "request_id", None) or os.urandom(4).hex()
+
+        # Never parse an untrusted Content-Length unless it is a small decimal.
+        # The raw SizeLimitMiddleware performs authoritative framing validation
+        # downstream; audit telemetry must not raise before that guard can reject
+        # malformed, duplicated, or absurd declared lengths.
+        raw_content_length = request.headers.get("content-length", "")
+        if (
+            raw_content_length.isascii()
+            and raw_content_length.isdigit()
+            and len(raw_content_length) <= 20
+        ):
+            body_size = int(raw_content_length, 10)
+        else:
+            body_size = 0
+
         error = None
         status = 0
         response: Response | None = None
