@@ -8,8 +8,12 @@ from starlette.responses import Response
 from api_middleware import RequestIdMiddleware
 
 
-def _request(request_id: str | None) -> Request:
-    headers = [] if request_id is None else [(b"x-request-id", request_id.encode())]
+def _request(request_ids: str | list[str] | None) -> Request:
+    if request_ids is None:
+        headers = []
+    else:
+        values = [request_ids] if isinstance(request_ids, str) else request_ids
+        headers = [(b"x-request-id", value.encode("latin-1")) for value in values]
     return Request(
         {
             "type": "http",
@@ -31,8 +35,8 @@ async def _handler(request: Request) -> Response:
     return response
 
 
-def _run(request_id: str | None) -> tuple[str, str, str]:
-    request = _request(request_id)
+def _run(request_ids: str | list[str] | None) -> tuple[str, str, str]:
+    request = _request(request_ids)
 
     async def exercise() -> tuple[str, str, str]:
         response = await RequestIdMiddleware(object()).dispatch(request, _handler)
@@ -45,6 +49,16 @@ def _run(request_id: str | None) -> tuple[str, str, str]:
     return asyncio.run(exercise())
 
 
+def _assert_generated(request_ids: str | list[str] | None) -> str:
+    state_id, response_id, handler_id = _run(request_ids)
+    assert response_id == state_id == handler_id
+    assert len(state_id) == 32
+    assert state_id.isascii()
+    assert state_id.isalnum()
+    int(state_id, 16)
+    return state_id
+
+
 def test_safe_request_id_round_trips_unchanged() -> None:
     state_id, response_id, handler_id = _run("trace_2026-09-15:abc")
     assert state_id == "trace_2026-09-15:abc"
@@ -53,26 +67,37 @@ def test_safe_request_id_round_trips_unchanged() -> None:
 
 
 def test_invalid_request_id_is_replaced_consistently() -> None:
-    state_id, response_id, handler_id = _run("bad id")
-    assert state_id != "bad id"
-    assert response_id == state_id
-    assert handler_id == state_id
-    assert len(state_id) == 16
+    generated = _assert_generated("bad id")
+    assert generated != "bad id"
 
 
 def test_control_character_request_id_is_replaced() -> None:
-    state_id, response_id, handler_id = _run("bad\nvalue")
-    assert response_id == state_id == handler_id
-    assert "\n" not in state_id
+    generated = _assert_generated("bad\nvalue")
+    assert "\n" not in generated
 
 
 def test_oversized_request_id_is_replaced() -> None:
-    state_id, response_id, handler_id = _run("a" * 129)
-    assert response_id == state_id == handler_id
-    assert len(state_id) == 16
+    _assert_generated("a" * 129)
 
 
 def test_missing_request_id_is_generated_and_propagated() -> None:
-    state_id, response_id, handler_id = _run(None)
-    assert response_id == state_id == handler_id
-    assert len(state_id) == 16
+    _assert_generated(None)
+
+
+def test_non_ascii_request_id_is_replaced() -> None:
+    _assert_generated("caf\xe9")
+
+
+def test_duplicate_request_id_headers_are_replaced() -> None:
+    generated = _assert_generated(["trace-one", "trace-two"])
+    assert generated not in {"trace-one", "trace-two"}
+
+
+def test_identical_duplicate_request_id_headers_are_still_ambiguous() -> None:
+    generated = _assert_generated(["trace-same", "trace-same"])
+    assert generated != "trace-same"
+
+
+def test_generated_ids_do_not_repeat_across_small_adversarial_sample() -> None:
+    generated = {_assert_generated(None) for _ in range(128)}
+    assert len(generated) == 128
