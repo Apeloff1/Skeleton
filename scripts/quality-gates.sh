@@ -16,12 +16,13 @@ python -m compileall -q skeleton
 printf '\n== Backend syntax ==\n'
 python -m compileall -q backend
 
-printf '\n== Provider runtime, orchestration, and observability contracts ==\n'
+printf '\n== Provider runtime, orchestration, agent runtime, and observability contracts ==\n'
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   tests/test_model_runtime.py \
   tests/test_provider_runtime_boundary.py \
   tests/test_orchestration.py \
   tests/test_orchestration_error_redaction.py \
+  tests/test_frontier_runtime_memory_retrieval.py \
   tests/test_agent_coordination.py \
   tests/test_observability.py
 
