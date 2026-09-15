@@ -9,6 +9,9 @@ Ties the full pipeline together:
 Provides:
 - GameForge: Orchestrator for intake → blueprint → pipelines
 - GameSpec: Packaged output artifact
+
+The final packaged creation crosses Jeeves' tri-engine 3x100 release boundary
+in addition to the component-level pipeline guards.
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from skeleton.cortex.tri_adversarial import guard_tri_creation
 from skeleton.kernel.events import DomainEvent, EventBus
 
 
@@ -80,17 +84,14 @@ class GameForge:
             repair: Run verify-until-green loop for godot targets
         """
         from skeleton.context import intake as process_intake
-        from skeleton.forge.universal import Forge
 
         self._stats["runs"] += 1
         run_id = str(uuid.uuid4())[:8]
 
         try:
-            # 1. Intake → vision + era
             intake_result = process_intake(answers)
             game_title = title or f"{intake_result.genre.title()} of {intake_result.era.replace('_', ' ').title()}"
 
-            # 2. Build blueprint from archetype
             forge = self._get_forge()
             bp = forge.new_blueprint(game_title)
             forge.instantiate(bp, "player", "hero")
@@ -101,12 +102,10 @@ class GameForge:
             bp.connect(("hero", "intent"), ("weapons", "parts"))
             bp.connect(("spawner", "spawn"), ("goal", "cores"))
 
-            # 3. Materialise
             artefact = forge.materialise(
                 bp, era=intake_result.era, target=target, repair=repair,
             )
 
-            # 4. Generate content pipelines
             npcs = self._generate_npcs(intake_result, game_title)
             game_logic = self._generate_logic(intake_result, game_title)
             animation = self._generate_animation(answers)
@@ -122,13 +121,22 @@ class GameForge:
                 game_logic=game_logic,
                 animation=animation,
             )
+            released = guard_tri_creation(
+                request=str(intake_result.vision or game_title),
+                candidate=spec,
+                metadata={
+                    "creation_type": "game_spec",
+                    "target": target,
+                    "repair_requested": bool(repair),
+                },
+            )
 
             self._bus.publish(DomainEvent(
                 topic="gameforge.run.completed",
                 payload={"spec_id": run_id, "title": game_title, "target": target},
                 correlation_id=f"gameforge_{run_id}",
             ))
-            return spec
+            return released
 
         except Exception as e:
             self._stats["failures"] += 1
