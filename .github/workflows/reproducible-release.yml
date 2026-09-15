@@ -82,6 +82,15 @@ jobs:
           set -euo pipefail
           export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
           python -m build --no-isolation --outdir dist
+          shopt -s nullglob
+          sdists=(dist/*.tar.gz)
+          if [[ ${#sdists[@]} -ne 1 ]]; then
+            echo "expected exactly one source distribution, found ${#sdists[@]}" >&2
+            exit 1
+          fi
+          python scripts/release_provenance.py normalize-sdist \
+            --path "${sdists[0]}" \
+            --source-date-epoch "$SOURCE_DATE_EPOCH"
           python scripts/release_provenance.py sbom \
             --pyproject pyproject.toml \
             --output dist/release-sbom.cdx.json \
@@ -105,6 +114,15 @@ jobs:
           set -euo pipefail
           export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
           python -m build --no-isolation --outdir dist
+          shopt -s nullglob
+          sdists=(dist/*.tar.gz)
+          if [[ ${#sdists[@]} -ne 1 ]]; then
+            echo "expected exactly one source distribution, found ${#sdists[@]}" >&2
+            exit 1
+          fi
+          python scripts/release_provenance.py normalize-sdist \
+            --path "${sdists[0]}" \
+            --source-date-epoch "$SOURCE_DATE_EPOCH"
           python scripts/release_provenance.py sbom \
             --pyproject pyproject.toml \
             --output dist/release-sbom.cdx.json \
