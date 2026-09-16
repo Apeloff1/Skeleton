@@ -11,7 +11,7 @@
  * - Economy & Monetization
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { API_BASE } from '../../utils/apiBase';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput,
@@ -111,6 +111,9 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   const [gameType, setGameType] = useState('RPG');
   const [monetizationModel, setMonetizationModel] = useState('free_to_play');
 
+  // Systems State
+  const [playerCapacity, setPlayerCapacity] = useState('1000');
+
   // Animation State
   const [characterType, setCharacterType] = useState('humanoid');
   const [animationName, setAnimationName] = useState('walk');
@@ -155,7 +158,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   // API CALLS
   // =========================================================================
 
-  const generateNPC = useCallback(async () => {
+  const generateNPC = async () => {
     if (!npcDescription.trim()) {
       toast.error('Please describe the NPC you want to create');
       return;
@@ -189,9 +192,9 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [npcDescription, npcArchetype, includeDialogue, includeQuests]);
+  };
 
-  const generateWorld = useCallback(async () => {
+  const generateWorld = async () => {
     setIsLoading(true);
     setResult(null);
     setResultCategory('world');
@@ -220,9 +223,9 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [worldBiome, worldSize, worldFeatures]);
+  };
 
-  const generateCombat = useCallback(async () => {
+  const generateCombat = async () => {
     setIsLoading(true);
     setResult(null);
     setResultCategory('combat');
@@ -251,9 +254,9 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [combatStyle, combatMechanics, combatComplexity]);
+  };
 
-  const generateQuest = useCallback(async () => {
+  const generateQuest = async () => {
     setIsLoading(true);
     setResult(null);
     setResultCategory('narrative');
@@ -281,9 +284,9 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [questType, questDifficulty, questSetting]);
+  };
 
-  const generateVFX = useCallback(async () => {
+  const generateVFX = async () => {
     setIsLoading(true);
     setResult(null);
     setResultCategory('vfx');
@@ -310,9 +313,9 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [effectType, visualStyle]);
+  };
 
-  const generateEconomy = useCallback(async () => {
+  const generateEconomy = async () => {
     setIsLoading(true);
     setResult(null);
     setResultCategory('economy');
@@ -339,9 +342,15 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [gameType, monetizationModel]);
+  };
 
-  const generateSystems = useCallback(async () => {
+  const generateSystems = async () => {
+    const capacity = Number(playerCapacity);
+    if (!Number.isInteger(capacity) || capacity <= 0) {
+      toast.error('Player capacity must be a positive whole number');
+      return;
+    }
+
     setIsLoading(true);
     setResult(null);
     setResultCategory('systems');
@@ -352,7 +361,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           game_type: gameType,
-          player_capacity: 1000,
+          player_capacity: capacity,
         }),
       });
 
@@ -368,9 +377,9 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [gameType]);
+  };
 
-  const generateAnimation = useCallback(async () => {
+  const generateAnimation = async () => {
     setIsLoading(true);
     setResult(null);
     setResultCategory('animation');
@@ -398,9 +407,9 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [characterType, animationName, animationStyle]);
+  };
 
-  const generateBotPersona = useCallback(async () => {
+  const generateBotPersona = async () => {
     setIsLoading(true);
     setResult(null);
     setResultCategory('bot');
@@ -431,9 +440,9 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [personaType, personalityTraits, knowledgeDomains]);
+  };
 
-  const generateTestCases = useCallback(async () => {
+  const generateTestCases = async () => {
     if (!testFeature.trim()) {
       toast.error('Please describe the feature to test');
       return;
@@ -465,7 +474,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [testFeature, testType]);
+  };
 
   // =========================================================================
   // UI COMPONENTS
@@ -776,6 +785,16 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
 
       {renderChipSelector(gameTypes, gameType, setGameType, '🎮 Game Type:')}
 
+      <Text style={[styles.inputLabel, { color: colors.text }]}>Player Capacity:</Text>
+      <TextInput
+        style={[styles.textInput, { backgroundColor: colors.codeBackground, color: colors.text, borderColor: colors.border }]}
+        placeholder="1000"
+        placeholderTextColor={colors.textSecondary}
+        value={playerCapacity}
+        onChangeText={setPlayerCapacity}
+        keyboardType="numeric"
+      />
+
       <TouchableOpacity
         style={[styles.generateBtn, { backgroundColor: colors.primary }]}
         onPress={generateSystems}
@@ -926,7 +945,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
             {result.success ? '✅ Generated Result' : '⚠️ Generation Failed'}
           </Text>
           {result.ai_generated && (
-            <View style={[styles.aiBadge, { backgroundColor: colors.primary }]}>
+            <View style={[styles.aiBadge, { backgroundColor: colors.primary }]}> 
               <Text style={styles.aiBadgeText}>🤖 {modelLabel}</Text>
             </View>
           )}
@@ -935,7 +954,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
           {generatedCategoryLabel}
         </Text>
         <ScrollView style={styles.resultScroll} nestedScrollEnabled>
-          <Text style={[styles.resultText, { color: colors.text }]}>
+          <Text style={[styles.resultText, { color: colors.text }]}> 
             {displayText}
           </Text>
         </ScrollView>
@@ -993,8 +1012,8 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
 
   return (
     <Modal visible={visible} animationType="slide" transparent={false}>
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}> 
+        <View style={[styles.header, { borderBottomColor: colors.border }]}> 
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
             <Ionicons name="close" size={24} color={colors.text} />
           </TouchableOpacity>
