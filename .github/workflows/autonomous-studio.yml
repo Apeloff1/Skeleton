@@ -162,14 +162,54 @@ jobs:
           supervisor_path = root / 'shift-supervisor.json'
           state = json.loads(state_path.read_text(encoding='utf-8'))
           supervisor = json.loads(supervisor_path.read_text(encoding='utf-8'))
-          state['shift_supervisor'] = supervisor
+          plan = supervisor.get('plan_items', [])
+
+          night_items = []
+          for item in plan:
+              if item.get('target_team') != 'night' or item.get('status') in {'done', 'rejected'}:
+                  continue
+              title = str(item.get('title', '')).strip()
+              description = str(item.get('description', '')).strip()
+              if not title or not description:
+                  continue
+              night_items.append(
+                  {
+                      'title': title[:300],
+                      'description': description[:1600],
+                      'priority': item.get('priority', 50),
+                      'rationale': str(item.get('rationale', ''))[:1000],
+                      'expected_output': str(item.get('expected_output', ''))[:1000],
+                      'validation': list(item.get('validation', []))[:8],
+                      'dependencies': list(item.get('dependencies', []))[:8],
+                  }
+              )
+              if len(night_items) >= 8:
+                  break
+
+          revision_summaries = {}
+          for actor, revision in supervisor.get('revisions', {}).items():
+              if not isinstance(revision, dict):
+                  continue
+              revision_summaries[str(actor)] = {
+                  'summary': str(revision.get('summary', ''))[:1600],
+                  'correlation_id': str(revision.get('correlation_id', ''))[:200],
+              }
+
+          # Leading underscore makes this trusted, bounded supervisor context
+          # sort before the large issue/PR snapshots consumed by Studio's
+          # 16k repository-state evidence window.
+          state['_shift_supervisor'] = {
+              'actors': supervisor.get('actors', []),
+              'revisions': revision_summaries,
+              'night_plan_items': night_items,
+          }
           state_path.write_text(json.dumps(state, sort_keys=True, indent=2), encoding='utf-8')
 
           lines = ['## Shift supervisor', '']
           lines.append(f"Actors: {', '.join(supervisor.get('actors', [])) or 'none'}")
           lines.append('')
-          plan = supervisor.get('plan_items', [])
-          lines.append(f"Plan items supplied to Night Studio: {len(plan)}")
+          lines.append(f"Plan items generated: {len(plan)}")
+          lines.append(f"Night work items promoted into planner context: {len(night_items)}")
           for item in plan[:20]:
               title = str(item.get('title', '')).strip() or '(untitled)'
               team = str(item.get('target_team', 'unknown'))
