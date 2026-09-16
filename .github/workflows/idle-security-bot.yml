@@ -11,13 +11,17 @@ concurrency:
 
 permissions:
   contents: read
-  issues: write
   security-events: read
   vulnerability-alerts: read
 
 jobs:
   digest:
     name: Maintain security backlog digest
+    permissions:
+      contents: read
+      issues: write
+      security-events: read
+      vulnerability-alerts: read
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
