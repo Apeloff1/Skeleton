@@ -24,6 +24,9 @@ REPO_INTEL_SNAPSHOT = (
     'python scripts/repo_intel_frontier.py snapshot --base "$REPO_INTEL_BASE" --out .cache/repo-intel'
 )
 REPO_INTEL_GATE = 'python scripts/repo_intel_frontier.py gate --base "$REPO_INTEL_BASE"'
+CONTRIBUTION_CHECK = "python scripts/repo_intel_contributions.py check"
+CONTRIBUTION_SNAPSHOT = "python scripts/repo_intel_contributions.py snapshot --out .cache/repo-intel"
+CONTRIBUTION_GATE = 'python scripts/check_repo_intel_contribution_gate.py --base "$REPO_INTEL_BASE"'
 REPO_INTEL_BASE = "REPO_INTEL_BASE: ${{ github.event.pull_request.base.sha || 'origin/main' }}"
 REPO_INTEL_PR_GATE_BASE = "REPO_INTEL_BASE: ${{ github.event.pull_request.base.sha }}"
 JOB_HEADER_RE = re.compile(r"^  (?P<name>[A-Za-z0-9_-]+):\s*$", re.MULTILINE)
@@ -72,9 +75,12 @@ def main() -> int:
     require(bool(quality_security), "quality_security job missing", failures)
     require(REPO_INTEL_CHECK in quality_security, "quality_security must validate the frontier repository knowledge-graph contract", failures)
     require(REPO_INTEL_SNAPSHOT in quality_security, "quality_security must materialize the frontier semantic/supply-chain/build-surface snapshot", failures)
+    require(CONTRIBUTION_CHECK in quality_security, "quality_security must validate the contributor/agent provenance contract", failures)
+    require(CONTRIBUTION_SNAPSHOT in quality_security, "quality_security must materialize contributor/agent provenance evidence", failures)
     require(REPO_INTEL_BASE in quality_security, "frontier snapshot must fall back to origin/main outside pull-request events", failures)
     require(REPO_INTEL_PR_GATE_BASE in quality_security, "repo-intelligence PR gate must compare against the immutable pull-request base SHA", failures)
     require(REPO_INTEL_GATE in quality_security, "quality_security must enforce augmentation notes for build-affecting pull requests", failures)
+    require(CONTRIBUTION_GATE in quality_security, "quality_security must enforce canonical human/AI/bot/automation handoff provenance", failures)
 
     readiness = job_block(text, "readiness")
     require(bool(readiness), "readiness job missing", failures)
@@ -94,8 +100,11 @@ def main() -> int:
         "scripts/repo_intel_deep.py",
         "scripts/repo_intel_test_evidence.py",
         "scripts/repo_intel_artifacts.py",
+        "scripts/repo_intel_contributions.py",
+        "scripts/check_repo_intel_contribution_gate.py",
         "scripts/repo_index.py",
         "scripts/repo_intel_frontier.py",
+        "tests/test_repo_intel_contributions.py",
         "repo-intel/batches.json",
         "repo-intel/game-capabilities.json",
         "repo-intel/boundaries.json",
@@ -104,6 +113,7 @@ def main() -> int:
         "repo-intel/deep-index-contract.json",
         "repo-intel/test-evidence-contract.json",
         "repo-intel/artifact-lineage-contract.json",
+        "repo-intel/contributors.json",
     )
     for relative in required_files:
         require((ROOT / relative).is_file(), f"required merge-readiness contract file missing: {relative}", failures)
@@ -116,8 +126,8 @@ def main() -> int:
 
     print(
         "Merge-readiness contract passed: stable aggregate, exact toolchain, PR-safe supersession, "
-        "non-cancelling main verification, frontier graph/test-evidence/artifact-lineage/augmentation-note enforcement, "
-        "quarantine/security/secret gates, and explicit fail-closed result aggregation are aligned."
+        "non-cancelling main verification, frontier graph/test-evidence/artifact-lineage/contributor-provenance/"
+        "augmentation-note enforcement, quarantine/security/secret gates, and explicit fail-closed result aggregation are aligned."
     )
     return 0
 
