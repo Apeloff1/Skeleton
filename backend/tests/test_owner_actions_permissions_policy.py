@@ -22,7 +22,9 @@ def test_external_control_audit_checks_required_owner_boundaries() -> None:
     text = AUDIT.read_text(encoding="utf-8")
 
     for marker in (
-        "required check is configured",
+        'required_check="Merge Readiness"',
+        'required_app_id="15368"',
+        "required check is bound to GitHub Actions",
         "protection applies to administrators",
         "pull-request changes are required",
         "force pushes are blocked",
@@ -31,6 +33,10 @@ def test_external_control_audit_checks_required_owner_boundaries() -> None:
         "Actions cannot approve pull requests",
     ):
         assert marker in text
+
+    assert 'status.get("checks") or []' in text
+    assert 'item.get("app_id") == app_id' in text
+    assert "readarray" not in text
 
 
 def test_external_control_audit_does_not_query_secret_value_endpoints() -> None:
