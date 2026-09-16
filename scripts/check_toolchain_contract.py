@@ -141,7 +141,7 @@ def main() -> int:
     project = backend.get("project", {})
     tool = backend.get("tool", {})
     dev = project.get("optional-dependencies", {}).get("dev", [])
-    uv_dev = tool.get("uv", {}).get("dev-dependencies", [])
+    uv_dev = backend.get("dependency-groups", {}).get("dev", [])
     test_deps = project.get("optional-dependencies", {}).get("test", [])
     runtime_deps = project.get("dependencies", [])
     requirements = read("backend/requirements.txt")
