@@ -59,7 +59,14 @@ def test_js_relative_resolution_checks_extensions_and_index() -> None:
     paths = {"frontend/lib/x.ts", "frontend/widgets/index.tsx"}
     assert sota._resolve_js_import("frontend/app/main.ts", "../lib/x", paths) == "frontend/lib/x.ts"
     assert sota._resolve_js_import("frontend/app/main.ts", "../widgets", paths) == "frontend/widgets/index.tsx"
+    assert sota._resolve_js_import("frontend/app/main.ts", "./../lib/./x", paths) == "frontend/lib/x.ts"
     assert sota._resolve_js_import("frontend/app/main.ts", "react", paths) is None
+
+
+def test_js_relative_resolution_rejects_repo_root_escape() -> None:
+    paths = {"outside.ts", "frontend/lib/x.ts"}
+    assert sota._resolve_js_import("frontend/app/main.ts", "../../../outside", paths) is None
+    assert sota._resolve_js_import("frontend/app/main.ts", "../../lib/x", paths) is None
 
 
 def test_reverse_graph_preserves_edge_precision() -> None:
