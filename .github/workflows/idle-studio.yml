@@ -120,6 +120,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p .idle-studio-tmp
           title='bot: idle studio ledger'
           number=$(gh issue list --repo "$REPO" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
           if [[ -z "${number:-}" ]]; then
