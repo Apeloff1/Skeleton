@@ -92,6 +92,22 @@ def test_compressed_state_file_round_trip(tmp_path):
     assert _read_state(path) == state
 
 
+def test_corrupt_compressed_state_is_rejected(tmp_path):
+    path = tmp_path / "corrupt.txt"
+    path.write_text("gz:v1:not-valid-base64%%%\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid compressed shift-supervisor state"):
+        _read_state(path)
+
+
+def test_malformed_plain_state_json_is_rejected(tmp_path):
+    path = tmp_path / "malformed.json"
+    path.write_text("{not-json", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid shift-supervisor state JSON"):
+        _read_state(path)
+
+
 def test_restore_rejects_future_state_version():
     store = InMemoryPlanStore()
     with pytest.raises(ValueError, match="unsupported shift-supervisor state version"):
