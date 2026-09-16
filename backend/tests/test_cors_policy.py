@@ -1,4 +1,5 @@
-from core.exec_guard import normalize_cors_origins
+from core import exec_guard
+from core.exec_guard import configure_cors_environment, normalize_cors_origins
 
 
 def test_production_unset_and_blank_fail_closed():
@@ -42,3 +43,19 @@ def test_partially_invalid_origins_fail_closed():
         "http://localhost",
         "http://127.0.0.1",
     )
+
+
+def test_configuration_loads_dotenv_before_normalizing(monkeypatch):
+    """An explicit backend .env value must win before import-time normalization."""
+    monkeypatch.delenv("CORS_ORIGINS", raising=False)
+    monkeypatch.delenv("EMERGENT_DEPLOY", raising=False)
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+
+    def fake_load_dotenv(path):
+        assert str(path).endswith("/backend/.env")
+        monkeypatch.setenv("CORS_ORIGINS", "https://configured.example/")
+        return True
+
+    monkeypatch.setattr(exec_guard, "load_dotenv", fake_load_dotenv)
+    assert configure_cors_environment() == ("https://configured.example",)
+    assert exec_guard.os.environ["CORS_ORIGINS"] == "https://configured.example"
