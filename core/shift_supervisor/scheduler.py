@@ -4,8 +4,10 @@ import threading
 import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from typing import Any
+from datetime import datetime, timezone
+from typing import Any, Mapping
 
+from .models import WorkerState
 from .secretary import SecretaryBot
 from .shift_manager import SMBShiftManager
 
@@ -58,6 +60,7 @@ class SupervisorScheduler:
             raise ValueError("at least one supervisor actor must run")
 
         project_context = self.project_context_supplier()
+        self._ingest_worker_snapshots(project_context.get("worker_snapshots", []))
         revisions: dict[str, Any] = {}
         if run_secretary:
             revisions["secretary"] = asdict(self.secretary.enrich_plan(project_context))
@@ -90,11 +93,15 @@ class SupervisorScheduler:
         while not self._stop.is_set():
             now = time.monotonic()
             if now >= next_secretary:
-                self.secretary.enrich_plan(self.project_context_supplier())
+                context = self.project_context_supplier()
+                self._ingest_worker_snapshots(context.get("worker_snapshots", []))
+                self.secretary.enrich_plan(context)
                 next_secretary = self._advance(next_secretary, self.cadence.secretary_seconds, now)
             if now >= next_manager:
+                context = self.project_context_supplier()
+                self._ingest_worker_snapshots(context.get("worker_snapshots", []))
                 self.manager.refresh_plan(
-                    project_context=self.project_context_supplier(),
+                    project_context=context,
                     research=self.research_supplier(),
                 )
                 next_manager = self._advance(next_manager, self.cadence.manager_seconds, now)
@@ -103,6 +110,75 @@ class SupervisorScheduler:
 
     def stop(self) -> None:
         self._stop.set()
+
+    def _ingest_worker_snapshots(self, raw: Any) -> None:
+        if not isinstance(raw, list):
+            return
+        for row in raw[:512]:
+            if not isinstance(row, Mapping):
+                continue
+            worker_id = str(row.get("worker_id", "")).strip()
+            team = str(row.get("team", "")).strip().lower()
+            status = str(row.get("status", "offline")).strip().lower()
+            if not worker_id or team not in {"night", "idle"}:
+                continue
+            if status not in {"offline", "idle", "working", "blocked"}:
+                status = "offline"
+            worker = WorkerState(
+                worker_id=worker_id,
+                team=team,  # type: ignore[arg-type]
+                status=status,  # type: ignore[arg-type]
+                clocked_in_at=self._parse_datetime(row.get("clocked_in_at")),
+                clocked_out_at=self._parse_datetime(row.get("clocked_out_at")),
+                last_heartbeat_at=self._parse_datetime(row.get("last_heartbeat_at")),
+                current_task_id=self._optional_string(row.get("current_task_id")),
+                normal_shift_minutes=self._nonnegative_int(row.get("normal_shift_minutes")),
+                overtime_minutes=self._nonnegative_int(row.get("overtime_minutes")),
+                overtime_task_ids=self._string_list(row.get("overtime_task_ids")),
+                metadata=dict(row.get("metadata", {})) if isinstance(row.get("metadata"), Mapping) else {},
+            )
+            existing = next(
+                (item for item in self.manager.store.snapshot_workers() if item.worker_id == worker_id),
+                None,
+            )
+            if existing is not None:
+                incoming_time = worker.last_heartbeat_at or worker.clocked_out_at or worker.clocked_in_at
+                existing_time = existing.last_heartbeat_at or existing.clocked_out_at or existing.clocked_in_at
+                if incoming_time is not None and existing_time is not None and incoming_time < existing_time:
+                    continue
+            self.manager.store.upsert_worker(worker)
+
+    @staticmethod
+    def _parse_datetime(value: Any) -> datetime | None:
+        if not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
+    @staticmethod
+    def _optional_string(value: Any) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text[:500] or None
+
+    @staticmethod
+    def _string_list(value: Any) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        return [str(item)[:500] for item in value[:64] if item is not None]
+
+    @staticmethod
+    def _nonnegative_int(value: Any) -> int:
+        try:
+            return max(0, int(value))
+        except (TypeError, ValueError):
+            return 0
 
     @staticmethod
     def _advance(previous: float, interval: int, now: float) -> float:
