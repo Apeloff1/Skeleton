@@ -15,9 +15,6 @@ from typing import Any
 if __package__:
     from .pr_obsolete_run_drain import GitHubApi, main as drain_main
 else:
-    # The Actions workflow executes this file directly from the repository root.
-    # In that mode Python puts backend/scripts on sys.path, not backend, so the
-    # package-qualified ``scripts.*`` import is unavailable.
     from pr_obsolete_run_drain import GitHubApi, main as drain_main
 
 
@@ -42,6 +39,10 @@ def _matches_signal(
     )
 
 
+def _head_sha(pr: dict[str, Any]) -> str:
+    return str((pr.get("head") or {}).get("sha") or "")
+
+
 def resolve_pr_number(
     api: GitHubApi,
     *,
@@ -50,8 +51,16 @@ def resolve_pr_number(
     head_sha: str,
     head_ref: str,
     default_branch: str,
-) -> int:
-    """Resolve exactly one trusted same-repository PR for a workflow-run signal."""
+) -> int | None:
+    """Resolve one trusted PR, or no mutation target, for a workflow-run signal.
+
+    Prefer immutable workflow-run hints/commit association. If GitHub drops the
+    commit-to-PR association after an unmerged PR closes, recover only from an
+    exact same-repository branch + base + immutable head-SHA match. If neither
+    source identifies a PR, there is no privileged mutation target and cleanup
+    safely becomes a no-op. Ambiguity, API failures, and contradictory identity
+    remain fail-closed.
+    """
     if not repo or not head_ref or not head_sha or not default_branch:
         raise RuntimeError("incomplete workflow_run PR identity")
     if head_ref == default_branch:
@@ -87,12 +96,48 @@ def resolve_pr_number(
         )
     }
     candidates.discard(0)
-    if len(candidates) != 1:
+    if len(candidates) == 1:
+        return next(iter(candidates))
+    if len(candidates) > 1:
         raise RuntimeError(
-            "workflow_run head did not resolve to exactly one trusted PR "
+            "workflow_run head resolved to multiple trusted PRs via commit association "
             f"(matches={sorted(candidates)})"
         )
-    return next(iter(candidates))
+
+    owner, separator, _ = repo.partition("/")
+    if not separator or not owner:
+        raise RuntimeError("invalid repository identity for PR history lookup")
+    quoted_head = urllib.parse.quote(f"{owner}:{head_ref}", safe="")
+    quoted_base = urllib.parse.quote(default_branch, safe="")
+    history_path = (
+        f"/repos/{repo}/pulls?state=all&head={quoted_head}&base={quoted_base}"
+        "&sort=updated&direction=desc&per_page=100"
+    )
+    status, history, _ = api.request(history_path)
+    if status != 200 or not isinstance(history, list):
+        raise RuntimeError(f"failed to resolve PR from workflow_run branch history: HTTP {status}")
+
+    historical_candidates = {
+        int(item.get("number") or 0)
+        for item in history
+        if isinstance(item, dict)
+        and _matches_signal(
+            item,
+            repo=repo,
+            head_ref=head_ref,
+            default_branch=default_branch,
+        )
+        and _head_sha(item) == head_sha
+    }
+    historical_candidates.discard(0)
+    if len(historical_candidates) == 1:
+        return next(iter(historical_candidates))
+    if len(historical_candidates) > 1:
+        raise RuntimeError(
+            "workflow_run head resolved to multiple trusted PRs via branch history "
+            f"(matches={sorted(historical_candidates)})"
+        )
+    return None
 
 
 def live_pr_head_converged(
@@ -102,14 +147,7 @@ def live_pr_head_converged(
     pr_number: int,
     signal_head_sha: str,
 ) -> bool:
-    """Return whether live PR state is safe to use for this lifecycle signal.
-
-    ``workflow_run: requested`` can arrive before the pull-request REST endpoint
-    exposes a synchronize event's new head. Running cleanup in that window can
-    cancel the new head's CodeQL/CI jobs as obsolete. Closed PRs are safe to
-    drain immediately; open PRs must first match the immutable signal head.
-    Any other/missing state is ambiguous and therefore fails closed.
-    """
+    """Return whether live PR state is safe to use for this lifecycle signal."""
     status, payload, _ = api.request(f"/repos/{repo}/pulls/{pr_number}")
     if status != 200 or not isinstance(payload, dict):
         raise RuntimeError(f"failed to refresh PR #{pr_number}: HTTP {status}")
@@ -150,6 +188,12 @@ def main() -> int:
             head_ref=head_ref,
             default_branch=default_branch,
         )
+        if pr_number is None:
+            print(
+                "obsolete-run drain skipped: workflow_run head no longer "
+                "resolves to a trusted pull request"
+            )
+            return 0
         if not live_pr_head_converged(
             api,
             repo=repo,
@@ -165,10 +209,6 @@ def main() -> int:
         print(f"drain failed: {exc}")
         return 1
 
-    # The delegated drainer reconciles against the PR's live state, so the
-    # original synchronize/closed action is intentionally not trusted as an
-    # authority. "synchronize" satisfies its legacy accepted-action contract;
-    # open/closed handling is determined by the fresh PR API response.
     os.environ["PR_NUMBER"] = str(pr_number)
     os.environ["PR_ACTION"] = "synchronize"
     os.environ.setdefault("EVENT_BEFORE_SHA", "")
