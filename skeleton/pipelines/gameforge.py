@@ -37,6 +37,7 @@ class GameSpec:
     npcs: List[Dict[str, Any]] = field(default_factory=list)
     game_logic: Optional[Dict[str, Any]] = None
     animation: Optional[Dict[str, Any]] = None
+    knowledge: Dict[str, Any] = field(default_factory=dict)
     created_at: float = field(default_factory=time.time)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -49,6 +50,7 @@ class GameSpec:
             "npcs": self.npcs,
             "game_logic": self.game_logic,
             "animation": self.animation,
+            "knowledge": self.knowledge,
             "file_count": self.artefact.get("file_count", 0),
             "created_at": self.created_at,
         }
@@ -106,6 +108,7 @@ class GameForge:
                 bp, era=intake_result.era, target=target, repair=repair,
             )
 
+            knowledge = self._build_knowledge_context(intake_result)
             npcs = self._generate_npcs(intake_result, game_title)
             game_logic = self._generate_logic(intake_result, game_title)
             animation = self._generate_animation(answers)
@@ -120,6 +123,7 @@ class GameForge:
                 npcs=npcs,
                 game_logic=game_logic,
                 animation=animation,
+                knowledge=knowledge,
             )
             released = guard_tri_creation(
                 request=str(intake_result.vision or game_title),
@@ -128,12 +132,18 @@ class GameForge:
                     "creation_type": "game_spec",
                     "target": target,
                     "repair_requested": bool(repair),
+                    "knowledge_references": knowledge.get("reference_count", 0),
                 },
             )
 
             self._bus.publish(DomainEvent(
                 topic="gameforge.run.completed",
-                payload={"spec_id": run_id, "title": game_title, "target": target},
+                payload={
+                    "spec_id": run_id,
+                    "title": game_title,
+                    "target": target,
+                    "knowledge_references": knowledge.get("reference_count", 0),
+                },
                 correlation_id=f"gameforge_{run_id}",
             ))
             return released
@@ -154,6 +164,18 @@ class GameForge:
                 return forge
         from skeleton.forge.universal import Forge
         return Forge(bus=self._bus)
+
+    def _build_knowledge_context(self, intake_result: Any) -> Dict[str, Any]:
+        from skeleton.acquired.gaming import build_game_knowledge_context
+
+        query = " ".join(
+            part for part in (
+                str(getattr(intake_result, "genre", "")),
+                str(getattr(intake_result, "era", "")),
+                str(getattr(intake_result, "vision", "")),
+            ) if part
+        )
+        return build_game_knowledge_context(query, era=intake_result.era, limit=4)
 
     def _generate_npcs(self, intake_result: Any, title: str) -> List[Dict[str, Any]]:
         from skeleton.pipelines import NPCPipeline
