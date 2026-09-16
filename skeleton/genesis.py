@@ -405,12 +405,16 @@ class Genesis:
         engine_v35.tick()
 
     def _phase_cortex(self) -> None:
-        """The Jeeves neocortex — wired last so it can observe the whole bus."""
+        """Wire a fresh cortex unless durable process ownership is explicit."""
         self.report.phases.append("cortex")
+        from skeleton.cortex.live import live_cortex, persistence_configured
         from skeleton.cortex.neocortex import JeevesCortex
         from skeleton.jeeves.core import Jeeves
 
-        neo = JeevesCortex(bus=self.bus)
+        if persistence_configured():
+            neo = live_cortex(self.bus)
+        else:
+            neo = JeevesCortex(bus=self.bus)
         self._wire("cortex", "cortex", neo)
         # Alias for GameForge/cockpit callers that look up the "jeeves" handle.
         j = Jeeves(bus=self.bus)
