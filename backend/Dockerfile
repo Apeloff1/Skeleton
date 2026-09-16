@@ -7,7 +7,7 @@
 
 # Stage 1: dependency builder. Alpine keeps the builder/runtime ABI aligned
 # so compiled wheels and native extensions do not cross a glibc/musl boundary.
-FROM python:3.14-alpine@sha256:05b2b8b732ecd268fee8727a369f936f022d1321b59befd13c30ede22769dcdc AS builder
+FROM python:3.14-alpine@sha256:c6ead215bfd31f1e433d968853b7a769989117115b728874824e6c0a27cb96fc AS builder
 
 WORKDIR /app
 
@@ -28,10 +28,11 @@ ENV UV_COMPILE_BYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN uv venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
-RUN uv pip install -r requirements.txt
+RUN uv pip install -r requirements.txt \
+    && uv pip install "msgpack>=1.2.1" "setuptools>=78.1.1"
 
 # Stage 2: Production
-FROM python:3.14-alpine@sha256:05b2b8b732ecd268fee8727a369f936f022d1321b59befd13c30ede22769dcdc AS production
+FROM python:3.14-alpine@sha256:c6ead215bfd31f1e433d968853b7a769989117115b728874824e6c0a27cb96fc AS production
 
 # Explicitly identify the application host as production so exec_guard can
 # never be re-enabled by ALLOW_UNSAFE_CODE_EXECUTION inside this image. CORS
