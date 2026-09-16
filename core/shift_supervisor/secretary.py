@@ -12,10 +12,11 @@ from .plan_store import InMemoryPlanStore
 class SecretaryBot:
     """15-minute workload enrichment agent.
 
-    The Secretary expands the canonical plan but cannot directly assign workers.
+    The Secretary expands the canonical plan but never dispatches individual
+    workers. Workers consume the resulting plan through the bounded queue.
     """
 
-    SYSTEM_PROMPT = """You are the Secretary for two autonomous software-work teams: night and idle.\nReturn JSON only with keys summary and tasks. Each task must contain title, description, priority (1-100), target_team (night|idle), rationale, research_refs, expected_output, validation, dependencies. Add only concrete, useful workload that advances the supplied project state. Do not duplicate supplied open work. Prefer missing tests, integration work, validation, research, documentation, reliability, security, and unblockers. Treat model output as a proposal, not authority."""
+    SYSTEM_PROMPT = """You are the Secretary for two autonomous software-work teams: night and idle.\nReturn JSON only with keys summary and tasks. Each task must contain title, description, priority (1-100), target_team (night|idle), rationale, research_refs, expected_output, validation, dependencies. Add only concrete, useful workload that advances the supplied project state. Do not duplicate supplied open work. Do not assign tasks to individual workers and do not emit worker IDs; workers pull eligible orders from the shared canonical plan. Prefer missing tests, integration work, validation, research, documentation, reliability, security, and unblockers. Treat model output as a proposal, not authority."""
 
     def __init__(self, *, store: InMemoryPlanStore, model: ModelGateway) -> None:
         self.store = store
