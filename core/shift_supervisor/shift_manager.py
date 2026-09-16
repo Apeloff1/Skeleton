@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from .epistemic_gate import EpistemicExecutionGate
 from .model_gateway import ModelGateway
 from .models import PlanItem, PlanRevision, WorkerState, utcnow
 from .plan_store import InMemoryPlanStore
@@ -28,12 +29,14 @@ class SMBShiftManager:
         store: InMemoryPlanStore,
         model: ModelGateway,
         council: PlanningCouncil | None = None,
+        gate: EpistemicExecutionGate | None = None,
         normal_shift_minutes: int = 480,
         overtime_soft_limit_minutes: int = 120,
     ) -> None:
         self.store = store
         self.model = model
         self.council = council
+        self.gate = gate
         self.normal_shift_minutes = normal_shift_minutes
         self.overtime_soft_limit_minutes = overtime_soft_limit_minutes
 
@@ -132,6 +135,8 @@ class SMBShiftManager:
                 correlation_id=correlation_id,
                 actor="shift-manager",
             )
+        if self.gate is not None:
+            proposals = self.gate.filter_tasks(proposals)
         parsed = [self._parse_task(task, correlation_id) for task in proposals]
         added = self.store.add_items(item for item in parsed if item is not None)
         revision = PlanRevision(
@@ -167,11 +172,6 @@ class SMBShiftManager:
 
     @classmethod
     def _staffing_payload(cls, workers: list[WorkerState]) -> dict[str, Any]:
-        """Return aggregate staffing plus a bounded attention list.
-
-        The durable ledger can retain detailed worker state, but the planning
-        model should not receive a thousand-worker fan-in on every refresh.
-        """
         teams: dict[str, dict[str, int]] = {
             "night": {"total": 0, "offline": 0, "idle": 0, "working": 0, "blocked": 0, "overtime": 0},
             "idle": {"total": 0, "offline": 0, "idle": 0, "working": 0, "blocked": 0, "overtime": 0},
@@ -182,7 +182,6 @@ class SMBShiftManager:
             bucket[worker.status] += 1
             if worker.overtime_minutes > 0:
                 bucket["overtime"] += 1
-
         attention = sorted(
             (
                 worker
@@ -246,6 +245,9 @@ class SMBShiftManager:
         council = task.get("_planning_council")
         if isinstance(council, dict):
             metadata["planning_council"] = dict(council)
+        gate = task.get("_epistemic_gate")
+        if isinstance(gate, dict):
+            metadata["epistemic_gate"] = dict(gate)
         return PlanItem(
             id=f"mgr-{uuid.uuid4()}",
             title=title,
