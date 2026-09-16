@@ -2,12 +2,13 @@
 """Deterministic contributor, bot, automation, and AI provenance inventory.
 
 This layer reports observable repository evidence. It deliberately separates direct
-Git contribution evidence from operational surfaces and user-declared tooling so a
-model/tool is never credited for a commit merely because its name appears in prose,
-a branch, a model catalog, or an instruction file.
+Git contribution evidence, explicit handoff-note attribution, operational surfaces,
+and user-declared tooling so a model/tool is never credited for a commit merely
+because its name appears in prose, a branch, a model catalog, or an instruction file.
 """
 from __future__ import annotations
 
+import argparse
 from collections import defaultdict
 import hashlib
 import json
@@ -18,8 +19,10 @@ from typing import Any
 import repo_intel as base
 
 ROOT = base.ROOT
+DEFAULT_OUT = base.DEFAULT_OUT
 _IDENT_RE = re.compile(r"^\s*(.*?)\s*<([^>]+)>\s*$")
 _TRAILER_RE = re.compile(r"^([A-Za-z][A-Za-z0-9-]*):\s*(.+?)\s*$")
+_AUTHOR_AGENT_RE = re.compile(r"^\s*-?\s*\*\*Author/agent:\*\*\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE)
 
 
 def _registry() -> dict[str, Any]:
@@ -45,6 +48,7 @@ def _actor_maps(registry: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], di
     actors = {str(actor["id"]): dict(actor) for actor in registry.get("actors", [])}
     exact: dict[str, str] = {}
     for actor_id, actor in actors.items():
+        exact[_norm(actor_id)] = actor_id
         for value in [actor.get("display_name", ""), *actor.get("aliases", []), *actor.get("identity_patterns", [])]:
             if value:
                 exact[_norm(str(value))] = actor_id
@@ -110,16 +114,55 @@ def _trailers(body: str) -> list[tuple[str, str]]:
     return result
 
 
+def _declared_actor_ids(value: str, actors: dict[str, dict[str, Any]], exact: dict[str, str]) -> list[str]:
+    normalized = _norm(value)
+    direct = exact.get(normalized)
+    if direct:
+        return [direct]
+    matches: set[str] = set()
+    for actor_id, actor in actors.items():
+        candidates = [actor_id, actor.get("display_name", ""), *actor.get("aliases", [])]
+        for candidate in candidates:
+            token = _norm(str(candidate))
+            if len(token) >= 4 and token in normalized:
+                matches.add(actor_id)
+    return sorted(matches)
+
+
+def _read_text(path: str) -> str:
+    try:
+        return (ROOT / path).read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return ""
+
+
+def _handoff_evidence(snapshot: dict[str, Any], actors: dict[str, dict[str, Any]], exact: dict[str, str]) -> dict[str, list[dict[str, str]]]:
+    evidence: dict[str, list[dict[str, str]]] = defaultdict(list)
+    for row in snapshot.get("files", []):
+        path = str(row["path"])
+        if not path.startswith("repo-intel/notes/") or not path.endswith(".md") or path.endswith("/TEMPLATE.md"):
+            continue
+        text = _read_text(path)
+        for match in _AUTHOR_AGENT_RE.finditer(text):
+            raw_value = match.group(1).strip()
+            for actor_id in _declared_actor_ids(raw_value, actors, exact):
+                evidence[actor_id].append({"path": path, "declared_as": raw_value})
+    return {key: sorted(value, key=lambda item: (item["path"], item["declared_as"])) for key, value in evidence.items()}
+
+
 def _surface_evidence(snapshot: dict[str, Any], actors: dict[str, dict[str, Any]], records: list[dict[str, str]]) -> dict[str, Any]:
     paths = [str(row["path"]) for row in snapshot.get("files", [])]
     by_actor: dict[str, dict[str, Any]] = {}
     for actor_id, actor in actors.items():
         instruction_files = [path for path in actor.get("instruction_files", []) if path in paths]
         prefixes = actor.get("surface_prefixes", [])
-        surface_paths = sorted(
-            path for path in paths if any(path == prefix.rstrip("/") or path.startswith(prefix) for prefix in prefixes)
-        )
         terms = [_norm(str(term)) for term in actor.get("surface_terms", []) if term]
+        surface_paths = sorted(
+            path
+            for path in paths
+            if any(path == prefix.rstrip("/") or path.startswith(prefix) for prefix in prefixes)
+            or any(term in path.casefold() for term in terms)
+        )
         message_commits = []
         if terms:
             for record in records:
@@ -151,7 +194,6 @@ def build(snapshot: dict[str, Any]) -> dict[str, Any]:
             "direct_trailer_commits": 0,
             "direct_commit_participation": set(),
             "informational_trailer_mentions": 0,
-            "samples": [],
         }
     )
     unknown_meta: dict[str, dict[str, Any]] = {}
@@ -180,7 +222,6 @@ def build(snapshot: dict[str, Any]) -> dict[str, Any]:
         stats[committer_id]["direct_commit_participation"].add(sha)
 
         direct_trailer_ids: set[str] = set()
-        informational: list[dict[str, str]] = []
         for key, value in _trailers(record["body"]):
             name, email = _parse_identity(value)
             actor_id = _match_actor(name, email, actors, exact)
@@ -197,7 +238,6 @@ def build(snapshot: dict[str, Any]) -> dict[str, Any]:
                 direct_trailer_ids.add(actor_id)
             elif key in info_keys:
                 stats[actor_id]["informational_trailer_mentions"] += 1
-                informational.append({"key": key, "actor": actor_id})
         for actor_id in direct_trailer_ids:
             stats[actor_id]["direct_trailer_commits"] += 1
             stats[actor_id]["direct_commit_participation"].add(sha)
@@ -222,15 +262,15 @@ def build(snapshot: dict[str, Any]) -> dict[str, Any]:
                         ),
                     }
                 )
-        if informational:
-            pass
 
     surfaces = _surface_evidence(snapshot, actors, records)
+    handoffs = _handoff_evidence(snapshot, actors, exact)
     actor_rows: list[dict[str, Any]] = []
     for actor_id, actor in sorted(actors.items()):
         data = stats[actor_id]
         samples = [item for item in nonhuman_direct_evidence if item["actor"] == actor_id][:25]
         surface = surfaces.get(actor_id, {})
+        note_evidence = handoffs.get(actor_id, [])
         actor_rows.append(
             {
                 "id": actor_id,
@@ -241,6 +281,8 @@ def build(snapshot: dict[str, Any]) -> dict[str, Any]:
                 "direct_committer_commits": data["committer_commits"],
                 "explicit_direct_trailer_commits": data["direct_trailer_commits"],
                 "direct_commit_participation": len(data["direct_commit_participation"]),
+                "declared_handoff_contributions": len(note_evidence),
+                "declared_handoff_evidence": note_evidence[:50],
                 "informational_trailer_mentions": data["informational_trailer_mentions"],
                 "instruction_files_present": surface.get("instruction_files", []),
                 "operational_surface_path_count": surface.get("surface_path_count", 0),
@@ -310,5 +352,51 @@ def check_contracts() -> None:
     print(f"repo-intel-contributions: contract valid ({len(actor_ids)} canonical actors)")
 
 
+def _load_snapshot(out: Path) -> dict[str, Any]:
+    path = out / "index.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(payload, dict) and isinstance(payload.get("files"), list):
+            return payload
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        pass
+    return base.build_snapshot()
+
+
+def snapshot_command(out: Path) -> dict[str, Any]:
+    check_contracts()
+    out.mkdir(parents=True, exist_ok=True)
+    payload = build(_load_snapshot(out))
+    target = out / "contributions.json"
+    target.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    direct = sum(actor["direct_commit_participation"] for actor in payload["actors"] if actor["kind"] != "human")
+    declared = sum(actor["declared_handoff_contributions"] for actor in payload["actors"] if actor["kind"] != "human")
+    print(
+        "repo-intel-contributions: "
+        f"scanned={payload['coverage']['scanned_commit_count']} commits; "
+        f"nonhuman-direct={direct}; handoff-declarations={declared}; "
+        f"unknown-identities={len(payload['unknown_direct_identities'])}"
+    )
+    return payload
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("check")
+    snap = sub.add_parser("snapshot")
+    snap.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    args = parser.parse_args(argv)
+    try:
+        if args.command == "check":
+            check_contracts()
+        elif args.command == "snapshot":
+            snapshot_command(args.out)
+        return 0
+    except RuntimeError as exc:
+        print(f"repo-intel-contributions: ERROR: {exc}")
+        return 2
+
+
 if __name__ == "__main__":
-    raise SystemExit("repo_intel_contributions is a library layer; use scripts/repo_intel_frontier.py")
+    raise SystemExit(main())
