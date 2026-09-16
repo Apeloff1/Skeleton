@@ -9,17 +9,18 @@ concurrency:
   group: idle-security-bot
   cancel-in-progress: false
 
-permissions:
-  contents: read
-  issues: write
-  security-events: read
-  vulnerability-alerts: read
+permissions: {}
 
 jobs:
   digest:
     name: Maintain security backlog digest
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+      security-events: read
+      vulnerability-alerts: read
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
