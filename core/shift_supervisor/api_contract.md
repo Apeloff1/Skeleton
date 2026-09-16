@@ -9,6 +9,8 @@ The supervisory agents communicate with the model through `ModelGateway.call_jso
 - unique correlation ID
 - bounded output token budget
 
+The model is a plan producer, not a dispatcher. Individual worker IDs are not part of the manager or secretary output contract.
+
 ## Manager expected response
 
 ```json
@@ -25,13 +27,6 @@ The supervisory agents communicate with the model through `ModelGateway.call_jso
       "expected_output": "...",
       "validation": ["..."],
       "dependencies": ["..."]
-    }
-  ],
-  "delegation": [
-    {
-      "task_id_or_title": "...",
-      "worker_id": "...",
-      "reason": "..."
     }
   ]
 }
@@ -58,4 +53,8 @@ The supervisory agents communicate with the model through `ModelGateway.call_jso
 }
 ```
 
-Malformed, duplicate, cross-team, blocked-worker, and excess-overtime proposals are rejected or ignored by the local orchestration layer rather than trusted solely because they came from a model.
+## Worker dispatch contract
+
+Workers obtain orders from `PlanQueueAPI.claim_next(worker_id)`. The local store atomically enforces one active task per worker, team boundaries, dependency completion, active-worker state, and the overtime soft limit. Completion or release also happens through the queue API, so workers do not need to ask the Shift Manager or Secretary for task-level decisions.
+
+Malformed and duplicate model proposals are rejected or ignored by the local orchestration layer. Worker capacity and assignment safety are enforced locally rather than trusted to model output.
