@@ -32,10 +32,13 @@ RUN yarn export:web
 # Stage 4: Production (Nginx)
 FROM nginx:alpine@sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5ffd29f1d3 AS production
 
-# The official image starts as root so it can bind privileged ports and prepare
-# runtime directories. Prepare the writable nginx paths at build time, then
+# Apply Alpine security updates newer than the pinned base snapshot. The
+# official image starts as root so it can prepare runtime directories; grant
+# the nginx user access to the real /run directory used for nginx.pid, then
 # permanently drop privileges for the production process.
-RUN chown -R nginx:nginx /var/cache/nginx /var/run /etc/nginx/conf.d /usr/share/nginx/html
+RUN apk upgrade --no-cache \
+    && chown nginx:nginx /run \
+    && chown -R nginx:nginx /var/cache/nginx /etc/nginx/conf.d /usr/share/nginx/html
 COPY --chown=nginx:nginx nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder --chown=nginx:nginx /app/dist /usr/share/nginx/html
 
