@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from core.shift_supervisor.models import WorkerState
 from core.shift_supervisor.plan_store import InMemoryPlanStore
 from core.shift_supervisor.secretary import SecretaryBot
@@ -74,6 +76,24 @@ def test_manager_drops_task_with_unresolvable_dependency_instead_of_executing_ou
     assert store.snapshot_items() == []
 
 
+def test_manager_rejects_entire_cyclic_batch() -> None:
+    store = InMemoryPlanStore()
+    model = RecordingModel(
+        {
+            "summary": "cycle",
+            "tasks": [
+                _task("a", dependencies=["b"], domain="a"),
+                _task("b", dependencies=["a"], domain="b"),
+            ],
+        }
+    )
+    manager = SMBShiftManager(store=store, model=model)
+
+    with pytest.raises(ValueError, match="cyclic plan dependencies rejected"):
+        manager.refresh_plan(project_context={}, research=[])
+    assert store.snapshot_items() == []
+
+
 def test_manager_exposes_safe_four_worker_capacity_to_planner() -> None:
     store = InMemoryPlanStore()
     for index in range(9):
@@ -88,6 +108,7 @@ def test_manager_exposes_safe_four_worker_capacity_to_planner() -> None:
     assert payload["policies"]["squad_size"] == 4
     assert payload["policies"]["safe_squad_capacity"]["night"] == 2
     assert "one task, one active squad" in payload["policies"]["anti_swarm"]
+    assert "acyclic DAG" in payload["policies"]["dependency_policy"]
 
 
 def test_secretary_additions_are_squad_ready_and_dependency_resolved() -> None:
@@ -110,3 +131,21 @@ def test_secretary_additions_are_squad_ready_and_dependency_resolved() -> None:
     assert items["test-integration"].dependencies == [items["test-foundation"].id]
     assert all(item.metadata["squad_size"] == 4 for item in items.values())
     assert "never dispatch workers" in SecretaryBot.SYSTEM_PROMPT.lower()
+
+
+def test_secretary_rejects_entire_cyclic_batch() -> None:
+    store = InMemoryPlanStore()
+    model = RecordingModel(
+        {
+            "summary": "cycle",
+            "tasks": [
+                _task("research", dependencies=["verify"], domain="research"),
+                _task("verify", dependencies=["research"], domain="verify"),
+            ],
+        }
+    )
+    secretary = SecretaryBot(store=store, model=model)
+
+    with pytest.raises(ValueError, match="cyclic plan dependencies rejected"):
+        secretary.enrich_plan({})
+    assert store.snapshot_items() == []
