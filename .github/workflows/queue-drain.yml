@@ -2,14 +2,13 @@ name: Drain superseded Actions queue
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
   schedule:
-    - cron: "*/5 * * * *"
+    # Avoid top-of-five-minute scheduler hotspots while preserving 5-minute cadence.
+    - cron: "2-57/5 * * * *"
 
-# One live drainer plus one coalesced pending run. The active worker is never
-# killed merely because main advances while it is sweeping delayed fanout.
+# One live drainer plus one coalesced pending run. Do not trigger on every main
+# push: during merge storms GitHub replaces the pending run in this concurrency
+# group before it receives a runner, which can starve queue recovery indefinitely.
 concurrency:
   group: queue-drain-${{ github.repository }}
   cancel-in-progress: false
