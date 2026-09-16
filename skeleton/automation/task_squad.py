@@ -9,10 +9,13 @@ reusable scheduling primitive for Night, Idle, and Autonomous Studio runtimes.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import os
+from threading import Lock
 
 from core.shift_supervisor.prompts import compose_role_prompt
 
-from .studio_registry import StudioBot, find_specialist
+from .studio_registry import STUDIO, StudioBot, find_specialist
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,8 +47,48 @@ class StudioTaskSquad:
         }
 
 
+_ALLOCATION_LOCK = Lock()
+_SCOPED_SQUADS: dict[tuple[str, str, str], StudioTaskSquad] = {}
+_SCOPED_WORKERS: dict[str, set[str]] = {}
+
+
+def _allocation_scope() -> str:
+    """Return the explicit/process run scope used to prevent worker overload."""
+
+    return os.getenv("STUDIO_SQUAD_SCOPE", "").strip() or os.getenv("GITHUB_RUN_ID", "").strip()
+
+
+def _find_unreserved_specialist(
+    division: str,
+    *,
+    mode: str,
+    seed: str,
+    reserved: set[str],
+) -> StudioBot:
+    matches = [
+        bot
+        for bot in STUDIO
+        if bot.division == division and bot.mode == mode and bot.bot_id not in reserved
+    ]
+    if not matches:
+        raise RuntimeError(
+            f"no unreserved {mode!r} specialist remains in division {division!r} for this run"
+        )
+    return min(
+        matches,
+        key=lambda bot: hashlib.sha256(f"{seed}\x1f{bot.bot_id}".encode("utf-8")).digest(),
+    )
+
+
 def select_task_squad(division: str, *, seed: str) -> StudioTaskSquad:
-    """Select one stable four-agent squad for a task/seed pair."""
+    """Select one stable four-agent squad for a task/seed pair.
+
+    When a run scope is present (``STUDIO_SQUAD_SCOPE`` or GitHub's
+    ``GITHUB_RUN_ID``), workers are reserved for the lifetime of the process so
+    different tasks cannot overload the same virtual worker. Re-selecting the
+    same scoped task returns its original squad.
+    """
+
     division = str(division).strip()
     seed = str(seed).strip()
     if not division:
@@ -53,21 +96,74 @@ def select_task_squad(division: str, *, seed: str) -> StudioTaskSquad:
     if not seed:
         raise ValueError("seed is required")
 
-    researcher = find_specialist(division, mode="scout", seed=f"{seed}:research")
-    lead = find_specialist(division, mode="builder", seed=f"{seed}:lead")
-    reviewer = find_specialist(division, mode="reviewer", seed=f"{seed}:review")
-    verifier = find_specialist(division, mode="tester", seed=f"{seed}:verify")
-    squad = StudioTaskSquad(
-        squad_key=f"{division}:{seed}",
-        division=division,
-        researcher=researcher,
-        lead=lead,
-        reviewer=reviewer,
-        verifier=verifier,
-    )
-    if len(set(squad.worker_ids)) != 4:
-        raise RuntimeError("task squad roles must map to four distinct workers")
-    return squad
+    scope = _allocation_scope()
+    if not scope:
+        researcher = find_specialist(division, mode="scout", seed=f"{seed}:research")
+        lead = find_specialist(division, mode="builder", seed=f"{seed}:lead")
+        reviewer = find_specialist(division, mode="reviewer", seed=f"{seed}:review")
+        verifier = find_specialist(division, mode="tester", seed=f"{seed}:verify")
+        squad = StudioTaskSquad(
+            squad_key=f"{division}:{seed}",
+            division=division,
+            researcher=researcher,
+            lead=lead,
+            reviewer=reviewer,
+            verifier=verifier,
+        )
+        if len(set(squad.worker_ids)) != 4:
+            raise RuntimeError("task squad roles must map to four distinct workers")
+        return squad
+
+    cache_key = (scope, division, seed)
+    with _ALLOCATION_LOCK:
+        cached = _SCOPED_SQUADS.get(cache_key)
+        if cached is not None:
+            return cached
+
+        reserved = set(_SCOPED_WORKERS.get(scope, set()))
+        researcher = _find_unreserved_specialist(
+            division,
+            mode="scout",
+            seed=f"{seed}:research",
+            reserved=reserved,
+        )
+        reserved.add(researcher.bot_id)
+        lead = _find_unreserved_specialist(
+            division,
+            mode="builder",
+            seed=f"{seed}:lead",
+            reserved=reserved,
+        )
+        reserved.add(lead.bot_id)
+        reviewer = _find_unreserved_specialist(
+            division,
+            mode="reviewer",
+            seed=f"{seed}:review",
+            reserved=reserved,
+        )
+        reserved.add(reviewer.bot_id)
+        verifier = _find_unreserved_specialist(
+            division,
+            mode="tester",
+            seed=f"{seed}:verify",
+            reserved=reserved,
+        )
+        reserved.add(verifier.bot_id)
+
+        squad = StudioTaskSquad(
+            squad_key=f"{division}:{seed}",
+            division=division,
+            researcher=researcher,
+            lead=lead,
+            reviewer=reviewer,
+            verifier=verifier,
+        )
+        if len(set(squad.worker_ids)) != 4:
+            raise RuntimeError("task squad roles must map to four distinct workers")
+
+        _SCOPED_SQUADS[cache_key] = squad
+        _SCOPED_WORKERS[scope] = reserved
+        return squad
 
 
 def role_prompt(
