@@ -10,7 +10,7 @@ set -euo pipefail
 
 repo="${REPO:-Apeloff1/Skeleton}"
 branch="${BRANCH:-main}"
-required_check="${REQUIRED_CHECK:-Merge Readiness}"
+required_check="Merge Readiness"
 mode="${1:-apply}"
 
 case "$mode" in
@@ -40,30 +40,31 @@ if [[ "$admin" != "true" ]]; then
 fi
 
 verify() {
-  local protected
+  local protected check_present enforce_admins strict pr_gate conversations force_pushes deletions
+
   protected="$(gh api "repos/${repo}/branches/${branch}" --jq '.protected')"
   if [[ "$protected" != "true" ]]; then
     echo "NOT ENFORCED: ${repo}:${branch} is not protected" >&2
     return 1
   fi
 
-  gh api "repos/${repo}/branches/${branch}/protection" --jq \
-    --arg check "$required_check" '
-      {
-        enforce_admins: .enforce_admins.enabled,
-        required_checks: .required_status_checks.contexts,
-        strict: .required_status_checks.strict,
-        pull_request_reviews: (.required_pull_request_reviews != null),
-        approving_reviews_required: (.required_pull_request_reviews.required_approving_review_count // null),
-        conversation_resolution: .required_conversation_resolution.enabled,
-        force_pushes_allowed: .allow_force_pushes.enabled,
-        deletions_allowed: .allow_deletions.enabled
-      }
-      | . + {required_check_present: (.required_checks | index($check) != null)}
-    '
+  gh api "repos/${repo}/branches/${branch}/protection" --jq '
+    {
+      enforce_admins: .enforce_admins.enabled,
+      required_checks: .required_status_checks.contexts,
+      strict: .required_status_checks.strict,
+      pull_request_reviews: (.required_pull_request_reviews != null),
+      approving_reviews_required: (.required_pull_request_reviews.required_approving_review_count // null),
+      conversation_resolution: .required_conversation_resolution.enabled,
+      force_pushes_allowed: .allow_force_pushes.enabled,
+      deletions_allowed: .allow_deletions.enabled
+    }
+  '
 
-  local check_present enforce_admins strict pr_gate conversations force_pushes deletions
-  check_present="$(gh api "repos/${repo}/branches/${branch}/protection" --jq --arg check "$required_check" '.required_status_checks.contexts | index($check) != null')"
+  check_present="false"
+  if gh api "repos/${repo}/branches/${branch}/protection" --jq '.required_status_checks.contexts[]' | grep -Fxq "$required_check"; then
+    check_present="true"
+  fi
   enforce_admins="$(gh api "repos/${repo}/branches/${branch}/protection" --jq '.enforce_admins.enabled')"
   strict="$(gh api "repos/${repo}/branches/${branch}/protection" --jq '.required_status_checks.strict')"
   pr_gate="$(gh api "repos/${repo}/branches/${branch}/protection" --jq '.required_pull_request_reviews != null')"
@@ -84,11 +85,10 @@ if [[ "$mode" == "--verify" ]]; then
   exit $?
 fi
 
-payload="$(cat <<JSON
-{
+payload='{
   "required_status_checks": {
     "strict": true,
-    "contexts": ["${required_check}"]
+    "contexts": ["Merge Readiness"]
   },
   "enforce_admins": true,
   "required_pull_request_reviews": {
@@ -105,9 +105,7 @@ payload="$(cat <<JSON
   "required_conversation_resolution": true,
   "lock_branch": false,
   "allow_fork_syncing": false
-}
-JSON
-)"
+}'
 
 if [[ "$mode" == "--dry-run" ]]; then
   printf '%s\n' "$payload"
