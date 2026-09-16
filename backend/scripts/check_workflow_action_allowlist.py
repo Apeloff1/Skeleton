@@ -36,9 +36,11 @@ APPROVED_THIRD_PARTY_ACTIONS = frozenset(
     {
         "anchore/sbom-action",
         "aquasecurity/trivy-action",
+        "astral-sh/setup-uv",
         "docker/build-push-action",
         "docker/setup-buildx-action",
         "gacts/gitleaks",
+        "gitleaks/gitleaks-action",
     }
 )
 
