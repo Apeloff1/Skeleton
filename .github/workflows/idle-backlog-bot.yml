@@ -9,16 +9,16 @@ concurrency:
   group: idle-backlog-bot
   cancel-in-progress: false
 
-permissions:
-  contents: read
-  issues: write
-  pull-requests: write
+permissions: {}
 
 jobs:
   triage:
     name: Triage stale work
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}

@@ -1,0 +1,282 @@
+name: Shift Supervisor Control
+
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+    - cron: '22,52 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: shift-supervisor-control
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  control:
+    if: github.repository == 'Apeloff1/Skeleton'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+      pull-requests: read
+      security-events: read
+    env:
+      REPO: ${{ github.repository }}
+      PLAN_TITLE: '[Shift Supervisor] Canonical Night + Idle Plan'
+
+    steps:
+      - name: Checkout trusted main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11.16'
+
+      - name: Snapshot planning, staffing, and research evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .shift-supervisor-tmp
+          gh issue list --repo "$REPO" --state open --limit 100 \
+            --json number,title,body,labels,updatedAt,url > .shift-supervisor-tmp/issues.json
+          gh pr list --repo "$REPO" --state open --limit 100 \
+            --json number,title,body,labels,headRefName,baseRefName,updatedAt,url > .shift-supervisor-tmp/pulls.json
+          gh run list --repo "$REPO" --limit 75 \
+            --json databaseId,name,status,conclusion,headBranch,headSha,createdAt,url > .shift-supervisor-tmp/runs.json
+          gh api "/repos/${REPO}/code-scanning/alerts?state=open&per_page=100" \
+            > .shift-supervisor-tmp/code-scanning.json || printf '[]\n' > .shift-supervisor-tmp/code-scanning.json
+          BASE_SHA=$(git rev-parse HEAD) PLAN_TITLE="$PLAN_TITLE" python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path('.shift-supervisor-tmp')
+          issues = json.loads((root / 'issues.json').read_text(encoding='utf-8'))
+          status_titles = {
+              '[Shift Supervisor] Idle Worker Status',
+              '[Shift Supervisor] Night Worker Status',
+          }
+          planning_issues = []
+          worker_snapshots = []
+          for item in issues:
+              title = str(item.get('title', '')) if isinstance(item, dict) else ''
+              if title == os.environ['PLAN_TITLE']:
+                  continue
+              if title in status_titles:
+                  try:
+                      payload = json.loads(str(item.get('body', '{}')))
+                  except json.JSONDecodeError:
+                      continue
+                  if not isinstance(payload, dict) or payload.get('version') != 1:
+                      continue
+                  workers = payload.get('workers', [])
+                  if isinstance(workers, list):
+                      worker_snapshots.extend(
+                          worker for worker in workers[:256] if isinstance(worker, dict)
+                      )
+                  continue
+              planning_issues.append(item)
+
+          context = {
+              'repository': os.environ['REPO'],
+              'base_sha': os.environ['BASE_SHA'],
+              'open_issues': planning_issues,
+              'open_pull_requests': json.loads((root / 'pulls.json').read_text(encoding='utf-8')),
+              'workflow_runs': json.loads((root / 'runs.json').read_text(encoding='utf-8')),
+              'code_scanning_alerts': json.loads((root / 'code-scanning.json').read_text(encoding='utf-8')),
+              'worker_snapshots': worker_snapshots[:512],
+              'research_policy': {
+                  'sources': ['github-issues', 'github-pull-requests', 'github-actions', 'code-scanning', 'hosted-web-search'],
+                  'external_evidence_is_untrusted': True,
+                  'objective': 'produce executable, validated work for the night and idle engineering teams',
+              },
+          }
+          (root / 'project-context.json').write_text(
+              json.dumps(context, sort_keys=True, indent=2),
+              encoding='utf-8',
+          )
+          PY
+
+      - name: Restore durable supervisor state
+        id: state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          number=$(gh issue list --repo "$REPO" --state open --limit 100 \
+            --json number,title --jq ".[] | select(.title == \"$PLAN_TITLE\") | .number" | head -n 1)
+          echo "issue_number=${number:-}" >> "$GITHUB_OUTPUT"
+          if [[ -n "${number:-}" ]]; then
+            gh issue view "$number" --repo "$REPO" --json body --jq '.body' \
+              > .shift-supervisor-tmp/previous-plan.md
+          else
+            : > .shift-supervisor-tmp/previous-plan.md
+          fi
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          root = Path('.shift-supervisor-tmp')
+          body = (root / 'previous-plan.md').read_text(encoding='utf-8')
+          match = re.search(
+              r'<!-- SHIFT_SUPERVISOR_STATE\n(.*?)\n-->',
+              body,
+              flags=re.DOTALL,
+          )
+          state = match.group(1).strip() if match else ''
+          (root / 'state-in.txt').write_text(state + ('\n' if state else ''), encoding='utf-8')
+          PY
+
+      - name: Procure and refresh the shared plan
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SHIFT_MODEL_NAME: ${{ vars.OPENAI_MODEL || 'gpt-5.6' }}
+          SHIFT_MODEL_WEB_SEARCH: '1'
+          SHIFT_PROJECT_CONTEXT_FILE: .shift-supervisor-tmp/project-context.json
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+            echo '::error::OPENAI_API_KEY repository secret is required for shift supervision.'
+            exit 1
+          fi
+
+          role='secretary'
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' || "$EVENT_SCHEDULE" == '7,37 * * * *' ]]; then
+            role='both'
+          fi
+
+          python -m core.shift_supervisor \
+            --once \
+            --role "$role" \
+            --output .shift-supervisor-tmp/result.json \
+            --state-in .shift-supervisor-tmp/state-in.txt \
+            --state-out .shift-supervisor-tmp/state-out.txt
+
+      - name: Publish canonical plan and machine state
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ steps.state.outputs.issue_number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          root = Path('.shift-supervisor-tmp')
+          result = json.loads((root / 'result.json').read_text(encoding='utf-8'))
+          state_blob = (root / 'state-out.txt').read_text(encoding='utf-8').strip()
+          plan = result.get('plan_items', [])
+          workers = result.get('workers', [])
+          revisions = result.get('revisions', {})
+
+          lines = [
+              '# Canonical Shift Supervisor Plan',
+              '',
+              f"Updated: {datetime.now(timezone.utc).isoformat()}",
+              f"Actors this cycle: {', '.join(result.get('actors', [])) or 'none'}",
+              f"Open plan items in snapshot: {len(plan)}",
+              f"Tracked workers: {len(workers)}",
+              '',
+              'This issue is the shared planning surface for Night Shift and Idle Shift. '
+              'Model output is advisory until validated by each team and repository CI.',
+          ]
+
+          for actor, revision in revisions.items():
+              if isinstance(revision, dict):
+                  summary = str(revision.get('summary', '')).strip()
+                  if summary:
+                      lines += ['', f"## {actor.title()} summary", '', summary[:4000]]
+
+          for team in ('night', 'idle'):
+              lines += ['', f"## {team.title()} shift plan", '']
+              team_items = [
+                  item for item in plan
+                  if item.get('target_team') == team and item.get('status') not in {'done', 'rejected'}
+              ][:24]
+              if not team_items:
+                  lines.append('No open items in the current bounded snapshot.')
+              for item in team_items:
+                  priority = item.get('priority', '?')
+                  status = item.get('status', 'queued')
+                  owner = item.get('owner') or 'unassigned'
+                  title = str(item.get('title', '')).strip() or '(untitled)'
+                  description = str(item.get('description', '')).strip()
+                  expected = str(item.get('expected_output', '')).strip()
+                  validation = item.get('validation', [])
+                  lines.append(f"### P{priority} · {status} · {title[:300]}")
+                  lines.append(f"Owner: `{owner}`")
+                  if description:
+                      lines.append(description[:1200])
+                  if expected:
+                      lines.append(f"Expected output: {expected[:800]}")
+                  if isinstance(validation, list) and validation:
+                      checks = '; '.join(str(value)[:250] for value in validation[:6])
+                      lines.append(f"Validation: {checks}")
+                  lines.append('')
+
+          if workers:
+              lines += ['', '## Clocked-in / overtime ledger', '']
+              lines.append('| Worker | Team | Status | Last/current task | Shift min | OT min |')
+              lines.append('| --- | --- | --- | --- | ---: | ---: |')
+              for worker in workers[:96]:
+                  metadata = worker.get('metadata', {}) if isinstance(worker.get('metadata'), dict) else {}
+                  task = worker.get('current_task_id') or metadata.get('last_task_id') or ''
+                  lines.append(
+                      '| {worker_id} | {team} | {status} | {task} | {normal} | {ot} |'.format(
+                          worker_id=str(worker.get('worker_id', ''))[:80],
+                          team=str(worker.get('team', ''))[:20],
+                          status=str(worker.get('status', ''))[:20],
+                          task=str(task)[:80].replace('|', '/'),
+                          normal=worker.get('normal_shift_minutes', 0),
+                          ot=worker.get('overtime_minutes', 0),
+                      )
+                  )
+
+          lines += ['', '<!-- SHIFT_SUPERVISOR_STATE', state_blob, '-->']
+          body = '\n'.join(lines) + '\n'
+          if len(body.encode('utf-8')) > 64_000:
+              compact = [
+                  '# Canonical Shift Supervisor Plan',
+                  '',
+                  'Human-readable detail was compacted because the GitHub issue body approached its size limit.',
+                  '',
+              ]
+              for team in ('night', 'idle'):
+                  compact += [f"## {team.title()} shift plan", '']
+                  for item in [x for x in plan if x.get('target_team') == team][:32]:
+                      compact.append(
+                          f"- P{item.get('priority', '?')} [{item.get('status', 'queued')}] "
+                          f"{str(item.get('title', ''))[:300]}"
+                      )
+                  compact.append('')
+              compact += ['<!-- SHIFT_SUPERVISOR_STATE', state_blob, '-->']
+              body = '\n'.join(compact) + '\n'
+          if len(body.encode('utf-8')) > 65_000:
+              raise SystemExit('compressed shift-supervisor state exceeds safe GitHub issue-body size')
+          (root / 'canonical-plan.md').write_text(body, encoding='utf-8')
+          PY
+
+          if [[ -n "${ISSUE_NUMBER:-}" ]]; then
+            gh issue edit "$ISSUE_NUMBER" --repo "$REPO" \
+              --body-file .shift-supervisor-tmp/canonical-plan.md >/dev/null
+          else
+            gh issue create --repo "$REPO" --title "$PLAN_TITLE" \
+              --body-file .shift-supervisor-tmp/canonical-plan.md >/dev/null
+          fi
+          cat .shift-supervisor-tmp/canonical-plan.md >> "$GITHUB_STEP_SUMMARY"

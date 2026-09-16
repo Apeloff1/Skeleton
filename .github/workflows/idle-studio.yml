@@ -2,7 +2,8 @@ name: Idle Studio
 
 on:
   schedule:
-    - cron: '7,22,37,52 * * * *'
+    - cron: '7,37 * * * *'
+    - cron: '22,52 * * * *'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -99,6 +100,118 @@ jobs:
           )
           PY
 
+      - name: Load canonical shift-supervisor plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import base64
+          import gzip
+          import hashlib
+          import json
+          import re
+          from pathlib import Path
+
+          root = Path('.idle-studio-tmp')
+          state_path = root / 'repo-state.json'
+          state = json.loads(state_path.read_text(encoding='utf-8'))
+          title = '[Shift Supervisor] Canonical Night + Idle Plan'
+          status_titles = {
+              '[Shift Supervisor] Idle Worker Status',
+              '[Shift Supervisor] Night Worker Status',
+          }
+          issues = state.get('issues', [])
+          canonical = next(
+              (
+                  issue for issue in issues
+                  if isinstance(issue, dict) and issue.get('title') == title
+              ),
+              None,
+          )
+          ignored_titles = {title, *status_titles}
+          state['issues'] = [
+              issue for issue in issues
+              if not (isinstance(issue, dict) and issue.get('title') in ignored_titles)
+          ]
+
+          plan = []
+          status = 'missing'
+          if canonical is not None:
+              body = str(canonical.get('body', ''))
+              match = re.search(
+                  r'<!-- SHIFT_SUPERVISOR_STATE\n(.*?)\n-->',
+                  body,
+                  flags=re.DOTALL,
+              )
+              if match:
+                  encoded = match.group(1).strip()
+                  if encoded.startswith('gz:v1:'):
+                      packed = base64.b64decode(encoded[len('gz:v1:'):], validate=True)
+                      durable = json.loads(gzip.decompress(packed).decode('utf-8'))
+                      if isinstance(durable, dict):
+                          plan = durable.get('plan_items', [])
+                          status = 'loaded'
+
+          synthetic = []
+          for item in plan[:32]:
+              if not isinstance(item, dict):
+                  continue
+              if item.get('target_team') != 'idle' or item.get('status') in {'done', 'rejected'}:
+                  continue
+              item_title = str(item.get('title', '')).strip()
+              description = str(item.get('description', '')).strip()
+              if not item_title or not description:
+                  continue
+              stable = hashlib.sha256(
+                  f"{item_title}\0{description}\0idle".encode('utf-8')
+              ).hexdigest()
+              number = -(int(stable[:12], 16) + 1)
+              priority = item.get('priority', 50)
+              evidence = {
+                  'source': 'canonical-shift-supervisor',
+                  'priority': priority,
+                  'description': description,
+                  'rationale': item.get('rationale', ''),
+                  'expected_output': item.get('expected_output', ''),
+                  'validation': item.get('validation', []),
+                  'dependencies': item.get('dependencies', []),
+                  'research_refs': item.get('research_refs', []),
+              }
+              text = f"{item_title} {description}".lower()
+              labels = [{'name': 'shift-supervisor'}]
+              if any(token in text for token in ('security', 'vulnerability', 'cve', 'secret', 'auth')):
+                  labels.append({'name': 'security'})
+              synthetic.append(
+                  {
+                      'number': number,
+                      'title': f"[Supervisor P{priority}] {item_title}"[:300],
+                      'body': json.dumps(evidence, sort_keys=True, default=str)[:12000],
+                      'labels': labels,
+                  }
+              )
+
+          state['shift_supervisor'] = {
+              'source': 'canonical-plan-issue',
+              'status': status,
+              'issue_number': canonical.get('number') if canonical else None,
+              'idle_plan_items': len(synthetic),
+          }
+          state.setdefault('issues', []).extend(synthetic)
+          state_path.write_text(json.dumps(state, sort_keys=True, indent=2), encoding='utf-8')
+
+          lines = ['## Shift supervisor', '']
+          if canonical is None:
+              lines.append('Canonical plan issue was not present; no supervisor tasks were promoted.')
+          elif status != 'loaded':
+              lines.append(f"Canonical issue #{canonical.get('number', '?')} was present but had no usable durable state.")
+          else:
+              lines.append(f"Canonical issue: #{canonical.get('number', '?')}")
+              lines.append(f"Idle work items promoted into studio intake: {len(synthetic)}")
+              for item in synthetic[:20]:
+                  lines.append(f"- {item['title']}")
+          (root / 'shift-supervisor-summary.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          PY
+
       - name: Plan, build, and independently review bounded work
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -125,6 +238,18 @@ jobs:
               )
           PY
 
+      - name: Record real idle workforce snapshot
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -s .idle-studio-tmp/package.json && -s .idle-studio-tmp/audit.jsonl ]]; then
+            python -m core.shift_supervisor.workforce_report idle \
+              --package .idle-studio-tmp/package.json \
+              --audit .idle-studio-tmp/audit.jsonl \
+              --output .idle-studio-tmp/worker-status.json
+          fi
+
       - name: Revalidate sealed proposals without model or GitHub credentials
         env:
           OPENAI_API_KEY: ''
@@ -137,7 +262,7 @@ jobs:
           python -m skeleton.automation.idle_studio_v2 validate \
             --package .idle-studio-tmp/package.json
 
-      - name: Persist append-only Idle Studio ledger
+      - name: Persist append-only Idle Studio ledger and staffing status
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
@@ -146,6 +271,17 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .idle-studio-tmp
+
+          if [[ -s .idle-studio-tmp/worker-status.json ]]; then
+            worker_title='[Shift Supervisor] Idle Worker Status'
+            worker_number=$(gh issue list --repo "$REPO" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"$worker_title\") | .number" | head -n 1)
+            if [[ -n "${worker_number:-}" ]]; then
+              gh issue edit "$worker_number" --repo "$REPO" --body-file .idle-studio-tmp/worker-status.json >/dev/null
+            else
+              gh issue create --repo "$REPO" --title "$worker_title" --body-file .idle-studio-tmp/worker-status.json >/dev/null
+            fi
+          fi
+
           title='bot: idle studio ledger'
           number=$(gh issue list --repo "$REPO" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
           if [[ -z "${number:-}" ]]; then
@@ -155,6 +291,10 @@ jobs:
           {
             echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo
+            if [[ -s .idle-studio-tmp/shift-supervisor-summary.md ]]; then
+              cat .idle-studio-tmp/shift-supervisor-summary.md
+              echo
+            fi
             if [[ -s .idle-studio-tmp/report.md ]]; then
               cat .idle-studio-tmp/report.md
             else
@@ -192,6 +332,10 @@ jobs:
         if: always()
         shell: bash
         run: |
+          if [[ -s .idle-studio-tmp/shift-supervisor-summary.md ]]; then
+            cat .idle-studio-tmp/shift-supervisor-summary.md >> "$GITHUB_STEP_SUMMARY"
+            echo >> "$GITHUB_STEP_SUMMARY"
+          fi
           if [[ -s .idle-studio-tmp/report.md ]]; then
             cat .idle-studio-tmp/report.md >> "$GITHUB_STEP_SUMMARY"
           else

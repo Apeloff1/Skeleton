@@ -58,7 +58,7 @@ jobs:
           set -euo pipefail
           mkdir -p .studio-tmp
           gh pr list --repo "$REPO" --state open --limit 100 --json number,title,headRefName,baseRefName,updatedAt,labels > .studio-tmp/open-prs.json
-          gh issue list --repo "$REPO" --state open --limit 100 --json number,title,updatedAt,labels > .studio-tmp/open-issues.json
+          gh issue list --repo "$REPO" --state open --limit 100 --json number,title,body,updatedAt,labels,url > .studio-tmp/open-issues.json
           gh run list --repo "$REPO" --status failure --limit 25 --json name,databaseId,headSha,headBranch,createdAt,url > .studio-tmp/failed-runs.json
           gh api "/repos/${REPO}/actions/runs?status=queued&per_page=1" --jq '.total_count' > .studio-tmp/queued-count.txt
           python - <<'PY'
@@ -134,6 +134,75 @@ jobs:
             echo 'proceed=true' >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Load canonical shift-supervisor plan
+        if: steps.pressure.outputs.proceed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import re
+          import os
+          from pathlib import Path
+
+          root = Path('.studio-tmp')
+          state_path = root / 'repo-state.json'
+          state = json.loads(state_path.read_text(encoding='utf-8'))
+          title = '[Shift Supervisor] Canonical Night + Idle Plan'
+          status_titles = {
+              '[Shift Supervisor] Idle Worker Status',
+              '[Shift Supervisor] Night Worker Status',
+          }
+          issues = state.get('open_issues', [])
+          canonical = next(
+              (
+                  issue for issue in issues
+                  if isinstance(issue, dict) and issue.get('title') == title
+              ),
+              None,
+          )
+          ignored_titles = {title, *status_titles}
+          state['open_issues'] = [
+              issue for issue in issues
+              if not (isinstance(issue, dict) and issue.get('title') in ignored_titles)
+          ]
+
+          lines = ['## Shift supervisor', '']
+          if canonical is None:
+              state['_shift_supervisor'] = {
+                  'source': 'canonical-plan-issue',
+                  'status': 'missing',
+                  'night_plan_excerpt': '',
+              }
+              lines.append('Canonical plan issue was not present; using normal repository evidence only.')
+          else:
+              body = str(canonical.get('body', ''))
+              match = re.search(
+                  r'## Night shift plan\s*(.*?)(?=\n## Idle shift plan|\n## Clocked-in / overtime ledger|\n<!-- SHIFT_SUPERVISOR_STATE|\Z)',
+                  body,
+                  flags=re.DOTALL | re.IGNORECASE,
+              )
+              night_excerpt = (match.group(1).strip() if match else body)[:12000]
+              state['_shift_supervisor'] = {
+                  'source': 'canonical-plan-issue',
+                  'status': 'loaded',
+                  'issue_number': canonical.get('number'),
+                  'issue_url': canonical.get('url'),
+                  'night_plan_excerpt': night_excerpt,
+              }
+              lines.append(f"Canonical issue: #{canonical.get('number', '?')}")
+              lines.append('Night plan loaded into the trusted planning context.')
+              if night_excerpt:
+                  lines += ['', night_excerpt[:6000]]
+
+          state_path.write_text(json.dumps(state, sort_keys=True, indent=2), encoding='utf-8')
+          summary = '\n'.join(lines) + '\n'
+          summary_path = root / 'shift-supervisor-summary.md'
+          summary_path.write_text(summary, encoding='utf-8')
+          runner_summary = Path(os.environ['RUNNER_TEMP']) / 'shift-supervisor-summary.md'
+          runner_summary.write_text(summary, encoding='utf-8')
+          PY
+
       - name: Generate bounded model proposals
         if: steps.pressure.outputs.proceed == 'true'
         id: proposal
@@ -164,6 +233,17 @@ jobs:
             echo 'has_patch=true' >> "$GITHUB_OUTPUT"
           else
             echo 'has_patch=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Record real night workforce snapshot
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -s "$RUNNER_TEMP/studio-audit.jsonl" ]]; then
+            python -m core.shift_supervisor.workforce_report night \
+              --audit "$RUNNER_TEMP/studio-audit.jsonl" \
+              --output "$RUNNER_TEMP/night-worker-status.json"
           fi
 
       - name: Validate proposed diff without model or GitHub credentials
@@ -209,13 +289,25 @@ jobs:
           git apply "$RUNNER_TEMP/studio.patch"
           git diff --check
 
-      - name: Persist Studio Ledger entry
+      - name: Persist Studio Ledger and staffing status
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
+
+          if [[ -s "$RUNNER_TEMP/night-worker-status.json" ]]; then
+            worker_title='[Shift Supervisor] Night Worker Status'
+            worker_number=$(gh issue list --repo "$REPO" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"$worker_title\") | .number" | head -n 1)
+            if [[ -n "${worker_number:-}" ]]; then
+              gh issue edit "$worker_number" --repo "$REPO" --body-file "$RUNNER_TEMP/night-worker-status.json" >/dev/null
+            else
+              gh issue create --repo "$REPO" --title "$worker_title" --body-file "$RUNNER_TEMP/night-worker-status.json" >/dev/null
+            fi
+          fi
+
           title='bot: autonomous studio ledger'
           number=$(gh issue list --repo "$REPO" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
           if [[ -z "${number:-}" ]]; then
@@ -225,7 +317,17 @@ jobs:
           {
             echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo
-            cat "$RUNNER_TEMP/studio-report.md"
+            if [[ -s "$RUNNER_TEMP/shift-supervisor-summary.md" ]]; then
+              cat "$RUNNER_TEMP/shift-supervisor-summary.md"
+              echo
+            fi
+            if [[ -s "$RUNNER_TEMP/studio-report.md" ]]; then
+              cat "$RUNNER_TEMP/studio-report.md"
+            else
+              echo '# Autonomous Studio shift'
+              echo
+              echo 'Controller stopped before a report could be produced.'
+            fi
           } > "$RUNNER_TEMP/ledger-comment.md"
           gh issue comment "$number" --repo "$REPO" --body-file "$RUNNER_TEMP/ledger-comment.md" >/dev/null
 
@@ -265,6 +367,10 @@ jobs:
           {
             echo '## Autonomous Studio publication'
             echo
+            if [[ -s "$RUNNER_TEMP/shift-supervisor-summary.md" ]]; then
+              cat "$RUNNER_TEMP/shift-supervisor-summary.md"
+              echo
+            fi
             echo "PR: ${pr_url}"
             echo '- Direct main writes: disabled'
             echo '- Auto-merge: disabled'
@@ -280,5 +386,13 @@ jobs:
           {
             echo '## Autonomous Studio'
             echo
-            cat "$RUNNER_TEMP/studio-report.md"
+            if [[ -s "$RUNNER_TEMP/shift-supervisor-summary.md" ]]; then
+              cat "$RUNNER_TEMP/shift-supervisor-summary.md"
+              echo
+            fi
+            if [[ -s "$RUNNER_TEMP/studio-report.md" ]]; then
+              cat "$RUNNER_TEMP/studio-report.md"
+            else
+              echo 'Autonomous Studio did not produce a report.'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
