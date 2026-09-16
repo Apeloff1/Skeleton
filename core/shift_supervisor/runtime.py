@@ -5,6 +5,7 @@ from typing import Any
 
 from .model_gateway import ModelGateway
 from .plan_store import InMemoryPlanStore
+from .planning_council import PlanningCouncil
 from .research import ResearchBroker
 from .scheduler import SupervisorCadence, SupervisorScheduler
 from .secretary import SecretaryBot
@@ -22,9 +23,10 @@ def build_supervisor(
     """Construct the paired manager/secretary runtime around shared state/API."""
     shared_store = store or InMemoryPlanStore()
     shared_model = model or ModelGateway()
+    council = PlanningCouncil(shared_model)
     broker = ResearchBroker(research_sources or {})
-    secretary = SecretaryBot(store=shared_store, model=shared_model)
-    manager = SMBShiftManager(store=shared_store, model=shared_model)
+    secretary = SecretaryBot(store=shared_store, model=shared_model, council=council)
+    manager = SMBShiftManager(store=shared_store, model=shared_model, council=council)
     return SupervisorScheduler(
         manager=manager,
         secretary=secretary,
