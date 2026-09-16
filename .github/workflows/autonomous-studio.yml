@@ -58,7 +58,7 @@ jobs:
           set -euo pipefail
           mkdir -p .studio-tmp
           gh pr list --repo "$REPO" --state open --limit 100 --json number,title,headRefName,baseRefName,updatedAt,labels > .studio-tmp/open-prs.json
-          gh issue list --repo "$REPO" --state open --limit 100 --json number,title,updatedAt,labels > .studio-tmp/open-issues.json
+          gh issue list --repo "$REPO" --state open --limit 100 --json number,title,body,updatedAt,labels,url > .studio-tmp/open-issues.json
           gh run list --repo "$REPO" --status failure --limit 25 --json name,databaseId,headSha,headBranch,createdAt,url > .studio-tmp/failed-runs.json
           gh api "/repos/${REPO}/actions/runs?status=queued&per_page=1" --jq '.total_count' > .studio-tmp/queued-count.txt
           python - <<'PY'
@@ -134,92 +134,63 @@ jobs:
             echo 'proceed=true' >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Refresh shared shift-supervisor plan
+      - name: Load canonical shift-supervisor plan
         if: steps.pressure.outputs.proceed == 'true'
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          SHIFT_MODEL_NAME: ${{ vars.OPENAI_MODEL || 'gpt-5.6' }}
-          SHIFT_PROJECT_CONTEXT_FILE: .studio-tmp/repo-state.json
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "${OPENAI_API_KEY:-}" ]]; then
-            echo '::error::OPENAI_API_KEY repository secret is required for shift supervision.'
-            exit 1
-          fi
-
-          python -m core.shift_supervisor \
-            --once \
-            --role both \
-            --output .studio-tmp/shift-supervisor.json
-
           python - <<'PY'
           import json
+          import re
           import os
           from pathlib import Path
 
           root = Path('.studio-tmp')
           state_path = root / 'repo-state.json'
-          supervisor_path = root / 'shift-supervisor.json'
           state = json.loads(state_path.read_text(encoding='utf-8'))
-          supervisor = json.loads(supervisor_path.read_text(encoding='utf-8'))
-          plan = supervisor.get('plan_items', [])
-
-          night_items = []
-          for item in plan:
-              if item.get('target_team') != 'night' or item.get('status') in {'done', 'rejected'}:
-                  continue
-              title = str(item.get('title', '')).strip()
-              description = str(item.get('description', '')).strip()
-              if not title or not description:
-                  continue
-              night_items.append(
-                  {
-                      'title': title[:300],
-                      'description': description[:1600],
-                      'priority': item.get('priority', 50),
-                      'rationale': str(item.get('rationale', ''))[:1000],
-                      'expected_output': str(item.get('expected_output', ''))[:1000],
-                      'validation': list(item.get('validation', []))[:8],
-                      'dependencies': list(item.get('dependencies', []))[:8],
-                  }
-              )
-              if len(night_items) >= 8:
-                  break
-
-          revision_summaries = {}
-          for actor, revision in supervisor.get('revisions', {}).items():
-              if not isinstance(revision, dict):
-                  continue
-              revision_summaries[str(actor)] = {
-                  'summary': str(revision.get('summary', ''))[:1600],
-                  'correlation_id': str(revision.get('correlation_id', ''))[:200],
-              }
-
-          # Leading underscore makes this trusted, bounded supervisor context
-          # sort before the large issue/PR snapshots consumed by Studio's
-          # 16k repository-state evidence window.
-          state['_shift_supervisor'] = {
-              'actors': supervisor.get('actors', []),
-              'revisions': revision_summaries,
-              'night_plan_items': night_items,
-          }
-          state_path.write_text(json.dumps(state, sort_keys=True, indent=2), encoding='utf-8')
+          title = '[Shift Supervisor] Canonical Night + Idle Plan'
+          canonical = next(
+              (
+                  issue for issue in state.get('open_issues', [])
+                  if isinstance(issue, dict) and issue.get('title') == title
+              ),
+              None,
+          )
 
           lines = ['## Shift supervisor', '']
-          lines.append(f"Actors: {', '.join(supervisor.get('actors', [])) or 'none'}")
-          lines.append('')
-          lines.append(f"Plan items generated: {len(plan)}")
-          lines.append(f"Night work items promoted into planner context: {len(night_items)}")
-          for item in plan[:20]:
-              title = str(item.get('title', '')).strip() or '(untitled)'
-              team = str(item.get('target_team', 'unknown'))
-              priority = item.get('priority', '?')
-              lines.append(f"- P{priority} [{team}] {title}")
+          if canonical is None:
+              state['_shift_supervisor'] = {
+                  'source': 'canonical-plan-issue',
+                  'status': 'missing',
+                  'night_plan_excerpt': '',
+              }
+              lines.append('Canonical plan issue was not present; using normal repository evidence only.')
+          else:
+              body = str(canonical.get('body', ''))
+              match = re.search(
+                  r'## Night shift plan\s*(.*?)(?=\n## Idle shift plan|\n## Clocked-in / overtime ledger|\n<!-- SHIFT_SUPERVISOR_STATE|\Z)',
+                  body,
+                  flags=re.DOTALL | re.IGNORECASE,
+              )
+              night_excerpt = (match.group(1).strip() if match else body)[:12000]
+              state['_shift_supervisor'] = {
+                  'source': 'canonical-plan-issue',
+                  'status': 'loaded',
+                  'issue_number': canonical.get('number'),
+                  'issue_url': canonical.get('url'),
+                  'night_plan_excerpt': night_excerpt,
+              }
+              lines.append(f"Canonical issue: #{canonical.get('number', '?')}")
+              lines.append('Night plan loaded into the trusted planning context.')
+              if night_excerpt:
+                  lines += ['', night_excerpt[:6000]]
+
+          state_path.write_text(json.dumps(state, sort_keys=True, indent=2), encoding='utf-8')
+          summary = '\n'.join(lines) + '\n'
           summary_path = root / 'shift-supervisor-summary.md'
-          summary_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          summary_path.write_text(summary, encoding='utf-8')
           runner_summary = Path(os.environ['RUNNER_TEMP']) / 'shift-supervisor-summary.md'
-          runner_summary.write_text(summary_path.read_text(encoding='utf-8'), encoding='utf-8')
+          runner_summary.write_text(summary, encoding='utf-8')
           PY
 
       - name: Generate bounded model proposals
