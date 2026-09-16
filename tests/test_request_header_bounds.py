@@ -125,3 +125,12 @@ def test_header_bounds_rejects_invalid_configuration(monkeypatch, name, value):
     monkeypatch.setenv(name, value)
     with pytest.raises(ValueError):
         HeaderBoundMiddleware(lambda *_: None)
+
+
+@pytest.mark.parametrize("value", [True, 1.5, "8"])
+def test_header_bounds_rejects_non_integer_explicit_limits(value):
+    with pytest.raises(TypeError, match="must be an integer"):
+        HeaderBoundMiddleware(lambda *_: None, max_header_bytes=value)
+
+    with pytest.raises(TypeError, match="must be an integer"):
+        HeaderBoundMiddleware(lambda *_: None, max_header_count=value)
