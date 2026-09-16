@@ -17,6 +17,19 @@ def test_ci_failure_bot_bypasses_root_package_imports() -> None:
     assert "python -m skeleton.automation.ci_failure_bot" not in text
 
 
+def test_ci_failure_bot_remains_read_only_and_uses_trusted_code() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    assert "contents: read" in text
+    assert "actions: read" in text
+    assert "issues: write" not in text
+    assert "pull-requests: write" not in text
+    assert "contents: write" not in text
+    assert "ref: ${{ github.event.repository.default_branch }}" in text
+    assert "persist-credentials: false" in text
+    assert "workflow_run.head_sha" not in text
+
+
 def test_ci_failure_bot_script_starts_without_project_dependencies() -> None:
     completed = subprocess.run(
         [sys.executable, str(SCRIPT)],
