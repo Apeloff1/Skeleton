@@ -8,11 +8,15 @@ from .backlog_index import (
     SymbolRecord,
 )
 from .backlog_reader import Document, Index, RepositoryReader
+from .chatgpt_adapter import ChatGPTReasoner, ReasoningRequest, ReasoningResult
 
 __all__ = [
+    "ChatGPTReasoner",
     "DependencyRecord",
     "Document",
     "Index",
+    "ReasoningRequest",
+    "ReasoningResult",
     "ReferenceRecord",
     "RepositoryIndex",
     "RepositoryIndexBuilder",
