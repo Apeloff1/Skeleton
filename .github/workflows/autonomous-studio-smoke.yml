@@ -6,8 +6,13 @@ on:
       - 'skeleton/automation/studio_*.py'
       - 'skeleton/automation/chatgpt_adapter.py'
       - 'skeleton/testing/test_studio*.py'
+      - 'core/shift_supervisor/**'
+      - 'tests/test_shift_supervisor_planning_harness.py'
+      - 'tests/test_shift_supervisor_peak_loop.py'
+      - 'tests/test_shift_supervisor_scheduler.py'
       - '.github/workflows/autonomous-studio.yml'
       - '.github/workflows/autonomous-studio-smoke.yml'
+      - '.github/workflows/shift-supervisor-harness.yml'
   workflow_dispatch:
 
 concurrency:
@@ -47,8 +52,8 @@ jobs:
           test -z "${GH_TOKEN:-}"
           test -z "${GITHUB_TOKEN:-}"
 
-      - name: Compile Studio control plane
-        run: python -m compileall skeleton/automation -q
+      - name: Compile Studio and Shift Supervisor control planes
+        run: python -m compileall skeleton/automation core/shift_supervisor -q
 
       - name: Exercise Studio CLI import path
         run: python -m skeleton.automation.studio_director --help >/dev/null
@@ -66,3 +71,14 @@ jobs:
             skeleton/testing/test_studio_report.py \
             skeleton/testing/test_studio_pipeline_smoke.py \
             -q --tb=short --maxfail=1
+
+      - name: Run deterministic Shift Supervisor planning suite
+        run: |
+          python -m pytest \
+            tests/test_shift_supervisor_planning_harness.py \
+            tests/test_shift_supervisor_peak_loop.py \
+            tests/test_shift_supervisor_scheduler.py \
+            -q --tb=short --maxfail=1
+
+      - name: Run 1,000-worker SMB planning stress contract
+        run: python -m core.shift_supervisor.planning_harness --workers 1000 --cycles 4
