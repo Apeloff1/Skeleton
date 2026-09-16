@@ -69,6 +69,7 @@ class QueryPlanner:
 
     _DEFAULT_TOP_K = 10
     _DEFAULT_PREFETCH_WORKERS = 4
+    _MAX_EXECUTION_ATTEMPTS = 2
 
     def __init__(
         self,
@@ -166,35 +167,59 @@ class QueryPlanner:
         if prefetched is not None and prefetched.plan != resolved_plan:
             raise RetrievalError("prefetched results do not match supplied plan")
 
-        with self._registry_lock:
-            current_generation = self._registry_generation
-            retrievers = {
-                name: self._retrievers.get(name) for name in resolved_plan.retrievers
-            }
-
-        prefetched_results: Mapping[str, Tuple[ScoredResult, ...]] = {}
-        if (
-            prefetched is not None
-            and prefetched.registry_generation == current_generation
-        ):
-            prefetched_results = prefetched.results_by_retriever
-
-        lists: Dict[str, List[ScoredResult]] = {}
-        for name in resolved_plan.retrievers:
-            cached = prefetched_results.get(name)
-            if cached is not None:
-                lists[name] = list(cached)
-                continue
-
-            fn = retrievers.get(name)
-            if fn is None:
-                continue
-            lists[name] = list(fn(query))
-
         limit = top_k if top_k is not None else self._DEFAULT_TOP_K
-        fused = self.fuser.fuse(lists, top_k=limit)
-        ranked = self.ranker.rank(list(fused), top_k=limit)
-        return tuple(ranked)
+
+        for attempt in range(self._MAX_EXECUTION_ATTEMPTS):
+            with self._registry_lock:
+                current_generation = self._registry_generation
+                retrievers = {
+                    name: self._retrievers.get(name)
+                    for name in resolved_plan.retrievers
+                }
+
+            prefetched_results: Mapping[str, Tuple[ScoredResult, ...]] = {}
+            if (
+                prefetched is not None
+                and prefetched.registry_generation == current_generation
+            ):
+                prefetched_results = prefetched.results_by_retriever
+
+            lists: Dict[str, List[ScoredResult]] = {}
+            for name in resolved_plan.retrievers:
+                cached = prefetched_results.get(name)
+                if cached is not None:
+                    lists[name] = list(cached)
+                    continue
+
+                fn = retrievers.get(name)
+                if fn is None:
+                    continue
+                lists[name] = list(fn(query))
+
+            # The registry lock must not span arbitrary retriever work, but the
+            # selected callable identities still need a stability check before
+            # stale results are fused. An unrelated registry update does not
+            # force duplicate retrieval; replacing one of this plan's selected
+            # retrievers does. Retry once from a fresh snapshot, then fail closed
+            # if the selected registry keeps changing under the same execution.
+            with self._registry_lock:
+                selected_unchanged = all(
+                    self._retrievers.get(name) is fn
+                    for name, fn in retrievers.items()
+                )
+
+            if selected_unchanged:
+                fused = self.fuser.fuse(lists, top_k=limit)
+                ranked = self.ranker.rank(list(fused), top_k=limit)
+                return tuple(ranked)
+
+            prefetched = None
+            if attempt + 1 >= self._MAX_EXECUTION_ATTEMPTS:
+                raise RetrievalError(
+                    "selected retriever registry changed repeatedly during execution"
+                )
+
+        raise RetrievalError("retrieval execution exhausted without a stable snapshot")
 
     def available(self) -> Tuple[str, ...]:
         with self._registry_lock:
