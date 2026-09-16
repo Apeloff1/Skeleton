@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "purpose": "Rank structurally relevant tests for changed source so local/agent validation can spend machine time efficiently without weakening authoritative integration/release gates.",
+  "max_transitive_depth": 3,
+  "confidence_semantics": "structural relevance only",
+  "evidence_sources": [
+    "direct AST/lexical test imports",
+    "explicit structural test edges",
+    "bounded transitive local import paths",
+    "existing reverse-impact candidate tests"
+  ],
+  "non_claims": [
+    "not statement coverage",
+    "not branch coverage",
+    "not historical pass probability",
+    "not proof of test sufficiency",
+    "not permission to skip required merge/release gates"
+  ],
+  "selection_policy": {
+    "local_agent_use": "run ranked focused tests first, then required broader gates according to the batch/release contract",
+    "aggregation": "highest confidence per test plus all distinct source/reason paths",
+    "determinism": true
+  }
+}
