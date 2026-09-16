@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
-from threading import RLock
+from threading import Event, RLock
 from typing import Any, Callable, Dict, List, Optional
 
 from skeleton.kernel.events import EventBus
@@ -44,7 +44,8 @@ class QuadRetriever:
 
     Registered planes execute concurrently. Results are collected in registration
     order so equal-score fusion ties remain deterministic even when faster planes
-    finish first.
+    finish first. Identical cacheable misses are coalesced so concurrent callers
+    share one plane fan-out instead of stampeding the same backends.
     """
 
     _PLANE_HISTORY_LIMIT = 64
@@ -64,9 +65,11 @@ class QuadRetriever:
         self._plane_history: deque[str] = deque(maxlen=self._PLANE_HISTORY_LIMIT)
         self._state_lock = RLock()
         self._cache_generation = 0
+        self._inflight: Dict[str, Event] = {}
         self._stats = {
             "queries": 0,
             "cache_hits": 0,
+            "coalesced_queries": 0,
             "plane_failures": 0,
             "ingested": 0,
             "triples_extracted": 0,
@@ -192,6 +195,13 @@ class QuadRetriever:
             if (item := self._normalize_result(plane_name, raw)) is not None
         ]
 
+    def _finish_inflight(self, cache_key: str, flight: Event) -> None:
+        """Release waiters for a cache key without disturbing a newer flight."""
+        with self._state_lock:
+            if self._inflight.get(cache_key) is flight:
+                self._inflight.pop(cache_key, None)
+            flight.set()
+
     def retrieve(self, query: str, k: int = 8, use_cache: bool = True) -> List[ScoredResult]:
         """Query registered planes concurrently and fuse deterministic results."""
         with self._state_lock:
@@ -208,76 +218,110 @@ class QuadRetriever:
 
         with self._state_lock:
             self._stats["queries"] += 1
+            flight = self._inflight.get(cache_key) if use_cache else None
+            owns_flight = use_cache and flight is None
+            if owns_flight:
+                flight = Event()
+                self._inflight[cache_key] = flight
+            elif flight is not None:
+                self._stats["coalesced_queries"] += 1
 
-        results_by_plane: Dict[str, List[ScoredResult]] = {}
-        failures: List[str] = []
+        if use_cache and not owns_flight:
+            assert flight is not None
+            flight.wait()
+            cached = self._cache.get(cache_key)
+            if cached is not None:
+                with self._state_lock:
+                    self._stats["cache_hits"] += 1
+                return list(cached)
 
-        if len(plane_items) == 1:
-            plane_name, retriever = plane_items[0]
-            try:
-                normalized = self._query_plane(plane_name, retriever, query, k)
-            except Exception:
-                failures.append(plane_name)
-            else:
-                if normalized:
-                    results_by_plane[plane_name] = normalized
-        elif plane_items:
-            with ThreadPoolExecutor(
-                max_workers=min(len(plane_items), self._MAX_PARALLEL_PLANES),
-                thread_name_prefix="skeleton-retrieval",
-            ) as executor:
-                futures = [
-                    (
-                        plane_name,
-                        executor.submit(
-                            self._query_plane,
-                            plane_name,
-                            retriever,
-                            query,
-                            k,
-                        ),
-                    )
-                    for plane_name, retriever in plane_items
-                ]
+            # A topology/ingestion generation change can intentionally prevent
+            # the leader from caching its old-generation result. Retry against
+            # the current generation rather than serving that stale snapshot.
+            return self.retrieve(query, k=k, use_cache=True)
 
-                # Consume in registration order, not completion order. The work
-                # still overlaps, while RRF tie ordering stays deterministic.
-                for plane_name, future in futures:
-                    try:
-                        normalized = future.result()
-                    except Exception:
-                        failures.append(plane_name)
-                        continue
+        try:
+            if use_cache:
+                # Close the handoff race where a previous flight populated the
+                # cache after our first miss but before this caller became leader.
+                cached = self._cache.get(cache_key)
+                if cached is not None:
+                    with self._state_lock:
+                        self._stats["cache_hits"] += 1
+                    return list(cached)
+
+            results_by_plane: Dict[str, List[ScoredResult]] = {}
+            failures: List[str] = []
+
+            if len(plane_items) == 1:
+                plane_name, retriever = plane_items[0]
+                try:
+                    normalized = self._query_plane(plane_name, retriever, query, k)
+                except Exception:
+                    failures.append(plane_name)
+                else:
                     if normalized:
                         results_by_plane[plane_name] = normalized
+            elif plane_items:
+                with ThreadPoolExecutor(
+                    max_workers=min(len(plane_items), self._MAX_PARALLEL_PLANES),
+                    thread_name_prefix="skeleton-retrieval",
+                ) as executor:
+                    futures = [
+                        (
+                            plane_name,
+                            executor.submit(
+                                self._query_plane,
+                                plane_name,
+                                retriever,
+                                query,
+                                k,
+                            ),
+                        )
+                        for plane_name, retriever in plane_items
+                    ]
 
-        with self._state_lock:
-            self._stats["plane_failures"] += len(failures)
-            for plane_name in results_by_plane:
-                self._plane_history.append(plane_name)
+                    # Consume in registration order, not completion order. The work
+                    # still overlaps, while RRF tie ordering stays deterministic.
+                    for plane_name, future in futures:
+                        try:
+                            normalized = future.result()
+                        except Exception:
+                            failures.append(plane_name)
+                            continue
+                        if normalized:
+                            results_by_plane[plane_name] = normalized
 
-        fused = self._fuser.fuse(results_by_plane, top_k=k)
-
-        # Generation checking closes a subtle invalidation race: a query that
-        # started before register_plane()/ingest_document() may finish after the
-        # cache was cleared. It must not repopulate that cache with stale results.
-        if use_cache:
             with self._state_lock:
-                if generation == self._cache_generation:
-                    self._cache.put(cache_key, tuple(fused))
+                self._stats["plane_failures"] += len(failures)
+                for plane_name in results_by_plane:
+                    self._plane_history.append(plane_name)
 
-        if self._bus:
-            self._bus.emit(
-                "retrieval.quad.query",
-                {
-                    "query": query,
-                    "planes": list(results_by_plane.keys()),
-                    "failed_planes": list(failures),
-                    "results": len(fused),
-                },
-            )
+            fused = self._fuser.fuse(results_by_plane, top_k=k)
 
-        return fused
+            # Generation checking closes a subtle invalidation race: a query that
+            # started before register_plane()/ingest_document() may finish after the
+            # cache was cleared. It must not repopulate that cache with stale results.
+            if use_cache:
+                with self._state_lock:
+                    if generation == self._cache_generation:
+                        self._cache.put(cache_key, tuple(fused))
+
+            if self._bus:
+                self._bus.emit(
+                    "retrieval.quad.query",
+                    {
+                        "query": query,
+                        "planes": list(results_by_plane.keys()),
+                        "failed_planes": list(failures),
+                        "results": len(fused),
+                    },
+                )
+
+            return fused
+        finally:
+            if use_cache and owns_flight and flight is not None:
+                self._finish_inflight(cache_key, flight)
 
     def ingest_document(
         self,
