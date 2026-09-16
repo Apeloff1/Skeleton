@@ -9,6 +9,7 @@ This repository therefore keeps an owner-side bootstrap at `scripts/configure_ma
 The script protects `main` with these invariants:
 
 - require the canonical `Merge Readiness` check and require the branch to be current before merge;
+- bind `Merge Readiness` to the GitHub Actions app (`app_id: 15368`) rather than accepting that check name from an arbitrary status publisher;
 - enforce required checks for repository administrators too;
 - require changes to arrive through a pull request, while allowing a single-maintainer repository to use zero mandatory approving reviewers;
 - dismiss stale approvals if approval requirements are increased later;
@@ -16,7 +17,9 @@ The script protects `main` with these invariants:
 - forbid force pushes and branch deletion;
 - leave the branch writable through the normal protected pull-request path.
 
-The GitHub UI may present the check as `CI/CD / Merge Readiness`; the branch-protection API consumes the check-run context name `Merge Readiness`. Historical repository check runs confirm that exact context is emitted by GitHub Actions.
+The GitHub UI may present the check as `CI/CD / Merge Readiness`; the branch-protection API consumes the check-run context name `Merge Readiness`. Historical repository check runs confirm that exact context is emitted by GitHub Actions and that the provider app ID is `15368`.
+
+The API payload keeps the required legacy `contexts` array empty and uses the modern `checks` array for the exact context/app binding. This prevents another status publisher from satisfying the required check merely by reusing the same context name.
 
 ## Run as the repository owner
 
