@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: Plan and validate without creating branches or pull requests
+        description: Plan, review, and validate without publishing pull requests
         required: false
         default: false
         type: boolean
@@ -19,27 +19,23 @@ permissions: {}
 
 jobs:
   studio:
-    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    if: >-
+      github.repository == 'Apeloff1/Skeleton' &&
+      (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main')
     name: 1000-worker idle control plane
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 35
     permissions:
       actions: read
       contents: write
-      issues: read
+      issues: write
       pull-requests: write
     env:
-      GITHUB_TOKEN: ${{ github.token }}
-      GITHUB_REPOSITORY: ${{ github.repository }}
-      GITHUB_SHA: ${{ github.sha }}
-      GITHUB_RUN_ID: ${{ github.run_id }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
       IDLE_STUDIO_ACTIVE_WORKERS: ${{ vars.IDLE_STUDIO_ACTIVE_WORKERS }}
       IDLE_STUDIO_TASKS_PER_RUN: ${{ vars.IDLE_STUDIO_TASKS_PER_RUN }}
       IDLE_STUDIO_MAX_MODEL_CALLS: ${{ vars.IDLE_STUDIO_MAX_MODEL_CALLS }}
       IDLE_STUDIO_MAX_OPEN_PRS: ${{ vars.IDLE_STUDIO_MAX_OPEN_PRS }}
-      IDLE_STUDIO_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+
     steps:
       - name: Checkout trusted default-branch snapshot
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -53,8 +49,125 @@ jobs:
         with:
           python-version: '3.11.16'
 
-      - name: Validate idle-studio controller
-        run: python -m unittest -v skeleton.testing.test_idle_studio
+      - name: Validate trusted idle-studio control plane
+        run: >-
+          python -m unittest -v
+          skeleton.testing.test_idle_studio
+          skeleton.testing.test_idle_studio_v2
 
-      - name: Run idle studio
-        run: python -m skeleton.automation.idle_studio
+      - name: Snapshot live repository state
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .idle-studio-tmp
+          gh api "/repos/$REPO/actions/runs?per_page=50" --jq '.workflow_runs' > .idle-studio-tmp/runs.json
+          gh api "/repos/$REPO/issues?state=open&per_page=50&sort=updated&direction=desc" > .idle-studio-tmp/issues.json
+          gh api "/repos/$REPO/pulls?state=open&per_page=50&sort=updated&direction=desc" > .idle-studio-tmp/pulls.json
+          base_sha=$(git rev-parse HEAD)
+          BASE_SHA="$base_sha" CURRENT_RUN_ID="$GITHUB_RUN_ID" python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path('.idle-studio-tmp')
+          state = {
+              'runs': json.loads((root / 'runs.json').read_text(encoding='utf-8')),
+              'issues': json.loads((root / 'issues.json').read_text(encoding='utf-8')),
+              'pulls': json.loads((root / 'pulls.json').read_text(encoding='utf-8')),
+              'base_sha': os.environ['BASE_SHA'],
+              'current_run_id': os.environ['CURRENT_RUN_ID'],
+          }
+          (root / 'repo-state.json').write_text(
+              json.dumps(state, sort_keys=True, indent=2),
+              encoding='utf-8',
+          )
+          PY
+
+      - name: Plan, build, and independently review bounded work
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m skeleton.automation.idle_studio_v2 propose \
+            --state .idle-studio-tmp/repo-state.json \
+            --package .idle-studio-tmp/package.json \
+            --audit .idle-studio-tmp/audit.jsonl \
+            --report .idle-studio-tmp/report.md
+          sha256sum .idle-studio-tmp/package.json > .idle-studio-tmp/package.sha256
+
+      - name: Revalidate sealed proposals without model or GitHub credentials
+        env:
+          OPENAI_API_KEY: ''
+          GH_TOKEN: ''
+          GITHUB_TOKEN: ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum -c .idle-studio-tmp/package.sha256
+          python -m skeleton.automation.idle_studio_v2 validate \
+            --package .idle-studio-tmp/package.json
+
+      - name: Persist append-only Idle Studio ledger
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          title='bot: idle studio ledger'
+          number=$(gh issue list --repo "$REPO" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
+          if [[ -z "${number:-}" ]]; then
+            issue_url=$(gh issue create --repo "$REPO" --title "$title" --body 'Append-only ledger for Idle Studio runs. Every scheduled/manual run records its human report and redacted machine audit here, including no-op and rejected runs.')
+            number="${issue_url##*/}"
+          fi
+          {
+            echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+            if [[ -s .idle-studio-tmp/report.md ]]; then
+              cat .idle-studio-tmp/report.md
+            else
+              echo '# Idle Studio run'
+              echo
+              echo 'Controller stopped before a report could be produced.'
+            fi
+            if [[ -s .idle-studio-tmp/audit.jsonl ]]; then
+              echo
+              echo '<details><summary>Redacted machine audit</summary>'
+              echo
+              echo '```jsonl'
+              cat .idle-studio-tmp/audit.jsonl
+              echo '```'
+              echo '</details>'
+            fi
+          } > .idle-studio-tmp/ledger-comment.md
+          gh issue comment "$number" --repo "$REPO" --body-file .idle-studio-tmp/ledger-comment.md >/dev/null
+
+      - name: Publish independently approved work as reviewable pull requests
+        if: >-
+          success() &&
+          (github.event_name != 'workflow_dispatch' || inputs.dry_run != true)
+        env:
+          OPENAI_API_KEY: ''
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum -c .idle-studio-tmp/package.sha256
+          python -m skeleton.automation.idle_studio_v2 publish \
+            --package .idle-studio-tmp/package.json
+
+      - name: Summarize idle studio run
+        if: always()
+        shell: bash
+        run: |
+          if [[ -s .idle-studio-tmp/report.md ]]; then
+            cat .idle-studio-tmp/report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Idle Studio did not produce a report.' >> "$GITHUB_STEP_SUMMARY"
+          fi
