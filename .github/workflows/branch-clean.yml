@@ -73,7 +73,7 @@ jobs:
           fi
 
           declare -A open_pr_heads=()
-          declare -A recent_branch_creations=()
+          declare -A branch_creation_epochs=()
 
           load_open_pr_heads() {
             local branch
@@ -87,15 +87,14 @@ jobs:
             )
           }
 
-          load_recent_branch_creations() {
-            local events_file ref created created_epoch now_epoch age
+          load_branch_creation_history() {
+            local events_file ref created created_epoch prior
             events_file="$RUNNER_TEMP/branch-create-events.tsv"
-            recent_branch_creations=()
-            now_epoch=$(date -u +%s)
+            branch_creation_epochs=()
 
-            # Repository CreateEvent timestamps give newly created refs a real
-            # grace period even when their starting commit is old. If this
-            # safety signal is unavailable, defer cleanup instead of guessing.
+            # Repository events are a bounded history, not a complete branch
+            # registry. A missing CreateEvent therefore means "creation age
+            # unknown", never "old enough to delete".
             if ! gh api --paginate "/repos/${GITHUB_REPOSITORY}/events?per_page=100" \
               --jq '.[] | select(.type == "CreateEvent" and .payload.ref_type == "branch") | [.payload.ref, .created_at] | @tsv' \
               > "$events_file"; then
@@ -108,9 +107,9 @@ jobs:
               if ! created_epoch=$(date -u -d "$created" +%s 2>/dev/null); then
                 continue
               fi
-              age=$((now_epoch - created_epoch))
-              if (( age < 0 || age < BRANCH_CLEAN_GRACE_SECONDS )); then
-                recent_branch_creations["$ref"]=1
+              prior="${branch_creation_epochs[$ref]:-}"
+              if [[ -z "$prior" ]] || (( created_epoch > prior )); then
+                branch_creation_epochs["$ref"]="$created_epoch"
               fi
             done < "$events_file"
           }
@@ -126,6 +125,7 @@ jobs:
             ancestor_count=0
             exact_main_count=0
             recent_creation_count=0
+            unknown_creation_count=0
             recent_tip_count=0
             unknown_tip_age_count=0
             unique_count=0
@@ -135,7 +135,7 @@ jobs:
             : > ../preserved-branches.txt
 
             load_open_pr_heads
-            if ! load_recent_branch_creations; then
+            if ! load_branch_creation_history; then
               {
                 echo '## Safe branch pruning deferred'
                 echo '- Repository CreateEvent history was unavailable.'
@@ -165,33 +165,39 @@ jobs:
                 continue
               fi
 
-              # A branch may exist briefly before its first commit or PR. Honor
-              # its repository CreateEvent before considering ancestry cleanup.
-              if [[ -n "${recent_branch_creations[$branch]+x}" ]]; then
+              # Deletion requires positive creation-age evidence. Repository
+              # events are bounded, so absence from the event feed is ambiguous
+              # and must preserve the ref rather than infer that it is old.
+              if [[ -z "${branch_creation_epochs[$branch]+x}" ]]; then
+                unknown_creation_count=$((unknown_creation_count + 1))
+                printf '%s %s creation-age-unknown\n' "$branch" "$tip" >> ../preserved-branches.txt
+                continue
+              fi
+
+              now_epoch=$(date -u +%s)
+              creation_epoch="${branch_creation_epochs[$branch]}"
+              creation_age=$((now_epoch - creation_epoch))
+              if (( creation_age < 0 || creation_age < BRANCH_CLEAN_GRACE_SECONDS )); then
                 recent_creation_count=$((recent_creation_count + 1))
                 printf '%s %s recent-create-event\n' "$branch" "$tip" >> ../preserved-branches.txt
                 continue
               fi
 
-              # Exact-main refs are ambiguous: they may be freshly created work
-              # branches that have not received their first commit yet. Preserve
-              # them until main moves; the ancestor path below will clean them
-              # later after the grace period expires.
+              # Exact-main refs are ambiguous even when older than the grace
+              # period: they may be work branches waiting for their first commit.
               if [[ "$tip" == "$classified_main" ]]; then
                 exact_main_count=$((exact_main_count + 1))
                 printf '%s %s exact-current-main\n' "$branch" "$tip" >> ../preserved-branches.txt
                 continue
               elif git merge-base --is-ancestor "$tip" "$main_ref"; then
-                # A recent default-history tip is a second safety signal for a
-                # new branch if CreateEvent delivery is delayed. Only old,
-                # already-merged tips can enter the deletion candidate set.
+                # Commit age is only an additional preservation signal; it is
+                # never used as a substitute for missing branch-creation age.
                 committed_at=$(git show -s --format=%cI "$tip" 2>/dev/null || true)
                 if [[ -z "$committed_at" ]] || ! committed_epoch=$(date -u -d "$committed_at" +%s 2>/dev/null); then
                   unknown_tip_age_count=$((unknown_tip_age_count + 1))
                   printf '%s %s tip-age-unavailable\n' "$branch" "$tip" >> ../preserved-branches.txt
                   continue
                 fi
-                now_epoch=$(date -u +%s)
                 tip_age=$((now_epoch - committed_epoch))
                 if (( tip_age < 0 || tip_age < BRANCH_CLEAN_GRACE_SECONDS )); then
                   recent_tip_count=$((recent_tip_count + 1))
@@ -201,7 +207,8 @@ jobs:
 
                 # Every commit reachable from this branch tip is already
                 # reachable from main, and both creation/tip grace checks have
-                # passed, so deleting only the ref cannot discard unique work.
+                # positively passed, so deleting only the ref cannot discard
+                # unique commit work.
                 ancestor_count=$((ancestor_count + 1))
                 delete_branches+=("$branch")
                 delete_tips+=("$tip")
@@ -287,6 +294,7 @@ jobs:
               echo "- Stable classification round: $round/$max_rounds"
               echo "- main tip: \`$current_main\`"
               echo "- Recent branch creations preserved: $recent_creation_count"
+              echo "- Unknown creation-age refs preserved: $unknown_creation_count"
               echo "- Exact-current-main refs preserved: $exact_main_count"
               echo "- Recent merged-tip refs preserved: $recent_tip_count"
               echo "- Unknown tip-age refs preserved: $unknown_tip_age_count"
@@ -299,7 +307,8 @@ jobs:
               echo "- Moved or server-protected refs preserved at deletion time: $raced_or_blocked"
               echo "- New-branch grace period: ${BRANCH_CLEAN_GRACE_SECONDS}s"
               echo '- main is never modified by this workflow.'
-              echo '- A non-protected branch is eligible only when its tip is an old ancestor of main after creation/tip grace checks.'
+              echo '- A non-protected branch is eligible only with known old creation age and an old tip already reachable from main.'
+              echo '- Missing branch creation history always preserves the ref.'
               echo '- Open PR heads are never cleanup candidates.'
               echo '- Every deletion uses an expected-tip lease.'
               if [[ -s ../preserved-branches.txt ]]; then
