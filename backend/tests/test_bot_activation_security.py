@@ -1,14 +1,21 @@
 from __future__ import annotations
 
 import ast
+import importlib.util
 from pathlib import Path
 import subprocess
 
 import pytest
 
-from core import activation_security as security
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
+_SECURITY_PATH = REPO_ROOT / "core" / "activation_security.py"
+_SECURITY_SPEC = importlib.util.spec_from_file_location(
+    "bot_activation_security_under_test",
+    _SECURITY_PATH,
+)
+assert _SECURITY_SPEC is not None and _SECURITY_SPEC.loader is not None
+security = importlib.util.module_from_spec(_SECURITY_SPEC)
+_SECURITY_SPEC.loader.exec_module(security)
 
 
 @pytest.fixture(autouse=True)
