@@ -155,6 +155,7 @@ jobs:
 
           python - <<'PY'
           import json
+          import os
           from pathlib import Path
 
           root = Path('.studio-tmp')
@@ -215,7 +216,10 @@ jobs:
               team = str(item.get('target_team', 'unknown'))
               priority = item.get('priority', '?')
               lines.append(f"- P{priority} [{team}] {title}")
-          (root / 'shift-supervisor-summary.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          summary_path = root / 'shift-supervisor-summary.md'
+          summary_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          runner_summary = Path(os.environ['RUNNER_TEMP']) / 'shift-supervisor-summary.md'
+          runner_summary.write_text(summary_path.read_text(encoding='utf-8'), encoding='utf-8')
           PY
 
       - name: Generate bounded model proposals
@@ -309,8 +313,8 @@ jobs:
           {
             echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo
-            if [[ -s .studio-tmp/shift-supervisor-summary.md ]]; then
-              cat .studio-tmp/shift-supervisor-summary.md
+            if [[ -s "$RUNNER_TEMP/shift-supervisor-summary.md" ]]; then
+              cat "$RUNNER_TEMP/shift-supervisor-summary.md"
               echo
             fi
             cat "$RUNNER_TEMP/studio-report.md"
@@ -353,8 +357,8 @@ jobs:
           {
             echo '## Autonomous Studio publication'
             echo
-            if [[ -s .studio-tmp/shift-supervisor-summary.md ]]; then
-              cat .studio-tmp/shift-supervisor-summary.md
+            if [[ -s "$RUNNER_TEMP/shift-supervisor-summary.md" ]]; then
+              cat "$RUNNER_TEMP/shift-supervisor-summary.md"
               echo
             fi
             echo "PR: ${pr_url}"
@@ -372,8 +376,8 @@ jobs:
           {
             echo '## Autonomous Studio'
             echo
-            if [[ -s .studio-tmp/shift-supervisor-summary.md ]]; then
-              cat .studio-tmp/shift-supervisor-summary.md
+            if [[ -s "$RUNNER_TEMP/shift-supervisor-summary.md" ]]; then
+              cat "$RUNNER_TEMP/shift-supervisor-summary.md"
               echo
             fi
             cat "$RUNNER_TEMP/studio-report.md"
