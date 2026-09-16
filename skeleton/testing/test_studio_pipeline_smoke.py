@@ -49,7 +49,7 @@ def test_offline_studio_pipeline_smoke(tmp_path: Path) -> None:
             {
                 "title": "Strengthen studio reporting",
                 "objective": "Keep report rendering deterministic and reviewable.",
-                "division": "testing",
+                "division": "qa_verification",
                 "paths": ["skeleton/automation/studio_report.py"],
             }
         ]
@@ -99,7 +99,7 @@ def test_offline_studio_pipeline_fails_closed_on_reviewer_rejection(tmp_path: Pa
                 {
                     "title": "Review-only rejection path",
                     "objective": "Verify senior review remains authoritative.",
-                    "division": "testing",
+                    "division": "qa_verification",
                     "paths": ["skeleton/automation/studio_report.py"],
                 }
             ]
