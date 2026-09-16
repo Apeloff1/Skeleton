@@ -74,27 +74,25 @@ class SocialGraph:
 
     def get_network(self, agent: str, depth: int = 1) -> Dict[str, Any]:
         """Get the social network around an agent up to a depth."""
+        network: Dict[str, List[str]] = {agent: self.get_neighbors(agent)}
         if depth <= 0:
-            return {agent: []}
+            return network
 
-        network: Dict[str, List[str]] = {}
-        frontier = [agent]
+        frontier = list(network[agent])
         visited = {agent}
 
-        for level in range(depth + 1):
+        for _ in range(depth):
             next_frontier: List[str] = []
             for current in frontier:
-                if level == depth:
-                    network.setdefault(current, [])
+                if current in visited:
                     continue
+                visited.add(current)
 
                 neighbors = self.get_neighbors(current)
                 network[current] = neighbors
                 for neighbor in neighbors:
-                    if neighbor in visited:
-                        continue
-                    visited.add(neighbor)
-                    next_frontier.append(neighbor)
+                    if neighbor not in visited:
+                        next_frontier.append(neighbor)
 
             if not next_frontier:
                 break
