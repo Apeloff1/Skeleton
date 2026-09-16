@@ -139,76 +139,18 @@ jobs:
             echo 'proceed=true' >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Load canonical shift-supervisor plan
+      - name: Load fresh canonical shift-supervisor plan
         if: steps.pressure.outputs.proceed == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          import json
-          import re
-          import os
-          from pathlib import Path
+          python -m core.shift_supervisor.consumer_plan prepare \
+            --team night \
+            --state .studio-tmp/repo-state.json \
+            --summary "$RUNNER_TEMP/shift-supervisor-summary.md" \
+            --max-age-minutes 20
 
-          root = Path('.studio-tmp')
-          state_path = root / 'repo-state.json'
-          state = json.loads(state_path.read_text(encoding='utf-8'))
-          title = '[Shift Supervisor] Canonical Night + Idle Plan'
-          status_titles = {
-              '[Shift Supervisor] Idle Worker Status',
-              '[Shift Supervisor] Night Worker Status',
-          }
-          issues = state.get('open_issues', [])
-          canonical = next(
-              (
-                  issue for issue in issues
-                  if isinstance(issue, dict) and issue.get('title') == title
-              ),
-              None,
-          )
-          ignored_titles = {title, *status_titles}
-          state['open_issues'] = [
-              issue for issue in issues
-              if not (isinstance(issue, dict) and issue.get('title') in ignored_titles)
-          ]
-
-          lines = ['## Shift supervisor', '']
-          if canonical is None:
-              state['_shift_supervisor'] = {
-                  'source': 'canonical-plan-issue',
-                  'status': 'missing',
-                  'night_plan_excerpt': '',
-              }
-              lines.append('Canonical plan issue was not present; using normal repository evidence only.')
-          else:
-              body = str(canonical.get('body', ''))
-              match = re.search(
-                  r'## Night shift plan\s*(.*?)(?=\n## Idle shift plan|\n## Clocked-in / overtime ledger|\n<!-- SHIFT_SUPERVISOR_STATE|\Z)',
-                  body,
-                  flags=re.DOTALL | re.IGNORECASE,
-              )
-              night_excerpt = (match.group(1).strip() if match else body)[:12000]
-              state['_shift_supervisor'] = {
-                  'source': 'canonical-plan-issue',
-                  'status': 'loaded',
-                  'issue_number': canonical.get('number'),
-                  'issue_url': canonical.get('url'),
-                  'night_plan_excerpt': night_excerpt,
-              }
-              lines.append(f"Canonical issue: #{canonical.get('number', '?')}")
-              lines.append('Night plan loaded into the trusted planning context.')
-              if night_excerpt:
-                  lines += ['', night_excerpt[:6000]]
-
-          state_path.write_text(json.dumps(state, sort_keys=True, indent=2), encoding='utf-8')
-          summary = '\n'.join(lines) + '\n'
-          summary_path = root / 'shift-supervisor-summary.md'
-          summary_path.write_text(summary, encoding='utf-8')
-          runner_summary = Path(os.environ['RUNNER_TEMP']) / 'shift-supervisor-summary.md'
-          runner_summary.write_text(summary, encoding='utf-8')
-          PY
-
-      - name: Generate bounded model proposals
+      - name: Generate supervisor-bound model proposals
         if: steps.pressure.outputs.proceed == 'true'
         id: proposal
         env:
@@ -237,14 +179,9 @@ jobs:
           }
           trap finalize_proposal EXIT
 
-          if [[ -z "${OPENAI_API_KEY:-}" ]]; then
-            echo '::error::OPENAI_API_KEY repository secret is required for Autonomous Studio.'
-            exit 1
-          fi
-
           max_tasks="${REQUESTED_MAX_TASKS:-2}"
           cohort_size="${REQUESTED_COHORT_SIZE:-15}"
-          python -m skeleton.automation.studio_director propose \
+          python -m skeleton.automation.supervised_studio \
             --patch-path .studio-tmp/studio.patch \
             --audit-path .studio-tmp/audit.jsonl \
             --repo-state-path .studio-tmp/repo-state.json \
@@ -258,18 +195,8 @@ jobs:
             echo 'has_patch=false' >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Record real night workforce snapshot
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -s "$RUNNER_TEMP/studio-audit.jsonl" ]]; then
-            python -m core.shift_supervisor.workforce_report night \
-              --audit "$RUNNER_TEMP/studio-audit.jsonl" \
-              --output "$RUNNER_TEMP/night-worker-status.json"
-          fi
-
       - name: Validate proposed diff without model or GitHub credentials
+        id: validation
         if: steps.proposal.outputs.has_patch == 'true'
         env:
           OPENAI_API_KEY: ''
@@ -278,6 +205,36 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          finalize_validation() {
+            rc=$?
+            VALIDATION_RC="$rc" python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          audit = Path(os.environ['RUNNER_TEMP']) / 'studio-audit.jsonl'
+          if audit.is_file():
+              rc = int(os.environ['VALIDATION_RC'])
+              event = {
+                  'ts': datetime.now(timezone.utc).isoformat(),
+                  'run_id': os.environ.get('GITHUB_RUN_ID', ''),
+                  'event': 'validation_passed' if rc == 0 else 'validation_failed',
+                  'stage': 'credential_free_validation',
+                  'status': 'passed' if rc == 0 else 'failed_closed',
+              }
+              with audit.open('a', encoding='utf-8') as handle:
+                  handle.write(json.dumps(event, sort_keys=True) + '\n')
+          PY
+            if [[ -s "$RUNNER_TEMP/studio-audit.jsonl" ]]; then
+              python -m skeleton.automation.studio_report \
+                --audit "$RUNNER_TEMP/studio-audit.jsonl" \
+                --output "$RUNNER_TEMP/studio-report.md" || true
+            fi
+            exit "$rc"
+          }
+          trap finalize_validation EXIT
+
           test -z "${OPENAI_API_KEY:-}"
           test -z "${GH_TOKEN:-}"
           test -z "${GITHUB_TOKEN:-}"
@@ -293,24 +250,63 @@ jobs:
             skeleton/testing/test_studio_registry.py \
             skeleton/testing/test_studio_director.py \
             skeleton/testing/test_studio_report.py \
+            skeleton/testing/test_supervised_studio.py \
+            tests/test_shift_supervisor_consumer_plan.py \
             -q --tb=short
           python -m pytest skeleton/testing -q --tb=short --maxfail=1
 
-      - name: Restore exact sealed patch after validation
-        if: steps.proposal.outputs.has_patch == 'true'
+      - name: Restore worktree and exact sealed patch after validation
+        if: always() && steps.proposal.outputs.has_patch == 'true'
         env:
           OPENAI_API_KEY: ''
           GH_TOKEN: ''
           GITHUB_TOKEN: ''
+          VALIDATION_OUTCOME: ${{ steps.validation.outcome }}
         shell: bash
         run: |
           set -euo pipefail
           git reset --hard HEAD
           git clean -fdx
+          if [[ "$VALIDATION_OUTCOME" != 'success' ]]; then
+            exit 0
+          fi
           sha256sum -c "$RUNNER_TEMP/studio.patch.sha256"
           git apply --check "$RUNNER_TEMP/studio.patch"
           git apply "$RUNNER_TEMP/studio.patch"
           git diff --check
+
+      - name: Record final night workforce snapshot
+        if: always()
+        env:
+          VALIDATION_OUTCOME: ${{ steps.validation.outcome }}
+          HAS_PATCH: ${{ steps.proposal.outputs.has_patch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$HAS_PATCH" == 'true' && "$VALIDATION_OUTCOME" == 'success' && -s "$RUNNER_TEMP/studio-audit.jsonl" ]]; then
+            python -m core.shift_supervisor.workforce_report night \
+              --audit "$RUNNER_TEMP/studio-audit.jsonl" \
+              --output "$RUNNER_TEMP/night-worker-status.json"
+          else
+            python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          value = {
+              'version': 1,
+              'team': 'night',
+              'updated_at': datetime.now(timezone.utc).isoformat(),
+              'run_status': 'no_validated_work',
+              'workers': [],
+          }
+          (Path(os.environ['RUNNER_TEMP']) / 'night-worker-status.json').write_text(
+              json.dumps(value, sort_keys=True, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          PY
+          fi
 
       - name: Persist Studio Ledger and staffing status
         if: always()
