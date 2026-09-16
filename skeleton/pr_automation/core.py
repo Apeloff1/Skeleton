@@ -26,7 +26,6 @@ class Decision(StrEnum):
     IGNORE = "ignore"
     HOLD = "hold"
     READY = "ready"
-    MANUAL = "manual"
     MERGE = "merge"
 
 
@@ -129,7 +128,7 @@ def evaluate(snapshot: PRSnapshot, policy: Policy) -> Evaluation:
 
     Only explicitly known state can become merge-ready. Unknown enum values and
     incomplete data fail closed. Changes to the automation trust surface may
-    pass normal merge gates but are always routed to a human merge decision.
+    satisfy normal merge gates but never produce an automated mutation action.
     """
 
     if snapshot.state != "open" or snapshot.merged:
@@ -197,7 +196,7 @@ def evaluate(snapshot: PRSnapshot, policy: Policy) -> Evaluation:
         return _evaluation(
             snapshot,
             policy,
-            Decision.MANUAL,
+            Decision.READY,
             (
                 f"automation trust surface changed in {len(snapshot.sensitive_paths)} path(s); "
                 "human merge required",
