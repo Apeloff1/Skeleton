@@ -249,9 +249,9 @@ def test_rate_limiter_serializes_concurrent_high_cardinality_admission() -> None
 @pytest.mark.parametrize(
     ("kwargs", "message"),
     [
-        ({"per_minute": 0}, "per_minute must be positive"),
-        ({"burst": 0}, "burst must be positive"),
-        ({"max_buckets": 0}, "max_buckets must be positive"),
+        ({"per_minute": 0}, "per_minute must be finite and positive"),
+        ({"burst": 0}, "burst must be finite and positive"),
+        ({"max_buckets": 0}, "max_buckets must be a positive integer"),
         ({"bucket_ttl": 0}, "bucket_ttl must be a positive finite number"),
         ({"bucket_ttl": float("inf")}, "bucket_ttl must be a positive finite number"),
     ],
