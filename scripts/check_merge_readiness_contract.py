@@ -14,11 +14,32 @@ GITLEAKS_PIN = "gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1
 REQUIRED_NEEDS = ("quarantine_policy", "unit", "integration_smoke", "quality_security")
 CONCURRENCY_GROUP = "group: merge-readiness-${{ github.event.pull_request.number || github.sha }}"
 CANCEL_POLICY = "cancel-in-progress: ${{ github.event_name == 'pull_request' }}"
+JOB_HEADER_RE = re.compile(r"^  (?P<name>[A-Za-z0-9_-]+):\s*$", re.MULTILINE)
+ALWAYS_GUARD_RE = re.compile(
+    r"^\s*if:\s*(?:\$\{\{\s*)?always\(\)(?=\s*(?:&&|\|\||\}\}|$))",
+    re.MULTILINE,
+)
 
 
 def require(condition: bool, message: str, failures: list[str]) -> None:
     if not condition:
         failures.append(message)
+
+
+def job_block(text: str, job_name: str) -> str:
+    """Return one top-level workflow job block without leaking into later jobs."""
+    target = re.search(rf"^  {re.escape(job_name)}:\s*$", text, re.MULTILINE)
+    if target is None:
+        return ""
+
+    next_job = JOB_HEADER_RE.search(text, target.end())
+    end = next_job.start() if next_job is not None else len(text)
+    return text[target.start() : end]
+
+
+def has_leading_always_guard(job: str) -> bool:
+    """Require ``always()`` to be the leading readiness condition token."""
+    return ALWAYS_GUARD_RE.search(job) is not None
 
 
 def main() -> int:
@@ -78,12 +99,11 @@ def main() -> int:
     require("continue-on-error: true" not in text, "required merge gates must not hide failures", failures)
     require('ports:\n          - "27017:27017"' in text, "Mongo service port must use explicit quoted list syntax", failures)
 
-    readiness_start = text.find("  readiness:")
-    require(readiness_start >= 0, "readiness job missing", failures)
-    readiness = text[readiness_start:] if readiness_start >= 0 else ""
+    readiness = job_block(text, "readiness")
+    require(bool(readiness), "readiness job missing", failures)
     require("name: Merge Readiness" in readiness, "stable Merge Readiness job name missing", failures)
     require(
-        re.search(r"^\s*if:\s*(?:\$\{\{\s*)?always\(\)", readiness, re.MULTILINE) is not None,
+        has_leading_always_guard(readiness),
         "Merge Readiness must always emit a result",
         failures,
     )
