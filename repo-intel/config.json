@@ -1,10 +1,35 @@
 {
-  "schema": 2,
-  "purpose": "Shared machine contract for fast repository discovery, build routing, gap detection, and agent handoff.",
+  "schema": 3,
+  "purpose": "Shared machine contract for content-addressed repository discovery, semantic/build graph routing, change impact, gap detection, security/quality evidence, and agent handoff.",
   "thresholds": {
     "large_tracked_bytes": 52428800,
-    "hot_subsystem_files": 150
+    "hot_subsystem_files": 150,
+    "semantic_text_bytes": 2097152
   },
+  "index_layers": [
+    "git-objects",
+    "file-intelligence",
+    "semantic-symbols-imports",
+    "typed-dependency-graph",
+    "reverse-impact-graph",
+    "build-test-workflow-map",
+    "security-quality-map",
+    "capability-evidence-map",
+    "agent-query-interface"
+  ],
+  "generated_outputs": [
+    ".cache/repo-intel/index.json",
+    ".cache/repo-intel/graph.json",
+    ".cache/repo-intel/symbols.json",
+    ".cache/repo-intel/build-map.json",
+    ".cache/repo-intel/impact.json",
+    ".cache/repo-intel/gaps.json",
+    ".cache/repo-intel/security-quality.json",
+    ".cache/repo-intel/metrics.json",
+    ".cache/repo-intel/notes.md",
+    ".cache/repo-intel/dependabot-notes.md",
+    ".cache/repo-intel/semantic-cache.json"
+  ],
   "subsystems": [
     {
       "id": "github",
@@ -52,7 +77,7 @@
       "id": "scripts",
       "root": "scripts",
       "kind": "tooling",
-      "build_role": "Fast local/CI verification, benchmark, policy and release tooling"
+      "build_role": "Fast local/CI verification, benchmark, policy, repository intelligence and release tooling"
     },
     {
       "id": "tests",
@@ -65,6 +90,12 @@
       "root": "docs",
       "kind": "documentation",
       "build_role": "Architecture, operating contract, evidence and roadmap"
+    },
+    {
+      "id": "repo-intel",
+      "root": "repo-intel",
+      "kind": "repository-knowledge",
+      "build_role": "Index schemas, graph/query/evidence contracts, 100-batch map and agent handoff notes"
     },
     {
       "id": "root",
@@ -107,8 +138,14 @@
     {
       "id": "repo-intel",
       "command": "make repo-intel",
-      "scope": "scripts/repo_intel.py",
-      "purpose": "Refresh build map, gaps, security/quality notes and machine index"
+      "scope": "scripts/repo_intel_sota.py",
+      "purpose": "Refresh semantic graph, reverse impact, build map, gaps, security/quality notes, metrics and machine index"
+    },
+    {
+      "id": "repo-impact",
+      "command": "make repo-intel-impact",
+      "scope": "scripts/repo_intel_sota.py",
+      "purpose": "Compute transitive reverse change impact and candidate validation surface"
     }
   ],
   "build_affecting_prefixes": [
@@ -130,14 +167,18 @@
   "agent_protocol": {
     "read_before_work": [
       "AGENTS.md",
+      "repo-intel/README.md",
       "repo-intel/config.json",
       "repo-intel/batches.json",
       "repo-intel/game-capabilities.json",
-      ".cache/repo-intel/notes.md"
+      ".cache/repo-intel/notes.md",
+      ".cache/repo-intel/build-map.json",
+      ".cache/repo-intel/impact.json"
     ],
     "required_start": "make repo-intel",
+    "required_impact": "make repo-intel-impact",
     "required_handoff": "make repo-intel-check",
     "required_change_note": "repo-intel/notes/<date>-<batch-or-topic>.md",
-    "principle": "Every build-affecting change leaves the repository more legible than it found it. Surface remaining gaps explicitly; never hide them behind completion claims."
+    "principle": "Every build-affecting change leaves the repository more legible than it found it. Query dependencies and reverse impact before broad edits, preserve evidence precision, and surface remaining gaps explicitly."
   }
 }
