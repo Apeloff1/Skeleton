@@ -7,6 +7,23 @@ from concurrent.futures import ThreadPoolExecutor
 from skeleton.api.gateway import APIGateway, GatewayRequest
 
 
+class _CountingLock:
+    def __init__(self) -> None:
+        self.entries = 0
+
+    def __enter__(self):
+        self.entries += 1
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        return None
+
+
+class _NoFormatActor(str):
+    def __format__(self, format_spec: str) -> str:
+        raise AssertionError("unlimited routes must not build a rate-limit key")
+
+
 def test_high_cardinality_rate_limit_buckets_are_reclaimed(monkeypatch) -> None:
     now = [100.0]
     monkeypatch.setattr("skeleton.api.gateway.time.monotonic", lambda: now[0])
@@ -95,3 +112,61 @@ def test_unlimited_route_skips_clock_without_limiter_state(monkeypatch) -> None:
     assert response.status == 200
     assert response.body == {"ok": True}
     assert gateway._buckets == {}
+
+
+def test_unknown_route_skips_request_timing_clocks(monkeypatch) -> None:
+    def unexpected_clock_read() -> int:
+        raise AssertionError("404 fast path must not start a request timer")
+
+    monkeypatch.setattr("skeleton.api.gateway.time.time_ns", unexpected_clock_read)
+    monkeypatch.setattr("skeleton.api.gateway.time.perf_counter_ns", unexpected_clock_read)
+    gateway = APIGateway()
+
+    response = gateway.handle(GatewayRequest("/missing"))
+
+    assert response.status == 404
+    assert response.duration_ms == 0.0
+
+
+def test_unlimited_route_skips_rate_limit_key_formatting() -> None:
+    gateway = APIGateway()
+    gateway.route("/unlimited", lambda payload: payload)
+
+    response = gateway.handle(
+        GatewayRequest("/unlimited", actor=_NoFormatActor("actor"), payload={"ok": True})
+    )
+
+    assert response.status == 200
+    assert response.body == {"ok": True}
+
+
+def test_successful_request_updates_stats_under_one_lock() -> None:
+    gateway = APIGateway()
+    route = gateway.route("/ok", lambda payload: payload)
+    stats_lock = _CountingLock()
+    gateway._stats_lock = stats_lock  # type: ignore[assignment]
+
+    response = gateway.handle(GatewayRequest("/ok", payload={"ok": True}))
+
+    assert response.status == 200
+    assert route.calls == 1
+    assert route.errors == 0
+    assert stats_lock.entries == 1
+
+
+def test_failed_request_updates_stats_under_one_lock() -> None:
+    gateway = APIGateway()
+
+    def fail(_payload):
+        raise RuntimeError("boom")
+
+    route = gateway.route("/fail", fail)
+    stats_lock = _CountingLock()
+    gateway._stats_lock = stats_lock  # type: ignore[assignment]
+
+    response = gateway.handle(GatewayRequest("/fail"))
+
+    assert response.status == 500
+    assert route.calls == 1
+    assert route.errors == 1
+    assert stats_lock.entries == 1
