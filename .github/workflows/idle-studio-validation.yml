@@ -1,0 +1,57 @@
+name: Idle Studio Validation
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/idle-studio.yml'
+      - '.github/workflows/idle-studio-validation.yml'
+      - 'skeleton/automation/chatgpt_adapter.py'
+      - 'skeleton/automation/idle_studio.py'
+      - 'skeleton/automation/idle_studio_v2.py'
+      - 'skeleton/automation/idle_studio_publisher.py'
+      - 'skeleton/testing/test_idle_studio.py'
+      - 'skeleton/testing/test_idle_studio_v2.py'
+      - 'skeleton/testing/test_idle_studio_publisher.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: idle-studio-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Idle Studio contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout pull request without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11.16'
+
+      - name: Compile idle studio controller
+        run: >-
+          python -m compileall -q
+          skeleton/automation/idle_studio.py
+          skeleton/automation/idle_studio_v2.py
+          skeleton/automation/idle_studio_publisher.py
+
+      - name: Run focused idle studio contracts
+        env:
+          OPENAI_API_KEY: ''
+          GH_TOKEN: ''
+          GITHUB_TOKEN: ''
+        run: >-
+          python -m unittest -v
+          skeleton.testing.test_idle_studio
+          skeleton.testing.test_idle_studio_v2
+          skeleton.testing.test_idle_studio_publisher
