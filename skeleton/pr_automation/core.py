@@ -55,6 +55,7 @@ class PRSnapshot:
     changed_files: int = 0
     additions: int = 0
     deletions: int = 0
+    sensitive_paths: tuple[str, ...] | None = ()
     labels: tuple[str, ...] = ()
     updated_at: str | None = None
 
@@ -180,6 +181,15 @@ def evaluate(snapshot: PRSnapshot, policy: Policy) -> Evaluation:
             return _hold(snapshot, policy, "review-thread state is unknown")
         if snapshot.unresolved_threads:
             return _hold(snapshot, policy, f"{snapshot.unresolved_threads} unresolved review thread(s)")
+
+    if snapshot.sensitive_paths is None:
+        return _hold(snapshot, policy, "changed-file trust-surface scan is incomplete")
+    if snapshot.sensitive_paths:
+        return _hold(
+            snapshot,
+            policy,
+            f"automation trust surface changed in {len(snapshot.sensitive_paths)} path(s)",
+        )
 
     if snapshot.changed_files < 0 or snapshot.additions < 0 or snapshot.deletions < 0:
         return _hold(snapshot, policy, "change metrics are invalid")
