@@ -34,6 +34,11 @@ RUN uv pip install -r requirements.txt \
 # Stage 2: Production
 FROM python:3.14-alpine@sha256:c6ead215bfd31f1e433d968853b7a769989117115b728874824e6c0a27cb96fc AS production
 
+# Apply the current Alpine security repository updates to the runtime layer.
+# The pinned base remains reproducible while util-linux and other OS packages
+# receive fixes released after the base-image snapshot.
+RUN apk upgrade --no-cache
+
 # Explicitly identify the application host as production so exec_guard can
 # never be re-enabled by ALLOW_UNSAFE_CODE_EXECUTION inside this image. CORS
 # also fails closed unless deployment supplies an explicit origin allowlist.
