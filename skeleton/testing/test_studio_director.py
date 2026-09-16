@@ -30,6 +30,7 @@ def test_path_policy_allows_normal_source_and_rejects_trust_boundaries() -> None
         "pyproject.toml",
         "skeleton/security/auth.py",
         "random-root/file.py",
+        "skeleton/gameplay/bad\npath.py",
     ):
         with pytest.raises(ValueError):
             _canonical_path(path)
@@ -75,6 +76,50 @@ index 1111111..2222222 100644
     deleted = patch.replace("+++ b/skeleton/foo.py", "+++ /dev/null")
     with pytest.raises(ValueError):
         _changed_paths(deleted)
+
+
+def test_patch_parser_binds_git_and_content_headers_to_same_target() -> None:
+    patch = """diff --git a/skeleton/foo.py b/skeleton/foo.py
+index 1111111..2222222 100644
+--- a/skeleton/foo.py
++++ b/skeleton/foo.py
+@@ -1 +1 @@
+-old
++new
+"""
+
+    # `git apply` accepts this shape and writes backend/other.py unless the
+    # content headers are independently validated against the diff header.
+    mismatched_allowed_target = patch.replace(
+        "--- a/skeleton/foo.py\n+++ b/skeleton/foo.py",
+        "--- a/backend/other.py\n+++ b/backend/other.py",
+    )
+    with pytest.raises(ValueError, match="headers disagree"):
+        _changed_paths(mismatched_allowed_target)
+
+    mismatched_denied_target = patch.replace(
+        "--- a/skeleton/foo.py\n+++ b/skeleton/foo.py",
+        "--- a/.github/workflows/pwn.yml\n+++ b/.github/workflows/pwn.yml",
+    )
+    with pytest.raises(ValueError):
+        _changed_paths(mismatched_denied_target)
+
+
+def test_patch_parser_rejects_binary_and_mode_metadata() -> None:
+    mode_patch = """diff --git a/skeleton/foo.py b/skeleton/foo.py
+old mode 100644
+new mode 100755
+"""
+    with pytest.raises(ValueError, match="metadata"):
+        _changed_paths(mode_patch)
+
+    binary_patch = """diff --git a/skeleton/foo.py b/skeleton/foo.py
+GIT binary patch
+literal 0
+HcmV?d00001
+"""
+    with pytest.raises(ValueError, match="metadata"):
+        _changed_paths(binary_patch)
 
 
 def test_redaction_preserves_nested_json_shapes() -> None:
