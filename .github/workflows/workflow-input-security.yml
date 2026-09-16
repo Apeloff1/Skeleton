@@ -17,6 +17,11 @@ on:
       - 'backend/tests/test_workflow_permissions_gate.py'
       - 'backend/tests/test_repo_attention_contract.py'
       - 'backend/tests/test_branch_flow_contract.py'
+      - 'core/shift_supervisor/model_gateway.py'
+      - 'skeleton/automation/activation_security.py'
+      - 'skeleton/automation/chatgpt_adapter.py'
+      - 'skeleton/testing/test_activation_security.py'
+      - 'skeleton/testing/test_repair_intake.py'
   push:
     branches: [main]
     paths:
@@ -32,6 +37,11 @@ on:
       - 'backend/tests/test_workflow_permissions_gate.py'
       - 'backend/tests/test_repo_attention_contract.py'
       - 'backend/tests/test_branch_flow_contract.py'
+      - 'core/shift_supervisor/model_gateway.py'
+      - 'skeleton/automation/activation_security.py'
+      - 'skeleton/automation/chatgpt_adapter.py'
+      - 'skeleton/testing/test_activation_security.py'
+      - 'skeleton/testing/test_repair_intake.py'
 
 concurrency:
   group: workflow-input-security-${{ github.event.pull_request.number || github.ref }}
@@ -68,6 +78,13 @@ jobs:
           tests/test_workflow_permissions_gate.py
           tests/test_repo_attention_contract.py
           tests/test_branch_flow_contract.py
+      - name: Run bot activation security regressions
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_activation_security.py
+          skeleton/testing/test_repair_intake.py
       - name: Reject direct untrusted event interpolation in run shells
         run: python backend/scripts/check_workflow_input_security.py
       - name: Enforce reviewed action repository allowlist
@@ -78,3 +95,5 @@ jobs:
         run: python backend/scripts/check_repo_attention_contract.py
       - name: Enforce branch-flow mutation contract
         run: python backend/scripts/check_branch_flow_contract.py
+      - name: Enforce bot activation security baseline
+        run: python -m skeleton.automation.activation_security
