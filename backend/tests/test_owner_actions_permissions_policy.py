@@ -14,7 +14,7 @@ def test_actions_owner_bootstrap_defaults_to_verification_and_read_only() -> Non
     assert 'mode="${1:---verify}"' in text
     assert "default_workflow_permissions=read" in text
     assert "can_approve_pull_request_reviews=false" in text
-    assert "X-GitHub-Api-Version: 2022-11-28" in text
+    assert "X-GitHub-Api-Version: 2026-03-10" in text
     assert '.permissions.admin // false' in text
 
 
