@@ -75,8 +75,9 @@ class InMemoryPlanStore:
         This is the only dispatch primitive workers need. The supervisor and
         secretary never push orders to workers; workers pull from this shared
         plan. A worker can hold at most one active item, and team/dependency/
-        overtime rules are enforced under one lock so concurrent bots cannot
-        double-claim work or overload the same worker.
+        overtime/conflict-domain rules are enforced under one lock so concurrent
+        bots cannot double-claim work, collide on shared surfaces, or overload
+        the same worker.
         """
         with self._lock:
             worker = self._workers.get(worker_id)
@@ -103,6 +104,7 @@ class InMemoryPlanStore:
                 and item.status == "queued"
                 and item.owner is None
                 and self._dependencies_satisfied(item)
+                and self._conflict_domains_available(item)
             ]
             if not eligible:
                 return None
@@ -242,6 +244,32 @@ class InMemoryPlanStore:
             self._items = items
             self._workers = workers
             self._revisions = revisions
+
+    def _conflict_domains_available(self, item: PlanItem) -> bool:
+        requested = self._conflict_domains(item)
+        if not requested:
+            return True
+        for active in self._items.values():
+            if active.id == item.id or active.status not in {"assigned", "working", "blocked"}:
+                continue
+            held = self._conflict_domains(active)
+            if not held:
+                continue
+            if "*" in requested or "*" in held or requested.intersection(held):
+                return False
+        return True
+
+    @staticmethod
+    def _conflict_domains(item: PlanItem) -> set[str]:
+        raw = item.metadata.get("conflict_domains", [])
+        if not isinstance(raw, list):
+            return set()
+        domains: set[str] = set()
+        for value in raw[:16]:
+            domain = str(value).strip().casefold()
+            if domain:
+                domains.add(domain)
+        return domains
 
     def _dependencies_satisfied(self, item: PlanItem) -> bool:
         for dependency_id in item.dependencies:
