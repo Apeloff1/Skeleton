@@ -55,12 +55,7 @@ def safe_squad_capacity(
     *,
     overtime_soft_limit_minutes: int = 120,
 ) -> int:
-    """Return safe four-person squad capacity for one team.
-
-    Floor division is deliberate: spare workers never become an implicit fifth
-    member of an active task. Only idle, unassigned workers below the overtime
-    boundary contribute to capacity.
-    """
+    """Return safe four-person squad capacity for one team."""
     if team not in {"night", "idle"}:
         raise ValueError("team must be night or idle")
     eligible = sum(
@@ -79,8 +74,7 @@ class SquadCoordinator:
 
     New claims must use the current plan generation when revision state exists.
     Once issued, a live lease survives later plan refreshes until completion,
-    release, rejection, explicit revocation, or expiry. This lets the plan
-    evolve every 15/30 minutes without invalidating healthy in-flight work.
+    release, rejection, explicit revocation, or expiry.
     """
 
     def __init__(
@@ -122,7 +116,7 @@ class SquadCoordinator:
             else max(5, min(int(lease_minutes), 240))
         )
 
-        with self.store._lock:  # noqa: SLF001 - coordinator shares the store transaction boundary
+        with self.store._lock:  # noqa: SLF001
             self._reclaim_expired_locked(moment)
             self._require_current_generation_locked(generation)
             allowed_workers = set(worker_ids) if worker_ids is not None else None
@@ -137,7 +131,7 @@ class SquadCoordinator:
                 if item.target_team == team
                 and item.status == "queued"
                 and item.owner is None
-                and int(item.metadata.get("squad_size", SQUAD_SIZE)) == SQUAD_SIZE
+                and self._is_squad_task(item)
                 and self.store._dependencies_satisfied(item)  # noqa: SLF001
                 and self._conflict_domain(item) not in active_domains
             ]
@@ -342,6 +336,13 @@ class SquadCoordinator:
     def _require_not_revoked(item: PlanItem) -> None:
         if item.metadata.get("lease_revoked") is True:
             raise PermissionError("squad lease was revoked by the control plane")
+
+    @staticmethod
+    def _is_squad_task(item: PlanItem) -> bool:
+        try:
+            return int(item.metadata.get("squad_size", 0)) == SQUAD_SIZE
+        except (TypeError, ValueError):
+            return False
 
     def _eligible_workers_locked(
         self, team: str, allowed_workers: set[str] | None
