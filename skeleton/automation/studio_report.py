@@ -49,7 +49,7 @@ def render_report(records: Iterable[Mapping[str, object]]) -> str:
         row
         for row in rows
         if str(row.get("event", "")).startswith("patch_rejected")
-        or row.get("event") == "task_failed_closed"
+        or row.get("event") in {"task_failed_closed", "run_failed_closed"}
     ]
 
     lines = [
@@ -62,7 +62,7 @@ def render_report(records: Iterable[Mapping[str, object]]) -> str:
         f"- Active bounded cohort: **{len(cohort)}**",
         f"- Planned tasks: **{len(plan_rows)}**",
         f"- Accepted patches: **{len(accepted)}**",
-        f"- Rejected/failed-closed tasks: **{len(rejected)}**",
+        f"- Rejected/failed-closed tasks or runs: **{len(rejected)}**",
         "",
         "## Planned work",
         "",
@@ -100,7 +100,8 @@ def render_report(records: Iterable[Mapping[str, object]]) -> str:
     else:
         for row in rejected:
             detail = row.get("reason") or row.get("error") or row.get("event")
-            lines.append(f"- **{row.get('task', 'unknown task')}**: {detail}")
+            subject = row.get("task") or row.get("stage") or "run"
+            lines.append(f"- **{subject}**: {detail}")
 
     lines.extend(
         [
