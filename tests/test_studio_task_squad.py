@@ -16,6 +16,18 @@ def test_task_squad_selection_is_stable_for_same_seed() -> None:
     assert first == second
 
 
+def test_run_scope_prevents_cross_task_worker_reuse(monkeypatch) -> None:
+    monkeypatch.setenv("STUDIO_SQUAD_SCOPE", "anti-overload-regression")
+
+    first = select_task_squad("gameplay_systems", seed="task-a")
+    second = select_task_squad("gameplay_systems", seed="task-b")
+    third = select_task_squad("gameplay_systems", seed="task-c")
+
+    assert first == select_task_squad("gameplay_systems", seed="task-a")
+    allocated = (*first.worker_ids, *second.worker_ids, *third.worker_ids)
+    assert len(set(allocated)) == 12
+
+
 def test_role_prompt_binds_worker_to_task_without_allowing_recruitment() -> None:
     squad = select_task_squad("engine_runtime", seed="runtime-task")
     prompt = role_prompt(
