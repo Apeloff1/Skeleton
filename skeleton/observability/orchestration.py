@@ -12,7 +12,7 @@ import asyncio
 import time
 import uuid
 from contextvars import ContextVar
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from skeleton.frontier.model_runtime import CancellationToken, ProviderCancelledError
 from skeleton.frontier.orchestration import (
@@ -24,6 +24,7 @@ from skeleton.frontier.orchestration import (
     RunStatus,
     StepKind,
     ToolCapability,
+    ToolDefinition,
     ToolInvocation,
     ToolRegistry,
     ToolResult,
@@ -194,6 +195,7 @@ class ObservableOrchestrator(CanonicalOrchestrator):
         *,
         cancellation: CancellationToken | None,
         granted_capabilities: frozenset[ToolCapability],
+        tool_definitions: Mapping[str, ToolDefinition],
     ) -> ToolResult:
         started = time.perf_counter()
         with self.tracer(
@@ -218,6 +220,7 @@ class ObservableOrchestrator(CanonicalOrchestrator):
                     call,
                     cancellation=cancellation,
                     granted_capabilities=granted_capabilities,
+                    tool_definitions=tool_definitions,
                 )
             except BaseException as exc:
                 step = next(
