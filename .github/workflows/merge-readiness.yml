@@ -140,12 +140,16 @@ jobs:
           REPO_INTEL_BASE: ${{ github.event.pull_request.base.sha || 'origin/main' }}
         run: |
           python scripts/repo_intel_frontier.py check
+          python scripts/repo_intel_contributions.py check
           python scripts/repo_intel_frontier.py snapshot --base "$REPO_INTEL_BASE" --out .cache/repo-intel
-      - name: Require augmentation note for build-affecting PR changes
+          python scripts/repo_intel_contributions.py snapshot --out .cache/repo-intel
+      - name: Require augmentation note and canonical contributor provenance
         if: github.event_name == 'pull_request'
         env:
           REPO_INTEL_BASE: ${{ github.event.pull_request.base.sha }}
-        run: python scripts/repo_intel_frontier.py gate --base "$REPO_INTEL_BASE"
+        run: |
+          python scripts/repo_intel_frontier.py gate --base "$REPO_INTEL_BASE"
+          python scripts/check_repo_intel_contribution_gate.py --base "$REPO_INTEL_BASE"
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
