@@ -137,6 +137,7 @@ def test_legacy_queue_cannot_claim_worker_reserved_by_active_squad_lease() -> No
     store.add_items([legacy])
 
     assert PlanQueueAPI(store).claim_next(damaged_worker_id) is None
+    assert store.claim_next_for_worker(damaged_worker_id) is None
     legacy_after = next(item for item in store.snapshot_items() if item.id == "legacy-task")
     assert legacy_after.status == "queued"
     assert legacy_after.owner is None
