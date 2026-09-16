@@ -20,10 +20,33 @@ _live_control: Optional[ControlSurface] = None
 _JEEVES = None
 
 
-def own_path() -> Path:
+def configured_own_path() -> Optional[Path]:
+    """Return the explicitly configured persistence path, if any.
+
+    ``SKELETON_OWN`` is the opt-in signal that a process is expected to own
+    durable cortex state.  The legacy fallback path remains available through
+    :func:`own_path`, but callers that decide whether multiple runtime surfaces
+    may share the process singleton should key off this explicit configuration
+    instead of an incidental ``.skeleton`` file.
+    """
     raw = os.environ.get("SKELETON_OWN")
-    if raw:
-        return Path(raw)
+    if raw is None:
+        return None
+    raw = raw.strip()
+    if not raw:
+        return None
+    return Path(raw)
+
+
+def persistence_configured() -> bool:
+    """Whether durable cortex ownership was explicitly configured."""
+    return configured_own_path() is not None
+
+
+def own_path() -> Path:
+    configured = configured_own_path()
+    if configured is not None:
+        return configured
     return Path(".skeleton") / "own.json"
 
 
