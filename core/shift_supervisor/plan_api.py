@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
 
 from .models import PlanItem
@@ -45,9 +47,9 @@ class PlanReadAPI:
 class PlanQueueAPI:
     """Legacy queue for explicitly single-worker plan items.
 
-    Autonomous four-agent work belongs to :class:`SquadPlanQueueAPI`. If this
-    compatibility queue momentarily claims a four-person task, it immediately
-    releases it so the atomic squad coordinator remains authoritative.
+    Autonomous four-agent work belongs to :class:`SquadPlanQueueAPI`. Legacy
+    workers filter squad-stamped work before claiming so a high-priority squad
+    item cannot starve lower-priority single-worker work.
     """
 
     def __init__(
@@ -60,16 +62,67 @@ class PlanQueueAPI:
         self.overtime_soft_limit_minutes = overtime_soft_limit_minutes
 
     def claim_next(self, worker_id: str) -> dict[str, Any] | None:
-        item = self.store.claim_next_for_worker(
-            worker_id,
-            overtime_soft_limit_minutes=self.overtime_soft_limit_minutes,
-        )
-        if item is None:
-            return None
-        if int(item.metadata.get("squad_size", 1)) == SQUAD_SIZE:
-            self.store.finish_claim(worker_id, item.id, outcome="queued")
-            return None
-        return PlanReadAPI._payload(item)
+        item = self._claim_next_legacy_item(worker_id)
+        return PlanReadAPI._payload(item) if item is not None else None
+
+    def _claim_next_legacy_item(self, worker_id: str) -> PlanItem | None:
+        """Atomically claim the highest-priority non-squad task for a worker."""
+        with self.store._lock:  # noqa: SLF001
+            worker = self.store._workers.get(worker_id)  # noqa: SLF001
+            if worker is None:
+                raise KeyError(worker_id)
+            if worker.status in {"offline", "blocked"}:
+                return None
+            if worker.current_task_id:
+                return None
+            if worker.overtime_minutes >= max(0, self.overtime_soft_limit_minutes):
+                return None
+
+            active_owned = any(
+                item.owner == worker_id
+                and item.status in {"assigned", "working", "blocked"}
+                for item in self.store._items.values()  # noqa: SLF001
+            )
+            if active_owned:
+                return None
+
+            eligible = [
+                item
+                for item in self.store._items.values()  # noqa: SLF001
+                if item.target_team == worker.team
+                and item.status == "queued"
+                and item.owner is None
+                and not self._is_squad_item(item)
+                and self.store._dependencies_satisfied(item)  # noqa: SLF001
+            ]
+            if not eligible:
+                return None
+
+            eligible.sort(key=lambda item: (-item.priority, item.created_at, item.id))
+            item = eligible[0]
+            now = datetime.now(timezone.utc)
+            item.owner = worker_id
+            item.status = "assigned"
+            item.updated_at = now
+            self.store._items[item.id] = replace(item)  # noqa: SLF001
+
+            worker.current_task_id = item.id
+            worker.status = "working"
+            worker.last_heartbeat_at = now
+            self.store._workers[worker_id] = replace(worker)  # noqa: SLF001
+            return replace(item)
+
+    @staticmethod
+    def _is_squad_item(item: PlanItem) -> bool:
+        raw = item.metadata.get("squad_size")
+        if raw is None:
+            return False
+        try:
+            return int(raw) == SQUAD_SIZE
+        except (TypeError, ValueError):
+            # An explicit but malformed squad stamp must fail closed instead of
+            # falling through to a legacy worker with different ownership rules.
+            return True
 
     def complete(self, worker_id: str, item_id: str) -> dict[str, Any]:
         return PlanReadAPI._payload(
