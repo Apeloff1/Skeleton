@@ -86,7 +86,7 @@ fi
 gh api \
   --method PUT \
   -H 'Accept: application/vnd.github+json' \
-  -H 'X-GitHub-Api-Version: 2022-11-28' \
+  -H 'X-GitHub-Api-Version: 2026-03-10' \
   "repos/${repo}/actions/permissions/workflow" \
   -f default_workflow_permissions=read \
   -F can_approve_pull_request_reviews=false \
