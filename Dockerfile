@@ -1,4 +1,4 @@
-ARG PYTHON_IMAGE=python:3.14-slim@sha256:cad9a2c871761c413caa6fdd6441c783451e740a48aaeba60ae62a8b53525ef6
+ARG PYTHON_IMAGE=python:3.14-slim@sha256:83ff1d245a3d57d04152252d3ef9cb361494d0b3395abd65a5ebe91c401c8e83
 FROM ${PYTHON_IMAGE}
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -7,13 +7,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
-
-# The pinned base digest can lag Debian security point releases. Apply
-# available vendor fixes at build time, then discard package indexes so the
-# runtime does not retain stale apt metadata.
-RUN apt-get update \
-    && apt-get upgrade -y \
-    && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid 10001 appuser \
     && useradd --create-home --uid 10001 --gid 10001 --shell /usr/sbin/nologin appuser
