@@ -15,11 +15,53 @@ SPECIAL_MOUNTS = {"routes.registry_health"}
 INTENTIONAL_UNMOUNTED = {"routes.academy"}
 
 
+def _internally_mounted_modules() -> set[str]:
+    """Discover child routers mounted by another route module.
+
+    Decomposed route families such as ``routes.galaxy_studio`` intentionally
+    include their child routers themselves because Starlette route ordering is
+    part of their public contract. Registering those children again through
+    ``core.routes_registry`` would duplicate paths and can change which static
+    route wins over a dynamic parameter route. Keep this audit AST-only while
+    treating a concrete ``from routes.x import router as y`` followed by
+    ``*.include_router(y)`` as an accounted-for mount.
+    """
+    mounted: set[str] = set()
+    for path in sorted(ROUTES_DIR.glob("*.py")):
+        if path.name == "__init__.py":
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        imported_router_aliases: dict[str, str] = {}
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ImportFrom):
+                continue
+            if not node.module or not node.module.startswith("routes."):
+                continue
+            for imported in node.names:
+                if imported.name == "router":
+                    imported_router_aliases[imported.asname or imported.name] = node.module
+
+        if not imported_router_aliases:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if not isinstance(func, ast.Attribute) or func.attr != "include_router":
+                continue
+            if not node.args or not isinstance(node.args[0], ast.Name):
+                continue
+            module = imported_router_aliases.get(node.args[0].id)
+            if module:
+                mounted.add(module)
+    return mounted
+
+
 def _declared_modules() -> set[str]:
     return {
         entry[0]
         for entry in (*KNOWN_ROUTES, *KNOWN_ROUTES_WITH_PREFIX)
-    } | SPECIAL_MOUNTS | INTENTIONAL_UNMOUNTED
+    } | SPECIAL_MOUNTS | INTENTIONAL_UNMOUNTED | _internally_mounted_modules()
 
 
 def _defines_api_router(path: Path) -> bool:
@@ -64,6 +106,6 @@ def test_every_top_level_api_router_is_accounted_for() -> None:
             islands.append(module)
 
     assert not islands, (
-        "mountable route islands are missing from core.routes_registry: "
+        "mountable route islands are missing from registry or parent-router mounts: "
         + ", ".join(islands)
     )
