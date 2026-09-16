@@ -1,4 +1,4 @@
-from skeleton.core.exec_guard import normalize_cors_origins
+from core.exec_guard import normalize_cors_origins
 
 
 def test_production_unset_and_blank_fail_closed():
