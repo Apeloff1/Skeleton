@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from skeleton.automation.dependabot_merge_policy import (
     DEFAULT_REQUIRED_WORKFLOWS,
+    GitHubCLI,
     dependency_path_allowed,
     evaluate_candidate,
     same_candidate_identity,
@@ -166,3 +167,27 @@ def test_identity_recheck_rejects_head_or_state_change() -> None:
     assert not same_candidate_identity(before, _pr(headRefOid="moved"))
     assert not same_candidate_identity(before, _pr(isDraft=True))
     assert not same_candidate_identity(before, _pr(author={"login": "someone-else"}))
+
+
+def test_merge_mutation_is_bound_to_validated_head_sha(monkeypatch) -> None:
+    client = GitHubCLI("owner/repo")
+    seen: list[list[str]] = []
+
+    def fake_run(args, *, timeout=None):
+        seen.append(list(args))
+        return '{"merged": true}'
+
+    monkeypatch.setattr(client, "_run", fake_run)
+
+    client.merge(42, "deadbeef")
+
+    assert seen == [[
+        "api",
+        "-X",
+        "PUT",
+        "repos/owner/repo/pulls/42/merge",
+        "-f",
+        "sha=deadbeef",
+        "-f",
+        "merge_method=squash",
+    ]]
