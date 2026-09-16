@@ -11,10 +11,29 @@ from core.truth_verifier import (
 
 def ev(source, group, *, kind=EvidenceKind.PRIMARY_EMPIRICAL, supports=True, quality=0.8,
        reproducible=False, peer_reviewed=True, primary=True):
+    """Build evidence that satisfies the verifier's hardened provenance boundary.
+
+    These legacy behavioral tests exercise verification state transitions rather than
+    provenance rejection. Keep their evidence explicitly admissible and sufficiently
+    documented so the methodology-quality cap does not accidentally turn every case
+    into speculation after the verifier hardening.
+    """
     return EvidenceItem(
-        source_id=source, locator="result:1", kind=kind, supports=supports,
-        independence_group=group, quality=quality, reproducible=reproducible,
-        peer_reviewed=peer_reviewed, primary=primary,
+        source_id=source,
+        locator="result:1",
+        kind=kind,
+        supports=supports,
+        independence_group=group,
+        quality=quality,
+        reproducible=reproducible,
+        peer_reviewed=peer_reviewed,
+        primary=primary,
+        provenance_verified=True,
+        preregistered=True,
+        data_available=True,
+        code_available=True,
+        sample_size=100,
+        uncertainty_reported=True,
     )
 
 
