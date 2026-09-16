@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "rules": [
+    {
+      "id": "core-runtime-isolation",
+      "from_subsystems": ["skeleton"],
+      "deny_to_subsystems": ["backend", "gameforge", "frontend"],
+      "edge_types": ["imports"],
+      "severity": "high",
+      "reason": "Canonical core runtime must remain reusable below product/backend/client layers."
+    },
+    {
+      "id": "gameforge-no-client-dependency",
+      "from_subsystems": ["gameforge"],
+      "deny_to_subsystems": ["frontend"],
+      "edge_types": ["imports"],
+      "severity": "high",
+      "reason": "Game creation backend/orchestration must expose contracts to clients rather than importing the client implementation."
+    },
+    {
+      "id": "repo-intel-independent-of-product-runtime",
+      "from_subsystems": ["repo-intel", "scripts"],
+      "deny_to_subsystems": ["frontend"],
+      "edge_types": ["imports"],
+      "severity": "medium",
+      "reason": "Repository/build intelligence should remain bootable without the interactive client runtime."
+    }
+  ],
+  "policy": "Violations are evidence to review, not automatic proof of a defect. High-severity new violations should block until justified or removed; existing violations should be explicitly baselined before enforcement."
+}
