@@ -72,10 +72,11 @@ def safe_squad_capacity(
 class SquadCoordinator:
     """Atomic four-agent task leasing over the canonical plan store.
 
-    This package-level coordinator deliberately shares the store's RLock. Task
-    ownership, four worker assignments, conflict exclusion, generation checks,
-    and lease expiry therefore become one state transition instead of four
-    independent worker claims that could swarm or partially allocate a task.
+    New claims must use the latest canonical plan generation. Once atomically
+    issued, however, a lease remains valid across later plan refreshes until it
+    is completed, released, rejected, explicitly revoked, or expires. This lets
+    the 15/30-minute planning cadence improve future work without invalidating
+    healthy in-flight squads.
     """
 
     def __init__(
@@ -199,7 +200,7 @@ class SquadCoordinator:
             item = self._require_owned_item_locked(squad_id, task_id)
             lease = self._lease_from_item(item)
             self._require_live_lease(lease, moment)
-            self._require_current_generation_locked(lease.plan_generation)
+            self._require_not_revoked(item)
             renewed = SquadLease(
                 squad_id=lease.squad_id,
                 task_id=lease.task_id,
@@ -243,7 +244,7 @@ class SquadCoordinator:
             item = self._require_owned_item_locked(squad_id, task_id)
             lease = self._lease_from_item(item)
             self._require_live_lease(lease, moment)
-            self._require_current_generation_locked(lease.plan_generation)
+            self._require_not_revoked(item)
             history = self._lease_history(item)
             history.append(
                 {
@@ -318,6 +319,11 @@ class SquadCoordinator:
         if lease.expires_at <= now:
             raise PermissionError("squad lease expired; reclaim before further mutation")
 
+    @staticmethod
+    def _require_not_revoked(item: PlanItem) -> None:
+        if item.metadata.get("lease_revoked") is True:
+            raise PermissionError("squad lease was revoked by the control plane")
+
     def _eligible_workers_locked(self, team: str, allowed_workers: set[str] | None) -> list[WorkerState]:
         result = []
         for worker in self.store._workers.values():  # noqa: SLF001
@@ -360,9 +366,6 @@ class SquadCoordinator:
 
     @staticmethod
     def _conflict_domain(item: PlanItem) -> str:
-        # Relevant repository paths are deterministic evidence and therefore
-        # outrank a model-provided label. This prevents two tasks touching the
-        # same subsystem from evading anti-swarm locks via different labels.
         paths = item.metadata.get("relevant_paths", [])
         if isinstance(paths, list) and paths:
             for raw in paths:
@@ -429,6 +432,14 @@ class SquadCoordinator:
             raise ValueError("squad lease plan generation missing")
         if lease.expires_at <= lease.started_at:
             raise ValueError("squad lease expiry must follow start")
+        if self_generation := item.metadata.get("lease_generation"):
+            try:
+                if int(self_generation) != lease.lease_generation:
+                    raise ValueError("squad lease generation mismatch")
+            except (TypeError, ValueError) as exc:
+                if isinstance(exc, ValueError) and str(exc) == "squad lease generation mismatch":
+                    raise
+                raise ValueError("invalid task lease generation") from exc
         return lease
 
     def _release_members_locked(self, lease: SquadLease, now: datetime) -> None:
