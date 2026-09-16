@@ -17,9 +17,10 @@ class ModelRequestError(RuntimeError):
 class ModelGateway:
     """Provider-neutral JSON model client shared by supervisor agents.
 
-    Defaults are OpenAI-compatible but every URL/model/header can be overridden.
-    Secrets are loaded at request time from the environment so importing this
-    module never freezes values before dotenv/secret loading completes.
+    The default uses OpenAI's Responses API, matching the repository's existing
+    model-driven automation. ``SHIFT_MODEL_API_URL`` can point at a compatible
+    ``/chat/completions`` provider; the request shape is selected from the URL.
+    Secrets are resolved for every request so late runtime secret loading works.
     """
 
     endpoint_env: str = "SHIFT_MODEL_API_URL"
@@ -27,9 +28,10 @@ class ModelGateway:
     model_env: str = "SHIFT_MODEL_NAME"
     timeout_seconds: float = 45.0
     max_attempts: int = 3
+    max_response_bytes: int = 2_000_000
 
     def _config(self) -> tuple[str, str, str]:
-        endpoint = os.getenv(self.endpoint_env, "https://api.openai.com/v1/chat/completions").strip()
+        endpoint = os.getenv(self.endpoint_env, "https://api.openai.com/v1/responses").strip()
         api_key = os.getenv(self.api_key_env, "").strip()
         model = os.getenv(self.model_env, "gpt-5.6").strip()
         if not endpoint:
@@ -50,15 +52,13 @@ class ModelGateway:
         extra_headers: Mapping[str, str] | None = None,
     ) -> dict[str, Any]:
         endpoint, api_key, model = self._config()
-        body = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            "response_format": {"type": "json_object"},
-            "max_tokens": max_output_tokens,
-        }
+        body = self._request_body(
+            endpoint=endpoint,
+            model=model,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            max_output_tokens=max_output_tokens,
+        )
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -68,33 +68,107 @@ class ModelGateway:
         if extra_headers:
             headers.update(extra_headers)
 
-        encoded = json.dumps(body).encode("utf-8")
+        encoded = json.dumps(body, separators=(",", ":")).encode("utf-8")
         last_error: BaseException | None = None
-        for attempt in range(1, max(1, self.max_attempts) + 1):
+        attempts = max(1, int(self.max_attempts))
+        for attempt in range(1, attempts + 1):
             request = urllib.request.Request(endpoint, data=encoded, headers=headers, method="POST")
             try:
                 with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
-                    payload = json.loads(response.read().decode("utf-8"))
+                    raw = response.read(self.max_response_bytes + 1)
+                if len(raw) > self.max_response_bytes:
+                    raise ValueError("model response exceeded configured byte limit")
+                payload = json.loads(raw.decode("utf-8"))
                 content = self._extract_content(payload)
                 if isinstance(content, dict):
                     return content
-                return json.loads(content)
-            except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+                decoded = json.loads(content)
+                if not isinstance(decoded, dict):
+                    raise TypeError("model JSON response must be an object")
+                return decoded
+            except (
+                urllib.error.URLError,
+                urllib.error.HTTPError,
+                TimeoutError,
+                OSError,
+                UnicodeDecodeError,
+                json.JSONDecodeError,
+                KeyError,
+                TypeError,
+                ValueError,
+            ) as exc:
                 last_error = exc
-                if attempt < self.max_attempts:
+                if attempt < attempts:
                     time.sleep(min(2 ** (attempt - 1), 4))
-        raise ModelRequestError(f"model request failed after {self.max_attempts} attempts: {last_error}")
+        raise ModelRequestError(f"model request failed after {attempts} attempts: {last_error}")
+
+    @staticmethod
+    def _request_body(
+        *,
+        endpoint: str,
+        model: str,
+        system_prompt: str,
+        user_prompt: str,
+        max_output_tokens: int,
+    ) -> dict[str, Any]:
+        limit = max(1, int(max_output_tokens))
+        if endpoint.rstrip("/").endswith("/responses"):
+            return {
+                "model": model,
+                "input": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "max_output_tokens": limit,
+            }
+        return {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "response_format": {"type": "json_object"},
+            "max_tokens": limit,
+        }
 
     @staticmethod
     def _extract_content(payload: dict[str, Any]) -> str | dict[str, Any]:
+        # OpenAI Responses API convenience field.
+        direct = payload.get("output_text")
+        if isinstance(direct, str) and direct:
+            return direct
+
+        # Raw Responses API payload.
+        output = payload.get("output")
+        if isinstance(output, list):
+            chunks: list[str] = []
+            for item in output:
+                if not isinstance(item, dict) or item.get("type") != "message":
+                    continue
+                content = item.get("content")
+                if not isinstance(content, list):
+                    continue
+                for part in content:
+                    if not isinstance(part, dict) or part.get("type") != "output_text":
+                        continue
+                    text = part.get("text")
+                    if isinstance(text, str) and text:
+                        chunks.append(text)
+            if chunks:
+                return "\n".join(chunks)
+
         # OpenAI-compatible Chat Completions response.
         choices = payload.get("choices")
         if isinstance(choices, list) and choices:
-            message = choices[0].get("message", {})
-            content = message.get("content")
-            if content is not None:
-                return content
-        # Small adapter escape hatch for providers returning already-structured JSON.
-        if isinstance(payload.get("output"), dict):
-            return payload["output"]
-        raise KeyError("model response did not contain choices[0].message.content or output")
+            first = choices[0]
+            if isinstance(first, dict):
+                message = first.get("message", {})
+                if isinstance(message, dict):
+                    content = message.get("content")
+                    if content is not None:
+                        return content
+
+        # Adapter escape hatch for providers returning already-structured JSON.
+        if isinstance(output, dict):
+            return output
+        raise KeyError("model response did not contain Responses output text, chat content, or object output")
