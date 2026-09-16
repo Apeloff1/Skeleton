@@ -8,6 +8,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Refresh the pinned Alpine base to the currently fixed security packages.
+RUN apk upgrade --no-cache
+
 RUN addgroup -S -g 10001 appuser \
     && adduser -S -D -u 10001 -G appuser -s /sbin/nologin appuser
 
@@ -18,7 +21,10 @@ COPY --chown=appuser:appuser skeleton ./skeleton
 # is also not a declared runtime dependency. Remove vulnerable copies that are
 # inherited from the base image after the application has been installed.
 RUN pip install --no-cache-dir . \
-    && pip uninstall -y msgpack setuptools
+    && pip uninstall -y msgpack setuptools || true \
+    && rm -rf /usr/local/lib/python3.14/site-packages/msgpack* \
+              /usr/local/lib/python3.14/site-packages/setuptools* \
+              /usr/local/lib/python3.14/site-packages/pkg_resources*
 
 USER appuser
 
