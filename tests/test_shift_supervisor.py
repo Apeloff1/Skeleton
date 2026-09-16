@@ -58,7 +58,7 @@ def test_secretary_calls_model_and_deduplicates_open_work():
 
 def test_manager_tracks_overtime_task_context_and_calls_model():
     store = InMemoryPlanStore()
-    model = FakeModel([{"summary": "balanced", "tasks": [], "delegation": []}])
+    model = FakeModel([{"summary": "balanced", "tasks": []}])
     manager = SMBShiftManager(store=store, model=model, normal_shift_minutes=60)
     start = datetime(2026, 9, 16, 0, 0, tzinfo=timezone.utc)
 
@@ -78,7 +78,7 @@ def test_manager_tracks_overtime_task_context_and_calls_model():
     assert revision.actor == "shift-manager"
 
 
-def test_manager_rejects_cross_team_delegation():
+def test_manager_ignores_direct_delegation_even_for_matching_worker():
     store = InMemoryPlanStore()
     secretary_model = FakeModel([
         {
@@ -103,16 +103,31 @@ def test_manager_rejects_cross_team_delegation():
 
     manager_model = FakeModel([
         {
-            "summary": "bad delegation is ignored",
+            "summary": "model attempted direct dispatch",
             "tasks": [],
             "delegation": [
-                {"task_id_or_title": item.id, "worker_id": "idle-1", "reason": "wrong team"}
+                {"task_id_or_title": item.id, "worker_id": "night-1", "reason": "direct assignment"}
             ],
         }
     ])
     manager = SMBShiftManager(store=store, model=manager_model)
-    manager.clock_in("idle-1", "idle")
+    manager.clock_in("night-1", "night")
     revision = manager.refresh_plan(project_context={}, research=[])
 
     assert revision.updated_item_ids == []
     assert store.snapshot_items()[0].owner is None
+    assert "do not emit worker IDs" in manager_model.calls[0]["system_prompt"]
+
+
+def test_manager_model_receives_aggregate_staffing_not_full_fleet():
+    store = InMemoryPlanStore()
+    model = FakeModel([{"summary": "capacity aware", "tasks": []}])
+    manager = SMBShiftManager(store=store, model=model)
+    for index in range(100):
+        manager.clock_in(f"idle-{index}", "idle")
+
+    manager.refresh_plan(project_context={}, research=[])
+
+    prompt = model.calls[0]["user_prompt"]
+    assert '"total": 100' in prompt
+    assert '"attention_workers": []' in prompt
