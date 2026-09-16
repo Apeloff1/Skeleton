@@ -12,6 +12,7 @@ selected ones, and hands their candidate lists to the Fuser/Ranker.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from threading import RLock
 from types import MappingProxyType
@@ -67,18 +68,23 @@ class QueryPlanner:
     """Registry of retrievers + execute → fused, ranked results."""
 
     _DEFAULT_TOP_K = 10
+    _DEFAULT_PREFETCH_WORKERS = 4
 
     def __init__(
         self,
         *,
         fuser: Optional[Fuser] = None,
         ranker: Optional[Ranker] = None,
+        prefetch_workers: int = _DEFAULT_PREFETCH_WORKERS,
     ) -> None:
+        if prefetch_workers < 1:
+            raise ValueError("prefetch_workers must be >= 1")
         self.fuser = fuser or Fuser(strategy=FusionStrategy.RRF)
         self.ranker = ranker or Ranker()
         self._retrievers: Dict[str, Callable[[str], Sequence[ScoredResult]]] = {}
         self._registry_generation = 0
         self._registry_lock = RLock()
+        self._prefetch_workers = prefetch_workers
 
     def register(
         self, name: str, retriever: Callable[[str], Sequence[ScoredResult]]
@@ -97,12 +103,16 @@ class QueryPlanner:
         return QueryPlan(query=query, retrievers=selected, reason="default-all")
 
     def prefetch(self, plan: QueryPlan) -> PrefetchedQuery:
-        """Warm the retrieval work selected by *plan*.
+        """Warm the retrieval work selected by *plan* concurrently.
 
         Retriever callables and the registry generation are snapshotted under
         the registry lock, but retrieval itself executes outside that lock. A
         replacement that races after the snapshot makes this bundle stale; the
         generation fence in :meth:`execute` then ignores these cached results.
+
+        Work is submitted before any result is awaited so independent I/O-bound
+        retrievers overlap. Results and failures are materialized in plan order,
+        keeping downstream fusion deterministic regardless of completion order.
         """
         with self._registry_lock:
             generation = self._registry_generation
@@ -110,15 +120,31 @@ class QueryPlanner:
                 (name, self._retrievers.get(name)) for name in plan.retrievers
             )
 
+        runnable = tuple((name, fn) for name, fn in retrievers if fn is not None)
         results: Dict[str, Tuple[ScoredResult, ...]] = {}
         failures: List[str] = []
-        for name, fn in retrievers:
-            if fn is None:
-                continue
-            try:
-                results[name] = tuple(fn(plan.query))
-            except Exception:
-                failures.append(name)
+        if not runnable:
+            return PrefetchedQuery(
+                plan=plan,
+                results_by_retriever=results,
+                failures=(),
+                registry_generation=generation,
+            )
+
+        workers = min(self._prefetch_workers, len(runnable))
+        with ThreadPoolExecutor(
+            max_workers=workers,
+            thread_name_prefix="retrieval-prefetch",
+        ) as executor:
+            futures = {
+                name: executor.submit(fn, plan.query) for name, fn in runnable
+            }
+            for name, _ in runnable:
+                try:
+                    results[name] = tuple(futures[name].result())
+                except Exception:
+                    failures.append(name)
+
         return PrefetchedQuery(
             plan=plan,
             results_by_retriever=results,
