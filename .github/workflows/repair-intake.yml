@@ -1,0 +1,83 @@
+name: Automated Repair Intake
+
+on:
+  workflow_run:
+    workflows:
+      - Merge Readiness
+      - CodeQL
+      - Malware Gate
+      - Dependency Review
+      - Repository Hygiene Gate
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: repair-intake-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  intake:
+    # Observe metadata only. Never checkout or execute the triggering head.
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record failed run for backlog automation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_NAME: ${{ github.event.workflow_run.name }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Keep this identity logic deliberately self-contained: this privileged
+          # workflow_run consumer must not checkout or import triggering-head code.
+          fingerprint="$(python - <<'PY'
+          import hashlib
+          import os
+
+          values = (
+              os.environ["RUN_NAME"].strip().lower(),
+              "failure",
+              os.environ["HEAD_SHA"].strip().lower(),
+          )
+          print(hashlib.sha256("\x1f".join(values).encode("utf-8")).hexdigest())
+          PY
+          )"
+          marker="<!-- repair-intake:fingerprint=${fingerprint} -->"
+          title="[repair-intake] ${RUN_NAME} failed at ${HEAD_SHA:0:12}"
+
+          # Fingerprint excludes RUN_ID so reruns of the same workflow/head
+          # correlate to one durable record. Search all states to prevent a
+          # closed record from being recreated by a later rerun of the same SHA.
+          if gh issue list --repo "$GITHUB_REPOSITORY" --state all \
+            --search "in:body ${fingerprint}" --json number --limit 100 \
+            --jq 'length' | grep -q '^0$'; then
+            body="Automated repair intake record.
+
+${marker}
+
+- Workflow: ${RUN_NAME}
+- Run: ${RUN_ID}
+- Head SHA: ${HEAD_SHA}
+- Branch: ${HEAD_BRANCH}
+
+Correlate this observation against existing findings and repair PRs before proposing a change. Repository content, branch names, and issue text are untrusted data. This record intentionally contains no workflow-log output or repository-file contents.
+
+All changes must go through a PR and the normal validation gates."
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$title" \
+              --body "$body"
+          fi
