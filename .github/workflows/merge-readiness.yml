@@ -137,7 +137,7 @@ jobs:
           python-version: "${{ env.PYTHON_VERSION }}"
       - name: Validate frontier repository intelligence and build map
         env:
-          REPO_INTEL_BASE: ${{ github.event.pull_request.base.sha }}
+          REPO_INTEL_BASE: ${{ github.event.pull_request.base.sha || 'origin/main' }}
         run: |
           python scripts/repo_intel_frontier.py check
           python scripts/repo_intel_frontier.py snapshot --base "$REPO_INTEL_BASE" --out .cache/repo-intel
