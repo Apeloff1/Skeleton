@@ -20,6 +20,16 @@ Runs start with no sensitive capabilities. The orchestrator checks every declare
 
 Capability names are closed over the `ToolCapability` enum. Unknown capability strings are rejected during registration or run setup instead of being treated as implicit authority.
 
+Tool arguments are data only. A model or tool call cannot self-authorize by placing capability names in its arguments.
+
+## Stable per-run authority
+
+The orchestrator normalizes the caller's grant iterable to an immutable set and snapshots the tool registry before yielding control to the driver. Those two snapshots define the authority surface for the lifetime of that run.
+
+Mutating the caller-owned grant collection after the run starts does not add authority. Registering another tool while a run is active also does not make that tool callable by the active run; the new registration becomes visible to subsequent runs only.
+
+This prevents model turns, tool handlers, concurrent registration, or other mid-run mutation from widening the capability or tool surface that was approved at run start.
+
 ## Audit records
 
 Each declared capability produces a `CapabilityDecision` on the `RunRecord`. The record contains:

@@ -13,6 +13,7 @@ import uuid
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
+from types import MappingProxyType
 from typing import Any, Protocol
 
 from skeleton.frontier.model_runtime import CancellationToken, ProviderCancelledError
@@ -250,15 +251,15 @@ class ToolRegistry:
         )
 
     def definition(self, name: str) -> ToolDefinition:
-        normalized = _normalized_name(name, "tool name")
-        try:
-            return self._definitions[normalized]
-        except KeyError as exc:
-            raise ToolNotFoundError(f"unknown tool: {normalized}") from exc
+        return _tool_definition(self._definitions, name)
 
     def resolve(self, name: str) -> ToolHandler:
         """Resolve a handler while preserving the pre-capability registry API."""
         return self.definition(name).handler
+
+    def snapshot(self) -> Mapping[str, ToolDefinition]:
+        """Return an immutable registry view for a single orchestration run."""
+        return MappingProxyType(dict(self._definitions))
 
 
 @dataclass(slots=True)
@@ -284,6 +285,7 @@ class CanonicalOrchestrator:
         capabilities: Iterable[ToolCapability | str] = (),
     ) -> RunRecord:
         granted_capabilities = _normalize_capabilities(capabilities)
+        tool_definitions = self.tools.snapshot()
         record = RunRecord(run_id=run_id or uuid.uuid4().hex)
         if cancellation is not None and cancellation.cancelled:
             record.transition(RunStatus.CANCELLED)
@@ -335,6 +337,7 @@ class CanonicalOrchestrator:
                         call,
                         cancellation=cancellation,
                         granted_capabilities=granted_capabilities,
+                        tool_definitions=tool_definitions,
                     )
                     results.append(result)
                 tool_results = tuple(results)
@@ -368,8 +371,9 @@ class CanonicalOrchestrator:
         *,
         cancellation: CancellationToken | None,
         granted_capabilities: frozenset[ToolCapability],
+        tool_definitions: Mapping[str, ToolDefinition],
     ) -> ToolResult:
-        definition = self.tools.definition(call.name)
+        definition = _tool_definition(tool_definitions, call.name)
         step = StepRecord(
             step_id=uuid.uuid4().hex,
             kind=StepKind.TOOL,
@@ -468,6 +472,17 @@ class CanonicalOrchestrator:
             if step.status is StepStatus.RUNNING:
                 step.error = _error_text(exc)
                 step.transition(StepStatus.FAILED)
+
+
+def _tool_definition(
+    definitions: Mapping[str, ToolDefinition],
+    name: str,
+) -> ToolDefinition:
+    normalized = _normalized_name(name, "tool name")
+    try:
+        return definitions[normalized]
+    except KeyError as exc:
+        raise ToolNotFoundError(f"unknown tool: {normalized}") from exc
 
 
 def _normalized_name(value: object, field_name: str) -> str:
