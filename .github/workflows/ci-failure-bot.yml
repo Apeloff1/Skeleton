@@ -12,11 +12,14 @@ concurrency:
 permissions:
   contents: read
   actions: read
-  issues: write
 
 jobs:
   triage:
     if: github.repository == 'Apeloff1/Skeleton'
+    permissions:
+      contents: read
+      actions: read
+      issues: write
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
