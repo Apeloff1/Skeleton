@@ -4,8 +4,9 @@
 This is the top compositional layer. It preserves the canonical index
 (semantic graph + structured supply chain + CODEOWNERS + architecture rules)
 and adds runtime/build surfaces, deterministic history hotspots, batch evidence,
-workflow/build-target relationships, compact agent retrieval, and richer change
-intelligence. Core indexing remains network-free and stdlib-only.
+workflow/build-target relationships, ranked structural test evidence, compact
+agent retrieval, and richer change intelligence. Core indexing remains
+network-free and stdlib-only.
 
 The frontier cache is self-validating: every read compares a cheap content-aware
 workspace fingerprint and regenerates the snapshot when tracked state changes.
@@ -31,6 +32,7 @@ import repo_index as core  # noqa: E402
 import repo_intel as base  # noqa: E402
 import repo_intel_deep as deep  # noqa: E402
 import repo_intel_sota as semantic  # noqa: E402
+import repo_intel_test_evidence as test_evidence  # noqa: E402
 
 ROOT = base.ROOT
 DEFAULT_OUT = base.DEFAULT_OUT
@@ -54,6 +56,7 @@ REQUIRED_SNAPSHOT_OUTPUTS = (
     "batch-status.json",
     "search-catalog.json",
     "build-relationships.json",
+    "test-evidence.json",
     "notes.md",
 )
 
@@ -73,7 +76,8 @@ def read_json(path: Path, default: Any = None) -> Any:
 def validate_contracts() -> None:
     core.validate_contracts()
     deep.check_contracts()
-    print("repo-intel-frontier: canonical + deep contracts valid")
+    test_evidence.check_contracts()
+    print("repo-intel-frontier: canonical + deep + test-evidence contracts valid")
 
 
 def _workspace_fingerprint() -> str:
@@ -170,6 +174,8 @@ def build_snapshot(out: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     catalog = deep.search_catalog(snapshot, surfaces, hotspots, dependencies)
 
     _merge_relationships(snapshot, relationships)
+    tests = test_evidence.build(snapshot)
+    snapshot["test_evidence"] = tests
 
     history_by_path = history["files"]
     centrality = deep._centrality(snapshot, [])
@@ -198,6 +204,8 @@ def build_snapshot(out: Path) -> tuple[dict[str, Any], dict[str, Any]]:
             "batch_evidence_noted": sum(
                 counts.get("evidence-noted", 0) for counts in batches["lane_counts"].values()
             ),
+            "test_evidence_links": tests["evidence_link_count"],
+            "source_test_evidence_ratio": tests["source_evidence_ratio"],
         }
     )
     bundle = {
@@ -208,6 +216,7 @@ def build_snapshot(out: Path) -> tuple[dict[str, Any], dict[str, Any]]:
         "hotspots": hotspots,
         "batch_status": batches,
         "search_catalog": catalog,
+        "test_evidence": tests,
     }
     return snapshot, bundle
 
@@ -225,6 +234,11 @@ def build_map(snapshot: dict[str, Any], bundle: dict[str, Any]) -> dict[str, Any
             "environment_variable_count": bundle["surfaces"]["environment_variable_count"],
             "hotspots": bundle["hotspots"]["hotspots"][:50],
             "batch_lane_counts": bundle["batch_status"]["lane_counts"],
+            "test_evidence": {
+                "source_evidence_ratio": bundle["test_evidence"]["source_evidence_ratio"],
+                "evidence_link_count": bundle["test_evidence"]["evidence_link_count"],
+                "test_file_count": bundle["test_evidence"]["test_file_count"],
+            },
         }
     )
     return mapping
@@ -249,6 +263,12 @@ def impact_payload(snapshot: dict[str, Any], changed: list[str]) -> dict[str, An
     payload["workflow_files_touched"] = sorted(
         path for path in impacted if path.startswith(".github/workflows/")
     )
+    ranked = test_evidence.select_for_impact(payload, snapshot.get("test_evidence", {}), limit=100)
+    payload["ranked_candidate_tests"] = ranked
+    payload["ranked_candidate_test_count"] = len(ranked)
+    payload["test_selection_semantics"] = (
+        "Ranked tests are structural relevance evidence only; required integration/release gates remain authoritative."
+    )
     return payload
 
 
@@ -262,6 +282,7 @@ def render_notes(
     text = core.render_notes(snapshot, gaps, sq, impact).rstrip()
     m = snapshot["metrics"]
     hot = bundle["hotspots"]["hotspots"][:8]
+    top_tests = impact.get("ranked_candidate_tests", [])[:8]
     lines = [
         text,
         "",
@@ -274,6 +295,8 @@ def render_notes(
         f"- Environment-variable names referenced: **{m['environment_variable_count']}**; "
         f"**{m['undocumented_environment_variable_count']}** absent from tracked `.env.example` files.",
         f"- Preserved relationship metadata variants: **{m['relationship_metadata_variants']}**.",
+        f"- Structural test-evidence links: **{m['test_evidence_links']}**; source files with ranked test evidence: "
+        f"**{m['source_test_evidence_ratio']:.1%}**.",
         f"- Deterministic churn window: **{m['history_window_commits']} commits** relative to HEAD time.",
         f"- Agent retrieval documents: **{m['search_document_count']}**.",
         f"- Batch evidence notes: **{m['batch_evidence_noted']}/100** batches referenced. "
@@ -290,12 +313,20 @@ def render_notes(
         )
     if not hot:
         lines.append("- No hotspot records generated.")
+    lines.extend(["", "### Focused test evidence for current impact", ""])
+    for item in top_tests:
+        lines.append(
+            f"- `{item['test']}` — confidence **{item['confidence']:.3f}**; "
+            f"reasons={', '.join(item['reasons'][:3])}."
+        )
+    if not top_tests:
+        lines.append("- No ranked structural test evidence for the current impact set.")
     lines.extend(
         [
             "",
             "Hotspot scores are relative engineering-attention signals, not quality/security grades. "
-            "Dependency declarations are offline inventory; GitHub Dependency Graph and Dependabot remain authoritative "
-            "for resolved/transitive vulnerability state.",
+            "Test confidence is structural relevance, not coverage or sufficiency. Dependency declarations are offline "
+            "inventory; GitHub Dependency Graph and Dependabot remain authoritative for resolved/transitive vulnerability state.",
             "",
         ]
     )
@@ -341,6 +372,7 @@ def snapshot_command(out: Path, base_ref: str) -> dict[str, Any]:
     write_json(out / "batch-status.json", bundle["batch_status"])
     write_json(out / "search-catalog.json", bundle["search_catalog"])
     write_json(out / "build-relationships.json", bundle["relationships"])
+    write_json(out / "test-evidence.json", bundle["test_evidence"])
     (out / "notes.md").write_text(render_notes(snapshot, bundle, gaps, sq, impact), encoding="utf-8")
 
     print(
@@ -348,6 +380,7 @@ def snapshot_command(out: Path, base_ref: str) -> dict[str, Any]:
         f"{snapshot['tracked_files']} files; {snapshot['metrics']['graph_nodes']} nodes/"
         f"{snapshot['metrics']['graph_edges']} edges; deps={snapshot['supply_chain']['component_count']}; "
         f"routes={snapshot['metrics']['route_count']}; targets={snapshot['metrics']['build_target_count']}; "
+        f"test_evidence={snapshot['metrics']['test_evidence_links']}; "
         f"cache_hits={snapshot['metrics']['semantic_cache_hit_ratio']:.1%}"
     )
     return snapshot
@@ -380,6 +413,7 @@ def query_command(out: Path, kind: str, value: str, transitive: bool, limit: int
             "codeowners": snapshot.get("codeowners", {}).get("file_owners", {}).get(value, []),
             "outgoing": [edge for edge in snapshot["graph"]["edges"] if edge["from"] == f"file:{value}"],
             "incoming": snapshot["graph"]["reverse_edges"].get(f"file:{value}", []),
+            "ranked_tests": snapshot.get("test_evidence", {}).get("by_source", {}).get(value, []),
         }
     elif kind == "symbol":
         payload = {
@@ -449,6 +483,19 @@ def query_command(out: Path, kind: str, value: str, transitive: bool, limit: int
                 or needle in str(item.get("title", "")).lower()
             ][:limit]
         }
+    elif kind == "tests":
+        evidence = read_json(out / "test-evidence.json", {"by_source": {}})
+        by_source = evidence.get("by_source", {})
+        if value in by_source:
+            payload = {"source": value, "ranked_tests": by_source[value][:limit]}
+        else:
+            payload = {
+                "sources": [
+                    {"source": source, "ranked_tests": items[:limit]}
+                    for source, items in by_source.items()
+                    if needle in source.lower()
+                ][:limit]
+            }
     elif kind == "search":
         catalog = read_json(out / "search-catalog.json", {"documents": []})
         payload = {"results": deep.search(catalog, value, limit=limit)}
@@ -505,6 +552,10 @@ def doctor_command(out: Path) -> int:
         "metrics": m,
         "top_hotspots": read_json(out / "hotspots.json", {"hotspots": []}).get("hotspots", [])[:20],
         "largest_cycles": snapshot["graph"].get("dependency_cycles", [])[:10],
+        "test_evidence": {
+            "source_evidence_ratio": m.get("source_test_evidence_ratio", 0.0),
+            "evidence_links": m.get("test_evidence_links", 0),
+        },
     }
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if not blockers else 1
@@ -544,6 +595,7 @@ def main(argv: list[str] | None = None) -> int:
             "env",
             "hotspot",
             "batch",
+            "tests",
             "search",
         ],
         required=True,
