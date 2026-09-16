@@ -1,6 +1,6 @@
 # Skeleton Backlog — failed-commit register + forward work
 
-Updated 2026-09-15 (F-6/F-13 reconciliation). Original register dated 2026-09-01. Two sections: things that failed and were recovered
+Updated 2026-09-16 (F-16 capability discovery pass). Original register dated 2026-09-01. Two sections: things that failed and were recovered
 (so the failure modes stay visible), and the frontier backlog (what to
 build next, ordered).
 
@@ -31,9 +31,9 @@ Those planes are out-of-scope for this register — audit separately.
 
 ## 2. Frontier backlog — ordered by leverage
 
-Updated 2026-09-15. Tier-1 seams F-1..F-10, the Tier-2 F-6 frontier push,
+Updated 2026-09-16. Tier-1 seams F-1..F-10, the Tier-2 F-6 frontier push,
 and F-13 economic/cascade reconciliation are **landed**; do not re-open them
-without a regression.
+without a regression. F-16 is active as the next additive structural slice.
 
 ### Landed (keep visible — failure modes + PR anchors)
 
@@ -90,9 +90,15 @@ remains Mixture-of-*Experts* and is a separate mechanism.
 4. **F-15. Organism/social/galaxy plane audit** — the repo grew three
    planes while the waves landed (see §1 drift note). Same size-filtered
    read methodology as the deep-cut campaign, when their churn settles.
+5. **F-16. Unified capability discovery — ACTIVE.** Add a versioned,
+   curated Python manifest for canonical subsystems and expose the identical
+   machine-readable payload through `skeleton capabilities`. Contract tests
+   must lock schema version, unique IDs/modules, resolvable package targets,
+   and CLI/API parity. Branch: `backlog/f16-capability-manifest`.
 
 ## Definition of SOTA (working)
 
 Tier-1 SOTA seams, F-6 Mixture-of-Depths, and F-13 economic/cascade
 reconciliation are landed in code. The former CI-1..CI-3 blockers are resolved
-on main; the remaining structural queue is F-11, F-12, F-14, then F-15.
+on main; the remaining structural queue is F-11, F-12, F-14, F-15, with F-16
+active as an additive discoverability slice.
