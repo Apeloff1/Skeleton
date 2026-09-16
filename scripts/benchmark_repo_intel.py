@@ -23,7 +23,7 @@ def run_once(out: Path, base_ref: str) -> tuple[float, dict]:
     started = time.perf_counter()
     snapshot = sota.snapshot_command(out, base_ref)
     wall_ms = (time.perf_counter() - started) * 1000
-    return wall_ms, snapshot["metrics"]
+    return wall_ms, snapshot
 
 
 def main() -> int:
@@ -39,18 +39,22 @@ def main() -> int:
         shutil.rmtree(args.out)
     args.out.mkdir(parents=True, exist_ok=True)
 
-    cold_ms, cold_metrics = run_once(args.out, args.base)
+    cold_ms, cold_snapshot = run_once(args.out, args.base)
     warm: list[float] = []
-    warm_metrics: list[dict] = []
+    warm_snapshots: list[dict] = []
     for _ in range(args.runs):
-        wall, metrics = run_once(args.out, args.base)
+        wall, snapshot = run_once(args.out, args.base)
         warm.append(wall)
-        warm_metrics.append(metrics)
+        warm_snapshots.append(snapshot)
 
+    cold_metrics = cold_snapshot["metrics"]
+    warm_metrics = [snapshot["metrics"] for snapshot in warm_snapshots]
     budgets = sota.base.load_json("quality-budgets.json")["index_performance_targets"]
     report = {
         "schema": 1,
-        "source_digest": cold_metrics.get("source_digest"),
+        "source_digest": cold_snapshot["source_digest"],
+        "tracked_files": cold_snapshot["tracked_files"],
+        "tracked_bytes": cold_snapshot["tracked_bytes"],
         "cold_wall_ms": round(cold_ms, 3),
         "warm_runs_ms": [round(x, 3) for x in warm],
         "warm_median_ms": round(statistics.median(warm), 3),
