@@ -10,13 +10,15 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  actions: write
   contents: read
-  issues: write
 
 jobs:
   watchdog:
     name: Recover transient CI failures
+    permissions:
+      actions: write
+      contents: read
+      issues: write
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
