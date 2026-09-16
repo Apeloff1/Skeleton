@@ -4,16 +4,15 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened, labeled]
 
-permissions:
-  contents: write
-  pull-requests: write
-
 concurrency:
   group: dependabot-automerge-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   automerge:
+    permissions:
+      contents: write
+      pull-requests: write
     if: >-
       github.event.pull_request.user.login == 'dependabot[bot]' &&
       startsWith(github.event.pull_request.head.ref, 'dependabot/')
