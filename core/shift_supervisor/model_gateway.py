@@ -20,15 +20,19 @@ class ModelGateway:
     The default uses OpenAI's Responses API, matching the repository's existing
     model-driven automation. ``SHIFT_MODEL_API_URL`` can point at a compatible
     ``/chat/completions`` provider; the request shape is selected from the URL.
-    Secrets are resolved for every request so late runtime secret loading works.
+    Hosted web search is opt-in through ``SHIFT_MODEL_WEB_SEARCH`` and remains
+    bounded to a small number of tool calls. Secrets are resolved for every
+    request so late runtime secret loading works.
     """
 
     endpoint_env: str = "SHIFT_MODEL_API_URL"
     api_key_env: str = "OPENAI_API_KEY"
     model_env: str = "SHIFT_MODEL_NAME"
+    web_search_env: str = "SHIFT_MODEL_WEB_SEARCH"
     timeout_seconds: float = 45.0
     max_attempts: int = 3
     max_response_bytes: int = 2_000_000
+    max_tool_calls: int = 4
 
     def _config(self) -> tuple[str, str, str]:
         endpoint = os.getenv(self.endpoint_env, "https://api.openai.com/v1/responses").strip()
@@ -41,6 +45,10 @@ class ModelGateway:
         if not model:
             raise ModelRequestError(f"{self.model_env} is empty")
         return endpoint, api_key, model
+
+    def _web_search_enabled(self) -> bool:
+        value = os.getenv(self.web_search_env, "").strip().casefold()
+        return value in {"1", "true", "yes", "on"}
 
     def call_json(
         self,
@@ -58,6 +66,8 @@ class ModelGateway:
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             max_output_tokens=max_output_tokens,
+            enable_web_search=self._web_search_enabled(),
+            max_tool_calls=self.max_tool_calls,
         )
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -110,10 +120,12 @@ class ModelGateway:
         system_prompt: str,
         user_prompt: str,
         max_output_tokens: int,
+        enable_web_search: bool = False,
+        max_tool_calls: int = 4,
     ) -> dict[str, Any]:
         limit = max(1, int(max_output_tokens))
         if endpoint.rstrip("/").endswith("/responses"):
-            return {
+            body: dict[str, Any] = {
                 "model": model,
                 "input": [
                     {"role": "system", "content": system_prompt},
@@ -121,6 +133,12 @@ class ModelGateway:
                 ],
                 "max_output_tokens": limit,
             }
+            if enable_web_search:
+                body["tools"] = [{"type": "web_search"}]
+                body["tool_choice"] = "auto"
+                body["max_tool_calls"] = max(1, min(int(max_tool_calls), 8))
+                body["include"] = ["web_search_call.action.sources"]
+            return body
         return {
             "model": model,
             "messages": [
@@ -138,7 +156,8 @@ class ModelGateway:
         if isinstance(direct, str) and direct:
             return direct
 
-        # Raw Responses API payload.
+        # Raw Responses API payload. Tool-call items can be interleaved with the
+        # assistant message, so only output_text message content is collected.
         output = payload.get("output")
         if isinstance(output, list):
             chunks: list[str] = []
