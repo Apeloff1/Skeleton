@@ -1,0 +1,52 @@
+name: Dependabot Auto-Merge
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+
+concurrency:
+  group: dependabot-automerge-${{ github.repository }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  automerge:
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Process trusted Dependabot pull requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          gh pr list --repo "$REPO" --state open --author dependabot[bot] --json number,headRefName --jq '.[] | select(.headRefName | startswith("dependabot/")) | .number' |
+          while IFS= read -r pr_number; do
+            [[ -n "$pr_number" ]] || continue
+
+            mapfile -t files < <(gh pr diff "$pr_number" --repo "$REPO" --name-only)
+            test "${#files[@]}" -gt 0
+
+            in_scope=true
+            for file in "${files[@]}"; do
+              case "$file" in
+                *.lock|requirements*.txt|pyproject.toml|package.json|package-lock.json|npm-shrinkwrap.json|yarn.lock|pnpm-lock.yaml)
+                  ;;
+                *)
+                  in_scope=false
+                  break
+                  ;;
+              esac
+            done
+
+            if [[ "$in_scope" == true ]]; then
+              gh pr merge "$pr_number" --repo "$REPO" --auto --squash
+            fi
+          done
