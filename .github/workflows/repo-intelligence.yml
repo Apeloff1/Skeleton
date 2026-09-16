@@ -23,9 +23,9 @@ env:
 
 jobs:
   map-and-gate:
-    name: Map semantic graph / impact / gaps / security / agent handoff
+    name: Map semantic / supply-chain / impact / security / handoff graph
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -50,22 +50,29 @@ jobs:
 
       - name: Validate repo-intelligence contracts
         run: |
-          python -m compileall -q scripts/repo_intel.py scripts/repo_intel_sota.py scripts/benchmark_repo_intel.py
-          python scripts/repo_intel_sota.py check
+          python -m compileall -q \
+            scripts/repo_intel.py \
+            scripts/repo_intel_sota.py \
+            scripts/repo_intel_supply_chain.py \
+            scripts/repo_index.py \
+            scripts/benchmark_repo_intel.py
+          python scripts/repo_index.py check
 
       - name: Run focused repository-index regressions
-        run: python -m pytest -q tests/test_repo_intel.py tests/test_repo_intel_sota.py
+        run: python -m pytest -q tests/test_repo_intel.py tests/test_repo_intel_sota.py tests/test_repo_index.py
 
-      - name: Build semantic repository knowledge graph
+      - name: Build canonical repository knowledge graph
         env:
           REPO_INTEL_BASE: ${{ github.event.pull_request.base.sha || 'origin/main' }}
-        run: python scripts/repo_intel_sota.py snapshot --base "$REPO_INTEL_BASE" --out .cache/repo-intel
+        run: |
+          python scripts/repo_index.py snapshot --base "$REPO_INTEL_BASE" --out .cache/repo-intel
+          python scripts/repo_index.py diff --base "$REPO_INTEL_BASE" --out .cache/repo-intel
 
       - name: Require build augmentation note
         if: github.event_name == 'pull_request'
         env:
           REPO_INTEL_BASE: ${{ github.event.pull_request.base.sha }}
-        run: python scripts/repo_intel_sota.py gate --base "$REPO_INTEL_BASE"
+        run: python scripts/repo_index.py gate --base "$REPO_INTEL_BASE"
 
       - name: Query live Dependabot security data when permitted
         env:
@@ -91,7 +98,7 @@ jobs:
           else
             : > .cache/repo-intel/dependabot-prs.json
           fi
-          python scripts/repo_intel_sota.py dependabot-notes \
+          python scripts/repo_index.py dependabot-notes \
             --alerts .cache/repo-intel/dependabot-alerts.json \
             --prs .cache/repo-intel/dependabot-prs.json \
             --out .cache/repo-intel/dependabot-notes.md
@@ -111,11 +118,13 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          base = Path('.cache/repo-intel')
-          index = json.loads((base / 'index.json').read_text())
-          gaps = json.loads((base / 'gaps.json').read_text())
-          sq = json.loads((base / 'security-quality.json').read_text())
-          impact = json.loads((base / 'impact.json').read_text())
+          root = Path('.cache/repo-intel')
+          index = json.loads((root / 'index.json').read_text())
+          gaps = json.loads((root / 'gaps.json').read_text())
+          sq = json.loads((root / 'security-quality.json').read_text())
+          impact = json.loads((root / 'impact.json').read_text())
+          supply = json.loads((root / 'supply-chain.json').read_text())
+          arch = json.loads((root / 'architecture.json').read_text())
           m = index['metrics']
           print('source_digest=', index['source_digest'])
           print('tracked_files=', index['tracked_files'])
@@ -124,6 +133,9 @@ jobs:
           print('graph_edges=', m['graph_edges'])
           print('semantic_cache_hit_ratio=', m['semantic_cache_hit_ratio'])
           print('dependency_cycles=', m['dependency_cycles'])
+          print('external_dependencies=', supply['component_count'])
+          print('dependency_ecosystems=', supply['ecosystems'])
+          print('architecture_boundaries=', arch['counts_by_severity'])
           print('owned_file_ratio=', m['owned_file_ratio'])
           print('impact_files=', impact['affected_file_count'])
           print('impact_subsystems=', impact['subsystems'])
