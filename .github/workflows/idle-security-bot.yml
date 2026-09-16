@@ -69,7 +69,19 @@ jobs:
             gh issue edit "$existing" --repo "$REPO" --add-label 'security' >/dev/null
             issue_number="$existing"
           else
-            issue_number=$(gh issue create --repo "$REPO" --title "$ISSUE_TITLE" --body-file "$body_file" --label 'security' --json number --jq '.number')
+            issue_number=$(gh api \
+              --method POST \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "repos/${REPO}/issues" \
+              -f title="$ISSUE_TITLE" \
+              -f body="$(cat "$body_file")" \
+              -f 'labels[]=security' \
+              --jq '.number')
+          fi
+          if [[ ! "$issue_number" =~ ^[0-9]+$ ]]; then
+            echo 'Idle security bot could not resolve a numeric digest issue ID' >&2
+            exit 1
           fi
 
           {
