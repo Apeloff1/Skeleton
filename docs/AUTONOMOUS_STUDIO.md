@@ -27,24 +27,38 @@ The registry is deterministic and fingerprinted so every audit log can identify 
 `.github/workflows/autonomous-studio.yml` schedules four bounded overnight shifts. Each shift:
 
 1. Checks out trusted `main` with persisted Git credentials disabled.
-2. Snapshots open PRs, open issues, and recent failed workflow runs.
-3. Selects a diverse deterministic worker cohort.
-4. Gives a planner the backlog, tracked-file manifest, live repository state, and cohort context.
-5. Allows up to three narrow tasks per run.
-6. Assigns a specialist builder and an independent senior reviewer to each task.
-7. Treats every model response as untrusted data.
-8. Rejects malformed, oversized, high-risk, out-of-scope, rename, delete, dependency-control, workflow, auth, secret, or security-boundary proposals.
-9. Uses `git apply --check` before accepting a proposal.
-10. Copies the accepted patch and audit evidence outside the disposable worktree and seals the patch with SHA-256.
-11. Explicitly blanks `OPENAI_API_KEY`, `GH_TOKEN`, and `GITHUB_TOKEN` for generated-code validation.
-12. Runs Python compilation, Ruff on changed Python files, studio control regressions, and the full `skeleton/testing` suite.
-13. Resets the repository and removes all untracked test side effects after generated-code execution.
-14. Verifies the sealed patch hash and reapplies the exact pre-test patch.
-15. Writes every run to the durable **Autonomous Studio Ledger**, including no-op and rejected runs.
-16. For an accepted patch, creates a new `studio/night-*` branch and opens a reviewable PR.
-17. Never writes directly to `main` and never enables auto-merge.
+2. Snapshots open PRs, open issues, recent failed workflow runs, and the current queued Actions-run count.
+3. Applies repository backpressure before any model call: at **40 or more queued Actions runs**, the shift becomes a logged safe no-op instead of generating or publishing work.
+4. Selects a diverse deterministic worker cohort when queue pressure is below the threshold.
+5. Gives a planner the backlog, tracked-file manifest, live repository state, and cohort context.
+6. Allows up to three narrow tasks per run.
+7. Assigns a specialist builder and an independent senior reviewer to each task.
+8. Treats every model response as untrusted data.
+9. Rejects malformed, oversized, high-risk, out-of-scope, rename, delete, dependency-control, workflow, auth, secret, or security-boundary proposals.
+10. Uses `git apply --check` before accepting a proposal.
+11. Copies the accepted patch and audit evidence outside the disposable worktree and seals the patch with SHA-256.
+12. Explicitly blanks `OPENAI_API_KEY`, `GH_TOKEN`, and `GITHUB_TOKEN` for generated-code validation.
+13. Runs Python compilation, Ruff on changed Python files, studio control regressions, and the full `skeleton/testing` suite.
+14. Resets the repository and removes all untracked test side effects after generated-code execution.
+15. Verifies the sealed patch hash and reapplies the exact pre-test patch.
+16. Writes every run to the durable **Autonomous Studio Ledger**, including queue-pressure, no-op, and rejected runs.
+17. For an accepted patch, creates a new `studio/night-*` branch and opens a reviewable PR.
+18. Never writes directly to `main` and never enables auto-merge.
 
 Normal repository PR CI remains an additional independent validation boundary after the studio's own pre-publication checks.
+
+### Actions backpressure
+
+The Studio deliberately refuses to add model/build/PR load when the repository is already congested. The workflow queries the repository-wide queued Actions-run count before proposal generation. When the count is at or above the current threshold of **40**, it:
+
+- skips the OpenAI proposal call;
+- skips generated-code execution;
+- skips branch and PR publication;
+- records `shift_skipped_queue_pressure` in the machine audit;
+- writes a human-readable no-op report; and
+- still appends the shift to the durable Studio Ledger.
+
+This makes overload handling fail-safe and observable while allowing the existing Actions queue to drain.
 
 ## Secret boundary
 
@@ -83,7 +97,7 @@ That means v1 optimizes and extends **existing ordinary source files**. New-file
 
 ## Logging: nothing silent
 
-Every shift emits JSONL events with timestamps, run ID, registry fingerprint, active cohort, plan, accepted/rejected task outcomes, assigned builder/reviewer IDs, review reasons, patch budget decisions, and final status.
+Every model-driven shift emits JSONL events with timestamps, run ID, registry fingerprint, active cohort, plan, accepted/rejected task outcomes, assigned builder/reviewer IDs, review reasons, patch budget decisions, and final status. Queue-pressure no-ops emit a dedicated machine event containing the measured queue depth and threshold.
 
 When a patch is published, the latest machine log, human report, and sealed patch hash are committed as:
 
@@ -115,6 +129,7 @@ The following are non-negotiable:
 - Generated-code test side effects are discarded; publication is reconstructed from the sealed pre-test patch.
 - No silent mutation: every run has a durable ledger record.
 - No unbounded concurrency: 1,000 identities are a specialization map, not 1,000 simultaneous processes.
+- No model/build/PR amplification while repository Actions queue pressure is above the bounded threshold.
 - No automatic merge of code changes in v1.
 - A failure to prove safety or applicability becomes a logged rejection, not a best-effort mutation.
 
