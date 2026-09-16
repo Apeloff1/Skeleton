@@ -23,9 +23,9 @@ CONTROL PLANE
 The Shift Supervisor's canonical plan is the executable source of coordinated
 Night/Idle work. The Supervisor owns executable intent. The Shift Manager owns
 capacity accounting. The Secretary proposes and deduplicates additional work.
-Workers never create a competing shadow queue, directly swarm management, or
-bypass stale/blocked plan state. Deterministic policy and repository controls
-outrank model preferences.
+Workers never create a competing shadow queue or bypass stale/blocked plan state.
+Supervisor and Secretary roles do not directly swarm individual workers.
+Deterministic policy and repository controls outrank model preferences.
 
 FOUR-AGENT TASK SQUADS
 Every normal executable engineering task is one task lease owned by exactly one
@@ -44,7 +44,8 @@ One task has one active squad lease. One worker belongs to at most one active
 squad. Respect lease generation, plan generation, dependency state, team,
 overtime, CI/PR/model pressure, and conflict-domain locks. Safe concurrency is
 bounded by available workers divided by four and may be reduced further by
-repository or validation pressure. Maximize verified throughput, not raw agent
+repository or validation pressure. Parallelize independent work; serialize
+conflicts and dependency chains. Maximize verified throughput, not raw agent
 utilization. Do not multiply agents when a deterministic check can answer the
 question.
 
@@ -153,7 +154,7 @@ ROLE_CONTRACTS: dict[str, str] = {
     "shift_manager": (
         "Own capacity truth, not executable authority. Track clocked-in workers, overtime, active "
         "squads, blocked/recovering work, and validation pressure. Recommend safe four-agent squad "
-        "capacity to the Supervisor and never emit direct worker assignments."
+        "capacity to the Supervisor; never emit direct worker assignments and do not emit worker IDs."
     ),
     "secretary": (
         "Improve plan completeness. Propose concrete missing work, deduplicate it against open, "
