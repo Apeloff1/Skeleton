@@ -29,7 +29,8 @@ BASE_BOTS = {
     "security": "security regression review",
     "cleanup": "safe repository cleanup",
 }
-DEFAULT_BOTS = {**BASE_BOTS, **{bot.name: bot.trigger for bot in ADVANCED_BOTS}}
+SPECIALIST_BOTS = {bot.name: bot.trigger for bot in ADVANCED_BOTS}
+DEFAULT_BOTS = {**BASE_BOTS, **SPECIALIST_BOTS}
 
 
 def load_state() -> dict[str, dict]:
@@ -48,15 +49,25 @@ def save_state(state: dict[str, dict]) -> None:
     os.replace(tmp, STATE)
 
 
-def select_due(state: dict[str, dict], now: float | None = None) -> list[str]:
-    now = time.time() if now is None else now
+def _due_from(names: list[str], state: dict[str, dict], now: float) -> list[str]:
     due = []
-    for name in DEFAULT_BOTS:
+    for name in names:
         item = state.get(name, asdict(BotHealth(name)))
         if item.get("enabled", True) and not item.get("circuit_open", False):
             if now - float(item.get("last_run", 0)) >= COOLDOWN_SECONDS:
                 due.append(name)
-    return due[:MAX_CONCURRENT]
+    return due
+
+
+def select_due(state: dict[str, dict], now: float | None = None) -> list[str]:
+    now = time.time() if now is None else now
+    return _due_from(list(DEFAULT_BOTS), state, now)[:MAX_CONCURRENT]
+
+
+def select_specialists_due(state: dict[str, dict], now: float | None = None) -> list[str]:
+    """Return an independent specialist lane for the secretary."""
+    now = time.time() if now is None else now
+    return _due_from(list(SPECIALIST_BOTS), state, now)[:MAX_CONCURRENT]
 
 
 def record_result(state: dict[str, dict], name: str, success: bool, now: float | None = None) -> None:
@@ -75,8 +86,9 @@ def record_result(state: dict[str, dict], name: str, success: bool, now: float |
 def main() -> int:
     state = load_state()
     due = select_due(state)
+    specialists = select_specialists_due(state)
     save_state(state)
-    print(json.dumps({"due": due, "bot_count": len(DEFAULT_BOTS), "max_concurrent": MAX_CONCURRENT}, indent=2))
+    print(json.dumps({"due": due, "specialists_due": specialists, "bot_count": len(DEFAULT_BOTS), "specialist_count": len(SPECIALIST_BOTS), "max_concurrent": MAX_CONCURRENT}, indent=2))
     return 0
 
 
