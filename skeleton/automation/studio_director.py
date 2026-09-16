@@ -149,9 +149,11 @@ def _extract_json(text: str) -> Any:
 def _canonical_path(value: object) -> str:
     if not isinstance(value, str):
         raise ValueError("path must be a string")
-    raw = value.strip().replace("\\", "/")
+    raw = value.strip()
     if not raw or "\x00" in raw:
         raise ValueError("path is empty or invalid")
+    if "\\" in raw:
+        raise ValueError("backslash path characters are not allowed")
     if any(ord(char) < 32 or ord(char) == 127 for char in raw):
         raise ValueError("path contains control characters")
     pure = PurePosixPath(raw)
