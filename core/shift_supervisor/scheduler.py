@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Mapping
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from .constants import MAX_WORKER_SNAPSHOTS
 from .models import WorkerState
 from .secretary import SecretaryBot
 from .shift_manager import SMBShiftManager
@@ -147,7 +148,7 @@ class SupervisorScheduler:
         if not isinstance(raw, list):
             return
         known = {worker.worker_id: worker for worker in self.manager.store.snapshot_workers()}
-        for row in raw[:512]:
+        for row in raw[:MAX_WORKER_SNAPSHOTS]:
             if not isinstance(row, Mapping):
                 continue
             worker_id = str(row.get("worker_id", "")).strip()
