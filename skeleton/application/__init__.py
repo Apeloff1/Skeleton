@@ -2,9 +2,11 @@
 
 from .capability_manifest import (
     CAPABILITIES,
+    CAPABILITIES_BY_ID,
     CAPABILITY_MANIFEST_VERSION,
     Capability,
     capability_manifest,
+    get_capability,
 )
 from .command_contracts import (
     CONTRACT_VERSION,
@@ -19,6 +21,7 @@ from .runtime_commands import build_runtime_command_service
 
 __all__ = [
     "CAPABILITIES",
+    "CAPABILITIES_BY_ID",
     "CAPABILITY_MANIFEST_VERSION",
     "CONTRACT_VERSION",
     "Capability",
@@ -29,5 +32,6 @@ __all__ = [
     "build_runtime_command_service",
     "capability_manifest",
     "command_specs",
+    "get_capability",
     "parity_matrix",
 ]
