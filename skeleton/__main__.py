@@ -4,21 +4,21 @@ Usage:
     python -m skeleton <command> [options]
 
 Commands:
-    run          Start the skeleton runtime / GameForge vision run
-    forge        Blueprint compilation and materialization
-    test         Run test suites
-    dev          Developer CLI (scaffold, wizard, health, visualize)
-    eras         List GameForge era dialects
-    generations  List hardware generations
-    plan         Jeeves BuildPlan for a vision / era
-    cockpit      Apply one cockpit command
-    walk         Prove spawn→extract on the emitted door graph
-    contracts    Show the shared API/CLI feature-parity contract
+    run         Start the skeleton runtime / GameForge vision run
+    forge       Blueprint compilation and materialization
+    test        Run test suites
+    dev         Developer CLI (scaffold, wizard, health, visualize)
+    eras        List GameForge era dialects
+    generations List hardware generations
+    plan        Jeeves BuildPlan for a vision / era
+    cockpit     Apply one cockpit command
+    walk        Prove spawn→extract on the emitted door graph
+    contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
-    command      Execute a shared command: command <name> ['{...json...}']
-    status       Shared runtime status command
-    config       Shared non-secret configuration command
-    help         Show this help message
+    command     Execute a shared command: command <name> ['{...json...}']
+    status      Shared runtime status command
+    config      Shared non-secret configuration command
+    help        Show this help message
 """
 
 from __future__ import annotations
