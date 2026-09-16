@@ -36,6 +36,13 @@ def _make_partial_tree(root: Path) -> Path:
     return blocked
 
 
+def _make_directory_symlink(link: Path, target: Path) -> None:
+    try:
+        link.symlink_to(target, target_is_directory=True)
+    except (NotImplementedError, OSError) as exc:
+        pytest.skip(f"directory symlinks unavailable on this platform: {type(exc).__name__}")
+
+
 def _fail_on_directory(monkeypatch: pytest.MonkeyPatch, module: ModuleType, blocked: Path) -> str:
     secret = "sensitive traversal detail"
     real_scandir = module.os.scandir
@@ -104,6 +111,22 @@ def test_backend_scan_fails_closed_when_root_is_missing(
     assert str(missing) not in captured.err
 
 
+def test_backend_scan_does_not_follow_directory_symlinks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "backend"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (root / "safe.py").write_text("value = 1\n", encoding="utf-8")
+    (outside / "hidden.py").write_text("value = 2\n", encoding="utf-8")
+    _make_directory_symlink(root / "linked", outside)
+    monkeypatch.setattr(BACKEND_GATE, "ROOT", root)
+
+    discovered = {path.relative_to(root) for path in BACKEND_GATE.python_files()}
+    assert discovered == {Path("safe.py")}
+
+
 def _configure_repository_gate(monkeypatch: pytest.MonkeyPatch, roots: tuple[Path, ...]) -> None:
     common_root = roots[0].parent
     monkeypatch.setattr(REPOSITORY_GATE, "REPO_ROOT", common_root)
@@ -167,3 +190,19 @@ def test_repository_scan_requires_every_configured_root(
     captured = capsys.readouterr()
     assert "Repository process-safety scan failed: FileNotFoundError" in captured.err
     assert str(missing) not in captured.err
+
+
+def test_repository_scan_does_not_follow_directory_symlinks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "runtime"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (root / "safe.py").write_text("value = 1\n", encoding="utf-8")
+    (outside / "hidden.py").write_text("value = 2\n", encoding="utf-8")
+    _make_directory_symlink(root / "linked", outside)
+    _configure_repository_gate(monkeypatch, (root,))
+
+    discovered = {path.relative_to(root) for path in REPOSITORY_GATE.python_files()}
+    assert discovered == {Path("safe.py")}
