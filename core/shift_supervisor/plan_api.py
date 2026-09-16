@@ -6,7 +6,7 @@ from typing import Any, Mapping, Sequence
 
 from .models import PlanItem
 from .plan_store import InMemoryPlanStore
-from .squads import SQUAD_SIZE, SquadCoordinator
+from .squads import SQUAD_SIZE, SquadCoordinator, safe_squad_capacity
 
 
 class PlanReadAPI:
@@ -161,12 +161,18 @@ class SquadPlanQueueAPI:
 
     def safe_capacity(self, team: str) -> int:
         self.recover_invalid_leases()
-        # Capacity is used by the planner before new claims are attempted. Make
-        # lease expiry visible here too, otherwise valid-but-expired leases can
-        # strand four workers and make the planner incorrectly report zero
-        # capacity until some later claim or explicit reclamation happens.
         self.coordinator.reclaim_expired()
-        return self.coordinator.safe_capacity(team)
+        reserved = self._active_squad_member_ids()
+        workers = [
+            worker
+            for worker in self.coordinator.store.snapshot_workers()
+            if worker.worker_id not in reserved
+        ]
+        return safe_squad_capacity(
+            workers,
+            team,
+            overtime_soft_limit_minutes=self.coordinator.overtime_soft_limit_minutes,
+        )
 
     def claim_next(
         self,
@@ -176,10 +182,23 @@ class SquadPlanQueueAPI:
         worker_ids: Sequence[str] | None = None,
     ) -> dict[str, Any] | None:
         self.recover_invalid_leases()
+        self.coordinator.reclaim_expired()
+        reserved = self._active_squad_member_ids()
+        if worker_ids is None:
+            with self.coordinator.store._lock:  # noqa: SLF001
+                allowed_workers = [
+                    worker_id
+                    for worker_id in self.coordinator.store._workers  # noqa: SLF001
+                    if worker_id not in reserved
+                ]
+        else:
+            allowed_workers = [
+                worker_id for worker_id in worker_ids if worker_id not in reserved
+            ]
         lease = self.coordinator.claim_next(
             team,
             plan_generation=plan_generation,
-            worker_ids=worker_ids,
+            worker_ids=allowed_workers,
         )
         return lease.to_dict() if lease is not None else None
 
@@ -366,3 +385,21 @@ class SquadPlanQueueAPI:
     def reclaim_expired(self) -> list[str]:
         self.recover_invalid_leases()
         return self.coordinator.reclaim_expired()
+
+    def _active_squad_member_ids(self) -> set[str]:
+        """Return workers reserved by valid active leases, independent of row state."""
+        coordinator = self.coordinator
+        store = coordinator.store
+        reserved: set[str] = set()
+        with store._lock:  # noqa: SLF001
+            for item in store._items.values():  # noqa: SLF001
+                if item.status not in {"assigned", "working", "blocked"}:
+                    continue
+                if not str(item.owner or "").startswith("squad-"):
+                    continue
+                try:
+                    lease = coordinator._lease_from_item(item)  # noqa: SLF001
+                except ValueError:
+                    continue
+                reserved.update(lease.members.values())
+        return reserved
