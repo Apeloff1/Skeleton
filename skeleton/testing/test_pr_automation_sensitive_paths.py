@@ -25,13 +25,14 @@ def _snapshot(*, sensitive_paths=()):
     )
 
 
-def test_sensitive_trust_surface_is_never_automatic_merge_material():
+def test_sensitive_trust_surface_is_ready_only_for_human_merge():
     result = evaluate(
         _snapshot(sensitive_paths=(".github/workflows/ci.yml",)),
         Policy(required_approvals=1, merge_when_ready=True),
     )
-    assert result.decision is Decision.HOLD
-    assert "trust surface" in result.reasons[0]
+    assert result.decision is Decision.READY
+    assert result.actions == ()
+    assert "human merge required" in result.reasons[0]
 
 
 def test_incomplete_changed_file_scan_fails_closed():
@@ -64,9 +65,10 @@ def test_sensitive_path_classifier_covers_automation_and_gate_controls():
     )
 
 
-def test_normal_application_changes_remain_eligible():
+def test_normal_application_changes_remain_eligible_for_auto_merge():
     result = evaluate(
         _snapshot(sensitive_paths=()),
         Policy(required_approvals=1, merge_when_ready=True),
     )
     assert result.decision is Decision.MERGE
+    assert len(result.actions) == 1
