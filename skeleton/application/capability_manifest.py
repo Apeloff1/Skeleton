@@ -8,7 +8,8 @@ as internal modules move or experimental packages come and go.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Final
+from types import MappingProxyType
+from typing import Final, Mapping
 
 
 CAPABILITY_MANIFEST_VERSION: Final = 1
@@ -60,6 +61,24 @@ CAPABILITIES: Final[tuple[Capability, ...]] = (
         description="Federation, transport, consensus, synchronization, and fleet coordination.",
     ),
 )
+
+CAPABILITIES_BY_ID: Final[Mapping[str, Capability]] = MappingProxyType(
+    {capability.id: capability for capability in CAPABILITIES}
+)
+
+
+def get_capability(capability_id: str) -> Capability:
+    """Return one capability by stable ID without exposing a mutable registry."""
+
+    if not isinstance(capability_id, str):
+        raise TypeError("capability_id must be a string")
+    normalized = capability_id.strip().lower()
+    if not normalized:
+        raise ValueError("capability_id must not be empty")
+    try:
+        return CAPABILITIES_BY_ID[normalized]
+    except KeyError as exc:
+        raise KeyError(f"unknown capability: {normalized}") from exc
 
 
 def capability_manifest() -> dict[str, object]:
