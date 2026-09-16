@@ -1,0 +1,125 @@
+# Autonomous Studio
+
+The Autonomous Studio is a bounded virtual engineering organization for advancing Skeleton as a frontier game-building AI system. It registers **1,000 deterministic worker identities** but deliberately activates only a small cohort at a time. The goal is high work throughput without turning repository automation into an uncontrolled swarm.
+
+## Directive
+
+Build game-building systems that are more complete, more testable, more composable, and more useful to developers than narrow demo-oriented systems. The studio should look for leverage across model/runtime architecture, game design, mechanics, procedural generation, embodied agents, world simulation, physics, animation, graphics, audio, tooling, engine runtime, networking, QA, security, performance, evaluation, research synthesis, developer experience, and release operations.
+
+The studio is expected to improve the project continuously, but **evidence beats activity**. A rejected proposal, a failed-closed task, or a no-op run is preferable to an unsafe change.
+
+## 1,000-worker topology
+
+`studio_registry.py` creates 20 divisions × 10 tracks × 5 worker modes = exactly 1,000 stable identities.
+
+Each division contains workers in these modes:
+
+- **Scout** — finds opportunities, gaps, regressions, and relevant evidence.
+- **Builder** — proposes a small code change for one bounded objective.
+- **Reviewer** — adversarially reviews a proposed patch before it may advance.
+- **Tester** — focuses on invariants, regressions, and evaluation design.
+- **Integrator** — focuses on compatibility, composition, and landing quality.
+
+The registry is deterministic and fingerprinted so every audit log can identify the exact virtual organization that existed for a run.
+
+## Night-shift execution
+
+`.github/workflows/autonomous-studio.yml` schedules four bounded overnight shifts. Each shift:
+
+1. Checks out trusted `main` with persisted Git credentials disabled.
+2. Snapshots open PRs, open issues, and recent failed workflow runs.
+3. Selects a diverse deterministic worker cohort.
+4. Gives a planner the backlog, tracked-file manifest, live repository state, and cohort context.
+5. Allows up to three narrow tasks per run.
+6. Assigns a specialist builder and an independent senior reviewer to each task.
+7. Treats every model response as untrusted data.
+8. Rejects malformed, oversized, high-risk, out-of-scope, rename, or delete proposals.
+9. Uses `git apply --check` before accepting a proposal.
+10. Removes the OpenAI key from the environment before post-proposal validation.
+11. Runs static Python compilation and Ruff on changed Python files without importing generated project code.
+12. Writes every run to the durable **Autonomous Studio Ledger**, including no-op and rejected runs.
+13. For an accepted patch, creates a new `studio/night-*` branch and opens a reviewable PR.
+14. Never writes directly to `main` and never enables auto-merge.
+
+Normal repository PR CI remains the deeper execution/test boundary for generated code.
+
+## Secret boundary
+
+The workflow expects one GitHub Actions repository secret:
+
+```text
+OPENAI_API_KEY
+```
+
+The key is exposed only to the proposal-generation step. It is not written to audit files, patches, commit messages, PR bodies, or the Studio Ledger. The workflow fails closed when the secret is missing.
+
+An optional repository variable can override the configured model:
+
+```text
+OPENAI_MODEL
+```
+
+If omitted, the existing bounded Responses API adapter uses its default model configuration.
+
+## Mutation boundary
+
+Studio v1 is intentionally conservative.
+
+Allowed model-selected source roots:
+
+- `skeleton/`
+- `backend/`
+- `scripts/`
+- `docs/`
+
+The deterministic repair policy rejects trust/security-sensitive paths. The studio additionally blocks workflow/control-plane paths, secrets, environment files, dependency manifests and lockfiles, renames, deletions, and new-file creation in model-generated patches.
+
+That means v1 optimizes and extends **existing ordinary source files**. New-file creation can be introduced later as a separately reviewed capability once the base system has accumulated evidence.
+
+## Logging: nothing silent
+
+Every shift emits JSONL events with timestamps, run ID, registry fingerprint, active cohort, plan, accepted/rejected task outcomes, assigned builder/reviewer IDs, review reasons, patch budget decisions, and final status.
+
+When a patch is published, the latest machine log and human report are committed as:
+
+- `.studio/audit/latest.jsonl`
+- `.studio/audit/latest.md`
+
+Every scheduled run also comments a human-readable summary on the durable `bot: autonomous studio ledger` GitHub issue. A run with no accepted code is still recorded.
+
+Secrets are recursively redacted **before** JSON serialization so redaction cannot corrupt the audit structure.
+
+## Daily reporting
+
+The reporting layer is designed around two consolidated reports rather than one message per bot:
+
+- **12:00 Europe/Oslo — Progress report.** Exhaustive but condensed explanation of code built, PRs, CI, architecture, tests, failures, lessons, and next work. It should teach the owner how the system is evolving.
+- **00:00 Europe/Oslo — Silent-actions audit.** Consolidates everything the automation did since the prior audit, including scans, rejected proposals, no-op decisions, failures, comments, branches, and validation results.
+
+Email delivery is intentionally kept outside the repository's OpenAI key boundary. A connected mail integration can send the two consolidated reports without granting generated code access to mailbox credentials.
+
+## Safety invariants
+
+The following are non-negotiable:
+
+- No direct autonomous write to `main`.
+- No autonomous weakening of CI, security gates, provenance, authentication, or secret handling.
+- No model-generated shell command execution.
+- No generated-code validation step receives `OPENAI_API_KEY` or an explicitly exported GitHub write token.
+- No silent mutation: every run has a durable ledger record.
+- No unbounded concurrency: 1,000 identities are a specialization map, not 1,000 simultaneous processes.
+- No automatic merge of code changes in v1.
+- A failure to prove safety or applicability becomes a logged rejection, not a best-effort mutation.
+
+## Scaling path
+
+Once v1 has a clean operating history, the next safe expansions are:
+
+1. Add a dedicated tester-agent pass that critiques likely regression surfaces before publication.
+2. Add isolated new-file creation with explicit per-directory quotas and provenance.
+3. Add benchmark-aware task selection so game-building improvements are tied to measurable eval deltas.
+4. Add CI-result feedback so the next cohort learns from the previous studio PR's concrete failures.
+5. Add dependency graphs and ownership maps to route work to specialists more accurately.
+6. Add branch supersession logic so stale studio PRs are replaced rather than accumulated.
+7. Add cost/token budgets and per-division throughput metrics to optimize useful work per model call.
+8. Add a promotion controller that can only request merge after required checks and explicit repository policy permit it; code auto-merge should remain opt-in.
