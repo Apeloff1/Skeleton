@@ -8,6 +8,7 @@ SCRIPTS = ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
+import check_repo_intel_contribution_gate as contribution_gate  # noqa: E402
 import repo_intel_contributions as contributions  # noqa: E402
 
 
@@ -25,8 +26,8 @@ def test_parse_log_handles_multiline_commit_bodies(monkeypatch) -> None:
     assert "Co-authored-by" in records[0]["body"]
 
 
-def test_build_separates_direct_credit_from_surface_mentions(monkeypatch) -> None:
-    registry = {
+def _registry() -> dict:
+    return {
         "schema": 1,
         "history_commit_limit": 100,
         "direct_trailer_keys": ["co-authored-by", "assisted-by"],
@@ -60,6 +61,9 @@ def test_build_separates_direct_credit_from_surface_mentions(monkeypatch) -> Non
         ],
         "semantics": {},
     }
+
+
+def test_build_separates_direct_credit_from_surface_mentions(monkeypatch) -> None:
     records = [
         {
             "sha": "1" * 40,
@@ -71,7 +75,7 @@ def test_build_separates_direct_credit_from_surface_mentions(monkeypatch) -> Non
             "subject": "Use grok notes",
         }
     ]
-    monkeypatch.setattr(contributions, "_registry", lambda: registry)
+    monkeypatch.setattr(contributions, "_registry", _registry)
     monkeypatch.setattr(contributions, "_parse_log", lambda _limit: records)
     monkeypatch.setattr(contributions.base, "git", lambda *args, **kwargs: "1" if args[:2] == ("rev-list", "--count") else "")
     snapshot = {"files": [{"path": "COPILOT.md"}, {"path": "src/app.py"}]}
@@ -82,6 +86,24 @@ def test_build_separates_direct_credit_from_surface_mentions(monkeypatch) -> Non
     assert actors["ai:grok"]["direct_commit_participation"] == 0
     assert actors["ai:grok"]["commit_message_reference_count"] == 1
     assert actors["ai:copilot"]["instruction_files_present"] == ["COPILOT.md"]
+
+
+def test_handoff_note_is_separate_declared_contribution(monkeypatch) -> None:
+    monkeypatch.setattr(contributions, "_registry", _registry)
+    monkeypatch.setattr(contributions, "_parse_log", lambda _limit: [])
+    monkeypatch.setattr(contributions.base, "git", lambda *args, **kwargs: "0" if args[:2] == ("rev-list", "--count") else "")
+    monkeypatch.setattr(
+        contributions,
+        "_read_text",
+        lambda path: "# Note\n- **Author/agent:** ai:grok\n" if path.endswith("handoff.md") else "",
+    )
+    payload = contributions.build(
+        {"files": [{"path": "repo-intel/notes/handoff.md"}, {"path": "src/app.py"}]}
+    )
+    actors = {actor["id"]: actor for actor in payload["actors"]}
+    assert actors["ai:grok"]["direct_commit_participation"] == 0
+    assert actors["ai:grok"]["declared_handoff_contributions"] == 1
+    assert actors["ai:grok"]["declared_handoff_evidence"][0]["path"] == "repo-intel/notes/handoff.md"
 
 
 def test_unknown_bot_identity_is_not_aliased_to_named_service(monkeypatch) -> None:
@@ -114,5 +136,33 @@ def test_unknown_bot_identity_is_not_aliased_to_named_service(monkeypatch) -> No
     assert unknown["id"].startswith("unknown-bot:")
 
 
-def test_contract_file_is_present() -> None:
+def test_gate_accepts_canonical_actor_and_rejects_unknown(monkeypatch) -> None:
+    monkeypatch.setattr(contributions, "_registry", _registry)
+    monkeypatch.setattr(contribution_gate.contributions, "_registry", _registry)
+    monkeypatch.setattr(
+        contribution_gate,
+        "_build_surface",
+        lambda _base: (
+            ["src/app.py", "repo-intel/notes/handoff.md"],
+            ["src/app.py"],
+            ["repo-intel/notes/handoff.md"],
+        ),
+    )
+    monkeypatch.setattr(contribution_gate.contributions, "check_contracts", lambda: None)
+    monkeypatch.setattr(
+        contribution_gate,
+        "_read",
+        lambda _path: "# Note\n- **Author/agent:** ai:grok\n",
+    )
+    assert contribution_gate.gate("main") == 0
+    monkeypatch.setattr(
+        contribution_gate,
+        "_read",
+        lambda _path: "# Note\n- **Author/agent:** ai:unregistered-model\n",
+    )
+    assert contribution_gate.gate("main") == 1
+
+
+def test_contract_files_are_present() -> None:
     assert (ROOT / "repo-intel" / "contributors.json").is_file()
+    assert (ROOT / "scripts" / "check_repo_intel_contribution_gate.py").is_file()
