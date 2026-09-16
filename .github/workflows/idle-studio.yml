@@ -1,0 +1,57 @@
+name: Idle Studio
+
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Plan and validate without creating branches or pull requests
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: idle-studio
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: read
+  actions: read
+
+jobs:
+  studio:
+    name: 1000-worker idle control plane
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      GITHUB_SHA: ${{ github.sha }}
+      GITHUB_RUN_ID: ${{ github.run_id }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      IDLE_STUDIO_ACTIVE_WORKERS: ${{ vars.IDLE_STUDIO_ACTIVE_WORKERS }}
+      IDLE_STUDIO_TASKS_PER_RUN: ${{ vars.IDLE_STUDIO_TASKS_PER_RUN }}
+      IDLE_STUDIO_MAX_MODEL_CALLS: ${{ vars.IDLE_STUDIO_MAX_MODEL_CALLS }}
+      IDLE_STUDIO_MAX_OPEN_PRS: ${{ vars.IDLE_STUDIO_MAX_OPEN_PRS }}
+      IDLE_STUDIO_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+    steps:
+      - name: Checkout trusted default-branch snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11.16'
+
+      - name: Validate idle-studio controller
+        run: python -m unittest -v skeleton.testing.test_idle_studio
+
+      - name: Run idle studio
+        run: python -m skeleton.automation.idle_studio
