@@ -103,6 +103,30 @@ def test_trusted_ipv6_proxy_chain_resolves_nearest_untrusted_hop(monkeypatch) ->
     assert api_middleware._client_ip(request) == "2001:db8:1::5"
 
 
+def test_trusted_proxy_chain_parses_each_address_once(monkeypatch) -> None:
+    trusted = (ipaddress.ip_network("10.0.0.0/8"),)
+    monkeypatch.setattr(api_middleware, "_TRUSTED_PROXY_NETWORKS", trusted)
+    original = api_middleware.ipaddress.ip_address
+    calls: list[str] = []
+
+    def counting_ip_address(value: str):
+        calls.append(value)
+        return original(value)
+
+    monkeypatch.setattr(api_middleware.ipaddress, "ip_address", counting_ip_address)
+    request = _request(
+        "10.0.0.5",
+        xff="203.0.113.7, 10.0.0.6, 10.0.0.7",
+    )
+
+    assert api_middleware._client_ip(request) == "203.0.113.7"
+    assert calls == ["10.0.0.5", "203.0.113.7", "10.0.0.6", "10.0.0.7"]
+
+    # Resolution is cached on request.state for downstream middleware reuse.
+    assert api_middleware._client_ip(request) == "203.0.113.7"
+    assert len(calls) == 4
+
+
 def test_expiry_pruning_preserves_active_bucket_state_and_reports_metrics() -> None:
     limiter = RateLimiterMiddleware(
         object(), per_minute=60, burst=2, max_buckets=3, bucket_ttl=300
@@ -233,14 +257,14 @@ def test_xff_value_has_hard_character_bound_before_ip_parsing(monkeypatch) -> No
         "_TRUSTED_PROXY_NETWORKS",
         (ipaddress.ip_network("10.0.0.0/8"),),
     )
-    original = api_middleware._canonical_ip
+    original = api_middleware._parse_ip
 
-    def guarded_canonical_ip(value: str):
+    def guarded_parse_ip(value: str):
         if len(value) > 1000:
             raise AssertionError("oversized forwarded value reached IP parsing")
         return original(value)
 
-    monkeypatch.setattr(api_middleware, "_canonical_ip", guarded_canonical_ip)
+    monkeypatch.setattr(api_middleware, "_parse_ip", guarded_parse_ip)
     oversized = "1" * (api_middleware._MAX_XFF_CHARS + 1)
 
     assert api_middleware._client_ip(_request("10.0.0.5", xff=oversized)) == "10.0.0.5"
