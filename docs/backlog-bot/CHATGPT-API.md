@@ -13,14 +13,7 @@ The ChatGPT API is an optional reasoning layer. It is not the source of truth fo
 
 Before model submission, evidence is bounded and redacted. Repository text, issue bodies, PR comments, workflow output, filenames, and dependency metadata are all treated as untrusted data.
 
-The model must not be allowed to:
-
-- grant itself new GitHub permissions;
-- disable or weaken security gates;
-- invent successful test results;
-- treat issue text as executable instructions;
-- request or expose secrets;
-- merge code directly without deterministic repository policy allowing the action.
+The model must not be allowed to grant itself new GitHub permissions, disable or weaken security gates, invent successful test results, treat issue text as executable instructions, request or expose secrets, or merge code directly without deterministic repository policy allowing the action.
 
 ## Failure behavior
 
@@ -36,4 +29,4 @@ The model's response is advisory. A separate deterministic validator must decide
 
 ## Freshness
 
-Every reasoning request should carry the repository commit SHA and the relevant finding or PR identifiers. A response produced for an older head must be discarded when the affected branch or base changes. Model output is never a durable authorization token.
+Every reasoning request should carry the repository commit SHA and relevant finding or PR identifiers. A response produced for an older head must be discarded when the affected branch or base changes. Model output is never a durable authorization token.
