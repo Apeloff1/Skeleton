@@ -15,7 +15,13 @@ from skeleton.vault.audit import AuditLog  # noqa: E402
 SECRET = "gate-middleware-test-secret"
 
 
-def _app(audit: AuditLog | None = None, policy: GatePolicy | None = None) -> FastAPI:
+def _app(
+    audit: AuditLog | None = None,
+    policy: GatePolicy | None = None,
+    *,
+    max_header_bytes: int | None = None,
+    max_header_count: int | None = None,
+) -> FastAPI:
     app = FastAPI()
     if audit is None:
         audit = AuditLog()
@@ -42,7 +48,14 @@ def _app(audit: AuditLog | None = None, policy: GatePolicy | None = None) -> Fas
     async def nowhere():
         return {"oops": True}
 
-    install_gate(app, policy=policy, audit_log=audit, max_body_bytes=64)
+    install_gate(
+        app,
+        policy=policy,
+        audit_log=audit,
+        max_body_bytes=64,
+        max_header_bytes=max_header_bytes,
+        max_header_count=max_header_count,
+    )
     return app
 
 
@@ -134,6 +147,24 @@ def test_body_bound_413(sealed):
     )
     assert res.status_code == 413
     assert res.json()["error"] == "scroll_too_large"
+
+
+def test_header_bound_rejects_before_seal_and_audit(monkeypatch):
+    monkeypatch.setenv("GF_SEAL_SECRET", SECRET)
+    audit = AuditLog()
+    app = _app(audit=audit, max_header_bytes=512, max_header_count=100)
+
+    with TestClient(app) as client:
+        res = client.get(
+            "/api/v1/forge/kinds",
+            headers={**_hdr(), "x-padding": "x" * 1024},
+        )
+
+    assert res.status_code == 431
+    assert res.json()["error"] == "request_headers_too_large"
+    assert res.json()["reason"] == "header_bytes"
+    assert "x-request-id" not in res.headers
+    assert len(audit) == 0
 
 
 def test_worm_audit_fail_503(monkeypatch):
