@@ -1,16 +1,23 @@
 #!/usr/bin/env python3
 """Frontier Skeleton repository knowledge-graph CLI.
 
-This is the top compositional layer. It preserves the canonical v4 index
+This is the top compositional layer. It preserves the canonical index
 (semantic graph + structured supply chain + CODEOWNERS + architecture rules)
 and adds runtime/build surfaces, deterministic history hotspots, batch evidence,
 workflow/build-target relationships, compact agent retrieval, and richer change
 intelligence. Core indexing remains network-free and stdlib-only.
+
+The frontier cache is self-validating: every read compares a cheap content-aware
+workspace fingerprint and regenerates the snapshot when tracked state changes.
+Graph composition also preserves relation metadata so distinct dependency scopes,
+requirements, and build relationships cannot collapse into one edge merely because
+they share the same endpoints and relation type.
 """
 from __future__ import annotations
 
 import argparse
 from collections import defaultdict
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -27,6 +34,28 @@ import repo_intel_sota as semantic  # noqa: E402
 
 ROOT = base.ROOT
 DEFAULT_OUT = base.DEFAULT_OUT
+REQUIRED_SNAPSHOT_OUTPUTS = (
+    "index.json",
+    "graph.json",
+    "symbols.json",
+    "build-map.json",
+    "impact.json",
+    "change-set.json",
+    "gaps.json",
+    "security-quality.json",
+    "metrics.json",
+    "supply-chain.json",
+    "codeowners.json",
+    "architecture.json",
+    "dependencies.json",
+    "surfaces.json",
+    "hotspots.json",
+    "history.json",
+    "batch-status.json",
+    "search-catalog.json",
+    "build-relationships.json",
+    "notes.md",
+)
 
 
 def write_json(path: Path, payload: Any) -> None:
@@ -47,37 +76,88 @@ def validate_contracts() -> None:
     print("repo-intel-frontier: canonical + deep contracts valid")
 
 
+def _workspace_fingerprint() -> str:
+    """Return a cheap content-aware identity for the tracked index + worktree.
+
+    `git write-tree` gives one compact identity for staged/tracked state. The
+    porcelain status captures status/mode changes, while only unstaged changed
+    files are content-hashed. Untracked files are intentionally excluded because
+    the repository index models tracked source until files are added to Git.
+    """
+    tree = base.git("write-tree", check=False).strip()
+    if not tree:
+        tree = base.git("ls-files", "-s", check=False)
+    status = base.git("status", "--porcelain=v1", "-z", "-uno", check=False)
+    dirty = sorted(filter(None, base.git("diff", "--name-only", "-z", check=False).split("\0")))
+
+    digest = hashlib.sha256()
+    digest.update(tree.encode("utf-8", errors="surrogateescape"))
+    digest.update(b"\0status\0")
+    digest.update(status.encode("utf-8", errors="surrogateescape"))
+    for path in dirty:
+        digest.update(b"\0path\0")
+        digest.update(path.encode("utf-8", errors="surrogateescape"))
+        target = ROOT / path
+        if target.is_file():
+            blob = base.git("hash-object", "--", path, check=False).strip()
+            digest.update(blob.encode("ascii", errors="ignore"))
+        else:
+            digest.update(b"<deleted-or-non-file>")
+    return digest.hexdigest()
+
+
+def _edge_key(edge: dict[str, Any]) -> str:
+    """Identity preserving all relation metadata, not only graph endpoints."""
+    return json.dumps(edge, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+
 def _merge_relationships(snapshot: dict[str, Any], relationships: dict[str, Any]) -> None:
     graph = snapshot["graph"]
     nodes_by_id = {str(node["id"]): node for node in graph.get("nodes", [])}
     for node in relationships.get("nodes", []):
         nodes_by_id[str(node["id"])] = node
-    edge_by_key = {
-        (str(edge["from"]), str(edge["to"]), str(edge["type"])): edge
-        for edge in graph.get("edges", [])
-    }
-    for edge in relationships.get("edges", []):
-        edge_by_key[(str(edge["from"]), str(edge["to"]), str(edge["type"]))] = edge
-    graph["nodes"] = [nodes_by_id[key] for key in sorted(nodes_by_id)]
-    graph["edges"] = [edge_by_key[key] for key in sorted(edge_by_key)]
 
-    reverse: dict[str, list[dict[str, str]]] = defaultdict(list)
+    # Exact duplicate edges collapse, but metadata variants remain independent.
+    edge_by_key = {_edge_key(edge): edge for edge in graph.get("edges", [])}
+    for edge in relationships.get("edges", []):
+        edge_by_key[_edge_key(edge)] = edge
+    graph["nodes"] = [nodes_by_id[key] for key in sorted(nodes_by_id)]
+    graph["edges"] = sorted(
+        edge_by_key.values(),
+        key=lambda edge: (
+            str(edge.get("from", "")),
+            str(edge.get("to", "")),
+            str(edge.get("type", "")),
+            _edge_key(edge),
+        ),
+    )
+
+    reverse: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for edge in graph["edges"]:
-        reverse[str(edge["to"])].append(
-            {
-                "from": str(edge["from"]),
-                "type": str(edge["type"]),
-                "precision": str(edge.get("precision", "unknown")),
-            }
-        )
+        incoming: dict[str, Any] = {
+            "from": str(edge["from"]),
+            "type": str(edge["type"]),
+            "precision": str(edge.get("precision", "unknown")),
+        }
+        for key, value in edge.items():
+            if key not in {"from", "to", "type", "precision"}:
+                incoming[key] = value
+        reverse[str(edge["to"])].append(incoming)
     graph["reverse_edges"] = {
-        key: sorted(value, key=lambda item: (item["from"], item["type"]))
+        key: sorted(value, key=lambda item: json.dumps(item, sort_keys=True, separators=(",", ":")))
         for key, value in sorted(reverse.items())
     }
 
 
+def _relationship_variant_count(edges: list[dict[str, Any]]) -> int:
+    counts: dict[tuple[str, str, str], int] = defaultdict(int)
+    for edge in edges:
+        counts[(str(edge.get("from")), str(edge.get("to")), str(edge.get("type")))] += 1
+    return sum(max(0, count - 1) for count in counts.values())
+
+
 def build_snapshot(out: Path) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Build canonical graph then add frontier layers without duplicating dependency nodes."""
+    """Build canonical graph then add frontier layers without duplicating package nodes."""
     snapshot = core.build_snapshot(out)
     dependencies = deep.dependency_inventory(snapshot)
     surfaces = deep.surface_inventory(snapshot)
@@ -106,6 +186,7 @@ def build_snapshot(out: Path) -> tuple[dict[str, Any], dict[str, Any]]:
         {
             "graph_nodes": len(snapshot["graph"]["nodes"]),
             "graph_edges": len(snapshot["graph"]["edges"]),
+            "relationship_metadata_variants": _relationship_variant_count(snapshot["graph"]["edges"]),
             "declared_dependency_records": dependencies["package_count"],
             "package_script_count": len(dependencies["package_scripts"]),
             "route_count": surfaces["route_count"],
@@ -136,6 +217,7 @@ def build_map(snapshot: dict[str, Any], bundle: dict[str, Any]) -> dict[str, Any
     mapping.update(
         {
             "schema": 5,
+            "workspace_fingerprint": snapshot.get("workspace_fingerprint"),
             "declared_dependency_records": bundle["dependencies"]["package_count"],
             "package_scripts": bundle["dependencies"]["package_scripts"],
             "build_targets": bundle["relationships"]["build_targets"],
@@ -165,9 +247,7 @@ def impact_payload(snapshot: dict[str, Any], changed: list[str]) -> dict[str, An
         if item["source"] in impacted or item["target"] in impacted
     ]
     payload["workflow_files_touched"] = sorted(
-        path
-        for path in impacted
-        if path.startswith(".github/workflows/")
+        path for path in impacted if path.startswith(".github/workflows/")
     )
     return payload
 
@@ -193,10 +273,12 @@ def render_notes(
         f"- Runtime/creator routes indexed: **{m['route_count']}**.",
         f"- Environment-variable names referenced: **{m['environment_variable_count']}**; "
         f"**{m['undocumented_environment_variable_count']}** absent from tracked `.env.example` files.",
+        f"- Preserved relationship metadata variants: **{m['relationship_metadata_variants']}**.",
         f"- Deterministic churn window: **{m['history_window_commits']} commits** relative to HEAD time.",
         f"- Agent retrieval documents: **{m['search_document_count']}**.",
         f"- Batch evidence notes: **{m['batch_evidence_noted']}/100** batches referenced. "
         "Reference does not imply completion.",
+        "- Snapshot reads are self-validating against a content-aware tracked-workspace fingerprint; stale caches rebuild automatically.",
         "",
         "### Highest-attention hotspots",
         "",
@@ -223,14 +305,22 @@ def render_notes(
 def snapshot_command(out: Path, base_ref: str) -> dict[str, Any]:
     validate_contracts()
     out.mkdir(parents=True, exist_ok=True)
+    start_fingerprint = _workspace_fingerprint()
     snapshot, bundle = build_snapshot(out)
     gaps = base.feature_gaps(snapshot)
     sq = base.security_quality(snapshot)
-    mapping = build_map(snapshot, bundle)
     changed = base.changed_paths(base_ref)
     impact = impact_payload(snapshot, changed)
     change_set = deep.change_set(base_ref, impact)
     arch = core.architecture_report(snapshot)
+    end_fingerprint = _workspace_fingerprint()
+    if end_fingerprint != start_fingerprint:
+        raise RuntimeError(
+            "tracked workspace changed while the repository index was being built; rerun to avoid publishing a mixed snapshot"
+        )
+    snapshot["workspace_fingerprint"] = end_fingerprint
+    snapshot["metrics"]["workspace_fingerprint_verified"] = True
+    mapping = build_map(snapshot, bundle)
 
     write_json(out / "index.json", snapshot)
     write_json(out / "graph.json", snapshot["graph"])
@@ -263,9 +353,18 @@ def snapshot_command(out: Path, base_ref: str) -> dict[str, Any]:
     return snapshot
 
 
+def _snapshot_is_fresh(current: Any, out: Path) -> bool:
+    if not isinstance(current, dict) or int(current.get("schema", 0)) < 5:
+        return False
+    if any(not (out / name).exists() for name in REQUIRED_SNAPSHOT_OUTPUTS):
+        return False
+    fingerprint = current.get("workspace_fingerprint")
+    return isinstance(fingerprint, str) and fingerprint == _workspace_fingerprint()
+
+
 def load_or_build(out: Path, base_ref: str = "origin/main") -> dict[str, Any]:
     current = read_json(out / "index.json")
-    if isinstance(current, dict) and int(current.get("schema", 0)) >= 5:
+    if _snapshot_is_fresh(current, out):
         return current
     return snapshot_command(out, base_ref)
 
@@ -384,6 +483,8 @@ def doctor_command(out: Path) -> int:
         blockers.append(f"semantic parse failures={m['semantic_parse_failures']}")
     if not snapshot["graph"].get("edges"):
         blockers.append("graph has no edges")
+    if not m.get("workspace_fingerprint_verified"):
+        blockers.append("workspace fingerprint was not verified during snapshot construction")
     if m.get("unowned_files"):
         advisories.append(f"architecturally unowned files={m['unowned_files']}")
     if m.get("dependency_cycles"):
@@ -395,8 +496,9 @@ def doctor_command(out: Path) -> int:
             f"environment variables absent from tracked examples={m['undocumented_environment_variable_count']}"
         )
     report = {
-        "schema": 2,
+        "schema": 3,
         "source_digest": snapshot["source_digest"],
+        "workspace_fingerprint": snapshot.get("workspace_fingerprint"),
         "healthy": not blockers,
         "blockers": blockers,
         "advisories": advisories,
