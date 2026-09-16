@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "queries": {
+    "file": "Return indexed metadata and graph relationships for an exact repository path.",
+    "symbol": "Find symbols by exact or substring name and return definitions plus owning files.",
+    "deps": "Return forward dependencies from a file with optional transitive traversal.",
+    "rdeps": "Return reverse dependencies / affected consumers from a file with optional transitive traversal.",
+    "impact": "Given changed paths or a Git base, return impacted files, subsystems, tests, workflows, security zones and capabilities.",
+    "capability": "Return structural evidence, batch ownership and missing evidence for a game-creation capability.",
+    "security": "Return security controls, sensitive surfaces and findings connected to paths or subsystems.",
+    "build": "Return entry points, manifests, workflows, scripts, artifacts and build-affecting relationships."
+  },
+  "edge_types": [
+    "contains",
+    "imports",
+    "references-module",
+    "tests",
+    "workflow-uses",
+    "declares-dependency",
+    "builds",
+    "evidence-for",
+    "owned-by"
+  ],
+  "node_types": [
+    "file",
+    "symbol",
+    "subsystem",
+    "test",
+    "workflow",
+    "manifest",
+    "capability",
+    "security-control",
+    "batch",
+    "artifact"
+  ],
+  "precision": {
+    "python": "AST-derived imports and symbols",
+    "javascript_typescript": "conservative lexical imports/exports until SCIP/compiler ingestion is enabled",
+    "other": "metadata-only unless a specialized indexer is registered"
+  }
+}
