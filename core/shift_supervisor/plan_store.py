@@ -64,6 +64,98 @@ class InMemoryPlanStore:
             item.updated_at = datetime.now(timezone.utc)
             self._items[item.id] = replace(item)
 
+    def claim_next_for_worker(
+        self,
+        worker_id: str,
+        *,
+        overtime_soft_limit_minutes: int = 120,
+    ) -> PlanItem | None:
+        """Atomically claim the highest-priority eligible plan item.
+
+        This is the only dispatch primitive workers need. The supervisor and
+        secretary never push orders to workers; workers pull from this shared
+        plan. A worker can hold at most one active item, and team/dependency/
+        overtime rules are enforced under one lock so concurrent bots cannot
+        double-claim work or overload the same worker.
+        """
+        with self._lock:
+            worker = self._workers.get(worker_id)
+            if worker is None:
+                raise KeyError(worker_id)
+            if worker.status in {"offline", "blocked"}:
+                return None
+            if worker.current_task_id:
+                return None
+            if worker.overtime_minutes >= max(0, overtime_soft_limit_minutes):
+                return None
+
+            active_owned = any(
+                item.owner == worker_id and item.status in {"assigned", "working", "blocked"}
+                for item in self._items.values()
+            )
+            if active_owned:
+                return None
+
+            eligible = [
+                item
+                for item in self._items.values()
+                if item.target_team == worker.team
+                and item.status == "queued"
+                and item.owner is None
+                and self._dependencies_satisfied(item)
+            ]
+            if not eligible:
+                return None
+
+            eligible.sort(key=lambda item: (-item.priority, item.created_at, item.id))
+            item = eligible[0]
+            now = datetime.now(timezone.utc)
+            item.owner = worker_id
+            item.status = "assigned"
+            item.updated_at = now
+            self._items[item.id] = replace(item)
+
+            worker.current_task_id = item.id
+            worker.status = "working"
+            worker.last_heartbeat_at = now
+            self._workers[worker_id] = replace(worker)
+            return replace(item)
+
+    def finish_claim(
+        self,
+        worker_id: str,
+        item_id: str,
+        *,
+        outcome: str = "done",
+    ) -> PlanItem:
+        """Finish or release a worker-owned item and clear worker capacity."""
+        if outcome not in {"done", "rejected", "queued"}:
+            raise ValueError("outcome must be done, rejected, or queued")
+        with self._lock:
+            worker = self._workers.get(worker_id)
+            if worker is None:
+                raise KeyError(worker_id)
+            item = self._items.get(item_id)
+            if item is None:
+                raise KeyError(item_id)
+            if item.owner != worker_id:
+                raise PermissionError(f"{worker_id!r} does not own {item_id!r}")
+
+            now = datetime.now(timezone.utc)
+            item.status = outcome  # type: ignore[assignment]
+            item.updated_at = now
+            if outcome == "queued":
+                item.owner = None
+            self._items[item.id] = replace(item)
+
+            if worker.current_task_id == item_id:
+                worker.current_task_id = None
+                if worker.status != "offline":
+                    worker.status = "idle"
+                worker.last_heartbeat_at = now
+                self._workers[worker_id] = replace(worker)
+            return replace(item)
+
     def append_revision(self, revision: PlanRevision) -> None:
         with self._lock:
             self._revisions.append(replace(revision))
@@ -147,6 +239,13 @@ class InMemoryPlanStore:
             self._items = items
             self._workers = workers
             self._revisions = revisions
+
+    def _dependencies_satisfied(self, item: PlanItem) -> bool:
+        for dependency_id in item.dependencies:
+            dependency = self._items.get(dependency_id)
+            if dependency is None or dependency.status != "done":
+                return False
+        return True
 
     @classmethod
     def _item_payload(cls, item: PlanItem) -> dict[str, Any]:
