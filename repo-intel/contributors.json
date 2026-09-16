@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "purpose": "Canonical contributor, bot, automation, and AI-agent identity registry for repository provenance. Direct contribution credit requires Git identity or explicit commit trailers; operational surfaces and user-declared tools are tracked separately.",
+  "purpose": "Canonical contributor, bot, automation, AI-agent, and AI-platform identity registry for repository provenance. Git contribution, declared handoff contribution, operational surfaces, and user-declared tooling are separate evidence classes.",
   "history_commit_limit": 3000,
   "direct_trailer_keys": [
     "co-authored-by",
@@ -98,14 +98,24 @@
       "instruction_files": ["GEMINI.md"],
       "surface_terms": ["gemini"],
       "evidence_class": "repository-observed-surface"
+    },
+    {
+      "id": "platform:emergent",
+      "display_name": "Emergent",
+      "kind": "ai-platform",
+      "aliases": ["Emergent", "Emergent AI"],
+      "surface_terms": ["emergent", "emergentintegrations"],
+      "evidence_class": "repository-observed-surface"
     }
   ],
   "semantics": {
-    "direct_contribution": "Count only Git author/committer identity or an explicit direct-contribution trailer. A tool name in prose, a model catalog, instruction file, branch name, or snapshot path is not direct authorship evidence.",
-    "operational_surface": "An instruction file, workflow, branch/snapshot name, or commit-message reference proves repository interaction/surface only, not authorship of code.",
-    "user_declared": "Records a tool the repository owner reports using; it is not attached to individual commits unless direct repository evidence exists.",
+    "direct_contribution": "Count only Git author/committer identity or an explicit direct-contribution trailer. A tool name in prose, a model catalog, instruction file, branch name, or snapshot path is not direct Git authorship evidence.",
+    "declared_handoff_contribution": "An augmentation note that explicitly names an Author/agent records declared participation in that work unit. It is stronger than a surface mention but remains distinct from Git authorship/co-authorship.",
+    "operational_surface": "An instruction file, workflow, branch/snapshot name, tracked path, or commit-message reference proves repository interaction/surface only, not authorship of code.",
+    "user_declared": "Records a tool the repository owner reports using; it is not attached to individual commits unless direct Git or explicit handoff evidence exists.",
     "unknown_identity": "Unmatched identities remain separate. Heuristics may classify bot-like names but must not alias them to a named service without evidence.",
-    "history_rewrites": "Squash merges, rebases, cherry-picks, imported snapshots, and rewritten commits can collapse or duplicate attribution. The index reports observable Git evidence and never reconstructs missing authorship by guesswork.",
+    "history_rewrites": "Squash merges, rebases, cherry-picks, imported snapshots, generated commits, and rewritten commits can collapse or duplicate attribution. The index reports observable Git and handoff evidence and never reconstructs missing authorship by guesswork.",
+    "shared_identity": "A human-owned commit created through an AI connector is not automatically AI-authored. Use an explicit trailer or Author/agent handoff declaration to preserve that contribution signal.",
     "privacy": "Generated provenance outputs do not emit raw email addresses. Matching may use Git emails locally; unknown identities receive stable hashed IDs."
   }
 }
