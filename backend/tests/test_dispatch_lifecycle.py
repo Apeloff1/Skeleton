@@ -62,7 +62,10 @@ def test_lifecycle_moves_from_pending_bound_to_confirmed(tmp_path):
     assert after["pending"] is False
     assert after["pending_operation"] is None
     assert after["receipt"]["result_artifact_id"]
-    assert {entry["kind"] for entry in after["audit_events"]} >= {"operation_admitted", "operation_executed"}
+    assert after["admitted_audit_present"] is True
+    assert after["executed_audit_present"] is True
+    assert after["executed_audit_count"] == 1
+    assert after["audit_sequences"]
 
 
 def test_unbound_lifecycle_is_explicit(tmp_path):
