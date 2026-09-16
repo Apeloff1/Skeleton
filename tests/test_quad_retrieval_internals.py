@@ -1,3 +1,4 @@
+import time
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier, Event
 
@@ -21,6 +22,15 @@ def _result(
         plane=plane,
         provenance="test",
     )
+
+
+def _wait_for_stat(quad: QuadRetriever, name: str, value: int) -> None:
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        if quad.stats()[name] >= value:
+            return
+        time.sleep(0.01)
+    assert quad.stats()[name] >= value
 
 
 def test_quad_dispatches_planes_concurrently() -> None:
@@ -64,6 +74,74 @@ def test_quad_fusion_order_is_deterministic_when_completion_order_reverses() -> 
     results = quad.retrieve("stable", k=4, use_cache=False)
 
     assert [item.fragment_id for item in results] == ["slow-doc", "fast-doc"]
+
+
+def test_quad_coalesces_identical_concurrent_cache_misses() -> None:
+    started = Event()
+    release = Event()
+    calls = []
+
+    class RagPlane:
+        def query(self, query: str, top_k: int):
+            calls.append(query)
+            started.set()
+            assert release.wait(timeout=2.0)
+            return [_result("shared-doc", query)]
+
+    quad = QuadRetriever()
+    quad.register_plane("rag", RagPlane())
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(quad.retrieve, "shared", 4)
+        assert started.wait(timeout=2.0)
+        second = executor.submit(quad.retrieve, "shared", 4)
+        _wait_for_stat(quad, "coalesced_queries", 1)
+        release.set()
+        first_results = first.result(timeout=2.0)
+        second_results = second.result(timeout=2.0)
+
+    assert calls == ["shared"]
+    assert [item.fragment_id for item in first_results] == ["shared-doc"]
+    assert [item.fragment_id for item in second_results] == ["shared-doc"]
+    assert quad.stats()["cache_hits"] >= 1
+
+
+def test_coalesced_waiter_retries_after_generation_change() -> None:
+    old_started = Event()
+    release_old = Event()
+    old_calls = []
+    new_calls = []
+
+    class OldPlane:
+        def query(self, query: str, top_k: int):
+            old_calls.append(query)
+            old_started.set()
+            assert release_old.wait(timeout=2.0)
+            return [_result("old-doc", query)]
+
+    class NewPlane:
+        def query(self, query: str, top_k: int):
+            new_calls.append(query)
+            return [_result("new-doc", query)]
+
+    quad = QuadRetriever()
+    quad.register_plane("rag", OldPlane())
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        leader = executor.submit(quad.retrieve, "changing", 4)
+        assert old_started.wait(timeout=2.0)
+        waiter = executor.submit(quad.retrieve, "changing", 4)
+        _wait_for_stat(quad, "coalesced_queries", 1)
+
+        quad.register_plane("rag", NewPlane())
+        release_old.set()
+        leader_results = leader.result(timeout=2.0)
+        waiter_results = waiter.result(timeout=2.0)
+
+    assert [item.fragment_id for item in leader_results] == ["old-doc"]
+    assert [item.fragment_id for item in waiter_results] == ["new-doc"]
+    assert old_calls == ["changing"]
+    assert new_calls == ["changing"]
 
 
 def test_registering_plane_invalidates_cached_topology() -> None:
