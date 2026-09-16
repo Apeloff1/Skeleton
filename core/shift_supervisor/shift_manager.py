@@ -99,7 +99,7 @@ class SMBShiftManager:
         workers = self.store.snapshot_workers()
         existing_items = self.store.snapshot_items()
         prompt_payload = {
-            "project_context": project_context,
+            "project_context": self._planning_context(project_context),
             "research": research or [],
             "staffing": self._staffing_payload(workers),
             "existing_plan": [self._item_payload(i) for i in existing_items],
@@ -130,6 +130,15 @@ class SMBShiftManager:
         )
         self.store.append_revision(revision)
         return revision
+
+    @staticmethod
+    def _planning_context(project_context: dict[str, Any]) -> dict[str, Any]:
+        """Remove raw per-worker records before context reaches the model."""
+        context = dict(project_context)
+        snapshots = context.pop("worker_snapshots", None)
+        if isinstance(snapshots, list):
+            context["worker_snapshot_count"] = len(snapshots)
+        return context
 
     def _refresh_worker_time(self, worker: WorkerState, now: datetime) -> None:
         if worker.clocked_in_at is None:
