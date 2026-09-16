@@ -76,8 +76,16 @@ jobs:
           with open('.studio-out/report.json', encoding='utf-8') as handle:
               report = json.load(handle)
           allowed = set(report.get('accepted_paths', []))
+
+          # Intent-to-add makes brand-new accepted files visible to git diff
+          # without staging their content or broadening the publication set.
+          for path in sorted(allowed):
+              subprocess.run(['git', 'add', '-N', '--', path], check=True)
+
           changed = set(
-              subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines()
+              subprocess.check_output(
+                  ['git', 'diff', '--name-only', '--', '.', ':!.studio-out'], text=True
+              ).splitlines()
           )
           unexpected = changed - allowed
           missing = allowed - changed
@@ -87,7 +95,7 @@ jobs:
               raise SystemExit(f'accepted paths missing from diff: {sorted(missing)}')
           print(f'validated {len(changed)} changed path(s) against studio report')
           PY
-          git diff --check
+          git diff --check -- . ':!.studio-out'
           git diff --binary -- . ':!.studio-out' > "$RUNNER_TEMP/studio.patch"
           sha256sum "$RUNNER_TEMP/studio.patch" > "$RUNNER_TEMP/studio.patch.sha256"
 
@@ -108,6 +116,10 @@ jobs:
           GITHUB_TOKEN: ''
         run: |
           set -euo pipefail
+          if [[ ! -s "$RUNNER_TEMP/studio.patch" ]]; then
+            echo 'No generated patch; skipping generated-code validation.'
+            exit 0
+          fi
           python -m compileall skeleton -q
           python -m pytest skeleton/testing -q --tb=short
 
@@ -128,6 +140,23 @@ jobs:
         run: |
           set -euo pipefail
           run_id="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          if [[ ! -s "$RUNNER_TEMP/studio.patch" ]]; then
+            {
+              echo "## Studio shift ${run_id}: no code proposal published"
+              echo
+              echo 'The shift still executed and all planner/model decisions are visible in this workflow run.'
+              echo 'No review branch or pull request was created because the sealed patch was empty.'
+              echo
+              echo '<details><summary>Machine-readable report</summary>'
+              echo
+              echo '```json'
+              cat "$RUNNER_TEMP/studio-report.json"
+              echo '```'
+              echo '</details>'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
           evidence_dir="docs/studio-runs/${run_id}"
           mkdir -p "$evidence_dir"
           cp "$RUNNER_TEMP/studio-report.json" "$evidence_dir/report.json"
@@ -151,14 +180,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          run_id="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          branch="studio/run-${run_id}"
-
-          if git diff --quiet && [[ -z "$(git ls-files --others --exclude-standard docs/studio-runs/${run_id})" ]]; then
-            echo 'No studio output to publish.'
+          if [[ ! -s "$RUNNER_TEMP/studio.patch" ]]; then
+            echo 'No studio code output to publish.'
             exit 0
           fi
 
+          run_id="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          branch="studio/run-${run_id}"
           git switch -c "$branch"
           git config user.name 'skeleton-studio[bot]'
           git config user.email '122585327+Apeloff1@users.noreply.github.com'
