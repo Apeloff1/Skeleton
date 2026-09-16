@@ -24,6 +24,7 @@ class SecretaryBot:
 
     def enrich_plan(self, project_context: dict[str, Any]) -> PlanRevision:
         correlation_id = f"secretary-{uuid.uuid4()}"
+        existing_items = self.store.snapshot_items()
         existing = [
             {
                 "id": item.id,
@@ -32,7 +33,7 @@ class SecretaryBot:
                 "target_team": item.target_team,
                 "status": item.status,
             }
-            for item in self.store.snapshot_items()
+            for item in existing_items
             if item.status not in {"done", "rejected"}
         ]
         response = self.model.call_json(
@@ -47,15 +48,25 @@ class SecretaryBot:
             correlation_id=correlation_id,
         )
         proposals = response.get("tasks", [])
-        items = [self._parse_task(task, correlation_id) for task in proposals if isinstance(task, dict)]
-        items = [item for item in items if item is not None]
-        added = self.store.add_items(items)
+        parsed = [self._parse_task(task, correlation_id) for task in proposals if isinstance(task, dict)]
+        parsed_items = [item for item in parsed if item is not None]
+        dependency_ids = {item.id for item in existing_items if item.status != "rejected"}
+        accepted_items = [
+            item for item in parsed_items if self._dependencies_resolvable(item, dependency_ids)
+        ]
+        rejected_dependencies = len(parsed_items) - len(accepted_items)
+        added = self.store.add_items(accepted_items)
+        summary = str(response.get("summary", ""))
+        if rejected_dependencies:
+            summary = (
+                f"{summary.rstrip()} Skipped {rejected_dependencies} task(s) with unresolved dependencies."
+            ).strip()
         revision = PlanRevision(
             revision_id=f"rev-{uuid.uuid4()}",
             actor="secretary",
             created_at=utcnow(),
             added_item_ids=added,
-            summary=str(response.get("summary", "")),
+            summary=summary,
             correlation_id=correlation_id,
         )
         self.store.append_revision(revision)
@@ -69,6 +80,11 @@ class SecretaryBot:
         if isinstance(snapshots, list):
             context["worker_snapshot_count"] = len(snapshots)
         return context
+
+    @staticmethod
+    def _dependencies_resolvable(item: PlanItem, dependency_ids: set[str]) -> bool:
+        """Reject model work that can never become queue-eligible."""
+        return all(dependency_id in dependency_ids for dependency_id in item.dependencies)
 
     @staticmethod
     def _parse_task(task: dict[str, Any], correlation_id: str) -> PlanItem | None:
