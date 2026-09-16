@@ -144,10 +144,13 @@ def test_replan_uses_reverse_edge_bfs_without_fixed_point_rescans(monkeypatch):
     _install_plan(monkeypatch, plan)
 
     result = orchestrator.replan_from("plan-1", "n0")
+    iterations_after_replan = nodes.iterations
 
     assert len(result["replanned"]) == 80
     assert all(node["status"] == "planned" for node in nodes)
     assert all(node["result"] is None for node in nodes)
     assert all(node["produced_gid"] is None for node in nodes)
     assert plan["version"] == 2
-    assert nodes.iterations <= 4
+    # Measure only replan_from itself; the validation traversals above also
+    # iterate CountingNodes and must not be charged to the scheduler.
+    assert iterations_after_replan <= 4
