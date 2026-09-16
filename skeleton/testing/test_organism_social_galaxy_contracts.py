@@ -1,12 +1,14 @@
 """Cross-plane regression contracts for the F-15 structural audit.
 
 These tests deliberately stay dependency-light: they exercise pure/local contracts
-across organism budgeting, social pointer ingest, and galaxy atom/codec handling.
+across organism budgeting/config auditing, social pointer ingest, and galaxy
+atom/codec handling.
 """
 
 from skeleton.galaxy.atoms import Atom
 from skeleton.galaxy.codec import KnowledgeCodec, parse_ccl, render_ccl
 from skeleton.organism.budget import CITE, choose
+from skeleton.organism.config_diff import ConfigDiff
 from skeleton.social.ingest import extract_urls, ingest
 
 
@@ -24,6 +26,22 @@ def test_organism_budget_card_keeps_provenance_without_stored_prose():
     assert card["stored_prose"] == 0
     assert card["pressure"] == 0.1
     assert card["fill"] == 0.2
+
+
+def test_organism_config_diff_redacts_secrets_nested_in_sequences():
+    diff = ConfigDiff().diff(
+        {"providers": [{"name": "primary", "token": "old-secret"}]},
+        {"providers": [{"name": "primary", "token": "new-secret"}]},
+    )
+    assert diff["max_risk"] == "critical"
+    assert diff["requires_review"] is True
+    assert diff["total"] == 1
+    assert diff["changes"][0]["path"] == "providers"
+    assert diff["changes"][0]["risk"] == "critical"
+    assert diff["changes"][0]["old"] is None
+    assert diff["changes"][0]["new"] is None
+    assert "old-secret" not in repr(diff)
+    assert "new-secret" not in repr(diff)
 
 
 def test_social_url_extraction_strips_sentence_punctuation():
