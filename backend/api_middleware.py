@@ -1,15 +1,16 @@
 """
-api_middleware — request ID injection, structured logging, and an in-memory
-token-bucket rate limiter.
+api_middleware — request ID injection, structured logging, request media-type
+validation, and an in-memory token-bucket rate limiter.
 
 Everything here is dependency-free (stdlib only) so it ships with the rest
 of the FastAPI app and adds zero install steps.
 
 Public surface:
-  • RequestIdMiddleware   — adds a canonical X-Request-Id header
-  • AccessLogMiddleware   — single-line structured log per request
-  • RateLimiterMiddleware — bounded per-IP token-bucket; 429 on overflow
-  • get_stats()           — observability snapshot (for /api/_telemetry)
+  • RequestIdMiddleware             — adds a canonical X-Request-Id header
+  • AccessLogMiddleware             — single-line structured log per request
+  • ContentTypeValidationMiddleware — 415 on unsupported body media types
+  • RateLimiterMiddleware           — bounded per-IP token-bucket; 429 on overflow
+  • get_stats()                     — observability snapshot (for /api/_telemetry)
 
 Tunable via env:
   RATE_LIMIT_PER_MIN      (int)   default 600        — 10 rps per IP
@@ -94,6 +95,15 @@ _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 _MAX_RETRY_AFTER_SECONDS = 86_400
 _MAX_XFF_HOPS = 32
 _MAX_XFF_CHARS = 2048
+_DEFAULT_ALLOWED_MEDIA_TYPES = frozenset(
+    {
+        "application/json",
+        "application/x-www-form-urlencoded",
+        "multipart/form-data",
+        "text/plain",
+        "application/octet-stream",
+    }
+)
 
 # Telemetry counters (in-memory) ───────────────────────────────────────
 _lat_ring: Deque[float] = deque(maxlen=1024)
@@ -246,6 +256,51 @@ def _client_ip(request: Request) -> str:
 def _matches_path_prefix(path: str, prefix: str = "/api") -> bool:
     """Match a route root exactly or one of its descendants, never lookalikes."""
     return path == prefix or path.startswith(prefix + "/")
+
+
+# ── Content-Type validation ───────────────────────────────────────────
+class ContentTypeValidationMiddleware(BaseHTTPMiddleware):
+    """Reject ambiguous or unsupported media types on non-empty requests."""
+
+    def __init__(self, app, *, allowed_media_types=None):
+        super().__init__(app)
+        configured = allowed_media_types or _DEFAULT_ALLOWED_MEDIA_TYPES
+        self.allowed_media_types = frozenset(
+            value.strip().lower() for value in configured if value.strip()
+        )
+
+    @staticmethod
+    def _has_body(request: Request) -> bool:
+        content_length = request.headers.get("content-length")
+        if content_length is not None:
+            try:
+                return int(content_length) > 0
+            except ValueError:
+                return True
+        return bool(request.headers.get("transfer-encoding"))
+
+    def _is_allowed(self, media_type: str) -> bool:
+        return media_type in self.allowed_media_types or (
+            media_type.startswith("application/") and media_type.endswith("+json")
+        )
+
+    async def dispatch(self, request: Request, call_next: Callable):
+        if not self._has_body(request):
+            return await call_next(request)
+
+        values = request.headers.getlist("content-type")
+        if len(values) != 1:
+            return JSONResponse(
+                {"detail": "Unsupported Media Type"}, status_code=415
+            )
+
+        media_type = values[0].split(";", 1)[0].strip().lower()
+        if not media_type or not self._is_allowed(media_type):
+            return JSONResponse(
+                {"detail": "Unsupported Media Type"}, status_code=415
+            )
+
+        return await call_next(request)
 
 
 # ── Access log ────────────────────────────────────────────────────────
@@ -462,8 +517,9 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
 def install_middleware(app) -> None:
     """Install middleware in the intentional Starlette LIFO order.
 
-    Client → RateLimiter → RequestId → AccessLog → handler
+    Client → RateLimiter → RequestId → AccessLog → ContentTypeValidation → handler
     """
+    app.add_middleware(ContentTypeValidationMiddleware)
     app.add_middleware(AccessLogMiddleware)
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(RateLimiterMiddleware)
