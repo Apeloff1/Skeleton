@@ -37,6 +37,10 @@ SECRET_DIRECTIVE_NAME_RE = re.compile(
     re.IGNORECASE,
 )
 ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+PARSER_ESCAPE_RE = re.compile(
+    r"^#\s*escape\s*=\s*(?P<escape>[\\`])\s*$",
+    re.IGNORECASE,
+)
 DEPLOYABLE_DOCKERFILES = (
     Path("Dockerfile"),
     Path("backend/Dockerfile"),
@@ -134,8 +138,24 @@ def policy_violations(
     return findings
 
 
+def _docker_escape_character(text: str) -> str:
+    """Resolve Docker's optional leading ``# escape=`` parser directive."""
+    escape = "\\"
+    for raw_line in text.splitlines():
+        stripped = raw_line.strip()
+        if not stripped:
+            continue
+        if not stripped.startswith("#"):
+            break
+        match = PARSER_ESCAPE_RE.fullmatch(stripped)
+        if match:
+            escape = match.group("escape")
+    return escape
+
+
 def _logical_instructions(text: str):
     """Yield ``(start_line, instruction)`` with Docker continuations joined."""
+    escape = _docker_escape_character(text)
     parts: list[str] = []
     start_line = 0
     for number, raw_line in enumerate(text.splitlines(), 1):
@@ -144,7 +164,7 @@ def _logical_instructions(text: str):
             continue
         if not parts:
             start_line = number
-        continued = stripped.endswith("\\")
+        continued = stripped.endswith(escape)
         piece = stripped[:-1].rstrip() if continued else stripped
         parts.append(piece)
         if not continued:
