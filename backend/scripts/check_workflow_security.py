@@ -1,6 +1,7 @@
 """Static GitHub Actions policy gate."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import re
 import sys
@@ -73,8 +74,28 @@ UNTRUSTED_RUN_CONTEXTS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 
 
+class WorkflowScanError(RuntimeError):
+    """Raised when workflow discovery cannot prove complete local coverage."""
+
+
 def workflow_files() -> list[Path]:
-    return sorted([*WORKFLOW_DIR.glob("*.yml"), *WORKFLOW_DIR.glob("*.yaml")])
+    """Return workflow files without following symlinks or hiding I/O errors."""
+    try:
+        with os.scandir(WORKFLOW_DIR) as entries:
+            workflows: list[Path] = []
+            for entry in entries:
+                if not entry.name.endswith((".yml", ".yaml")):
+                    continue
+                try:
+                    if entry.is_symlink():
+                        raise WorkflowScanError("workflow source traversal failed")
+                    if entry.is_file(follow_symlinks=False):
+                        workflows.append(Path(entry.path))
+                except OSError as exc:
+                    raise WorkflowScanError("workflow source traversal failed") from exc
+    except OSError as exc:
+        raise WorkflowScanError("workflow source traversal failed") from exc
+    return sorted(workflows)
 
 
 def _is_local(reference: str) -> bool:
@@ -345,7 +366,7 @@ def violations(path: Path) -> list[str]:
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as exc:
-        return [f"{path}: read failure: {exc}"]
+        return [f"{path}: read failure: {type(exc).__name__}"]
 
     findings: list[str] = []
     findings.extend(input_boundary_violations(path))
@@ -408,7 +429,12 @@ def violations(path: Path) -> list[str]:
 
 def main() -> int:
     findings: list[str] = []
-    workflows = workflow_files()
+    try:
+        workflows = workflow_files()
+    except WorkflowScanError as exc:
+        print("GitHub Actions workflow security violations detected:", file=sys.stderr)
+        print(f"  - scanner coverage failure: {exc}", file=sys.stderr)
+        return 1
     if not workflows:
         print("No GitHub Actions workflows found.", file=sys.stderr)
         return 1
