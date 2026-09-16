@@ -107,6 +107,7 @@ python backend/scripts/check_malware_iocs.py
 printf '\n== Backend security scanner regressions ==\n'
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_exec_guard.py \
+  backend/tests/test_auth_security.py \
   backend/tests/test_process_safety_gate.py \
   backend/tests/test_process_safety_destructuring.py \
   backend/tests/test_process_safety_partial.py \
@@ -127,6 +128,11 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_repository_python_sast_scope.py \
   backend/tests/test_js_process_alias_safety.py \
   backend/tests/test_workflow_security_gate.py \
+  backend/tests/test_workflow_flow_style_security.py \
+  backend/tests/test_workflow_event_context_security.py \
+  backend/tests/test_workflow_quoted_key_security.py \
+  backend/tests/test_workflow_flow_uses_security.py \
+  backend/tests/test_workflow_trigger_security.py \
   backend/tests/test_workflow_security_checkout_credentials.py \
   backend/tests/test_workflow_input_security_gate.py \
   backend/tests/test_workflow_event_shell_security.py \
@@ -134,7 +140,13 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_secret_hygiene_gate.py \
   backend/tests/test_malware_ioc_gate.py \
   backend/tests/test_malware_ioc_io_fail_closed.py \
+  backend/tests/test_developer_tooling_security.py \
   backend/tests/test_incident_response_runbook.py \
+  backend/tests/test_api_middleware_adversarial.py \
+  backend/tests/test_api_middleware_regression_gaps.py \
+  backend/tests/test_proxy_header_bounds.py \
+  backend/tests/test_request_identity_logging_security.py \
+  backend/tests/test_security_middleware_properties.py \
   backend/tests/test_webhook_cron_security.py \
   backend/tests/test_audit_framing_stack.py
 
