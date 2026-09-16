@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import pytest
 
-from skeleton.pr_automation.ruleset import DEFAULT_GITHUB_ACTIONS_APP_ID, build_ruleset
+from skeleton.pr_automation.ruleset import (
+    DEFAULT_GITHUB_ACTIONS_APP_ID,
+    DEFAULT_MERGE_READINESS_CONTEXT,
+    build_ruleset,
+)
 from skeleton.pr_automation.runner import GATE_CONTEXT
 
 
-def test_ruleset_requires_trusted_gate_and_strict_up_to_date_checks():
+def test_ruleset_requires_native_readiness_policy_gate_and_strict_up_to_date_checks():
     payload = build_ruleset(branch="main", approvals=1)
     assert payload["enforcement"] == "active"
     assert payload["conditions"]["ref_name"]["include"] == ["refs/heads/main"]
@@ -24,7 +28,11 @@ def test_ruleset_requires_trusted_gate_and_strict_up_to_date_checks():
     checks = by_type["required_status_checks"]["parameters"]
     assert checks["strict_required_status_checks_policy"] is True
     assert checks["required_status_checks"] == [
-        {"context": GATE_CONTEXT, "integration_id": DEFAULT_GITHUB_ACTIONS_APP_ID}
+        {
+            "context": DEFAULT_MERGE_READINESS_CONTEXT,
+            "integration_id": DEFAULT_GITHUB_ACTIONS_APP_ID,
+        },
+        {"context": GATE_CONTEXT, "integration_id": DEFAULT_GITHUB_ACTIONS_APP_ID},
     ]
 
 
@@ -38,11 +46,18 @@ def test_ruleset_rejects_unsafe_or_ambiguous_inputs():
     with pytest.raises(ValueError):
         build_ruleset(gate_context="")
     with pytest.raises(ValueError):
+        build_ruleset(merge_readiness_context="")
+    with pytest.raises(ValueError):
+        build_ruleset(gate_context="same", merge_readiness_context="same")
+    with pytest.raises(ValueError):
         build_ruleset(integration_id=0)
 
 
-def test_ruleset_can_omit_app_binding_when_a_non_actions_status_provider_is_intended():
+def test_ruleset_can_omit_app_binding_when_non_actions_status_providers_are_intended():
     payload = build_ruleset(integration_id=None)
     by_type = {rule["type"]: rule for rule in payload["rules"]}
     checks = by_type["required_status_checks"]["parameters"]["required_status_checks"]
-    assert checks == [{"context": GATE_CONTEXT}]
+    assert checks == [
+        {"context": DEFAULT_MERGE_READINESS_CONTEXT},
+        {"context": GATE_CONTEXT},
+    ]
