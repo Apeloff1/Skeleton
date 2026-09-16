@@ -35,11 +35,9 @@ def require(condition: bool, message: str, failures: list[str]) -> None:
 
 
 def job_block(text: str, job_name: str) -> str:
-    """Return one top-level workflow job block without leaking into later jobs."""
     target = re.search(rf"^  {re.escape(job_name)}:\s*$", text, re.MULTILINE)
     if target is None:
         return ""
-
     next_job = JOB_HEADER_RE.search(text, target.end())
     end = next_job.start() if next_job is not None else len(text)
     return text[target.start() : end]
@@ -53,111 +51,39 @@ def main() -> int:
         raise SystemExit(f"merge-readiness contract: cannot read workflow: {exc}")
 
     require("concurrency:" in text, "merge-readiness concurrency policy missing", failures)
-    require(
-        CONCURRENCY_GROUP in text,
-        "merge-readiness concurrency must deduplicate PRs while preserving each main head SHA",
-        failures,
-    )
-    require(
-        CANCEL_POLICY in text,
-        "only superseded pull-request merge-readiness runs may be cancelled",
-        failures,
-    )
-    require(
-        "cancel-in-progress: true" not in text,
-        "unconditional merge-readiness cancellation can erase canonical main verification evidence",
-        failures,
-    )
-    require(
-        "github.event.pull_request.number || github.ref" not in text,
-        "branch-ref merge-readiness grouping can starve main verification during rapid merges",
-        failures,
-    )
-    require(
-        re.search(r'^\s*PYTHON_VERSION:\s*"3\.11\.16"\s*$', text, re.MULTILINE) is not None,
-        f"Python must be pinned to {PYTHON_VERSION}",
-        failures,
-    )
-    require(
-        re.search(r'^\s*NODE_VERSION:\s*"24\.20\.0"\s*$', text, re.MULTILINE) is not None,
-        f"Node must be pinned to {NODE_VERSION}",
-        failures,
-    )
-    require(
-        text.count('python-version: "${{ env.PYTHON_VERSION }}"') == 4,
-        "all four Python setup sites must consume PYTHON_VERSION",
-        failures,
-    )
-    require(
-        'node-version: "${{ env.NODE_VERSION }}"' in text,
-        "Node setup must consume NODE_VERSION",
-        failures,
-    )
+    require(CONCURRENCY_GROUP in text, "merge-readiness concurrency must deduplicate PRs while preserving each main head SHA", failures)
+    require(CANCEL_POLICY in text, "only superseded pull-request merge-readiness runs may be cancelled", failures)
+    require("cancel-in-progress: true" not in text, "unconditional merge-readiness cancellation can erase canonical main verification evidence", failures)
+    require("github.event.pull_request.number || github.ref" not in text, "branch-ref merge-readiness grouping can starve main verification during rapid merges", failures)
+    require(re.search(r'^\s*PYTHON_VERSION:\s*"3\.11\.16"\s*$', text, re.MULTILINE) is not None, f"Python must be pinned to {PYTHON_VERSION}", failures)
+    require(re.search(r'^\s*NODE_VERSION:\s*"24\.20\.0"\s*$', text, re.MULTILINE) is not None, f"Node must be pinned to {NODE_VERSION}", failures)
+    require(text.count('python-version: "${{ env.PYTHON_VERSION }}"') == 4, "all four Python setup sites must consume PYTHON_VERSION", failures)
+    require('node-version: "${{ env.NODE_VERSION }}"' in text, "Node setup must consume NODE_VERSION", failures)
     require(f'"ruff=={RUFF_VERSION}"' in text, f"Ruff must be pinned to {RUFF_VERSION}", failures)
     require("ruff==0.9.*" not in text, "wildcard Ruff execution is forbidden", failures)
-    require(
-        "--frozen-lockfile --non-interactive" in text,
-        "frontend install must be frozen and non-interactive",
-        failures,
-    )
+    require("--frozen-lockfile --non-interactive" in text, "frontend install must be frozen and non-interactive", failures)
     require("python scripts/check_flaky_quarantine.py" in text, "quarantine policy checker must run", failures)
     require("bash scripts/quality-gates.sh" in text, "canonical quality/security gates must run", failures)
     require(GITLEAKS_PIN in text, "full-history Gitleaks action pin drifted", failures)
     require("continue-on-error: true" not in text, "required merge gates must not hide failures", failures)
-    require(
-        'ports:\n          - "27017:27017"' in text,
-        "Mongo service port must use explicit quoted list syntax",
-        failures,
-    )
+    require('ports:\n          - "27017:27017"' in text, "Mongo service port must use explicit quoted list syntax", failures)
 
     quality_security = job_block(text, "quality_security")
     require(bool(quality_security), "quality_security job missing", failures)
-    require(
-        REPO_INTEL_CHECK in quality_security,
-        "quality_security must validate the frontier repository knowledge-graph contract",
-        failures,
-    )
-    require(
-        REPO_INTEL_SNAPSHOT in quality_security,
-        "quality_security must materialize the frontier semantic/supply-chain/build-surface snapshot",
-        failures,
-    )
-    require(
-        REPO_INTEL_BASE in quality_security,
-        "frontier snapshot must fall back to origin/main outside pull-request events",
-        failures,
-    )
-    require(
-        REPO_INTEL_PR_GATE_BASE in quality_security,
-        "repo-intelligence PR gate must compare against the immutable pull-request base SHA",
-        failures,
-    )
-    require(
-        REPO_INTEL_GATE in quality_security,
-        "quality_security must enforce augmentation notes for build-affecting pull requests",
-        failures,
-    )
+    require(REPO_INTEL_CHECK in quality_security, "quality_security must validate the frontier repository knowledge-graph contract", failures)
+    require(REPO_INTEL_SNAPSHOT in quality_security, "quality_security must materialize the frontier semantic/supply-chain/build-surface snapshot", failures)
+    require(REPO_INTEL_BASE in quality_security, "frontier snapshot must fall back to origin/main outside pull-request events", failures)
+    require(REPO_INTEL_PR_GATE_BASE in quality_security, "repo-intelligence PR gate must compare against the immutable pull-request base SHA", failures)
+    require(REPO_INTEL_GATE in quality_security, "quality_security must enforce augmentation notes for build-affecting pull requests", failures)
 
     readiness = job_block(text, "readiness")
     require(bool(readiness), "readiness job missing", failures)
     require("name: Merge Readiness" in readiness, "stable Merge Readiness job name missing", failures)
-    require(
-        READINESS_GUARD in readiness,
-        "Merge Readiness must aggregate active validation runs while preserving draft/close cancellation barriers",
-        failures,
-    )
+    require(READINESS_GUARD in readiness, "Merge Readiness must aggregate active validation runs while preserving draft/close cancellation barriers", failures)
     require('result != "success"' in readiness, "Merge Readiness must fail on every non-success result", failures)
     for job in REQUIRED_NEEDS:
-        require(
-            re.search(rf"^\s+-\s+{re.escape(job)}\s*$", readiness, re.MULTILINE) is not None,
-            f"Merge Readiness missing required dependency {job}",
-            failures,
-        )
-        require(
-            f"needs.{job}.result" in readiness,
-            f"Merge Readiness missing explicit result binding for {job}",
-            failures,
-        )
+        require(re.search(rf"^\s+-\s+{re.escape(job)}\s*$", readiness, re.MULTILINE) is not None, f"Merge Readiness missing required dependency {job}", failures)
+        require(f"needs.{job}.result" in readiness, f"Merge Readiness missing explicit result binding for {job}", failures)
 
     required_files = (
         ".github/ci/flaky-quarantine.json",
@@ -167,6 +93,7 @@ def main() -> int:
         "scripts/repo_intel_supply_chain.py",
         "scripts/repo_intel_deep.py",
         "scripts/repo_intel_test_evidence.py",
+        "scripts/repo_intel_artifacts.py",
         "scripts/repo_index.py",
         "scripts/repo_intel_frontier.py",
         "repo-intel/batches.json",
@@ -176,6 +103,7 @@ def main() -> int:
         "repo-intel/query-contract.json",
         "repo-intel/deep-index-contract.json",
         "repo-intel/test-evidence-contract.json",
+        "repo-intel/artifact-lineage-contract.json",
     )
     for relative in required_files:
         require((ROOT / relative).is_file(), f"required merge-readiness contract file missing: {relative}", failures)
@@ -188,7 +116,7 @@ def main() -> int:
 
     print(
         "Merge-readiness contract passed: stable aggregate, exact toolchain, PR-safe supersession, "
-        "non-cancelling main verification, frontier repo knowledge-graph/test-evidence/augmentation-note enforcement, "
+        "non-cancelling main verification, frontier graph/test-evidence/artifact-lineage/augmentation-note enforcement, "
         "quarantine/security/secret gates, and explicit fail-closed result aggregation are aligned."
     )
     return 0
