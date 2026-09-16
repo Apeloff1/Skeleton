@@ -40,24 +40,45 @@ class GameReference:
 
     @classmethod
     def from_mapping(cls, raw: Mapping[str, Any]) -> "GameReference":
-        if int(raw.get("stored_prose", 0)) != 0:
+        if not isinstance(raw, Mapping):
+            raise ValueError("game reference entries must be objects")
+        if raw.get("stored_prose", 0) != 0:
             raise ValueError("game knowledge references must remain metadata-only")
-        required = ("appid", "title", "era", "dialect", "source", "citation", "license", "url")
-        missing = [key for key in required if raw.get(key) in (None, "")]
-        if missing:
-            raise ValueError(f"game reference missing required fields: {', '.join(missing)}")
+
+        required = ("title", "era", "dialect", "source", "citation", "license", "url")
+        invalid = [
+            key
+            for key in required
+            if not isinstance(raw.get(key), str) or not str(raw[key]).strip()
+        ]
+        if invalid:
+            raise ValueError(f"game reference missing required text fields: {', '.join(invalid)}")
+
+        appid = raw.get("appid")
+        if isinstance(appid, bool) or not isinstance(appid, int) or appid <= 0:
+            raise ValueError("game reference appid must be a positive integer")
+
+        optional_text = ("wiki", "wiki_citation", "wiki_license")
+        invalid_optional = [
+            key
+            for key in optional_text
+            if key in raw and not isinstance(raw[key], str)
+        ]
+        if invalid_optional:
+            raise ValueError(f"game reference optional fields must be text: {', '.join(invalid_optional)}")
+
         return cls(
-            appid=int(raw["appid"]),
-            title=str(raw["title"]),
-            era=str(raw["era"]),
-            dialect=str(raw["dialect"]),
-            source=str(raw["source"]),
-            citation=str(raw["citation"]),
-            license=str(raw["license"]),
-            url=str(raw["url"]),
-            wiki=str(raw.get("wiki", "")),
-            wiki_citation=str(raw.get("wiki_citation", "")),
-            wiki_license=str(raw.get("wiki_license", "")),
+            appid=appid,
+            title=raw["title"].strip(),
+            era=raw["era"].strip(),
+            dialect=raw["dialect"].strip(),
+            source=raw["source"].strip(),
+            citation=raw["citation"].strip(),
+            license=raw["license"].strip(),
+            url=raw["url"].strip(),
+            wiki=raw.get("wiki", "").strip(),
+            wiki_citation=raw.get("wiki_citation", "").strip(),
+            wiki_license=raw.get("wiki_license", "").strip(),
         )
 
     def to_context(self) -> dict[str, Any]:
@@ -109,13 +130,23 @@ class GameKnowledgeBase:
     def from_path(cls, path: str | Path) -> "GameKnowledgeBase":
         source_path = Path(path)
         raw = json.loads(source_path.read_text(encoding="utf-8"))
+        if not isinstance(raw, Mapping):
+            raise ValueError("game knowledge file must contain an object")
         if raw.get("kind") != "reference-index":
             raise ValueError("game knowledge file must be a reference-index")
         items = raw.get("games")
         if not isinstance(items, list) or not items:
             raise ValueError("game knowledge reference-index has no games")
-        if raw.get("n") is not None and int(raw["n"]) != len(items):
-            raise ValueError("game knowledge reference count does not match index metadata")
+        if not all(isinstance(item, Mapping) for item in items):
+            raise ValueError("game knowledge reference entries must be objects")
+
+        declared_count = raw.get("n")
+        if declared_count is not None:
+            if isinstance(declared_count, bool) or not isinstance(declared_count, int):
+                raise ValueError("game knowledge reference count must be an integer")
+            if declared_count != len(items):
+                raise ValueError("game knowledge reference count does not match index metadata")
+
         references = [GameReference.from_mapping(item) for item in items]
         return cls(references, source=str(source_path))
 
