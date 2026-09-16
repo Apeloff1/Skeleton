@@ -19,9 +19,9 @@ READINESS_GUARD = (
     "(!github.event.pull_request.draft && github.event.action != 'converted_to_draft' "
     "&& github.event.action != 'closed')) }}"
 )
-REPO_INTEL_CHECK = "python scripts/repo_intel.py check"
-REPO_INTEL_SNAPSHOT = "python scripts/repo_intel.py snapshot --out .cache/repo-intel"
-REPO_INTEL_GATE = 'python scripts/repo_intel.py gate --base "$REPO_INTEL_BASE"'
+REPO_INTEL_CHECK = "python scripts/repo_index.py check"
+REPO_INTEL_SNAPSHOT = 'python scripts/repo_index.py snapshot --base "$REPO_INTEL_BASE" --out .cache/repo-intel'
+REPO_INTEL_GATE = 'python scripts/repo_index.py gate --base "$REPO_INTEL_BASE"'
 REPO_INTEL_BASE = "REPO_INTEL_BASE: ${{ github.event.pull_request.base.sha }}"
 JOB_HEADER_RE = re.compile(r"^  (?P<name>[A-Za-z0-9_-]+):\s*$", re.MULTILINE)
 
@@ -103,12 +103,12 @@ def main() -> int:
     require(bool(quality_security), "quality_security job missing", failures)
     require(
         REPO_INTEL_CHECK in quality_security,
-        "quality_security must validate the repository-intelligence contract",
+        "quality_security must validate the canonical repository knowledge-graph contract",
         failures,
     )
     require(
         REPO_INTEL_SNAPSHOT in quality_security,
-        "quality_security must materialize the current build/gap/security snapshot",
+        "quality_security must materialize the canonical semantic/supply-chain/impact snapshot",
         failures,
     )
     require(
@@ -143,11 +143,21 @@ def main() -> int:
             failures,
         )
 
-    require((ROOT / ".github/ci/flaky-quarantine.json").is_file(), "flaky quarantine registry missing", failures)
-    require((ROOT / "scripts/check_flaky_quarantine.py").is_file(), "flaky quarantine checker missing", failures)
-    require((ROOT / "scripts/repo_intel.py").is_file(), "repository intelligence scanner missing", failures)
-    require((ROOT / "repo-intel/batches.json").is_file(), "100-batch repository intelligence plan missing", failures)
-    require((ROOT / "repo-intel/game-capabilities.json").is_file(), "game-creation capability envelope missing", failures)
+    required_files = (
+        ".github/ci/flaky-quarantine.json",
+        "scripts/check_flaky_quarantine.py",
+        "scripts/repo_intel.py",
+        "scripts/repo_intel_sota.py",
+        "scripts/repo_intel_supply_chain.py",
+        "scripts/repo_index.py",
+        "repo-intel/batches.json",
+        "repo-intel/game-capabilities.json",
+        "repo-intel/boundaries.json",
+        "repo-intel/ownership.json",
+        "repo-intel/query-contract.json",
+    )
+    for relative in required_files:
+        require((ROOT / relative).is_file(), f"required merge-readiness contract file missing: {relative}", failures)
 
     if failures:
         print("Merge-readiness contract violations:")
@@ -157,7 +167,7 @@ def main() -> int:
 
     print(
         "Merge-readiness contract passed: stable aggregate, exact toolchain, PR-safe supersession, "
-        "non-cancelling main verification, repo-intelligence/augmentation-note enforcement, "
+        "non-cancelling main verification, canonical repo knowledge-graph/augmentation-note enforcement, "
         "quarantine/security/secret gates, and explicit fail-closed result aggregation are aligned."
     )
     return 0
