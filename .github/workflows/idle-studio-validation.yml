@@ -2,7 +2,6 @@ name: Idle Studio Validation
 
 on:
   pull_request:
-    branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - '.github/workflows/idle-studio.yml'
@@ -18,6 +17,7 @@ on:
       - 'skeleton/automation/supervised_studio.py'
       - 'skeleton/automation/studio_registry.py'
       - 'skeleton/automation/studio_report.py'
+      - 'skeleton/automation/task_squad.py'
       - 'skeleton/testing/test_idle_studio.py'
       - 'skeleton/testing/test_idle_studio_v2.py'
       - 'skeleton/testing/test_idle_studio_publisher.py'
@@ -28,6 +28,7 @@ on:
       - 'tests/test_shift_supervisor_consumer_plan.py'
       - 'tests/test_shift_supervisor_scheduler.py'
       - 'tests/test_shift_supervisor_workforce_report.py'
+      - 'tests/test_studio_task_squad.py'
 
 permissions:
   contents: read
@@ -71,6 +72,7 @@ jobs:
           skeleton/automation/supervised_studio.py
           skeleton/automation/studio_registry.py
           skeleton/automation/studio_report.py
+          skeleton/automation/task_squad.py
 
       - name: Run focused idle studio contracts
         env:
@@ -105,3 +107,4 @@ jobs:
           skeleton/testing/test_studio_director.py
           skeleton/testing/test_supervised_studio.py
           skeleton/testing/test_studio_report.py
+          tests/test_studio_task_squad.py
