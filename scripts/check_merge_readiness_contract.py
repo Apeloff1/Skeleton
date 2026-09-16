@@ -11,7 +11,19 @@ PYTHON_VERSION = "3.11.16"
 NODE_VERSION = "24.20.0"
 RUFF_VERSION = "0.9.10"
 GITLEAKS_PIN = "gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e"
-REQUIRED_NEEDS = ("quarantine_policy", "unit", "integration_smoke", "quality_security")
+REQUIRED_NEEDS = (
+    "quarantine_policy",
+    "unit",
+    "integration_smoke",
+    "quality_security",
+    "pr_automation",
+)
+PR_AUTOMATION_TESTS = (
+    "skeleton/testing/test_pr_automation.py",
+    "skeleton/testing/test_pr_automation_ruleset.py",
+    "skeleton/testing/test_pr_automation_sensitive_paths.py",
+    "skeleton/testing/test_pr_automation_workflow.py",
+)
 CONCURRENCY_GROUP = "group: merge-readiness-${{ github.event.pull_request.number || github.sha }}"
 CANCEL_POLICY = "cancel-in-progress: ${{ github.event_name == 'pull_request' }}"
 READINESS_GUARD = (
@@ -77,8 +89,8 @@ def main() -> int:
         failures,
     )
     require(
-        text.count('python-version: "${{ env.PYTHON_VERSION }}"') == 4,
-        "all four Python setup sites must consume PYTHON_VERSION",
+        text.count('python-version: "${{ env.PYTHON_VERSION }}"') == 5,
+        "all five Python setup sites must consume PYTHON_VERSION",
         failures,
     )
     require(
@@ -88,12 +100,37 @@ def main() -> int:
     )
     require(f'"ruff=={RUFF_VERSION}"' in text, f"Ruff must be pinned to {RUFF_VERSION}", failures)
     require("ruff==0.9.*" not in text, "wildcard Ruff execution is forbidden", failures)
-    require("--frozen-lockfile --non-interactive" in text, "frontend install must be frozen and non-interactive", failures)
+    require(
+        "--frozen-lockfile --non-interactive" in text,
+        "frontend install must be frozen and non-interactive",
+        failures,
+    )
     require("python scripts/check_flaky_quarantine.py" in text, "quarantine policy checker must run", failures)
     require("bash scripts/quality-gates.sh" in text, "canonical quality/security gates must run", failures)
     require(GITLEAKS_PIN in text, "full-history Gitleaks action pin drifted", failures)
     require("continue-on-error: true" not in text, "required merge gates must not hide failures", failures)
-    require('ports:\n          - "27017:27017"' in text, "Mongo service port must use explicit quoted list syntax", failures)
+    require(
+        'ports:\n          - "27017:27017"' in text,
+        "Mongo service port must use explicit quoted list syntax",
+        failures,
+    )
+
+    pr_automation = job_block(text, "pr_automation")
+    require(bool(pr_automation), "PR automation validation job missing", failures)
+    require("name: PR Automation Tests" in pr_automation, "stable PR Automation Tests job name missing", failures)
+    require(
+        "python -m compileall -q skeleton/pr_automation" in pr_automation,
+        "PR automation package compilation gate missing",
+        failures,
+    )
+    require(
+        'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in pr_automation,
+        "PR automation tests must disable ambient pytest plugins",
+        failures,
+    )
+    require("--noconftest" in pr_automation, "PR automation tests must avoid unrelated conftest state", failures)
+    for test_path in PR_AUTOMATION_TESTS:
+        require(test_path in pr_automation, f"PR automation gate missing {test_path}", failures)
 
     readiness = job_block(text, "readiness")
     require(bool(readiness), "readiness job missing", failures)
@@ -127,8 +164,8 @@ def main() -> int:
 
     print(
         "Merge-readiness contract passed: stable aggregate, exact toolchain, PR-safe supersession, "
-        "non-cancelling main verification, quarantine/security/secret gates, and explicit fail-closed "
-        "result aggregation are aligned."
+        "non-cancelling main verification, quarantine/security/secret gates, focused PR automation "
+        "contracts, and explicit fail-closed result aggregation are aligned."
     )
     return 0
 
