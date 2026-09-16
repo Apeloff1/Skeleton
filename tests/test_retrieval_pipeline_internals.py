@@ -70,6 +70,12 @@ def test_prefetch_worker_count_must_be_positive() -> None:
         QueryPlanner(prefetch_workers=0)
 
 
+@pytest.mark.parametrize("value", [True, 1.5, "2"])
+def test_prefetch_worker_count_must_be_an_integer(value) -> None:
+    with pytest.raises(TypeError, match="prefetch_workers must be an integer"):
+        QueryPlanner(prefetch_workers=value)
+
+
 def test_failed_prefetch_is_retried_by_normal_execution() -> None:
     calls = 0
 
@@ -233,6 +239,23 @@ def test_default_top_k_path_uses_planner_limit_without_fuser_attribute() -> None
     results = planner.execute("limit")
 
     assert len(results) == 10
+
+
+@pytest.mark.parametrize("value", [True, 1.5, "2"])
+def test_execute_top_k_must_be_an_integer(value) -> None:
+    planner = QueryPlanner()
+    planner.register("rag", lambda query: [_result("doc-1", query)])
+
+    with pytest.raises(TypeError, match="top_k must be an integer"):
+        planner.execute("limit", top_k=value)
+
+
+def test_execute_top_k_must_be_positive() -> None:
+    planner = QueryPlanner()
+    planner.register("rag", lambda query: [_result("doc-1", query)])
+
+    with pytest.raises(ValueError, match="top_k must be >= 1"):
+        planner.execute("limit", top_k=0)
 
 
 def test_feature_reranker_receives_and_returns_scored_results() -> None:
