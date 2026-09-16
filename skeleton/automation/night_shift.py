@@ -1,9 +1,4 @@
-"""Safe, repository-native maintenance bots for scheduled unattended runs.
-
-The worker operates only through the GitHub CLI against the trusted default branch.
-It never executes pull-request code, changes source files, or merges arbitrary PRs.
-It labels/annotates actionable backlog and writes a compact nightly report issue.
-"""
+"""Safe, repository-native maintenance bots for scheduled unattended runs."""
 
 from __future__ import annotations
 
@@ -29,27 +24,18 @@ class Gh:
         self.timeout = timeout
 
     def run(self, args: Sequence[str], *, check: bool = True) -> str:
-        p = subprocess.run(
-            ["gh", *args], capture_output=True, text=True,
-            timeout=self.timeout, check=check,
-        )
+        p = subprocess.run(["gh", *args], capture_output=True, text=True, timeout=self.timeout, check=check)
         return p.stdout
 
     def json(self, args: Sequence[str]) -> Any:
         return json.loads(self.run(args) or "null")
 
     def issues(self, limit: int = 100) -> list[Mapping[str, Any]]:
-        data = self.json([
-            "issue", "list", "--repo", self.repo, "--state", "open",
-            "--limit", str(limit), "--json", "number,title,body,labels,updatedAt,author,url",
-        ])
+        data = self.json(["issue", "list", "--repo", self.repo, "--state", "open", "--limit", str(limit), "--json", "number,title,body,labels,updatedAt,author,url"])
         return data if isinstance(data, list) else []
 
     def prs(self, limit: int = 100) -> list[Mapping[str, Any]]:
-        data = self.json([
-            "pr", "list", "--repo", self.repo, "--state", "open",
-            "--limit", str(limit), "--json", "number,title,body,labels,author,url,headRefName,baseRefName",
-        ])
+        data = self.json(["pr", "list", "--repo", self.repo, "--state", "open", "--limit", str(limit), "--json", "number,title,body,labels,author,url,headRefName,baseRefName"])
         return data if isinstance(data, list) else []
 
     def add_label(self, number: int, label: str) -> None:
@@ -81,7 +67,6 @@ def labels_for(text: str) -> tuple[str, ...]:
 
 def triage(gh: Gh) -> BotResult:
     changed = 0
-    notes: list[str] = []
     for item in gh.issues():
         number = item.get("number")
         if not isinstance(number, int):
@@ -91,8 +76,7 @@ def triage(gh: Gh) -> BotResult:
             if label not in existing:
                 gh.add_label(number, label)
                 changed += 1
-    notes.append("classified open issues by security/CI/supply-chain/docs signals")
-    return BotResult("issue-triage", changed, tuple(notes))
+    return BotResult("issue-triage", changed, ("classified open issues",))
 
 
 def pr_triage(gh: Gh) -> BotResult:
@@ -115,20 +99,19 @@ def nightly_report(gh: Gh, results: Sequence[BotResult]) -> BotResult:
     prs = gh.prs()
     security = [x for x in issues if "security" in {str(y.get("name", "")) for y in x.get("labels", []) if isinstance(y, Mapping)}]
     lines = [
-        f"Night Shift report — {now}",
-        "",
-        f"Open issues: {len(issues)}",
-        f"Open PRs: {len(prs)}",
-        f"Security-labelled issues: {len(security)}",
-        "",
-        "Bots executed:",
+        f"Night Shift report — {now}", "", f"Open issues: {len(issues)}", f"Open PRs: {len(prs)}",
+        f"Security-labelled issues: {len(security)}", "", "Bots executed:",
         *[f"- {r.name}: {r.changed} changes — {'; '.join(r.notes) or 'ok'}" for r in results],
-        "",
-        "Safety: this run only labels/issues; it does not execute PR code, alter source, weaken security gates, or merge arbitrary changes.",
+        "", "Safety: labels/issues only; no PR code execution, source mutation, security-gate weakening, or arbitrary merges.",
     ]
-    title = f"bot: night shift report {now}"
-    gh.create_issue(title, "\n".join(lines), ("automation",))
-    return BotResult("nightly-report", 1, ("created an auditable report issue",))
+    title = "bot: night shift report"
+    existing = [x for x in issues if str(x.get("title", "")) == title]
+    body = "\n".join(lines)
+    if existing and isinstance(existing[0].get("number"), int):
+        gh.comment(existing[0]["number"], body)
+        return BotResult("nightly-report", 1, ("updated the existing report issue",))
+    gh.create_issue(title, body, ("automation",))
+    return BotResult("nightly-report", 1, ("created the report issue",))
 
 
 def main() -> int:
