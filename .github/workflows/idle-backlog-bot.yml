@@ -41,7 +41,7 @@ jobs:
 
           gh issue list --repo "$REPO" --state open --limit 100 --json number,title,updatedAt,isPullRequest,labels > "$RUNNER_TEMP/items.json"
 
-          while IFS=$'\t' read -r number title updated is_pr labels; do
+          while IFS=$'\t' read -r number title updated kind labels; do
             [[ -n "${number:-}" ]] || continue
             updated_epoch=$(date -u -d "$updated" +%s)
             (( updated_epoch < cutoff )) || continue
@@ -49,7 +49,7 @@ jobs:
 
             if [[ "$labels" != *'bot:stale'* ]]; then
               gh issue edit "$number" --repo "$REPO" --add-label 'bot:stale' >/dev/null
-              gh issue comment "$number" --repo "$REPO" --body "Repository bot triage: this ${is_pr:+pull request}${is_pr:-issue} has had no update for at least ${STALE_DAYS} days. It remains open; review whether it is still actionable, blocked, superseded, or ready for work. No automatic closure was performed." >/dev/null
+              gh issue comment "$number" --repo "$REPO" --body "Repository bot triage: this ${kind} has had no update for at least ${STALE_DAYS} days. It remains open; review whether it is still actionable, blocked, superseded, or ready for work. No automatic closure was performed." >/dev/null
               triaged=$((triaged + 1))
             fi
           done < <(jq -r '.[] | [.number,.title,.updatedAt,(if .isPullRequest then "pull request" else "issue" end),([.labels[].name] | join(","))] | @tsv' "$RUNNER_TEMP/items.json")
