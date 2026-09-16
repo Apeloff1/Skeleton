@@ -36,7 +36,7 @@ NAMESPACE_IMPORT_RE = re.compile(
 
 
 def javascript_files() -> Iterable[Path]:
-    """Walk frontend JS/TS sources without following symlinks or hiding I/O errors."""
+    """Walk frontend JS/TS sources without following or silently skipping symlinks."""
     if FRONTEND_ROOT.is_symlink():
         raise OSError("scan root must not be a symlink")
 
@@ -49,6 +49,8 @@ def javascript_files() -> Iterable[Path]:
             for entry in sorted(entries, key=lambda item: item.name):
                 if entry.name in SKIP_DIRS:
                     continue
+                if entry.is_symlink():
+                    raise OSError("scan tree must not contain symlinks")
                 if entry.is_dir(follow_symlinks=False):
                     child_dirs.append(Path(entry.path))
                 elif (
