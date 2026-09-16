@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "purpose": "Deterministic build/supply-chain/runtime-surface enrichment layered on the content-addressed semantic repository graph.",
   "history_window_commits": 600,
   "generated_outputs": [
@@ -12,6 +12,19 @@
     "history.json",
     "build-relationships.json"
   ],
+  "cache_freshness": {
+    "mode": "self-validating",
+    "tracked_workspace_identity": "Git index tree plus tracked worktree status and content hashes for unstaged changed files",
+    "untracked_files": "excluded until added to Git",
+    "read_rule": "A schema-5 snapshot may be reused only when its workspace fingerprint matches and all required companion outputs exist.",
+    "concurrent_mutation_rule": "If tracked state changes during snapshot construction, publication fails rather than emitting a mixed-state index."
+  },
+  "relationship_fidelity": {
+    "edge_identity": "Full canonical edge metadata",
+    "exact_duplicate_policy": "collapse exact duplicates",
+    "metadata_variant_policy": "preserve distinct scopes, requirements, commands and other relation metadata even when from/to/type are identical",
+    "reverse_edges": "retain relation metadata needed to distinguish incoming variants"
+  },
   "dependency_semantics": {
     "scope": "offline direct declarations",
     "ecosystems": ["pypi", "npm", "docker", "github-actions"],
