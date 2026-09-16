@@ -32,7 +32,7 @@ jobs:
 
           for file in "${files[@]}"; do
             case "$file" in
-              .github/dependabot.yml|*.lock|requirements*.txt|pyproject.toml|package.json|package-lock.json|npm-shrinkwrap.json|yarn.lock|pnpm-lock.yaml|Dockerfile|**/Dockerfile)
+              *.lock|requirements*.txt|pyproject.toml|package.json|package-lock.json|npm-shrinkwrap.json|yarn.lock|pnpm-lock.yaml)
                 ;;
               *)
                 echo "Out-of-scope file: $file"
