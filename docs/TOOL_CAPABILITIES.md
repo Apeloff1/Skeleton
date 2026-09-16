@@ -26,6 +26,8 @@ Tool arguments are data only. A model or tool call cannot self-authorize by plac
 
 The orchestrator normalizes the caller's grant iterable to an immutable set and snapshots the tool registry before yielding control to the driver. Those two snapshots define the authority surface for the lifetime of that run.
 
+`ToolRegistry.snapshot()` returns a read-only mapping detached from subsequent registry additions. Each captured `ToolDefinition` is frozen and retains its immutable declared capability set, so callers cannot rewrite the snapshot in place after authorization begins.
+
 Mutating the caller-owned grant collection after the run starts does not add authority. Registering another tool while a run is active also does not make that tool callable by the active run; the new registration becomes visible to subsequent runs only.
 
 This prevents model turns, tool handlers, concurrent registration, or other mid-run mutation from widening the capability or tool surface that was approved at run start.
