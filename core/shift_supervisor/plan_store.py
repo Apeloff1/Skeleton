@@ -73,9 +73,9 @@ class InMemoryPlanStore:
     def export_state(
         self,
         *,
-        max_items: int = 64,
-        max_workers: int = 128,
-        max_revisions: int = 64,
+        max_items: int = 32,
+        max_workers: int = 96,
+        max_revisions: int = 24,
     ) -> dict[str, Any]:
         """Return bounded JSON-safe state for cross-run persistence."""
         with self._lock:
