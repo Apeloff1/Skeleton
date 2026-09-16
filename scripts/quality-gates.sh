@@ -144,6 +144,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_workflow_action_allowlist.py \
   backend/tests/test_workflow_permissions_gate.py \
   backend/tests/test_pr_obsolete_run_from_workflow_run.py \
+  backend/tests/test_pr_churn_control.py \
   backend/tests/test_secret_hygiene_gate.py \
   backend/tests/test_malware_ioc_gate.py \
   backend/tests/test_malware_ioc_io_fail_closed.py \
