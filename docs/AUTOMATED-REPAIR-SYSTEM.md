@@ -6,7 +6,7 @@ Skeleton now has a layered automated-remediation strategy.
 
 1. **Dependabot security updates** — GitHub automatically raises security-update PRs for vulnerable dependencies when a patched version is available.
 2. **Dependabot version updates** — `.github/dependabot.yml` keeps Actions, Python, npm, and Docker dependencies current on a schedule.
-3. **Dependabot Auto-Merge** — `.github/workflows/dependabot-automerge.yml` enables GitHub auto-merge only for Dependabot PRs whose changed files stay inside the explicitly allowlisted dependency/update surface. GitHub's required checks and branch rules remain authoritative.
+3. **Dependabot Auto-Merge** — `.github/workflows/dependabot-automerge.yml` enables GitHub auto-merge only for Dependabot PRs whose changed files stay inside the explicitly allowlisted dependency-manifest/lockfile surface. GitHub's required checks and branch rules remain authoritative.
 4. **CodeQL/Copilot Autofix** — GitHub can generate fixes for supported code-scanning alerts; agentic autofix can explore the repository, validate the fix, and open a PR when the repository has the required GitHub security/Copilot capabilities enabled.
 5. **Repository backlog bot** — the repository-native backlog reader/indexer provides deterministic evidence collection and an optional ChatGPT reasoning layer for issues that need broader diagnosis than dependency updates.
 
@@ -19,7 +19,8 @@ Dependabot auto-merge is deliberately narrow:
 - only `dependabot[bot]` PRs;
 - only `dependabot/*` heads;
 - no repository checkout or execution of PR code;
-- changed files must match the dependency/update allowlist;
+- changed files must be dependency manifests or lockfiles in the explicit allowlist;
+- `.github/dependabot.yml`, workflow files, Dockerfiles, scripts, and other control-plane/runtime files are excluded;
 - GitHub required checks and branch protections must still pass;
 - merge is performed by GitHub auto-merge, not by force-pushing `main`;
 - anything outside the allowlist is left for normal review/remediation.
