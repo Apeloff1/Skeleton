@@ -55,10 +55,14 @@ def _project_id(value: str | None) -> str | None:
     if value is None:
         return None
     normalized = value.strip()
+    path_segments = normalized.split("/")
     if (
         not normalized
         or len(normalized) > _MAX_PROJECT_ID_LENGTH
         or not _PROJECT_ID_PATTERN.fullmatch(normalized)
+        or "://" in normalized
+        or normalized.startswith("/")
+        or any(segment in {"", ".", ".."} for segment in path_segments)
     ):
         raise ValueError("project_id must be a bounded canonical identifier")
     return normalized
