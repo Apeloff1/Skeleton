@@ -19,9 +19,11 @@ READINESS_GUARD = (
     "(!github.event.pull_request.draft && github.event.action != 'converted_to_draft' "
     "&& github.event.action != 'closed')) }}"
 )
-REPO_INTEL_CHECK = "python scripts/repo_index.py check"
-REPO_INTEL_SNAPSHOT = 'python scripts/repo_index.py snapshot --base "$REPO_INTEL_BASE" --out .cache/repo-intel'
-REPO_INTEL_GATE = 'python scripts/repo_index.py gate --base "$REPO_INTEL_BASE"'
+REPO_INTEL_CHECK = "python scripts/repo_intel_frontier.py check"
+REPO_INTEL_SNAPSHOT = (
+    'python scripts/repo_intel_frontier.py snapshot --base "$REPO_INTEL_BASE" --out .cache/repo-intel'
+)
+REPO_INTEL_GATE = 'python scripts/repo_intel_frontier.py gate --base "$REPO_INTEL_BASE"'
 REPO_INTEL_BASE = "REPO_INTEL_BASE: ${{ github.event.pull_request.base.sha }}"
 JOB_HEADER_RE = re.compile(r"^  (?P<name>[A-Za-z0-9_-]+):\s*$", re.MULTILINE)
 
@@ -92,23 +94,31 @@ def main() -> int:
     )
     require(f'"ruff=={RUFF_VERSION}"' in text, f"Ruff must be pinned to {RUFF_VERSION}", failures)
     require("ruff==0.9.*" not in text, "wildcard Ruff execution is forbidden", failures)
-    require("--frozen-lockfile --non-interactive" in text, "frontend install must be frozen and non-interactive", failures)
+    require(
+        "--frozen-lockfile --non-interactive" in text,
+        "frontend install must be frozen and non-interactive",
+        failures,
+    )
     require("python scripts/check_flaky_quarantine.py" in text, "quarantine policy checker must run", failures)
     require("bash scripts/quality-gates.sh" in text, "canonical quality/security gates must run", failures)
     require(GITLEAKS_PIN in text, "full-history Gitleaks action pin drifted", failures)
     require("continue-on-error: true" not in text, "required merge gates must not hide failures", failures)
-    require('ports:\n          - "27017:27017"' in text, "Mongo service port must use explicit quoted list syntax", failures)
+    require(
+        'ports:\n          - "27017:27017"' in text,
+        "Mongo service port must use explicit quoted list syntax",
+        failures,
+    )
 
     quality_security = job_block(text, "quality_security")
     require(bool(quality_security), "quality_security job missing", failures)
     require(
         REPO_INTEL_CHECK in quality_security,
-        "quality_security must validate the canonical repository knowledge-graph contract",
+        "quality_security must validate the frontier repository knowledge-graph contract",
         failures,
     )
     require(
         REPO_INTEL_SNAPSHOT in quality_security,
-        "quality_security must materialize the canonical semantic/supply-chain/impact snapshot",
+        "quality_security must materialize the frontier semantic/supply-chain/build-surface snapshot",
         failures,
     )
     require(
@@ -149,12 +159,15 @@ def main() -> int:
         "scripts/repo_intel.py",
         "scripts/repo_intel_sota.py",
         "scripts/repo_intel_supply_chain.py",
+        "scripts/repo_intel_deep.py",
         "scripts/repo_index.py",
+        "scripts/repo_intel_frontier.py",
         "repo-intel/batches.json",
         "repo-intel/game-capabilities.json",
         "repo-intel/boundaries.json",
         "repo-intel/ownership.json",
         "repo-intel/query-contract.json",
+        "repo-intel/deep-index-contract.json",
     )
     for relative in required_files:
         require((ROOT / relative).is_file(), f"required merge-readiness contract file missing: {relative}", failures)
@@ -167,7 +180,7 @@ def main() -> int:
 
     print(
         "Merge-readiness contract passed: stable aggregate, exact toolchain, PR-safe supersession, "
-        "non-cancelling main verification, canonical repo knowledge-graph/augmentation-note enforcement, "
+        "non-cancelling main verification, frontier repo knowledge-graph/augmentation-note enforcement, "
         "quarantine/security/secret gates, and explicit fail-closed result aggregation are aligned."
     )
     return 0
