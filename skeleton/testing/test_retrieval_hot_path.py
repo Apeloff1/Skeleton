@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from skeleton.retrieval.cache import ResultCache
 from skeleton.retrieval.fusion import ScoredResult
+from skeleton.retrieval.index import InvertedIndex
 from skeleton.retrieval.quad import QuadRetriever
 
 
@@ -27,6 +28,16 @@ class _CountingPlane:
 
     def add(self, chunk) -> None:
         self.added.append(chunk)
+
+
+class _NoDocumentScanDict(dict):
+    def items(self):
+        raise AssertionError("search must use postings instead of scanning documents")
+
+
+class _NoAggregateLengthDict(dict):
+    def values(self):
+        raise AssertionError("search must use the maintained total document length")
 
 
 def test_result_cache_is_lru_and_hard_bounded() -> None:
@@ -84,3 +95,50 @@ def test_ingest_invalidates_cached_rankings() -> None:
 
     assert retriever.ingest_document("doc-1", "new retrieval content") == 1
     assert retriever.stats()["cache_size"] == 0
+
+
+def test_inverted_index_search_uses_postings_without_document_scans() -> None:
+    index = InvertedIndex()
+    index.add("a", "alpha alpha beta")
+    index.add("b", "alpha beta beta beta")
+    index.add("c", "gamma")
+
+    # Search may inspect document count and individual lengths, but it must not
+    # iterate every document or recompute the aggregate length on each query.
+    index._docs = _NoDocumentScanDict(index._docs)
+    index._doc_length = _NoAggregateLengthDict(index._doc_length)
+
+    results = index.search("alpha alpha beta", top_k=2)
+
+    assert [result.fragment_id for result in results] == ["a", "b"]
+    assert [result.score for result in results] == [0.694388, 0.585462]
+    assert [result.content for result in results] == [
+        "alpha alpha beta",
+        "alpha beta beta beta",
+    ]
+    assert all(result.plane == "index" for result in results)
+
+
+def test_inverted_index_postings_and_length_track_replace_and_remove() -> None:
+    index = InvertedIndex()
+    index.add("a", "alpha beta beta")
+    index.add("b", "gamma")
+
+    assert index._total_doc_length == 4
+    assert index._postings["beta"] == {"a": 2}
+
+    index.add("a", "gamma gamma")
+    assert index._total_doc_length == 3
+    assert "alpha" not in index._postings
+    assert "beta" not in index._postings
+    assert index._postings["gamma"] == {"b": 1, "a": 2}
+    assert index._df["gamma"] == 2
+
+    assert index.remove("a") is True
+    assert index._total_doc_length == 1
+    assert index._postings["gamma"] == {"b": 1}
+    assert index._df["gamma"] == 1
+    assert index.remove("a") is False
+
+    results = index.search("gamma")
+    assert [result.fragment_id for result in results] == ["b"]
