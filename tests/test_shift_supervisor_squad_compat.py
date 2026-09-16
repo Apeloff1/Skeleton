@@ -54,3 +54,69 @@ def test_unstamped_legacy_task_remains_available_to_single_worker_queue() -> Non
     assert claimed is not None
     assert claimed["id"] == "legacy-task"
     assert claimed["status"] == "assigned"
+
+
+def test_higher_priority_squad_task_does_not_starve_legacy_queue() -> None:
+    store = InMemoryPlanStore()
+    store.upsert_worker(_worker("night-0"))
+    store.add_items(
+        [
+            PlanItem(
+                id="squad-task",
+                title="Squad task",
+                description="Must stay reserved for four-agent execution.",
+                priority=100,
+                target_team="night",
+                metadata={"squad_size": 4},
+            ),
+            PlanItem(
+                id="legacy-task",
+                title="Legacy task",
+                description="Must remain reachable by the legacy queue.",
+                priority=50,
+                target_team="night",
+            ),
+        ]
+    )
+
+    claimed = PlanQueueAPI(store).claim_next("night-0")
+    assert claimed is not None
+    assert claimed["id"] == "legacy-task"
+
+    by_id = {item.id: item for item in store.snapshot_items()}
+    assert by_id["squad-task"].status == "queued"
+    assert by_id["squad-task"].owner is None
+    assert by_id["legacy-task"].status == "assigned"
+    assert by_id["legacy-task"].owner == "night-0"
+
+
+def test_malformed_squad_stamp_fails_closed_for_legacy_queue() -> None:
+    store = InMemoryPlanStore()
+    store.upsert_worker(_worker("night-0"))
+    store.add_items(
+        [
+            PlanItem(
+                id="malformed-squad-task",
+                title="Malformed squad task",
+                description="Invalid squad metadata must not fall through to legacy dispatch.",
+                priority=100,
+                target_team="night",
+                metadata={"squad_size": "four"},
+            ),
+            PlanItem(
+                id="legacy-task",
+                title="Legacy task",
+                description="Safe fallback legacy work.",
+                priority=50,
+                target_team="night",
+            ),
+        ]
+    )
+
+    claimed = PlanQueueAPI(store).claim_next("night-0")
+    assert claimed is not None
+    assert claimed["id"] == "legacy-task"
+
+    by_id = {item.id: item for item in store.snapshot_items()}
+    assert by_id["malformed-squad-task"].status == "queued"
+    assert by_id["malformed-squad-task"].owner is None
