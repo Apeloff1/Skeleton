@@ -13,7 +13,6 @@ on:
 permissions:
   contents: read
   actions: read
-  issues: write
 
 concurrency:
   group: repair-intake-${{ github.repository }}
@@ -22,6 +21,10 @@ concurrency:
 jobs:
   intake:
     # Observe trusted workflow metadata only. Never checkout or execute PR code.
+    permissions:
+      contents: read
+      actions: read
+      issues: write
     if: >-
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.conclusion == 'failure' &&
