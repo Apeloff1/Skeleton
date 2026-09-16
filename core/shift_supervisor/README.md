@@ -19,6 +19,26 @@ The API key is never stored in plan data or committed to the repository.
 
 Both agents are **plan producers only**. Neither agent assigns work to an individual bot.
 
+## Planning harness
+
+Use the credential-free deterministic harness before activating or changing planning behavior:
+
+```bash
+python -m core.shift_supervisor.planning_harness --workers 1000 --cycles 4
+```
+
+One virtual cycle is 15 minutes. The harness runs Secretary every cycle and SMB every second cycle, deliberately repeats model proposals to stress deduplication, and then exercises the worker pull queue. It fails closed if any of these invariants break:
+
+- planning actors directly own or dispatch worker tasks;
+- the 15/30-minute Secretary/SMB cadence drifts;
+- duplicate proposals multiply the canonical workload;
+- the manager prompt loses aggregate workforce capacity or exceeds its 64-worker attention bound;
+- Night and Idle workers cross team boundaries or double-claim work;
+- one worker acquires multiple active tasks;
+- a worker at the overtime soft limit receives additional work.
+
+The default 1,000-worker run is intentionally model-credential-free and deterministic so it can be used in CI as an orchestration contract test rather than an external API smoke test.
+
 ## Dispatch architecture
 
 Night and Idle workers pull orders from the canonical plan through `PlanQueueAPI` instead of asking the Shift Manager or Secretary what to do. This keeps a large fleet from swarming either supervisory agent.
