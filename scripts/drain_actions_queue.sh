@@ -155,8 +155,12 @@ def usable_replacement(run):
     )
 
 
+def path(run):
+    return run.get("path") or ""
+
+
 def is_control_plane(run):
-    return (run.get("path") or "") in control_plane_paths
+    return path(run) in control_plane_paths
 
 
 def cancel(run_id):
@@ -236,7 +240,7 @@ for pass_no in range(1, passes + 1):
         if (
             (run.get("head_branch") or "") == "main"
             and (run.get("head_sha") or "") != head
-            and (run.get("path") or "").startswith("dynamic/")
+            and path(run).startswith("dynamic/")
             and workflow_event_key(run) in replacement_keys
         ):
             selected.append((run, "stale-dynamic-active"))
@@ -246,13 +250,29 @@ for pass_no in range(1, passes + 1):
         print(f"cancellation cap reached: MAX_CANCEL={max_cancel}")
         break
     selected = selected[:remaining]
-    total_selected += len(selected)
 
     print(
         f"pass={pass_no} main={head} queued={len(queued)} active={len(active)} "
         f"selected={len(selected)} control_plane_preserved={preserved_control} "
         f"last_validation_preserved={preserved_last_validation} dry_run={dry_run}"
     )
+
+    # Apply mode is intentionally stricter than the selection pass. A new main
+    # head invalidates the replacement evidence we just computed, so perform no
+    # mutations from that snapshot and let the next pass reselect against the
+    # live repository state.
+    if not dry_run and selected:
+        live_head = main_sha()
+        if live_head != head:
+            print(
+                f"main advanced before mutation: selected_for={head} live={live_head}; "
+                "deferring this pass"
+            )
+            if pass_no < passes:
+                time.sleep(8)
+            continue
+
+    total_selected += len(selected)
 
     for run, reason in selected:
         run_id = int(run["id"])
