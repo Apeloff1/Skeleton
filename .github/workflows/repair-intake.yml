@@ -73,6 +73,5 @@ Correlate this observation against existing findings and repair PRs before propo
 All changes must go through a PR and the normal validation gates."
             gh issue create --repo "$GITHUB_REPOSITORY" \
               --title "$title" \
-              --label "area/security" \
               --body "$body"
           fi
