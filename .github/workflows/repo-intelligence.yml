@@ -66,6 +66,7 @@ jobs:
           tests/test_repo_intel.py
           tests/test_repo_intel_sota.py
           tests/test_repo_intel_deep.py
+          tests/test_repo_intel_frontier.py
           tests/test_repo_index.py
 
       - name: Build frontier repository knowledge graph
