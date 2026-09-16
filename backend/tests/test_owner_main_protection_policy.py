@@ -24,7 +24,8 @@ def test_owner_main_protection_defaults_to_verification() -> None:
 
     assert 'mode="${1:---verify}"' in text
     assert 'required_check="Merge Readiness"' in text
-    assert "X-GitHub-Api-Version: 2022-11-28" in text
+    assert 'required_app_id="15368"' in text
+    assert "X-GitHub-Api-Version: 2026-03-10" in text
 
 
 def test_owner_main_protection_payload_is_fail_closed_for_normal_changes() -> None:
@@ -32,7 +33,13 @@ def test_owner_main_protection_payload_is_fail_closed_for_normal_changes() -> No
 
     assert payload["required_status_checks"] == {
         "strict": True,
-        "contexts": ["Merge Readiness"],
+        "contexts": [],
+        "checks": [
+            {
+                "context": "Merge Readiness",
+                "app_id": 15368,
+            }
+        ],
     }
     assert payload["enforce_admins"] is True
     assert payload["required_pull_request_reviews"] == {
@@ -45,6 +52,14 @@ def test_owner_main_protection_payload_is_fail_closed_for_normal_changes() -> No
     assert payload["allow_force_pushes"] is False
     assert payload["allow_deletions"] is False
     assert payload["restrictions"] is None
+
+
+def test_owner_main_protection_binds_merge_readiness_to_github_actions() -> None:
+    text = _script()
+
+    assert '.required_status_checks.checks[]?' in text
+    assert '.context == "Merge Readiness"' in text
+    assert ".app_id == 15368" in text
 
 
 def test_owner_main_protection_validates_repo_and_branch_inputs() -> None:
