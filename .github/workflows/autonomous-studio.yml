@@ -60,15 +60,20 @@ jobs:
           gh pr list --repo "$REPO" --state open --limit 100 --json number,title,headRefName,baseRefName,updatedAt,labels > .studio-tmp/open-prs.json
           gh issue list --repo "$REPO" --state open --limit 100 --json number,title,updatedAt,labels > .studio-tmp/open-issues.json
           gh run list --repo "$REPO" --status failure --limit 25 --json name,databaseId,headSha,headBranch,createdAt,url > .studio-tmp/failed-runs.json
+          gh api "/repos/${REPO}/actions/runs?status=queued&per_page=1" --jq '.total_count' > .studio-tmp/queued-count.txt
           python - <<'PY'
           import json
           from pathlib import Path
 
           root = Path('.studio-tmp')
+          queued_text = (root / 'queued-count.txt').read_text(encoding='utf-8').strip()
+          if not queued_text.isdigit():
+              raise SystemExit(f'invalid queued Actions count: {queued_text!r}')
           state = {
               'open_prs': json.loads((root / 'open-prs.json').read_text()),
               'open_issues': json.loads((root / 'open-issues.json').read_text()),
               'recent_failed_runs': json.loads((root / 'failed-runs.json').read_text()),
+              'queued_actions_runs': int(queued_text),
           }
           (root / 'repo-state.json').write_text(
               json.dumps(state, sort_keys=True, indent=2),
@@ -76,7 +81,61 @@ jobs:
           )
           PY
 
+      - name: Apply Actions queue pressure guard
+        id: pressure
+        env:
+          MAX_QUEUED_ACTIONS_RUNS: '40'
+        shell: bash
+        run: |
+          set -euo pipefail
+          queued_count=$(cat .studio-tmp/queued-count.txt)
+          threshold="$MAX_QUEUED_ACTIONS_RUNS"
+          if ! [[ "$queued_count" =~ ^[0-9]+$ && "$threshold" =~ ^[0-9]+$ ]]; then
+            echo '::error::Actions queue guard received a non-numeric count or threshold.'
+            exit 1
+          fi
+
+          if (( queued_count >= threshold )); then
+            echo 'proceed=false' >> "$GITHUB_OUTPUT"
+            : > "$RUNNER_TEMP/studio.patch"
+            python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          queued = int(Path('.studio-tmp/queued-count.txt').read_text(encoding='utf-8').strip())
+          threshold = int(os.environ['MAX_QUEUED_ACTIONS_RUNS'])
+          event = {
+              'event': 'shift_skipped_queue_pressure',
+              'queued_actions_runs': queued,
+              'threshold': threshold,
+              'run_id': os.environ.get('GITHUB_RUN_ID', ''),
+              'run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT', ''),
+              'timestamp': datetime.now(timezone.utc).isoformat(),
+          }
+          audit = Path(os.environ['RUNNER_TEMP']) / 'studio-audit.jsonl'
+          audit.write_text(json.dumps(event, sort_keys=True) + '\n', encoding='utf-8')
+          report = Path(os.environ['RUNNER_TEMP']) / 'studio-report.md'
+          report.write_text(
+              '# Autonomous Studio shift\n\n'
+              'Status: **safe no-op due to Actions queue pressure**.\n\n'
+              f'- Queued Actions runs: {queued}\n'
+              f'- Backpressure threshold: {threshold}\n'
+              '- Model proposal generation: skipped\n'
+              '- Generated-code execution: skipped\n'
+              '- Branch/PR publication: skipped\n\n'
+              'The shift was intentionally suppressed so Autonomous Studio does not amplify repository CI congestion.\n',
+              encoding='utf-8',
+          )
+          PY
+            sha256sum "$RUNNER_TEMP/studio.patch" > "$RUNNER_TEMP/studio.patch.sha256"
+          else
+            echo 'proceed=true' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Generate bounded model proposals
+        if: steps.pressure.outputs.proceed == 'true'
         id: proposal
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -221,6 +280,5 @@ jobs:
           {
             echo '## Autonomous Studio'
             echo
-            echo 'No patch cleared planning, deterministic policy, git applicability, and senior review in this run.'
-            echo 'The run is still recorded in the durable Studio Ledger.'
+            cat "$RUNNER_TEMP/studio-report.md"
           } >> "$GITHUB_STEP_SUMMARY"
