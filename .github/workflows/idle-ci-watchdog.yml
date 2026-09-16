@@ -1,0 +1,82 @@
+name: Idle CI Watchdog
+
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: idle-ci-watchdog
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+
+jobs:
+  watchdog:
+    name: Recover transient CI failures
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      ISSUE_TITLE: 'bot: CI watchdog'
+    steps:
+      - name: Inspect recent workflow failures
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run list --repo "$REPO" --limit 100 --json databaseId,name,status,conclusion,createdAt,url > "$RUNNER_TEMP/runs.json"
+
+      - name: Retry only safe transient runs once
+        shell: bash
+        run: |
+          set -euo pipefail
+          issue=$(gh issue list --repo "$REPO" --state open --search "${ISSUE_TITLE} in:title" --limit 1 --json number --jq '.[0].number // empty')
+          if [[ -z "$issue" ]]; then
+            issue=$(gh issue create --repo "$REPO" --title "$ISSUE_TITLE" --body 'Automated CI watchdog ledger. The bot only retries cancelled/timed-out non-security workflows once per run ID and never bypasses a failed security gate.' --json number --jq '.number')
+          fi
+
+          cutoff=$(date -u -d '6 hours ago' +%s)
+          retries=0
+          inspected=0
+
+          while IFS=$'\t' read -r id name status conclusion created url; do
+            [[ -n "${id:-}" ]] || continue
+            inspected=$((inspected + 1))
+            created_epoch=$(date -u -d "$created" +%s)
+            (( created_epoch >= cutoff )) || continue
+            [[ "$status" == 'completed' ]] || continue
+            [[ "$conclusion" == 'cancelled' || "$conclusion" == 'timed_out' ]] || continue
+
+            case "$name" in
+              *Malware*|*Secret*|*Security*|*CodeQL*|*Provenance*|*Artifact\ Policy*|*Dependency\ Review*)
+                continue
+                ;;
+            esac
+
+            if gh issue view "$issue" --repo "$REPO" --comments --json comments --jq '.comments[].body' | grep -Fq "run:${id}"; then
+              continue
+            fi
+
+            if (( retries >= 3 )); then
+              break
+            fi
+
+            gh issue comment "$issue" --repo "$REPO" --body "CI watchdog retrying transient ${conclusion} run:${id} (${name}): ${url}" >/dev/null
+            if gh run rerun "$id" --repo "$REPO"; then
+              retries=$((retries + 1))
+            else
+              gh issue comment "$issue" --repo "$REPO" --body "CI watchdog could not rerun run:${id}; leaving it for manual investigation." >/dev/null || true
+            fi
+          done < <(jq -r '.[] | [.databaseId,.name,.status,.conclusion,.createdAt,.url] | @tsv' "$RUNNER_TEMP/runs.json")
+
+          {
+            echo '## Idle CI watchdog'
+            echo "- Recent runs inspected: ${inspected}"
+            echo "- Transient retries started: ${retries}"
+            echo '- Security, provenance, artifact and dependency-security workflows are never auto-retried.'
+            echo '- Failed runs are not hidden or bypassed; persistent failures remain visible for repair.'
+          } >> "$GITHUB_STEP_SUMMARY"
