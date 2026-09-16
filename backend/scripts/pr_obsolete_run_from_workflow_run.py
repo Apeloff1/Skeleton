@@ -50,8 +50,14 @@ def resolve_pr_number(
     head_sha: str,
     head_ref: str,
     default_branch: str,
-) -> int:
-    """Resolve exactly one trusted same-repository PR for a workflow-run signal."""
+) -> int | None:
+    """Resolve one trusted PR, or no target, for a workflow-run signal.
+
+    A missing association is a benign no-op: there is no pull request for the
+    privileged cleanup worker to mutate, and the scheduled sweep can reconcile
+    any later-visible association. Ambiguous or contradictory identities still
+    fail closed.
+    """
     if not repo or not head_ref or not head_sha or not default_branch:
         raise RuntimeError("incomplete workflow_run PR identity")
     if head_ref == default_branch:
@@ -87,9 +93,11 @@ def resolve_pr_number(
         )
     }
     candidates.discard(0)
-    if len(candidates) != 1:
+    if not candidates:
+        return None
+    if len(candidates) > 1:
         raise RuntimeError(
-            "workflow_run head did not resolve to exactly one trusted PR "
+            "workflow_run head resolved to multiple trusted PRs "
             f"(matches={sorted(candidates)})"
         )
     return next(iter(candidates))
@@ -150,6 +158,12 @@ def main() -> int:
             head_ref=head_ref,
             default_branch=default_branch,
         )
+        if pr_number is None:
+            print(
+                "obsolete-run drain skipped: workflow_run head no longer "
+                "resolves to a trusted pull request"
+            )
+            return 0
         if not live_pr_head_converged(
             api,
             repo=repo,
