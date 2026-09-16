@@ -149,13 +149,23 @@ jobs:
           state_path = root / 'repo-state.json'
           state = json.loads(state_path.read_text(encoding='utf-8'))
           title = '[Shift Supervisor] Canonical Night + Idle Plan'
+          status_titles = {
+              '[Shift Supervisor] Idle Worker Status',
+              '[Shift Supervisor] Night Worker Status',
+          }
+          issues = state.get('open_issues', [])
           canonical = next(
               (
-                  issue for issue in state.get('open_issues', [])
+                  issue for issue in issues
                   if isinstance(issue, dict) and issue.get('title') == title
               ),
               None,
           )
+          ignored_titles = {title, *status_titles}
+          state['open_issues'] = [
+              issue for issue in issues
+              if not (isinstance(issue, dict) and issue.get('title') in ignored_titles)
+          ]
 
           lines = ['## Shift supervisor', '']
           if canonical is None:
@@ -225,6 +235,17 @@ jobs:
             echo 'has_patch=false' >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Record real night workforce snapshot
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -s "$RUNNER_TEMP/studio-audit.jsonl" ]]; then
+            python -m core.shift_supervisor.workforce_report night \
+              --audit "$RUNNER_TEMP/studio-audit.jsonl" \
+              --output "$RUNNER_TEMP/night-worker-status.json"
+          fi
+
       - name: Validate proposed diff without model or GitHub credentials
         if: steps.proposal.outputs.has_patch == 'true'
         env:
@@ -268,13 +289,25 @@ jobs:
           git apply "$RUNNER_TEMP/studio.patch"
           git diff --check
 
-      - name: Persist Studio Ledger entry
+      - name: Persist Studio Ledger and staffing status
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
+
+          if [[ -s "$RUNNER_TEMP/night-worker-status.json" ]]; then
+            worker_title='[Shift Supervisor] Night Worker Status'
+            worker_number=$(gh issue list --repo "$REPO" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"$worker_title\") | .number" | head -n 1)
+            if [[ -n "${worker_number:-}" ]]; then
+              gh issue edit "$worker_number" --repo "$REPO" --body-file "$RUNNER_TEMP/night-worker-status.json" >/dev/null
+            else
+              gh issue create --repo "$REPO" --title "$worker_title" --body-file "$RUNNER_TEMP/night-worker-status.json" >/dev/null
+            fi
+          fi
+
           title='bot: autonomous studio ledger'
           number=$(gh issue list --repo "$REPO" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
           if [[ -z "${number:-}" ]]; then
@@ -288,7 +321,13 @@ jobs:
               cat "$RUNNER_TEMP/shift-supervisor-summary.md"
               echo
             fi
-            cat "$RUNNER_TEMP/studio-report.md"
+            if [[ -s "$RUNNER_TEMP/studio-report.md" ]]; then
+              cat "$RUNNER_TEMP/studio-report.md"
+            else
+              echo '# Autonomous Studio shift'
+              echo
+              echo 'Controller stopped before a report could be produced.'
+            fi
           } > "$RUNNER_TEMP/ledger-comment.md"
           gh issue comment "$number" --repo "$REPO" --body-file "$RUNNER_TEMP/ledger-comment.md" >/dev/null
 
@@ -351,5 +390,9 @@ jobs:
               cat "$RUNNER_TEMP/shift-supervisor-summary.md"
               echo
             fi
-            cat "$RUNNER_TEMP/studio-report.md"
+            if [[ -s "$RUNNER_TEMP/studio-report.md" ]]; then
+              cat "$RUNNER_TEMP/studio-report.md"
+            else
+              echo 'Autonomous Studio did not produce a report.'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
