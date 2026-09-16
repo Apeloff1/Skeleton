@@ -2,7 +2,8 @@ name: Idle Studio
 
 on:
   schedule:
-    - cron: '7,22,37,52 * * * *'
+    - cron: '7,37 * * * *'
+    - cron: '22,52 * * * *'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -99,6 +100,56 @@ jobs:
           )
           PY
 
+      - name: Refresh shared shift-supervisor plan
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SHIFT_MODEL_NAME: ${{ vars.OPENAI_MODEL || 'gpt-5.6' }}
+          SHIFT_PROJECT_CONTEXT_FILE: .idle-studio-tmp/repo-state.json
+          EVENT_NAME: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+            echo '::error::OPENAI_API_KEY repository secret is required for shift supervision.'
+            exit 1
+          fi
+
+          role='secretary'
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' || "$SCHEDULE" == '7,37 * * * *' ]]; then
+            role='both'
+          fi
+
+          python -m core.shift_supervisor \
+            --once \
+            --role "$role" \
+            --output .idle-studio-tmp/shift-supervisor.json
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('.idle-studio-tmp')
+          state_path = root / 'repo-state.json'
+          supervisor_path = root / 'shift-supervisor.json'
+          state = json.loads(state_path.read_text(encoding='utf-8'))
+          supervisor = json.loads(supervisor_path.read_text(encoding='utf-8'))
+          state['shift_supervisor'] = supervisor
+          state_path.write_text(json.dumps(state, sort_keys=True, indent=2), encoding='utf-8')
+
+          lines = ['## Shift supervisor', '']
+          lines.append(f"Actors: {', '.join(supervisor.get('actors', [])) or 'none'}")
+          lines.append('')
+          plan = supervisor.get('plan_items', [])
+          lines.append(f"Plan items supplied to Idle Studio: {len(plan)}")
+          for item in plan[:20]:
+              title = str(item.get('title', '')).strip() or '(untitled)'
+              team = str(item.get('target_team', 'unknown'))
+              priority = item.get('priority', '?')
+              lines.append(f"- P{priority} [{team}] {title}")
+          (root / 'shift-supervisor-summary.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          PY
+
       - name: Plan, build, and independently review bounded work
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -155,6 +206,10 @@ jobs:
           {
             echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo
+            if [[ -s .idle-studio-tmp/shift-supervisor-summary.md ]]; then
+              cat .idle-studio-tmp/shift-supervisor-summary.md
+              echo
+            fi
             if [[ -s .idle-studio-tmp/report.md ]]; then
               cat .idle-studio-tmp/report.md
             else
@@ -192,6 +247,10 @@ jobs:
         if: always()
         shell: bash
         run: |
+          if [[ -s .idle-studio-tmp/shift-supervisor-summary.md ]]; then
+            cat .idle-studio-tmp/shift-supervisor-summary.md >> "$GITHUB_STEP_SUMMARY"
+            echo >> "$GITHUB_STEP_SUMMARY"
+          fi
           if [[ -s .idle-studio-tmp/report.md ]]; then
             cat .idle-studio-tmp/report.md >> "$GITHUB_STEP_SUMMARY"
           else
