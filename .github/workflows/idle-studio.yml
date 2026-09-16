@@ -49,6 +49,13 @@ jobs:
         with:
           python-version: '3.11.16'
 
+      - name: Install focused trusted runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "fastapi>=0.141.1,<1"
+          "pydantic>=2.13.5,<3"
+          "pydantic-settings>=2.15.0,<3"
+
       - name: Validate trusted idle-studio control plane
         run: >-
           python -m unittest -v
