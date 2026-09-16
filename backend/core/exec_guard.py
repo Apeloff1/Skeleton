@@ -1,18 +1,16 @@
-"""Shared fail-closed guard for user-controlled host code execution.
+"""Shared fail-closed guards for execution and production CORS policy.
 
 User-supplied code is never allowed to execute on a detected production
-application host. Local/trusted development still requires an explicit opt-in,
-but deployed environments cannot be re-enabled through environment
-configuration alone.
-
-Production code execution belongs in a separately isolated sandbox/worker with
-an OS/container security boundary, not inside the API process that holds service
-credentials and application data access.
+application host. CORS is likewise fail-closed in deployed environments:
+unset, blank, or wildcard configuration cannot silently enable cross-origin
+access. Local development uses explicit localhost origins unless a developer
+opts into a wildcard.
 """
 
 from __future__ import annotations
 
 import os
+from urllib.parse import urlsplit
 
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 _DEPLOYED_ENVIRONMENTS = frozenset({"prod", "production", "staging"})
@@ -22,6 +20,8 @@ _PRODUCTION_MARKERS = (
     "WEBSITE_INSTANCE_ID",  # Azure App Service
     "DYNO",  # Heroku
 )
+_CORS_DISABLED_ORIGIN = "https://cors-disabled.invalid"
+_LOCAL_CORS_ORIGINS = ("http://localhost", "http://127.0.0.1")
 
 
 def _truthy(name: str) -> bool:
@@ -36,6 +36,52 @@ def production_runtime_detected() -> bool:
     if environment in _DEPLOYED_ENVIRONMENTS:
         return True
     return any(bool(os.environ.get(marker)) for marker in _PRODUCTION_MARKERS)
+
+
+def _valid_cors_origin(value: str) -> bool:
+    """Accept only absolute HTTP(S) origins without paths or credentials."""
+    parsed = urlsplit(value)
+    return (
+        parsed.scheme in {"http", "https"}
+        and bool(parsed.hostname)
+        and not parsed.username
+        and not parsed.password
+        and not parsed.path
+        and not parsed.query
+        and not parsed.fragment
+    )
+
+
+def normalize_cors_origins(raw: str | None, *, production: bool) -> tuple[str, ...]:
+    """Normalize and validate CORS origins, failing closed when unsafe."""
+    values = tuple(part.strip().rstrip("/") for part in (raw or "").split(",") if part.strip())
+    if not values:
+        return (_CORS_DISABLED_ORIGIN,) if production else _LOCAL_CORS_ORIGINS
+
+    if "*" in values:
+        if production or not _truthy("ALLOW_DEV_CORS_WILDCARD") or len(values) != 1:
+            return (_CORS_DISABLED_ORIGIN,) if production else _LOCAL_CORS_ORIGINS
+        return ("*",)
+
+    valid = tuple(dict.fromkeys(value for value in values if _valid_cors_origin(value)))
+    if not valid:
+        return (_CORS_DISABLED_ORIGIN,) if production else _LOCAL_CORS_ORIGINS
+    return valid
+
+
+def configure_cors_environment() -> tuple[str, ...]:
+    """Set the normalized CORS environment before the application builds middleware."""
+    origins = normalize_cors_origins(
+        os.environ.get("CORS_ORIGINS"), production=production_runtime_detected()
+    )
+    os.environ["CORS_ORIGINS"] = ",".join(origins)
+    return origins
+
+
+# ``backend.server`` imports this module before constructing CORSMiddleware.
+# Normalize the environment at import time so an unset/blank production value
+# cannot fall through to the server's historical wildcard default.
+configure_cors_environment()
 
 
 def code_execution_enabled() -> bool:
