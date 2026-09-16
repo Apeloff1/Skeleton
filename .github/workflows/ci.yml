@@ -31,6 +31,7 @@ concurrency:
 env:
   PYTHON_VERSION: "3.11.16"
   NODE_VERSION: "24.20.0"
+  PYTHONPATH: "${{ github.workspace }}"
 permissions:
   contents: read
 jobs:
