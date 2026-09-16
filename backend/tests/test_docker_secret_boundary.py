@@ -159,6 +159,23 @@ def test_secret_bearing_baked_env_is_forbidden_without_echoing_value(
     assert secret_value not in findings[0]
 
 
+def test_backtick_escape_continuation_cannot_hide_secret_env(tmp_path: Path) -> None:
+    secret_value = "do-not-echo-backtick-secret"
+    dockerfile = _write_dockerfile(
+        tmp_path,
+        "# escape=`\n"
+        "FROM python:alpine\n"
+        "ENV SAFE_MODE=1 `\n"
+        f"    JWT_SECRET={secret_value}\n",
+    )
+    findings = docker_boundary.dockerfile_secret_directive_violations(
+        dockerfile, repo_root=tmp_path
+    )
+    assert len(findings) == 1
+    assert "JWT_SECRET" in findings[0]
+    assert secret_value not in findings[0]
+
+
 def test_safe_image_arg_and_nonsecret_env_are_allowed(tmp_path: Path) -> None:
     dockerfile = _write_dockerfile(
         tmp_path,
