@@ -30,6 +30,22 @@ def _roles(prefix="ok"):
     return {role: {"finding": f"{prefix}-{role}"} for role in COUNCIL_ROLES}
 
 
+def _review(*, decision="accept", confidence=90, roles=None, revisions=None, **overrides):
+    review = {
+        "candidate_index": 0,
+        "decision": decision,
+        "confidence": confidence,
+        "roles": roles or _roles(),
+        "assumptions": ["repository state is current"],
+        "failure_modes": ["integration contract regresses"],
+        "success_metrics": ["focused regression and integration smoke pass"],
+        "evidence_gaps": [],
+        "revisions": revisions or {},
+    }
+    review.update(overrides)
+    return review
+
+
 def _task(**overrides):
     task = {
         "title": "Canonical task",
@@ -49,25 +65,17 @@ def _task(**overrides):
 def test_council_revises_only_allowed_fields_and_preserves_identity(monkeypatch):
     monkeypatch.setenv("SHIFT_PLANNING_COUNCIL", "1")
     model = _ScriptedModel(
-        [
-            {
-                "reviews": [
-                    {
-                        "candidate_index": 0,
-                        "decision": "revise",
-                        "confidence": 97,
-                        "roles": _roles(),
-                        "revisions": {
-                            "description": "Hardened description",
-                            "rationale": "Evidence-backed rationale",
-                            "expected_output": "A bounded patch plus regression proof",
-                            "validation": ["focused unit", "integration smoke"],
-                            "priority": 91,
-                        },
-                    }
-                ]
-            }
-        ]
+        [{"reviews": [_review(
+            decision="revise",
+            confidence=97,
+            revisions={
+                "description": "Hardened description",
+                "rationale": "Evidence-backed rationale",
+                "expected_output": "A bounded patch plus regression proof",
+                "validation": ["focused unit", "integration smoke"],
+                "priority": 91,
+            },
+        )]}]
     )
     council = PlanningCouncil(model)
     original = _task()
@@ -87,64 +95,44 @@ def test_council_revises_only_allowed_fields_and_preserves_identity(monkeypatch)
     assert item["description"] == "Hardened description"
     assert item["priority"] == 91
     assert item["validation"] == ["focused unit", "integration smoke"]
-    assert item["_planning_council"]["decision"] == "revise"
-    assert set(item["_planning_council"]["roles"]) == set(COUNCIL_ROLES)
+    evidence = item["_planning_council"]
+    assert evidence["version"] == 2
+    assert evidence["decision"] == "revise"
+    assert evidence["failure_modes"]
+    assert evidence["success_metrics"]
+    assert set(evidence["roles"]) == set(COUNCIL_ROLES)
     assert model.calls[0]["correlation_id"] == "manager-1-council"
     payload = json.loads(model.calls[0]["user_prompt"])
     assert payload["council_roles"] == list(COUNCIL_ROLES)
     assert payload["candidates"][0]["candidate_index"] == 0
 
 
-def test_council_can_reject_a_candidate(monkeypatch):
+def test_council_can_reject_a_candidate_without_epistemic_packet(monkeypatch):
     monkeypatch.setenv("SHIFT_PLANNING_COUNCIL", "1")
-    model = _ScriptedModel(
-        [
-            {
-                "reviews": [
-                    {
-                        "candidate_index": 0,
-                        "decision": "reject",
-                        "confidence": 88,
-                        "roles": _roles("reject"),
-                        "revisions": {},
-                    }
-                ]
-            }
-        ]
-    )
+    model = _ScriptedModel([
+        {"reviews": [{
+            "candidate_index": 0,
+            "decision": "reject",
+            "confidence": 88,
+            "roles": _roles("reject"),
+            "revisions": {},
+        }]}
+    ])
 
     assert PlanningCouncil(model).review_tasks(
-        [_task()],
-        context={},
-        correlation_id="sec-1",
-        actor="secretary",
+        [_task()], context={}, correlation_id="sec-1", actor="secretary"
     ) == []
 
 
 def test_council_rejects_forbidden_identity_or_team_revision(monkeypatch):
     monkeypatch.setenv("SHIFT_PLANNING_COUNCIL", "1")
-    model = _ScriptedModel(
-        [
-            {
-                "reviews": [
-                    {
-                        "candidate_index": 0,
-                        "decision": "revise",
-                        "confidence": 50,
-                        "roles": _roles(),
-                        "revisions": {"target_team": "idle"},
-                    }
-                ]
-            }
-        ]
-    )
+    model = _ScriptedModel([{"reviews": [_review(
+        decision="revise", revisions={"target_team": "idle"}
+    )]}])
 
     with pytest.raises(CouncilReviewError, match="forbidden revisions"):
         PlanningCouncil(model).review_tasks(
-            [_task()],
-            context={},
-            correlation_id="manager-2",
-            actor="shift-manager",
+            [_task()], context={}, correlation_id="manager-2", actor="shift-manager"
         )
 
 
@@ -152,57 +140,32 @@ def test_council_requires_exact_four_role_coverage(monkeypatch):
     monkeypatch.setenv("SHIFT_PLANNING_COUNCIL", "1")
     roles = _roles()
     roles.pop("verifier")
-    model = _ScriptedModel(
-        [
-            {
-                "reviews": [
-                    {
-                        "candidate_index": 0,
-                        "decision": "accept",
-                        "confidence": 50,
-                        "roles": roles,
-                        "revisions": {},
-                    }
-                ]
-            }
-        ]
-    )
+    model = _ScriptedModel([{"reviews": [_review(roles=roles)]}])
 
     with pytest.raises(CouncilReviewError, match="exactly four"):
         PlanningCouncil(model).review_tasks(
-            [_task()],
-            context={},
-            correlation_id="manager-3",
-            actor="shift-manager",
+            [_task()], context={}, correlation_id="manager-3", actor="shift-manager"
+        )
+
+
+def test_council_requires_failure_modes_and_success_metrics(monkeypatch):
+    monkeypatch.setenv("SHIFT_PLANNING_COUNCIL", "1")
+    model = _ScriptedModel([{"reviews": [_review(failure_modes=[])]}])
+    with pytest.raises(CouncilReviewError, match="failure mode"):
+        PlanningCouncil(model).review_tasks(
+            [_task()], context={}, correlation_id="manager-epistemic", actor="shift-manager"
         )
 
 
 def test_council_budget_reviews_only_bounded_prefix(monkeypatch):
     monkeypatch.setenv("SHIFT_PLANNING_COUNCIL", "1")
     monkeypatch.setenv("SHIFT_PLANNING_COUNCIL_MAX_TASKS", "1")
-    model = _ScriptedModel(
-        [
-            {
-                "reviews": [
-                    {
-                        "candidate_index": 0,
-                        "decision": "accept",
-                        "confidence": 82,
-                        "roles": _roles(),
-                        "revisions": {},
-                    }
-                ]
-            }
-        ]
-    )
+    model = _ScriptedModel([{"reviews": [_review(confidence=82)]}])
     first = _task(title="first")
     second = _task(title="second", target_team="idle")
 
     reviewed = PlanningCouncil(model).review_tasks(
-        [first, second],
-        context={},
-        correlation_id="manager-4",
-        actor="shift-manager",
+        [first, second], context={}, correlation_id="manager-4", actor="shift-manager"
     )
 
     assert [item["title"] for item in reviewed] == ["first", "second"]
@@ -216,12 +179,8 @@ def test_council_disable_switch_avoids_extra_model_call(monkeypatch):
     monkeypatch.setenv("SHIFT_PLANNING_COUNCIL", "0")
     model = _ScriptedModel([])
     task = _task()
-
     assert PlanningCouncil(model).review_tasks(
-        [task],
-        context={},
-        correlation_id="manager-5",
-        actor="shift-manager",
+        [task], context={}, correlation_id="manager-5", actor="shift-manager"
     ) == [task]
     assert model.calls == []
 
@@ -229,22 +188,10 @@ def test_council_disable_switch_avoids_extra_model_call(monkeypatch):
 def test_manager_persists_council_evidence(monkeypatch):
     monkeypatch.setenv("SHIFT_PLANNING_COUNCIL", "1")
     proposal = _task(dependencies=[])
-    model = _ScriptedModel(
-        [
-            {"summary": "one task", "tasks": [proposal]},
-            {
-                "reviews": [
-                    {
-                        "candidate_index": 0,
-                        "decision": "accept",
-                        "confidence": 94,
-                        "roles": _roles("manager"),
-                        "revisions": {},
-                    }
-                ]
-            },
-        ]
-    )
+    model = _ScriptedModel([
+        {"summary": "one task", "tasks": [proposal]},
+        {"reviews": [_review(confidence=94, roles=_roles("manager"))]},
+    ])
     store = InMemoryPlanStore()
     manager = SMBShiftManager(store=store, model=model, council=PlanningCouncil(model))
 
@@ -254,13 +201,15 @@ def test_manager_persists_council_evidence(monkeypatch):
     item = store.snapshot_items()[0]
     assert item.title == "Canonical task"
     assert item.metadata["planning_council"]["confidence"] == 94
-    assert item.metadata["planning_council"]["decision"] == "accept"
+    assert item.metadata["planning_council"]["success_metrics"]
     assert len(model.calls) == 2
 
 
-def test_runtime_shares_one_council_between_manager_and_secretary():
+def test_runtime_shares_one_council_and_gate_between_manager_and_secretary():
     model = _ScriptedModel([])
     scheduler = build_supervisor(project_context_supplier=lambda: {}, model=model)
 
     assert scheduler.manager.council is not None
     assert scheduler.manager.council is scheduler.secretary.council
+    assert scheduler.manager.gate is not None
+    assert scheduler.manager.gate is scheduler.secretary.gate
