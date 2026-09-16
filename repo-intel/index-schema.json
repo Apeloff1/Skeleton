@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Apeloff1/Skeleton/repo-intel/index-schema.json",
+  "title": "Skeleton Repository Intelligence Snapshot",
+  "type": "object",
+  "required": ["schema", "source_digest", "tracked_files", "tracked_bytes", "files", "graph", "symbols", "subsystems"],
+  "properties": {
+    "schema": {"type": "integer", "minimum": 3},
+    "source_digest": {"type": "string", "minLength": 32},
+    "tracked_files": {"type": "integer", "minimum": 0},
+    "tracked_bytes": {"type": "integer", "minimum": 0},
+    "files": {"type": "array"},
+    "symbols": {"type": "array"},
+    "subsystems": {"type": "array"},
+    "graph": {
+      "type": "object",
+      "required": ["nodes", "edges", "reverse_edges"],
+      "properties": {
+        "nodes": {"type": "array"},
+        "edges": {"type": "array"},
+        "reverse_edges": {"type": "object"}
+      }
+    },
+    "large_tracked_files": {"type": "array"},
+    "metrics": {"type": "object"}
+  },
+  "additionalProperties": true
+}
