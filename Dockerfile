@@ -8,13 +8,24 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# The pinned base digest can lag Debian security point releases. Apply
+# available vendor fixes at build time, then discard package indexes so the
+# runtime does not retain stale apt metadata.
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --gid 10001 appuser \
     && useradd --create-home --uid 10001 --gid 10001 --shell /usr/sbin/nologin appuser
 
 COPY --chown=appuser:appuser pyproject.toml README.md ./
 COPY --chown=appuser:appuser skeleton ./skeleton
 
-RUN pip install --no-cache-dir .
+# setuptools is required only to build this project, not to serve it. msgpack
+# is also not a declared runtime dependency. Remove vulnerable copies that are
+# inherited from the base image after the application has been installed.
+RUN pip install --no-cache-dir . \
+    && pip uninstall -y msgpack setuptools
 
 USER appuser
 
