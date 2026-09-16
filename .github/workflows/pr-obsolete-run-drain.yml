@@ -10,6 +10,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/pr-obsolete-run-drain.yml'
+      - 'backend/scripts/pr_obsolete_run_from_workflow_run.py'
       - 'backend/scripts/pr_obsolete_run_drain.py'
       - 'backend/scripts/pr_obsolete_run_sweep.py'
 
