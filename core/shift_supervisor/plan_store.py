@@ -70,13 +70,12 @@ class InMemoryPlanStore:
         *,
         overtime_soft_limit_minutes: int = 120,
     ) -> PlanItem | None:
-        """Atomically claim the highest-priority eligible plan item.
+        """Atomically claim the highest-priority eligible legacy plan item.
 
-        This is the only dispatch primitive workers need. The supervisor and
-        secretary never push orders to workers; workers pull from this shared
-        plan. A worker can hold at most one active item, and team/dependency/
-        overtime rules are enforced under one lock so concurrent bots cannot
-        double-claim work or overload the same worker.
+        Explicitly squad-stamped work is reserved for the four-agent squad
+        runtime even when the stamp is malformed or unsupported. This keeps the
+        lowest-level claim primitive aligned with :class:`PlanQueueAPI` so a
+        direct store caller cannot bypass canonical squad ownership.
         """
         with self._lock:
             worker = self._workers.get(worker_id)
@@ -86,7 +85,12 @@ class InMemoryPlanStore:
                 return None
             if worker.current_task_id:
                 return None
-            if worker.overtime_minutes >= max(0, overtime_soft_limit_minutes):
+            overtime_limit = max(0, int(overtime_soft_limit_minutes))
+            if (
+                worker.overtime_minutes > 0
+                if overtime_limit == 0
+                else worker.overtime_minutes >= overtime_limit
+            ):
                 return None
 
             active_owned = any(
@@ -102,6 +106,7 @@ class InMemoryPlanStore:
                 if item.target_team == worker.team
                 and item.status == "queued"
                 and item.owner is None
+                and "squad_size" not in item.metadata
                 and self._dependencies_satisfied(item)
             ]
             if not eligible:
