@@ -59,9 +59,18 @@ def test_store_state_round_trip_preserves_open_plan_and_active_worker():
     assert revisions[0].correlation_id == "manager-test"
 
 
-def test_export_omits_uninteresting_offline_workers():
+def test_export_omits_uninteresting_offline_workers_but_keeps_daily_hours():
     store = InMemoryPlanStore()
     store.upsert_worker(WorkerState(worker_id="idle-0000", team="idle"))
+    store.upsert_worker(
+        WorkerState(
+            worker_id="idle-0002",
+            team="idle",
+            status="offline",
+            normal_shift_minutes=120,
+            metadata={"daily_accounting_day": "2026-09-16", "daily_work_minutes": 120},
+        )
+    )
     store.upsert_worker(
         WorkerState(
             worker_id="night-0001",
@@ -73,7 +82,10 @@ def test_export_omits_uninteresting_offline_workers():
     )
 
     state = store.export_state()
-    assert [worker["worker_id"] for worker in state["workers"]] == ["night-0001"]
+    assert [worker["worker_id"] for worker in state["workers"]] == [
+        "night-0001",
+        "idle-0002",
+    ]
 
 
 def test_compressed_state_file_round_trip(tmp_path):
