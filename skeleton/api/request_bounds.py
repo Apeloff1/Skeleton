@@ -29,6 +29,8 @@ def _positive_limit(
         except ValueError as exc:
             raise ValueError(f"{env_name} must be an integer") from exc
     elif explicit is not None:
+        if isinstance(explicit, bool) or not isinstance(explicit, int):
+            raise TypeError(f"{env_name} must be an integer")
         value = explicit
     else:
         value = default
