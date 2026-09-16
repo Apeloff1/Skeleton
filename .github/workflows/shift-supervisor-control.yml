@@ -2,7 +2,8 @@ name: Shift Supervisor Control
 
 on:
   schedule:
-    - cron: '7,22,37,52 * * * *'
+    - cron: '7,37 * * * *'
+    - cron: '22,52 * * * *'
   workflow_dispatch:
 
 concurrency:
@@ -128,11 +129,8 @@ jobs:
           fi
 
           role='secretary'
-          if [[ "$EVENT_NAME" == 'workflow_dispatch' || "$EVENT_SCHEDULE" == '7,22,37,52 * * * *' ]]; then
-            minute=$(date -u +%M)
-            if [[ "$EVENT_NAME" == 'workflow_dispatch' || "$minute" == '07' || "$minute" == '37' ]]; then
-              role='both'
-            fi
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' || "$EVENT_SCHEDULE" == '7,37 * * * *' ]]; then
+            role='both'
           fi
 
           python -m core.shift_supervisor \
