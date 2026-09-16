@@ -73,7 +73,7 @@ api = "https://api.github.com"
 headers = {
     "Accept": "application/vnd.github+json",
     "Authorization": f"Bearer {token}",
-    "X-GitHub-Api-Version": "2022-11-28",
+    "X-GitHub-Api-Version": "2026-03-10",
     "User-Agent": "skeleton-owner-queue-drainer",
 }
 retryable = frozenset({0, 429, 500, 502, 503, 504})
