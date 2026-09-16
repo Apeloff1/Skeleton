@@ -73,6 +73,25 @@ def test_interaction_log_enforces_small_capacity_and_rebuilds_indices() -> None:
     assert log.stats() == {"total": 3, "types": 2, "agents": 4}
 
 
+def test_interaction_log_query_returns_structurally_isolated_snapshot() -> None:
+    log = InteractionLog(max_size=2)
+    log.append(
+        Interaction(
+            from_agent="alpha",
+            to_agent="beta",
+            interaction_type="message",
+            outcome=1.0,
+            timestamp=1.0,
+        )
+    )
+
+    snapshot = log.query()
+    snapshot.clear()
+
+    assert len(log.query()) == 1
+    assert log.stats()["total"] == 1
+
+
 def test_interaction_log_rejects_non_positive_capacity() -> None:
     with pytest.raises(ValueError, match="greater than zero"):
         InteractionLog(max_size=0)
