@@ -100,58 +100,70 @@ jobs:
           )
           PY
 
-      - name: Refresh shared shift-supervisor plan
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          SHIFT_MODEL_NAME: ${{ vars.OPENAI_MODEL || 'gpt-5.6' }}
-          SHIFT_PROJECT_CONTEXT_FILE: .idle-studio-tmp/repo-state.json
-          EVENT_NAME: ${{ github.event_name }}
-          SCHEDULE: ${{ github.event.schedule }}
+      - name: Load canonical shift-supervisor plan
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "${OPENAI_API_KEY:-}" ]]; then
-            echo '::error::OPENAI_API_KEY repository secret is required for shift supervision.'
-            exit 1
-          fi
-
-          role='secretary'
-          if [[ "$EVENT_NAME" == 'workflow_dispatch' || "$SCHEDULE" == '7,37 * * * *' ]]; then
-            role='both'
-          fi
-
-          python -m core.shift_supervisor \
-            --once \
-            --role "$role" \
-            --output .idle-studio-tmp/shift-supervisor.json
-
           python - <<'PY'
+          import base64
+          import gzip
           import hashlib
           import json
+          import re
           from pathlib import Path
 
           root = Path('.idle-studio-tmp')
           state_path = root / 'repo-state.json'
-          supervisor_path = root / 'shift-supervisor.json'
           state = json.loads(state_path.read_text(encoding='utf-8'))
-          supervisor = json.loads(supervisor_path.read_text(encoding='utf-8'))
-          state['shift_supervisor'] = supervisor
+          title = '[Shift Supervisor] Canonical Night + Idle Plan'
+          issues = state.get('issues', [])
+          canonical = next(
+              (
+                  issue for issue in issues
+                  if isinstance(issue, dict) and issue.get('title') == title
+              ),
+              None,
+          )
+          state['issues'] = [
+              issue for issue in issues
+              if not (isinstance(issue, dict) and issue.get('title') == title)
+          ]
+
+          plan = []
+          status = 'missing'
+          if canonical is not None:
+              body = str(canonical.get('body', ''))
+              match = re.search(
+                  r'<!-- SHIFT_SUPERVISOR_STATE\n(.*?)\n-->',
+                  body,
+                  flags=re.DOTALL,
+              )
+              if match:
+                  encoded = match.group(1).strip()
+                  if encoded.startswith('gz:v1:'):
+                      packed = base64.b64decode(encoded[len('gz:v1:'):], validate=True)
+                      durable = json.loads(gzip.decompress(packed).decode('utf-8'))
+                      if isinstance(durable, dict):
+                          plan = durable.get('plan_items', [])
+                          status = 'loaded'
 
           synthetic = []
-          for item in supervisor.get('plan_items', [])[:20]:
+          for item in plan[:32]:
+              if not isinstance(item, dict):
+                  continue
               if item.get('target_team') != 'idle' or item.get('status') in {'done', 'rejected'}:
                   continue
-              title = str(item.get('title', '')).strip()
+              item_title = str(item.get('title', '')).strip()
               description = str(item.get('description', '')).strip()
-              if not title or not description:
+              if not item_title or not description:
                   continue
               stable = hashlib.sha256(
-                  f"{title}\0{description}\0idle".encode('utf-8')
+                  f"{item_title}\0{description}\0idle".encode('utf-8')
               ).hexdigest()
               number = -(int(stable[:12], 16) + 1)
               priority = item.get('priority', 50)
               evidence = {
-                  'source': 'shift-supervisor',
+                  'source': 'canonical-shift-supervisor',
                   'priority': priority,
                   'description': description,
                   'rationale': item.get('rationale', ''),
@@ -160,33 +172,38 @@ jobs:
                   'dependencies': item.get('dependencies', []),
                   'research_refs': item.get('research_refs', []),
               }
-              text = f"{title} {description}".lower()
+              text = f"{item_title} {description}".lower()
               labels = [{'name': 'shift-supervisor'}]
               if any(token in text for token in ('security', 'vulnerability', 'cve', 'secret', 'auth')):
                   labels.append({'name': 'security'})
               synthetic.append(
                   {
                       'number': number,
-                      'title': f"[Supervisor P{priority}] {title}"[:300],
+                      'title': f"[Supervisor P{priority}] {item_title}"[:300],
                       'body': json.dumps(evidence, sort_keys=True, default=str)[:12000],
                       'labels': labels,
                   }
               )
 
+          state['shift_supervisor'] = {
+              'source': 'canonical-plan-issue',
+              'status': status,
+              'issue_number': canonical.get('number') if canonical else None,
+              'idle_plan_items': len(synthetic),
+          }
           state.setdefault('issues', []).extend(synthetic)
           state_path.write_text(json.dumps(state, sort_keys=True, indent=2), encoding='utf-8')
 
           lines = ['## Shift supervisor', '']
-          lines.append(f"Actors: {', '.join(supervisor.get('actors', [])) or 'none'}")
-          lines.append('')
-          plan = supervisor.get('plan_items', [])
-          lines.append(f"Plan items generated: {len(plan)}")
-          lines.append(f"Idle work items promoted into studio intake: {len(synthetic)}")
-          for item in plan[:20]:
-              title = str(item.get('title', '')).strip() or '(untitled)'
-              team = str(item.get('target_team', 'unknown'))
-              priority = item.get('priority', '?')
-              lines.append(f"- P{priority} [{team}] {title}")
+          if canonical is None:
+              lines.append('Canonical plan issue was not present; no supervisor tasks were promoted.')
+          elif status != 'loaded':
+              lines.append(f"Canonical issue #{canonical.get('number', '?')} was present but had no usable durable state.")
+          else:
+              lines.append(f"Canonical issue: #{canonical.get('number', '?')}")
+              lines.append(f"Idle work items promoted into studio intake: {len(synthetic)}")
+              for item in synthetic[:20]:
+                  lines.append(f"- {item['title']}")
           (root / 'shift-supervisor-summary.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
           PY
 
