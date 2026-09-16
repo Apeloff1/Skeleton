@@ -31,6 +31,7 @@ def test_path_policy_allows_normal_source_and_rejects_trust_boundaries() -> None
         "skeleton/security/auth.py",
         "random-root/file.py",
         "skeleton/gameplay/bad\npath.py",
+        r"skeleton\foo.py",
     ):
         with pytest.raises(ValueError):
             _canonical_path(path)
@@ -76,6 +77,10 @@ index 1111111..2222222 100644
     deleted = patch.replace("+++ b/skeleton/foo.py", "+++ /dev/null")
     with pytest.raises(ValueError):
         _changed_paths(deleted)
+
+    backslash_target = patch.replace("skeleton/foo.py", r"skeleton\foo.py")
+    with pytest.raises(ValueError, match="backslash"):
+        _changed_paths(backslash_target)
 
 
 def test_patch_parser_binds_git_and_content_headers_to_same_target() -> None:
