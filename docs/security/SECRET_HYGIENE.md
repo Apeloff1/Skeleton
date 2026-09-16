@@ -7,7 +7,7 @@ Skeleton treats any credential committed to Git history, copied into an issue, o
 The repository uses two complementary scanners:
 
 1. `backend/scripts/check_secret_hygiene.py` scans repository text for high-confidence credential shapes without echoing secret values.
-2. Gitleaks scans Git history with the repository policy in `.gitleaks.toml`. CI pins Gitleaks `8.24.3` and checks out full history.
+2. Gitleaks scans Git history with the repository policy in `.gitleaks.toml`. CI pins Gitleaks `8.24.3` and checks out full history. In addition to the maintained default detector set, the repository policy rejects sufficiently long, high-entropy opaque values assigned to secret-bearing identifiers such as API keys, access/auth tokens, client secrets, secret keys, passwords, and credentials. This covers provider-agnostic credentials that do not expose a branded token prefix while keeping low-entropy placeholders out of the finding set.
 
 Run the complete local gate before security-sensitive merges:
 
