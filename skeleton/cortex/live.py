@@ -69,11 +69,12 @@ def get_live(bus: Optional[EventBus] = None) -> JeevesCortex:
 def live_cortex(bus: Optional[EventBus] = None) -> JeevesCortex:
     """Return the process singleton and bind it to the caller's bus."""
     global _live_control
-    cortex = get_live(bus)
-    if bus is not None:
-        cortex._bus = bus
-        _live_control = ControlSurface(cortex, bus=bus)
-    return cortex
+    with _LOCK:
+        cortex = get_live(bus)
+        if bus is not None:
+            cortex._bus = bus
+            _live_control = ControlSurface(cortex, bus=bus)
+        return cortex
 
 
 def get_control() -> Optional[ControlSurface]:
