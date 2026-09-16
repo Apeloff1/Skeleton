@@ -1,4 +1,4 @@
-.PHONY: install dev test smoke verify quality ci lint clean repo-intel repo-intel-check repo-intel-impact repo-intel-diff repo-intel-doctor repo-intel-bench
+.PHONY: install dev test smoke verify quality ci lint clean repo-intel repo-intel-check repo-intel-impact repo-intel-diff repo-intel-doctor repo-intel-bench repo-intel-contributions
 
 install:
 	pip install -r requirements.txt
@@ -20,11 +20,18 @@ quality:
 
 repo-intel:
 	python scripts/repo_intel_frontier.py check
+	python scripts/repo_intel_contributions.py check
 	python scripts/repo_intel_frontier.py snapshot --out .cache/repo-intel
+	python scripts/repo_intel_contributions.py snapshot --out .cache/repo-intel
 
 repo-intel-check:
 	python scripts/repo_intel_frontier.py gate --base "$${REPO_INTEL_BASE:-origin/main}"
+	python scripts/repo_intel_contributions.py check
 	python scripts/repo_intel_frontier.py snapshot --base "$${REPO_INTEL_BASE:-origin/main}" --out .cache/repo-intel
+	python scripts/repo_intel_contributions.py snapshot --out .cache/repo-intel
+
+repo-intel-contributions:
+	python scripts/repo_intel_contributions.py snapshot --out .cache/repo-intel
 
 repo-intel-impact:
 	python scripts/repo_intel_frontier.py impact --base "$${REPO_INTEL_BASE:-origin/main}" --out .cache/repo-intel
@@ -40,6 +47,7 @@ repo-intel-bench:
 
 ci:
 	python scripts/repo_intel_frontier.py check
+	python scripts/repo_intel_contributions.py check
 	bash scripts/ci.sh
 
 lint:
