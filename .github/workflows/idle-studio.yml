@@ -66,6 +66,8 @@ jobs:
 
       - name: Require successful supervisor refresh
         if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success'
+        env:
+          SUPERVISOR_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
         shell: bash
         run: |
           set -euo pipefail
@@ -75,7 +77,7 @@ jobs:
             echo
             echo 'Status: **blocked**'
             echo
-            echo "Shift Supervisor Control concluded: ${{ github.event.workflow_run.conclusion }}"
+            echo "Shift Supervisor Control concluded: $SUPERVISOR_CONCLUSION"
             echo 'No Idle Studio work was generated and prior worker status will be cleared.'
           } > .idle-studio-tmp/shift-supervisor-summary.md
           exit 1
