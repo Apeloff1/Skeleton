@@ -51,6 +51,25 @@ def test_compose_pins_stateful_images_and_hardens_non_root_app_services() -> Non
         assert "cap_drop:\n      - ALL" in service
 
 
+def test_api_runtime_filesystems_are_read_only_with_bounded_tmpfs() -> None:
+    compose = (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    skeleton = _service_block(compose, "skeleton")
+    backend = _service_block(compose, "backend")
+
+    for service in (skeleton, backend):
+        assert "read_only: true" in service
+        assert "tmpfs:\n      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777" in service
+
+    assert "./backend:/app:ro" in backend
+    assert "./skeleton:/app/skeleton:ro" in backend
+    assert "backend_data:/app/data" in backend
+    assert "backend_data:/app/data:ro" not in backend
+    assert "/app/__pycache__" not in backend
+
+    backend_dockerfile = (REPO_ROOT / "backend" / "Dockerfile").read_text(encoding="utf-8")
+    assert "PYTHONDONTWRITEBYTECODE=1" in backend_dockerfile
+
+
 def test_compose_healthchecks_use_runtime_available_tools_and_canonical_routes() -> None:
     compose = (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
     skeleton = _service_block(compose, "skeleton")
