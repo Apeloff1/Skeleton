@@ -111,17 +111,23 @@ def test_environment_limits_override_constructor_values(monkeypatch):
     monkeypatch.setenv("SKELETON_GATE_MAX_HEADER_BYTES", "8")
     monkeypatch.setenv("SKELETON_GATE_MAX_HEADER_COUNT", "1")
 
-    middleware = HeaderBoundMiddleware(lambda *_args: None, max_header_bytes=1024, max_header_count=10)
+    async def app(scope, receive, send):
+        return None
+
+    middleware = HeaderBoundMiddleware(app, max_header_bytes=1024, max_header_count=10)
 
     assert middleware.max_header_bytes == 8
     assert middleware.max_header_count == 1
 
 
 def test_limits_must_be_positive():
+    async def app(scope, receive, send):
+        return None
+
     with pytest.raises(ValueError, match="must be positive"):
-        HeaderBoundMiddleware(lambda *_args: None, max_header_bytes=0)
+        HeaderBoundMiddleware(app, max_header_bytes=0)
     with pytest.raises(ValueError, match="must be positive"):
-        HeaderBoundMiddleware(lambda *_args: None, max_header_count=-1)
+        HeaderBoundMiddleware(app, max_header_count=-1)
 
 
 def test_non_http_scope_passes_through():
