@@ -158,6 +158,7 @@ class SquadPlanQueueAPI:
         )
 
     def safe_capacity(self, team: str) -> int:
+        self.recover_invalid_leases()
         return self.coordinator.safe_capacity(team)
 
     def claim_next(
@@ -167,6 +168,7 @@ class SquadPlanQueueAPI:
         plan_generation: str,
         worker_ids: Sequence[str] | None = None,
     ) -> dict[str, Any] | None:
+        self.recover_invalid_leases()
         lease = self.coordinator.claim_next(
             team,
             plan_generation=plan_generation,
@@ -284,5 +286,72 @@ class SquadPlanQueueAPI:
             coordinator._release_members_locked(lease, moment)  # noqa: SLF001
             return PlanReadAPI._payload(replace(item))
 
+    def recover_invalid_leases(self) -> list[str]:
+        """Fail closed but recover capacity from malformed durable squad leases.
+
+        A corrupt or partially persisted lease must not leave an active task and
+        four workers permanently wedged. Invalid active squad leases are
+        archived as recovery events, their workers are released, and the task
+        is returned to the canonical queue for a fresh lease generation.
+        """
+        coordinator = self.coordinator
+        store = coordinator.store
+        moment = datetime.now(timezone.utc)
+        recovered: list[str] = []
+        with store._lock:  # noqa: SLF001
+            for item in list(store._items.values()):  # noqa: SLF001
+                if item.status not in {"assigned", "working", "blocked"}:
+                    continue
+                owner = str(item.owner or "")
+                if not owner.startswith("squad-"):
+                    continue
+                try:
+                    coordinator._lease_from_item(item)  # noqa: SLF001
+                    continue
+                except ValueError as exc:
+                    error = str(exc)[:500]
+
+                history = coordinator._lease_history(item)  # noqa: SLF001
+                history.append(
+                    {
+                        "squad_id": owner,
+                        "task_id": item.id,
+                        "team": item.target_team,
+                        "finished_at": moment.isoformat(),
+                        "outcome": "invalid_lease_recovered",
+                        "error": error,
+                    }
+                )
+                meta = dict(item.metadata)
+                meta["squad_lease_history"] = history[-16:]
+                meta["invalid_lease_recovery_count"] = coordinator._nonnegative_int(  # noqa: SLF001
+                    meta.get("invalid_lease_recovery_count")
+                ) + 1
+                meta["last_squad_outcome"] = "invalid_lease_recovered"
+                meta.pop("squad_lease", None)
+                meta.pop("lease_revoked", None)
+                item.metadata = meta
+                item.owner = None
+                item.status = "queued"
+                item.updated_at = moment
+                store._items[item.id] = replace(item)  # noqa: SLF001
+
+                for worker_id, worker in list(store._workers.items()):  # noqa: SLF001
+                    current_squad = str(worker.metadata.get("current_squad_id", ""))
+                    if worker.current_task_id != item.id and current_squad != owner:
+                        continue
+                    worker.current_task_id = None
+                    if worker.status != "offline":
+                        worker.status = "idle"
+                    worker.last_heartbeat_at = moment
+                    worker_meta = dict(worker.metadata)
+                    worker_meta.pop("current_squad_id", None)
+                    worker_meta.pop("current_squad_role", None)
+                    worker.metadata = worker_meta
+                    store._workers[worker_id] = replace(worker)  # noqa: SLF001
+                recovered.append(item.id)
+        return recovered
+
     def reclaim_expired(self) -> list[str]:
+        self.recover_invalid_leases()
         return self.coordinator.reclaim_expired()
