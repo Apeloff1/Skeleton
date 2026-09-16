@@ -53,8 +53,16 @@
       "id": "ai:grok",
       "display_name": "Grok",
       "kind": "ai-agent",
-      "aliases": ["Grok", "grok bot", "grokbot"],
-      "surface_terms": ["grok bot", "grok"],
+      "aliases": ["Grok"],
+      "surface_terms": ["grok"],
+      "evidence_class": "user-declared-and-repository-surface"
+    },
+    {
+      "id": "bot:grokbot",
+      "display_name": "grokbot",
+      "kind": "ai-bot",
+      "aliases": ["grokbot", "grok bot"],
+      "surface_terms": ["grokbot", "grok bot"],
       "evidence_class": "user-declared-and-repository-surface"
     },
     {
@@ -115,6 +123,7 @@
     "user_declared": "Records a tool the repository owner reports using; it is not attached to individual commits unless direct Git or explicit handoff evidence exists.",
     "unknown_identity": "Unmatched identities remain separate. Heuristics may classify bot-like names but must not alias them to a named service without evidence.",
     "identity_collision": "Generic provider emails, shared service accounts, and GitHub-owned committer identities are not sufficient to map a contribution to a named bot or AI. Prefer unique actor names/IDs or explicit trailers.",
+    "agent_bot_separation": "A model/agent and a bot/orchestrator that can invoke it are separate actors unless repository evidence proves they are the same identity. Similar names are not sufficient to merge them.",
     "history_rewrites": "Squash merges, rebases, cherry-picks, imported snapshots, generated commits, and rewritten commits can collapse or duplicate attribution. The index reports observable Git and handoff evidence and never reconstructs missing authorship by guesswork.",
     "shared_identity": "A human-owned commit created through an AI connector is not automatically AI-authored. Use an explicit trailer or Author/agent handoff declaration to preserve that contribution signal.",
     "privacy": "Generated provenance outputs do not emit raw email addresses. Matching may use Git emails locally; unknown identities receive stable hashed IDs."
