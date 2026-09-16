@@ -86,8 +86,18 @@ class ChatGPTReasoner:
         if not math.isfinite(float(timeout)):
             raise ValueError("timeout must be finite")
 
-        self.api_key = api_key if api_key is not None else os.getenv("OPENAI_API_KEY", "")
-        self.model = model or os.getenv("OPENAI_MODEL", "gpt-5.6")
+        resolved_key = api_key if api_key is not None else os.getenv("OPENAI_API_KEY", "")
+        if not isinstance(resolved_key, str):
+            raise TypeError("api_key must be a string")
+        resolved_model = model if model is not None else os.getenv("OPENAI_MODEL", "gpt-5.6")
+        if not isinstance(resolved_model, str):
+            raise TypeError("model must be a string")
+        resolved_model = resolved_model.strip() or "gpt-5.6"
+        if len(resolved_model) > 200:
+            raise ValueError("model identifier is too long")
+
+        self.api_key = resolved_key.strip()
+        self.model = resolved_model
         self.timeout = max(1.0, min(float(timeout), 60.0))
 
     @staticmethod
@@ -141,8 +151,10 @@ class ChatGPTReasoner:
             or request_data.max_output_chars <= 0
         ):
             return ReasoningResult(False, error_kind="invalid_output_limit")
-        if not isinstance(request_data.task, str) or not all(
-            isinstance(item, str) for item in request_data.evidence
+        if (
+            not isinstance(request_data.task, str)
+            or not isinstance(request_data.evidence, tuple)
+            or not all(isinstance(item, str) for item in request_data.evidence)
         ):
             return ReasoningResult(False, error_kind="invalid_request")
 
@@ -168,8 +180,8 @@ class ChatGPTReasoner:
                 },
             ],
             "max_output_tokens": max(
-                64,
-                min(request_data.max_output_chars // 4, 4_000),
+                1,
+                min((request_data.max_output_chars + 3) // 4, 4_000),
             ),
         }
         body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
