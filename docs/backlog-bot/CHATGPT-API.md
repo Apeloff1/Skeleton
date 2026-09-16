@@ -33,3 +33,7 @@ Network calls use bounded timeouts and response sizes. Raw error bodies are not 
 Evidence should be selected by finding, file, symbol, test, workflow, dependency, and security relationships. Whole-repository prompts are prohibited for normal operation.
 
 The model's response is advisory. A separate deterministic validator must decide whether any proposed action is allowed, and security findings must never be downgraded solely because the model recommends doing so.
+
+## Freshness
+
+Every reasoning request should carry the repository commit SHA and the relevant finding or PR identifiers. A response produced for an older head must be discarded when the affected branch or base changes. Model output is never a durable authorization token.
