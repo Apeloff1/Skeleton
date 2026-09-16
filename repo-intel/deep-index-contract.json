@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "purpose": "Deterministic build/supply-chain/runtime-surface enrichment layered on the content-addressed semantic repository graph.",
+  "history_window_commits": 600,
+  "generated_outputs": [
+    "dependencies.json",
+    "surfaces.json",
+    "hotspots.json",
+    "batch-status.json",
+    "search-catalog.json",
+    "change-set.json",
+    "history.json",
+    "build-relationships.json"
+  ],
+  "dependency_semantics": {
+    "scope": "offline direct declarations",
+    "ecosystems": ["pypi", "npm", "docker", "github-actions"],
+    "non_claims": [
+      "no transitive resolution",
+      "no vulnerability status without GitHub/Dependabot evidence",
+      "no license conclusion inferred from package names"
+    ]
+  },
+  "surface_semantics": {
+    "routes": "FastAPI-style decorator routes and Expo file routes are discoverability evidence, not endpoint reachability proof.",
+    "environment": "Only variable names and source reference paths are indexed; values are never emitted."
+  },
+  "hotspot_semantics": {
+    "inputs": ["bounded git touches", "fan-in", "fan-out", "tracked bytes", "ownership risk", "security sensitivity"],
+    "meaning": "relative engineering-attention signal",
+    "non_claim": "not a code quality, security, competence, or SOTA score"
+  },
+  "batch_semantics": {
+    "states": ["planned", "evidence-noted"],
+    "evidence-noted": "At least one tracked handoff note references the batch ID; this does not establish completion or readiness."
+  },
+  "search_semantics": {
+    "core": "deterministic lexical retrieval over paths, symbols, imports, routes, env names, dependency declarations and subsystems",
+    "network_required": false,
+    "embeddings_required": false
+  },
+  "determinism": "Age/freshness is measured relative to HEAD commit time, never wall-clock time. History is bounded to the declared commit window."
+}
