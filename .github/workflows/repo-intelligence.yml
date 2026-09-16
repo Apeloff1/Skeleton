@@ -36,12 +36,21 @@ jobs:
         with:
           python-version: "${{ env.PYTHON_VERSION }}"
 
+      - name: Restore/save content-addressed semantic cache
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        with:
+          path: .cache/repo-intel/semantic-cache.json
+          key: repo-intel-semantic-v1-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ github.sha }}
+          restore-keys: |
+            repo-intel-semantic-v1-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-
+
       - name: Install repository test dependencies
         run: python -m pip install --disable-pip-version-check --no-input -e ".[dev]"
 
       - name: Validate repo-intelligence contracts
         run: |
-          python -m compileall -q scripts/repo_intel.py scripts/repo_intel_sota.py
+          python -m compileall -q scripts/repo_intel.py scripts/repo_intel_sota.py scripts/benchmark_repo_intel.py
           python scripts/repo_intel_sota.py check
 
       - name: Run focused repository-index regressions
