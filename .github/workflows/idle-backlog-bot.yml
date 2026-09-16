@@ -39,7 +39,14 @@ jobs:
           cutoff=$(date -u -d "${STALE_DAYS} days ago" +%s)
           triaged=0
 
-          gh issue list --repo "$REPO" --state open --limit 100 --json number,title,updatedAt,isPullRequest,labels > "$RUNNER_TEMP/items.json"
+          # The issues REST endpoint returns both issues and pull requests.
+          # `gh issue list` does not expose an `isPullRequest` JSON field, so use
+          # the API's `pull_request` marker and `updated_at` field directly.
+          gh api \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "repos/${REPO}/issues?state=open&per_page=100" \
+            > "$RUNNER_TEMP/items.json"
 
           while IFS=$'\t' read -r number title updated kind labels; do
             [[ -n "${number:-}" ]] || continue
@@ -52,7 +59,7 @@ jobs:
               gh issue comment "$number" --repo "$REPO" --body "Repository bot triage: this ${kind} has had no update for at least ${STALE_DAYS} days. It remains open; review whether it is still actionable, blocked, superseded, or ready for work. No automatic closure was performed." >/dev/null
               triaged=$((triaged + 1))
             fi
-          done < <(jq -r '.[] | [.number,.title,.updatedAt,(if .isPullRequest then "pull request" else "issue" end),([.labels[].name] | join(","))] | @tsv' "$RUNNER_TEMP/items.json")
+          done < <(jq -r '.[] | [.number,.title,.updated_at,(if has("pull_request") then "pull request" else "issue" end),([.labels[].name] | join(","))] | @tsv' "$RUNNER_TEMP/items.json")
 
           {
             echo '## Idle backlog bot'
