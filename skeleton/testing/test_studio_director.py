@@ -32,6 +32,12 @@ def _init_smoke_repo(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
 
+def _artifact_paths(tmp_path):
+    output_dir = tmp_path.parent / f"{tmp_path.name}-outputs"
+    output_dir.mkdir(exist_ok=True)
+    return output_dir / "proposal.patch", output_dir / "audit.jsonl"
+
+
 def test_extract_json_accepts_plain_and_fenced_payloads() -> None:
     assert _extract_json('{"tasks": []}') == {"tasks": []}
     assert _extract_json('```json\n{"tasks": []}\n```') == {"tasks": []}
@@ -111,8 +117,6 @@ index 1111111..2222222 100644
 +new
 """
 
-    # `git apply` accepts this shape and writes backend/other.py unless the
-    # content headers are independently validated against the diff header.
     mismatched_allowed_target = patch.replace(
         "--- a/skeleton/foo.py\n+++ b/skeleton/foo.py",
         "--- a/backend/other.py\n+++ b/backend/other.py",
@@ -216,8 +220,7 @@ def test_propose_smoke_exercises_plan_build_review_and_restores_worktree(tmp_pat
             return SimpleNamespace(ok=True, text=text, error_kind=None)
 
     monkeypatch.setattr(studio_director, "ChatGPTReasoner", FakeReasoner)
-    patch_path = tmp_path / "proposal.patch"
-    audit_path = tmp_path / "audit.jsonl"
+    patch_path, audit_path = _artifact_paths(tmp_path)
 
     assert studio_director.propose(
         patch_path=patch_path,
@@ -256,8 +259,7 @@ def test_propose_planning_failure_is_audited_and_emits_empty_patch(tmp_path, mon
             return SimpleNamespace(ok=False, text="", error_kind="missing_api_key")
 
     monkeypatch.setattr(studio_director, "ChatGPTReasoner", FailingReasoner)
-    patch_path = tmp_path / "proposal.patch"
-    audit_path = tmp_path / "audit.jsonl"
+    patch_path, audit_path = _artifact_paths(tmp_path)
 
     with pytest.raises(RuntimeError, match="failed closed"):
         studio_director.propose(
