@@ -58,10 +58,13 @@ APScheduler==3.11.3
 # --- Payments ---
 stripe==15.6.1
 
-# --- Documents / media ---
+# --- Documents / media / compression ---
 reportlab==5.0.1
 pillow==12.3.0
 numpy==2.4.6
+# Swarm planner snapshots use zstd compression directly; keep it explicit rather
+# than relying on an optional/transitive package being present in CI or runtime.
+zstandard==0.25.0
 
 # --- Logging ---
 loguru==0.7.3
