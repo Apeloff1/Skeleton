@@ -78,6 +78,8 @@ class QueryPlanner:
         ranker: Optional[Ranker] = None,
         prefetch_workers: int = _DEFAULT_PREFETCH_WORKERS,
     ) -> None:
+        if isinstance(prefetch_workers, bool) or not isinstance(prefetch_workers, int):
+            raise TypeError("prefetch_workers must be an integer")
         if prefetch_workers < 1:
             raise ValueError("prefetch_workers must be >= 1")
         self.fuser = fuser or Fuser(strategy=FusionStrategy.RRF)
@@ -167,7 +169,14 @@ class QueryPlanner:
         if prefetched is not None and prefetched.plan != resolved_plan:
             raise RetrievalError("prefetched results do not match supplied plan")
 
-        limit = top_k if top_k is not None else self._DEFAULT_TOP_K
+        if top_k is None:
+            limit = self._DEFAULT_TOP_K
+        else:
+            if isinstance(top_k, bool) or not isinstance(top_k, int):
+                raise TypeError("top_k must be an integer")
+            if top_k < 1:
+                raise ValueError("top_k must be >= 1")
+            limit = top_k
 
         for attempt in range(self._MAX_EXECUTION_ATTEMPTS):
             with self._registry_lock:
