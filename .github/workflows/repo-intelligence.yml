@@ -23,7 +23,7 @@ env:
 
 jobs:
   map-and-gate:
-    name: Map semantic / supply-chain / runtime / tests / artifacts / impact / security / handoff graph
+    name: Map semantic / supply-chain / runtime / tests / artifacts / contributors / impact / security / handoff graph
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -57,10 +57,13 @@ jobs:
             scripts/repo_intel_deep.py \
             scripts/repo_intel_test_evidence.py \
             scripts/repo_intel_artifacts.py \
+            scripts/repo_intel_contributions.py \
+            scripts/check_repo_intel_contribution_gate.py \
             scripts/repo_index.py \
             scripts/repo_intel_frontier.py \
             scripts/benchmark_repo_intel.py
           python scripts/repo_intel_frontier.py check
+          python scripts/repo_intel_contributions.py check
 
       - name: Run focused repository-index regressions
         run: >-
@@ -70,6 +73,7 @@ jobs:
           tests/test_repo_intel_deep.py
           tests/test_repo_intel_test_evidence.py
           tests/test_repo_intel_artifacts.py
+          tests/test_repo_intel_contributions.py
           tests/test_repo_intel_frontier.py
           tests/test_repo_index.py
 
@@ -79,12 +83,15 @@ jobs:
         run: |
           python scripts/repo_intel_frontier.py snapshot --base "$REPO_INTEL_BASE" --out .cache/repo-intel
           python scripts/repo_intel_frontier.py diff --base "$REPO_INTEL_BASE" --out .cache/repo-intel
+          python scripts/repo_intel_contributions.py snapshot --out .cache/repo-intel
 
-      - name: Require build augmentation note
+      - name: Require build augmentation and contributor provenance
         if: github.event_name == 'pull_request'
         env:
           REPO_INTEL_BASE: ${{ github.event.pull_request.base.sha }}
-        run: python scripts/repo_intel_frontier.py gate --base "$REPO_INTEL_BASE"
+        run: |
+          python scripts/repo_intel_frontier.py gate --base "$REPO_INTEL_BASE"
+          python scripts/check_repo_intel_contribution_gate.py --base "$REPO_INTEL_BASE"
 
       - name: Query live Dependabot security data when permitted
         env:
@@ -141,6 +148,7 @@ jobs:
           batches = json.loads((root / 'batch-status.json').read_text())
           tests = json.loads((root / 'test-evidence.json').read_text())
           artifacts = json.loads((root / 'artifact-lineage.json').read_text())
+          contributions = json.loads((root / 'contributions.json').read_text())
           arch = json.loads((root / 'architecture.json').read_text())
           m = index['metrics']
           print('source_digest=', index['source_digest'])
@@ -165,6 +173,12 @@ jobs:
           print('artifact_unresolved_inputs=', artifacts['unresolved_count'])
           print('affected_artifacts=', len(impact.get('affected_artifacts', [])))
           print('ranked_candidate_tests=', len(impact.get('ranked_candidate_tests', [])))
+          print('contribution_commits_scanned=', contributions['coverage']['scanned_commit_count'])
+          print('contribution_history_truncated=', contributions['coverage']['history_truncated'])
+          print('nonhuman_direct_evidence=', contributions['nonhuman_direct_evidence_count'])
+          print('declared_handoff_contributions=', sum(a['declared_handoff_contributions'] for a in contributions['actors']))
+          print('unknown_direct_identities=', len(contributions['unknown_direct_identities']))
+          print('automation_workflows=', contributions['automation_surfaces']['workflow_count'])
           print('architecture_boundaries=', arch['counts_by_severity'])
           print('owned_file_ratio=', m['owned_file_ratio'])
           print('impact_files=', impact['affected_file_count'])
