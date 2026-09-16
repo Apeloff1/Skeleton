@@ -82,6 +82,65 @@ def test_idle_consumer_promotes_only_fresh_canonical_items():
     assert plan_map[f"issue:{synthetic['number']}"] == "idle-task-1"
 
 
+def test_consumer_only_promotes_queued_items_with_completed_dependencies():
+    state = _state()
+    state["issues"][0]["body"] = _body(
+        [
+            {
+                "id": "done-base",
+                "title": "Completed dependency",
+                "description": "Already done.",
+                "priority": 50,
+                "target_team": "night",
+                "status": "done",
+            },
+            {
+                "id": "eligible",
+                "title": "Eligible follow-up",
+                "description": "Dependency is complete.",
+                "priority": 90,
+                "target_team": "night",
+                "status": "queued",
+                "dependencies": ["done-base"],
+            },
+            {
+                "id": "blocked",
+                "title": "Blocked item",
+                "description": "Must not execute.",
+                "priority": 100,
+                "target_team": "night",
+                "status": "blocked",
+            },
+            {
+                "id": "assigned",
+                "title": "Already assigned",
+                "description": "Must not be reclaimed.",
+                "priority": 99,
+                "target_team": "night",
+                "status": "assigned",
+            },
+            {
+                "id": "missing-dependency",
+                "title": "Missing dependency",
+                "description": "Must fail closed.",
+                "priority": 98,
+                "target_team": "night",
+                "status": "queued",
+                "dependencies": ["not-in-state"],
+            },
+        ]
+    )
+
+    consumed, _ = consume_plan(
+        state,
+        team="night",
+        now=datetime(2026, 9, 16, 10, 10, tzinfo=timezone.utc),
+        max_age_minutes=20,
+    )
+
+    assert [item["id"] for item in consumed["_shift_supervisor"]["plan_items"]] == ["eligible"]
+
+
 def test_consumer_rejects_stale_generation():
     with pytest.raises(CanonicalPlanError, match="stale"):
         consume_plan(
