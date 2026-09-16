@@ -4,6 +4,7 @@ import json
 import uuid
 from typing import Any
 
+from .epistemic_gate import EpistemicExecutionGate
 from .model_gateway import ModelGateway
 from .models import PlanItem, PlanRevision, utcnow
 from .plan_store import InMemoryPlanStore
@@ -25,10 +26,12 @@ class SecretaryBot:
         store: InMemoryPlanStore,
         model: ModelGateway,
         council: PlanningCouncil | None = None,
+        gate: EpistemicExecutionGate | None = None,
     ) -> None:
         self.store = store
         self.model = model
         self.council = council
+        self.gate = gate
 
     def enrich_plan(self, project_context: dict[str, Any]) -> PlanRevision:
         correlation_id = f"secretary-{uuid.uuid4()}"
@@ -62,6 +65,8 @@ class SecretaryBot:
                 correlation_id=correlation_id,
                 actor="secretary",
             )
+        if self.gate is not None:
+            proposals = self.gate.filter_tasks(proposals)
         items = [self._parse_task(task, correlation_id) for task in proposals]
         items = [item for item in items if item is not None]
         added = self.store.add_items(items)
@@ -91,6 +96,9 @@ class SecretaryBot:
         council = task.get("_planning_council")
         if isinstance(council, dict):
             metadata["planning_council"] = dict(council)
+        gate = task.get("_epistemic_gate")
+        if isinstance(gate, dict):
+            metadata["epistemic_gate"] = dict(gate)
         return PlanItem(
             id=f"sec-{uuid.uuid4()}",
             title=title,
