@@ -1,0 +1,104 @@
+"""Manifest-bound runtime loading for Skeleton's canonical capability planes.
+
+The capability manifest is the authority for what may be resolved.  Runtime
+consumers therefore get one stable bridge across subsystem boundaries without
+turning a user supplied string into an arbitrary Python import.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from importlib import import_module
+from threading import RLock
+from types import ModuleType
+
+from .capability_manifest import CAPABILITIES, get_capability
+
+
+class CapabilityLoadError(RuntimeError):
+    """Raised when a curated capability cannot be imported."""
+
+    def __init__(self, capability_id: str) -> None:
+        self.capability_id = capability_id
+        super().__init__(f"failed to load capability: {capability_id}")
+
+
+@dataclass(frozen=True, slots=True)
+class CapabilityRuntimeStatus:
+    """Side-effect-free runtime state for one manifest capability."""
+
+    id: str
+    module: str
+    loaded: bool
+
+
+class CapabilityLoader:
+    """Thread-safe lazy loader restricted to the curated capability manifest."""
+
+    def __init__(self) -> None:
+        self._loaded: dict[str, ModuleType] = {}
+        self._lock = RLock()
+
+    def resolve(self, capability_id: str) -> ModuleType:
+        """Resolve one stable capability ID to its canonical package module."""
+
+        capability = get_capability(capability_id)
+        with self._lock:
+            cached = self._loaded.get(capability.id)
+            if cached is not None:
+                return cached
+            try:
+                module = import_module(capability.module)
+            except Exception as exc:
+                raise CapabilityLoadError(capability.id) from exc
+            self._loaded[capability.id] = module
+            return module
+
+    def is_loaded(self, capability_id: str) -> bool:
+        """Return whether this loader already resolved the capability."""
+
+        capability = get_capability(capability_id)
+        with self._lock:
+            return capability.id in self._loaded
+
+    def loaded_ids(self) -> tuple[str, ...]:
+        """Return loaded capability IDs in manifest order."""
+
+        with self._lock:
+            loaded = frozenset(self._loaded)
+        return tuple(capability.id for capability in CAPABILITIES if capability.id in loaded)
+
+    def status(self) -> tuple[CapabilityRuntimeStatus, ...]:
+        """Return deterministic runtime status without importing new modules."""
+
+        with self._lock:
+            loaded = frozenset(self._loaded)
+        return tuple(
+            CapabilityRuntimeStatus(
+                id=capability.id,
+                module=capability.module,
+                loaded=capability.id in loaded,
+            )
+            for capability in CAPABILITIES
+        )
+
+    def clear_cache(self) -> None:
+        """Forget loader-local module references without mutating ``sys.modules``."""
+
+        with self._lock:
+            self._loaded.clear()
+
+
+CAPABILITY_LOADER = CapabilityLoader()
+
+
+def load_capability(capability_id: str) -> ModuleType:
+    """Resolve a canonical subsystem through the shared application loader."""
+
+    return CAPABILITY_LOADER.resolve(capability_id)
+
+
+def capability_runtime_status() -> tuple[CapabilityRuntimeStatus, ...]:
+    """Return the shared loader's side-effect-free capability status."""
+
+    return CAPABILITY_LOADER.status()
