@@ -1,17 +1,30 @@
 {
-  "schema": 1,
+  "schema": 2,
   "index_performance_targets": {
     "warm_refresh_ms": 1000,
     "impact_query_ms": 250,
     "changed_blob_semantic_refresh_ms_each": 100,
-    "cache_hit_ratio_target": 0.95
+    "cache_hit_ratio_target": 0.95,
+    "core_network_requests": 0
   },
   "graph_quality_targets": {
     "build_affecting_paths_classified_ratio": 1.0,
     "python_parse_success_ratio": 0.995,
     "owned_subsystem_ratio": 1.0,
     "capability_records_with_batch_ratio": 1.0,
-    "security_controls_indexed_ratio": 1.0
+    "security_controls_indexed_ratio": 1.0,
+    "environment_values_emitted": 0,
+    "batch_completion_inferred_from_note_presence": 0
   },
-  "note": "Targets are budgets to measure and gate later; they are not achieved-performance claims until telemetry proves them."
+  "frontier_observability_targets": {
+    "dependency_ecosystems_reported": true,
+    "runtime_route_count_reported": true,
+    "environment_reference_count_reported": true,
+    "build_target_count_reported": true,
+    "history_window_reported": true,
+    "hotspot_inputs_explainable": true,
+    "search_document_count_reported": true,
+    "architecture_findings_reported": true
+  },
+  "note": "Targets are budgets to measure and gate later; they are not achieved-performance claims until telemetry proves them. Frontier completeness targets require measured evidence and may not be interpreted as a SOTA score."
 }
