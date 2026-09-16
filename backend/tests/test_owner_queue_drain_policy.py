@@ -48,3 +48,15 @@ def test_owner_queue_drain_requires_current_main_replacement_before_stale_dynami
     assert "replacement_keys =" in owner
     assert "workflow_event_key(run) in replacement_keys" in owner
     assert 'and (run.get("head_sha") or "") != head' in owner
+
+
+def test_owner_queue_drain_rechecks_main_before_mutation() -> None:
+    owner = OWNER_DRAIN.read_text(encoding="utf-8")
+
+    recheck = owner.index("live_head = main_sha()")
+    cancel = owner.index("status = cancel(run_id)")
+    assert recheck < cancel
+    assert "if live_head != head:" in owner
+    assert "main advanced before mutation" in owner
+    assert "deferring this pass" in owner
+    assert "total_selected += len(selected)" in owner[recheck:cancel]
