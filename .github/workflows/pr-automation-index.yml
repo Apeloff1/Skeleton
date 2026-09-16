@@ -9,7 +9,9 @@ on:
       - Dependency Review
       - Dependency Security
       - CodeQL
-    types: [requested, in_progress, completed]
+    # Evaluate terminal workflow state only. Requested/in-progress transitions
+    # multiplied Actions load without adding merge-readiness information.
+    types: [completed]
   schedule:
     - cron: "17,47 * * * *"
   workflow_dispatch:

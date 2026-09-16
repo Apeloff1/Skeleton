@@ -35,9 +35,12 @@ def test_privileged_python_executes_only_staged_package_in_isolated_mode():
     assert "python -m skeleton.pr_automation.runner" not in text
 
 
-def test_workflow_reacts_to_ci_rerun_transitions_and_serializes_writers():
+def test_workflow_reacts_only_to_terminal_ci_state_and_serializes_writers():
     text = _workflow()
-    assert "types: [requested, in_progress, completed]" in text
+    assert "types: [completed]" in text
+    assert "types: [requested, in_progress, completed]" not in text
+    assert "types: [requested]" not in text
+    assert "types: [in_progress]" not in text
     assert "- Merge Readiness" in text
     assert "group: pr-automation-index" in text
     assert "cancel-in-progress: false" in text
