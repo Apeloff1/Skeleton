@@ -30,9 +30,13 @@ RUN uv pip install -r requirements.txt
 # Stage 2: Production
 FROM python:3.14-slim@sha256:83ff1d245a3d57d04152252d3ef9cb361494d0b3395abd65a5ebe91c401c8e83 AS production
 
+# Fail closed for cross-origin browser access when deploy configuration omits
+# CORS_ORIGINS. Production deployments that need cross-origin access must set
+# the exact allowed origin list explicitly.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    CORS_ORIGINS=https://cors.invalid
 
 WORKDIR /app
 
@@ -63,6 +67,10 @@ CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001"]
 
 # Stage 3: Development
 FROM production AS development
+
+# Preserve the historical local-development convenience while keeping the
+# production image fail-closed.
+ENV CORS_ORIGINS=*
 
 USER root
 RUN pip install --no-cache-dir "pytest>=8,<9" pytest-cov "ruff==0.9.*"
