@@ -21,7 +21,7 @@ def _repo(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     runner = tmp_path.parent / f"{tmp_path.name}-runner"
     monkeypatch.setenv("RUNNER_TEMP", str(runner))
-    state = tmp_path / "state.json"
+    state = tmp_path.parent / f"{tmp_path.name}-state.json"
     state.write_text(
         json.dumps(
             {
