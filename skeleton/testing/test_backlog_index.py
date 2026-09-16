@@ -20,6 +20,29 @@ def test_index_builder_maps_symbols_dependencies_workflows_and_tests():
     assert index.tests == ("tests/test_app.py",)
 
 
+def test_package_json_only_indexes_dependency_sections():
+    reader = RepositoryReader()
+    package = reader.document(
+        "package.json",
+        '{"name":"demo","version":"1","dependencies":{"react":"^1"},'
+        '"devDependencies":{"vitest":"^2"},"scripts":{"build":"evil-not-a-dependency"}}',
+    )
+    index = RepositoryIndexBuilder().build([(package, package.path and '{"name":"demo","version":"1","dependencies":{"react":"^1"},"devDependencies":{"vitest":"^2"},"scripts":{"build":"evil-not-a-dependency"}}')])
+    assert [(item.name, item.source) for item in index.dependencies] == [
+        ("react", "package-json:dependencies"),
+        ("vitest", "package-json:devDependencies"),
+    ]
+
+
+def test_index_order_is_deterministic():
+    reader = RepositoryReader()
+    first = reader.document("z.py", "def z():\n    pass\n")
+    second = reader.document("a.py", "def a():\n    pass\n")
+    index = RepositoryIndexBuilder().build([(first, "def z():\n    pass\n"), (second, "def a():\n    pass\n")])
+    assert [doc.path for doc in index.files] == ["a.py", "z.py"]
+    assert [symbol.name for symbol in index.symbols] == ["a", "z"]
+
+
 def test_reader_rejects_traversal_and_absolute_paths():
     reader = RepositoryReader()
     for path in ("../secret.md", "/tmp/secret.md", "a/../../secret.md"):
