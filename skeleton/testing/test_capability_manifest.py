@@ -5,8 +5,15 @@ from __future__ import annotations
 import importlib.util
 import json
 
+import pytest
+
 from skeleton.__main__ import main
-from skeleton.application import CAPABILITY_MANIFEST_VERSION, capability_manifest
+from skeleton.application import (
+    CAPABILITIES_BY_ID,
+    CAPABILITY_MANIFEST_VERSION,
+    capability_manifest,
+    get_capability,
+)
 
 
 def test_capability_manifest_is_versioned_unique_and_resolvable() -> None:
@@ -30,6 +37,21 @@ def test_capability_manifest_is_versioned_unique_and_resolvable() -> None:
         assert capability["id"]
         assert capability["description"]
         assert importlib.util.find_spec(capability["module"]) is not None
+
+
+def test_capability_lookup_is_stable_normalized_and_immutable() -> None:
+    gameforge = get_capability("  GameForge  ")
+    assert gameforge.id == "gameforge"
+    assert CAPABILITIES_BY_ID["gameforge"] is gameforge
+
+    with pytest.raises(KeyError, match="unknown capability: missing"):
+        get_capability("missing")
+    with pytest.raises(ValueError, match="must not be empty"):
+        get_capability("   ")
+    with pytest.raises(TypeError, match="must be a string"):
+        get_capability(None)  # type: ignore[arg-type]
+    with pytest.raises(TypeError):
+        CAPABILITIES_BY_ID["missing"] = gameforge  # type: ignore[index]
 
 
 def test_capabilities_cli_matches_python_api(capsys) -> None:
