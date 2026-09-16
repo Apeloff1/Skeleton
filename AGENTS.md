@@ -60,7 +60,7 @@ CI rejects build-affecting changes that do not include an augmentation note. Thi
 
 - Use the repo-intelligence graph/impact map before broad searches.
 - Use `query --kind search` for deterministic repo-native retrieval before scanning large trees manually.
-- Use `query --kind tests --value <source-path>` and `impact.json.rank​ed_candidate_tests` to run the highest-confidence focused tests first; reserve full matrices for integration/release gates. (The hidden zero-width character is intentionally absent in generated keys; the actual key is `ranked_candidate_tests`.)
+- Use `query --kind tests --value <source-path>` and `impact.json` → `ranked_candidate_tests` to run the highest-confidence focused tests first; reserve full matrices for integration/release gates.
 - Prefer Git/index metadata and content hashes over rescanning source when metadata is sufficient.
 - Semantic analysis is blob-cached: identical Git content must be reusable across moves/branches where path-independent semantics permit it.
 - The frontier snapshot is self-validating: queries must rebuild when tracked workspace identity changes or required companion outputs are missing.
