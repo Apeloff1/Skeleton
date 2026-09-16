@@ -1,9 +1,4 @@
-"""Deterministic policy and fingerprinting for automated repair intake.
-
-This module is intentionally independent of any LLM. Repository and GitHub text
-is data, never policy. The policy classifies the *change surface* before a repair
-engine is allowed to propose or merge anything.
-"""
+"""Deterministic policy and fingerprinting for automated repair intake."""
 
 from __future__ import annotations
 
@@ -13,9 +8,11 @@ import re
 from typing import Iterable
 
 
+# These surfaces are never eligible for autonomous merging.
 TRUST_SURFACES = frozenset(
     {
         ".github/workflows/",
+        ".github/actions/",
         "security",
         "auth",
         "sandbox",
@@ -23,13 +20,16 @@ TRUST_SURFACES = frozenset(
         "secret",
         "permission",
         "provenance",
+        "attestation",
         "merge",
         "dockerfile",
+        "dependabot",
     }
 )
 
 HIGH_RISK_PATH_RE = re.compile(
-    r"(^|/)(\.github/workflows/|security|auth|sandbox|secrets?|Dockerfile(?:\.|$))|"
+    r"(^|/)(\.github/(workflows|actions)/|security|auth|sandbox|secrets?|Dockerfile(?:\.|$)|"
+    r"dependabot(?:\.yml)?|provenance|attestation|sbom|merge[-_]?gate)|"
     r"(^|/)(pyproject\.toml|package-lock\.json|poetry\.lock|requirements[^/]*\.txt)$",
     re.IGNORECASE,
 )
@@ -64,15 +64,26 @@ def classify_change(paths: Iterable[str], *, security_finding: bool = False) -> 
         reasons.append("security finding")
     if any(HIGH_RISK_PATH_RE.search(path) for path in normalized):
         reasons.append("trust/security-sensitive path")
-    if any(path.startswith(".github/workflows/") for path in normalized):
+    if any(path.startswith((".github/workflows/", ".github/actions/")) for path in normalized):
         reasons.append("workflow control plane")
-    if any("auth" in path.lower() or "sandbox" in path.lower() for path in normalized):
-        reasons.append("authorization or capability boundary")
+    if any(
+        marker in path.lower()
+        for path in normalized
+        for marker in ("auth", "sandbox", "secret", "permission", "provenance", "attestation")
+    ):
+        reasons.append("security or capability boundary")
 
+    # Autonomous merging is intentionally an explicit allowlist, not a broad
+    # denylist: only small documentation-only changes qualify today.
+    documentation_only = (
+        bool(normalized)
+        and len(normalized) <= 3
+        and all(path.endswith((".md", ".mdx", ".rst")) for path in normalized)
+    )
     if reasons:
         risk = "high"
         allowed = False
-    elif any(path.endswith((".md", ".mdx", ".rst")) for path in normalized) and len(normalized) <= 3:
+    elif documentation_only:
         risk = "low"
         allowed = True
     else:
