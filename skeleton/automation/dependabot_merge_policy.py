@@ -1,9 +1,10 @@
 """Fail-closed Dependabot merge policy for trusted default-branch automation.
 
 The policy never executes pull-request code. It validates immutable PR identity,
-a narrow dependency-file allowlist, and successful workflow runs for the exact
-head SHA before allowing a merge attempt. The final merge API call is also bound
-to that exact validated head SHA so a last-moment head move cannot be merged.
+a narrow dependency-file allowlist, successful workflow runs for the exact head
+SHA, and that the validated candidate contains a stable default-branch head
+before allowing a merge attempt. The final merge API call is also bound to the
+exact validated head SHA so a last-moment head move cannot be merged.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 import subprocess
 from typing import Any, Iterable, Mapping, Sequence
+from urllib.parse import quote
 
 DEFAULT_REQUIRED_WORKFLOWS = (
     "CI/CD",
@@ -208,6 +210,32 @@ class GitHubCLI:
                 result.extend(run for run in workflow_runs if isinstance(run, Mapping))
         return result
 
+    def branch_head(self, branch: str) -> str:
+        payload = self._json([
+            "api",
+            f"repos/{self.repo}/git/ref/heads/{quote(branch, safe='')}",
+        ])
+        if not isinstance(payload, Mapping):
+            raise RuntimeError("default branch ref response was malformed")
+        ref_object = payload.get("object")
+        sha = ref_object.get("sha") if isinstance(ref_object, Mapping) else None
+        if not isinstance(sha, str) or not sha:
+            raise RuntimeError("default branch head SHA was unavailable")
+        return sha
+
+    def candidate_contains_base(self, base_sha: str, head_sha: str) -> bool:
+        if not base_sha or not head_sha:
+            return False
+        payload = self._json([
+            "api",
+            f"repos/{self.repo}/compare/{base_sha}...{head_sha}",
+        ])
+        if not isinstance(payload, Mapping):
+            return False
+        merge_base = payload.get("merge_base_commit")
+        merge_base_sha = merge_base.get("sha") if isinstance(merge_base, Mapping) else None
+        return merge_base_sha == base_sha
+
     def merge(self, number: int, expected_head_sha: str) -> None:
         payload = self._json([
             "api", "-X", "PUT",
@@ -236,6 +264,11 @@ def run_once(repo: str, base_branch: str) -> int:
         number = summary.get("number")
         if not isinstance(number, int):
             continue
+
+        # Bind validation to one observed default-branch head. If main moves at
+        # any later checkpoint, this pass for the candidate becomes a no-op.
+        initial_base_sha = client.branch_head(base_branch)
+
         files = client.files(number)
         runs = client.runs(str(summary.get("headRefOid") or ""))
         decision = evaluate_candidate(
@@ -247,12 +280,18 @@ def run_once(repo: str, base_branch: str) -> int:
         )
         if not decision.ready:
             continue
+        if not client.candidate_contains_base(initial_base_sha, decision.head_sha):
+            continue
 
-        # Re-read all merge-relevant state and workflow results immediately
-        # before mutation. A moved head or changed PR state invalidates the pass.
+        # Re-read all merge-relevant PR state and workflow results immediately
+        # before mutation. A moved head, changed PR state, or moved base
+        # invalidates the pass.
         current = client.pr(number)
         if not same_candidate_identity(summary, current):
             continue
+        if client.branch_head(base_branch) != initial_base_sha:
+            continue
+
         current_files = client.files(number)
         current_runs = client.runs(str(current.get("headRefOid") or ""))
         final = evaluate_candidate(
@@ -263,6 +302,14 @@ def run_once(repo: str, base_branch: str) -> int:
             required_workflows=required,
         )
         if not final.ready or final.head_sha != decision.head_sha:
+            continue
+        if not client.candidate_contains_base(initial_base_sha, final.head_sha):
+            continue
+
+        # GitHub's merge API has an expected-head precondition but no
+        # expected-base precondition. Check the base one last time immediately
+        # before the SHA-bound merge call; any observed movement fails closed.
+        if client.branch_head(base_branch) != initial_base_sha:
             continue
 
         client.merge(number, final.head_sha)
