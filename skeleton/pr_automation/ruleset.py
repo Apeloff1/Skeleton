@@ -19,6 +19,7 @@ from .runner import GATE_CONTEXT
 
 API = "https://api.github.com"
 DEFAULT_GITHUB_ACTIONS_APP_ID = 15368
+DEFAULT_MERGE_READINESS_CONTEXT = "Merge Readiness"
 
 
 def build_ruleset(
@@ -27,13 +28,16 @@ def build_ruleset(
     name: str = "PR automation merge safety",
     approvals: int = 1,
     gate_context: str = GATE_CONTEXT,
+    merge_readiness_context: str = DEFAULT_MERGE_READINESS_CONTEXT,
     integration_id: int | None = DEFAULT_GITHUB_ACTIONS_APP_ID,
 ) -> dict[str, Any]:
     """Return a conservative repository-ruleset payload.
 
-    The ruleset intentionally delegates CI applicability to the trusted
-    ``PR Automation Gate`` status instead of requiring every path-filtered
-    workflow directly, which would deadlock documentation-only PRs.
+    The native aggregate CI context and the trusted automation gate are both
+    required. Requiring the native context closes the window where a previously
+    successful automation status could otherwise outlive a newly requested CI
+    rerun; requiring the automation gate adds policy checks GitHub's native CI
+    context does not encode (scope, fork policy, trust-surface quarantine, etc.).
     """
 
     if not branch or branch.startswith("refs/"):
@@ -44,12 +48,19 @@ def build_ruleset(
         raise ValueError("approvals must be between 0 and 10")
     if not gate_context.strip():
         raise ValueError("gate context must not be empty")
+    if not merge_readiness_context.strip():
+        raise ValueError("merge readiness context must not be empty")
+    if gate_context == merge_readiness_context:
+        raise ValueError("gate and merge readiness contexts must be distinct")
     if integration_id is not None and integration_id <= 0:
         raise ValueError("integration_id must be positive when supplied")
 
-    required_check: dict[str, Any] = {"context": gate_context}
-    if integration_id is not None:
-        required_check["integration_id"] = integration_id
+    required_checks: list[dict[str, Any]] = []
+    for context in (merge_readiness_context, gate_context):
+        check: dict[str, Any] = {"context": context}
+        if integration_id is not None:
+            check["integration_id"] = integration_id
+        required_checks.append(check)
 
     return {
         "name": name.strip(),
@@ -80,7 +91,7 @@ def build_ruleset(
                 "parameters": {
                     "strict_required_status_checks_policy": True,
                     "do_not_enforce_on_create": False,
-                    "required_status_checks": [required_check],
+                    "required_status_checks": required_checks,
                 },
             },
         ],
@@ -143,6 +154,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--name", default="PR automation merge safety")
     parser.add_argument("--approvals", type=int, default=1)
     parser.add_argument("--gate-context", default=GATE_CONTEXT)
+    parser.add_argument("--merge-readiness-context", default=DEFAULT_MERGE_READINESS_CONTEXT)
     parser.add_argument("--integration-id", type=int, default=DEFAULT_GITHUB_ACTIONS_APP_ID)
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args(argv)
@@ -155,6 +167,7 @@ def main(argv: list[str] | None = None) -> int:
         name=args.name,
         approvals=args.approvals,
         gate_context=args.gate_context,
+        merge_readiness_context=args.merge_readiness_context,
         integration_id=args.integration_id,
     )
     if not args.apply:
