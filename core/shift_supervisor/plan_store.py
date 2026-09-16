@@ -186,11 +186,14 @@ class InMemoryPlanStore:
                     for worker in self._workers.values()
                     if worker.status != "offline"
                     or worker.current_task_id
+                    or worker.normal_shift_minutes > 0
                     or worker.overtime_minutes > 0
+                    or self._nonnegative_int(worker.metadata.get("daily_work_minutes")) > 0
                 ),
                 key=lambda worker: (
                     worker.status == "offline",
                     -worker.overtime_minutes,
+                    -worker.normal_shift_minutes,
                     worker.worker_id,
                 ),
             )[: max(0, max_workers)]
