@@ -46,10 +46,15 @@ class KnowledgeAugmentedJeeves:
             signal_key=signal_key,
             observed_at=observed_at,
         )
-        # Always call the engine-level projection. VerifiedCuriosityEngine
-        # overrides this to enforce expiry/retraction/current truth state; using
-        # fabric.orientation_pack directly would bypass that safety boundary.
-        pack = self.curiosity.orientation_pack(prompt, limit=8)
+        # VerifiedCuriosityEngine owns a stricter engine-level projection that
+        # enforces expiry/retraction/current truth state. The base CuriosityEngine
+        # predates that method, so preserve its public behavior by delegating to
+        # the underlying fabric rather than failing with AttributeError.
+        orientation_pack = getattr(self.curiosity, "orientation_pack", None)
+        if callable(orientation_pack):
+            pack = orientation_pack(prompt, limit=8)
+        else:
+            pack = self.curiosity.fabric.orientation_pack(prompt, limit=8)
         return {"signal_id": signal.id, "subject": signal.subject, "orientation": pack}
 
     @staticmethod
