@@ -36,4 +36,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: python -m skeleton.automation.ci_failure_bot
+        run: python skeleton/automation/ci_failure_bot.py
