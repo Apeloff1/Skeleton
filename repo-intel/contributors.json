@@ -1,0 +1,111 @@
+{
+  "schema": 1,
+  "purpose": "Canonical contributor, bot, automation, and AI-agent identity registry for repository provenance. Direct contribution credit requires Git identity or explicit commit trailers; operational surfaces and user-declared tools are tracked separately.",
+  "history_commit_limit": 3000,
+  "direct_trailer_keys": [
+    "co-authored-by",
+    "assisted-by",
+    "generated-by",
+    "ai-assisted-by",
+    "agent-by"
+  ],
+  "informational_trailer_keys": [
+    "signed-off-by",
+    "tool",
+    "model"
+  ],
+  "actors": [
+    {
+      "id": "human:apeloff1",
+      "display_name": "Apeloff1",
+      "kind": "human",
+      "aliases": ["Apeloff1"],
+      "identity_patterns": ["122585327+Apeloff1@users.noreply.github.com"],
+      "evidence_class": "repository-observed"
+    },
+    {
+      "id": "ai:github-copilot",
+      "display_name": "GitHub Copilot",
+      "kind": "ai-agent",
+      "aliases": ["Copilot App", "Copilot", "GitHub Copilot"],
+      "identity_patterns": ["223556219+Copilot@users.noreply.github.com"],
+      "instruction_files": [".github/copilot-instructions.md"],
+      "evidence_class": "repository-observed"
+    },
+    {
+      "id": "bot:dependabot",
+      "display_name": "Dependabot",
+      "kind": "dependency-bot",
+      "aliases": ["dependabot[bot]", "Dependabot"],
+      "identity_patterns": ["49699333+dependabot[bot]@users.noreply.github.com", "support@github.com"],
+      "evidence_class": "repository-observed"
+    },
+    {
+      "id": "automation:github-actions",
+      "display_name": "GitHub Actions",
+      "kind": "automation",
+      "aliases": ["github-actions[bot]", "GitHub Actions"],
+      "identity_patterns": ["41898282+github-actions[bot]@users.noreply.github.com"],
+      "surface_prefixes": [".github/workflows/"],
+      "evidence_class": "repository-observed"
+    },
+    {
+      "id": "ai:grok",
+      "display_name": "Grok",
+      "kind": "ai-agent",
+      "aliases": ["Grok", "grok bot", "grokbot"],
+      "surface_terms": ["grok bot", "grok"],
+      "evidence_class": "user-declared-and-repository-surface"
+    },
+    {
+      "id": "ai:chatgpt",
+      "display_name": "ChatGPT",
+      "kind": "ai-agent",
+      "aliases": ["ChatGPT", "OpenAI ChatGPT"],
+      "surface_terms": ["chatgpt"],
+      "evidence_class": "user-declared"
+    },
+    {
+      "id": "ai:use-ai",
+      "display_name": "use.ai",
+      "kind": "ai-orchestrator",
+      "aliases": ["use.ai", "use ai"],
+      "surface_terms": ["use.ai"],
+      "evidence_class": "user-declared"
+    },
+    {
+      "id": "ai:codex",
+      "display_name": "Codex",
+      "kind": "ai-agent",
+      "aliases": ["Codex", "OpenAI Codex"],
+      "surface_terms": ["codex/", "codex-", "codex"],
+      "evidence_class": "repository-observed-surface"
+    },
+    {
+      "id": "ai:claude",
+      "display_name": "Claude",
+      "kind": "ai-agent",
+      "aliases": ["Claude", "Anthropic Claude"],
+      "instruction_files": ["CLAUDE.md"],
+      "surface_terms": ["claude"],
+      "evidence_class": "repository-observed-surface"
+    },
+    {
+      "id": "ai:gemini",
+      "display_name": "Gemini",
+      "kind": "ai-agent",
+      "aliases": ["Gemini", "Google Gemini"],
+      "instruction_files": ["GEMINI.md"],
+      "surface_terms": ["gemini"],
+      "evidence_class": "repository-observed-surface"
+    }
+  ],
+  "semantics": {
+    "direct_contribution": "Count only Git author/committer identity or an explicit direct-contribution trailer. A tool name in prose, a model catalog, instruction file, branch name, or snapshot path is not direct authorship evidence.",
+    "operational_surface": "An instruction file, workflow, branch/snapshot name, or commit-message reference proves repository interaction/surface only, not authorship of code.",
+    "user_declared": "Records a tool the repository owner reports using; it is not attached to individual commits unless direct repository evidence exists.",
+    "unknown_identity": "Unmatched identities remain separate. Heuristics may classify bot-like names but must not alias them to a named service without evidence.",
+    "history_rewrites": "Squash merges, rebases, cherry-picks, imported snapshots, and rewritten commits can collapse or duplicate attribution. The index reports observable Git evidence and never reconstructs missing authorship by guesswork.",
+    "privacy": "Generated provenance outputs do not emit raw email addresses. Matching may use Git emails locally; unknown identities receive stable hashed IDs."
+  }
+}
