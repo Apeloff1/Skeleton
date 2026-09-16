@@ -1,14 +1,22 @@
 {
-  "schema": 1,
+  "schema": 2,
   "queries": {
-    "file": "Return indexed metadata and graph relationships for an exact repository path.",
+    "file": "Return indexed metadata, semantic evidence, ownership, history/hotspot metadata, and incoming/outgoing graph relationships for an exact repository path.",
     "symbol": "Find symbols by exact or substring name and return definitions plus owning files.",
-    "deps": "Return forward dependencies from a file with optional transitive traversal.",
+    "deps": "Return forward code/build/workflow/dependency relationships from a file with optional transitive traversal.",
     "rdeps": "Return reverse dependencies / affected consumers from a file with optional transitive traversal.",
-    "impact": "Given changed paths or a Git base, return impacted files, subsystems, tests, workflows, security zones and capabilities.",
+    "impact": "Given changed paths or a Git base, return impacted files, subsystems, candidate tests, workflows, security zones, external dependency declarations, architecture findings and capabilities.",
+    "diff": "Combine Git path change status with current-head graph and reverse-impact evidence for review automation.",
+    "dependency": "Query canonical external dependency components and their structured manifest declarations.",
+    "route": "Query discoverable backend HTTP and Expo file-route surfaces with source paths.",
+    "env": "Query environment-variable names and reference paths; values are never indexed.",
+    "hotspot": "Return relative engineering-attention hotspots derived from bounded history, dependency degree, size and risk metadata.",
+    "batch": "Return 100-batch plan entries with handoff-evidence presence and dependency-note state without inferring completion.",
+    "search": "Deterministic lexical retrieval over paths, symbols, imports, routes, environment names, package declarations and subsystems.",
+    "owner": "Return files associated with architectural ownership zones or approximate local CODEOWNERS evidence.",
     "capability": "Return structural evidence, batch ownership and missing evidence for a game-creation capability.",
     "security": "Return security controls, sensitive surfaces and findings connected to paths or subsystems.",
-    "build": "Return entry points, manifests, workflows, scripts, artifacts and build-affecting relationships."
+    "build": "Return entry points, manifests, package scripts, Make targets, workflows, referenced repository files, artifacts and build-affecting relationships."
   },
   "edge_types": [
     "contains",
@@ -17,6 +25,9 @@
     "tests",
     "workflow-uses",
     "declares-dependency",
+    "declares-target",
+    "build-uses",
+    "invokes",
     "builds",
     "evidence-for",
     "owned-by"
@@ -28,14 +39,28 @@
     "test",
     "workflow",
     "manifest",
+    "external-dependency",
+    "build-target",
     "capability",
     "security-control",
     "batch",
-    "artifact"
+    "artifact",
+    "owner"
   ],
   "precision": {
     "python": "AST-derived imports and symbols",
     "javascript_typescript": "conservative lexical imports/exports until SCIP/compiler ingestion is enabled",
+    "manifests": "structured parser evidence for supported Python/npm manifests; Docker/Actions use constrained declarations",
+    "workflow_build_links": "lexical references to tracked repository paths, Python modules and Make targets",
+    "routes": "FastAPI-style decorators and Expo file routing are discoverability evidence, not reachability proof",
+    "history": "bounded Git history relative to HEAD commit time for deterministic churn/freshness signals",
     "other": "metadata-only unless a specialized indexer is registered"
-  }
+  },
+  "non_claims": [
+    "Structural evidence is not correctness or release-readiness proof.",
+    "Hotspot scores are triage signals, not quality or security grades.",
+    "Batch note presence does not mean completion.",
+    "Offline dependency declarations do not replace GitHub Dependency Graph or Dependabot resolved vulnerability evidence.",
+    "Environment variable values are never part of the index."
+  ]
 }
