@@ -1,0 +1,284 @@
+name: Autonomous Studio Night Shift
+
+on:
+  schedule:
+    # Four bounded overnight shifts. These land around midnight-06:00 in Norway
+    # across CET/CEST without requiring timezone-aware cron support.
+    - cron: '19 22,0,2,4 * * *'
+  workflow_dispatch:
+    inputs:
+      max_tasks:
+        description: 'Maximum accepted engineering tasks in this run (1-3)'
+        required: false
+        default: '2'
+      cohort_size:
+        description: 'Virtual workers activated for planning context (3-50)'
+        required: false
+        default: '15'
+
+concurrency:
+  group: autonomous-studio-night-shift
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  studio:
+    if: github.repository == 'Apeloff1/Skeleton'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout trusted main without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v6.1.0
+        with:
+          python-version: '3.11.16'
+
+      - name: Install trusted studio tooling
+        run: python -m pip install -e '.[dev]'
+
+      - name: Snapshot live repository state
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .studio-tmp
+          gh pr list --repo "$REPO" --state open --limit 100 --json number,title,headRefName,baseRefName,updatedAt,labels > .studio-tmp/open-prs.json
+          gh issue list --repo "$REPO" --state open --limit 100 --json number,title,updatedAt,labels > .studio-tmp/open-issues.json
+          gh run list --repo "$REPO" --status failure --limit 25 --json name,databaseId,headSha,headBranch,createdAt,url > .studio-tmp/failed-runs.json
+          gh api "/repos/${REPO}/actions/runs?status=queued&per_page=1" --jq '.total_count' > .studio-tmp/queued-count.txt
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('.studio-tmp')
+          queued_text = (root / 'queued-count.txt').read_text(encoding='utf-8').strip()
+          if not queued_text.isdigit():
+              raise SystemExit(f'invalid queued Actions count: {queued_text!r}')
+          state = {
+              'open_prs': json.loads((root / 'open-prs.json').read_text()),
+              'open_issues': json.loads((root / 'open-issues.json').read_text()),
+              'recent_failed_runs': json.loads((root / 'failed-runs.json').read_text()),
+              'queued_actions_runs': int(queued_text),
+          }
+          (root / 'repo-state.json').write_text(
+              json.dumps(state, sort_keys=True, indent=2),
+              encoding='utf-8',
+          )
+          PY
+
+      - name: Apply Actions queue pressure guard
+        id: pressure
+        env:
+          MAX_QUEUED_ACTIONS_RUNS: '40'
+        shell: bash
+        run: |
+          set -euo pipefail
+          queued_count=$(cat .studio-tmp/queued-count.txt)
+          threshold="$MAX_QUEUED_ACTIONS_RUNS"
+          if ! [[ "$queued_count" =~ ^[0-9]+$ && "$threshold" =~ ^[0-9]+$ ]]; then
+            echo '::error::Actions queue guard received a non-numeric count or threshold.'
+            exit 1
+          fi
+
+          if (( queued_count >= threshold )); then
+            echo 'proceed=false' >> "$GITHUB_OUTPUT"
+            : > "$RUNNER_TEMP/studio.patch"
+            python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          queued = int(Path('.studio-tmp/queued-count.txt').read_text(encoding='utf-8').strip())
+          threshold = int(os.environ['MAX_QUEUED_ACTIONS_RUNS'])
+          event = {
+              'event': 'shift_skipped_queue_pressure',
+              'queued_actions_runs': queued,
+              'threshold': threshold,
+              'run_id': os.environ.get('GITHUB_RUN_ID', ''),
+              'run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT', ''),
+              'timestamp': datetime.now(timezone.utc).isoformat(),
+          }
+          audit = Path(os.environ['RUNNER_TEMP']) / 'studio-audit.jsonl'
+          audit.write_text(json.dumps(event, sort_keys=True) + '\n', encoding='utf-8')
+          report = Path(os.environ['RUNNER_TEMP']) / 'studio-report.md'
+          report.write_text(
+              '# Autonomous Studio shift\n\n'
+              'Status: **safe no-op due to Actions queue pressure**.\n\n'
+              f'- Queued Actions runs: {queued}\n'
+              f'- Backpressure threshold: {threshold}\n'
+              '- Model proposal generation: skipped\n'
+              '- Generated-code execution: skipped\n'
+              '- Branch/PR publication: skipped\n\n'
+              'The shift was intentionally suppressed so Autonomous Studio does not amplify repository CI congestion.\n',
+              encoding='utf-8',
+          )
+          PY
+            sha256sum "$RUNNER_TEMP/studio.patch" > "$RUNNER_TEMP/studio.patch.sha256"
+          else
+            echo 'proceed=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate bounded model proposals
+        if: steps.pressure.outputs.proceed == 'true'
+        id: proposal
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.6' }}
+          REQUESTED_MAX_TASKS: ${{ inputs.max_tasks }}
+          REQUESTED_COHORT_SIZE: ${{ inputs.cohort_size }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+            echo '::error::OPENAI_API_KEY repository secret is required for Autonomous Studio.'
+            exit 1
+          fi
+
+          max_tasks="${REQUESTED_MAX_TASKS:-2}"
+          cohort_size="${REQUESTED_COHORT_SIZE:-15}"
+          python -m skeleton.automation.studio_director propose --patch-path .studio-tmp/studio.patch --audit-path .studio-tmp/audit.jsonl --repo-state-path .studio-tmp/repo-state.json --max-tasks "$max_tasks" --cohort-size "$cohort_size" --seed "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          python -m skeleton.automation.studio_report --audit .studio-tmp/audit.jsonl --output .studio-tmp/report.md
+
+          cp .studio-tmp/studio.patch "$RUNNER_TEMP/studio.patch"
+          cp .studio-tmp/audit.jsonl "$RUNNER_TEMP/studio-audit.jsonl"
+          cp .studio-tmp/report.md "$RUNNER_TEMP/studio-report.md"
+          sha256sum "$RUNNER_TEMP/studio.patch" > "$RUNNER_TEMP/studio.patch.sha256"
+
+          if [[ -s "$RUNNER_TEMP/studio.patch" ]]; then
+            echo 'has_patch=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'has_patch=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate proposed diff without model or GitHub credentials
+        if: steps.proposal.outputs.has_patch == 'true'
+        env:
+          OPENAI_API_KEY: ''
+          GH_TOKEN: ''
+          GITHUB_TOKEN: ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "${OPENAI_API_KEY:-}"
+          test -z "${GH_TOKEN:-}"
+          test -z "${GITHUB_TOKEN:-}"
+          git apply --check "$RUNNER_TEMP/studio.patch"
+          git apply "$RUNNER_TEMP/studio.patch"
+          git diff --check
+          python -m compileall skeleton backend -q
+          mapfile -t changed_python < <(git diff --name-only --diff-filter=ACM | grep -E '\.py$' || true)
+          if (( ${#changed_python[@]} > 0 )); then
+            python -m ruff check "${changed_python[@]}"
+          fi
+          python -m pytest \
+            skeleton/testing/test_studio_registry.py \
+            skeleton/testing/test_studio_director.py \
+            skeleton/testing/test_studio_report.py \
+            -q --tb=short
+          python -m pytest skeleton/testing -q --tb=short --maxfail=1
+
+      - name: Restore exact sealed patch after validation
+        if: steps.proposal.outputs.has_patch == 'true'
+        env:
+          OPENAI_API_KEY: ''
+          GH_TOKEN: ''
+          GITHUB_TOKEN: ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          git reset --hard HEAD
+          git clean -fdx
+          sha256sum -c "$RUNNER_TEMP/studio.patch.sha256"
+          git apply --check "$RUNNER_TEMP/studio.patch"
+          git apply "$RUNNER_TEMP/studio.patch"
+          git diff --check
+
+      - name: Persist Studio Ledger entry
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          title='bot: autonomous studio ledger'
+          number=$(gh issue list --repo "$REPO" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
+          if [[ -z "${number:-}" ]]; then
+            issue_url=$(gh issue create --repo "$REPO" --title "$title" --body 'Durable append-only human-readable ledger for Autonomous Studio runs. Every scheduled run comments here, including rejected/no-op runs. Source-of-truth machine events also live in the PR audit JSONL when a patch is published.')
+            number="${issue_url##*/}"
+          fi
+          {
+            echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+            cat "$RUNNER_TEMP/studio-report.md"
+          } > "$RUNNER_TEMP/ledger-comment.md"
+          gh issue comment "$number" --repo "$REPO" --body-file "$RUNNER_TEMP/ledger-comment.md" >/dev/null
+
+      - name: Prepare validated branch payload
+        if: steps.proposal.outputs.has_patch == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .studio/audit
+          cp "$RUNNER_TEMP/studio-audit.jsonl" .studio/audit/latest.jsonl
+          cp "$RUNNER_TEMP/studio-report.md" .studio/audit/latest.md
+          cp "$RUNNER_TEMP/studio.patch.sha256" .studio/audit/latest.patch.sha256
+          git add -u
+          git add .studio/audit/latest.jsonl .studio/audit/latest.md .studio/audit/latest.patch.sha256
+          git diff --cached --check
+          if git diff --cached --name-only | grep -q '^\.studio-tmp/'; then
+            echo '::error::temporary proposal files must never be committed'
+            exit 1
+          fi
+
+      - name: Publish reviewable studio PR
+        if: steps.proposal.outputs.has_patch == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="studio/night-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name 'skeleton-studio[bot]'
+          git config user.email 'skeleton-studio[bot]@users.noreply.github.com'
+          git checkout -b "$branch"
+          git commit -m "studio: bounded autonomous build run ${GITHUB_RUN_ID}"
+          gh auth setup-git
+          git push --set-upstream origin "$branch"
+          pr_url=$(gh pr create --repo "$REPO" --base main --head "$branch" --title "studio: autonomous build run ${GITHUB_RUN_ID}" --body-file .studio/audit/latest.md)
+          {
+            echo '## Autonomous Studio publication'
+            echo
+            echo "PR: ${pr_url}"
+            echo '- Direct main writes: disabled'
+            echo '- Auto-merge: disabled'
+            echo '- Model-generated shell execution: disabled'
+            echo '- API key present during generated-code validation: no'
+            echo '- GitHub token exported during generated-code validation: no'
+            echo '- Published worktree restored from sealed pre-test patch: yes'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Summarize no-op/rejected shift
+        if: steps.proposal.outputs.has_patch != 'true'
+        run: |
+          {
+            echo '## Autonomous Studio'
+            echo
+            cat "$RUNNER_TEMP/studio-report.md"
+          } >> "$GITHUB_STEP_SUMMARY"
