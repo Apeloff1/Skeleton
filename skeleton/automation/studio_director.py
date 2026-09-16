@@ -1,6 +1,6 @@
 """Bounded autonomous studio director.
 
-The director treats model output as an untrusted proposal. It may generate
+The director treats model output as an untrusted *proposal*.  It may generate
 patches, but deterministic policy controls which paths can be touched and a
 separate CI phase must run the resulting code without API credentials before a
 branch may be pushed.
@@ -88,9 +88,21 @@ class AuditLog:
             "event": event,
             **fields,
         }
-        safe = ChatGPTReasoner.redact(json.dumps(record, sort_keys=True, default=str))
+        safe_record = _redact_value(record)
         with self.path.open("a", encoding="utf-8") as handle:
-            handle.write(safe + "\n")
+            handle.write(json.dumps(safe_record, sort_keys=True, default=str) + "\n")
+
+
+def _redact_value(value: object) -> object:
+    """Redact strings recursively while preserving JSON structure."""
+
+    if isinstance(value, str):
+        return ChatGPTReasoner.redact(value)
+    if isinstance(value, dict):
+        return {str(key): _redact_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_redact_value(item) for item in value]
+    return value
 
 
 def _git(*args: str, check: bool = True) -> str:
@@ -310,12 +322,20 @@ def _plan(
     *,
     max_tasks: int,
     backlog_path: Path,
+    repo_state_path: Path | None = None,
 ) -> tuple[PlannedTask, ...]:
     backlog = backlog_path.read_text(encoding="utf-8")[:MAX_FILE_CONTEXT_CHARS] if backlog_path.exists() else ""
-    evidence = (
+    evidence_items = [
         f"BACKLOG.md\n{backlog}",
         f"TRACKED FILES\n{_repo_manifest()}",
-    )
+    ]
+    if repo_state_path is not None and repo_state_path.is_file():
+        try:
+            repo_state = repo_state_path.read_text(encoding="utf-8")[:MAX_FILE_CONTEXT_CHARS]
+        except (OSError, UnicodeDecodeError):
+            repo_state = "[unreadable repository state snapshot]"
+        evidence_items.append(f"LIVE REPOSITORY STATE\n{repo_state}")
+    evidence = tuple(evidence_items)
     payload = _call_json(
         reasoner,
         _planning_prompt(cohort, max_tasks),
@@ -383,6 +403,7 @@ def propose(
     max_tasks: int,
     cohort_size: int,
     seed: str,
+    repo_state_path: Path | None = None,
 ) -> int:
     if isinstance(max_tasks, bool) or not 1 <= max_tasks <= MAX_PLANNED_TASKS:
         raise ValueError(f"max_tasks must be 1-{MAX_PLANNED_TASKS}")
@@ -400,7 +421,13 @@ def propose(
     )
 
     reasoner = ChatGPTReasoner()
-    tasks = _plan(reasoner, cohort, max_tasks=max_tasks, backlog_path=Path("BACKLOG.md"))
+    tasks = _plan(
+        reasoner,
+        cohort,
+        max_tasks=max_tasks,
+        backlog_path=Path("BACKLOG.md"),
+        repo_state_path=repo_state_path,
+    )
     audit.emit(
         "plan_created",
         tasks=[
@@ -460,6 +487,8 @@ def propose(
     diff = _git("diff", "--no-ext-diff", "--binary")
     patch_path.parent.mkdir(parents=True, exist_ok=True)
     patch_path.write_text(diff, encoding="utf-8")
+    # Revert working tree so proposal generation cannot accidentally carry state
+    # into later commands that expect to apply the emitted patch from scratch.
     _git("reset", "--hard", "HEAD")
     audit.emit(
         "run_finished",
@@ -491,6 +520,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     propose_parser.add_argument("--audit-path", default=".studio-tmp/audit.jsonl")
     propose_parser.add_argument("--max-tasks", type=int, default=2)
     propose_parser.add_argument("--cohort-size", type=int, default=15)
+    propose_parser.add_argument("--repo-state-path", default=".studio-tmp/repo-state.json")
     propose_parser.add_argument(
         "--seed",
         default=os.environ.get("GITHUB_RUN_ID") or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
@@ -503,6 +533,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             max_tasks=args.max_tasks,
             cohort_size=args.cohort_size,
             seed=args.seed,
+            repo_state_path=Path(args.repo_state_path) if args.repo_state_path else None,
         )
     raise AssertionError("unreachable")
 
