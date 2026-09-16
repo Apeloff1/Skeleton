@@ -1,0 +1,143 @@
+{
+  "schema": 2,
+  "purpose": "Shared machine contract for fast repository discovery, build routing, gap detection, and agent handoff.",
+  "thresholds": {
+    "large_tracked_bytes": 52428800,
+    "hot_subsystem_files": 150
+  },
+  "subsystems": [
+    {
+      "id": "github",
+      "root": ".github",
+      "kind": "automation",
+      "build_role": "CI, dependency automation, security gates, branch lifecycle"
+    },
+    {
+      "id": "backend",
+      "root": "backend",
+      "kind": "application",
+      "build_role": "Backend services, runtime integrations, data and game creation services"
+    },
+    {
+      "id": "gameforge",
+      "root": "backend/gameforge",
+      "kind": "game-creation-platform",
+      "build_role": "AI-native game creation, orchestration, generation, evaluation and deployment"
+    },
+    {
+      "id": "frontend",
+      "root": "frontend",
+      "kind": "application",
+      "build_role": "Expo/React Native client and creator experience"
+    },
+    {
+      "id": "skeleton",
+      "root": "skeleton",
+      "kind": "core-runtime",
+      "build_role": "AI engine, orchestration, retrieval, resilience, developer and game primitives"
+    },
+    {
+      "id": "memory",
+      "root": "memory",
+      "kind": "knowledge",
+      "build_role": "Persistent repository/domain memory and handoff material"
+    },
+    {
+      "id": "satellites",
+      "root": "satellites",
+      "kind": "integration",
+      "build_role": "Absorbed/satellite systems and compatibility surfaces"
+    },
+    {
+      "id": "scripts",
+      "root": "scripts",
+      "kind": "tooling",
+      "build_role": "Fast local/CI verification, benchmark, policy and release tooling"
+    },
+    {
+      "id": "tests",
+      "root": "tests",
+      "kind": "verification",
+      "build_role": "Cross-system regression and integration validation"
+    },
+    {
+      "id": "docs",
+      "root": "docs",
+      "kind": "documentation",
+      "build_role": "Architecture, operating contract, evidence and roadmap"
+    },
+    {
+      "id": "root",
+      "root": ".",
+      "kind": "repository",
+      "build_role": "Root build, packaging, deployment and repository contracts"
+    }
+  ],
+  "entrypoints": [
+    {
+      "id": "boot",
+      "command": "python -m skeleton run",
+      "scope": "skeleton",
+      "purpose": "Boot full system"
+    },
+    {
+      "id": "test-core",
+      "command": "make test",
+      "scope": "skeleton/testing",
+      "purpose": "Core regression suite"
+    },
+    {
+      "id": "quality",
+      "command": "make quality",
+      "scope": "scripts/quality-gates.sh",
+      "purpose": "Repository quality gates"
+    },
+    {
+      "id": "ci-local",
+      "command": "make ci",
+      "scope": "scripts/ci.sh",
+      "purpose": "Local CI parity"
+    },
+    {
+      "id": "forge-verify",
+      "command": "make verify",
+      "scope": "scripts/verify-forge.sh",
+      "purpose": "Gameforge verification"
+    },
+    {
+      "id": "repo-intel",
+      "command": "make repo-intel",
+      "scope": "scripts/repo_intel.py",
+      "purpose": "Refresh build map, gaps, security/quality notes and machine index"
+    }
+  ],
+  "build_affecting_prefixes": [
+    ".github/",
+    "backend/",
+    "frontend/",
+    "skeleton/",
+    "memory/",
+    "satellites/",
+    "scripts/",
+    "tests/",
+    "Dockerfile",
+    "docker-compose.yml",
+    "Makefile",
+    "pyproject.toml",
+    "requirements",
+    "repo-intel/"
+  ],
+  "agent_protocol": {
+    "read_before_work": [
+      "AGENTS.md",
+      "repo-intel/config.json",
+      "repo-intel/batches.json",
+      "repo-intel/game-capabilities.json",
+      ".cache/repo-intel/notes.md"
+    ],
+    "required_start": "make repo-intel",
+    "required_handoff": "make repo-intel-check",
+    "required_change_note": "repo-intel/notes/<date>-<batch-or-topic>.md",
+    "principle": "Every build-affecting change leaves the repository more legible than it found it. Surface remaining gaps explicitly; never hide them behind completion claims."
+  }
+}
