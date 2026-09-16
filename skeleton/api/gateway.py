@@ -147,17 +147,29 @@ class APIGateway:
             return True
 
     def handle(self, request: GatewayRequest) -> GatewayResponse:
-        start = time.time_ns()
         route = self._routes.get(request.path)
         if not route:
             return GatewayResponse(404, {"error": "not found"}, 0.0)
 
+        start = time.perf_counter_ns()
         if self._rbac and route.scope != "public":
             if not self._rbac.check_scope(request.actor, route.scope, route.action):
-                return GatewayResponse(403, {"error": "forbidden"}, (time.time_ns() - start) / 1e6)
+                return GatewayResponse(
+                    403,
+                    {"error": "forbidden"},
+                    (time.perf_counter_ns() - start) / 1e6,
+                )
 
-        if not self._rate_ok(f"{request.actor}:{route.path}", route.rate_limit_per_s):
-            return GatewayResponse(429, {"error": "rate limited"}, (time.time_ns() - start) / 1e6)
+        rate_limit_per_s = route.rate_limit_per_s
+        rate_key = (
+            f"{request.actor}:{route.path}" if rate_limit_per_s > 0 else ""
+        )
+        if not self._rate_ok(rate_key, rate_limit_per_s):
+            return GatewayResponse(
+                429,
+                {"error": "rate limited"},
+                (time.perf_counter_ns() - start) / 1e6,
+            )
 
         cache_key: Optional[str] = None
         if self._cache and route.cache_ttl_s > 0:
@@ -165,23 +177,29 @@ class APIGateway:
             if cache_key is not None:
                 hit = self._cache.get("gateway", cache_key)
                 if hit is not None:
-                    return GatewayResponse(200, hit, (time.time_ns() - start) / 1e6, cached=True)
+                    return GatewayResponse(
+                        200,
+                        hit,
+                        (time.perf_counter_ns() - start) / 1e6,
+                        cached=True,
+                    )
 
-        with self._stats_lock:
-            route.calls += 1
+        error = False
         try:
             body = route.handler(request.payload)
             for transform in self._transforms:
                 body = transform(body)
             status = 200
         except Exception:  # noqa: BLE001
-            with self._stats_lock:
-                route.errors += 1
             body = {"error": "internal server error"}
             status = 500
-        duration = (time.time_ns() - start) / 1e6
+            error = True
+        duration = (time.perf_counter_ns() - start) / 1e6
         with self._stats_lock:
+            route.calls += 1
             route.total_ms += duration
+            if error:
+                route.errors += 1
 
         if self._cache and cache_key is not None and status == 200:
             self._cache.set("gateway", cache_key, body, ttl_s=route.cache_ttl_s)
