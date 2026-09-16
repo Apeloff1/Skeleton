@@ -5,18 +5,21 @@
 # skeleton/ alongside backend/.
 # ============================================================================
 
-# Resolve the versioned uv image by immutable multi-platform digest. Refresh
-# the tag+digest pair deliberately alongside dependency/security review.
-FROM ghcr.io/astral-sh/uv:0.12.4@sha256:d0a6eca6c669dc7e9c51218707b8438a3d30402733d739dcc00adb3e213e8f5c AS uv
-
-# Official Python multi-platform index pinned for reproducible rebuilds.
-# Refresh this digest deliberately alongside dependency/security review.
-# Stage 1: Builder with uv
-FROM python:3.14-slim@sha256:83ff1d245a3d57d04152252d3ef9cb361494d0b3395abd65a5ebe91c401c8e83 AS builder
+# Stage 1: dependency builder. Alpine keeps the builder/runtime ABI aligned
+# so compiled wheels and native extensions do not cross a glibc/musl boundary.
+FROM python:3.14-alpine@sha256:05b2b8b732ecd268fee8727a369f936f022d1321b59befd13c30ede22769dcdc AS builder
 
 WORKDIR /app
 
-COPY --from=uv /uv /usr/local/bin/uv
+# uv is a build-time tool only. Build dependencies are isolated to this stage.
+RUN apk add --no-cache --virtual .build-deps \
+      build-base \
+      cargo \
+      libffi-dev \
+      openssl-dev \
+      linux-headers \
+    && pip install --no-cache-dir uv==0.12.4
+
 COPY backend/pyproject.toml ./
 COPY backend/requirements.txt ./
 
@@ -28,7 +31,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN uv pip install -r requirements.txt
 
 # Stage 2: Production
-FROM python:3.14-slim@sha256:83ff1d245a3d57d04152252d3ef9cb361494d0b3395abd65a5ebe91c401c8e83 AS production
+FROM python:3.14-alpine@sha256:05b2b8b732ecd268fee8727a369f936f022d1321b59befd13c30ede22769dcdc AS production
 
 # Explicitly identify the application host as production so exec_guard can
 # never be re-enabled by ALLOW_UNSAFE_CODE_EXECUTION inside this image. CORS
@@ -41,13 +44,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# msgpack and setuptools are inherited tooling rather than backend runtime
-# dependencies. Remove those base-image copies before the application runs;
-# the production dependency graph itself lives in /opt/venv.
-RUN python -m pip uninstall -y msgpack setuptools
-
-RUN groupadd --gid 10001 appuser \
-    && useradd --create-home --uid 10001 --gid 10001 --shell /usr/sbin/nologin appuser
+RUN addgroup -S -g 10001 appuser \
+    && adduser -S -D -u 10001 -G appuser -s /sbin/nologin appuser
 
 COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
