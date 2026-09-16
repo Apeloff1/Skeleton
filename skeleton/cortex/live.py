@@ -20,10 +20,33 @@ _live_control: Optional[ControlSurface] = None
 _JEEVES = None
 
 
-def own_path() -> Path:
+def configured_own_path() -> Optional[Path]:
+    """Return the explicitly configured persistence path, if any.
+
+    ``SKELETON_OWN`` is the opt-in signal that a process is expected to own
+    durable cortex state.  The legacy fallback path remains available through
+    :func:`own_path`, but callers that decide whether multiple runtime surfaces
+    may share the process singleton should key off this explicit configuration
+    instead of an incidental ``.skeleton`` file.
+    """
     raw = os.environ.get("SKELETON_OWN")
-    if raw:
-        return Path(raw)
+    if raw is None:
+        return None
+    raw = raw.strip()
+    if not raw:
+        return None
+    return Path(raw)
+
+
+def persistence_configured() -> bool:
+    """Whether durable cortex ownership was explicitly configured."""
+    return configured_own_path() is not None
+
+
+def own_path() -> Path:
+    configured = configured_own_path()
+    if configured is not None:
+        return configured
     return Path(".skeleton") / "own.json"
 
 
@@ -44,8 +67,14 @@ def get_live(bus: Optional[EventBus] = None) -> JeevesCortex:
 
 
 def live_cortex(bus: Optional[EventBus] = None) -> JeevesCortex:
-    """Alias used by GameForge CLI / genesis."""
-    return get_live(bus)
+    """Return the process singleton and bind it to the caller's bus."""
+    global _live_control
+    with _LOCK:
+        cortex = get_live(bus)
+        if bus is not None:
+            cortex._bus = bus
+            _live_control = ControlSurface(cortex, bus=bus)
+        return cortex
 
 
 def get_control() -> Optional[ControlSurface]:
@@ -53,9 +82,11 @@ def get_control() -> Optional[ControlSurface]:
 
 
 def attach(bus: EventBus) -> JeevesCortex:
-    cortex = get_live(bus)
-    cortex._bus = bus
-    bus.subscribe("*", cortex._on_event)
+    """Bind the live cortex to ``bus`` and subscribe when it has an observer."""
+    cortex = live_cortex(bus)
+    observer = getattr(cortex, "_on_event", None)
+    if callable(observer):
+        bus.subscribe("*", observer)
     return cortex
 
 

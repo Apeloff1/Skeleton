@@ -6,7 +6,6 @@ resilience, interface, forge, galaxy, contexts, support, cortex.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -406,17 +405,15 @@ class Genesis:
         engine_v35.tick()
 
     def _phase_cortex(self) -> None:
-        """Wire a persisted live cortex when SKELETON_OWN is configured."""
+        """Wire a fresh cortex unless durable process ownership is explicit."""
         self.report.phases.append("cortex")
+        from skeleton.cortex.live import live_cortex, persistence_configured
+        from skeleton.cortex.neocortex import JeevesCortex
         from skeleton.jeeves.core import Jeeves
 
-        if os.environ.get("SKELETON_OWN"):
-            from skeleton.cortex.live import live_cortex
-
+        if persistence_configured():
             neo = live_cortex(self.bus)
         else:
-            from skeleton.cortex.neocortex import JeevesCortex
-
             neo = JeevesCortex(bus=self.bus)
         self._wire("cortex", "cortex", neo)
         # Alias for GameForge/cockpit callers that look up the "jeeves" handle.
