@@ -1,0 +1,11 @@
+{
+  "name": "godot",
+  "kind": "engine-binary",
+  "platform": "linux-x86_64",
+  "approx_bytes": 107374182,
+  "sha256": null,
+  "source": "env:GODOT_BINARY|path:godot|url:https://github.com/godotengine/godot/releases",
+  "hint": "Do not commit the binary. Fetch Godot 4.x stable for linux.x86_64, chmod +x, place at backend/godot or set GODOT_BINARY.",
+  "local_path": "backend/godot",
+  "stored_prose": 0
+}
