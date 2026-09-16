@@ -218,9 +218,15 @@ def test_secret_scanning_workflow_hardening_contract() -> None:
     assert "branches:" not in workflow
     assert "permissions:\n  contents: read\n" in workflow
     assert "persist-credentials: false" in workflow
-    assert 'GITLEAKS_VERSION: "8.24.3"' in workflow
+    # The workflow installs a pinned scanner and invokes the returned binary
+    # itself so the exact revision range remains under repository control.
+    assert "uses: gacts/gitleaks@073b89c1d99411300246edfd0125a78edc80750b" in workflow
+    assert 'version: "8.24.3"' in workflow
+    assert 'run: "false"' in workflow
+    assert 'GITLEAKS_BIN: ${{ steps.gitleaks.outputs.gitleaks-bin }}' in workflow
     assert 'GITLEAKS_CONFIG: ".gitleaks.toml"' in workflow
-    assert 'GITLEAKS_ENABLE_COMMENTS: "false"' in workflow
+    assert 'SCAN_RANGE: ${{ steps.scan-range.outputs.range }}' in workflow
+    assert '"$GITLEAKS_BIN" detect' in workflow
 
 
 def test_gitleaks_remains_complementary_to_local_secret_hygiene_gate() -> None:
