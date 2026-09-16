@@ -37,7 +37,14 @@ jobs:
           set -euo pipefail
           issue=$(gh issue list --repo "$REPO" --state open --search "${ISSUE_TITLE} in:title" --limit 1 --json number --jq '.[0].number // empty')
           if [[ -z "$issue" ]]; then
-            issue=$(gh issue create --repo "$REPO" --title "$ISSUE_TITLE" --body 'Automated CI watchdog ledger. The bot only retries cancelled/timed-out non-security workflows once per run ID and never bypasses a failed security gate.' --json number --jq '.number')
+            issue=$(gh api --method POST "repos/${REPO}/issues" \
+              -f title="$ISSUE_TITLE" \
+              -f body='Automated CI watchdog ledger. The bot only retries cancelled/timed-out non-security workflows once per run ID and never bypasses a failed security gate.' \
+              --jq '.number')
+          fi
+          if [[ ! "$issue" =~ ^[0-9]+$ ]]; then
+            echo 'CI watchdog could not resolve a valid ledger issue number.' >&2
+            exit 1
           fi
 
           cutoff=$(date -u -d '6 hours ago' +%s)
@@ -62,15 +69,26 @@ jobs:
               continue
             fi
 
+            run_attempt=$(gh api "repos/${REPO}/actions/runs/${id}" --jq '.run_attempt')
+            if [[ ! "$run_attempt" =~ ^[0-9]+$ ]] || (( run_attempt < 1 )); then
+              echo "CI watchdog could not resolve a valid run_attempt for run ${id}." >&2
+              exit 1
+            fi
+            if (( run_attempt > 1 )); then
+              continue
+            fi
+
             if (( retries >= 3 )); then
               break
             fi
 
-            gh issue comment "$issue" --repo "$REPO" --body "CI watchdog retrying transient ${conclusion} run:${id} (${name}): ${url}" >/dev/null
             if gh run rerun "$id" --repo "$REPO"; then
               retries=$((retries + 1))
+              if ! gh issue comment "$issue" --repo "$REPO" --body "CI watchdog retrying transient ${conclusion} run:${id} (${name}): ${url}" >/dev/null; then
+                echo "::warning::Watchdog reran run ${id} but could not record the ledger comment."
+              fi
             else
-              gh issue comment "$issue" --repo "$REPO" --body "CI watchdog could not rerun run:${id}; leaving it for manual investigation." >/dev/null || true
+              gh issue comment "$issue" --repo "$REPO" --body "CI watchdog could not rerun candidate:${id}; leaving it eligible for a later watchdog pass." >/dev/null || true
             fi
           done < <(jq -r '.[] | [.databaseId,.name,.status,.conclusion,.createdAt,.url] | @tsv' "$RUNNER_TEMP/runs.json")
 
@@ -79,5 +97,6 @@ jobs:
             echo "- Recent runs inspected: ${inspected}"
             echo "- Transient retries started: ${retries}"
             echo '- Security, provenance, artifact and dependency-security workflows are never auto-retried.'
+            echo '- GitHub run_attempt is authoritative for once-per-run retry enforcement.'
             echo '- Failed runs are not hidden or bypassed; persistent failures remain visible for repair.'
           } >> "$GITHUB_STEP_SUMMARY"
