@@ -7,11 +7,12 @@ def test_failure_fingerprint_is_stable_and_order_independent():
     assert left == right
 
 
-def test_workflow_changes_require_human_review():
-    decision = classify_change([".github/workflows/repair.yml"])
-    assert decision.risk == "high"
-    assert decision.human_review_required
-    assert not decision.automated_merge_allowed
+def test_workflow_and_action_changes_require_human_review():
+    for path in (".github/workflows/repair.yml", ".github/actions/repair/action.yml"):
+        decision = classify_change([path])
+        assert decision.risk == "high"
+        assert decision.human_review_required
+        assert not decision.automated_merge_allowed
 
 
 def test_security_findings_cannot_be_auto_merged():
@@ -19,6 +20,22 @@ def test_security_findings_cannot_be_auto_merged():
     assert decision.risk == "high"
     assert decision.human_review_required
     assert not decision.automated_merge_allowed
+
+
+def test_security_control_paths_cannot_be_auto_merged():
+    for path in ("docs/security-policy.md", "docs/attestation.md", "docs/merge-gate.md"):
+        decision = classify_change([path])
+        assert decision.risk == "high"
+        assert decision.human_review_required
+        assert not decision.automated_merge_allowed
+
+
+def test_dependency_manifests_require_human_review():
+    for path in ("pyproject.toml", "package-lock.json", "requirements-prod.txt"):
+        decision = classify_change([path])
+        assert decision.risk == "high"
+        assert decision.human_review_required
+        assert not decision.automated_merge_allowed
 
 
 def test_small_documentation_change_can_be_low_risk():
