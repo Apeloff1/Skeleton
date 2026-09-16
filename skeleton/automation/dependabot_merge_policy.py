@@ -1,9 +1,9 @@
 """Fail-closed Dependabot merge policy for trusted default-branch automation.
 
-The policy never executes pull-request code.  It validates immutable PR identity,
+The policy never executes pull-request code. It validates immutable PR identity,
 a narrow dependency-file allowlist, and successful workflow runs for the exact
-head SHA before allowing a merge attempt.  Callers must re-evaluate immediately
-before mutation to close the head-movement/TOCTOU window.
+head SHA before allowing a merge attempt. The final merge API call is also bound
+to that exact validated head SHA so a last-moment head move cannot be merged.
 """
 
 from __future__ import annotations
@@ -208,8 +208,15 @@ class GitHubCLI:
                 result.extend(run for run in workflow_runs if isinstance(run, Mapping))
         return result
 
-    def merge(self, number: int) -> None:
-        self._run(["pr", "merge", str(number), "--repo", self.repo, "--squash"], timeout=60)
+    def merge(self, number: int, expected_head_sha: str) -> None:
+        payload = self._json([
+            "api", "-X", "PUT",
+            f"repos/{self.repo}/pulls/{number}/merge",
+            "-f", f"sha={expected_head_sha}",
+            "-f", "merge_method=squash",
+        ])
+        if not isinstance(payload, Mapping) or payload.get("merged") is not True:
+            raise RuntimeError("Dependabot merge was not accepted")
 
 
 def required_workflows_from_env() -> tuple[str, ...]:
@@ -258,7 +265,7 @@ def run_once(repo: str, base_branch: str) -> int:
         if not final.ready or final.head_sha != decision.head_sha:
             continue
 
-        client.merge(number)
+        client.merge(number, final.head_sha)
         merged += 1
 
     return merged
