@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import subprocess
+from types import SimpleNamespace
 
 import pytest
 
+import skeleton.automation.studio_director as studio_director
 from skeleton.automation.studio_director import (
     AuditLog,
     _canonical_path,
@@ -12,6 +15,20 @@ from skeleton.automation.studio_director import (
     _parse_task,
     _redact_value,
 )
+
+
+def _init_smoke_repo(tmp_path, monkeypatch) -> None:
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "Studio Smoke"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "studio-smoke@example.invalid"], cwd=tmp_path, check=True)
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "smoke.txt").write_text("old\n", encoding="utf-8")
+    subprocess.run(["git", "add", "docs/smoke.txt"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "smoke fixture"], cwd=tmp_path, check=True)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("RUNNER_TEMP", str(tmp_path / ".runner"))
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
 
 def test_extract_json_accepts_plain_and_fenced_payloads() -> None:
@@ -150,3 +167,118 @@ def test_audit_log_redacts_secret_like_values_without_corrupting_json(tmp_path) 
     assert "super-secret" not in path.read_text(encoding="utf-8")
     assert "abc123" not in path.read_text(encoding="utf-8")
     assert "[REDACTED]" in row["value"]
+
+
+def test_propose_smoke_exercises_plan_build_review_and_restores_worktree(tmp_path, monkeypatch) -> None:
+    _init_smoke_repo(tmp_path, monkeypatch)
+    responses = [
+        json.dumps(
+            {
+                "tasks": [
+                    {
+                        "title": "Smoke change",
+                        "objective": "Exercise the sealed proposal path.",
+                        "division": "gameplay_systems",
+                        "paths": ["docs/smoke.txt"],
+                    }
+                ]
+            }
+        ),
+        json.dumps(
+            {
+                "patch": (
+                    "diff --git a/docs/smoke.txt b/docs/smoke.txt\n"
+                    "--- a/docs/smoke.txt\n"
+                    "+++ b/docs/smoke.txt\n"
+                    "@@ -1 +1 @@\n"
+                    "-old\n"
+                    "+new\n"
+                ),
+                "summary": "Replace the smoke fixture value.",
+                "tests": ["studio smoke"],
+            }
+        ),
+        json.dumps({"approve": True, "reasons": ["bounded fixture-only change"]}),
+    ]
+
+    class FakeReasoner:
+        def __init__(self) -> None:
+            self.index = 0
+
+        @staticmethod
+        def redact(value: str) -> str:
+            return value
+
+        def reason(self, _request):
+            text = responses[self.index]
+            self.index += 1
+            return SimpleNamespace(ok=True, text=text, error_kind=None)
+
+    monkeypatch.setattr(studio_director, "ChatGPTReasoner", FakeReasoner)
+    patch_path = tmp_path / "proposal.patch"
+    audit_path = tmp_path / "audit.jsonl"
+
+    assert studio_director.propose(
+        patch_path=patch_path,
+        audit_path=audit_path,
+        max_tasks=1,
+        cohort_size=3,
+        seed="smoke-seed",
+        repo_state_path=None,
+    ) == 0
+
+    patch = patch_path.read_text(encoding="utf-8")
+    assert "docs/smoke.txt" in patch
+    assert "+new" in patch
+    assert (tmp_path / "docs/smoke.txt").read_text(encoding="utf-8") == "old\n"
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    assert status == ""
+    events = [json.loads(line)["event"] for line in audit_path.read_text(encoding="utf-8").splitlines()]
+    assert events == ["run_started", "plan_created", "patch_accepted", "run_finished"]
+
+
+def test_propose_planning_failure_is_audited_and_emits_empty_patch(tmp_path, monkeypatch) -> None:
+    _init_smoke_repo(tmp_path, monkeypatch)
+
+    class FailingReasoner:
+        @staticmethod
+        def redact(value: str) -> str:
+            return value
+
+        def reason(self, _request):
+            return SimpleNamespace(ok=False, text="", error_kind="missing_api_key")
+
+    monkeypatch.setattr(studio_director, "ChatGPTReasoner", FailingReasoner)
+    patch_path = tmp_path / "proposal.patch"
+    audit_path = tmp_path / "audit.jsonl"
+
+    with pytest.raises(RuntimeError, match="failed closed"):
+        studio_director.propose(
+            patch_path=patch_path,
+            audit_path=audit_path,
+            max_tasks=1,
+            cohort_size=3,
+            seed="failure-seed",
+            repo_state_path=None,
+        )
+
+    assert patch_path.exists()
+    assert patch_path.read_text(encoding="utf-8") == ""
+    records = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
+    assert records[-1]["event"] == "run_failed_closed"
+    assert records[-1]["stage"] == "planning"
+    assert records[-1]["status"] == "failed_closed"
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    assert status == ""
