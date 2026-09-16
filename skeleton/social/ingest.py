@@ -13,32 +13,37 @@ from skeleton.social.cdx import probe
 from skeleton.social.sources import SOTA_POINTERS, classify
 
 _URL_RE = re.compile(r"https?://[^\s)>\]]+", re.I)
+_TRAILING_URL_PUNCTUATION = ".,;:!?"
 
 
 def extract_urls(text: str) -> List[str]:
-    return _URL_RE.findall(text or "")
+    return [u.rstrip(_TRAILING_URL_PUNCTUATION) for u in _URL_RE.findall(text or "")]
 
 
 def ingest(stimulus: str, *, live: bool = False) -> Dict[str, Any]:
     urls = extract_urls(stimulus)
     cards: List[Dict[str, Any]] = []
     houses: List[str] = []
+    source_ids: List[str] = []
     for u in urls:
         card = pointer(u)
         src = classify(u)
         if src:
             card["source_id"] = src["id"]
             card["house"] = src["house"]
-            houses.append(str(src["id"]))
+            source_ids.append(str(src["id"]))
+            houses.append(str(src["house"]))
         cards.append(card)
     xs = parse_x_status(stimulus)
     if xs and not any(c.get("kind") == "x-status" for c in cards):
         cards.append({**xs, "source_id": "x-status", "house": "X"})
-        houses.append("x-status")
+        source_ids.append("x-status")
+        houses.append("X")
     ax = parse_arxiv(stimulus)
     if ax and not any(c.get("kind") == "arxiv" for c in cards):
         cards.append({**ax, "source_id": "arxiv", "house": "arXiv"})
-        houses.append("arxiv")
+        source_ids.append("arxiv")
+        houses.append("arXiv")
     probes: List[Dict[str, Any]] = []
     if live:
         for card in cards[:2]:
@@ -50,6 +55,7 @@ def ingest(stimulus: str, *, live: bool = False) -> Dict[str, Any]:
         "urls": urls,
         "cards": cards,
         "houses": sorted(set(houses)),
+        "source_ids": sorted(set(source_ids)),
         "x_posts": sum(1 for c in cards if c.get("kind") == "x-status"),
         "papers": sum(1 for c in cards if c.get("kind") == "arxiv"),
         "archives": sum(1 for c in cards if "xarchive" in c or c.get("kind") == "url"),
