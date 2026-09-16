@@ -37,7 +37,13 @@ class SecretaryBot:
         ]
         response = self.model.call_json(
             system_prompt=self.SYSTEM_PROMPT,
-            user_prompt=json.dumps({"project_context": project_context, "open_work": existing}, default=str),
+            user_prompt=json.dumps(
+                {
+                    "project_context": self._planning_context(project_context),
+                    "open_work": existing,
+                },
+                default=str,
+            ),
             correlation_id=correlation_id,
         )
         proposals = response.get("tasks", [])
@@ -54,6 +60,15 @@ class SecretaryBot:
         )
         self.store.append_revision(revision)
         return revision
+
+    @staticmethod
+    def _planning_context(project_context: dict[str, Any]) -> dict[str, Any]:
+        """Keep raw workforce records local to orchestration, not the model."""
+        context = dict(project_context)
+        snapshots = context.pop("worker_snapshots", None)
+        if isinstance(snapshots, list):
+            context["worker_snapshot_count"] = len(snapshots)
+        return context
 
     @staticmethod
     def _parse_task(task: dict[str, Any], correlation_id: str) -> PlanItem | None:
