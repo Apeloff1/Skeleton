@@ -11,9 +11,14 @@ def _workflow() -> str:
     return WORKFLOW.read_text(encoding="utf-8")
 
 
-def test_privileged_workflow_checks_out_only_default_branch_without_credentials():
+def test_privileged_workflow_uses_only_trusted_default_branch_triggers():
     text = _workflow()
-    assert "pull_request_target:" in text
+    assert "workflow_run:" in text
+    assert "schedule:" in text
+    assert "workflow_dispatch:" in text
+    assert "pull_request_target:" not in text
+    assert "pull_request_review:" not in text
+    assert "pull_request_review_comment:" not in text
     assert "ref: ${{ github.event.repository.default_branch }}" in text
     assert "persist-credentials: false" in text
     assert "github.event.pull_request.head" not in text
@@ -50,9 +55,10 @@ def test_workflow_defaults_are_fail_closed_and_bounded():
     assert 'PR_AUTOMATION_MAX_MUTATIONS: "1"' in text
 
 
-def test_workflow_has_only_the_permissions_needed_for_status_and_merge_control():
+def test_workflow_elevates_only_the_evaluate_job_for_status_and_merge_control():
     text = _workflow()
-    assert "permissions:\n  contents: write\n  pull-requests: write\n  statuses: write\n" in text
+    assert "permissions:\n  contents: read\n" in text
+    assert "    permissions:\n      contents: write\n      pull-requests: write\n      statuses: write\n" in text
     assert "actions: write" not in text
     assert "administration: write" not in text
     assert "secrets: write" not in text
