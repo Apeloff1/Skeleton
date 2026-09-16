@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "purpose": "Connect tracked source/build declarations to produced container stages/services using explicit, bounded, deterministic evidence.",
+  "sources": [
+    "Dockerfile FROM/COPY/ADD declarations",
+    "Compose service build context/dockerfile/target declarations"
+  ],
+  "edge_types": [
+    "declares-artifact",
+    "artifact-input",
+    "packages-artifact"
+  ],
+  "shell_output_policy": "never infer arbitrary command outputs",
+  "directory_selector_policy": "bounded selector nodes",
+  "dynamic_input_policy": "retain unresolved evidence instead of guessing",
+  "build_context_policy": {
+    "compose": "authoritative explicit context for supported Compose mapping form",
+    "fallback": "Dockerfile parent directory only when no Compose context is found, labeled lower precision"
+  },
+  "security": {
+    "secret_values": "never indexed",
+    "missing_dynamic_inputs": "surfaced as unresolved findings",
+    "supply_chain_use": "lineage augments but does not replace SBOM, signature, provenance, or vulnerability evidence"
+  },
+  "non_claims": [
+    "does not prove artifact reproducibility",
+    "does not prove runtime contents match source without a build/provenance attestation",
+    "does not infer arbitrary RUN command outputs",
+    "does not expand directory selectors into unbounded file-edge fanout"
+  ]
+}
