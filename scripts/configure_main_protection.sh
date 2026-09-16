@@ -11,6 +11,7 @@ set -euo pipefail
 repo="${REPO:-Apeloff1/Skeleton}"
 branch="${BRANCH:-main}"
 required_check="Merge Readiness"
+required_app_id="15368" # GitHub Actions
 mode="${1:---verify}"
 
 if [[ ! "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
@@ -58,7 +59,8 @@ verify() {
   gh api "repos/${repo}/branches/${branch}/protection" --jq '
     {
       enforce_admins: .enforce_admins.enabled,
-      required_checks: .required_status_checks.contexts,
+      required_checks: .required_status_checks.checks,
+      legacy_contexts: .required_status_checks.contexts,
       strict: .required_status_checks.strict,
       pull_request_reviews: (.required_pull_request_reviews != null),
       approving_reviews_required: (.required_pull_request_reviews.required_approving_review_count // null),
@@ -69,7 +71,9 @@ verify() {
   '
 
   check_present="false"
-  if gh api "repos/${repo}/branches/${branch}/protection" --jq '.required_status_checks.contexts[]' | grep -Fxq "$required_check"; then
+  if gh api "repos/${repo}/branches/${branch}/protection" --jq \
+    '.required_status_checks.checks[]? | select(.context == "Merge Readiness" and .app_id == 15368) | .context' \
+    | grep -Fxq "$required_check"; then
     check_present="true"
   fi
   enforce_admins="$(gh api "repos/${repo}/branches/${branch}/protection" --jq '.enforce_admins.enabled')"
@@ -84,7 +88,7 @@ verify() {
     return 1
   fi
 
-  echo "OK: ${repo}:${branch} enforces ${required_check} for admins and pull requests"
+  echo "OK: ${repo}:${branch} requires ${required_check} from GitHub Actions app ${required_app_id} and enforces protection for admins/PRs"
 }
 
 if [[ "$mode" == "--verify" ]]; then
@@ -95,7 +99,13 @@ fi
 payload='{
   "required_status_checks": {
     "strict": true,
-    "contexts": ["Merge Readiness"]
+    "contexts": [],
+    "checks": [
+      {
+        "context": "Merge Readiness",
+        "app_id": 15368
+      }
+    ]
   },
   "enforce_admins": true,
   "required_pull_request_reviews": {
@@ -122,7 +132,7 @@ fi
 printf '%s\n' "$payload" | gh api \
   --method PUT \
   -H 'Accept: application/vnd.github+json' \
-  -H 'X-GitHub-Api-Version: 2022-11-28' \
+  -H 'X-GitHub-Api-Version: 2026-03-10' \
   "repos/${repo}/branches/${branch}/protection" \
   --input - >/dev/null
 
