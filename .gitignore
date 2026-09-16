@@ -142,8 +142,9 @@ backend/data/build_artifacts/
 *.aab
 *.ipa
 
-# Godot runtime projects scaffolded at runtime (the engine binary itself,
-# backend/godot, is a first-class tracked asset — do NOT ignore it)
+# Godot editor binary is an artifact-plane object (GB-9). Pointer lives at
+# backend/godot.artifact.json. The 103 MB blob stays off git.
+backend/godot
 backend/data/godot_projects/
 
 # Live Jeeves own-system persist
