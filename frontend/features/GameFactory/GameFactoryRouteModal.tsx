@@ -28,6 +28,11 @@ interface GameFactoryRouteModalProps {
 
 type HandoffStage = 'review' | 'creating' | 'created' | 'factory';
 
+interface CreatedProjectSummary {
+  projectId: string;
+  title: string;
+}
+
 const API_BASE = (() => {
   if (
     typeof window !== 'undefined'
@@ -40,6 +45,25 @@ const API_BASE = (() => {
     || process.env.EXPO_PUBLIC_BACKEND_URL
     || '';
 })();
+
+function parseCreatedProjectPayload(payload: unknown): CreatedProjectSummary | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+
+  const record = payload as Record<string, unknown>;
+  if (typeof record.project_id !== 'string') return null;
+  const projectId = record.project_id.trim();
+  if (!projectId || projectId.length > 256) return null;
+
+  let title = 'Seeded game project';
+  if (record.gdd && typeof record.gdd === 'object' && !Array.isArray(record.gdd)) {
+    const rawTitle = (record.gdd as Record<string, unknown>).title;
+    if (typeof rawTitle === 'string' && rawTitle.trim()) {
+      title = rawTitle.trim().slice(0, 160);
+    }
+  }
+
+  return { projectId, title };
+}
 
 export const GameFactoryRouteModal: React.FC<GameFactoryRouteModalProps> = ({
   visible,
@@ -74,12 +98,19 @@ export const GameFactoryRouteModal: React.FC<GameFactoryRouteModalProps> = ({
         return;
       }
 
-      const payload = await response.json();
-      setCreatedProjectId(String(payload?.project_id || ''));
-      setCreatedTitle(String(payload?.gdd?.title || 'Seeded game project'));
+      const payload: unknown = await response.json();
+      const created = parseCreatedProjectPayload(payload);
+      if (!created) {
+        setError('Game Factory returned an invalid project response.');
+        setStage('review');
+        return;
+      }
+
+      setCreatedProjectId(created.projectId);
+      setCreatedTitle(created.title);
       setStage('created');
-    } catch (cause: any) {
-      setError(cause?.message ? `Could not create project: ${cause.message}` : 'Could not create project.');
+    } catch {
+      setError('Could not create project. Check your connection and try again.');
       setStage('review');
     }
   }, [description, stage]);
@@ -90,12 +121,18 @@ export const GameFactoryRouteModal: React.FC<GameFactoryRouteModalProps> = ({
 
   const category = artifact?.category || 'game';
   const isCreating = stage === 'creating';
+  const createDisabled = !description.trim() || isCreating;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={[styles.root, { backgroundColor: colors.background || '#05070d' }]}>
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity accessibilityRole="button" onPress={onClose} style={styles.iconButton}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Close Game Factory handoff"
+            onPress={onClose}
+            style={styles.iconButton}
+          >
             <Ionicons name="close" size={24} color={colors.text} />
           </TouchableOpacity>
           <View style={styles.headerText}>
@@ -106,15 +143,17 @@ export const GameFactoryRouteModal: React.FC<GameFactoryRouteModalProps> = ({
 
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           {stage === 'created' ? (
-            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: '#22C55E55' }]}>
+            <View
+              accessibilityLiveRegion="polite"
+              style={[styles.card, { backgroundColor: colors.surface, borderColor: '#22C55E55' }]}
+            >
               <Ionicons name="checkmark-circle" size={42} color="#22C55E" />
               <Text style={[styles.cardTitle, { color: colors.text }]}>Project created</Text>
               <Text style={[styles.body, { color: colors.textMuted }]}>{createdTitle}</Text>
-              {!!createdProjectId && (
-                <Text style={[styles.projectId, { color: colors.textMuted }]}>Project {createdProjectId}</Text>
-              )}
+              <Text style={[styles.projectId, { color: colors.textMuted }]}>Project {createdProjectId}</Text>
               <TouchableOpacity
                 accessibilityRole="button"
+                accessibilityLabel="Continue in Game Factory"
                 style={[styles.primaryButton, { backgroundColor: '#8B5CF6' }]}
                 onPress={() => setStage('factory')}
               >
@@ -135,6 +174,7 @@ export const GameFactoryRouteModal: React.FC<GameFactoryRouteModalProps> = ({
               </Text>
               <TextInput
                 accessibilityLabel="Game Factory builder brief"
+                accessibilityHint="Edit the AI-generated seed before creating a Game Factory project"
                 value={description}
                 onChangeText={setDescription}
                 editable={!isCreating}
@@ -149,19 +189,25 @@ export const GameFactoryRouteModal: React.FC<GameFactoryRouteModalProps> = ({
               <Text style={[styles.count, { color: colors.textMuted }]}>{description.length}/2000</Text>
 
               {!!error && (
-                <View style={[styles.errorBox, { borderColor: '#EF444455' }]}>
+                <View
+                  accessibilityRole="alert"
+                  accessibilityLiveRegion="assertive"
+                  style={[styles.errorBox, { borderColor: '#EF444455' }]}
+                >
                   <Text style={styles.errorText}>{error}</Text>
                 </View>
               )}
 
               <TouchableOpacity
                 accessibilityRole="button"
+                accessibilityLabel="Create seeded Game Factory project"
+                accessibilityState={{ disabled: createDisabled, busy: isCreating }}
                 style={[
                   styles.primaryButton,
-                  { backgroundColor: description.trim() && !isCreating ? '#22C55E' : colors.border },
+                  { backgroundColor: !createDisabled ? '#22C55E' : colors.border },
                 ]}
                 onPress={createSeededProject}
-                disabled={!description.trim() || isCreating}
+                disabled={createDisabled}
               >
                 {isCreating ? (
                   <ActivityIndicator color="#FFF" />
@@ -175,6 +221,8 @@ export const GameFactoryRouteModal: React.FC<GameFactoryRouteModalProps> = ({
 
               <TouchableOpacity
                 accessibilityRole="button"
+                accessibilityLabel="Discard seed and open Game Factory"
+                accessibilityState={{ disabled: isCreating }}
                 style={styles.secondaryButton}
                 onPress={() => setStage('factory')}
                 disabled={isCreating}
