@@ -37,8 +37,8 @@ class GameSpec:
     npcs: List[Dict[str, Any]] = field(default_factory=list)
     game_logic: Optional[Dict[str, Any]] = None
     animation: Optional[Dict[str, Any]] = None
-    knowledge: Dict[str, Any] = field(default_factory=dict)
     created_at: float = field(default_factory=time.time)
+    knowledge: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
