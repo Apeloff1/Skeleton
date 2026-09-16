@@ -1,11 +1,12 @@
 export interface GameBuilderArtifact {
   category: string;
-  data: unknown;
+  data: string;
   createdAt: number;
 }
 
 const DEFAULT_MAX_AGE_MS = 30 * 60 * 1000;
 const DEFAULT_DESCRIPTION_LIMIT = 1800;
+const DEFAULT_HANDOFF_PAYLOAD_LIMIT = 32 * 1024;
 
 let pendingArtifact: GameBuilderArtifact | null = null;
 
@@ -24,10 +25,17 @@ function serializeArtifact(data: unknown): string {
   }
 }
 
+function boundedPayload(data: unknown, maxLength = DEFAULT_HANDOFF_PAYLOAD_LIMIT): string {
+  const limit = Math.max(256, Math.floor(maxLength));
+  const serialized = serializeArtifact(data).trim();
+  if (serialized.length <= limit) return serialized;
+  return `${serialized.slice(0, limit - 1)}…`;
+}
+
 export function queueGameBuilderArtifact(data: unknown, category: string): GameBuilderArtifact {
   pendingArtifact = {
     category: normalizeCategory(category),
-    data,
+    data: boundedPayload(data),
     createdAt: Date.now(),
   };
   return pendingArtifact;
@@ -49,7 +57,7 @@ export function formatGameBuilderDescription(
 ): string {
   const limit = Math.max(160, Math.floor(maxLength));
   const prefix = `Build a complete game around this AI-generated ${artifact.category} seed. Preserve its useful constraints and integrate it coherently with the rest of the game.\n\nSeed:\n`;
-  const serialized = serializeArtifact(artifact.data).trim();
+  const serialized = artifact.data.trim();
   const available = Math.max(0, limit - prefix.length);
 
   if (serialized.length <= available) return `${prefix}${serialized}`;
