@@ -23,9 +23,9 @@ env:
 
 jobs:
   map-and-gate:
-    name: Map build / gaps / security / agent handoff
+    name: Map semantic graph / impact / gaps / security / agent handoff
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -37,16 +37,23 @@ jobs:
           python-version: "${{ env.PYTHON_VERSION }}"
 
       - name: Validate repo-intelligence contracts
-        run: python scripts/repo_intel.py check
+        run: |
+          python -m compileall -q scripts/repo_intel.py scripts/repo_intel_sota.py
+          python scripts/repo_intel_sota.py check
 
-      - name: Build fast repository snapshot
-        run: python scripts/repo_intel.py snapshot --out .cache/repo-intel
+      - name: Run focused repository-index regressions
+        run: python -m pytest -q tests/test_repo_intel.py tests/test_repo_intel_sota.py
+
+      - name: Build semantic repository knowledge graph
+        env:
+          REPO_INTEL_BASE: ${{ github.event.pull_request.base.sha || 'origin/main' }}
+        run: python scripts/repo_intel_sota.py snapshot --base "$REPO_INTEL_BASE" --out .cache/repo-intel
 
       - name: Require build augmentation note
         if: github.event_name == 'pull_request'
         env:
-          REPO_INTEL_BASE: origin/${{ github.base_ref }}
-        run: python scripts/repo_intel.py gate --base "$REPO_INTEL_BASE"
+          REPO_INTEL_BASE: ${{ github.event.pull_request.base.sha }}
+        run: python scripts/repo_intel_sota.py gate --base "$REPO_INTEL_BASE"
 
       - name: Query live Dependabot security data when permitted
         env:
@@ -72,7 +79,7 @@ jobs:
           else
             : > .cache/repo-intel/dependabot-prs.json
           fi
-          python scripts/repo_intel.py dependabot-notes \
+          python scripts/repo_intel_sota.py dependabot-notes \
             --alerts .cache/repo-intel/dependabot-alerts.json \
             --prs .cache/repo-intel/dependabot-prs.json \
             --out .cache/repo-intel/dependabot-notes.md
@@ -96,9 +103,19 @@ jobs:
           index = json.loads((base / 'index.json').read_text())
           gaps = json.loads((base / 'gaps.json').read_text())
           sq = json.loads((base / 'security-quality.json').read_text())
+          impact = json.loads((base / 'impact.json').read_text())
+          m = index['metrics']
           print('source_digest=', index['source_digest'])
           print('tracked_files=', index['tracked_files'])
           print('tracked_bytes=', index['tracked_bytes'])
+          print('graph_nodes=', m['graph_nodes'])
+          print('graph_edges=', m['graph_edges'])
+          print('semantic_cache_hit_ratio=', m['semantic_cache_hit_ratio'])
+          print('dependency_cycles=', m['dependency_cycles'])
+          print('owned_file_ratio=', m['owned_file_ratio'])
+          print('impact_files=', impact['affected_file_count'])
+          print('impact_subsystems=', impact['subsystems'])
+          print('candidate_tests=', len(impact['candidate_tests']))
           print('gap_counts=', gaps['counts'])
           print('dependabot_ecosystems=', sq['dependabot_ecosystems'])
           print('large_tracked_files=', len(index['large_tracked_files']))
