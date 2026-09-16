@@ -55,6 +55,12 @@ _DENIED_BASENAMES = {
     "requirements-dev.txt",
 }
 _DIFF_PATH = re.compile(r"^diff --git a/(.+?) b/(.+?)$", re.MULTILINE)
+_OLD_PATCH_PATH = re.compile(r"^--- (.+)$", re.MULTILINE)
+_NEW_PATCH_PATH = re.compile(r"^\+\+\+ (.+)$", re.MULTILINE)
+_FORBIDDEN_DIFF_METADATA = re.compile(
+    r"^(?:new file mode|deleted file mode|old mode|new mode|rename from|rename to|copy from|copy to|GIT binary patch|Binary files )",
+    re.MULTILINE,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,6 +152,8 @@ def _canonical_path(value: object) -> str:
     raw = value.strip().replace("\\", "/")
     if not raw or "\x00" in raw:
         raise ValueError("path is empty or invalid")
+    if any(ord(char) < 32 or ord(char) == 127 for char in raw):
+        raise ValueError("path contains control characters")
     pure = PurePosixPath(raw)
     if pure.is_absolute() or ".." in pure.parts or pure.as_posix() != raw:
         raise ValueError(f"non-canonical repository path: {raw!r}")
@@ -159,6 +167,22 @@ def _canonical_path(value: object) -> str:
     if decision.risk == "high":
         raise ValueError(f"high-risk path rejected: {raw}")
     return raw
+
+
+def _patch_header_path(value: str, *, expected_prefix: str) -> str:
+    """Return a canonical path from a ---/+++ header or fail closed.
+
+    Git accepts patches where the ``diff --git`` names disagree with the
+    ``---``/``+++`` names.  The latter can determine the actual write target,
+    so both header families must be validated and bound to the same path.
+    """
+
+    raw = value.split("\t", 1)[0]
+    if raw == "/dev/null":
+        raise ValueError("file creation/deletion via /dev/null is disabled in v1")
+    if not raw.startswith(expected_prefix):
+        raise ValueError("patch file header has an unexpected path prefix")
+    return _canonical_path(raw[len(expected_prefix) :])
 
 
 def _parse_task(value: object) -> PlannedTask:
@@ -190,16 +214,33 @@ def _changed_paths(patch: str) -> tuple[str, ...]:
         raise ValueError("patch exceeds per-task size limit")
     if "\x00" in patch:
         raise ValueError("binary patch content is not allowed")
-    if "\n--- /dev/null\n" in patch or "\n+++ /dev/null\n" in patch:
-        raise ValueError("file deletion/creation via /dev/null is disabled in v1")
-    matches = _DIFF_PATH.findall(patch)
+
+    matches = list(_DIFF_PATH.finditer(patch))
     if not matches:
         raise ValueError("patch contains no git diff headers")
+
     paths: list[str] = []
-    for before, after in matches:
+    for index, match in enumerate(matches):
+        block_end = matches[index + 1].start() if index + 1 < len(matches) else len(patch)
+        block = patch[match.start() : block_end]
+        if _FORBIDDEN_DIFF_METADATA.search(block):
+            raise ValueError("file creation/deletion/rename/copy/mode/binary metadata is disabled in v1")
+
+        before = _canonical_path(match.group(1))
+        after = _canonical_path(match.group(2))
         if before != after:
             raise ValueError("renames are disabled")
-        paths.append(_canonical_path(after))
+
+        old_headers = _OLD_PATCH_PATH.findall(block)
+        new_headers = _NEW_PATCH_PATH.findall(block)
+        if len(old_headers) != 1 or len(new_headers) != 1:
+            raise ValueError("each file diff must contain exactly one --- and +++ path header")
+        old_path = _patch_header_path(old_headers[0], expected_prefix="a/")
+        new_path = _patch_header_path(new_headers[0], expected_prefix="b/")
+        if old_path != before or new_path != after or old_path != new_path:
+            raise ValueError("diff --git and ---/+++ path headers disagree")
+        paths.append(after)
+
     return tuple(dict.fromkeys(paths))
 
 
