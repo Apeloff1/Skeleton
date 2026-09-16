@@ -1,12 +1,9 @@
-"""Small provider-neutral chat client for repo automation bots.
-
-Supports any OpenAI-compatible chat endpoint. Keep the API key in the CI
-secret store; never commit it or include it in prompts, logs, or artifacts.
-"""
+"""Provider-neutral chat client and prompt-safety helpers for repo bots."""
 from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 
@@ -15,8 +12,27 @@ class ModelError(RuntimeError):
     pass
 
 
+_SECRET_PATTERNS = (
+    re.compile(r"(?i)\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_\-]+"),
+    re.compile(r"(?i)\bgithub_pat_[A-Za-z0-9_\-]+"),
+    re.compile(r"\bsk-[A-Za-z0-9_\-]{16,}"),
+    re.compile(r"\bAIza[0-9A-Za-z_\-]{20,}"),
+    re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{16,}"),
+    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----", re.DOTALL),
+    re.compile(r"(?im)^(\s*(?:api[_-]?key|secret|password|token)\s*[=:]\s*)\S+\s*$"),
+)
+
+
+def redact_secrets(text: str) -> str:
+    """Remove common credential forms before repository text leaves the runner."""
+    clean = text
+    for pattern in _SECRET_PATTERNS:
+        clean = pattern.sub("[REDACTED]", clean)
+    return clean
+
+
 def _secret(value: str) -> str:
-    return value.replace("\n", " ").replace("\r", " ")[:4096]
+    return redact_secrets(value).replace("\n", " ").replace("\r", " ")[:4096]
 
 
 class FreeModelClient:
@@ -32,8 +48,8 @@ class FreeModelClient:
         payload = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
+                {"role": "system", "content": redact_secrets(system)},
+                {"role": "user", "content": redact_secrets(user)},
             ],
             "temperature": 0.1,
             "max_tokens": max(256, min(max_tokens, 8000)),
