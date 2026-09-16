@@ -6,7 +6,6 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any, Sequence
 
-from .models import WorkerState
 from .plan_api import PlanQueueAPI
 from .plan_store import InMemoryPlanStore
 from .scheduler import SupervisorScheduler
@@ -46,40 +45,44 @@ def _task(
     }
 
 
-def _seed_workers(store: InMemoryPlanStore, total_workers: int) -> tuple[str, str, str]:
+def _worker_snapshots(total_workers: int) -> tuple[list[dict[str, Any]], str, str, str]:
     if total_workers < 4:
         raise ValueError("total_workers must be at least 4")
 
     night_count = total_workers // 2
     idle_count = total_workers - night_count
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).isoformat()
+    snapshots: list[dict[str, Any]] = []
 
     for index in range(night_count):
-        store.upsert_worker(
-            WorkerState(
-                worker_id=f"night-{index:04d}",
-                team="night",
-                status="idle",
-                last_heartbeat_at=now,
-            )
+        is_overtime_worker = index == night_count - 1
+        snapshots.append(
+            {
+                "worker_id": f"night-{index:04d}",
+                "team": "night",
+                "status": "idle",
+                "last_heartbeat_at": now,
+                "normal_shift_minutes": 480 if is_overtime_worker else 0,
+                "overtime_minutes": 120 if is_overtime_worker else 0,
+                "overtime_task_ids": [],
+                "metadata": {"source": "planning-harness"},
+            }
         )
     for index in range(idle_count):
-        store.upsert_worker(
-            WorkerState(
-                worker_id=f"idle-{index:04d}",
-                team="idle",
-                status="idle",
-                last_heartbeat_at=now,
-            )
+        snapshots.append(
+            {
+                "worker_id": f"idle-{index:04d}",
+                "team": "idle",
+                "status": "idle",
+                "last_heartbeat_at": now,
+                "normal_shift_minutes": 0,
+                "overtime_minutes": 0,
+                "overtime_task_ids": [],
+                "metadata": {"source": "planning-harness"},
+            }
         )
 
-    overtime_worker = f"night-{night_count - 1:04d}"
-    worker = next(item for item in store.snapshot_workers() if item.worker_id == overtime_worker)
-    worker.normal_shift_minutes = 480
-    worker.overtime_minutes = 120
-    store.upsert_worker(worker)
-
-    return "night-0000", "idle-0000", overtime_worker
+    return snapshots, "night-0000", "idle-0000", f"night-{night_count - 1:04d}"
 
 
 def run_planning_harness(*, total_workers: int = 1000, cycles: int = 4) -> dict[str, Any]:
@@ -88,13 +91,15 @@ def run_planning_harness(*, total_workers: int = 1000, cycles: int = 4) -> dict[
     One virtual cycle represents 15 minutes. Secretary runs every cycle; SMB
     runs every second cycle. The scripted models intentionally repeat the same
     proposals so the harness verifies canonical-plan deduplication under a
-    sustained loop instead of relying on prompt compliance alone.
+    sustained loop instead of relying on prompt compliance alone. The entire
+    logical workforce enters through the same worker-snapshot path used by the
+    scheduled supervisor rather than being pre-seeded directly into the store.
     """
     if cycles < 1:
         raise ValueError("cycles must be positive")
 
     store = InMemoryPlanStore()
-    night_worker, idle_worker, overtime_worker = _seed_workers(store, total_workers)
+    worker_snapshots, night_worker, idle_worker, overtime_worker = _worker_snapshots(total_workers)
 
     secretary_model = ScriptedModel(
         {
@@ -143,7 +148,7 @@ def run_planning_harness(*, total_workers: int = 1000, cycles: int = 4) -> dict[
         project_context_supplier=lambda: {
             "repository": "Apeloff1/Skeleton",
             "planning_stage": "integrated-harness",
-            "worker_snapshots": [],
+            "worker_snapshots": worker_snapshots,
         },
         research_supplier=lambda: [
             {
@@ -166,7 +171,14 @@ def run_planning_harness(*, total_workers: int = 1000, cycles: int = 4) -> dict[
                 "virtual_minute": cycle * 15,
                 "actors": result["actors"],
                 "plan_item_count": len(result["plan_items"]),
+                "worker_count": len(result["workers"]),
             }
+        )
+
+    ingested_workers = store.snapshot_workers()
+    if len(ingested_workers) != total_workers:
+        raise AssertionError(
+            f"worker snapshot ingress truncated: expected {total_workers}, got {len(ingested_workers)}"
         )
 
     produced_items = store.snapshot_items()
@@ -187,6 +199,14 @@ def run_planning_harness(*, total_workers: int = 1000, cycles: int = 4) -> dict[
         raise AssertionError("SMB cadence drifted from the 30-minute virtual cycle")
 
     latest_manager_payload = json.loads(manager_model.calls[-1]["user_prompt"])
+    latest_secretary_payload = json.loads(secretary_model.calls[-1]["user_prompt"])
+    for payload in (latest_secretary_payload, latest_manager_payload):
+        planning_context = payload["project_context"]
+        if "worker_snapshots" in planning_context:
+            raise AssertionError("raw worker snapshots leaked into a planning-model prompt")
+        if planning_context.get("worker_snapshot_count") != total_workers:
+            raise AssertionError("planning context lost the workforce snapshot count")
+
     staffing = latest_manager_payload["staffing"]
     attention_workers = staffing["attention_workers"]
     if len(attention_workers) > 64:
@@ -232,8 +252,10 @@ def run_planning_harness(*, total_workers: int = 1000, cycles: int = 4) -> dict[
             "overtime_claim": None,
         },
         "invariants": {
+            "full_snapshot_ingress": True,
             "producer_only": True,
             "deduplicated": True,
+            "raw_worker_snapshots_local_only": True,
             "bounded_manager_prompt": True,
             "team_pull_queue": True,
             "one_active_task_per_worker": True,
