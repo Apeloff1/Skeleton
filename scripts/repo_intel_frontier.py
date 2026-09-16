@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
 """Frontier Skeleton repository knowledge-graph CLI.
 
-This is the top compositional layer. It preserves the canonical index
-(semantic graph + structured supply chain + CODEOWNERS + architecture rules)
-and adds runtime/build surfaces, deterministic history hotspots, batch evidence,
-workflow/build-target relationships, ranked structural test evidence, compact
-agent retrieval, and richer change intelligence. Core indexing remains
-network-free and stdlib-only.
+The frontier composes the canonical semantic/supply-chain graph with build/runtime
+surfaces, deterministic history hotspots, ranked structural test evidence, explicit
+artifact lineage, batch evidence, compact agent retrieval, and change intelligence.
+Core indexing remains network-free and Python 3.11 stdlib-only.
 
-The frontier cache is self-validating: every read compares a cheap content-aware
-workspace fingerprint and regenerates the snapshot when tracked state changes.
-Graph composition also preserves relation metadata so distinct dependency scopes,
-requirements, and build relationships cannot collapse into one edge merely because
-they share the same endpoints and relation type.
+Snapshot reads are self-validating against tracked workspace identity. Graph edge
+identity preserves complete relation metadata so distinct scopes/specifications are
+not collapsed merely because endpoints and relation type match.
 """
 from __future__ import annotations
 
@@ -30,6 +26,7 @@ if str(SCRIPTS) not in sys.path:
 
 import repo_index as core  # noqa: E402
 import repo_intel as base  # noqa: E402
+import repo_intel_artifacts as artifacts  # noqa: E402
 import repo_intel_deep as deep  # noqa: E402
 import repo_intel_sota as semantic  # noqa: E402
 import repo_intel_test_evidence as test_evidence  # noqa: E402
@@ -57,6 +54,7 @@ REQUIRED_SNAPSHOT_OUTPUTS = (
     "search-catalog.json",
     "build-relationships.json",
     "test-evidence.json",
+    "artifact-lineage.json",
     "notes.md",
 )
 
@@ -77,23 +75,17 @@ def validate_contracts() -> None:
     core.validate_contracts()
     deep.check_contracts()
     test_evidence.check_contracts()
-    print("repo-intel-frontier: canonical + deep + test-evidence contracts valid")
+    artifacts.check_contracts()
+    print("repo-intel-frontier: canonical + deep + test-evidence + artifact-lineage contracts valid")
 
 
 def _workspace_fingerprint() -> str:
-    """Return a cheap content-aware identity for the tracked index + worktree.
-
-    `git write-tree` gives one compact identity for staged/tracked state. The
-    porcelain status captures status/mode changes, while only unstaged changed
-    files are content-hashed. Untracked files are intentionally excluded because
-    the repository index models tracked source until files are added to Git.
-    """
+    """Cheap content-aware identity for tracked index/worktree state."""
     tree = base.git("write-tree", check=False).strip()
     if not tree:
         tree = base.git("ls-files", "-s", check=False)
     status = base.git("status", "--porcelain=v1", "-z", "-uno", check=False)
     dirty = sorted(filter(None, base.git("diff", "--name-only", "-z", check=False).split("\0")))
-
     digest = hashlib.sha256()
     digest.update(tree.encode("utf-8", errors="surrogateescape"))
     digest.update(b"\0status\0")
@@ -111,23 +103,22 @@ def _workspace_fingerprint() -> str:
 
 
 def _edge_key(edge: dict[str, Any]) -> str:
-    """Identity preserving all relation metadata, not only graph endpoints."""
     return json.dumps(edge, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
 
 def _merge_relationships(snapshot: dict[str, Any], relationships: dict[str, Any]) -> None:
+    """Merge nodes/edges while preserving metadata-distinct relation variants."""
     graph = snapshot["graph"]
     nodes_by_id = {str(node["id"]): node for node in graph.get("nodes", [])}
     for node in relationships.get("nodes", []):
         nodes_by_id[str(node["id"])] = node
 
-    # Exact duplicate edges collapse, but metadata variants remain independent.
-    edge_by_key = {_edge_key(edge): edge for edge in graph.get("edges", [])}
+    edges_by_key = {_edge_key(edge): edge for edge in graph.get("edges", [])}
     for edge in relationships.get("edges", []):
-        edge_by_key[_edge_key(edge)] = edge
+        edges_by_key[_edge_key(edge)] = edge
     graph["nodes"] = [nodes_by_id[key] for key in sorted(nodes_by_id)]
     graph["edges"] = sorted(
-        edge_by_key.values(),
+        edges_by_key.values(),
         key=lambda edge: (
             str(edge.get("from", "")),
             str(edge.get("to", "")),
@@ -161,12 +152,9 @@ def _relationship_variant_count(edges: list[dict[str, Any]]) -> int:
 
 
 def build_snapshot(out: Path) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Build canonical graph then add frontier layers without duplicating package nodes."""
     snapshot = core.build_snapshot(out)
     dependencies = deep.dependency_inventory(snapshot)
     surfaces = deep.surface_inventory(snapshot)
-    # Canonical supply-chain nodes already model packages. Frontier relationships
-    # add workflow/build targets only to avoid duplicate dependency graph nodes.
     relationships = deep.build_relationships(snapshot, {"packages": []})
     history = deep.history_metrics(snapshot)
     hotspots = deep.hotspot_inventory(snapshot, history, relationships["edges"])
@@ -175,7 +163,10 @@ def build_snapshot(out: Path) -> tuple[dict[str, Any], dict[str, Any]]:
 
     _merge_relationships(snapshot, relationships)
     tests = test_evidence.build(snapshot)
+    lineage = artifacts.build(snapshot)
+    _merge_relationships(snapshot, lineage)
     snapshot["test_evidence"] = tests
+    snapshot["artifact_lineage"] = lineage
 
     history_by_path = history["files"]
     centrality = deep._centrality(snapshot, [])
@@ -206,9 +197,12 @@ def build_snapshot(out: Path) -> tuple[dict[str, Any], dict[str, Any]]:
             ),
             "test_evidence_links": tests["evidence_link_count"],
             "source_test_evidence_ratio": tests["source_evidence_ratio"],
+            "artifact_nodes": lineage["artifact_node_count"],
+            "artifact_lineage_edges": lineage["lineage_edge_count"],
+            "artifact_unresolved_inputs": lineage["unresolved_count"],
         }
     )
-    bundle = {
+    return snapshot, {
         "dependencies": dependencies,
         "surfaces": surfaces,
         "relationships": relationships,
@@ -217,8 +211,8 @@ def build_snapshot(out: Path) -> tuple[dict[str, Any], dict[str, Any]]:
         "batch_status": batches,
         "search_catalog": catalog,
         "test_evidence": tests,
+        "artifact_lineage": lineage,
     }
-    return snapshot, bundle
 
 
 def build_map(snapshot: dict[str, Any], bundle: dict[str, Any]) -> dict[str, Any]:
@@ -238,6 +232,12 @@ def build_map(snapshot: dict[str, Any], bundle: dict[str, Any]) -> dict[str, Any
                 "source_evidence_ratio": bundle["test_evidence"]["source_evidence_ratio"],
                 "evidence_link_count": bundle["test_evidence"]["evidence_link_count"],
                 "test_file_count": bundle["test_evidence"]["test_file_count"],
+            },
+            "artifact_lineage": {
+                "artifact_nodes": bundle["artifact_lineage"]["artifact_node_count"],
+                "lineage_edges": bundle["artifact_lineage"]["lineage_edge_count"],
+                "unresolved_inputs": bundle["artifact_lineage"]["unresolved_count"],
+                "compose_services": bundle["artifact_lineage"]["compose_services"],
             },
         }
     )
@@ -269,6 +269,12 @@ def impact_payload(snapshot: dict[str, Any], changed: list[str]) -> dict[str, An
     payload["test_selection_semantics"] = (
         "Ranked tests are structural relevance evidence only; required integration/release gates remain authoritative."
     )
+    affected_artifacts = artifacts.affected_artifacts(payload, snapshot.get("artifact_lineage", {}))
+    payload["affected_artifacts"] = affected_artifacts
+    payload["affected_artifact_count"] = len(affected_artifacts)
+    payload["artifact_impact_semantics"] = (
+        "Artifact impact follows explicit Docker/Compose lineage only; unresolved/dynamic build inputs remain findings."
+    )
     return payload
 
 
@@ -283,6 +289,7 @@ def render_notes(
     m = snapshot["metrics"]
     hot = bundle["hotspots"]["hotspots"][:8]
     top_tests = impact.get("ranked_candidate_tests", [])[:8]
+    affected_artifacts = impact.get("affected_artifacts", [])[:8]
     lines = [
         text,
         "",
@@ -297,11 +304,12 @@ def render_notes(
         f"- Preserved relationship metadata variants: **{m['relationship_metadata_variants']}**.",
         f"- Structural test-evidence links: **{m['test_evidence_links']}**; source files with ranked test evidence: "
         f"**{m['source_test_evidence_ratio']:.1%}**.",
+        f"- Explicit artifact graph: **{m['artifact_nodes']} artifacts / {m['artifact_lineage_edges']} lineage edges**; "
+        f"unresolved inputs: **{m['artifact_unresolved_inputs']}**.",
         f"- Deterministic churn window: **{m['history_window_commits']} commits** relative to HEAD time.",
         f"- Agent retrieval documents: **{m['search_document_count']}**.",
-        f"- Batch evidence notes: **{m['batch_evidence_noted']}/100** batches referenced. "
-        "Reference does not imply completion.",
-        "- Snapshot reads are self-validating against a content-aware tracked-workspace fingerprint; stale caches rebuild automatically.",
+        f"- Batch evidence notes: **{m['batch_evidence_noted']}/100** batches referenced. Reference does not imply completion.",
+        "- Snapshot reads self-validate against tracked workspace identity; stale/partial caches rebuild automatically.",
         "",
         "### Highest-attention hotspots",
         "",
@@ -316,17 +324,20 @@ def render_notes(
     lines.extend(["", "### Focused test evidence for current impact", ""])
     for item in top_tests:
         lines.append(
-            f"- `{item['test']}` — confidence **{item['confidence']:.3f}**; "
-            f"reasons={', '.join(item['reasons'][:3])}."
+            f"- `{item['test']}` — confidence **{item['confidence']:.3f}**; reasons={', '.join(item['reasons'][:3])}."
         )
     if not top_tests:
         lines.append("- No ranked structural test evidence for the current impact set.")
+    lines.extend(["", "### Explicit artifacts affected by current impact", ""])
+    for item in affected_artifacts:
+        lines.append(f"- `{item['artifact']}` — lineage depth **{item['depth']}**, kind={item['kind']}.")
+    if not affected_artifacts:
+        lines.append("- No explicit Docker/Compose artifact lineage reached by the current impact set.")
     lines.extend(
         [
             "",
-            "Hotspot scores are relative engineering-attention signals, not quality/security grades. "
-            "Test confidence is structural relevance, not coverage or sufficiency. Dependency declarations are offline "
-            "inventory; GitHub Dependency Graph and Dependabot remain authoritative for resolved/transitive vulnerability state.",
+            "Hotspot scores are triage signals, test confidence is structural relevance, and artifact lineage is explicit "
+            "build-declaration evidence. None independently proves correctness, coverage, reproducibility, or release readiness.",
             "",
         ]
     )
@@ -347,7 +358,7 @@ def snapshot_command(out: Path, base_ref: str) -> dict[str, Any]:
     end_fingerprint = _workspace_fingerprint()
     if end_fingerprint != start_fingerprint:
         raise RuntimeError(
-            "tracked workspace changed while the repository index was being built; rerun to avoid publishing a mixed snapshot"
+            "tracked workspace changed while repository intelligence was building; refusing mixed-state snapshot"
         )
     snapshot["workspace_fingerprint"] = end_fingerprint
     snapshot["metrics"]["workspace_fingerprint_verified"] = True
@@ -373,6 +384,7 @@ def snapshot_command(out: Path, base_ref: str) -> dict[str, Any]:
     write_json(out / "search-catalog.json", bundle["search_catalog"])
     write_json(out / "build-relationships.json", bundle["relationships"])
     write_json(out / "test-evidence.json", bundle["test_evidence"])
+    write_json(out / "artifact-lineage.json", bundle["artifact_lineage"])
     (out / "notes.md").write_text(render_notes(snapshot, bundle, gaps, sq, impact), encoding="utf-8")
 
     print(
@@ -380,7 +392,7 @@ def snapshot_command(out: Path, base_ref: str) -> dict[str, Any]:
         f"{snapshot['tracked_files']} files; {snapshot['metrics']['graph_nodes']} nodes/"
         f"{snapshot['metrics']['graph_edges']} edges; deps={snapshot['supply_chain']['component_count']}; "
         f"routes={snapshot['metrics']['route_count']}; targets={snapshot['metrics']['build_target_count']}; "
-        f"test_evidence={snapshot['metrics']['test_evidence_links']}; "
+        f"tests={snapshot['metrics']['test_evidence_links']}; artifacts={snapshot['metrics']['artifact_nodes']}; "
         f"cache_hits={snapshot['metrics']['semantic_cache_hit_ratio']:.1%}"
     )
     return snapshot
@@ -417,26 +429,20 @@ def query_command(out: Path, kind: str, value: str, transitive: bool, limit: int
         }
     elif kind == "symbol":
         payload = {
-            "symbols": [
-                symbol
-                for symbol in snapshot["symbols"]
-                if needle in str(symbol.get("qualified_name", "")).lower()
-            ][:limit]
+            "symbols": [s for s in snapshot["symbols"] if needle in str(s.get("qualified_name", "")).lower()][:limit]
         }
     elif kind in {"deps", "rdeps"}:
         adjacency = core.graph_adjacency(
             snapshot,
-            {"imports", "declares-dependency", "workflow-uses", "build-uses"},
+            {"imports", "declares-dependency", "workflow-uses", "build-uses", "artifact-input", "packages-artifact"},
             reverse=(kind == "rdeps"),
         )
         payload = {kind: core.traverse(adjacency, f"file:{value}", transitive)[:limit]}
     elif kind == "dependency":
         payload = {
             "dependencies": [
-                node
-                for node in snapshot["supply_chain"]["nodes"]
-                if needle in str(node.get("name", "")).lower()
-                or needle in str(node.get("id", "")).lower()
+                node for node in snapshot["supply_chain"]["nodes"]
+                if needle in str(node.get("name", "")).lower() or needle in str(node.get("id", "")).lower()
             ][:limit]
         }
     elif kind == "subsystem":
@@ -444,8 +450,7 @@ def query_command(out: Path, kind: str, value: str, transitive: bool, limit: int
     elif kind == "owner":
         payload = {
             "files": [
-                row
-                for row in snapshot["files"]
+                row for row in snapshot["files"]
                 if (row.get("owner") or {}).get("id") == value
                 or value in snapshot.get("codeowners", {}).get("file_owners", {}).get(row["path"], [])
             ][:limit]
@@ -454,30 +459,26 @@ def query_command(out: Path, kind: str, value: str, transitive: bool, limit: int
         surfaces = read_json(out / "surfaces.json", {"routes": []})
         payload = {
             "routes": [
-                item
-                for item in surfaces.get("routes", [])
-                if needle in str(item.get("route", "")).lower()
-                or needle in str(item.get("path", "")).lower()
+                item for item in surfaces.get("routes", [])
+                if needle in str(item.get("route", "")).lower() or needle in str(item.get("path", "")).lower()
             ][:limit]
         }
     elif kind == "env":
         surfaces = read_json(out / "surfaces.json", {"environment_variables": []})
         payload = {
             "environment_variables": [
-                item
-                for item in surfaces.get("environment_variables", [])
+                item for item in surfaces.get("environment_variables", [])
                 if needle in str(item.get("name", "")).lower()
             ][:limit]
         }
     elif kind == "hotspot":
-        hotspots = read_json(out / "hotspots.json", {"hotspots": []}).get("hotspots", [])
-        payload = {"hotspots": [item for item in hotspots if not value or needle in item["path"].lower()][:limit]}
+        values = read_json(out / "hotspots.json", {"hotspots": []}).get("hotspots", [])
+        payload = {"hotspots": [item for item in values if not value or needle in item["path"].lower()][:limit]}
     elif kind == "batch":
-        batches = read_json(out / "batch-status.json", {"batches": []}).get("batches", [])
+        values = read_json(out / "batch-status.json", {"batches": []}).get("batches", [])
         payload = {
             "batches": [
-                item
-                for item in batches
+                item for item in values
                 if needle in str(item.get("id", "")).lower()
                 or needle in str(item.get("lane", "")).lower()
                 or needle in str(item.get("title", "")).lower()
@@ -492,10 +493,22 @@ def query_command(out: Path, kind: str, value: str, transitive: bool, limit: int
             payload = {
                 "sources": [
                     {"source": source, "ranked_tests": items[:limit]}
-                    for source, items in by_source.items()
-                    if needle in source.lower()
+                    for source, items in by_source.items() if needle in source.lower()
                 ][:limit]
             }
+    elif kind == "artifact":
+        lineage = read_json(out / "artifact-lineage.json", {"nodes": [], "unresolved": []})
+        payload = {
+            "artifacts": [
+                node for node in lineage.get("nodes", [])
+                if node.get("type") == "artifact"
+                and (not value or needle in str(node.get("id", "")).lower() or needle in json.dumps(node).lower())
+            ][:limit],
+            "unresolved": [
+                item for item in lineage.get("unresolved", [])
+                if not value or needle in json.dumps(item).lower()
+            ][:limit],
+        }
     elif kind == "search":
         catalog = read_json(out / "search-catalog.json", {"documents": []})
         payload = {"results": deep.search(catalog, value, limit=limit)}
@@ -515,8 +528,6 @@ def impact_command(out: Path, base_ref: str, paths: list[str]) -> dict[str, Any]
 
 
 def diff_command(out: Path, base_ref: str) -> dict[str, Any]:
-    # Canonical diff logic operates correctly on schema-5 snapshots and benefits
-    # from the extra workflow/build edges already present in the graph.
     load_or_build(out, base_ref)
     return core.diff_command(out, base_ref)
 
@@ -539,11 +550,11 @@ def doctor_command(out: Path) -> int:
     if m.get("architecture_boundary_violations"):
         advisories.append(f"architecture boundary findings={m['architecture_boundary_violations']}")
     if m.get("undocumented_environment_variable_count"):
-        advisories.append(
-            f"environment variables absent from tracked examples={m['undocumented_environment_variable_count']}"
-        )
+        advisories.append(f"environment variables absent from tracked examples={m['undocumented_environment_variable_count']}")
+    if m.get("artifact_unresolved_inputs"):
+        advisories.append(f"unresolved explicit artifact inputs={m['artifact_unresolved_inputs']}")
     report = {
-        "schema": 3,
+        "schema": 4,
         "source_digest": snapshot["source_digest"],
         "workspace_fingerprint": snapshot.get("workspace_fingerprint"),
         "healthy": not blockers,
@@ -555,6 +566,11 @@ def doctor_command(out: Path) -> int:
         "test_evidence": {
             "source_evidence_ratio": m.get("source_test_evidence_ratio", 0.0),
             "evidence_links": m.get("test_evidence_links", 0),
+        },
+        "artifact_lineage": {
+            "artifact_nodes": m.get("artifact_nodes", 0),
+            "lineage_edges": m.get("artifact_lineage_edges", 0),
+            "unresolved_inputs": m.get("artifact_unresolved_inputs", 0),
         },
     }
     print(json.dumps(report, indent=2, sort_keys=True))
@@ -584,19 +600,8 @@ def main(argv: list[str] | None = None) -> int:
     query.add_argument(
         "--kind",
         choices=[
-            "file",
-            "symbol",
-            "deps",
-            "rdeps",
-            "dependency",
-            "subsystem",
-            "owner",
-            "route",
-            "env",
-            "hotspot",
-            "batch",
-            "tests",
-            "search",
+            "file", "symbol", "deps", "rdeps", "dependency", "subsystem", "owner",
+            "route", "env", "hotspot", "batch", "tests", "artifact", "search",
         ],
         required=True,
     )
