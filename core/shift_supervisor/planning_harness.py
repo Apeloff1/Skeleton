@@ -31,6 +31,7 @@ def _task(
     *,
     priority: int,
     target_team: str,
+    dependencies: Sequence[str] = (),
 ) -> dict[str, Any]:
     return {
         "title": title,
@@ -41,7 +42,7 @@ def _task(
         "research_refs": ["harness:deterministic"],
         "expected_output": "validated repository change",
         "validation": ["tests pass", "canonical plan remains pull-only"],
-        "dependencies": [],
+        "dependencies": list(dependencies),
     }
 
 
@@ -94,6 +95,8 @@ def run_planning_harness(*, total_workers: int = 1000, cycles: int = 4) -> dict[
     sustained loop instead of relying on prompt compliance alone. The entire
     logical workforce enters through the same worker-snapshot path used by the
     scheduled supervisor rather than being pre-seeded directly into the store.
+    Invalid dependency proposals are repeated as well so both planning actors
+    must fail closed instead of poisoning the pull queue with stranded work.
     """
     if cycles < 1:
         raise ValueError("cycles must be positive")
@@ -110,7 +113,14 @@ def run_planning_harness(*, total_workers: int = 1000, cycles: int = 4) -> dict[
                     "Exercise the shared plan handoff without direct worker dispatch.",
                     priority=88,
                     target_team="idle",
-                )
+                ),
+                _task(
+                    "Secretary unresolved dependency probe",
+                    "This proposal must be rejected because its dependency cannot resolve.",
+                    priority=99,
+                    target_team="idle",
+                    dependencies=("missing-secretary-dependency",),
+                ),
             ],
         }
     )
@@ -135,6 +145,13 @@ def run_planning_harness(*, total_workers: int = 1000, cycles: int = 4) -> dict[
                     "Improve reliability coverage while foreground work is idle.",
                     priority=84,
                     target_team="idle",
+                ),
+                _task(
+                    "Manager unresolved dependency probe",
+                    "This proposal must be rejected before workers can see it.",
+                    priority=100,
+                    target_team="night",
+                    dependencies=("missing-manager-dependency",),
                 ),
             ],
         }
@@ -189,8 +206,18 @@ def run_planning_harness(*, total_workers: int = 1000, cycles: int = 4) -> dict[
     expected_unique_items = 4
     if len(produced_items) != expected_unique_items:
         raise AssertionError(
-            f"deduplication failure: expected {expected_unique_items} unique items, got {len(produced_items)}"
+            f"deduplication or dependency-guard failure: expected {expected_unique_items} "
+            f"unique items, got {len(produced_items)}"
         )
+
+    known_plan_ids = {item.id for item in produced_items}
+    unresolved_dependencies = {
+        item.id: [dependency_id for dependency_id in item.dependencies if dependency_id not in known_plan_ids]
+        for item in produced_items
+        if any(dependency_id not in known_plan_ids for dependency_id in item.dependencies)
+    }
+    if unresolved_dependencies:
+        raise AssertionError(f"unresolved dependencies entered canonical plan: {unresolved_dependencies}")
 
     expected_manager_calls = (cycles + 1) // 2
     if len(secretary_model.calls) != cycles:
@@ -234,6 +261,15 @@ def run_planning_harness(*, total_workers: int = 1000, cycles: int = 4) -> dict[
         raise AssertionError(
             f"revision ledger mismatch: expected {expected_revisions}, got {len(revisions)}"
         )
+    dependency_guard_actors = {
+        revision.actor
+        for revision in revisions
+        if "unresolved dependencies" in revision.summary
+    }
+    if dependency_guard_actors != {"secretary", "shift-manager"}:
+        raise AssertionError(
+            f"dependency rejection was not exercised for both planners: {sorted(dependency_guard_actors)}"
+        )
 
     return {
         "ok": True,
@@ -255,6 +291,8 @@ def run_planning_harness(*, total_workers: int = 1000, cycles: int = 4) -> dict[
             "full_snapshot_ingress": True,
             "producer_only": True,
             "deduplicated": True,
+            "dependency_integrity": True,
+            "dependency_rejections_logged": True,
             "raw_worker_snapshots_local_only": True,
             "bounded_manager_prompt": True,
             "team_pull_queue": True,
