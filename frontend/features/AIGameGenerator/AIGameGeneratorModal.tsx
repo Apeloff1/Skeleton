@@ -53,12 +53,34 @@ const CATEGORIES = [
   { key: 'testing', label: '🧪 Testing', icon: 'flask', desc: 'QA & Test Cases' },
 ];
 
+const readApiJson = async (response: any) => {
+  const data = await response.json().catch(() => null);
+
+  if (response.ok === false) {
+    const detail = data?.detail ?? data?.error ?? data?.message;
+    const message = typeof detail === 'string'
+      ? detail
+      : `Request failed (${response.status ?? 'unknown status'})`;
+    throw new Error(message);
+  }
+
+  if (!data) {
+    throw new Error('API returned an empty or invalid JSON response');
+  }
+
+  return data;
+};
+
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : 'Unknown generation error';
+
 export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   visible, onClose, colors, onGenerated
 }) => {
   const [activeCategory, setActiveCategory] = useState<CategoryType>('npc');
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<GenerationResult | null>(null);
+  const [resultCategory, setResultCategory] = useState<CategoryType | null>(null);
   
   // NPC State
   const [npcDescription, setNpcDescription] = useState('');
@@ -119,6 +141,16 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   const personaTypes = ['companion', 'mentor', 'antagonist', 'shopkeeper', 'guide', 'narrator'];
   const testTypes = ['functional', 'unit', 'integration', 'performance', 'regression'];
 
+  const recordFailure = (prefix: string, error: unknown) => {
+    const message = getErrorMessage(error);
+    setResult({
+      success: false,
+      data: { error: message },
+      ai_generated: false,
+    });
+    toast.error(`${prefix}: ${message}`);
+  };
+
   // =========================================================================
   // API CALLS
   // =========================================================================
@@ -131,6 +163,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
 
     setIsLoading(true);
     setResult(null);
+    setResultCategory('npc');
 
     try {
       const response = await apiFetch(`${API_URL}/api/npc-pipeline/ai/generate`, {
@@ -144,15 +177,15 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
       setResult({
         success: data.success,
         data: data.npc || data,
         ai_generated: data.ai_generated,
         model: data.model,
       });
-    } catch (error: any) {
-      toast.error(`Failed to generate NPC: ${error.message}`);
+    } catch (error: unknown) {
+      recordFailure('Failed to generate NPC', error);
     } finally {
       setIsLoading(false);
     }
@@ -161,6 +194,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   const generateWorld = useCallback(async () => {
     setIsLoading(true);
     setResult(null);
+    setResultCategory('world');
 
     try {
       const features = worldFeatures.split(',').map(f => f.trim());
@@ -174,15 +208,15 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
       setResult({
         success: data.success,
         data: data.world_region || data,
         ai_generated: data.ai_generated,
         model: data.model,
       });
-    } catch (error: any) {
-      toast.error(`Failed to generate world: ${error.message}`);
+    } catch (error: unknown) {
+      recordFailure('Failed to generate world', error);
     } finally {
       setIsLoading(false);
     }
@@ -191,6 +225,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   const generateCombat = useCallback(async () => {
     setIsLoading(true);
     setResult(null);
+    setResultCategory('combat');
 
     try {
       const mechanics = combatMechanics.split(',').map(m => m.trim());
@@ -204,15 +239,15 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
       setResult({
         success: data.success,
         data: data.combat_system || data,
         ai_generated: data.ai_generated,
         model: data.model,
       });
-    } catch (error: any) {
-      toast.error(`Failed to generate combat system: ${error.message}`);
+    } catch (error: unknown) {
+      recordFailure('Failed to generate combat system', error);
     } finally {
       setIsLoading(false);
     }
@@ -221,6 +256,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   const generateQuest = useCallback(async () => {
     setIsLoading(true);
     setResult(null);
+    setResultCategory('narrative');
 
     try {
       const response = await apiFetch(`${API_URL}/api/interactive-narrative/ai/quest/generate`, {
@@ -233,15 +269,15 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
       setResult({
         success: data.success,
         data: data.quest || data,
         ai_generated: data.ai_generated,
         model: data.model,
       });
-    } catch (error: any) {
-      toast.error(`Failed to generate quest: ${error.message}`);
+    } catch (error: unknown) {
+      recordFailure('Failed to generate quest', error);
     } finally {
       setIsLoading(false);
     }
@@ -250,6 +286,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   const generateVFX = useCallback(async () => {
     setIsLoading(true);
     setResult(null);
+    setResultCategory('vfx');
 
     try {
       const response = await apiFetch(`${API_URL}/api/animation-pipeline/ai/vfx/generate`, {
@@ -261,15 +298,15 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
       setResult({
         success: data.success,
         data: data.vfx_system || data,
         ai_generated: data.ai_generated,
         model: data.model,
       });
-    } catch (error: any) {
-      toast.error(`Failed to generate VFX: ${error.message}`);
+    } catch (error: unknown) {
+      recordFailure('Failed to generate VFX', error);
     } finally {
       setIsLoading(false);
     }
@@ -278,6 +315,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   const generateEconomy = useCallback(async () => {
     setIsLoading(true);
     setResult(null);
+    setResultCategory('economy');
 
     try {
       const response = await apiFetch(`${API_URL}/api/economy/ai/economy/design`, {
@@ -289,15 +327,15 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
       setResult({
         success: data.success,
         data: data.economy_design || data,
         ai_generated: data.ai_generated,
         model: data.model,
       });
-    } catch (error: any) {
-      toast.error(`Failed to generate economy: ${error.message}`);
+    } catch (error: unknown) {
+      recordFailure('Failed to generate economy', error);
     } finally {
       setIsLoading(false);
     }
@@ -306,6 +344,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   const generateSystems = useCallback(async () => {
     setIsLoading(true);
     setResult(null);
+    setResultCategory('systems');
 
     try {
       const response = await apiFetch(`${API_URL}/api/server-backend/ai/architecture/design`, {
@@ -317,15 +356,15 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
       setResult({
         success: data.success,
         data: data.server_architecture || data,
         ai_generated: data.ai_generated,
         model: data.model,
       });
-    } catch (error: any) {
-      toast.error(`Failed to generate system architecture: ${error.message}`);
+    } catch (error: unknown) {
+      recordFailure('Failed to generate system architecture', error);
     } finally {
       setIsLoading(false);
     }
@@ -334,6 +373,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   const generateAnimation = useCallback(async () => {
     setIsLoading(true);
     setResult(null);
+    setResultCategory('animation');
 
     try {
       const response = await apiFetch(`${API_URL}/api/animation-pipeline/ai/animation/generate`, {
@@ -346,15 +386,15 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
       setResult({
         success: data.success,
         data: data.animation || data,
         ai_generated: data.ai_generated,
         model: data.model,
       });
-    } catch (error: any) {
-      toast.error(`Failed to generate animation: ${error.message}`);
+    } catch (error: unknown) {
+      recordFailure('Failed to generate animation', error);
     } finally {
       setIsLoading(false);
     }
@@ -363,6 +403,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   const generateBotPersona = useCallback(async () => {
     setIsLoading(true);
     setResult(null);
+    setResultCategory('bot');
 
     try {
       const traits = personalityTraits.split(',').map(t => t.trim());
@@ -378,15 +419,15 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
       setResult({
         success: data.success,
         data: data.bot_persona || data,
         ai_generated: data.ai_generated,
         model: data.model,
       });
-    } catch (error: any) {
-      toast.error(`Failed to generate bot persona: ${error.message}`);
+    } catch (error: unknown) {
+      recordFailure('Failed to generate bot persona', error);
     } finally {
       setIsLoading(false);
     }
@@ -400,6 +441,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
 
     setIsLoading(true);
     setResult(null);
+    setResultCategory('testing');
 
     try {
       const response = await apiFetch(`${API_URL}/api/testing-qa/ai/test-cases/generate`, {
@@ -411,15 +453,15 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
       setResult({
         success: data.success,
         data: data.test_cases || data,
         ai_generated: data.ai_generated,
         model: data.model,
       });
-    } catch (error: any) {
-      toast.error(`Failed to generate test cases: ${error.message}`);
+    } catch (error: unknown) {
+      recordFailure('Failed to generate test cases', error);
     } finally {
       setIsLoading(false);
     }
@@ -489,8 +531,10 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
       {CATEGORIES.map((cat) => (
         <TouchableOpacity
           key={cat.key}
+          disabled={isLoading}
           style={[
             styles.categoryTab,
+            isLoading && styles.categoryTabDisabled,
             activeCategory === cat.key && { 
               backgroundColor: colors.primary + '20',
               borderBottomColor: colors.primary,
@@ -500,6 +544,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
           onPress={() => {
             setActiveCategory(cat.key as CategoryType);
             setResult(null);
+            setResultCategory(null);
           }}
         >
           <Ionicons 
@@ -871,12 +916,14 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
     }
 
     const modelLabel = result.model?.trim() || 'AI';
+    const generatedCategory = resultCategory ?? activeCategory;
+    const generatedCategoryLabel = CATEGORIES.find(category => category.key === generatedCategory)?.label ?? generatedCategory;
 
     return (
       <View style={[styles.resultContainer, { backgroundColor: colors.codeBackground, borderColor: colors.border }]}>
         <View style={styles.resultHeader}>
           <Text style={[styles.resultTitle, { color: colors.text }]}>
-            {result.success ? '✅ Generated Result' : '⚠️ Generation Result'}
+            {result.success ? '✅ Generated Result' : '⚠️ Generation Failed'}
           </Text>
           {result.ai_generated && (
             <View style={[styles.aiBadge, { backgroundColor: colors.primary }]}>
@@ -884,28 +931,46 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
             </View>
           )}
         </View>
+        <Text style={[styles.resultCategory, { color: colors.textSecondary }]}>
+          {generatedCategoryLabel}
+        </Text>
         <ScrollView style={styles.resultScroll} nestedScrollEnabled>
           <Text style={[styles.resultText, { color: colors.text }]}>
             {displayText}
           </Text>
         </ScrollView>
-        <TouchableOpacity
-          style={[styles.copyBtn, { backgroundColor: colors.success }]}
-          onPress={async () => {
-            try {
-              await Clipboard.setStringAsync(displayText);
-              if (onGenerated) {
-                onGenerated(result.data, activeCategory);
+        <View style={styles.resultActions}>
+          <TouchableOpacity
+            style={[styles.resultActionBtn, { backgroundColor: colors.success }]}
+            onPress={async () => {
+              try {
+                await Clipboard.setStringAsync(displayText);
+                toast.success('Result copied to clipboard');
+              } catch {
+                toast.error('Unable to copy result to clipboard');
               }
-              toast.success('Result copied to clipboard');
-            } catch {
-              toast.error('Unable to copy result to clipboard');
-            }
-          }}
-        >
-          <Ionicons name="copy" size={16} color="#FFF" />
-          <Text style={styles.copyBtnText}>Copy Result</Text>
-        </TouchableOpacity>
+            }}
+          >
+            <Ionicons name="copy" size={16} color="#FFF" />
+            <Text style={styles.resultActionText}>Copy Result</Text>
+          </TouchableOpacity>
+          {result.success && onGenerated && (
+            <TouchableOpacity
+              style={[styles.resultActionBtn, { backgroundColor: colors.primary }]}
+              onPress={() => {
+                try {
+                  onGenerated(result.data, generatedCategory);
+                  toast.success('Added result to game builder');
+                } catch {
+                  toast.error('Unable to add result to game builder');
+                }
+              }}
+            >
+              <Ionicons name="add-circle" size={16} color="#FFF" />
+              <Text style={styles.resultActionText}>Add to Game Builder</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     );
   };
@@ -992,6 +1057,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     gap: 6,
+  },
+  categoryTabDisabled: {
+    opacity: 0.55,
   },
   categoryLabel: { 
     fontSize: 13, 
@@ -1108,11 +1176,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 4,
   },
   resultTitle: { 
     fontSize: 16, 
     fontWeight: '700' 
+  },
+  resultCategory: {
+    fontSize: 12,
+    marginBottom: 12,
   },
   aiBadge: {
     paddingHorizontal: 10,
@@ -1132,16 +1204,23 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', 
     lineHeight: 18 
   },
-  copyBtn: {
+  resultActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  resultActionBtn: {
+    flex: 1,
+    minWidth: 140,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 12,
     borderRadius: 8,
     gap: 6,
-    marginTop: 12,
   },
-  copyBtnText: {
+  resultActionText: {
     color: '#FFF',
     fontSize: 14,
     fontWeight: '600',
