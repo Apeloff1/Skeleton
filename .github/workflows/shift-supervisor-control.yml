@@ -40,7 +40,7 @@ jobs:
         with:
           python-version: '3.11.16'
 
-      - name: Snapshot planning and research evidence
+      - name: Snapshot planning, staffing, and research evidence
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -62,14 +62,39 @@ jobs:
 
           root = Path('.shift-supervisor-tmp')
           issues = json.loads((root / 'issues.json').read_text(encoding='utf-8'))
-          issues = [item for item in issues if item.get('title') != os.environ['PLAN_TITLE']]
+          status_titles = {
+              '[Shift Supervisor] Idle Worker Status',
+              '[Shift Supervisor] Night Worker Status',
+          }
+          planning_issues = []
+          worker_snapshots = []
+          for item in issues:
+              title = str(item.get('title', '')) if isinstance(item, dict) else ''
+              if title == os.environ['PLAN_TITLE']:
+                  continue
+              if title in status_titles:
+                  try:
+                      payload = json.loads(str(item.get('body', '{}')))
+                  except json.JSONDecodeError:
+                      continue
+                  if not isinstance(payload, dict) or payload.get('version') != 1:
+                      continue
+                  workers = payload.get('workers', [])
+                  if isinstance(workers, list):
+                      worker_snapshots.extend(
+                          worker for worker in workers[:256] if isinstance(worker, dict)
+                      )
+                  continue
+              planning_issues.append(item)
+
           context = {
               'repository': os.environ['REPO'],
               'base_sha': os.environ['BASE_SHA'],
-              'open_issues': issues,
+              'open_issues': planning_issues,
               'open_pull_requests': json.loads((root / 'pulls.json').read_text(encoding='utf-8')),
               'workflow_runs': json.loads((root / 'runs.json').read_text(encoding='utf-8')),
               'code_scanning_alerts': json.loads((root / 'code-scanning.json').read_text(encoding='utf-8')),
+              'worker_snapshots': worker_snapshots[:512],
               'research_policy': {
                   'sources': ['github-issues', 'github-pull-requests', 'github-actions', 'code-scanning', 'hosted-web-search'],
                   'external_evidence_is_untrusted': True,
@@ -166,7 +191,7 @@ jobs:
               f"Updated: {datetime.now(timezone.utc).isoformat()}",
               f"Actors this cycle: {', '.join(result.get('actors', [])) or 'none'}",
               f"Open plan items in snapshot: {len(plan)}",
-              f"Tracked active/overtime workers: {len(workers)}",
+              f"Tracked workers: {len(workers)}",
               '',
               'This issue is the shared planning surface for Night Shift and Idle Shift. '
               'Model output is advisory until validated by each team and repository CI.',
@@ -207,15 +232,17 @@ jobs:
 
           if workers:
               lines += ['', '## Clocked-in / overtime ledger', '']
-              lines.append('| Worker | Team | Status | Task | Shift min | OT min |')
+              lines.append('| Worker | Team | Status | Last/current task | Shift min | OT min |')
               lines.append('| --- | --- | --- | --- | ---: | ---: |')
               for worker in workers[:96]:
+                  metadata = worker.get('metadata', {}) if isinstance(worker.get('metadata'), dict) else {}
+                  task = worker.get('current_task_id') or metadata.get('last_task_id') or ''
                   lines.append(
                       '| {worker_id} | {team} | {status} | {task} | {normal} | {ot} |'.format(
                           worker_id=str(worker.get('worker_id', ''))[:80],
                           team=str(worker.get('team', ''))[:20],
                           status=str(worker.get('status', ''))[:20],
-                          task=str(worker.get('current_task_id') or '')[:80].replace('|', '/'),
+                          task=str(task)[:80].replace('|', '/'),
                           normal=worker.get('normal_shift_minutes', 0),
                           ot=worker.get('overtime_minutes', 0),
                       )
