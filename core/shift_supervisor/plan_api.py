@@ -75,7 +75,12 @@ class PlanQueueAPI:
                 return None
             if worker.current_task_id:
                 return None
-            if worker.overtime_minutes >= max(0, self.overtime_soft_limit_minutes):
+            overtime_limit = max(0, int(self.overtime_soft_limit_minutes))
+            if (
+                worker.overtime_minutes > 0
+                if overtime_limit == 0
+                else worker.overtime_minutes >= overtime_limit
+            ):
                 return None
 
             active_owned = any(
@@ -114,15 +119,12 @@ class PlanQueueAPI:
 
     @staticmethod
     def _is_squad_item(item: PlanItem) -> bool:
-        raw = item.metadata.get("squad_size")
-        if raw is None:
+        if "squad_size" not in item.metadata:
             return False
-        try:
-            return int(raw) == SQUAD_SIZE
-        except (TypeError, ValueError):
-            # An explicit but malformed squad stamp must fail closed instead of
-            # falling through to a legacy worker with different ownership rules.
-            return True
+        # Any explicit squad stamp is reserved for the squad runtime. Only the
+        # canonical size is executable there; unsupported or malformed values
+        # remain queued instead of leaking into legacy single-worker ownership.
+        return True
 
     def complete(self, worker_id: str, item_id: str) -> dict[str, Any]:
         return PlanReadAPI._payload(
@@ -159,6 +161,11 @@ class SquadPlanQueueAPI:
 
     def safe_capacity(self, team: str) -> int:
         self.recover_invalid_leases()
+        # Capacity is used by the planner before new claims are attempted. Make
+        # lease expiry visible here too, otherwise valid-but-expired leases can
+        # strand four workers and make the planner incorrectly report zero
+        # capacity until some later claim or explicit reclamation happens.
+        self.coordinator.reclaim_expired()
         return self.coordinator.safe_capacity(team)
 
     def claim_next(
