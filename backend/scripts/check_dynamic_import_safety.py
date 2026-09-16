@@ -7,7 +7,9 @@ import execution paths.
 A small number of legacy internal loaders are temporarily retained behind exact,
 time-bounded exceptions. Exceptions bind the repository path, enclosing function,
 import primitive, and name expression; widening or moving a loader therefore fails
-closed. Expired exceptions fail exactly like any other dynamic import.
+closed. Each exception authorizes at most one matching call, so duplicating an
+otherwise identical dynamic import also fails closed. Expired exceptions fail exactly
+like any other dynamic import.
 """
 from __future__ import annotations
 
@@ -49,7 +51,8 @@ class DynamicImportException:
 
 # These are migration debt, not permanent policy exemptions. Each entry is exact
 # enough that adding another dynamic import to the same file/function with a
-# different expression or primitive still fails the gate.
+# different expression or primitive still fails the gate, and one entry can
+# authorize only one matching call.
 APPROVED_DYNAMIC_IMPORT_EXCEPTIONS: dict[str, tuple[DynamicImportException, ...]] = {
     "backend/core/routes_registry.py": (
         DynamicImportException(
@@ -313,6 +316,7 @@ def _approved_exception(
     primitive: str,
     name: ast.AST | None,
     parents: dict[ast.AST, ast.AST],
+    used_exception_indexes: set[int],
 ) -> bool:
     if name is None:
         return False
@@ -323,14 +327,19 @@ def _approved_exception(
     function = _enclosing_function(node, parents)
     expression = ast.unparse(name)
     today = date.today()
-    return any(
-        spec.function == function
-        and spec.primitive == primitive
-        and spec.name_expression == expression
-        and spec.expires_on >= today
-        and bool(spec.rationale.strip())
-        for spec in specs
-    )
+    for index, spec in enumerate(specs):
+        if index in used_exception_indexes:
+            continue
+        if (
+            spec.function == function
+            and spec.primitive == primitive
+            and spec.name_expression == expression
+            and spec.expires_on >= today
+            and bool(spec.rationale.strip())
+        ):
+            used_exception_indexes.add(index)
+            return True
+    return False
 
 
 def violations(path: Path) -> list[str]:
@@ -343,6 +352,7 @@ def violations(path: Path) -> list[str]:
     importlib_modules, builtins_modules, function_aliases = _import_aliases(tree)
     _propagate_aliases(tree, importlib_modules, builtins_modules, function_aliases)
     parents = _parent_map(tree)
+    used_exception_indexes: set[int] = set()
     findings: list[str] = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
@@ -358,7 +368,7 @@ def violations(path: Path) -> list[str]:
         name = _call_name_argument(node)
         if _literal_module_name(name):
             continue
-        if _approved_exception(path, node, primitive, name, parents):
+        if _approved_exception(path, node, primitive, name, parents, used_exception_indexes):
             continue
         findings.append(
             f"{label}:{node.lineno}: {primitive}() module name must be a non-empty literal string; "
