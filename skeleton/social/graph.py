@@ -74,16 +74,30 @@ class SocialGraph:
 
     def get_network(self, agent: str, depth: int = 1) -> Dict[str, Any]:
         """Get the social network around an agent up to a depth."""
+        network: Dict[str, List[str]] = {agent: self.get_neighbors(agent)}
         if depth <= 0:
-            return {agent: []}
-        
-        direct = self.get_neighbors(agent)
-        network = {agent: direct}
-        
-        for neighbor in direct:
-            if neighbor not in network:
-                network[neighbor] = self.get_neighbors(neighbor)
-        
+            return network
+
+        frontier = list(network[agent])
+        visited = {agent}
+
+        for _ in range(depth):
+            next_frontier: List[str] = []
+            for current in frontier:
+                if current in visited:
+                    continue
+                visited.add(current)
+
+                neighbors = self.get_neighbors(current)
+                network[current] = neighbors
+                for neighbor in neighbors:
+                    if neighbor not in visited:
+                        next_frontier.append(neighbor)
+
+            if not next_frontier:
+                break
+            frontier = next_frontier
+
         return network
 
     def stats(self) -> Dict[str, Any]:
@@ -177,9 +191,11 @@ class ReputationEngine:
 
 
 class InteractionLog:
-    """Immutable log of all agent interactions."""
+    """Bounded log of agent interactions with mutation-safe query snapshots."""
 
     def __init__(self, max_size: int = 100000):
+        if max_size <= 0:
+            raise ValueError("max_size must be greater than zero")
         self._interactions: List[Interaction] = []
         self._max_size = max_size
         self._by_type: Dict[str, List[Interaction]] = {}
@@ -197,20 +213,23 @@ class InteractionLog:
         self._by_agent.setdefault(interaction.to_agent, []).append(interaction)
         
         # Trim if too large
-        if len(self._interactions) > self._max_size:
-            removed = self._interactions[:self._max_size // 10]
-            self._interactions = self._interactions[self._max_size // 10:]
-            # Rebuild indices (simplified)
-            self._by_type.clear()
-            self._by_agent.clear()
-            for i in self._interactions:
-                self._by_type.setdefault(i.interaction_type, []).append(i)
-                self._by_agent.setdefault(i.from_agent, []).append(i)
-                self._by_agent.setdefault(i.to_agent, []).append(i)
+        overflow = len(self._interactions) - self._max_size
+        if overflow > 0:
+            self._interactions = self._interactions[overflow:]
+            self._rebuild_indices()
+
+    def _rebuild_indices(self) -> None:
+        """Rebuild secondary indices after bounded-log eviction."""
+        self._by_type.clear()
+        self._by_agent.clear()
+        for interaction in self._interactions:
+            self._by_type.setdefault(interaction.interaction_type, []).append(interaction)
+            self._by_agent.setdefault(interaction.from_agent, []).append(interaction)
+            self._by_agent.setdefault(interaction.to_agent, []).append(interaction)
 
     def query(self, agent: Optional[str] = None, interaction_type: Optional[str] = None, since: Optional[float] = None) -> List[Interaction]:
-        """Query interactions by agent, type, or time."""
-        results = self._interactions
+        """Query interactions by agent, type, or time and return a fresh list snapshot."""
+        results = list(self._interactions)
         
         if agent:
             results = [i for i in results if i.from_agent == agent or i.to_agent == agent]
@@ -218,7 +237,7 @@ class InteractionLog:
         if interaction_type:
             results = [i for i in results if i.interaction_type == interaction_type]
         
-        if since:
+        if since is not None:
             results = [i for i in results if i.timestamp >= since]
         
         return results

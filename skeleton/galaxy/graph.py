@@ -54,6 +54,7 @@ def edges_of(atoms: Iterable[Any], *, min_j: float = 0.12) -> List[Tuple[str, st
                 w = jaccard(lookup[a].tokens, lookup[b].tokens)
                 if w >= min_j:
                     out.append((pair[0], pair[1], round(w, 4)))
+    out.sort(key=lambda row: (row[0], row[1], -row[2]))
     return out
 
 
@@ -69,22 +70,24 @@ def reconstruct(mesh, cue: str, *, k: int = 0) -> Dict[str, Any]:
     q = token_set(cue)
     seeds = sorted(
         ((jaccard(q, a.tokens), a) for a in atoms),
-        key=lambda p: p[0],
-        reverse=True,
+        key=lambda p: (-p[0], p[1].id),
     )
     seeds = [a for s, a in seeds if s > 0][: max(2, k // 2)]
-    seed_ids = {a.id for a in seeds}
+    seed_order = [a.id for a in seeds]
+    seed_ids = set(seed_order)
     ed = edges_of(atoms)
     nbrs: Dict[str, List[Tuple[str, float]]] = defaultdict(list)
     for a, b, w in ed:
         nbrs[a].append((b, w))
         nbrs[b].append((a, w))
-    forest_ids: Set[str] = set(seed_ids)
+    forest_ids: Set[str] = set(seed_order)
+    forest_order = list(seed_order)
     forest_e: List[Tuple[str, str, float]] = []
-    for sid in list(seed_ids):
-        for nid, w in sorted(nbrs.get(sid, []), key=lambda p: -p[1])[:3]:
+    for sid in seed_order:
+        for nid, w in sorted(nbrs.get(sid, []), key=lambda p: (-p[1], p[0]))[:3]:
             if nid not in forest_ids and len(forest_ids) < k:
                 forest_ids.add(nid)
+                forest_order.append(nid)
                 forest_e.append((sid, nid, w))
     lookup = {a.id: a for a in atoms}
     nodes = [
@@ -96,7 +99,7 @@ def reconstruct(mesh, cue: str, *, k: int = 0) -> Dict[str, Any]:
             "citation": getattr(lookup[aid], "citation", ""),
             "seed": int(aid in seed_ids),
         }
-        for aid in forest_ids
+        for aid in forest_order
         if aid in lookup
     ]
     return {
