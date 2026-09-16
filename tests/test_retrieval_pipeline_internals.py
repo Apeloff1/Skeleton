@@ -1,10 +1,11 @@
-from threading import Barrier
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier, Event
 
 import pytest
 
 from skeleton.retrieval.fusion import ScoredResult
 from skeleton.retrieval.pipeline import SearchPipeline
-from skeleton.retrieval.query import QueryPlanner
+from skeleton.retrieval.query import QueryPlanner, RetrievalError
 from skeleton.retrieval.reranker import FeatureReranker
 
 
@@ -115,6 +116,73 @@ def test_replaced_retriever_invalidates_prefetched_results() -> None:
     assert old_calls == ["alpha"]
     assert new_calls == ["alpha"]
     assert [item.fragment_id for item in outcome.results] == ["new"]
+
+
+def test_execute_retries_when_selected_retriever_is_replaced_midflight() -> None:
+    old_started = Event()
+    release_old = Event()
+    old_calls = []
+    new_calls = []
+
+    def old_retriever(query: str):
+        old_calls.append(query)
+        old_started.set()
+        assert release_old.wait(timeout=2.0)
+        return [_result("old", "stale result")]
+
+    def new_retriever(query: str):
+        new_calls.append(query)
+        return [_result("new", "fresh result")]
+
+    planner = QueryPlanner()
+    planner.register("quad", old_retriever)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(planner.execute, "alpha")
+        assert old_started.wait(timeout=2.0)
+        planner.register("quad", new_retriever)
+        release_old.set()
+        results = future.result(timeout=2.0)
+
+    assert old_calls == ["alpha"]
+    assert new_calls == ["alpha"]
+    assert [item.fragment_id for item in results] == ["new"]
+
+
+def test_execute_fails_closed_when_selected_retriever_keeps_changing() -> None:
+    old_started = Event()
+    release_old = Event()
+    middle_started = Event()
+    release_middle = Event()
+
+    def old_retriever(query: str):
+        old_started.set()
+        assert release_old.wait(timeout=2.0)
+        return [_result("old", query)]
+
+    def middle_retriever(query: str):
+        middle_started.set()
+        assert release_middle.wait(timeout=2.0)
+        return [_result("middle", query)]
+
+    def newest_retriever(query: str):
+        return [_result("newest", query)]
+
+    planner = QueryPlanner()
+    planner.register("quad", old_retriever)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(planner.execute, "alpha")
+        assert old_started.wait(timeout=2.0)
+        planner.register("quad", middle_retriever)
+        release_old.set()
+
+        assert middle_started.wait(timeout=2.0)
+        planner.register("quad", newest_retriever)
+        release_middle.set()
+
+        with pytest.raises(RetrievalError, match="changed repeatedly"):
+            future.result(timeout=2.0)
 
 
 def test_prefetched_result_mapping_shape_is_read_only() -> None:
