@@ -235,5 +235,54 @@ class SquadPlanQueueAPI:
             )
         )
 
+    def revoke(
+        self,
+        squad_id: str,
+        task_id: str,
+        *,
+        reason: str = "",
+        requeue: bool = True,
+    ) -> dict[str, Any]:
+        """Immediately revoke one squad lease and return its worker capacity.
+
+        Revocation is a control-plane mutation, so it does not rely on the
+        worker-side finish path. The lease is archived before ownership is
+        removed, all four members are released atomically, and a requeued task
+        can receive a fresh lease generation instead of remaining poisoned by a
+        stale ``lease_revoked`` flag.
+        """
+        coordinator = self.coordinator
+        store = coordinator.store
+        moment = datetime.now(timezone.utc)
+        with store._lock:  # noqa: SLF001
+            item = coordinator._require_owned_item_locked(squad_id, task_id)  # noqa: SLF001
+            lease = coordinator._lease_from_item(item)  # noqa: SLF001
+            history = coordinator._lease_history(item)  # noqa: SLF001
+            record: dict[str, Any] = {
+                **lease.to_dict(),
+                "finished_at": moment.isoformat(),
+                "outcome": "lease_revoked",
+            }
+            bounded_reason = str(reason).strip()[:2_000]
+            if bounded_reason:
+                record["reason"] = bounded_reason
+            history.append(record)
+
+            meta = dict(item.metadata)
+            meta["squad_lease_history"] = history[-16:]
+            meta["lease_revocation_count"] = coordinator._nonnegative_int(  # noqa: SLF001
+                meta.get("lease_revocation_count")
+            ) + 1
+            meta["last_squad_outcome"] = "lease_revoked"
+            meta.pop("squad_lease", None)
+            meta.pop("lease_revoked", None)
+            item.metadata = meta
+            item.owner = None
+            item.status = "queued" if requeue else "rejected"
+            item.updated_at = moment
+            store._items[item.id] = replace(item)  # noqa: SLF001
+            coordinator._release_members_locked(lease, moment)  # noqa: SLF001
+            return PlanReadAPI._payload(replace(item))
+
     def reclaim_expired(self) -> list[str]:
         return self.coordinator.reclaim_expired()
