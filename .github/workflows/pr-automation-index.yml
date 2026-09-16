@@ -22,7 +22,7 @@ on:
       - Dependency Review
       - Dependency Security
       - CodeQL
-    types: [completed]
+    types: [requested, in_progress, completed]
   schedule:
     - cron: "17,47 * * * *"
   workflow_dispatch:
