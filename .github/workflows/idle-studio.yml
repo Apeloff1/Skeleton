@@ -126,6 +126,7 @@ jobs:
             --output .idle-studio-tmp/shift-supervisor.json
 
           python - <<'PY'
+          import hashlib
           import json
           from pathlib import Path
 
@@ -135,13 +136,52 @@ jobs:
           state = json.loads(state_path.read_text(encoding='utf-8'))
           supervisor = json.loads(supervisor_path.read_text(encoding='utf-8'))
           state['shift_supervisor'] = supervisor
+
+          synthetic = []
+          for item in supervisor.get('plan_items', [])[:20]:
+              if item.get('target_team') != 'idle' or item.get('status') in {'done', 'rejected'}:
+                  continue
+              title = str(item.get('title', '')).strip()
+              description = str(item.get('description', '')).strip()
+              if not title or not description:
+                  continue
+              stable = hashlib.sha256(
+                  f"{title}\0{description}\0idle".encode('utf-8')
+              ).hexdigest()
+              number = -(int(stable[:12], 16) + 1)
+              priority = item.get('priority', 50)
+              evidence = {
+                  'source': 'shift-supervisor',
+                  'priority': priority,
+                  'description': description,
+                  'rationale': item.get('rationale', ''),
+                  'expected_output': item.get('expected_output', ''),
+                  'validation': item.get('validation', []),
+                  'dependencies': item.get('dependencies', []),
+                  'research_refs': item.get('research_refs', []),
+              }
+              text = f"{title} {description}".lower()
+              labels = [{'name': 'shift-supervisor'}]
+              if any(token in text for token in ('security', 'vulnerability', 'cve', 'secret', 'auth')):
+                  labels.append({'name': 'security'})
+              synthetic.append(
+                  {
+                      'number': number,
+                      'title': f"[Supervisor P{priority}] {title}"[:300],
+                      'body': json.dumps(evidence, sort_keys=True, default=str)[:12000],
+                      'labels': labels,
+                  }
+              )
+
+          state.setdefault('issues', []).extend(synthetic)
           state_path.write_text(json.dumps(state, sort_keys=True, indent=2), encoding='utf-8')
 
           lines = ['## Shift supervisor', '']
           lines.append(f"Actors: {', '.join(supervisor.get('actors', [])) or 'none'}")
           lines.append('')
           plan = supervisor.get('plan_items', [])
-          lines.append(f"Plan items supplied to Idle Studio: {len(plan)}")
+          lines.append(f"Plan items generated: {len(plan)}")
+          lines.append(f"Idle work items promoted into studio intake: {len(synthetic)}")
           for item in plan[:20]:
               title = str(item.get('title', '')).strip() or '(untitled)'
               team = str(item.get('target_team', 'unknown'))
