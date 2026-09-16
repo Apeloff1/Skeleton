@@ -1,5 +1,4 @@
 import json
-import os
 from unittest.mock import patch
 
 from core.shift_supervisor.model_gateway import ModelGateway, ModelRequestError
@@ -15,12 +14,13 @@ class FakeHTTPResponse:
     def __exit__(self, exc_type, exc, tb):
         return False
 
-    def read(self):
+    def read(self, *_args):
         return json.dumps(self.payload).encode("utf-8")
 
 
-def test_gateway_reads_credentials_at_call_time(monkeypatch):
+def test_gateway_reads_credentials_at_call_time_and_uses_responses_api(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("SHIFT_MODEL_API_URL", raising=False)
     gateway = ModelGateway(max_attempts=1)
     monkeypatch.setenv("OPENAI_API_KEY", "runtime-key")
     monkeypatch.setenv("SHIFT_MODEL_NAME", "test-model")
@@ -28,9 +28,21 @@ def test_gateway_reads_credentials_at_call_time(monkeypatch):
     captured = {}
 
     def fake_urlopen(request, timeout):
+        captured["url"] = request.full_url
         captured["authorization"] = request.headers.get("Authorization")
         captured["body"] = json.loads(request.data.decode("utf-8"))
-        return FakeHTTPResponse({"choices": [{"message": {"content": '{"ok": true}'}}]})
+        return FakeHTTPResponse(
+            {
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [
+                            {"type": "output_text", "text": '{"ok": true}'}
+                        ],
+                    }
+                ]
+            }
+        )
 
     with patch("urllib.request.urlopen", fake_urlopen):
         result = gateway.call_json(
@@ -40,8 +52,35 @@ def test_gateway_reads_credentials_at_call_time(monkeypatch):
         )
 
     assert result == {"ok": True}
+    assert captured["url"] == "https://api.openai.com/v1/responses"
     assert captured["authorization"] == "Bearer runtime-key"
     assert captured["body"]["model"] == "test-model"
+    assert captured["body"]["input"][0]["role"] == "system"
+    assert captured["body"]["max_output_tokens"] == 8000
+
+
+def test_gateway_keeps_chat_completions_compatibility(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "runtime-key")
+    monkeypatch.setenv("SHIFT_MODEL_API_URL", "https://provider.example/v1/chat/completions")
+    gateway = ModelGateway(max_attempts=1)
+    captured = {}
+
+    def fake_urlopen(request, timeout):
+        captured["body"] = json.loads(request.data.decode("utf-8"))
+        return FakeHTTPResponse(
+            {"choices": [{"message": {"content": '{"mode": "chat"}'}}]}
+        )
+
+    with patch("urllib.request.urlopen", fake_urlopen):
+        result = gateway.call_json(
+            system_prompt="system",
+            user_prompt="user",
+            correlation_id="corr-chat",
+        )
+
+    assert result == {"mode": "chat"}
+    assert "messages" in captured["body"]
+    assert captured["body"]["response_format"] == {"type": "json_object"}
 
 
 def test_gateway_fails_when_api_key_missing(monkeypatch):
