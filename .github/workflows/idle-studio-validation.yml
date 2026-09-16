@@ -26,6 +26,7 @@ on:
       - 'skeleton/testing/test_studio_registry.py'
       - 'skeleton/testing/test_studio_report.py'
       - 'tests/test_shift_supervisor_consumer_plan.py'
+      - 'tests/test_shift_supervisor_epistemic_gate.py'
       - 'tests/test_shift_supervisor_planning_council.py'
       - 'tests/test_shift_supervisor_scheduler.py'
       - 'tests/test_shift_supervisor_workforce_report.py'
@@ -84,7 +85,7 @@ jobs:
           skeleton.testing.test_idle_studio_v2
           skeleton.testing.test_idle_studio_publisher
 
-      - name: Run supervisor consumer, council, reconciliation, and workforce contracts
+      - name: Run supervisor consumer, epistemic, council, reconciliation, and workforce contracts
         env:
           OPENAI_API_KEY: ''
           GH_TOKEN: ''
@@ -92,6 +93,7 @@ jobs:
         run: >-
           python -m pytest -q
           tests/test_shift_supervisor_consumer_plan.py
+          tests/test_shift_supervisor_epistemic_gate.py
           tests/test_shift_supervisor_planning_council.py
           tests/test_shift_supervisor_scheduler.py
           tests/test_shift_supervisor_workforce_report.py
