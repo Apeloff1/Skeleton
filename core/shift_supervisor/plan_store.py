@@ -70,13 +70,12 @@ class InMemoryPlanStore:
         *,
         overtime_soft_limit_minutes: int = 120,
     ) -> PlanItem | None:
-        """Atomically claim the highest-priority eligible plan item.
+        """Atomically claim the highest-priority eligible legacy plan item.
 
-        This is the only dispatch primitive workers need. The supervisor and
-        secretary never push orders to workers; workers pull from this shared
-        plan. A worker can hold at most one active item, and team/dependency/
-        overtime rules are enforced under one lock so concurrent bots cannot
-        double-claim work or overload the same worker.
+        Explicitly squad-stamped work is reserved for the four-agent squad
+        runtime even when the stamp is malformed or unsupported. This keeps the
+        lowest-level claim primitive aligned with :class:`PlanQueueAPI` so a
+        direct store caller cannot bypass canonical squad ownership.
         """
         with self._lock:
             worker = self._workers.get(worker_id)
@@ -86,7 +85,15 @@ class InMemoryPlanStore:
                 return None
             if worker.current_task_id:
                 return None
-            if worker.overtime_minutes >= max(0, overtime_soft_limit_minutes):
+            now = datetime.now(timezone.utc)
+            if self._worker_reserved_by_active_squad(worker_id, now=now):
+                return None
+            overtime_limit = max(0, int(overtime_soft_limit_minutes))
+            if (
+                worker.overtime_minutes > 0
+                if overtime_limit == 0
+                else worker.overtime_minutes >= overtime_limit
+            ):
                 return None
 
             active_owned = any(
@@ -102,6 +109,7 @@ class InMemoryPlanStore:
                 if item.target_team == worker.team
                 and item.status == "queued"
                 and item.owner is None
+                and "squad_size" not in item.metadata
                 and self._dependencies_satisfied(item)
             ]
             if not eligible:
@@ -109,7 +117,6 @@ class InMemoryPlanStore:
 
             eligible.sort(key=lambda item: (-item.priority, item.created_at, item.id))
             item = eligible[0]
-            now = datetime.now(timezone.utc)
             item.owner = worker_id
             item.status = "assigned"
             item.updated_at = now
@@ -249,6 +256,31 @@ class InMemoryPlanStore:
             if dependency is None or dependency.status != "done":
                 return False
         return True
+
+    def _worker_reserved_by_active_squad(self, worker_id: str, *, now: datetime) -> bool:
+        worker = self._workers.get(worker_id)
+        current_squad = (
+            str(worker.metadata.get("current_squad_id", "")) if worker is not None else ""
+        )
+        for item in self._items.values():
+            if item.status not in {"assigned", "working", "blocked"}:
+                continue
+            owner = str(item.owner or "")
+            if not owner.startswith("squad-"):
+                continue
+            raw = item.metadata.get("squad_lease")
+            if isinstance(raw, Mapping):
+                expires_at = self._decode_dt(raw.get("expires_at"))
+                if expires_at is not None and expires_at <= now:
+                    continue
+                members = raw.get("members")
+                if isinstance(members, Mapping) and worker_id in {
+                    str(value) for value in members.values()
+                }:
+                    return True
+            if current_squad == owner:
+                return True
+        return False
 
     @classmethod
     def _item_payload(cls, item: PlanItem) -> dict[str, Any]:

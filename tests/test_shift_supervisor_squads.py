@@ -298,6 +298,65 @@ def test_revoked_lease_cannot_renew_or_finish() -> None:
         )
 
 
+def test_api_revoke_immediately_releases_capacity_and_allows_fresh_lease() -> None:
+    store = InMemoryPlanStore()
+    _seed_workers(store, 4)
+    store.add_items([_task("task-a", 100, "gameplay")])
+    api = SquadPlanQueueAPI(store)
+    lease = api.claim_next("night", plan_generation="rev-1")
+    assert lease is not None
+
+    revoked = api.revoke(
+        lease["squad_id"],
+        lease["task_id"],
+        reason="control-plane conflict detected",
+    )
+    assert revoked["status"] == "queued"
+    assert revoked["owner"] is None
+    assert revoked["metadata"]["lease_revocation_count"] == 1
+    history = revoked["metadata"]["squad_lease_history"][-1]
+    assert history["outcome"] == "lease_revoked"
+    assert history["reason"] == "control-plane conflict detected"
+    assert all(worker.status == "idle" for worker in store.snapshot_workers())
+    assert all(worker.current_task_id is None for worker in store.snapshot_workers())
+
+    replacement = api.claim_next("night", plan_generation="rev-1")
+    assert replacement is not None
+    assert replacement["task_id"] == "task-a"
+    assert replacement["lease_generation"] == lease["lease_generation"] + 1
+
+
+def test_malformed_durable_lease_is_recovered_without_stranding_workers() -> None:
+    store = InMemoryPlanStore()
+    _seed_workers(store, 4)
+    store.add_items([_task("task-a", 100, "gameplay")])
+    api = SquadPlanQueueAPI(store)
+    lease = api.claim_next("night", plan_generation="rev-1")
+    assert lease is not None
+
+    item = store.snapshot_items()[0]
+    corrupted = dict(item.metadata["squad_lease"])
+    corrupted["expires_at"] = "not-a-timestamp"
+    item.metadata["squad_lease"] = corrupted
+    store.update_item(item)
+
+    assert api.recover_invalid_leases() == ["task-a"]
+    recovered = store.snapshot_items()[0]
+    assert recovered.status == "queued"
+    assert recovered.owner is None
+    assert recovered.metadata["invalid_lease_recovery_count"] == 1
+    history = recovered.metadata["squad_lease_history"][-1]
+    assert history["outcome"] == "invalid_lease_recovered"
+    assert "malformed squad lease" in history["error"]
+    assert all(worker.status == "idle" for worker in store.snapshot_workers())
+    assert all(worker.current_task_id is None for worker in store.snapshot_workers())
+
+    replacement = api.claim_next("night", plan_generation="rev-1")
+    assert replacement is not None
+    assert replacement["task_id"] == "task-a"
+    assert replacement["lease_generation"] == lease["lease_generation"] + 1
+
+
 def test_worker_role_preferences_are_used_without_worker_reuse() -> None:
     store = InMemoryPlanStore()
     for role in SQUAD_ROLES:
