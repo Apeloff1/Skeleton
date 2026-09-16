@@ -191,7 +191,7 @@ class ReputationEngine:
 
 
 class InteractionLog:
-    """Immutable log of all agent interactions."""
+    """Bounded log of agent interactions with mutation-safe query snapshots."""
 
     def __init__(self, max_size: int = 100000):
         if max_size <= 0:
@@ -228,8 +228,8 @@ class InteractionLog:
             self._by_agent.setdefault(interaction.to_agent, []).append(interaction)
 
     def query(self, agent: Optional[str] = None, interaction_type: Optional[str] = None, since: Optional[float] = None) -> List[Interaction]:
-        """Query interactions by agent, type, or time."""
-        results = self._interactions
+        """Query interactions by agent, type, or time and return a fresh list snapshot."""
+        results = list(self._interactions)
         
         if agent:
             results = [i for i in results if i.from_agent == agent or i.to_agent == agent]
