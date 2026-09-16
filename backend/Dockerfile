@@ -77,7 +77,8 @@ EXPOSE 8001
 HEALTHCHECK --interval=30s --timeout=15s --start-period=60s --retries=5 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/health', timeout=10).read()" || exit 1
 
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001"]
+# security_app wraps server.app with the outer fail-closed header boundary.
+CMD ["uvicorn", "security_app:app", "--host", "0.0.0.0", "--port", "8001"]
 
 # Stage 3: Development
 FROM production AS development
@@ -92,4 +93,4 @@ RUN python -m ensurepip --upgrade \
     && python -m pip install --no-cache-dir "pytest>=8,<9" pytest-cov "ruff==0.9.*"
 USER appuser
 
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
+CMD ["uvicorn", "security_app:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
