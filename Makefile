@@ -26,6 +26,7 @@ repo-intel:
 
 repo-intel-check:
 	python scripts/repo_intel_frontier.py gate --base "$${REPO_INTEL_BASE:-origin/main}"
+	python scripts/check_repo_intel_contribution_gate.py --base "$${REPO_INTEL_BASE:-origin/main}"
 	python scripts/repo_intel_contributions.py check
 	python scripts/repo_intel_frontier.py snapshot --base "$${REPO_INTEL_BASE:-origin/main}" --out .cache/repo-intel
 	python scripts/repo_intel_contributions.py snapshot --out .cache/repo-intel
