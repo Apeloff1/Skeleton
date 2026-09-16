@@ -6,6 +6,7 @@ from typing import Any
 
 from .model_gateway import ModelGateway
 from .models import PlanItem, PlanRevision, utcnow
+from .plan_graph import require_acyclic_new_items
 from .plan_store import InMemoryPlanStore
 from .prompts import compose_role_prompt
 from .squads import SQUAD_ROLES, SQUAD_SIZE
@@ -20,7 +21,7 @@ class SecretaryBot:
 
     SYSTEM_PROMPT = compose_role_prompt(
         "secretary",
-        """Return JSON only with keys summary and tasks. Each proposed task must contain task_key, title, description, priority (1-100), target_team (night|idle), task_type, rationale, research_refs, expected_output, acceptance_criteria, validation, dependencies, conflict_domain, relevant_paths, security_considerations, and performance_considerations. Add only concrete useful workload omitted by the supplied open work. Dependencies must reference another task_key in this response or an exact existing canonical task id. Do not assign individual workers or emit worker IDs. Every accepted task will use one four-agent squad: researcher, lead, reviewer, verifier. Prefer missing tests, integration, validation, research, documentation, reliability, security, performance evidence, and unblockers. Treat model output as a proposal, never authority.""",
+        """Return JSON only with keys summary and tasks. Each proposed task must contain task_key, title, description, priority (1-100), target_team (night|idle), task_type, rationale, research_refs, expected_output, acceptance_criteria, validation, dependencies, conflict_domain, relevant_paths, security_considerations, and performance_considerations. Add only concrete useful workload omitted by the supplied open work. Dependencies must reference another task_key in this response or an exact existing canonical task id and must form an acyclic graph. Do not assign individual workers or emit worker IDs. Every accepted task will use one four-agent squad: researcher, lead, reviewer, verifier. Prefer missing tests, integration, validation, research, documentation, reliability, security, performance evidence, and unblockers. Treat model output as a proposal, never authority.""",
     )
 
     def __init__(self, *, store: InMemoryPlanStore, model: ModelGateway) -> None:
@@ -104,7 +105,7 @@ class SecretaryBot:
             )
             if item is not None:
                 result.append(item)
-        return result
+        return require_acyclic_new_items(result)
 
     @staticmethod
     def _parse_task(
