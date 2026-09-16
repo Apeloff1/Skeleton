@@ -61,6 +61,13 @@ def test_supervised_night_smoke_preserves_canonical_plan_id(tmp_path, monkeypatc
         ),
         json.dumps(
             {
+                "findings": ["docs/smoke.txt contains the old fixture value"],
+                "risks": ["fixture must remain plain text"],
+                "recommended_checks": ["git apply --check", "credential-free smoke"],
+            }
+        ),
+        json.dumps(
+            {
                 "patch": (
                     "diff --git a/docs/smoke.txt b/docs/smoke.txt\n"
                     "--- a/docs/smoke.txt\n"
@@ -74,6 +81,13 @@ def test_supervised_night_smoke_preserves_canonical_plan_id(tmp_path, monkeypatc
             }
         ),
         json.dumps({"approve": True, "reasons": ["bounded canonical task"]}),
+        json.dumps(
+            {
+                "approve": True,
+                "reasons": ["canonical task has deterministic validation"],
+                "required_checks": ["credential-free autonomous studio smoke"],
+            }
+        ),
     ]
 
     class FakeReasoner:
@@ -108,6 +122,14 @@ def test_supervised_night_smoke_preserves_canonical_plan_id(tmp_path, monkeypatc
     accepted = next(row for row in rows if row["event"] == "patch_accepted")
     assert accepted["task"] == "night-plan-1"
     assert accepted["task_title"] == "Canonical smoke change"
+    workers = {
+        accepted["researcher"],
+        accepted["builder"],
+        accepted["reviewer"],
+        accepted["verifier"],
+    }
+    assert len(workers) == 4
+    assert accepted["required_checks"] == ["credential-free autonomous studio smoke"]
     assert subprocess.run(
         ["git", "status", "--porcelain"],
         cwd=tmp_path,
