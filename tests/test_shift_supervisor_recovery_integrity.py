@@ -1,5 +1,5 @@
 from core.shift_supervisor.models import PlanItem, WorkerState
-from core.shift_supervisor.plan_api import SquadPlanQueueAPI
+from core.shift_supervisor.plan_api import PlanQueueAPI, SquadPlanQueueAPI
 from core.shift_supervisor.plan_store import InMemoryPlanStore
 
 
@@ -104,3 +104,39 @@ def test_active_lease_members_stay_reserved_when_worker_row_loses_assignment() -
     assert by_id["task-a"].status == "assigned"
     assert by_id["task-b"].status == "queued"
     assert by_id["task-b"].owner is None
+
+
+def test_legacy_queue_cannot_claim_worker_reserved_by_active_squad_lease() -> None:
+    store = InMemoryPlanStore()
+    for index in range(4):
+        store.upsert_worker(_worker(f"night-{index}"))
+    store.add_items([_squad_task("task-a")])
+
+    squad_api = SquadPlanQueueAPI(store)
+    lease = squad_api.claim_next("night", plan_generation="rev-1")
+    assert lease is not None
+
+    damaged_worker_id = next(iter(lease["members"].values()))
+    damaged_worker = next(
+        worker
+        for worker in store.snapshot_workers()
+        if worker.worker_id == damaged_worker_id
+    )
+    damaged_worker.current_task_id = None
+    damaged_worker.status = "idle"
+    damaged_worker.metadata = {}
+    store.upsert_worker(damaged_worker)
+
+    legacy = PlanItem(
+        id="legacy-task",
+        title="legacy-task",
+        description="single-worker fallback work",
+        priority=50,
+        target_team="night",
+    )
+    store.add_items([legacy])
+
+    assert PlanQueueAPI(store).claim_next(damaged_worker_id) is None
+    legacy_after = next(item for item in store.snapshot_items() if item.id == "legacy-task")
+    assert legacy_after.status == "queued"
+    assert legacy_after.owner is None
