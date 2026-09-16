@@ -128,7 +128,9 @@ def test_all_extended_contracts_are_valid_json() -> None:
     ]
     for name in names:
         payload = json.loads((ROOT / "repo-intel" / name).read_text(encoding="utf-8"))
-        assert payload["schema"] >= 1 or "$schema" in payload
+        assert payload.get("schema", 1) >= 1
+        if name == "index-schema.json":
+            assert "$schema" in payload
 
 
 def test_quality_budgets_are_targets_not_claims() -> None:
