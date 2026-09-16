@@ -1,4 +1,4 @@
-.PHONY: install dev test smoke verify quality ci lint clean repo-intel repo-intel-check repo-intel-impact repo-intel-doctor
+.PHONY: install dev test smoke verify quality ci lint clean repo-intel repo-intel-check repo-intel-impact repo-intel-doctor repo-intel-bench
 
 install:
 	pip install -r requirements.txt
@@ -31,6 +31,9 @@ repo-intel-impact:
 
 repo-intel-doctor:
 	python scripts/repo_intel_sota.py doctor --out .cache/repo-intel
+
+repo-intel-bench:
+	python scripts/benchmark_repo_intel.py --base "$${REPO_INTEL_BASE:-origin/main}" --out .cache/repo-intel-benchmark
 
 ci:
 	python scripts/repo_intel_sota.py check
