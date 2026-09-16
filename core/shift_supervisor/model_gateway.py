@@ -8,7 +8,7 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from skeleton.automation.activation_security import enforce_bot_activation_security
+from core.activation_security import enforce_bot_activation_security
 
 
 class ModelRequestError(RuntimeError):
