@@ -36,6 +36,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Install Debian security updates that are newer than the immutable base-image
+# snapshot, then discard apt metadata. Keep the scanner fail-closed for any
+# HIGH/CRITICAL findings that still have no vendor fix.
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip uninstall -y msgpack setuptools
+
 RUN groupadd --gid 10001 appuser \
     && useradd --create-home --uid 10001 --gid 10001 --shell /usr/sbin/nologin appuser
 
