@@ -1,8 +1,8 @@
 """Bounded, fail-closed cleanup for explicitly superseded pull requests.
 
 The controller never infers supersedence from titles, changed files, or timing alone.
-A newer trusted same-repository PR must explicitly say that it supersedes an older
-PR before that older PR can be retired.
+A newer trusted same-repository PR must explicitly declare that it supersedes an
+older PR before that older PR can be retired.
 """
 
 from __future__ import annotations
@@ -23,7 +23,9 @@ DEFAULT_MAX_MUTATIONS = 100
 ABSOLUTE_MAX_MUTATIONS = 250
 PRESERVE_LABELS = frozenset({"churn/preserve", "keep-open", "do-not-close"})
 _RETRYABLE = frozenset({0, 429, 500, 502, 503, 504})
-_SUPERSEDES_RE = re.compile(r"\bsupersedes\b", re.IGNORECASE)
+_SUPERSEDES_DIRECTIVE_RE = re.compile(
+    r"^\s*(?:(?:[-*+]\s+)|(?:#{1,6}\s+))?supersedes\b", re.IGNORECASE
+)
 _PR_REF_RE = re.compile(r"#([1-9][0-9]*)\b")
 
 
@@ -178,10 +180,12 @@ def _strip_untrusted_markdown_regions(body: str) -> Iterable[str]:
 
 
 def superseded_numbers(body: object) -> tuple[int, ...]:
-    """Extract explicit same-line ``supersedes ... #N`` directives.
+    """Extract explicit ``Supersedes ... #N`` directive lines.
 
-    Multiple references in the same sentence are supported, e.g.
-    ``Supersedes #10 and #11``. Fenced code and blockquotes are ignored.
+    The directive must begin the prose line (optionally after a Markdown list or
+    heading marker). This deliberately rejects incidental or negated prose such
+    as ``does not supersede #10``. Multiple references in the same directive are
+    supported. Fenced code and blockquotes are ignored.
     """
     if not isinstance(body, str) or not body.strip():
         return ()
@@ -189,16 +193,16 @@ def superseded_numbers(body: object) -> tuple[int, ...]:
     found: list[int] = []
     seen: set[int] = set()
     for line in _strip_untrusted_markdown_regions(body):
-        for match in _SUPERSEDES_RE.finditer(line):
-            # Only examine the immediate clause after "supersedes". This avoids
-            # unrelated references later in a long paragraph.
-            tail = line[match.end() : match.end() + 180]
-            clause = re.split(r"[.!?;]", tail, maxsplit=1)[0]
-            for ref in _PR_REF_RE.finditer(clause):
-                number = int(ref.group(1))
-                if number not in seen:
-                    seen.add(number)
-                    found.append(number)
+        match = _SUPERSEDES_DIRECTIVE_RE.match(line)
+        if match is None:
+            continue
+        tail = line[match.end() : match.end() + 180]
+        clause = re.split(r"[.!?;]", tail, maxsplit=1)[0]
+        for ref in _PR_REF_RE.finditer(clause):
+            number = int(ref.group(1))
+            if number not in seen:
+                seen.add(number)
+                found.append(number)
     return tuple(found)
 
 
@@ -490,7 +494,7 @@ def main() -> int:
             )
             handle.write(
                 "- Policy: only newer, owner-authored, same-repository PRs that "
-                "explicitly say `Supersedes #…` may retire older open PRs. "
+                "use an explicit `Supersedes #…` directive may retire older open PRs. "
                 "Draft/validation sources, foreign heads, foreign authors, and "
                 "preserve-labeled targets are never retired.\n"
             )
