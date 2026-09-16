@@ -150,6 +150,9 @@ class Atom:
     def from_dict(cls, data: Dict[str, Any]) -> "Atom":
         tags = tuple(data.get("tags") or ())
         links = tuple(data.get("links") or ())
+        confidence = data.get("confidence")
+        risk = data.get("risk")
+        timestamp = data.get("ts")
         atom = cls(
             id=str(data.get("id") or atom_id("restore")),
             kind=str(data.get("kind") or "capture"),
@@ -163,11 +166,11 @@ class Atom:
             parent=str(data.get("parent") or ""),
             links=links,
             tags=tags,
-            confidence=float(data.get("confidence") or 0.7),
-            risk=float(data.get("risk") or 0.0),
+            confidence=0.7 if confidence is None else float(confidence),
+            risk=0.0 if risk is None else float(risk),
             stored_prose=0,
             superseded_by=str(data.get("superseded_by") or ""),
-            ts=float(data.get("ts") or time.time()),
+            ts=time.time() if timestamp is None else float(timestamp),
         )
         return atom
 
