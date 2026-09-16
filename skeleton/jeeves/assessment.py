@@ -149,6 +149,18 @@ class AssessmentEngine:
         self._skills[skill_id] = skill
         return skill
 
+    def mastery(self, skill_id: str) -> Optional[float]:
+        """Return current stored mastery for a skill, or ``None`` if unknown.
+
+        This is intentionally a read-only public lookup so curriculum and
+        higher-level learning services do not need to reach into ``_skills``.
+        It preserves the engine's existing semantics: decay is applied when
+        new evidence is observed, not merely because a caller reads state.
+        """
+        skill_id = _skill_id(skill_id)
+        skill = self._skills.get(skill_id)
+        return None if skill is None else skill.mastery
+
     def observe(self, evidence: InteractionEvidence) -> SkillModel:
         if not isinstance(evidence, InteractionEvidence):
             raise AssessmentError("evidence must be InteractionEvidence")
@@ -214,7 +226,6 @@ class AdaptiveTest:
         return weakest[0].skill_id if weakest else None
 
     def should_remediate(self, skill_id: str, threshold: float = 0.4) -> bool:
-        skill_id = _skill_id(skill_id)
         threshold = _unit_interval("threshold", threshold)
-        skill = self.engine._skills.get(skill_id)
-        return skill is not None and skill.mastery < threshold
+        mastery = self.engine.mastery(skill_id)
+        return mastery is not None and mastery < threshold
