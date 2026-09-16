@@ -23,7 +23,7 @@ env:
 
 jobs:
   map-and-gate:
-    name: Map semantic / supply-chain / runtime / tests / impact / security / handoff graph
+    name: Map semantic / supply-chain / runtime / tests / artifacts / impact / security / handoff graph
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -56,6 +56,7 @@ jobs:
             scripts/repo_intel_supply_chain.py \
             scripts/repo_intel_deep.py \
             scripts/repo_intel_test_evidence.py \
+            scripts/repo_intel_artifacts.py \
             scripts/repo_index.py \
             scripts/repo_intel_frontier.py \
             scripts/benchmark_repo_intel.py
@@ -68,6 +69,7 @@ jobs:
           tests/test_repo_intel_sota.py
           tests/test_repo_intel_deep.py
           tests/test_repo_intel_test_evidence.py
+          tests/test_repo_intel_artifacts.py
           tests/test_repo_intel_frontier.py
           tests/test_repo_index.py
 
@@ -138,6 +140,7 @@ jobs:
           hotspots = json.loads((root / 'hotspots.json').read_text())
           batches = json.loads((root / 'batch-status.json').read_text())
           tests = json.loads((root / 'test-evidence.json').read_text())
+          artifacts = json.loads((root / 'artifact-lineage.json').read_text())
           arch = json.loads((root / 'architecture.json').read_text())
           m = index['metrics']
           print('source_digest=', index['source_digest'])
@@ -157,6 +160,10 @@ jobs:
           print('batch_lane_counts=', batches['lane_counts'])
           print('test_evidence_links=', tests['evidence_link_count'])
           print('source_test_evidence_ratio=', tests['source_evidence_ratio'])
+          print('artifact_nodes=', artifacts['artifact_node_count'])
+          print('artifact_lineage_edges=', artifacts['lineage_edge_count'])
+          print('artifact_unresolved_inputs=', artifacts['unresolved_count'])
+          print('affected_artifacts=', len(impact.get('affected_artifacts', [])))
           print('ranked_candidate_tests=', len(impact.get('ranked_candidate_tests', [])))
           print('architecture_boundaries=', arch['counts_by_severity'])
           print('owned_file_ratio=', m['owned_file_ratio'])
