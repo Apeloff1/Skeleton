@@ -60,6 +60,7 @@ jobs:
           control_plane_paths = frozenset({
               '.github/workflows/branch-clean.yml',
               '.github/workflows/branch-flow.yml',
+              '.github/workflows/branch-repair-100.yml',
               '.github/workflows/merge-readiness.yml',
               '.github/workflows/pr-obsolete-run-drain.yml',
               '.github/workflows/queue-drain.yml',
@@ -321,10 +322,11 @@ jobs:
                   )
                   handle.write(
                       '- Safety: `branch-clean.yml`, `branch-flow.yml`, '
-                      '`merge-readiness.yml`, `pr-obsolete-run-drain.yml`, and '
-                      '`queue-drain.yml` are never cancellation targets; current '
-                      'main, PR work, and the newest path-filtered validation '
-                      'without a live-head replacement are preserved.\n\n'
+                      '`branch-repair-100.yml`, `merge-readiness.yml`, '
+                      '`pr-obsolete-run-drain.yml`, and `queue-drain.yml` are '
+                      'never cancellation targets; current main, PR work, and '
+                      'the newest path-filtered validation without a live-head '
+                      'replacement are preserved.\n\n'
                   )
                   handle.write('### Passes\n')
                   for line in pass_lines:
