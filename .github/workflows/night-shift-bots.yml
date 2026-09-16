@@ -30,4 +30,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: python -m skeleton.automation.night_shift --repo "$GITHUB_REPOSITORY"
+        run: python skeleton/automation/night_shift.py --repo "$GITHUB_REPOSITORY"
