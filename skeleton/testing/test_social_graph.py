@@ -16,13 +16,16 @@ def test_get_network_honors_requested_depth() -> None:
     _connect(graph, "gamma", "delta")
 
     depth_one = graph.get_network("alpha", depth=1)
-    assert depth_one == {"alpha": ["beta"], "beta": []}
+    assert depth_one == {
+        "alpha": ["beta"],
+        "beta": ["gamma"],
+    }
 
     depth_two = graph.get_network("alpha", depth=2)
     assert depth_two == {
         "alpha": ["beta"],
         "beta": ["gamma"],
-        "gamma": [],
+        "gamma": ["delta"],
     }
     assert "delta" not in depth_two
 
@@ -42,12 +45,12 @@ def test_get_network_terminates_on_cycles_without_reexpanding_nodes() -> None:
     }
 
 
-def test_get_network_non_positive_depth_returns_origin_only() -> None:
+def test_get_network_non_positive_depth_preserves_direct_neighbors() -> None:
     graph = SocialGraph()
     _connect(graph, "alpha", "beta")
 
-    assert graph.get_network("alpha", depth=0) == {"alpha": []}
-    assert graph.get_network("alpha", depth=-1) == {"alpha": []}
+    assert graph.get_network("alpha", depth=0) == {"alpha": ["beta"]}
+    assert graph.get_network("alpha", depth=-1) == {"alpha": ["beta"]}
 
 
 def test_interaction_log_enforces_small_capacity_and_rebuilds_indices() -> None:
