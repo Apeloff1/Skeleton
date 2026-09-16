@@ -4,20 +4,21 @@ Usage:
     python -m skeleton <command> [options]
 
 Commands:
-    run         Start the skeleton runtime / GameForge vision run
-    forge       Blueprint compilation and materialization
-    test        Run test suites
-    dev         Developer CLI (scaffold, wizard, health, visualize)
-    eras        List GameForge era dialects
-    generations List hardware generations
-    plan        Jeeves BuildPlan for a vision / era
-    cockpit     Apply one cockpit command
-    walk        Prove spawn→extract on the emitted door graph
-    contracts   Show the shared API/CLI feature-parity contract
-    command     Execute a shared command: command <name> ['{...json...}']
-    status      Shared runtime status command
-    config      Shared non-secret configuration command
-    help        Show this help message
+    run          Start the skeleton runtime / GameForge vision run
+    forge        Blueprint compilation and materialization
+    test         Run test suites
+    dev          Developer CLI (scaffold, wizard, health, visualize)
+    eras         List GameForge era dialects
+    generations  List hardware generations
+    plan         Jeeves BuildPlan for a vision / era
+    cockpit      Apply one cockpit command
+    walk         Prove spawn→extract on the emitted door graph
+    contracts    Show the shared API/CLI feature-parity contract
+    capabilities Show the stable machine-readable capability manifest
+    command      Execute a shared command: command <name> ['{...json...}']
+    status       Shared runtime status command
+    config       Shared non-secret configuration command
+    help         Show this help message
 """
 
 from __future__ import annotations
@@ -31,6 +32,13 @@ def _cmd_contracts(_rest: List[str]) -> int:
     from skeleton.application import parity_matrix
 
     print(json.dumps(parity_matrix(), indent=2, default=str))
+    return 0
+
+
+def _cmd_capabilities(_rest: List[str]) -> int:
+    from skeleton.application import capability_manifest
+
+    print(json.dumps(capability_manifest(), indent=2, default=str))
     return 0
 
 
@@ -255,6 +263,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "cockpit": return _cmd_cockpit(rest)
     if cmd == "walk": return _cmd_walk(rest)
     if cmd == "contracts": return _cmd_contracts(rest)
+    if cmd == "capabilities": return _cmd_capabilities(rest)
     if cmd == "command": return _cmd_shared_command(rest)
     if cmd == "status": return _cmd_shared_command(["status"])
     if cmd == "config": return _cmd_shared_command(["configuration"])
