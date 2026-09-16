@@ -134,6 +134,50 @@ jobs:
             echo 'proceed=true' >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Refresh shared shift-supervisor plan
+        if: steps.pressure.outputs.proceed == 'true'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SHIFT_MODEL_NAME: ${{ vars.OPENAI_MODEL || 'gpt-5.6' }}
+          SHIFT_PROJECT_CONTEXT_FILE: .studio-tmp/repo-state.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+            echo '::error::OPENAI_API_KEY repository secret is required for shift supervision.'
+            exit 1
+          fi
+
+          python -m core.shift_supervisor \
+            --once \
+            --role both \
+            --output .studio-tmp/shift-supervisor.json
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('.studio-tmp')
+          state_path = root / 'repo-state.json'
+          supervisor_path = root / 'shift-supervisor.json'
+          state = json.loads(state_path.read_text(encoding='utf-8'))
+          supervisor = json.loads(supervisor_path.read_text(encoding='utf-8'))
+          state['shift_supervisor'] = supervisor
+          state_path.write_text(json.dumps(state, sort_keys=True, indent=2), encoding='utf-8')
+
+          lines = ['## Shift supervisor', '']
+          lines.append(f"Actors: {', '.join(supervisor.get('actors', [])) or 'none'}")
+          lines.append('')
+          plan = supervisor.get('plan_items', [])
+          lines.append(f"Plan items supplied to Night Studio: {len(plan)}")
+          for item in plan[:20]:
+              title = str(item.get('title', '')).strip() or '(untitled)'
+              team = str(item.get('target_team', 'unknown'))
+              priority = item.get('priority', '?')
+              lines.append(f"- P{priority} [{team}] {title}")
+          (root / 'shift-supervisor-summary.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          PY
+
       - name: Generate bounded model proposals
         if: steps.pressure.outputs.proceed == 'true'
         id: proposal
@@ -225,6 +269,10 @@ jobs:
           {
             echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo
+            if [[ -s .studio-tmp/shift-supervisor-summary.md ]]; then
+              cat .studio-tmp/shift-supervisor-summary.md
+              echo
+            fi
             cat "$RUNNER_TEMP/studio-report.md"
           } > "$RUNNER_TEMP/ledger-comment.md"
           gh issue comment "$number" --repo "$REPO" --body-file "$RUNNER_TEMP/ledger-comment.md" >/dev/null
@@ -265,6 +313,10 @@ jobs:
           {
             echo '## Autonomous Studio publication'
             echo
+            if [[ -s .studio-tmp/shift-supervisor-summary.md ]]; then
+              cat .studio-tmp/shift-supervisor-summary.md
+              echo
+            fi
             echo "PR: ${pr_url}"
             echo '- Direct main writes: disabled'
             echo '- Auto-merge: disabled'
@@ -280,5 +332,9 @@ jobs:
           {
             echo '## Autonomous Studio'
             echo
+            if [[ -s .studio-tmp/shift-supervisor-summary.md ]]; then
+              cat .studio-tmp/shift-supervisor-summary.md
+              echo
+            fi
             cat "$RUNNER_TEMP/studio-report.md"
           } >> "$GITHUB_STEP_SUMMARY"
