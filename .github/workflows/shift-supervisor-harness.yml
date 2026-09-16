@@ -6,12 +6,16 @@ on:
     paths:
       - 'core/shift_supervisor/**'
       - 'tests/test_shift_supervisor_planning_harness.py'
+      - 'tests/test_shift_supervisor_peak_loop.py'
+      - 'tests/test_shift_supervisor_scheduler.py'
       - '.github/workflows/shift-supervisor-harness.yml'
   push:
     branches: [main]
     paths:
       - 'core/shift_supervisor/**'
       - 'tests/test_shift_supervisor_planning_harness.py'
+      - 'tests/test_shift_supervisor_peak_loop.py'
+      - 'tests/test_shift_supervisor_scheduler.py'
       - '.github/workflows/shift-supervisor-harness.yml'
 
 concurrency:
@@ -37,10 +41,14 @@ jobs:
         run: python -m pip install 'pytest>=8,<9'
       - name: Compile supervisor package
         run: python -m compileall -q core/shift_supervisor
-      - name: Run planning harness regressions
+      - name: Run supervisor planning regressions
         env:
           PYTHONPATH: '.'
-        run: python -m pytest -q tests/test_shift_supervisor_planning_harness.py
+        run: |
+          python -m pytest -q \
+            tests/test_shift_supervisor_planning_harness.py \
+            tests/test_shift_supervisor_peak_loop.py \
+            tests/test_shift_supervisor_scheduler.py
       - name: Run 1,000-worker credential-free stress contract
         env:
           PYTHONPATH: '.'
