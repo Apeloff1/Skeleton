@@ -30,12 +30,15 @@ COPY . .
 RUN yarn export:web
 
 # Stage 4: Production (Nginx)
-FROM nginx:alpine@sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5ffd29f1d3 AS production
+# Use the minimal official nginx runtime to reduce the production package/CVE
+# surface. Keep the multi-platform index immutable for reproducible rebuilds.
+FROM nginx:1.31-alpine-slim@sha256:17d54e4e48ae6b564266ffd4a688b1bced79e57e59a7f08929e0059672ed3501 AS production
 
-# The official image starts as root so it can bind privileged ports and prepare
-# runtime directories. Prepare the writable nginx paths at build time, then
-# permanently drop privileges for the production process.
-RUN chown -R nginx:nginx /var/cache/nginx /var/run /etc/nginx/conf.d /usr/share/nginx/html
+# The official image starts as root so it can prepare runtime directories.
+# Grant the nginx user access to the real /run directory used for nginx.pid,
+# then permanently drop privileges for the production process.
+RUN chown nginx:nginx /run \
+    && chown -R nginx:nginx /var/cache/nginx /etc/nginx/conf.d /usr/share/nginx/html
 COPY --chown=nginx:nginx nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder --chown=nginx:nginx /app/dist /usr/share/nginx/html
 

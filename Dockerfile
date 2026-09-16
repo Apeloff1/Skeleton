@@ -1,4 +1,4 @@
-ARG PYTHON_IMAGE=python:3.14-slim@sha256:cad9a2c871761c413caa6fdd6441c783451e740a48aaeba60ae62a8b53525ef6
+ARG PYTHON_IMAGE=python:3.14-slim@sha256:83ff1d245a3d57d04152252d3ef9cb361494d0b3395abd65a5ebe91c401c8e83
 FROM ${PYTHON_IMAGE}
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -14,7 +14,11 @@ RUN groupadd --gid 10001 appuser \
 COPY --chown=appuser:appuser pyproject.toml README.md ./
 COPY --chown=appuser:appuser skeleton ./skeleton
 
-RUN pip install --no-cache-dir .
+# setuptools is required only to build this project, not to serve it. msgpack
+# is also not a declared runtime dependency. Remove vulnerable copies that are
+# inherited from the base image after the application has been installed.
+RUN pip install --no-cache-dir . \
+    && pip uninstall -y msgpack setuptools
 
 USER appuser
 

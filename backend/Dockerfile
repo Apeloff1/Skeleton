@@ -12,7 +12,7 @@ FROM ghcr.io/astral-sh/uv:0.12.4@sha256:d0a6eca6c669dc7e9c51218707b8438a3d304027
 # Official Python multi-platform index pinned for reproducible rebuilds.
 # Refresh this digest deliberately alongside dependency/security review.
 # Stage 1: Builder with uv
-FROM python:3.14-slim@sha256:cad9a2c871761c413caa6fdd6441c783451e740a48aaeba60ae62a8b53525ef6 AS builder
+FROM python:3.14-slim@sha256:83ff1d245a3d57d04152252d3ef9cb361494d0b3395abd65a5ebe91c401c8e83 AS builder
 
 WORKDIR /app
 
@@ -28,13 +28,23 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN uv pip install -r requirements.txt
 
 # Stage 2: Production
-FROM python:3.14-slim@sha256:cad9a2c871761c413caa6fdd6441c783451e740a48aaeba60ae62a8b53525ef6 AS production
+FROM python:3.14-slim@sha256:83ff1d245a3d57d04152252d3ef9cb361494d0b3395abd65a5ebe91c401c8e83 AS production
 
+# Explicitly identify the application host as production so exec_guard can
+# never be re-enabled by ALLOW_UNSAFE_CODE_EXECUTION inside this image. CORS
+# also fails closed unless deployment supplies an explicit origin allowlist.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    ENVIRONMENT=production \
+    CORS_ORIGINS=https://cors.invalid
 
 WORKDIR /app
+
+# msgpack and setuptools are inherited tooling rather than backend runtime
+# dependencies. Remove those base-image copies before the application runs;
+# the production dependency graph itself lives in /opt/venv.
+RUN python -m pip uninstall -y msgpack setuptools
 
 RUN groupadd --gid 10001 appuser \
     && useradd --create-home --uid 10001 --gid 10001 --shell /usr/sbin/nologin appuser
@@ -58,6 +68,11 @@ CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001"]
 
 # Stage 3: Development
 FROM production AS development
+
+# Preserve the historical local-development convenience while keeping the
+# production image fail-closed and permanently disabling host execution there.
+ENV ENVIRONMENT=development \
+    CORS_ORIGINS=*
 
 USER root
 RUN pip install --no-cache-dir "pytest>=8,<9" pytest-cov "ruff==0.9.*"

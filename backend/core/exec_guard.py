@@ -2,7 +2,8 @@
 
 User-supplied code is never allowed to execute on a detected production
 application host. Local/trusted development still requires an explicit opt-in,
-but production cannot be re-enabled through environment configuration alone.
+but deployed environments cannot be re-enabled through environment
+configuration alone.
 
 Production code execution belongs in a separately isolated sandbox/worker with
 an OS/container security boundary, not inside the API process that holds service
@@ -14,6 +15,7 @@ from __future__ import annotations
 import os
 
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
+_DEPLOYED_ENVIRONMENTS = frozenset({"prod", "production", "staging"})
 _PRODUCTION_MARKERS = (
     "K_SERVICE",  # Cloud Run
     "KUBERNETES_SERVICE_HOST",  # Kubernetes
@@ -31,7 +33,7 @@ def production_runtime_detected() -> bool:
     if _truthy("EMERGENT_DEPLOY"):
         return True
     environment = os.environ.get("ENVIRONMENT", "").strip().lower()
-    if environment in {"prod", "production"}:
+    if environment in _DEPLOYED_ENVIRONMENTS:
         return True
     return any(bool(os.environ.get(marker)) for marker in _PRODUCTION_MARKERS)
 
@@ -39,7 +41,7 @@ def production_runtime_detected() -> bool:
 def code_execution_enabled() -> bool:
     """Return whether user-controlled host execution is explicitly permitted.
 
-    Host execution is fail-closed in every detected production runtime. No
+    Host execution is fail-closed in every detected deployed runtime. No
     environment override can turn it back on inside the application process.
     Trusted local development must still opt in with
     ``ALLOW_UNSAFE_CODE_EXECUTION=true``.
