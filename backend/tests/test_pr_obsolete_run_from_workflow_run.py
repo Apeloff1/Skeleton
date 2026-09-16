@@ -95,7 +95,7 @@ def test_branch_history_fallback_requires_immutable_signal_sha() -> None:
         }
     )
 
-    with pytest.raises(RuntimeError, match="branch_sha_matches=\[\]"):
+    with pytest.raises(RuntimeError, match=r"branch_sha_matches=\[\]"):
         resolve_pr_number(
             api,
             repo="Apeloff1/Skeleton",
@@ -104,6 +104,37 @@ def test_branch_history_fallback_requires_immutable_signal_sha() -> None:
             head_ref="feature/cleanup",
             default_branch="main",
         )
+
+
+def test_branch_history_ambiguity_fails_closed() -> None:
+    commit_path = "/repos/Apeloff1/Skeleton/commits/shared-head/pulls"
+    history_path = (
+        "/repos/Apeloff1/Skeleton/pulls?state=all&head="
+        "Apeloff1%3Afeature%2Fcleanup&base=main&sort=updated&direction=desc&per_page=100"
+    )
+    api = ScriptedApi(
+        {
+            commit_path: (200, []),
+            history_path: (
+                200,
+                [
+                    _pr(868, sha="shared-head"),
+                    _pr(869, sha="shared-head"),
+                ],
+            ),
+        }
+    )
+
+    with pytest.raises(RuntimeError, match=r"branch_sha_matches=\[868, 869\]"):
+        resolve_pr_number(
+            api,
+            repo="Apeloff1/Skeleton",
+            hinted_number=0,
+            head_sha="shared-head",
+            head_ref="feature/cleanup",
+            default_branch="main",
+        )
+    assert api.paths == [commit_path, history_path]
 
 
 def test_commit_association_ambiguity_fails_without_history_fallback() -> None:
