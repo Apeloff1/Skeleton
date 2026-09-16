@@ -22,11 +22,17 @@ from skeleton.developer.commands import DevCommandRegistry
 Wizard = ProjectWizard
 CommandRegistry = DevCommandRegistry
 
+# ``CommandRegistry`` is the historical package-level spelling. The concrete
+# implementation is ``DevCommandRegistry``; alias it here so importing
+# ``skeleton.developer`` stays compatible without duplicating registry logic.
+CommandRegistry = DevCommandRegistry
+
 __all__ = [
     "ScaffoldEngine",
     "list_templates",
     "ProjectWizard",
     "Wizard",
     "SubsystemExplorer",
+    "DevCommandRegistry",
     "CommandRegistry",
 ]
