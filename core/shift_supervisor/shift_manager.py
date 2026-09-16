@@ -8,6 +8,7 @@ from typing import Any
 from .model_gateway import ModelGateway
 from .models import PlanItem, PlanRevision, WorkerState, utcnow
 from .plan_store import InMemoryPlanStore
+from .planning_council import PlanningCouncil
 
 
 class SMBShiftManager:
@@ -26,11 +27,13 @@ class SMBShiftManager:
         *,
         store: InMemoryPlanStore,
         model: ModelGateway,
+        council: PlanningCouncil | None = None,
         normal_shift_minutes: int = 480,
         overtime_soft_limit_minutes: int = 120,
     ) -> None:
         self.store = store
         self.model = model
+        self.council = council
         self.normal_shift_minutes = normal_shift_minutes
         self.overtime_soft_limit_minutes = overtime_soft_limit_minutes
 
@@ -116,8 +119,20 @@ class SMBShiftManager:
             correlation_id=correlation_id,
             max_output_tokens=12000,
         )
-        proposals = response.get("tasks", [])
-        parsed = [self._parse_task(task, correlation_id) for task in proposals if isinstance(task, dict)]
+        raw_proposals = response.get("tasks", [])
+        proposals = (
+            [dict(task) for task in raw_proposals if isinstance(task, dict)]
+            if isinstance(raw_proposals, list)
+            else []
+        )
+        if self.council is not None:
+            proposals = self.council.review_tasks(
+                proposals,
+                context=prompt_payload,
+                correlation_id=correlation_id,
+                actor="shift-manager",
+            )
+        parsed = [self._parse_task(task, correlation_id) for task in proposals]
         added = self.store.add_items(item for item in parsed if item is not None)
         revision = PlanRevision(
             revision_id=f"rev-{uuid.uuid4()}",
@@ -227,6 +242,10 @@ class SMBShiftManager:
             priority = max(1, min(100, int(task.get("priority", 50))))
         except (TypeError, ValueError):
             priority = 50
+        metadata: dict[str, Any] = {"correlation_id": correlation_id}
+        council = task.get("_planning_council")
+        if isinstance(council, dict):
+            metadata["planning_council"] = dict(council)
         return PlanItem(
             id=f"mgr-{uuid.uuid4()}",
             title=title,
@@ -239,5 +258,5 @@ class SMBShiftManager:
             research_refs=[str(x) for x in task.get("research_refs", []) if x],
             expected_output=str(task.get("expected_output", "")),
             validation=[str(x) for x in task.get("validation", []) if x],
-            metadata={"correlation_id": correlation_id},
+            metadata=metadata,
         )
