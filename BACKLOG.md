@@ -1,6 +1,6 @@
 # Skeleton Backlog — failed-commit register + forward work
 
-Updated 2026-09-15 (F-6/F-13 reconciliation). Original register dated 2026-09-01. Two sections: things that failed and were recovered
+Updated 2026-09-16 (F-11 root-sprawl partial cleanup). Original register dated 2026-09-01. Two sections: things that failed and were recovered
 (so the failure modes stay visible), and the frontier backlog (what to
 build next, ordered).
 
@@ -31,7 +31,7 @@ Those planes are out-of-scope for this register — audit separately.
 
 ## 2. Frontier backlog — ordered by leverage
 
-Updated 2026-09-15. Tier-1 seams F-1..F-10, the Tier-2 F-6 frontier push,
+Updated 2026-09-16. Tier-1 seams F-1..F-10, the Tier-2 F-6 frontier push,
 and F-13 economic/cascade reconciliation are **landed**; do not re-open them
 without a regression.
 
@@ -80,8 +80,13 @@ remains Mixture-of-*Experts* and is a separate mechanism.
 
 ### Tier 3 — structural (next work, schedule carefully)
 
-1. **F-11. Track E cleanup** — root sprawl moves, SEVEN_BY physical moves,
-   godot binary to LFS, shim deletion. Local git ops.
+1. **F-11. Track E cleanup — IN PROGRESS.**
+   - [x] Relocate standalone root planning/delivery records into `docs/`:
+     `BUILD_PLAN.md`, `CONSOLIDATION.md`, and `DELIVERY.md`.
+   - [ ] Complete remaining root-sprawl cleanup after reference audit.
+   - [ ] Complete `SEVEN_BY_*` physical moves/archival.
+   - [ ] Move the Godot binary to LFS without losing the tracked engine artifact.
+   - [ ] Delete compatibility shims only after import/caller verification.
 2. **F-12. H5.4 cortex persistence** — genesis twin vs live singleton once
    `$SKELETON_OWN` exists in the container.
 3. **F-14. Speculative RAG** — pre-fetch likely-needed documents during
