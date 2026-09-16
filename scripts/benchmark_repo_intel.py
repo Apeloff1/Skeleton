@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark cold/warm canonical repository-intelligence refreshes."""
+"""Benchmark cold/warm frontier repository-intelligence refreshes."""
 from __future__ import annotations
 
 import argparse
@@ -14,7 +14,7 @@ SCRIPTS = Path(__file__).resolve().parent
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
-import repo_index  # noqa: E402
+import repo_intel_frontier as repo_index  # noqa: E402
 
 ROOT = repo_index.ROOT
 
@@ -51,13 +51,19 @@ def main() -> int:
     warm_metrics = [snapshot["metrics"] for snapshot in warm_snapshots]
     budgets = repo_index.base.load_json("quality-budgets.json")["index_performance_targets"]
     report = {
-        "schema": 2,
+        "schema": 3,
+        "index_schema": cold_snapshot.get("schema"),
         "source_digest": cold_snapshot["source_digest"],
         "tracked_files": cold_snapshot["tracked_files"],
         "tracked_bytes": cold_snapshot["tracked_bytes"],
         "graph_nodes": cold_metrics["graph_nodes"],
         "graph_edges": cold_metrics["graph_edges"],
         "external_dependency_components": cold_metrics.get("external_dependency_components", 0),
+        "declared_dependency_records": cold_metrics.get("declared_dependency_records", 0),
+        "route_count": cold_metrics.get("route_count", 0),
+        "build_target_count": cold_metrics.get("build_target_count", 0),
+        "search_document_count": cold_metrics.get("search_document_count", 0),
+        "history_window_commits": cold_metrics.get("history_window_commits", 0),
         "cold_wall_ms": round(cold_ms, 3),
         "warm_runs_ms": [round(x, 3) for x in warm],
         "warm_median_ms": round(statistics.median(warm), 3),
