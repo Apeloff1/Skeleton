@@ -34,3 +34,12 @@ def test_workflow_run_consumer_never_checks_out_triggering_code() -> None:
     assert 'os.environ["RUN_ID"].strip()' not in workflow
     assert "--state all" in workflow
     assert 'os.environ["HEAD_SHA"].strip().lower()' in workflow
+
+
+def test_issue_body_template_cannot_escape_yaml_shell_block() -> None:
+    workflow = Path(".github/workflows/repair-intake.yml").read_text(encoding="utf-8")
+
+    assert "printf -v body '%s\\n'" in workflow
+    assert "\n${marker}\n" not in workflow
+    assert "\n- Workflow: ${RUN_NAME}\n" not in workflow
+    assert "\nCorrelate this observation against existing findings" not in workflow
