@@ -39,6 +39,7 @@ def test_owner_queue_drain_is_bounded_and_dry_run_by_default() -> None:
     assert 'path(run).startswith("dynamic/")' in owner
     assert 'run_status="queued"' in owner
     assert 'run_status="in_progress"' in owner
+    assert '"X-GitHub-Api-Version": "2026-03-10"' in owner
 
 
 def test_owner_queue_drain_requires_current_main_replacement_before_stale_dynamic_cancel() -> None:
