@@ -8,6 +8,9 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from core.activation_security import enforce_bot_activation_security
+from .prompts import compose_system_prompt
+
 
 class ModelRequestError(RuntimeError):
     """Raised when a bounded model request cannot be completed safely."""
@@ -59,7 +62,9 @@ class ModelGateway:
         max_output_tokens: int = 8000,
         extra_headers: Mapping[str, str] | None = None,
     ) -> dict[str, Any]:
+        enforce_bot_activation_security()
         endpoint, api_key, model = self._config()
+        system_prompt = compose_system_prompt(system_prompt)
         web_search = self._web_search_enabled()
         if web_search and endpoint.rstrip("/").endswith("/responses"):
             system_prompt = (
@@ -160,13 +165,10 @@ class ModelGateway:
 
     @staticmethod
     def _extract_content(payload: dict[str, Any]) -> str | dict[str, Any]:
-        # OpenAI Responses API convenience field.
         direct = payload.get("output_text")
         if isinstance(direct, str) and direct:
             return direct
 
-        # Raw Responses API payload. Tool-call items can be interleaved with the
-        # assistant message, so only output_text message content is collected.
         output = payload.get("output")
         if isinstance(output, list):
             chunks: list[str] = []
@@ -185,7 +187,6 @@ class ModelGateway:
             if chunks:
                 return "\n".join(chunks)
 
-        # OpenAI-compatible Chat Completions response.
         choices = payload.get("choices")
         if isinstance(choices, list) and choices:
             first = choices[0]
@@ -196,7 +197,6 @@ class ModelGateway:
                     if content is not None:
                         return content
 
-        # Adapter escape hatch for providers returning already-structured JSON.
         if isinstance(output, dict):
             return output
         raise KeyError("model response did not contain Responses output text, chat content, or object output")
