@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "metrics": [
     "tracked_files",
     "tracked_bytes",
@@ -10,17 +10,52 @@
     "graph_nodes",
     "graph_edges",
     "dependency_cycles",
+    "external_dependency_components",
+    "external_dependency_declarations",
+    "declared_dependency_records",
+    "package_script_count",
+    "route_count",
+    "environment_variable_count",
+    "undocumented_environment_variable_count",
+    "build_target_count",
+    "history_window_commits",
+    "search_document_count",
+    "batch_evidence_noted",
+    "codeowners_matched_files",
+    "architecture_boundary_violations",
     "large_tracked_files",
     "unowned_files",
     "snapshot_wall_ms",
     "semantic_wall_ms",
     "graph_wall_ms",
+    "canonical_snapshot_wall_ms",
     "impact_wall_ms"
   ],
   "derived": [
     "semantic_cache_hit_ratio",
     "python_parse_success_ratio",
-    "owned_file_ratio"
+    "owned_file_ratio",
+    "batch_evidence_ratio",
+    "environment_documentation_ratio"
   ],
-  "rule": "Performance and quality claims must cite measured telemetry from a specific tree/CI run. Targets in quality-budgets.json are not evidence by themselves."
+  "determinism": {
+    "history_clock": "HEAD commit timestamp",
+    "history_window": "bounded by deep-index-contract.json",
+    "secret_values": "never telemetry/index inputs",
+    "network": "not required for core snapshot generation"
+  },
+  "benchmark_required_fields": [
+    "cold_wall_ms",
+    "warm_median_ms",
+    "warm_cache_hit_ratios",
+    "graph_nodes",
+    "graph_edges",
+    "external_dependency_components",
+    "declared_dependency_records",
+    "route_count",
+    "build_target_count",
+    "search_document_count",
+    "history_window_commits"
+  ],
+  "rule": "Performance and quality claims must cite measured telemetry from a specific tree/CI run. Targets in quality-budgets.json are not evidence by themselves, and hotspot/batch evidence signals are not quality or completion scores."
 }
