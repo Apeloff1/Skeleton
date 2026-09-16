@@ -127,6 +127,18 @@ def _scope_task(reasoner: ChatGPTReasoner, item: Mapping[str, Any]) -> PlannedTa
     )
 
 
+def _reject_overlapping_scopes(scoped: Sequence[tuple[str, PlannedTask]]) -> None:
+    owners: dict[str, str] = {}
+    for plan_id, task in scoped:
+        for path in task.paths:
+            previous = owners.get(path)
+            if previous is not None and previous != plan_id:
+                raise ValueError(
+                    f"canonical plan items {previous!r} and {plan_id!r} map to overlapping path {path!r}"
+                )
+            owners[path] = plan_id
+
+
 def propose(
     *,
     patch_path: Path,
@@ -171,6 +183,7 @@ def propose(
         if not scoped:
             detail = scope_errors[0][1] if scope_errors else "no canonical task could be scoped"
             raise RuntimeError(detail)
+        _reject_overlapping_scopes(scoped)
     except Exception as exc:
         patch_path.parent.mkdir(parents=True, exist_ok=True)
         patch_path.write_text("", encoding="utf-8")
