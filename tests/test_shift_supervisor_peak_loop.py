@@ -1,3 +1,5 @@
+import json
+
 from core.shift_supervisor.models import PlanRevision, utcnow
 from core.shift_supervisor.plan_store import InMemoryPlanStore
 from core.shift_supervisor.runtime import build_supervisor
@@ -80,7 +82,7 @@ def test_run_forever_coalesces_coincident_secretary_and_manager_tick(monkeypatch
     ]
 
 
-def test_runtime_reuses_cycle_context_for_research_collection():
+def test_runtime_reuses_cycle_context_and_bounds_worker_prompt_surface():
     context_calls = 0
     research_generations = []
 
@@ -90,17 +92,24 @@ def test_runtime_reuses_cycle_context_for_research_collection():
         return {
             "generation": context_calls,
             "repository": "Apeloff1/Skeleton",
-            "worker_snapshots": [],
+            "worker_snapshots": [
+                {
+                    "worker_id": "idle-prompt-guard",
+                    "team": "idle",
+                    "status": "idle",
+                }
+            ],
         }
 
     def research_source(context):
         research_generations.append(context["generation"])
         return [{"source": "same-cycle", "generation": context["generation"]}]
 
+    model = _Model()
     scheduler = build_supervisor(
         project_context_supplier=context_supplier,
         research_sources={"test": research_source},
-        model=_Model(),
+        model=model,
     )
 
     result = scheduler.run_once()
@@ -108,3 +117,15 @@ def test_runtime_reuses_cycle_context_for_research_collection():
     assert result["actors"] == ["secretary", "manager"]
     assert context_calls == 1
     assert research_generations == [1]
+    assert len(model.calls) == 2
+
+    secretary_payload = json.loads(model.calls[0]["user_prompt"])
+    manager_payload = json.loads(model.calls[1]["user_prompt"])
+    for payload in (secretary_payload, manager_payload):
+        planning_context = payload["project_context"]
+        assert "worker_snapshots" not in planning_context
+        assert planning_context["worker_snapshot_count"] == 1
+        assert planning_context["generation"] == 1
+
+    assert manager_payload["staffing"]["teams"]["idle"]["total"] == 1
+    assert manager_payload["staffing"]["teams"]["night"]["total"] == 0
