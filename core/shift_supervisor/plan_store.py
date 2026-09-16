@@ -3,18 +3,20 @@ from __future__ import annotations
 import threading
 from dataclasses import replace
 from datetime import datetime, timezone
-from typing import Iterable
+from typing import Any, Iterable, Mapping
 
 from .models import PlanItem, PlanRevision, WorkerState
 
 
 class InMemoryPlanStore:
-    """Thread-safe reference store.
+    """Thread-safe reference store with bounded import/export support.
 
-    Production deployments can replace this with the repo's persistent store by
-    preserving this method surface. Keeping the orchestration against an
-    interface prevents scheduler/model code from owning persistence details.
+    The runtime remains dependency-free, while scheduled jobs can persist this
+    state through an external durable medium (for example a GitHub issue body)
+    and restore it on the next run.
     """
+
+    STATE_VERSION = 1
 
     def __init__(self) -> None:
         self._lock = threading.RLock()
@@ -29,6 +31,10 @@ class InMemoryPlanStore:
     def snapshot_workers(self) -> list[WorkerState]:
         with self._lock:
             return [replace(worker) for worker in self._workers.values()]
+
+    def snapshot_revisions(self) -> list[PlanRevision]:
+        with self._lock:
+            return [replace(revision) for revision in self._revisions]
 
     def upsert_worker(self, worker: WorkerState) -> None:
         with self._lock:
@@ -61,6 +67,251 @@ class InMemoryPlanStore:
     def append_revision(self, revision: PlanRevision) -> None:
         with self._lock:
             self._revisions.append(replace(revision))
+            if len(self._revisions) > 256:
+                self._revisions = self._revisions[-256:]
+
+    def export_state(
+        self,
+        *,
+        max_items: int = 64,
+        max_workers: int = 128,
+        max_revisions: int = 64,
+    ) -> dict[str, Any]:
+        """Return bounded JSON-safe state for cross-run persistence."""
+        with self._lock:
+            items = sorted(
+                self._items.values(),
+                key=lambda item: (
+                    item.status in {"done", "rejected"},
+                    -item.priority,
+                    -item.updated_at.timestamp(),
+                    item.id,
+                ),
+            )[: max(0, max_items)]
+            workers = sorted(
+                (
+                    worker
+                    for worker in self._workers.values()
+                    if worker.status != "offline"
+                    or worker.current_task_id
+                    or worker.overtime_minutes > 0
+                ),
+                key=lambda worker: (
+                    worker.status == "offline",
+                    -worker.overtime_minutes,
+                    worker.worker_id,
+                ),
+            )[: max(0, max_workers)]
+            revisions = self._revisions[-max(0, max_revisions) :] if max_revisions else []
+            return {
+                "version": self.STATE_VERSION,
+                "plan_items": [self._item_payload(item) for item in items],
+                "workers": [self._worker_payload(worker) for worker in workers],
+                "revisions": [self._revision_payload(revision) for revision in revisions],
+            }
+
+    def restore_state(self, state: Mapping[str, Any]) -> None:
+        """Replace local state from a previously exported payload.
+
+        Invalid individual rows are ignored, but an unsupported outer version
+        fails closed so a future incompatible state shape is never misread.
+        """
+        version = state.get("version", self.STATE_VERSION)
+        if version != self.STATE_VERSION:
+            raise ValueError(f"unsupported shift-supervisor state version: {version!r}")
+
+        raw_items = state.get("plan_items", state.get("items", []))
+        raw_workers = state.get("workers", [])
+        raw_revisions = state.get("revisions", [])
+        items: dict[str, PlanItem] = {}
+        workers: dict[str, WorkerState] = {}
+        revisions: list[PlanRevision] = []
+
+        if isinstance(raw_items, list):
+            for row in raw_items[:256]:
+                item = self._parse_item(row)
+                if item is not None:
+                    items[item.id] = item
+        if isinstance(raw_workers, list):
+            for row in raw_workers[:512]:
+                worker = self._parse_worker(row)
+                if worker is not None:
+                    workers[worker.worker_id] = worker
+        if isinstance(raw_revisions, list):
+            for row in raw_revisions[-256:]:
+                revision = self._parse_revision(row)
+                if revision is not None:
+                    revisions.append(revision)
+
+        with self._lock:
+            self._items = items
+            self._workers = workers
+            self._revisions = revisions
+
+    @classmethod
+    def _item_payload(cls, item: PlanItem) -> dict[str, Any]:
+        return {
+            "id": item.id,
+            "title": item.title,
+            "description": item.description,
+            "priority": item.priority,
+            "target_team": item.target_team,
+            "status": item.status,
+            "owner": item.owner,
+            "dependencies": list(item.dependencies),
+            "source": item.source,
+            "rationale": item.rationale,
+            "research_refs": list(item.research_refs),
+            "expected_output": item.expected_output,
+            "validation": list(item.validation),
+            "created_at": cls._encode_dt(item.created_at),
+            "updated_at": cls._encode_dt(item.updated_at),
+            "metadata": dict(item.metadata),
+        }
+
+    @classmethod
+    def _worker_payload(cls, worker: WorkerState) -> dict[str, Any]:
+        return {
+            "worker_id": worker.worker_id,
+            "team": worker.team,
+            "status": worker.status,
+            "clocked_in_at": cls._encode_dt(worker.clocked_in_at),
+            "clocked_out_at": cls._encode_dt(worker.clocked_out_at),
+            "last_heartbeat_at": cls._encode_dt(worker.last_heartbeat_at),
+            "current_task_id": worker.current_task_id,
+            "normal_shift_minutes": worker.normal_shift_minutes,
+            "overtime_minutes": worker.overtime_minutes,
+            "overtime_task_ids": list(worker.overtime_task_ids),
+            "metadata": dict(worker.metadata),
+        }
+
+    @classmethod
+    def _revision_payload(cls, revision: PlanRevision) -> dict[str, Any]:
+        return {
+            "revision_id": revision.revision_id,
+            "actor": revision.actor,
+            "created_at": cls._encode_dt(revision.created_at),
+            "added_item_ids": list(revision.added_item_ids),
+            "updated_item_ids": list(revision.updated_item_ids),
+            "summary": revision.summary,
+            "correlation_id": revision.correlation_id,
+        }
+
+    @classmethod
+    def _parse_item(cls, value: Any) -> PlanItem | None:
+        if not isinstance(value, Mapping):
+            return None
+        item_id = str(value.get("id", "")).strip()
+        title = str(value.get("title", "")).strip()
+        description = str(value.get("description", "")).strip()
+        team = str(value.get("target_team", "")).strip().lower()
+        status = str(value.get("status", "queued")).strip().lower()
+        if not item_id or not title or not description or team not in {"night", "idle"}:
+            return None
+        if status not in {"queued", "assigned", "working", "blocked", "done", "rejected"}:
+            status = "queued"
+        try:
+            priority = max(1, min(100, int(value.get("priority", 50))))
+        except (TypeError, ValueError):
+            priority = 50
+        return PlanItem(
+            id=item_id,
+            title=title,
+            description=description,
+            priority=priority,
+            target_team=team,  # type: ignore[arg-type]
+            status=status,  # type: ignore[arg-type]
+            owner=cls._optional_str(value.get("owner")),
+            dependencies=cls._string_list(value.get("dependencies")),
+            source=str(value.get("source", "unknown")),
+            rationale=str(value.get("rationale", "")),
+            research_refs=cls._string_list(value.get("research_refs")),
+            expected_output=str(value.get("expected_output", "")),
+            validation=cls._string_list(value.get("validation")),
+            created_at=cls._decode_dt(value.get("created_at")) or datetime.now(timezone.utc),
+            updated_at=cls._decode_dt(value.get("updated_at")) or datetime.now(timezone.utc),
+            metadata=dict(value.get("metadata", {})) if isinstance(value.get("metadata"), Mapping) else {},
+        )
+
+    @classmethod
+    def _parse_worker(cls, value: Any) -> WorkerState | None:
+        if not isinstance(value, Mapping):
+            return None
+        worker_id = str(value.get("worker_id", "")).strip()
+        team = str(value.get("team", "")).strip().lower()
+        status = str(value.get("status", "offline")).strip().lower()
+        if not worker_id or team not in {"night", "idle"}:
+            return None
+        if status not in {"offline", "idle", "working", "blocked"}:
+            status = "offline"
+        return WorkerState(
+            worker_id=worker_id,
+            team=team,  # type: ignore[arg-type]
+            status=status,  # type: ignore[arg-type]
+            clocked_in_at=cls._decode_dt(value.get("clocked_in_at")),
+            clocked_out_at=cls._decode_dt(value.get("clocked_out_at")),
+            last_heartbeat_at=cls._decode_dt(value.get("last_heartbeat_at")),
+            current_task_id=cls._optional_str(value.get("current_task_id")),
+            normal_shift_minutes=cls._nonnegative_int(value.get("normal_shift_minutes")),
+            overtime_minutes=cls._nonnegative_int(value.get("overtime_minutes")),
+            overtime_task_ids=cls._string_list(value.get("overtime_task_ids")),
+            metadata=dict(value.get("metadata", {})) if isinstance(value.get("metadata"), Mapping) else {},
+        )
+
+    @classmethod
+    def _parse_revision(cls, value: Any) -> PlanRevision | None:
+        if not isinstance(value, Mapping):
+            return None
+        revision_id = str(value.get("revision_id", "")).strip()
+        actor = str(value.get("actor", "")).strip()
+        created_at = cls._decode_dt(value.get("created_at"))
+        if not revision_id or not actor or created_at is None:
+            return None
+        return PlanRevision(
+            revision_id=revision_id,
+            actor=actor,
+            created_at=created_at,
+            added_item_ids=cls._string_list(value.get("added_item_ids")),
+            updated_item_ids=cls._string_list(value.get("updated_item_ids")),
+            summary=str(value.get("summary", "")),
+            correlation_id=str(value.get("correlation_id", "")),
+        )
+
+    @staticmethod
+    def _encode_dt(value: datetime | None) -> str | None:
+        return value.astimezone(timezone.utc).isoformat() if value is not None else None
+
+    @staticmethod
+    def _decode_dt(value: Any) -> datetime | None:
+        if not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
+    @staticmethod
+    def _string_list(value: Any) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        return [str(item) for item in value[:64] if item is not None]
+
+    @staticmethod
+    def _optional_str(value: Any) -> str | None:
+        if value is None:
+            return None
+        result = str(value).strip()
+        return result or None
+
+    @staticmethod
+    def _nonnegative_int(value: Any) -> int:
+        try:
+            return max(0, int(value))
+        except (TypeError, ValueError):
+            return 0
 
     @staticmethod
     def _fingerprint(title: str, description: str, target_team: str) -> str:
