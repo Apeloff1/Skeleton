@@ -10,6 +10,7 @@ from skeleton.automation.studio_director import (
     _changed_paths,
     _extract_json,
     _parse_task,
+    _redact_value,
 )
 
 
@@ -76,11 +77,26 @@ index 1111111..2222222 100644
         _changed_paths(deleted)
 
 
-def test_audit_log_redacts_secret_like_values(tmp_path) -> None:
+def test_redaction_preserves_nested_json_shapes() -> None:
+    value = {
+        "outer": [
+            "api_key=super-secret",
+            {"authorization": "Authorization: Bearer another-secret"},
+        ]
+    }
+    redacted = _redact_value(value)
+    encoded = json.dumps(redacted)
+    decoded = json.loads(encoded)
+    assert decoded["outer"][0] == "api_key=[REDACTED]"
+    assert "another-secret" not in encoded
+
+
+def test_audit_log_redacts_secret_like_values_without_corrupting_json(tmp_path) -> None:
     path = tmp_path / "audit.jsonl"
     audit = AuditLog(path, "run-1")
-    audit.emit("test", value="api_key=super-secret")
+    audit.emit("test", value="api_key=super-secret", nested={"token": "token=abc123"})
     row = json.loads(path.read_text(encoding="utf-8"))
     assert row["run_id"] == "run-1"
     assert "super-secret" not in path.read_text(encoding="utf-8")
+    assert "abc123" not in path.read_text(encoding="utf-8")
     assert "[REDACTED]" in row["value"]
