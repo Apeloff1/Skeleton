@@ -25,6 +25,8 @@ class PlanReadAPI:
 
     @staticmethod
     def _payload(item: PlanItem) -> dict[str, Any]:
+        context_refs = item.metadata.get("context_refs", [])
+        conflict_domains = item.metadata.get("conflict_domains", [])
         return {
             "id": item.id,
             "title": item.title,
@@ -34,6 +36,8 @@ class PlanReadAPI:
             "owner": item.owner,
             "dependencies": list(item.dependencies),
             "research_refs": list(item.research_refs),
+            "context_refs": list(context_refs) if isinstance(context_refs, list) else [],
+            "conflict_domains": list(conflict_domains) if isinstance(conflict_domains, list) else [],
             "expected_output": item.expected_output,
             "validation": list(item.validation),
         }
@@ -45,7 +49,8 @@ class PlanQueueAPI:
     Workers never ask the Shift Manager or Secretary for a task. They claim the
     next eligible order from this queue. Claiming is atomic in the store and a
     worker can hold at most one active task, preventing supervisor fan-in and
-    per-worker overload.
+    per-worker overload. Conflict domains are enforced by the store so workers
+    receive parallel work only when active tasks are semantically independent.
     """
 
     def __init__(self, store: InMemoryPlanStore, *, overtime_soft_limit_minutes: int = 120) -> None:
