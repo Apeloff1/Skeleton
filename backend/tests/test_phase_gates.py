@@ -19,10 +19,13 @@ def test_phase_gates_100_phases():
 
 
 def test_phase_gates_pass_on_clean_build():
-    out = pg.build(_manifest())
+    # A clean advanced build is asset-grounded by contract. The Assets band is
+    # intentionally fail-closed when no forged inventory is supplied.
+    out = pg.build(_manifest(), assets={"forged": 1, "families": ["core"]})
     assert out["all_gates_green"] is True
     assert out["pass_pct"] == 100
     assert out["bands_passed"] == 8
+    assert out["asset_grounded"] is True
 
 
 def test_phase_gates_band_ranges_cover_1_to_100():
