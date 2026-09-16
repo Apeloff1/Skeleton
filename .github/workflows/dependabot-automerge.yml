@@ -1,0 +1,53 @@
+name: Dependabot Auto-Merge
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependabot-automerge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  automerge:
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      startsWith(github.event.pull_request.head.ref, 'dependabot/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Dependabot change scope
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --name-only)
+          test "${#files[@]}" -gt 0
+
+          for file in "${files[@]}"; do
+            case "$file" in
+              .github/dependabot.yml|*.lock|requirements*.txt|pyproject.toml|package.json|package-lock.json|npm-shrinkwrap.json|yarn.lock|pnpm-lock.yaml|Dockerfile|**/Dockerfile)
+                ;;
+              *)
+                echo "Out-of-scope file: $file"
+                exit 1
+                ;;
+            esac
+          done
+
+      - name: Enable GitHub auto-merge
+        if: steps.scope.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr merge "$PR_NUMBER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --auto \
+            --squash
