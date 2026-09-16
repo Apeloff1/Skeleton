@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "exports": {
+    "repository_graph": {
+      "format": "repo-intel native JSON",
+      "purpose": "full typed graph, reverse edges, impact and agent queries"
+    },
+    "symbols": {
+      "format": "SCIP-aligned concepts",
+      "purpose": "definitions, occurrences, symbol roles and future compiler-precise ingestion",
+      "status": "native JSON now; direct SCIP protobuf export is a planned compatibility layer"
+    },
+    "supply_chain": {
+      "format": "CycloneDX-aligned components/dependencies",
+      "purpose": "dependencies, services, provenance and security relationships",
+      "status": "native graph now; CycloneDX 1.7/2.x export is planned"
+    },
+    "build_graph": {
+      "format": "typed DAG",
+      "purpose": "entrypoints, manifests, workflows, declared inputs/outputs, reverse dependencies and future action fingerprints"
+    }
+  },
+  "rule": "Never claim compatibility with an external format until an exporter validates against that format's schema/tooling."
+}
