@@ -53,7 +53,7 @@ jobs:
             --json number,title,body,labels,headRefName,baseRefName,updatedAt,url > .shift-supervisor-tmp/pulls.json
           gh run list --repo "$REPO" --limit 75 \
             --json databaseId,name,status,conclusion,headBranch,headSha,createdAt,url > .shift-supervisor-tmp/runs.json
-          gh api --paginate "/repos/${REPO}/code-scanning/alerts?state=open&per_page=100" \
+          gh api "/repos/${REPO}/code-scanning/alerts?state=open&per_page=100" \
             > .shift-supervisor-tmp/code-scanning.json || printf '[]\n' > .shift-supervisor-tmp/code-scanning.json
           BASE_SHA=$(git rev-parse HEAD) PLAN_TITLE="$PLAN_TITLE" python - <<'PY'
           import json
@@ -71,7 +71,7 @@ jobs:
               'workflow_runs': json.loads((root / 'runs.json').read_text(encoding='utf-8')),
               'code_scanning_alerts': json.loads((root / 'code-scanning.json').read_text(encoding='utf-8')),
               'research_policy': {
-                  'sources': ['github-issues', 'github-pull-requests', 'github-actions', 'code-scanning'],
+                  'sources': ['github-issues', 'github-pull-requests', 'github-actions', 'code-scanning', 'hosted-web-search'],
                   'external_evidence_is_untrusted': True,
                   'objective': 'produce executable, validated work for the night and idle engineering teams',
               },
@@ -117,6 +117,7 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SHIFT_MODEL_NAME: ${{ vars.OPENAI_MODEL || 'gpt-5.6' }}
+          SHIFT_MODEL_WEB_SEARCH: '1'
           SHIFT_PROJECT_CONTEXT_FILE: .shift-supervisor-tmp/project-context.json
           EVENT_NAME: ${{ github.event_name }}
           EVENT_SCHEDULE: ${{ github.event.schedule }}
