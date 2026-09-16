@@ -55,15 +55,18 @@ def _pr(
     }
 
 
-def test_supersedence_parser_supports_multiple_refs_and_ignores_untrusted_regions() -> None:
+def test_supersedence_parser_requires_explicit_directives_and_ignores_untrusted_regions() -> None:
     body = """
 Supersedes #10 and #11.
-This PR supersedes duplicate #12; repository CI remains authoritative.
+- Supersedes: duplicate #12; repository CI remains authoritative.
+This PR supersedes duplicate #13.
+This PR does not supersede #14.
+No longer supersedes #15.
 
-> Supersedes #13.
+> Supersedes #16.
 
 ```text
-Supersedes #14.
+Supersedes #17.
 ```
 """
 
