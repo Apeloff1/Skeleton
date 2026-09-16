@@ -7,7 +7,8 @@ set -euo pipefail
 
 repo="${REPO:-Apeloff1/Skeleton}"
 branch="${BRANCH:-main}"
-required_check="${REQUIRED_CHECK:-Merge Readiness}"
+required_check="Merge Readiness"
+required_app_id="15368" # GitHub Actions
 failures=0
 
 if [[ ! "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
@@ -23,6 +24,10 @@ if ! command -v gh >/dev/null 2>&1; then
   echo "error: GitHub CLI (gh) is required" >&2
   exit 1
 fi
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "error: Python 3 is required" >&2
+  exit 1
+fi
 if ! gh auth status -h github.com >/dev/null 2>&1; then
   echo "error: gh is not authenticated to github.com" >&2
   exit 1
@@ -33,7 +38,8 @@ mark_failure() {
   printf 'FAIL: %s\n' "$1" >&2
 }
 
-printf 'Repository: %s\nBranch: %s\nRequired check: %s\n\n' "$repo" "$branch" "$required_check"
+printf 'Repository: %s\nBranch: %s\nRequired check: %s\nRequired app id: %s (GitHub Actions)\n\n' \
+  "$repo" "$branch" "$required_check" "$required_app_id"
 
 admin="$(gh api "repos/${repo}" --jq '.permissions.admin // false')"
 if [[ "$admin" == "true" ]]; then
@@ -50,31 +56,43 @@ if [[ "$protected" == "true" ]]; then
   trap 'rm -f "$protection_json"' EXIT
   gh api "repos/${repo}/branches/${branch}/protection" >"$protection_json"
 
-  readarray -t protection < <(python3 - "$protection_json" "$required_check" <<'PY'
+  IFS=$'\t' read -r check_present enforce_admins strict pr_gate conversations force_pushes deletions < <(
+    python3 - "$protection_json" "$required_check" "$required_app_id" <<'PY'
 import json
 import sys
 
-path, required = sys.argv[1:]
+path, required, app_id_raw = sys.argv[1:]
+app_id = int(app_id_raw)
 with open(path, encoding="utf-8") as handle:
     data = json.load(handle)
-checks = (data.get("required_status_checks") or {}).get("contexts") or []
-print(str(required in checks).lower())
-print(str(bool((data.get("enforce_admins") or {}).get("enabled"))).lower())
-print(str(bool((data.get("required_status_checks") or {}).get("strict"))).lower())
-print(str(data.get("required_pull_request_reviews") is not None).lower())
-print(str(bool((data.get("required_conversation_resolution") or {}).get("enabled"))).lower())
-print(str(bool((data.get("allow_force_pushes") or {}).get("enabled"))).lower())
-print(str(bool((data.get("allow_deletions") or {}).get("enabled"))).lower())
+status = data.get("required_status_checks") or {}
+checks = status.get("checks") or []
+check_present = any(
+    isinstance(item, dict)
+    and item.get("context") == required
+    and item.get("app_id") == app_id
+    for item in checks
+)
+values = (
+    check_present,
+    bool((data.get("enforce_admins") or {}).get("enabled")),
+    bool(status.get("strict")),
+    data.get("required_pull_request_reviews") is not None,
+    bool((data.get("required_conversation_resolution") or {}).get("enabled")),
+    bool((data.get("allow_force_pushes") or {}).get("enabled")),
+    bool((data.get("allow_deletions") or {}).get("enabled")),
+)
+print("\t".join(str(value).lower() for value in values))
 PY
   )
 
-  [[ "${protection[0]:-false}" == "true" ]] && echo "PASS: required check is configured" || mark_failure "required check '${required_check}' is missing"
-  [[ "${protection[1]:-false}" == "true" ]] && echo "PASS: protection applies to administrators" || mark_failure "administrators can bypass protection"
-  [[ "${protection[2]:-false}" == "true" ]] && echo "PASS: required checks require an up-to-date branch" || mark_failure "strict required-status mode is disabled"
-  [[ "${protection[3]:-false}" == "true" ]] && echo "PASS: pull-request changes are required" || mark_failure "pull-request review gate is absent"
-  [[ "${protection[4]:-false}" == "true" ]] && echo "PASS: conversations must be resolved" || mark_failure "conversation resolution is not required"
-  [[ "${protection[5]:-true}" == "false" ]] && echo "PASS: force pushes are blocked" || mark_failure "force pushes are allowed"
-  [[ "${protection[6]:-true}" == "false" ]] && echo "PASS: branch deletion is blocked" || mark_failure "branch deletion is allowed"
+  [[ "${check_present:-false}" == "true" ]] && echo "PASS: required check is bound to GitHub Actions" || mark_failure "required check '${required_check}' is not bound to GitHub Actions app ${required_app_id}"
+  [[ "${enforce_admins:-false}" == "true" ]] && echo "PASS: protection applies to administrators" || mark_failure "administrators can bypass protection"
+  [[ "${strict:-false}" == "true" ]] && echo "PASS: required checks require an up-to-date branch" || mark_failure "strict required-status mode is disabled"
+  [[ "${pr_gate:-false}" == "true" ]] && echo "PASS: pull-request changes are required" || mark_failure "pull-request review gate is absent"
+  [[ "${conversations:-false}" == "true" ]] && echo "PASS: conversations must be resolved" || mark_failure "conversation resolution is not required"
+  [[ "${force_pushes:-true}" == "false" ]] && echo "PASS: force pushes are blocked" || mark_failure "force pushes are allowed"
+  [[ "${deletions:-true}" == "false" ]] && echo "PASS: branch deletion is blocked" || mark_failure "branch deletion is allowed"
 else
   mark_failure "${branch} is not protected"
 fi
