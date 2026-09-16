@@ -37,6 +37,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          gh label create 'security' --repo "$REPO" --color 'b60205' --description 'Security-related repository work' --force
           code_count=$(jq 'if type == "array" then length else 0 end' "$RUNNER_TEMP/security/code.json")
           dep_count=$(jq 'if type == "array" then length else 0 end' "$RUNNER_TEMP/security/dependabot.json")
           total=$((code_count + dep_count))
@@ -64,7 +65,7 @@ jobs:
           existing=$(gh issue list --repo "$REPO" --state open --search "${ISSUE_TITLE} in:title" --limit 1 --json number --jq '.[0].number // empty')
           if [[ -n "$existing" ]]; then
             gh issue comment "$existing" --repo "$REPO" --body-file "$body_file" >/dev/null
-            gh issue edit "$existing" --repo "$REPO" --add-label 'security' >/dev/null 2>&1 || true
+            gh issue edit "$existing" --repo "$REPO" --add-label 'security' >/dev/null
             issue_number="$existing"
           else
             issue_number=$(gh issue create --repo "$REPO" --title "$ISSUE_TITLE" --body-file "$body_file" --label 'security' --json number --jq '.number')
