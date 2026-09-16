@@ -154,12 +154,15 @@ def violations_for_text(text: str) -> list[str]:
         "managed unlabel exclusion": '$kind == "unlabeled"',
         "bot exclusion": '!= "Bot"',
         "commit timestamp extraction": "$e.committer.date // $e.author.date",
-        "two-pass convergence": "for pass in 1 2; do",
         "closed-item repair": "state=closed&labels=${label}",
     }
     for label, marker in required_sweep_markers.items():
         if marker not in sweep:
             findings.append(f"sweep contract missing {label}")
+    # Both the PR reconciler and issue reconciler must run a second snapshot
+    # pass. Checking only for one generic loop lets one path silently regress.
+    if sweep.count("for pass in 1 2; do") < 2:
+        findings.append("sweep contract missing two-pass convergence")
     if "[.number, .updated_at" in sweep or "updated_epoch=$(date" in sweep:
         findings.append("generic updated_at must not be used as the inactivity clock")
     if "Failed to remove ${label}" not in sweep:

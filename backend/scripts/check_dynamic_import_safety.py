@@ -1,12 +1,19 @@
 """Fail closed on runtime-selected Python module imports in backend production code.
 
-Literal module names remain allowed. Runtime-selected module names must be replaced
-with an explicit allowlist/dispatch table so untrusted input cannot choose import
-execution paths.
+Literal module names remain allowed. Runtime-selected module names must normally be
+replaced with an explicit allowlist/dispatch table so untrusted input cannot choose
+import execution paths.
+
+A small number of legacy internal loaders are temporarily retained behind exact,
+time-bounded exceptions. Exceptions bind the repository path, enclosing function,
+import primitive, and name expression; widening or moving a loader therefore fails
+closed. Expired exceptions fail exactly like any other dynamic import.
 """
 from __future__ import annotations
 
 import ast
+from dataclasses import dataclass
+from datetime import date
 import os
 from pathlib import Path
 import sys
@@ -26,6 +33,51 @@ SKIP_DIRS = {
     ".expo",
     "coverage",
     "tests",
+}
+
+
+@dataclass(frozen=True)
+class DynamicImportException:
+    """One narrow, temporary exception for an audited internal loader."""
+
+    function: str
+    primitive: str
+    name_expression: str
+    expires_on: date
+    rationale: str
+
+
+# These are migration debt, not permanent policy exemptions. Each entry is exact
+# enough that adding another dynamic import to the same file/function with a
+# different expression or primitive still fails the gate.
+APPROVED_DYNAMIC_IMPORT_EXCEPTIONS: dict[str, tuple[DynamicImportException, ...]] = {
+    "backend/core/routes_registry.py": (
+        DynamicImportException(
+            function="register_routes",
+            primitive="importlib.import_module",
+            name_expression="module_path",
+            expires_on=date(2026, 12, 31),
+            rationale="Declarative router registry; module names come from repository-owned route tables.",
+        ),
+    ),
+    "backend/routes/gameforge_studio.py": (
+        DynamicImportException(
+            function="_try",
+            primitive="__import__",
+            name_expression="path",
+            expires_on=date(2026, 12, 31),
+            rationale="Studio startup passes repository-owned literal module names into this defensive loader.",
+        ),
+    ),
+    "backend/server.py": (
+        DynamicImportException(
+            function="_kick_agent_knowledge",
+            primitive="__import__",
+            name_expression="f'seeds.{mod}'",
+            expires_on=date(2026, 12, 31),
+            rationale="Background seeding iterates a repository-owned literal seed-module table.",
+        ),
+    ),
 }
 
 
@@ -242,6 +294,45 @@ def _called_dynamic_import(
     )
 
 
+def _parent_map(tree: ast.AST) -> dict[ast.AST, ast.AST]:
+    return {child: parent for parent in ast.walk(tree) for child in ast.iter_child_nodes(parent)}
+
+
+def _enclosing_function(node: ast.AST, parents: dict[ast.AST, ast.AST]) -> str:
+    current = node
+    while current in parents:
+        current = parents[current]
+        if isinstance(current, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return current.name
+    return "<module>"
+
+
+def _approved_exception(
+    path: Path,
+    node: ast.Call,
+    primitive: str,
+    name: ast.AST | None,
+    parents: dict[ast.AST, ast.AST],
+) -> bool:
+    if name is None:
+        return False
+    key = display_path(path).as_posix()
+    specs = APPROVED_DYNAMIC_IMPORT_EXCEPTIONS.get(key, ())
+    if not specs:
+        return False
+    function = _enclosing_function(node, parents)
+    expression = ast.unparse(name)
+    today = date.today()
+    return any(
+        spec.function == function
+        and spec.primitive == primitive
+        and spec.name_expression == expression
+        and spec.expires_on >= today
+        and bool(spec.rationale.strip())
+        for spec in specs
+    )
+
+
 def violations(path: Path) -> list[str]:
     label = display_path(path)
     try:
@@ -251,6 +342,7 @@ def violations(path: Path) -> list[str]:
 
     importlib_modules, builtins_modules, function_aliases = _import_aliases(tree)
     _propagate_aliases(tree, importlib_modules, builtins_modules, function_aliases)
+    parents = _parent_map(tree)
     findings: list[str] = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
@@ -264,11 +356,14 @@ def violations(path: Path) -> list[str]:
         if primitive is None:
             continue
         name = _call_name_argument(node)
-        if not _literal_module_name(name):
-            findings.append(
-                f"{label}:{node.lineno}: {primitive}() module name must be a non-empty literal string; "
-                "use an explicit allowlist/dispatch table for runtime selection"
-            )
+        if _literal_module_name(name):
+            continue
+        if _approved_exception(path, node, primitive, name, parents):
+            continue
+        findings.append(
+            f"{label}:{node.lineno}: {primitive}() module name must be a non-empty literal string; "
+            "use an explicit allowlist/dispatch table for runtime selection"
+        )
     return findings
 
 
