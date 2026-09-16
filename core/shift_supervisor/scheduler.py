@@ -151,7 +151,33 @@ class SupervisorScheduler:
                     continue
             worker = self._merge_daily_snapshot(existing, worker)
             self.manager.store.upsert_worker(worker)
+            self._reconcile_validated_work(worker)
             known[worker_id] = worker
+
+    def _reconcile_validated_work(self, worker: WorkerState) -> None:
+        """Close canonical plan items proven by a validated studio snapshot.
+
+        Night and Idle workflows publish ``worked_on`` only after their
+        credential-free validation succeeds. Those values are canonical plan
+        IDs, so the next supervisor cycle can safely retire matching work
+        instead of repeatedly handing the same order back to another shift.
+        Unknown IDs and cross-team IDs are deliberately ignored.
+        """
+        worked_on = set(self._string_list(worker.metadata.get("worked_on")))
+        if not worked_on:
+            return
+        for item in self.manager.store.snapshot_items():
+            if item.id not in worked_on or item.target_team != worker.team:
+                continue
+            if item.status in {"done", "rejected"}:
+                continue
+            item.status = "done"
+            item.owner = worker.worker_id
+            metadata = dict(item.metadata)
+            metadata["completed_by_worker"] = worker.worker_id
+            metadata["completion_source"] = "validated-studio-worker-snapshot"
+            item.metadata = metadata
+            self.manager.store.update_item(item)
 
     def _merge_daily_snapshot(
         self,

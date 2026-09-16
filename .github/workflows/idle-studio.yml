@@ -1,9 +1,9 @@
 name: Idle Studio
 
 on:
-  schedule:
-    - cron: '7,37 * * * *'
-    - cron: '22,52 * * * *'
+  workflow_run:
+    workflows: ['Shift Supervisor Control']
+    types: [completed]
   workflow_dispatch:
     inputs:
       dry_run:
@@ -64,6 +64,24 @@ jobs:
           skeleton.testing.test_idle_studio_v2
           skeleton.testing.test_idle_studio_publisher
 
+      - name: Require successful supervisor refresh
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success'
+        env:
+          SUPERVISOR_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .idle-studio-tmp
+          {
+            echo '## Shift supervisor'
+            echo
+            echo 'Status: **blocked**'
+            echo
+            echo "Shift Supervisor Control concluded: $SUPERVISOR_CONCLUSION"
+            echo 'No Idle Studio work was generated and prior worker status will be cleared.'
+          } > .idle-studio-tmp/shift-supervisor-summary.md
+          exit 1
+
       - name: Snapshot live repository state
         env:
           GH_TOKEN: ${{ github.token }}
@@ -100,130 +118,40 @@ jobs:
           )
           PY
 
-      - name: Load canonical shift-supervisor plan
+      - name: Load fresh canonical shift-supervisor plan
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          import base64
-          import gzip
-          import hashlib
-          import json
-          import re
-          from pathlib import Path
+          python -m core.shift_supervisor.consumer_plan prepare \
+            --team idle \
+            --state .idle-studio-tmp/repo-state.json \
+            --summary .idle-studio-tmp/shift-supervisor-summary.md \
+            --plan-map .idle-studio-tmp/plan-map.json \
+            --max-age-minutes 20
 
-          root = Path('.idle-studio-tmp')
-          state_path = root / 'repo-state.json'
-          state = json.loads(state_path.read_text(encoding='utf-8'))
-          title = '[Shift Supervisor] Canonical Night + Idle Plan'
-          status_titles = {
-              '[Shift Supervisor] Idle Worker Status',
-              '[Shift Supervisor] Night Worker Status',
-          }
-          issues = state.get('issues', [])
-          canonical = next(
-              (
-                  issue for issue in issues
-                  if isinstance(issue, dict) and issue.get('title') == title
-              ),
-              None,
-          )
-          ignored_titles = {title, *status_titles}
-          state['issues'] = [
-              issue for issue in issues
-              if not (isinstance(issue, dict) and issue.get('title') in ignored_titles)
-          ]
-
-          plan = []
-          status = 'missing'
-          if canonical is not None:
-              body = str(canonical.get('body', ''))
-              match = re.search(
-                  r'<!-- SHIFT_SUPERVISOR_STATE\n(.*?)\n-->',
-                  body,
-                  flags=re.DOTALL,
-              )
-              if match:
-                  encoded = match.group(1).strip()
-                  if encoded.startswith('gz:v1:'):
-                      packed = base64.b64decode(encoded[len('gz:v1:'):], validate=True)
-                      durable = json.loads(gzip.decompress(packed).decode('utf-8'))
-                      if isinstance(durable, dict):
-                          plan = durable.get('plan_items', [])
-                          status = 'loaded'
-
-          synthetic = []
-          for item in plan[:32]:
-              if not isinstance(item, dict):
-                  continue
-              if item.get('target_team') != 'idle' or item.get('status') in {'done', 'rejected'}:
-                  continue
-              item_title = str(item.get('title', '')).strip()
-              description = str(item.get('description', '')).strip()
-              if not item_title or not description:
-                  continue
-              stable = hashlib.sha256(
-                  f"{item_title}\0{description}\0idle".encode('utf-8')
-              ).hexdigest()
-              number = -(int(stable[:12], 16) + 1)
-              priority = item.get('priority', 50)
-              evidence = {
-                  'source': 'canonical-shift-supervisor',
-                  'priority': priority,
-                  'description': description,
-                  'rationale': item.get('rationale', ''),
-                  'expected_output': item.get('expected_output', ''),
-                  'validation': item.get('validation', []),
-                  'dependencies': item.get('dependencies', []),
-                  'research_refs': item.get('research_refs', []),
-              }
-              text = f"{item_title} {description}".lower()
-              labels = [{'name': 'shift-supervisor'}]
-              if any(token in text for token in ('security', 'vulnerability', 'cve', 'secret', 'auth')):
-                  labels.append({'name': 'security'})
-              synthetic.append(
-                  {
-                      'number': number,
-                      'title': f"[Supervisor P{priority}] {item_title}"[:300],
-                      'body': json.dumps(evidence, sort_keys=True, default=str)[:12000],
-                      'labels': labels,
-                  }
-              )
-
-          state['shift_supervisor'] = {
-              'source': 'canonical-plan-issue',
-              'status': status,
-              'issue_number': canonical.get('number') if canonical else None,
-              'idle_plan_items': len(synthetic),
-          }
-          state.setdefault('issues', []).extend(synthetic)
-          state_path.write_text(json.dumps(state, sort_keys=True, indent=2), encoding='utf-8')
-
-          lines = ['## Shift supervisor', '']
-          if canonical is None:
-              lines.append('Canonical plan issue was not present; no supervisor tasks were promoted.')
-          elif status != 'loaded':
-              lines.append(f"Canonical issue #{canonical.get('number', '?')} was present but had no usable durable state.")
-          else:
-              lines.append(f"Canonical issue: #{canonical.get('number', '?')}")
-              lines.append(f"Idle work items promoted into studio intake: {len(synthetic)}")
-              for item in synthetic[:20]:
-                  lines.append(f"- {item['title']}")
-          (root / 'shift-supervisor-summary.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
-          PY
-
-      - name: Plan, build, and independently review bounded work
+      - name: Plan, build, and independently review supervisor work
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.6' }}
         shell: bash
         run: |
           set -euo pipefail
+          restore_backlog() {
+            if [[ -f .idle-studio-tmp/BACKLOG.md.saved ]]; then
+              mv .idle-studio-tmp/BACKLOG.md.saved BACKLOG.md
+            fi
+          }
+          trap restore_backlog EXIT
+          if [[ -f BACKLOG.md ]]; then
+            mv BACKLOG.md .idle-studio-tmp/BACKLOG.md.saved
+          fi
           python -m skeleton.automation.idle_studio_v2 propose \
             --state .idle-studio-tmp/repo-state.json \
             --package .idle-studio-tmp/package.json \
             --audit .idle-studio-tmp/audit.jsonl \
             --report .idle-studio-tmp/report.md
+          restore_backlog
+          trap - EXIT
           sha256sum .idle-studio-tmp/package.json > .idle-studio-tmp/package.sha256
           python - <<'PY'
           import json
@@ -238,19 +166,8 @@ jobs:
               )
           PY
 
-      - name: Record real idle workforce snapshot
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -s .idle-studio-tmp/package.json && -s .idle-studio-tmp/audit.jsonl ]]; then
-            python -m core.shift_supervisor.workforce_report idle \
-              --package .idle-studio-tmp/package.json \
-              --audit .idle-studio-tmp/audit.jsonl \
-              --output .idle-studio-tmp/worker-status.json
-          fi
-
       - name: Revalidate sealed proposals without model or GitHub credentials
+        id: validation
         env:
           OPENAI_API_KEY: ''
           GH_TOKEN: ''
@@ -261,6 +178,47 @@ jobs:
           sha256sum -c .idle-studio-tmp/package.sha256
           python -m skeleton.automation.idle_studio_v2 validate \
             --package .idle-studio-tmp/package.json
+
+      - name: Record final idle workforce snapshot
+        if: always()
+        env:
+          VALIDATION_OUTCOME: ${{ steps.validation.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .idle-studio-tmp
+          if [[ "$VALIDATION_OUTCOME" == 'success' && -s .idle-studio-tmp/package.json && -s .idle-studio-tmp/audit.jsonl ]]; then
+            python -m core.shift_supervisor.workforce_report idle \
+              --package .idle-studio-tmp/package.json \
+              --audit .idle-studio-tmp/audit.jsonl \
+              --output .idle-studio-tmp/worker-status.json
+            if [[ -s .idle-studio-tmp/plan-map.json ]]; then
+              python -m core.shift_supervisor.consumer_plan normalize-worker-status \
+                --status .idle-studio-tmp/worker-status.json \
+                --plan-map .idle-studio-tmp/plan-map.json
+            fi
+          else
+            python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          Path('.idle-studio-tmp/worker-status.json').write_text(
+              json.dumps(
+                  {
+                      'version': 1,
+                      'team': 'idle',
+                      'updated_at': datetime.now(timezone.utc).isoformat(),
+                      'run_status': 'no_validated_work',
+                      'workers': [],
+                  },
+                  sort_keys=True,
+                  indent=2,
+              ) + '\n',
+              encoding='utf-8',
+          )
+          PY
+          fi
 
       - name: Persist append-only Idle Studio ledger and staffing status
         if: always()

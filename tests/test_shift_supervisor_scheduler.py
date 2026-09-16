@@ -1,4 +1,4 @@
-from core.shift_supervisor.models import PlanRevision, utcnow
+from core.shift_supervisor.models import PlanItem, PlanRevision, utcnow
 from core.shift_supervisor.plan_store import InMemoryPlanStore
 from core.shift_supervisor.scheduler import SupervisorScheduler
 
@@ -95,6 +95,62 @@ def test_run_once_ingests_latest_worker_snapshot_before_manager_call():
     assert result["workers"][0]["normal_shift_minutes"] == 7
     assert result["workers"][0]["metadata"]["last_task_id"] == "issue:42"
     assert manager.calls[0][0] is context
+
+
+def test_validated_worker_snapshot_retires_matching_canonical_plan_item():
+    secretary = _Secretary()
+    store = InMemoryPlanStore()
+    store.add_items(
+        [
+            PlanItem(
+                id="night-task-1",
+                title="Night canonical task",
+                description="validated night work",
+                priority=90,
+                target_team="night",
+            ),
+            PlanItem(
+                id="idle-task-1",
+                title="Idle canonical task",
+                description="must not be closed by a night worker",
+                priority=80,
+                target_team="idle",
+            ),
+        ]
+    )
+    manager = _Manager(store)
+    context = {
+        "worker_snapshots": [
+            {
+                "worker_id": "night-0042",
+                "team": "night",
+                "status": "offline",
+                "clocked_in_at": "2026-09-16T10:00:00+00:00",
+                "clocked_out_at": "2026-09-16T10:07:00+00:00",
+                "last_heartbeat_at": "2026-09-16T10:07:00+00:00",
+                "normal_shift_minutes": 7,
+                "overtime_minutes": 0,
+                "metadata": {
+                    "last_task_id": "night-task-1",
+                    "worked_on": ["night-task-1", "idle-task-1", "unknown-task"],
+                },
+            }
+        ]
+    }
+    scheduler = SupervisorScheduler(
+        manager=manager,
+        secretary=secretary,
+        project_context_supplier=lambda: context,
+    )
+
+    result = scheduler.run_once(run_secretary=False, run_manager=True)
+
+    items = {item["id"]: item for item in result["plan_items"]}
+    assert items["night-task-1"]["status"] == "done"
+    assert items["night-task-1"]["owner"] == "night-0042"
+    assert items["night-task-1"]["metadata"]["completion_source"] == "validated-studio-worker-snapshot"
+    assert items["idle-task-1"]["status"] == "queued"
+    assert items["idle-task-1"]["owner"] is None
 
 
 def test_run_once_can_execute_secretary_without_manager():
