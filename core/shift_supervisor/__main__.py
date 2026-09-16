@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import binascii
 import gzip
 import json
 import os
@@ -34,9 +35,12 @@ def _read_state(path: Path) -> dict[str, Any]:
         try:
             packed = base64.b64decode(raw[len(_STATE_PREFIX) :], validate=True)
             raw = gzip.decompress(packed).decode("utf-8")
-        except (ValueError, OSError) as exc:
+        except (ValueError, OSError, EOFError, UnicodeDecodeError, binascii.Error) as exc:
             raise ValueError("invalid compressed shift-supervisor state") from exc
-    value = json.loads(raw)
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError("invalid shift-supervisor state JSON") from exc
     if not isinstance(value, dict):
         raise ValueError("shift-supervisor state must contain a JSON object")
     return value
