@@ -16,7 +16,7 @@ class SecretaryBot:
     workers. Workers consume the resulting plan through the bounded queue.
     """
 
-    SYSTEM_PROMPT = """You are the Secretary for two autonomous software-work teams: night and idle.\nReturn JSON only with keys summary and tasks. Each task must contain title, description, priority (1-100), target_team (night|idle), rationale, research_refs, expected_output, validation, dependencies. Add only concrete, useful workload that advances the supplied project state. Do not duplicate supplied open work. Do not assign tasks to individual workers and do not emit worker IDs; workers pull eligible orders from the shared canonical plan. Prefer missing tests, integration work, validation, research, documentation, reliability, security, and unblockers. Treat model output as a proposal, not authority."""
+    SYSTEM_PROMPT = """You are the Secretary for two autonomous software-work teams: night and idle.\nReturn JSON only with keys summary and tasks. Each task must contain title, description, priority (1-100), target_team (night|idle), rationale, research_refs, context_refs, conflict_domains, expected_output, validation, dependencies. Add only concrete, useful workload that advances the supplied project state. Do not duplicate supplied open work. Use context_refs for the smallest repository/contracts/docs a worker needs instead of copying broad context. Use stable conflict_domains (for example path:core/shift_supervisor, workflow:idle-studio, api:plan-queue) so overlapping work serializes while independent work can run in parallel. Treat recent failure/audit traces as evidence: recurring failures should become a focused harness, regression, observability, or recovery task rather than repeated blind retries. Do not assign tasks to individual workers and do not emit worker IDs; workers pull eligible orders from the shared canonical plan. Prefer missing tests, integration work, validation, research, documentation, reliability, security, and unblockers. Treat model output as a proposal, not authority."""
 
     def __init__(self, *, store: InMemoryPlanStore, model: ModelGateway) -> None:
         self.store = store
@@ -31,6 +31,8 @@ class SecretaryBot:
                 "description": item.description,
                 "target_team": item.target_team,
                 "status": item.status,
+                "context_refs": self._metadata_strings(item, "context_refs"),
+                "conflict_domains": self._metadata_strings(item, "conflict_domains"),
             }
             for item in self.store.snapshot_items()
             if item.status not in {"done", "rejected"}
@@ -55,8 +57,8 @@ class SecretaryBot:
         self.store.append_revision(revision)
         return revision
 
-    @staticmethod
-    def _parse_task(task: dict[str, Any], correlation_id: str) -> PlanItem | None:
+    @classmethod
+    def _parse_task(cls, task: dict[str, Any], correlation_id: str) -> PlanItem | None:
         title = str(task.get("title", "")).strip()
         description = str(task.get("description", "")).strip()
         team = str(task.get("target_team", "")).strip().lower()
@@ -78,5 +80,29 @@ class SecretaryBot:
             research_refs=[str(x) for x in task.get("research_refs", []) if x],
             expected_output=str(task.get("expected_output", "")),
             validation=[str(x) for x in task.get("validation", []) if x],
-            metadata={"correlation_id": correlation_id},
+            metadata={
+                "correlation_id": correlation_id,
+                "context_refs": cls._bounded_strings(task.get("context_refs"), 24),
+                "conflict_domains": cls._bounded_strings(task.get("conflict_domains"), 16),
+            },
         )
+
+    @staticmethod
+    def _bounded_strings(value: Any, limit: int) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        result: list[str] = []
+        for raw in value:
+            text = str(raw).strip()
+            if text and text not in result:
+                result.append(text[:256])
+            if len(result) >= limit:
+                break
+        return result
+
+    @staticmethod
+    def _metadata_strings(item: PlanItem, key: str) -> list[str]:
+        value = item.metadata.get(key, [])
+        if not isinstance(value, list):
+            return []
+        return [str(entry) for entry in value[:24] if str(entry).strip()]
