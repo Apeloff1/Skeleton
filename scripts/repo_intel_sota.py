@@ -13,6 +13,7 @@ import ast
 from collections import defaultdict, deque
 import json
 from pathlib import Path
+import posixpath
 import re
 import sys
 import time
@@ -260,15 +261,15 @@ def _resolve_python_import(source: str, imp: dict[str, Any], modules: dict[str, 
 def _resolve_js_import(source: str, specifier: str, paths: set[str]) -> str | None:
     if not specifier.startswith("."):
         return None
-    base_dir = Path(source).parent
-    raw = (base_dir / specifier).as_posix()
+    raw = posixpath.normpath(posixpath.join(posixpath.dirname(source), specifier))
+    if raw == ".." or raw.startswith("../") or raw.startswith("/"):
+        return None
     candidates = [raw]
     candidates.extend(raw + suffix for suffix in JS_SUFFIXES)
-    candidates.extend((Path(raw) / f"index{suffix}").as_posix() for suffix in JS_SUFFIXES)
+    candidates.extend(posixpath.join(raw, f"index{suffix}") for suffix in JS_SUFFIXES)
     for candidate in candidates:
-        normalized = Path(candidate).as_posix()
-        if normalized in paths:
-            return normalized
+        if candidate in paths:
+            return candidate
     return None
 
 
