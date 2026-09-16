@@ -12,7 +12,7 @@ def test_repository_hygiene_bootstrap_defaults_to_verification() -> None:
 
     assert 'mode="${1:---verify}"' in text
     assert '.permissions.admin // false' in text
-    assert "X-GitHub-Api-Version: 2022-11-28" in text
+    assert "X-GitHub-Api-Version: 2026-03-10" in text
 
 
 def test_repository_hygiene_owner_policy_enables_branch_maintenance() -> None:
