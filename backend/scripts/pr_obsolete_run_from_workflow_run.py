@@ -42,6 +42,10 @@ def _matches_signal(
     )
 
 
+def _head_sha(pr: dict[str, Any]) -> str:
+    return str((pr.get("head") or {}).get("sha") or "")
+
+
 def resolve_pr_number(
     api: GitHubApi,
     *,
@@ -51,7 +55,14 @@ def resolve_pr_number(
     head_ref: str,
     default_branch: str,
 ) -> int:
-    """Resolve exactly one trusted same-repository PR for a workflow-run signal."""
+    """Resolve exactly one trusted same-repository PR for a workflow-run signal.
+
+    GitHub's commit-to-PR association can disappear after an unmerged PR closes.
+    When the immutable ``workflow_run`` payload has no PR hint and commit lookup
+    returns no trusted match, fall back to recent PR history for the exact
+    same-repository head branch *and* immutable head SHA. Ambiguous history still
+    fails closed.
+    """
     if not repo or not head_ref or not head_sha or not default_branch:
         raise RuntimeError("incomplete workflow_run PR identity")
     if head_ref == default_branch:
@@ -87,12 +98,46 @@ def resolve_pr_number(
         )
     }
     candidates.discard(0)
-    if len(candidates) != 1:
+    if len(candidates) == 1:
+        return next(iter(candidates))
+    if len(candidates) > 1:
         raise RuntimeError(
-            "workflow_run head did not resolve to exactly one trusted PR "
+            "workflow_run head resolved to multiple trusted PRs via commit association "
             f"(matches={sorted(candidates)})"
         )
-    return next(iter(candidates))
+
+    owner, separator, _ = repo.partition("/")
+    if not separator or not owner:
+        raise RuntimeError("invalid repository identity for PR history lookup")
+    quoted_head = urllib.parse.quote(f"{owner}:{head_ref}", safe="")
+    quoted_base = urllib.parse.quote(default_branch, safe="")
+    history_path = (
+        f"/repos/{repo}/pulls?state=all&head={quoted_head}&base={quoted_base}"
+        "&sort=updated&direction=desc&per_page=100"
+    )
+    status, history, _ = api.request(history_path)
+    if status != 200 or not isinstance(history, list):
+        raise RuntimeError(f"failed to resolve PR from workflow_run branch history: HTTP {status}")
+
+    historical_candidates = {
+        int(item.get("number") or 0)
+        for item in history
+        if isinstance(item, dict)
+        and _matches_signal(
+            item,
+            repo=repo,
+            head_ref=head_ref,
+            default_branch=default_branch,
+        )
+        and _head_sha(item) == head_sha
+    }
+    historical_candidates.discard(0)
+    if len(historical_candidates) != 1:
+        raise RuntimeError(
+            "workflow_run head did not resolve to exactly one trusted PR "
+            f"(commit_matches=[], branch_sha_matches={sorted(historical_candidates)})"
+        )
+    return next(iter(historical_candidates))
 
 
 def live_pr_head_converged(
