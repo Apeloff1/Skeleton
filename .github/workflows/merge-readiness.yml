@@ -135,6 +135,15 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "${{ env.PYTHON_VERSION }}"
+      - name: Validate repository intelligence and build map
+        run: |
+          python scripts/repo_intel.py check
+          python scripts/repo_intel.py snapshot --out .cache/repo-intel
+      - name: Require augmentation note for build-affecting PR changes
+        if: github.event_name == 'pull_request'
+        env:
+          REPO_INTEL_BASE: ${{ github.event.pull_request.base.sha }}
+        run: python scripts/repo_intel.py gate --base "$REPO_INTEL_BASE"
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
