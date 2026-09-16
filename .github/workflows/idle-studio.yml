@@ -74,9 +74,14 @@ jobs:
           from pathlib import Path
 
           root = Path('.idle-studio-tmp')
+          issues = json.loads((root / 'issues.json').read_text(encoding='utf-8'))
+          issues = [
+              item for item in issues
+              if not str(item.get('title', '')).strip().lower().startswith('bot:')
+          ]
           state = {
               'runs': json.loads((root / 'runs.json').read_text(encoding='utf-8')),
-              'issues': json.loads((root / 'issues.json').read_text(encoding='utf-8')),
+              'issues': issues,
               'pulls': json.loads((root / 'pulls.json').read_text(encoding='utf-8')),
               'base_sha': os.environ['BASE_SHA'],
               'current_run_id': os.environ['CURRENT_RUN_ID'],
@@ -90,7 +95,7 @@ jobs:
       - name: Plan, build, and independently review bounded work
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-5.6' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -100,6 +105,18 @@ jobs:
             --audit .idle-studio-tmp/audit.jsonl \
             --report .idle-studio-tmp/report.md
           sha256sum .idle-studio-tmp/package.json > .idle-studio-tmp/package.sha256
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          package = json.loads(
+              Path('.idle-studio-tmp/package.json').read_text(encoding='utf-8')
+          )
+          if package.get('status') == 'missing-api-key':
+              raise SystemExit(
+                  'OPENAI_API_KEY repository secret is required for Idle Studio'
+              )
+          PY
 
       - name: Revalidate sealed proposals without model or GitHub credentials
         env:
