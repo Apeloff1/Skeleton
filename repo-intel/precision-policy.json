@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "levels": {
+    "compiler": {"rank": 5, "description": "Compiler or SCIP-derived semantic relationship."},
+    "ast": {"rank": 4, "description": "Language AST-derived relationship."},
+    "manifest": {"rank": 4, "description": "Structured build/dependency manifest relationship."},
+    "lexical": {"rank": 2, "description": "Conservative text-derived relationship."},
+    "structural": {"rank": 1, "description": "Path/config-derived relationship."}
+  },
+  "rules": [
+    "Never silently upgrade lexical/structural evidence to AST/compiler precision.",
+    "Impact analysis may conservatively include lower-precision edges.",
+    "SOTA/correctness claims require explicit test/eval evidence independent of index precision."
+  ]
+}
