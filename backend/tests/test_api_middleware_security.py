@@ -86,15 +86,15 @@ def test_request_id_accepts_only_bounded_header_safe_values() -> None:
 
     assert api_middleware._request_id(accepted) == "trace-01.prod:abc_123"
     assert api_middleware._request_id(rejected) != "unsafe value with spaces"
-    assert len(api_middleware._request_id(oversized)) == 16
+    assert len(api_middleware._request_id(oversized)) == 32
 
 
 def test_api_route_boundary_rejects_lookalike_prefixes() -> None:
-    assert api_middleware._is_api_path("/api")
-    assert api_middleware._is_api_path("/api/health")
-    assert not api_middleware._is_api_path("/apiary")
-    assert not api_middleware._is_api_path("/apis")
-    assert not api_middleware._is_api_path("/api-v2")
+    assert api_middleware._matches_path_prefix("/api")
+    assert api_middleware._matches_path_prefix("/api/health")
+    assert not api_middleware._matches_path_prefix("/apiary")
+    assert not api_middleware._matches_path_prefix("/apis")
+    assert not api_middleware._matches_path_prefix("/api-v2")
 
 
 @pytest.mark.asyncio
