@@ -71,9 +71,16 @@ jobs:
             echo '> This bot inventories findings and keeps them visible. It does not dismiss alerts or weaken security gates.'
           } > "$body_file"
 
-          existing=$(gh issue list --repo "$REPO" --state open --search "${ISSUE_TITLE} in:title" --limit 20 --json number,title \
-            | jq -r --arg title "$ISSUE_TITLE" '.[] | select(.title == $title) | .number' \
-            | head -n 1)
+          existing=$(
+            gh api --paginate --slurp "/repos/${REPO}/issues?state=open&per_page=100" \
+              | jq -r --arg title "$ISSUE_TITLE" '
+                  first(
+                    .[] | if type == "array" then .[] else empty end
+                    | select((has("pull_request") | not) and (.title == $title))
+                    | .number
+                  ) // empty
+                '
+          )
 
           if [[ -n "$existing" ]]; then
             issue_number="$existing"
