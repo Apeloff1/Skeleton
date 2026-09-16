@@ -116,6 +116,10 @@ jobs:
           state_path = root / 'repo-state.json'
           state = json.loads(state_path.read_text(encoding='utf-8'))
           title = '[Shift Supervisor] Canonical Night + Idle Plan'
+          status_titles = {
+              '[Shift Supervisor] Idle Worker Status',
+              '[Shift Supervisor] Night Worker Status',
+          }
           issues = state.get('issues', [])
           canonical = next(
               (
@@ -124,9 +128,10 @@ jobs:
               ),
               None,
           )
+          ignored_titles = {title, *status_titles}
           state['issues'] = [
               issue for issue in issues
-              if not (isinstance(issue, dict) and issue.get('title') == title)
+              if not (isinstance(issue, dict) and issue.get('title') in ignored_titles)
           ]
 
           plan = []
@@ -233,6 +238,18 @@ jobs:
               )
           PY
 
+      - name: Record real idle workforce snapshot
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -s .idle-studio-tmp/package.json && -s .idle-studio-tmp/audit.jsonl ]]; then
+            python -m core.shift_supervisor.workforce_report idle \
+              --package .idle-studio-tmp/package.json \
+              --audit .idle-studio-tmp/audit.jsonl \
+              --output .idle-studio-tmp/worker-status.json
+          fi
+
       - name: Revalidate sealed proposals without model or GitHub credentials
         env:
           OPENAI_API_KEY: ''
@@ -245,7 +262,7 @@ jobs:
           python -m skeleton.automation.idle_studio_v2 validate \
             --package .idle-studio-tmp/package.json
 
-      - name: Persist append-only Idle Studio ledger
+      - name: Persist append-only Idle Studio ledger and staffing status
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
@@ -254,6 +271,17 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .idle-studio-tmp
+
+          if [[ -s .idle-studio-tmp/worker-status.json ]]; then
+            worker_title='[Shift Supervisor] Idle Worker Status'
+            worker_number=$(gh issue list --repo "$REPO" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"$worker_title\") | .number" | head -n 1)
+            if [[ -n "${worker_number:-}" ]]; then
+              gh issue edit "$worker_number" --repo "$REPO" --body-file .idle-studio-tmp/worker-status.json >/dev/null
+            else
+              gh issue create --repo "$REPO" --title "$worker_title" --body-file .idle-studio-tmp/worker-status.json >/dev/null
+            fi
+          fi
+
           title='bot: idle studio ledger'
           number=$(gh issue list --repo "$REPO" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
           if [[ -z "${number:-}" ]]; then
