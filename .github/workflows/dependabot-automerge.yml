@@ -37,6 +37,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m skeleton.automation.dependabot_merge_policy \
+          python skeleton/automation/dependabot_merge_policy.py \
             --repo "$REPO" \
             --base "$DEFAULT_BRANCH"
