@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import os
 import threading
 import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Mapping
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .models import WorkerState
 from .secretary import SecretaryBot
@@ -61,6 +63,7 @@ class SupervisorScheduler:
 
         project_context = self.project_context_supplier()
         self._ingest_worker_snapshots(project_context.get("worker_snapshots", []))
+        self._rollover_daily_totals()
         revisions: dict[str, Any] = {}
         if run_secretary:
             revisions["secretary"] = asdict(self.secretary.enrich_plan(project_context))
@@ -95,11 +98,13 @@ class SupervisorScheduler:
             if now >= next_secretary:
                 context = self.project_context_supplier()
                 self._ingest_worker_snapshots(context.get("worker_snapshots", []))
+                self._rollover_daily_totals()
                 self.secretary.enrich_plan(context)
                 next_secretary = self._advance(next_secretary, self.cadence.secretary_seconds, now)
             if now >= next_manager:
                 context = self.project_context_supplier()
                 self._ingest_worker_snapshots(context.get("worker_snapshots", []))
+                self._rollover_daily_totals()
                 self.manager.refresh_plan(
                     project_context=context,
                     research=self.research_supplier(),
@@ -114,6 +119,7 @@ class SupervisorScheduler:
     def _ingest_worker_snapshots(self, raw: Any) -> None:
         if not isinstance(raw, list):
             return
+        known = {worker.worker_id: worker for worker in self.manager.store.snapshot_workers()}
         for row in raw[:512]:
             if not isinstance(row, Mapping):
                 continue
@@ -137,16 +143,152 @@ class SupervisorScheduler:
                 overtime_task_ids=self._string_list(row.get("overtime_task_ids")),
                 metadata=dict(row.get("metadata", {})) if isinstance(row.get("metadata"), Mapping) else {},
             )
-            existing = next(
-                (item for item in self.manager.store.snapshot_workers() if item.worker_id == worker_id),
-                None,
-            )
+            existing = known.get(worker_id)
             if existing is not None:
                 incoming_time = worker.last_heartbeat_at or worker.clocked_out_at or worker.clocked_in_at
                 existing_time = existing.last_heartbeat_at or existing.clocked_out_at or existing.clocked_in_at
                 if incoming_time is not None and existing_time is not None and incoming_time < existing_time:
                     continue
+            worker = self._merge_daily_snapshot(existing, worker)
             self.manager.store.upsert_worker(worker)
+            known[worker_id] = worker
+
+    def _merge_daily_snapshot(
+        self,
+        existing: WorkerState | None,
+        incoming: WorkerState,
+    ) -> WorkerState:
+        """Merge one completed bounded shift into a de-duplicated daily ledger."""
+        meta = dict(incoming.metadata)
+        shift_key = str(meta.get("shift_key", "")).strip()
+        shift_minutes = self._nonnegative_int(meta.get("shift_minutes"))
+        ended = incoming.clocked_out_at or incoming.last_heartbeat_at or incoming.clocked_in_at
+        if not shift_key or shift_minutes <= 0 or ended is None:
+            return incoming
+
+        incoming_day = self._accounting_day(ended)
+        old_meta = dict(existing.metadata) if existing is not None else {}
+        old_day = str(old_meta.get("daily_accounting_day", "")).strip()
+        if old_day and old_day > incoming_day:
+            return existing if existing is not None else incoming
+
+        history = self._history(old_meta.get("overtime_history"))
+        if existing is not None and old_day and old_day != incoming_day:
+            history = self._archive_overtime_day(existing, history)
+            prior_work = 0
+            prior_overtime = 0
+            prior_overtime_tasks: list[str] = []
+            applied: list[str] = []
+            daily_worked_on: list[str] = []
+        elif existing is not None:
+            prior_work = self._nonnegative_int(old_meta.get("daily_work_minutes"))
+            if prior_work == 0:
+                prior_work = existing.normal_shift_minutes + existing.overtime_minutes
+            prior_overtime = existing.overtime_minutes
+            prior_overtime_tasks = list(existing.overtime_task_ids)
+            applied = self._string_list(old_meta.get("applied_shift_keys"))
+            daily_worked_on = self._string_list(old_meta.get("daily_worked_on"))
+        else:
+            prior_work = 0
+            prior_overtime = 0
+            prior_overtime_tasks = []
+            applied = []
+            daily_worked_on = []
+
+        if shift_key in applied and existing is not None:
+            incoming.normal_shift_minutes = existing.normal_shift_minutes
+            incoming.overtime_minutes = existing.overtime_minutes
+            incoming.overtime_task_ids = list(existing.overtime_task_ids)
+            merged_meta = dict(old_meta)
+            merged_meta.update(meta)
+            merged_meta["daily_accounting_day"] = old_day or incoming_day
+            merged_meta["daily_work_minutes"] = prior_work
+            merged_meta["applied_shift_keys"] = applied[-64:]
+            merged_meta["daily_worked_on"] = daily_worked_on[-64:]
+            merged_meta["overtime_history"] = history[-14:]
+            incoming.metadata = merged_meta
+            return incoming
+
+        worked_on = self._string_list(meta.get("worked_on"))
+        total_work = prior_work + shift_minutes
+        regular = min(total_work, self.manager.normal_shift_minutes)
+        overtime = max(0, total_work - self.manager.normal_shift_minutes)
+        overtime_tasks = list(prior_overtime_tasks)
+        if overtime > prior_overtime:
+            for task_id in worked_on:
+                if task_id not in overtime_tasks:
+                    overtime_tasks.append(task_id)
+
+        for task_id in worked_on:
+            if task_id not in daily_worked_on:
+                daily_worked_on.append(task_id)
+        applied.append(shift_key)
+
+        incoming.normal_shift_minutes = regular
+        incoming.overtime_minutes = overtime
+        incoming.overtime_task_ids = overtime_tasks[-64:]
+        merged_meta = dict(old_meta)
+        merged_meta.update(meta)
+        merged_meta.update(
+            {
+                "daily_accounting_day": incoming_day,
+                "daily_work_minutes": total_work,
+                "daily_worked_on": daily_worked_on[-64:],
+                "applied_shift_keys": applied[-64:],
+                "overtime_history": history[-14:],
+            }
+        )
+        incoming.metadata = merged_meta
+        return incoming
+
+    def _rollover_daily_totals(self) -> None:
+        today = self._accounting_day(datetime.now(timezone.utc))
+        for worker in self.manager.store.snapshot_workers():
+            meta = dict(worker.metadata)
+            day = str(meta.get("daily_accounting_day", "")).strip()
+            if not day or day >= today:
+                continue
+            history = self._archive_overtime_day(worker, self._history(meta.get("overtime_history")))
+            meta.update(
+                {
+                    "daily_accounting_day": today,
+                    "daily_work_minutes": 0,
+                    "daily_worked_on": [],
+                    "applied_shift_keys": [],
+                    "overtime_history": history[-14:],
+                }
+            )
+            worker.normal_shift_minutes = 0
+            worker.overtime_minutes = 0
+            worker.overtime_task_ids = []
+            worker.metadata = meta
+            self.manager.store.upsert_worker(worker)
+
+    def _archive_overtime_day(
+        self,
+        worker: WorkerState,
+        history: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        meta = worker.metadata
+        day = str(meta.get("daily_accounting_day", "")).strip()
+        overtime = self._nonnegative_int(worker.overtime_minutes)
+        if not day or overtime <= 0:
+            return history
+        entry = {
+            "day": day,
+            "work_minutes": self._nonnegative_int(meta.get("daily_work_minutes")),
+            "overtime_minutes": overtime,
+            "task_ids": list(worker.overtime_task_ids)[:64],
+        }
+        history = [row for row in history if str(row.get("day", "")) != day]
+        history.append(entry)
+        return history[-14:]
+
+    @staticmethod
+    def _history(value: Any) -> list[dict[str, Any]]:
+        if not isinstance(value, list):
+            return []
+        return [dict(row) for row in value[-14:] if isinstance(row, Mapping)]
 
     @staticmethod
     def _parse_datetime(value: Any) -> datetime | None:
@@ -179,6 +321,15 @@ class SupervisorScheduler:
             return max(0, int(value))
         except (TypeError, ValueError):
             return 0
+
+    @staticmethod
+    def _accounting_day(value: datetime) -> str:
+        zone_name = os.getenv("SHIFT_ACCOUNTING_TIMEZONE", "UTC").strip() or "UTC"
+        try:
+            zone = ZoneInfo(zone_name)
+        except ZoneInfoNotFoundError:
+            zone = timezone.utc
+        return value.astimezone(zone).date().isoformat()
 
     @staticmethod
     def _advance(previous: float, interval: int, now: float) -> float:
