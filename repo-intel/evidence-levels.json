@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "levels": [
+    {"id": "surface", "rank": 1, "requires": ["implementation anchor"]},
+    {"id": "tested", "rank": 2, "requires": ["focused automated regression"]},
+    {"id": "integrated", "rank": 3, "requires": ["cross-subsystem integration evidence"]},
+    {"id": "benchmarked", "rank": 4, "requires": ["versioned metric/eval against declared workload"]},
+    {"id": "release-evidenced", "rank": 5, "requires": ["target-matrix CI/release evidence", "security/quality gates"]}
+  ],
+  "competitive_claim_rule": "No competitive or SOTA label may be derived automatically from structural surface evidence. Claims require explicit benchmark/eval records with workload, version, date and metric."
+}
