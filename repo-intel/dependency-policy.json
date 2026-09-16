@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "ecosystems": {
+    "github-actions": {
+      "preferred_identity": "full-commit-sha",
+      "mutable_ref_is_finding": true,
+      "rationale": "Workflow actions should resolve to immutable reviewed content."
+    },
+    "oci": {
+      "preferred_identity": "sha256-digest",
+      "mutable_ref_is_finding": true,
+      "rationale": "Container bases used for reproducible/security-sensitive builds should have immutable image identity."
+    },
+    "npm": {
+      "lockfiles": ["yarn.lock", "package-lock.json", "pnpm-lock.yaml", "npm-shrinkwrap.json"],
+      "lockfile_required_when_manifest_present": true
+    },
+    "pypi": {
+      "lockfiles": ["uv.lock", "poetry.lock", "Pipfile.lock"],
+      "note": "Pinned requirements files are also treated as reproducibility evidence; ranged pyproject dependencies may coexist with a resolved deployment manifest."
+    }
+  },
+  "rules": {
+    "exact_pin_conflict_severity": "high",
+    "multi_spec_drift_severity": "medium",
+    "mutable_identity_severity": "high",
+    "missing_lockfile_severity": "medium"
+  },
+  "evidence_rule": "A policy finding is review evidence, not proof of exploitability. Vulnerability state remains sourced from Dependabot/dependency review/other scanners."
+}
