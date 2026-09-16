@@ -18,6 +18,10 @@ else:
     from pr_obsolete_run_drain import GitHubApi, main as drain_main
 
 
+MAX_HISTORY_PAGES = 10
+HISTORY_PAGE_SIZE = 100
+
+
 def _repo_full_name(obj: Any) -> str:
     return str((obj or {}).get("full_name") or "")
 
@@ -41,6 +45,48 @@ def _matches_signal(
 
 def _head_sha(pr: dict[str, Any]) -> str:
     return str((pr.get("head") or {}).get("sha") or "")
+
+
+def _list_branch_history(
+    api: GitHubApi,
+    *,
+    repo: str,
+    owner: str,
+    head_ref: str,
+    default_branch: str,
+) -> list[dict[str, Any]]:
+    """List a bounded, complete prefix of matching PR history.
+
+    Identity recovery must not silently trust only GitHub's first page. Scan up
+    to 1,000 branch/base matches and fail closed if that bound is exhausted,
+    because an unseen later page could contain another exact head-SHA match.
+    """
+    history: list[dict[str, Any]] = []
+    for page in range(1, MAX_HISTORY_PAGES + 1):
+        query = urllib.parse.urlencode(
+            {
+                "state": "all",
+                "head": f"{owner}:{head_ref}",
+                "base": default_branch,
+                "sort": "updated",
+                "direction": "desc",
+                "per_page": HISTORY_PAGE_SIZE,
+                "page": page,
+            }
+        )
+        status, payload, _ = api.request(f"/repos/{repo}/pulls?{query}")
+        if status != 200 or not isinstance(payload, list):
+            raise RuntimeError(
+                "failed to resolve PR from workflow_run branch history: "
+                f"HTTP {status}"
+            )
+        history.extend(item for item in payload if isinstance(item, dict))
+        if len(payload) < HISTORY_PAGE_SIZE:
+            return history
+
+    raise RuntimeError(
+        "workflow_run branch history exceeded bounded 1000-entry identity scan"
+    )
 
 
 def resolve_pr_number(
@@ -107,21 +153,18 @@ def resolve_pr_number(
     owner, separator, _ = repo.partition("/")
     if not separator or not owner:
         raise RuntimeError("invalid repository identity for PR history lookup")
-    quoted_head = urllib.parse.quote(f"{owner}:{head_ref}", safe="")
-    quoted_base = urllib.parse.quote(default_branch, safe="")
-    history_path = (
-        f"/repos/{repo}/pulls?state=all&head={quoted_head}&base={quoted_base}"
-        "&sort=updated&direction=desc&per_page=100"
+    history = _list_branch_history(
+        api,
+        repo=repo,
+        owner=owner,
+        head_ref=head_ref,
+        default_branch=default_branch,
     )
-    status, history, _ = api.request(history_path)
-    if status != 200 or not isinstance(history, list):
-        raise RuntimeError(f"failed to resolve PR from workflow_run branch history: HTTP {status}")
 
     historical_candidates = {
         int(item.get("number") or 0)
         for item in history
-        if isinstance(item, dict)
-        and _matches_signal(
+        if _matches_signal(
             item,
             repo=repo,
             head_ref=head_ref,
