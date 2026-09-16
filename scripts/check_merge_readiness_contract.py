@@ -14,6 +14,11 @@ GITLEAKS_PIN = "gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1
 REQUIRED_NEEDS = ("quarantine_policy", "unit", "integration_smoke", "quality_security")
 CONCURRENCY_GROUP = "group: merge-readiness-${{ github.event.pull_request.number || github.sha }}"
 CANCEL_POLICY = "cancel-in-progress: ${{ github.event_name == 'pull_request' }}"
+READINESS_GUARD = (
+    "if: ${{ always() && (github.event_name != 'pull_request' || "
+    "(!github.event.pull_request.draft && github.event.action != 'converted_to_draft' "
+    "&& github.event.action != 'closed')) }}"
+)
 
 
 def require(condition: bool, message: str, failures: list[str]) -> None:
@@ -83,8 +88,8 @@ def main() -> int:
     readiness = text[readiness_start:] if readiness_start >= 0 else ""
     require("name: Merge Readiness" in readiness, "stable Merge Readiness job name missing", failures)
     require(
-        re.search(r"^\s*if:\s*(?:\$\{\{\s*)?always\(\)", readiness, re.MULTILINE) is not None,
-        "Merge Readiness must aggregate required results with always()",
+        READINESS_GUARD in readiness,
+        "Merge Readiness must aggregate active validation runs while preserving draft/close cancellation barriers",
         failures,
     )
     require('result != "success"' in readiness, "Merge Readiness must fail on every non-success result", failures)
