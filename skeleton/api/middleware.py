@@ -4,7 +4,7 @@ FastAPI doesn't ship with these; they live here so routes stay thin.
 
 Gate stack (outer → inner), sibling of Zaibatsu.Gate Program.cs::
 
-    RequestSeal → WriteAdmit → BodyBound → WORM → Auth → PolicyGate
+    HeaderBound → RequestSeal → WriteAdmit → BodyBound → WORM → Auth → PolicyGate
 
 Install with :func:`install_gate` (Starlette LIFO: last added = outermost).
 """
@@ -190,7 +190,7 @@ def _json_response(status: int, body: Dict[str, Any]):
 
 
 class RequestSealMiddleware:
-    """Outer seal: mint/propagate X-Request-Id; HMAC fail-closed on protected paths.
+    """Seal layer: mint/propagate X-Request-Id; HMAC fail-closed on protected paths.
 
     Correlation seal always threads. Credential seal (``x-gf-seal`` / #16 HMAC)
     is enforced here for non-open routes: missing/bad → 401; secret unset → 503.
@@ -460,6 +460,8 @@ def install_gate(
     policy: Optional[GatePolicy] = None,
     audit_log: Any = None,
     max_body_bytes: Optional[int] = None,
+    max_header_bytes: Optional[int] = None,
+    max_header_count: Optional[int] = None,
     write_gate: Any = None,
     write_governor: Any = None,
 ) -> Any:
@@ -469,9 +471,10 @@ def install_gate(
 
     Order (outer → inner), sibling of Zaibatsu.Gate + gf-server admit_write::
 
-        RequestSeal → WriteAdmit → BodyBound → WORM → Auth → PolicyGate
+        HeaderBound → RequestSeal → WriteAdmit → BodyBound → WORM → Auth → PolicyGate
     """
     from skeleton.api.admit_write import WriteAdmitMiddleware
+    from skeleton.api.request_bounds import HeaderBoundMiddleware
 
     policy = policy or GatePolicy()
     # Innermost first:
@@ -486,4 +489,9 @@ def install_gate(
         governor=write_governor,
     )
     app.add_middleware(RequestSealMiddleware, policy=policy)
+    app.add_middleware(
+        HeaderBoundMiddleware,
+        max_header_bytes=max_header_bytes,
+        max_header_count=max_header_count,
+    )
     return app
