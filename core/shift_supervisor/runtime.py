@@ -19,16 +19,34 @@ def build_supervisor(
     model: ModelGateway | None = None,
     cadence: SupervisorCadence | None = None,
 ) -> SupervisorScheduler:
-    """Construct the paired manager/secretary runtime around shared state/API."""
+    """Construct the paired manager/secretary runtime around shared state/API.
+
+    The scheduler and research broker share the same captured project snapshot
+    for a planning cycle. This avoids re-fetching a large repository/workforce
+    context just to collect research for the Manager.
+    """
     shared_store = store or InMemoryPlanStore()
     shared_model = model or ModelGateway()
     broker = ResearchBroker(research_sources or {})
     secretary = SecretaryBot(store=shared_store, model=shared_model)
     manager = SMBShiftManager(store=shared_store, model=shared_model)
+    latest_context: dict[str, dict[str, Any]] = {}
+
+    def capture_context() -> dict[str, Any]:
+        context = project_context_supplier()
+        latest_context["value"] = context
+        return context
+
+    def collect_research() -> list[dict[str, Any]]:
+        context = latest_context.get("value")
+        if context is None:
+            context = capture_context()
+        return broker.collect(context)
+
     return SupervisorScheduler(
         manager=manager,
         secretary=secretary,
-        project_context_supplier=project_context_supplier,
-        research_supplier=lambda: broker.collect(project_context_supplier()),
+        project_context_supplier=capture_context,
+        research_supplier=collect_research,
         cadence=cadence,
     )
