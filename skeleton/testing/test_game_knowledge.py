@@ -2,12 +2,30 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from skeleton.acquired.gaming import GameKnowledgeBase, GameReference, build_game_knowledge_context
 from skeleton.pipelines.gameforge import GameForge
+
+
+def _reference_payload(**overrides: object) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "appid": 1,
+        "title": "Example",
+        "era": "example",
+        "dialect": "example",
+        "source": "test",
+        "citation": "Example citation",
+        "license": "Test-License",
+        "url": "https://example.invalid",
+        "stored_prose": 0,
+    }
+    payload.update(overrides)
+    return payload
 
 
 def test_packaged_knowledge_loads_reference_index() -> None:
@@ -52,17 +70,48 @@ def test_context_is_bounded_and_preserves_provenance() -> None:
 
 def test_reference_rejects_copied_prose() -> None:
     with pytest.raises(ValueError, match="metadata-only"):
-        GameReference.from_mapping({
-            "appid": 1,
-            "title": "Example",
-            "era": "example",
-            "dialect": "example",
-            "source": "test",
-            "citation": "Example citation",
-            "license": "Test-License",
-            "url": "https://example.invalid",
-            "stored_prose": 1,
-        })
+        GameReference.from_mapping(_reference_payload(stored_prose=1))
+
+
+@pytest.mark.parametrize("appid", [True, "1", 1.5, 0, -1])
+def test_reference_requires_positive_integer_appid(appid: object) -> None:
+    with pytest.raises(ValueError, match="positive integer"):
+        GameReference.from_mapping(_reference_payload(appid=appid))
+
+
+def test_reference_rejects_non_text_required_metadata() -> None:
+    with pytest.raises(ValueError, match="required text fields: title"):
+        GameReference.from_mapping(_reference_payload(title=7))
+
+
+def test_from_path_rejects_non_object_root(tmp_path: Path) -> None:
+    path = tmp_path / "references.json"
+    path.write_text("[]", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="must contain an object"):
+        GameKnowledgeBase.from_path(path)
+
+
+def test_from_path_rejects_non_object_entries(tmp_path: Path) -> None:
+    path = tmp_path / "references.json"
+    path.write_text(
+        json.dumps({"kind": "reference-index", "games": ["not-an-object"], "n": 1}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="entries must be objects"):
+        GameKnowledgeBase.from_path(path)
+
+
+def test_from_path_rejects_non_integer_declared_count(tmp_path: Path) -> None:
+    path = tmp_path / "references.json"
+    path.write_text(
+        json.dumps({"kind": "reference-index", "games": [_reference_payload()], "n": "1"}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="count must be an integer"):
+        GameKnowledgeBase.from_path(path)
 
 
 def test_search_limit_must_be_positive() -> None:
