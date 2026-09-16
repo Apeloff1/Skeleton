@@ -1,4 +1,4 @@
-.PHONY: install dev test smoke verify quality ci lint clean
+.PHONY: install dev test smoke verify quality ci lint clean repo-intel repo-intel-check
 
 install:
 	pip install -r requirements.txt
@@ -18,7 +18,16 @@ verify:
 quality:
 	bash scripts/quality-gates.sh
 
+repo-intel:
+	python scripts/repo_intel.py check
+	python scripts/repo_intel.py snapshot --out .cache/repo-intel
+
+repo-intel-check:
+	python scripts/repo_intel.py gate --base "$${REPO_INTEL_BASE:-origin/main}"
+	python scripts/repo_intel.py snapshot --out .cache/repo-intel
+
 ci:
+	python scripts/repo_intel.py check
 	bash scripts/ci.sh
 
 lint:
