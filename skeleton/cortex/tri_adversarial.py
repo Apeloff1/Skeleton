@@ -331,6 +331,7 @@ class TriAdversarialEngine:
                 raise RuntimeError(
                     f"tri-engine invariant violated: {lane.value} mutated candidate outside repairer"
                 )
+            decision = self._bind_lane_seal(lane, decision)
             lane_decisions.append(LaneDecision(lane, decision))
             flat_results.extend(TriGateResult(lane, result) for result in decision.results)
             # Only the explicitly bounded repair path is authorized to change the
@@ -370,6 +371,29 @@ class TriAdversarialEngine:
             external_content=deepcopy(ctx.external_content),
             metadata=metadata,
         )
+
+    def _bind_lane_seal(self, lane: TriLane, decision: ReleaseDecision) -> ReleaseDecision:
+        """Bind an allowed lane seal to lane identity without changing base-engine seals."""
+        if decision.seal is None:
+            return decision
+        payload = json.dumps(
+            {
+                "version": 1,
+                "architecture": "jeeves-tri-engine-lane",
+                "lane": lane.value,
+                "decision_seal": decision.seal,
+            },
+            sort_keys=True,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        if self.seal_key:
+            seal = "hmac-sha256:" + hmac.new(
+                self.seal_key, payload, hashlib.sha256
+            ).hexdigest()
+        else:
+            seal = "sha256:" + hashlib.sha256(payload).hexdigest()
+        return replace(decision, seal=seal)
 
     def _make_seal(
         self,

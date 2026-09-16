@@ -104,6 +104,7 @@ jobs:
         env:
           MONGO_URL: mongodb://localhost:27017/test
           SKIP_HEAVY_SEED: "true"
+          PYTHONPATH: ".."
         run: >-
           uv run python -c "import server; assert server.app is not None;
           print('server import: OK')"
