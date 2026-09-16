@@ -54,6 +54,7 @@ jobs:
           python -m unittest -v
           skeleton.testing.test_idle_studio
           skeleton.testing.test_idle_studio_v2
+          skeleton.testing.test_idle_studio_publisher
 
       - name: Snapshot live repository state
         env:
@@ -160,7 +161,7 @@ jobs:
         run: |
           set -euo pipefail
           sha256sum -c .idle-studio-tmp/package.sha256
-          python -m skeleton.automation.idle_studio_v2 publish \
+          python -m skeleton.automation.idle_studio_publisher \
             --package .idle-studio-tmp/package.json
 
       - name: Summarize idle studio run
