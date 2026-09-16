@@ -39,6 +39,7 @@ def test_local_execution_requires_explicit_opt_in(monkeypatch: pytest.MonkeyPatc
     [
         ("EMERGENT_DEPLOY", "true"),
         ("ENVIRONMENT", "production"),
+        ("ENVIRONMENT", "staging"),
         ("K_SERVICE", "skeleton-api"),
         ("KUBERNETES_SERVICE_HOST", "10.0.0.1"),
         ("WEBSITE_INSTANCE_ID", "instance-1"),
