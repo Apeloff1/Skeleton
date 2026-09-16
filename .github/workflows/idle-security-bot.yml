@@ -31,8 +31,16 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/security"
-          gh api --paginate "/repos/${REPO}/code-scanning/alerts?state=open&per_page=100" > "$RUNNER_TEMP/security/code.json" || printf '[]' > "$RUNNER_TEMP/security/code.json"
-          gh api --paginate "/repos/${REPO}/dependabot/alerts?state=open&per_page=100" > "$RUNNER_TEMP/security/dependabot.json" || printf '[]' > "$RUNNER_TEMP/security/dependabot.json"
+
+          if ! gh api --paginate --slurp "/repos/${REPO}/code-scanning/alerts?state=open&per_page=100" \
+            | jq '[.[] | if type == "array" then .[] else empty end]' > "$RUNNER_TEMP/security/code.json"; then
+            printf '[]' > "$RUNNER_TEMP/security/code.json"
+          fi
+
+          if ! gh api --paginate --slurp "/repos/${REPO}/dependabot/alerts?state=open&per_page=100" \
+            | jq '[.[] | if type == "array" then .[] else empty end]' > "$RUNNER_TEMP/security/dependabot.json"; then
+            printf '[]' > "$RUNNER_TEMP/security/dependabot.json"
+          fi
 
       - name: Create or refresh digest issue
         shell: bash
@@ -63,13 +71,25 @@ jobs:
             echo '> This bot inventories findings and keeps them visible. It does not dismiss alerts or weaken security gates.'
           } > "$body_file"
 
-          existing=$(gh issue list --repo "$REPO" --state open --search "${ISSUE_TITLE} in:title" --limit 1 --json number --jq '.[0].number // empty')
+          existing=$(gh issue list --repo "$REPO" --state open --search "${ISSUE_TITLE} in:title" --limit 20 --json number,title \
+            | jq -r --arg title "$ISSUE_TITLE" '.[] | select(.title == $title) | .number' \
+            | head -n 1)
+
           if [[ -n "$existing" ]]; then
-            gh issue comment "$existing" --repo "$REPO" --body-file "$body_file" >/dev/null
-            gh issue edit "$existing" --repo "$REPO" --add-label 'security' >/dev/null
             issue_number="$existing"
+            gh issue comment "$issue_number" --repo "$REPO" --body-file "$body_file" >/dev/null
+            gh issue edit "$issue_number" --repo "$REPO" --add-label 'security' >/dev/null
           else
-            issue_number=$(gh issue create --repo "$REPO" --title "$ISSUE_TITLE" --body-file "$body_file" --label 'security' --json number --jq '.number')
+            issue_number=$(gh api --method POST "repos/${REPO}/issues" \
+              -f title="$ISSUE_TITLE" \
+              -f body="$(cat "$body_file")" \
+              -f 'labels[]=security' \
+              --jq '.number')
+          fi
+
+          if [[ ! "$issue_number" =~ ^[0-9]+$ ]]; then
+            echo 'Idle security bot could not resolve a valid digest issue number.' >&2
+            exit 1
           fi
 
           {
