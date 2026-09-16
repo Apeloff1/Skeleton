@@ -1,0 +1,105 @@
+name: Repository Intelligence
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: repo-intel-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+  security-events: read
+
+env:
+  PYTHON_VERSION: "3.11.16"
+  PYTHONPATH: "${{ github.workspace }}"
+
+jobs:
+  map-and-gate:
+    name: Map build / gaps / security / agent handoff
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "${{ env.PYTHON_VERSION }}"
+
+      - name: Validate repo-intelligence contracts
+        run: python scripts/repo_intel.py check
+
+      - name: Build fast repository snapshot
+        run: python scripts/repo_intel.py snapshot --out .cache/repo-intel
+
+      - name: Require build augmentation note
+        if: github.event_name == 'pull_request'
+        env:
+          REPO_INTEL_BASE: origin/${{ github.base_ref }}
+        run: python scripts/repo_intel.py gate --base "$REPO_INTEL_BASE"
+
+      - name: Query live Dependabot security data when permitted
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p .cache/repo-intel
+          if gh api -X GET \
+            "repos/${GITHUB_REPOSITORY}/dependabot/alerts" \
+            -f state=open -f per_page=100 \
+            > .cache/repo-intel/dependabot-alerts.json 2> .cache/repo-intel/dependabot-alerts.err; then
+            echo "Dependabot alert API available"
+          else
+            : > .cache/repo-intel/dependabot-alerts.json
+            echo "Dependabot alert API unavailable to workflow token; continuing with static coverage"
+          fi
+          if gh api -X GET search/issues \
+            -f q="repo:${GITHUB_REPOSITORY} author:app/dependabot is:pr is:open" \
+            -f per_page=100 \
+            > .cache/repo-intel/dependabot-prs.json 2> .cache/repo-intel/dependabot-prs.err; then
+            echo "Dependabot PR search available"
+          else
+            : > .cache/repo-intel/dependabot-prs.json
+          fi
+          python scripts/repo_intel.py dependabot-notes \
+            --alerts .cache/repo-intel/dependabot-alerts.json \
+            --prs .cache/repo-intel/dependabot-prs.json \
+            --out .cache/repo-intel/dependabot-notes.md
+
+      - name: Publish build-facing notes to job summary
+        shell: bash
+        run: |
+          {
+            cat .cache/repo-intel/notes.md
+            echo
+            cat .cache/repo-intel/dependabot-notes.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Show machine-map summary
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          base = Path('.cache/repo-intel')
+          index = json.loads((base / 'index.json').read_text())
+          gaps = json.loads((base / 'gaps.json').read_text())
+          sq = json.loads((base / 'security-quality.json').read_text())
+          print('source_digest=', index['source_digest'])
+          print('tracked_files=', index['tracked_files'])
+          print('tracked_bytes=', index['tracked_bytes'])
+          print('gap_counts=', gaps['counts'])
+          print('dependabot_ecosystems=', sq['dependabot_ecosystems'])
+          print('large_tracked_files=', len(index['large_tracked_files']))
+          PY
