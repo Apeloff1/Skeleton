@@ -1,4 +1,4 @@
-ARG PYTHON_IMAGE=python:3.14-alpine@sha256:05b2b8b732ecd268fee8727a369f936f022d1321b59befd13c30ede22769dcdc
+ARG PYTHON_IMAGE=python:3.14-alpine@sha256:c6ead215bfd31f1e433d968853b7a769989117115b728874824e6c0a27cb96fc
 FROM ${PYTHON_IMAGE}
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -17,14 +17,20 @@ RUN addgroup -S -g 10001 appuser \
 COPY --chown=appuser:appuser pyproject.toml README.md ./
 COPY --chown=appuser:appuser skeleton ./skeleton
 
-# setuptools is required only to build this project, not to serve it. msgpack
-# is also not a declared runtime dependency. Remove vulnerable copies that are
-# inherited from the base image after the application has been installed.
+# The installer toolchain is build-time only. pip 26.2+ also carries vendored
+# packages plus an embedded CycloneDX SBOM under pip/_vendor; leaving that
+# tree in a production image makes those vendored copies part of the runtime
+# attack surface and causes image scanners to report them independently of
+# the application's installed packages. Install first, then remove the full
+# installer/toolchain surface from the final runtime.
 RUN pip install --no-cache-dir . \
-    && pip uninstall -y msgpack setuptools || true \
+    && pip uninstall -y msgpack setuptools \
     && rm -rf /usr/local/lib/python3.14/site-packages/msgpack* \
               /usr/local/lib/python3.14/site-packages/setuptools* \
-              /usr/local/lib/python3.14/site-packages/pkg_resources*
+              /usr/local/lib/python3.14/site-packages/pkg_resources* \
+              /usr/local/lib/python3.14/site-packages/pip \
+              /usr/local/lib/python3.14/site-packages/pip-*.dist-info \
+              /usr/local/bin/pip*
 
 USER appuser
 
