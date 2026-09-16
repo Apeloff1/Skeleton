@@ -1,5 +1,6 @@
 import pytest
 
+from skeleton.automation.free_model import redact_secrets
 from skeleton.automation.repo_bots import extract_plan, safe_path
 
 
@@ -20,3 +21,10 @@ def test_safe_path_rejects_control_plane_and_traversal():
 def test_extract_plan_rejects_untrusted_paths():
     with pytest.raises(ValueError):
         extract_plan('{"summary":"bad","files":[{"path":".github/workflows/x.yml","content":"x"}]}')
+
+
+def test_redact_secrets_removes_common_credentials():
+    text = "token=ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ123456 bearer Bearer abcdefghijklmnop123456"
+    clean = redact_secrets(text)
+    assert "ghp_" not in clean
+    assert "Bearer abcdef" not in clean
