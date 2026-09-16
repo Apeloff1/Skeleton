@@ -7,6 +7,7 @@ and string/template literal data. Expressions inside template literals remain co
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import re
 import sys
@@ -35,14 +36,28 @@ NAMESPACE_IMPORT_RE = re.compile(
 
 
 def javascript_files() -> Iterable[Path]:
-    if not FRONTEND_ROOT.exists():
-        return
-    for path in FRONTEND_ROOT.rglob("*"):
-        if not path.is_file() or path.suffix.lower() not in JS_SUFFIXES:
-            continue
-        if any(part in SKIP_DIRS for part in path.parts):
-            continue
-        yield path
+    """Walk frontend JS/TS sources without following symlinks or hiding I/O errors."""
+    if FRONTEND_ROOT.is_symlink():
+        raise OSError("scan root must not be a symlink")
+
+    stack = [FRONTEND_ROOT]
+    while stack:
+        current = stack.pop()
+        child_dirs: list[Path] = []
+        javascript_paths: list[Path] = []
+        with os.scandir(current) as entries:
+            for entry in sorted(entries, key=lambda item: item.name):
+                if entry.name in SKIP_DIRS:
+                    continue
+                if entry.is_dir(follow_symlinks=False):
+                    child_dirs.append(Path(entry.path))
+                elif (
+                    entry.is_file(follow_symlinks=False)
+                    and Path(entry.name).suffix.lower() in JS_SUFFIXES
+                ):
+                    javascript_paths.append(Path(entry.path))
+        yield from javascript_paths
+        stack.extend(reversed(child_dirs))
 
 
 def display_path(path: Path) -> Path:
@@ -61,7 +76,6 @@ def _mask_comments(text: str) -> str:
     chars = list(text)
     out = list(text)
     state = "code"
-    quote = ""
     escaped = False
     template_expr_depths: list[int] = []
     i = 0
@@ -276,7 +290,7 @@ def violations(path: Path) -> list[str]:
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as exc:
-        return [f"{label}: read failure: {exc}"]
+        return [f"{label}: read failure: {type(exc).__name__}"]
 
     scan_text = _mask_comments(text)
     code_positions = _code_positions(text)
@@ -318,9 +332,20 @@ def violations(path: Path) -> list[str]:
 def main() -> int:
     findings: list[str] = []
     scanned = 0
-    for path in javascript_files():
-        scanned += 1
-        findings.extend(violations(path))
+    try:
+        for path in javascript_files():
+            scanned += 1
+            findings.extend(violations(path))
+    except OSError as exc:
+        print(
+            f"JavaScript child_process alias scan failed: {type(exc).__name__}",
+            file=sys.stderr,
+        )
+        return 1
+
+    if scanned == 0:
+        findings.append("scanner coverage failure: no frontend JS/TS files were scanned")
+
     if findings:
         print("JavaScript child_process alias violations detected:", file=sys.stderr)
         for finding in sorted(findings):
