@@ -463,14 +463,31 @@ def propose(
         max_tasks=max_tasks,
     )
 
-    reasoner = ChatGPTReasoner()
-    tasks = _plan(
-        reasoner,
-        cohort,
-        max_tasks=max_tasks,
-        backlog_path=Path("BACKLOG.md"),
-        repo_state_path=repo_state_path,
-    )
+    try:
+        reasoner = ChatGPTReasoner()
+        tasks = _plan(
+            reasoner,
+            cohort,
+            max_tasks=max_tasks,
+            backlog_path=Path("BACKLOG.md"),
+            repo_state_path=repo_state_path,
+        )
+    except Exception as exc:
+        # Fail loudly, but leave a deterministic machine record and empty patch
+        # so workflow finalizers can report the failure without ambiguous state.
+        patch_path.parent.mkdir(parents=True, exist_ok=True)
+        patch_path.write_text("", encoding="utf-8")
+        _git("reset", "--hard", "HEAD", check=False)
+        audit.emit(
+            "run_failed_closed",
+            stage="planning",
+            error=str(exc)[:2000],
+            accepted_tasks=0,
+            emitted_patch_chars=0,
+            status="failed_closed",
+        )
+        raise
+
     audit.emit(
         "plan_created",
         tasks=[
