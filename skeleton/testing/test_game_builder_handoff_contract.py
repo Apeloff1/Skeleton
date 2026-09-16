@@ -37,6 +37,10 @@ def test_builder_handoff_is_bounded_ephemeral_and_not_url_serialized() -> None:
 
     assert "DEFAULT_MAX_AGE_MS = 30 * 60 * 1000" in handoff
     assert "DEFAULT_DESCRIPTION_LIMIT = 1800" in handoff
+    assert "DEFAULT_HANDOFF_PAYLOAD_LIMIT = 32 * 1024" in handoff
+    assert "data: string;" in handoff
+    assert "data: boundedPayload(data)" in handoff
+    assert "serialized.slice(0, limit - 1)" in handoff
     assert "pendingArtifact" in handoff
     assert "pendingArtifact = null" in handoff
     assert "localStorage" not in handoff
