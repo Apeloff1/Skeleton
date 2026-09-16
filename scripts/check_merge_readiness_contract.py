@@ -24,7 +24,8 @@ REPO_INTEL_SNAPSHOT = (
     'python scripts/repo_intel_frontier.py snapshot --base "$REPO_INTEL_BASE" --out .cache/repo-intel'
 )
 REPO_INTEL_GATE = 'python scripts/repo_intel_frontier.py gate --base "$REPO_INTEL_BASE"'
-REPO_INTEL_BASE = "REPO_INTEL_BASE: ${{ github.event.pull_request.base.sha }}"
+REPO_INTEL_BASE = "REPO_INTEL_BASE: ${{ github.event.pull_request.base.sha || 'origin/main' }}"
+REPO_INTEL_PR_GATE_BASE = "REPO_INTEL_BASE: ${{ github.event.pull_request.base.sha }}"
 JOB_HEADER_RE = re.compile(r"^  (?P<name>[A-Za-z0-9_-]+):\s*$", re.MULTILINE)
 
 
@@ -123,6 +124,11 @@ def main() -> int:
     )
     require(
         REPO_INTEL_BASE in quality_security,
+        "frontier snapshot must fall back to origin/main outside pull-request events",
+        failures,
+    )
+    require(
+        REPO_INTEL_PR_GATE_BASE in quality_security,
         "repo-intelligence PR gate must compare against the immutable pull-request base SHA",
         failures,
     )
