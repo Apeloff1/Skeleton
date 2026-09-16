@@ -209,16 +209,16 @@ def test_symlink_scan_root_fails_closed(
     assert "JavaScript child_process alias scan failed: OSError" in captured.err
 
 
-def test_discovery_does_not_follow_symlink_directories(
+def test_discovery_fails_closed_on_symlink_directories(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     frontend = tmp_path / "frontend"
     external = tmp_path / "external"
     frontend.mkdir()
     external.mkdir()
-    safe = frontend / "safe.ts"
-    safe.write_text("export const safe = true;\n", encoding="utf-8")
+    (frontend / "safe.ts").write_text("export const safe = true;\n", encoding="utf-8")
     (external / "hidden.ts").write_text(
         "import * as cp from 'child_process';\ncp.exec(input);\n",
         encoding="utf-8",
@@ -231,4 +231,35 @@ def test_discovery_does_not_follow_symlink_directories(
 
     monkeypatch.setattr(scanner, "FRONTEND_ROOT", frontend)
 
-    assert list(scanner.javascript_files()) == [safe]
+    assert scanner.main() == 1
+    captured = capsys.readouterr()
+    assert "JavaScript child_process alias scan failed: OSError" in captured.err
+    assert "linked" not in captured.err
+    assert "external" not in captured.err
+
+
+def test_discovery_fails_closed_on_symlink_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    frontend = tmp_path / "frontend"
+    frontend.mkdir()
+    external = tmp_path / "external.ts"
+    external.write_text(
+        "import * as cp from 'child_process';\ncp.exec(input);\n",
+        encoding="utf-8",
+    )
+    link = frontend / "linked.ts"
+    try:
+        link.symlink_to(external)
+    except OSError:
+        pytest.skip("file symlinks are unavailable on this platform")
+
+    monkeypatch.setattr(scanner, "FRONTEND_ROOT", frontend)
+
+    assert scanner.main() == 1
+    captured = capsys.readouterr()
+    assert "JavaScript child_process alias scan failed: OSError" in captured.err
+    assert "linked.ts" not in captured.err
+    assert "external.ts" not in captured.err
