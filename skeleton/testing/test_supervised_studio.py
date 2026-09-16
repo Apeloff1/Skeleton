@@ -139,6 +139,72 @@ def test_supervised_night_smoke_preserves_canonical_plan_id(tmp_path, monkeypatc
     ).stdout == ""
 
 
+def test_supervised_night_rejects_overlapping_scoped_paths(tmp_path, monkeypatch):
+    state = _repo(tmp_path, monkeypatch)
+    payload = json.loads(state.read_text(encoding="utf-8"))
+    payload["_shift_supervisor"]["plan_items"].append(
+        {
+            "id": "night-plan-2",
+            "title": "Second canonical smoke change",
+            "description": "A second task that must not share the same file scope.",
+            "priority": 90,
+            "target_team": "night",
+            "status": "queued",
+            "expected_output": "Independent file scope.",
+            "validation": ["smoke test"],
+        }
+    )
+    state.write_text(json.dumps(payload), encoding="utf-8")
+    responses = [
+        json.dumps(
+            {
+                "plan_item_id": "night-plan-1",
+                "division": "gameplay_systems",
+                "paths": ["docs/smoke.txt"],
+            }
+        ),
+        json.dumps(
+            {
+                "plan_item_id": "night-plan-2",
+                "division": "gameplay_systems",
+                "paths": ["docs/smoke.txt"],
+            }
+        ),
+    ]
+
+    class OverlapReasoner:
+        def __init__(self):
+            self.index = 0
+
+        @staticmethod
+        def redact(value: str) -> str:
+            return value
+
+        def reason(self, _request):
+            text = responses[self.index]
+            self.index += 1
+            return SimpleNamespace(ok=True, text=text, error_kind=None)
+
+    monkeypatch.setattr(supervised_studio, "ChatGPTReasoner", OverlapReasoner)
+    patch = tmp_path.parent / "overlap.patch"
+    audit = tmp_path.parent / "overlap-audit.jsonl"
+
+    with pytest.raises(ValueError, match="overlapping path"):
+        supervised_studio.propose(
+            patch_path=patch,
+            audit_path=audit,
+            repo_state_path=state,
+            max_tasks=2,
+            cohort_size=3,
+            seed="overlap",
+        )
+
+    assert patch.read_text(encoding="utf-8") == ""
+    rows = [json.loads(line) for line in audit.read_text(encoding="utf-8").splitlines()]
+    assert rows[-1]["event"] == "run_failed_closed"
+    assert rows[-1]["stage"] == "supervisor_scope"
+
+
 def test_supervised_night_rejects_scope_mapper_that_changes_plan_id(tmp_path, monkeypatch):
     state = _repo(tmp_path, monkeypatch)
 
