@@ -26,19 +26,7 @@ Model input is minimized, sanitized and provenance-tagged. Repository text, issu
 
 ## Safe automation
 
-Autonomous work is bounded by:
-
-- least-privilege GitHub permissions
-- immutable Actions
-- bounded file/context sizes
-- deterministic risk classification
-- retry budgets and circuit breakers
-- secret redaction
-- stale-branch and changed-base detection
-- duplicate/concurrency locks
-- security-gate preservation
-- explicit quarantine for ambiguous or dangerous operations
-- durable state that survives transient API/model failures
+Autonomous work is bounded by least-privilege GitHub permissions, immutable Actions, bounded file/context sizes, deterministic risk classification, retry budgets, circuit breakers, secret redaction, stale-branch detection, duplicate/concurrency locks, security-gate preservation, explicit quarantine, and durable state.
 
 The bot must never make a change merely to make a security gate pass. Model output is advisory and cannot directly authorize a merge, permission change, gate bypass, secret access, or destructive operation.
 
