@@ -1,16 +1,15 @@
 """Safe repository reader primitives for backlog automation.
 
-The reader is intentionally deterministic. It indexes documentation and text-like
-repository files without executing them, and treats their contents as untrusted
-input for any later LLM reasoning stage.
+The reader is deterministic: it indexes text-like repository files without
+executing them and treats contents as untrusted input for later reasoning.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
-from pathlib import PurePosixPath
 import hashlib
+from pathlib import PurePosixPath
 from typing import Iterable
 
 DEFAULT_EXTENSIONS = frozenset({
@@ -55,17 +54,32 @@ class RepositoryReader:
         self.max_file_bytes = max_file_bytes
         self.max_files = max_files
 
-    def should_read(self, path: str, size: int, extensions: Iterable[str] = DEFAULT_EXTENSIONS) -> bool:
+    @staticmethod
+    def _normalized_path(path: str) -> str:
         normalized = path.replace("\\", "/")
+        pure = PurePosixPath(normalized)
+        if pure.is_absolute() or any(part in {"", ".", ".."} for part in pure.parts):
+            raise ValueError("path must be repository-relative and normalized")
+        return pure.as_posix()
+
+    def should_read(self, path: str, size: int, extensions: Iterable[str] = DEFAULT_EXTENSIONS) -> bool:
+        normalized = self._normalized_path(path)
         if size < 0 or size > self.max_file_bytes:
             return False
-        if any(normalized.startswith(p.rstrip("/")) or f"/{p}" in normalized for p in DEFAULT_IGNORES):
-            return False
         name = PurePosixPath(normalized).name.lower()
+        if any(
+            normalized == ignored.rstrip("/") or normalized.startswith(ignored)
+            for ignored in DEFAULT_IGNORES
+            if ignored.endswith("/")
+        ):
+            return False
+        if any(fnmatch(name, pattern.lower()) for pattern in DEFAULT_IGNORES if not pattern.endswith("/")):
+            return False
         suffix = PurePosixPath(normalized).suffix.lower()
         return suffix in {e.lower() for e in extensions} or name in {"readme", "license", "dockerfile"}
 
     def document(self, path: str, content: str) -> Document:
+        normalized = self._normalized_path(path)
         encoded = content.encode("utf-8", errors="replace")
         if len(encoded) > self.max_file_bytes:
             raise ValueError("document exceeds configured size limit")
@@ -77,7 +91,7 @@ class RepositoryReader:
                 if heading:
                     sections.append(heading[:200])
         return Document(
-            path=path,
+            path=normalized,
             sha256=hashlib.sha256(encoded).hexdigest(),
             size=len(encoded),
             lines=len(content.splitlines()),
@@ -95,7 +109,7 @@ class RepositoryReader:
                 continue
             doc = self.document(path, content)
             docs.append(doc)
-            ext = PurePosixPath(path).suffix.lower() or "<none>"
+            ext = PurePosixPath(doc.path).suffix.lower() or "<none>"
             extensions[ext] = extensions.get(ext, 0) + 1
-            sections[path] = doc.sections
+            sections[doc.path] = doc.sections
         return Index(tuple(docs), extensions, sections)
