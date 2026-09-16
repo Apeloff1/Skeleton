@@ -114,9 +114,9 @@ jobs:
           number=$(gh issue list --repo "$REPO" --state open --limit 100 \
             --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
           if [[ -z "${number:-}" ]]; then
-            number=$(gh issue create --repo "$REPO" --title "$title" \
-              --body 'Durable append-only human-readable ledger for Autonomous Studio runs. Every scheduled run comments here, including rejected/no-op runs. Source-of-truth machine events also live in the PR audit JSONL when a patch is published.' \
-              --json number --jq '.number')
+            issue_url=$(gh issue create --repo "$REPO" --title "$title" \
+              --body 'Durable append-only human-readable ledger for Autonomous Studio runs. Every scheduled run comments here, including rejected/no-op runs. Source-of-truth machine events also live in the PR audit JSONL when a patch is published.')
+            number="${issue_url##*/}"
           fi
 
           {
@@ -134,8 +134,16 @@ jobs:
           mkdir -p .studio/audit
           cp .studio-tmp/audit.jsonl .studio/audit/latest.jsonl
           cp .studio-tmp/report.md .studio/audit/latest.md
-          git add -A
+
+          # Studio v1 only modifies existing model-selected files; stage tracked
+          # modifications plus the two controlled audit artifacts explicitly.
+          git add -u
+          git add .studio/audit/latest.jsonl .studio/audit/latest.md
           git diff --cached --check
+          if git diff --cached --name-only | grep -q '^\.studio-tmp/'; then
+            echo '::error::temporary proposal files must never be committed'
+            exit 1
+          fi
 
       - name: Publish reviewable studio PR
         if: steps.proposal.outputs.has_patch == 'true'
