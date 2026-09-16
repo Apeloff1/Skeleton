@@ -8,6 +8,8 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from .prompts import compose_system_prompt
+
 
 class ModelRequestError(RuntimeError):
     """Raised when a bounded model request cannot be completed safely."""
@@ -60,6 +62,7 @@ class ModelGateway:
         extra_headers: Mapping[str, str] | None = None,
     ) -> dict[str, Any]:
         endpoint, api_key, model = self._config()
+        system_prompt = compose_system_prompt(system_prompt)
         web_search = self._web_search_enabled()
         if web_search and endpoint.rstrip("/").endswith("/responses"):
             system_prompt = (
