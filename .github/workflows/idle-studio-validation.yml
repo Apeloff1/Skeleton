@@ -7,13 +7,20 @@ on:
     paths:
       - '.github/workflows/idle-studio.yml'
       - '.github/workflows/idle-studio-validation.yml'
+      - '.github/workflows/autonomous-studio.yml'
       - 'skeleton/automation/chatgpt_adapter.py'
       - 'skeleton/automation/idle_studio.py'
       - 'skeleton/automation/idle_studio_v2.py'
       - 'skeleton/automation/idle_studio_publisher.py'
+      - 'skeleton/automation/studio_director.py'
+      - 'skeleton/automation/studio_registry.py'
+      - 'skeleton/automation/studio_report.py'
       - 'skeleton/testing/test_idle_studio.py'
       - 'skeleton/testing/test_idle_studio_v2.py'
       - 'skeleton/testing/test_idle_studio_publisher.py'
+      - 'skeleton/testing/test_studio_director.py'
+      - 'skeleton/testing/test_studio_registry.py'
+      - 'skeleton/testing/test_studio_report.py'
 
 permissions:
   contents: read
@@ -44,13 +51,17 @@ jobs:
           "fastapi>=0.141.1,<1"
           "pydantic>=2.13.5,<3"
           "pydantic-settings>=2.15.0,<3"
+          "pytest>=8,<9"
 
-      - name: Compile idle studio controller
+      - name: Compile studio controllers
         run: >-
           python -m compileall -q
           skeleton/automation/idle_studio.py
           skeleton/automation/idle_studio_v2.py
           skeleton/automation/idle_studio_publisher.py
+          skeleton/automation/studio_director.py
+          skeleton/automation/studio_registry.py
+          skeleton/automation/studio_report.py
 
       - name: Run focused idle studio contracts
         env:
@@ -62,3 +73,14 @@ jobs:
           skeleton.testing.test_idle_studio
           skeleton.testing.test_idle_studio_v2
           skeleton.testing.test_idle_studio_publisher
+
+      - name: Run credential-free autonomous studio smoke and contracts
+        env:
+          OPENAI_API_KEY: ''
+          GH_TOKEN: ''
+          GITHUB_TOKEN: ''
+        run: >-
+          python -m pytest -q
+          skeleton/testing/test_studio_registry.py
+          skeleton/testing/test_studio_director.py
+          skeleton/testing/test_studio_report.py
