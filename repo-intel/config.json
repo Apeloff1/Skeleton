@@ -1,6 +1,6 @@
 {
   "schema": 5,
-  "purpose": "Shared machine contract for content-addressed repository discovery, semantic/build/supply-chain graph routing, reverse change impact, architecture boundaries, runtime/build surfaces, deterministic history hotspots, ranked structural test evidence, capability gaps, security/quality evidence, batch evidence, and agent handoff.",
+  "purpose": "Shared machine contract for content-addressed repository discovery, semantic/build/supply-chain graph routing, reverse change impact, architecture boundaries, ranked structural test evidence, explicit artifact lineage, runtime/build surfaces, deterministic history hotspots, capability gaps, security/quality evidence, batch evidence, and agent handoff.",
   "thresholds": {
     "large_tracked_bytes": 52428800,
     "hot_subsystem_files": 150,
@@ -15,6 +15,7 @@
     "structured-supply-chain",
     "build-test-workflow-map",
     "ranked-structural-test-evidence",
+    "explicit-artifact-lineage",
     "runtime-route-env-surfaces",
     "deterministic-history-hotspots",
     "ownership-architecture-boundaries",
@@ -42,6 +43,7 @@
     ".cache/repo-intel/batch-status.json",
     ".cache/repo-intel/search-catalog.json",
     ".cache/repo-intel/test-evidence.json",
+    ".cache/repo-intel/artifact-lineage.json",
     ".cache/repo-intel/codeowners.json",
     ".cache/repo-intel/architecture.json",
     ".cache/repo-intel/gaps.json",
@@ -52,173 +54,46 @@
     ".cache/repo-intel/semantic-cache.json"
   ],
   "subsystems": [
-    {
-      "id": "github",
-      "root": ".github",
-      "kind": "automation",
-      "build_role": "CI, dependency automation, security gates, branch lifecycle"
-    },
-    {
-      "id": "backend",
-      "root": "backend",
-      "kind": "application",
-      "build_role": "Backend services, runtime integrations, data and game creation services"
-    },
-    {
-      "id": "gameforge",
-      "root": "backend/gameforge",
-      "kind": "game-creation-platform",
-      "build_role": "AI-native game creation, orchestration, generation, evaluation and deployment"
-    },
-    {
-      "id": "frontend",
-      "root": "frontend",
-      "kind": "application",
-      "build_role": "Expo/React Native client and creator experience"
-    },
-    {
-      "id": "skeleton",
-      "root": "skeleton",
-      "kind": "core-runtime",
-      "build_role": "AI engine, orchestration, retrieval, resilience, developer and game primitives"
-    },
-    {
-      "id": "memory",
-      "root": "memory",
-      "kind": "knowledge",
-      "build_role": "Persistent repository/domain memory and handoff material"
-    },
-    {
-      "id": "satellites",
-      "root": "satellites",
-      "kind": "integration",
-      "build_role": "Absorbed/satellite systems and compatibility surfaces"
-    },
-    {
-      "id": "scripts",
-      "root": "scripts",
-      "kind": "tooling",
-      "build_role": "Fast local/CI verification, benchmark, policy, repository intelligence and release tooling"
-    },
-    {
-      "id": "tests",
-      "root": "tests",
-      "kind": "verification",
-      "build_role": "Cross-system regression and integration validation"
-    },
-    {
-      "id": "docs",
-      "root": "docs",
-      "kind": "documentation",
-      "build_role": "Architecture, operating contract, evidence and roadmap"
-    },
-    {
-      "id": "repo-intel",
-      "root": "repo-intel",
-      "kind": "repository-knowledge",
-      "build_role": "Index schemas, graph/query/evidence contracts, 100-batch map and agent handoff notes"
-    },
-    {
-      "id": "root",
-      "root": ".",
-      "kind": "repository",
-      "build_role": "Root build, packaging, deployment and repository contracts"
-    }
+    {"id":"github","root":".github","kind":"automation","build_role":"CI, dependency automation, security gates, branch lifecycle"},
+    {"id":"backend","root":"backend","kind":"application","build_role":"Backend services, runtime integrations, data and game creation services"},
+    {"id":"gameforge","root":"backend/gameforge","kind":"game-creation-platform","build_role":"AI-native game creation, orchestration, generation, evaluation and deployment"},
+    {"id":"frontend","root":"frontend","kind":"application","build_role":"Expo/React Native client and creator experience"},
+    {"id":"skeleton","root":"skeleton","kind":"core-runtime","build_role":"AI engine, orchestration, retrieval, resilience, developer and game primitives"},
+    {"id":"memory","root":"memory","kind":"knowledge","build_role":"Persistent repository/domain memory and handoff material"},
+    {"id":"satellites","root":"satellites","kind":"integration","build_role":"Absorbed/satellite systems and compatibility surfaces"},
+    {"id":"scripts","root":"scripts","kind":"tooling","build_role":"Fast local/CI verification, benchmark, policy, repository intelligence and release tooling"},
+    {"id":"tests","root":"tests","kind":"verification","build_role":"Cross-system regression and integration validation"},
+    {"id":"docs","root":"docs","kind":"documentation","build_role":"Architecture, operating contract, evidence and roadmap"},
+    {"id":"repo-intel","root":"repo-intel","kind":"repository-knowledge","build_role":"Index schemas, graph/query/evidence contracts, 100-batch map and agent handoff notes"},
+    {"id":"root","root":".","kind":"repository","build_role":"Root build, packaging, deployment and repository contracts"}
   ],
   "entrypoints": [
-    {
-      "id": "boot",
-      "command": "python -m skeleton run",
-      "scope": "skeleton",
-      "purpose": "Boot full system"
-    },
-    {
-      "id": "test-core",
-      "command": "make test",
-      "scope": "skeleton/testing",
-      "purpose": "Core regression suite"
-    },
-    {
-      "id": "quality",
-      "command": "make quality",
-      "scope": "scripts/quality-gates.sh",
-      "purpose": "Repository quality gates"
-    },
-    {
-      "id": "ci-local",
-      "command": "make ci",
-      "scope": "scripts/ci.sh",
-      "purpose": "Local CI parity"
-    },
-    {
-      "id": "forge-verify",
-      "command": "make verify",
-      "scope": "scripts/verify-forge.sh",
-      "purpose": "Gameforge verification"
-    },
-    {
-      "id": "repo-intel",
-      "command": "make repo-intel",
-      "scope": "scripts/repo_intel_frontier.py",
-      "purpose": "Refresh canonical semantic/supply-chain graph plus workflow/build targets, ranked test evidence, runtime surfaces, hotspots, batch evidence and agent retrieval"
-    },
-    {
-      "id": "repo-impact",
-      "command": "make repo-intel-impact",
-      "scope": "scripts/repo_intel_frontier.py",
-      "purpose": "Compute transitive reverse change impact and ranked candidate validation surface"
-    },
-    {
-      "id": "repo-diff",
-      "command": "make repo-intel-diff",
-      "scope": "scripts/repo_intel_frontier.py",
-      "purpose": "Combine Git change status with current semantic/build graph and impact evidence"
-    },
-    {
-      "id": "repo-benchmark",
-      "command": "make repo-intel-bench",
-      "scope": "scripts/benchmark_repo_intel.py",
-      "purpose": "Measure cold/warm frontier index refresh and semantic cache reuse"
-    }
+    {"id":"boot","command":"python -m skeleton run","scope":"skeleton","purpose":"Boot full system"},
+    {"id":"test-core","command":"make test","scope":"skeleton/testing","purpose":"Core regression suite"},
+    {"id":"quality","command":"make quality","scope":"scripts/quality-gates.sh","purpose":"Repository quality gates"},
+    {"id":"ci-local","command":"make ci","scope":"scripts/ci.sh","purpose":"Local CI parity"},
+    {"id":"forge-verify","command":"make verify","scope":"scripts/verify-forge.sh","purpose":"Gameforge verification"},
+    {"id":"repo-intel","command":"make repo-intel","scope":"scripts/repo_intel_frontier.py","purpose":"Refresh semantic/supply-chain/build graph plus ranked tests, artifact lineage, runtime surfaces, hotspots, batch evidence and agent retrieval"},
+    {"id":"repo-impact","command":"make repo-intel-impact","scope":"scripts/repo_intel_frontier.py","purpose":"Compute reverse change impact, ranked tests, and explicit affected artifacts"},
+    {"id":"repo-diff","command":"make repo-intel-diff","scope":"scripts/repo_intel_frontier.py","purpose":"Combine Git change status with current semantic/build graph and impact evidence"},
+    {"id":"repo-benchmark","command":"make repo-intel-bench","scope":"scripts/benchmark_repo_intel.py","purpose":"Measure cold/warm frontier index refresh and semantic cache reuse"}
   ],
   "build_affecting_prefixes": [
-    ".github/",
-    "backend/",
-    "frontend/",
-    "skeleton/",
-    "memory/",
-    "satellites/",
-    "scripts/",
-    "tests/",
-    "Dockerfile",
-    "docker-compose.yml",
-    "Makefile",
-    "pyproject.toml",
-    "requirements",
-    "repo-intel/"
+    ".github/","backend/","frontend/","skeleton/","memory/","satellites/","scripts/","tests/",
+    "Dockerfile","docker-compose.yml","Makefile","pyproject.toml","requirements","repo-intel/"
   ],
   "agent_protocol": {
     "read_before_work": [
-      "AGENTS.md",
-      "repo-intel/README.md",
-      "repo-intel/config.json",
-      "repo-intel/batches.json",
-      "repo-intel/game-capabilities.json",
-      ".cache/repo-intel/notes.md",
-      ".cache/repo-intel/build-map.json",
-      ".cache/repo-intel/impact.json",
-      ".cache/repo-intel/test-evidence.json",
-      ".cache/repo-intel/supply-chain.json",
-      ".cache/repo-intel/surfaces.json",
-      ".cache/repo-intel/hotspots.json",
-      ".cache/repo-intel/batch-status.json",
-      ".cache/repo-intel/architecture.json"
+      "AGENTS.md","repo-intel/README.md","repo-intel/config.json","repo-intel/batches.json","repo-intel/game-capabilities.json",
+      ".cache/repo-intel/notes.md",".cache/repo-intel/build-map.json",".cache/repo-intel/impact.json",
+      ".cache/repo-intel/test-evidence.json",".cache/repo-intel/artifact-lineage.json",".cache/repo-intel/supply-chain.json",
+      ".cache/repo-intel/surfaces.json",".cache/repo-intel/hotspots.json",".cache/repo-intel/batch-status.json",".cache/repo-intel/architecture.json"
     ],
     "required_start": "make repo-intel",
     "required_impact": "make repo-intel-impact",
     "required_diff": "make repo-intel-diff",
     "required_handoff": "make repo-intel-check",
     "required_change_note": "repo-intel/notes/<date>-<batch-or-topic>.md",
-    "principle": "Every build-affecting change leaves the repository more legible than it found it. Query dependencies, ranked test evidence, runtime surfaces, hotspots, supply-chain state and reverse impact before broad edits, preserve evidence precision, and surface remaining gaps explicitly."
+    "principle": "Every build-affecting change leaves the repository more legible than it found it. Query dependencies, ranked tests, artifact lineage, runtime surfaces, hotspots, supply-chain state and reverse impact before broad edits; preserve evidence precision and surface remaining gaps explicitly."
   }
 }
