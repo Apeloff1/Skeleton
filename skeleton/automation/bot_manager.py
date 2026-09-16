@@ -1,16 +1,13 @@
-"""Conservative manager for repository maintenance bots.
-
-The manager inventories bot definitions, applies cooldown/concurrency limits,
-and records decisions. It never grants a bot additional permissions and never
-merges PRs or changes protected control-plane files.
-"""
+"""Conservative scheduler and circuit breaker for repository bots."""
 from __future__ import annotations
 
 import json
 import os
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
+
+from .advanced_bots import ADVANCED_BOTS
 
 STATE = Path(".skeleton-bot-state.json")
 MAX_CONCURRENT = 3
@@ -26,18 +23,13 @@ class BotHealth:
     circuit_open: bool = False
 
 
-DEFAULT_BOTS = {
+BASE_BOTS = {
     "triage": "issue triage and bounded repair proposals",
-    "ci": "CI failure diagnosis and regression repair",
-    "security": "security regression review and tests",
-    "cleanup": "safe cleanup of stale code/docs/tests",
-    "dependency": "dependency and lockfile maintenance",
-    "test": "test-gap discovery and focused regression coverage",
-    "review": "PR risk review and contract verification",
-    "docs": "documentation drift detection and repair",
-    "performance": "bounded performance regression analysis",
-    "release": "release-readiness and artifact consistency checks",
+    "ci": "CI diagnosis and focused repair",
+    "security": "security regression review",
+    "cleanup": "safe repository cleanup",
 }
+DEFAULT_BOTS = {**BASE_BOTS, **{bot.name: bot.trigger for bot in ADVANCED_BOTS}}
 
 
 def load_state() -> dict[str, dict]:
@@ -84,7 +76,7 @@ def main() -> int:
     state = load_state()
     due = select_due(state)
     save_state(state)
-    print(json.dumps({"due": due, "max_concurrent": MAX_CONCURRENT}, indent=2))
+    print(json.dumps({"due": due, "bot_count": len(DEFAULT_BOTS), "max_concurrent": MAX_CONCURRENT}, indent=2))
     return 0
 
 
