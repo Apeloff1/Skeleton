@@ -3,7 +3,7 @@ from __future__ import annotations
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from .secretary import SecretaryBot
@@ -40,6 +40,49 @@ class SupervisorScheduler:
         self.research_supplier = research_supplier or (lambda: [])
         self.cadence = cadence or SupervisorCadence()
         self._stop = threading.Event()
+
+    def run_once(
+        self,
+        *,
+        run_secretary: bool = True,
+        run_manager: bool = True,
+    ) -> dict[str, Any]:
+        """Run a bounded supervisor cycle and return its machine-readable plan.
+
+        GitHub-hosted automation should use this mode instead of ``run_forever``
+        so each Actions job has a finite lifetime. When both actors run they
+        share the same store, allowing the Manager to see Secretary additions
+        from the same cycle before producing its refresh.
+        """
+        if not run_secretary and not run_manager:
+            raise ValueError("at least one supervisor actor must run")
+
+        project_context = self.project_context_supplier()
+        revisions: dict[str, Any] = {}
+        if run_secretary:
+            revisions["secretary"] = asdict(self.secretary.enrich_plan(project_context))
+        if run_manager:
+            revisions["manager"] = asdict(
+                self.manager.refresh_plan(
+                    project_context=project_context,
+                    research=self.research_supplier(),
+                )
+            )
+
+        items = sorted(
+            self.manager.store.snapshot_items(),
+            key=lambda item: (-item.priority, item.created_at, item.id),
+        )
+        workers = sorted(
+            self.manager.store.snapshot_workers(),
+            key=lambda worker: worker.worker_id,
+        )
+        return {
+            "actors": list(revisions),
+            "revisions": revisions,
+            "plan_items": [asdict(item) for item in items],
+            "workers": [asdict(worker) for worker in workers],
+        }
 
     def run_forever(self) -> None:
         next_secretary = time.monotonic()
