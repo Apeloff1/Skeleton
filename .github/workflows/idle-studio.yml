@@ -15,17 +15,18 @@ concurrency:
   group: idle-studio
   cancel-in-progress: false
 
-permissions:
-  contents: write
-  pull-requests: write
-  issues: read
-  actions: read
+permissions: {}
 
 jobs:
   studio:
     name: 1000-worker idle control plane
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: write
+      issues: read
+      pull-requests: write
     env:
       GITHUB_TOKEN: ${{ github.token }}
       GITHUB_REPOSITORY: ${{ github.repository }}
