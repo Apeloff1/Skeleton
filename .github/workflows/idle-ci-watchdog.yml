@@ -9,16 +9,17 @@ concurrency:
   group: idle-ci-watchdog
   cancel-in-progress: false
 
-permissions:
-  actions: write
-  contents: read
-  issues: write
+permissions: {}
 
 jobs:
   watchdog:
     name: Recover transient CI failures
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    permissions:
+      actions: write
+      contents: read
+      issues: write
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
