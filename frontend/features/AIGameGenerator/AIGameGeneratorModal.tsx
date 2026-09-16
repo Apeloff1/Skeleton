@@ -1,7 +1,7 @@
 /**
  * AI Game Generator Modal v15.5
  * Unified Interface for All AI-Powered Game Development Pipelines
- * 
+ *
  * Features:
  * - NPC & Character Generation
  * - World & Level Design
@@ -40,7 +40,7 @@ interface GenerationResult {
   model?: string;
 }
 
-const CATEGORIES = [
+const CATEGORIES: Array<{ key: CategoryType; label: string; icon: string; desc: string }> = [
   { key: 'npc', label: '👤 NPCs', icon: 'person', desc: 'Characters & AI Behavior' },
   { key: 'world', label: '🌍 Worlds', icon: 'globe', desc: 'Regions & Levels' },
   { key: 'combat', label: '⚔️ Combat', icon: 'flash', desc: 'Systems & Mechanics' },
@@ -53,18 +53,18 @@ const CATEGORIES = [
   { key: 'testing', label: '🧪 Testing', icon: 'flask', desc: 'QA & Test Cases' },
 ];
 
-const readApiJson = async (response: any) => {
+const readApiJson = async (response: Response) => {
   const data = await response.json().catch(() => null);
 
-  if (response.ok === false) {
+  if (!response.ok) {
     const detail = data?.detail ?? data?.error ?? data?.message;
-    const message = typeof detail === 'string'
+    const message = typeof detail === 'string' && detail.trim()
       ? detail
-      : `Request failed (${response.status ?? 'unknown status'})`;
+      : `Request failed (${response.status || 'unknown status'})`;
     throw new Error(message);
   }
 
-  if (!data) {
+  if (data == null) {
     throw new Error('API returned an empty or invalid JSON response');
   }
 
@@ -72,7 +72,17 @@ const readApiJson = async (response: any) => {
 };
 
 const getErrorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : 'Unknown generation error';
+  error instanceof Error && error.message ? error.message : 'Unknown generation error';
+
+const parseCommaSeparated = (value: string) =>
+  value.split(',').map(item => item.trim()).filter(Boolean);
+
+const parsePositiveWholeNumber = (value: string): number | null => {
+  const normalized = value.trim();
+  if (!/^\d+$/.test(normalized)) return null;
+  const parsed = Number(normalized);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+};
 
 export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   visible, onClose, colors, onGenerated
@@ -81,32 +91,32 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<GenerationResult | null>(null);
   const [resultCategory, setResultCategory] = useState<CategoryType | null>(null);
-  
+
   // NPC State
   const [npcDescription, setNpcDescription] = useState('');
   const [npcArchetype, setNpcArchetype] = useState('warrior');
   const [includeDialogue, setIncludeDialogue] = useState(true);
   const [includeQuests, setIncludeQuests] = useState(false);
-  
+
   // World State
   const [worldBiome, setWorldBiome] = useState('forest');
   const [worldSize, setWorldSize] = useState('medium');
   const [worldFeatures, setWorldFeatures] = useState('village, dungeon, landmark');
-  
+
   // Combat State
   const [combatStyle, setCombatStyle] = useState('turn_based');
   const [combatMechanics, setCombatMechanics] = useState('attack, defend, magic');
   const [combatComplexity, setCombatComplexity] = useState('moderate');
-  
+
   // Narrative State
   const [questType, setQuestType] = useState('adventure');
   const [questDifficulty, setQuestDifficulty] = useState('medium');
   const [questSetting, setQuestSetting] = useState('fantasy village');
-  
+
   // VFX State
   const [effectType, setEffectType] = useState('fire');
   const [visualStyle, setVisualStyle] = useState('realistic');
-  
+
   // Economy State
   const [gameType, setGameType] = useState('RPG');
   const [monetizationModel, setMonetizationModel] = useState('free_to_play');
@@ -159,7 +169,8 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   // =========================================================================
 
   const generateNPC = async () => {
-    if (!npcDescription.trim()) {
+    const description = npcDescription.trim();
+    if (!description) {
       toast.error('Please describe the NPC you want to create');
       return;
     }
@@ -173,7 +184,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          description: npcDescription,
+          description,
           archetype: npcArchetype,
           include_dialogue: includeDialogue,
           include_quests: includeQuests,
@@ -182,10 +193,10 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
 
       const data = await readApiJson(response);
       setResult({
-        success: data.success,
-        data: data.npc || data,
-        ai_generated: data.ai_generated,
-        model: data.model,
+        success: data.success !== false,
+        data: data.npc ?? data,
+        ai_generated: Boolean(data.ai_generated),
+        model: typeof data.model === 'string' ? data.model : undefined,
       });
     } catch (error: unknown) {
       recordFailure('Failed to generate NPC', error);
@@ -195,28 +206,33 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   };
 
   const generateWorld = async () => {
+    const features = parseCommaSeparated(worldFeatures);
+    if (!features.length) {
+      toast.error('Add at least one world feature');
+      return;
+    }
+
     setIsLoading(true);
     setResult(null);
     setResultCategory('world');
 
     try {
-      const features = worldFeatures.split(',').map(f => f.trim());
       const response = await apiFetch(`${API_URL}/api/world-management/ai/region/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           biome: worldBiome,
           size: worldSize,
-          features: features,
+          features,
         }),
       });
 
       const data = await readApiJson(response);
       setResult({
-        success: data.success,
-        data: data.world_region || data,
-        ai_generated: data.ai_generated,
-        model: data.model,
+        success: data.success !== false,
+        data: data.world_region ?? data,
+        ai_generated: Boolean(data.ai_generated),
+        model: typeof data.model === 'string' ? data.model : undefined,
       });
     } catch (error: unknown) {
       recordFailure('Failed to generate world', error);
@@ -226,28 +242,33 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   };
 
   const generateCombat = async () => {
+    const mechanics = parseCommaSeparated(combatMechanics);
+    if (!mechanics.length) {
+      toast.error('Add at least one combat mechanic');
+      return;
+    }
+
     setIsLoading(true);
     setResult(null);
     setResultCategory('combat');
 
     try {
-      const mechanics = combatMechanics.split(',').map(m => m.trim());
       const response = await apiFetch(`${API_URL}/api/game-logic-pipeline/ai/combat/design`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           combat_style: combatStyle,
-          mechanics: mechanics,
+          mechanics,
           complexity: combatComplexity,
         }),
       });
 
       const data = await readApiJson(response);
       setResult({
-        success: data.success,
-        data: data.combat_system || data,
-        ai_generated: data.ai_generated,
-        model: data.model,
+        success: data.success !== false,
+        data: data.combat_system ?? data,
+        ai_generated: Boolean(data.ai_generated),
+        model: typeof data.model === 'string' ? data.model : undefined,
       });
     } catch (error: unknown) {
       recordFailure('Failed to generate combat system', error);
@@ -257,6 +278,12 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   };
 
   const generateQuest = async () => {
+    const setting = questSetting.trim();
+    if (!setting) {
+      toast.error('Please describe the quest setting');
+      return;
+    }
+
     setIsLoading(true);
     setResult(null);
     setResultCategory('narrative');
@@ -268,16 +295,16 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         body: JSON.stringify({
           quest_type: questType,
           difficulty: questDifficulty,
-          setting: questSetting,
+          setting,
         }),
       });
 
       const data = await readApiJson(response);
       setResult({
-        success: data.success,
-        data: data.quest || data,
-        ai_generated: data.ai_generated,
-        model: data.model,
+        success: data.success !== false,
+        data: data.quest ?? data,
+        ai_generated: Boolean(data.ai_generated),
+        model: typeof data.model === 'string' ? data.model : undefined,
       });
     } catch (error: unknown) {
       recordFailure('Failed to generate quest', error);
@@ -303,10 +330,10 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
 
       const data = await readApiJson(response);
       setResult({
-        success: data.success,
-        data: data.vfx_system || data,
-        ai_generated: data.ai_generated,
-        model: data.model,
+        success: data.success !== false,
+        data: data.vfx_system ?? data,
+        ai_generated: Boolean(data.ai_generated),
+        model: typeof data.model === 'string' ? data.model : undefined,
       });
     } catch (error: unknown) {
       recordFailure('Failed to generate VFX', error);
@@ -332,10 +359,10 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
 
       const data = await readApiJson(response);
       setResult({
-        success: data.success,
-        data: data.economy_design || data,
-        ai_generated: data.ai_generated,
-        model: data.model,
+        success: data.success !== false,
+        data: data.economy_design ?? data,
+        ai_generated: Boolean(data.ai_generated),
+        model: typeof data.model === 'string' ? data.model : undefined,
       });
     } catch (error: unknown) {
       recordFailure('Failed to generate economy', error);
@@ -345,9 +372,9 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   };
 
   const generateSystems = async () => {
-    const capacity = Number(playerCapacity);
-    if (!Number.isInteger(capacity) || capacity <= 0) {
-      toast.error('Player capacity must be a positive whole number');
+    const capacity = parsePositiveWholeNumber(playerCapacity);
+    if (capacity == null) {
+      toast.error('Player capacity must contain digits only and be greater than zero');
       return;
     }
 
@@ -367,10 +394,10 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
 
       const data = await readApiJson(response);
       setResult({
-        success: data.success,
-        data: data.server_architecture || data,
-        ai_generated: data.ai_generated,
-        model: data.model,
+        success: data.success !== false,
+        data: data.server_architecture ?? data,
+        ai_generated: Boolean(data.ai_generated),
+        model: typeof data.model === 'string' ? data.model : undefined,
       });
     } catch (error: unknown) {
       recordFailure('Failed to generate system architecture', error);
@@ -397,10 +424,10 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
 
       const data = await readApiJson(response);
       setResult({
-        success: data.success,
-        data: data.animation || data,
-        ai_generated: data.ai_generated,
-        model: data.model,
+        success: data.success !== false,
+        data: data.animation ?? data,
+        ai_generated: Boolean(data.ai_generated),
+        model: typeof data.model === 'string' ? data.model : undefined,
       });
     } catch (error: unknown) {
       recordFailure('Failed to generate animation', error);
@@ -410,14 +437,22 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   };
 
   const generateBotPersona = async () => {
+    const traits = parseCommaSeparated(personalityTraits);
+    const domains = parseCommaSeparated(knowledgeDomains);
+    if (!traits.length) {
+      toast.error('Add at least one personality trait');
+      return;
+    }
+    if (!domains.length) {
+      toast.error('Add at least one knowledge domain');
+      return;
+    }
+
     setIsLoading(true);
     setResult(null);
     setResultCategory('bot');
 
     try {
-      const traits = personalityTraits.split(',').map(t => t.trim());
-      const domains = knowledgeDomains.split(',').map(d => d.trim());
-      
       const response = await apiFetch(`${API_URL}/api/bot-persona/ai/persona/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -430,10 +465,10 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
 
       const data = await readApiJson(response);
       setResult({
-        success: data.success,
-        data: data.bot_persona || data,
-        ai_generated: data.ai_generated,
-        model: data.model,
+        success: data.success !== false,
+        data: data.bot_persona ?? data,
+        ai_generated: Boolean(data.ai_generated),
+        model: typeof data.model === 'string' ? data.model : undefined,
       });
     } catch (error: unknown) {
       recordFailure('Failed to generate bot persona', error);
@@ -443,7 +478,8 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   };
 
   const generateTestCases = async () => {
-    if (!testFeature.trim()) {
+    const feature = testFeature.trim();
+    if (!feature) {
       toast.error('Please describe the feature to test');
       return;
     }
@@ -457,17 +493,17 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          feature: testFeature,
+          feature,
           test_type: testType,
         }),
       });
 
       const data = await readApiJson(response);
       setResult({
-        success: data.success,
-        data: data.test_cases || data,
-        ai_generated: data.ai_generated,
-        model: data.model,
+        success: data.success !== false,
+        data: data.test_cases ?? data,
+        ai_generated: Boolean(data.ai_generated),
+        model: typeof data.model === 'string' ? data.model : undefined,
       });
     } catch (error: unknown) {
       recordFailure('Failed to generate test cases', error);
@@ -492,17 +528,21 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         {options.map((option) => (
           <TouchableOpacity
             key={option}
+            disabled={isLoading}
             style={[
               styles.chip,
-              { 
-                backgroundColor: selected === option ? colors.primary : colors.cardBackground, 
-                borderColor: colors.border 
+              isLoading && styles.controlDisabled,
+              {
+                backgroundColor: selected === option ? colors.primary : colors.cardBackground,
+                borderColor: colors.border
               }
             ]}
             onPress={() => onSelect(option)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: selected === option, disabled: isLoading }}
           >
             <Text style={[
-              styles.chipText, 
+              styles.chipText,
               { color: selected === option ? '#FFF' : colors.text }
             ]}>
               {option.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
@@ -514,13 +554,16 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   );
 
   const renderToggle = (label: string, value: boolean, onToggle: () => void) => (
-    <TouchableOpacity 
-      style={[styles.toggle, { borderColor: colors.border }]}
+    <TouchableOpacity
+      style={[styles.toggle, { borderColor: colors.border }, isLoading && styles.controlDisabled]}
       onPress={onToggle}
+      disabled={isLoading}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value, disabled: isLoading }}
     >
       <Text style={[styles.toggleText, { color: colors.text }]}>{label}</Text>
       <View style={[
-        styles.toggleSwitch, 
+        styles.toggleSwitch,
         { backgroundColor: value ? colors.primary : colors.border }
       ]}>
         <View style={[
@@ -532,9 +575,9 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   );
 
   const renderCategoryTabs = () => (
-    <ScrollView 
-      horizontal 
-      showsHorizontalScrollIndicator={false} 
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
       style={[styles.categoryTabs, { borderBottomColor: colors.border }]}
     >
       {CATEGORIES.map((cat) => (
@@ -543,26 +586,29 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
           disabled={isLoading}
           style={[
             styles.categoryTab,
-            isLoading && styles.categoryTabDisabled,
-            activeCategory === cat.key && { 
+            isLoading && styles.controlDisabled,
+            activeCategory === cat.key && {
               backgroundColor: colors.primary + '20',
               borderBottomColor: colors.primary,
-              borderBottomWidth: 2 
+              borderBottomWidth: 2
             }
           ]}
           onPress={() => {
-            setActiveCategory(cat.key as CategoryType);
+            setActiveCategory(cat.key);
             setResult(null);
             setResultCategory(null);
           }}
+          accessibilityRole="tab"
+          accessibilityLabel={`${cat.label}: ${cat.desc}`}
+          accessibilityState={{ selected: activeCategory === cat.key, disabled: isLoading }}
         >
-          <Ionicons 
-            name={cat.icon as any} 
-            size={20} 
-            color={activeCategory === cat.key ? colors.primary : colors.textSecondary} 
+          <Ionicons
+            name={cat.icon as any}
+            size={20}
+            color={activeCategory === cat.key ? colors.primary : colors.textSecondary}
           />
           <Text style={[
-            styles.categoryLabel, 
+            styles.categoryLabel,
             { color: activeCategory === cat.key ? colors.primary : colors.textSecondary }
           ]}>
             {cat.label}
@@ -588,6 +634,8 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         onChangeText={setNpcDescription}
         multiline
         numberOfLines={3}
+        editable={!isLoading}
+        accessibilityLabel="NPC description"
       />
 
       {renderChipSelector(archetypes, npcArchetype, setNpcArchetype, '🎯 Archetype:')}
@@ -601,6 +649,8 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         style={[styles.generateBtn, { backgroundColor: colors.primary }]}
         onPress={generateNPC}
         disabled={isLoading}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isLoading, busy: isLoading }}
       >
         {isLoading ? (
           <ActivityIndicator color="#FFF" />
@@ -631,12 +681,16 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         placeholderTextColor={colors.textSecondary}
         value={worldFeatures}
         onChangeText={setWorldFeatures}
+        editable={!isLoading}
+        accessibilityLabel="World features"
       />
 
       <TouchableOpacity
         style={[styles.generateBtn, { backgroundColor: colors.primary }]}
         onPress={generateWorld}
         disabled={isLoading}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isLoading, busy: isLoading }}
       >
         {isLoading ? (
           <ActivityIndicator color="#FFF" />
@@ -667,12 +721,16 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         placeholderTextColor={colors.textSecondary}
         value={combatMechanics}
         onChangeText={setCombatMechanics}
+        editable={!isLoading}
+        accessibilityLabel="Combat mechanics"
       />
 
       <TouchableOpacity
         style={[styles.generateBtn, { backgroundColor: colors.primary }]}
         onPress={generateCombat}
         disabled={isLoading}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isLoading, busy: isLoading }}
       >
         {isLoading ? (
           <ActivityIndicator color="#FFF" />
@@ -703,12 +761,16 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         placeholderTextColor={colors.textSecondary}
         value={questSetting}
         onChangeText={setQuestSetting}
+        editable={!isLoading}
+        accessibilityLabel="Quest setting"
       />
 
       <TouchableOpacity
         style={[styles.generateBtn, { backgroundColor: colors.primary }]}
         onPress={generateQuest}
         disabled={isLoading}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isLoading, busy: isLoading }}
       >
         {isLoading ? (
           <ActivityIndicator color="#FFF" />
@@ -736,6 +798,8 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         style={[styles.generateBtn, { backgroundColor: colors.primary }]}
         onPress={generateVFX}
         disabled={isLoading}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isLoading, busy: isLoading }}
       >
         {isLoading ? (
           <ActivityIndicator color="#FFF" />
@@ -763,6 +827,8 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         style={[styles.generateBtn, { backgroundColor: colors.primary }]}
         onPress={generateEconomy}
         disabled={isLoading}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isLoading, busy: isLoading }}
       >
         {isLoading ? (
           <ActivityIndicator color="#FFF" />
@@ -780,7 +846,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
     <View style={styles.formContainer}>
       <Text style={[styles.formTitle, { color: colors.text }]}>⚙️ AI Systems Architect</Text>
       <Text style={[styles.formSubtitle, { color: colors.textSecondary }]}>
-        Design server architecture and game systems
+        Design server architecture and game systems for your intended scale
       </Text>
 
       {renderChipSelector(gameTypes, gameType, setGameType, '🎮 Game Type:')}
@@ -793,12 +859,17 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         value={playerCapacity}
         onChangeText={setPlayerCapacity}
         keyboardType="numeric"
+        editable={!isLoading}
+        accessibilityLabel="Expected concurrent player capacity"
       />
+      <Text style={[styles.inputHint, { color: colors.textSecondary }]}>Positive whole numbers only.</Text>
 
       <TouchableOpacity
         style={[styles.generateBtn, { backgroundColor: colors.primary }]}
         onPress={generateSystems}
         disabled={isLoading}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isLoading, busy: isLoading }}
       >
         {isLoading ? (
           <ActivityIndicator color="#FFF" />
@@ -827,6 +898,8 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         style={[styles.generateBtn, { backgroundColor: colors.primary }]}
         onPress={generateAnimation}
         disabled={isLoading}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isLoading, busy: isLoading }}
       >
         {isLoading ? (
           <ActivityIndicator color="#FFF" />
@@ -856,6 +929,8 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         placeholderTextColor={colors.textSecondary}
         value={personalityTraits}
         onChangeText={setPersonalityTraits}
+        editable={!isLoading}
+        accessibilityLabel="Bot personality traits"
       />
 
       <Text style={[styles.inputLabel, { color: colors.text }]}>Knowledge Domains (comma-separated):</Text>
@@ -865,12 +940,16 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         placeholderTextColor={colors.textSecondary}
         value={knowledgeDomains}
         onChangeText={setKnowledgeDomains}
+        editable={!isLoading}
+        accessibilityLabel="Bot knowledge domains"
       />
 
       <TouchableOpacity
         style={[styles.generateBtn, { backgroundColor: colors.primary }]}
         onPress={generateBotPersona}
         disabled={isLoading}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isLoading, busy: isLoading }}
       >
         {isLoading ? (
           <ActivityIndicator color="#FFF" />
@@ -900,6 +979,8 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         onChangeText={setTestFeature}
         multiline
         numberOfLines={3}
+        editable={!isLoading}
+        accessibilityLabel="Feature to test"
       />
 
       {renderChipSelector(testTypes, testType, setTestType, '📋 Test Type:')}
@@ -908,6 +989,8 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         style={[styles.generateBtn, { backgroundColor: colors.primary }]}
         onPress={generateTestCases}
         disabled={isLoading}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isLoading, busy: isLoading }}
       >
         {isLoading ? (
           <ActivityIndicator color="#FFF" />
@@ -924,11 +1007,10 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
   const renderResult = () => {
     if (!result) return null;
 
-    const resultText = typeof result.data === 'string' 
-      ? result.data 
+    const resultText = typeof result.data === 'string'
+      ? result.data
       : JSON.stringify(result.data, null, 2);
 
-    // Clean up markdown code blocks if present
     let displayText = resultText;
     if (displayText.includes('```json')) {
       displayText = displayText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
@@ -954,7 +1036,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
           {generatedCategoryLabel}
         </Text>
         <ScrollView style={styles.resultScroll} nestedScrollEnabled>
-          <Text style={[styles.resultText, { color: colors.text }]}> 
+          <Text style={[styles.resultText, { color: colors.text }]}>
             {displayText}
           </Text>
         </ScrollView>
@@ -969,6 +1051,8 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
                 toast.error('Unable to copy result to clipboard');
               }
             }}
+            accessibilityRole="button"
+            accessibilityLabel="Copy generated result"
           >
             <Ionicons name="copy" size={16} color="#FFF" />
             <Text style={styles.resultActionText}>Copy Result</Text>
@@ -984,6 +1068,8 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
                   toast.error('Unable to add result to game builder');
                 }
               }}
+              accessibilityRole="button"
+              accessibilityLabel="Add generated result to game builder"
             >
               <Ionicons name="add-circle" size={16} color="#FFF" />
               <Text style={styles.resultActionText}>Add to Game Builder</Text>
@@ -1014,7 +1100,12 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
     <Modal visible={visible} animationType="slide" transparent={false}>
       <View style={[styles.container, { backgroundColor: colors.background }]}> 
         <View style={[styles.header, { borderBottomColor: colors.border }]}> 
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.closeBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Close AI Game Generator"
+          >
             <Ionicons name="close" size={24} color={colors.text} />
           </TouchableOpacity>
           <View style={styles.headerTitle}>
@@ -1025,7 +1116,7 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
         </View>
 
         {renderCategoryTabs()}
-        
+
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {renderActiveForm()}
           {renderResult()}
@@ -1037,86 +1128,90 @@ export const AIGameGeneratorModal: React.FC<AIGameGeneratorModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    paddingTop: Platform.OS === 'ios' ? 50 : 30 
+  container: {
+    flex: 1,
+    paddingTop: Platform.OS === 'ios' ? 50 : 30
   },
-  header: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between', 
-    paddingHorizontal: 16, 
-    paddingBottom: 12, 
-    borderBottomWidth: 1 
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1
   },
-  closeBtn: { 
-    padding: 8 
+  closeBtn: {
+    padding: 8
   },
   headerTitle: {
     alignItems: 'center',
   },
-  title: { 
-    fontSize: 20, 
-    fontWeight: 'bold' 
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold'
   },
   subtitle: {
     fontSize: 12,
     marginTop: 2,
   },
-  placeholder: { 
-    width: 40 
+  placeholder: {
+    width: 40
   },
-  categoryTabs: { 
+  categoryTabs: {
     borderBottomWidth: 1,
     maxHeight: 60,
   },
-  categoryTab: { 
+  categoryTab: {
     flexDirection: 'row',
-    alignItems: 'center', 
+    alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 16,
     gap: 6,
   },
-  categoryTabDisabled: {
+  controlDisabled: {
     opacity: 0.55,
   },
-  categoryLabel: { 
-    fontSize: 13, 
-    fontWeight: '600' 
+  categoryLabel: {
+    fontSize: 13,
+    fontWeight: '600'
   },
-  content: { 
-    flex: 1 
+  content: {
+    flex: 1
   },
-  formContainer: { 
-    padding: 16 
+  formContainer: {
+    padding: 16
   },
-  formTitle: { 
-    fontSize: 22, 
-    fontWeight: 'bold', 
-    marginBottom: 4 
+  formTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 4
   },
-  formSubtitle: { 
-    fontSize: 14, 
-    marginBottom: 20 
+  formSubtitle: {
+    fontSize: 14,
+    marginBottom: 20
   },
-  inputLabel: { 
-    fontSize: 14, 
-    fontWeight: '600', 
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
     marginBottom: 8,
     marginTop: 12,
   },
-  textArea: { 
-    borderWidth: 1, 
-    borderRadius: 8, 
-    padding: 12, 
-    fontSize: 14, 
-    minHeight: 80, 
-    textAlignVertical: 'top' 
+  inputHint: {
+    fontSize: 12,
+    marginTop: 6,
   },
-  textInput: { 
-    borderWidth: 1, 
-    borderRadius: 8, 
-    padding: 12, 
+  textArea: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    minHeight: 80,
+    textAlignVertical: 'top'
+  },
+  textInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
     fontSize: 14,
   },
   selectorContainer: {
@@ -1127,19 +1222,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 8,
   },
-  chipScroll: { 
-    marginBottom: 8 
+  chipScroll: {
+    marginBottom: 8
   },
-  chip: { 
-    paddingHorizontal: 14, 
-    paddingVertical: 8, 
-    borderRadius: 20, 
-    marginRight: 8, 
-    borderWidth: 1 
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+    borderWidth: 1
   },
-  chipText: { 
-    fontSize: 13, 
-    fontWeight: '500' 
+  chipText: {
+    fontSize: 13,
+    fontWeight: '500'
   },
   toggleRow: {
     flexDirection: 'row',
@@ -1171,25 +1266,25 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     backgroundColor: '#FFF',
   },
-  generateBtn: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    padding: 16, 
-    borderRadius: 12, 
-    gap: 8, 
-    marginTop: 20 
+  generateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    gap: 8,
+    marginTop: 20
   },
-  generateBtnText: { 
-    color: '#FFF', 
-    fontSize: 16, 
-    fontWeight: '700' 
+  generateBtnText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700'
   },
-  resultContainer: { 
-    margin: 16, 
-    borderRadius: 12, 
-    borderWidth: 1, 
-    padding: 16 
+  resultContainer: {
+    margin: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 16
   },
   resultHeader: {
     flexDirection: 'row',
@@ -1197,9 +1292,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
-  resultTitle: { 
-    fontSize: 16, 
-    fontWeight: '700' 
+  resultTitle: {
+    fontSize: 16,
+    fontWeight: '700'
   },
   resultCategory: {
     fontSize: 12,
@@ -1215,13 +1310,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
-  resultScroll: { 
-    maxHeight: 300 
+  resultScroll: {
+    maxHeight: 300
   },
-  resultText: { 
-    fontSize: 12, 
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', 
-    lineHeight: 18 
+  resultText: {
+    fontSize: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    lineHeight: 18
   },
   resultActions: {
     flexDirection: 'row',
@@ -1244,8 +1339,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  bottomPadding: { 
-    height: 40 
+  bottomPadding: {
+    height: 40
   },
 });
 
