@@ -17,6 +17,8 @@ from skeleton.frontier.memory import normalize_memory_metadata
 
 
 def _require_text(value: object, field_name: str) -> str:
+    if value is None:
+        raise ValueError(f"retrieval {field_name} is required")
     if not isinstance(value, str):
         raise TypeError(f"retrieval {field_name} must be a string")
     normalized = value.strip()
