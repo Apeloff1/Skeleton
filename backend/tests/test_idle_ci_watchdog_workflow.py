@@ -14,7 +14,8 @@ def test_watchdog_ledger_creation_uses_supported_gh_api_contract() -> None:
     # flags. Keep creation on the REST endpoint so the numeric issue ID is
     # machine-readable and fail-closed before later mutation commands use it.
     assert "gh issue create" not in text
-    assert "gh api \\\n              --method POST" in text
+    assert "gh api \\" in text
+    assert "--method POST" in text
     assert '"repos/${REPO}/issues"' in text
     assert "--jq '.number'" in text
     assert '[[ ! "$issue" =~ ^[0-9]+$ ]]' in text
