@@ -24,6 +24,11 @@ const PILLARS: readonly { id: ProductPillar; title: string; subtitle: string }[]
   { id: 'operate', title: 'Operate', subtitle: 'Observe agents, builds, policy, audit and runtime health.' },
 ];
 
+const pillarSearchText = (pillar: ProductPillar) => {
+  const definition = PILLARS.find((candidate) => candidate.id === pillar);
+  return definition ? `${definition.title} ${definition.subtitle}` : pillar;
+};
+
 export default function ProductShellRoute() {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -34,18 +39,21 @@ export default function ProductShellRoute() {
   const visibleCapabilities = useMemo(() => {
     if (!normalizedQuery) return PRODUCT_CAPABILITIES;
 
+    const searchTerms = normalizedQuery.split(/\s+/).filter(Boolean);
+
     return PRODUCT_CAPABILITIES.filter((capability) => {
       const searchable = [
         capability.title,
         capability.description,
         capability.pillar,
+        pillarSearchText(capability.pillar),
         capability.backendSurface ?? '',
         ...capability.actions.flatMap((action) => [action.title, action.description, action.operation]),
       ]
         .join(' ')
         .toLowerCase();
 
-      return searchable.includes(normalizedQuery);
+      return searchTerms.every((term) => searchable.includes(term));
     });
   }, [normalizedQuery]);
 
@@ -85,7 +93,7 @@ export default function ProductShellRoute() {
           </Text>
           <View style={styles.metricsRow}>
             <Metric label={normalizedQuery ? 'Matches' : 'Capabilities'} value={String(visibleCapabilities.length)} />
-            <Metric label="Pillars" value="4" />
+            <Metric label="Pillars" value={String(normalizedQuery ? visiblePillars.length : PILLARS.length)} />
             <Metric label="Shell" value="Unified" />
           </View>
         </View>
@@ -95,7 +103,7 @@ export default function ProductShellRoute() {
             <View style={styles.searchCopy}>
               <Text style={styles.searchTitle}>Find a capability</Text>
               <Text style={styles.searchSubtitle}>
-                Search names, descriptions, operations and backend surfaces.
+                Search names, pillars, descriptions, operations and backend surfaces.
               </Text>
             </View>
             {normalizedQuery ? (
