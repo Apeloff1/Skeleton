@@ -98,19 +98,20 @@ class IdleStudioV2Tests(unittest.TestCase):
         self.assertEqual(first.role, "security")
 
     def test_recursive_redaction_removes_nested_credentials(self) -> None:
+        bearer = "abcdefghijkl" + "mnopqrstuvwxyz"
+        api_key = "sk-" + "abcdefghijklmnop" + "QRSTUV"
+        token = "super" + "secretvalue"
         value = {
-            "authorization": (
-                "Authorization: Bearer abcdefghijklmnopqrstuvwxyz"
-            ),
+            "authorization": f"Authorization: Bearer {bearer}",
             "nested": [
-                "api_key=sk-abcdefghijklmnopQRSTUV",
-                {"token": "token=supersecretvalue"},
+                f"api_key={api_key}",
+                {"token": f"token={token}"},
             ],
         }
         encoded = json.dumps(redact(value))
-        self.assertNotIn("abcdefghijklmnopqrstuvwxyz", encoded)
-        self.assertNotIn("sk-abcdefghijklmnopQRSTUV", encoded)
-        self.assertNotIn("supersecretvalue", encoded)
+        self.assertNotIn(bearer, encoded)
+        self.assertNotIn(api_key, encoded)
+        self.assertNotIn(token, encoded)
         self.assertIn("REDACTED", encoded)
 
     def test_sealed_package_round_trip_requires_independent_approval(self) -> None:
