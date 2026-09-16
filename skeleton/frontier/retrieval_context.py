@@ -106,8 +106,11 @@ def normalize_retrieval_hit(hit: Mapping[str, Any]) -> RetrievedMemory:
         raise TypeError("retrieval hit metadata must be a mapping")
     metadata = normalize_memory_metadata(raw_metadata)
 
+    raw_source_repository = metadata.get("source_repository")
+    if raw_source_repository is None:
+        raise ValueError("retrieval source_repository is required")
     source_repository = _require_text(
-        metadata.get("source_repository"),
+        raw_source_repository,
         "source_repository",
     )
     source_revision = _optional_text(
