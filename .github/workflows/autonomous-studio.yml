@@ -15,6 +15,11 @@ on:
         description: 'Virtual workers activated for planning context (3-50)'
         required: false
         default: '15'
+      dry_run:
+        description: 'Plan, review, and validate without publishing a pull request'
+        required: false
+        default: true
+        type: boolean
 
 concurrency:
   group: autonomous-studio-night-shift
@@ -145,6 +150,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p .studio-tmp
+          finalize_proposal() {
+            if [[ -s .studio-tmp/audit.jsonl ]]; then
+              python -m skeleton.automation.studio_report \
+                --audit .studio-tmp/audit.jsonl \
+                --output .studio-tmp/report.md || true
+              cp .studio-tmp/audit.jsonl "$RUNNER_TEMP/studio-audit.jsonl"
+            fi
+            if [[ -s .studio-tmp/report.md ]]; then
+              cp .studio-tmp/report.md "$RUNNER_TEMP/studio-report.md"
+            fi
+            if [[ -f .studio-tmp/studio.patch ]]; then
+              cp .studio-tmp/studio.patch "$RUNNER_TEMP/studio.patch"
+              sha256sum "$RUNNER_TEMP/studio.patch" > "$RUNNER_TEMP/studio.patch.sha256"
+            fi
+          }
+          trap finalize_proposal EXIT
+
           if [[ -z "${OPENAI_API_KEY:-}" ]]; then
             echo '::error::OPENAI_API_KEY repository secret is required for Autonomous Studio.'
             exit 1
@@ -152,15 +175,15 @@ jobs:
 
           max_tasks="${REQUESTED_MAX_TASKS:-2}"
           cohort_size="${REQUESTED_COHORT_SIZE:-15}"
-          python -m skeleton.automation.studio_director propose --patch-path .studio-tmp/studio.patch --audit-path .studio-tmp/audit.jsonl --repo-state-path .studio-tmp/repo-state.json --max-tasks "$max_tasks" --cohort-size "$cohort_size" --seed "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          python -m skeleton.automation.studio_report --audit .studio-tmp/audit.jsonl --output .studio-tmp/report.md
+          python -m skeleton.automation.studio_director propose \
+            --patch-path .studio-tmp/studio.patch \
+            --audit-path .studio-tmp/audit.jsonl \
+            --repo-state-path .studio-tmp/repo-state.json \
+            --max-tasks "$max_tasks" \
+            --cohort-size "$cohort_size" \
+            --seed "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
 
-          cp .studio-tmp/studio.patch "$RUNNER_TEMP/studio.patch"
-          cp .studio-tmp/audit.jsonl "$RUNNER_TEMP/studio-audit.jsonl"
-          cp .studio-tmp/report.md "$RUNNER_TEMP/studio-report.md"
-          sha256sum "$RUNNER_TEMP/studio.patch" > "$RUNNER_TEMP/studio.patch.sha256"
-
-          if [[ -s "$RUNNER_TEMP/studio.patch" ]]; then
+          if [[ -s .studio-tmp/studio.patch ]]; then
             echo 'has_patch=true' >> "$GITHUB_OUTPUT"
           else
             echo 'has_patch=false' >> "$GITHUB_OUTPUT"
@@ -210,12 +233,14 @@ jobs:
           git diff --check
 
       - name: Persist Studio Ledger entry
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p "$RUNNER_TEMP"
           title='bot: autonomous studio ledger'
           number=$(gh issue list --repo "$REPO" --state open --limit 100 --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
           if [[ -z "${number:-}" ]]; then
@@ -225,7 +250,22 @@ jobs:
           {
             echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo
-            cat "$RUNNER_TEMP/studio-report.md"
+            if [[ -s "$RUNNER_TEMP/studio-report.md" ]]; then
+              cat "$RUNNER_TEMP/studio-report.md"
+            else
+              echo '# Autonomous Studio shift'
+              echo
+              echo 'Controller stopped before a report could be produced.'
+            fi
+            if [[ -s "$RUNNER_TEMP/studio-audit.jsonl" ]]; then
+              echo
+              echo '<details><summary>Redacted machine audit</summary>'
+              echo
+              echo '```jsonl'
+              cat "$RUNNER_TEMP/studio-audit.jsonl"
+              echo '```'
+              echo '</details>'
+            fi
           } > "$RUNNER_TEMP/ledger-comment.md"
           gh issue comment "$number" --repo "$REPO" --body-file "$RUNNER_TEMP/ledger-comment.md" >/dev/null
 
@@ -247,7 +287,10 @@ jobs:
           fi
 
       - name: Publish reviewable studio PR
-        if: steps.proposal.outputs.has_patch == 'true'
+        if: >-
+          success() &&
+          steps.proposal.outputs.has_patch == 'true' &&
+          (github.event_name != 'workflow_dispatch' || inputs.dry_run != true)
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -274,11 +317,16 @@ jobs:
             echo '- Published worktree restored from sealed pre-test patch: yes'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Summarize no-op/rejected shift
-        if: steps.proposal.outputs.has_patch != 'true'
+      - name: Summarize Autonomous Studio run
+        if: always()
+        shell: bash
         run: |
-          {
-            echo '## Autonomous Studio'
-            echo
-            cat "$RUNNER_TEMP/studio-report.md"
-          } >> "$GITHUB_STEP_SUMMARY"
+          if [[ -s "$RUNNER_TEMP/studio-report.md" ]]; then
+            cat "$RUNNER_TEMP/studio-report.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo '## Autonomous Studio'
+              echo
+              echo 'Controller stopped before a report could be produced.'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
