@@ -1,6 +1,6 @@
 {
-  "schema": 4,
-  "purpose": "Shared machine contract for content-addressed repository discovery, semantic/build/supply-chain graph routing, reverse change impact, architecture boundaries, capability gaps, security/quality evidence, and agent handoff.",
+  "schema": 5,
+  "purpose": "Shared machine contract for content-addressed repository discovery, semantic/build/supply-chain graph routing, reverse change impact, architecture boundaries, runtime/build surfaces, deterministic history hotspots, capability gaps, security/quality evidence, batch evidence, and agent handoff.",
   "thresholds": {
     "large_tracked_bytes": 52428800,
     "hot_subsystem_files": 150,
@@ -14,10 +14,14 @@
     "reverse-impact-graph",
     "structured-supply-chain",
     "build-test-workflow-map",
+    "runtime-route-env-surfaces",
+    "deterministic-history-hotspots",
     "ownership-architecture-boundaries",
     "security-quality-map",
     "capability-evidence-map",
+    "batch-evidence-map",
     "graph-diff",
+    "agent-search-catalog",
     "agent-query-interface"
   ],
   "generated_outputs": [
@@ -25,9 +29,17 @@
     ".cache/repo-intel/graph.json",
     ".cache/repo-intel/symbols.json",
     ".cache/repo-intel/build-map.json",
+    ".cache/repo-intel/build-relationships.json",
     ".cache/repo-intel/impact.json",
+    ".cache/repo-intel/change-set.json",
     ".cache/repo-intel/graph-diff.json",
     ".cache/repo-intel/supply-chain.json",
+    ".cache/repo-intel/dependencies.json",
+    ".cache/repo-intel/surfaces.json",
+    ".cache/repo-intel/hotspots.json",
+    ".cache/repo-intel/history.json",
+    ".cache/repo-intel/batch-status.json",
+    ".cache/repo-intel/search-catalog.json",
     ".cache/repo-intel/codeowners.json",
     ".cache/repo-intel/architecture.json",
     ".cache/repo-intel/gaps.json",
@@ -145,26 +157,26 @@
     {
       "id": "repo-intel",
       "command": "make repo-intel",
-      "scope": "scripts/repo_index.py",
-      "purpose": "Refresh canonical semantic, supply-chain, reverse-impact, architecture, capability and security/quality graph outputs"
+      "scope": "scripts/repo_intel_frontier.py",
+      "purpose": "Refresh canonical semantic/supply-chain graph plus workflow/build targets, runtime surfaces, hotspots, batch evidence and agent retrieval"
     },
     {
       "id": "repo-impact",
       "command": "make repo-intel-impact",
-      "scope": "scripts/repo_index.py",
+      "scope": "scripts/repo_intel_frontier.py",
       "purpose": "Compute transitive reverse change impact and candidate validation surface"
     },
     {
       "id": "repo-diff",
       "command": "make repo-intel-diff",
-      "scope": "scripts/repo_index.py",
-      "purpose": "Combine Git change status with current semantic graph and impact evidence"
+      "scope": "scripts/repo_intel_frontier.py",
+      "purpose": "Combine Git change status with current semantic/build graph and impact evidence"
     },
     {
       "id": "repo-benchmark",
       "command": "make repo-intel-bench",
       "scope": "scripts/benchmark_repo_intel.py",
-      "purpose": "Measure cold/warm canonical index refresh and semantic cache reuse"
+      "purpose": "Measure cold/warm frontier index refresh and semantic cache reuse"
     }
   ],
   "build_affecting_prefixes": [
@@ -194,6 +206,9 @@
       ".cache/repo-intel/build-map.json",
       ".cache/repo-intel/impact.json",
       ".cache/repo-intel/supply-chain.json",
+      ".cache/repo-intel/surfaces.json",
+      ".cache/repo-intel/hotspots.json",
+      ".cache/repo-intel/batch-status.json",
       ".cache/repo-intel/architecture.json"
     ],
     "required_start": "make repo-intel",
@@ -201,6 +216,6 @@
     "required_diff": "make repo-intel-diff",
     "required_handoff": "make repo-intel-check",
     "required_change_note": "repo-intel/notes/<date>-<batch-or-topic>.md",
-    "principle": "Every build-affecting change leaves the repository more legible than it found it. Query dependencies, supply-chain state and reverse impact before broad edits, preserve evidence precision, and surface remaining gaps explicitly."
+    "principle": "Every build-affecting change leaves the repository more legible than it found it. Query dependencies, runtime surfaces, hotspots, supply-chain state and reverse impact before broad edits, preserve evidence precision, and surface remaining gaps explicitly."
   }
 }
