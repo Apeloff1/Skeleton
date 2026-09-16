@@ -50,6 +50,20 @@ def test_legacy_zero_overtime_limit_allows_zero_overtime_worker() -> None:
     assert claimed["id"] == "legacy-task"
 
 
+def test_store_zero_overtime_limit_allows_zero_overtime_worker() -> None:
+    store = InMemoryPlanStore()
+    store.upsert_worker(_worker("night-store", overtime=0))
+    store.add_items([_legacy_task()])
+
+    claimed = store.claim_next_for_worker(
+        "night-store",
+        overtime_soft_limit_minutes=0,
+    )
+
+    assert claimed is not None
+    assert claimed.id == "legacy-task"
+
+
 def test_explicit_unsupported_squad_size_never_falls_through_to_legacy_queue() -> None:
     store = InMemoryPlanStore()
     store.upsert_worker(_worker("night-0"))
@@ -61,6 +75,22 @@ def test_explicit_unsupported_squad_size_never_falls_through_to_legacy_queue() -
 
     assert claimed is not None
     assert claimed["id"] == "legacy-task"
+    by_id = {item.id: item for item in store.snapshot_items()}
+    assert by_id["unsupported-squad"].status == "queued"
+    assert by_id["unsupported-squad"].owner is None
+
+
+def test_store_primitive_reserves_every_explicit_squad_stamp() -> None:
+    store = InMemoryPlanStore()
+    store.upsert_worker(_worker("night-store"))
+    unsupported = _squad_task("unsupported-squad", priority=100)
+    unsupported.metadata["squad_size"] = 5
+    store.add_items([unsupported, _legacy_task(priority=50)])
+
+    claimed = store.claim_next_for_worker("night-store")
+
+    assert claimed is not None
+    assert claimed.id == "legacy-task"
     by_id = {item.id: item for item in store.snapshot_items()}
     assert by_id["unsupported-squad"].status == "queued"
     assert by_id["unsupported-squad"].owner is None
