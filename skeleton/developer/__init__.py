@@ -15,12 +15,12 @@ Usage:
 
 from skeleton.developer.scaffold import ScaffoldEngine, list_templates
 from skeleton.developer.wizard import ProjectWizard, SubsystemExplorer
-from skeleton.developer.commands import CommandRegistry
+from skeleton.developer.commands import DevCommandRegistry
 
-# ``Wizard`` was the documented package-level name even though the implementation
-# has always been ``ProjectWizard``. Keep that public spelling as a compatibility
-# alias while exporting the canonical class explicitly.
+# Keep the documented package-level compatibility names while exposing the
+# canonical implementation classes explicitly.
 Wizard = ProjectWizard
+CommandRegistry = DevCommandRegistry
 
 __all__ = [
     "ScaffoldEngine",
