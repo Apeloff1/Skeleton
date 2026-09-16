@@ -50,6 +50,7 @@ class PRSnapshot:
     mergeable_state: str = "unknown"
     ci_state: CIState = CIState.UNKNOWN
     approvals: int | None = 0
+    changes_requested: int | None = 0
     unresolved_threads: int | None = None
     changed_files: int = 0
     additions: int = 0
@@ -65,6 +66,7 @@ class PRSnapshot:
 class Policy:
     allowed_bases: tuple[str, ...] = ("main",)
     required_approvals: int = 0
+    require_no_changes_requested: bool = True
     require_resolved_threads: bool = True
     require_checks: bool = True
     allow_fork_merge: bool = False
@@ -123,8 +125,9 @@ def _hold(snapshot: PRSnapshot, policy: Policy, *reasons: str) -> Evaluation:
 def evaluate(snapshot: PRSnapshot, policy: Policy) -> Evaluation:
     """Evaluate one immutable PR snapshot without side effects.
 
-    Fail closed: ambiguous, stale, unknown, or incomplete state never becomes
-    merge-ready. Mutation logic is intentionally separate from policy logic.
+    Only an explicitly known-clean state can become merge-ready. Unknown enum
+    values and incomplete data fail closed so newly introduced GitHub states do
+    not accidentally inherit permissive behavior.
     """
 
     if snapshot.state != "open" or snapshot.merged:
@@ -142,12 +145,10 @@ def evaluate(snapshot: PRSnapshot, policy: Policy) -> Evaluation:
         return _hold(snapshot, policy, "fork pull requests are observe-only by policy")
 
     merge_state = snapshot.mergeable_state.casefold()
-    if snapshot.mergeable is False or merge_state in {"dirty", "blocked"}:
-        return _hold(snapshot, policy, "pull request is not mergeable")
-    if snapshot.mergeable is None or merge_state in {"unknown", "unstable"}:
-        return _hold(snapshot, policy, "mergeability is not finalized")
-    if merge_state in {"behind", "has_hooks"}:
-        return _hold(snapshot, policy, f"branch state requires intervention: {merge_state}")
+    if snapshot.mergeable is not True:
+        return _hold(snapshot, policy, "mergeability is not affirmatively true")
+    if merge_state != "clean":
+        return _hold(snapshot, policy, f"branch merge state is not clean: {merge_state or 'missing'}")
 
     if policy.require_checks:
         if snapshot.ci_state is CIState.FAILING:
@@ -167,6 +168,12 @@ def evaluate(snapshot: PRSnapshot, policy: Policy) -> Evaluation:
             policy,
             f"approvals {snapshot.approvals} below required {policy.required_approvals}",
         )
+
+    if policy.require_no_changes_requested:
+        if snapshot.changes_requested is None:
+            return _hold(snapshot, policy, "blocking-review state is incomplete")
+        if snapshot.changes_requested:
+            return _hold(snapshot, policy, f"{snapshot.changes_requested} active change request(s)")
 
     if policy.require_resolved_threads:
         if snapshot.unresolved_threads is None:
