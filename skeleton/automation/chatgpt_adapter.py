@@ -15,6 +15,8 @@ import re
 from typing import Any
 from urllib import error, request
 
+from .activation_security import enforce_bot_activation_security
+
 _API_URL = "https://api.openai.com/v1/responses"
 _MAX_TASK_CHARS = 20_000
 _MAX_EVIDENCE_ITEMS = 20
@@ -83,6 +85,8 @@ class ChatGPTReasoner:
         model: str | None = None,
         timeout: float = 20.0,
     ) -> None:
+        enforce_bot_activation_security()
+
         if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
             raise TypeError("timeout must be a number")
         if not math.isfinite(float(timeout)):
