@@ -10,7 +10,10 @@ opts into a wildcard.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from urllib.parse import urlsplit
+
+from dotenv import load_dotenv
 
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 _DEPLOYED_ENVIRONMENTS = frozenset({"prod", "production", "staging"})
@@ -76,6 +79,10 @@ def normalize_cors_origins(raw: str | None, *, production: bool) -> tuple[str, .
 
 def configure_cors_environment() -> tuple[str, ...]:
     """Set the normalized CORS environment before the application builds middleware."""
+    # ``backend.server`` imports this guard before its own ``load_dotenv`` call.
+    # Load the same backend-local .env first so an explicit development origin
+    # is not replaced by the localhost fallback before the server sees it.
+    load_dotenv(Path(__file__).resolve().parents[1] / ".env")
     origins = normalize_cors_origins(
         os.environ.get("CORS_ORIGINS"), production=production_runtime_detected()
     )
@@ -83,9 +90,8 @@ def configure_cors_environment() -> tuple[str, ...]:
     return origins
 
 
-# ``backend.server`` imports this module before constructing CORSMiddleware.
-# Normalize the environment at import time so an unset/blank production value
-# cannot fall through to the server's historical wildcard default.
+# Normalize after loading the intended configuration source, even though the
+# server imports this module before its own explicit load_dotenv() call.
 configure_cors_environment()
 
 
