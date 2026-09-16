@@ -84,27 +84,33 @@ class SecretaryBot:
                 continue
             task_key = str(task.get("task_key", "")).strip() or f"proposal-{index + 1}"
             if task_key in key_to_id:
-                continue
+                return []
             item_id = f"sec-{uuid.uuid4()}"
             key_to_id[task_key] = item_id
             staged.append((task, task_key, item_id))
 
+        resolved_dependencies: dict[str, list[str]] = {}
+        for task, _task_key, item_id in staged:
+            raw_dependencies = task.get("dependencies", [])
+            if not isinstance(raw_dependencies, list):
+                return []
+            dependency_names = [str(value).strip() for value in raw_dependencies if str(value).strip()]
+            if any(name not in key_to_id and name not in existing_ids for name in dependency_names):
+                return []
+            resolved_dependencies[item_id] = [key_to_id.get(name, name) for name in dependency_names]
+
         result: list[PlanItem] = []
         for task, task_key, item_id in staged:
-            raw_deps = task.get("dependencies", [])
-            names = [str(value).strip() for value in raw_deps if str(value).strip()] if isinstance(raw_deps, list) else []
-            if any(name not in key_to_id and name not in existing_ids for name in names):
-                continue
-            dependencies = [key_to_id.get(name, name) for name in names]
             item = cls._parse_task(
                 task,
                 correlation_id,
                 item_id=item_id,
                 task_key=task_key,
-                dependencies=dependencies,
+                dependencies=resolved_dependencies[item_id],
             )
-            if item is not None:
-                result.append(item)
+            if item is None:
+                return []
+            result.append(item)
         return require_acyclic_new_items(result)
 
     @staticmethod
