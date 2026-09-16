@@ -46,7 +46,7 @@ def test_index_order_is_deterministic_and_deduplicates_references():
     index = RepositoryIndexBuilder().build([(first, first_text), (second, second_text)])
     assert [doc.path for doc in index.files] == ["a.py", "z.py"]
     assert [symbol.name for symbol in index.symbols] == ["a", "z"]
-    assert index.references == (index.references[0],)
+    assert len(index.references) == 1
     assert index.references[0].target == "os"
 
 
