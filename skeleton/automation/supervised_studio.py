@@ -1,10 +1,10 @@
 """Supervisor-bound Autonomous Studio proposal runner.
 
 The Shift Supervisor owns *what* work exists. This adapter only maps canonical
-Night plan items onto bounded repository paths/divisions, then reuses the
-existing builder/reviewer and patch safety machinery. A model cannot introduce
-an unrelated task because every scoped task must echo an exact canonical
-``plan_item_id`` from the fail-closed supervisor snapshot.
+Night plan items onto bounded repository paths/divisions, then executes them
+through the shared four-agent research/build/review/verify safety machinery. A
+model cannot introduce an unrelated task because every scoped task must echo an
+exact canonical ``plan_item_id`` from the fail-closed supervisor snapshot.
 """
 from __future__ import annotations
 
@@ -151,6 +151,7 @@ def propose(
         cohort=[bot.to_dict() for bot in cohort],
         max_tasks=max_tasks,
         plan_source="shift-supervisor-canonical",
+        execution_unit="four-agent-squad",
     )
 
     try:
@@ -205,7 +206,7 @@ def propose(
             reviewed = _build_and_review(reasoner, task, seed=f"{seed}:{plan_id}")
             if reviewed is None:
                 audit.emit(
-                    "patch_rejected_by_reviewer",
+                    "patch_rejected_by_squad",
                     task=plan_id,
                     task_title=task.title,
                     division=task.division,
@@ -233,10 +234,15 @@ def propose(
                 "patch_accepted",
                 task=plan_id,
                 task_title=task.title,
+                researcher=reviewed.researcher.bot_id,
                 builder=reviewed.builder.bot_id,
                 reviewer=reviewed.reviewer.bot_id,
+                verifier=reviewed.verifier.bot_id,
                 summary=reviewed.summary,
+                research_findings=reviewed.research_findings,
                 review_reasons=reviewed.review_reasons,
+                verification_reasons=reviewed.verification_reasons,
+                required_checks=reviewed.required_checks,
                 paths=list(task.paths),
             )
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
@@ -260,6 +266,7 @@ def propose(
                 "planned_tasks": len(scoped),
                 "accepted_tasks": accepted,
                 "patch_chars": len(diff),
+                "squad_size": 4,
             },
             sort_keys=True,
         )
