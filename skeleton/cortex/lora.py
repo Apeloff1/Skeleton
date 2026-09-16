@@ -10,7 +10,7 @@ import math
 import random
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
-from skeleton.cortex.attn import add, add_outer, matvec, matvec_T, scale
+from skeleton.cortex.attn import add, add_outer, matvec, matvec_T, scale, softmax
 
 Vec = List[float]
 Mat = List[List[float]]
@@ -115,6 +115,41 @@ class LoRABank:
             attached.append(name)
         setattr(lm, "lora", self)
         return {"attached": attached, "rank": self.rank, "alpha": self.alpha}
+
+    def fit_output(self, lm, texts: Iterable[str], *, lr: float = 0.04) -> int:
+        """Train the mergeable output adapter from real next-token CE gradients.
+
+        Contact training historically attached a LoRA bank but only updated the
+        base transformer. This focused path teaches Wout using the same hidden
+        states and targets as the language-model objective, so the adapter gene
+        accumulates meaningful state that can later be snapshotted or merged.
+        """
+        adapter = self.adapters.get("Wout")
+        if adapter is None or not hasattr(lm, "_ids") or not hasattr(lm, "_forward"):
+            return 0
+        ctx = max(1, int(getattr(lm, "ctx", 6) or 6))
+        steps = 0
+        for raw in texts:
+            if not raw:
+                continue
+            ids = list(lm._ids(raw))
+            for i in range(1, len(ids)):
+                window = ids[max(0, i - ctx):i]
+                if not window:
+                    continue
+                hidden, _ = lm._forward(window)
+                if not hidden:
+                    continue
+                y = list(hidden[-1])
+                logits = list(lm._unembed(y))
+                probs = softmax(logits)
+                target = int(ids[i])
+                if target < 0 or target >= len(probs):
+                    continue
+                dlog = [p - (1.0 if j == target else 0.0) for j, p in enumerate(probs)]
+                adapter.step(y, dlog, float(lr))
+                steps += 1
+        return steps
 
     def merge(self, lm) -> Dict[str, Any]:
         merged = []
