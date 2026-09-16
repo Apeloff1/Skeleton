@@ -38,11 +38,23 @@ def _audit_rows(path: Path) -> list[Mapping[str, Any]]:
     return rows
 
 
-def _elapsed_minutes(rows: Iterable[Mapping[str, Any]], *, ended_at: datetime | None = None) -> tuple[str, str, int]:
-    now = ended_at or datetime.now(timezone.utc)
+def _elapsed_minutes(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    ended_at: datetime | None = None,
+) -> tuple[str, str, int]:
+    """Return the bounded run envelope represented by the audit itself.
+
+    Do not extend a historical audit to wall-clock ``now``. Workforce reports
+    can be regenerated later, and doing so must not manufacture overtime.
+    """
     timestamps = [stamp for row in rows if (stamp := _parse_time(row.get("ts"))) is not None]
+    now = ended_at or datetime.now(timezone.utc)
     started = min(timestamps) if timestamps else now
-    ended = max([*timestamps, now])
+    if ended_at is not None:
+        ended = max([*timestamps, ended_at]) if timestamps else ended_at
+    else:
+        ended = max(timestamps) if timestamps else now
     elapsed = max(1, math.ceil((ended - started).total_seconds() / 60))
     return started.isoformat(), ended.isoformat(), elapsed
 
@@ -60,6 +72,7 @@ def _worker_payload(
     unique_tasks = list(dict.fromkeys(task for task in tasks if task))[:64]
     normal = min(elapsed_minutes, _NORMAL_SHIFT_MINUTES)
     overtime = max(0, elapsed_minutes - _NORMAL_SHIFT_MINUTES)
+    shift_key = f"{team}:{worker_id}:{started_at}:{ended_at}"
     return {
         "worker_id": worker_id,
         "team": team,
@@ -75,6 +88,11 @@ def _worker_payload(
             "worked_on": unique_tasks,
             "roles": list(dict.fromkeys(role for role in roles if role))[:16],
             "last_task_id": unique_tasks[-1] if unique_tasks else None,
+            "shift_key": shift_key,
+            "shift_minutes": elapsed_minutes,
+            "shift_started_at": started_at,
+            "shift_ended_at": ended_at,
+            "time_basis": "run-envelope",
         },
     }
 
