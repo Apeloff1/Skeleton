@@ -50,6 +50,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   tests/test_frontier_runtime_memory_retrieval.py \
   tests/test_agent_coordination.py \
   tests/test_api_gateway_rate_limit_reliability.py \
+  tests/test_middleware_rate_limiter.py \
   tests/test_api_gateway_payload_reliability.py \
   tests/test_api_gateway_error_redaction.py \
   skeleton/testing/test_tiered_cache.py \

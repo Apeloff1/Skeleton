@@ -11,8 +11,10 @@ Install with :func:`install_gate` (Starlette LIFO: last added = outermost).
 
 from __future__ import annotations
 
+import math
 import os
 import re
+import threading
 import time
 import uuid
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -54,24 +56,62 @@ class BearerAuth:
 
 
 class RateLimiter:
-    """Token-bucket keyed by arbitrary string (IP, user-id, API key)."""
+    """Thread-safe token bucket keyed by arbitrary string (IP, user-id, API key)."""
+
+    _MIN_SWEEP_INTERVAL_S = 1.0
 
     def __init__(self, *, capacity: float = 100.0, refill_per_sec: float = 10.0) -> None:
-        self.capacity = capacity
-        self.refill_per_sec = refill_per_sec
-        self._buckets: Dict[str, tuple] = {}
+        if not math.isfinite(capacity) or capacity <= 0:
+            raise ValueError("capacity must be a positive finite number")
+        if not math.isfinite(refill_per_sec) or refill_per_sec <= 0:
+            raise ValueError("refill_per_sec must be a positive finite number")
+        self.capacity = float(capacity)
+        self.refill_per_sec = float(refill_per_sec)
+        self._buckets: Dict[str, Tuple[float, float]] = {}
+        self._lock = threading.Lock()
+        self._last_sweep: Optional[float] = None
+        self._sweep_interval_s = max(
+            self._MIN_SWEEP_INTERVAL_S,
+            self.capacity / self.refill_per_sec,
+        )
+
+    def _sweep(self, now: float) -> None:
+        """Drop keys whose buckets have fully refilled back to capacity."""
+        last_sweep = self._last_sweep
+        if last_sweep is not None and now - last_sweep < self._sweep_interval_s:
+            return
+        stale = [
+            key
+            for key, (current, last) in self._buckets.items()
+            if current
+            + max(0.0, now - last) * self.refill_per_sec
+            >= self.capacity
+        ]
+        for key in stale:
+            self._buckets.pop(key, None)
+        self._last_sweep = now
 
     def check(self, key: str, tokens: float = 1.0) -> None:
+        if not math.isfinite(tokens) or not 0 < tokens <= self.capacity:
+            raise ValueError("tokens must be finite, positive, and no greater than capacity")
         now = time.monotonic()
-        current, last = self._buckets.get(key, (self.capacity, now))
-        current = min(self.capacity, current + (now - last) * self.refill_per_sec)
-        if current < tokens:
-            self._buckets[key] = (current, now)
-            raise RateLimitError(
-                "rate limit exceeded",
-                context={"retry_after_s": round((tokens - current) / self.refill_per_sec, 2)},
-            )
-        self._buckets[key] = (current - tokens, now)
+        with self._lock:
+            self._sweep(now)
+            current, last = self._buckets.get(key, (self.capacity, now))
+            elapsed = max(0.0, now - last)
+            current = min(self.capacity, current + elapsed * self.refill_per_sec)
+            if current < tokens:
+                self._buckets[key] = (current, now)
+                raise RateLimitError(
+                    "rate limit exceeded",
+                    context={
+                        "retry_after_s": round(
+                            (tokens - current) / self.refill_per_sec,
+                            2,
+                        )
+                    },
+                )
+            self._buckets[key] = (current - tokens, now)
 
 
 _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
