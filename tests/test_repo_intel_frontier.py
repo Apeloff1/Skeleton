@@ -147,3 +147,11 @@ def test_frontier_contract_files_are_present() -> None:
         ROOT / "scripts" / "repo_intel_frontier.py",
     ]
     assert all(path.is_file() for path in required)
+
+
+def test_frontier_contract_locks_freshness_and_relation_fidelity() -> None:
+    payload = json.loads((ROOT / "repo-intel" / "deep-index-contract.json").read_text(encoding="utf-8"))
+    assert payload["schema"] >= 2
+    assert payload["cache_freshness"]["mode"] == "self-validating"
+    assert payload["relationship_fidelity"]["edge_identity"] == "Full canonical edge metadata"
+    assert payload["relationship_fidelity"]["metadata_variant_policy"].startswith("preserve distinct")
