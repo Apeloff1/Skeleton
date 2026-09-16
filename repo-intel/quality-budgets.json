@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "index_performance_targets": {
+    "warm_refresh_ms": 1000,
+    "impact_query_ms": 250,
+    "changed_blob_semantic_refresh_ms_each": 100,
+    "cache_hit_ratio_target": 0.95
+  },
+  "graph_quality_targets": {
+    "build_affecting_paths_classified_ratio": 1.0,
+    "python_parse_success_ratio": 0.995,
+    "owned_subsystem_ratio": 1.0,
+    "capability_records_with_batch_ratio": 1.0,
+    "security_controls_indexed_ratio": 1.0
+  },
+  "note": "Targets are budgets to measure and gate later; they are not achieved-performance claims until telemetry proves them."
+}
