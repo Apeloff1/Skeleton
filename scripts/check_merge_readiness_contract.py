@@ -166,6 +166,7 @@ def main() -> int:
         "scripts/repo_intel_sota.py",
         "scripts/repo_intel_supply_chain.py",
         "scripts/repo_intel_deep.py",
+        "scripts/repo_intel_test_evidence.py",
         "scripts/repo_index.py",
         "scripts/repo_intel_frontier.py",
         "repo-intel/batches.json",
@@ -174,6 +175,7 @@ def main() -> int:
         "repo-intel/ownership.json",
         "repo-intel/query-contract.json",
         "repo-intel/deep-index-contract.json",
+        "repo-intel/test-evidence-contract.json",
     )
     for relative in required_files:
         require((ROOT / relative).is_file(), f"required merge-readiness contract file missing: {relative}", failures)
@@ -186,7 +188,7 @@ def main() -> int:
 
     print(
         "Merge-readiness contract passed: stable aggregate, exact toolchain, PR-safe supersession, "
-        "non-cancelling main verification, frontier repo knowledge-graph/augmentation-note enforcement, "
+        "non-cancelling main verification, frontier repo knowledge-graph/test-evidence/augmentation-note enforcement, "
         "quarantine/security/secret gates, and explicit fail-closed result aggregation are aligned."
     )
     return 0
