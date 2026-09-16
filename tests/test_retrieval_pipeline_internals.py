@@ -1,3 +1,5 @@
+from threading import Barrier
+
 import pytest
 
 from skeleton.retrieval.fusion import ScoredResult
@@ -33,6 +35,38 @@ def test_prepare_then_search_reuses_prefetched_retrieval_work() -> None:
     assert calls == ["alpha"]
     assert prepared.failures == ()
     assert [item.fragment_id for item in outcome.results] == ["doc-1"]
+
+
+def test_prefetch_overlaps_independent_retrievers_and_keeps_plan_order() -> None:
+    rendezvous = Barrier(2)
+
+    def retrieve(name: str):
+        def _retrieve(query: str):
+            rendezvous.wait(timeout=2.0)
+            return [_result(name, query)]
+
+        return _retrieve
+
+    planner = QueryPlanner(prefetch_workers=2)
+    planner.register("beta", retrieve("beta"))
+    planner.register("alpha", retrieve("alpha"))
+
+    plan = planner.plan("parallel")
+    prepared = planner.prefetch(plan)
+
+    assert prepared.failures == ()
+    assert tuple(prepared.results_by_retriever) == ("alpha", "beta")
+    assert [item.fragment_id for item in prepared.results_by_retriever["alpha"]] == [
+        "alpha"
+    ]
+    assert [item.fragment_id for item in prepared.results_by_retriever["beta"]] == [
+        "beta"
+    ]
+
+
+def test_prefetch_worker_count_must_be_positive() -> None:
+    with pytest.raises(ValueError, match="prefetch_workers"):
+        QueryPlanner(prefetch_workers=0)
 
 
 def test_failed_prefetch_is_retried_by_normal_execution() -> None:
