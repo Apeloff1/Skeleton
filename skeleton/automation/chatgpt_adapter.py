@@ -15,7 +15,7 @@ import re
 from typing import Any
 from urllib import error, request
 
-from .activation_security import enforce_bot_activation_security
+from core.activation_security import enforce_bot_activation_security
 
 _API_URL = "https://api.openai.com/v1/responses"
 _MAX_TASK_CHARS = 20_000
