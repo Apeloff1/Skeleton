@@ -64,6 +64,11 @@ def normalize_cors_origins(raw: str | None, *, production: bool) -> tuple[str, .
         return ("*",)
 
     valid = tuple(dict.fromkeys(value for value in values if _valid_cors_origin(value)))
+    # A partially invalid list is not accepted: silently dropping an invalid
+    # origin can hide a deployment/configuration error and create an unintended
+    # allowlist. Treat any invalid entry as a fail-closed configuration.
+    if len(valid) != len(values):
+        return (_CORS_DISABLED_ORIGIN,) if production else _LOCAL_CORS_ORIGINS
     if not valid:
         return (_CORS_DISABLED_ORIGIN,) if production else _LOCAL_CORS_ORIGINS
     return valid
