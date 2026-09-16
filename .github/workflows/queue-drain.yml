@@ -21,7 +21,9 @@ jobs:
     permissions:
       actions: write
       contents: read
-    runs-on: ubuntu-24.04-arm
+    # Queue recovery must not depend on the scarcer ARM lane it may be trying
+    # to recover when repository-wide workflow fanout is saturated.
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
