@@ -2,8 +2,10 @@ name: Shift Supervisor Control
 
 on:
   schedule:
-    - cron: '7,37 * * * *'
-    - cron: '22,52 * * * *'
+    # Run five minutes before Idle Studio (:07/:22/:37/:52) so consumers see
+    # a completed canonical refresh rather than racing the plan producer.
+    - cron: '2,32 * * * *'
+    - cron: '17,47 * * * *'
   workflow_dispatch:
 
 concurrency:
@@ -26,6 +28,7 @@ jobs:
     env:
       REPO: ${{ github.repository }}
       PLAN_TITLE: '[Shift Supervisor] Canonical Night + Idle Plan'
+      SHIFT_ACCOUNTING_TIMEZONE: Europe/Oslo
 
     steps:
       - name: Checkout trusted main
@@ -155,7 +158,7 @@ jobs:
           fi
 
           role='secretary'
-          if [[ "$EVENT_NAME" == 'workflow_dispatch' || "$EVENT_SCHEDULE" == '7,37 * * * *' ]]; then
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' || "$EVENT_SCHEDULE" == '2,32 * * * *' ]]; then
             role='both'
           fi
 
@@ -231,20 +234,22 @@ jobs:
                   lines.append('')
 
           if workers:
-              lines += ['', '## Clocked-in / overtime ledger', '']
-              lines.append('| Worker | Team | Status | Last/current task | Shift min | OT min |')
-              lines.append('| --- | --- | --- | --- | ---: | ---: |')
+              lines += ['', '## Daily worker / overtime ledger', '']
+              lines.append('| Worker | Team | Status | Last/current task | Regular today | OT today | OT tasks |')
+              lines.append('| --- | --- | --- | --- | ---: | ---: | --- |')
               for worker in workers[:96]:
                   metadata = worker.get('metadata', {}) if isinstance(worker.get('metadata'), dict) else {}
                   task = worker.get('current_task_id') or metadata.get('last_task_id') or ''
+                  overtime_tasks = ', '.join(str(value)[:50] for value in worker.get('overtime_task_ids', [])[:4])
                   lines.append(
-                      '| {worker_id} | {team} | {status} | {task} | {normal} | {ot} |'.format(
+                      '| {worker_id} | {team} | {status} | {task} | {normal} | {ot} | {ot_tasks} |'.format(
                           worker_id=str(worker.get('worker_id', ''))[:80],
                           team=str(worker.get('team', ''))[:20],
                           status=str(worker.get('status', ''))[:20],
                           task=str(task)[:80].replace('|', '/'),
                           normal=worker.get('normal_shift_minutes', 0),
                           ot=worker.get('overtime_minutes', 0),
+                          ot_tasks=overtime_tasks.replace('|', '/'),
                       )
                   )
 

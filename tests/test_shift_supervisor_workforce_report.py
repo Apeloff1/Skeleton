@@ -26,8 +26,12 @@ def test_idle_snapshot_uses_package_builder_and_reviewer(tmp_path):
 
     assert snapshot["team"] == "idle"
     assert [worker["worker_id"] for worker in snapshot["workers"]] == ["idle-0042", "idle-0900"]
-    assert snapshot["workers"][0]["metadata"]["worked_on"] == ["issue:42"]
-    assert snapshot["workers"][0]["status"] == "offline"
+    worker = snapshot["workers"][0]
+    assert worker["metadata"]["worked_on"] == ["issue:42"]
+    assert worker["status"] == "offline"
+    assert worker["metadata"]["shift_minutes"] == 1
+    assert worker["metadata"]["shift_key"].startswith("idle:idle-0042:")
+    assert worker["metadata"]["time_basis"] == "run-envelope"
 
 
 def test_night_snapshot_uses_only_accepted_patch_workers(tmp_path):
@@ -51,3 +55,8 @@ def test_night_snapshot_uses_only_accepted_patch_workers(tmp_path):
     assert set(workers) == {"night-build-7", "night-review-3"}
     assert workers["night-build-7"]["metadata"]["worked_on"] == ["task-a"]
     assert workers["night-review-3"]["metadata"]["roles"] == ["reviewer"]
+    assert workers["night-build-7"]["metadata"]["shift_minutes"] == 5
+    assert workers["night-build-7"]["normal_shift_minutes"] == 5
+    assert workers["night-build-7"]["metadata"]["shift_key"].startswith(
+        "night:night-build-7:2026-09-16T10:00:00+00:00:"
+    )
