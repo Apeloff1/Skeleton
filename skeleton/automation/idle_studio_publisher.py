@@ -1,8 +1,8 @@
 """Credential-isolated publisher for reviewed Idle Studio packages.
 
-The model key must be absent. This module revalidates the sealed package,
-checks current task claims and PR capacity, checks the main SHA both before and
-after Git object construction, and only then creates a review branch and PR.
+The model key must be absent. This module revalidates the sealed four-agent
+package, checks current task claims and PR capacity, checks the main SHA before
+and after Git object construction, and only then creates a review branch and PR.
 """
 from __future__ import annotations
 
@@ -24,7 +24,14 @@ from .idle_studio import (
     _proposal_body,
     task_fingerprint,
 )
-from .idle_studio_v2 import ReviewDecision, read_package, unpack_entry
+from .idle_studio_v2 import (
+    IdleTaskSquad,
+    ResearchDecision,
+    ReviewDecision,
+    VerificationDecision,
+    read_package,
+    unpack_entry,
+)
 
 
 class PublisherClient(Protocol):
@@ -46,16 +53,26 @@ def branch_name(task: WorkItem, builder: WorkerSpec, run_id: str, attempt: str) 
 
 def _review_body(
     task: WorkItem,
-    builder: WorkerSpec,
-    reviewer: WorkerSpec,
+    squad: IdleTaskSquad,
+    research: ResearchDecision,
     review: ReviewDecision,
+    verification: VerificationDecision,
     proposal: ChangeProposal,
 ) -> str:
-    return _proposal_body(task, builder, proposal) + (
-        "\n\n### Independent senior review\n"
-        f"- Reviewer: `{reviewer.worker_id}` ({reviewer.role})\n"
-        "- Decision: approved for CI\n"
-        f"- Reason: {review.reason or 'approved'}\n"
+    findings = "\n".join(f"  - {item}" for item in research.findings[:5]) or "  - No additional finding recorded."
+    checks = "\n".join(f"  - {item}" for item in verification.required_checks[:10]) or "  - Repository CI."
+    return _proposal_body(task, squad.builder, proposal) + (
+        "\n\n### Four-agent squad provenance\n"
+        f"- Researcher: `{squad.researcher.worker_id}` ({squad.researcher.role})\n"
+        f"- Lead: `{squad.builder.worker_id}` ({squad.builder.role})\n"
+        f"- Reviewer: `{squad.reviewer.worker_id}` ({squad.reviewer.role})\n"
+        f"- Verifier: `{squad.verifier.worker_id}` ({squad.verifier.role})\n"
+        f"- Review decision: approved for CI — {review.reason or 'approved'}\n"
+        f"- Verification decision: approved for credential-free CI — {verification.reason or 'approved'}\n\n"
+        "### Research findings\n"
+        f"{findings}\n\n"
+        "### Required deterministic checks\n"
+        f"{checks}\n"
     )
 
 
@@ -74,10 +91,7 @@ def publish_entries(
 
     fresh_pulls = github.open_pulls()
     claimed = _existing_studio_task_keys(fresh_pulls)
-    capacity = max(
-        0,
-        config.max_open_studio_prs - _open_studio_pr_count(fresh_pulls),
-    )
+    capacity = max(0, config.max_open_studio_prs - _open_studio_pr_count(fresh_pulls))
     published: list[dict[str, Any]] = []
 
     for raw in entries:
@@ -85,21 +99,18 @@ def publish_entries(
             break
         if not isinstance(raw, Mapping):
             raise ValueError("package entry must be an object")
-        task, builder, reviewer, review, proposal = unpack_entry(raw, config)
+        task, squad, research, review, verification, proposal = unpack_entry(raw, config)
         if task.key in claimed:
             continue
 
-        title = f"bot({builder.role}): {task.title}"[:240]
-        branch = branch_name(task, builder, run_id, attempt)
-        body = _review_body(task, builder, reviewer, review, proposal)
+        title = f"bot({squad.builder.role}): {task.title}"[:240]
+        branch = branch_name(task, squad.builder, run_id, attempt)
+        body = _review_body(task, squad, research, review, verification, proposal)
 
         if github.branch_sha("main") != base_sha:
             raise RuntimeError("main moved before idle-studio publication")
         base_tree = github.commit_tree_sha(base_sha)
-        blobs = [
-            (item.path, github.create_blob(item.content))
-            for item in proposal.files
-        ]
+        blobs = [(item.path, github.create_blob(item.content)) for item in proposal.files]
         tree_sha = github.create_tree(base_tree, blobs)
         commit_sha = github.create_commit(title, tree_sha, base_sha)
 
@@ -108,9 +119,7 @@ def publish_entries(
         github.create_ref(branch, commit_sha)
 
         if github.branch_sha("main") != base_sha:
-            raise RuntimeError(
-                "main moved after idle-studio branch creation; refusing PR creation"
-            )
+            raise RuntimeError("main moved after idle-studio branch creation; refusing PR creation")
         pr = github.create_pull(title=title, branch=branch, body=body)
         claimed.add(task.key)
         published.append(
@@ -119,6 +128,7 @@ def publish_entries(
                 "number": pr.get("number"),
                 "url": pr.get("html_url"),
                 "branch": branch,
+                "squad": list(squad.worker_ids),
             }
         )
 
@@ -129,9 +139,7 @@ def publish(package_path: Path, config: StudioConfig) -> int:
     if os.getenv("OPENAI_API_KEY", "").strip():
         raise ValueError("OPENAI_API_KEY must be absent during publish")
     repo = os.getenv("GITHUB_REPOSITORY", "").strip()
-    token = os.environ.pop("GITHUB_TOKEN", "").strip() or os.environ.pop(
-        "GH_TOKEN", ""
-    ).strip()
+    token = os.environ.pop("GITHUB_TOKEN", "").strip() or os.environ.pop("GH_TOKEN", "").strip()
     if not repo or not token:
         raise ValueError("GitHub repository/token required")
 
@@ -146,11 +154,7 @@ def publish(package_path: Path, config: StudioConfig) -> int:
     )
     print(
         json.dumps(
-            {
-                "status": "published",
-                "count": len(published),
-                "pull_requests": published,
-            },
+            {"status": "published", "count": len(published), "pull_requests": published},
             indent=2,
             sort_keys=True,
         )
