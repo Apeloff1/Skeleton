@@ -7,6 +7,7 @@ from typing import Any
 
 from .model_gateway import ModelGateway
 from .models import PlanItem, PlanRevision, WorkerState, utcnow
+from .plan_api import SquadPlanQueueAPI
 from .plan_graph import require_acyclic_new_items
 from .plan_store import InMemoryPlanStore
 from .prompts import compose_role_prompt
@@ -108,6 +109,10 @@ class SMBShiftManager:
     ) -> PlanRevision:
         correlation_id = f"manager-{uuid.uuid4()}"
         now = datetime.now(timezone.utc)
+        SquadPlanQueueAPI(
+            self.store,
+            overtime_soft_limit_minutes=self.overtime_soft_limit_minutes,
+        ).reclaim_expired()
         workers = self.store.snapshot_workers()
         for worker in workers:
             if worker.status != "offline":
