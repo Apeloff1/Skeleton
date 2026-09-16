@@ -85,6 +85,9 @@ class InMemoryPlanStore:
                 return None
             if worker.current_task_id:
                 return None
+            now = datetime.now(timezone.utc)
+            if self._worker_reserved_by_active_squad(worker_id, now=now):
+                return None
             overtime_limit = max(0, int(overtime_soft_limit_minutes))
             if (
                 worker.overtime_minutes > 0
@@ -114,7 +117,6 @@ class InMemoryPlanStore:
 
             eligible.sort(key=lambda item: (-item.priority, item.created_at, item.id))
             item = eligible[0]
-            now = datetime.now(timezone.utc)
             item.owner = worker_id
             item.status = "assigned"
             item.updated_at = now
@@ -254,6 +256,31 @@ class InMemoryPlanStore:
             if dependency is None or dependency.status != "done":
                 return False
         return True
+
+    def _worker_reserved_by_active_squad(self, worker_id: str, *, now: datetime) -> bool:
+        worker = self._workers.get(worker_id)
+        current_squad = (
+            str(worker.metadata.get("current_squad_id", "")) if worker is not None else ""
+        )
+        for item in self._items.values():
+            if item.status not in {"assigned", "working", "blocked"}:
+                continue
+            owner = str(item.owner or "")
+            if not owner.startswith("squad-"):
+                continue
+            raw = item.metadata.get("squad_lease")
+            if isinstance(raw, Mapping):
+                expires_at = self._decode_dt(raw.get("expires_at"))
+                if expires_at is not None and expires_at <= now:
+                    continue
+                members = raw.get("members")
+                if isinstance(members, Mapping) and worker_id in {
+                    str(value) for value in members.values()
+                }:
+                    return True
+            if current_squad == owner:
+                return True
+        return False
 
     @classmethod
     def _item_payload(cls, item: PlanItem) -> dict[str, Any]:
