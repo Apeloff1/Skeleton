@@ -104,6 +104,9 @@ python backend/scripts/check_workflow_permissions.py
 printf '\n== Repository secret hygiene ==\n'
 python backend/scripts/check_secret_hygiene.py
 
+printf '\n== Docker build-context secret boundary ==\n'
+python backend/scripts/check_docker_secret_boundary.py
+
 printf '\n== Repository malware / IOC scan ==\n'
 python backend/scripts/check_malware_iocs.py
 
@@ -136,6 +139,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_workflow_action_allowlist.py \
   backend/tests/test_workflow_permissions_gate.py \
   backend/tests/test_secret_hygiene_gate.py \
+  backend/tests/test_docker_secret_boundary.py \
   backend/tests/test_malware_ioc_gate.py \
   backend/tests/test_malware_ioc_io_fail_closed.py \
   backend/tests/test_incident_response_runbook.py \
