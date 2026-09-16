@@ -11,12 +11,14 @@ concurrency:
 
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
 
 jobs:
   triage:
     name: Triage stale work
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
