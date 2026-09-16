@@ -7,6 +7,11 @@ on:
     - cron: '2,32 * * * *'
     - cron: '17,47 * * * *'
   workflow_dispatch:
+  # GitHub can delay or omit scheduled events under heavy Actions pressure.
+  # Main-push fallback is gated below and only refreshes when the canonical
+  # plan is missing or already at the consumer freshness boundary.
+  push:
+    branches: [main]
 
 concurrency:
   group: shift-supervisor-control
@@ -28,10 +33,36 @@ jobs:
     env:
       REPO: ${{ github.repository }}
       PLAN_TITLE: '[Shift Supervisor] Canonical Night + Idle Plan'
+      PLAN_FRESHNESS_SECONDS: '1200'
       SHIFT_ACCOUNTING_TIMEZONE: Europe/Oslo
 
     steps:
+      - name: Gate main-push fallback on stale or missing canonical plan
+        id: fallback
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          should_run='true'
+          if [[ "$EVENT_NAME" == 'push' ]]; then
+            updated=$(gh issue list --repo "$REPO" --state open --limit 100 \
+              --json title,updatedAt \
+              --jq 'map(select(.title == env.PLAN_TITLE)) | first | .updatedAt // ""')
+            if [[ -n "$updated" ]]; then
+              updated_epoch=$(date -u -d "$updated" +%s)
+              now_epoch=$(date -u +%s)
+              age_seconds=$(( now_epoch - updated_epoch ))
+              if (( age_seconds >= 0 && age_seconds < PLAN_FRESHNESS_SECONDS )); then
+                should_run='false'
+              fi
+            fi
+          fi
+          echo "run=$should_run" >> "$GITHUB_OUTPUT"
+
       - name: Checkout trusted main
+        if: steps.fallback.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
@@ -39,11 +70,13 @@ jobs:
           fetch-depth: 1
 
       - name: Set up Python
+        if: steps.fallback.outputs.run == 'true'
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.11.16'
 
       - name: Snapshot planning, staffing, and research evidence
+        if: steps.fallback.outputs.run == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -111,6 +144,7 @@ jobs:
           PY
 
       - name: Restore durable supervisor state
+        if: steps.fallback.outputs.run == 'true'
         id: state
         env:
           GH_TOKEN: ${{ github.token }}
@@ -142,6 +176,7 @@ jobs:
           PY
 
       - name: Procure and refresh the shared plan
+        if: steps.fallback.outputs.run == 'true'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SHIFT_MODEL_NAME: ${{ vars.OPENAI_MODEL || 'gpt-5.6' }}
@@ -158,7 +193,7 @@ jobs:
           fi
 
           role='secretary'
-          if [[ "$EVENT_NAME" == 'workflow_dispatch' || "$EVENT_SCHEDULE" == '2,32 * * * *' ]]; then
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' || "$EVENT_NAME" == 'push' || "$EVENT_SCHEDULE" == '2,32 * * * *' ]]; then
             role='both'
           fi
 
@@ -170,6 +205,7 @@ jobs:
             --state-out .shift-supervisor-tmp/state-out.txt
 
       - name: Publish canonical plan and machine state
+        if: steps.fallback.outputs.run == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           ISSUE_NUMBER: ${{ steps.state.outputs.issue_number }}
