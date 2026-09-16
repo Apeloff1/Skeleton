@@ -65,3 +65,42 @@ def test_invalid_lease_recovery_does_not_clobber_worker_reassigned_elsewhere() -
     ]
     assert all(worker.current_task_id is None for worker in released)
     assert all(worker.status == "idle" for worker in released)
+
+
+def test_active_lease_members_stay_reserved_when_worker_row_loses_assignment() -> None:
+    store = InMemoryPlanStore()
+    for index in range(7):
+        store.upsert_worker(_worker(f"night-{index}"))
+
+    first = _squad_task("task-a")
+    second = _squad_task("task-b")
+    second.metadata["relevant_paths"] = ["skeleton/independent/module.py"]
+    store.add_items([first, second])
+
+    api = SquadPlanQueueAPI(store)
+    lease = api.claim_next("night", plan_generation="rev-1")
+    assert lease is not None
+    assert lease["task_id"] == "task-a"
+
+    damaged_worker_id = next(iter(lease["members"].values()))
+    damaged_worker = next(
+        worker
+        for worker in store.snapshot_workers()
+        if worker.worker_id == damaged_worker_id
+    )
+    # Simulate a partial durable restore that lost the worker-row assignment
+    # while the canonical task lease remains valid and authoritative.
+    damaged_worker.current_task_id = None
+    damaged_worker.status = "idle"
+    damaged_worker.metadata = {}
+    store.upsert_worker(damaged_worker)
+
+    # Only three genuinely unreserved workers remain, so the damaged lease
+    # member must not be counted or double-booked into the second squad.
+    assert api.safe_capacity("night") == 0
+    assert api.claim_next("night", plan_generation="rev-1") is None
+
+    by_id = {item.id: item for item in store.snapshot_items()}
+    assert by_id["task-a"].status == "assigned"
+    assert by_id["task-b"].status == "queued"
+    assert by_id["task-b"].owner is None
