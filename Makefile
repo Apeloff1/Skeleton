@@ -1,4 +1,4 @@
-.PHONY: install dev test smoke verify quality ci lint clean repo-intel repo-intel-check repo-intel-impact repo-intel-doctor repo-intel-bench
+.PHONY: install dev test smoke verify quality ci lint clean repo-intel repo-intel-check repo-intel-impact repo-intel-diff repo-intel-doctor repo-intel-bench
 
 install:
 	pip install -r requirements.txt
@@ -19,24 +19,27 @@ quality:
 	bash scripts/quality-gates.sh
 
 repo-intel:
-	python scripts/repo_intel_sota.py check
-	python scripts/repo_intel_sota.py snapshot --out .cache/repo-intel
+	python scripts/repo_index.py check
+	python scripts/repo_index.py snapshot --out .cache/repo-intel
 
 repo-intel-check:
-	python scripts/repo_intel_sota.py gate --base "$${REPO_INTEL_BASE:-origin/main}"
-	python scripts/repo_intel_sota.py snapshot --base "$${REPO_INTEL_BASE:-origin/main}" --out .cache/repo-intel
+	python scripts/repo_index.py gate --base "$${REPO_INTEL_BASE:-origin/main}"
+	python scripts/repo_index.py snapshot --base "$${REPO_INTEL_BASE:-origin/main}" --out .cache/repo-intel
 
 repo-intel-impact:
-	python scripts/repo_intel_sota.py impact --base "$${REPO_INTEL_BASE:-origin/main}" --out .cache/repo-intel
+	python scripts/repo_index.py impact --base "$${REPO_INTEL_BASE:-origin/main}" --out .cache/repo-intel
+
+repo-intel-diff:
+	python scripts/repo_index.py diff --base "$${REPO_INTEL_BASE:-origin/main}" --out .cache/repo-intel
 
 repo-intel-doctor:
-	python scripts/repo_intel_sota.py doctor --out .cache/repo-intel
+	python scripts/repo_index.py doctor --out .cache/repo-intel
 
 repo-intel-bench:
 	python scripts/benchmark_repo_intel.py --base "$${REPO_INTEL_BASE:-origin/main}" --out .cache/repo-intel-benchmark
 
 ci:
-	python scripts/repo_intel_sota.py check
+	python scripts/repo_index.py check
 	bash scripts/ci.sh
 
 lint:
