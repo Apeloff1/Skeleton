@@ -36,6 +36,16 @@ TERMINAL_FAILURES = {
 }
 PENDING_STATES = {"queued", "in_progress", "pending", "requested", "waiting"}
 _STATE_SEVERITY = {"passing": 0, "unknown": 1, "pending": 2, "failing": 3}
+SENSITIVE_PREFIXES = (
+    ".github/workflows/",
+    ".github/ci/",
+    "skeleton/pr_automation/",
+)
+SENSITIVE_FILES = {
+    "scripts/check_merge_readiness_contract.py",
+    "scripts/quality-gates.sh",
+    "tests/run_unit.py",
+}
 
 
 class GitHubError(RuntimeError):
@@ -134,7 +144,6 @@ def _check_state(run: dict[str, Any]) -> str:
         return "passing"
     if conclusion in TERMINAL_FAILURES:
         return "failing"
-    # neutral/skipped and new conclusion values do not satisfy a required gate.
     return "unknown"
 
 
@@ -154,12 +163,7 @@ def aggregate_ci(
     statuses: list[dict[str, Any]],
     required: set[str],
 ) -> CIState:
-    """Collapse CI into a conservative state without stale-rerun overrides.
-
-    The newest run is selected per check-name/provider pair, then different
-    providers with the same name are combined pessimistically. A third-party
-    passing check therefore cannot overwrite a failing GitHub Actions check.
-    """
+    """Collapse CI into a conservative state without stale-rerun overrides."""
 
     providers: dict[tuple[str, str], tuple[tuple[str, int], str]] = {}
     for run in check_runs:
@@ -270,7 +274,6 @@ def unresolved_threads(client: GitHubClient, repository: str, number: int) -> in
     data = client.graphql(THREADS_QUERY, {"owner": owner, "name": name, "number": number})
     threads = data["repository"]["pullRequest"]["reviewThreads"]
     if threads["pageInfo"]["hasNextPage"]:
-        # Do not silently ignore review threads beyond the first 100.
         return None
     return sum(1 for node in threads["nodes"] if not node["isResolved"])
 
@@ -314,6 +317,15 @@ def _paged_check_runs(
     return items, total is not None and len(items) >= total
 
 
+def _scan_sensitive_paths(files: list[dict[str, Any]]) -> tuple[str, ...]:
+    paths = []
+    for item in files:
+        filename = str(item.get("filename") or "")
+        if filename in SENSITIVE_FILES or filename.startswith(SENSITIVE_PREFIXES):
+            paths.append(filename)
+    return tuple(sorted(set(paths)))
+
+
 def fetch_snapshot(
     client: GitHubClient,
     repository: str,
@@ -334,6 +346,11 @@ def fetch_snapshot(
     reviews, reviews_complete = _paged_list(
         client,
         f"/repos/{owner}/{name}/pulls/{number}/reviews",
+    )
+    files, files_complete = _paged_list(
+        client,
+        f"/repos/{owner}/{name}/pulls/{number}/files",
+        max_pages=30,
     )
 
     ci_state = (
@@ -364,7 +381,6 @@ def fetch_snapshot(
         state=str(pr.get("state") or "unknown"),
         merged=bool(pr.get("merged")),
         draft=bool(pr.get("draft")),
-        # A missing head repo commonly means a deleted fork; treat it as external/unknown.
         from_fork=not head_repo or str(head_repo).casefold() != repository.casefold(),
         mergeable=pr.get("mergeable"),
         mergeable_state=str(pr.get("mergeable_state") or "unknown"),
@@ -375,6 +391,7 @@ def fetch_snapshot(
         changed_files=int(pr.get("changed_files") or 0),
         additions=int(pr.get("additions") or 0),
         deletions=int(pr.get("deletions") or 0),
+        sensitive_paths=_scan_sensitive_paths(files) if files_complete else None,
         labels=tuple(
             sorted(str(item.get("name") or "") for item in pr.get("labels", []) if item.get("name"))
         ),
@@ -657,7 +674,6 @@ def run_one(
         extra={"mode": mode.value, "mutation_budget": max_mutations},
     )
     if evaluation.decision is not Decision.IGNORE:
-        # Publish readiness before merge so a ruleset may require this trusted context.
         publish_gate_status(client, snapshot, evaluation)
 
     return execute_actions(
