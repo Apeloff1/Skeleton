@@ -1,47 +1,110 @@
 # Build augmentation note — B001 repository intelligence spine
 
-- **Batch IDs:** B001, B006, B081
-- **Area:** repository layout, build intelligence, agent handoff, dependency/security visibility
+- **Batch IDs:** B001, B002, B005, B006, B071, B081, B091
+- **Area:** repository layout, semantic/build intelligence, impact analysis, agent handoff, dependency/security visibility
 - **Author/agent:** ChatGPT
-- **Intent:** Replace ad-hoc repository discovery with a fast machine-readable index, force build-affecting work to leave useful notes, and expose structural gaps that can feed later SOTA game-creation batches.
+- **Intent:** Evolve ad-hoc repository discovery into a content-addressed repository knowledge graph that can guide agents, tests, security review, build selection, and later distributed execution.
 
 ## What changed
 
-Added a stdlib-only repository intelligence scanner driven by the Git index; subsystem/build contracts; a structural SOTA game-creation capability envelope; a dependency-aware 100-batch execution graph; and a mandatory augmentation-note format. The scanner will emit a full tracked-file index, subsystem build map, capability gaps, security/quality findings, and a concise human notes page under `.cache/repo-intel/`.
+The original Git-index file inventory has been substantially augmented with a new stdlib-only semantic graph layer in `scripts/repo_intel_sota.py`. The canonical `make repo-intel` path now builds that richer index.
 
-The scanner uses Git blob metadata for clean files and only hashes unstaged working-tree files. This deliberately avoids repeatedly reading the whole repository during routine agent/build startup.
+The generated snapshot now targets these layers:
+
+1. Git object/path/blob/size metadata.
+2. File language, role, subsystem, ownership/risk zone, test/build/security/generated flags.
+3. Blob-cached semantic records: Python AST symbols/imports/tests and conservative JS/TS symbols/imports with explicit precision labels.
+4. Typed forward and reverse graph edges for containment, imports, tests and ownership.
+5. Dependency-cycle detection.
+6. Build topology: manifests, workflows, tests, entrypoints and hot subsystems.
+7. Capability/gap and security/quality reports.
+8. Reverse-dependency change impact with affected files, subsystems, candidate tests, workflows, high-risk zones and capability evidence.
+9. Machine queries for files, symbols, dependencies, reverse dependencies and subsystems.
+10. Measured index telemetry plus explicit performance/quality budgets.
+
+New source contracts under `repo-intel/` define graph semantics, ownership zones, query vocabulary, snapshot schema, precision levels, evidence levels, telemetry, quality budgets, and interoperability direction. `SOTA_INDEX_ARCHITECTURE.md` documents the complete graph architecture.
+
+## SOTA design grounding
+
+The design intentionally adopts proven concepts from large-scale tooling rather than inventing another flat manifest:
+
+- build dependency/reverse-dependency DAGs and content-addressable build concepts;
+- incremental invalidation and reuse of unchanged content;
+- precise semantic-index concepts (definitions/symbols/references) with explicit fallback precision;
+- supply-chain component/dependency/provenance modeling;
+- one additional Skeleton-specific layer connecting code → build → tests → security → game capability → work batch → release evidence.
+
+The repo does **not** claim external SCIP or CycloneDX compatibility yet. `export-contract.json` explicitly marks those exporters as future compatibility layers that must validate against the external formats before being advertised.
 
 ## Validation evidence
 
-Configuration validation is designed to enforce exactly 100 unique batch IDs, unique subsystem IDs, unique capability IDs, and presence of the build/security/quality/gameplay/AI work lanes. The CI workflow in this change will run the same checks on every relevant pull request.
+Added `tests/test_repo_intel_sota.py` covering:
+
+- Python AST symbol/import/test extraction;
+- explicit syntax-parse failure reporting;
+- JS/TS lexical import/export precision;
+- local Python and JS/TS dependency resolution;
+- reverse-edge precision preservation;
+- strongly connected dependency-cycle detection;
+- most-specific ownership-zone selection;
+- transitive reverse change impact and candidate-test surfacing;
+- presence/validity of extended repo-intelligence contracts;
+- measurable-budget semantics and bidirectional query contract.
+
+The dedicated Repository Intelligence workflow now compiles both indexers, runs the original and new focused regression files, generates the semantic graph, runs the augmentation gate, queries Dependabot data when permissions allow, and publishes graph/impact/cache/ownership metrics.
 
 ## Security impact
 
-The existing repository already tracks Dependabot configuration for GitHub Actions, root/backend Python, frontend npm, and root/backend/frontend Docker ecosystems. Existing workflow surfaces also include CodeQL, dependency review, dependency security, secret scanning and gitleaks configuration. The repo-intelligence security report records whether these controls remain present and CI will optionally enrich notes with live Dependabot alert data when the workflow token is authorized.
+The index now marks security-sensitive files and high/critical ownership zones so impact reports expose when a change reaches build/security boundaries. It retains static detection of Dependabot, CodeQL, dependency review/security, secret scanning and Gitleaks controls, while CI optionally enriches the report with live Dependabot alert/PR data.
 
-A significant repository-performance/supply-chain review point is the tracked `backend/godot` binary (roughly 103 MB in the current tree). This batch intentionally does not remove it; B006/B091 should determine whether it remains a justified first-class tracked runtime, moves to Git LFS/release assets, or becomes a verified fetch-on-demand toolchain input.
+The tracked `backend/godot` binary (roughly 103 MB in the current tree) remains an explicit repository-performance and supply-chain review point. This batch still does not move it without measurement; B006/B091 own the verified distribution/embedding decision.
+
+No new runtime or third-party indexing dependency was added. The semantic graph is Python 3.11 stdlib-only, reducing index supply-chain risk.
 
 ## Quality/performance impact
 
-The index is content-addressed by Git blob state and avoids source parsing as the default discovery mechanism. That keeps it cheap enough to run at agent startup and CI while still exposing large tracked artifacts, subsystem file/byte counts, build entry points and structural feature gaps.
+Semantic analysis is now cached by Git blob SHA. Identical clean content can reuse its semantic record instead of being reparsed. The graph materializes reverse edges once, making impact queries graph traversals rather than repeated repository scans.
 
-The main quality risk is structural detection false confidence. To prevent that, capability status is explicitly named `present-surface`, `partial-surface`, or `missing-surface`; a matching path is not treated as proof of functional or competitive readiness.
+Precision is explicit: Python relations are AST-derived; current JS/TS relations are conservative lexical evidence. Lower-precision relationships may widen an impact set but may not be silently presented as compiler-proven.
+
+`quality-budgets.json` defines engineering targets (warm refresh, impact latency, cache-hit ratio, parse success, ownership coverage). `telemetry-contract.json` defines the measurements required before any speed/quality claim. These are targets, not achieved-performance claims.
 
 ## Dependabot/dependency note
 
-No runtime dependency is added by this batch. The scanner is Python 3.11 stdlib-only. Dependabot remains the dependency-update source; repo-intelligence consumes its configuration and CI-visible alert/PR metadata rather than replacing it.
+No third-party dependency is introduced. Existing Dependabot ecosystems remain GitHub Actions, Python, npm and Docker. The index consumes dependency/security state; it does not replace Dependabot or vulnerability scanning.
 
 ## Noticeable gaps / next augmentation
 
-Current high-leverage gaps include a proper physics integration surface, multiplayer/netcode, deterministic replay, large-world streaming, live preview, visual/semantic editing, 3D asset validation, generated-code sandboxing, and a reproducible concept-to-release benchmark. The 100-batch graph assigns these to independent lanes so work can proceed concurrently without collapsing into one giant refactor.
+The index is now materially deeper, but the following are deliberate next steps rather than hidden gaps:
 
-The current root layout also mixes core runtime, backend product code, gameforge, frontend, satellites, memory and extensive CI/tooling. The new subsystem map should be used before any physical directory moves; layout rework should follow measured import/build dependencies instead of renaming folders first.
+- ingest compiler/SCIP indexes when available for precise Python/TypeScript references across the full graph;
+- persist semantic cache across CI runners with a pinned/verified cache mechanism;
+- parse structured package manifests into external dependency nodes/edges and export CycloneDX-compatible BOM data;
+- ingest CODEOWNERS/human ownership in addition to architectural zones;
+- learn/select tests from historical execution evidence, not only graph candidates;
+- add action fingerprints, declared inputs/outputs and remote execution/cache compatibility;
+- add graph diff between commits/branches for review agents;
+- link benchmarks/release evidence directly to capability nodes;
+- measure full/warm snapshot latency and cache-hit ratio on representative repo sizes;
+- resolve/measure import cycles and architecture-boundary violations rather than treating all cycles equally.
+
+Game-creation gaps remain tracked separately in `game-capabilities.json` / the 100-batch graph. The repository index is now designed to expose and route those gaps rather than certify them from path names.
 
 ## Build handoff
 
-- [x] repo-intel scanner and configs added
-- [x] 100 large batches mapped
-- [x] security/quality and Dependabot integration contract defined
-- [ ] CI execution on the branch/PR
-- [ ] measure generated index and critical-path timings
-- [ ] B006/B091 decision on the tracked Godot binary
+- [x] Git/content-addressed base index
+- [x] semantic symbols/imports with precision labels
+- [x] forward + reverse typed graph
+- [x] ownership/risk zones
+- [x] dependency-cycle discovery
+- [x] reverse change-impact analysis
+- [x] candidate-test/workflow/security-zone impact output
+- [x] query interface
+- [x] measurable telemetry/budget contracts
+- [x] focused graph/index regressions
+- [x] dedicated CI workflow updated for the rich index
+- [ ] current-head CI execution completed successfully
+- [ ] measured warm/full index benchmark evidence
+- [ ] compiler/SCIP ingestion
+- [ ] CycloneDX exporter validation
+- [ ] B006/B091 decision on tracked Godot binary
