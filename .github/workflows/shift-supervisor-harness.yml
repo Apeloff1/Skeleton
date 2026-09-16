@@ -1,0 +1,47 @@
+name: Shift Supervisor Harness
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'core/shift_supervisor/**'
+      - 'tests/test_shift_supervisor_planning_harness.py'
+      - '.github/workflows/shift-supervisor-harness.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'core/shift_supervisor/**'
+      - 'tests/test_shift_supervisor_planning_harness.py'
+      - '.github/workflows/shift-supervisor-harness.yml'
+
+concurrency:
+  group: shift-supervisor-harness-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  planning-harness:
+    name: Planning Harness
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11.16'
+      - name: Install focused test dependency
+        run: python -m pip install 'pytest>=8,<9'
+      - name: Compile supervisor package
+        run: python -m compileall -q core/shift_supervisor
+      - name: Run planning harness regressions
+        env:
+          PYTHONPATH: '.'
+        run: python -m pytest -q tests/test_shift_supervisor_planning_harness.py
+      - name: Run 1,000-worker credential-free stress contract
+        env:
+          PYTHONPATH: '.'
+        run: python -m core.shift_supervisor.planning_harness --workers 1000 --cycles 4
