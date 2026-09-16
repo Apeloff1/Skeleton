@@ -33,17 +33,17 @@ def test_runtime_dockerfiles_keep_security_hardening() -> None:
     frontend_nginx = (ROOT / "frontend" / "nginx.conf").read_text(encoding="utf-8")
 
     # Production/build base images must be immutable and runtime users non-root.
-    assert "python:3.14-slim@sha256:" in root_dockerfile
+    assert "python:3.14-alpine@sha256:" in root_dockerfile
     assert "USER appuser" in root_dockerfile
-    assert "/usr/sbin/nologin" in root_dockerfile
+    assert "/sbin/nologin" in root_dockerfile
     assert "urllib.request.urlopen" in root_dockerfile
     assert "127.0.0.1:8001/api/v1/health/live" in root_dockerfile
 
-    assert "ghcr.io/astral-sh/uv:0.12.4@sha256:" in backend_dockerfile
+    assert "python:3.14-alpine@sha256:" in backend_dockerfile
+    assert "ghcr.io/astral-sh/uv:0.12.4@sha256:" not in backend_dockerfile
     assert "ghcr.io/astral-sh/uv:${UV_VERSION}" not in backend_dockerfile
-    assert "FROM python:3.14-slim@sha256:" in backend_dockerfile
     assert "USER appuser" in backend_dockerfile
-    assert "/usr/sbin/nologin" in backend_dockerfile
+    assert "/sbin/nologin" in backend_dockerfile
     assert "ENVIRONMENT=production" in backend_dockerfile
     assert "CORS_ORIGINS=https://cors.invalid" in backend_dockerfile
 
