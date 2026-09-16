@@ -10,6 +10,8 @@ The bot must treat backlog automation as a fault-tolerant security boundary, not
 - A changed PR base, force-push, or stale branch invalidates cached conclusions.
 - Concurrent bot runs use a deterministic work key and must not race on the same finding.
 - API pagination, rate limits, 404s, malformed responses, and transient 5xx errors are bounded and retried only when safe.
+- A changed head SHA invalidates a repair plan even if the PR number is unchanged.
+- Deleted or renamed findings retain their historical fingerprint so work is not silently duplicated.
 
 ## Repository content
 
@@ -19,6 +21,7 @@ The bot must treat backlog automation as a fault-tolerant security boundary, not
 - Symlinks are not followed as executable content.
 - Archives are not blindly extracted; size, entry-count, and path limits apply if archive inspection is later enabled.
 - Oversized files, binary media, and malformed text are skipped or marked incomplete.
+- Case variants of important filenames are normalized for classification without changing original provenance.
 
 ## Security findings
 
@@ -26,6 +29,7 @@ The bot must treat backlog automation as a fault-tolerant security boundary, not
 - Scanner disagreement is recorded rather than silently choosing the least restrictive result.
 - High-confidence security findings cannot be downgraded merely to make a check pass.
 - A proposed fix must preserve existing security controls unless the finding itself requires a documented change.
+- Secret-like values are redacted before model submission and are never used as work-item identifiers.
 
 ## CI and repair loops
 
@@ -34,6 +38,8 @@ The bot must treat backlog automation as a fault-tolerant security boundary, not
 - Repeated failed repairs trigger quarantine/escalation instead of infinite loops.
 - Merge conflicts invalidate a repair plan and require fresh context from the current base.
 - Timeouts stop the current attempt and preserve durable state.
+- A green result from an unrelated workflow cannot satisfy a required security gate.
+- Cancelled or superseded runs remain historical evidence but cannot satisfy current-head verification.
 
 ## ChatGPT API
 
@@ -42,3 +48,4 @@ The bot must treat backlog automation as a fault-tolerant security boundary, not
 - Model output is treated as a proposal. Deterministic policy validates every proposed action.
 - Context is bounded by file count, bytes, and evidence relevance.
 - Raw model responses are not logged when they could contain sensitive repository evidence.
+- A model response from an old commit cannot authorize an action against a newer commit.
