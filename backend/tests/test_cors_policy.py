@@ -32,3 +32,13 @@ def test_invalid_origins_fail_closed():
     assert normalize_cors_origins("example.com,ftp://example.com/path", production=True) == (
         "https://cors-disabled.invalid",
     )
+
+
+def test_partially_invalid_origins_fail_closed():
+    assert normalize_cors_origins("https://good.example,not-an-origin", production=True) == (
+        "https://cors-disabled.invalid",
+    )
+    assert normalize_cors_origins("https://good.example,not-an-origin", production=False) == (
+        "http://localhost",
+        "http://127.0.0.1",
+    )
