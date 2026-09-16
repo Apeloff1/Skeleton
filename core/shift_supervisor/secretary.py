@@ -7,6 +7,7 @@ from typing import Any
 from .model_gateway import ModelGateway
 from .models import PlanItem, PlanRevision, utcnow
 from .plan_store import InMemoryPlanStore
+from .planning_council import PlanningCouncil
 
 
 class SecretaryBot:
@@ -18,9 +19,16 @@ class SecretaryBot:
 
     SYSTEM_PROMPT = """You are the Secretary for two autonomous software-work teams: night and idle.\nReturn JSON only with keys summary and tasks. Each task must contain title, description, priority (1-100), target_team (night|idle), rationale, research_refs, expected_output, validation, dependencies. Add only concrete, useful workload that advances the supplied project state. Do not duplicate supplied open work. Do not assign tasks to individual workers and do not emit worker IDs; workers pull eligible orders from the shared canonical plan. Prefer missing tests, integration work, validation, research, documentation, reliability, security, and unblockers. Treat model output as a proposal, not authority."""
 
-    def __init__(self, *, store: InMemoryPlanStore, model: ModelGateway) -> None:
+    def __init__(
+        self,
+        *,
+        store: InMemoryPlanStore,
+        model: ModelGateway,
+        council: PlanningCouncil | None = None,
+    ) -> None:
         self.store = store
         self.model = model
+        self.council = council
 
     def enrich_plan(self, project_context: dict[str, Any]) -> PlanRevision:
         correlation_id = f"secretary-{uuid.uuid4()}"
@@ -35,13 +43,26 @@ class SecretaryBot:
             for item in self.store.snapshot_items()
             if item.status not in {"done", "rejected"}
         ]
+        prompt_payload = {"project_context": project_context, "open_work": existing}
         response = self.model.call_json(
             system_prompt=self.SYSTEM_PROMPT,
-            user_prompt=json.dumps({"project_context": project_context, "open_work": existing}, default=str),
+            user_prompt=json.dumps(prompt_payload, default=str),
             correlation_id=correlation_id,
         )
-        proposals = response.get("tasks", [])
-        items = [self._parse_task(task, correlation_id) for task in proposals if isinstance(task, dict)]
+        raw_proposals = response.get("tasks", [])
+        proposals = (
+            [dict(task) for task in raw_proposals if isinstance(task, dict)]
+            if isinstance(raw_proposals, list)
+            else []
+        )
+        if self.council is not None:
+            proposals = self.council.review_tasks(
+                proposals,
+                context=prompt_payload,
+                correlation_id=correlation_id,
+                actor="secretary",
+            )
+        items = [self._parse_task(task, correlation_id) for task in proposals]
         items = [item for item in items if item is not None]
         added = self.store.add_items(items)
         revision = PlanRevision(
@@ -66,6 +87,10 @@ class SecretaryBot:
             priority = max(1, min(100, int(task.get("priority", 50))))
         except (TypeError, ValueError):
             priority = 50
+        metadata: dict[str, Any] = {"correlation_id": correlation_id}
+        council = task.get("_planning_council")
+        if isinstance(council, dict):
+            metadata["planning_council"] = dict(council)
         return PlanItem(
             id=f"sec-{uuid.uuid4()}",
             title=title,
@@ -78,5 +103,5 @@ class SecretaryBot:
             research_refs=[str(x) for x in task.get("research_refs", []) if x],
             expected_output=str(task.get("expected_output", "")),
             validation=[str(x) for x in task.get("validation", []) if x],
-            metadata={"correlation_id": correlation_id},
+            metadata=metadata,
         )
