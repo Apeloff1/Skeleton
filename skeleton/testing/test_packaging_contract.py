@@ -26,6 +26,24 @@ def test_runtime_image_excludes_development_payload() -> None:
     assert "USER appuser" in dockerfile
 
 
+def test_production_images_drop_installer_toolchain() -> None:
+    root_dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    backend_dockerfile = (ROOT / "backend" / "Dockerfile").read_text(encoding="utf-8")
+    production, development = backend_dockerfile.split("FROM production AS development", maxsplit=1)
+
+    # pip 26.2+ carries vendored runtime code and an embedded CycloneDX SBOM.
+    # Production images install dependencies first and then remove that entire
+    # installer-only surface rather than suppressing scanner findings.
+    for dockerfile in (root_dockerfile, production):
+        assert "/usr/local/lib/python3.14/site-packages/pip" in dockerfile
+        assert "/usr/local/lib/python3.14/site-packages/pip-*.dist-info" in dockerfile
+        assert "/usr/local/bin/pip*" in dockerfile
+
+    assert "python -m ensurepip --upgrade" not in production
+    assert "python -m ensurepip --upgrade" in development
+    assert "python -m pip install --no-cache-dir" in development
+
+
 def test_runtime_dockerfiles_keep_security_hardening() -> None:
     root_dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
     backend_dockerfile = (ROOT / "backend" / "Dockerfile").read_text(encoding="utf-8")
