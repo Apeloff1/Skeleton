@@ -16,6 +16,7 @@ on:
     types: [created, edited, deleted]
   workflow_run:
     workflows:
+      - Merge Readiness
       - CI/CD
       - Backend Quality
       - Dependency Review
@@ -60,7 +61,8 @@ jobs:
       PR_AUTOMATION_INDEX: .pr-automation/index.sqlite3
       PR_AUTOMATION_EXPORT: .pr-automation/index.jsonl
       PR_AUTOMATION_ALLOWED_BASES: ${{ vars.PR_AUTOMATION_ALLOWED_BASES || 'main' }}
-      PR_AUTOMATION_REQUIRED_CHECKS: ${{ vars.PR_AUTOMATION_REQUIRED_CHECKS }}
+      # Merge Readiness is the repository's always-on aggregate PR gate.
+      PR_AUTOMATION_REQUIRED_CHECKS: ${{ vars.PR_AUTOMATION_REQUIRED_CHECKS || 'Merge Readiness' }}
       PR_AUTOMATION_REQUIRED_APPROVALS: ${{ vars.PR_AUTOMATION_REQUIRED_APPROVALS || '1' }}
       PR_AUTOMATION_REQUIRE_CHECKS: ${{ vars.PR_AUTOMATION_REQUIRE_CHECKS || 'true' }}
       PR_AUTOMATION_REQUIRE_NO_CHANGES_REQUESTED: ${{ vars.PR_AUTOMATION_REQUIRE_NO_CHANGES_REQUESTED || 'true' }}
