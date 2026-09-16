@@ -71,6 +71,38 @@ def _canonical_issue(state: Mapping[str, Any]) -> tuple[str, Mapping[str, Any], 
     return issue_key, canonical, issues
 
 
+def _executable_team_items(raw_plan: object, team: str) -> list[dict[str, Any]]:
+    if not isinstance(raw_plan, list):
+        raise CanonicalPlanError("canonical plan state has no plan_items list")
+    rows = [item for item in raw_plan if isinstance(item, Mapping)]
+    by_id = {
+        str(item.get("id", "")).strip(): item
+        for item in rows
+        if str(item.get("id", "")).strip()
+    }
+    executable: list[dict[str, Any]] = []
+    for item in rows:
+        if item.get("target_team") != team or str(item.get("status", "queued")).lower() != "queued":
+            continue
+        item_id = str(item.get("id", "")).strip()
+        title = str(item.get("title", "")).strip()
+        description = str(item.get("description", "")).strip()
+        if not item_id or not title or not description:
+            continue
+        dependencies = item.get("dependencies", [])
+        if not isinstance(dependencies, list):
+            continue
+        dependency_ids = [str(value).strip() for value in dependencies if str(value).strip()]
+        if any(
+            dependency_id not in by_id
+            or str(by_id[dependency_id].get("status", "")).lower() != "done"
+            for dependency_id in dependency_ids
+        ):
+            continue
+        executable.append(dict(item))
+    return executable
+
+
 def consume_plan(
     state: dict[str, Any],
     *,
@@ -97,17 +129,7 @@ def consume_plan(
         )
 
     durable = decode_durable_state(str(canonical.get("body", "")))
-    raw_plan = durable.get("plan_items", [])
-    team_items = [
-        dict(item)
-        for item in raw_plan
-        if isinstance(item, Mapping)
-        and item.get("target_team") == team
-        and item.get("status") not in {"done", "rejected"}
-        and str(item.get("id", "")).strip()
-        and str(item.get("title", "")).strip()
-        and str(item.get("description", "")).strip()
-    ]
+    team_items = _executable_team_items(durable.get("plan_items", []), team)
     if not team_items:
         raise CanonicalPlanError(f"canonical supervisor plan has no executable {team} items")
 
@@ -187,7 +209,7 @@ def consume_plan(
                 if isinstance(item, Mapping)
                 and str(item.get("status", "")).lower() in _ACTIVE_RUN_STATES
             ]
-        # Fresh pull state is re-read by the publisher before any mutation.  Do
+        # Fresh pull state is re-read by the publisher before any mutation. Do
         # not let open PR review suggestions become independent work producers.
         state["pulls"] = []
 
@@ -197,7 +219,7 @@ def consume_plan(
 def _summary(team: str, state: Mapping[str, Any], *, error: str | None = None) -> str:
     lines = ["## Shift supervisor", ""]
     if error:
-        lines += [f"Status: **blocked**", "", error, "", "No studio work was generated."]
+        lines += ["Status: **blocked**", "", error, "", "No studio work was generated."]
         return "\n".join(lines) + "\n"
     supervisor = state.get("_shift_supervisor", {})
     items = supervisor.get("plan_items", []) if isinstance(supervisor, Mapping) else []
