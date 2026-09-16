@@ -39,6 +39,15 @@ FROM python:3.14-alpine@sha256:c6ead215bfd31f1e433d968853b7a769989117115b7288748
 # receive fixes released after the base-image snapshot.
 RUN apk upgrade --no-cache
 
+# pip is not required to serve the production application. pip 26.2+ carries
+# vendored packages and an embedded CycloneDX SBOM under pip/_vendor, so keep
+# that installer-only code out of the production runtime entirely. The
+# development stage below can restore pip from Python's bundled ensurepip when
+# developer-only tools are explicitly requested.
+RUN rm -rf /usr/local/lib/python3.14/site-packages/pip \
+           /usr/local/lib/python3.14/site-packages/pip-*.dist-info \
+           /usr/local/bin/pip*
+
 # Explicitly identify the application host as production so exec_guard can
 # never be re-enabled by ALLOW_UNSAFE_CODE_EXECUTION inside this image. CORS
 # also fails closed unless deployment supplies an explicit origin allowlist.
@@ -79,7 +88,8 @@ ENV ENVIRONMENT=development \
     CORS_ORIGINS=*
 
 USER root
-RUN pip install --no-cache-dir "pytest>=8,<9" pytest-cov "ruff==0.9.*"
+RUN python -m ensurepip --upgrade \
+    && python -m pip install --no-cache-dir "pytest>=8,<9" pytest-cov "ruff==0.9.*"
 USER appuser
 
 CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
