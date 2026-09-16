@@ -27,7 +27,8 @@ def _init_smoke_repo(tmp_path, monkeypatch) -> None:
     subprocess.run(["git", "add", "docs/smoke.txt"], cwd=tmp_path, check=True)
     subprocess.run(["git", "commit", "-qm", "smoke fixture"], cwd=tmp_path, check=True)
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("RUNNER_TEMP", str(tmp_path / ".runner"))
+    runner_temp = tmp_path.parent / f"{tmp_path.name}-runner"
+    monkeypatch.setenv("RUNNER_TEMP", str(runner_temp))
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
 
