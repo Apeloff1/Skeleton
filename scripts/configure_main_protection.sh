@@ -11,14 +11,21 @@ set -euo pipefail
 repo="${REPO:-Apeloff1/Skeleton}"
 branch="${BRANCH:-main}"
 required_check="Merge Readiness"
-mode="${1:-apply}"
+mode="${1:---verify}"
+
+if [[ ! "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+  echo "error: REPO must be a safe owner/name value" >&2
+  exit 2
+fi
+if [[ ! "$branch" =~ ^[A-Za-z0-9._/-]+$ || "$branch" == *".."* || "$branch" == /* || "$branch" == */ ]]; then
+  echo "error: BRANCH contains unsupported characters" >&2
+  exit 2
+fi
 
 case "$mode" in
-  apply|--apply) ;;
-  --dry-run) ;;
-  --verify) ;;
+  apply|--apply|--dry-run|--verify) ;;
   *)
-    echo "usage: REPO=owner/name BRANCH=main $0 [--dry-run|--verify|--apply]" >&2
+    echo "usage: REPO=owner/name BRANCH=main $0 [--verify|--dry-run|--apply]" >&2
     exit 2
     ;;
 esac
@@ -115,7 +122,7 @@ fi
 printf '%s\n' "$payload" | gh api \
   --method PUT \
   -H 'Accept: application/vnd.github+json' \
-  -H 'X-GitHub-Api-Version: 2026-03-10' \
+  -H 'X-GitHub-Api-Version: 2022-11-28' \
   "repos/${repo}/branches/${branch}/protection" \
   --input - >/dev/null
 
