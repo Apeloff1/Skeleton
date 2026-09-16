@@ -118,14 +118,25 @@ class SMBShiftManager:
         )
         proposals = response.get("tasks", [])
         parsed = [self._parse_task(task, correlation_id) for task in proposals if isinstance(task, dict)]
-        added = self.store.add_items(item for item in parsed if item is not None)
+        parsed_items = [item for item in parsed if item is not None]
+        dependency_ids = {item.id for item in existing_items if item.status != "rejected"}
+        accepted_items = [
+            item for item in parsed_items if self._dependencies_resolvable(item, dependency_ids)
+        ]
+        rejected_dependencies = len(parsed_items) - len(accepted_items)
+        added = self.store.add_items(accepted_items)
+        summary = str(response.get("summary", ""))
+        if rejected_dependencies:
+            summary = (
+                f"{summary.rstrip()} Skipped {rejected_dependencies} task(s) with unresolved dependencies."
+            ).strip()
         revision = PlanRevision(
             revision_id=f"rev-{uuid.uuid4()}",
             actor="shift-manager",
             created_at=utcnow(),
             added_item_ids=added,
             updated_item_ids=[],
-            summary=str(response.get("summary", "")),
+            summary=summary,
             correlation_id=correlation_id,
         )
         self.store.append_revision(revision)
@@ -139,6 +150,11 @@ class SMBShiftManager:
         if isinstance(snapshots, list):
             context["worker_snapshot_count"] = len(snapshots)
         return context
+
+    @staticmethod
+    def _dependencies_resolvable(item: PlanItem, dependency_ids: set[str]) -> bool:
+        """Reject model work that can never become queue-eligible."""
+        return all(dependency_id in dependency_ids for dependency_id in item.dependencies)
 
     def _refresh_worker_time(self, worker: WorkerState, now: datetime) -> None:
         if worker.clocked_in_at is None:
