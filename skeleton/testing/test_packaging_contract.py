@@ -45,7 +45,7 @@ def test_runtime_dockerfiles_keep_security_hardening() -> None:
     assert "USER appuser" in backend_dockerfile
     assert "/usr/sbin/nologin" in backend_dockerfile
 
-    assert "FROM nginx:alpine@sha256:" in frontend_dockerfile
+    assert "FROM nginx:1.31-alpine-slim@sha256:" in frontend_dockerfile
     assert "USER nginx" in frontend_dockerfile
     assert "EXPOSE 8080" in frontend_dockerfile
     assert "127.0.0.1:8080/healthz" in frontend_dockerfile
