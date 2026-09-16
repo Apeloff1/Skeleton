@@ -44,6 +44,7 @@ def test_runtime_dockerfiles_keep_security_hardening() -> None:
     assert "FROM python:3.14-slim@sha256:" in backend_dockerfile
     assert "USER appuser" in backend_dockerfile
     assert "/usr/sbin/nologin" in backend_dockerfile
+    assert "ENVIRONMENT=production" in backend_dockerfile
     assert "CORS_ORIGINS=https://cors.invalid" in backend_dockerfile
 
     assert "FROM nginx:1.31-alpine-slim@sha256:" in frontend_dockerfile
