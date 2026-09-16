@@ -33,15 +33,18 @@ The registry is deterministic and fingerprinted so every audit log can identify 
 5. Allows up to three narrow tasks per run.
 6. Assigns a specialist builder and an independent senior reviewer to each task.
 7. Treats every model response as untrusted data.
-8. Rejects malformed, oversized, high-risk, out-of-scope, rename, or delete proposals.
+8. Rejects malformed, oversized, high-risk, out-of-scope, rename, delete, dependency-control, workflow, auth, secret, or security-boundary proposals.
 9. Uses `git apply --check` before accepting a proposal.
-10. Removes the OpenAI key from the environment before post-proposal validation.
-11. Runs static Python compilation and Ruff on changed Python files without importing generated project code.
-12. Writes every run to the durable **Autonomous Studio Ledger**, including no-op and rejected runs.
-13. For an accepted patch, creates a new `studio/night-*` branch and opens a reviewable PR.
-14. Never writes directly to `main` and never enables auto-merge.
+10. Copies the accepted patch and audit evidence outside the disposable worktree and seals the patch with SHA-256.
+11. Explicitly blanks `OPENAI_API_KEY`, `GH_TOKEN`, and `GITHUB_TOKEN` for generated-code validation.
+12. Runs Python compilation, Ruff on changed Python files, studio control regressions, and the full `skeleton/testing` suite.
+13. Resets the repository and removes all untracked test side effects after generated-code execution.
+14. Verifies the sealed patch hash and reapplies the exact pre-test patch.
+15. Writes every run to the durable **Autonomous Studio Ledger**, including no-op and rejected runs.
+16. For an accepted patch, creates a new `studio/night-*` branch and opens a reviewable PR.
+17. Never writes directly to `main` and never enables auto-merge.
 
-Normal repository PR CI remains the deeper execution/test boundary for generated code.
+Normal repository PR CI remains an additional independent validation boundary after the studio's own pre-publication checks.
 
 ## Secret boundary
 
@@ -60,6 +63,8 @@ OPENAI_MODEL
 ```
 
 If omitted, the existing bounded Responses API adapter uses its default model configuration.
+
+The GitHub write token is exported only by trusted metadata/publication steps. It is explicitly blank during generated-code validation. Generated tests therefore cannot read the repository write token or the OpenAI key from their process environment.
 
 ## Mutation boundary
 
@@ -80,10 +85,11 @@ That means v1 optimizes and extends **existing ordinary source files**. New-file
 
 Every shift emits JSONL events with timestamps, run ID, registry fingerprint, active cohort, plan, accepted/rejected task outcomes, assigned builder/reviewer IDs, review reasons, patch budget decisions, and final status.
 
-When a patch is published, the latest machine log and human report are committed as:
+When a patch is published, the latest machine log, human report, and sealed patch hash are committed as:
 
 - `.studio/audit/latest.jsonl`
 - `.studio/audit/latest.md`
+- `.studio/audit/latest.patch.sha256`
 
 Every scheduled run also comments a human-readable summary on the durable `bot: autonomous studio ledger` GitHub issue. A run with no accepted code is still recorded.
 
@@ -106,6 +112,7 @@ The following are non-negotiable:
 - No autonomous weakening of CI, security gates, provenance, authentication, or secret handling.
 - No model-generated shell command execution.
 - No generated-code validation step receives `OPENAI_API_KEY` or an explicitly exported GitHub write token.
+- Generated-code test side effects are discarded; publication is reconstructed from the sealed pre-test patch.
 - No silent mutation: every run has a durable ledger record.
 - No unbounded concurrency: 1,000 identities are a specialization map, not 1,000 simultaneous processes.
 - No automatic merge of code changes in v1.
