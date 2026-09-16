@@ -8,6 +8,8 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from skeleton.automation.activation_security import enforce_bot_activation_security
+
 
 class ModelRequestError(RuntimeError):
     """Raised when a bounded model request cannot be completed safely."""
@@ -59,6 +61,7 @@ class ModelGateway:
         max_output_tokens: int = 8000,
         extra_headers: Mapping[str, str] | None = None,
     ) -> dict[str, Any]:
+        enforce_bot_activation_security()
         endpoint, api_key, model = self._config()
         web_search = self._web_search_enabled()
         if web_search and endpoint.rstrip("/").endswith("/responses"):
