@@ -27,6 +27,9 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
     ports:
       - "${SKELETON_PORT:-8010}:8001"
     environment:
@@ -64,6 +67,9 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
     ports:
       - "${BACKEND_PORT:-8001}:8001"
     environment:
@@ -76,10 +82,9 @@ services:
       - STRIPE_API_KEY=${STRIPE_API_KEY:-}
       - CHROMA_PERSIST_DIR=/app/data/chroma
     volumes:
-      - ./backend:/app
-      - ./skeleton:/app/skeleton
+      - ./backend:/app:ro
+      - ./skeleton:/app/skeleton:ro
       - backend_data:/app/data
-      - /app/__pycache__
     depends_on:
       mongo:
         condition: service_healthy
