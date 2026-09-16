@@ -75,6 +75,8 @@ class PlanQueueAPI:
                 return None
             if worker.current_task_id:
                 return None
+            if self._worker_reserved_by_active_squad_locked(worker_id):
+                return None
             overtime_limit = max(0, int(self.overtime_soft_limit_minutes))
             if (
                 worker.overtime_minutes > 0
@@ -116,6 +118,39 @@ class PlanQueueAPI:
             worker.last_heartbeat_at = now
             self.store._workers[worker_id] = replace(worker)  # noqa: SLF001
             return replace(item)
+
+    def _worker_reserved_by_active_squad_locked(self, worker_id: str) -> bool:
+        """Treat live squad leases as authoritative even if a worker row is stale."""
+        worker = self.store._workers.get(worker_id)  # noqa: SLF001
+        current_squad = (
+            str(worker.metadata.get("current_squad_id", "")) if worker is not None else ""
+        )
+        now = datetime.now(timezone.utc)
+        for item in self.store._items.values():  # noqa: SLF001
+            if item.status not in {"assigned", "working", "blocked"}:
+                continue
+            owner = str(item.owner or "")
+            if not owner.startswith("squad-"):
+                continue
+            try:
+                lease = SquadCoordinator._lease_from_item(item)  # noqa: SLF001
+            except ValueError:
+                raw = item.metadata.get("squad_lease")
+                if not isinstance(raw, Mapping):
+                    continue
+                members = raw.get("members")
+                if not isinstance(members, Mapping):
+                    continue
+                if worker_id in {str(value) for value in members.values()}:
+                    return True
+                if current_squad == owner:
+                    return True
+                continue
+            if lease.expires_at <= now:
+                continue
+            if worker_id in lease.members.values() or current_squad == owner:
+                return True
+        return False
 
     @staticmethod
     def _is_squad_item(item: PlanItem) -> bool:
