@@ -11,11 +11,13 @@ concurrency:
 
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
 
 jobs:
   night-shift:
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
