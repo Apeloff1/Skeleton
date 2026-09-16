@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "zones": [
+    {"id": "core-runtime", "prefixes": ["skeleton/"], "risk": "high", "notes": "Canonical engine/runtime primitives; changes require focused unit/integration evidence."},
+    {"id": "game-platform", "prefixes": ["backend/gameforge/"], "risk": "high", "notes": "Game creation backend and orchestration surface."},
+    {"id": "backend-service", "prefixes": ["backend/"], "risk": "high", "notes": "API, persistence, provider and service runtime."},
+    {"id": "creator-client", "prefixes": ["frontend/"], "risk": "medium", "notes": "Expo/React Native creator/application surface."},
+    {"id": "build-security", "prefixes": [".github/", "scripts/", "Dockerfile", "docker-compose.yml", "Makefile", "pyproject.toml"], "risk": "critical", "notes": "Build, CI, supply-chain and repository policy surface."},
+    {"id": "repo-intelligence", "prefixes": ["repo-intel/", "scripts/repo_intel.py"], "risk": "high", "notes": "Machine map and agent/build handoff contract."},
+    {"id": "tests", "prefixes": ["tests/", "skeleton/testing/"], "risk": "medium", "notes": "Verification and regression evidence."},
+    {"id": "docs", "prefixes": ["docs/", "README.md"], "risk": "low", "notes": "Human-facing architecture and operating guidance."}
+  ],
+  "rule": "Most-specific matching prefix wins. Ownership zones are architectural responsibility boundaries, not GitHub user assignments. CODEOWNERS ingestion may refine human ownership later."
+}
