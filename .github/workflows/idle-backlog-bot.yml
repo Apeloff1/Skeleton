@@ -19,6 +19,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: read
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
@@ -39,10 +40,35 @@ jobs:
           cutoff=$(date -u -d "${STALE_DAYS} days ago" +%s)
           triaged=0
 
-          gh issue list --repo "$REPO" --state open --limit 100 --json number,title,updatedAt,isPullRequest,labels > "$RUNNER_TEMP/items.json"
+          gh issue list \
+            --repo "$REPO" \
+            --state open \
+            --limit 100 \
+            --json number,title,updatedAt,labels \
+            | jq '[.[] | . + {kind: "issue"}]' \
+            > "$RUNNER_TEMP/issues.json"
 
-          while IFS=$'\t' read -r number title updated kind labels; do
-            [[ -n "${number:-}" ]] || continue
+          gh pr list \
+            --repo "$REPO" \
+            --state open \
+            --limit 100 \
+            --json number,title,updatedAt,labels \
+            | jq '[.[] | . + {kind: "pull request"}]' \
+            > "$RUNNER_TEMP/pulls.json"
+
+          jq -s 'add | sort_by(.updatedAt)' \
+            "$RUNNER_TEMP/issues.json" \
+            "$RUNNER_TEMP/pulls.json" \
+            > "$RUNNER_TEMP/items.json"
+
+          while IFS= read -r item; do
+            [[ -n "${item:-}" ]] || continue
+            number=$(jq -r '.number' <<<"$item")
+            updated=$(jq -r '.updatedAt' <<<"$item")
+            kind=$(jq -r '.kind' <<<"$item")
+            labels=$(jq -r '[.labels[].name] | join(",")' <<<"$item")
+
+            [[ "$number" =~ ^[0-9]+$ ]] || continue
             updated_epoch=$(date -u -d "$updated" +%s)
             (( updated_epoch < cutoff )) || continue
             (( triaged < MAX_ITEMS )) || break
@@ -52,7 +78,7 @@ jobs:
               gh issue comment "$number" --repo "$REPO" --body "Repository bot triage: this ${kind} has had no update for at least ${STALE_DAYS} days. It remains open; review whether it is still actionable, blocked, superseded, or ready for work. No automatic closure was performed." >/dev/null
               triaged=$((triaged + 1))
             fi
-          done < <(jq -r '.[] | [.number,.title,.updatedAt,(if .isPullRequest then "pull request" else "issue" end),([.labels[].name] | join(","))] | @tsv' "$RUNNER_TEMP/items.json")
+          done < <(jq -c '.[]' "$RUNNER_TEMP/items.json")
 
           {
             echo '## Idle backlog bot'
