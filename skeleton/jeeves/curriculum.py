@@ -10,7 +10,7 @@ engine so a student only sees what they're ready for.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 from skeleton.kernel.errors import KernelError
@@ -28,7 +28,7 @@ class Lesson:
     skill_id: str
     bloom_level: BloomLevel = BloomLevel.UNDERSTAND
     prerequisites: Tuple[str, ...] = ()
-    mastery_gate: float = 0.6  # required mastery of prerequisites
+    mastery_gate: float = 0.6  # required mastery of prerequisite skills
 
 
 class Curriculum:
@@ -77,14 +77,16 @@ class Curriculum:
     def ready(
         self, engine: AssessmentEngine
     ) -> Tuple[Lesson, ...]:
-        """Lessons whose prerequisites all clear their mastery gates."""
+        """Lessons whose prerequisite lessons' skills clear the mastery gate."""
         out: List[Lesson] = []
         for lesson in self._lessons.values():
-            prereqs_ok = all(
-                engine._skills.get(p) is not None
-                and engine._skills[p].mastery >= lesson.mastery_gate
-                for p in lesson.prerequisites
-            )
+            prereqs_ok = True
+            for prereq_id in lesson.prerequisites:
+                prerequisite = self._lessons[prereq_id]
+                mastery = engine.mastery(prerequisite.skill_id)
+                if mastery is None or mastery < lesson.mastery_gate:
+                    prereqs_ok = False
+                    break
             if prereqs_ok:
                 out.append(lesson)
         return tuple(out)
