@@ -45,6 +45,8 @@ class SMBShiftManager:
             raise ValueError("team must be night or idle")
         now = at or datetime.now(timezone.utc)
         worker = self._get_worker(worker_id) or WorkerState(worker_id=worker_id, team=team)  # type: ignore[arg-type]
+        if worker.current_task_id is not None:
+            raise PermissionError("cannot clock in or reset a worker with an active task")
         worker.team = team  # type: ignore[assignment]
         worker.status = "idle"
         worker.clocked_in_at = now
@@ -59,6 +61,8 @@ class SMBShiftManager:
 
     def clock_out(self, worker_id: str, *, at: datetime | None = None) -> WorkerState:
         worker = self._require_worker(worker_id)
+        if worker.current_task_id is not None:
+            raise PermissionError("cannot clock out a worker with an active task; release the assignment first")
         now = at or datetime.now(timezone.utc)
         self._refresh_worker_time(worker, now)
         worker.status = "offline"
@@ -78,6 +82,14 @@ class SMBShiftManager:
         if status not in {"idle", "working", "blocked"}:
             raise ValueError("invalid active worker status")
         worker = self._require_worker(worker_id)
+        if worker.current_task_id is None:
+            if task_id is not None:
+                raise PermissionError("heartbeat cannot self-assign work; claim from the canonical queue")
+        else:
+            if task_id != worker.current_task_id:
+                raise PermissionError("heartbeat cannot replace or clear an active task assignment")
+            if status == "idle":
+                raise PermissionError("heartbeat cannot mark a worker idle while a task is active")
         now = at or datetime.now(timezone.utc)
         self._refresh_worker_time(worker, now)
         worker.status = status  # type: ignore[assignment]
@@ -259,22 +271,33 @@ class SMBShiftManager:
                 continue
             task_key = str(task.get("task_key", "")).strip() or f"proposal-{index + 1}"
             if task_key in key_to_id:
-                continue
+                return []
             item_id = f"mgr-{uuid.uuid4()}"
             key_to_id[task_key] = item_id
             staged.append((task, task_key, item_id))
 
+        resolved_dependencies: dict[str, list[str]] = {}
+        for task, _task_key, item_id in staged:
+            raw_dependencies = task.get("dependencies", [])
+            if not isinstance(raw_dependencies, list):
+                return []
+            dependency_names = [str(value).strip() for value in raw_dependencies if str(value).strip()]
+            if any(name not in key_to_id and name not in existing_ids for name in dependency_names):
+                return []
+            resolved_dependencies[item_id] = [key_to_id.get(name, name) for name in dependency_names]
+
         parsed: list[PlanItem] = []
         for task, task_key, item_id in staged:
-            raw_dependencies = task.get("dependencies", [])
-            dependency_names = [str(value).strip() for value in raw_dependencies if str(value).strip()] if isinstance(raw_dependencies, list) else []
-            unresolved = [name for name in dependency_names if name not in key_to_id and name not in existing_ids]
-            if unresolved:
-                continue
-            dependencies = [key_to_id.get(name, name) for name in dependency_names]
-            item = cls._parse_task(task, correlation_id, item_id=item_id, task_key=task_key, dependencies=dependencies)
-            if item is not None:
-                parsed.append(item)
+            item = cls._parse_task(
+                task,
+                correlation_id,
+                item_id=item_id,
+                task_key=task_key,
+                dependencies=resolved_dependencies[item_id],
+            )
+            if item is None:
+                return []
+            parsed.append(item)
         return require_acyclic_new_items(parsed)
 
     @staticmethod
