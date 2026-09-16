@@ -1,3 +1,5 @@
+import pytest
+
 from skeleton.automation.repo_bots import extract_plan, safe_path
 
 
@@ -15,11 +17,6 @@ def test_safe_path_rejects_control_plane_and_traversal():
     assert not safe_path("skeleton\\evil.py")
 
 
-def test_extract_plan_rejects_oversized_or_untrusted_paths():
-    assert extract_plan('{"summary":"none","files":[],"tests":[]}[trailing]') if False else True
-    try:
+def test_extract_plan_rejects_untrusted_paths():
+    with pytest.raises(ValueError):
         extract_plan('{"summary":"bad","files":[{"path":".github/workflows/x.yml","content":"x"}]}')
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("unsafe workflow path was accepted")
