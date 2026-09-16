@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark cold/warm repository-intelligence refreshes on the current tree."""
+"""Benchmark cold/warm canonical repository-intelligence refreshes."""
 from __future__ import annotations
 
 import argparse
@@ -14,14 +14,14 @@ SCRIPTS = Path(__file__).resolve().parent
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
-import repo_intel_sota as sota  # noqa: E402
+import repo_index  # noqa: E402
 
-ROOT = sota.ROOT
+ROOT = repo_index.ROOT
 
 
 def run_once(out: Path, base_ref: str) -> tuple[float, dict]:
     started = time.perf_counter()
-    snapshot = sota.snapshot_command(out, base_ref)
+    snapshot = repo_index.snapshot_command(out, base_ref)
     wall_ms = (time.perf_counter() - started) * 1000
     return wall_ms, snapshot
 
@@ -49,12 +49,15 @@ def main() -> int:
 
     cold_metrics = cold_snapshot["metrics"]
     warm_metrics = [snapshot["metrics"] for snapshot in warm_snapshots]
-    budgets = sota.base.load_json("quality-budgets.json")["index_performance_targets"]
+    budgets = repo_index.base.load_json("quality-budgets.json")["index_performance_targets"]
     report = {
-        "schema": 1,
+        "schema": 2,
         "source_digest": cold_snapshot["source_digest"],
         "tracked_files": cold_snapshot["tracked_files"],
         "tracked_bytes": cold_snapshot["tracked_bytes"],
+        "graph_nodes": cold_metrics["graph_nodes"],
+        "graph_edges": cold_metrics["graph_edges"],
+        "external_dependency_components": cold_metrics.get("external_dependency_components", 0),
         "cold_wall_ms": round(cold_ms, 3),
         "warm_runs_ms": [round(x, 3) for x in warm],
         "warm_median_ms": round(statistics.median(warm), 3),
