@@ -345,7 +345,11 @@ class SquadPlanQueueAPI:
 
                 for worker_id, worker in list(store._workers.items()):  # noqa: SLF001
                     current_squad = str(worker.metadata.get("current_squad_id", ""))
-                    if worker.current_task_id != item.id and current_squad != owner:
+                    owns_recovered_task = worker.current_task_id == item.id
+                    orphaned_in_recovered_squad = (
+                        worker.current_task_id is None and current_squad == owner
+                    )
+                    if not owns_recovered_task and not orphaned_in_recovered_squad:
                         continue
                     worker.current_task_id = None
                     if worker.status != "offline":
