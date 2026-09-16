@@ -92,17 +92,56 @@ def publish_entries(
     fresh_pulls = github.open_pulls()
     claimed = _existing_studio_task_keys(fresh_pulls)
     capacity = max(0, config.max_open_studio_prs - _open_studio_pr_count(fresh_pulls))
-    published: list[dict[str, Any]] = []
+    prepared: list[
+        tuple[
+            WorkItem,
+            IdleTaskSquad,
+            ResearchDecision,
+            ReviewDecision,
+            VerificationDecision,
+            ChangeProposal,
+        ]
+    ] = []
+    path_owners: dict[str, str] = {}
+    worker_owners: dict[str, str] = {}
+    scheduled_tasks = set(claimed)
 
+    # Preflight the complete publishable batch before creating any blob, branch,
+    # or pull request. Different squads may not share workers or write the same
+    # repository path in one run; either condition is an anti-swarm violation.
     for raw in entries:
-        if len(published) >= capacity:
+        if len(prepared) >= capacity:
             break
         if not isinstance(raw, Mapping):
             raise ValueError("package entry must be an object")
         task, squad, research, review, verification, proposal = unpack_entry(raw, config)
-        if task.key in claimed:
+        if task.key in scheduled_tasks:
             continue
 
+        proposal_paths = tuple(item.path for item in proposal.files)
+        overlapping = sorted(path for path in proposal_paths if path in path_owners)
+        if overlapping:
+            prior = {path: path_owners[path] for path in overlapping}
+            raise ValueError(
+                f"idle-studio squads overlap repository paths: {prior!r} conflicts with {task.key!r}"
+            )
+
+        reused_workers = sorted(worker_id for worker_id in squad.worker_ids if worker_id in worker_owners)
+        if reused_workers:
+            prior = {worker_id: worker_owners[worker_id] for worker_id in reused_workers}
+            raise ValueError(
+                f"idle-studio squads reuse workers across tasks: {prior!r} conflicts with {task.key!r}"
+            )
+
+        for path in proposal_paths:
+            path_owners[path] = task.key
+        for worker_id in squad.worker_ids:
+            worker_owners[worker_id] = task.key
+        scheduled_tasks.add(task.key)
+        prepared.append((task, squad, research, review, verification, proposal))
+
+    published: list[dict[str, Any]] = []
+    for task, squad, research, review, verification, proposal in prepared:
         title = f"bot({squad.builder.role}): {task.title}"[:240]
         branch = branch_name(task, squad.builder, run_id, attempt)
         body = _review_body(task, squad, research, review, verification, proposal)
@@ -121,7 +160,6 @@ def publish_entries(
         if github.branch_sha("main") != base_sha:
             raise RuntimeError("main moved after idle-studio branch creation; refusing PR creation")
         pr = github.create_pull(title=title, branch=branch, body=body)
-        claimed.add(task.key)
         published.append(
             {
                 "task": task.key,
