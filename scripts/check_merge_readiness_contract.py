@@ -19,11 +19,23 @@ READINESS_GUARD = (
     "(!github.event.pull_request.draft && github.event.action != 'converted_to_draft' "
     "&& github.event.action != 'closed')) }}"
 )
+JOB_HEADER_RE = re.compile(r"^  (?P<name>[A-Za-z0-9_-]+):\s*$", re.MULTILINE)
 
 
 def require(condition: bool, message: str, failures: list[str]) -> None:
     if not condition:
         failures.append(message)
+
+
+def job_block(text: str, job_name: str) -> str:
+    """Return one top-level workflow job block without leaking into later jobs."""
+    target = re.search(rf"^  {re.escape(job_name)}:\s*$", text, re.MULTILINE)
+    if target is None:
+        return ""
+
+    next_job = JOB_HEADER_RE.search(text, target.end())
+    end = next_job.start() if next_job is not None else len(text)
+    return text[target.start() : end]
 
 
 def main() -> int:
@@ -83,9 +95,8 @@ def main() -> int:
     require("continue-on-error: true" not in text, "required merge gates must not hide failures", failures)
     require('ports:\n          - "27017:27017"' in text, "Mongo service port must use explicit quoted list syntax", failures)
 
-    readiness_start = text.find("  readiness:")
-    require(readiness_start >= 0, "readiness job missing", failures)
-    readiness = text[readiness_start:] if readiness_start >= 0 else ""
+    readiness = job_block(text, "readiness")
+    require(bool(readiness), "readiness job missing", failures)
     require("name: Merge Readiness" in readiness, "stable Merge Readiness job name missing", failures)
     require(
         READINESS_GUARD in readiness,
