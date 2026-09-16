@@ -14,13 +14,21 @@ def test_security_digest_uses_supported_issue_creation_contract() -> None:
     assert 'gh api --method POST "repos/${REPO}/issues"' in text
     assert "--jq '.number'" in text
     assert '[[ ! "$issue_number" =~ ^[0-9]+$ ]]' in text
-    assert "select(.title == $title)" in text
+
+
+def test_security_digest_resolves_exact_issue_from_paginated_rest_results() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    assert '"/repos/${REPO}/issues?state=open&per_page=100"' in text
+    assert 'select((has("pull_request") | not) and (.title == $title))' in text
+    assert "gh issue list" not in text
+    assert "head -n 1" not in text
 
 
 def test_security_digest_flattens_paginated_alert_pages() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
 
-    assert text.count("gh api --paginate --slurp") == 2
+    assert text.count("gh api --paginate --slurp") == 3
     assert "code-scanning/alerts?state=open&per_page=100" in text
     assert "dependabot/alerts?state=open&per_page=100" in text
-    assert text.count("if type == \"array\" then .[] else empty end") == 2
+    assert text.count("if type == \"array\" then .[] else empty end") == 3
