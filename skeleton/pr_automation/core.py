@@ -26,6 +26,7 @@ class Decision(StrEnum):
     IGNORE = "ignore"
     HOLD = "hold"
     READY = "ready"
+    MANUAL = "manual"
     MERGE = "merge"
 
 
@@ -126,9 +127,9 @@ def _hold(snapshot: PRSnapshot, policy: Policy, *reasons: str) -> Evaluation:
 def evaluate(snapshot: PRSnapshot, policy: Policy) -> Evaluation:
     """Evaluate one immutable PR snapshot without side effects.
 
-    Only an explicitly known-clean state can become merge-ready. Unknown enum
-    values and incomplete data fail closed so newly introduced GitHub states do
-    not accidentally inherit permissive behavior.
+    Only explicitly known state can become merge-ready. Unknown enum values and
+    incomplete data fail closed. Changes to the automation trust surface may
+    pass normal merge gates but are always routed to a human merge decision.
     """
 
     if snapshot.state != "open" or snapshot.merged:
@@ -184,12 +185,6 @@ def evaluate(snapshot: PRSnapshot, policy: Policy) -> Evaluation:
 
     if snapshot.sensitive_paths is None:
         return _hold(snapshot, policy, "changed-file trust-surface scan is incomplete")
-    if snapshot.sensitive_paths:
-        return _hold(
-            snapshot,
-            policy,
-            f"automation trust surface changed in {len(snapshot.sensitive_paths)} path(s)",
-        )
 
     if snapshot.changed_files < 0 or snapshot.additions < 0 or snapshot.deletions < 0:
         return _hold(snapshot, policy, "change metrics are invalid")
@@ -197,6 +192,17 @@ def evaluate(snapshot: PRSnapshot, policy: Policy) -> Evaluation:
         return _hold(snapshot, policy, "changed-file count exceeds policy")
     if snapshot.additions + snapshot.deletions > policy.max_total_line_delta:
         return _hold(snapshot, policy, "line delta exceeds policy")
+
+    if snapshot.sensitive_paths:
+        return _evaluation(
+            snapshot,
+            policy,
+            Decision.MANUAL,
+            (
+                f"automation trust surface changed in {len(snapshot.sensitive_paths)} path(s); "
+                "human merge required",
+            ),
+        )
 
     if policy.merge_when_ready:
         action = PlannedAction.make(
