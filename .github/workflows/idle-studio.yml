@@ -19,6 +19,7 @@ permissions: {}
 
 jobs:
   studio:
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
     name: 1000-worker idle control plane
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -43,6 +44,7 @@ jobs:
       - name: Checkout trusted default-branch snapshot
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: main
           persist-credentials: false
           fetch-depth: 1
 
