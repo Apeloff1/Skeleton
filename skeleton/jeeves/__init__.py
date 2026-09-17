@@ -50,6 +50,13 @@ from .historical_uncertainty import (
     build_sequential_intervals,
     conformal_radius,
 )
+from .historical_horizons import (
+    HorizonConsistencyDecision,
+    HorizonEvaluation,
+    HorizonGridConfig,
+    MultiHorizonModeLab,
+    MultiHorizonReport,
+)
 from .historical_evidence import (
     HistoricalEvidenceBundle,
     build_historical_evidence,
@@ -172,6 +179,11 @@ __all__ = [
     "UncertaintyDecision",
     "build_sequential_intervals",
     "conformal_radius",
+    "HorizonConsistencyDecision",
+    "HorizonEvaluation",
+    "HorizonGridConfig",
+    "MultiHorizonModeLab",
+    "MultiHorizonReport",
     "HistoricalEvidenceBundle",
     "build_historical_evidence",
     "build_uncertainty_evidence",
