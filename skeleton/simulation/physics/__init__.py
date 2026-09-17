@@ -20,7 +20,17 @@ from .collision import (
     detect_collision,
     generate_manifolds,
 )
-from .constraints import ConstraintSolver, ConstraintStats, DistanceJoint
+from .constraints import (
+    ConstraintSolver,
+    ConstraintStats,
+    DistanceJoint,
+    DistanceLimitJoint,
+    JointConstraint,
+    JointKind,
+    PointJoint,
+    SpringJoint,
+    is_joint_constraint,
+)
 from .contacts import ContactCache, ContactCacheEntry
 from .errors import (
     BodyNotFoundError,
@@ -99,7 +109,10 @@ __all__ = [
     "ContactCacheEntry",
     "ContinuousCollisionDetector",
     "DistanceJoint",
+    "DistanceLimitJoint",
     "DuplicateJointError",
+    "JointConstraint",
+    "JointKind",
     "JointNotFoundError",
     "BodyType",
     "BoxShape",
@@ -146,6 +159,7 @@ __all__ = [
     "PhysicsValidationError",
     "PhysicsWorld",
     "PlaneShape",
+    "PointJoint",
     "ProjectileSolution",
     "Quat",
     "Ray",
@@ -157,6 +171,7 @@ __all__ = [
     "SolverError",
     "SolverStats",
     "SphereShape",
+    "SpringJoint",
     "SweepAndPruneBroadPhase",
     "TOIEvent",
     "Transform",
@@ -172,6 +187,7 @@ __all__ = [
     "generate_manifolds",
     "gravitational_potential_energy",
     "impulse_from_force",
+    "is_joint_constraint",
     "kinetic_energy",
     "linear_momentum",
     "raycast_body",
