@@ -7,9 +7,10 @@ sharpness, and sequential calibration drift.
 
 All diagnostics operate on already-produced forecasts and realized targets. They
 never mutate model state or feed a target back into the forecast that produced it.
-Calibration reports retain exact target identity plus a deterministic fingerprint
-of the predictive mixtures used for every target, allowing downstream governance
-to verify evidence custody instead of relying on equal sample counts.
+Calibration reports retain exact target identity, the full PIT sequence, and a
+deterministic fingerprint of the predictive mixtures used for every target. This
+allows downstream governance to verify evidence custody instead of relying on
+equal sample counts or detached aggregate metrics.
 """
 
 from __future__ import annotations
@@ -138,6 +139,7 @@ class CalibrationReport:
     target_pairs: tuple[tuple[int, float], ...]
     target_fingerprint: str
     observation_fingerprint: str
+    pits: tuple[float, ...]
     pit: PitDiagnostic
     coverage: tuple[CoverageDiagnostic, ...]
     mean_log_score: float
@@ -157,6 +159,13 @@ class CalibrationReport:
                 context={"reason": "invalid_calibration_report"},
             )
         _validate_target_pairs(self.target_pairs, expected_count=self.observations)
+        if not isinstance(self.pits, tuple) or len(self.pits) != self.observations:
+            raise StateSpaceError(
+                "PIT sequence count must equal calibration observations",
+                context={"reason": "invalid_calibration_report"},
+            )
+        for value in self.pits:
+            _unit("pit", value)
         for name, value in (
             ("target_fingerprint", self.target_fingerprint),
             ("observation_fingerprint", self.observation_fingerprint),
@@ -259,6 +268,7 @@ def calibrate_distributions(
         target_pairs=target_pairs,
         target_fingerprint=target_fingerprint,
         observation_fingerprint=observation_fingerprint,
+        pits=pits,
         pit=pit,
         coverage=coverage,
         mean_log_score=mean_log_score,
@@ -267,6 +277,50 @@ def calibrate_distributions(
         calibration_score=calibration_score,
         fingerprint=fingerprint,
     )
+
+
+def validate_calibration_report(report: CalibrationReport) -> None:
+    """Reject malformed or tampered distributional-calibration evidence."""
+
+    if not isinstance(report, CalibrationReport):
+        raise StateSpaceError(
+            "report must be a CalibrationReport",
+            context={"reason": "invalid_calibration_report"},
+        )
+    _validate_target_pairs(report.target_pairs, expected_count=report.observations)
+    expected_target_fingerprint = _target_fingerprint(report.target_pairs)
+    if report.target_fingerprint != expected_target_fingerprint:
+        raise StateSpaceError(
+            "calibration target fingerprint mismatch",
+            context={"reason": "calibration_report_identity_mismatch"},
+        )
+    if len(report.pits) != report.observations:
+        raise StateSpaceError(
+            "calibration PIT sequence count mismatch",
+            context={"reason": "calibration_report_identity_mismatch"},
+        )
+    expected_pit = _pit_diagnostic(report.pits, report.config)
+    if report.pit != expected_pit:
+        raise StateSpaceError(
+            "calibration PIT diagnostic mismatch",
+            context={"reason": "calibration_report_identity_mismatch"},
+        )
+    expected_fingerprint = _report_fingerprint(
+        config=report.config,
+        target_fingerprint=report.target_fingerprint,
+        observation_fingerprint=report.observation_fingerprint,
+        pits=report.pits,
+        coverage=report.coverage,
+        mean_log_score=report.mean_log_score,
+        mean_crps=report.mean_crps,
+        drift_events=report.drift_events,
+        calibration_score=report.calibration_score,
+    )
+    if report.fingerprint != expected_fingerprint:
+        raise StateSpaceError(
+            "calibration report fingerprint mismatch",
+            context={"reason": "calibration_report_identity_mismatch"},
+        )
 
 
 def calibration_observation_fingerprint(
@@ -733,4 +787,5 @@ __all__ = [
     "mixture_cdf",
     "mixture_quantile",
     "pinball_loss",
+    "validate_calibration_report",
 ]
