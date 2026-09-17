@@ -48,6 +48,7 @@ from .lineage import (
     TheoryRecord,
     default_lineage,
 )
+from .semantic_exchange import SemanticForecastExpert, SemanticTargetBinding
 from .predictive_exchange import (
     DistributionComponent,
     EnsembleForecast,
@@ -124,6 +125,8 @@ __all__ = [
     "ScoreAvailability",
     "ScientificClaim",
     "ScientificEvidenceLedger",
+    "SemanticForecastExpert",
+    "SemanticTargetBinding",
     "TechniqueRegistry",
     "TheoryRecord",
     "YearFrontierDecision",
