@@ -282,12 +282,13 @@ def test_world_receipt_counts_hinge_joint_through_island_solver() -> None:
         )
     )
     world.add_body(_static("anchor"))
-    world.add_body(_dynamic("body"))
+    world.add_body(_dynamic("body", position=Vec3(2.0, 0.0, 0.0)))
     world.add_joint(
         HingeJoint(
             "hinge",
             "anchor",
             "body",
+            local_anchor_a=Vec3(2.0, 0.0, 0.0),
             motor_speed=1.0,
             max_motor_torque=1.0,
         )
