@@ -151,15 +151,7 @@ def _cmd_flesh(rest: List[str]) -> int:
         payload = play(seed=_seed(rest))
     except Exception as exc:
         return _fail(exc)
-    print(json.dumps({
-        "ok": True,
-        "digest": payload["digest"],
-        "floors": payload["floors"],
-        "extract_count": payload["extract_count"],
-        "saved": payload["saved"],
-        "sota_ready": payload["sota_ready"],
-        "stored_prose": payload["stored_prose"],
-    }, indent=2))
+    print(json.dumps({"ok": True, "digest": payload["digest"], "floors": payload["floors"], "extract_count": payload["extract_count"], "saved": payload["saved"], "sota_ready": payload["sota_ready"], "stored_prose": payload["stored_prose"]}, indent=2))
     return 0
 
 
@@ -169,15 +161,28 @@ def _cmd_world(rest: List[str]) -> int:
         payload = play(seed=_seed(rest), ticks=16)
     except Exception as exc:
         return _fail(exc)
-    print(json.dumps({
-        "ok": True,
-        "digest": payload["digest"],
-        "floors": payload["floors"],
-        "contacts": payload["contacts"],
-        "extract_count": payload["extract_count"],
-        "sota_ready": payload["sota_ready"],
-        "stored_prose": payload["stored_prose"],
-    }, indent=2))
+    print(json.dumps({"ok": True, "digest": payload["digest"], "floors": payload["floors"], "contacts": payload["contacts"], "extract_count": payload["extract_count"], "sota_ready": payload["sota_ready"], "stored_prose": payload["stored_prose"]}, indent=2))
+    return 0
+
+
+def _cmd_warena(rest: List[str]) -> int:
+    from skeleton.game.world_arena import compare
+    seed = _seed(rest)
+    try:
+        payload = compare(seed_a=seed, seed_b=seed, ticks=16)
+    except Exception as exc:
+        return _fail(exc)
+    print(json.dumps({"ok": True, "match": payload["match"], "digest_a": payload["digest_a"], "sota_ready": payload["sota_ready"], "stored_prose": payload["stored_prose"]}, indent=2))
+    return 0
+
+
+def _cmd_monte(rest: List[str]) -> int:
+    from skeleton.game.world_arena import monte
+    try:
+        payload = monte(seed=_seed(rest), n=4, ticks=16)
+    except Exception as exc:
+        return _fail(exc)
+    print(json.dumps({"ok": True, "unique_digests": payload["unique_digests"], "extracts": payload["extracts"], "sota_ready": payload["sota_ready"], "stored_prose": payload["stored_prose"]}, indent=2))
     return 0
 
 
@@ -186,7 +191,8 @@ def dispatch(cmd: str, rest: List[str]) -> int | None:
         "spec": _cmd_spec, "emit": _cmd_emit, "doctor": _cmd_doctor, "turn": _cmd_turn,
         "compose": _cmd_compose, "nexus": _cmd_nexus, "packtree": _cmd_packtree,
         "bundles": _cmd_bundles, "catalog": _cmd_catalog, "sim": _cmd_sim,
-        "lab": _cmd_lab, "campus": _cmd_campus, "flesh": _cmd_flesh, "world": _cmd_world,
+        "lab": _cmd_lab, "campus": _cmd_campus, "flesh": _cmd_flesh,
+        "world": _cmd_world, "warena": _cmd_warena, "monte": _cmd_monte,
     }
     fn = table.get(cmd)
     return None if fn is None else fn(rest)

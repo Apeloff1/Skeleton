@@ -30,10 +30,10 @@ def test_floor_path_and_craft() -> None:
     assert bag["slots"]["coil"] >= 1
 
 
-def test_cli_arena(capsys) -> None:
+def test_cli_warena(capsys) -> None:
     from skeleton.__main__ import main
 
-    assert main(["arena", "--seed", "8847291"]) == 0
+    assert main(["warena", "--seed", "8847291"]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["ok"] is True
     assert payload["match"] is True
