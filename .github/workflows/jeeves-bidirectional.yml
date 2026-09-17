@@ -9,6 +9,7 @@ on:
       - 'skeleton/jeeves/bidirectional_modes.py'
       - 'skeleton/jeeves/bidirectional_calibration.py'
       - 'skeleton/jeeves/historical_robustness.py'
+      - 'skeleton/jeeves/historical_uncertainty.py'
       - 'skeleton/jeeves/historical_evidence.py'
       - 'skeleton/jeeves/__init__.py'
       - 'skeleton/learning/evidence.py'
@@ -16,6 +17,7 @@ on:
       - 'skeleton/testing/test_jeeves_bidirectional_modes.py'
       - 'skeleton/testing/test_jeeves_bidirectional_calibration.py'
       - 'skeleton/testing/test_jeeves_historical_robustness.py'
+      - 'skeleton/testing/test_jeeves_historical_uncertainty.py'
       - 'skeleton/testing/test_jeeves_historical_evidence.py'
       - 'skeleton/testing/test_jeeves_historical_mode_exports.py'
       - 'skeleton/testing/test_learning_evidence.py'
@@ -27,6 +29,7 @@ on:
       - 'skeleton/jeeves/bidirectional_modes.py'
       - 'skeleton/jeeves/bidirectional_calibration.py'
       - 'skeleton/jeeves/historical_robustness.py'
+      - 'skeleton/jeeves/historical_uncertainty.py'
       - 'skeleton/jeeves/historical_evidence.py'
       - 'skeleton/jeeves/__init__.py'
       - 'skeleton/learning/evidence.py'
@@ -34,6 +37,7 @@ on:
       - 'skeleton/testing/test_jeeves_bidirectional_modes.py'
       - 'skeleton/testing/test_jeeves_bidirectional_calibration.py'
       - 'skeleton/testing/test_jeeves_historical_robustness.py'
+      - 'skeleton/testing/test_jeeves_historical_uncertainty.py'
       - 'skeleton/testing/test_jeeves_historical_evidence.py'
       - 'skeleton/testing/test_jeeves_historical_mode_exports.py'
       - 'skeleton/testing/test_learning_evidence.py'
@@ -82,16 +86,18 @@ jobs:
             skeleton/jeeves/bidirectional_modes.py \
             skeleton/jeeves/bidirectional_calibration.py \
             skeleton/jeeves/historical_robustness.py \
+            skeleton/jeeves/historical_uncertainty.py \
             skeleton/jeeves/historical_evidence.py \
             skeleton/learning/evidence.py
 
-      - name: Run historical falsification calibration robustness and evidence regressions
+      - name: Run historical falsification calibration robustness uncertainty and evidence regressions
         run: |
           python -m pytest -q \
             skeleton/testing/test_jeeves_historical_modes.py \
             skeleton/testing/test_jeeves_bidirectional_modes.py \
             skeleton/testing/test_jeeves_bidirectional_calibration.py \
             skeleton/testing/test_jeeves_historical_robustness.py \
+            skeleton/testing/test_jeeves_historical_uncertainty.py \
             skeleton/testing/test_jeeves_historical_evidence.py \
             skeleton/testing/test_jeeves_historical_mode_exports.py \
             skeleton/testing/test_learning_evidence.py
