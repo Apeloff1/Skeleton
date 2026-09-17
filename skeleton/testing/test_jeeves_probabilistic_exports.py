@@ -86,3 +86,21 @@ def test_probabilistic_facade_exports_hidden_markov_regime_surface() -> None:
     assert expected.issubset(set(probabilistic.__all__))
     for name in expected:
         assert hasattr(probabilistic, name)
+
+
+def test_probabilistic_facade_exports_paired_arena_surface() -> None:
+    expected = {
+        "ArenaCandidate",
+        "ArenaFold",
+        "ArenaMetrics",
+        "HACComparison",
+        "PredictiveArenaConfig",
+        "PredictiveArenaDecision",
+        "PredictiveArenaReport",
+        "evaluate_predictive_arena",
+        "newey_west_mean_test",
+        "regime_forecast_crps",
+    }
+    assert expected.issubset(set(probabilistic.__all__))
+    for name in expected:
+        assert hasattr(probabilistic, name)
