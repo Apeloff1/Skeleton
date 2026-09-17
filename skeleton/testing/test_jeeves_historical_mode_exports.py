@@ -4,6 +4,8 @@ from skeleton.jeeves import (
     BASE_MODES,
     BidirectionalConfig,
     BidirectionalModeLab,
+    CalibratedBidirectionalModeLab,
+    CrossDirectionConfig,
     HistoricalMode,
     HistoricalModeLab,
     HistoricalSeries,
@@ -38,3 +40,23 @@ def test_bidirectional_mode_lab_is_available_from_public_jeeves_surface() -> Non
     assert report.forward.direction is TemporalDirection.FORWARD
     assert report.backward.direction is TemporalDirection.BACKWARD
     assert reverse_series(series).values == tuple(reversed(series.values))
+
+
+def test_calibrated_bidirectional_lab_is_available_from_public_surface() -> None:
+    lab = CalibratedBidirectionalModeLab(
+        config=WalkForwardConfig(min_train_size=4),
+        gate=SelectionGate(min_folds=2, min_relative_improvement=0.0),
+        bidirectional=BidirectionalConfig(max_mae_asymmetry=1.0, max_direction_rank=2),
+        calibration=CrossDirectionConfig(
+            top_k=2,
+            min_rank_correlation=-1.0,
+            min_top_k_overlap=0.0,
+            max_candidate_rank_gap=2,
+            min_paired_targets=0,
+        ),
+        modes=(HistoricalMode.LINEAR_TREND,),
+    )
+    report = lab.evaluate(HistoricalSeries.from_values(range(1, 13)))
+    assert report.ranking_agreement.common_modes >= 2
+    assert report.decision.candidate is report.base.decision.candidate
+    assert report.by_mode(HistoricalMode.PERSISTENCE).mode is HistoricalMode.PERSISTENCE
