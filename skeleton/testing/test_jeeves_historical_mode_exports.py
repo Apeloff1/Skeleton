@@ -6,12 +6,15 @@ from skeleton.jeeves import (
     BidirectionalModeLab,
     CalibratedBidirectionalModeLab,
     CrossDirectionConfig,
+    HistoricalEvidenceBundle,
     HistoricalMode,
     HistoricalModeLab,
     HistoricalSeries,
     SelectionGate,
     TemporalDirection,
     WalkForwardConfig,
+    build_historical_evidence,
+    bundle_manifest,
     reverse_series,
 )
 
@@ -60,3 +63,25 @@ def test_calibrated_bidirectional_lab_is_available_from_public_surface() -> None
     assert report.ranking_agreement.common_modes >= 2
     assert report.decision.candidate is report.base.decision.candidate
     assert report.by_mode(HistoricalMode.PERSISTENCE).mode is HistoricalMode.PERSISTENCE
+
+
+def test_historical_evidence_bridge_is_available_from_public_surface() -> None:
+    series = HistoricalSeries.from_values(range(1, 17), label="public-evidence")
+    lab = CalibratedBidirectionalModeLab(
+        config=WalkForwardConfig(min_train_size=4),
+        gate=SelectionGate(min_folds=2, min_relative_improvement=0.0),
+        bidirectional=BidirectionalConfig(max_mae_asymmetry=1.0, max_direction_rank=2),
+        calibration=CrossDirectionConfig(
+            top_k=2,
+            min_rank_correlation=-1.0,
+            min_top_k_overlap=0.0,
+            max_candidate_rank_gap=2,
+            min_paired_targets=0,
+        ),
+        modes=(HistoricalMode.LINEAR_TREND,),
+    )
+    report = lab.evaluate(series)
+    bundle = build_historical_evidence(report, series, subject_id="public-evidence")
+    assert isinstance(bundle, HistoricalEvidenceBundle)
+    assert bundle.features
+    assert "report_fingerprint" in bundle_manifest(bundle)
