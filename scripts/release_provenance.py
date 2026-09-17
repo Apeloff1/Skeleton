@@ -2,7 +2,9 @@
 """Deterministic release metadata, checksums, SBOM, and rebuild verification.
 
 The release workflow uses this module without third-party runtime dependencies so the
-metadata path itself is small, auditable, and reproducible.
+metadata path itself is small, auditable, and reproducible. SCHEMA_VERSION 1 emit/compare
+callers are unchanged. Optional ``evidence`` and ``gate`` commands consume
+``skeleton.release.evidence`` as a separate release-ready document.
 """
 
 from __future__ import annotations
@@ -26,6 +28,7 @@ SCHEMA_VERSION = 1
 _CYCLONEDX_SPEC = "1.6"
 _COMMIT_RE = re.compile(r"^[0-9a-fA-F]{40,64}$")
 _DEP_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*")
+_OBSERVED_RE = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._:-]*)=(.+)$")
 
 
 def _sha256(path: Path) -> str:
@@ -264,6 +267,118 @@ def compare_provenance(args: argparse.Namespace) -> int:
     return 0
 
 
+def _load_release_evidence():
+    """Import the canonical evidence gate without coupling v1 emit to it."""
+
+    try:
+        from skeleton.release import evidence as release_evidence
+    except ImportError as exc:  # pragma: no cover - package layout is required for evidence
+        raise ValueError(
+            "release evidence commands require the skeleton.release.evidence package"
+        ) from exc
+    return release_evidence
+
+
+def _load_json_records(paths: Iterable[str]) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for item in paths:
+        payload = json.loads(Path(item).read_text(encoding="utf-8"))
+        if isinstance(payload, list):
+            records.extend(payload)
+        elif isinstance(payload, dict):
+            records.append(payload)
+        else:
+            raise ValueError(f"{item} must contain a JSON object or list of objects")
+    return records
+
+
+def _load_observed_artifacts(values: Iterable[str]) -> dict[str, bytes]:
+    observed: dict[str, bytes] = {}
+    for item in values:
+        match = _OBSERVED_RE.fullmatch(item)
+        if not match:
+            raise ValueError("observed artifact must use artifact_id=path")
+        artifact_id, raw_path = match.group(1), match.group(2)
+        path = Path(raw_path)
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        observed[artifact_id] = path.read_bytes()
+    return observed
+
+
+def emit_release_evidence(args: argparse.Namespace) -> int:
+    """Write a separate release-ready evidence document from v1 provenance."""
+
+    release_evidence = _load_release_evidence()
+    provenance = json.loads(Path(args.provenance).read_text(encoding="utf-8"))
+    if provenance.get("schema_version") != SCHEMA_VERSION:
+        raise ValueError("evidence adapter requires a SCHEMA_VERSION 1 provenance document")
+    test_evidence = _load_json_records(args.test_evidence)
+    eval_evidence = _load_json_records(args.eval_evidence)
+    asset_provenance: list[dict[str, Any]] = []
+    if args.asset_provenance:
+        asset_payload = json.loads(Path(args.asset_provenance).read_text(encoding="utf-8"))
+        if isinstance(asset_payload, dict) and "assets" in asset_payload:
+            assets = asset_payload["assets"]
+            if not isinstance(assets, list):
+                raise ValueError("asset provenance assets must be a list")
+            asset_provenance = assets
+        elif isinstance(asset_payload, list):
+            asset_provenance = asset_payload
+        else:
+            raise ValueError("asset provenance must be a list or an assets manifest object")
+
+    try:
+        evidence = release_evidence.from_v1_provenance(
+            provenance,
+            test_evidence=test_evidence,
+            eval_evidence=eval_evidence,
+            asset_provenance=asset_provenance,
+        )
+        serialized = release_evidence.serialize_evidence(evidence)
+        output = Path(args.output)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(serialized + "\n", encoding="utf-8")
+        observed = _load_observed_artifacts(args.observed)
+        result = release_evidence.evaluate_release_ready(
+            evidence,
+            expected_commit=args.source_commit,
+            observed_artifacts=observed or None,
+        )
+    except release_evidence.ReleaseEvidenceError as exc:
+        raise ValueError(str(exc)) from exc
+    print(json.dumps(result.to_payload(), indent=2, sort_keys=True))
+    if args.gate and not result.release_ready:
+        print("release evidence is not release-ready", file=sys.stderr)
+        for reason in result.reasons:
+            print(reason, file=sys.stderr)
+        return 1
+    return 0
+
+
+def gate_release_evidence(args: argparse.Namespace) -> int:
+    """Fail closed unless the evidence document is release-ready."""
+
+    release_evidence = _load_release_evidence()
+    observed = _load_observed_artifacts(args.observed)
+    try:
+        result = release_evidence.evaluate_release_ready(
+            Path(args.evidence).read_text(encoding="utf-8"),
+            expected_commit=args.source_commit,
+            observed_artifacts=observed or None,
+        )
+    except release_evidence.ReleaseEvidenceError as exc:
+        raise ValueError(str(exc)) from exc
+    print(json.dumps(result.to_payload(), indent=2, sort_keys=True))
+    if not result.release_ready:
+        print("release evidence is not release-ready", file=sys.stderr)
+        for reason in result.reasons:
+            print(reason, file=sys.stderr)
+        return 1
+    print("release-ready")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -296,6 +411,43 @@ def build_parser() -> argparse.ArgumentParser:
     compare.add_argument("left")
     compare.add_argument("right")
     compare.set_defaults(func=compare_provenance)
+
+    evidence = subparsers.add_parser(
+        "evidence",
+        help="write a separate release-ready evidence document from SCHEMA_VERSION 1 provenance",
+    )
+    evidence.add_argument("--provenance", required=True)
+    evidence.add_argument("--output", required=True)
+    evidence.add_argument("--source-commit", required=True)
+    evidence.add_argument("--test-evidence", action="append", default=[])
+    evidence.add_argument("--eval-evidence", action="append", default=[])
+    evidence.add_argument("--asset-provenance", default=None)
+    evidence.add_argument(
+        "--observed",
+        action="append",
+        default=[],
+        help="bind exact artifact bytes as artifact_id=path",
+    )
+    evidence.add_argument(
+        "--gate",
+        action="store_true",
+        help="fail closed unless the adapted evidence is release-ready",
+    )
+    evidence.set_defaults(func=emit_release_evidence)
+
+    gate = subparsers.add_parser(
+        "gate",
+        help="classify a release evidence document; missing evidence fails closed",
+    )
+    gate.add_argument("--evidence", required=True)
+    gate.add_argument("--source-commit", required=True)
+    gate.add_argument(
+        "--observed",
+        action="append",
+        default=[],
+        help="bind exact artifact bytes as artifact_id=path",
+    )
+    gate.set_defaults(func=gate_release_evidence)
     return parser
 
 
