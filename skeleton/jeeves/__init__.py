@@ -32,6 +32,11 @@ from .bidirectional_calibration import (
     ModeCalibration,
     RankingAgreement,
 )
+from .historical_evidence import (
+    HistoricalEvidenceBundle,
+    build_historical_evidence,
+    bundle_manifest,
+)
 from .matrices import ClomMatrix, KremMatrix, SamMatrix
 from .matrices_llm import (
     CompressedLearnedOutcomeModel,
@@ -134,6 +139,9 @@ __all__ = [
     "CrossDirectionConfig",
     "ModeCalibration",
     "RankingAgreement",
+    "HistoricalEvidenceBundle",
+    "build_historical_evidence",
+    "bundle_manifest",
     "ClomMatrix",
     "KremMatrix",
     "SamMatrix",
