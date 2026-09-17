@@ -98,8 +98,10 @@ class RigidBody:
                 abs_tol=1.0e-12,
             ):
                 raise PhysicsValidationError("dynamic body mass and inverse_mass disagree")
-            if abs(self.local_inertia.determinant()) <= 1.0e-12:
-                raise PhysicsValidationError("dynamic body inertia must be invertible")
+            if not self.local_inertia.is_invertible():
+                raise PhysicsValidationError(
+                    "dynamic body inertia must be invertible"
+                )
         else:
             self.mass = math.inf
             self.inverse_mass = 0.0
