@@ -15,6 +15,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { ErrorState } from './ui/ErrorState';
 import theme from '../theme/tokens';
+import { isDevErrorDetails, safeErrorMessage } from '../utils/safeError';
 
 interface Props {
   children: React.ReactNode;
@@ -37,9 +38,8 @@ export class ModalErrorBoundary extends React.Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, info: React.ErrorInfo) {
-     
-    console.error(`[ModalErrorBoundary:${this.props.name || 'unknown'}]`, error, info?.componentStack);
+  componentDidCatch(error: Error, _info: React.ErrorInfo) {
+    console.error(`[ModalErrorBoundary:${this.props.name || 'unknown'}]`, safeErrorMessage(error));
   }
 
   retry = () => {
@@ -63,7 +63,7 @@ export class ModalErrorBoundary extends React.Component<Props, State> {
           <ErrorState
             title={`${this.props.name || 'This feature'} hit a snag`}
             message="We caught the error before it could affect the rest of the app. You can retry, close this and pick another feature, or copy the details to share with us."
-            error={this.state.error}
+            error={isDevErrorDetails() ? this.state.error : null}
             onRetry={this.retry}
             fallbackAction={this.props.onClose ? { label: 'Close', onPress: this.close } : undefined}
           />

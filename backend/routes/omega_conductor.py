@@ -14,6 +14,8 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from core.http_errors import internal_http_error
+
 from gameforge.omega import (
     conductor_registry, omega_fabric,
     AgentToAgentConductor, OrchestratorConductor, UserToJeevesConductor,
@@ -71,8 +73,8 @@ async def sessions():
 async def create_session(req: CreateReq):
     try:
         sess = conductor_registry.create(req.role, req.node_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid_omega_request")
     snap = None
     if req.autobegin:
         snap = await sess.conductor.begin(req.mode, req.total, fresh=True)
@@ -115,12 +117,12 @@ async def end(sid: str):
 # ── delivery (context / response / handoff / jeeves) ─────────────────
 def _map_err(e: Exception) -> HTTPException:
     if isinstance(e, RepetitionError):
-        return HTTPException(status_code=409, detail=f"repetition_blocked: {e}")
+        return HTTPException(status_code=409, detail="repetition_blocked")
     if isinstance(e, MarathonStateError):
-        return HTTPException(status_code=409, detail=f"not_begun: {e}")
+        return HTTPException(status_code=409, detail="not_begun")
     if isinstance(e, ConsensusError):
-        return HTTPException(status_code=503, detail=f"consensus_failed: {e}")
-    return HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
+        return HTTPException(status_code=503, detail="consensus_failed")
+    return internal_http_error("omega_request_failed", e)
 
 
 @router.post("/session/{sid}/context")

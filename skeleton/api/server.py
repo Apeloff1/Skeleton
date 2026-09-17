@@ -9,6 +9,22 @@ from dataclasses import asdict, is_dataclass
 from threading import RLock
 from typing import Any, Dict, Optional
 
+from skeleton.api.errors import (
+    install_error_handlers,
+    skeleton_error_handler,
+    unhandled_error_handler,
+)
+
+__all__ = [
+    "ServerState",
+    "create_app",
+    "get_state",
+    "install_error_handlers",
+    "run_server",
+    "skeleton_error_handler",
+    "unhandled_error_handler",
+]
+
 _fastapi = None
 _uvicorn = None
 
@@ -260,6 +276,7 @@ def _gate_open_prefixes() -> tuple[str, ...]:
 def create_app() -> Any:
     fastapi = _get_fastapi()
     app = fastapi.FastAPI(title="Skeleton API", version="16.0.0", description="AI game engine / agent orchestration framework")
+    install_error_handlers(app)
 
     from skeleton.api.routes import router
     from skeleton.api.gameforge_routes import router as gameforge_router

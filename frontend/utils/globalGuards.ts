@@ -15,6 +15,7 @@
  */
 import { traceStep } from './bootTracer';
 import { getSessionId } from './modalLogger';
+import { crashTelemetryFields } from './safeError';
 
 const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 let _installed = false;
@@ -23,9 +24,8 @@ const _MAX_SEEN = 50;
 
 function postCrash(source: string, error: any, isFatal: boolean) {
   try {
-    const message  = String(error?.message ?? error ?? 'unknown');
-    const stack    = String(error?.stack ?? '').slice(0, 8000);
-    const hash     = `${source}|${message.slice(0, 200)}`;
+    const fields = crashTelemetryFields(error);
+    const hash     = `${source}|${fields.message.slice(0, 200)}`;
     if (_seenHashes.has(hash)) return;
     _seenHashes.add(hash);
     if (_seenHashes.size > _MAX_SEEN) {
@@ -34,15 +34,15 @@ function postCrash(source: string, error: any, isFatal: boolean) {
       _seenHashes.clear();
       arr.forEach(h => _seenHashes.add(h));
     }
-    traceStep(`crash:${source}:${message.slice(0, 80)}`).catch(() => {});
+    traceStep(`crash:${source}:${fields.message.slice(0, 80)}`).catch(() => {});
     fetch(`${BACKEND}/api/telemetry/last-crash`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         source,
         component:  source,
-        message,
-        stack,
+        message:    fields.message,
+        stack:      fields.stack,
         info:       { fatal: isFatal },
         session_id: getSessionId(),
       }),

@@ -10,6 +10,7 @@ import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { getSessionId } from '../utils/modalLogger';
 import { navToSafeMode } from '../utils/bootTracer';
+import { crashTelemetryFields, isDevErrorDetails, redactSecrets, safeErrorMessage } from '../utils/safeError';
 
 const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
@@ -35,18 +36,19 @@ export class ErrorBoundary extends React.Component<Props, State> {
     this.setState({ info });
     try { this.props.onError?.(error, info); } catch { /* observer callbacks never break recovery */ }
     // Universal crash funnel — route to Safe Mode (shows boot trace + recovery).
-    try { navToSafeMode(`error_boundary:${(error.message || '').slice(0, 60)}`); } catch {}
+    try { navToSafeMode(`error_boundary:${safeErrorMessage(error)}`); } catch {}
     // Fire-and-forget telemetry — never throw from telemetry itself.
     try {
+      const fields = crashTelemetryFields(error);
       fetch(`${BACKEND}/api/telemetry/last-crash`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           source:     'ErrorBoundary',
           component:  (info.componentStack || '').split('\n')[1]?.trim() || null,
-          message:    error.message,
-          stack:      (error.stack || '').slice(0, 8000),
-          info:       { componentStack: (info.componentStack || '').slice(0, 4000) },
+          message:    fields.message,
+          stack:      fields.stack,
+          info:       { componentStack: redactSecrets((info.componentStack || '').slice(0, 2000)) },
           session_id: getSessionId(),
         }),
       }).catch(() => {});
@@ -75,14 +77,20 @@ export class ErrorBoundary extends React.Component<Props, State> {
             <Text style={styles.sub}>The crash was logged to telemetry. You can retry without restarting the app.</Text>
           </View>
           <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 16 }}>
-            <Text style={styles.label}>Error</Text>
-            <Text style={styles.errName}>{this.state.error.name}: {this.state.error.message}</Text>
-            <Text style={styles.label}>Stack</Text>
-            <Text style={styles.trace}>{this.state.error.stack || '(no stack)'}</Text>
-            {this.state.info?.componentStack ? (<>
-              <Text style={styles.label}>Component tree</Text>
-              <Text style={styles.trace}>{this.state.info.componentStack}</Text>
-            </>) : null}
+            {isDevErrorDetails() ? (
+              <>
+                <Text style={styles.label}>Error</Text>
+                <Text style={styles.errName}>{safeErrorMessage(this.state.error)}: {redactSecrets(this.state.error.message || '')}</Text>
+                <Text style={styles.label}>Stack</Text>
+                <Text style={styles.trace}>{redactSecrets((this.state.error.stack || '(no stack)').slice(0, 2000))}</Text>
+                {this.state.info?.componentStack ? (<>
+                  <Text style={styles.label}>Component tree</Text>
+                  <Text style={styles.trace}>{redactSecrets(this.state.info.componentStack.slice(0, 2000))}</Text>
+                </>) : null}
+              </>
+            ) : (
+              <Text style={styles.trace}>Technical details are hidden in this build. The crash was logged so we can investigate.</Text>
+            )}
           </ScrollView>
           <View style={styles.footer}>
             <TouchableOpacity style={styles.btn} onPress={this.reload}>

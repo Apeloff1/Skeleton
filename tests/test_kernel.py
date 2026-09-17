@@ -102,3 +102,17 @@ class TestErrors:
     def test_http_mapping(self):
         assert http_status_for(CapabilityNotFoundError("x")) == 404
         assert http_status_for(SkeletonError("x")) == 500
+
+    def test_public_payload_hides_server_internals(self):
+        err = SkeletonError("token=super-secret", context={"path": "/tmp/key"})
+        payload = err.public_payload()
+        assert payload["message"] == "internal server error"
+        assert payload["context"] == {}
+        assert "super-secret" not in repr(payload)
+        assert err.to_dict()["message"] == "token=super-secret"
+
+    def test_public_payload_keeps_client_errors(self):
+        err = CapabilityNotFoundError("npc pipeline missing")
+        payload = err.public_payload()
+        assert payload["message"] == "npc pipeline missing"
+        assert payload["code"] == "KRN.CAPABILITY_NOT_FOUND"
