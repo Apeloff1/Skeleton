@@ -6,6 +6,11 @@ from dataclasses import replace
 import pytest
 
 from skeleton.simulation.physics import (
+    PhysicsCommand,
+    PhysicsCommandFrame,
+    PhysicsCommandKind,
+    PhysicsCommandReplayRecorder,
+    PhysicsCommandReplayTape,
     PhysicsReplayDivergenceError,
     PhysicsReplayError,
     PhysicsReplayRecorder,
@@ -20,6 +25,8 @@ from skeleton.simulation.physics import (
     Vec3,
     build_snapshot,
     replay_physics,
+    replay_physics_commands,
+    step_physics_with_commands,
 )
 
 
@@ -330,3 +337,177 @@ def test_rollback_session_rejects_invalid_step_count() -> None:
     session = PhysicsRollbackSession(_world())
     with pytest.raises(PhysicsSnapshotError, match="steps"):
         session.step(0)
+
+
+
+def test_command_frame_rejects_noncontiguous_sequence() -> None:
+    commands = (
+        PhysicsCommand(
+            1,
+            "ball",
+            PhysicsCommandKind.APPLY_IMPULSE,
+            Vec3(1.0, 0.0, 0.0),
+        ),
+    )
+    with pytest.raises(PhysicsReplayError, match="contiguous"):
+        PhysicsCommandFrame.build(1, commands)
+
+
+def test_command_frame_digest_detects_payload_tamper() -> None:
+    frame = PhysicsCommandFrame.build(
+        1,
+        (
+            PhysicsCommand(
+                0,
+                "ball",
+                PhysicsCommandKind.APPLY_FORCE,
+                Vec3(1.0, 2.0, 3.0),
+            ),
+        ),
+    )
+    altered_command = replace(frame.commands[0], vector=Vec3(9.0, 2.0, 3.0))
+    with pytest.raises(PhysicsReplayError, match="digest mismatch"):
+        replace(frame, commands=(altered_command,))
+
+
+def test_invalid_late_command_rolls_back_earlier_command_atomically() -> None:
+    world = _world()
+    body = world.get_body("ball")
+    before_digest = world.state_digest
+    before_velocity = body.linear_velocity
+    frame = PhysicsCommandFrame.build(
+        1,
+        (
+            PhysicsCommand(
+                0,
+                "ball",
+                PhysicsCommandKind.APPLY_IMPULSE,
+                Vec3(10.0, 0.0, 0.0),
+            ),
+            PhysicsCommand(
+                1,
+                "ground",
+                PhysicsCommandKind.APPLY_FORCE,
+                Vec3(100.0, 0.0, 0.0),
+            ),
+        ),
+    )
+
+    with pytest.raises(PhysicsValidationError, match="dynamic body"):
+        step_physics_with_commands(world, frame)
+
+    assert world.tick == 0
+    assert world.state_digest == before_digest
+    assert body.linear_velocity == before_velocity
+
+
+def test_command_replay_reconstructs_input_driven_run_exactly() -> None:
+    world = _world()
+    recorder = PhysicsCommandReplayRecorder(world)
+
+    recorder.step(
+        (
+            PhysicsCommand(
+                0,
+                "ball",
+                PhysicsCommandKind.APPLY_IMPULSE,
+                Vec3(2.0, 3.0, 0.0),
+            ),
+        )
+    )
+    recorder.step(
+        (
+            PhysicsCommand(
+                0,
+                "ball",
+                PhysicsCommandKind.APPLY_FORCE,
+                Vec3(0.0, 12.0, 4.0),
+            ),
+            PhysicsCommand(
+                1,
+                "ball",
+                PhysicsCommandKind.APPLY_TORQUE,
+                Vec3(0.0, 1.0, 0.0),
+            ),
+        )
+    )
+    recorder.step(
+        (
+            PhysicsCommand(
+                0,
+                "ball",
+                PhysicsCommandKind.SET_LINEAR_VELOCITY,
+                Vec3(-1.0, 2.0, 0.5),
+            ),
+        )
+    )
+    for _ in range(20):
+        recorder.step()
+
+    tape = recorder.tape()
+    verification = replay_physics_commands(_world, tape)
+    assert verification.ok
+    assert verification.frames == len(tape.frames)
+    assert verification.final_digest == world.state_digest
+    assert verification.chain_digest == tape.chain_digest
+
+
+def test_command_replay_records_pre_and_post_command_state() -> None:
+    world = _world()
+    recorder = PhysicsCommandReplayRecorder(world)
+    initial = world.state_digest
+    recorder.step(
+        (
+            PhysicsCommand(
+                0,
+                "ball",
+                PhysicsCommandKind.APPLY_IMPULSE,
+                Vec3(3.0, 0.0, 0.0),
+            ),
+        )
+    )
+    frame = recorder.tape().frames[0]
+    assert frame.before_digest == initial
+    assert frame.simulation_before_digest != initial
+    assert frame.after_digest == world.state_digest
+
+
+def test_command_replay_detects_valid_but_altered_input_frame() -> None:
+    recorder = PhysicsCommandReplayRecorder(_world())
+    recorder.step(
+        (
+            PhysicsCommand(
+                0,
+                "ball",
+                PhysicsCommandKind.APPLY_IMPULSE,
+                Vec3(1.0, 0.0, 0.0),
+            ),
+        )
+    )
+    tape = recorder.tape()
+    altered_commands = PhysicsCommandFrame.build(
+        1,
+        (
+            PhysicsCommand(
+                0,
+                "ball",
+                PhysicsCommandKind.APPLY_IMPULSE,
+                Vec3(5.0, 0.0, 0.0),
+            ),
+        ),
+    )
+    altered_frame = replace(tape.frames[0], commands=altered_commands)
+    altered_tape = PhysicsCommandReplayTape(
+        initial=tape.initial,
+        frames=(altered_frame,),
+        chain_digest=tape.chain_digest,
+    )
+    with pytest.raises(PhysicsReplayDivergenceError, match="frame 0"):
+        replay_physics_commands(_world, altered_tape)
+
+
+def test_command_step_requires_next_tick_frame() -> None:
+    world = _world()
+    frame = PhysicsCommandFrame.build(2, ())
+    with pytest.raises(PhysicsValidationError, match="next simulation tick"):
+        step_physics_with_commands(world, frame)
