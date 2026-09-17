@@ -345,10 +345,10 @@ Render the actual game content this team produced — show what their work looks
                     "image_url": None,
                 }
 
-    except Exception as e:
+    except Exception:
         return {
             "success": False,
-            "error": str(e),
+            "error": "image_render_failed",
             "prompt_used": render_prompt,
             "image_url": None,
         }

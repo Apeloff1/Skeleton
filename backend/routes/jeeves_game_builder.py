@@ -645,8 +645,8 @@ AGENT OUTPUTS:
         )
         compiled = parse_json_response(result.get("response", "")) if result.get("success") else {}
         compiled["compile_status"] = "success" if result.get("success") else "fallback"
-    except Exception as e:
-        compiled = {"compile_status": "error", "error": str(e)}
+    except Exception:
+        compiled = {"compile_status": "error", "error": "compile_failed"}
 
     project["compiled_output"] = compiled
     project["status"] = "compiled"
