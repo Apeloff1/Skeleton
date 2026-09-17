@@ -40,6 +40,7 @@ TEST_MODULE_NAMES = (
     "skeleton.testing.test_simulation_physics_ccd_advanced",
     "skeleton.testing.test_simulation_physics_constraints",
     "skeleton.testing.test_simulation_physics_foundation",
+    "skeleton.testing.test_simulation_physics_hinge",
     "skeleton.testing.test_simulation_physics_islands",
     "skeleton.testing.test_simulation_physics_manifolds",
     "skeleton.testing.test_simulation_physics_replay",
