@@ -3,8 +3,8 @@
 This module keeps the public import surface compact while the implementation is
 split into state-space filtering, exact Bayesian parameter uncertainty, online
 Bayesian ensembles, distributional calibration, hidden-Markov regime inference,
-multiscale harmonic forecasting, cross-family arbitration, paired model
-comparison, and explicit promotion eligibility contracts.
+multiscale harmonic forecasting, cross-family arbitration, prequential conformal
+coverage calibration, paired model comparison, and explicit promotion contracts.
 """
 
 from .probabilistic_arbitration import (
@@ -52,6 +52,26 @@ from .probabilistic_calibration import (
     mixture_cdf,
     mixture_quantile,
     pinball_loss,
+)
+from .probabilistic_conformal import (
+    ConformalCalibrationState,
+    ConformalConfig,
+    ConformalInterval,
+    ConformalObservation,
+    ConformalReport,
+    ConformalStep,
+    LocationScaleForecast,
+    attainable_miscoverage_floor,
+    conformal_interval_from_scores,
+    evaluate_conformal_observations,
+    finite_sample_conformal_quantile,
+    forecast_scale,
+    nonconformity_score,
+    observations_from_cross_family_report,
+    required_calibration_size,
+    state_from_report,
+    verify_report_integrity,
+    verify_state_integrity,
 )
 from .probabilistic_contracts import (
     ProbabilisticPromotionDecision,
@@ -123,6 +143,12 @@ __all__ = [
     "BayesianTrendFold",
     "CalibrationConfig",
     "CalibrationReport",
+    "ConformalCalibrationState",
+    "ConformalConfig",
+    "ConformalInterval",
+    "ConformalObservation",
+    "ConformalReport",
+    "ConformalStep",
     "CoverageDiagnostic",
     "CrossFamilyArbitrator",
     "CrossFamilyConfig",
@@ -139,6 +165,7 @@ __all__ = [
     "HACComparison",
     "HarmonicComponent",
     "InnovationRegime",
+    "LocationScaleForecast",
     "MixtureForecast",
     "OnlineBayesianEnsemble",
     "PitDiagnostic",
@@ -170,21 +197,26 @@ __all__ = [
     "StateSpaceTournament",
     "StudentTForecast",
     "WeightedForecast",
+    "attainable_miscoverage_floor",
     "calibrate_distributions",
     "central_interval",
+    "conformal_interval_from_scores",
     "discover_spectral_peaks",
     "evaluate_bayesian_trend",
+    "evaluate_conformal_observations",
     "evaluate_predictive_arena",
     "evaluate_probabilistic_promotion",
     "evaluate_regime_hmm_prequential",
     "evaluate_spectral_complexities",
     "evaluate_state_space_families",
+    "finite_sample_conformal_quantile",
     "fit_bayesian_trend",
     "fit_regime_hmm",
     "fit_spectral_model",
     "fit_state_space",
     "forecast_bayesian_trend",
     "forecast_regime_hmm",
+    "forecast_scale",
     "forecast_spectral",
     "forecast_state_space",
     "gaussian_as_mixture",
@@ -192,7 +224,13 @@ __all__ = [
     "mixture_cdf",
     "mixture_quantile",
     "newey_west_mean_test",
+    "nonconformity_score",
+    "observations_from_cross_family_report",
     "pinball_loss",
     "probability_integral_transform",
     "regime_forecast_crps",
+    "required_calibration_size",
+    "state_from_report",
+    "verify_report_integrity",
+    "verify_state_integrity",
 ]
