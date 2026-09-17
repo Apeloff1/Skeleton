@@ -36,14 +36,17 @@ import statistics
 from dataclasses import dataclass
 from typing import Sequence
 
-from .bidirectional_modes import BidirectionalModeLab, BidirectionalReport
+from .bidirectional_modes import (
+    BidirectionalConfig,
+    BidirectionalModeLab,
+    BidirectionalReport,
+)
 from .historical_modes import (
     EvaluationReport,
     FoldResult,
     HistoricalMode,
     HistoricalModeError,
     HistoricalSeries,
-    ModeReport,
     SelectionGate,
     WalkForwardConfig,
 )
@@ -194,7 +197,7 @@ class CalibratedBidirectionalModeLab:
         *,
         config: WalkForwardConfig | None = None,
         gate: SelectionGate | None = None,
-        bidirectional=None,
+        bidirectional: BidirectionalConfig | None = None,
         calibration: CrossDirectionConfig | None = None,
         modes: Sequence[HistoricalMode] | None = None,
     ) -> None:
