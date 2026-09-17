@@ -72,8 +72,10 @@ def build_historical_evidence(
     _require_report_series_alignment(report, series)
     series_fingerprint = _series_fingerprint(series)
     report_fingerprint = report.fingerprint
-    observation_id = f"histobs-{series_fingerprint[:20]}-{report_fingerprint[:12]}"
 
+    # The root fact identity depends only on the supplied series.  Analysis
+    # configuration/report identity belongs on the derived feature plane.
+    observation_id = f"histobs-{series_fingerprint[:32]}"
     observation_payload: dict[str, object] = {
         "series_label": series.label,
         "sample_count": len(series.values),
@@ -81,7 +83,6 @@ def build_historical_evidence(
         "last_value": series.values[-1],
         "has_timestamps": series.timestamps is not None,
         "series_fingerprint": series_fingerprint,
-        "report_fingerprint": report_fingerprint,
     }
     if series.timestamps is not None:
         observation_payload["first_timestamp"] = series.timestamps[0]
