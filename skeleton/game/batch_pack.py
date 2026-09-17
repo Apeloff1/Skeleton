@@ -1,4 +1,4 @@
-"""Named batches."""
+"""Named brick batches."""
 
 from __future__ import annotations
 
@@ -9,13 +9,15 @@ class BatchPackError(ValueError):
     pass
 
 
-BATCH = tuple(f"bh_{i:02d}" for i in range(28))
+BATCH = tuple(f"bt_{i:02d}" for i in range(16))
 
 
-def start(state: dict[str, Any], name: str) -> dict[str, Any]:
+def set_batch(state: dict[str, Any], name: str, n: int) -> dict[str, Any]:
     if name not in BATCH:
         raise BatchPackError(name)
     nxt = dict(state)
-    nxt["batch"] = name
+    cur = dict(nxt.get("batch") or {})
+    cur[name] = max(0, int(n))
+    nxt["batch"] = cur
     nxt["stored_prose"] = 0
     return nxt
