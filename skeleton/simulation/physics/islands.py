@@ -8,6 +8,7 @@ from .collision import ContactManifold
 from .constraints import ConstraintSolver, ConstraintStats, JointConstraint
 from .contacts import ContactCache
 from .errors import BodyNotFoundError, PhysicsValidationError
+from .joint_cache import JointImpulseCache
 from .solver import SequentialImpulseSolver, SolverStats
 
 
@@ -257,6 +258,7 @@ def solve_islands(
     contact_solver: SequentialImpulseSolver,
     constraint_solver: ConstraintSolver,
     cache: ContactCache,
+    joint_cache: JointImpulseCache,
     tick: int,
     dt: float,
 ) -> IslandSolveReceipt:
@@ -277,6 +279,7 @@ def solve_islands(
     hinge_joints = 0
     fixed_joints = 0
     slider_joints = 0
+    warm_started_rows = 0
 
     for island in graph.islands:
         if island.manifolds:
@@ -300,6 +303,8 @@ def solve_islands(
                 bodies,
                 island.joints,
                 dt=dt,
+                cache=joint_cache,
+                tick=tick,
             )
             joint_count += joint_stats.joints
             joint_velocity_impulses += joint_stats.velocity_impulses
@@ -315,6 +320,7 @@ def solve_islands(
             hinge_joints += joint_stats.hinge_joints
             fixed_joints += joint_stats.fixed_joints
             slider_joints += joint_stats.slider_joints
+            warm_started_rows += joint_stats.warm_started_rows
 
     cache.prune(tick=tick)
     return IslandSolveReceipt(
@@ -341,5 +347,7 @@ def solve_islands(
             hinge_joints=hinge_joints,
             fixed_joints=fixed_joints,
             slider_joints=slider_joints,
+            warm_started_rows=warm_started_rows,
+            cached_rows=len(joint_cache),
         ),
     )
