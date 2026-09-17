@@ -133,39 +133,59 @@ class SemanticTangentBridge:
             evidence_gap=max(self.policy.default_evidence_gap, finding.ambiguity),
         )
 
-    def ingest_composition(self, composition: SemanticComposition, *, sequence: int) -> tuple[TangentNode, ...]:
+    def ingest_composition(
+        self,
+        composition: SemanticComposition,
+        *,
+        root_fingerprint: str,
+        sequence: int,
+    ) -> tuple[TangentNode, ...]:
+        """Add composition tangents under the same durable run root.
+
+        ``LensCompositionEngine`` fingerprints a seed from the two readings that
+        generated it.  That local fingerprint is useful provenance, but a graph
+        checkpoint groups by ``root_fingerprint``.  We therefore preserve the
+        local fingerprint as metadata/tag material while rebinding the seed's
+        graph root to the run/restart root supplied here.
+        """
         added: list[TangentNode] = []
-        interaction_by_id = {item.interaction_id: item for item in composition.interactions}
         for seed in composition.tangent_seeds:
-            interaction = next((item for item in composition.interactions if item.tangent and item.tangent.seed_id == seed.seed_id), None)
+            interaction = next(
+                (item for item in composition.interactions if item.tangent and item.tangent.seed_id == seed.seed_id),
+                None,
+            )
             hint = interaction.rule.tangent_axis_hint if interaction is not None else None
-            family = None
-            if interaction is not None:
-                # Prefer a family only when both findings came from the same
-                # semantic family.  Mixed-family conflicts stay axis-first.
-                family = next((family for family in composition.families if family.value == hint), None)
             axis = _AXIS_HINTS.get(str(hint).casefold(), ExplorationAxis.SEMANTIC) if hint else ExplorationAxis.SEMANTIC
+            normalized_seed = TangentSeed(
+                seed_id=seed.seed_id,
+                parent_fingerprint=root_fingerprint,
+                lens_key=seed.lens_key,
+                direction=seed.direction,
+                rationale=seed.rationale,
+                novelty=seed.novelty,
+                expected_value=seed.expected_value,
+                evidence_ids=seed.evidence_ids,
+                tags=tuple(sorted(set(seed.tags) | {f"local-root:{seed.parent_fingerprint[:24]}"})),
+            )
             try:
                 node = self.graph.add_seed(
-                    seed,
+                    normalized_seed,
                     axis=axis,
-                    family=family,
+                    family=None,
                     sequence=sequence,
                     trigger_terms=(seed.lens_key, *(interaction.observation_ids if interaction else ())),
                     risk=self.policy.default_risk,
                     evidence_gap=max(self.policy.default_evidence_gap, interaction.ambiguity if interaction else 0.5),
                 )
             except AgentContractError as exc:
-                # Deterministic duplicate/collision protection belongs in the
-                # graph.  Do not hide unrelated graph contract failures.
                 existing_id = stable_id(
                     "tangent",
                     {
-                        "seed": seed.seed_id,
+                        "seed": normalized_seed.seed_id,
                         "parent": None,
-                        "root": seed.parent_fingerprint,
+                        "root": root_fingerprint,
                         "axis": axis.value,
-                        "direction": seed.direction,
+                        "direction": normalized_seed.direction,
                     },
                     length=32,
                 )
@@ -190,7 +210,13 @@ class SemanticTangentBridge:
             if node is not None:
                 added.append(node)
         if composition is not None:
-            added.extend(self.ingest_composition(composition, sequence=sequence))
+            added.extend(
+                self.ingest_composition(
+                    composition,
+                    root_fingerprint=root_fingerprint,
+                    sequence=sequence,
+                )
+            )
         unique = {node.tangent_id: node for node in added}
         return tuple(sorted(unique.values(), key=lambda node: node.tangent_id))
 
