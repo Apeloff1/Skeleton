@@ -1,19 +1,24 @@
 """Prequential conformal interval calibration for Jeeves.
 
-This module calibrates predictive intervals from already-issued forecasts.  It is
-model-agnostic: Gaussian, Student-t, regime-mixture, spectral, and arbitrated
-forecasts can all contribute as long as they expose ``horizon``, ``mean``, and
-``variance``.
+The calibration layer is model-agnostic. Any already-issued forecast exposing a
+positive horizon, finite mean, and positive finite variance can contribute.
 
-Temporal custody is explicit.  For target ``t`` the interval is built only from
-nonconformity scores produced by targets strictly before ``t``.  The realized
-value at ``t`` may update calibration state only after the interval has been
-recorded and scored.
+Temporal custody is explicit: an interval for target ``t`` is constructed only
+from nonconformity scores produced by targets strictly before ``t``. The
+realized value at ``t`` may update calibration state only after its interval has
+been recorded and scored.
 
-With fixed miscoverage and exchangeable scores, the finite-sample order statistic
-is the standard split-conformal correction.  Adaptive miscoverage is an online
-coverage-control heuristic for non-stationarity; it should not be described as a
-finite-sample coverage guarantee under arbitrary drift.
+Finite-sample coverage has a hard resolution limit. With ``n`` calibration
+scores, split conformal cannot request miscoverage smaller than ``1/(n+1)``
+without using an infinite sentinel. Direct quantile calls therefore fail closed
+when the requested alpha is unattainable. The streaming evaluator instead
+records and uses the smallest attainable alpha for that target, making the
+coverage limitation explicit rather than silently pretending the requested
+coverage was achieved.
+
+Adaptive miscoverage is an online coverage-control heuristic for
+non-stationarity. It is not a finite-sample coverage guarantee under arbitrary
+drift.
 """
 
 from __future__ import annotations
@@ -119,15 +124,7 @@ class ConformalObservation:
     forecast: LocationScaleForecast
 
     def __post_init__(self) -> None:
-        if (
-            isinstance(self.target_index, bool)
-            or not isinstance(self.target_index, int)
-            or self.target_index < 0
-        ):
-            raise StateSpaceError(
-                "target_index must be a non-negative integer",
-                context={"reason": "invalid_conformal_observation"},
-            )
+        _target_index(self.target_index)
         _finite("actual", self.actual)
         _validate_forecast(self.forecast)
 
@@ -145,18 +142,31 @@ class ConformalInterval:
     score_quantile: float
     forecast_scale: float
     miscoverage: float
+    requested_miscoverage: float
+    attainable_miscoverage_floor: float
     calibration_size: int
     normalized_scores: bool
 
     def __post_init__(self) -> None:
-        if self.lower > self.center or self.center > self.upper:
+        _target_index(self.target_index)
+        if isinstance(self.horizon, bool) or not isinstance(self.horizon, int) or self.horizon <= 0:
             raise StateSpaceError(
-                "conformal interval must contain its center",
+                "conformal interval horizon must be a positive integer",
                 context={"reason": "invalid_conformal_interval"},
             )
-        if self.radius < 0.0 or self.calibration_size < 1:
+        if isinstance(self.calibration_size, bool) or not isinstance(self.calibration_size, int):
             raise StateSpaceError(
-                "conformal interval geometry is invalid",
+                "calibration_size must be an integer",
+                context={"reason": "invalid_conformal_interval"},
+            )
+        if self.calibration_size < 1:
+            raise StateSpaceError(
+                "calibration_size must be positive",
+                context={"reason": "invalid_conformal_interval"},
+            )
+        if not isinstance(self.normalized_scores, bool):
+            raise StateSpaceError(
+                "normalized_scores must be boolean",
                 context={"reason": "invalid_conformal_interval"},
             )
         for name in (
@@ -167,19 +177,72 @@ class ConformalInterval:
             "score_quantile",
             "forecast_scale",
             "miscoverage",
+            "requested_miscoverage",
+            "attainable_miscoverage_floor",
         ):
             _finite(name, getattr(self, name))
+        _open_unit_interval("miscoverage", self.miscoverage)
+        _open_unit_interval("requested_miscoverage", self.requested_miscoverage)
+        _open_unit_interval(
+            "attainable_miscoverage_floor",
+            self.attainable_miscoverage_floor,
+        )
+        if self.radius < 0.0 or self.score_quantile < 0.0 or self.forecast_scale <= 0.0:
+            raise StateSpaceError(
+                "conformal interval geometry is invalid",
+                context={"reason": "invalid_conformal_interval"},
+            )
+        if self.lower > self.center or self.center > self.upper:
+            raise StateSpaceError(
+                "conformal interval must contain its center",
+                context={"reason": "invalid_conformal_interval"},
+            )
+        if abs((self.upper - self.center) - self.radius) > max(1e-9, 1e-12 * abs(self.radius)):
+            raise StateSpaceError(
+                "upper interval radius is inconsistent",
+                context={"reason": "invalid_conformal_interval"},
+            )
+        if abs((self.center - self.lower) - self.radius) > max(1e-9, 1e-12 * abs(self.radius)):
+            raise StateSpaceError(
+                "lower interval radius is inconsistent",
+                context={"reason": "invalid_conformal_interval"},
+            )
+        expected_floor = attainable_miscoverage_floor(self.calibration_size)
+        if abs(self.attainable_miscoverage_floor - expected_floor) > 1e-15:
+            raise StateSpaceError(
+                "attainable miscoverage floor does not match calibration size",
+                context={"reason": "invalid_conformal_interval"},
+            )
+        expected_effective = max(self.requested_miscoverage, expected_floor)
+        if abs(self.miscoverage - expected_effective) > 1e-15:
+            raise StateSpaceError(
+                "effective miscoverage does not match finite-sample limit",
+                context={"reason": "invalid_conformal_interval"},
+            )
 
     @property
     def width(self) -> float:
-        return self.upper - self.lower
+        width = self.upper - self.lower
+        return _finite_result("interval_width", width)
+
+    @property
+    def coverage_limited(self) -> bool:
+        return self.miscoverage > self.requested_miscoverage + 1e-15
+
+    @property
+    def effective_coverage(self) -> float:
+        return 1.0 - self.miscoverage
+
+    @property
+    def requested_coverage(self) -> float:
+        return 1.0 - self.requested_miscoverage
 
     def contains(self, actual: float) -> bool:
         actual = _finite("actual", actual)
         return self.lower <= actual <= self.upper
 
     def interval_score(self, actual: float) -> float:
-        """Winkler interval score at this interval's nominal miscoverage."""
+        """Winkler interval score at the interval's effective alpha."""
 
         actual = _finite("actual", actual)
         score = self.width
@@ -187,7 +250,7 @@ class ConformalInterval:
             score += (2.0 / self.miscoverage) * (self.lower - actual)
         elif actual > self.upper:
             score += (2.0 / self.miscoverage) * (actual - self.upper)
-        return score
+        return _finite_result("interval_score", score)
 
 
 @dataclass(frozen=True, slots=True)
@@ -199,12 +262,67 @@ class ConformalStep:
     forecast_mean: float
     forecast_variance: float
     prior_miscoverage: float
+    effective_miscoverage: float | None
     posterior_miscoverage: float
     nonconformity_score: float
     interval: ConformalInterval | None
     covered: bool | None
     calibration_size_before: int
     calibration_size_after: int
+
+    def __post_init__(self) -> None:
+        _target_index(self.target_index)
+        _finite("actual", self.actual)
+        _finite("forecast_mean", self.forecast_mean)
+        _positive("forecast_variance", self.forecast_variance)
+        _open_unit_interval("prior_miscoverage", self.prior_miscoverage)
+        _open_unit_interval("posterior_miscoverage", self.posterior_miscoverage)
+        _non_negative("nonconformity_score", self.nonconformity_score)
+        if self.effective_miscoverage is not None:
+            _open_unit_interval("effective_miscoverage", self.effective_miscoverage)
+        if isinstance(self.calibration_size_before, bool) or not isinstance(
+            self.calibration_size_before,
+            int,
+        ):
+            raise StateSpaceError(
+                "calibration_size_before must be an integer",
+                context={"reason": "invalid_conformal_step"},
+            )
+        if isinstance(self.calibration_size_after, bool) or not isinstance(
+            self.calibration_size_after,
+            int,
+        ):
+            raise StateSpaceError(
+                "calibration_size_after must be an integer",
+                context={"reason": "invalid_conformal_step"},
+            )
+        if self.calibration_size_before < 0 or self.calibration_size_after < 1:
+            raise StateSpaceError(
+                "calibration sizes are invalid",
+                context={"reason": "invalid_conformal_step"},
+            )
+        if self.interval is None:
+            if self.covered is not None or self.effective_miscoverage is not None:
+                raise StateSpaceError(
+                    "warmup steps cannot carry interval outcomes",
+                    context={"reason": "invalid_conformal_step"},
+                )
+        else:
+            if not isinstance(self.covered, bool):
+                raise StateSpaceError(
+                    "evaluated conformal step requires boolean coverage",
+                    context={"reason": "invalid_conformal_step"},
+                )
+            if self.effective_miscoverage is None:
+                raise StateSpaceError(
+                    "evaluated conformal step requires effective miscoverage",
+                    context={"reason": "invalid_conformal_step"},
+                )
+            if self.interval.target_index != self.target_index:
+                raise StateSpaceError(
+                    "interval target does not match step target",
+                    context={"reason": "invalid_conformal_step"},
+                )
 
     @property
     def eligible(self) -> bool:
@@ -220,6 +338,7 @@ class ConformalReport:
     steps: tuple[ConformalStep, ...]
     evaluated_intervals: int
     warmup_observations: int
+    finite_sample_limited_intervals: int
     empirical_coverage: float | None
     coverage_gap: float | None
     average_width: float | None
@@ -227,6 +346,75 @@ class ConformalReport:
     average_score_quantile: float | None
     final_miscoverage: float
     fingerprint: str
+
+    def __post_init__(self) -> None:
+        if isinstance(self.horizon, bool) or not isinstance(self.horizon, int) or self.horizon <= 0:
+            raise StateSpaceError(
+                "report horizon must be a positive integer",
+                context={"reason": "invalid_conformal_report"},
+            )
+        if not self.steps:
+            raise StateSpaceError(
+                "conformal report requires at least one step",
+                context={"reason": "invalid_conformal_report"},
+            )
+        for name in (
+            "evaluated_intervals",
+            "warmup_observations",
+            "finite_sample_limited_intervals",
+        ):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise StateSpaceError(
+                    f"{name} must be a non-negative integer",
+                    context={"reason": "invalid_conformal_report", "field": name},
+                )
+        if self.evaluated_intervals + self.warmup_observations != len(self.steps):
+            raise StateSpaceError(
+                "report interval counts do not match steps",
+                context={"reason": "invalid_conformal_report"},
+            )
+        if self.finite_sample_limited_intervals > self.evaluated_intervals:
+            raise StateSpaceError(
+                "finite-sample limited interval count exceeds evaluated intervals",
+                context={"reason": "invalid_conformal_report"},
+            )
+        _open_unit_interval("final_miscoverage", self.final_miscoverage)
+        if not isinstance(self.fingerprint, str) or len(self.fingerprint) != 64:
+            raise StateSpaceError(
+                "report fingerprint must be a SHA-256 hex digest",
+                context={"reason": "invalid_conformal_report"},
+            )
+        if self.empirical_coverage is None:
+            if self.evaluated_intervals != 0:
+                raise StateSpaceError(
+                    "missing coverage with evaluated intervals",
+                    context={"reason": "invalid_conformal_report"},
+                )
+            if any(
+                value is not None
+                for value in (
+                    self.coverage_gap,
+                    self.average_width,
+                    self.average_interval_score,
+                    self.average_score_quantile,
+                )
+            ):
+                raise StateSpaceError(
+                    "unevaluated report cannot expose aggregate interval metrics",
+                    context={"reason": "invalid_conformal_report"},
+                )
+        else:
+            coverage = _closed_unit_interval("empirical_coverage", self.empirical_coverage)
+            _finite("coverage_gap", self.coverage_gap)
+            _non_negative("average_width", self.average_width)
+            _non_negative("average_interval_score", self.average_interval_score)
+            _non_negative("average_score_quantile", self.average_score_quantile)
+            if coverage != self.empirical_coverage:
+                raise StateSpaceError(
+                    "empirical coverage normalization changed unexpectedly",
+                    context={"reason": "invalid_conformal_report"},
+                )
 
     @property
     def target_coverage(self) -> float:
@@ -256,9 +444,47 @@ class ConformalCalibrationState:
     config: ConformalConfig
     fingerprint: str
 
+    def __post_init__(self) -> None:
+        if isinstance(self.horizon, bool) or not isinstance(self.horizon, int) or self.horizon <= 0:
+            raise StateSpaceError(
+                "conformal state horizon must be a positive integer",
+                context={"reason": "invalid_conformal_state"},
+            )
+        clean_scores = tuple(_non_negative("score", score) for score in self.scores)
+        if clean_scores != self.scores:
+            raise StateSpaceError(
+                "conformal state scores changed under validation",
+                context={"reason": "invalid_conformal_state"},
+            )
+        if (
+            self.config.calibration_window is not None
+            and len(self.scores) > self.config.calibration_window
+        ):
+            raise StateSpaceError(
+                "conformal state exceeds configured calibration window",
+                context={"reason": "invalid_conformal_state"},
+            )
+        alpha = _open_unit_interval("current_miscoverage", self.current_miscoverage)
+        if not self.config.min_miscoverage <= alpha <= self.config.max_miscoverage:
+            raise StateSpaceError(
+                "state miscoverage is outside configured bounds",
+                context={"reason": "invalid_conformal_state"},
+            )
+        if not isinstance(self.fingerprint, str) or len(self.fingerprint) != 64:
+            raise StateSpaceError(
+                "state fingerprint must be a SHA-256 hex digest",
+                context={"reason": "invalid_conformal_state"},
+            )
+
     @property
     def ready(self) -> bool:
         return len(self.scores) >= self.config.min_calibration_size
+
+    @property
+    def attainable_floor(self) -> float | None:
+        if not self.scores:
+            return None
+        return attainable_miscoverage_floor(len(self.scores))
 
     def interval_for(
         self,
@@ -266,6 +492,7 @@ class ConformalCalibrationState:
         *,
         target_index: int,
     ) -> ConformalInterval | None:
+        _target_index(target_index)
         _validate_forecast(forecast)
         if forecast.horizon != self.horizon:
             raise StateSpaceError(
@@ -280,6 +507,7 @@ class ConformalCalibrationState:
             target_index=target_index,
             miscoverage=self.current_miscoverage,
             config=self.config,
+            enforce_attainable=False,
         )
 
 
@@ -288,12 +516,7 @@ def evaluate_conformal_observations(
     *,
     config: ConformalConfig | None = None,
 ) -> ConformalReport:
-    """Run leakage-safe prequential conformal calibration.
-
-    Every interval is constructed from scores whose target index is strictly
-    smaller than the current target index.  The current target score is appended
-    only after interval scoring and adaptive-miscoverage updating.
-    """
+    """Run leakage-safe prequential conformal calibration."""
 
     actual_config = config or ConformalConfig()
     values = tuple(observations)
@@ -312,20 +535,27 @@ def evaluate_conformal_observations(
     interval_scores: list[float] = []
     quantiles: list[float] = []
     coverages: list[float] = []
+    limited_count = 0
 
     for observation in values:
         prior_alpha = alpha
+        effective_alpha: float | None = None
         interval: ConformalInterval | None = None
         covered: bool | None = None
         before = len(scores)
         if before >= actual_config.min_calibration_size:
+            floor = attainable_miscoverage_floor(before)
+            effective_alpha = max(prior_alpha, floor)
             interval = conformal_interval_from_scores(
                 observation.forecast,
                 scores,
                 target_index=observation.target_index,
                 miscoverage=prior_alpha,
                 config=actual_config,
+                enforce_attainable=False,
             )
+            if interval.coverage_limited:
+                limited_count += 1
             covered = interval.contains(observation.actual)
             coverages.append(1.0 if covered else 0.0)
             widths.append(interval.width)
@@ -361,6 +591,7 @@ def evaluate_conformal_observations(
                 forecast_mean=float(observation.forecast.mean),
                 forecast_variance=float(observation.forecast.variance),
                 prior_miscoverage=prior_alpha,
+                effective_miscoverage=effective_alpha,
                 posterior_miscoverage=alpha,
                 nonconformity_score=score,
                 interval=interval,
@@ -389,6 +620,7 @@ def evaluate_conformal_observations(
         steps=tuple(steps),
         evaluated_intervals=evaluated,
         warmup_observations=len(steps) - evaluated,
+        finite_sample_limited_intervals=limited_count,
         empirical_coverage=empirical_coverage,
         coverage_gap=coverage_gap,
         average_width=statistics.fmean(widths) if widths else None,
@@ -402,27 +634,20 @@ def evaluate_conformal_observations(
 
 
 def state_from_report(report: ConformalReport) -> ConformalCalibrationState:
-    """Extract the exact score window and adaptive alpha for the next target."""
+    """Extract exact rolling scores and adaptive alpha for the next target."""
 
-    if not report.steps:
-        raise StateSpaceError(
-            "cannot build conformal state from an empty report",
-            context={"reason": "empty_conformal_report"},
-        )
+    verify_report_integrity(report)
     scores = [step.nonconformity_score for step in report.steps]
     window = report.config.calibration_window
     if window is not None and len(scores) > window:
         scores = scores[-window:]
-    fingerprint = hashlib.sha256(
-        "|".join(
-            (
-                "jeeves-conformal-state-v1",
-                report.fingerprint,
-                ",".join(format(value, ".17g") for value in scores),
-                format(report.final_miscoverage, ".17g"),
-            )
-        ).encode("utf-8")
-    ).hexdigest()
+    fingerprint = _state_fingerprint(
+        report_fingerprint=report.fingerprint,
+        horizon=report.horizon,
+        scores=scores,
+        current_miscoverage=report.final_miscoverage,
+        config=report.config,
+    )
     return ConformalCalibrationState(
         horizon=report.horizon,
         scores=tuple(scores),
@@ -439,12 +664,19 @@ def conformal_interval_from_scores(
     target_index: int,
     miscoverage: float,
     config: ConformalConfig | None = None,
+    enforce_attainable: bool = True,
 ) -> ConformalInterval:
-    """Build one interval from already-realized calibration scores."""
+    """Build one interval from already-realized calibration scores.
+
+    Direct callers fail closed on unattainable alpha by default. Streaming
+    callers can set ``enforce_attainable=False`` to use and record the finite-
+    sample floor explicitly.
+    """
 
     actual_config = config or ConformalConfig(miscoverage=miscoverage)
+    _target_index(target_index)
     _validate_forecast(forecast)
-    alpha = _open_unit_interval("miscoverage", miscoverage)
+    requested_alpha = _open_unit_interval("miscoverage", miscoverage)
     clean_scores = tuple(_non_negative("score", score) for score in scores)
     if len(clean_scores) < actual_config.min_calibration_size:
         raise StateSpaceError(
@@ -455,20 +687,41 @@ def conformal_interval_from_scores(
                 "required": actual_config.min_calibration_size,
             },
         )
-    quantile = finite_sample_conformal_quantile(clean_scores, miscoverage=alpha)
+    floor = attainable_miscoverage_floor(len(clean_scores))
+    if enforce_attainable and requested_alpha + 1e-15 < floor:
+        raise StateSpaceError(
+            "requested conformal coverage is unattainable with available calibration scores",
+            context={
+                "reason": "unattainable_conformal_miscoverage",
+                "requested_miscoverage": requested_alpha,
+                "attainable_miscoverage_floor": floor,
+                "calibration_size": len(clean_scores),
+                "required_calibration_size": required_calibration_size(requested_alpha),
+            },
+        )
+    effective_alpha = max(requested_alpha, floor)
+    quantile = finite_sample_conformal_quantile(
+        clean_scores,
+        miscoverage=effective_alpha,
+    )
     scale = forecast_scale(forecast, config=actual_config)
     radius = quantile * scale if actual_config.normalized_scores else quantile
+    radius = _finite_result("conformal_radius", radius)
     center = float(forecast.mean)
+    lower = _finite_result("conformal_lower", center - radius)
+    upper = _finite_result("conformal_upper", center + radius)
     return ConformalInterval(
         target_index=target_index,
         horizon=forecast.horizon,
         center=center,
-        lower=center - radius,
-        upper=center + radius,
+        lower=lower,
+        upper=upper,
         radius=radius,
         score_quantile=quantile,
         forecast_scale=scale,
-        miscoverage=alpha,
+        miscoverage=effective_alpha,
+        requested_miscoverage=requested_alpha,
+        attainable_miscoverage_floor=floor,
         calibration_size=len(clean_scores),
         normalized_scores=actual_config.normalized_scores,
     )
@@ -479,7 +732,11 @@ def finite_sample_conformal_quantile(
     *,
     miscoverage: float,
 ) -> float:
-    """Return the standard finite-sample split-conformal order statistic."""
+    """Return the finite-sample split-conformal order statistic.
+
+    Requests below ``1/(n+1)`` fail closed instead of clipping to the largest
+    observed score and overstating the requested coverage.
+    """
 
     alpha = _open_unit_interval("miscoverage", miscoverage)
     clean = sorted(_non_negative("score", score) for score in scores)
@@ -488,9 +745,47 @@ def finite_sample_conformal_quantile(
             "conformal quantile requires at least one score",
             context={"reason": "empty_conformal_scores"},
         )
+    floor = attainable_miscoverage_floor(len(clean))
+    if alpha + 1e-15 < floor:
+        raise StateSpaceError(
+            "requested conformal quantile is unattainable with available scores",
+            context={
+                "reason": "unattainable_conformal_miscoverage",
+                "requested_miscoverage": alpha,
+                "attainable_miscoverage_floor": floor,
+                "calibration_size": len(clean),
+                "required_calibration_size": required_calibration_size(alpha),
+            },
+        )
     rank = math.ceil((len(clean) + 1) * (1.0 - alpha))
-    index = min(len(clean), max(1, rank)) - 1
-    return clean[index]
+    if rank < 1 or rank > len(clean):
+        raise StateSpaceError(
+            "conformal rank escaped finite calibration support",
+            context={"reason": "numerical_instability", "rank": rank},
+        )
+    return clean[rank - 1]
+
+
+def attainable_miscoverage_floor(calibration_size: int) -> float:
+    """Smallest finite split-conformal alpha supported by ``calibration_size``."""
+
+    if (
+        isinstance(calibration_size, bool)
+        or not isinstance(calibration_size, int)
+        or calibration_size < 1
+    ):
+        raise StateSpaceError(
+            "calibration_size must be a positive integer",
+            context={"reason": "invalid_calibration_size"},
+        )
+    return 1.0 / (calibration_size + 1.0)
+
+
+def required_calibration_size(miscoverage: float) -> int:
+    """Minimum calibration size needed for a finite interval at ``miscoverage``."""
+
+    alpha = _open_unit_interval("miscoverage", miscoverage)
+    return max(1, math.ceil(1.0 / alpha - 1.0 - 1e-12))
 
 
 def nonconformity_score(
@@ -505,9 +800,11 @@ def nonconformity_score(
     _validate_forecast(forecast)
     actual = _finite("actual", actual)
     residual = abs(actual - float(forecast.mean))
+    residual = _finite_result("absolute_residual", residual)
     if not actual_config.normalized_scores:
         return residual
-    return residual / forecast_scale(forecast, config=actual_config)
+    score = residual / forecast_scale(forecast, config=actual_config)
+    return _finite_result("nonconformity_score", score)
 
 
 def forecast_scale(
@@ -519,11 +816,12 @@ def forecast_scale(
 
     actual_config = config or ConformalConfig()
     _validate_forecast(forecast)
-    return max(actual_config.min_scale, math.sqrt(float(forecast.variance)))
+    scale = math.sqrt(float(forecast.variance))
+    return max(actual_config.min_scale, _finite_result("forecast_scale", scale))
 
 
 def observations_from_cross_family_report(report: object) -> tuple[ConformalObservation, ...]:
-    """Adapt a cross-family arbitration report without creating a hard import cycle."""
+    """Adapt a cross-family report without coercing malformed target identity."""
 
     raw_steps = getattr(report, "steps", None)
     if raw_steps is None:
@@ -531,22 +829,79 @@ def observations_from_cross_family_report(report: object) -> tuple[ConformalObse
             "report does not expose prequential steps",
             context={"reason": "invalid_conformal_source_report"},
         )
+    try:
+        steps = tuple(raw_steps)
+    except TypeError as exc:
+        raise StateSpaceError(
+            "report steps must be iterable",
+            context={"reason": "invalid_conformal_source_report"},
+        ) from exc
+    if not steps:
+        raise StateSpaceError(
+            "source report contains no steps",
+            context={"reason": "invalid_conformal_source_report"},
+        )
     observations: list[ConformalObservation] = []
-    for step in raw_steps:
+    for step in steps:
         try:
-            observations.append(
-                ConformalObservation(
-                    target_index=int(step.target_index),
-                    actual=float(step.actual),
-                    forecast=step.predictive,
-                )
-            )
-        except (AttributeError, TypeError, ValueError) as exc:
+            target_index = step.target_index
+            actual = step.actual
+            forecast = step.predictive
+        except AttributeError as exc:
             raise StateSpaceError(
                 "report step does not satisfy conformal source contract",
                 context={"reason": "invalid_conformal_source_report"},
             ) from exc
+        observations.append(
+            ConformalObservation(
+                target_index=target_index,
+                actual=actual,
+                forecast=forecast,
+            )
+        )
     return tuple(observations)
+
+
+def verify_report_integrity(report: ConformalReport) -> None:
+    """Recompute report evidence identity and reject tampered report objects."""
+
+    expected = _report_fingerprint(
+        config=report.config,
+        horizon=report.horizon,
+        steps=report.steps,
+        final_miscoverage=report.final_miscoverage,
+    )
+    if expected != report.fingerprint:
+        raise StateSpaceError(
+            "conformal report fingerprint mismatch",
+            context={"reason": "conformal_report_integrity_failure"},
+        )
+
+
+def verify_state_integrity(
+    state: ConformalCalibrationState,
+    *,
+    report_fingerprint: str,
+) -> None:
+    """Validate serialized state identity against the report it was derived from."""
+
+    if not isinstance(report_fingerprint, str) or len(report_fingerprint) != 64:
+        raise StateSpaceError(
+            "report fingerprint must be a SHA-256 hex digest",
+            context={"reason": "invalid_conformal_state"},
+        )
+    expected = _state_fingerprint(
+        report_fingerprint=report_fingerprint,
+        horizon=state.horizon,
+        scores=state.scores,
+        current_miscoverage=state.current_miscoverage,
+        config=state.config,
+    )
+    if expected != state.fingerprint:
+        raise StateSpaceError(
+            "conformal state fingerprint mismatch",
+            context={"reason": "conformal_state_integrity_failure"},
+        )
 
 
 def _validate_observation_sequence(
@@ -555,6 +910,11 @@ def _validate_observation_sequence(
     previous_index: int | None = None
     horizon: int | None = None
     for observation in observations:
+        if not isinstance(observation, ConformalObservation):
+            raise StateSpaceError(
+                "conformal observations must use ConformalObservation",
+                context={"reason": "invalid_conformal_observation"},
+            )
         if previous_index is not None and observation.target_index <= previous_index:
             raise StateSpaceError(
                 "conformal observations must have strictly increasing target indices",
@@ -571,20 +931,22 @@ def _validate_observation_sequence(
 
 
 def _validate_forecast(forecast: LocationScaleForecast) -> None:
-    horizon = getattr(forecast, "horizon", None)
-    mean = getattr(forecast, "mean", None)
-    variance = getattr(forecast, "variance", None)
+    try:
+        horizon = getattr(forecast, "horizon")
+        mean = getattr(forecast, "mean")
+        variance = getattr(forecast, "variance")
+    except (AttributeError, TypeError) as exc:
+        raise StateSpaceError(
+            "forecast does not satisfy conformal location-scale contract",
+            context={"reason": "invalid_conformal_forecast"},
+        ) from exc
     if isinstance(horizon, bool) or not isinstance(horizon, int) or horizon <= 0:
         raise StateSpaceError(
             "conformal forecast horizon must be a positive integer",
             context={"reason": "invalid_conformal_forecast"},
         )
     _finite("forecast_mean", mean)
-    if _positive("forecast_variance", variance) <= 0.0:
-        raise StateSpaceError(
-            "conformal forecast variance must be positive",
-            context={"reason": "invalid_conformal_forecast"},
-        )
+    _positive("forecast_variance", variance)
 
 
 def _report_fingerprint(
@@ -595,7 +957,7 @@ def _report_fingerprint(
     final_miscoverage: float,
 ) -> str:
     parts = [
-        "jeeves-prequential-conformal-v1",
+        "jeeves-prequential-conformal-v2",
         repr(config),
         str(horizon),
     ]
@@ -607,9 +969,14 @@ def _report_fingerprint(
                 format(step.forecast_mean, ".17g"),
                 format(step.forecast_variance, ".17g"),
                 format(step.prior_miscoverage, ".17g"),
+                "none"
+                if step.effective_miscoverage is None
+                else format(step.effective_miscoverage, ".17g"),
                 format(step.posterior_miscoverage, ".17g"),
                 format(step.nonconformity_score, ".17g"),
                 "none" if step.covered is None else str(int(step.covered)),
+                str(step.calibration_size_before),
+                str(step.calibration_size_after),
             )
         )
         if step.interval is not None:
@@ -618,11 +985,44 @@ def _report_fingerprint(
                     format(step.interval.lower, ".17g"),
                     format(step.interval.upper, ".17g"),
                     format(step.interval.score_quantile, ".17g"),
+                    format(step.interval.miscoverage, ".17g"),
+                    format(step.interval.requested_miscoverage, ".17g"),
                     str(step.interval.calibration_size),
                 )
             )
     parts.append(format(final_miscoverage, ".17g"))
     return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
+
+
+def _state_fingerprint(
+    *,
+    report_fingerprint: str,
+    horizon: int,
+    scores: Sequence[float],
+    current_miscoverage: float,
+    config: ConformalConfig,
+) -> str:
+    return hashlib.sha256(
+        "|".join(
+            (
+                "jeeves-conformal-state-v2",
+                report_fingerprint,
+                str(horizon),
+                repr(config),
+                ",".join(format(value, ".17g") for value in scores),
+                format(current_miscoverage, ".17g"),
+            )
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _target_index(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise StateSpaceError(
+            "target_index must be a non-negative integer",
+            context={"reason": "invalid_conformal_observation"},
+        )
+    return value
 
 
 def _finite(name: str, value: object) -> float:
@@ -638,6 +1038,15 @@ def _finite(name: str, value: object) -> float:
             context={"reason": "invalid_number", "field": name},
         )
     return number
+
+
+def _finite_result(name: str, value: float) -> float:
+    if not math.isfinite(value):
+        raise StateSpaceError(
+            f"{name} overflowed or became non-finite",
+            context={"reason": "numerical_instability", "field": name},
+        )
+    return value
 
 
 def _positive(name: str, value: object) -> float:
@@ -692,11 +1101,15 @@ __all__ = [
     "ConformalReport",
     "ConformalStep",
     "LocationScaleForecast",
+    "attainable_miscoverage_floor",
     "conformal_interval_from_scores",
     "evaluate_conformal_observations",
     "finite_sample_conformal_quantile",
     "forecast_scale",
     "nonconformity_score",
     "observations_from_cross_family_report",
+    "required_calibration_size",
     "state_from_report",
+    "verify_report_integrity",
+    "verify_state_integrity",
 ]
