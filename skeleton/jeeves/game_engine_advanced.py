@@ -1074,12 +1074,9 @@ class ModernGpuMachine(AdvancedMachine):
     def _export_state(
         self,
     ) -> dict[str, object]:
-        out = super()._export_state()
-        out["rollback_ticks"] = tuple(
-            snapshot.tick
-            for snapshot in self._rollback
-        )
-        return out
+        # Rollback history is recovery metadata, not simulation authority.
+        # Keeping it out of the fingerprint makes restore identity stable.
+        return super()._export_state()
 
     def _import_state(
         self,
