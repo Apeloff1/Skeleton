@@ -37,6 +37,7 @@ TEST_MODULE_NAMES = (
     "tests.test_context",
     "tests.test_cortex",
     "tests.test_cortex_acquire_contract",
+    "skeleton.testing.test_simulation_physics_ccd_advanced",
     "skeleton.testing.test_simulation_physics_foundation",
     "skeleton.testing.test_simulation_physics_manifolds",
     "skeleton.testing.test_simulation_physics_replay",
