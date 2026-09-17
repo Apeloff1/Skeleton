@@ -156,6 +156,14 @@ async def capabilities(state=Depends(_state)) -> List[Dict[str, Any]]:
     return [cap.to_dict() for cap in _require(state.registry, "Registry").list()]
 
 
+@router.get("/application/planes/audit")
+async def application_plane_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --plane-audit``."""
+    from skeleton.application import plane_audit_snapshot
+
+    return plane_audit_snapshot()
+
+
 @router.get("/application/capabilities/lifecycle")
 async def application_capability_lifecycle() -> Dict[str, Any]:
     """Return resolvable/loaded status for the curated capability manifest."""

@@ -4,6 +4,18 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-17 — F-15 organism/social/galaxy plane audit
+
+- Additive `plane_audit` snapshot reports public exports, architecture
+  documentation drift, genesis wiring, and boot-phase listing for organism,
+  social, and galaxy without importing those planes.
+- Identical payload through `python -m skeleton capabilities --plane-audit`,
+  `GET /api/v1/application/planes/audit`, and the shared `capabilities`
+  command with `plane_audit: true`. Combined with `--lifecycle` fails closed.
+- Architecture `PACKAGES` export lists now match the public `__all__` for the
+  three planes. Genesis still wires galaxy only; architecture `BOOT_PHASES`
+  still omit all three, and the snapshot locks that split.
+
 ## 2026-09-17 — F-16 API/CLI capability parity + F-14 speculative RAG
 
 - Curated capability manifest now covers the remaining canonical packages and

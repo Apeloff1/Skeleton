@@ -41,8 +41,20 @@ def _configuration_handler(state: Any):
 def _capabilities_handler(_state: Any):
     def handle(payload: Mapping[str, Any]) -> Dict[str, Any]:
         raw_lifecycle = payload.get("lifecycle", False)
-        if raw_lifecycle not in {True, False}:
+        raw_plane_audit = payload.get("plane_audit", False)
+        if raw_lifecycle is not True and raw_lifecycle is not False:
             raise CommandError("invalid_argument", "lifecycle must be a boolean")
+        if raw_plane_audit is not True and raw_plane_audit is not False:
+            raise CommandError("invalid_argument", "plane_audit must be a boolean")
+        if raw_lifecycle and raw_plane_audit:
+            raise CommandError(
+                "invalid_argument",
+                "lifecycle and plane_audit are mutually exclusive",
+            )
+        if raw_plane_audit:
+            from .plane_audit import plane_audit_snapshot
+
+            return plane_audit_snapshot()
         if raw_lifecycle:
             from .capability_runtime import capability_lifecycle_snapshot
 

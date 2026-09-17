@@ -16,6 +16,7 @@ Commands:
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
                 Use `capabilities --lifecycle` for resolvable/loaded status
+                Use `capabilities --plane-audit` for the F-15 plane audit
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
@@ -37,18 +38,36 @@ def _cmd_contracts(_rest: List[str]) -> int:
 
 
 def _cmd_capabilities(rest: List[str]) -> int:
-    from skeleton.application import capability_lifecycle_snapshot, capability_manifest
+    from skeleton.application import (
+        capability_lifecycle_snapshot,
+        capability_manifest,
+        plane_audit_snapshot,
+    )
 
     flags = {item.strip().lower() for item in rest if item.strip()}
-    unknown = flags - {"--lifecycle", "lifecycle"}
+    allowed = {
+        "--lifecycle",
+        "lifecycle",
+        "--plane-audit",
+        "plane-audit",
+        "--plane_audit",
+        "plane_audit",
+    }
+    unknown = flags - allowed
     if unknown:
         print(f"Unknown capabilities option: {sorted(unknown)[0]}")
         return 2
-    payload = (
-        capability_lifecycle_snapshot()
-        if flags & {"--lifecycle", "lifecycle"}
-        else capability_manifest()
-    )
+    lifecycle = bool(flags & {"--lifecycle", "lifecycle"})
+    plane_audit = bool(flags & {"--plane-audit", "plane-audit", "--plane_audit", "plane_audit"})
+    if lifecycle and plane_audit:
+        print("lifecycle and plane_audit are mutually exclusive")
+        return 2
+    if plane_audit:
+        payload = plane_audit_snapshot()
+    elif lifecycle:
+        payload = capability_lifecycle_snapshot()
+    else:
+        payload = capability_manifest()
     print(json.dumps(payload, indent=2, default=str))
     return 0
 

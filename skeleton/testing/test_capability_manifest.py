@@ -214,6 +214,9 @@ def test_http_application_capability_routes_match_cli_payloads() -> None:
 
     assert asyncio.run(routes.application_capabilities()) == capability_manifest()
     assert asyncio.run(routes.application_capability_lifecycle()) == capability_lifecycle_snapshot()
+    from skeleton.application import plane_audit_snapshot
+
+    assert asyncio.run(routes.application_plane_audit()) == plane_audit_snapshot()
 
     cortex = asyncio.run(routes.application_capability(" Cortex "))
     assert cortex["id"] == "cortex"
@@ -249,3 +252,7 @@ def test_shared_command_capabilities_matches_identity_manifest() -> None:
     invalid = service.execute("capabilities", {"lifecycle": "yes"})
     assert invalid.ok is False
     assert invalid.to_payload()["error"]["code"] == "invalid_argument"
+
+    plane_audit_invalid = service.execute("capabilities", {"plane_audit": 1})
+    assert plane_audit_invalid.ok is False
+    assert plane_audit_invalid.to_payload()["error"]["code"] == "invalid_argument"

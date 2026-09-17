@@ -1,6 +1,6 @@
 # Skeleton Backlog — failed-commit register + forward work
 
-Updated 2026-09-17 (F-16 CLI/API parity + F-14 speculative RAG). Original register dated 2026-09-01. Two sections: things that failed and were recovered
+Updated 2026-09-17 (F-15 plane audit + F-16 CLI/API parity + F-14 speculative RAG). Original register dated 2026-09-01. Two sections: things that failed and were recovered
 (so the failure modes stay visible), and the frontier backlog (what to
 build next, ordered).
 
@@ -32,8 +32,9 @@ Those planes are out-of-scope for this register — audit separately.
 ## 2. Frontier backlog — ordered by leverage
 
 Updated 2026-09-17. Tier-1 seams F-1..F-10, the Tier-2 F-6 frontier push,
-F-13 economic/cascade reconciliation, F-14 speculative RAG, and F-16
-capability discovery are **landed**; do not re-open them without a regression.
+F-13 economic/cascade reconciliation, F-14 speculative RAG, F-15
+organism/social/galaxy plane audit, and F-16 capability discovery are
+**landed**; do not re-open them without a regression.
 
 ### Landed (keep visible — failure modes + PR anchors)
 
@@ -52,6 +53,7 @@ capability discovery are **landed**; do not re-open them without a regression.
 | F-12 Cortex persistence | #1019 | SKELETON_OWN live singleton, fail-closed corrupt restore |
 | F-13 EconomicOptimiser × CascadeRouter | #277 | shared economic model registry, cascade planning, real model IDs, budget/cost accounting |
 | F-14 Speculative RAG | #1019 | pipeline planning prefetch via quad + composer; prefetch failures never fail the run |
+| F-15 Organism/social/galaxy plane audit | #1019 | import-free export/genesis/boot snapshot; architecture public export lists synced |
 | F-16 Unified capability discovery | #1019 | CLI/API/command identity payload + additive lifecycle snapshot |
 | P6 policy enforcement | #13 | CodeVerifier + repair/verify gates |
 
@@ -85,13 +87,11 @@ remains Mixture-of-*Experts* and is a separate mechanism.
 
 1. **F-11. Track E cleanup** — root sprawl moves, SEVEN_BY physical moves,
    godot binary to LFS, shim deletion. Local git ops.
-2. **F-15. Organism/social/galaxy plane audit** — the repo grew three
-   planes while the waves landed (see §1 drift note). Same size-filtered
-   read methodology as the deep-cut campaign, when their churn settles.
 
 ## Definition of SOTA (working)
 
 Tier-1 SOTA seams, F-6 Mixture-of-Depths, F-13 economic/cascade
-reconciliation, F-12 cortex persistence, F-14 speculative RAG, and F-16
-capability discovery are landed in code. The former CI-1..CI-3 blockers are resolved
-on main; the remaining structural queue is F-11, F-15.
+reconciliation, F-12 cortex persistence, F-14 speculative RAG, F-15
+organism/social/galaxy plane audit, and F-16 capability discovery are landed
+in code. The former CI-1..CI-3 blockers are resolved on main; the remaining
+structural queue is F-11.
