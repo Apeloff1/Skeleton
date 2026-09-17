@@ -43,6 +43,7 @@ _PROJECT_KEYS: Final = frozenset(
     {"title", "viewport_width", "viewport_height", "renderer", "features", "main_scene"}
 )
 _GAME_KEYS: Final = frozenset({"combat_style", "mechanic_types", "combat", "currencies"})
+_ROOM_KEYS: Final = frozenset({"id", "kind", "x", "y", "occupants", "index"})
 _EDGE_KEYS: Final = frozenset({"from", "to"})
 _ROOM_GRAPH_KEYS: Final = frozenset(
     {
@@ -332,12 +333,6 @@ def _reject_engine_globals(name: str, payload: Mapping[str, Any]) -> None:
         )
 
 
-def _vec2(name: str, value: object) -> tuple[float, float]:
-    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)) or len(value) != 2:
-        raise GodotAdapterError(f"{name} must contain exactly two coordinates")
-    return (_strict_float(f"{name}[0]", value[0]), _strict_float(f"{name}[1]", value[1]))
-
-
 def map_occupant_kind(kind: object) -> str:
     """Map a supported world occupant kind onto a Godot node type."""
 
@@ -409,8 +404,8 @@ def _mechanic_type(value: object) -> MechanicType:
 
 
 def _map_project(payload: Mapping[str, Any]) -> GodotProjectView:
-    _reject_unknown("project", payload, _PROJECT_KEYS)
     _reject_engine_globals("project", payload)
+    _reject_unknown("project", payload, _PROJECT_KEYS)
     features_raw = payload.get("features", list(GODOT_FEATURES))
     if isinstance(features_raw, str):
         raise GodotAdapterError("project.features must be a sequence of strings")
@@ -450,8 +445,8 @@ def _map_game(payload: object) -> GodotGameView:
             resource_labels=(),
         )
     game = _mapping("game", payload)
-    _reject_unknown("game", game, _GAME_KEYS)
     _reject_engine_globals("game", game)
+    _reject_unknown("game", game, _GAME_KEYS)
     style_source: object = game.get("combat_style")
     combat_payload = game.get("combat")
     if combat_payload is not None:
@@ -817,8 +812,8 @@ class GodotAdapter:
 
     def adapt(self, document: Mapping[str, Any]) -> GodotAdapterView:
         payload = _mapping("document", document)
-        _reject_unknown("document", payload, _DOCUMENT_KEYS)
         _reject_engine_globals("document", payload)
+        _reject_unknown("document", payload, _DOCUMENT_KEYS)
         schema = payload.get("schema", ADAPTER_INPUT_SCHEMA)
         if schema != ADAPTER_INPUT_SCHEMA:
             raise GodotVersionError(
