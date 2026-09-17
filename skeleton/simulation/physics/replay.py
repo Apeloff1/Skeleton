@@ -56,6 +56,7 @@ class PhysicsReplayTape:
             raise PhysicsReplayError("replay tape initial must be PhysicsSnapshot")
         object.__setattr__(self, "frames", tuple(self.frames))
         _sha256_text(self.chain_digest, name="chain_digest")
+        previous_digest = self.initial.state_digest
         for index, frame in enumerate(self.frames):
             if not isinstance(frame, PhysicsReplayFrame):
                 raise PhysicsReplayError("replay tape contains invalid frame")
@@ -63,6 +64,9 @@ class PhysicsReplayTape:
                 raise PhysicsReplayError("replay frame indices must be contiguous")
             if frame.tick != self.initial.tick + index + 1:
                 raise PhysicsReplayError("replay frame ticks must be contiguous")
+            if frame.before_digest != previous_digest:
+                raise PhysicsReplayError("replay frame state chain must be contiguous")
+            previous_digest = frame.after_digest
 
 
 @dataclass(frozen=True, slots=True)
