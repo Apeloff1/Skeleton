@@ -8,6 +8,7 @@ improve boundary.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Iterable
@@ -348,6 +349,47 @@ class EngineEvolutionSession:
             self.checkpoints + (snapshot,),
             self.sequence + 1,
         )
+
+    @property
+    def lineage_digest(self) -> str:
+        payload = "|".join(
+            (
+                f"{snapshot.sequence}:"
+                f"{snapshot.parent_digest or '-'}:"
+                f"{snapshot.tree_digest}"
+            )
+            for snapshot in self.checkpoints
+        )
+        return hashlib.sha256(
+            payload.encode("utf-8")
+        ).hexdigest()
+
+    def verify_lineage(self) -> bool:
+        if not self.checkpoints:
+            raise GameEngineLabError(
+                "evolution session has no checkpoints"
+            )
+        parent: str | None = None
+        expected_sequence = 0
+        for snapshot in self.checkpoints:
+            if snapshot.era is not self.sandbox.era:
+                raise GameEngineLabError(
+                    "evolution checkpoint era mismatch"
+                )
+            if snapshot.sequence != expected_sequence:
+                raise GameEngineLabError(
+                    "evolution checkpoint sequence mismatch"
+                )
+            if snapshot.parent_digest != parent:
+                raise GameEngineLabError(
+                    "evolution checkpoint parent mismatch"
+                )
+            VirtualFileTree.restore(
+                snapshot
+            )
+            parent = snapshot.tree_digest
+            expected_sequence += 1
+        return True
 
     def restore(
         self,
