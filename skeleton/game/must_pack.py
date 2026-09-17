@@ -9,16 +9,14 @@ class MustPackError(ValueError):
     pass
 
 
-MUST = tuple(f"mu_{i:02d}" for i in range(16))
+MUST = tuple(f"mu_{i:02d}" for i in range(12))
 
 
-def add(state: dict[str, Any], name: str) -> dict[str, Any]:
+def press(state: dict[str, Any], name: str) -> dict[str, Any]:
     if name not in MUST:
         raise MustPackError(name)
     nxt = dict(state)
-    have = list(nxt.get("must_lot") or [])
-    have.append(name)
-    nxt["must_lot"] = have
-    nxt["must"] = int(nxt.get("must", 0)) + 1
+    nxt["must"] = name
+    nxt["wet"] = int(nxt.get("wet", 0)) + 1
     nxt["stored_prose"] = 0
     return nxt
