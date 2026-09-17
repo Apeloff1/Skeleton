@@ -934,11 +934,44 @@ class ScientificContextCompiler:
 
     @property
     def fingerprint(self) -> str:
+        resolver_policy = self.resolver.policy
+        base_budget = self.base.budget
+        policy = self.policy
         return stable_fingerprint(
             {
-                "resolver_policy": self.resolver.policy,
+                "resolver_policy": {
+                    "card_limit": resolver_policy.card_limit,
+                    "association_seed_limit": resolver_policy.association_seed_limit,
+                    "association_limit_per_seed": resolver_policy.association_limit_per_seed,
+                    "memory_limit": resolver_policy.memory_limit,
+                    "repository_limit": resolver_policy.repository_limit,
+                    "source_limit_per_tier": resolver_policy.source_limit_per_tier,
+                    "minimum_item_score": resolver_policy.minimum_item_score,
+                    "minimum_association_score": resolver_policy.minimum_association_score,
+                    "association_boost_cap": resolver_policy.association_boost_cap,
+                    "stop_coverage": resolver_policy.stop_coverage,
+                    "stop_confidence": resolver_policy.stop_confidence,
+                    "stop_trust": resolver_policy.stop_trust,
+                    "minimum_deep_gain": resolver_policy.minimum_deep_gain,
+                    "maximum_tier": int(resolver_policy.maximum_tier),
+                    "max_total_chars": resolver_policy.max_total_chars,
+                },
                 "nuance": self.nuance.fingerprint,
-                "base_budget": self.base.budget,
-                "policy": self.policy,
+                "base_budget": {
+                    "total_chars": base_budget.total_chars,
+                    "system_chars": base_budget.system_chars,
+                    "goal_chars": base_budget.goal_chars,
+                    "plan_chars": base_budget.plan_chars,
+                    "memory_chars": base_budget.memory_chars,
+                    "evidence_chars": base_budget.evidence_chars,
+                    "observation_chars": base_budget.observation_chars,
+                    "scratch_chars": base_budget.scratch_chars,
+                },
+                "policy": {
+                    "maximum_nuance_chars": policy.maximum_nuance_chars,
+                    "maximum_juxtapositions": policy.maximum_juxtapositions,
+                    "maximum_lens_questions": policy.maximum_lens_questions,
+                    "context_priority": policy.context_priority,
+                },
             }
         )
