@@ -1,4 +1,4 @@
-"""Velocity and positional contact resolution using sequential impulses."""
+"""Sequential impulse contact solver with persistent warm starting."""
 from __future__ import annotations
 
 import math
@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from .body import RigidBody
 from .collision import ContactManifold, ContactPoint
+from .contacts import ContactCache
 from .errors import PhysicsValidationError, SolverError
 from .math3d import EPSILON, Vec3
 
@@ -24,10 +25,28 @@ class SolverStats:
     friction_impulses: int
     position_corrections: int
     maximum_penetration: float
+    warm_started_contacts: int = 0
+    cached_contacts: int = 0
+
+
+@dataclass(slots=True)
+class _VelocityContact:
+    manifold: ContactManifold
+    point: ContactPoint
+    accumulated_normal: float = 0.0
+    tangent: Vec3 = Vec3()
+    accumulated_tangent: float = 0.0
+    restitution_target: float = 0.0
 
 
 class SequentialImpulseSolver:
-    """Deterministic Gauss-Seidel-style rigid-body contact solver."""
+    """Deterministic projected Gauss-Seidel contact solver.
+
+    Normal and tangential impulses are accumulated and clamped across iterations.
+    When a bounded ContactCache is supplied, the prior frame's converged impulses
+    are applied once before iteration, substantially improving resting stacks and
+    low-iteration stability without hiding solver state from determinism.
+    """
 
     def __init__(
         self,
@@ -94,65 +113,152 @@ class SequentialImpulseSolver:
         body_a.apply_impulse(-impulse, point=point)
         body_b.apply_impulse(impulse, point=point)
 
-    def _solve_velocity_point(
+    def _prepare_contacts(
         self,
-        body_a: RigidBody,
-        body_b: RigidBody,
-        manifold: ContactManifold,
-        point: ContactPoint,
-    ) -> tuple[int, int]:
+        bodies: dict[str, RigidBody],
+        manifolds: tuple[ContactManifold, ...],
+        *,
+        cache: ContactCache | None,
+        tick: int,
+    ) -> tuple[list[_VelocityContact], int]:
+        states: list[_VelocityContact] = []
+        warm_started = 0
+
+        for manifold in manifolds:
+            body_a = bodies[manifold.body_a]
+            body_b = bodies[manifold.body_b]
+            for point in manifold.points:
+                relative, _, _ = self._relative_velocity(body_a, body_b, point.position)
+                normal_speed = relative.dot(manifold.normal)
+                restitution_target = (
+                    -manifold.material.restitution * normal_speed
+                    if normal_speed < -self.restitution_velocity_threshold
+                    else 0.0
+                )
+                slip = relative - manifold.normal * normal_speed
+                tangent = slip.normalized_or_zero()
+                state = _VelocityContact(
+                    manifold=manifold,
+                    point=point,
+                    tangent=tangent,
+                    restitution_target=restitution_target,
+                )
+
+                entry = None if cache is None else cache.lookup(manifold, point, tick=tick)
+                if entry is not None:
+                    state.accumulated_normal = entry.normal_impulse
+                    if entry.tangent.length_squared() > EPSILON * EPSILON:
+                        state.tangent = entry.tangent
+                        state.accumulated_tangent = entry.tangent_impulse
+
+                    both_quiet = (
+                        (not body_a.dynamic_body or not body_a.awake)
+                        and (not body_b.dynamic_body or not body_b.awake)
+                    )
+                    if not both_quiet:
+                        impulse = (
+                            manifold.normal * state.accumulated_normal
+                            + state.tangent * state.accumulated_tangent
+                        )
+                        if impulse.length_squared() > EPSILON * EPSILON:
+                            self._apply_pair_impulse(
+                                body_a,
+                                body_b,
+                                impulse,
+                                point.position,
+                            )
+                            warm_started += 1
+                states.append(state)
+
+        return states, warm_started
+
+    def _solve_normal(
+        self,
+        bodies: dict[str, RigidBody],
+        state: _VelocityContact,
+    ) -> int:
+        manifold = state.manifold
+        point = state.point
+        body_a = bodies[manifold.body_a]
+        body_b = bodies[manifold.body_b]
         relative, arm_a, arm_b = self._relative_velocity(body_a, body_b, point.position)
         normal = manifold.normal
         normal_speed = relative.dot(normal)
 
-        if normal_speed >= 0.0:
-            return (0, 0)
-
-        restitution = (
-            manifold.material.restitution
-            if normal_speed < -self.restitution_velocity_threshold
-            else 0.0
-        )
         denominator = (
             self._effective_mass(body_a, arm_a, normal)
             + self._effective_mass(body_b, arm_b, normal)
         )
         if denominator <= EPSILON:
-            return (0, 0)
+            return 0
 
-        normal_impulse_magnitude = -(1.0 + restitution) * normal_speed / denominator
-        if not math.isfinite(normal_impulse_magnitude):
+        delta = -(normal_speed - state.restitution_target) / denominator
+        if not math.isfinite(delta):
             raise SolverError("non-finite normal impulse")
-        normal_impulse_magnitude = max(0.0, normal_impulse_magnitude)
-        normal_impulse = normal * normal_impulse_magnitude
-        self._apply_pair_impulse(body_a, body_b, normal_impulse, point.position)
-
-        relative_after, arm_a, arm_b = self._relative_velocity(body_a, body_b, point.position)
-        tangent = relative_after - normal * relative_after.dot(normal)
-        if tangent.length_squared() <= EPSILON * EPSILON:
-            return (1, 0)
-        tangent = tangent.normalized()
-
-        tangent_denominator = (
-            self._effective_mass(body_a, arm_a, tangent)
-            + self._effective_mass(body_b, arm_b, tangent)
-        )
-        if tangent_denominator <= EPSILON:
-            return (1, 0)
-
-        friction_magnitude = -relative_after.dot(tangent) / tangent_denominator
-        friction_limit = manifold.material.friction * normal_impulse_magnitude
-        friction_magnitude = min(max(friction_magnitude, -friction_limit), friction_limit)
-        if abs(friction_magnitude) <= EPSILON:
-            return (1, 0)
+        previous = state.accumulated_normal
+        state.accumulated_normal = max(0.0, previous + delta)
+        applied = state.accumulated_normal - previous
+        if abs(applied) <= EPSILON:
+            return 0
 
         self._apply_pair_impulse(
             body_a,
             body_b,
-            tangent * friction_magnitude,
+            normal * applied,
             point.position,
         )
-        return (1, 1)
+        return 1
+
+    def _solve_friction(
+        self,
+        bodies: dict[str, RigidBody],
+        state: _VelocityContact,
+    ) -> int:
+        if state.accumulated_normal <= EPSILON:
+            return 0
+
+        manifold = state.manifold
+        point = state.point
+        body_a = bodies[manifold.body_a]
+        body_b = bodies[manifold.body_b]
+        relative, arm_a, arm_b = self._relative_velocity(body_a, body_b, point.position)
+        normal = manifold.normal
+        slip = relative - normal * relative.dot(normal)
+
+        if state.tangent.length_squared() <= EPSILON * EPSILON:
+            if slip.length_squared() <= EPSILON * EPSILON:
+                return 0
+            state.tangent = slip.normalized()
+
+        tangent = state.tangent
+        denominator = (
+            self._effective_mass(body_a, arm_a, tangent)
+            + self._effective_mass(body_b, arm_b, tangent)
+        )
+        if denominator <= EPSILON:
+            return 0
+
+        delta = -relative.dot(tangent) / denominator
+        if not math.isfinite(delta):
+            raise SolverError("non-finite friction impulse")
+
+        friction_limit = manifold.material.friction * state.accumulated_normal
+        previous = state.accumulated_tangent
+        state.accumulated_tangent = min(
+            max(previous + delta, -friction_limit),
+            friction_limit,
+        )
+        applied = state.accumulated_tangent - previous
+        if abs(applied) <= EPSILON:
+            return 0
+
+        self._apply_pair_impulse(
+            body_a,
+            body_b,
+            tangent * applied,
+            point.position,
+        )
+        return 1
 
     def _solve_position_point(
         self,
@@ -185,25 +291,28 @@ class SequentialImpulseSolver:
         self,
         bodies: dict[str, RigidBody],
         manifolds: tuple[ContactManifold, ...],
+        *,
+        cache: ContactCache | None = None,
+        tick: int = 0,
     ) -> SolverStats:
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
+            raise PhysicsValidationError("solver tick must be non-negative integer")
+
+        states, warm_started = self._prepare_contacts(
+            bodies,
+            manifolds,
+            cache=cache,
+            tick=tick,
+        )
         normal_impulses = 0
         friction_impulses = 0
         position_corrections = 0
         maximum_penetration = max((row.penetration for row in manifolds), default=0.0)
 
         for _ in range(self.velocity_iterations):
-            for manifold in manifolds:
-                body_a = bodies[manifold.body_a]
-                body_b = bodies[manifold.body_b]
-                for point in manifold.points:
-                    normal_count, friction_count = self._solve_velocity_point(
-                        body_a,
-                        body_b,
-                        manifold,
-                        point,
-                    )
-                    normal_impulses += normal_count
-                    friction_impulses += friction_count
+            for state in states:
+                normal_impulses += self._solve_normal(bodies, state)
+                friction_impulses += self._solve_friction(bodies, state)
 
         for _ in range(self.position_iterations):
             for manifold in manifolds:
@@ -217,6 +326,18 @@ class SequentialImpulseSolver:
                         point,
                     )
 
+        if cache is not None:
+            for state in states:
+                cache.store(
+                    state.manifold,
+                    state.point,
+                    normal_impulse=state.accumulated_normal,
+                    tangent=state.tangent,
+                    tangent_impulse=state.accumulated_tangent,
+                    tick=tick,
+                )
+            cache.prune(tick=tick)
+
         return SolverStats(
             velocity_iterations=self.velocity_iterations,
             position_iterations=self.position_iterations,
@@ -224,4 +345,6 @@ class SequentialImpulseSolver:
             friction_impulses=friction_impulses,
             position_corrections=position_corrections,
             maximum_penetration=maximum_penetration,
+            warm_started_contacts=warm_started,
+            cached_contacts=0 if cache is None else len(cache),
         )
