@@ -5,12 +5,14 @@ on:
     paths:
       - "skeleton/jeeves/probabilistic.py"
       - "skeleton/jeeves/probabilistic_state_space.py"
+      - "skeleton/jeeves/probabilistic_bayes.py"
       - "skeleton/jeeves/probabilistic_ensemble.py"
       - "skeleton/jeeves/probabilistic_calibration.py"
       - "skeleton/jeeves/probabilistic_contracts.py"
       - "skeleton/jeeves/probabilistic_regimes.py"
       - "skeleton/jeeves/probabilistic_arena.py"
       - "skeleton/testing/test_jeeves_probabilistic_state_space.py"
+      - "skeleton/testing/test_jeeves_probabilistic_bayes.py"
       - "skeleton/testing/test_jeeves_probabilistic_calibration.py"
       - "skeleton/testing/test_jeeves_probabilistic_contracts.py"
       - "skeleton/testing/test_jeeves_probabilistic_regimes.py"
@@ -49,6 +51,7 @@ jobs:
           python -m py_compile \
             skeleton/jeeves/probabilistic.py \
             skeleton/jeeves/probabilistic_state_space.py \
+            skeleton/jeeves/probabilistic_bayes.py \
             skeleton/jeeves/probabilistic_ensemble.py \
             skeleton/jeeves/probabilistic_calibration.py \
             skeleton/jeeves/probabilistic_contracts.py \
@@ -60,12 +63,14 @@ jobs:
           ruff check \
             skeleton/jeeves/probabilistic.py \
             skeleton/jeeves/probabilistic_state_space.py \
+            skeleton/jeeves/probabilistic_bayes.py \
             skeleton/jeeves/probabilistic_ensemble.py \
             skeleton/jeeves/probabilistic_calibration.py \
             skeleton/jeeves/probabilistic_contracts.py \
             skeleton/jeeves/probabilistic_regimes.py \
             skeleton/jeeves/probabilistic_arena.py \
             skeleton/testing/test_jeeves_probabilistic_state_space.py \
+            skeleton/testing/test_jeeves_probabilistic_bayes.py \
             skeleton/testing/test_jeeves_probabilistic_calibration.py \
             skeleton/testing/test_jeeves_probabilistic_contracts.py \
             skeleton/testing/test_jeeves_probabilistic_regimes.py \
@@ -78,6 +83,7 @@ jobs:
         run: |
           python -m pytest -q --noconftest \
             skeleton/testing/test_jeeves_probabilistic_state_space.py \
+            skeleton/testing/test_jeeves_probabilistic_bayes.py \
             skeleton/testing/test_jeeves_probabilistic_calibration.py \
             skeleton/testing/test_jeeves_probabilistic_contracts.py \
             skeleton/testing/test_jeeves_probabilistic_regimes.py \
