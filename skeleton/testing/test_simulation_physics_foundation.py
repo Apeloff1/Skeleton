@@ -486,3 +486,17 @@ def test_broadphase_pair_budget_fails_closed() -> None:
     )
     with pytest.raises(PhysicsValidationError, match="pair bound"):
         broad.compute_pairs(bodies)
+
+
+def test_vertical_downward_projectile_solution_hits_target() -> None:
+    profile = GamePhysicsProfile.earth()
+    origin = Vec3(0.0, 5.0, 0.0)
+    target = Vec3.zero()
+    solution = profile.projectile_solutions(origin, target, 10.0)
+    assert len(solution) == 1
+    end = profile.projectile_position(
+        origin,
+        solution[0].launch_velocity,
+        solution[0].flight_time,
+    )
+    assert end.almost_equal(target, tolerance=1.0e-8)
