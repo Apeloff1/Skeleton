@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from ..ecs.canonical import digest
 from .body import BodyType, RigidBody
+from .calculations import PhysicsAggregate, aggregate_physics
 from .collision import ContactManifold, SweepAndPruneBroadPhase, generate_manifolds
 from .errors import BodyNotFoundError, DuplicateBodyError, PhysicsValidationError
 from .math3d import AABB, Quat, Vec3
@@ -176,6 +177,19 @@ class PhysicsWorld:
 
     def contacts(self) -> tuple[ContactManifold, ...]:
         return self._last_manifolds
+
+    def measure(
+        self,
+        *,
+        angular_origin: Vec3 = Vec3(),
+        potential_reference: Vec3 = Vec3(),
+    ) -> PhysicsAggregate:
+        return aggregate_physics(
+            self.bodies(),
+            self.settings.gravity,
+            angular_origin=angular_origin,
+            potential_reference=potential_reference,
+        )
 
     def query_aabb(self, bounds: AABB) -> tuple[str, ...]:
         matches: list[str] = []
