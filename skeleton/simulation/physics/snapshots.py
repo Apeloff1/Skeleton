@@ -218,3 +218,62 @@ def verify_snapshot(snapshot: PhysicsSnapshot) -> None:
     )
     if expected != snapshot.snapshot_digest:
         raise PhysicsSnapshotError("physics snapshot digest mismatch")
+
+
+
+class PhysicsSnapshotHistory:
+    """Bounded tick-indexed immutable snapshot history for rollback workflows."""
+
+    def __init__(self, capacity: int = 256) -> None:
+        if (
+            isinstance(capacity, bool)
+            or not isinstance(capacity, int)
+            or not 1 <= capacity <= 100_000
+        ):
+            raise PhysicsSnapshotError("snapshot history capacity outside supported range")
+        self.capacity = capacity
+        self._snapshots: dict[int, PhysicsSnapshot] = {}
+
+    def __len__(self) -> int:
+        return len(self._snapshots)
+
+    def ticks(self) -> tuple[int, ...]:
+        return tuple(sorted(self._snapshots))
+
+    def append(self, snapshot: PhysicsSnapshot) -> PhysicsSnapshot:
+        if not isinstance(snapshot, PhysicsSnapshot):
+            raise PhysicsSnapshotError("history requires PhysicsSnapshot")
+        verify_snapshot(snapshot)
+        existing = self._snapshots.get(snapshot.tick)
+        if existing is not None and existing != snapshot:
+            raise PhysicsSnapshotError(
+                "history tick already contains different snapshot"
+            )
+        self._snapshots[snapshot.tick] = snapshot
+        while len(self._snapshots) > self.capacity:
+            del self._snapshots[min(self._snapshots)]
+        return snapshot
+
+    def at_tick(self, tick: int) -> PhysicsSnapshot:
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
+            raise PhysicsSnapshotError("history tick must be non-negative integer")
+        try:
+            return self._snapshots[tick]
+        except KeyError as exc:
+            raise PhysicsSnapshotError(f"snapshot tick not retained: {tick}") from exc
+
+    def latest(self) -> PhysicsSnapshot:
+        if not self._snapshots:
+            raise PhysicsSnapshotError("snapshot history is empty")
+        return self._snapshots[max(self._snapshots)]
+
+    def truncate_after(self, tick: int) -> int:
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
+            raise PhysicsSnapshotError("history tick must be non-negative integer")
+        future = [value for value in self._snapshots if value > tick]
+        for value in sorted(future):
+            del self._snapshots[value]
+        return len(future)
+
+    def clear(self) -> None:
+        self._snapshots.clear()
