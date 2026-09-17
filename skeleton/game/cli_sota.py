@@ -182,6 +182,25 @@ def _cmd_catalog(_rest: List[str]) -> int:
     return 0
 
 
+def _cmd_sim(rest: List[str]) -> int:
+    from skeleton.game.sim_loop import play
+
+    try:
+        payload = play(seed=_seed(rest))
+    except Exception as exc:
+        return _fail(exc)
+    print(json.dumps({
+        "ok": True,
+        "digest": payload["digest"],
+        "route": payload["route"],
+        "quests_done": payload["quests_done"],
+        "combat_winner": payload["combat_winner"],
+        "sota_ready": payload["sota_ready"],
+        "stored_prose": payload["stored_prose"],
+    }, indent=2))
+    return 0
+
+
 def dispatch(cmd: str, rest: List[str]) -> int | None:
     if cmd == "spec":
         return _cmd_spec(rest)
@@ -201,4 +220,6 @@ def dispatch(cmd: str, rest: List[str]) -> int | None:
         return _cmd_bundles(rest)
     if cmd == "catalog":
         return _cmd_catalog(rest)
+    if cmd == "sim":
+        return _cmd_sim(rest)
     return None
