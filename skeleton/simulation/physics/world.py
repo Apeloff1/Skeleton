@@ -16,11 +16,18 @@ from .errors import (
     DuplicateBodyError,
     DuplicateJointError,
     JointNotFoundError,
+    PhysicsSnapshotError,
     PhysicsValidationError,
 )
 from .math3d import AABB, Quat, Vec3
 from .queries import Ray, RayHit, raycast_body, sort_hits, sphere_cast_body
 from .shapes import BoxShape, PlaneShape, SphereShape
+from .snapshots import (
+    PhysicsBodyState,
+    PhysicsSnapshot,
+    build_snapshot,
+    verify_snapshot,
+)
 from .solver import SequentialImpulseSolver, SolverStats
 
 MAX_WORLD_BODIES = 100_000
@@ -371,6 +378,28 @@ class PhysicsWorld:
             }
         raise PhysicsValidationError("unknown shape implementation")
 
+    def _body_configuration_record(self, body: RigidBody) -> dict[str, object]:
+        return {
+            "body_id": body.body_id,
+            "type": body.body_type.value,
+            "shape_config": self._shape_record(body),
+            "mass": body.mass if math.isfinite(body.mass) else None,
+            "inverse_mass": body.inverse_mass,
+            "material": {
+                "friction": body.material.friction,
+                "restitution": body.material.restitution,
+                "rolling_friction": body.material.rolling_friction,
+                "friction_rule": body.material.friction_rule.value,
+                "restitution_rule": body.material.restitution_rule.value,
+            },
+            "local_inertia": body.local_inertia.to_tuple(),
+            "local_inverse_inertia": body.local_inverse_inertia.to_tuple(),
+            "linear_damping": body.linear_damping,
+            "angular_damping": body.angular_damping,
+            "gravity_scale": body.gravity_scale,
+            "continuous": body.continuous,
+        }
+
     def _body_record(self, body: RigidBody) -> dict[str, object]:
         return {
             **body.state_record(),
@@ -389,6 +418,20 @@ class PhysicsWorld:
         }
 
     @property
+    def configuration_digest(self) -> str:
+        return digest(
+            {
+                "domain": "skeleton.simulation.physics.configuration.v1",
+                "settings": self.settings.fingerprint,
+                "bodies": [
+                    self._body_configuration_record(body)
+                    for body in self.bodies()
+                ],
+                "joints": [joint.state_record() for joint in self.joints()],
+            }
+        )
+
+    @property
     def state_digest(self) -> str:
         return digest(
             {
@@ -400,6 +443,69 @@ class PhysicsWorld:
                 "contact_cache": self._contact_cache.state_record(),
             }
         )
+
+    def capture_snapshot(self) -> PhysicsSnapshot:
+        body_states = tuple(
+            PhysicsBodyState(
+                body_id=body.body_id,
+                position=body.position,
+                orientation=body.orientation,
+                linear_velocity=body.linear_velocity,
+                angular_velocity=body.angular_velocity,
+                force=body.force,
+                torque=body.torque,
+                awake=body.awake,
+                sleep_time=body.sleep_time,
+            )
+            for body in self.bodies()
+        )
+        return build_snapshot(
+            tick=self._tick,
+            configuration_digest=self.configuration_digest,
+            body_states=body_states,
+            contact_cache=self._contact_cache.snapshot(),
+            manifolds=self._last_manifolds,
+            state_digest=self.state_digest,
+        )
+
+    def _apply_snapshot_state(self, snapshot: PhysicsSnapshot) -> None:
+        for state in snapshot.body_states:
+            body = self._bodies[state.body_id]
+            body.position = state.position
+            body.orientation = state.orientation
+            body.linear_velocity = state.linear_velocity
+            body.angular_velocity = state.angular_velocity
+            body.force = state.force
+            body.torque = state.torque
+            body.awake = state.awake
+            body.sleep_time = state.sleep_time
+        self._contact_cache.restore(snapshot.contact_cache)
+        self._last_manifolds = snapshot.manifolds
+        self._tick = snapshot.tick
+
+    def restore_snapshot(self, snapshot: PhysicsSnapshot) -> None:
+        if not isinstance(snapshot, PhysicsSnapshot):
+            raise PhysicsSnapshotError("restore requires PhysicsSnapshot")
+        verify_snapshot(snapshot)
+        if snapshot.configuration_digest != self.configuration_digest:
+            raise PhysicsSnapshotError("physics snapshot configuration mismatch")
+        expected_ids = self.body_ids()
+        snapshot_ids = tuple(row.body_id for row in snapshot.body_states)
+        if snapshot_ids != expected_ids:
+            raise PhysicsSnapshotError("physics snapshot body set mismatch")
+
+        previous = self.capture_snapshot()
+        try:
+            self._apply_snapshot_state(snapshot)
+            if self.state_digest != snapshot.state_digest:
+                raise PhysicsSnapshotError("physics snapshot state digest mismatch")
+        except Exception:
+            self._apply_snapshot_state(previous)
+            if self.state_digest != previous.state_digest:
+                raise PhysicsSnapshotError(
+                    "physics snapshot restore rollback failed"
+                )
+            raise
 
     def _capture_step_checkpoint(self) -> _StepCheckpoint:
         states = tuple(
