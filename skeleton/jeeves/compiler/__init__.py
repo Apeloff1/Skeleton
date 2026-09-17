@@ -1,4 +1,10 @@
-"""Verified semantic compilation and evidence-bearing decompilation for Jeeves."""
+"""Verified semantic compilation and evidence-bearing decompilation for Jeeves.
+
+The public compiler surface intentionally separates IR verification, bounded
+translation validation, high-assurance promotion gates, and decompilation loss
+auditing.  Consumers should prefer :class:`AssuredPassManager` for production
+transformations and retain :class:`PassManager` for lower-level experiments.
+"""
 
 from .ir import (
     BasicBlock,
@@ -28,6 +34,7 @@ from .pipeline import (
     PassSemantics,
     TranslationValidation,
     TranslationValidator,
+    ValidationStatus,
 )
 from .decompiler import (
     DecompilationArtifact,
@@ -37,17 +44,49 @@ from .decompiler import (
     RecoveredType,
     RecoveryConfidence,
 )
+from .assurance import (
+    AssuranceCertificate,
+    AssuranceError,
+    AssuranceObligation,
+    AssuredPassManager,
+    CompilerAssuranceEngine,
+    CompilerAssurancePolicy,
+    CoverageAudit,
+    DecompilationAssurance,
+    DecompilationAssurancePolicy,
+    DecompilationAssuranceReport,
+    EffectAudit,
+    ExternalProofStatus,
+    ExternalValidationEvidence,
+    ObligationKind,
+    ObligationStatus,
+    ProvenanceAtom,
+    ProvenanceAudit,
+)
 
 __all__ = [
     "AbstractState",
     "AbstractValue",
     "AbstractValueKind",
+    "AssuranceCertificate",
+    "AssuranceError",
+    "AssuranceObligation",
+    "AssuredPassManager",
     "BasicBlock",
     "CompilationPass",
+    "CompilerAssuranceEngine",
+    "CompilerAssurancePolicy",
     "ControlFlowGraph",
+    "CoverageAudit",
     "DecompilationArtifact",
+    "DecompilationAssurance",
+    "DecompilationAssurancePolicy",
+    "DecompilationAssuranceReport",
     "Decompiler",
     "Effect",
+    "EffectAudit",
+    "ExternalProofStatus",
+    "ExternalValidationEvidence",
     "FunctionIR",
     "IRDiagnostic",
     "IRModule",
@@ -56,10 +95,14 @@ __all__ = [
     "Instruction",
     "LossKind",
     "LossRecord",
+    "ObligationKind",
+    "ObligationStatus",
     "PassContract",
     "PassManager",
     "PassRecord",
     "PassSemantics",
+    "ProvenanceAtom",
+    "ProvenanceAudit",
     "RecoveredType",
     "RecoveryConfidence",
     "Severity",
@@ -69,5 +112,6 @@ __all__ = [
     "TerminatorKind",
     "TranslationValidation",
     "TranslationValidator",
+    "ValidationStatus",
     "VerificationReport",
 ]
