@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import SimpleNamespace
 
 import pytest
@@ -189,6 +189,22 @@ def test_next_forecast_reuses_only_final_completed_calibration_state() -> None:
     assert interval.calibration_size == len(report.final_calibration_scores)
     assert interval.effective_alpha == pytest.approx(report.final_effective_alpha)
     assert interval.lower < interval.center < interval.upper
+
+
+def test_next_forecast_rejects_tampered_report_state() -> None:
+    observations = _observations((0.2, 0.3, 0.4, 0.5, 0.8, 0.7, 0.9, 1.0))
+    report = evaluate_prequential_conformal(observations, config=_config())
+    tampered = replace(
+        report,
+        final_calibration_scores=report.final_calibration_scores[:-1] + (99.0,),
+    )
+
+    with pytest.raises(StateSpaceError):
+        conformalize_next_forecast(
+            _Forecast(mean=3.0, variance=4.0),
+            tampered,
+            target_index=20,
+        )
 
 
 def test_cross_family_adapter_consumes_only_step_contract() -> None:
