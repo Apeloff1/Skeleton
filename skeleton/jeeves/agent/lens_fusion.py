@@ -338,7 +338,12 @@ class LensFusionEngine:
                         )
                     )
                 for edge in candidates:
-                    index[(edge.key[0], edge.key[1], edge.kind)] = edge
+                    key = (edge.key[0], edge.key[1], edge.kind)
+                    existing = index.get(key)
+                    # Explicit/learned dependence knowledge may be stronger than
+                    # a generic overlap heuristic. Never silently weaken it.
+                    if existing is None or edge.strength > existing.strength:
+                        index[key] = edge
         return tuple(
             sorted(
                 index.values(),
