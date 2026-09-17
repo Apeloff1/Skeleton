@@ -179,6 +179,15 @@ from .metacognition import (
     epistemic_signals,
     progress_signals,
 )
+from .nuance_runtime import (
+    FrontierUncertaintyRouter,
+    NuanceFrame,
+    NuanceRuntimeError,
+    NuanceRuntimePolicy,
+    NuanceUpdate,
+    ScientificNuanceRuntime,
+    UncertaintyRecommendation,
+)
 from .planning import (
     ModelPlanParser,
     PlanScheduler,
