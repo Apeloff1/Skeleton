@@ -1,9 +1,9 @@
 """Stable Jeeves probabilistic-modeling facade.
 
 This module keeps the public import surface compact while the implementation is
-split into state-space filtering, online Bayesian ensembles, distributional
-calibration, hidden-Markov regime inference, paired model comparison, and explicit
-promotion eligibility contracts.
+split into state-space filtering, exact Bayesian parameter uncertainty, online
+Bayesian ensembles, distributional calibration, hidden-Markov regime inference,
+paired model comparison, and explicit promotion eligibility contracts.
 """
 
 from .probabilistic_arena import (
@@ -17,6 +17,16 @@ from .probabilistic_arena import (
     evaluate_predictive_arena,
     newey_west_mean_test,
     regime_forecast_crps,
+)
+from .probabilistic_bayes import (
+    BayesianTrendConfig,
+    BayesianTrendEvaluation,
+    BayesianTrendFit,
+    BayesianTrendFold,
+    StudentTForecast,
+    evaluate_bayesian_trend,
+    fit_bayesian_trend,
+    forecast_bayesian_trend,
 )
 from .probabilistic_calibration import (
     CalibrationConfig,
@@ -83,6 +93,10 @@ __all__ = [
     "ArenaMetrics",
     "BayesianEnsembleConfig",
     "BayesianEnsembleReport",
+    "BayesianTrendConfig",
+    "BayesianTrendEvaluation",
+    "BayesianTrendFit",
+    "BayesianTrendFold",
     "CalibrationConfig",
     "CalibrationReport",
     "CoverageDiagnostic",
@@ -117,15 +131,19 @@ __all__ = [
     "StateSpaceFit",
     "StateSpaceScore",
     "StateSpaceTournament",
+    "StudentTForecast",
     "WeightedForecast",
     "calibrate_distributions",
     "central_interval",
+    "evaluate_bayesian_trend",
     "evaluate_predictive_arena",
     "evaluate_probabilistic_promotion",
     "evaluate_regime_hmm_prequential",
     "evaluate_state_space_families",
+    "fit_bayesian_trend",
     "fit_regime_hmm",
     "fit_state_space",
+    "forecast_bayesian_trend",
     "forecast_regime_hmm",
     "forecast_state_space",
     "gaussian_as_mixture",
