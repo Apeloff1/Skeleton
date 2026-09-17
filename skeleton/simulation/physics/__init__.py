@@ -29,6 +29,9 @@ from .errors import (
     DuplicateJointError,
     JointNotFoundError,
     PhysicsError,
+    PhysicsReplayDivergenceError,
+    PhysicsReplayError,
+    PhysicsSnapshotError,
     PhysicsValidationError,
     SolverError,
     UnsupportedCollisionError,
@@ -43,8 +46,21 @@ from .materials import CombineRule, ContactMaterial, PhysicsMaterial, combine_ma
 from .math3d import AABB, Mat3, Quat, Transform, Vec3
 from .queries import Ray, RayHit, raycast_body, sphere_cast_body
 from .shapes import BoxShape, CollisionShape, MassProperties, PlaneShape, ShapeKind, SphereShape
+from .snapshots import (
+    PhysicsBodyState,
+    PhysicsSnapshot,
+    build_snapshot,
+    verify_snapshot,
+)
 from .solver import SequentialImpulseSolver, SolverStats
 from .world import PhysicsSettings, PhysicsStepReceipt, PhysicsWorld
+from .replay import (
+    PhysicsReplayFrame,
+    PhysicsReplayRecorder,
+    PhysicsReplayTape,
+    PhysicsReplayVerification,
+    replay_physics,
+)
 
 __all__ = [
     "AABB",
@@ -74,6 +90,15 @@ __all__ = [
     "MassProperties",
     "Mat3",
     "PhysicsAggregate",
+    "PhysicsBodyState",
+    "PhysicsReplayDivergenceError",
+    "PhysicsReplayError",
+    "PhysicsReplayFrame",
+    "PhysicsReplayRecorder",
+    "PhysicsReplayTape",
+    "PhysicsReplayVerification",
+    "PhysicsSnapshot",
+    "PhysicsSnapshotError",
     "PhysicsError",
     "PhysicsMaterial",
     "PhysicsSettings",
@@ -97,6 +122,7 @@ __all__ = [
     "Vec3",
     "aggregate_physics",
     "angular_momentum",
+    "build_snapshot",
     "combine_materials",
     "detect_collision",
     "generate_manifolds",
@@ -105,6 +131,8 @@ __all__ = [
     "kinetic_energy",
     "linear_momentum",
     "raycast_body",
+    "replay_physics",
     "sphere_cast_body",
+    "verify_snapshot",
     "world_inertia",
 ]
