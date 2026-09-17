@@ -400,7 +400,19 @@ class EngineEvolutionSession:
                 "evolution session has no checkpoints"
             )
         try:
-            snapshot = self.checkpoints[index]
+            resolved_index = (
+                index
+                if index >= 0
+                else len(self.checkpoints) + index
+            )
+            if (
+                resolved_index < 0
+                or resolved_index >= len(self.checkpoints)
+            ):
+                raise IndexError
+            snapshot = self.checkpoints[
+                resolved_index
+            ]
         except IndexError as exc:
             raise GameEngineLabError(
                 "evolution checkpoint index out of range"
@@ -415,13 +427,13 @@ class EngineEvolutionSession:
         restored = self.sandbox.with_tree(
             tree
         )
+        retained = self.checkpoints[
+            : resolved_index + 1
+        ]
         return EngineEvolutionSession(
             restored,
-            self.checkpoints,
-            max(
-                self.sequence,
-                snapshot.sequence + 1,
-            ),
+            retained,
+            snapshot.sequence + 1,
         )
 
 
