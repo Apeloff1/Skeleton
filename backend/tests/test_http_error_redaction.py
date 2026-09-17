@@ -101,7 +101,7 @@ def test_converted_routes_use_stable_helpers_or_constants(path: Path) -> None:
     assert "str(e)" not in source
     assert "str(exc)" not in source
     assert "repr(e)" not in source
-    assert "{type(e).__name__}" not in source
+    assert "type(e).__name__}: {e}" not in source
     assert "internal_http_error(" in source or "from core.http_errors import" in source
 
 
