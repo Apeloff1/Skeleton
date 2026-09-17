@@ -175,30 +175,58 @@ def test_classify_intake_preempts_storms_and_ambiguous_state() -> None:
         )
         == INTAKE_SKIP_RECOVERED
     )
+    assert (
+        classify_intake(
+            sha_record_exists=False,
+            family_open_exists=True,
+            branch_lookup="ok",
+            branch_tip=head,
+            head_sha=head,
+            recovered=False,
+            recovery_known=False,
+        )
+        == INTAKE_SKIP_UNREADABLE
+    )
+
+
+def _recovery_opener(payload: dict[str, object], paths: list[str]):
+    def opener(path: str) -> tuple[int, dict[str, object] | None]:
+        paths.append(path)
+        return 200, payload
+
+    return opener
 
 
 def test_workflow_sha_recovered_ignores_cancelled_and_foreign_workflows() -> None:
     payload = {
+        "total_count": 3,
         "workflow_runs": [
             {"name": "Malware Gate", "conclusion": "cancelled"},
             {"name": "Merge Readiness", "conclusion": "failure"},
             {"name": "Merge Readiness", "conclusion": "success"},
-        ]
+        ],
     }
+    paths: list[str] = []
     assert (
         workflow_sha_recovered(
             "Apeloff1/Skeleton",
             "Merge Readiness",
             "abc123",
-            opener=lambda _path: (200, payload),
+            workflow_id=4242,
+            opener=_recovery_opener(payload, paths),
         )
         is True
     )
+    assert paths == [
+        "/repos/Apeloff1/Skeleton/actions/workflows/4242/runs"
+        "?head_sha=abc123&status=completed&per_page=100&page=1"
+    ]
     assert (
         workflow_sha_recovered(
             "Apeloff1/Skeleton",
             "Malware Gate",
             "abc123",
+            workflow_id=4242,
             opener=lambda _path: (200, payload),
         )
         is False
@@ -208,10 +236,94 @@ def test_workflow_sha_recovered_ignores_cancelled_and_foreign_workflows() -> Non
             "Apeloff1/Skeleton",
             "Merge Readiness",
             "abc123",
+            workflow_id=4242,
             opener=lambda _path: (500, None),
         )
         is None
     )
+
+
+def test_workflow_sha_recovered_finds_success_beyond_first_thirty_results() -> None:
+    failure = {"name": "Merge Readiness", "conclusion": "failure"}
+    first_page = {"total_count": 31, "workflow_runs": [failure] * 30}
+    second_page = {
+        "total_count": 31,
+        "workflow_runs": [{"name": "Merge Readiness", "conclusion": "success"}],
+    }
+    paths: list[str] = []
+
+    def opener(path: str) -> tuple[int, dict[str, object] | None]:
+        paths.append(path)
+        if "page=1" in path:
+            return 200, first_page
+        if "page=2" in path:
+            return 200, second_page
+        raise AssertionError(f"unexpected recovery path: {path}")
+
+    assert (
+        workflow_sha_recovered(
+            "Apeloff1/Skeleton",
+            "Merge Readiness",
+            "abc123",
+            workflow_id=4242,
+            opener=opener,
+            page_size=30,
+            max_pages=10,
+        )
+        is True
+    )
+    assert paths == [
+        "/repos/Apeloff1/Skeleton/actions/workflows/4242/runs"
+        "?head_sha=abc123&status=completed&per_page=30&page=1",
+        "/repos/Apeloff1/Skeleton/actions/workflows/4242/runs"
+        "?head_sha=abc123&status=completed&per_page=30&page=2",
+    ]
+
+
+def test_workflow_sha_recovered_fails_closed_when_page_bound_exhausted() -> None:
+    failure_page = {
+        "total_count": 250,
+        "workflow_runs": [{"name": "Merge Readiness", "conclusion": "failure"}] * 100,
+    }
+    paths: list[str] = []
+
+    def opener(path: str) -> tuple[int, dict[str, object] | None]:
+        paths.append(path)
+        return 200, failure_page
+
+    assert (
+        workflow_sha_recovered(
+            "Apeloff1/Skeleton",
+            "Merge Readiness",
+            "abc123",
+            workflow_id=4242,
+            opener=opener,
+            page_size=100,
+            max_pages=2,
+        )
+        is None
+    )
+    assert len(paths) == 2
+    assert "page=2" in paths[-1]
+
+
+def test_workflow_sha_recovered_rejects_invalid_workflow_identity() -> None:
+    with pytest.raises(TypeError, match="workflow_id"):
+        workflow_sha_recovered(
+            "Apeloff1/Skeleton",
+            "Merge Readiness",
+            "abc123",
+            workflow_id="Merge Readiness",  # type: ignore[arg-type]
+            opener=lambda _path: (200, {"total_count": 0, "workflow_runs": []}),
+        )
+    with pytest.raises(ValueError, match="workflow_id"):
+        workflow_sha_recovered(
+            "Apeloff1/Skeleton",
+            "Merge Readiness",
+            "abc123",
+            workflow_id=0,
+            opener=lambda _path: (200, {"total_count": 0, "workflow_runs": []}),
+        )
 
 
 def test_workflow_run_consumer_never_checks_out_triggering_code() -> None:
@@ -222,6 +334,12 @@ def test_workflow_run_consumer_never_checks_out_triggering_code() -> None:
     assert 'os.environ["RUN_ID"].strip()' not in workflow
     assert "--state all" in workflow
     assert 'os.environ["HEAD_SHA"].strip().lower()' in workflow
+    assert "github.event.workflow_run.workflow_id" in workflow
+    assert "/actions/workflows/{workflow_id}/runs" in workflow
+    assert "/actions/runs?" not in workflow
+    assert "per_page=30" not in workflow
+    assert "&page={page}" in workflow
+    assert 'decision = "skip_unreadable"' in workflow
 
 
 def test_workflow_preempts_superseded_sha_and_open_family_records() -> None:

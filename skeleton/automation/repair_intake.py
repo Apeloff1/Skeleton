@@ -21,6 +21,8 @@ INTAKE_SKIP_UNREADABLE: Final = "skip_unreadable"
 INTAKE_SKIP_RECOVERED: Final = "skip_recovered"
 
 FAMILY_DISCRIMINATOR: Final = "family"
+RECOVERY_PAGE_SIZE: Final = 100
+RECOVERY_MAX_PAGES: Final = 10
 
 HttpOpener = Callable[[str], tuple[int, Mapping[str, object] | None]]
 
@@ -145,18 +147,36 @@ def resolve_branch_tip(
         return "unreadable", None
 
 
+def _required_workflow_id(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        if isinstance(value, str) and value.strip().isdigit():
+            parsed = int(value.strip())
+        else:
+            raise TypeError("workflow_id must be a positive integer")
+    else:
+        parsed = value
+    if parsed < 1:
+        raise ValueError("workflow_id must be a positive integer")
+    return parsed
+
+
 def workflow_sha_recovered(
     repo: str,
     workflow: str,
     head_sha: str,
     *,
+    workflow_id: int,
     opener: HttpOpener,
+    page_size: int = RECOVERY_PAGE_SIZE,
+    max_pages: int = RECOVERY_MAX_PAGES,
 ) -> bool | None:
     """Return whether the same workflow later succeeded on this SHA.
 
-    ``True`` means a completed success exists, so the failure observation is
-    stale. ``False`` means no success was found. ``None`` means the lookup was
-    unreadable; callers must not treat that as recovery.
+    Looks up runs for the numeric workflow identity rather than scanning every
+    completed run on the SHA. Pages through results with a strict cap. ``True``
+    means a completed success exists. ``False`` means the workflow-specific
+    history was fully scanned with no success. ``None`` means the lookup was
+    unreadable or the page bound was exhausted while more results remained.
     """
 
     repository = _required_text(repo, "repo")
@@ -164,25 +184,52 @@ def workflow_sha_recovered(
         raise ValueError("repo must be owner/name")
     name = _required_text(workflow, "workflow").lower()
     sha = _required_ref(head_sha, "head_sha")
-    path = f"/repos/{repository}/actions/runs?head_sha={quote(sha, safe='')}&status=completed&per_page=30"
-    try:
-        status, payload = opener(path)
-    except Exception:
+    identity = _required_workflow_id(workflow_id)
+    if isinstance(page_size, bool) or not isinstance(page_size, int) or page_size < 1:
+        raise ValueError("page_size must be a positive integer")
+    if isinstance(max_pages, bool) or not isinstance(max_pages, int) or max_pages < 1:
+        raise ValueError("max_pages must be a positive integer")
+
+    scanned = 0
+    total_count: int | None = None
+    for page in range(1, max_pages + 1):
+        path = (
+            f"/repos/{repository}/actions/workflows/{identity}/runs"
+            f"?head_sha={quote(sha, safe='')}"
+            "&status=completed"
+            f"&per_page={page_size}"
+            f"&page={page}"
+        )
+        try:
+            status, payload = opener(path)
+        except Exception:
+            return None
+        if status != 200 or not isinstance(payload, Mapping):
+            return None
+        raw_total = payload.get("total_count")
+        if isinstance(raw_total, bool) or not isinstance(raw_total, int) or raw_total < 0:
+            return None
+        if total_count is None:
+            total_count = raw_total
+        elif raw_total != total_count:
+            return None
+        runs = payload.get("workflow_runs")
+        if not isinstance(runs, list):
+            return None
+        for run in runs:
+            if not isinstance(run, Mapping):
+                continue
+            run_name = run.get("name")
+            conclusion = run.get("conclusion")
+            if isinstance(run_name, str) and run_name.strip().lower() != name:
+                continue
+            if isinstance(conclusion, str) and conclusion.strip().lower() == "success":
+                return True
+        scanned += len(runs)
+        if len(runs) < page_size or scanned >= total_count:
+            return False
+    if total_count is not None and scanned < total_count:
         return None
-    if status != 200 or not isinstance(payload, Mapping):
-        return None
-    runs = payload.get("workflow_runs")
-    if not isinstance(runs, list):
-        return None
-    for run in runs:
-        if not isinstance(run, Mapping):
-            continue
-        run_name = run.get("name")
-        conclusion = run.get("conclusion")
-        if not isinstance(run_name, str) or not isinstance(conclusion, str):
-            continue
-        if run_name.strip().lower() == name and conclusion.strip().lower() == "success":
-            return True
     return False
 
 
@@ -194,6 +241,7 @@ def classify_intake(
     branch_tip: str | None,
     head_sha: str,
     recovered: bool = False,
+    recovery_known: bool = True,
 ) -> str:
     """Return the pre-emptive intake action for one failure observation.
 
@@ -207,6 +255,8 @@ def classify_intake(
         raise TypeError("family_open_exists must be a bool")
     if not isinstance(recovered, bool):
         raise TypeError("recovered must be a bool")
+    if not isinstance(recovery_known, bool):
+        raise TypeError("recovery_known must be a bool")
     if branch_lookup not in {"ok", "missing", "unreadable"}:
         raise ValueError("branch_lookup must be ok, missing, or unreadable")
 
@@ -229,6 +279,8 @@ def classify_intake(
         return INTAKE_SKIP_UNREADABLE
     if tip != current_sha:
         return INTAKE_SKIP_SUPERSEDED
+    if not recovery_known:
+        return INTAKE_SKIP_UNREADABLE
     if recovered:
         return INTAKE_SKIP_RECOVERED
     if family_open_exists:
