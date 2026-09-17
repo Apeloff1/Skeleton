@@ -22,7 +22,7 @@ from skeleton.jeeves.historical_modes import (
 )
 from skeleton.learning import LearningEvidenceError, LearningEvidenceStore
 
-NOW = 1_000.0
+NOW = 1_790_000_000.0
 SUBJECT = "jeeves-historical-fixture"
 
 
@@ -46,10 +46,27 @@ def _report(series: HistoricalSeries, *, calibration=None):
     return lab.evaluate(series)
 
 
+def _build(report, series, **kwargs):
+    return build_historical_evidence(
+        report,
+        series,
+        subject_id=SUBJECT,
+        observed_at=NOW,
+        **kwargs,
+    )
+
+
+def test_bridge_requires_explicit_observation_time() -> None:
+    series = _series()
+    with pytest.raises(LearningEvidenceError) as caught:
+        _build(_report(series), series)
+    assert caught.value.context == {"reason": "missing_observed_at", "field": "observed_at"}
+
+
 def test_bridge_builds_one_fact_root_and_derived_features() -> None:
     series = _series()
     report = _report(series)
-    bundle = build_historical_evidence(report, series, subject_id=SUBJECT)
+    bundle = _build(report, series)
     assert bundle.observation.subject_id == SUBJECT
     assert bundle.observation.payload["sample_count"] == 40
     assert bundle.observation.payload["series_label"] == series.label
@@ -61,8 +78,8 @@ def test_bridge_builds_one_fact_root_and_derived_features() -> None:
 def test_bridge_is_deterministic_for_same_report_and_series() -> None:
     series = _series()
     report = _report(series)
-    first = build_historical_evidence(report, series, subject_id=SUBJECT)
-    second = build_historical_evidence(report, series, subject_id=SUBJECT)
+    first = _build(report, series)
+    second = _build(report, series)
     assert first == second
     assert bundle_manifest(first) == bundle_manifest(second)
 
@@ -72,8 +89,8 @@ def test_series_fingerprint_changes_when_input_changes() -> None:
     second_values = list(first_series.values)
     second_values[20] += 1
     second_series = _series(second_values)
-    first = build_historical_evidence(_report(first_series), first_series, subject_id=SUBJECT)
-    second = build_historical_evidence(_report(second_series), second_series, subject_id=SUBJECT)
+    first = _build(_report(first_series), first_series)
+    second = _build(_report(second_series), second_series)
     assert first.series_fingerprint != second.series_fingerprint
     assert first.observation.observation_id != second.observation.observation_id
 
@@ -89,8 +106,8 @@ def test_fact_root_is_invariant_to_analysis_configuration() -> None:
             min_top_k_overlap=0.0,
         ),
     )
-    first = build_historical_evidence(first_report, series, subject_id=SUBJECT)
-    second = build_historical_evidence(second_report, series, subject_id=SUBJECT)
+    first = _build(first_report, series)
+    second = _build(second_report, series)
     assert first.observation == second.observation
     assert first.series_fingerprint == second.series_fingerprint
     assert first.report_fingerprint != second.report_fingerprint
@@ -102,7 +119,7 @@ def test_fact_root_is_invariant_to_analysis_configuration() -> None:
 def test_timestamp_fingerprint_is_present_when_clock_exists() -> None:
     timestamps = [100.0 + index * index + index for index in range(40)]
     series = _series(timestamps=timestamps)
-    bundle = build_historical_evidence(_report(series), series, subject_id=SUBJECT)
+    bundle = _build(_report(series), series)
     assert bundle.observation.payload["has_timestamps"] is True
     assert "timestamp_fingerprint" in bundle.observation.payload
     assert bundle.observation.payload["first_timestamp"] == timestamps[0]
@@ -112,7 +129,7 @@ def test_timestamp_fingerprint_is_present_when_clock_exists() -> None:
 def test_feature_lookup_exposes_calibration_measurements() -> None:
     series = _series()
     report = _report(series)
-    bundle = build_historical_evidence(report, series, subject_id=SUBJECT)
+    bundle = _build(report, series)
     assert bundle.feature_by_name("selected_mode").value == report.selected_mode.value
     assert bundle.feature_by_name("calibration_fingerprint").value == report.fingerprint
     assert bundle.feature_by_name("rank_correlation").value == pytest.approx(
@@ -122,7 +139,7 @@ def test_feature_lookup_exposes_calibration_measurements() -> None:
 
 def test_unknown_feature_lookup_fails_closed() -> None:
     series = _series()
-    bundle = build_historical_evidence(_report(series), series, subject_id=SUBJECT)
+    bundle = _build(_report(series), series)
     with pytest.raises(LearningEvidenceError) as caught:
         bundle.feature_by_name("does-not-exist")
     assert caught.value.context["reason"] == "unknown_record"
@@ -130,13 +147,7 @@ def test_unknown_feature_lookup_fails_closed() -> None:
 
 def test_bundle_can_be_explicitly_recorded_into_learning_evidence_store() -> None:
     series = _series()
-    bundle = build_historical_evidence(
-        _report(series),
-        series,
-        subject_id=SUBJECT,
-        observed_at=NOW,
-        clock_version=1,
-    )
+    bundle = _build(_report(series), series, clock_version=1)
     store = LearningEvidenceStore(
         clock=lambda: NOW,
         clock_version=1,
@@ -155,7 +166,7 @@ def test_bridge_itself_does_not_require_or_mutate_a_store() -> None:
     series = _series()
     store = LearningEvidenceStore(clock=lambda: NOW, clock_version=1)
     before = store.facts()
-    bundle = build_historical_evidence(_report(series), series, subject_id=SUBJECT)
+    bundle = _build(_report(series), series)
     assert bundle.features
     assert store.facts() == before
 
@@ -165,7 +176,7 @@ def test_report_series_label_mismatch_is_rejected() -> None:
     report = _report(original)
     different = _series(label="different")
     with pytest.raises(HistoricalModeError) as caught:
-        build_historical_evidence(report, different, subject_id=SUBJECT)
+        build_historical_evidence(report, different, subject_id=SUBJECT, observed_at=NOW)
     assert caught.value.context["reason"] == "report_series_mismatch"
 
 
@@ -177,6 +188,7 @@ def test_blocked_live_model_source_kind_is_rejected_by_evidence_contract() -> No
             report,
             series,
             subject_id=SUBJECT,
+            observed_at=NOW,
             source_kind="live-model",
         )
     assert caught.value.context["reason"] == "blocked_source"
@@ -184,7 +196,7 @@ def test_blocked_live_model_source_kind_is_rejected_by_evidence_contract() -> No
 
 def test_manifest_contains_only_identifiers_and_fingerprints() -> None:
     series = _series()
-    bundle = build_historical_evidence(_report(series), series, subject_id=SUBJECT)
+    bundle = _build(_report(series), series)
     manifest = json.loads(bundle_manifest(bundle))
     assert set(manifest) == {
         "observation_id",
@@ -199,7 +211,7 @@ def test_manifest_contains_only_identifiers_and_fingerprints() -> None:
 def test_report_fingerprint_stays_on_derived_feature_plane() -> None:
     series = _series()
     report = _report(series)
-    bundle = build_historical_evidence(report, series, subject_id=SUBJECT)
+    bundle = _build(report, series)
     assert bundle.report_fingerprint == report.fingerprint
     assert "report_fingerprint" not in bundle.observation.payload
     assert bundle.feature_by_name("calibration_fingerprint").value == report.fingerprint
