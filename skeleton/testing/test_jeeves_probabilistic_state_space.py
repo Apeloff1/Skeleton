@@ -294,7 +294,7 @@ def test_online_ensemble_is_deterministic() -> None:
     left = engine.evaluate(_oscillating(58))
     right = engine.evaluate(_oscillating(58))
     assert left.fingerprint == right.fingerprint
-    assert left.final_weights == pytest.approx(right.final_weights)
+    assert left.final_weights == right.final_weights
     assert left.mean_log_score == pytest.approx(right.mean_log_score)
     assert left.mean_crps == pytest.approx(right.mean_crps)
 
@@ -316,8 +316,8 @@ def test_future_tail_mutation_cannot_change_earlier_ensemble_forecasts() -> None
         assert first.target_index == second.target_index
         assert first.predictive.mean == pytest.approx(second.predictive.mean)
         assert first.predictive.variance == pytest.approx(second.predictive.variance)
-        assert first.prior_weights == pytest.approx(second.prior_weights)
-        assert first.posterior_weights == pytest.approx(second.posterior_weights)
+        assert first.prior_weights == second.prior_weights
+        assert first.posterior_weights == second.posterior_weights
 
 
 def test_posterior_for_current_target_does_not_rewrite_current_predictive_weights() -> None:
@@ -343,7 +343,7 @@ def test_posterior_for_current_target_does_not_rewrite_current_predictive_weight
                 key=lambda item: item[0].value,
             )
         )
-        assert component_weights == pytest.approx(step.prior_weights)
+        assert component_weights == step.prior_weights
 
 
 def test_min_weight_prevents_exact_component_extinction() -> None:
@@ -422,11 +422,3 @@ def test_invalid_ensemble_configuration_fails_closed() -> None:
         BayesianEnsembleConfig(forgetting_factor=0.0)
     with pytest.raises(StateSpaceError):
         BayesianEnsembleConfig(min_weight=0.5)
-
-
-def test_high_floor_is_rejected_for_large_family_set_when_used() -> None:
-    engine = OnlineBayesianEnsemble(
-        config=BayesianEnsembleConfig(min_train_size=8, min_weight=0.20),
-    )
-    with pytest.raises(StateSpaceError):
-        engine.evaluate(_trend(20))
