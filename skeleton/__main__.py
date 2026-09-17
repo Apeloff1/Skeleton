@@ -17,6 +17,7 @@ Commands:
     capabilities Show the stable machine-readable capability manifest
     sota        Show the #807 SOTA game-creation program map
     replay      Record and verify a deterministic mechanics replay
+    session     Compose replay + AI + harbor + mass + era bind
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
@@ -61,10 +62,7 @@ def _cmd_sota(rest: List[str]) -> int:
     return 0
 
 
-def _cmd_replay(rest: List[str]) -> int:
-    from skeleton.game.replay import REPLAY_SCHEMA_VERSION, record, verify
-    from skeleton.vault.tool_fence import inspect_tool
-
+def _parse_seed(rest: List[str]) -> int | str:
     seed: int | str = 8847291
     i = 0
     while i < len(rest):
@@ -74,6 +72,14 @@ def _cmd_replay(rest: List[str]) -> int:
             i += 2
         else:
             i += 1
+    return seed
+
+
+def _cmd_replay(rest: List[str]) -> int:
+    from skeleton.game.replay import REPLAY_SCHEMA_VERSION, record, verify
+    from skeleton.vault.tool_fence import inspect_tool
+
+    seed = _parse_seed(rest)
     inputs = [
         {"t": 0, "verb": "attack"},
         {"t": 1, "verb": "defend"},
@@ -94,6 +100,27 @@ def _cmd_replay(rest: List[str]) -> int:
         "digest": check["digest"],
         "frames": check["frames"],
         "seed": trace.seed,
+    }, indent=2))
+    return 0
+
+
+def _cmd_session(rest: List[str]) -> int:
+    from skeleton.game.session import run_session
+
+    seed = _parse_seed(rest)
+    inputs = [{"t": 0, "verb": "attack"}, {"t": 1, "verb": "wait"}]
+    try:
+        payload = run_session(seed=seed, inputs=inputs, forges=4)
+    except Exception as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}, indent=2))
+        return 2
+    print(json.dumps({
+        "ok": True,
+        "digest": payload["digest"],
+        "replay_digest": payload["replay_digest"],
+        "frames": payload["frames"],
+        "era": payload["reference"]["era"],
+        "stored_prose": payload["stored_prose"],
     }, indent=2))
     return 0
 
@@ -322,6 +349,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "capabilities": return _cmd_capabilities(rest)
     if cmd == "sota": return _cmd_sota(rest)
     if cmd == "replay": return _cmd_replay(rest)
+    if cmd == "session": return _cmd_session(rest)
     if cmd == "command": return _cmd_shared_command(rest)
     if cmd == "status": return _cmd_shared_command(["status"])
     if cmd == "config": return _cmd_shared_command(["configuration"])
