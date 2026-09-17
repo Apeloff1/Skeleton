@@ -44,6 +44,12 @@ class PhysicsRollbackSession:
 
     def step(self, steps: int = 1) -> tuple[PhysicsStepReceipt, ...]:
         self._assert_configuration()
+        if (
+            isinstance(steps, bool)
+            or not isinstance(steps, int)
+            or not 1 <= steps <= 10_000
+        ):
+            raise PhysicsSnapshotError("rollback session steps outside supported range")
         receipts: list[PhysicsStepReceipt] = []
         for _ in range(steps):
             receipt = self.world.step()[0]
@@ -71,7 +77,10 @@ class PhysicsRollbackSession:
             raise PhysicsSnapshotError(
                 "resimulation target must be integer at or after current tick"
             )
-        return self.step(tick - self.world.tick) if tick > self.world.tick else ()
+        delta = tick - self.world.tick
+        if delta > 10_000:
+            raise PhysicsSnapshotError("resimulation span exceeds supported range")
+        return self.step(delta) if delta > 0 else ()
 
     @property
     def history_digest(self) -> str:
