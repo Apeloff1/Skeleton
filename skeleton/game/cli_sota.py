@@ -196,6 +196,26 @@ def _cmd_bundle(rest: List[str]) -> int:
     return 0
 
 
+def _cmd_laws(rest: List[str]) -> int:
+    from skeleton.game.law_composer import play
+    try:
+        payload = play(seed=_seed(rest))
+    except Exception as exc:
+        return _fail(exc)
+    print(json.dumps({"ok": True, "digest": payload["digest"], "enc_done": payload["enc_done"], "ledger": payload["ledger"], "extract_count": payload["extract_count"], "sota_ready": payload["sota_ready"], "stored_prose": payload["stored_prose"]}, indent=2))
+    return 0
+
+
+def _cmd_hunt(rest: List[str]) -> int:
+    from skeleton.game.hunt_field import play
+    try:
+        payload = play(seed=_seed(rest), ticks=16)
+    except Exception as exc:
+        return _fail(exc)
+    print(json.dumps({"ok": True, "digest": payload["digest"], "hunters": payload["hunters"], "contacts": payload["contacts"], "extract_count": payload["extract_count"], "sota_ready": payload["sota_ready"], "stored_prose": payload["stored_prose"]}, indent=2))
+    return 0
+
+
 def dispatch(cmd: str, rest: List[str]) -> int | None:
     table = {
         "spec": _cmd_spec, "emit": _cmd_emit, "doctor": _cmd_doctor, "turn": _cmd_turn,
@@ -203,7 +223,7 @@ def dispatch(cmd: str, rest: List[str]) -> int | None:
         "bundles": _cmd_bundles, "catalog": _cmd_catalog, "sim": _cmd_sim,
         "lab": _cmd_lab, "campus": _cmd_campus, "flesh": _cmd_flesh,
         "world": _cmd_world, "warena": _cmd_warena, "monte": _cmd_monte,
-        "bundle": _cmd_bundle,
+        "bundle": _cmd_bundle, "laws": _cmd_laws, "hunt": _cmd_hunt,
     }
     fn = table.get(cmd)
     return None if fn is None else fn(rest)
