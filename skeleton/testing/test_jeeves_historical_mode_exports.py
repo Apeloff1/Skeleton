@@ -12,6 +12,8 @@ from skeleton.jeeves import (
     HistoricalModeLab,
     HistoricalSeries,
     HistoricalUncertaintyModeLab,
+    HorizonGridConfig,
+    MultiHorizonModeLab,
     SelectionGate,
     TemporalDirection,
     TemporalJackknifeConfig,
@@ -116,6 +118,53 @@ def test_historical_uncertainty_lab_is_available_from_public_surface() -> None:
     assert report.forward.calibrated_folds > 0
     assert report.backward.calibrated_folds > 0
     assert conformal_radius([1.0, 2.0, 3.0], 0.20) == 3.0
+
+
+def test_multi_horizon_lab_is_available_from_public_surface() -> None:
+    lab = MultiHorizonModeLab(
+        config=WalkForwardConfig(min_train_size=4),
+        gate=SelectionGate(min_folds=2, min_relative_improvement=0.0),
+        bidirectional=BidirectionalConfig(max_mae_asymmetry=1.0, max_direction_rank=2),
+        calibration=CrossDirectionConfig(
+            top_k=2,
+            min_rank_correlation=-1.0,
+            min_top_k_overlap=0.0,
+            max_candidate_rank_gap=2,
+            max_normalized_score_gap=100.0,
+            max_p90_error_asymmetry=100.0,
+            max_bias_ratio_asymmetry=100.0,
+            max_directional_accuracy_gap=1.0,
+            min_paired_targets=0,
+            max_paired_error_asymmetry=100.0,
+        ),
+        jackknife=TemporalJackknifeConfig(
+            trim_fraction=0.10,
+            max_trim=2,
+            min_views=1,
+            min_acceptance_rate=0.0,
+            min_candidate_support_rate=0.0,
+            max_candidate_mae_spread=100.0,
+        ),
+        conformal=ConformalConfig(
+            min_calibration_folds=2,
+            calibration_window=4,
+            min_empirical_coverage=0.0,
+            max_direction_coverage_gap=1.0,
+            max_direction_width_asymmetry=100.0,
+        ),
+        horizons=HorizonGridConfig(
+            horizons=(1, 2),
+            min_horizons=2,
+            min_acceptance_rate=0.0,
+            min_candidate_support_rate=0.0,
+            max_candidate_mae_spread=100.0,
+            max_coverage_spread=1.0,
+        ),
+        modes=(HistoricalMode.LINEAR_TREND,),
+    )
+    report = lab.evaluate(HistoricalSeries.from_values(range(1, 25)))
+    assert tuple(item.horizon for item in report.evaluations) == (1, 2)
+    assert report.decision.anchor_horizon == 1
 
 
 def test_historical_evidence_bridge_is_available_from_public_surface() -> None:
