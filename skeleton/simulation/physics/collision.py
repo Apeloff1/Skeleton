@@ -9,12 +9,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .body import BodyType, RigidBody
-from .errors import UnsupportedCollisionError
+from .errors import PhysicsValidationError, UnsupportedCollisionError
 from .materials import ContactMaterial, combine_materials
 from .math3d import EPSILON, AABB, Vec3
 from .shapes import BoxShape, PlaneShape, ShapeKind, SphereShape
 
 _AXIS_EPSILON_SQ = 1.0e-16
+MAX_BROAD_PHASE_PAIRS = 1_000_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,13 +25,17 @@ class BroadPhasePair:
 
     def __post_init__(self) -> None:
         if self.body_a >= self.body_b:
-            raise ValueError("broad-phase pair ids must be strictly ordered")
+            raise PhysicsValidationError("broad-phase pair ids must be strictly ordered")
 
 
 @dataclass(frozen=True, slots=True)
 class ContactPoint:
     position: Vec3
     penetration: float
+
+    def __post_init__(self) -> None:
+        if self.penetration < 0.0:
+            raise PhysicsValidationError("contact penetration must be non-negative")
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +47,15 @@ class ContactManifold:
     normal: Vec3
     points: tuple[ContactPoint, ...]
     material: ContactMaterial
+
+    def __post_init__(self) -> None:
+        if self.body_a == self.body_b:
+            raise PhysicsValidationError("contact manifold requires distinct bodies")
+        if not self.points:
+            raise PhysicsValidationError("contact manifold requires at least one point")
+        normalized = self.normal.normalized()
+        object.__setattr__(self, "normal", normalized)
+        object.__setattr__(self, "points", tuple(self.points))
 
     @property
     def penetration(self) -> float:
@@ -66,11 +80,23 @@ def _needs_physical_pair(left: RigidBody, right: RigidBody) -> bool:
 
 
 class SweepAndPruneBroadPhase:
-    """Stable one-axis sweep with full-AABB rejection.
+    """Stable one-axis sweep with full-AABB rejection."""
 
-    This is O(n log n + k) in ordinary scenes, deterministic by body id for
-    equal endpoints, and keeps infinite planes outside the finite endpoint set.
-    """
+    def __init__(self, *, max_pairs: int = 250_000) -> None:
+        if (
+            isinstance(max_pairs, bool)
+            or not isinstance(max_pairs, int)
+            or not 1 <= max_pairs <= MAX_BROAD_PHASE_PAIRS
+        ):
+            raise PhysicsValidationError("max_pairs outside supported range")
+        self.max_pairs = max_pairs
+
+    def _add_pair(self, pairs: set[BroadPhasePair], pair: BroadPhasePair) -> None:
+        if pair in pairs:
+            return
+        if len(pairs) >= self.max_pairs:
+            raise PhysicsValidationError("broad-phase pair bound exceeded")
+        pairs.add(pair)
 
     def compute_pairs(self, bodies: tuple[RigidBody, ...]) -> tuple[BroadPhasePair, ...]:
         finite: list[tuple[float, str, RigidBody, AABB]] = []
@@ -94,7 +120,7 @@ class SweepAndPruneBroadPhase:
                     continue
                 if bounds.overlaps(other_bounds):
                     left, right = _ordered_pair(body, other)
-                    pairs.add(BroadPhasePair(left.body_id, right.body_id))
+                    self._add_pair(pairs, BroadPhasePair(left.body_id, right.body_id))
             active.append((bounds.maximum.x, body.body_id, body, bounds))
             active.sort(key=lambda row: (row[0], row[1]))
 
@@ -105,7 +131,7 @@ class SweepAndPruneBroadPhase:
                 if not _needs_physical_pair(plane, body):
                     continue
                 left, right = _ordered_pair(plane, body)
-                pairs.add(BroadPhasePair(left.body_id, right.body_id))
+                self._add_pair(pairs, BroadPhasePair(left.body_id, right.body_id))
 
         return tuple(sorted(pairs, key=lambda row: (row.body_a, row.body_b)))
 
