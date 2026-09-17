@@ -176,7 +176,40 @@ def test_adaptive_ensemble_is_always_in_report() -> None:
 
 
 def test_adaptive_ensemble_current_target_cannot_change_its_own_prediction() -> None:
-    values = [1, 4, 2, 7, 3, 9, 5, 12, 8, 14, 9, 16, 11, 18, 12, 21, 13, 23, 15, 25, 16, 27, 18, 30, 19, 31, 21, 34, 22, 36, 24, 39]
+    values = [
+        1,
+        4,
+        2,
+        7,
+        3,
+        9,
+        5,
+        12,
+        8,
+        14,
+        9,
+        16,
+        11,
+        18,
+        12,
+        21,
+        13,
+        23,
+        15,
+        25,
+        16,
+        27,
+        18,
+        30,
+        19,
+        31,
+        21,
+        34,
+        22,
+        36,
+        24,
+        39,
+    ]
     target_index = 20
     changed = list(values)
     changed[target_index] += 10_000
