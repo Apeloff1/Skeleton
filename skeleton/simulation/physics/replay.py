@@ -17,6 +17,16 @@ from .world import PhysicsStepReceipt, PhysicsWorld
 _ZERO_CHAIN = "0" * 64
 
 
+def _sha256_text(value: str, *, name: str) -> str:
+    if not isinstance(value, str) or len(value) != 64:
+        raise PhysicsReplayError(f"{name} must be sha256 text")
+    try:
+        int(value, 16)
+    except ValueError as exc:
+        raise PhysicsReplayError(f"{name} must be sha256 text") from exc
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class PhysicsReplayFrame:
     index: int
@@ -25,12 +35,34 @@ class PhysicsReplayFrame:
     after_digest: str
     receipt_digest: str
 
+    def __post_init__(self) -> None:
+        if isinstance(self.index, bool) or not isinstance(self.index, int) or self.index < 0:
+            raise PhysicsReplayError("replay frame index must be non-negative integer")
+        if isinstance(self.tick, bool) or not isinstance(self.tick, int) or self.tick < 0:
+            raise PhysicsReplayError("replay frame tick must be non-negative integer")
+        _sha256_text(self.before_digest, name="before_digest")
+        _sha256_text(self.after_digest, name="after_digest")
+        _sha256_text(self.receipt_digest, name="receipt_digest")
+
 
 @dataclass(frozen=True, slots=True)
 class PhysicsReplayTape:
     initial: PhysicsSnapshot
     frames: tuple[PhysicsReplayFrame, ...]
     chain_digest: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.initial, PhysicsSnapshot):
+            raise PhysicsReplayError("replay tape initial must be PhysicsSnapshot")
+        object.__setattr__(self, "frames", tuple(self.frames))
+        _sha256_text(self.chain_digest, name="chain_digest")
+        for index, frame in enumerate(self.frames):
+            if not isinstance(frame, PhysicsReplayFrame):
+                raise PhysicsReplayError("replay tape contains invalid frame")
+            if frame.index != index:
+                raise PhysicsReplayError("replay frame indices must be contiguous")
+            if frame.tick != self.initial.tick + index + 1:
+                raise PhysicsReplayError("replay frame ticks must be contiguous")
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,8 +123,6 @@ def replay_physics(
 
     chain = _ZERO_CHAIN
     for expected in tape.frames:
-        if expected.index < 0:
-            raise PhysicsReplayError("replay frame index must be non-negative")
         receipt = world.step()[0]
         actual = _frame_from_receipt(expected.index, receipt)
         if actual != expected:
