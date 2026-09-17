@@ -165,6 +165,23 @@ def _cmd_bundles(rest: List[str]) -> int:
     return 0
 
 
+def _cmd_catalog(_rest: List[str]) -> int:
+    from skeleton.game.catalog_index import census
+
+    try:
+        payload = census()
+    except Exception as exc:
+        return _fail(exc)
+    print(json.dumps({
+        "ok": True,
+        "modules": payload["modules"],
+        "n": payload["n"],
+        "sota_ready": payload["sota_ready"],
+        "stored_prose": payload["stored_prose"],
+    }, indent=2))
+    return 0
+
+
 def dispatch(cmd: str, rest: List[str]) -> int | None:
     if cmd == "spec":
         return _cmd_spec(rest)
@@ -182,4 +199,6 @@ def dispatch(cmd: str, rest: List[str]) -> int | None:
         return _cmd_packtree(rest)
     if cmd == "bundles":
         return _cmd_bundles(rest)
+    if cmd == "catalog":
+        return _cmd_catalog(rest)
     return None
