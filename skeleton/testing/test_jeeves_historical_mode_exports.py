@@ -5,11 +5,13 @@ from skeleton.jeeves import (
     BidirectionalConfig,
     BidirectionalModeLab,
     CalibratedBidirectionalModeLab,
+    ConformalConfig,
     CrossDirectionConfig,
     HistoricalEvidenceBundle,
     HistoricalMode,
     HistoricalModeLab,
     HistoricalSeries,
+    HistoricalUncertaintyModeLab,
     SelectionGate,
     TemporalDirection,
     TemporalJackknifeConfig,
@@ -18,6 +20,7 @@ from skeleton.jeeves import (
     WalkForwardConfig,
     build_historical_evidence,
     bundle_manifest,
+    conformal_radius,
     reverse_series,
 )
 
@@ -85,6 +88,34 @@ def test_temporal_jackknife_lab_is_available_from_public_surface() -> None:
     report = lab.evaluate(HistoricalSeries.from_values(range(1, 21)))
     assert report.by_view(TemporalViewKind.FULL).start == 0
     assert report.decision.total_views >= 2
+
+
+def test_historical_uncertainty_lab_is_available_from_public_surface() -> None:
+    lab = HistoricalUncertaintyModeLab(
+        config=WalkForwardConfig(min_train_size=4),
+        gate=SelectionGate(min_folds=2, min_relative_improvement=0.0),
+        jackknife=TemporalJackknifeConfig(
+            trim_fraction=0.10,
+            max_trim=2,
+            min_views=2,
+            min_acceptance_rate=0.0,
+            min_candidate_support_rate=0.0,
+            max_candidate_mae_spread=100.0,
+        ),
+        conformal=ConformalConfig(
+            alpha=0.20,
+            min_calibration_folds=2,
+            calibration_window=4,
+            min_empirical_coverage=0.0,
+            max_direction_coverage_gap=1.0,
+            max_direction_width_asymmetry=100.0,
+        ),
+        modes=(HistoricalMode.LINEAR_TREND,),
+    )
+    report = lab.evaluate(HistoricalSeries.from_values(range(1, 21)))
+    assert report.forward.calibrated_folds > 0
+    assert report.backward.calibrated_folds > 0
+    assert conformal_radius([1.0, 2.0, 3.0], 0.20) == 3.0
 
 
 def test_historical_evidence_bridge_is_available_from_public_surface() -> None:
