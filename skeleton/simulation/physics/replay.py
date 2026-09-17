@@ -33,6 +33,7 @@ class PhysicsReplayFrame:
     index: int
     tick: int
     before_digest: str
+    simulation_before_digest: str
     after_digest: str
     receipt_digest: str
 
@@ -42,6 +43,10 @@ class PhysicsReplayFrame:
         if isinstance(self.tick, bool) or not isinstance(self.tick, int) or self.tick < 0:
             raise PhysicsReplayError("replay frame tick must be non-negative integer")
         _sha256_text(self.before_digest, name="before_digest")
+        _sha256_text(
+            self.simulation_before_digest,
+            name="simulation_before_digest",
+        )
         _sha256_text(self.after_digest, name="after_digest")
         _sha256_text(self.receipt_digest, name="receipt_digest")
 
@@ -82,7 +87,8 @@ def _frame_from_receipt(index: int, receipt: PhysicsStepReceipt) -> PhysicsRepla
     return PhysicsReplayFrame(
         index=index,
         tick=receipt.tick,
-        before_digest=receipt.before_digest,
+        before_digest=before_digest,
+        simulation_before_digest=receipt.before_digest,
         after_digest=receipt.after_digest,
         receipt_digest=digest(asdict(receipt)),
     )
@@ -212,6 +218,7 @@ def _command_replay_chain_material(frame: PhysicsCommandReplayFrame) -> dict[str
         "tick": frame.tick,
         "command_frame_digest": frame.commands.frame_digest,
         "before_digest": frame.before_digest,
+        "simulation_before_digest": frame.simulation_before_digest,
         "after_digest": frame.after_digest,
         "receipt_digest": frame.receipt_digest,
     }
@@ -221,6 +228,8 @@ def _command_frame_from_receipt(
     index: int,
     commands: PhysicsCommandFrame,
     receipt: PhysicsStepReceipt,
+    *,
+    before_digest: str,
 ) -> PhysicsCommandReplayFrame:
     return PhysicsCommandReplayFrame(
         index=index,
@@ -251,11 +260,13 @@ class PhysicsCommandReplayRecorder:
         commands: tuple[PhysicsCommand, ...] | list[PhysicsCommand] = (),
     ) -> PhysicsStepReceipt:
         frame = PhysicsCommandFrame.build(self.world.tick + 1, tuple(commands))
+        before_digest = self.world.state_digest
         receipt = step_physics_with_commands(self.world, frame)
         replay_frame = _command_frame_from_receipt(
             len(self._frames),
             frame,
             receipt,
+            before_digest=before_digest,
         )
         self._chain = chained_digest(
             self._chain,
@@ -291,11 +302,13 @@ def replay_physics_commands(
         {"initial_snapshot_digest": tape.initial.snapshot_digest},
     )
     for expected in tape.frames:
+        before_digest = world.state_digest
         receipt = step_physics_with_commands(world, expected.commands)
         actual = _command_frame_from_receipt(
             expected.index,
             expected.commands,
             receipt,
+            before_digest=before_digest,
         )
         if actual != expected:
             raise PhysicsReplayDivergenceError(
