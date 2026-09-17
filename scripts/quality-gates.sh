@@ -103,6 +103,9 @@ python backend/scripts/check_workflow_action_allowlist.py
 printf '\n== GitHub Actions token permissions ==\n'
 python backend/scripts/check_workflow_permissions.py
 
+printf '\n== GitHub Actions concurrency collision audit ==\n'
+python backend/scripts/check_workflow_concurrency.py
+
 printf '\n== Repository secret hygiene ==\n'
 python backend/scripts/check_secret_hygiene.py
 
@@ -143,6 +146,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_workflow_event_shell_security.py \
   backend/tests/test_workflow_action_allowlist.py \
   backend/tests/test_workflow_permissions_gate.py \
+  backend/tests/test_workflow_concurrency_gate.py \
   skeleton/testing/test_dependabot_merge_policy.py \
   backend/tests/test_pr_obsolete_run_from_workflow_run.py \
   backend/tests/test_pr_churn_control.py \
