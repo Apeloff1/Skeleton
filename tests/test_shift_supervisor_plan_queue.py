@@ -133,3 +133,18 @@ def test_blocked_or_offline_worker_cannot_claim():
 
     assert queue.claim_next("blocked") is None
     assert queue.claim_next("offline") is None
+
+
+def test_working_worker_without_task_cannot_claim_new_work():
+    store = InMemoryPlanStore()
+    store.upsert_worker(WorkerState(worker_id="stale-working", team="night", status="working"))
+    store.add_items(
+        [
+            PlanItem(id="task", title="Task", description="task", priority=100, target_team="night"),
+        ]
+    )
+    queue = PlanQueueAPI(store)
+
+    assert queue.claim_next("stale-working") is None
+    assert store.claim_next_for_worker("stale-working") is None
+    assert store.snapshot_items()[0].owner is None

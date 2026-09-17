@@ -11,6 +11,7 @@ from typing import Any, Sequence
 
 from .plan_store import InMemoryPlanStore
 from .runtime import build_supervisor
+from .scheduler import github_actions_forbids_unbounded_loop
 
 _STATE_PREFIX = "gz:v1:"
 
@@ -84,6 +85,14 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> None:
     args = _parser().parse_args(argv)
+    if not args.once:
+        if github_actions_forbids_unbounded_loop():
+            raise SystemExit(
+                "shift supervisor refuses unbounded mode in GitHub Actions; pass --once"
+            )
+        if args.output or args.state_out:
+            raise SystemExit("--output/--state-out require --once")
+
     store = InMemoryPlanStore()
     if args.state_in:
         state_path = Path(args.state_in)
@@ -92,8 +101,6 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     scheduler = build_supervisor(project_context_supplier=_context, store=store)
     if not args.once:
-        if args.output or args.state_out:
-            raise SystemExit("--output/--state-out require --once")
         scheduler.run_forever()
         return
 
