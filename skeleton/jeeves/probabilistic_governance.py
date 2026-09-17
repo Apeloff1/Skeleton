@@ -1,9 +1,9 @@
 """Fail-closed governance evidence for Jeeves stratified uncertainty.
 
-This module evaluates calibration evidence only.  It does not activate models,
+This module evaluates calibration evidence only. It does not activate models,
 route forecasts, place orders, mutate learning state, or override higher-level
-policy.  The resulting decision is an immutable evidence artifact that a
-separate governance layer may consume.
+policy. Decisions retain their report and gate identities so downstream
+composition can verify provenance rather than trusting an eligibility boolean.
 """
 
 from __future__ import annotations
@@ -72,6 +72,8 @@ class ConformalGovernanceDecision:
     evidenced_buckets: int
     evidenced_regime_buckets: int
     observed_regime_buckets: int
+    report_fingerprint: str
+    gate_fingerprint: str
     fingerprint: str
 
 
@@ -147,39 +149,25 @@ def evaluate_conformal_governance(
     if eligible:
         reasons.append("conformal_evidence_gate_passed")
 
-    fingerprint = _digest(
-        {
-            "schema": "jeeves.conformal-governance.v2",
-            "report_fingerprint": report.fingerprint,
-            "gate": {
-                "min_scored_steps": actual_gate.min_scored_steps,
-                "max_absolute_coverage_gap": actual_gate.max_absolute_coverage_gap,
-                "max_bucket_coverage_gap": actual_gate.max_bucket_coverage_gap,
-                "max_fallback_rate": actual_gate.max_fallback_rate,
-                "max_unevidenced_step_rate": actual_gate.max_unevidenced_step_rate,
-                "max_regime_switch_rate": actual_gate.max_regime_switch_rate,
-                "min_evidenced_buckets": actual_gate.min_evidenced_buckets,
-                "min_regime_buckets": actual_gate.min_regime_buckets,
-                "min_bucket_uses": actual_gate.min_bucket_uses,
-                "max_mean_width": actual_gate.max_mean_width,
-                "max_mean_interval_score": actual_gate.max_mean_interval_score,
-            },
-            "eligible": eligible,
-            "reasons": reasons,
-            "scored_steps": scored_steps,
-            "target_coverage": target,
-            "empirical_coverage": report.empirical_coverage,
-            "absolute_coverage_gap": absolute_gap,
-            "worst_bucket_coverage_gap": worst_bucket_gap,
-            "mean_width": report.mean_width,
-            "mean_interval_score": report.mean_interval_score,
-            "fallback_rate": report.fallback_rate,
-            "unevidenced_step_rate": unevidenced_step_rate,
-            "regime_switch_rate": regime_switch_rate,
-            "evidenced_buckets": len(evidenced),
-            "evidenced_regime_buckets": len(regime_evidenced),
-            "observed_regime_buckets": observed_regime_buckets,
-        }
+    gate_fingerprint = _gate_fingerprint(actual_gate)
+    fingerprint = _decision_fingerprint(
+        eligible=eligible,
+        reasons=tuple(reasons),
+        scored_steps=scored_steps,
+        target_coverage=target,
+        empirical_coverage=report.empirical_coverage,
+        absolute_coverage_gap=absolute_gap,
+        worst_bucket_coverage_gap=worst_bucket_gap,
+        mean_width=report.mean_width,
+        mean_interval_score=report.mean_interval_score,
+        fallback_rate=report.fallback_rate,
+        unevidenced_step_rate=unevidenced_step_rate,
+        regime_switch_rate=regime_switch_rate,
+        evidenced_buckets=len(evidenced),
+        evidenced_regime_buckets=len(regime_evidenced),
+        observed_regime_buckets=observed_regime_buckets,
+        report_fingerprint=report.fingerprint,
+        gate_fingerprint=gate_fingerprint,
     )
 
     return ConformalGovernanceDecision(
@@ -198,8 +186,184 @@ def evaluate_conformal_governance(
         evidenced_buckets=len(evidenced),
         evidenced_regime_buckets=len(regime_evidenced),
         observed_regime_buckets=observed_regime_buckets,
+        report_fingerprint=report.fingerprint,
+        gate_fingerprint=gate_fingerprint,
         fingerprint=fingerprint,
     )
+
+
+def validate_conformal_governance_decision(
+    decision: ConformalGovernanceDecision,
+) -> None:
+    """Reject a malformed or tampered conformal governance artifact."""
+
+    if not isinstance(decision, ConformalGovernanceDecision):
+        raise StateSpaceError(
+            "decision must be a ConformalGovernanceDecision",
+            context={"reason": "invalid_conformal_governance_decision"},
+        )
+    if not isinstance(decision.eligible, bool):
+        raise StateSpaceError(
+            "eligible must be a boolean",
+            context={"reason": "invalid_conformal_governance_decision"},
+        )
+    _positive_integer("scored_steps", decision.scored_steps)
+    _unit("target_coverage", decision.target_coverage)
+    _unit("empirical_coverage", decision.empirical_coverage)
+    _unit("absolute_coverage_gap", decision.absolute_coverage_gap)
+    _unit("worst_bucket_coverage_gap", decision.worst_bucket_coverage_gap)
+    _non_negative("mean_width", decision.mean_width)
+    _non_negative("mean_interval_score", decision.mean_interval_score)
+    _unit("fallback_rate", decision.fallback_rate)
+    _unit("unevidenced_step_rate", decision.unevidenced_step_rate)
+    _unit("regime_switch_rate", decision.regime_switch_rate)
+    _non_negative_integer("evidenced_buckets", decision.evidenced_buckets)
+    _non_negative_integer(
+        "evidenced_regime_buckets",
+        decision.evidenced_regime_buckets,
+    )
+    _non_negative_integer("observed_regime_buckets", decision.observed_regime_buckets)
+    if decision.evidenced_regime_buckets > decision.evidenced_buckets:
+        raise StateSpaceError(
+            "regime evidenced buckets cannot exceed total evidenced buckets",
+            context={"reason": "invalid_conformal_governance_decision"},
+        )
+    if decision.evidenced_regime_buckets > decision.observed_regime_buckets:
+        raise StateSpaceError(
+            "evidenced regime buckets cannot exceed observed regime buckets",
+            context={"reason": "invalid_conformal_governance_decision"},
+        )
+    if abs(abs(decision.empirical_coverage - decision.target_coverage) - decision.absolute_coverage_gap) > 1e-12:
+        raise StateSpaceError(
+            "coverage gap disagrees with coverage values",
+            context={"reason": "invalid_conformal_governance_decision"},
+        )
+    _validate_reasons(decision.reasons, eligible=decision.eligible)
+    for name, value in (
+        ("report_fingerprint", decision.report_fingerprint),
+        ("gate_fingerprint", decision.gate_fingerprint),
+        ("fingerprint", decision.fingerprint),
+    ):
+        _validate_digest(name, value)
+
+    expected = _decision_fingerprint(
+        eligible=decision.eligible,
+        reasons=decision.reasons,
+        scored_steps=decision.scored_steps,
+        target_coverage=decision.target_coverage,
+        empirical_coverage=decision.empirical_coverage,
+        absolute_coverage_gap=decision.absolute_coverage_gap,
+        worst_bucket_coverage_gap=decision.worst_bucket_coverage_gap,
+        mean_width=decision.mean_width,
+        mean_interval_score=decision.mean_interval_score,
+        fallback_rate=decision.fallback_rate,
+        unevidenced_step_rate=decision.unevidenced_step_rate,
+        regime_switch_rate=decision.regime_switch_rate,
+        evidenced_buckets=decision.evidenced_buckets,
+        evidenced_regime_buckets=decision.evidenced_regime_buckets,
+        observed_regime_buckets=decision.observed_regime_buckets,
+        report_fingerprint=decision.report_fingerprint,
+        gate_fingerprint=decision.gate_fingerprint,
+    )
+    if decision.fingerprint != expected:
+        raise StateSpaceError(
+            "conformal governance decision fingerprint mismatch",
+            context={"reason": "conformal_governance_identity_mismatch"},
+        )
+
+
+def _gate_fingerprint(gate: ConformalGovernanceGate) -> str:
+    return _digest(
+        {
+            "schema": "jeeves.conformal-governance-gate.v3",
+            "min_scored_steps": gate.min_scored_steps,
+            "max_absolute_coverage_gap": gate.max_absolute_coverage_gap,
+            "max_bucket_coverage_gap": gate.max_bucket_coverage_gap,
+            "max_fallback_rate": gate.max_fallback_rate,
+            "max_unevidenced_step_rate": gate.max_unevidenced_step_rate,
+            "max_regime_switch_rate": gate.max_regime_switch_rate,
+            "min_evidenced_buckets": gate.min_evidenced_buckets,
+            "min_regime_buckets": gate.min_regime_buckets,
+            "min_bucket_uses": gate.min_bucket_uses,
+            "max_mean_width": gate.max_mean_width,
+            "max_mean_interval_score": gate.max_mean_interval_score,
+        }
+    )
+
+
+def _decision_fingerprint(
+    *,
+    eligible: bool,
+    reasons: tuple[str, ...],
+    scored_steps: int,
+    target_coverage: float,
+    empirical_coverage: float,
+    absolute_coverage_gap: float,
+    worst_bucket_coverage_gap: float,
+    mean_width: float,
+    mean_interval_score: float,
+    fallback_rate: float,
+    unevidenced_step_rate: float,
+    regime_switch_rate: float,
+    evidenced_buckets: int,
+    evidenced_regime_buckets: int,
+    observed_regime_buckets: int,
+    report_fingerprint: str,
+    gate_fingerprint: str,
+) -> str:
+    return _digest(
+        {
+            "schema": "jeeves.conformal-governance-decision.v3",
+            "eligible": eligible,
+            "reasons": list(reasons),
+            "scored_steps": scored_steps,
+            "target_coverage": target_coverage,
+            "empirical_coverage": empirical_coverage,
+            "absolute_coverage_gap": absolute_coverage_gap,
+            "worst_bucket_coverage_gap": worst_bucket_coverage_gap,
+            "mean_width": mean_width,
+            "mean_interval_score": mean_interval_score,
+            "fallback_rate": fallback_rate,
+            "unevidenced_step_rate": unevidenced_step_rate,
+            "regime_switch_rate": regime_switch_rate,
+            "evidenced_buckets": evidenced_buckets,
+            "evidenced_regime_buckets": evidenced_regime_buckets,
+            "observed_regime_buckets": observed_regime_buckets,
+            "report_fingerprint": report_fingerprint,
+            "gate_fingerprint": gate_fingerprint,
+        }
+    )
+
+
+def _validate_reasons(reasons: tuple[str, ...], *, eligible: bool) -> None:
+    if not isinstance(reasons, tuple) or not reasons:
+        raise StateSpaceError(
+            "reasons must be a non-empty tuple",
+            context={"reason": "invalid_conformal_governance_decision"},
+        )
+    if any(not isinstance(reason, str) or not reason for reason in reasons):
+        raise StateSpaceError(
+            "reasons must contain non-empty strings",
+            context={"reason": "invalid_conformal_governance_decision"},
+        )
+    passed = "conformal_evidence_gate_passed" in reasons
+    if eligible != passed or (passed and len(reasons) != 1):
+        raise StateSpaceError(
+            "conformal reasons disagree with eligibility",
+            context={"reason": "invalid_conformal_governance_decision"},
+        )
+
+
+def _validate_digest(name: str, value: object) -> None:
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(character not in "0123456789abcdef" for character in value)
+    ):
+        raise StateSpaceError(
+            f"{name} must be a sha256 hex digest",
+            context={"reason": "invalid_conformal_governance_decision"},
+        )
 
 
 def _regime_switch_rate(report: StratifiedConformalReport) -> float:
@@ -281,4 +445,5 @@ __all__ = [
     "ConformalGovernanceDecision",
     "ConformalGovernanceGate",
     "evaluate_conformal_governance",
+    "validate_conformal_governance_decision",
 ]
