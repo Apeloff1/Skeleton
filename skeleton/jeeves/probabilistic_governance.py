@@ -28,6 +28,8 @@ class ConformalGovernanceGate:
     max_absolute_coverage_gap: float = 0.15
     max_bucket_coverage_gap: float = 0.25
     max_fallback_rate: float = 0.50
+    max_unevidenced_step_rate: float = 0.25
+    max_regime_switch_rate: float | None = None
     min_evidenced_buckets: int = 1
     min_regime_buckets: int = 0
     min_bucket_uses: int = 5
@@ -39,6 +41,9 @@ class ConformalGovernanceGate:
         _unit("max_absolute_coverage_gap", self.max_absolute_coverage_gap)
         _unit("max_bucket_coverage_gap", self.max_bucket_coverage_gap)
         _unit("max_fallback_rate", self.max_fallback_rate)
+        _unit("max_unevidenced_step_rate", self.max_unevidenced_step_rate)
+        if self.max_regime_switch_rate is not None:
+            _unit("max_regime_switch_rate", self.max_regime_switch_rate)
         _non_negative_integer("min_evidenced_buckets", self.min_evidenced_buckets)
         _non_negative_integer("min_regime_buckets", self.min_regime_buckets)
         _positive_integer("min_bucket_uses", self.min_bucket_uses)
@@ -62,8 +67,11 @@ class ConformalGovernanceDecision:
     mean_width: float
     mean_interval_score: float
     fallback_rate: float
+    unevidenced_step_rate: float
+    regime_switch_rate: float
     evidenced_buckets: int
     evidenced_regime_buckets: int
+    observed_regime_buckets: int
     fingerprint: str
 
 
@@ -85,8 +93,12 @@ def evaluate_conformal_governance(
         for bucket in report.buckets
         if bucket.issued_intervals >= actual_gate.min_bucket_uses
     )
+    evidenced_keys = {bucket.key for bucket in evidenced}
     regime_evidenced = tuple(
         bucket for bucket in evidenced if bucket.key.is_regime_specific
+    )
+    observed_regime_buckets = sum(
+        1 for bucket in report.buckets if bucket.key.is_regime_specific
     )
     bucket_gaps = tuple(
         abs(bucket.empirical_coverage - target)
@@ -94,6 +106,11 @@ def evaluate_conformal_governance(
         if bucket.empirical_coverage is not None
     )
     worst_bucket_gap = max(bucket_gaps, default=1.0)
+    unevidenced_steps = sum(
+        1 for step in report.steps if step.stratum not in evidenced_keys
+    )
+    unevidenced_step_rate = unevidenced_steps / max(1, scored_steps)
+    regime_switch_rate = _regime_switch_rate(report)
 
     reasons: list[str] = []
     if scored_steps < actual_gate.min_scored_steps:
@@ -104,6 +121,13 @@ def evaluate_conformal_governance(
         reasons.append("bucket_conformal_coverage_gap_above_gate")
     if report.fallback_rate > actual_gate.max_fallback_rate:
         reasons.append("conformal_fallback_rate_above_gate")
+    if unevidenced_step_rate > actual_gate.max_unevidenced_step_rate:
+        reasons.append("conformal_unevidenced_step_rate_above_gate")
+    if (
+        actual_gate.max_regime_switch_rate is not None
+        and regime_switch_rate > actual_gate.max_regime_switch_rate
+    ):
+        reasons.append("conformal_regime_switch_rate_above_gate")
     if len(evidenced) < actual_gate.min_evidenced_buckets:
         reasons.append("insufficient_evidenced_conformal_buckets")
     if len(regime_evidenced) < actual_gate.min_regime_buckets:
@@ -125,13 +149,15 @@ def evaluate_conformal_governance(
 
     fingerprint = _digest(
         {
-            "schema": "jeeves.conformal-governance.v1",
+            "schema": "jeeves.conformal-governance.v2",
             "report_fingerprint": report.fingerprint,
             "gate": {
                 "min_scored_steps": actual_gate.min_scored_steps,
                 "max_absolute_coverage_gap": actual_gate.max_absolute_coverage_gap,
                 "max_bucket_coverage_gap": actual_gate.max_bucket_coverage_gap,
                 "max_fallback_rate": actual_gate.max_fallback_rate,
+                "max_unevidenced_step_rate": actual_gate.max_unevidenced_step_rate,
+                "max_regime_switch_rate": actual_gate.max_regime_switch_rate,
                 "min_evidenced_buckets": actual_gate.min_evidenced_buckets,
                 "min_regime_buckets": actual_gate.min_regime_buckets,
                 "min_bucket_uses": actual_gate.min_bucket_uses,
@@ -148,8 +174,11 @@ def evaluate_conformal_governance(
             "mean_width": report.mean_width,
             "mean_interval_score": report.mean_interval_score,
             "fallback_rate": report.fallback_rate,
+            "unevidenced_step_rate": unevidenced_step_rate,
+            "regime_switch_rate": regime_switch_rate,
             "evidenced_buckets": len(evidenced),
             "evidenced_regime_buckets": len(regime_evidenced),
+            "observed_regime_buckets": observed_regime_buckets,
         }
     )
 
@@ -164,10 +193,25 @@ def evaluate_conformal_governance(
         mean_width=report.mean_width,
         mean_interval_score=report.mean_interval_score,
         fallback_rate=report.fallback_rate,
+        unevidenced_step_rate=unevidenced_step_rate,
+        regime_switch_rate=regime_switch_rate,
         evidenced_buckets=len(evidenced),
         evidenced_regime_buckets=len(regime_evidenced),
+        observed_regime_buckets=observed_regime_buckets,
         fingerprint=fingerprint,
     )
+
+
+def _regime_switch_rate(report: StratifiedConformalReport) -> float:
+    regimes = tuple(
+        step.requested_regime
+        for step in report.steps
+        if step.requested_regime is not None
+    )
+    if len(regimes) < 2:
+        return 0.0
+    switches = sum(left != right for left, right in zip(regimes, regimes[1:]))
+    return switches / (len(regimes) - 1)
 
 
 def _digest(payload: object) -> str:
