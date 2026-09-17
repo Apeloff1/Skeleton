@@ -9,6 +9,7 @@ work unchanged.
 """
 from __future__ import annotations
 
+import html
 import re
 from datetime import datetime
 
@@ -124,7 +125,8 @@ class ImportExportService:
         theme      = options.get("theme", "dark")
         bg_color   = "#1E1E1E" if theme == "dark" else "#FFFFFF"
         text_color = "#D4D4D4" if theme == "dark" else "#000000"
-        escaped    = code.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        escaped    = html.escape(code, quote=True)
+        label      = html.escape(str(language or "text"), quote=True)
         return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -137,7 +139,7 @@ class ImportExportService:
     </style>
 </head>
 <body>
-    <div class="header">Language: {language} | Exported from CodeDock v9.0.0</div>
+    <div class="header">Language: {label} | Exported from CodeDock v9.0.0</div>
     <pre><code>{escaped}</code></pre>
 </body>
 </html>"""
