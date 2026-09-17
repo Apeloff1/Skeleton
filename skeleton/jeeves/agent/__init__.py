@@ -185,9 +185,12 @@ from .nuance_runtime import (
     NuanceRuntimeError,
     NuanceRuntimePolicy,
     NuanceUpdate,
+    ScientificContextCompiler,
+    ScientificContextCompilerPolicy,
     ScientificNuanceRuntime,
     UncertaintyRecommendation,
 )
+from .scientific_runtime import ScientificAdaptiveJeevesRuntime, ScientificJeevesRuntime
 from .planning import (
     ModelPlanParser,
     PlanScheduler,
