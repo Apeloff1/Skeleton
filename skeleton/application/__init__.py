@@ -26,6 +26,15 @@ from .command_contracts import (
     parity_matrix,
 )
 from .runtime_commands import build_runtime_command_service
+from .sota_program import (
+    LANES,
+    LANES_BY_ID,
+    SOTA_PROGRAM_ISSUE,
+    SOTA_PROGRAM_VERSION,
+    SotaLane,
+    get_lane,
+    sota_program,
+)
 
 __all__ = [
     "CAPABILITIES",
@@ -33,6 +42,10 @@ __all__ = [
     "CAPABILITY_LOADER",
     "CAPABILITY_MANIFEST_VERSION",
     "CONTRACT_VERSION",
+    "LANES",
+    "LANES_BY_ID",
+    "SOTA_PROGRAM_ISSUE",
+    "SOTA_PROGRAM_VERSION",
     "Capability",
     "CapabilityLoadError",
     "CapabilityLoader",
@@ -41,11 +54,14 @@ __all__ = [
     "CommandResult",
     "CommandService",
     "CommandSpec",
+    "SotaLane",
     "build_runtime_command_service",
     "capability_manifest",
     "capability_runtime_status",
     "command_specs",
     "get_capability",
+    "get_lane",
     "load_capability",
     "parity_matrix",
+    "sota_program",
 ]
