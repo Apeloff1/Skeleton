@@ -186,6 +186,16 @@ def _cmd_monte(rest: List[str]) -> int:
     return 0
 
 
+def _cmd_bundle(rest: List[str]) -> int:
+    from skeleton.game.world_bundle import bundle
+    try:
+        payload = bundle(seed=_seed(rest))
+    except Exception as exc:
+        return _fail(exc)
+    print(json.dumps({"ok": True, "digest": payload["digest"], "path_len": payload["path_len"], "monte": payload["monte"], "extract_count": payload["extract_count"], "sota_ready": payload["sota_ready"], "stored_prose": payload["stored_prose"]}, indent=2))
+    return 0
+
+
 def dispatch(cmd: str, rest: List[str]) -> int | None:
     table = {
         "spec": _cmd_spec, "emit": _cmd_emit, "doctor": _cmd_doctor, "turn": _cmd_turn,
@@ -193,6 +203,7 @@ def dispatch(cmd: str, rest: List[str]) -> int | None:
         "bundles": _cmd_bundles, "catalog": _cmd_catalog, "sim": _cmd_sim,
         "lab": _cmd_lab, "campus": _cmd_campus, "flesh": _cmd_flesh,
         "world": _cmd_world, "warena": _cmd_warena, "monte": _cmd_monte,
+        "bundle": _cmd_bundle,
     }
     fn = table.get(cmd)
     return None if fn is None else fn(rest)
