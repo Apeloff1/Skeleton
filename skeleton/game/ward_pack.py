@@ -1,4 +1,4 @@
-"""Named wards. Spend coil."""
+"""Named wards."""
 
 from __future__ import annotations
 
@@ -9,17 +9,15 @@ class WardPackError(ValueError):
     pass
 
 
-WARDS = tuple(f"wd_{i:02d}" for i in range(16))
+WARD = tuple(f"wd_{i:02d}" for i in range(12))
 
 
-def raise_ward(state: dict[str, Any], name: str) -> dict[str, Any]:
-    if name not in WARDS:
+def set_ward(state: dict[str, Any], name: str) -> dict[str, Any]:
+    if name not in WARD:
         raise WardPackError(name)
     nxt = dict(state)
-    if int(nxt.get("coil", 0)) < 1:
-        raise WardPackError("coil")
-    nxt["coil"] = int(nxt.get("coil", 0)) - 1
-    nxt["ward"] = name
-    nxt["heat"] = max(0, int(nxt.get("heat", 0)) - 2)
+    have = list(nxt.get("ward") or [])
+    have.append(name)
+    nxt["ward"] = have
     nxt["stored_prose"] = 0
     return nxt
