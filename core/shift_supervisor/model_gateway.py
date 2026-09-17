@@ -36,6 +36,7 @@ class ModelGateway:
     max_attempts: int = 3
     max_response_bytes: int = 2_000_000
     max_tool_calls: int = 4
+    max_retry_delay_seconds: float = 30.0
 
     def _config(self) -> tuple[str, str, str]:
         endpoint = os.getenv(self.endpoint_env, "https://api.openai.com/v1/responses").strip()
@@ -52,6 +53,18 @@ class ModelGateway:
     def _web_search_enabled(self) -> bool:
         value = os.getenv(self.web_search_env, "").strip().casefold()
         return value in {"1", "true", "yes", "on"}
+
+    def _retry_delay(self, exc: BaseException, attempt: int) -> float:
+        fallback = min(2 ** (attempt - 1), 4)
+        if isinstance(exc, urllib.error.HTTPError) and exc.code == 429:
+            retry_after = exc.headers.get("Retry-After") if exc.headers else None
+            if retry_after:
+                try:
+                    requested = float(retry_after)
+                except ValueError:
+                    requested = fallback
+                return max(0.0, min(requested, self.max_retry_delay_seconds))
+        return float(fallback)
 
     def call_json(
         self,
@@ -123,7 +136,7 @@ class ModelGateway:
             ) as exc:
                 last_error = exc
                 if attempt < attempts:
-                    time.sleep(min(2 ** (attempt - 1), 4))
+                    time.sleep(self._retry_delay(exc, attempt))
         raise ModelRequestError(f"model request failed after {attempts} attempts: {last_error}")
 
     @staticmethod
