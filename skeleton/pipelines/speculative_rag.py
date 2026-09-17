@@ -125,6 +125,27 @@ class SpeculativeRagBundle:
         }
 
 
+def prefetch_from_genesis(
+    genesis: Any,
+    pipeline_name: str,
+    context: Optional[Mapping[str, Any]] = None,
+    *,
+    limit: int = _DEFAULT_QUERY_LIMIT,
+) -> SpeculativeRagBundle:
+    """Prefetch using a genesis-wired quad retriever when one exists."""
+
+    handles = getattr(genesis, "handles", None)
+    quad = handles.get("quad") if isinstance(handles, Mapping) else None
+    if quad is not None and not isinstance(quad, QuadRetriever):
+        quad = None
+    return prefetch_for_pipeline(
+        pipeline_name,
+        context,
+        quad=quad,
+        limit=limit,
+    )
+
+
 def bind_quad_search_pipeline(quad: QuadRetriever) -> SearchPipeline:
     """Register the quad retriever on a planner used for speculative prefetch."""
 

@@ -208,10 +208,24 @@ def test_lifecycle_snapshot_does_not_import_planes(monkeypatch) -> None:
 def test_http_application_capability_routes_match_cli_payloads() -> None:
     import asyncio
 
+    from fastapi import HTTPException
+
     from skeleton.api import routes
 
     assert asyncio.run(routes.application_capabilities()) == capability_manifest()
     assert asyncio.run(routes.application_capability_lifecycle()) == capability_lifecycle_snapshot()
+
+    cortex = asyncio.run(routes.application_capability(" Cortex "))
+    assert cortex["id"] == "cortex"
+    assert cortex["module"] == "skeleton.cortex"
+
+    with pytest.raises(HTTPException) as missing:
+        asyncio.run(routes.application_capability("missing"))
+    assert missing.value.status_code == 404
+
+    with pytest.raises(HTTPException) as empty:
+        asyncio.run(routes.application_capability("   "))
+    assert empty.value.status_code == 422
 
 
 def test_shared_command_capabilities_matches_identity_manifest() -> None:

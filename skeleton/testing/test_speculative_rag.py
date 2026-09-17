@@ -12,6 +12,7 @@ from skeleton.pipelines.speculative_rag import (
     execute_with_speculative_rag,
     plan_pipeline_queries,
     prefetch_for_pipeline,
+    prefetch_from_genesis,
 )
 from skeleton.retrieval.fusion import ScoredResult
 from skeleton.retrieval.pipeline import SearchPipeline
@@ -136,6 +137,33 @@ def test_prefetch_failure_does_not_fail_the_pipeline() -> None:
     assert run.succeeded is True
     assert observed["failures"] == ("a knight:quad",)
     assert run.context["ok"] is True
+
+
+def test_prefetch_from_genesis_uses_quad_and_ignores_unknown_handles() -> None:
+    calls: list[str] = []
+
+    class RagPlane:
+        def query(self, query: str, top_k: int):
+            calls.append(query)
+            return [_result(f"doc:{query}", query)]
+
+    quad = QuadRetriever()
+    quad.register_plane("rag", RagPlane())
+
+    class Genesis:
+        handles = {"quad": quad, "other": object()}
+
+    bundle = prefetch_from_genesis(
+        Genesis(),
+        "npc",
+        {"description": "a spy"},
+        limit=1,
+    )
+    assert calls == ["a spy"]
+    assert bundle.documents_for("a spy")[0].fragment_id == "doc:a spy"
+
+    empty = prefetch_from_genesis(object(), "npc", {"description": "a spy"}, limit=1)
+    assert empty.prepared == MappingProxyType({})
 
 
 def test_prepared_mapping_is_immutable() -> None:

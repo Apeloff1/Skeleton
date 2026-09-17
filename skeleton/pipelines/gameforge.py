@@ -167,6 +167,7 @@ class GameForge:
 
     def _build_knowledge_context(self, intake_result: Any) -> Dict[str, Any]:
         from skeleton.acquired.gaming import build_game_knowledge_context
+        from skeleton.pipelines.speculative_rag import prefetch_from_genesis
 
         query = " ".join(
             part for part in (
@@ -175,7 +176,14 @@ class GameForge:
                 str(getattr(intake_result, "vision", "")),
             ) if part
         )
-        return build_game_knowledge_context(query, era=intake_result.era, limit=4)
+        knowledge = build_game_knowledge_context(query, era=intake_result.era, limit=4)
+        knowledge["speculative_rag"] = prefetch_from_genesis(
+            self._genesis,
+            "game_logic",
+            {"description": query, "vision": str(getattr(intake_result, "vision", ""))},
+            limit=3,
+        ).to_dict()
+        return knowledge
 
     def _generate_npcs(self, intake_result: Any, title: str) -> List[Dict[str, Any]]:
         from skeleton.pipelines import NPCPipeline

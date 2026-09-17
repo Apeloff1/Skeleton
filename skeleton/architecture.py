@@ -7,7 +7,7 @@ It is importable for programmatic access to architecture metadata.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 ARCHITECTURE_VERSION = "16.0.0"
@@ -143,6 +143,7 @@ API_ROUTES: List[Dict[str, Any]] = [
     {"method": "GET", "path": "/api/v1/capabilities", "protected": False, "description": "Capability registry"},
     {"method": "GET", "path": "/api/v1/application/capabilities", "protected": False, "description": "Curated capability manifest"},
     {"method": "GET", "path": "/api/v1/application/capabilities/lifecycle", "protected": False, "description": "Capability lifecycle snapshot"},
+    {"method": "GET", "path": "/api/v1/application/capabilities/{capability_id}", "protected": False, "description": "One curated capability"},
     {"method": "POST", "path": "/api/v1/retrieval/query", "protected": False, "description": "Multi-plane search"},
     {"method": "POST", "path": "/api/v1/retrieval/ingest", "protected": False, "description": "Document ingestion"},
     {"method": "POST", "path": "/api/v1/retrieval/feedback", "protected": False, "description": "Plane feedback"},

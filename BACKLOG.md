@@ -49,6 +49,7 @@ capability discovery are **landed**; do not re-open them without a regression.
 | F-8 blackboard poison guards | #18 | provenance + quarantine |
 | F-9 N+1 tool-call suppression | #20 | compose `kernel/dedup.py` |
 | F-10 PromptImproveDriver | #31 | ImproveLoop over prefix variants |
+| F-12 Cortex persistence | #1019 | SKELETON_OWN live singleton, fail-closed corrupt restore |
 | F-13 EconomicOptimiser × CascadeRouter | #277 | shared economic model registry, cascade planning, real model IDs, budget/cost accounting |
 | F-14 Speculative RAG | #1019 | pipeline planning prefetch via quad + composer; prefetch failures never fail the run |
 | F-16 Unified capability discovery | #1019 | CLI/API/command identity payload + additive lifecycle snapshot |
@@ -84,15 +85,13 @@ remains Mixture-of-*Experts* and is a separate mechanism.
 
 1. **F-11. Track E cleanup** — root sprawl moves, SEVEN_BY physical moves,
    godot binary to LFS, shim deletion. Local git ops.
-2. **F-12. H5.4 cortex persistence** — genesis twin vs live singleton once
-   `$SKELETON_OWN` exists in the container.
-3. **F-15. Organism/social/galaxy plane audit** — the repo grew three
+2. **F-15. Organism/social/galaxy plane audit** — the repo grew three
    planes while the waves landed (see §1 drift note). Same size-filtered
    read methodology as the deep-cut campaign, when their churn settles.
 
 ## Definition of SOTA (working)
 
 Tier-1 SOTA seams, F-6 Mixture-of-Depths, F-13 economic/cascade
-reconciliation, F-14 speculative RAG, and F-16 capability discovery are landed
-in code. The former CI-1..CI-3 blockers are resolved
-on main; the remaining structural queue is F-11, F-12, F-15.
+reconciliation, F-12 cortex persistence, F-14 speculative RAG, and F-16
+capability discovery are landed in code. The former CI-1..CI-3 blockers are resolved
+on main; the remaining structural queue is F-11, F-15.

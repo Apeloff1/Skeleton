@@ -11,8 +11,13 @@ All notable changes to Skeleton.
   `python -m skeleton capabilities`, and the shared `capabilities` command.
 - Additive lifecycle snapshot reports resolvable/loaded flags without importing
   planes (`capabilities --lifecycle`, `/application/capabilities/lifecycle`).
+- `GET /api/v1/application/capabilities/{id}` looks up one curated capability
+  and fails closed on unknown/empty IDs.
 - Pipeline planning can prefetch likely documents through quad + composer
-  composition; prefetch failures never fail the run.
+  composition; GameForge knowledge and `/pipeline/*` responses attach the
+  prefetch bundle. Prefetch failures never fail the run.
+- Configured cortex restore (`SKELETON_OWN`) is fail-closed on corrupt snapshots
+  and no longer loads incidental `.skeleton/own.json` when persistence is unset.
 - Legacy `GET /api/v1/capabilities` registry listing is unchanged.
 
 ---

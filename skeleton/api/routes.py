@@ -30,6 +30,17 @@ def _require(obj: Any, name: str) -> Any:
     return obj
 
 
+def _pipeline_prefetch(state: Any, pipeline_name: str, description: Any) -> Dict[str, Any]:
+    from skeleton.pipelines.speculative_rag import prefetch_from_genesis
+
+    return prefetch_from_genesis(
+        getattr(state, "genesis", None),
+        pipeline_name,
+        {"description": str(description or "")},
+        limit=3,
+    ).to_dict()
+
+
 @router.get("/health")
 async def health(state=Depends(_state)) -> Dict[str, Any]:
     checks = state.is_healthy()
@@ -151,6 +162,21 @@ async def application_capability_lifecycle() -> Dict[str, Any]:
     from skeleton.application import capability_lifecycle_snapshot
 
     return capability_lifecycle_snapshot()
+
+
+@router.get("/application/capabilities/{capability_id}")
+async def application_capability(capability_id: str) -> Dict[str, Any]:
+    """Return one curated capability by stable ID."""
+    from dataclasses import asdict
+
+    from skeleton.application import get_capability
+
+    try:
+        return asdict(get_capability(capability_id))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get("/application/capabilities")
@@ -307,35 +333,50 @@ async def scheduler_stats(state=Depends(_state)) -> Dict[str, Any]:
 
 @router.post("/pipeline/npc")
 async def pipeline_npc(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    description = request.get("description", "")
     spec = _require(state.npc_pipeline, "NPC pipeline").run(
-        request.get("description", ""),
+        description,
         name=request.get("name"),
         dialogue_beats=request.get("dialogue_beats", 3),
         params=request.get("params"),
     )
-    return {"npc": spec.to_dict(), "status": "generated"}
+    return {
+        "npc": spec.to_dict(),
+        "status": "generated",
+        "speculative_rag": _pipeline_prefetch(state, "npc", description),
+    }
 
 
 @router.post("/pipeline/game-logic")
 async def pipeline_game_logic(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    description = request.get("description", "")
     spec = _require(state.game_logic_pipeline, "Game logic pipeline").run(
-        request.get("description", ""),
+        description,
         title=request.get("title", "untitled"),
         max_level=request.get("max_level", 50),
         curve=request.get("curve", "quadratic"),
         currency=request.get("currency", "gold"),
     )
-    return {"game_logic": spec.to_dict(), "status": "generated"}
+    return {
+        "game_logic": spec.to_dict(),
+        "status": "generated",
+        "speculative_rag": _pipeline_prefetch(state, "game_logic", description),
+    }
 
 
 @router.post("/pipeline/animation")
 async def pipeline_animation(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     actions = request.get("actions")
+    description = request.get("description", "humanoid")
     spec = _require(state.animation_pipeline, "Animation pipeline").run(
-        request.get("description", "humanoid"),
+        description,
         actions=tuple(actions) if actions else ("idle", "walk", "run", "attack"),
     )
-    return {"animation": spec.to_dict(), "status": "generated"}
+    return {
+        "animation": spec.to_dict(),
+        "status": "generated",
+        "speculative_rag": _pipeline_prefetch(state, "animation", description),
+    }
 
 
 @router.post("/forge/blueprint")
