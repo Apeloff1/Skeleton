@@ -5,9 +5,9 @@ split into state-space filtering, exact Bayesian parameter uncertainty, online
 Bayesian ensembles, distributional calibration, adaptive and stratified
 conformal calibration, hidden-Markov regime inference, multiscale harmonic
 forecasting, cross-family and delayed multi-horizon arbitration, regime-aware
-multi-horizon uncertainty, semantic evidence validation, paired model comparison,
-and explicit promotion, uncertainty-governance, joint evidence, and
-target-alignment contracts.
+multi-horizon uncertainty, semantic evidence validation, empirical joint path
+scenarios, paired model comparison, and explicit promotion, uncertainty-governance,
+joint evidence, and target-alignment contracts.
 """
 
 from .probabilistic_arbitration import (
@@ -146,6 +146,19 @@ from .probabilistic_joint_governance import (
     evaluate_joint_probabilistic_governance,
     validate_joint_probabilistic_governance_decision,
 )
+from .probabilistic_joint_paths import (
+    JointPathConfig,
+    JointPathForecast,
+    JointPathReport,
+    JointPathScenario,
+    JointPathStep,
+    ResidualPath,
+    energy_score,
+    evaluate_joint_paths,
+    forecast_joint_path,
+    validate_joint_path_report,
+    variogram_score,
+)
 from .probabilistic_regimes import (
     GaussianRegime,
     RegimeForecast,
@@ -236,6 +249,11 @@ __all__ = [
     "HorizonStratifiedInterval",
     "HorizonSummary",
     "InnovationRegime",
+    "JointPathConfig",
+    "JointPathForecast",
+    "JointPathReport",
+    "JointPathScenario",
+    "JointPathStep",
     "JointProbabilisticGovernanceDecision",
     "JointProbabilisticGovernanceGate",
     "MixtureForecast",
@@ -264,6 +282,7 @@ __all__ = [
     "RegimePosterior",
     "RegimePosteriorStep",
     "RegimePrequentialScore",
+    "ResidualPath",
     "SeriesValues",
     "SpectralConfig",
     "SpectralFit",
@@ -292,9 +311,11 @@ __all__ = [
     "conformalize_next_forecast",
     "conformalize_next_stratified_forecast",
     "discover_spectral_peaks",
+    "energy_score",
     "evaluate_bayesian_trend",
     "evaluate_conformal_governance",
     "evaluate_cross_family_conformal",
+    "evaluate_joint_paths",
     "evaluate_joint_probabilistic_governance",
     "evaluate_multihorizon_conformal",
     "evaluate_multihorizon_conformal_governance",
@@ -312,6 +333,7 @@ __all__ = [
     "fit_spectral_model",
     "fit_state_space",
     "forecast_bayesian_trend",
+    "forecast_joint_path",
     "forecast_regime_hmm",
     "forecast_spectral",
     "forecast_state_space",
@@ -326,10 +348,12 @@ __all__ = [
     "regime_forecast_crps",
     "validate_calibration_report",
     "validate_conformal_governance_decision",
+    "validate_joint_path_report",
     "validate_joint_probabilistic_governance_decision",
     "validate_multihorizon_report",
     "validate_multihorizon_stratified_calibration",
     "validate_probabilistic_governance_bundle",
     "validate_probabilistic_promotion_decision",
     "validate_stratified_conformal_report",
+    "variogram_score",
 ]
