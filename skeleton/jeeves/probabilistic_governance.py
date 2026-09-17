@@ -4,6 +4,11 @@ This module evaluates calibration evidence only. It does not activate models,
 route forecasts, place orders, mutate learning state, or override higher-level
 policy. Decisions retain their report and gate identities so downstream
 composition can verify provenance rather than trusting an eligibility boolean.
+
+Evidence is evaluated globally, by calibration bucket, and independently by
+forecast horizon. Horizon aggregation is deliberately separate from regime
+strata so regime fragmentation cannot hide systematic long- or short-horizon
+miscalibration.
 """
 
 from __future__ import annotations
@@ -27,12 +32,16 @@ class ConformalGovernanceGate:
     min_scored_steps: int = 20
     max_absolute_coverage_gap: float = 0.15
     max_bucket_coverage_gap: float = 0.25
+    max_horizon_coverage_gap: float = 0.25
     max_fallback_rate: float = 0.50
     max_unevidenced_step_rate: float = 0.25
+    max_unevidenced_horizon_step_rate: float = 0.25
     max_regime_switch_rate: float | None = None
     min_evidenced_buckets: int = 1
     min_regime_buckets: int = 0
     min_bucket_uses: int = 5
+    min_evidenced_horizons: int = 1
+    min_horizon_steps: int = 5
     max_mean_width: float | None = None
     max_mean_interval_score: float | None = None
 
@@ -40,13 +49,20 @@ class ConformalGovernanceGate:
         _positive_integer("min_scored_steps", self.min_scored_steps)
         _unit("max_absolute_coverage_gap", self.max_absolute_coverage_gap)
         _unit("max_bucket_coverage_gap", self.max_bucket_coverage_gap)
+        _unit("max_horizon_coverage_gap", self.max_horizon_coverage_gap)
         _unit("max_fallback_rate", self.max_fallback_rate)
         _unit("max_unevidenced_step_rate", self.max_unevidenced_step_rate)
+        _unit(
+            "max_unevidenced_horizon_step_rate",
+            self.max_unevidenced_horizon_step_rate,
+        )
         if self.max_regime_switch_rate is not None:
             _unit("max_regime_switch_rate", self.max_regime_switch_rate)
         _non_negative_integer("min_evidenced_buckets", self.min_evidenced_buckets)
         _non_negative_integer("min_regime_buckets", self.min_regime_buckets)
         _positive_integer("min_bucket_uses", self.min_bucket_uses)
+        _non_negative_integer("min_evidenced_horizons", self.min_evidenced_horizons)
+        _positive_integer("min_horizon_steps", self.min_horizon_steps)
         if self.max_mean_width is not None:
             _non_negative("max_mean_width", self.max_mean_width)
         if self.max_mean_interval_score is not None:
@@ -64,14 +80,18 @@ class ConformalGovernanceDecision:
     empirical_coverage: float
     absolute_coverage_gap: float
     worst_bucket_coverage_gap: float
+    worst_horizon_coverage_gap: float
     mean_width: float
     mean_interval_score: float
     fallback_rate: float
     unevidenced_step_rate: float
+    unevidenced_horizon_step_rate: float
     regime_switch_rate: float
     evidenced_buckets: int
     evidenced_regime_buckets: int
     observed_regime_buckets: int
+    evidenced_horizons: int
+    observed_horizons: int
     report_fingerprint: str
     gate_fingerprint: str
     fingerprint: str
@@ -112,6 +132,29 @@ def evaluate_conformal_governance(
         1 for step in report.steps if step.stratum not in evidenced_keys
     )
     unevidenced_step_rate = unevidenced_steps / max(1, scored_steps)
+
+    horizon_counts: dict[int, int] = {}
+    horizon_misses: dict[int, int] = {}
+    for step in report.steps:
+        horizon = step.interval.horizon
+        horizon_counts[horizon] = horizon_counts.get(horizon, 0) + 1
+        horizon_misses[horizon] = horizon_misses.get(horizon, 0) + int(step.missed)
+    evidenced_horizon_keys = {
+        horizon
+        for horizon, count in horizon_counts.items()
+        if count >= actual_gate.min_horizon_steps
+    }
+    horizon_gaps = tuple(
+        abs((1.0 - horizon_misses[horizon] / horizon_counts[horizon]) - target)
+        for horizon in sorted(evidenced_horizon_keys)
+    )
+    worst_horizon_gap = max(horizon_gaps, default=1.0)
+    unevidenced_horizon_steps = sum(
+        count
+        for horizon, count in horizon_counts.items()
+        if horizon not in evidenced_horizon_keys
+    )
+    unevidenced_horizon_step_rate = unevidenced_horizon_steps / max(1, scored_steps)
     regime_switch_rate = _regime_switch_rate(report)
 
     reasons: list[str] = []
@@ -121,10 +164,17 @@ def evaluate_conformal_governance(
         reasons.append("global_conformal_coverage_gap_above_gate")
     if worst_bucket_gap > actual_gate.max_bucket_coverage_gap:
         reasons.append("bucket_conformal_coverage_gap_above_gate")
+    if worst_horizon_gap > actual_gate.max_horizon_coverage_gap:
+        reasons.append("horizon_conformal_coverage_gap_above_gate")
     if report.fallback_rate > actual_gate.max_fallback_rate:
         reasons.append("conformal_fallback_rate_above_gate")
     if unevidenced_step_rate > actual_gate.max_unevidenced_step_rate:
         reasons.append("conformal_unevidenced_step_rate_above_gate")
+    if (
+        unevidenced_horizon_step_rate
+        > actual_gate.max_unevidenced_horizon_step_rate
+    ):
+        reasons.append("conformal_unevidenced_horizon_step_rate_above_gate")
     if (
         actual_gate.max_regime_switch_rate is not None
         and regime_switch_rate > actual_gate.max_regime_switch_rate
@@ -134,6 +184,8 @@ def evaluate_conformal_governance(
         reasons.append("insufficient_evidenced_conformal_buckets")
     if len(regime_evidenced) < actual_gate.min_regime_buckets:
         reasons.append("insufficient_regime_conformal_buckets")
+    if len(evidenced_horizon_keys) < actual_gate.min_evidenced_horizons:
+        reasons.append("insufficient_evidenced_conformal_horizons")
     if (
         actual_gate.max_mean_width is not None
         and report.mean_width > actual_gate.max_mean_width
@@ -158,14 +210,18 @@ def evaluate_conformal_governance(
         empirical_coverage=report.empirical_coverage,
         absolute_coverage_gap=absolute_gap,
         worst_bucket_coverage_gap=worst_bucket_gap,
+        worst_horizon_coverage_gap=worst_horizon_gap,
         mean_width=report.mean_width,
         mean_interval_score=report.mean_interval_score,
         fallback_rate=report.fallback_rate,
         unevidenced_step_rate=unevidenced_step_rate,
+        unevidenced_horizon_step_rate=unevidenced_horizon_step_rate,
         regime_switch_rate=regime_switch_rate,
         evidenced_buckets=len(evidenced),
         evidenced_regime_buckets=len(regime_evidenced),
         observed_regime_buckets=observed_regime_buckets,
+        evidenced_horizons=len(evidenced_horizon_keys),
+        observed_horizons=len(horizon_counts),
         report_fingerprint=report.fingerprint,
         gate_fingerprint=gate_fingerprint,
     )
@@ -178,14 +234,18 @@ def evaluate_conformal_governance(
         empirical_coverage=report.empirical_coverage,
         absolute_coverage_gap=absolute_gap,
         worst_bucket_coverage_gap=worst_bucket_gap,
+        worst_horizon_coverage_gap=worst_horizon_gap,
         mean_width=report.mean_width,
         mean_interval_score=report.mean_interval_score,
         fallback_rate=report.fallback_rate,
         unevidenced_step_rate=unevidenced_step_rate,
+        unevidenced_horizon_step_rate=unevidenced_horizon_step_rate,
         regime_switch_rate=regime_switch_rate,
         evidenced_buckets=len(evidenced),
         evidenced_regime_buckets=len(regime_evidenced),
         observed_regime_buckets=observed_regime_buckets,
+        evidenced_horizons=len(evidenced_horizon_keys),
+        observed_horizons=len(horizon_counts),
         report_fingerprint=report.fingerprint,
         gate_fingerprint=gate_fingerprint,
         fingerprint=fingerprint,
@@ -212,10 +272,15 @@ def validate_conformal_governance_decision(
     _unit("empirical_coverage", decision.empirical_coverage)
     _unit("absolute_coverage_gap", decision.absolute_coverage_gap)
     _unit("worst_bucket_coverage_gap", decision.worst_bucket_coverage_gap)
+    _unit("worst_horizon_coverage_gap", decision.worst_horizon_coverage_gap)
     _non_negative("mean_width", decision.mean_width)
     _non_negative("mean_interval_score", decision.mean_interval_score)
     _unit("fallback_rate", decision.fallback_rate)
     _unit("unevidenced_step_rate", decision.unevidenced_step_rate)
+    _unit(
+        "unevidenced_horizon_step_rate",
+        decision.unevidenced_horizon_step_rate,
+    )
     _unit("regime_switch_rate", decision.regime_switch_rate)
     _non_negative_integer("evidenced_buckets", decision.evidenced_buckets)
     _non_negative_integer(
@@ -223,6 +288,8 @@ def validate_conformal_governance_decision(
         decision.evidenced_regime_buckets,
     )
     _non_negative_integer("observed_regime_buckets", decision.observed_regime_buckets)
+    _non_negative_integer("evidenced_horizons", decision.evidenced_horizons)
+    _positive_integer("observed_horizons", decision.observed_horizons)
     if decision.evidenced_regime_buckets > decision.evidenced_buckets:
         raise StateSpaceError(
             "regime evidenced buckets cannot exceed total evidenced buckets",
@@ -233,7 +300,13 @@ def validate_conformal_governance_decision(
             "evidenced regime buckets cannot exceed observed regime buckets",
             context={"reason": "invalid_conformal_governance_decision"},
         )
-    if abs(abs(decision.empirical_coverage - decision.target_coverage) - decision.absolute_coverage_gap) > 1e-12:
+    if decision.evidenced_horizons > decision.observed_horizons:
+        raise StateSpaceError(
+            "evidenced horizons cannot exceed observed horizons",
+            context={"reason": "invalid_conformal_governance_decision"},
+        )
+    recomputed_gap = abs(decision.empirical_coverage - decision.target_coverage)
+    if abs(recomputed_gap - decision.absolute_coverage_gap) > 1e-12:
         raise StateSpaceError(
             "coverage gap disagrees with coverage values",
             context={"reason": "invalid_conformal_governance_decision"},
@@ -254,14 +327,18 @@ def validate_conformal_governance_decision(
         empirical_coverage=decision.empirical_coverage,
         absolute_coverage_gap=decision.absolute_coverage_gap,
         worst_bucket_coverage_gap=decision.worst_bucket_coverage_gap,
+        worst_horizon_coverage_gap=decision.worst_horizon_coverage_gap,
         mean_width=decision.mean_width,
         mean_interval_score=decision.mean_interval_score,
         fallback_rate=decision.fallback_rate,
         unevidenced_step_rate=decision.unevidenced_step_rate,
+        unevidenced_horizon_step_rate=decision.unevidenced_horizon_step_rate,
         regime_switch_rate=decision.regime_switch_rate,
         evidenced_buckets=decision.evidenced_buckets,
         evidenced_regime_buckets=decision.evidenced_regime_buckets,
         observed_regime_buckets=decision.observed_regime_buckets,
+        evidenced_horizons=decision.evidenced_horizons,
+        observed_horizons=decision.observed_horizons,
         report_fingerprint=decision.report_fingerprint,
         gate_fingerprint=decision.gate_fingerprint,
     )
@@ -275,16 +352,20 @@ def validate_conformal_governance_decision(
 def _gate_fingerprint(gate: ConformalGovernanceGate) -> str:
     return _digest(
         {
-            "schema": "jeeves.conformal-governance-gate.v3",
+            "schema": "jeeves.conformal-governance-gate.v4",
             "min_scored_steps": gate.min_scored_steps,
             "max_absolute_coverage_gap": gate.max_absolute_coverage_gap,
             "max_bucket_coverage_gap": gate.max_bucket_coverage_gap,
+            "max_horizon_coverage_gap": gate.max_horizon_coverage_gap,
             "max_fallback_rate": gate.max_fallback_rate,
             "max_unevidenced_step_rate": gate.max_unevidenced_step_rate,
+            "max_unevidenced_horizon_step_rate": gate.max_unevidenced_horizon_step_rate,
             "max_regime_switch_rate": gate.max_regime_switch_rate,
             "min_evidenced_buckets": gate.min_evidenced_buckets,
             "min_regime_buckets": gate.min_regime_buckets,
             "min_bucket_uses": gate.min_bucket_uses,
+            "min_evidenced_horizons": gate.min_evidenced_horizons,
+            "min_horizon_steps": gate.min_horizon_steps,
             "max_mean_width": gate.max_mean_width,
             "max_mean_interval_score": gate.max_mean_interval_score,
         }
@@ -300,20 +381,24 @@ def _decision_fingerprint(
     empirical_coverage: float,
     absolute_coverage_gap: float,
     worst_bucket_coverage_gap: float,
+    worst_horizon_coverage_gap: float,
     mean_width: float,
     mean_interval_score: float,
     fallback_rate: float,
     unevidenced_step_rate: float,
+    unevidenced_horizon_step_rate: float,
     regime_switch_rate: float,
     evidenced_buckets: int,
     evidenced_regime_buckets: int,
     observed_regime_buckets: int,
+    evidenced_horizons: int,
+    observed_horizons: int,
     report_fingerprint: str,
     gate_fingerprint: str,
 ) -> str:
     return _digest(
         {
-            "schema": "jeeves.conformal-governance-decision.v3",
+            "schema": "jeeves.conformal-governance-decision.v4",
             "eligible": eligible,
             "reasons": list(reasons),
             "scored_steps": scored_steps,
@@ -321,14 +406,18 @@ def _decision_fingerprint(
             "empirical_coverage": empirical_coverage,
             "absolute_coverage_gap": absolute_coverage_gap,
             "worst_bucket_coverage_gap": worst_bucket_coverage_gap,
+            "worst_horizon_coverage_gap": worst_horizon_coverage_gap,
             "mean_width": mean_width,
             "mean_interval_score": mean_interval_score,
             "fallback_rate": fallback_rate,
             "unevidenced_step_rate": unevidenced_step_rate,
+            "unevidenced_horizon_step_rate": unevidenced_horizon_step_rate,
             "regime_switch_rate": regime_switch_rate,
             "evidenced_buckets": evidenced_buckets,
             "evidenced_regime_buckets": evidenced_regime_buckets,
             "observed_regime_buckets": observed_regime_buckets,
+            "evidenced_horizons": evidenced_horizons,
+            "observed_horizons": observed_horizons,
             "report_fingerprint": report_fingerprint,
             "gate_fingerprint": gate_fingerprint,
         }
