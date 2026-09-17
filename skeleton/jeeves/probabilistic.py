@@ -4,8 +4,9 @@ This module keeps the public import surface compact while the implementation is
 split into state-space filtering, exact Bayesian parameter uncertainty, online
 Bayesian ensembles, distributional calibration, adaptive and stratified
 conformal calibration, hidden-Markov regime inference, multiscale harmonic
-forecasting, cross-family arbitration, paired model comparison, and explicit
-promotion, uncertainty-governance, and joint evidence contracts.
+forecasting, cross-family and delayed multi-horizon arbitration, regime-aware
+multi-horizon uncertainty, paired model comparison, and explicit promotion,
+uncertainty-governance, and joint evidence contracts.
 """
 
 from .probabilistic_arbitration import (
@@ -102,6 +103,31 @@ from .probabilistic_governance import (
     evaluate_conformal_governance,
     validate_conformal_governance_decision,
 )
+from .probabilistic_horizon_stratified import (
+    HorizonConformalGovernanceEvidence,
+    HorizonStratifiedCalibration,
+    HorizonStratifiedInterval,
+    MultiHorizonConformalGovernanceEvidence,
+    MultiHorizonStratifiedCalibration,
+    MultiHorizonStratifiedIntervalLadder,
+    conformalize_multihorizon_ladder_stratified,
+    evaluate_multihorizon_conformal_governance,
+    evaluate_multihorizon_stratified_conformal,
+    validate_multihorizon_stratified_calibration,
+)
+from .probabilistic_horizons import (
+    HorizonConformalReport,
+    HorizonDependenceReport,
+    HorizonForecast,
+    HorizonLadder,
+    HorizonSettlement,
+    HorizonSummary,
+    MultiHorizonArbitrator,
+    MultiHorizonConfig,
+    MultiHorizonConformalReport,
+    MultiHorizonReport,
+    evaluate_multihorizon_conformal,
+)
 from .probabilistic_joint_governance import (
     JointProbabilisticGovernanceDecision,
     JointProbabilisticGovernanceGate,
@@ -188,10 +214,26 @@ __all__ = [
     "GaussianRegime",
     "HACComparison",
     "HarmonicComponent",
+    "HorizonConformalGovernanceEvidence",
+    "HorizonConformalReport",
+    "HorizonDependenceReport",
+    "HorizonForecast",
+    "HorizonLadder",
+    "HorizonSettlement",
+    "HorizonStratifiedCalibration",
+    "HorizonStratifiedInterval",
+    "HorizonSummary",
     "InnovationRegime",
     "JointProbabilisticGovernanceDecision",
     "JointProbabilisticGovernanceGate",
     "MixtureForecast",
+    "MultiHorizonArbitrator",
+    "MultiHorizonConfig",
+    "MultiHorizonConformalGovernanceEvidence",
+    "MultiHorizonConformalReport",
+    "MultiHorizonReport",
+    "MultiHorizonStratifiedCalibration",
+    "MultiHorizonStratifiedIntervalLadder",
     "OnlineBayesianEnsemble",
     "PitDiagnostic",
     "PredictiveArenaConfig",
@@ -231,6 +273,7 @@ __all__ = [
     "central_interval",
     "conformal_interval",
     "conformal_quantile",
+    "conformalize_multihorizon_ladder_stratified",
     "conformalize_next_forecast",
     "conformalize_next_stratified_forecast",
     "discover_spectral_peaks",
@@ -238,6 +281,9 @@ __all__ = [
     "evaluate_conformal_governance",
     "evaluate_cross_family_conformal",
     "evaluate_joint_probabilistic_governance",
+    "evaluate_multihorizon_conformal",
+    "evaluate_multihorizon_conformal_governance",
+    "evaluate_multihorizon_stratified_conformal",
     "evaluate_predictive_arena",
     "evaluate_prequential_conformal",
     "evaluate_probabilistic_promotion",
@@ -264,6 +310,7 @@ __all__ = [
     "regime_forecast_crps",
     "validate_conformal_governance_decision",
     "validate_joint_probabilistic_governance_decision",
+    "validate_multihorizon_stratified_calibration",
     "validate_probabilistic_promotion_decision",
     "validate_stratified_conformal_report",
 ]

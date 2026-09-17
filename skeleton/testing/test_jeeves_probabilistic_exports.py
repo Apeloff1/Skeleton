@@ -174,3 +174,22 @@ def test_probabilistic_facade_exports_cross_family_arbitration_surface() -> None
     assert expected.issubset(set(probabilistic.__all__))
     for name in expected:
         assert hasattr(probabilistic, name)
+
+
+def test_probabilistic_facade_exports_multi_horizon_surface() -> None:
+    expected = {
+        "HorizonConformalReport",
+        "HorizonDependenceReport",
+        "HorizonForecast",
+        "HorizonLadder",
+        "HorizonSettlement",
+        "HorizonSummary",
+        "MultiHorizonArbitrator",
+        "MultiHorizonConfig",
+        "MultiHorizonConformalReport",
+        "MultiHorizonReport",
+        "evaluate_multihorizon_conformal",
+    }
+    assert expected.issubset(set(probabilistic.__all__))
+    for name in expected:
+        assert hasattr(probabilistic, name)
