@@ -193,6 +193,69 @@ def test_json_envelopes_do_not_stringify_caught_exceptions(path: Path) -> None:
     assert "curiosity research unavailable:" not in source
 
 
+
+def test_json_envelopes_do_not_expose_upstream_response_bodies() -> None:
+    source = (REPO_ROOT / "backend" / "routes" / "game_command_agents.py").read_text(encoding="utf-8")
+    assert "response.text" not in source
+    assert "Image generation unavailable (" not in source
+
+
+
+def test_holodeck_render_redacts_non_200_provider_body(monkeypatch) -> None:
+    import types
+    import routes.game_command_agents as command_agents
+
+    image_generation = types.ModuleType("routes.image_generation")
+
+    async def no_primary_image(_prompt: str) -> dict:
+        return {"images": []}
+
+    image_generation.generate_with_gemini = no_primary_image
+    monkeypatch.setitem(sys.modules, "routes.image_generation", image_generation)
+    monkeypatch.setattr(command_agents, "XAI_API_KEY", "test-key")
+
+    class FakeResponse:
+        status_code = 429
+        text = f"provider diagnostic: {_PRIVATE}"
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def post(self, *args, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(command_agents.httpx, "AsyncClient", lambda *args, **kwargs: FakeClient())
+
+    result = asyncio.run(command_agents.generate_holodeck_render("team", "output", "game"))
+
+    assert result["success"] is False
+    assert result["error"] == "image_render_failed"
+    assert _PRIVATE not in str(result)
+
+
+def test_holodeck_render_missing_provider_key_uses_same_stable_code(monkeypatch) -> None:
+    import types
+    import routes.game_command_agents as command_agents
+
+    image_generation = types.ModuleType("routes.image_generation")
+
+    async def no_primary_image(_prompt: str) -> dict:
+        return {"images": []}
+
+    image_generation.generate_with_gemini = no_primary_image
+    monkeypatch.setitem(sys.modules, "routes.image_generation", image_generation)
+    monkeypatch.setattr(command_agents, "XAI_API_KEY", "")
+
+    result = asyncio.run(command_agents.generate_holodeck_render("team", "output", "game"))
+
+    assert result["success"] is False
+    assert result["error"] == "image_render_failed"
+
+
 def test_internal_http_error_is_stable_and_typed() -> None:
     exc = internal_http_error("Jeeves request failed", RuntimeError(_PRIVATE))
     assert isinstance(exc, HTTPException)
