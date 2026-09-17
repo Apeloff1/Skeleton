@@ -37,6 +37,7 @@ TEST_MODULE_NAMES = (
     "tests.test_context",
     "tests.test_cortex",
     "tests.test_cortex_acquire_contract",
+    "skeleton.testing.test_simulation_physics_foundation",
 )
 
 UNSUPPORTED_MODULE_LIFECYCLE_HOOKS = (
