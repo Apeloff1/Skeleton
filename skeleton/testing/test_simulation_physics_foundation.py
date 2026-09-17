@@ -9,6 +9,7 @@ from skeleton.simulation.physics import (
     AABB,
     BodyType,
     BoxShape,
+    DistanceJoint,
     GamePhysicsProfile,
     GameplayScale,
     PhysicsMaterial,
@@ -550,7 +551,7 @@ def test_failed_solver_rolls_back_entire_tick_atomically() -> None:
     before_contacts = world.contacts()
 
     class _FailingSolver:
-        def solve(self, bodies, manifolds):
+        def solve(self, bodies, manifolds, **kwargs):
             bodies["body"].position = Vec3(999.0, 999.0, 999.0)
             bodies["body"].linear_velocity = Vec3(-999.0, 0.0, 0.0)
             raise RuntimeError("synthetic solver failure")
@@ -607,3 +608,241 @@ def test_world_measure_potential_energy_uses_gravity_direction() -> None:
     assert measure.mechanical_energy == pytest.approx(
         measure.kinetic_energy + measure.potential_energy
     )
+
+
+
+def test_persistent_contact_cache_warm_starts_second_ground_frame() -> None:
+    world = PhysicsWorld(
+        PhysicsSettings(
+            fixed_dt=1.0 / 120.0,
+            velocity_iterations=6,
+            position_iterations=4,
+            sleep_after_seconds=10.0,
+        )
+    )
+    world.add_body(RigidBody.static("ground", PlaneShape()))
+    ball = RigidBody.dynamic(
+        "ball",
+        SphereShape(0.5),
+        position=Vec3(0.0, 0.5, 0.0),
+        linear_damping=0.0,
+        angular_damping=0.0,
+    )
+    world.add_body(ball)
+
+    first = world.step()[0]
+    assert first.solver.cached_contacts >= 1
+    assert world.contact_cache_size() >= 1
+
+    second = world.step()[0]
+    assert second.solver.warm_started_contacts >= 1
+    assert second.solver.cached_contacts >= 1
+
+
+def test_contact_cache_is_part_of_authoritative_state_digest() -> None:
+    left = PhysicsWorld(PhysicsSettings(sleep_after_seconds=10.0))
+    right = PhysicsWorld(PhysicsSettings(sleep_after_seconds=10.0))
+    for world in (left, right):
+        world.add_body(RigidBody.static("ground", PlaneShape()))
+        world.add_body(
+            RigidBody.dynamic(
+                "ball",
+                SphereShape(0.5),
+                position=Vec3(0.0, 0.5, 0.0),
+                linear_damping=0.0,
+                angular_damping=0.0,
+            )
+        )
+    assert left.state_digest == right.state_digest
+    left.step()
+    assert left.contact_cache_size() >= 1
+    assert left.state_digest != right.state_digest
+
+
+def test_failure_after_contact_solver_restores_warm_cache_atomically() -> None:
+    world = PhysicsWorld(
+        PhysicsSettings(
+            fixed_dt=1.0 / 120.0,
+            sleep_after_seconds=10.0,
+        )
+    )
+    world.add_body(RigidBody.static("ground", PlaneShape()))
+    world.add_body(
+        RigidBody.dynamic(
+            "ball",
+            SphereShape(0.5),
+            position=Vec3(0.0, 0.5, 0.0),
+            linear_damping=0.0,
+            angular_damping=0.0,
+        )
+    )
+    before_digest = world.state_digest
+    before_cache = world.contact_cache_size()
+    before_tick = world.tick
+
+    class _FailingConstraintSolver:
+        def solve(self, bodies, joints, *, dt):
+            raise RuntimeError("constraint stage failure")
+
+    world._constraint_solver = _FailingConstraintSolver()  # type: ignore[assignment]
+
+    with pytest.raises(RuntimeError, match="constraint stage failure"):
+        world.step()
+
+    assert world.tick == before_tick
+    assert world.contact_cache_size() == before_cache
+    assert world.state_digest == before_digest
+
+
+def test_continuous_sphere_does_not_tunnel_through_thin_static_box() -> None:
+    world = PhysicsWorld(
+        PhysicsSettings(
+            gravity=Vec3.zero(),
+            fixed_dt=0.01,
+            sleep_after_seconds=10.0,
+        )
+    )
+    world.add_body(
+        RigidBody.static(
+            "wall",
+            BoxShape(Vec3(0.05, 1.0, 1.0)),
+            position=Vec3(5.0, 0.0, 0.0),
+        )
+    )
+    bullet = RigidBody.dynamic(
+        "bullet",
+        SphereShape(0.1),
+        position=Vec3.zero(),
+        linear_damping=0.0,
+        angular_damping=0.0,
+        continuous=True,
+    )
+    bullet.linear_velocity = Vec3(1000.0, 0.0, 0.0)
+    world.add_body(bullet)
+
+    receipt = world.step()[0]
+    assert receipt.ccd_clamps == 1
+    assert 4.7 < bullet.position.x < 5.0
+    assert bullet.linear_velocity.x < 1.0
+
+
+def test_same_fast_sphere_tunnels_when_ccd_globally_disabled() -> None:
+    world = PhysicsWorld(
+        PhysicsSettings(
+            gravity=Vec3.zero(),
+            fixed_dt=0.01,
+            sleep_after_seconds=10.0,
+            ccd_enabled=False,
+        )
+    )
+    world.add_body(
+        RigidBody.static(
+            "wall",
+            BoxShape(Vec3(0.05, 1.0, 1.0)),
+            position=Vec3(5.0, 0.0, 0.0),
+        )
+    )
+    bullet = RigidBody.dynamic(
+        "bullet",
+        SphereShape(0.1),
+        position=Vec3.zero(),
+        linear_damping=0.0,
+        angular_damping=0.0,
+        continuous=True,
+    )
+    bullet.linear_velocity = Vec3(1000.0, 0.0, 0.0)
+    world.add_body(bullet)
+
+    receipt = world.step()[0]
+    assert receipt.ccd_clamps == 0
+    assert bullet.position.x == pytest.approx(10.0)
+
+
+def test_sphere_cast_rejects_expanded_box_corner_false_positive() -> None:
+    world = _zero_gravity_world()
+    world.add_body(RigidBody.static("box", BoxShape(Vec3.one())))
+    hits = world.sphere_cast(
+        Ray(Vec3(-3.0, 1.09, 1.09), Vec3.axis(0), 6.0),
+        0.1,
+    )
+    assert hits == ()
+
+
+def test_continuous_body_moving_away_from_touching_plane_is_not_pinned() -> None:
+    world = PhysicsWorld(
+        PhysicsSettings(
+            gravity=Vec3.zero(),
+            fixed_dt=0.1,
+            sleep_after_seconds=10.0,
+        )
+    )
+    world.add_body(RigidBody.static("ground", PlaneShape()))
+    ball = RigidBody.dynamic(
+        "ball",
+        SphereShape(0.5),
+        position=Vec3(0.0, 0.5, 0.0),
+        linear_damping=0.0,
+        angular_damping=0.0,
+        continuous=True,
+    )
+    ball.linear_velocity = Vec3(0.0, 10.0, 0.0)
+    world.add_body(ball)
+    receipt = world.step()[0]
+    assert receipt.ccd_clamps == 0
+    assert ball.position.y == pytest.approx(1.5)
+
+
+def test_distance_joint_pulls_bodies_toward_rest_length() -> None:
+    world = PhysicsWorld(
+        PhysicsSettings(
+            gravity=Vec3.zero(),
+            fixed_dt=1.0 / 120.0,
+            sleep_after_seconds=10.0,
+        )
+    )
+    left = RigidBody.dynamic(
+        "left",
+        SphereShape(0.25),
+        position=Vec3(-2.0, 0.0, 0.0),
+        linear_damping=0.0,
+        angular_damping=0.0,
+    )
+    right = RigidBody.dynamic(
+        "right",
+        SphereShape(0.25),
+        position=Vec3(2.0, 0.0, 0.0),
+        linear_damping=0.0,
+        angular_damping=0.0,
+    )
+    world.add_body(left)
+    world.add_body(right)
+    world.add_joint(DistanceJoint("link", "left", "right", rest_length=2.0))
+
+    before = (right.position - left.position).length()
+    receipt = world.step()[0]
+    after = (right.position - left.position).length()
+
+    assert receipt.constraints.joints == 1
+    assert receipt.constraints.velocity_impulses > 0
+    assert receipt.constraints.position_corrections > 0
+    assert after < before
+
+
+def test_joint_configuration_is_bound_into_state_digest() -> None:
+    left = _zero_gravity_world()
+    right = _zero_gravity_world()
+    for world in (left, right):
+        world.add_body(RigidBody.dynamic("a", SphereShape(0.25), position=Vec3(-1.0, 0.0, 0.0)))
+        world.add_body(RigidBody.dynamic("b", SphereShape(0.25), position=Vec3(1.0, 0.0, 0.0)))
+    assert left.state_digest == right.state_digest
+    left.add_joint(DistanceJoint("joint", "a", "b", rest_length=1.0))
+    assert left.state_digest != right.state_digest
+
+
+def test_body_referenced_by_joint_cannot_be_removed_silently() -> None:
+    world = _zero_gravity_world()
+    world.add_body(RigidBody.dynamic("a", SphereShape(0.25)))
+    world.add_body(RigidBody.dynamic("b", SphereShape(0.25), position=Vec3(2.0, 0.0, 0.0)))
+    world.add_joint(DistanceJoint("joint", "a", "b", rest_length=2.0))
+    with pytest.raises(PhysicsValidationError, match="referenced by joint"):
+        world.remove_body("a")
