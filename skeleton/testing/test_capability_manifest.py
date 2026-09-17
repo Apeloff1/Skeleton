@@ -205,6 +205,15 @@ def test_lifecycle_snapshot_does_not_import_planes(monkeypatch) -> None:
     assert all(row["loaded"] is False for row in payload["capabilities"])
 
 
+def test_http_application_capability_routes_match_cli_payloads() -> None:
+    import asyncio
+
+    from skeleton.api import routes
+
+    assert asyncio.run(routes.application_capabilities()) == capability_manifest()
+    assert asyncio.run(routes.application_capability_lifecycle()) == capability_lifecycle_snapshot()
+
+
 def test_shared_command_capabilities_matches_identity_manifest() -> None:
     from skeleton.application import build_runtime_command_service
 

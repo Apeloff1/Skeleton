@@ -50,8 +50,8 @@ capability discovery are **landed**; do not re-open them without a regression.
 | F-9 N+1 tool-call suppression | #20 | compose `kernel/dedup.py` |
 | F-10 PromptImproveDriver | #31 | ImproveLoop over prefix variants |
 | F-13 EconomicOptimiser × CascadeRouter | #277 | shared economic model registry, cascade planning, real model IDs, budget/cost accounting |
-| F-14 Speculative RAG | this PR | pipeline planning prefetch via quad + composer; prefetch failures never fail the run |
-| F-16 Unified capability discovery | this PR | CLI/API/command identity payload + additive lifecycle snapshot |
+| F-14 Speculative RAG | #1019 | pipeline planning prefetch via quad + composer; prefetch failures never fail the run |
+| F-16 Unified capability discovery | #1019 | CLI/API/command identity payload + additive lifecycle snapshot |
 | P6 policy enforcement | #13 | CodeVerifier + repair/verify gates |
 
 ### Live ops state — resolved blockers, keep green
