@@ -257,5 +257,11 @@ class RigidBody:
             ),
             "linear_velocity": self.linear_velocity.to_tuple(),
             "angular_velocity": self.angular_velocity.to_tuple(),
+            "force": self.force.to_tuple(),
+            "torque": self.torque.to_tuple(),
+            "linear_damping": self.linear_damping,
+            "angular_damping": self.angular_damping,
+            "gravity_scale": self.gravity_scale,
             "awake": self.awake,
+            "sleep_time": self.sleep_time,
         }
