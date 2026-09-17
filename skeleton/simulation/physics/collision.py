@@ -6,6 +6,7 @@ separating-axis candidates (three face axes per box plus nine edge cross axes).
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from .body import BodyType, RigidBody
@@ -34,8 +35,8 @@ class ContactPoint:
     penetration: float
 
     def __post_init__(self) -> None:
-        if self.penetration < 0.0:
-            raise PhysicsValidationError("contact penetration must be non-negative")
+        if not math.isfinite(self.penetration) or self.penetration < 0.0:
+            raise PhysicsValidationError("contact penetration must be finite and non-negative")
 
 
 @dataclass(frozen=True, slots=True)
