@@ -4,7 +4,15 @@ from __future__ import annotations
 
 from typing import Any, Dict, Mapping
 
-from .command_contracts import CONTRACT_VERSION, CommandError, CommandService, require_bool, require_int
+from .command_contracts import (
+    CONTRACT_VERSION,
+    MATERIALISE_TARGETS,
+    CommandError,
+    CommandService,
+    require_bool,
+    require_int,
+    require_text,
+)
 
 APP_VERSION = "16.0.0"
 
@@ -45,6 +53,9 @@ _CAPABILITY_VIEW_FLAGS = (
     "export_audit",
     "route_audit",
     "hmac_audit",
+    "cli_audit",
+    "template_audit",
+    "sidecar_audit",
 )
 
 
@@ -80,6 +91,18 @@ def _lookup_row(payload: Mapping[str, Any], key: str, getter, snapshot):
 def _capabilities_handler(_state: Any):
     def handle(payload: Mapping[str, Any]) -> Dict[str, Any]:
         flags = _capability_view_flags(payload)
+        if flags["sidecar_audit"]:
+            from .sidecar_route_audit import get_sidecar_route_audit_row, sidecar_route_audit_snapshot
+
+            return _lookup_row(payload, "route_id", get_sidecar_route_audit_row, sidecar_route_audit_snapshot)
+        if flags["template_audit"]:
+            from .template_audit import get_template_audit_row, template_audit_snapshot
+
+            return _lookup_row(payload, "template_id", get_template_audit_row, template_audit_snapshot)
+        if flags["cli_audit"]:
+            from .developer_cli_audit import developer_cli_audit_snapshot, get_developer_cli_audit_row
+
+            return _lookup_row(payload, "command_id", get_developer_cli_audit_row, developer_cli_audit_snapshot)
         if flags["hmac_audit"]:
             from .hmac_open_audit import get_hmac_open_audit_row, hmac_open_audit_snapshot
 
@@ -188,8 +211,8 @@ def _run_handler(state: Any):
             raise CommandError("invalid_argument", "answers must be an object")
         spec = gameforge.run(
             dict(answers),
-            title=payload.get("title"),
-            target=payload.get("target", "json"),
+            title=require_text(payload, "title", None, optional=True),
+            target=require_text(payload, "target", "json", allowed=MATERIALISE_TARGETS),
             repair=require_bool(payload, "repair", False),
         )
         game = spec.to_dict() if hasattr(spec, "to_dict") else spec

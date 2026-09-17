@@ -36,6 +36,17 @@ from .hmac_open_audit import (
     get_hmac_open_audit_row,
     hmac_open_audit_snapshot,
 )
+from .developer_cli_audit import (
+    DEVELOPER_CLI_AUDIT_KIND,
+    developer_cli_audit_snapshot,
+    get_developer_cli_audit_row,
+)
+from .template_audit import TEMPLATE_AUDIT_KIND, get_template_audit_row, template_audit_snapshot
+from .sidecar_route_audit import (
+    SIDECAR_ROUTE_AUDIT_KIND,
+    get_sidecar_route_audit_row,
+    sidecar_route_audit_snapshot,
+)
 from .export_audit import EXPORT_AUDIT_KIND, export_audit_snapshot, get_export_audit_row
 from .genesis_boot_audit import (
     GENESIS_BOOT_AUDIT_KIND,
@@ -58,10 +69,13 @@ __all__ = [
     "CAPABILITY_LOADER",
     "CAPABILITY_MANIFEST_VERSION",
     "CONTRACT_VERSION",
+    "DEVELOPER_CLI_AUDIT_KIND",
     "EXPORT_AUDIT_KIND",
     "GENESIS_BOOT_AUDIT_KIND",
     "HMAC_OPEN_AUDIT_KIND",
     "PLANE_AUDIT_KIND",
+    "SIDECAR_ROUTE_AUDIT_KIND",
+    "TEMPLATE_AUDIT_KIND",
     "Capability",
     "CapabilityLoadError",
     "CapabilityLoader",
@@ -76,16 +90,22 @@ __all__ = [
     "capability_manifest",
     "capability_runtime_status",
     "command_specs",
+    "developer_cli_audit_snapshot",
     "export_audit_snapshot",
     "genesis_boot_audit_snapshot",
     "get_api_route_audit_row",
     "get_capability",
+    "get_developer_cli_audit_row",
     "get_export_audit_row",
     "get_genesis_boot_audit_row",
     "get_hmac_open_audit_row",
     "get_plane_audit_row",
+    "get_sidecar_route_audit_row",
+    "get_template_audit_row",
     "hmac_open_audit_snapshot",
     "load_capability",
     "parity_matrix",
     "plane_audit_snapshot",
+    "sidecar_route_audit_snapshot",
+    "template_audit_snapshot",
 ]

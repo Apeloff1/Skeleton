@@ -378,3 +378,218 @@ def hmac_runtime_root_open() -> bool:
                     return True
         return False
     return False
+
+
+def _is_named_call(node: ast.AST, name: str) -> bool:
+    if not isinstance(node, ast.Call):
+        return False
+    func = node.func
+    if isinstance(func, ast.Name) and func.id == name:
+        return True
+    return isinstance(func, ast.Attribute) and func.attr == name
+
+
+def _depends_named(fn: ast.FunctionDef | ast.AsyncFunctionDef, name: str) -> bool:
+    defaults = list(fn.args.defaults) + [item for item in fn.args.kw_defaults if item is not None]
+    for default in defaults:
+        if _is_named_call(default, name):
+            return True
+        if (
+            isinstance(default, ast.Call)
+            and isinstance(default.func, ast.Name)
+            and default.func.id == "Depends"
+            and default.args
+            and _is_named_call(default.args[0], name)
+        ):
+            return True
+    return False
+
+
+def _normalize_handler_path(path: str) -> str:
+    full_path = path if path.startswith(_API_PREFIX) else f"{_API_PREFIX}{path}"
+    return full_path.replace(":path", "").replace(":int", "").replace(":float", "").replace(":uuid", "")
+
+
+def module_router_handlers(module: str, *, source: str = "") -> list[dict[str, object]]:
+    tree = parse_module_tree(module)
+    if tree is None or not isinstance(tree, ast.Module):
+        return []
+    rows: list[dict[str, object]] = []
+    seen: set[tuple[str, str]] = set()
+    for node in tree.body:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for decorator in node.decorator_list:
+            parsed = _decorator_route(decorator)
+            if parsed is None:
+                continue
+            method, path = parsed
+            full_path = _normalize_handler_path(path)
+            key = (method, full_path)
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(
+                {
+                    "method": method,
+                    "path": full_path,
+                    "handler": node.name,
+                    "module": module,
+                    "source": source or module.rsplit(".", 1)[-1],
+                    "charter_gated": _depends_named(node, "require_charter"),
+                    "seal_gated": _depends_named(node, "require_seal"),
+                }
+            )
+    return rows
+
+
+def sidecar_router_handlers() -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    seen: set[tuple[str, str]] = set()
+    for module, source in (
+        ("skeleton.api.gameforge_routes", "gameforge"),
+        ("skeleton.api.command_routes", "command"),
+    ):
+        for row in module_router_handlers(module, source=source):
+            key = (str(row["method"]), str(row["path"]))
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(row)
+    return rows
+
+
+def _dict_str_keys(node: ast.AST | None) -> list[str]:
+    if not isinstance(node, ast.Dict):
+        return []
+    keys: list[str] = []
+    for key in node.keys:
+        if isinstance(key, ast.Constant) and isinstance(key.value, str):
+            keys.append(key.value)
+    return keys
+
+
+def _assigned_dict(tree: ast.AST | None, name: str) -> ast.Dict | None:
+    if tree is None or not isinstance(tree, ast.Module):
+        return None
+    for node in tree.body:
+        target_nodes: list[ast.AST] = []
+        value: ast.AST | None = None
+        if isinstance(node, ast.Assign):
+            target_nodes = list(node.targets)
+            value = node.value
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            target_nodes = [node.target]
+            value = node.value
+        if not any(isinstance(target, ast.Name) and target.id == name for target in target_nodes):
+            continue
+        return value if isinstance(value, ast.Dict) else None
+    return None
+
+
+def scaffold_template_catalog() -> list[dict[str, object]]:
+    tree = parse_module_tree("skeleton.developer.scaffold")
+    assigned = _assigned_dict(tree, "TEMPLATES")
+    if assigned is None:
+        return []
+    rows: list[dict[str, object]] = []
+    for key, value in zip(assigned.keys, assigned.values):
+        if not isinstance(key, ast.Constant) or not isinstance(key.value, str):
+            continue
+        description = ""
+        files: list[str] = []
+        if isinstance(value, ast.Dict):
+            for field_key, field_value in zip(value.keys, value.values):
+                if not isinstance(field_key, ast.Constant) or not isinstance(field_key.value, str):
+                    continue
+                if field_key.value == "description" and isinstance(field_value, ast.Constant):
+                    description = str(field_value.value)
+                elif field_key.value == "files":
+                    files = _dict_str_keys(field_value)
+        rows.append({"id": key.value, "description": description, "files": files})
+    return rows
+
+
+def architecture_templates() -> list[dict[str, object]]:
+    from skeleton.architecture import TEMPLATES
+
+    rows: list[dict[str, object]] = []
+    for template in TEMPLATES:
+        name = template.get("name")
+        if not isinstance(name, str) or not name:
+            continue
+        files = template.get("files", [])
+        rows.append(
+            {
+                "id": name,
+                "description": str(template.get("description") or ""),
+                "files": [item for item in files if isinstance(item, str)] if isinstance(files, list) else [],
+            }
+        )
+    return rows
+
+
+def developer_registry_commands() -> list[str]:
+    tree = parse_module_tree("skeleton.developer.commands")
+    if tree is None:
+        return []
+    names: list[str] = []
+    seen: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not node.args:
+            continue
+        func = node.func
+        if not isinstance(func, ast.Attribute) or func.attr != "register":
+            continue
+        if not isinstance(func.value, ast.Name) or func.value.id != "_dev_registry":
+            continue
+        arg = node.args[0]
+        if not isinstance(arg, ast.Constant) or not isinstance(arg.value, str):
+            continue
+        if arg.value in seen:
+            continue
+        seen.add(arg.value)
+        names.append(arg.value)
+    return names
+
+
+def developer_cli_dispatch_commands() -> list[str]:
+    tree = parse_module_tree("skeleton.developer.cli")
+    if tree is None:
+        return []
+    names: list[str] = []
+    seen: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Compare) or not node.ops or not node.comparators:
+            continue
+        if not isinstance(node.ops[0], ast.Eq):
+            continue
+        left = node.left
+        if not isinstance(left, ast.Name) or left.id != "command":
+            continue
+        comparator = node.comparators[0]
+        if not isinstance(comparator, ast.Constant) or not isinstance(comparator.value, str):
+            continue
+        if comparator.value in seen:
+            continue
+        seen.add(comparator.value)
+        names.append(comparator.value)
+    return names
+
+
+def architecture_cli_commands() -> list[dict[str, object]]:
+    from skeleton.architecture import CLI_COMMANDS
+
+    rows: list[dict[str, object]] = []
+    for command in CLI_COMMANDS:
+        name = command.get("command")
+        if not isinstance(name, str) or not name:
+            continue
+        rows.append(
+            {
+                "command": name,
+                "args": str(command.get("args") or ""),
+                "description": str(command.get("description") or ""),
+            }
+        )
+    return rows

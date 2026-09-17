@@ -47,6 +47,38 @@ def _int_field(payload: Dict[str, Any], key: str, default: int, *, minimum: int 
         raise _payload_error(exc) from exc
 
 
+def _float_field(
+    payload: Dict[str, Any],
+    key: str,
+    default: float,
+    *,
+    minimum: float | None = None,
+    maximum: float | None = None,
+) -> float:
+    from skeleton.application.command_contracts import CommandError, require_float
+
+    try:
+        return require_float(payload, key, default, minimum=minimum, maximum=maximum)
+    except CommandError as exc:
+        raise _payload_error(exc) from exc
+
+
+def _text_field(
+    payload: Dict[str, Any],
+    key: str,
+    default: str = "",
+    *,
+    allowed: tuple[str, ...] | None = None,
+) -> str:
+    from skeleton.application.command_contracts import CommandError, require_text
+
+    try:
+        value = require_text(payload, key, default, allowed=allowed)
+    except CommandError as exc:
+        raise _payload_error(exc) from exc
+    return str(value or "")
+
+
 def _bool_field(payload: Dict[str, Any], key: str, default: bool = False) -> bool:
     from skeleton.application.command_contracts import CommandError, require_bool
 
@@ -166,7 +198,7 @@ async def retrieval_ingest(request: Dict[str, Any], state=Depends(_state)) -> Di
     chunks = quad.ingest_document(
         doc_id, text,
         metadata=request.get("metadata"),
-        salience=float(request.get("salience", 0.5)),
+        salience=_float_field(request, "salience", 0.5, minimum=0.0),
     )
     return {"doc_id": doc_id, "chunks": chunks, "status": "ingested"}
 
@@ -230,6 +262,69 @@ async def application_hmac_open_audit() -> Dict[str, Any]:
     from skeleton.application import hmac_open_audit_snapshot
 
     return hmac_open_audit_snapshot()
+
+
+@router.get("/application/cli/audit/{command_id}")
+async def application_developer_cli_audit_row(command_id: str) -> Dict[str, Any]:
+    """Return one developer-CLI audit row by command name."""
+    from skeleton.application import get_developer_cli_audit_row
+
+    try:
+        return get_developer_cli_audit_row(command_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/cli/audit")
+async def application_developer_cli_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --cli-audit``."""
+    from skeleton.application import developer_cli_audit_snapshot
+
+    return developer_cli_audit_snapshot()
+
+
+@router.get("/application/templates/audit/{template_id}")
+async def application_template_audit_row(template_id: str) -> Dict[str, Any]:
+    """Return one scaffold-template audit row by template ID."""
+    from skeleton.application import get_template_audit_row
+
+    try:
+        return get_template_audit_row(template_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/templates/audit")
+async def application_template_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --template-audit``."""
+    from skeleton.application import template_audit_snapshot
+
+    return template_audit_snapshot()
+
+
+@router.get("/application/sidecars/audit/{method}/{path:path}")
+async def application_sidecar_route_audit_row(method: str, path: str) -> Dict[str, Any]:
+    """Return one sidecar-router audit row by method and path."""
+    from skeleton.application import get_sidecar_route_audit_row
+
+    try:
+        return get_sidecar_route_audit_row(f"{method} /{path.lstrip('/')}")
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/sidecars/audit")
+async def application_sidecar_route_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --sidecar-audit``."""
+    from skeleton.application import sidecar_route_audit_snapshot
+
+    return sidecar_route_audit_snapshot()
 
 
 @router.get("/application/planes/audit/{plane_id}")
@@ -409,7 +504,7 @@ async def swarm_stats(state=Depends(_state)) -> Dict[str, Any]:
 async def swarm_register_agent(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     agent = _require(state.mesh, "Swarm").join(
         set(request.get("specialisations", [])),
-        weight=request.get("weight", 1.0),
+        weight=_float_field(request, "weight", 1.0, minimum=0.0),
         metadata=request.get("metadata"),
     )
     return {"agent_id": str(agent.agent_id), "status": "registered"}
@@ -493,8 +588,8 @@ async def pipeline_game_logic(request: Dict[str, Any], state=Depends(_state)) ->
         description,
         title=request.get("title", "untitled"),
         max_level=_int_field(request, "max_level", 50, minimum=1),
-        curve=request.get("curve", "quadratic"),
-        currency=request.get("currency", "gold"),
+        curve=_text_field(request, "curve", "quadratic"),
+        currency=_text_field(request, "currency", "gold"),
     )
     return {
         "game_logic": spec.to_dict(),
@@ -543,10 +638,12 @@ async def forge_materialise(http_request: Request, request: Dict[str, Any], stat
         bp.connect(tuple(wire["from"]), tuple(wire["to"]))
     repair = _bool_field(request, "repair", False)
     max_rounds = _int_field(request, "max_rounds", 3, minimum=1)
+    from skeleton.application.command_contracts import MATERIALISE_TARGETS
+
     artefact = forge.materialise(
         bp,
         era=request.get("era", "extraction_now"),
-        target=request.get("target", "json"),
+        target=_text_field(request, "target", "json", allowed=MATERIALISE_TARGETS),
         repair=repair,
         max_rounds=max_rounds,
     )
@@ -578,10 +675,12 @@ async def forge_archetype(http_request: Request, request: Dict[str, Any], state=
     if replay is not None:
         return replay  # type: ignore[return-value]
     from skeleton.forge.archetypes import default_library
+    from skeleton.application.command_contracts import MATERIALISE_TARGETS
+
     forge = _require(state.forge, "Forge")
     name = request.get("name", "extraction")
     era = request.get("era", "extraction_now")
-    target = request.get("target", "godot")
+    target = _text_field(request, "target", "godot", allowed=MATERIALISE_TARGETS)
     bp = default_library().build(forge, name)
     repair = _bool_field(request, "repair", target == "godot")
     max_rounds = _int_field(request, "max_rounds", 3, minimum=1)
@@ -641,18 +740,20 @@ async def gameforge_run(http_request: Request, request: Dict[str, Any], state=De
     replay = _idempotency.replay(dict(http_request.headers))
     if replay is not None:
         return replay  # type: ignore[return-value]
+    from skeleton.application.command_contracts import MATERIALISE_TARGETS
+
     runner = _require(state.gameforge, "GameForge")
     out = runner.execute(
         request.get("vision", ""),
         era=request.get("era"),
-        archetype=request.get("archetype", "extraction"),
-        target=request.get("target", "godot"),
+        archetype=_text_field(request, "archetype", "extraction"),
+        target=_text_field(request, "target", "godot", allowed=MATERIALISE_TARGETS),
     )
     # files can be large; keep names in the HTTP body
     files = out.get("files") or {}
     out = dict(out)
     out["file_names"] = sorted(files)
-    if not request.get("include_files"):
+    if not _bool_field(request, "include_files", False):
         out.pop("files", None)
     _idempotency.remember(dict(http_request.headers), out)
     return out
@@ -664,6 +765,8 @@ async def gameforge_intake(http_request: Request, request: Dict[str, Any], state
     if replay is not None:
         return replay  # type: ignore[return-value]
     from skeleton.context.questionnaire import intake
+    from skeleton.application.command_contracts import MATERIALISE_TARGETS
+
     taken = intake(request.get("answers") or {})
     runner = _require(state.gameforge, "GameForge")
     out = runner.execute(
@@ -672,14 +775,14 @@ async def gameforge_intake(http_request: Request, request: Dict[str, Any], state
         answers=request.get("answers") or {},
         project_root=request.get("project_root"),
         overwrite=_bool_field(request, "overwrite", False),
-        target=request.get("target", "godot"),
-        archetype=request.get("archetype", "extraction"),
+        target=_text_field(request, "target", "godot", allowed=MATERIALISE_TARGETS),
+        archetype=_text_field(request, "archetype", "extraction"),
     )
     files = out.get("files") or {}
     out = dict(out)
     out["intake"] = taken.to_dict()
     out["file_names"] = sorted(files)
-    if not request.get("include_files"):
+    if not _bool_field(request, "include_files", False):
         out.pop("files", None)
     _idempotency.remember(dict(http_request.headers), out)
     return out

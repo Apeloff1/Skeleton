@@ -4,6 +4,23 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-17 — F-22..F-27 fail-closed numbers/text and CLI/template/sidecar audits
+
+- Shared `require_float` / `require_text` reject bools, numeric strings, NaN/inf,
+  and unknown materialise targets. Run `title`/`target` use them. HTTP salience,
+  swarm weight, curve/currency, GameForge/forge `target`/`archetype`, and
+  `include_files` fail closed the same way.
+- Additive `developer_cli_audit` reports registry persistence commands
+  (`snapshot`/`restore`/`snapshots`) missing from `CLI_COMMANDS`, and help-only
+  `list-templates`/`validate`/`docs` living outside the registry.
+- Additive `template_audit` locks the four scaffold templates against
+  `architecture.TEMPLATES` with zero file drift.
+- Additive `sidecar_route_audit` reports GameForge/command sidecar handlers.
+  Duplicate `POST /gameforge/intake|run` remain unchartered on the sidecar;
+  `/commands/contracts` and `/commands/execute/{command}` stay undocumented.
+- Identical payloads through `--cli-audit` / `--template-audit` / `--sidecar-audit`,
+  matching HTTP audit routes, and the shared `capabilities` command.
+
 ## 2026-09-17 — F-20 fail-closed payload types + F-21 HMAC open-prefix audit
 
 - Shared `require_bool` / `require_int` reject bool-as-int (`True→1`), numeric

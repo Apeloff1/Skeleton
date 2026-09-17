@@ -21,6 +21,9 @@ Commands:
                 Use `capabilities --export-audit` for manifest export drift
                 Use `capabilities --route-audit` for main-router API_ROUTES drift
                 Use `capabilities --hmac-audit` for HMAC open-prefix vs API_ROUTES drift
+                Use `capabilities --cli-audit` for developer CLI vs CLI_COMMANDS drift
+                Use `capabilities --template-audit` for scaffold TEMPLATES drift
+                Use `capabilities --sidecar-audit` for GameForge/command sidecar routes
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
@@ -50,6 +53,9 @@ def _cmd_capabilities(rest: List[str]) -> int:
         plane_audit_snapshot,
         api_route_audit_snapshot,
         hmac_open_audit_snapshot,
+        developer_cli_audit_snapshot,
+        template_audit_snapshot,
+        sidecar_route_audit_snapshot,
     )
 
     flags = {item.strip().lower() for item in rest if item.strip()}
@@ -60,6 +66,9 @@ def _cmd_capabilities(rest: List[str]) -> int:
         "export_audit": {"--export-audit", "export-audit", "--export_audit", "export_audit"},
         "route_audit": {"--route-audit", "route-audit", "--route_audit", "route_audit"},
         "hmac_audit": {"--hmac-audit", "hmac-audit", "--hmac_audit", "hmac_audit"},
+        "cli_audit": {"--cli-audit", "cli-audit", "--cli_audit", "cli_audit"},
+        "template_audit": {"--template-audit", "template-audit", "--template_audit", "template_audit"},
+        "sidecar_audit": {"--sidecar-audit", "sidecar-audit", "--sidecar_audit", "sidecar_audit"},
     }
     allowed = set().union(*aliases.values())
     unknown = flags - allowed
@@ -71,7 +80,13 @@ def _cmd_capabilities(rest: List[str]) -> int:
         print(f"{' and '.join(selected)} are mutually exclusive")
         return 2
     view = selected[0] if selected else ""
-    if view == "hmac_audit":
+    if view == "sidecar_audit":
+        payload = sidecar_route_audit_snapshot()
+    elif view == "template_audit":
+        payload = template_audit_snapshot()
+    elif view == "cli_audit":
+        payload = developer_cli_audit_snapshot()
+    elif view == "hmac_audit":
         payload = hmac_open_audit_snapshot()
     elif view == "route_audit":
         payload = api_route_audit_snapshot()

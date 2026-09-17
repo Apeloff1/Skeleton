@@ -146,3 +146,79 @@ def test_http_retrieval_query_rejects_coerced_k_and_cache_flag() -> None:
     with pytest.raises(HTTPException) as coerced_cache:
         asyncio.run(routes.retrieval_query({"query": "alpha", "use_cache": "false"}, _HttpState()))
     assert coerced_cache.value.status_code == 422
+
+
+def test_require_float_rejects_bool_string_and_non_finite() -> None:
+    from skeleton.application.command_contracts import require_float
+
+    assert require_float({}, "salience", 0.5, minimum=0.0) == 0.5
+    assert require_float({"salience": 1}, "salience", 0.5, minimum=0.0) == 1.0
+    for value in (True, "0.5", None, float("nan"), float("inf")):
+        with pytest.raises(CommandError):
+            require_float({"salience": value}, "salience", 0.5, minimum=0.0)
+
+
+def test_require_text_rejects_non_strings_and_unknown_targets() -> None:
+    from skeleton.application.command_contracts import MATERIALISE_TARGETS, require_text
+
+    assert require_text({}, "target", "json", allowed=MATERIALISE_TARGETS) == "json"
+    assert require_text({"title": "Arena"}, "title", None, optional=True) == "Arena"
+    assert require_text({}, "title", None, optional=True) is None
+    with pytest.raises(CommandError):
+        require_text({"target": 1}, "target", "json", allowed=MATERIALISE_TARGETS)
+    with pytest.raises(CommandError):
+        require_text({"target": "unity"}, "target", "json", allowed=MATERIALISE_TARGETS)
+
+
+def test_run_command_rejects_coerced_target_and_title() -> None:
+    service = build_runtime_command_service(_State())
+    ok = service.execute("run", {"answers": {}, "target": "godot", "title": "Arena"})
+    assert ok.ok is True
+
+    for payload in (
+        {"answers": {}, "target": True},
+        {"answers": {}, "target": "unity"},
+        {"answers": {}, "title": 12},
+    ):
+        result = service.execute("run", payload)
+        assert result.ok is False
+        assert result.to_payload()["error"]["code"] == "invalid_argument"
+
+
+def test_http_ingest_and_include_files_reject_coerced_types() -> None:
+    from skeleton.api import routes
+
+    class _Quad:
+        def ingest_document(self, doc_id, text, metadata=None, salience=0.5):
+            self.salience = salience
+            return 1
+
+    class _Genesis:
+        handles = {"quad": _Quad()}
+
+    class _HttpState:
+        genesis = _Genesis()
+
+    body = asyncio.run(
+        routes.retrieval_ingest({"doc_id": "a", "text": "hello", "salience": 0.25}, _HttpState())
+    )
+    assert body["status"] == "ingested"
+
+    with pytest.raises(HTTPException) as coerced:
+        asyncio.run(routes.retrieval_ingest({"doc_id": "a", "text": "hello", "salience": True}, _HttpState()))
+    assert coerced.value.status_code == 422
+
+    class _Forge:
+        def execute(self, *args, **kwargs):
+            return {"files": {"a.gd": "x"}}
+
+    class _GameState:
+        gameforge = _Forge()
+
+    kept = asyncio.run(routes.gameforge_run(type("R", (), {"headers": {}})(), {"include_files": True}, _GameState()))
+    assert "files" in kept
+    stripped = asyncio.run(routes.gameforge_run(type("R", (), {"headers": {}})(), {}, _GameState()))
+    assert "files" not in stripped
+    with pytest.raises(HTTPException):
+        asyncio.run(routes.gameforge_run(type("R", (), {"headers": {}})(), {"include_files": "false"}, _GameState()))
+
