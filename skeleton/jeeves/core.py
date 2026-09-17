@@ -111,6 +111,7 @@ class Jeeves:
         self._sessions: dict[str, Session] = {}
         self._brain = None  # lazy TacticalBrain
         self._cortex = None  # lazy JeevesCortex — the model in training
+        self._game_engines = None  # lazy executable historical engine lab
         self.era = "extraction_now"
         self.last_plan = None
         self.last_walk = None
@@ -232,6 +233,78 @@ class Jeeves:
 
     def get_session(self, session_id: str) -> Session:
         return self._get(session_id)
+
+    @property
+    def game_engines(self):
+        """Lazy Pong-to-next executable engine laboratory."""
+        if self._game_engines is None:
+            from skeleton.jeeves.game_engine_runtime import ExecutableGameEngineLab
+            self._game_engines = ExecutableGameEngineLab()
+        return self._game_engines
+
+    def build_game_engine(self, era, *, gameplay_dialect: str | None = None):
+        """Create an isolated executable era sandbox owned by Jeeves."""
+        sandbox = self.game_engines.create(era, gameplay_dialect)
+        self._bus.emit(
+            "jeeves.game_engine.created",
+            {
+                "era": sandbox.era.value,
+                "family": sandbox.family.value,
+                "tree_digest": sandbox.tree.digest,
+            },
+        )
+        return sandbox
+
+    def evaluate_game_engine(self, sandbox):
+        """Run the era-specific adversarial quality suite."""
+        report = self.game_engines.evaluate(sandbox)
+        self._bus.emit(
+            "jeeves.game_engine.evaluated",
+            {
+                "era": sandbox.era.value,
+                "family": sandbox.family.value,
+                "score": report.score,
+                "passed": report.passed,
+                "failed": list(report.failed),
+            },
+        )
+        return report
+
+    def evolve_game_engine(
+        self,
+        sandbox,
+        *,
+        proposer=None,
+        target: float = 1.0,
+        max_rounds: int = 12,
+        max_candidates: int = 32,
+    ):
+        """Snapshot and adversarially improve a sandbox until its gate passes."""
+        from skeleton.jeeves.game_engine_runtime import AdversarialEngineEvolution
+
+        evolution = AdversarialEngineEvolution(self.game_engines)
+        session = evolution.start(sandbox)
+        strategy = proposer or evolution.canonical_candidates
+        result = evolution.evolve(
+            session,
+            strategy,
+            target=target,
+            max_rounds=max_rounds,
+            max_candidates=max_candidates,
+        )
+        self._bus.emit(
+            "jeeves.game_engine.evolved",
+            {
+                "era": sandbox.era.value,
+                "family": sandbox.family.value,
+                "target": target,
+                "target_met": result.target_met,
+                "rounds": len(result.rounds),
+                "checkpoints": len(result.session.checkpoints),
+                "tree_digest": result.session.sandbox.tree.digest,
+            },
+        )
+        return result
 
     def _brain_get(self):
         if self._brain is None:
