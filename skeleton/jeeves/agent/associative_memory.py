@@ -1,15 +1,20 @@
 """Associative L0 memory mesh layered over Jeeves index cards.
 
 ``MemoryGameIndex`` already gives Jeeves a fast cue-card layer ahead of durable
-memory and context stores.  This module adds the missing relational machinery:
+memory and context stores. This module adds the missing relational machinery:
 items can be remembered by what preceded them, what followed them, what was
 juxtaposed with them, which context changed their interpretation, and which
 short sequences repeatedly co-occurred.
 
-The mesh is deliberately *non-authoritative*.  Association strength changes
-retrieval order, never factual trust.  Cross-user edges are impossible because
-every edge and n-gram is namespace scoped.  Deep stores remain responsible for
+The mesh is deliberately *non-authoritative*. Association strength changes
+retrieval order, never factual trust. Cross-user edges are impossible because
+every edge and n-gram is namespace scoped. Deep stores remain responsible for
 provenance, evidence and durable semantic promotion.
+
+Critically, relation observation is not retrieval validation. ``observations``
+counts how often a relation was seen; ``tested_retrievals`` counts occasions on
+which the relation actually participated in a retrieval test. Untested evidence
+therefore remains neutral rather than being silently counted as failure.
 """
 
 from __future__ import annotations
@@ -23,7 +28,7 @@ from enum import Enum
 from typing import Any, Callable, Mapping, Sequence
 
 from .memory import MemoryNamespace
-from .memory_game import CardHit, InteractionCard, MemoryGameIndex, MemoryGamePolicy
+from .memory_game import CardHit, InteractionCard, MemoryGameIndex
 from .probability_frontier import retrieval_competition_probability
 from .types import AgentContractError, finite_number, json_safe, positive_int, probability, stable_fingerprint, stable_id
 
@@ -50,6 +55,7 @@ class MemoryAssociation:
     created_at: float
     updated_at: float
     observations: int = 1
+    tested_retrievals: int = 0
     successes: int = 0
     strength: float = 0.5
     surprise_ema: float = 0.0
@@ -76,8 +82,14 @@ class MemoryAssociation:
         object.__setattr__(self, "updated_at", updated)
         if isinstance(self.observations, bool) or not isinstance(self.observations, int) or self.observations <= 0:
             raise AgentContractError("association observations must be positive")
-        if isinstance(self.successes, bool) or not isinstance(self.successes, int) or not 0 <= self.successes <= self.observations:
-            raise AgentContractError("association successes must be in [0, observations]")
+        if isinstance(self.tested_retrievals, bool) or not isinstance(self.tested_retrievals, int) or self.tested_retrievals < 0:
+            raise AgentContractError("tested_retrievals must be non-negative")
+        if self.tested_retrievals > self.observations:
+            raise AgentContractError("tested_retrievals cannot exceed observations")
+        if isinstance(self.successes, bool) or not isinstance(self.successes, int) or self.successes < 0:
+            raise AgentContractError("successes must be non-negative")
+        if self.successes > self.tested_retrievals:
+            raise AgentContractError("successes cannot exceed tested_retrievals")
         for name in ("strength", "surprise_ema", "direction_confidence"):
             object.__setattr__(self, name, probability(name, getattr(self, name)))
         object.__setattr__(self, "evidence_ids", tuple(sorted({str(x) for x in self.evidence_ids if str(x)})))
@@ -85,10 +97,16 @@ class MemoryAssociation:
         object.__setattr__(self, "metadata", json_safe(dict(self.metadata)))
 
     @property
+    def retrieval_success_probability(self) -> float:
+        if self.tested_retrievals == 0:
+            return 0.5
+        return (self.successes + 1.0) / (self.tested_retrievals + 2.0)
+
+    @property
     def posterior_strength(self) -> float:
-        # Beta(1,1) smoothed success estimate blended with externally observed
-        # relation strength.  Success is about retrieval utility, not truth.
-        empirical = (self.successes + 1.0) / (self.observations + 2.0)
+        # Relation strength and measured retrieval utility are distinct signals.
+        # Untested retrievals remain neutral at 0.5 rather than becoming failures.
+        empirical = self.retrieval_success_probability
         return max(0.0, min(1.0, 0.55 * self.strength + 0.45 * empirical))
 
     @property
@@ -100,6 +118,7 @@ class MemoryAssociation:
                 "target": self.target_card_id,
                 "kind": self.kind.value,
                 "observations": self.observations,
+                "tested_retrievals": self.tested_retrievals,
                 "successes": self.successes,
                 "strength": self.strength,
                 "surprise": self.surprise_ema,
@@ -223,6 +242,7 @@ class AssociativeMemoryMesh:
                     created_at=now,
                     updated_at=now,
                     observations=1,
+                    tested_retrievals=1 if success is not None else 0,
                     successes=1 if success is True else 0,
                     strength=strength,
                     surprise_ema=surprise,
@@ -233,16 +253,14 @@ class AssociativeMemoryMesh:
                 )
             else:
                 observations = existing.observations + 1
+                tested = existing.tested_retrievals + (1 if success is not None else 0)
                 successes = existing.successes + (1 if success is True else 0)
-                # A missing success label means the relation was observed but
-                # retrieval utility was not tested; do not count it as failure.
-                if success is None:
-                    successes = existing.successes
                 rate = min(0.25, 1.0 / math.sqrt(observations))
                 association = replace(
                     existing,
                     updated_at=now,
                     observations=observations,
+                    tested_retrievals=tested,
                     successes=successes,
                     strength=(1.0 - rate) * existing.strength + rate * strength,
                     surprise_ema=0.85 * existing.surprise_ema + 0.15 * surprise,
@@ -265,9 +283,7 @@ class AssociativeMemoryMesh:
         tags: Sequence[str] = (),
     ) -> tuple[MemoryAssociation, ...]:
         ids = tuple(str(item) for item in card_ids if str(item))
-        if len(ids) < 2:
-            return ()
-        if len(set(ids)) < 2:
+        if len(ids) < 2 or len(set(ids)) < 2:
             return ()
         edges: list[MemoryAssociation] = []
         for left, right in zip(ids, ids[1:]):
@@ -316,32 +332,22 @@ class AssociativeMemoryMesh:
     ) -> tuple[MemoryAssociation, MemoryAssociation]:
         strength = 0.80 if changed_interpretation else 0.35
         surprise = 0.65 if changed_interpretation else 0.15
-        left = self.observe(
-            namespace,
-            left_card_id,
-            right_card_id,
-            kind=AssociationKind.JUXTAPOSITION,
-            strength=strength,
-            success=changed_interpretation,
-            surprise=surprise,
-            direction_confidence=0.55,
-            evidence_ids=evidence_ids,
-            tags=tuple(tags) + ("juxtaposition",),
-            metadata={"interpretation_changed": bool(changed_interpretation), "symmetric_pair": True},
-        )
-        right = self.observe(
-            namespace,
-            right_card_id,
-            left_card_id,
-            kind=AssociationKind.JUXTAPOSITION,
-            strength=strength,
-            success=changed_interpretation,
-            surprise=surprise,
-            direction_confidence=0.55,
-            evidence_ids=evidence_ids,
-            tags=tuple(tags) + ("juxtaposition",),
-            metadata={"interpretation_changed": bool(changed_interpretation), "symmetric_pair": True},
-        )
+        common = {
+            "kind": AssociationKind.JUXTAPOSITION,
+            "strength": strength,
+            "success": None,
+            "surprise": surprise,
+            "direction_confidence": 0.55,
+            "evidence_ids": evidence_ids,
+            "tags": tuple(tags) + ("juxtaposition",),
+            "metadata": {
+                "interpretation_changed": bool(changed_interpretation),
+                "symmetric_pair": True,
+                "retrieval_test": False,
+            },
+        }
+        left = self.observe(namespace, left_card_id, right_card_id, **common)
+        right = self.observe(namespace, right_card_id, left_card_id, **common)
         return left, right
 
     def neighbors(
@@ -374,7 +380,15 @@ class AssociativeMemoryMesh:
                 + self.policy.direction_weight * edge.direction_confidence
             )
             hits.append(AssociationHit(edge, max(0.0, min(1.0, score)), recency, posterior))
-        hits.sort(key=lambda item: (item.score, item.association.observations, item.association.updated_at, item.association.association_id), reverse=True)
+        hits.sort(
+            key=lambda item: (
+                item.score,
+                item.association.observations,
+                item.association.updated_at,
+                item.association.association_id,
+            ),
+            reverse=True,
+        )
         return tuple(hits[:limit_value])
 
     def predict_next(self, namespace: MemoryNamespace, prefix: Sequence[str], *, limit: int = 8) -> SequencePrediction:
@@ -396,7 +410,14 @@ class AssociativeMemoryMesh:
                     counts[gram[-1]] += count
                     evidence += count
         if not counts:
-            return SequencePrediction(namespace.key, use_prefix, (), 0.0, 0, stable_fingerprint((namespace.key, use_prefix, ())))
+            return SequencePrediction(
+                namespace.key,
+                use_prefix,
+                (),
+                0.0,
+                0,
+                stable_fingerprint((namespace.key, use_prefix, ())),
+            )
         total = sum(counts.values())
         ranked = tuple((card_id, count / total) for card_id, count in counts.most_common(limit))
         normalized = [count / total for count in counts.values()]
@@ -407,7 +428,9 @@ class AssociativeMemoryMesh:
             candidates=ranked,
             entropy_bits=entropy,
             evidence_count=evidence,
-            fingerprint=stable_fingerprint({"namespace": namespace.key, "prefix": use_prefix, "counts": sorted(counts.items())}),
+            fingerprint=stable_fingerprint(
+                {"namespace": namespace.key, "prefix": use_prefix, "counts": sorted(counts.items())}
+            ),
         )
 
     def record_retrieval_outcome(
@@ -435,7 +458,7 @@ class AssociativeMemoryMesh:
                     direction_confidence=edge.direction_confidence,
                     evidence_ids=edge.evidence_ids,
                     tags=edge.tags,
-                    metadata=edge.metadata,
+                    metadata={**dict(edge.metadata), "retrieval_test": True},
                 )
             )
         return tuple(updated)
@@ -531,16 +554,29 @@ class AssociativeMemoryGameIndex(MemoryGameIndex):
         requested_tags = {str(tag).strip().casefold() for tag in context_tags if str(tag).strip()}
         now = self._clock()
 
-        seeds = [hit for hit in direct if hit.lexical >= self.association_policy.minimum_seed_lexical or hit.context_match > 0.5]
+        seeds = [
+            hit
+            for hit in direct
+            if hit.lexical >= self.association_policy.minimum_seed_lexical or hit.context_match > 0.5
+        ]
+        allowed_namespaces = {namespace.key}
+        if namespace.session_id:
+            allowed_namespaces.add(namespace.parent().key)
         for seed in seeds[:4]:
-            for relation in self.mesh.neighbors(namespace, seed.card.card_id, limit=self.association_policy.max_neighbors):
+            for relation in self.mesh.neighbors(
+                namespace,
+                seed.card.card_id,
+                limit=self.association_policy.max_neighbors,
+            ):
                 card = self.store.get(relation.association.target_card_id)
-                if card is None or card.namespace.key not in {namespace.key, namespace.parent().key if namespace.session_id else namespace.key}:
+                if card is None or card.namespace.key not in allowed_namespaces:
                     continue
                 card_tokens = Counter({token: 1 for token in card.cue_tokens})
                 lexical = self._cosine(query_tokens, card_tokens)
                 card_tags = set(card.context_tags)
-                context_match = len(requested_tags & card_tags) / len(requested_tags) if requested_tags else 0.5
+                context_match = (
+                    len(requested_tags & card_tags) / len(requested_tags) if requested_tags else 0.5
+                )
                 activation = self.activation(card, now=now)
                 retrieval = self.predicted_retrieval(card, now=now)
                 age = max(0.0, now - card.updated_at)
@@ -551,7 +587,8 @@ class AssociativeMemoryGameIndex(MemoryGameIndex):
                     + self.policy.context_weight * context_match
                     + self.policy.trust_weight * card.trust
                     + self.policy.salience_weight * card.salience
-                    + self.policy.surprise_weight * min(1.0, 0.65 * card.surprise_ema + 0.35 * card.prediction_error_ema)
+                    + self.policy.surprise_weight
+                    * min(1.0, 0.65 * card.surprise_ema + 0.35 * card.prediction_error_ema)
                     + self.policy.recency_weight * recency
                 )
                 association_boost = min(
@@ -564,7 +601,16 @@ class AssociativeMemoryGameIndex(MemoryGameIndex):
                 if existing is None or candidate.score > existing.score:
                     by_id[card.card_id] = candidate
 
-        hits = sorted(by_id.values(), key=lambda hit: (hit.score, hit.retrieval_probability, hit.card.updated_at, hit.card.card_id), reverse=True)
+        hits = sorted(
+            by_id.values(),
+            key=lambda hit: (
+                hit.score,
+                hit.retrieval_probability,
+                hit.card.updated_at,
+                hit.card.card_id,
+            ),
+            reverse=True,
+        )
         return tuple(hits[:limit_value])
 
     def retrieval_competition(self, hits: Sequence[CardHit], target_card_id: str) -> float:
@@ -583,4 +629,6 @@ class AssociativeMemoryGameIndex(MemoryGameIndex):
 
     @property
     def associative_fingerprint(self) -> str:
-        return stable_fingerprint({"base_policy": self.policy.__class__.__name__, "mesh": self.mesh.fingerprint})
+        return stable_fingerprint(
+            {"base_policy": self.policy.__class__.__name__, "mesh": self.mesh.fingerprint}
+        )
