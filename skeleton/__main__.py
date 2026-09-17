@@ -20,6 +20,9 @@ Commands:
     session     Compose replay + AI + harbor + mass + era bind
     conductor   Run the 7-step GameForge conductor cards
     arena       Run the B100 structural sealed-replay arena
+    spec        Compile a Game Spec card from a vision
+    emit        Validate the emit-pack tree (no Godot binary)
+    doctor      Run one doctor cycle on the weakest critique axis
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
@@ -395,6 +398,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "session": return _cmd_session(rest)
     if cmd == "conductor": return _cmd_conductor(rest)
     if cmd == "arena": return _cmd_arena(rest)
+    from skeleton.game.cli_sota import dispatch
+    extra = dispatch(cmd, rest)
+    if extra is not None:
+        return extra
     if cmd == "command": return _cmd_shared_command(rest)
     if cmd == "status": return _cmd_shared_command(["status"])
     if cmd == "config": return _cmd_shared_command(["configuration"])
