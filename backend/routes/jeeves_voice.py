@@ -815,14 +815,14 @@ async def voice_speak(req: ExpressiveSpeakRequest):
         )
         out["status"] = "success"
         return out
-    except Exception as e:
+    except Exception:
         # Graceful fallback — still return the cadence-shaped script so the
         # client can fall back to on-device speech without losing the rhythm.
         return {
             "status": "fallback_text_only",
             "tone": (resolve_tone(tone)["id"]),
             "spoken_text": shape_cadence(req.text, tone),
-            "error": str(e)[:200],
+            "error": "tts_failed",
         }
 
 
@@ -876,9 +876,9 @@ async def narrate(req: NarrateRequest):
         try:
             out = await generate_expressive_tts(text=ch, tone=tone)
             clips.append({"index": i, "status": "success", **out})
-        except Exception as e:
+        except Exception:
             clips.append({"index": i, "status": "fallback_text_only",
-                          "spoken_text": shape_cadence(ch, tone), "error": str(e)[:160]})
+                          "spoken_text": shape_cadence(ch, tone), "error": "tts_failed"})
     return {"tone": resolve_tone(tone)["id"], "chunks": len(clips), "clips": clips}
 
 
@@ -972,9 +972,9 @@ async def voiced_trailer(req: TrailerRequest):
         try:
             out = await generate_expressive_tts(text=b["text"], tone=b["tone"])
             return {"label": b["label"], "status": "success", **out}
-        except Exception as e:
+        except Exception:
             return {"label": b["label"], "tone": b["tone"], "status": "fallback_text_only",
-                    "spoken_text": shape_cadence(b["text"], b["tone"]), "error": str(e)[:160]}
+                    "spoken_text": shape_cadence(b["text"], b["tone"]), "error": "tts_failed"}
 
     # Generate all 3 beats concurrently for a fast trailer.
     clips = await asyncio.gather(*[_beat(b) for b in beats])
