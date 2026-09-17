@@ -58,7 +58,7 @@ LANES: Final[tuple[SotaLane, ...]] = (
         owner_issue=943,
         status="contract",
         evidence="structural",
-        module="skeleton.forge",
+        module="skeleton.game.session",
         next_contract="deterministic mechanics + replay #936",
     ),
     SotaLane(
@@ -68,7 +68,7 @@ LANES: Final[tuple[SotaLane, ...]] = (
         owner_issue=944,
         status="contract",
         evidence="structural",
-        module="skeleton.cortex",
+        module="skeleton.game.ai_policy",
         next_contract="tool capability security + eval arena",
     ),
     SotaLane(
@@ -108,7 +108,7 @@ LANES: Final[tuple[SotaLane, ...]] = (
         owner_issue=948,
         status="contract",
         evidence="structural",
-        module="skeleton.testing",
+        module="skeleton.game.replay",
         next_contract="replay evidence + flake lifecycle",
     ),
     SotaLane(
@@ -118,7 +118,7 @@ LANES: Final[tuple[SotaLane, ...]] = (
         owner_issue=949,
         status="contract",
         evidence="structural",
-        module="skeleton.vault",
+        module="skeleton.vault.tool_fence",
         next_contract="generated-code sandbox + prompt/tool injection",
     ),
     SotaLane(
