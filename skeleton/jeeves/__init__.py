@@ -19,6 +19,23 @@ from .providers import (
     OpenAIProvider,
     get_provider,
 )
+from .historical_models import (
+    BenchmarkDefinition,
+    BenchmarkDomain,
+    BenchmarkSnapshot,
+    ChampionDecision,
+    DomainScore,
+    HistoricalModelError,
+    HistoricalModelRegistry,
+    MetricDirection,
+    MissingDomainPolicy,
+    ModelIdentity,
+    ModelScore,
+    SelectionPolicy,
+    balanced_frontier_policy,
+    make_benchmark_provenance,
+    summarize_decision,
+)
 from .citations import Citation, CitationEngine
 from .assessment import (
     AdaptiveTest,
@@ -56,6 +73,7 @@ from .troubleshooting import Troubleshooter, TroubleshootingStep
 # neocortex, so a first CORTEX request must use that same lifecycle-bound model.
 _core_think = Jeeves.think
 
+
 def _jeeves_think_lazy_cortex(self, stimulus: str, *, context=None):
     cortex = self.cortex
     if callable(getattr(cortex, "think", None)):
@@ -67,6 +85,7 @@ def _jeeves_think_lazy_cortex(self, stimulus: str, *, context=None):
         })
         return trace
     return _core_think(self, stimulus, context=context)
+
 
 Jeeves.think = _jeeves_think_lazy_cortex
 
@@ -97,6 +116,21 @@ __all__ = [
     "OpenAIProvider",
     "AnthropicProvider",
     "get_provider",
+    "BenchmarkDefinition",
+    "BenchmarkDomain",
+    "BenchmarkSnapshot",
+    "ChampionDecision",
+    "DomainScore",
+    "HistoricalModelError",
+    "HistoricalModelRegistry",
+    "MetricDirection",
+    "MissingDomainPolicy",
+    "ModelIdentity",
+    "ModelScore",
+    "SelectionPolicy",
+    "balanced_frontier_policy",
+    "make_benchmark_provenance",
+    "summarize_decision",
     "Citation",
     "CitationEngine",
     "AdaptiveTest",
