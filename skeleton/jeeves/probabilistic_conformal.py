@@ -28,8 +28,6 @@ from typing import Protocol, Sequence
 
 from .probabilistic_state_space import StateSpaceError
 
-_EPSILON = 1e-15
-
 
 class ConformalPredictiveDistribution(Protocol):
     """Minimal predictive contract required by conformal calibration."""
@@ -138,9 +136,16 @@ class ConformalInterval:
     scale: float
 
     def __post_init__(self) -> None:
-        if self.target_index < 1 or self.horizon < 1:
+        if (
+            isinstance(self.target_index, bool)
+            or not isinstance(self.target_index, int)
+            or self.target_index < 1
+            or isinstance(self.horizon, bool)
+            or not isinstance(self.horizon, int)
+            or self.horizon < 1
+        ):
             raise StateSpaceError(
-                "conformal interval indices must be positive",
+                "conformal interval indices must be positive integers",
                 context={"reason": "invalid_conformal_interval"},
             )
         for name in (
@@ -168,9 +173,13 @@ class ConformalInterval:
                 "effective_alpha must lie in (0, 1)",
                 context={"reason": "invalid_conformal_interval"},
             )
-        if self.calibration_size < 1:
+        if (
+            isinstance(self.calibration_size, bool)
+            or not isinstance(self.calibration_size, int)
+            or self.calibration_size < 1
+        ):
             raise StateSpaceError(
-                "calibration_size must be positive",
+                "calibration_size must be a positive integer",
                 context={"reason": "invalid_conformal_interval"},
             )
 
@@ -200,6 +209,11 @@ class ConformalStep:
         if score < 0.0 or interval_score < 0.0:
             raise StateSpaceError(
                 "conformal scores must be non-negative",
+                context={"reason": "invalid_conformal_step"},
+            )
+        if not isinstance(self.missed, bool):
+            raise StateSpaceError(
+                "missed must be a boolean",
                 context={"reason": "invalid_conformal_step"},
             )
         if self.missed == self.interval.contains(self.actual):
@@ -478,19 +492,9 @@ def conformalize_next_forecast(
     *,
     target_index: int,
 ) -> ConformalInterval:
-    """Issue the next interval from a completed conformal report state."""
+    """Issue the next interval from a completed, integrity-checked report."""
 
-    expected = _configuration_fingerprint(report.config)
-    if report.configuration_fingerprint != expected:
-        raise StateSpaceError(
-            "conformal report configuration fingerprint mismatch",
-            context={"reason": "conformal_report_identity_mismatch"},
-        )
-    if not report.final_calibration_scores:
-        raise StateSpaceError(
-            "conformal report has no retained calibration state",
-            context={"reason": "empty_conformal_calibration"},
-        )
+    _validate_report_identity(report)
     return conformal_interval(
         predictive,
         report.final_calibration_scores,
@@ -569,6 +573,62 @@ def _validate_observation_order(observations: Sequence[ForecastObservation]) -> 
                 context={"reason": "non_monotonic_conformal_targets"},
             )
         previous = observation.target_index
+
+
+def _validate_report_identity(report: ConformalReport) -> None:
+    if not isinstance(report, ConformalReport):
+        raise StateSpaceError(
+            "report must be a ConformalReport",
+            context={"reason": "invalid_conformal_report"},
+        )
+    expected_configuration = _configuration_fingerprint(report.config)
+    if report.configuration_fingerprint != expected_configuration:
+        raise StateSpaceError(
+            "conformal report configuration fingerprint mismatch",
+            context={"reason": "conformal_report_identity_mismatch"},
+        )
+    if report.warmup_count != report.config.min_calibration:
+        raise StateSpaceError(
+            "conformal report warmup state is inconsistent",
+            context={"reason": "conformal_report_identity_mismatch"},
+        )
+    if not report.steps:
+        raise StateSpaceError(
+            "conformal report has no scored steps",
+            context={"reason": "invalid_conformal_report"},
+        )
+    if not (
+        report.config.min_calibration
+        <= len(report.final_calibration_scores)
+        <= report.config.calibration_window
+    ):
+        raise StateSpaceError(
+            "conformal report calibration state is out of bounds",
+            context={"reason": "conformal_report_identity_mismatch"},
+        )
+    for score in report.final_calibration_scores:
+        _non_negative("final_calibration_score", score)
+    if not (
+        report.config.min_alpha
+        <= report.final_effective_alpha
+        <= report.config.max_alpha
+    ):
+        raise StateSpaceError(
+            "conformal report effective alpha is out of bounds",
+            context={"reason": "conformal_report_identity_mismatch"},
+        )
+    expected_report = _report_fingerprint(
+        configuration_fingerprint=report.configuration_fingerprint,
+        warmup_count=report.warmup_count,
+        steps=report.steps,
+        final_effective_alpha=report.final_effective_alpha,
+        final_calibration_scores=report.final_calibration_scores,
+    )
+    if report.fingerprint != expected_report:
+        raise StateSpaceError(
+            "conformal report state fingerprint mismatch",
+            context={"reason": "conformal_report_identity_mismatch"},
+        )
 
 
 def _configuration_fingerprint(config: ConformalConfig) -> str:
