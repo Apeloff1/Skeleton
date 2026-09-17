@@ -630,3 +630,35 @@ def test_command_tape_correction_changes_evidence_digest() -> None:
         )
     )
     assert session.commands.tape_digest != before
+
+
+
+def test_rewind_step_rejects_conflicting_retained_commands_without_erasing_future() -> None:
+    session = PhysicsCommandRollbackSession(_world(), history_capacity=32)
+    session.step((_impulse_command(0, 1.0),))
+    session.step((_impulse_command(0, 2.0),))
+    session.step((_impulse_command(0, 3.0),))
+    tape_before = session.commands.tape_digest
+    retained_ticks = session.commands.ticks()
+
+    session.rollback_to(1)
+    state_before = session.world.state_digest
+    with pytest.raises(PhysicsReplayError, match="use correction"):
+        session.step((_impulse_command(0, 99.0),))
+
+    assert session.world.tick == 1
+    assert session.world.state_digest == state_before
+    assert session.commands.ticks() == retained_ticks
+    assert session.commands.tape_digest == tape_before
+
+
+def test_rewind_step_can_reuse_identical_retained_command_frame() -> None:
+    session = PhysicsCommandRollbackSession(_world(), history_capacity=32)
+    session.step((_impulse_command(0, 1.0),))
+    session.step((_impulse_command(0, 2.0),))
+    final_digest = session.world.state_digest
+
+    session.rollback_to(1)
+    session.step((_impulse_command(0, 2.0),))
+    assert session.world.tick == 2
+    assert session.world.state_digest == final_digest
