@@ -10,7 +10,8 @@ The root observation stays factual: label, sample count, endpoint values,
 timestamp presence, and deterministic content fingerprints. Evaluation output,
 including uncertainty calibration, remains on the derived ``Feature`` plane.
 Callers that want persistence must explicitly record the returned objects in an
-evidence store.
+evidence store. Evidence construction also requires an explicit observation time;
+there is no fixture-time default that can silently become stale at persistence.
 """
 
 from __future__ import annotations
@@ -56,14 +57,20 @@ def build_historical_evidence(
     series: HistoricalSeries,
     *,
     subject_id: str,
-    observed_at: float = 1_000.0,
+    observed_at: float | None = None,
     clock_version: int = 1,
     source_id: str = "jeeves-historical-lab",
     source_kind: str = "historical-evaluation",
     uri: str | None = None,
 ) -> HistoricalEvidenceBundle:
-    """Construct factual/feature evidence without mutating any evidence store."""
+    """Construct factual/feature evidence without mutating any evidence store.
 
+    ``observed_at`` is intentionally required at runtime. Historical evidence may
+    be persisted into freshness-enforcing stores, so inventing a fixture timestamp
+    here would produce deterministically stale evidence in real deployments.
+    """
+
+    observed_at = _require_observed_at(observed_at)
     _require_report_series_alignment(report, series)
     series_fingerprint = _series_fingerprint(series)
     report_fingerprint = report.fingerprint
@@ -130,7 +137,7 @@ def build_uncertainty_evidence(
     series: HistoricalSeries,
     *,
     subject_id: str,
-    observed_at: float = 1_000.0,
+    observed_at: float | None = None,
     clock_version: int = 1,
     source_id: str = "jeeves-historical-lab",
     source_kind: str = "historical-evaluation",
@@ -139,9 +146,11 @@ def build_uncertainty_evidence(
     """Extend calibrated evidence with conformal uncertainty measurements.
 
     The same series-only observation is reused. Uncertainty diagnostics are
-    additional derived features and cannot alter factual identity.
+    additional derived features and cannot alter factual identity. ``observed_at``
+    must be supplied explicitly for the same freshness reason as base evidence.
     """
 
+    observed_at = _require_observed_at(observed_at)
     base = build_historical_evidence(
         report.robustness.full,
         series,
@@ -224,6 +233,15 @@ def _uncertainty_feature_values(report: HistoricalUncertaintyReport) -> dict[str
         "uncertainty_fingerprint": report.fingerprint,
         "robustness_fingerprint": report.robustness.fingerprint,
     }
+
+
+def _require_observed_at(observed_at: float | None) -> float:
+    if observed_at is None:
+        raise LearningEvidenceError(
+            "historical evidence requires an explicit observation timestamp",
+            context={"reason": "missing_observed_at", "field": "observed_at"},
+        )
+    return observed_at
 
 
 def _make_feature(
