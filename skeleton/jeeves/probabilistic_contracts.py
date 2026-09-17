@@ -4,6 +4,11 @@ This module does not promote or route a model by itself. It translates numerical
 validation evidence into an explicit eligibility decision that higher-level Jeeves
 governance may consume. Decisions retain source and policy identities so they can
 be independently integrity-checked downstream.
+
+Promotion requires exact evidence identity between the ensemble backtest and its
+calibration report: target indices, realized values, predictive mixture weights,
+means, variances, horizons, and component families must all match. Equal counts
+alone are never sufficient evidence custody.
 """
 
 from __future__ import annotations
@@ -13,7 +18,11 @@ import json
 import math
 from dataclasses import dataclass
 
-from .probabilistic_calibration import CalibrationReport
+from .probabilistic_calibration import (
+    CalibrationReport,
+    DistributionObservation,
+    calibration_observation_fingerprint,
+)
 from .probabilistic_ensemble import BayesianEnsembleReport
 from .probabilistic_state_space import StateSpaceError
 
@@ -83,6 +92,8 @@ class ProbabilisticPromotionDecision:
     average_effective_model_count: float
     ensemble_fingerprint: str
     calibration_fingerprint: str
+    calibration_target_fingerprint: str
+    evidence_observation_fingerprint: str
     gate_fingerprint: str
     fingerprint: str
 
@@ -96,7 +107,19 @@ def evaluate_probabilistic_promotion(
     """Evaluate numerical evidence without mutating or activating anything."""
 
     actual_gate = gate or ProbabilisticPromotionGate()
-    if calibration.observations != len(ensemble.steps):
+    ensemble_observations = tuple(
+        DistributionObservation(
+            forecast=step.predictive,
+            actual=step.actual,
+            target_index=step.target_index,
+        )
+        for step in ensemble.steps
+    )
+    ensemble_pairs = tuple(
+        (observation.target_index, float(observation.actual))
+        for observation in ensemble_observations
+    )
+    if calibration.observations != len(ensemble_observations):
         raise StateSpaceError(
             "ensemble and calibration evidence must cover equal fold counts",
             context={
@@ -104,6 +127,19 @@ def evaluate_probabilistic_promotion(
                 "ensemble_folds": len(ensemble.steps),
                 "calibration_observations": calibration.observations,
             },
+        )
+    if calibration.target_pairs != ensemble_pairs:
+        raise StateSpaceError(
+            "ensemble and calibration targets must match exactly",
+            context={"reason": "promotion_target_identity_mismatch"},
+        )
+    ensemble_observation_fingerprint = calibration_observation_fingerprint(
+        ensemble_observations
+    )
+    if calibration.observation_fingerprint != ensemble_observation_fingerprint:
+        raise StateSpaceError(
+            "calibration forecasts must be the exact ensemble predictive evidence",
+            context={"reason": "promotion_forecast_identity_mismatch"},
         )
 
     reasons: list[str] = []
@@ -155,6 +191,8 @@ def evaluate_probabilistic_promotion(
         average_effective_model_count=effective_model_count,
         ensemble_fingerprint=ensemble.fingerprint,
         calibration_fingerprint=calibration.fingerprint,
+        calibration_target_fingerprint=calibration.target_fingerprint,
+        evidence_observation_fingerprint=ensemble_observation_fingerprint,
         gate_fingerprint=gate_fingerprint,
     )
 
@@ -170,6 +208,8 @@ def evaluate_probabilistic_promotion(
         average_effective_model_count=effective_model_count,
         ensemble_fingerprint=ensemble.fingerprint,
         calibration_fingerprint=calibration.fingerprint,
+        calibration_target_fingerprint=calibration.target_fingerprint,
+        evidence_observation_fingerprint=ensemble_observation_fingerprint,
         gate_fingerprint=gate_fingerprint,
         fingerprint=fingerprint,
     )
@@ -227,6 +267,11 @@ def validate_probabilistic_promotion_decision(
     for name, value in (
         ("ensemble_fingerprint", decision.ensemble_fingerprint),
         ("calibration_fingerprint", decision.calibration_fingerprint),
+        ("calibration_target_fingerprint", decision.calibration_target_fingerprint),
+        (
+            "evidence_observation_fingerprint",
+            decision.evidence_observation_fingerprint,
+        ),
         ("gate_fingerprint", decision.gate_fingerprint),
         ("fingerprint", decision.fingerprint),
     ):
@@ -244,6 +289,8 @@ def validate_probabilistic_promotion_decision(
         average_effective_model_count=decision.average_effective_model_count,
         ensemble_fingerprint=decision.ensemble_fingerprint,
         calibration_fingerprint=decision.calibration_fingerprint,
+        calibration_target_fingerprint=decision.calibration_target_fingerprint,
+        evidence_observation_fingerprint=decision.evidence_observation_fingerprint,
         gate_fingerprint=decision.gate_fingerprint,
     )
     if decision.fingerprint != expected:
@@ -256,7 +303,7 @@ def validate_probabilistic_promotion_decision(
 def _gate_fingerprint(gate: ProbabilisticPromotionGate) -> str:
     return _digest(
         {
-            "schema": "jeeves.probabilistic-promotion-gate.v2",
+            "schema": "jeeves.probabilistic-promotion-gate.v3",
             "min_folds": gate.min_folds,
             "min_calibration_score": gate.min_calibration_score,
             "max_coverage_gap": gate.max_coverage_gap,
@@ -281,11 +328,13 @@ def _decision_fingerprint(
     average_effective_model_count: float,
     ensemble_fingerprint: str,
     calibration_fingerprint: str,
+    calibration_target_fingerprint: str,
+    evidence_observation_fingerprint: str,
     gate_fingerprint: str,
 ) -> str:
     return _digest(
         {
-            "schema": "jeeves.probabilistic-promotion-decision.v2",
+            "schema": "jeeves.probabilistic-promotion-decision.v3",
             "eligible": eligible,
             "reasons": list(reasons),
             "folds": folds,
@@ -297,6 +346,8 @@ def _decision_fingerprint(
             "average_effective_model_count": average_effective_model_count,
             "ensemble_fingerprint": ensemble_fingerprint,
             "calibration_fingerprint": calibration_fingerprint,
+            "calibration_target_fingerprint": calibration_target_fingerprint,
+            "evidence_observation_fingerprint": evidence_observation_fingerprint,
             "gate_fingerprint": gate_fingerprint,
         }
     )
