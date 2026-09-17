@@ -312,7 +312,11 @@ class AdaptiveContextGovernor:
         coverage = self.resolver.cards.coverage(query, cards)
         unresolved = max(0.0, min(1.0, 1.0 - coverage))
         prediction_error = self._prediction_error_pressure(cards)
-        hard_max = hard_max_tier or self.resolver.policy.maximum_tier
+        hard_max = (
+            hard_max_tier
+            if hard_max_tier is not None
+            else self.resolver.policy.maximum_tier
+        )
         if not isinstance(hard_max, ContextTier):
             hard_max = ContextTier(int(hard_max))
 
