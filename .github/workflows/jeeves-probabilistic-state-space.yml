@@ -7,18 +7,22 @@ on:
     paths:
       - 'skeleton/jeeves/probabilistic_state_space.py'
       - 'skeleton/jeeves/bayesian_regime_shift.py'
+      - 'skeleton/jeeves/gaussian_process.py'
       - 'skeleton/jeeves/__init__.py'
       - 'skeleton/testing/test_jeeves_probabilistic_state_space.py'
       - 'skeleton/testing/test_jeeves_bayesian_regime_shift.py'
+      - 'skeleton/testing/test_jeeves_gaussian_process.py'
       - '.github/workflows/jeeves-probabilistic-state-space.yml'
   push:
     branches: [main]
     paths:
       - 'skeleton/jeeves/probabilistic_state_space.py'
       - 'skeleton/jeeves/bayesian_regime_shift.py'
+      - 'skeleton/jeeves/gaussian_process.py'
       - 'skeleton/jeeves/__init__.py'
       - 'skeleton/testing/test_jeeves_probabilistic_state_space.py'
       - 'skeleton/testing/test_jeeves_bayesian_regime_shift.py'
+      - 'skeleton/testing/test_jeeves_gaussian_process.py'
       - '.github/workflows/jeeves-probabilistic-state-space.yml'
 
 concurrency:
@@ -37,7 +41,7 @@ jobs:
     name: Probabilistic forecasting regression
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - name: Checkout without persisted credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -61,10 +65,12 @@ jobs:
         run: |
           python -m compileall -q \
             skeleton/jeeves/probabilistic_state_space.py \
-            skeleton/jeeves/bayesian_regime_shift.py
+            skeleton/jeeves/bayesian_regime_shift.py \
+            skeleton/jeeves/gaussian_process.py
 
-      - name: Run probabilistic and regime-shift regressions
+      - name: Run probabilistic forecasting regressions
         run: |
           python -m pytest -q \
             skeleton/testing/test_jeeves_probabilistic_state_space.py \
-            skeleton/testing/test_jeeves_bayesian_regime_shift.py
+            skeleton/testing/test_jeeves_bayesian_regime_shift.py \
+            skeleton/testing/test_jeeves_gaussian_process.py
