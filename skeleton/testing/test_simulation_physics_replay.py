@@ -241,3 +241,18 @@ def test_replay_detects_changed_runtime_logic_via_configuration_guard() -> None:
 
     with pytest.raises(PhysicsSnapshotError, match="configuration"):
         replay_physics(changed_world, tape)
+
+
+
+def test_zero_frame_replay_chain_still_binds_initial_snapshot() -> None:
+    recorder = PhysicsReplayRecorder(_world())
+    tape = recorder.tape()
+    assert tape.chain_digest != "0" * 64
+
+    alternate = _world()
+    alternate.get_body("ball").apply_impulse(Vec3(1.0, 0.0, 0.0))
+    alternate_initial = alternate.capture_snapshot()
+    tampered = replace(tape, initial=alternate_initial)
+
+    with pytest.raises(PhysicsReplayDivergenceError, match="chain"):
+        replay_physics(_world, tampered)
