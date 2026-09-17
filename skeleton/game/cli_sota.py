@@ -24,6 +24,9 @@ def _fail(exc: Exception) -> int:
 
 
 def dispatch(cmd: str, rest: List[str]) -> int | None:
+    if cmd == "wave16":
+        from skeleton.game.cli_wave16 import run
+        return run(rest)
     table = {
         "spec": _cmd_spec, "emit": _cmd_emit, "doctor": _cmd_doctor, "turn": _cmd_turn,
         "compose": _cmd_compose, "nexus": _cmd_nexus, "packtree": _cmd_packtree,
