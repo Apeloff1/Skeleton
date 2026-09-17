@@ -30,6 +30,7 @@ from typing import Any, Mapping, Sequence
 from .context_pipeline import ContextResolution, LayeredContextResolver
 from .memory import MemoryNamespace
 from .memory_game import InteractionCard
+from .perpendicular_semantics import PerpendicularExpansionPlan, PerpendicularExpansionPlanner
 from .relational_memory import SequenceObservation
 from .semantic_frontier import FrontierLensRouter, FrontierSemanticRegistry, LensCompositionEngine, SemanticComposition
 from .semantic_lenses import LensSelection, SemanticFinding, SemanticObservation
@@ -82,6 +83,7 @@ class NuanceUpdate:
     forecasts: tuple[SemanticForecast, ...]
     tangent_nodes: tuple[TangentNode, ...]
     fingerprint: str
+    perpendicular_plan: PerpendicularExpansionPlan | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -199,6 +201,7 @@ class ScientificNuanceRuntime:
         prediction_ledger: SemanticPredictionLedger | None = None,
         tangent_bridge: SemanticTangentBridge | None = None,
         uncertainty_router: FrontierUncertaintyRouter | None = None,
+        perpendicular_planner: PerpendicularExpansionPlanner | None = None,
         policy: NuanceRuntimePolicy | None = None,
     ) -> None:
         if not isinstance(resolver, LayeredContextResolver):
@@ -211,6 +214,7 @@ class ScientificNuanceRuntime:
         self.prediction_ledger = prediction_ledger or SemanticPredictionLedger()
         self.tangent_bridge = tangent_bridge or SemanticTangentBridge()
         self.uncertainty_router = uncertainty_router or FrontierUncertaintyRouter()
+        self.perpendicular_planner = perpendicular_planner or PerpendicularExpansionPlanner(self.semantic_registry)
         self.policy = policy or NuanceRuntimePolicy()
         self._frames: dict[str, NuanceFrame] = {}
         self._updates: dict[str, NuanceUpdate] = {}
@@ -413,11 +417,28 @@ class ScientificNuanceRuntime:
         forecasts = self.predictive_model.propose(validated, composition=composition)
         for forecast in forecasts:
             self.prediction_ledger.add(forecast)
-        tangents = self.tangent_bridge.ingest(
-            validated,
-            composition=composition,
-            root_fingerprint=frame.fingerprint,
-            sequence=sequence,
+        tangents = list(
+            self.tangent_bridge.ingest(
+                validated,
+                composition=composition,
+                root_fingerprint=frame.fingerprint,
+                sequence=sequence,
+            )
+        )
+        perpendicular_plan = self.perpendicular_planner.plan(
+            frame.observations,
+            findings=validated,
+            selected_lens_keys=tuple(item.key for item in frame.lens_selection.lenses),
+        )
+        tangents.extend(
+            self.tangent_bridge.ingest_perpendicular(
+                perpendicular_plan,
+                root_fingerprint=frame.fingerprint,
+                sequence=sequence,
+            )
+        )
+        tangent_tuple = tuple(
+            sorted({item.tangent_id: item for item in tangents}.values(), key=lambda item: item.tangent_id)
         )
         fingerprint = stable_fingerprint(
             {
@@ -425,7 +446,8 @@ class ScientificNuanceRuntime:
                 "findings": [item.fingerprint for item in validated],
                 "composition": composition.fingerprint,
                 "forecasts": [item.fingerprint for item in forecasts],
-                "tangents": [item.fingerprint for item in tangents],
+                "tangents": [item.fingerprint for item in tangent_tuple],
+                "perpendicular_plan": perpendicular_plan.fingerprint,
             }
         )
         update = NuanceUpdate(
@@ -433,8 +455,9 @@ class ScientificNuanceRuntime:
             findings=validated,
             composition=composition,
             forecasts=forecasts,
-            tangent_nodes=tangents,
+            tangent_nodes=tangent_tuple,
             fingerprint=fingerprint,
+            perpendicular_plan=perpendicular_plan,
         )
         self._updates[frame.frame_id] = update
         return update
@@ -444,6 +467,20 @@ class ScientificNuanceRuntime:
         if frame is None:
             raise NuanceRuntimeError("unknown nuance frame")
         update = self._updates.get(frame.frame_id)
+        if update is None:
+            # Even if no semantic findings were registered, a restart must not
+            # discard cue-supported orthogonal directions that were visible in
+            # the frame. Persist them before checkpointing.
+            restart_plan = self.perpendicular_planner.plan(
+                frame.observations,
+                findings=(),
+                selected_lens_keys=tuple(item.key for item in frame.lens_selection.lenses),
+            )
+            self.tangent_bridge.ingest_perpendicular(
+                restart_plan,
+                root_fingerprint=frame.fingerprint,
+                sequence=sequence,
+            )
         return self.tangent_bridge.restart_packet(
             root_fingerprint=frame.fingerprint,
             sequence=sequence,
