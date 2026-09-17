@@ -8,9 +8,12 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from .constraints import JointConstraint
 from .errors import PhysicsValidationError
+
+if TYPE_CHECKING:
+    from .constraints import JointConstraint
 
 MAX_JOINT_CACHE_ENTRIES = 1_000_000
 MAX_JOINT_CACHE_AGE_TICKS = 10_000
