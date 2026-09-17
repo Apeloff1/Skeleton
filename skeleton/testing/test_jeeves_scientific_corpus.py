@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Optional
 
 import pytest
 
@@ -16,7 +17,7 @@ from skeleton.jeeves.science import (
 )
 
 
-def _artifact(identifier: str, year: int, *, digest: str | None = None) -> ResearchArtifact:
+def _artifact(identifier: str, year: int, *, digest: Optional[str] = None) -> ResearchArtifact:
     return ResearchArtifact(
         artifact_id=identifier,
         title=identifier,
