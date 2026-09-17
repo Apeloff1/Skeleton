@@ -9,7 +9,9 @@ on:
       - "skeleton/jeeves/probabilistic_ensemble.py"
       - "skeleton/jeeves/probabilistic_calibration.py"
       - "skeleton/jeeves/probabilistic_conformal.py"
+      - "skeleton/jeeves/probabilistic_conformal_stratified.py"
       - "skeleton/jeeves/probabilistic_contracts.py"
+      - "skeleton/jeeves/probabilistic_governance.py"
       - "skeleton/jeeves/probabilistic_regimes.py"
       - "skeleton/jeeves/probabilistic_arena.py"
       - "skeleton/jeeves/probabilistic_spectral.py"
@@ -18,12 +20,15 @@ on:
       - "skeleton/testing/test_jeeves_probabilistic_bayes.py"
       - "skeleton/testing/test_jeeves_probabilistic_calibration.py"
       - "skeleton/testing/test_jeeves_probabilistic_conformal.py"
+      - "skeleton/testing/test_jeeves_probabilistic_conformal_stratified.py"
       - "skeleton/testing/test_jeeves_probabilistic_contracts.py"
+      - "skeleton/testing/test_jeeves_probabilistic_governance.py"
       - "skeleton/testing/test_jeeves_probabilistic_regimes.py"
       - "skeleton/testing/test_jeeves_probabilistic_arena.py"
       - "skeleton/testing/test_jeeves_probabilistic_spectral.py"
       - "skeleton/testing/test_jeeves_probabilistic_arbitration.py"
       - "skeleton/testing/test_jeeves_probabilistic_exports.py"
+      - "skeleton/testing/test_jeeves_probabilistic_stratified_exports.py"
       - ".github/workflows/jeeves-probabilistic.yml"
   workflow_dispatch:
 
@@ -61,7 +66,9 @@ jobs:
             skeleton/jeeves/probabilistic_ensemble.py \
             skeleton/jeeves/probabilistic_calibration.py \
             skeleton/jeeves/probabilistic_conformal.py \
+            skeleton/jeeves/probabilistic_conformal_stratified.py \
             skeleton/jeeves/probabilistic_contracts.py \
+            skeleton/jeeves/probabilistic_governance.py \
             skeleton/jeeves/probabilistic_regimes.py \
             skeleton/jeeves/probabilistic_arena.py \
             skeleton/jeeves/probabilistic_spectral.py \
@@ -76,7 +83,9 @@ jobs:
             skeleton/jeeves/probabilistic_ensemble.py \
             skeleton/jeeves/probabilistic_calibration.py \
             skeleton/jeeves/probabilistic_conformal.py \
+            skeleton/jeeves/probabilistic_conformal_stratified.py \
             skeleton/jeeves/probabilistic_contracts.py \
+            skeleton/jeeves/probabilistic_governance.py \
             skeleton/jeeves/probabilistic_regimes.py \
             skeleton/jeeves/probabilistic_arena.py \
             skeleton/jeeves/probabilistic_spectral.py \
@@ -85,12 +94,15 @@ jobs:
             skeleton/testing/test_jeeves_probabilistic_bayes.py \
             skeleton/testing/test_jeeves_probabilistic_calibration.py \
             skeleton/testing/test_jeeves_probabilistic_conformal.py \
+            skeleton/testing/test_jeeves_probabilistic_conformal_stratified.py \
             skeleton/testing/test_jeeves_probabilistic_contracts.py \
+            skeleton/testing/test_jeeves_probabilistic_governance.py \
             skeleton/testing/test_jeeves_probabilistic_regimes.py \
             skeleton/testing/test_jeeves_probabilistic_arena.py \
             skeleton/testing/test_jeeves_probabilistic_spectral.py \
             skeleton/testing/test_jeeves_probabilistic_arbitration.py \
-            skeleton/testing/test_jeeves_probabilistic_exports.py
+            skeleton/testing/test_jeeves_probabilistic_exports.py \
+            skeleton/testing/test_jeeves_probabilistic_stratified_exports.py
 
       - name: Run probabilistic regression suite
         env:
@@ -101,9 +113,12 @@ jobs:
             skeleton/testing/test_jeeves_probabilistic_bayes.py \
             skeleton/testing/test_jeeves_probabilistic_calibration.py \
             skeleton/testing/test_jeeves_probabilistic_conformal.py \
+            skeleton/testing/test_jeeves_probabilistic_conformal_stratified.py \
             skeleton/testing/test_jeeves_probabilistic_contracts.py \
+            skeleton/testing/test_jeeves_probabilistic_governance.py \
             skeleton/testing/test_jeeves_probabilistic_regimes.py \
             skeleton/testing/test_jeeves_probabilistic_arena.py \
             skeleton/testing/test_jeeves_probabilistic_spectral.py \
             skeleton/testing/test_jeeves_probabilistic_arbitration.py \
-            skeleton/testing/test_jeeves_probabilistic_exports.py
+            skeleton/testing/test_jeeves_probabilistic_exports.py \
+            skeleton/testing/test_jeeves_probabilistic_stratified_exports.py
