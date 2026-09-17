@@ -118,6 +118,53 @@ def _cmd_compose(rest: List[str]) -> int:
     return 0
 
 
+def _cmd_nexus(rest: List[str]) -> int:
+    from skeleton.game.nexus_sim import simulate
+
+    try:
+        payload = simulate(seed=_seed(rest), ticks=32)
+    except Exception as exc:
+        return _fail(exc)
+    print(json.dumps({
+        "ok": True,
+        "digest": payload["digest"],
+        "extracted": payload["extracted"],
+        "tokens": payload["tokens"],
+        "passed": payload["passed"],
+        "sota_ready": payload["sota_ready"],
+        "stored_prose": payload["stored_prose"],
+    }, indent=2))
+    return 0
+
+
+def _cmd_packtree(rest: List[str]) -> int:
+    from skeleton.game.emit_tree import build, public_card
+
+    try:
+        payload = public_card(build(seed=_seed(rest)))
+    except Exception as exc:
+        return _fail(exc)
+    print(json.dumps(payload, indent=2))
+    return 0
+
+
+def _cmd_bundles(rest: List[str]) -> int:
+    from skeleton.game.zip_bundle import bundles
+
+    try:
+        payload = bundles(seed=_seed(rest))
+    except Exception as exc:
+        return _fail(exc)
+    print(json.dumps({
+        "ok": True,
+        "n": payload["n"],
+        "spec": payload["spec"],
+        "sota_ready": payload["sota_ready"],
+        "stored_prose": payload["stored_prose"],
+    }, indent=2))
+    return 0
+
+
 def dispatch(cmd: str, rest: List[str]) -> int | None:
     if cmd == "spec":
         return _cmd_spec(rest)
@@ -129,4 +176,10 @@ def dispatch(cmd: str, rest: List[str]) -> int | None:
         return _cmd_turn(rest)
     if cmd == "compose":
         return _cmd_compose(rest)
+    if cmd == "nexus":
+        return _cmd_nexus(rest)
+    if cmd == "packtree":
+        return _cmd_packtree(rest)
+    if cmd == "bundles":
+        return _cmd_bundles(rest)
     return None
