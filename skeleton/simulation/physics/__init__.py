@@ -54,13 +54,25 @@ from .snapshots import (
 )
 from .solver import SequentialImpulseSolver, SolverStats
 from .world import PhysicsSettings, PhysicsStepReceipt, PhysicsWorld
+from .commands import (
+    PhysicsCommand,
+    PhysicsCommandFrame,
+    PhysicsCommandKind,
+    PhysicsCommandTape,
+    apply_physics_commands,
+    step_physics_with_commands,
+)
 from .rollback import PhysicsRollbackSession, RollbackReceipt
 from .replay import (
+    PhysicsCommandReplayFrame,
+    PhysicsCommandReplayRecorder,
+    PhysicsCommandReplayTape,
     PhysicsReplayFrame,
     PhysicsReplayRecorder,
     PhysicsReplayTape,
     PhysicsReplayVerification,
     replay_physics,
+    replay_physics_commands,
 )
 
 __all__ = [
@@ -92,6 +104,13 @@ __all__ = [
     "Mat3",
     "PhysicsAggregate",
     "PhysicsBodyState",
+    "PhysicsCommand",
+    "PhysicsCommandFrame",
+    "PhysicsCommandKind",
+    "PhysicsCommandReplayFrame",
+    "PhysicsCommandReplayRecorder",
+    "PhysicsCommandReplayTape",
+    "PhysicsCommandTape",
     "PhysicsReplayDivergenceError",
     "PhysicsReplayError",
     "PhysicsReplayFrame",
@@ -124,6 +143,7 @@ __all__ = [
     "UnsupportedCollisionError",
     "Vec3",
     "aggregate_physics",
+    "apply_physics_commands",
     "angular_momentum",
     "build_snapshot",
     "combine_materials",
@@ -135,7 +155,9 @@ __all__ = [
     "linear_momentum",
     "raycast_body",
     "replay_physics",
+    "replay_physics_commands",
     "sphere_cast_body",
+    "step_physics_with_commands",
     "verify_snapshot",
     "world_inertia",
 ]
