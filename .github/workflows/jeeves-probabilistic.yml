@@ -23,6 +23,7 @@ on:
       - "skeleton/testing/test_jeeves_probabilistic_conformal_stratified.py"
       - "skeleton/testing/test_jeeves_probabilistic_contracts.py"
       - "skeleton/testing/test_jeeves_probabilistic_governance.py"
+      - "skeleton/testing/test_jeeves_probabilistic_governance_stress.py"
       - "skeleton/testing/test_jeeves_probabilistic_regimes.py"
       - "skeleton/testing/test_jeeves_probabilistic_arena.py"
       - "skeleton/testing/test_jeeves_probabilistic_spectral.py"
@@ -97,6 +98,7 @@ jobs:
             skeleton/testing/test_jeeves_probabilistic_conformal_stratified.py \
             skeleton/testing/test_jeeves_probabilistic_contracts.py \
             skeleton/testing/test_jeeves_probabilistic_governance.py \
+            skeleton/testing/test_jeeves_probabilistic_governance_stress.py \
             skeleton/testing/test_jeeves_probabilistic_regimes.py \
             skeleton/testing/test_jeeves_probabilistic_arena.py \
             skeleton/testing/test_jeeves_probabilistic_spectral.py \
@@ -116,6 +118,7 @@ jobs:
             skeleton/testing/test_jeeves_probabilistic_conformal_stratified.py \
             skeleton/testing/test_jeeves_probabilistic_contracts.py \
             skeleton/testing/test_jeeves_probabilistic_governance.py \
+            skeleton/testing/test_jeeves_probabilistic_governance_stress.py \
             skeleton/testing/test_jeeves_probabilistic_regimes.py \
             skeleton/testing/test_jeeves_probabilistic_arena.py \
             skeleton/testing/test_jeeves_probabilistic_spectral.py \
