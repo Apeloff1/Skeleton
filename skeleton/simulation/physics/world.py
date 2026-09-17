@@ -7,14 +7,24 @@ from dataclasses import dataclass
 from ..ecs.canonical import digest
 from .body import BodyType, RigidBody
 from .calculations import PhysicsAggregate, aggregate_physics
+from .ccd import CCDHit, ContinuousCollisionDetector
 from .collision import ContactManifold, SweepAndPruneBroadPhase, generate_manifolds
-from .errors import BodyNotFoundError, DuplicateBodyError, PhysicsValidationError
+from .constraints import ConstraintSolver, ConstraintStats, DistanceJoint
+from .contacts import ContactCache, ContactCacheEntry
+from .errors import (
+    BodyNotFoundError,
+    DuplicateBodyError,
+    DuplicateJointError,
+    JointNotFoundError,
+    PhysicsValidationError,
+)
 from .math3d import AABB, Quat, Vec3
 from .queries import Ray, RayHit, raycast_body, sort_hits, sphere_cast_body
 from .shapes import BoxShape, PlaneShape, SphereShape
 from .solver import SequentialImpulseSolver, SolverStats
 
 MAX_WORLD_BODIES = 100_000
+MAX_WORLD_JOINTS = 100_000
 MAX_STEP_COUNT = 10_000
 
 
@@ -34,6 +44,7 @@ class _BodyStepState:
 class _StepCheckpoint:
     tick: int
     body_states: tuple[tuple[str, _BodyStepState], ...]
+    contact_cache: tuple[ContactCacheEntry, ...]
     manifolds: tuple[ContactManifold, ...]
     state_digest: str
 
@@ -47,6 +58,12 @@ def _positive(value: float, *, name: str) -> float:
     return value
 
 
+def _bounded_int(value: int, *, name: str, maximum: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= maximum:
+        raise PhysicsValidationError(f"{name} outside supported range")
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class PhysicsSettings:
     fixed_dt: float = 1.0 / 60.0
@@ -55,18 +72,33 @@ class PhysicsSettings:
     sleep_angular_speed: float = 0.03
     sleep_after_seconds: float = 0.75
     max_bodies: int = 16_384
+    max_joints: int = 16_384
     max_pairs: int = 250_000
     velocity_iterations: int = 10
     position_iterations: int = 4
+    contact_cache_entries: int = 65_536
+    contact_cache_age_ticks: int = 8
+    ccd_enabled: bool = True
+    ccd_motion_threshold: float = 0.5
+    max_ccd_checks: int = 65_536
+    constraint_velocity_iterations: int = 8
+    constraint_position_iterations: int = 4
 
     def __post_init__(self) -> None:
         if not isinstance(self.gravity, Vec3):
             raise PhysicsValidationError("gravity must be Vec3")
+        if not isinstance(self.ccd_enabled, bool):
+            raise PhysicsValidationError("ccd_enabled must be boolean")
         object.__setattr__(self, "fixed_dt", _positive(self.fixed_dt, name="fixed_dt"))
         object.__setattr__(
             self,
             "sleep_after_seconds",
             _positive(self.sleep_after_seconds, name="sleep_after_seconds"),
+        )
+        object.__setattr__(
+            self,
+            "ccd_motion_threshold",
+            _positive(self.ccd_motion_threshold, name="ccd_motion_threshold"),
         )
         for name in ("sleep_linear_speed", "sleep_angular_speed"):
             value = getattr(self, name)
@@ -76,37 +108,51 @@ class PhysicsSettings:
             if not math.isfinite(value) or value < 0.0:
                 raise PhysicsValidationError(f"{name} must be finite and non-negative")
             object.__setattr__(self, name, value)
-        if (
-            isinstance(self.max_bodies, bool)
-            or not isinstance(self.max_bodies, int)
-            or not 1 <= self.max_bodies <= MAX_WORLD_BODIES
+
+        _bounded_int(self.max_bodies, name="max_bodies", maximum=MAX_WORLD_BODIES)
+        _bounded_int(self.max_joints, name="max_joints", maximum=MAX_WORLD_JOINTS)
+        _bounded_int(self.max_pairs, name="max_pairs", maximum=1_000_000)
+        _bounded_int(
+            self.contact_cache_entries,
+            name="contact_cache_entries",
+            maximum=1_000_000,
+        )
+        _bounded_int(
+            self.contact_cache_age_ticks,
+            name="contact_cache_age_ticks",
+            maximum=10_000,
+        )
+        _bounded_int(self.max_ccd_checks, name="max_ccd_checks", maximum=1_000_000)
+        for name in (
+            "velocity_iterations",
+            "position_iterations",
+            "constraint_velocity_iterations",
+            "constraint_position_iterations",
         ):
-            raise PhysicsValidationError("max_bodies outside supported range")
-        if (
-            isinstance(self.max_pairs, bool)
-            or not isinstance(self.max_pairs, int)
-            or not 1 <= self.max_pairs <= 1_000_000
-        ):
-            raise PhysicsValidationError("max_pairs outside supported range")
-        for name in ("velocity_iterations", "position_iterations"):
-            value = getattr(self, name)
-            if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 128:
-                raise PhysicsValidationError(f"{name} outside supported range")
+            _bounded_int(getattr(self, name), name=name, maximum=128)
 
     @property
     def fingerprint(self) -> str:
         return digest(
             {
-                "domain": "skeleton.simulation.physics.settings.v1",
+                "domain": "skeleton.simulation.physics.settings.v2",
                 "fixed_dt": self.fixed_dt,
                 "gravity": self.gravity.to_tuple(),
                 "sleep_linear_speed": self.sleep_linear_speed,
                 "sleep_angular_speed": self.sleep_angular_speed,
                 "sleep_after_seconds": self.sleep_after_seconds,
                 "max_bodies": self.max_bodies,
+                "max_joints": self.max_joints,
                 "max_pairs": self.max_pairs,
                 "velocity_iterations": self.velocity_iterations,
                 "position_iterations": self.position_iterations,
+                "contact_cache_entries": self.contact_cache_entries,
+                "contact_cache_age_ticks": self.contact_cache_age_ticks,
+                "ccd_enabled": self.ccd_enabled,
+                "ccd_motion_threshold": self.ccd_motion_threshold,
+                "max_ccd_checks": self.max_ccd_checks,
+                "constraint_velocity_iterations": self.constraint_velocity_iterations,
+                "constraint_position_iterations": self.constraint_position_iterations,
             }
         )
 
@@ -120,9 +166,11 @@ class PhysicsStepReceipt:
     broad_phase_pairs: int
     manifolds: int
     contact_points: int
+    ccd_clamps: int
     kinetic_energy: float
     sleeping_bodies: int
     solver: SolverStats
+    constraints: ConstraintStats
 
     @property
     def changed(self) -> bool:
@@ -135,11 +183,24 @@ class PhysicsWorld:
             raise PhysicsValidationError("settings must be PhysicsSettings")
         self.settings = settings or PhysicsSettings()
         self._bodies: dict[str, RigidBody] = {}
+        self._joints: dict[str, DistanceJoint] = {}
         self._tick = 0
         self._broad_phase = SweepAndPruneBroadPhase(max_pairs=self.settings.max_pairs)
         self._solver = SequentialImpulseSolver(
             velocity_iterations=self.settings.velocity_iterations,
             position_iterations=self.settings.position_iterations,
+        )
+        self._constraint_solver = ConstraintSolver(
+            velocity_iterations=self.settings.constraint_velocity_iterations,
+            position_iterations=self.settings.constraint_position_iterations,
+        )
+        self._contact_cache = ContactCache(
+            max_entries=self.settings.contact_cache_entries,
+            max_age_ticks=self.settings.contact_cache_age_ticks,
+        )
+        self._ccd = ContinuousCollisionDetector(
+            motion_threshold=self.settings.ccd_motion_threshold,
+            max_checks=self.settings.max_ccd_checks,
         )
         self._last_manifolds: tuple[ContactManifold, ...] = ()
 
@@ -170,13 +231,60 @@ class PhysicsWorld:
         return body
 
     def remove_body(self, body_id: str) -> RigidBody:
+        if any(
+            joint.body_a == body_id or joint.body_b == body_id
+            for joint in self._joints.values()
+        ):
+            raise PhysicsValidationError("cannot remove body referenced by joint")
         try:
-            return self._bodies.pop(body_id)
+            body = self._bodies.pop(body_id)
         except KeyError as exc:
             raise BodyNotFoundError(body_id) from exc
+        self._contact_cache.remove_body(body_id)
+        self._last_manifolds = tuple(
+            row
+            for row in self._last_manifolds
+            if row.body_a != body_id and row.body_b != body_id
+        )
+        return body
+
+    def joint_ids(self) -> tuple[str, ...]:
+        return tuple(sorted(self._joints))
+
+    def joints(self) -> tuple[DistanceJoint, ...]:
+        return tuple(self._joints[joint_id] for joint_id in self.joint_ids())
+
+    def get_joint(self, joint_id: str) -> DistanceJoint:
+        try:
+            return self._joints[joint_id]
+        except KeyError as exc:
+            raise JointNotFoundError(joint_id) from exc
+
+    def add_joint(self, joint: DistanceJoint) -> DistanceJoint:
+        if not isinstance(joint, DistanceJoint):
+            raise PhysicsValidationError("joint must be DistanceJoint")
+        if joint.joint_id in self._joints:
+            raise DuplicateJointError(joint.joint_id)
+        if len(self._joints) >= self.settings.max_joints:
+            raise PhysicsValidationError("physics world joint bound exceeded")
+        body_a = self.get_body(joint.body_a)
+        body_b = self.get_body(joint.body_b)
+        if body_a.body_type is BodyType.STATIC and body_b.body_type is BodyType.STATIC:
+            raise PhysicsValidationError("cannot bind two static bodies")
+        self._joints[joint.joint_id] = joint
+        return joint
+
+    def remove_joint(self, joint_id: str) -> DistanceJoint:
+        try:
+            return self._joints.pop(joint_id)
+        except KeyError as exc:
+            raise JointNotFoundError(joint_id) from exc
 
     def contacts(self) -> tuple[ContactManifold, ...]:
         return self._last_manifolds
+
+    def contact_cache_size(self) -> int:
+        return len(self._contact_cache)
 
     def measure(
         self,
@@ -274,10 +382,12 @@ class PhysicsWorld:
     def state_digest(self) -> str:
         return digest(
             {
-                "domain": "skeleton.simulation.physics.world_state.v1",
+                "domain": "skeleton.simulation.physics.world_state.v2",
                 "settings": self.settings.fingerprint,
                 "tick": self._tick,
                 "bodies": [self._body_record(body) for body in self.bodies()],
+                "joints": [joint.state_record() for joint in self.joints()],
+                "contact_cache": self._contact_cache.state_record(),
             }
         )
 
@@ -301,6 +411,7 @@ class PhysicsWorld:
         return _StepCheckpoint(
             tick=self._tick,
             body_states=states,
+            contact_cache=self._contact_cache.snapshot(),
             manifolds=self._last_manifolds,
             state_digest=self.state_digest,
         )
@@ -318,10 +429,26 @@ class PhysicsWorld:
             body.torque = state.torque
             body.awake = state.awake
             body.sleep_time = state.sleep_time
+        self._contact_cache.restore(checkpoint.contact_cache)
         self._tick = checkpoint.tick
         self._last_manifolds = checkpoint.manifolds
         if self.state_digest != checkpoint.state_digest:
             raise PhysicsValidationError("physics step checkpoint failed exact restoration")
+
+    def _integrate_velocity_phase(self, dt: float) -> tuple[CCDHit, ...]:
+        bodies = self.bodies()
+        hits: list[CCDHit] = []
+        for body in bodies:
+            hit = None
+            if self.settings.ccd_enabled:
+                hit = self._ccd.sweep(body, bodies, dt)
+            if hit is None:
+                body.integrate_velocity(dt)
+                continue
+            body.position = hit.center
+            body.integrate_orientation(dt)
+            hits.append(hit)
+        return tuple(hits)
 
     def _update_sleep(self, dt: float) -> None:
         linear_limit_sq = self.settings.sleep_linear_speed**2
@@ -346,23 +473,33 @@ class PhysicsWorld:
         checkpoint = self._capture_step_checkpoint()
         dt = self.settings.fixed_dt
         before = checkpoint.state_digest
+        next_tick = self._tick + 1
 
         try:
             for body in self.bodies():
                 body.integrate_forces(dt, self.settings.gravity)
-            for body in self.bodies():
-                body.integrate_velocity(dt)
+            ccd_hits = self._integrate_velocity_phase(dt)
 
             pairs = self._broad_phase.compute_pairs(self.bodies())
             manifolds = generate_manifolds(self._bodies, pairs)
-            solver_stats = self._solver.solve(self._bodies, manifolds)
+            solver_stats = self._solver.solve(
+                self._bodies,
+                manifolds,
+                cache=self._contact_cache,
+                tick=next_tick,
+            )
+            constraint_stats = self._constraint_solver.solve(
+                self._bodies,
+                self.joints(),
+                dt=dt,
+            )
 
             self._update_sleep(dt)
             for body in self.bodies():
                 body.clear_accumulators()
 
             self._last_manifolds = manifolds
-            self._tick += 1
+            self._tick = next_tick
             after = self.state_digest
             energy = sum(body.kinetic_energy() for body in self.bodies())
             sleeping = sum(
@@ -382,9 +519,11 @@ class PhysicsWorld:
             broad_phase_pairs=len(pairs),
             manifolds=len(manifolds),
             contact_points=sum(len(row.points) for row in manifolds),
+            ccd_clamps=len(ccd_hits),
             kinetic_energy=energy,
             sleeping_bodies=sleeping,
             solver=solver_stats,
+            constraints=constraint_stats,
         )
 
     def step(self, steps: int = 1) -> tuple[PhysicsStepReceipt, ...]:
