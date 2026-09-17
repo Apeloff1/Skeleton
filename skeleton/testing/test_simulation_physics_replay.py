@@ -10,6 +10,7 @@ from skeleton.simulation.physics import (
     PhysicsCommandFrame,
     PhysicsCommandKind,
     PhysicsCommandReplayRecorder,
+    PhysicsCommandRollbackSession,
     PhysicsCommandReplayTape,
     PhysicsReplayDivergenceError,
     PhysicsReplayError,
@@ -511,3 +512,121 @@ def test_command_step_requires_next_tick_frame() -> None:
     frame = PhysicsCommandFrame.build(2, ())
     with pytest.raises(PhysicsValidationError, match="next simulation tick"):
         step_physics_with_commands(world, frame)
+
+
+
+def _impulse_command(sequence: int, value: float) -> PhysicsCommand:
+    return PhysicsCommand(
+        sequence,
+        "ball",
+        PhysicsCommandKind.APPLY_IMPULSE,
+        Vec3(value, 0.0, 0.0),
+    )
+
+
+def test_late_command_correction_matches_fresh_corrected_simulation() -> None:
+    world = _world()
+    session = PhysicsCommandRollbackSession(world, history_capacity=64)
+    session.step((_impulse_command(0, 1.0),))
+    session.step(())
+    session.step(
+        (
+            PhysicsCommand(
+                0,
+                "ball",
+                PhysicsCommandKind.APPLY_FORCE,
+                Vec3(0.0, 8.0, 0.0),
+            ),
+        )
+    )
+    session.step(())
+    original_digest = world.state_digest
+
+    correction = session.correct_and_resimulate(
+        1,
+        (_impulse_command(0, 3.0),),
+    )
+    corrected_digest = world.state_digest
+    assert correction.corrected_tick == 1
+    assert correction.resimulated_through_tick == 4
+    assert corrected_digest != original_digest
+
+    fresh = _world()
+    fresh_session = PhysicsCommandRollbackSession(fresh, history_capacity=64)
+    fresh_session.step((_impulse_command(0, 3.0),))
+    fresh_session.step(())
+    fresh_session.step(
+        (
+            PhysicsCommand(
+                0,
+                "ball",
+                PhysicsCommandKind.APPLY_FORCE,
+                Vec3(0.0, 8.0, 0.0),
+            ),
+        )
+    )
+    fresh_session.step(())
+
+    assert fresh.tick == world.tick == 4
+    assert fresh.state_digest == corrected_digest
+    assert fresh_session.commands.tape_digest == session.commands.tape_digest
+
+
+def test_failed_late_input_correction_restores_world_commands_and_history() -> None:
+    world = _world()
+    session = PhysicsCommandRollbackSession(world, history_capacity=64)
+    session.step((_impulse_command(0, 1.0),))
+    session.step(())
+    session.step((_impulse_command(0, 0.5),))
+
+    before_digest = world.state_digest
+    before_tick = world.tick
+    before_history_digest = session.history_digest
+    before_tape_digest = session.commands.tape_digest
+    before_ticks = session.history.ticks()
+    original_frame = session.commands.frame(1)
+
+    class _FailingConstraintSolver:
+        def solve(self, bodies, joints, *, dt):
+            raise RuntimeError("synthetic correction failure")
+
+    world._constraint_solver = _FailingConstraintSolver()  # type: ignore[assignment]
+
+    with pytest.raises(RuntimeError, match="synthetic correction failure"):
+        session.correct_and_resimulate(
+            1,
+            (_impulse_command(0, 9.0),),
+        )
+
+    assert world.tick == before_tick
+    assert world.state_digest == before_digest
+    assert session.history.ticks() == before_ticks
+    assert session.history_digest == before_history_digest
+    assert session.commands.tape_digest == before_tape_digest
+    assert session.commands.frame(1) == original_frame
+
+
+def test_command_rollback_requires_preceding_snapshot_to_correct() -> None:
+    session = PhysicsCommandRollbackSession(_world(), history_capacity=2)
+    for _ in range(5):
+        session.step(())
+    before = session.world.state_digest
+    with pytest.raises(PhysicsSnapshotError, match="not retained"):
+        session.correct_and_resimulate(
+            1,
+            (_impulse_command(0, 2.0),),
+        )
+    assert session.world.state_digest == before
+
+
+def test_command_tape_correction_changes_evidence_digest() -> None:
+    session = PhysicsCommandRollbackSession(_world())
+    session.step((_impulse_command(0, 1.0),))
+    before = session.commands.tape_digest
+    session.commands.replace(
+        PhysicsCommandFrame.build(
+            1,
+            (_impulse_command(0, 2.0),),
+        )
+    )
+    assert session.commands.tape_digest != before
