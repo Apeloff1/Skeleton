@@ -256,3 +256,18 @@ def test_zero_frame_replay_chain_still_binds_initial_snapshot() -> None:
 
     with pytest.raises(PhysicsReplayDivergenceError, match="chain"):
         replay_physics(_world, tampered)
+
+
+
+def test_replay_tape_rejects_broken_state_digest_chain() -> None:
+    recorder = PhysicsReplayRecorder(_world())
+    recorder.step()
+    recorder.step()
+    tape = recorder.tape()
+    bad_second = replace(tape.frames[1], before_digest="f" * 64)
+    with pytest.raises(PhysicsReplayError, match="state chain"):
+        PhysicsReplayTape(
+            initial=tape.initial,
+            frames=(tape.frames[0], bad_second),
+            chain_digest=tape.chain_digest,
+        )
