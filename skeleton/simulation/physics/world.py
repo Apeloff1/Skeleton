@@ -398,6 +398,10 @@ class PhysicsWorld:
                 "bodies": [self._body_record(body) for body in self.bodies()],
                 "joints": [joint.state_record() for joint in self.joints()],
                 "contact_cache": self._contact_cache.state_record(),
+                "last_manifolds": [
+                    self._manifold_record(manifold)
+                    for manifold in self._last_manifolds
+                ],
             }
         )
 
