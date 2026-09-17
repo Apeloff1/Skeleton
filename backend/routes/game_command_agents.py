@@ -13,6 +13,7 @@ load_dotenv()
 
 XAI_API_KEY = os.getenv("XAI_API_KEY", "")
 XAI_BASE_URL = "https://api.x.ai/v1"
+_IMAGE_RENDER_ERROR = "image_render_failed"
 
 
 # =============================================================================
@@ -295,7 +296,7 @@ Render the actual game content this team produced — show what their work looks
     if not XAI_API_KEY:
         return {
             "success": False,
-            "error": "Image generation unavailable (Nano Banana returned no image and XAI_API_KEY not set).",
+            "error": _IMAGE_RENDER_ERROR,
             "prompt_used": render_prompt,
             "image_url": None,
         }
@@ -340,7 +341,7 @@ Render the actual game content this team produced — show what their work looks
             else:
                 return {
                     "success": False,
-                    "error": f"Grok API returned {response.status_code}: {response.text[:300]}",
+                    "error": _IMAGE_RENDER_ERROR,
                     "prompt_used": render_prompt,
                     "image_url": None,
                 }
@@ -348,7 +349,7 @@ Render the actual game content this team produced — show what their work looks
     except Exception:
         return {
             "success": False,
-            "error": "image_render_failed",
+            "error": _IMAGE_RENDER_ERROR,
             "prompt_used": render_prompt,
             "image_url": None,
         }
