@@ -97,6 +97,14 @@ from .epistemic_planning import (
     StressResult,
     UtilityInterval,
 )
+from .epistemic_tool_gate import (
+    AuthorizedToolDenied,
+    AuthorizedToolError,
+    BoundToolExecution,
+    PermitBoundToolExecutor,
+    ToolExecutionIntent,
+    bind_intent_metadata,
+)
 from .evidence import (
     Contradiction,
     EvidenceArtifact,
