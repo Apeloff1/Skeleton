@@ -171,56 +171,99 @@ def _sphere_cast_box(
     body: RigidBody,
     shape: BoxShape,
 ) -> RayHit | None:
-    # Slab against the expanded OBB is a cheap conservative prefilter.  We then
-    # advance using exact point-to-OBB distance, eliminating expanded-box corner
-    # false positives that would otherwise pin fast spheres outside geometry.
-    coarse = _box_intersection(ray, body, shape, expansion=radius)
-    if coarse is None:
-        return None
+    """First center-of-sphere hit against an OBB radius offset.
+
+    The distance from a point on a line to a convex box is a convex function of
+    line parameter. We first bound the possible interval with an expanded OBB,
+    locate the minimum separation deterministically, then bisect the first root.
+    This avoids the square-corner false positives of a plain expanded-box slab.
+    """
 
     local_origin = body.transform.inverse_transform_point(ray.origin)
     local_direction = body.transform.inverse_transform_vector(ray.direction).normalized()
     half = shape.half_extents
-    distance_along_ray = max(0.0, coarse.distance)
+    expanded = half + Vec3.one() * radius
+
+    t_min = 0.0
+    t_max = ray.max_distance
+    origins = local_origin.to_tuple()
+    directions = local_direction.to_tuple()
+    extents = expanded.to_tuple()
+
+    for axis in range(3):
+        origin = origins[axis]
+        direction = directions[axis]
+        extent = extents[axis]
+        if abs(direction) <= EPSILON:
+            if origin < -extent or origin > extent:
+                return None
+            continue
+        inverse = 1.0 / direction
+        near = (-extent - origin) * inverse
+        far = (extent - origin) * inverse
+        if near > far:
+            near, far = far, near
+        t_min = max(t_min, near)
+        t_max = min(t_max, far)
+        if t_min > t_max:
+            return None
+
     tolerance = max(1.0e-9, radius * 1.0e-8)
 
-    for _ in range(64):
-        if distance_along_ray > ray.max_distance:
-            return None
-        center = local_origin + local_direction * distance_along_ray
+    def separation_at(distance: float) -> float:
+        center = local_origin + local_direction * distance
+        closest = center.clamp(-half, half)
+        return (center - closest).length()
+
+    def make_hit(distance: float) -> RayHit:
+        center = local_origin + local_direction * distance
         closest = center.clamp(-half, half)
         delta = center - closest
         separation = delta.length()
-
-        if separation <= radius + tolerance:
-            if separation > EPSILON:
-                local_normal = delta / separation
-            else:
-                face_distances = (
-                    half.x - abs(center.x),
-                    half.y - abs(center.y),
-                    half.z - abs(center.z),
-                )
-                axis_index = min(range(3), key=lambda index: (face_distances[index], index))
-                sign = 1.0 if center.to_tuple()[axis_index] >= 0.0 else -1.0
-                local_normal = Vec3.axis(axis_index) * sign
-            normal = body.transform.transform_vector(local_normal).normalized()
-            return RayHit(
-                body.body_id,
-                distance_along_ray,
-                ray.point_at(distance_along_ray),
-                normal,
+        if separation > EPSILON:
+            local_normal = delta / separation
+        else:
+            face_distances = (
+                half.x - abs(center.x),
+                half.y - abs(center.y),
+                half.z - abs(center.z),
             )
+            axis_index = min(range(3), key=lambda index: (face_distances[index], index))
+            sign = 1.0 if center.to_tuple()[axis_index] >= 0.0 else -1.0
+            local_normal = Vec3.axis(axis_index) * sign
+        normal = body.transform.transform_vector(local_normal).normalized()
+        return RayHit(body.body_id, distance, ray.point_at(distance), normal)
 
-        # Euclidean distance to a closed convex set is 1-Lipschitz, so advancing
-        # by the current clearance cannot cross the first radius-offset surface.
-        advance = separation - radius
-        if advance <= tolerance:
-            advance = tolerance
-        distance_along_ray += advance
+    if separation_at(t_min) <= radius + tolerance:
+        return make_hit(t_min)
 
-    return None
+    if t_max <= t_min:
+        return None
 
+    low = t_min
+    high = t_max
+    for _ in range(64):
+        third = (high - low) / 3.0
+        left = low + third
+        right = high - third
+        if separation_at(left) <= separation_at(right):
+            high = right
+        else:
+            low = left
+    minimum_t = (low + high) * 0.5
+
+    if separation_at(minimum_t) > radius + tolerance:
+        return None
+
+    low = t_min
+    high = minimum_t
+    for _ in range(64):
+        middle = (low + high) * 0.5
+        if separation_at(middle) <= radius + tolerance:
+            high = middle
+        else:
+            low = middle
+    return make_hit(high)
 
 def sphere_cast_body(
     ray: Ray,
