@@ -8,7 +8,7 @@ from skeleton.jeeves.agent.perpendicular_semantics import PerpendicularExpansion
 from skeleton.jeeves.agent.relational_memory import RelationalMemoryIndex
 from skeleton.jeeves.agent.semantic_deep_lenses import deep_lens_lineage, deep_semantic_lenses
 from skeleton.jeeves.agent.semantic_frontier import FrontierSemanticRegistry
-from skeleton.jeeves.agent.semantic_lenses import SemanticObservation
+from skeleton.jeeves.agent.semantic_lenses import LensFamily, SemanticFinding, SemanticObservation
 
 
 def _runtime():
@@ -134,3 +134,37 @@ def test_checkpoint_runs_perpendicular_audit_without_registered_findings():
     # The graph checkpoint must be valid even when the active semantic model
     # has not yet returned findings.
     assert packet.graph_bundle.root_fingerprint == frame.fingerprint
+
+
+def test_validated_pairwise_finding_enters_relational_hypothesis_memory():
+    namespace, relations, runtime = _runtime()
+    first = runtime.prepare(namespace, "neutral face observation")
+    frame = runtime.prepare(
+        namespace,
+        "neutral face beside a coffin image creates montage contrast and juxtaposition",
+        requested_lenses=("montage_collision",),
+    )
+    prior_observation = next(
+        item
+        for item in frame.observations
+        if item.metadata.get("context_item_id") == first.captured_card_id
+    )
+    current_observation = frame.observations[0]
+    finding = SemanticFinding(
+        finding_id="finding:montage",
+        lens_key="montage_collision",
+        family=LensFamily.FILM,
+        observation_ids=(prior_observation.observation_id, current_observation.observation_id),
+        interpretation="The paired observations support a contrast reading.",
+        prediction="Changing the neighboring image should change the induced reading.",
+        confidence=0.82,
+        ambiguity=0.35,
+        novelty=0.72,
+    )
+    update = runtime.register_findings(frame, (finding,), sequence=1)
+    assert update.relational_hypothesis_ids
+    trace = relations.store.get(update.relational_hypothesis_ids[0])
+    assert trace is not None
+    assert trace.metadata["semantic_hypothesis"] is True
+    assert trace.metadata["finding_id"] == finding.finding_id
+    assert trace.kind.value == "contrast"
