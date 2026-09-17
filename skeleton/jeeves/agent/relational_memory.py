@@ -240,6 +240,7 @@ class RelationPrediction:
     target_card_id: str
     probability: float
     support_count: int
+    support_weight: float
     trust: float
     conditional_entropy: float
     closed_support: bool = True
@@ -248,6 +249,10 @@ class RelationPrediction:
         object.__setattr__(self, "source_card_id", require_id("source_card_id", self.source_card_id))
         object.__setattr__(self, "target_card_id", require_id("target_card_id", self.target_card_id))
         object.__setattr__(self, "probability", probability("transition probability", self.probability))
+        support_weight = finite_number("transition support_weight", self.support_weight)
+        if support_weight < 0:
+            raise RelationalMemoryError("support_weight must be non-negative")
+        object.__setattr__(self, "support_weight", support_weight)
         object.__setattr__(self, "trust", probability("transition trust", self.trust))
         object.__setattr__(self, "conditional_entropy", probability("conditional entropy", self.conditional_entropy))
         if isinstance(self.support_count, bool) or not isinstance(self.support_count, int) or self.support_count < 0:
@@ -538,6 +543,7 @@ class RelationalMemoryIndex:
                 target_card_id=trace.card_ids[1],
                 probability=p,
                 support_count=trace.occurrence_count,
+                support_weight=trace.support_weight,
                 trust=trace.trust,
                 conditional_entropy=entropy,
                 closed_support=False,
@@ -580,7 +586,7 @@ class RelationalMemoryIndex:
             0.0,
         )
         if probability_before <= 0.0:
-            outgoing_support = sum(item.support_count for item in existing_predictions)
+            outgoing_support = sum(item.support_weight for item in existing_predictions)
             k = len(existing_predictions)
             if k:
                 alpha = self.policy.dirichlet_alpha
@@ -727,6 +733,140 @@ class RelationalMemoryIndex:
             event_boundary_ids=tuple(dict.fromkeys(boundaries)),
             transition_predictions=initial_predictions,
             fingerprint=fingerprint,
+        )
+
+    def observe_stream_step(
+        self,
+        namespace: MemoryNamespace,
+        current_card_id: str,
+        *,
+        previous_card_ids: Sequence[str] = (),
+        context_tags: Sequence[str] = (),
+        provenance: Sequence[str] = (),
+    ) -> SequenceObservation:
+        """Learn one chronological interaction step without lookahead leakage.
+
+        The immediate previous-card transition is scored first, then learned.
+        Adjacency/co-occurrence, event-boundary state, and a length-three motif
+        are added afterwards.  If the card index exposes the older associative
+        mesh, the same observed sequence is mirrored there as the lower-level
+        spreading-activation representation.
+        """
+
+        current = require_id("current_card_id", current_card_id)
+        self._card(current)
+        history = tuple(require_id("previous_card_id", item) for item in previous_card_ids if str(item))
+        if not history:
+            return SequenceObservation(
+                created_relation_ids=(),
+                event_boundary_ids=(),
+                transition_predictions=(),
+                fingerprint=stable_fingerprint(
+                    {"namespace": namespace.key, "current": current, "history": ()}
+                ),
+            )
+        for card_id in history:
+            self._card(card_id)
+
+        previous = history[-1]
+        predictions_before = self.predictions(namespace, previous, limit=8)
+        feedback = self.record_transition(
+            namespace,
+            previous,
+            current,
+            context_tags=context_tags,
+            provenance=provenance,
+        )
+        created = [feedback.relation_id]
+        boundaries: list[str] = []
+
+        for kind, rationale in (
+            (RelationKind.ADJACENCY, "observed neighboring interaction turns"),
+            (RelationKind.CO_OCCURRENCE, "observed local interaction co-occurrence"),
+        ):
+            trace = self.link(
+                namespace,
+                kind,
+                (previous, current),
+                context_tags=context_tags,
+                surprise=feedback.surprise,
+                provenance=provenance,
+                rationale=rationale,
+            )
+            created.append(trace.relation_id)
+
+        if feedback.surprise >= self.policy.event_boundary_surprise:
+            boundary = self.link(
+                namespace,
+                RelationKind.EVENT_BOUNDARY,
+                (previous, current),
+                context_tags=context_tags,
+                surprise=feedback.surprise,
+                salience=max(0.70, feedback.surprise),
+                provenance=provenance,
+                rationale="prequential transition surprise marks candidate event boundary",
+                metadata={
+                    "prediction_error_boundary": True,
+                    "predicted_probability": feedback.predicted_probability,
+                    "brier_error": feedback.brier_error,
+                },
+            )
+            boundaries.append(boundary.relation_id)
+            created.append(boundary.relation_id)
+
+        if len(history) >= 2:
+            triple = (history[-2], previous, current)
+            triad = self.link(
+                namespace,
+                RelationKind.TRIAD,
+                triple,
+                context_tags=context_tags,
+                surprise=feedback.surprise,
+                provenance=provenance,
+                rationale="observed ordered three-turn interaction",
+            )
+            created.append(triad.relation_id)
+            if triple[0] == triple[2]:
+                motif = self.link(
+                    namespace,
+                    RelationKind.MOTIF,
+                    triple,
+                    context_tags=context_tags,
+                    salience=max(0.72, feedback.surprise),
+                    surprise=feedback.surprise,
+                    provenance=provenance,
+                    rationale="A-B-A interaction recurrence motif",
+                    metadata={"aba": True},
+                )
+                created.append(motif.relation_id)
+
+        # Synchronize with the pre-existing associative mesh when available.
+        # The mesh remains the cheap spreading-activation/ngram layer; this
+        # class remains the typed/prequential relational layer.
+        mesh = getattr(self.cards, "mesh", None)
+        if mesh is not None and hasattr(mesh, "observe_sequence"):
+            mesh.observe_sequence(
+                namespace,
+                (*history[-2:], current),
+                evidence_ids=provenance,
+                tags=context_tags,
+            )
+
+        return SequenceObservation(
+            created_relation_ids=tuple(dict.fromkeys(created)),
+            event_boundary_ids=tuple(dict.fromkeys(boundaries)),
+            transition_predictions=predictions_before,
+            fingerprint=stable_fingerprint(
+                {
+                    "namespace": namespace.key,
+                    "history": history[-2:],
+                    "current": current,
+                    "predicted_probability": feedback.predicted_probability,
+                    "surprise": feedback.surprise,
+                    "brier": feedback.brier_error,
+                    "created": sorted(set(created)),
+                }
+            ),
         )
 
     def _relation_text(self, trace: RelationTrace) -> tuple[str, tuple[str, ...]]:
