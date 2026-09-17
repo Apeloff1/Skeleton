@@ -62,7 +62,12 @@ from .commands import (
     apply_physics_commands,
     step_physics_with_commands,
 )
-from .rollback import PhysicsRollbackSession, RollbackReceipt
+from .rollback import (
+    CommandCorrectionReceipt,
+    PhysicsCommandRollbackSession,
+    PhysicsRollbackSession,
+    RollbackReceipt,
+)
 from .replay import (
     PhysicsCommandReplayFrame,
     PhysicsCommandReplayRecorder,
@@ -79,6 +84,7 @@ __all__ = [
     "AABB",
     "BodyNotFoundError",
     "CCDHit",
+    "CommandCorrectionReceipt",
     "ConstraintSolver",
     "ConstraintStats",
     "ContactCache",
@@ -110,6 +116,7 @@ __all__ = [
     "PhysicsCommandReplayFrame",
     "PhysicsCommandReplayRecorder",
     "PhysicsCommandReplayTape",
+    "PhysicsCommandRollbackSession",
     "PhysicsCommandTape",
     "PhysicsReplayDivergenceError",
     "PhysicsReplayError",
