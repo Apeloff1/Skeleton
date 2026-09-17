@@ -9,14 +9,13 @@ class WeirPackError(ValueError):
     pass
 
 
-WEIR = tuple(f"wr_{i:02d}" for i in range(12))
+WEIR = tuple(f"wr_{i:02d}" for i in range(8))
 
 
-def set_weir(node: dict[str, Any], name: str, level: int) -> dict[str, Any]:
+def set_weir(node: dict[str, Any], name: str) -> dict[str, Any]:
     if name not in WEIR:
         raise WeirPackError(name)
     nxt = dict(node)
     nxt["weir"] = name
-    nxt["level"] = max(0, min(16, int(level)))
     nxt["stored_prose"] = 0
     return nxt
