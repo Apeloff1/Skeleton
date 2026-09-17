@@ -7,6 +7,7 @@ from skeleton.jeeves.probabilistic_arbitration import (
     CrossFamilyConfig,
     ExpertKind,
 )
+from skeleton.jeeves.probabilistic_bayes import BayesianTrendConfig
 from skeleton.jeeves.probabilistic_regimes import RegimeHMMConfig
 from skeleton.jeeves.probabilistic_spectral import SpectralConfig
 from skeleton.jeeves.probabilistic_state_space import StateSpaceError
@@ -106,6 +107,7 @@ def test_cross_family_evaluation_is_deterministic() -> None:
 
     assert first == second
     assert first.fingerprint == second.fingerprint
+    assert first.configuration_fingerprint == arbitrator.configuration_fingerprint
 
 
 def test_forecast_from_report_uses_completed_posterior_weights() -> None:
@@ -140,6 +142,22 @@ def test_all_builtin_expert_kinds_can_be_arbitrated() -> None:
     assert len(forecast.components) == len(experts)
 
 
+def test_exact_bayesian_trend_is_a_first_class_expert() -> None:
+    arbitrator = CrossFamilyArbitrator(
+        experts=(ExpertKind.BAYESIAN_TREND, ExpertKind.SPECTRAL),
+        bayesian_config=BayesianTrendConfig(window=36),
+        spectral_config=SpectralConfig(max_harmonics=2, robust_iterations=2),
+    )
+    forecast = arbitrator.forecast(_series(48), horizon=4)
+
+    components = {component.expert: component for component in forecast.components}
+    bayesian = components[ExpertKind.BAYESIAN_TREND].predictive
+    assert bayesian.horizon == 4
+    assert math.isfinite(bayesian.mean)
+    assert bayesian.variance > 0.0
+    assert math.isfinite(bayesian.log_density(_series(52)[-1]))
+
+
 def test_report_identity_mismatch_fails_closed() -> None:
     values = _series(64)
     source = _fast_arbitrator()
@@ -156,6 +174,43 @@ def test_report_identity_mismatch_fails_closed() -> None:
 
     with pytest.raises(StateSpaceError):
         mismatched.forecast_from_report(values, report)
+
+
+def test_report_binds_underlying_expert_model_configs() -> None:
+    values = _series(64)
+    source = _fast_arbitrator()
+    report = source.evaluate(values)
+    mismatched = CrossFamilyArbitrator(
+        config=source.config,
+        spectral_config=SpectralConfig(
+            max_harmonics=1,
+            min_period=3.0,
+            max_period_fraction=0.75,
+            robust_iterations=2,
+        ),
+        regime_config=source.regime_config,
+    )
+
+    assert mismatched.config == source.config
+    assert mismatched.experts == source.experts
+    assert mismatched.configuration_fingerprint != source.configuration_fingerprint
+    with pytest.raises(StateSpaceError):
+        mismatched.forecast_from_report(values, report)
+
+
+def test_configuration_identity_binds_bayesian_assumptions() -> None:
+    left = CrossFamilyArbitrator(
+        experts=(ExpertKind.BAYESIAN_TREND, ExpertKind.LOCAL_LEVEL),
+        bayesian_config=BayesianTrendConfig(window=24),
+    )
+    right = CrossFamilyArbitrator(
+        experts=(ExpertKind.BAYESIAN_TREND, ExpertKind.LOCAL_LEVEL),
+        bayesian_config=BayesianTrendConfig(window=48),
+    )
+
+    assert left.config == right.config
+    assert left.experts == right.experts
+    assert left.configuration_fingerprint != right.configuration_fingerprint
 
 
 def test_prior_must_exactly_cover_experts() -> None:
