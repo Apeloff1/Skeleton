@@ -9,6 +9,7 @@ from skeleton.simulation.physics import (
     PhysicsReplayDivergenceError,
     PhysicsReplayError,
     PhysicsReplayRecorder,
+    PhysicsRollbackSession,
     PhysicsReplayTape,
     PhysicsSettings,
     PhysicsSnapshotError,
@@ -271,3 +272,61 @@ def test_replay_tape_rejects_broken_state_digest_chain() -> None:
             frames=(tape.frames[0], bad_second),
             chain_digest=tape.chain_digest,
         )
+
+
+
+def test_rollback_session_restores_and_resimulates_exact_state() -> None:
+    world = _world()
+    session = PhysicsRollbackSession(world, capacity=128)
+    session.step(40)
+    final_digest = world.state_digest
+    final_position = world.get_body("ball").position
+    assert session.snapshot_at(40).state_digest == final_digest
+
+    receipt = session.rollback_to(15)
+    assert receipt.from_tick == 40
+    assert receipt.to_tick == 15
+    assert world.tick == 15
+    assert session.history.ticks()[-1] == 15
+
+    session.resimulate_to(40)
+    assert world.tick == 40
+    assert world.state_digest == final_digest
+    assert world.get_body("ball").position == final_position
+
+
+def test_rollback_session_history_is_bounded() -> None:
+    session = PhysicsRollbackSession(_world(), capacity=4)
+    session.step(8)
+    assert len(session.history) == 4
+    assert session.history.ticks() == (5, 6, 7, 8)
+
+
+def test_rollback_session_rejects_world_topology_change() -> None:
+    world = _world()
+    session = PhysicsRollbackSession(world)
+    world.add_body(
+        RigidBody.dynamic(
+            "extra",
+            SphereShape(0.25),
+            position=Vec3(4.0, 4.0, 0.0),
+        )
+    )
+    with pytest.raises(PhysicsSnapshotError, match="configuration changed"):
+        session.step()
+
+
+def test_rollback_history_digest_changes_with_retained_timeline() -> None:
+    session = PhysicsRollbackSession(_world())
+    initial_digest = session.history_digest
+    session.step(2)
+    later_digest = session.history_digest
+    assert later_digest != initial_digest
+    session.rollback_to(0)
+    assert session.history_digest == initial_digest
+
+
+def test_rollback_session_rejects_invalid_step_count() -> None:
+    session = PhysicsRollbackSession(_world())
+    with pytest.raises(PhysicsSnapshotError, match="steps"):
+        session.step(0)
