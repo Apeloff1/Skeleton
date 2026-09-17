@@ -5,7 +5,7 @@ split into state-space filtering, exact Bayesian parameter uncertainty, online
 Bayesian ensembles, distributional calibration, adaptive and stratified
 conformal calibration, hidden-Markov regime inference, multiscale harmonic
 forecasting, cross-family arbitration, paired model comparison, and explicit
-promotion and uncertainty-governance evidence contracts.
+promotion, uncertainty-governance, and joint evidence contracts.
 """
 
 from .probabilistic_arbitration import (
@@ -84,6 +84,7 @@ from .probabilistic_contracts import (
     ProbabilisticPromotionDecision,
     ProbabilisticPromotionGate,
     evaluate_probabilistic_promotion,
+    validate_probabilistic_promotion_decision,
 )
 from .probabilistic_ensemble import (
     BayesianEnsembleConfig,
@@ -99,6 +100,13 @@ from .probabilistic_governance import (
     ConformalGovernanceDecision,
     ConformalGovernanceGate,
     evaluate_conformal_governance,
+    validate_conformal_governance_decision,
+)
+from .probabilistic_joint_governance import (
+    JointProbabilisticGovernanceDecision,
+    JointProbabilisticGovernanceGate,
+    evaluate_joint_probabilistic_governance,
+    validate_joint_probabilistic_governance_decision,
 )
 from .probabilistic_regimes import (
     GaussianRegime,
@@ -181,6 +189,8 @@ __all__ = [
     "HACComparison",
     "HarmonicComponent",
     "InnovationRegime",
+    "JointProbabilisticGovernanceDecision",
+    "JointProbabilisticGovernanceGate",
     "MixtureForecast",
     "OnlineBayesianEnsemble",
     "PitDiagnostic",
@@ -227,6 +237,7 @@ __all__ = [
     "evaluate_bayesian_trend",
     "evaluate_conformal_governance",
     "evaluate_cross_family_conformal",
+    "evaluate_joint_probabilistic_governance",
     "evaluate_predictive_arena",
     "evaluate_prequential_conformal",
     "evaluate_probabilistic_promotion",
@@ -251,5 +262,8 @@ __all__ = [
     "pinball_loss",
     "probability_integral_transform",
     "regime_forecast_crps",
+    "validate_conformal_governance_decision",
+    "validate_joint_probabilistic_governance_decision",
+    "validate_probabilistic_promotion_decision",
     "validate_stratified_conformal_report",
 ]
