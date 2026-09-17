@@ -6,7 +6,7 @@ maximization. It is an offline mathematical primitive: no provider calls, market
 data fetching, actions, or learning-state mutation occur here.
 
 Key properties:
-- scaled forward/backward recursions for numerical stability,
+- log-shifted scaled forward/backward recursions for numerical stability,
 - sticky transition regularization to discourage pathological one-step regimes,
 - deterministic state ordering by emission mean to avoid label switching,
 - posterior state probabilities and entropy,
@@ -463,25 +463,30 @@ def _forward(
     states = len(model.regimes)
     alpha = [[0.0] * states for _ in observations]
     scales = [0.0] * len(observations)
+    log_likelihood = 0.0
 
+    emissions, log_offset = _shifted_emissions(observations[0], model.regimes)
     for state in range(states):
-        alpha[0][state] = model.initial[state] * _emission_density(observations[0], model.regimes[state])
+        alpha[0][state] = model.initial[state] * emissions[state]
     scales[0] = sum(alpha[0])
     _require_positive_scale(scales[0])
     alpha[0] = [value / scales[0] for value in alpha[0]]
+    log_likelihood += math.log(scales[0]) + log_offset
 
     for t in range(1, len(observations)):
+        emissions, log_offset = _shifted_emissions(observations[t], model.regimes)
         for target in range(states):
             predicted = sum(
                 alpha[t - 1][source] * model.transition[source][target]
                 for source in range(states)
             )
-            alpha[t][target] = predicted * _emission_density(observations[t], model.regimes[target])
+            alpha[t][target] = predicted * emissions[target]
         scales[t] = sum(alpha[t])
         _require_positive_scale(scales[t])
         alpha[t] = [value / scales[t] for value in alpha[t]]
+        log_likelihood += math.log(scales[t]) + log_offset
 
-    return alpha, scales, sum(math.log(scale) for scale in scales)
+    return alpha, scales, log_likelihood
 
 
 def _backward(
@@ -494,10 +499,11 @@ def _backward(
     beta[-1] = [1.0] * states
 
     for t in range(len(observations) - 2, -1, -1):
+        emissions, _ = _shifted_emissions(observations[t + 1], model.regimes)
         for source in range(states):
             beta[t][source] = sum(
                 model.transition[source][target]
-                * _emission_density(observations[t + 1], model.regimes[target])
+                * emissions[target]
                 * beta[t + 1][target]
                 for target in range(states)
             ) / scales[t + 1]
@@ -525,6 +531,7 @@ def _xi(
     states = len(model.regimes)
     result: list[list[list[float]]] = []
     for t in range(len(observations) - 1):
+        emissions, _ = _shifted_emissions(observations[t + 1], model.regimes)
         matrix = [[0.0] * states for _ in range(states)]
         total = 0.0
         for source in range(states):
@@ -532,7 +539,7 @@ def _xi(
                 value = (
                     alpha[t][source]
                     * model.transition[source][target]
-                    * _emission_density(observations[t + 1], model.regimes[target])
+                    * emissions[target]
                     * beta[t + 1][target]
                 )
                 matrix[source][target] = value
@@ -615,12 +622,39 @@ def _ordered_model(model: RegimeHMMModel) -> RegimeHMMModel:
     return RegimeHMMModel(regimes=regimes, transition=transition, initial=initial)
 
 
-def _emission_density(value: float, regime: GaussianRegime) -> float:
-    error = value - regime.mean_change
-    variance = regime.variance_change
-    exponent = -0.5 * error * error / variance
-    # Floor protects scaled recursions from exact underflow on extreme tails.
-    return max(_EPSILON, math.exp(exponent) / math.sqrt(2.0 * math.pi * variance))
+def _shifted_emissions(
+    value: float,
+    regimes: Sequence[GaussianRegime],
+) -> tuple[tuple[float, ...], float]:
+    """Return Gaussian emission weights after subtracting the largest log density.
+
+    The common log offset is accumulated by the forward pass, so this preserves
+    the exact sequence log likelihood while preventing all state densities from
+    underflowing together on an extreme observation.
+    """
+
+    log_densities = tuple(
+        _gaussian_log_density(value - regime.mean_change, regime.variance_change)
+        for regime in regimes
+    )
+    maximum = max(log_densities)
+    if not math.isfinite(maximum):
+        raise StateSpaceError(
+            "HMM emission log density is non-finite",
+            context={"reason": "numerical_instability"},
+        )
+    weights = tuple(math.exp(log_density - maximum) for log_density in log_densities)
+    if any(not math.isfinite(weight) or weight < 0.0 for weight in weights):
+        raise StateSpaceError(
+            "HMM shifted emission weight is invalid",
+            context={"reason": "numerical_instability"},
+        )
+    if max(weights) != 1.0:
+        raise StateSpaceError(
+            "HMM shifted emissions lost their normalization anchor",
+            context={"reason": "numerical_instability"},
+        )
+    return weights, maximum
 
 
 def _gaussian_log_density(error: float, variance: float) -> float:
@@ -661,7 +695,7 @@ def _validate_probability_vector(values: Sequence[float], *, field: str) -> None
 
 
 def _require_positive_scale(value: float) -> None:
-    if not math.isfinite(value) or value <= _EPSILON:
+    if not math.isfinite(value) or value <= 0.0:
         raise StateSpaceError(
             "HMM forward/backward scale collapsed",
             context={"reason": "numerical_instability"},
