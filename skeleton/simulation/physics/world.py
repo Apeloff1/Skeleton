@@ -14,6 +14,7 @@ from .collision import (
     detect_collision,
     generate_manifolds,
 )
+from .coloring import ConstraintColorSchedule, color_constraints
 from .constraints import (
     ConstraintSolver,
     ConstraintStats,
@@ -363,6 +364,13 @@ class PhysicsWorld:
 
     def joint_cache_size(self) -> int:
         return len(self._joint_cache)
+
+    def constraint_schedule(self) -> ConstraintColorSchedule:
+        return color_constraints(
+            self._bodies,
+            self._last_manifolds,
+            self.joints(),
+        )
 
     def measure(
         self,
@@ -798,6 +806,7 @@ class PhysicsWorld:
                 contact_solver=self._solver,
                 constraint_solver=self._constraint_solver,
                 cache=self._contact_cache,
+                joint_cache=self._joint_cache,
                 tick=next_tick,
                 dt=dt,
             )
