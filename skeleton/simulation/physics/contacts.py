@@ -35,6 +35,8 @@ class ContactCacheEntry:
     feature_id: str
     normal: Vec3
     normal_impulse: float
+    tangent: Vec3
+    tangent_impulse: float
     last_tick: int
 
     def __post_init__(self) -> None:
@@ -50,6 +52,20 @@ class ContactCacheEntry:
             "normal_impulse",
             _non_negative(self.normal_impulse, name="normal_impulse"),
         )
+        if not isinstance(self.tangent, Vec3):
+            raise PhysicsValidationError("contact tangent must be Vec3")
+        tangent = self.tangent.normalized_or_zero()
+        object.__setattr__(self, "tangent", tangent)
+        if isinstance(self.tangent_impulse, bool) or not isinstance(
+            self.tangent_impulse, (int, float)
+        ):
+            raise PhysicsValidationError("tangent_impulse must be numeric")
+        tangent_impulse = float(self.tangent_impulse)
+        if not math.isfinite(tangent_impulse):
+            raise PhysicsValidationError("tangent_impulse must be finite")
+        if tangent.length_squared() == 0.0 and abs(tangent_impulse) > 0.0:
+            raise PhysicsValidationError("zero tangent cannot carry tangent impulse")
+        object.__setattr__(self, "tangent_impulse", tangent_impulse)
         if isinstance(self.last_tick, bool) or not isinstance(self.last_tick, int) or self.last_tick < 0:
             raise PhysicsValidationError("last_tick must be a non-negative integer")
 
@@ -121,6 +137,8 @@ class ContactCache:
         point: ContactPoint,
         *,
         normal_impulse: float,
+        tangent: Vec3 = Vec3(),
+        tangent_impulse: float = 0.0,
         tick: int,
     ) -> ContactCacheEntry:
         key = self.key_for(manifold, point)
@@ -133,10 +151,22 @@ class ContactCache:
             feature_id=point.feature_id,
             normal=manifold.normal,
             normal_impulse=normal_impulse,
+            tangent=tangent,
+            tangent_impulse=tangent_impulse,
             last_tick=tick,
         )
         self._entries[key] = entry
         return entry
+
+    def remove_body(self, body_id: str) -> int:
+        removed = [
+            key
+            for key, entry in self._entries.items()
+            if entry.body_a == body_id or entry.body_b == body_id
+        ]
+        for key in sorted(removed):
+            del self._entries[key]
+        return len(removed)
 
     def _evict_oldest(self) -> None:
         if not self._entries:
@@ -186,6 +216,8 @@ class ContactCache:
                 "feature_id": entry.feature_id,
                 "normal": entry.normal.to_tuple(),
                 "normal_impulse": entry.normal_impulse,
+                "tangent": entry.tangent.to_tuple(),
+                "tangent_impulse": entry.tangent_impulse,
                 "last_tick": entry.last_tick,
             }
             for entry in self.snapshot()
