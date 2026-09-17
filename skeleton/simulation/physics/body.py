@@ -248,6 +248,17 @@ class RigidBody:
             )
         self.wake()
 
+    def apply_angular_impulse(self, angular_impulse: Vec3) -> None:
+        if not self.dynamic_body:
+            return
+        if not isinstance(angular_impulse, Vec3):
+            raise PhysicsValidationError("angular_impulse must be Vec3")
+        self.angular_velocity = (
+            self.angular_velocity
+            + self.world_inverse_inertia().mul_vec(angular_impulse)
+        )
+        self.wake()
+
     def integrate_forces(self, dt: float, gravity: Vec3) -> None:
         if not self.dynamic_body or not self.awake:
             return
