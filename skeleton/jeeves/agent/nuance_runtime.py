@@ -408,6 +408,12 @@ class ScientificNuanceRuntime:
         relations = self.resolver.relations
         if relations is None or frame.captured_card_id is None:
             return ()
+        captured_card = self.resolver.cards.store.get(frame.captured_card_id)
+        if captured_card is None:
+            # A bounded fast-memory store may evict a card between prepare()
+            # and model-returned finding registration. Never reconstruct or
+            # guess an evicted identity from semantic text.
+            return ()
 
         observation_to_card: dict[str, str] = {}
         for observation in frame.observations:
@@ -419,7 +425,7 @@ class ScientificNuanceRuntime:
                 observation_to_card[observation.observation_id] = item_id
 
         created: list[RelationTrace] = []
-        namespace = self.resolver.cards.store.get(frame.captured_card_id).namespace
+        namespace = captured_card.namespace
         for finding in findings:
             spec = self.semantic_registry.get(finding.lens_key)
             if not spec.pairwise:
