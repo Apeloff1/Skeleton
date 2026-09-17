@@ -25,7 +25,11 @@ from skeleton.eval.concept_to_release import (
     retain_evidence,
     score_concept_to_release,
 )
-from skeleton.game.mechanics import CombatStyle, CombatSystemSpec, GameMechanicsGenerator
+from skeleton.game.mechanics import (
+    CombatStyle,
+    CombatSystemSpec,
+    GameMechanicsGenerator,
+)
 from skeleton.organism.quality_state import summarize_quality
 
 

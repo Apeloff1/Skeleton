@@ -23,9 +23,10 @@ import hmac
 import json
 import math
 import re
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Final, Iterable, Mapping
+from typing import Any, Final
 
 from skeleton.kernel.errors import KernelError
 
@@ -654,9 +655,7 @@ def build_summary(
 def _index_items(items: Iterable[EvidenceItem]) -> dict[str, EvidenceItem]:
     indexed: dict[str, EvidenceItem] = {}
     seen_dimensions: set[str] = set()
-    count = 0
-    for item in items:
-        count += 1
+    for count, item in enumerate(items, start=1):
         if count > MAX_EVIDENCE_ITEMS:
             raise ConceptToReleaseError(
                 "evidence bundle exceeds item bound",
