@@ -94,7 +94,8 @@ class RelationalMemoryPolicy:
     maximum_seed_cards: int = 8
     maximum_card_chars: int = 2_000
     minimum_score: float = 0.16
-    event_boundary_surprise: float = 0.72
+    event_boundary_surprise: float = 0.60
+    surprisal_scale_nats: float = 6.0
     dirichlet_alpha: float = 0.5
     half_life_seconds: float = 21.0 * 24.0 * 3600.0
 
@@ -112,6 +113,10 @@ class RelationalMemoryPolicy:
             object.__setattr__(self, name, positive_int(name, getattr(self, name), maximum=10_000_000))
         for name in ("minimum_score", "event_boundary_surprise"):
             object.__setattr__(self, name, probability(name, getattr(self, name)))
+        surprisal_scale = finite_number("surprisal_scale_nats", self.surprisal_scale_nats)
+        if surprisal_scale <= 0:
+            raise RelationalMemoryError("surprisal_scale_nats must be positive")
+        object.__setattr__(self, "surprisal_scale_nats", surprisal_scale)
         alpha = finite_number("dirichlet_alpha", self.dirichlet_alpha)
         if alpha <= 0:
             raise RelationalMemoryError("dirichlet_alpha must be positive")
@@ -594,7 +599,7 @@ class RelationalMemoryIndex:
             probability_before = alpha / (outgoing_support + alpha * (k + 1))
         if prediction_available:
             probability_before = max(_EPS, min(1.0, probability_before))
-            surprise = min(1.0, -math.log(probability_before) / 27.631021115928547)
+            surprise = min(1.0, -math.log(probability_before) / self.policy.surprisal_scale_nats)
             brier = (1.0 - probability_before) ** 2
         else:
             # No forecast existed, so there is no forecast error to score.
