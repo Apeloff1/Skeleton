@@ -90,7 +90,10 @@ class PhysicsReplayRecorder:
         self.world = world
         self.initial = world.capture_snapshot()
         self._frames: list[PhysicsReplayFrame] = []
-        self._chain = _ZERO_CHAIN
+        self._chain = chained_digest(
+            _ZERO_CHAIN,
+            {"initial_snapshot_digest": self.initial.snapshot_digest},
+        )
 
     def step(self) -> PhysicsStepReceipt:
         receipt = self.world.step()[0]
@@ -121,7 +124,10 @@ def replay_physics(
         raise PhysicsReplayError("world_factory must return PhysicsWorld")
     world.restore_snapshot(tape.initial)
 
-    chain = _ZERO_CHAIN
+    chain = chained_digest(
+        _ZERO_CHAIN,
+        {"initial_snapshot_digest": tape.initial.snapshot_digest},
+    )
     for expected in tape.frames:
         receipt = world.step()[0]
         actual = _frame_from_receipt(expected.index, receipt)
