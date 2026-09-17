@@ -24,6 +24,7 @@ from .errors import (
     PhysicsSnapshotError,
     PhysicsValidationError,
 )
+from .islands import IslandGraph, IslandGraphStats, build_islands, solve_islands
 from .math3d import EPSILON, AABB, Quat, Vec3
 from .queries import Ray, RayHit, raycast_body, sort_hits, sphere_cast_body
 from .shapes import BoxShape, PlaneShape, SphereShape
@@ -216,6 +217,7 @@ class PhysicsStepReceipt:
     sleeping_bodies: int
     solver: SolverStats
     constraints: ConstraintStats
+    islands: IslandGraphStats
 
     @property
     def changed(self) -> bool:
@@ -698,24 +700,35 @@ class PhysicsWorld:
 
         return tuple(events)
 
-    def _update_sleep(self, dt: float) -> None:
+    def _update_sleep(self, graph: IslandGraph, dt: float) -> None:
         linear_limit_sq = self.settings.sleep_linear_speed**2
         angular_limit_sq = self.settings.sleep_angular_speed**2
-        for body in self.bodies():
-            if body.body_type is not BodyType.DYNAMIC or not body.awake:
-                continue
-            quiet = (
-                body.linear_velocity.length_squared() <= linear_limit_sq
-                and body.angular_velocity.length_squared() <= angular_limit_sq
-                and body.force.length_squared() == 0.0
-                and body.torque.length_squared() == 0.0
+
+        for island in graph.islands:
+            dynamic = tuple(self._bodies[body_id] for body_id in island.dynamic_bodies)
+            active = any(
+                body.linear_velocity.length_squared() > linear_limit_sq
+                or body.angular_velocity.length_squared() > angular_limit_sq
+                or body.force.length_squared() > 0.0
+                or body.torque.length_squared() > 0.0
+                for body in dynamic
             )
-            if quiet:
-                body.sleep_time += dt
-                if body.sleep_time >= self.settings.sleep_after_seconds:
+
+            if active:
+                for body in dynamic:
+                    body.sleep_time = 0.0
+                continue
+
+            all_ready = True
+            for body in dynamic:
+                if body.awake:
+                    body.sleep_time += dt
+                if body.sleep_time < self.settings.sleep_after_seconds:
+                    all_ready = False
+
+            if all_ready:
+                for body in dynamic:
                     body.sleep()
-            else:
-                body.sleep_time = 0.0
 
     def _step_once(self) -> PhysicsStepReceipt:
         checkpoint = self._capture_step_checkpoint()
@@ -724,25 +737,38 @@ class PhysicsWorld:
         next_tick = self._tick + 1
 
         try:
+            previous_graph = build_islands(
+                self._bodies,
+                self._last_manifolds,
+                self.joints(),
+            )
+            previous_graph.propagate_awake(self._bodies)
+
             for body in self.bodies():
                 body.integrate_forces(dt, self.settings.gravity)
             ccd_hits = self._integrate_velocity_phase(dt, tick=next_tick)
 
             pairs = self._broad_phase.compute_pairs(self.bodies())
             manifolds = generate_manifolds(self._bodies, pairs)
-            solver_stats = self._solver.solve(
+            graph = build_islands(
                 self._bodies,
                 manifolds,
+                self.joints(),
+            )
+            graph.propagate_awake(self._bodies)
+            island_solve = solve_islands(
+                self._bodies,
+                graph,
+                contact_solver=self._solver,
+                constraint_solver=self._constraint_solver,
                 cache=self._contact_cache,
                 tick=next_tick,
-            )
-            constraint_stats = self._constraint_solver.solve(
-                self._bodies,
-                self.joints(),
                 dt=dt,
             )
+            solver_stats = island_solve.solver
+            constraint_stats = island_solve.constraints
 
-            self._update_sleep(dt)
+            self._update_sleep(graph, dt)
             for body in self.bodies():
                 body.clear_accumulators()
 
@@ -772,6 +798,7 @@ class PhysicsWorld:
             sleeping_bodies=sleeping,
             solver=solver_stats,
             constraints=constraint_stats,
+            islands=graph.stats,
         )
 
     def step(self, steps: int = 1) -> tuple[PhysicsStepReceipt, ...]:
