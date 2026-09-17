@@ -2,10 +2,22 @@
 
 This module keeps the public import surface compact while the implementation is
 split into state-space filtering, online Bayesian ensembles, distributional
-calibration, hidden-Markov regime inference, and explicit promotion eligibility
-contracts.
+calibration, hidden-Markov regime inference, paired model comparison, and explicit
+promotion eligibility contracts.
 """
 
+from .probabilistic_arena import (
+    ArenaCandidate,
+    ArenaFold,
+    ArenaMetrics,
+    HACComparison,
+    PredictiveArenaConfig,
+    PredictiveArenaDecision,
+    PredictiveArenaReport,
+    evaluate_predictive_arena,
+    newey_west_mean_test,
+    regime_forecast_crps,
+)
 from .probabilistic_calibration import (
     CalibrationConfig,
     CalibrationReport,
@@ -66,6 +78,9 @@ from .probabilistic_state_space import (
 )
 
 __all__ = [
+    "ArenaCandidate",
+    "ArenaFold",
+    "ArenaMetrics",
     "BayesianEnsembleConfig",
     "BayesianEnsembleReport",
     "CalibrationConfig",
@@ -77,10 +92,14 @@ __all__ = [
     "FilterStep",
     "GaussianForecast",
     "GaussianRegime",
+    "HACComparison",
     "InnovationRegime",
     "MixtureForecast",
     "OnlineBayesianEnsemble",
     "PitDiagnostic",
+    "PredictiveArenaConfig",
+    "PredictiveArenaDecision",
+    "PredictiveArenaReport",
     "ProbabilisticPromotionDecision",
     "ProbabilisticPromotionGate",
     "RegimeForecast",
@@ -101,6 +120,7 @@ __all__ = [
     "WeightedForecast",
     "calibrate_distributions",
     "central_interval",
+    "evaluate_predictive_arena",
     "evaluate_probabilistic_promotion",
     "evaluate_regime_hmm_prequential",
     "evaluate_state_space_families",
@@ -112,6 +132,8 @@ __all__ = [
     "gaussian_mixture_crps",
     "mixture_cdf",
     "mixture_quantile",
+    "newey_west_mean_test",
     "pinball_loss",
     "probability_integral_transform",
+    "regime_forecast_crps",
 ]
