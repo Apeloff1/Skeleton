@@ -97,6 +97,13 @@ class ContinuousCollisionDetector:
                 raise PhysicsValidationError("CCD check bound exceeded")
             hit = sphere_cast_body(ray, body.shape.radius, target)
             if hit is not None:
+                if (
+                    hit.distance <= EPSILON
+                    and body.linear_velocity.dot(hit.normal) >= 0.0
+                ):
+                    # Existing touching/overlap moving away is a discrete-contact
+                    # concern, not a future time-of-impact clamp.
+                    continue
                 candidates.append((hit.distance, target.body_id, hit))
 
         if not candidates:
