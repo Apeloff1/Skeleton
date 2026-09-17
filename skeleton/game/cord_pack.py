@@ -1,4 +1,4 @@
-"""Named cords / lines."""
+"""Named cords of wood."""
 
 from __future__ import annotations
 
@@ -9,15 +9,14 @@ class CordPackError(ValueError):
     pass
 
 
-CORD = tuple(f"cd_{i:02d}" for i in range(24))
+CORD = tuple(f"cd_{i:02d}" for i in range(12))
 
 
-def tie(state: dict[str, Any], name: str, a: str, b: str) -> dict[str, Any]:
+def measure(state: dict[str, Any], name: str) -> dict[str, Any]:
     if name not in CORD:
         raise CordPackError(name)
     nxt = dict(state)
-    cur = dict(nxt.get("cord") or {})
-    cur[name] = (a, b)
-    nxt["cord"] = cur
+    nxt["cord"] = name
+    nxt["wood"] = int(nxt.get("wood", 0)) + 1
     nxt["stored_prose"] = 0
     return nxt
