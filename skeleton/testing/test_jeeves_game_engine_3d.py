@@ -253,3 +253,24 @@ def test_regressing_3d_candidate_is_not_promoted() -> None:
     assert not result.promoted
     assert len(result.rounds) == 1
     assert not result.rounds[0].accepted
+
+
+def test_shader_state_identity_uses_stable_digest_not_process_hash() -> None:
+    machine = ShaderConsoleMachine()
+    frame = machine.step()
+
+    by_shader = {
+        command.shader: command.state_key[1]
+        for command in frame.commands
+    }
+    expected = {
+        name: int(
+            __import__("hashlib").sha256(
+                name.encode("utf-8")
+            ).hexdigest()[:8],
+            16,
+        )
+        for name in SHADERS
+    }
+
+    assert by_shader == expected
