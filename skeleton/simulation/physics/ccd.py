@@ -104,8 +104,7 @@ class ContinuousCollisionDetector:
         self.motion_threshold = float(motion_threshold)
         self.max_checks = max_checks
 
-    @staticmethod
-    def _eligible_continuous_sphere(body: RigidBody, dt: float) -> bool:
+    def _eligible_continuous_sphere(self, body: RigidBody, dt: float) -> bool:
         if (
             not body.continuous
             or body.body_type is not BodyType.DYNAMIC
@@ -114,7 +113,7 @@ class ContinuousCollisionDetector:
         ):
             return False
         travel = body.linear_velocity.length() * dt
-        return travel > body.shape.radius * 0.5
+        return travel > body.shape.radius * self.motion_threshold
 
     @staticmethod
     def _sphere_sphere_toi(
