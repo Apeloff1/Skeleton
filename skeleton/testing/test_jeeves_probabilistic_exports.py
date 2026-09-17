@@ -23,6 +23,22 @@ def test_probabilistic_facade_exports_core_state_space_surface() -> None:
         assert hasattr(probabilistic, name)
 
 
+def test_probabilistic_facade_exports_bayesian_parameter_surface() -> None:
+    expected = {
+        "BayesianTrendConfig",
+        "BayesianTrendEvaluation",
+        "BayesianTrendFit",
+        "BayesianTrendFold",
+        "StudentTForecast",
+        "evaluate_bayesian_trend",
+        "fit_bayesian_trend",
+        "forecast_bayesian_trend",
+    }
+    assert expected.issubset(set(probabilistic.__all__))
+    for name in expected:
+        assert hasattr(probabilistic, name)
+
+
 def test_probabilistic_facade_exports_bayesian_ensemble_surface() -> None:
     expected = {
         "BayesianEnsembleConfig",
