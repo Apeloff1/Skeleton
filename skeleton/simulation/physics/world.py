@@ -80,6 +80,7 @@ class PhysicsSettings:
     contact_cache_age_ticks: int = 8
     ccd_enabled: bool = True
     ccd_motion_threshold: float = 0.5
+    ccd_contact_slop: float = 1.0e-7
     max_ccd_checks: int = 65_536
     constraint_velocity_iterations: int = 8
     constraint_position_iterations: int = 4
@@ -100,6 +101,14 @@ class PhysicsSettings:
             "ccd_motion_threshold",
             _positive(self.ccd_motion_threshold, name="ccd_motion_threshold"),
         )
+        if (
+            isinstance(self.ccd_contact_slop, bool)
+            or not isinstance(self.ccd_contact_slop, (int, float))
+            or not math.isfinite(float(self.ccd_contact_slop))
+            or float(self.ccd_contact_slop) < 0.0
+        ):
+            raise PhysicsValidationError("ccd_contact_slop must be finite and non-negative")
+        object.__setattr__(self, "ccd_contact_slop", float(self.ccd_contact_slop))
         for name in ("sleep_linear_speed", "sleep_angular_speed"):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -150,6 +159,7 @@ class PhysicsSettings:
                 "contact_cache_age_ticks": self.contact_cache_age_ticks,
                 "ccd_enabled": self.ccd_enabled,
                 "ccd_motion_threshold": self.ccd_motion_threshold,
+                "ccd_contact_slop": self.ccd_contact_slop,
                 "max_ccd_checks": self.max_ccd_checks,
                 "constraint_velocity_iterations": self.constraint_velocity_iterations,
                 "constraint_position_iterations": self.constraint_position_iterations,
@@ -445,7 +455,7 @@ class PhysicsWorld:
             if hit is None:
                 body.integrate_velocity(dt)
                 continue
-            body.position = hit.center
+            body.position = hit.center - hit.normal * self.settings.ccd_contact_slop
             body.integrate_orientation(dt)
             hits.append(hit)
         return tuple(hits)
