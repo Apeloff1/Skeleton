@@ -51,6 +51,7 @@ class RigidBody:
     torque: Vec3 = Vec3()
     awake: bool = True
     sleep_time: float = 0.0
+    continuous: bool = False
     user_data: Any = None
 
     def __post_init__(self) -> None:
@@ -78,6 +79,8 @@ class RigidBody:
             raise PhysicsValidationError("inertia tensors must be Mat3")
         if not isinstance(self.awake, bool):
             raise PhysicsValidationError("awake must be boolean")
+        if not isinstance(self.continuous, bool):
+            raise PhysicsValidationError("continuous must be boolean")
         self.orientation = self.orientation.normalized()
         self.linear_damping = _non_negative(self.linear_damping, name="linear_damping")
         self.angular_damping = _non_negative(self.angular_damping, name="angular_damping")
@@ -116,6 +119,7 @@ class RigidBody:
         linear_damping: float = 0.05,
         angular_damping: float = 0.05,
         gravity_scale: float = 1.0,
+        continuous: bool = False,
     ) -> "RigidBody":
         props = shape.mass_properties(density)
         if props.center_of_mass != Vec3.zero():
@@ -137,6 +141,7 @@ class RigidBody:
             linear_damping=linear_damping,
             angular_damping=angular_damping,
             gravity_scale=gravity_scale,
+            continuous=continuous,
         )
 
     @classmethod
@@ -252,16 +257,22 @@ class RigidBody:
         self.linear_velocity = self.linear_velocity * math.exp(-self.linear_damping * dt)
         self.angular_velocity = self.angular_velocity * math.exp(-self.angular_damping * dt)
 
-    def integrate_velocity(self, dt: float) -> None:
+    def integrate_orientation(self, dt: float) -> None:
         if not self.movable or (self.dynamic_body and not self.awake):
             return
         dt = _non_negative(dt, name="dt")
-        self.position = self.position + self.linear_velocity * dt
         if self.angular_velocity.length_squared() > 0.0:
             self.orientation = self.orientation.integrate_world_angular_velocity(
                 self.angular_velocity,
                 dt,
             )
+
+    def integrate_velocity(self, dt: float) -> None:
+        if not self.movable or (self.dynamic_body and not self.awake):
+            return
+        dt = _non_negative(dt, name="dt")
+        self.position = self.position + self.linear_velocity * dt
+        self.integrate_orientation(dt)
 
     def clear_accumulators(self) -> None:
         self.force = Vec3.zero()
@@ -297,4 +308,5 @@ class RigidBody:
             "gravity_scale": self.gravity_scale,
             "awake": self.awake,
             "sleep_time": self.sleep_time,
+            "continuous": self.continuous,
         }
