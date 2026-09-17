@@ -1,7 +1,6 @@
 """Deterministic gameplay input commands for physics replay and rollback."""
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 from enum import Enum
 
@@ -160,7 +159,7 @@ class PhysicsCommandTape:
         )
 
 
-def apply_physics_commands(
+def _apply_physics_commands_unchecked(
     world: PhysicsWorld,
     frame: PhysicsCommandFrame,
 ) -> None:
@@ -199,3 +198,41 @@ def apply_physics_commands(
             body.wake()
         else:
             raise PhysicsValidationError(f"unsupported command kind: {command.kind}")
+
+
+
+def apply_physics_commands(
+    world: PhysicsWorld,
+    frame: PhysicsCommandFrame,
+) -> None:
+    """Apply one command frame atomically without advancing simulation."""
+
+    if not isinstance(world, PhysicsWorld):
+        raise PhysicsValidationError("command application requires PhysicsWorld")
+    if not isinstance(frame, PhysicsCommandFrame):
+        raise PhysicsValidationError("command application requires PhysicsCommandFrame")
+    before = world.capture_snapshot()
+    try:
+        _apply_physics_commands_unchecked(world, frame)
+    except Exception:
+        world.restore_snapshot(before)
+        raise
+
+
+def step_physics_with_commands(
+    world: PhysicsWorld,
+    frame: PhysicsCommandFrame,
+):
+    """Atomically apply commands and execute exactly one fixed physics tick."""
+
+    if not isinstance(world, PhysicsWorld):
+        raise PhysicsValidationError("command step requires PhysicsWorld")
+    if not isinstance(frame, PhysicsCommandFrame):
+        raise PhysicsValidationError("command step requires PhysicsCommandFrame")
+    before = world.capture_snapshot()
+    try:
+        _apply_physics_commands_unchecked(world, frame)
+        return world.step()[0]
+    except Exception:
+        world.restore_snapshot(before)
+        raise
