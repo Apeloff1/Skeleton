@@ -53,6 +53,7 @@ from .historical_uncertainty import (
 from .historical_evidence import (
     HistoricalEvidenceBundle,
     build_historical_evidence,
+    build_uncertainty_evidence,
     bundle_manifest,
 )
 from .matrices import ClomMatrix, KremMatrix, SamMatrix
@@ -173,6 +174,7 @@ __all__ = [
     "conformal_radius",
     "HistoricalEvidenceBundle",
     "build_historical_evidence",
+    "build_uncertainty_evidence",
     "bundle_manifest",
     "ClomMatrix",
     "KremMatrix",
