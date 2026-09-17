@@ -201,6 +201,26 @@ def _cmd_sim(rest: List[str]) -> int:
     return 0
 
 
+def _cmd_lab(rest: List[str]) -> int:
+    from skeleton.game.lab_sim import play
+
+    try:
+        payload = play(seed=_seed(rest), rooms=8)
+    except Exception as exc:
+        return _fail(exc)
+    print(json.dumps({
+        "ok": True,
+        "digest": payload["digest"],
+        "cycles": payload["cycles"],
+        "opened": payload["opened"],
+        "alert": payload["alert"],
+        "extract_count": payload["extract_count"],
+        "sota_ready": payload["sota_ready"],
+        "stored_prose": payload["stored_prose"],
+    }, indent=2))
+    return 0
+
+
 def dispatch(cmd: str, rest: List[str]) -> int | None:
     if cmd == "spec":
         return _cmd_spec(rest)
@@ -222,4 +242,6 @@ def dispatch(cmd: str, rest: List[str]) -> int | None:
         return _cmd_catalog(rest)
     if cmd == "sim":
         return _cmd_sim(rest)
+    if cmd == "lab":
+        return _cmd_lab(rest)
     return None
