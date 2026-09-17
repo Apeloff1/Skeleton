@@ -4,8 +4,9 @@ This module keeps the public import surface compact while the implementation is
 split into state-space filtering, exact Bayesian parameter uncertainty, online
 Bayesian ensembles, distributional calibration, adaptive and stratified
 conformal calibration, hidden-Markov regime inference, multiscale harmonic
-forecasting, cross-family arbitration, paired model comparison, and explicit
-promotion and uncertainty-governance evidence contracts.
+forecasting, cross-family and delayed multi-horizon arbitration, paired model
+comparison, and explicit promotion and uncertainty-governance evidence
+contracts.
 """
 
 from .probabilistic_arbitration import (
@@ -100,6 +101,19 @@ from .probabilistic_governance import (
     ConformalGovernanceGate,
     evaluate_conformal_governance,
 )
+from .probabilistic_horizons import (
+    HorizonConformalReport,
+    HorizonDependenceReport,
+    HorizonForecast,
+    HorizonLadder,
+    HorizonSettlement,
+    HorizonSummary,
+    MultiHorizonArbitrator,
+    MultiHorizonConfig,
+    MultiHorizonConformalReport,
+    MultiHorizonReport,
+    evaluate_multihorizon_conformal,
+)
 from .probabilistic_regimes import (
     GaussianRegime,
     RegimeForecast,
@@ -180,8 +194,18 @@ __all__ = [
     "GaussianRegime",
     "HACComparison",
     "HarmonicComponent",
+    "HorizonConformalReport",
+    "HorizonDependenceReport",
+    "HorizonForecast",
+    "HorizonLadder",
+    "HorizonSettlement",
+    "HorizonSummary",
     "InnovationRegime",
     "MixtureForecast",
+    "MultiHorizonArbitrator",
+    "MultiHorizonConfig",
+    "MultiHorizonConformalReport",
+    "MultiHorizonReport",
     "OnlineBayesianEnsemble",
     "PitDiagnostic",
     "PredictiveArenaConfig",
@@ -227,6 +251,7 @@ __all__ = [
     "evaluate_bayesian_trend",
     "evaluate_conformal_governance",
     "evaluate_cross_family_conformal",
+    "evaluate_multihorizon_conformal",
     "evaluate_predictive_arena",
     "evaluate_prequential_conformal",
     "evaluate_probabilistic_promotion",
