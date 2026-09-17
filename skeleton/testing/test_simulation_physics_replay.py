@@ -19,6 +19,7 @@ from skeleton.simulation.physics import (
     PhysicsReplayTape,
     PhysicsSettings,
     PhysicsSnapshotError,
+    PhysicsValidationError,
     PhysicsWorld,
     PlaneShape,
     RigidBody,
@@ -175,7 +176,7 @@ def test_replay_detects_tampered_frame_state_digest() -> None:
         recorder.step()
     tape = recorder.tape()
 
-    bad_frame = replace(tape.frames[1], after_digest="f" * 64)
+    bad_frame = replace(tape.frames[1], receipt_digest="f" * 64)
     tampered = replace(
         tape,
         frames=(tape.frames[0], bad_frame, *tape.frames[2:]),
