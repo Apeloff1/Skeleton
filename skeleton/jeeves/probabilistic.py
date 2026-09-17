@@ -2,10 +2,10 @@
 
 This module keeps the public import surface compact while the implementation is
 split into state-space filtering, exact Bayesian parameter uncertainty, online
-Bayesian ensembles, distributional calibration, adaptive conformal calibration,
-hidden-Markov regime inference, multiscale harmonic forecasting, cross-family
-arbitration, paired model comparison, and explicit promotion eligibility
-contracts.
+Bayesian ensembles, distributional calibration, adaptive and stratified
+conformal calibration, hidden-Markov regime inference, multiscale harmonic
+forecasting, cross-family arbitration, paired model comparison, and explicit
+promotion and uncertainty-governance evidence contracts.
 """
 
 from .probabilistic_arbitration import (
@@ -68,6 +68,18 @@ from .probabilistic_conformal import (
     evaluate_prequential_conformal,
     nonconformity_score,
 )
+from .probabilistic_conformal_stratified import (
+    ConformalBucketState,
+    ConformalStratumKey,
+    StratifiedConformalConfig,
+    StratifiedConformalReport,
+    StratifiedConformalStep,
+    StratifiedForecastInterval,
+    StratifiedForecastObservation,
+    conformalize_next_stratified_forecast,
+    evaluate_stratified_conformal,
+    validate_stratified_conformal_report,
+)
 from .probabilistic_contracts import (
     ProbabilisticPromotionDecision,
     ProbabilisticPromotionGate,
@@ -82,6 +94,11 @@ from .probabilistic_ensemble import (
     WeightedForecast,
     gaussian_mixture_crps,
     probability_integral_transform,
+)
+from .probabilistic_governance import (
+    ConformalGovernanceDecision,
+    ConformalGovernanceGate,
+    evaluate_conformal_governance,
 )
 from .probabilistic_regimes import (
     GaussianRegime,
@@ -138,11 +155,15 @@ __all__ = [
     "BayesianTrendFold",
     "CalibrationConfig",
     "CalibrationReport",
+    "ConformalBucketState",
     "ConformalConfig",
+    "ConformalGovernanceDecision",
+    "ConformalGovernanceGate",
     "ConformalInterval",
     "ConformalPredictiveDistribution",
     "ConformalReport",
     "ConformalStep",
+    "ConformalStratumKey",
     "CoverageDiagnostic",
     "CrossFamilyArbitrator",
     "CrossFamilyConfig",
@@ -189,6 +210,11 @@ __all__ = [
     "StateSpaceFit",
     "StateSpaceScore",
     "StateSpaceTournament",
+    "StratifiedConformalConfig",
+    "StratifiedConformalReport",
+    "StratifiedConformalStep",
+    "StratifiedForecastInterval",
+    "StratifiedForecastObservation",
     "StudentTForecast",
     "WeightedForecast",
     "calibrate_distributions",
@@ -196,8 +222,10 @@ __all__ = [
     "conformal_interval",
     "conformal_quantile",
     "conformalize_next_forecast",
+    "conformalize_next_stratified_forecast",
     "discover_spectral_peaks",
     "evaluate_bayesian_trend",
+    "evaluate_conformal_governance",
     "evaluate_cross_family_conformal",
     "evaluate_predictive_arena",
     "evaluate_prequential_conformal",
@@ -205,6 +233,7 @@ __all__ = [
     "evaluate_regime_hmm_prequential",
     "evaluate_spectral_complexities",
     "evaluate_state_space_families",
+    "evaluate_stratified_conformal",
     "fit_bayesian_trend",
     "fit_regime_hmm",
     "fit_spectral_model",
@@ -222,4 +251,5 @@ __all__ = [
     "pinball_loss",
     "probability_integral_transform",
     "regime_forecast_crps",
+    "validate_stratified_conformal_report",
 ]
