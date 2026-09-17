@@ -1,7 +1,7 @@
 """Scientific validation plane for cinematic, literary, ludic and semantic lenses.
 
 A rich interpretive catalog is dangerous if every coherent reading is treated
-as equally useful.  This module makes each lens earn influence through recorded
+as equally useful. This module makes each lens earn influence through recorded
 predictions, calibration, transfer across domains, independent repetitions and
 negative controls.
 
@@ -10,13 +10,12 @@ The key separation is:
     observation/evidence -> semantic hypothesis -> falsifiable forecast
       -> observed outcome -> lens reliability update
 
-No amount of narrative coherence can skip that chain.  A lens can remain useful
+No amount of narrative coherence can skip that chain. A lens can remain useful
 for hypothesis generation while being restricted or rejected as a predictor.
 """
 
 from __future__ import annotations
 
-import math
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
@@ -107,12 +106,23 @@ class JuxtapositionTrial:
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        for name in ("trial_id", "lens_key", "target_fingerprint", "context_a_fingerprint", "context_b_fingerprint", "independent_run"):
+        for name in (
+            "trial_id",
+            "lens_key",
+            "target_fingerprint",
+            "context_a_fingerprint",
+            "context_b_fingerprint",
+            "independent_run",
+        ):
             if not str(getattr(self, name)).strip():
                 raise AgentContractError(f"{name} is required")
         object.__setattr__(self, "lens_key", str(self.lens_key).strip().casefold())
         object.__setattr__(self, "domain", str(self.domain).strip().casefold())
-        object.__setattr__(self, "predicted_change_probability", probability("predicted_change_probability", self.predicted_change_probability))
+        object.__setattr__(
+            self,
+            "predicted_change_probability",
+            probability("predicted_change_probability", self.predicted_change_probability),
+        )
         if not isinstance(self.observed_interpretation_changed, bool):
             raise AgentContractError("observed_interpretation_changed must be boolean")
         object.__setattr__(self, "metadata", json_safe(dict(self.metadata)))
@@ -153,11 +163,21 @@ class ScientificLensPolicy:
     reject_ece: float = 0.30
 
     def __post_init__(self) -> None:
-        for name in ("minimum_trials", "minimum_independent_runs", "minimum_domains_for_transfer", "minimum_control_trials", "minimum_transfer_trials_per_domain"):
+        for name in (
+            "minimum_trials",
+            "minimum_independent_runs",
+            "minimum_domains_for_transfer",
+            "minimum_control_trials",
+            "minimum_transfer_trials_per_domain",
+        ):
             object.__setattr__(self, name, positive_int(name, getattr(self, name), maximum=1_000_000))
         for name in (
-            "maximum_brier", "maximum_ece", "minimum_brier_gain_over_base_rate",
-            "maximum_negative_control_positive_rate", "reject_brier", "reject_ece",
+            "maximum_brier",
+            "maximum_ece",
+            "minimum_brier_gain_over_base_rate",
+            "maximum_negative_control_positive_rate",
+            "reject_brier",
+            "reject_ece",
         ):
             object.__setattr__(self, name, probability(name, getattr(self, name)))
         if self.reject_brier < self.maximum_brier or self.reject_ece < self.maximum_ece:
@@ -173,6 +193,17 @@ class DomainCalibration:
     ece: float
     mean_probability: float
     empirical_rate: float
+
+    def as_json(self) -> dict[str, float | int | str]:
+        return {
+            "domain": self.domain,
+            "count": self.count,
+            "brier": self.brier,
+            "log_loss": self.log_loss,
+            "ece": self.ece,
+            "mean_probability": self.mean_probability,
+            "empirical_rate": self.empirical_rate,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -257,7 +288,11 @@ class ScientificLensLab:
             source_finding_id=finding.finding_id,
             observation_ids=finding.observation_ids,
             evidence_ids=finding.evidence_ids,
-            metadata={"finding_status": finding.status.value, "finding_confidence": finding.confidence, "finding_ambiguity": finding.ambiguity},
+            metadata={
+                "finding_status": finding.status.value,
+                "finding_confidence": finding.confidence,
+                "finding_ambiguity": finding.ambiguity,
+            },
         )
         return self.record(trial)
 
@@ -304,19 +339,22 @@ class ScientificLensLab:
         if controls:
             control_positive = sum(item.outcome for item in controls) / len(controls)
         domain_reports = tuple(
-            self._domain_report(domain, [item for item in trials if item.domain == domain])
-            for domain in domains
+            self._domain_report(domain, [item for item in trials if item.domain == domain]) for domain in domains
         )
         transfer_domains = sum(
-            report.count >= self.policy.minimum_transfer_trials_per_domain
-            for report in domain_reports
+            report.count >= self.policy.minimum_transfer_trials_per_domain for report in domain_reports
         )
 
         reasons: list[str] = []
         if brier >= self.policy.reject_brier or ece >= self.policy.reject_ece:
             status = ScientificLensStatus.REJECTED
             reasons.append("predictive calibration exceeds rejection threshold")
-        elif controls and len(controls) >= self.policy.minimum_control_trials and control_positive is not None and control_positive > self.policy.maximum_negative_control_positive_rate:
+        elif (
+            controls
+            and len(controls) >= self.policy.minimum_control_trials
+            and control_positive is not None
+            and control_positive > self.policy.maximum_negative_control_positive_rate
+        ):
             status = ScientificLensStatus.RESTRICTED
             reasons.append("negative controls indicate an over-sensitive lens")
         elif count < self.policy.minimum_trials or len(runs) < self.policy.minimum_independent_runs:
@@ -335,8 +373,6 @@ class ScientificLensLab:
             status = ScientificLensStatus.ACTIVE
             reasons.append("lens is replicated, calibrated, base-rate improving, and transfer-tested")
 
-        # Influence is deliberately capped.  Even an active interpretive lens
-        # remains weaker than direct evidence in host decisions.
         status_cap = {
             ScientificLensStatus.SHADOW: 0.20,
             ScientificLensStatus.CANDIDATE: 0.35,
@@ -345,8 +381,13 @@ class ScientificLensLab:
             ScientificLensStatus.REJECTED: 0.0,
         }[status]
         calibration_quality = max(0.0, 1.0 - min(1.0, 2.0 * brier + ece))
-        replication_quality = min(1.0, count / max(1, self.policy.minimum_trials)) * min(1.0, len(runs) / max(1, self.policy.minimum_independent_runs))
-        predictive_weight = min(status_cap, status_cap * (0.55 * calibration_quality + 0.45 * replication_quality))
+        replication_quality = min(1.0, count / max(1, self.policy.minimum_trials)) * min(
+            1.0, len(runs) / max(1, self.policy.minimum_independent_runs)
+        )
+        predictive_weight = min(
+            status_cap,
+            status_cap * (0.55 * calibration_quality + 0.45 * replication_quality),
+        )
 
         payload = {
             "lens": key,
@@ -361,7 +402,7 @@ class ScientificLensLab:
             "log_loss": ll,
             "controls": len(controls),
             "control_positive": control_positive,
-            "domain_reports": [report.__dict__ for report in domain_reports],
+            "domain_reports": [report.as_json() for report in domain_reports],
             "reasons": reasons,
             "predictive_weight": predictive_weight,
         }
@@ -393,17 +434,10 @@ class ScientificLensLab:
         return self.report(key).predictive_weight
 
     def status_map(self) -> Mapping[str, ScientificLensStatus]:
-        result: dict[str, ScientificLensStatus] = {}
-        for key in sorted(self._by_lens):
-            result[key] = self.report(key).status
-        return result
+        return {key: self.report(key).status for key in sorted(self._by_lens)}
 
     def juxtaposition_effect_report(self, lens_key: str) -> Mapping[str, Any]:
-        """Return paired-context diagnostic statistics for one lens.
-
-        This intentionally reports effect and uncertainty rather than declaring
-        a causal effect unless the caller's trial design actually warrants it.
-        """
+        """Return paired-context diagnostics without manufacturing a causal claim."""
 
         trials = [item for item in self.trials(lens_key) if item.metadata.get("paired_context_trial")]
         if not trials:
@@ -425,4 +459,6 @@ class ScientificLensLab:
 
     @property
     def fingerprint(self) -> str:
-        return stable_fingerprint([(trial_id, trial.fingerprint) for trial_id, trial in sorted(self._trials.items())])
+        return stable_fingerprint(
+            [(trial_id, trial.fingerprint) for trial_id, trial in sorted(self._trials.items())]
+        )
