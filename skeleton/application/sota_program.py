@@ -167,10 +167,10 @@ def sota_program() -> dict[str, object]:
         "lanes_with_eval_evidence": ready,
         "lane_count": len(LANES),
         "lanes": [asdict(lane) for lane in LANES],
-        "high_leverage": (
+        "high_leverage": [
             "B021/B071/B072 deterministic mechanics + replay",
             "B082/B086 generated-code sandbox + injection boundary",
             "B006/B091 Godot binary off git onto artifact plane",
             "B100 only after major lanes have eval evidence",
-        ),
+        ],
     }
