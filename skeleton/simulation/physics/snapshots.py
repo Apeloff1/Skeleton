@@ -80,6 +80,15 @@ class PhysicsSnapshot:
         _digest_text(self.configuration_digest, name="configuration_digest")
         _digest_text(self.state_digest, name="state_digest")
         _digest_text(self.snapshot_digest, name="snapshot_digest")
+        object.__setattr__(self, "body_states", tuple(self.body_states))
+        object.__setattr__(self, "contact_cache", tuple(self.contact_cache))
+        object.__setattr__(self, "manifolds", tuple(self.manifolds))
+        if not all(isinstance(row, PhysicsBodyState) for row in self.body_states):
+            raise PhysicsSnapshotError("snapshot contains invalid body state")
+        if not all(isinstance(row, ContactCacheEntry) for row in self.contact_cache):
+            raise PhysicsSnapshotError("snapshot contains invalid contact cache entry")
+        if not all(isinstance(row, ContactManifold) for row in self.manifolds):
+            raise PhysicsSnapshotError("snapshot contains invalid manifold")
         if tuple(sorted(row.body_id for row in self.body_states)) != tuple(
             row.body_id for row in self.body_states
         ):
