@@ -11,12 +11,16 @@ on:
       - "skeleton/jeeves/probabilistic_contracts.py"
       - "skeleton/jeeves/probabilistic_regimes.py"
       - "skeleton/jeeves/probabilistic_arena.py"
+      - "skeleton/jeeves/probabilistic_spectral.py"
+      - "skeleton/jeeves/probabilistic_arbitration.py"
       - "skeleton/testing/test_jeeves_probabilistic_state_space.py"
       - "skeleton/testing/test_jeeves_probabilistic_bayes.py"
       - "skeleton/testing/test_jeeves_probabilistic_calibration.py"
       - "skeleton/testing/test_jeeves_probabilistic_contracts.py"
       - "skeleton/testing/test_jeeves_probabilistic_regimes.py"
       - "skeleton/testing/test_jeeves_probabilistic_arena.py"
+      - "skeleton/testing/test_jeeves_probabilistic_spectral.py"
+      - "skeleton/testing/test_jeeves_probabilistic_arbitration.py"
       - "skeleton/testing/test_jeeves_probabilistic_exports.py"
       - ".github/workflows/jeeves-probabilistic.yml"
   workflow_dispatch:
@@ -56,7 +60,9 @@ jobs:
             skeleton/jeeves/probabilistic_calibration.py \
             skeleton/jeeves/probabilistic_contracts.py \
             skeleton/jeeves/probabilistic_regimes.py \
-            skeleton/jeeves/probabilistic_arena.py
+            skeleton/jeeves/probabilistic_arena.py \
+            skeleton/jeeves/probabilistic_spectral.py \
+            skeleton/jeeves/probabilistic_arbitration.py
 
       - name: Ruff probabilistic surfaces
         run: |
@@ -69,12 +75,16 @@ jobs:
             skeleton/jeeves/probabilistic_contracts.py \
             skeleton/jeeves/probabilistic_regimes.py \
             skeleton/jeeves/probabilistic_arena.py \
+            skeleton/jeeves/probabilistic_spectral.py \
+            skeleton/jeeves/probabilistic_arbitration.py \
             skeleton/testing/test_jeeves_probabilistic_state_space.py \
             skeleton/testing/test_jeeves_probabilistic_bayes.py \
             skeleton/testing/test_jeeves_probabilistic_calibration.py \
             skeleton/testing/test_jeeves_probabilistic_contracts.py \
             skeleton/testing/test_jeeves_probabilistic_regimes.py \
             skeleton/testing/test_jeeves_probabilistic_arena.py \
+            skeleton/testing/test_jeeves_probabilistic_spectral.py \
+            skeleton/testing/test_jeeves_probabilistic_arbitration.py \
             skeleton/testing/test_jeeves_probabilistic_exports.py
 
       - name: Run probabilistic regression suite
@@ -88,4 +98,6 @@ jobs:
             skeleton/testing/test_jeeves_probabilistic_contracts.py \
             skeleton/testing/test_jeeves_probabilistic_regimes.py \
             skeleton/testing/test_jeeves_probabilistic_arena.py \
+            skeleton/testing/test_jeeves_probabilistic_spectral.py \
+            skeleton/testing/test_jeeves_probabilistic_arbitration.py \
             skeleton/testing/test_jeeves_probabilistic_exports.py
