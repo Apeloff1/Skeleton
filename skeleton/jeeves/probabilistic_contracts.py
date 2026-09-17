@@ -22,6 +22,7 @@ from .probabilistic_calibration import (
     CalibrationReport,
     DistributionObservation,
     calibration_observation_fingerprint,
+    validate_calibration_report,
 )
 from .probabilistic_ensemble import BayesianEnsembleReport
 from .probabilistic_state_space import StateSpaceError
@@ -107,6 +108,7 @@ def evaluate_probabilistic_promotion(
     """Evaluate numerical evidence without mutating or activating anything."""
 
     actual_gate = gate or ProbabilisticPromotionGate()
+    validate_calibration_report(calibration)
     ensemble_observations = tuple(
         DistributionObservation(
             forecast=step.predictive,
