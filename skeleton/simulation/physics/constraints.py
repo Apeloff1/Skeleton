@@ -604,9 +604,11 @@ class ConstraintSolver:
         reference_a = (
             reference_a - axis_a * reference_a.dot(axis_a)
         ).normalized()
-        reference_b = (
-            reference_b - axis_a * reference_b.dot(axis_a)
-        ).normalized()
+        projected_b = reference_b - axis_a * reference_b.dot(axis_a)
+        if projected_b.length_squared() <= EPSILON * EPSILON:
+            reference_b = reference_a
+        else:
+            reference_b = projected_b.normalized()
         sine = axis_a.dot(reference_a.cross(reference_b))
         cosine = max(-1.0, min(1.0, reference_a.dot(reference_b)))
         angle = math.atan2(sine, cosine)
