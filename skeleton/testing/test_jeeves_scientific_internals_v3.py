@@ -7,6 +7,10 @@ from skeleton.jeeves.agent.context_pipeline import (
     LayeredContextResolver,
     ResolutionStage,
 )
+from skeleton.jeeves.agent.episodic_scaffold import (
+    EpisodicScaffoldIndex,
+    ScaffoldedMemoryGameIndex,
+)
 from skeleton.jeeves.agent.lens_fusion import LensFusionEngine, LensSignal
 from skeleton.jeeves.agent.memory import MemoryManager, MemoryNamespace
 from skeleton.jeeves.agent.memory_game import MemoryGameIndex, MemoryGamePolicy
@@ -393,3 +397,84 @@ def test_validation_consensus_accepts_independent_semantic_methods_and_refutatio
     )
     assert rejected.status is AssuranceConsensusStatus.REJECTED
     assert rejected.accepted is False
+
+
+def test_episodic_scaffold_keeps_repeated_content_as_distinct_positions():
+    now = [1_000.0]
+    clock = lambda: now[0]
+    base = MemoryGameIndex(clock=clock)
+    scaffold = EpisodicScaffoldIndex(base, clock=clock)
+    namespace = MemoryNamespace("tenant", "user-a", session_id="s1")
+
+    first_card, first = scaffold.capture_interaction(
+        namespace, "alpha checkpoint", context_tags=("phase-a",), entity_cues=("engine",)
+    )
+    now[0] += 10
+    _, second = scaffold.capture_interaction(
+        namespace, "beta checkpoint", context_tags=("phase-b",), entity_cues=("engine",)
+    )
+    now[0] += 10
+    third_card, third = scaffold.capture_interaction(
+        namespace, "alpha checkpoint", context_tags=("phase-a",), entity_cues=("engine",)
+    )
+
+    assert first_card.card_id == third_card.card_id
+    assert (first.ordinal, second.ordinal, third.ordinal) == (1, 2, 3)
+    assert first.episode_id != third.episode_id
+    window = scaffold.chronological_window(second.episode_id, radius=1)
+    assert [episode.ordinal for episode in window] == [1, 2, 3]
+
+
+def test_episodic_scaffold_prospection_is_successor_grounded_and_retrieval_only():
+    now = [2_000.0]
+    clock = lambda: now[0]
+    base = MemoryGameIndex(clock=clock)
+    scaffold = EpisodicScaffoldIndex(base, clock=clock)
+    namespace = MemoryNamespace("tenant", "user-a")
+
+    _, first = scaffold.capture_interaction(namespace, "open project alpha")
+    now[0] += 5
+    _, second = scaffold.capture_interaction(
+        namespace, "run beta verification", context_tags=("verification",)
+    )
+
+    probes = scaffold.prospective_probes(namespace, "open project alpha", limit=2)
+
+    assert probes
+    assert probes[0].source_episode_id == first.episode_id
+    assert probes[0].successor_episode_id == second.episode_id
+    assert probes[0].retrieval_only is True
+    assert any("beta" == cue for cue in probes[0].cues)
+
+
+def test_scaffolded_memory_game_remains_layered_context_compatible():
+    now = [3_000.0]
+    clock = lambda: now[0]
+    base = MemoryGameIndex(
+        policy=MemoryGamePolicy(
+            minimum_score=0.0,
+            minimum_fast_path_coverage=0.0,
+            minimum_fast_path_confidence=0.0,
+        ),
+        clock=clock,
+    )
+    cards = ScaffoldedMemoryGameIndex(base=base, clock=clock)
+    namespace = MemoryNamespace("tenant", "user-a", session_id="s1")
+    cards.capture_interaction(
+        namespace,
+        "remember crimson rook",
+        context_tags=("board",),
+        entity_cues=("rook",),
+    )
+    resolver = LayeredContextResolver(cards=cards, memory=MemoryManager(clock=clock))
+
+    resolution = resolver.resolve(
+        namespace,
+        "remember crimson rook",
+        context_tags=("board",),
+        force_max_tier=ContextTier.ARCHIVE,
+    )
+
+    assert resolution.fast_path is True
+    assert resolution.stopped_at is ContextTier.INDEX_CARD
+    assert resolution.items
