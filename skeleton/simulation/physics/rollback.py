@@ -231,17 +231,24 @@ class PhysicsCommandRollbackSession:
             raise PhysicsReplayError("correction resimulation span exceeds supported range")
 
         corrected = PhysicsCommandFrame.build(tick, tuple(commands))
-        before_digest = self.world.state_digest
+        before_snapshot = self.world.capture_snapshot()
+        before_digest = before_snapshot.state_digest
         original = self.commands.frame(tick)
+        retained_history = tuple(
+            self.history.at_tick(value)
+            for value in self.history.ticks()
+        )
 
         self.commands.replace(corrected)
         try:
             self.rollback_to(tick - 1)
             self.resimulate_to(present_tick)
         except Exception:
-            # Put command evidence back even if resimulation itself failed. World
-            # state is best-effort restored to the last retained state available.
             self.commands.replace(original)
+            self.history.clear()
+            for snapshot in retained_history:
+                self.history.append(snapshot)
+            self.world.restore_snapshot(before_snapshot)
             raise
 
         return CommandCorrectionReceipt(
