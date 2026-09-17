@@ -13,6 +13,7 @@ from ..ecs.canonical import digest
 from .collision import ContactManifold
 from .contacts import ContactCacheEntry
 from .errors import PhysicsSnapshotError
+from .joint_cache import JointImpulseEntry
 from .math3d import Quat, Vec3
 
 
@@ -73,6 +74,7 @@ class PhysicsSnapshot:
     manifolds: tuple[ContactManifold, ...]
     state_digest: str
     snapshot_digest: str
+    joint_cache: tuple[JointImpulseEntry, ...] = ()
 
     def __post_init__(self) -> None:
         if isinstance(self.tick, bool) or not isinstance(self.tick, int) or self.tick < 0:
@@ -84,17 +86,21 @@ class PhysicsSnapshot:
             body_states = tuple(self.body_states)
             contact_cache = tuple(self.contact_cache)
             manifolds = tuple(self.manifolds)
+            joint_cache = tuple(self.joint_cache)
         except TypeError as exc:
             raise PhysicsSnapshotError("snapshot collections must be iterable") from exc
         object.__setattr__(self, "body_states", body_states)
         object.__setattr__(self, "contact_cache", contact_cache)
         object.__setattr__(self, "manifolds", manifolds)
+        object.__setattr__(self, "joint_cache", joint_cache)
         if not all(isinstance(row, PhysicsBodyState) for row in self.body_states):
             raise PhysicsSnapshotError("snapshot contains invalid body state")
         if not all(isinstance(row, ContactCacheEntry) for row in self.contact_cache):
             raise PhysicsSnapshotError("snapshot contains invalid contact cache entry")
         if not all(isinstance(row, ContactManifold) for row in self.manifolds):
             raise PhysicsSnapshotError("snapshot contains invalid manifold")
+        if not all(isinstance(row, JointImpulseEntry) for row in self.joint_cache):
+            raise PhysicsSnapshotError("snapshot contains invalid joint cache entry")
         if tuple(sorted(row.body_id for row in self.body_states)) != tuple(
             row.body_id for row in self.body_states
         ):
@@ -136,6 +142,18 @@ def _cache_record(entry: ContactCacheEntry) -> dict[str, object]:
     }
 
 
+def _joint_cache_record(entry: JointImpulseEntry) -> dict[str, object]:
+    return {
+        "key": entry.key,
+        "joint_id": entry.joint_id,
+        "body_a": entry.body_a,
+        "body_b": entry.body_b,
+        "row_id": entry.row_id,
+        "impulse": entry.impulse,
+        "last_tick": entry.last_tick,
+    }
+
+
 def _manifold_record(manifold: ContactManifold) -> dict[str, object]:
     return {
         "body_a": manifold.body_a,
@@ -165,13 +183,15 @@ def snapshot_material(
     contact_cache: tuple[ContactCacheEntry, ...],
     manifolds: tuple[ContactManifold, ...],
     state_digest: str,
+    joint_cache: tuple[JointImpulseEntry, ...] = (),
 ) -> dict[str, object]:
     return {
-        "domain": "skeleton.simulation.physics.snapshot.v1",
+        "domain": "skeleton.simulation.physics.snapshot.v2",
         "tick": tick,
         "configuration_digest": configuration_digest,
         "body_states": [_body_state_record(row) for row in body_states],
         "contact_cache": [_cache_record(row) for row in contact_cache],
+        "joint_cache": [_joint_cache_record(row) for row in joint_cache],
         "manifolds": [_manifold_record(row) for row in manifolds],
         "state_digest": state_digest,
     }
@@ -185,11 +205,13 @@ def build_snapshot(
     contact_cache: tuple[ContactCacheEntry, ...],
     manifolds: tuple[ContactManifold, ...],
     state_digest: str,
+    joint_cache: tuple[JointImpulseEntry, ...] = (),
 ) -> PhysicsSnapshot:
     try:
         body_states = tuple(body_states)
         contact_cache = tuple(contact_cache)
         manifolds = tuple(manifolds)
+        joint_cache = tuple(joint_cache)
     except TypeError as exc:
         raise PhysicsSnapshotError("snapshot collections must be iterable") from exc
     if not all(isinstance(row, PhysicsBodyState) for row in body_states):
@@ -198,6 +220,8 @@ def build_snapshot(
         raise PhysicsSnapshotError("snapshot contains invalid contact cache entry")
     if not all(isinstance(row, ContactManifold) for row in manifolds):
         raise PhysicsSnapshotError("snapshot contains invalid manifold")
+    if not all(isinstance(row, JointImpulseEntry) for row in joint_cache):
+        raise PhysicsSnapshotError("snapshot contains invalid joint cache entry")
 
     material = snapshot_material(
         tick=tick,
@@ -206,6 +230,7 @@ def build_snapshot(
         contact_cache=contact_cache,
         manifolds=manifolds,
         state_digest=state_digest,
+        joint_cache=joint_cache,
     )
     return PhysicsSnapshot(
         tick=tick,
@@ -215,6 +240,7 @@ def build_snapshot(
         manifolds=manifolds,
         state_digest=state_digest,
         snapshot_digest=digest(material),
+        joint_cache=joint_cache,
     )
 
 
@@ -227,6 +253,7 @@ def verify_snapshot(snapshot: PhysicsSnapshot) -> None:
             contact_cache=snapshot.contact_cache,
             manifolds=snapshot.manifolds,
             state_digest=snapshot.state_digest,
+            joint_cache=snapshot.joint_cache,
         )
     )
     if expected != snapshot.snapshot_digest:
