@@ -112,6 +112,18 @@ from .epistemic_tool_gate import (
     ToolExecutionIntent,
     bind_intent_metadata,
 )
+from .episodic_scaffold import (
+    AnchorKind,
+    EpisodicAnchor,
+    EpisodicScaffoldIndex,
+    EpisodicScaffoldPolicy,
+    EpisodicScaffoldStore,
+    ProspectiveProbe,
+    ScaffoldEpisode,
+    ScaffoldError,
+    ScaffoldHit,
+    ScaffoldedMemoryGameIndex,
+)
 from .evidence import (
     Contradiction,
     EvidenceArtifact,
