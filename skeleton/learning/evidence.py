@@ -1,43 +1,36 @@
 """Provider-neutral evidence-first learning contract.
 
-This module is the canonical home for Jeeves *learning* evidence: raw
-observations, extracted features, hypotheses, predictions, outcomes,
-calibration metadata, and bounded reversible update history.
+The learning evidence plane stores raw observations/features separately from
+derived hypotheses/predictions and explicit outcomes. It is intentionally
+separate from curriculum/assessment and from Jeeves' read-only provider
+grounding path.
 
-It is intentionally distinct from:
-
-* ``skeleton.learning.service`` — curriculum and Bloom assessment
-* ``skeleton.jeeves.evidence_core`` — read-only tool evidence for LLM replies
-* ``skeleton.jeeves.absorb`` / ``absorb_claims`` / ``absorb_evolution`` —
-  absorb-plane intake, claims, and routing-policy evolution
-* ``skeleton.retrieval.provenance`` — retrieval lineage ledger
-
-Retrieval provenance is consumed (fingerprints), not replaced.  The store is
-offline, deterministic when given an explicit clock, and fail-closed: missing
-provenance, stale clock/version evidence, and contradictory signals are
-rejected rather than averaged or silently repaired.  There is no path that
-mutates the store from live model output; every write is an explicit caller
-operation.
+Writes are explicit, provenance-bearing, versioned and rollback-capable.
+Live-model/self-modifying sources are rejected. The contract is deterministic
+when callers inject a deterministic clock.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum
+from types import MappingProxyType
 from typing import Any
 
 from skeleton.kernel.errors import KernelError
 from skeleton.retrieval.provenance import ProvenanceEntry
 
-MAX_ID_CHARS = 128
+MAX_ID_CHARS = 256
 MAX_CLAIM_CHARS = 4_096
 MAX_SOURCE_CHARS = 256
 MAX_PAYLOAD_KEYS = 64
 DEFAULT_MAX_AGE_SECONDS = 3_600.0
 DEFAULT_MAX_HISTORY = 64
+DEFAULT_FUTURE_SKEW_SECONDS = 60.0
 BLOCKED_SOURCE_KINDS = frozenset(
     {
         "autonomous",
@@ -68,8 +61,6 @@ class UpdateKind(str, Enum):
 
 
 class RecordPlane(str, Enum):
-    """Storage plane. Facts never share a map with derived analysis."""
-
     FACT = "fact"
     ANALYSIS = "analysis"
     RESULT = "result"
@@ -134,6 +125,15 @@ def _positive_int(name: str, value: Any) -> int:
     return value
 
 
+def _non_negative_int(name: str, value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise LearningEvidenceError(
+            f"{name} must be a non-negative integer",
+            context={"field": name, "reason": "invalid_number"},
+        )
+    return value
+
+
 def _json_scalar(name: str, value: Any) -> object:
     if value is None or isinstance(value, (bool, str)):
         return value
@@ -152,14 +152,35 @@ def _json_scalar(name: str, value: Any) -> object:
     )
 
 
+def _canonical_json_obj(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            str(key): _canonical_json_obj(item)
+            for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))
+        }
+    if isinstance(value, tuple):
+        return [_canonical_json_obj(item) for item in value]
+    if isinstance(value, list):
+        return [_canonical_json_obj(item) for item in value]
+    return value
+
+
+def _canonical_json(value: Any, *, ensure_ascii: bool = False) -> str:
+    return json.dumps(
+        _canonical_json_obj(value),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=ensure_ascii,
+        default=str,
+    )
+
+
 def canonical_fingerprint(payload: Mapping[str, object] | object) -> str:
-    """Deterministic content fingerprint via retrieval provenance hashing."""
-
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
-    return ProvenanceEntry.hash_data(encoded)
+    """Stable learning-plane fingerprint using canonical retrieval hashing."""
+    return ProvenanceEntry.hash_data(_canonical_json(payload))
 
 
-def _freeze_payload(payload: Mapping[str, object]) -> dict[str, object]:
+def _freeze_payload(payload: Mapping[str, object]) -> Mapping[str, object]:
     if not isinstance(payload, Mapping):
         raise LearningEvidenceError(
             "payload must be a mapping of factual fields",
@@ -174,7 +195,7 @@ def _freeze_payload(payload: Mapping[str, object]) -> dict[str, object]:
     for key, value in payload.items():
         name = _text("payload key", key, MAX_ID_CHARS)
         frozen[name] = _json_scalar(f"payload[{name}]", value)
-    return frozen
+    return MappingProxyType(frozen)
 
 
 def _ids(name: str, values: Iterable[str]) -> tuple[str, ...]:
@@ -192,7 +213,7 @@ def _ids(name: str, values: Iterable[str]) -> tuple[str, ...]:
 
 @dataclass(frozen=True, slots=True)
 class EvidenceProvenance:
-    """Required custody metadata for every learning evidence record."""
+    """Required chain-of-custody metadata for a learning record."""
 
     source_id: str
     source_kind: str
@@ -201,6 +222,9 @@ class EvidenceProvenance:
     fingerprint: str
     parent_ids: tuple[str, ...] = ()
     uri: str | None = None
+    source_digest: str | None = None
+    retrieved_at: float | None = None
+    revision: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "source_id", _text("source_id", self.source_id, MAX_SOURCE_CHARS))
@@ -217,12 +241,16 @@ class EvidenceProvenance:
         object.__setattr__(self, "parent_ids", _ids("parent_id", self.parent_ids))
         if self.uri is not None:
             object.__setattr__(self, "uri", _text("uri", self.uri, MAX_SOURCE_CHARS))
+        if self.source_digest is not None:
+            object.__setattr__(self, "source_digest", _text("source_digest", self.source_digest, 128))
+        if self.retrieved_at is not None:
+            object.__setattr__(self, "retrieved_at", _non_negative("retrieved_at", self.retrieved_at))
+        if self.revision is not None:
+            object.__setattr__(self, "revision", _text("revision", self.revision, 128))
 
 
 @dataclass(frozen=True, slots=True)
 class Observation:
-    """Raw factual record. Stored on the fact plane, never mixed with analysis."""
-
     observation_id: str
     subject_id: str
     payload: Mapping[str, object]
@@ -232,8 +260,8 @@ class Observation:
         object.__setattr__(self, "observation_id", _text("observation_id", self.observation_id, MAX_ID_CHARS))
         object.__setattr__(self, "subject_id", _text("subject_id", self.subject_id, MAX_ID_CHARS))
         frozen = _freeze_payload(self.payload)
-        object.__setattr__(self, "payload", frozen)
         _require_provenance(self.provenance, expected_fingerprint=canonical_fingerprint(frozen))
+        object.__setattr__(self, "payload", frozen)
         if self.provenance.parent_ids:
             raise LearningEvidenceError(
                 "observations are root facts and must not declare parents",
@@ -243,8 +271,6 @@ class Observation:
 
 @dataclass(frozen=True, slots=True)
 class Feature:
-    """Extracted measurement grounded in one or more observations."""
-
     feature_id: str
     subject_id: str
     name: str
@@ -274,8 +300,6 @@ class Feature:
 
 @dataclass(frozen=True, slots=True)
 class Hypothesis:
-    """Derived analysis. Stored on the analysis plane, never with raw facts."""
-
     hypothesis_id: str
     subject_id: str
     claim: str
@@ -305,11 +329,7 @@ class Hypothesis:
         _require_provenance(
             self.provenance,
             expected_fingerprint=canonical_fingerprint(
-                {
-                    "claim": self.claim,
-                    "polarity": self.polarity,
-                    "subject_id": self.subject_id,
-                }
+                {"claim": self.claim, "polarity": self.polarity, "subject_id": self.subject_id}
             ),
         )
         _require_parents(self.provenance, self.feature_ids, record_id=self.hypothesis_id)
@@ -317,8 +337,6 @@ class Hypothesis:
 
 @dataclass(frozen=True, slots=True)
 class Calibration:
-    """Confidence/calibration metadata. Never a substitute for factual payload."""
-
     channel: str
     stated_confidence: float
     empirical_rate: float
@@ -330,11 +348,7 @@ class Calibration:
         object.__setattr__(self, "channel", _text("channel", self.channel, MAX_ID_CHARS))
         object.__setattr__(self, "stated_confidence", _unit("stated_confidence", self.stated_confidence))
         object.__setattr__(self, "empirical_rate", _unit("empirical_rate", self.empirical_rate))
-        if isinstance(self.sample_count, bool) or not isinstance(self.sample_count, int) or self.sample_count < 0:
-            raise LearningEvidenceError(
-                "sample_count must be a non-negative integer",
-                context={"reason": "invalid_number", "field": "sample_count"},
-            )
+        object.__setattr__(self, "sample_count", _non_negative_int("sample_count", self.sample_count))
         object.__setattr__(
             self,
             "expected_calibration_error",
@@ -350,8 +364,6 @@ class Calibration:
 
 @dataclass(frozen=True, slots=True)
 class Prediction:
-    """Forward claim derived from a hypothesis, with calibration metadata."""
-
     prediction_id: str
     hypothesis_id: str
     expected: object
@@ -387,8 +399,6 @@ class Prediction:
 
 @dataclass(frozen=True, slots=True)
 class Outcome:
-    """Observed result of a prediction. Does not rewrite the fact plane."""
-
     outcome_id: str
     prediction_id: str
     actual: object
@@ -415,8 +425,6 @@ class Outcome:
 
 @dataclass(frozen=True, slots=True)
 class UpdateRecord:
-    """One explicit, versioned mutation. History is bounded and reversible."""
-
     version: int
     kind: UpdateKind
     target_id: str
@@ -437,7 +445,7 @@ class UpdateRecord:
             object.__setattr__(
                 self,
                 "previous_version",
-                _positive_int("previous_version", self.previous_version),
+                _non_negative_int("previous_version", self.previous_version),
             )
 
 
@@ -458,14 +466,9 @@ def _require_provenance(
     *,
     expected_fingerprint: str,
 ) -> None:
-    if provenance is None:
+    if provenance is None or not isinstance(provenance, EvidenceProvenance):
         raise LearningEvidenceError(
-            "provenance is required",
-            context={"reason": "missing_provenance"},
-        )
-    if not isinstance(provenance, EvidenceProvenance):
-        raise LearningEvidenceError(
-            "provenance must be EvidenceProvenance",
+            "provenance is required and must be EvidenceProvenance",
             context={"reason": "missing_provenance"},
         )
     if provenance.fingerprint != expected_fingerprint:
@@ -525,21 +528,69 @@ def _summarize_calibration(
     )
 
 
+def _sha256_for_evidence_data(payload: Any) -> str:
+    rendered = _canonical_json(payload, ensure_ascii=True)
+    return hashlib.sha256(rendered.encode("utf-8")).hexdigest()
+
+
+def make_provenance_from_evidence_envelope(
+    payload: Mapping[str, object] | object,
+    provenance: Mapping[str, object],
+    *,
+    source_kind: str = "jeeves-evidence",
+    clock_version: int = 1,
+    parent_ids: tuple[str, ...] = (),
+    uri: str | None = None,
+) -> EvidenceProvenance:
+    """Translate an EvidenceJeevesCore provenance envelope explicitly."""
+    if not isinstance(provenance, Mapping):
+        raise LearningEvidenceError(
+            "evidence provenance envelope must be a mapping",
+            context={"reason": "missing_provenance"},
+        )
+
+    source_id = _text("source_id", provenance.get("source_id"), MAX_SOURCE_CHARS)
+    if "observed_at" not in provenance:
+        raise LearningEvidenceError(
+            "evidence provenance requires observed_at for learning ingestion",
+            context={"reason": "missing_provenance", "field": "observed_at"},
+        )
+    observed_at = _non_negative("observed_at", provenance["observed_at"])
+
+    digest = _text("sha256", provenance.get("sha256"), 64).casefold()
+    expected = _sha256_for_evidence_data(payload)
+    if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+        raise LearningEvidenceError(
+            "evidence provenance sha256 is malformed",
+            context={"reason": "fingerprint_mismatch", "algorithm": "sha256"},
+        )
+    if digest != expected:
+        raise LearningEvidenceError(
+            "evidence provenance sha256 does not match payload",
+            context={"reason": "fingerprint_mismatch", "algorithm": "sha256"},
+        )
+
+    retrieved_at_raw = provenance.get("retrieved_at")
+    retrieved_at = None if retrieved_at_raw is None else _non_negative("retrieved_at", retrieved_at_raw)
+    revision_raw = provenance.get("revision")
+    revision = None if revision_raw is None else _text("revision", revision_raw, 128)
+
+    return EvidenceProvenance(
+        source_id=source_id,
+        source_kind=source_kind,
+        observed_at=observed_at,
+        clock_version=clock_version,
+        fingerprint=canonical_fingerprint(payload),
+        parent_ids=parent_ids,
+        uri=uri,
+        source_digest=digest,
+        retrieved_at=retrieved_at,
+        revision=revision,
+    )
+
+
 class LearningEvidenceStore:
-    """Explicit, versioned store for learning evidence.
-
-    Raw observations and features live on the fact plane. Hypotheses and
-    predictions live on the analysis plane. Outcomes are results. The three
-    planes never share maps, so factual evidence cannot be overwritten by
-    derived analysis.
-
-    Callers inject a clock and a clock version. Incoming records whose
-    ``observed_at`` is older than ``max_age_seconds`` or whose
-    ``clock_version`` is below the store epoch are rejected as stale.
-    Contradictory features or hypotheses fail closed instead of being
-    averaged. Update history is bounded; rollback to an evicted version
-    fails closed.
-    """
+    """Explicit, fail-closed, versioned store for learning evidence."""
 
     def __init__(
         self,
@@ -548,6 +599,7 @@ class LearningEvidenceStore:
         clock_version: int = 1,
         max_age_seconds: float = DEFAULT_MAX_AGE_SECONDS,
         max_history: int = DEFAULT_MAX_HISTORY,
+        future_skew_seconds: float = DEFAULT_FUTURE_SKEW_SECONDS,
     ) -> None:
         if not callable(clock):
             raise LearningEvidenceError(
@@ -562,6 +614,7 @@ class LearningEvidenceStore:
                 "max_age_seconds must be positive",
                 context={"reason": "invalid_number"},
             )
+        self._future_skew_seconds = _non_negative("future_skew_seconds", future_skew_seconds)
         self._max_history = _positive_int("max_history", max_history)
         self._observations: dict[str, Observation] = {}
         self._features: dict[str, Feature] = {}
@@ -573,6 +626,7 @@ class LearningEvidenceStore:
         self._history: list[UpdateRecord] = []
         self._snapshots: dict[int, _Snapshot] = {}
         self._version = 0
+        self._snapshots[0] = self._capture()
 
     @property
     def version(self) -> int:
@@ -623,6 +677,7 @@ class LearningEvidenceStore:
         return self._calibrations.get(_text("channel", channel, MAX_ID_CHARS))
 
     def plane_of(self, record_id: str) -> RecordPlane:
+        record_id = _text("record_id", record_id, MAX_ID_CHARS)
         if record_id in self._observations or record_id in self._features:
             return RecordPlane.FACT
         if record_id in self._hypotheses or record_id in self._predictions:
@@ -635,35 +690,33 @@ class LearningEvidenceStore:
         )
 
     def advance_clock_version(self) -> int:
-        """Explicit epoch bump. Prior clock versions become stale on ingest."""
-
         self._clock_version += 1
         return self._clock_version
 
     def record_observation(self, observation: Observation) -> UpdateRecord:
-        self._reject_stale(observation.provenance)
+        timestamp = self._reject_stale(observation.provenance)
         self._reject_duplicate(observation.observation_id)
         self._observations[observation.observation_id] = observation
-        return self._commit(UpdateKind.OBSERVATION, observation.observation_id)
+        return self._commit(UpdateKind.OBSERVATION, observation.observation_id, timestamp)
 
     def record_feature(self, feature: Feature) -> UpdateRecord:
-        self._reject_stale(feature.provenance)
+        timestamp = self._reject_stale(feature.provenance)
         self._reject_duplicate(feature.feature_id)
         self._require_existing(feature.observation_ids, self._observations, kind="observation")
         self._reject_feature_contradiction(feature)
         self._features[feature.feature_id] = feature
-        return self._commit(UpdateKind.FEATURE, feature.feature_id)
+        return self._commit(UpdateKind.FEATURE, feature.feature_id, timestamp)
 
     def record_hypothesis(self, hypothesis: Hypothesis) -> UpdateRecord:
-        self._reject_stale(hypothesis.provenance)
+        timestamp = self._reject_stale(hypothesis.provenance)
         self._reject_duplicate(hypothesis.hypothesis_id)
         self._require_existing(hypothesis.feature_ids, self._features, kind="feature")
         self._reject_hypothesis_contradiction(hypothesis)
         self._hypotheses[hypothesis.hypothesis_id] = hypothesis
-        return self._commit(UpdateKind.HYPOTHESIS, hypothesis.hypothesis_id)
+        return self._commit(UpdateKind.HYPOTHESIS, hypothesis.hypothesis_id, timestamp)
 
     def record_prediction(self, prediction: Prediction) -> UpdateRecord:
-        self._reject_stale(prediction.provenance)
+        timestamp = self._reject_stale(prediction.provenance)
         self._reject_duplicate(prediction.prediction_id)
         self._require_existing((prediction.hypothesis_id,), self._hypotheses, kind="hypothesis")
         existing = [
@@ -683,10 +736,10 @@ class LearningEvidenceStore:
                 },
             )
         self._predictions[prediction.prediction_id] = prediction
-        return self._commit(UpdateKind.PREDICTION, prediction.prediction_id)
+        return self._commit(UpdateKind.PREDICTION, prediction.prediction_id, timestamp)
 
     def record_outcome(self, outcome: Outcome) -> UpdateRecord:
-        self._reject_stale(outcome.provenance)
+        timestamp = self._reject_stale(outcome.provenance)
         self._reject_duplicate(outcome.outcome_id)
         prediction = self._predictions.get(outcome.prediction_id)
         if prediction is None:
@@ -714,21 +767,21 @@ class LearningEvidenceStore:
             stated_confidence=prediction.confidence,
         )
         self._outcomes[outcome.outcome_id] = outcome
-        return self._commit(UpdateKind.OUTCOME, outcome.outcome_id)
+        return self._commit(UpdateKind.OUTCOME, outcome.outcome_id, timestamp)
 
     def rollback(self, version: int) -> UpdateRecord:
+        version = _non_negative_int("version", version)
         snapshot = self._snapshots.get(version)
         if snapshot is None:
             raise LearningEvidenceError(
                 "rollback target is outside bounded history",
                 context={"reason": "rollback_unavailable", "version": version, "retained": sorted(self._snapshots)},
             )
+        timestamp = _non_negative("clock", self._clock())
         self._restore(snapshot)
-        return self._commit(UpdateKind.ROLLBACK, f"v{version}")
+        return self._commit(UpdateKind.ROLLBACK, f"v{version}", timestamp)
 
     def lineage(self, record_id: str) -> tuple[str, ...]:
-        """Walk provenance parents from roots to ``record_id``."""
-
         ordered: list[str] = []
         visiting: set[str] = set()
 
@@ -766,7 +819,7 @@ class LearningEvidenceStore:
             context={"reason": "unknown_record", "record_id": record_id},
         )
 
-    def _reject_stale(self, provenance: EvidenceProvenance) -> None:
+    def _reject_stale(self, provenance: EvidenceProvenance) -> float:
         now = _non_negative("clock", self._clock())
         age = now - provenance.observed_at
         if age > self._max_age_seconds:
@@ -780,10 +833,15 @@ class LearningEvidenceStore:
                     "now": now,
                 },
             )
-        if provenance.observed_at > now:
+        if provenance.observed_at > now + self._future_skew_seconds:
             raise LearningEvidenceError(
-                "evidence timestamp is ahead of the explicit clock",
-                context={"reason": "stale_evidence", "observed_at": provenance.observed_at, "now": now},
+                "evidence timestamp is implausibly ahead of the explicit clock",
+                context={
+                    "reason": "future_evidence",
+                    "observed_at": provenance.observed_at,
+                    "now": now,
+                    "future_skew_seconds": self._future_skew_seconds,
+                },
             )
         if provenance.clock_version != self._clock_version:
             raise LearningEvidenceError(
@@ -794,6 +852,7 @@ class LearningEvidenceStore:
                     "store_clock_version": self._clock_version,
                 },
             )
+        return now
 
     def _reject_duplicate(self, record_id: str) -> None:
         if (
@@ -819,15 +878,22 @@ class LearningEvidenceStore:
     def _reject_feature_contradiction(self, feature: Feature) -> None:
         cited_values: list[object] = []
         subjects: set[str] = set()
+        newest_parent_time = 0.0
         for observation_id in feature.observation_ids:
             observation = self._observations[observation_id]
             subjects.add(observation.subject_id)
+            newest_parent_time = max(newest_parent_time, observation.provenance.observed_at)
             if feature.name in observation.payload:
                 cited_values.append(observation.payload[feature.name])
         if len(subjects) > 1 or feature.subject_id not in subjects:
             raise LearningEvidenceError(
                 "feature subject must match cited observations",
                 context={"reason": "subject_mismatch", "feature_id": feature.feature_id},
+            )
+        if feature.provenance.observed_at < newest_parent_time:
+            raise LearningEvidenceError(
+                "feature predates a cited observation",
+                context={"reason": "stale_evidence", "feature_id": feature.feature_id},
             )
         unique_cited = {canonical_fingerprint({"v": value}) for value in cited_values}
         if len(unique_cited) > 1:
@@ -842,47 +908,55 @@ class LearningEvidenceStore:
             )
         for existing in self._features.values():
             if (
-                existing.subject_id == feature.subject_id
-                and existing.name == feature.name
-                and not _values_equal(existing.value, feature.value)
+                existing.subject_id != feature.subject_id
+                or existing.name != feature.name
+                or _values_equal(existing.value, feature.value)
             ):
+                continue
+            if feature.provenance.observed_at <= existing.provenance.observed_at:
                 raise LearningEvidenceError(
-                    "contradictory feature signal; values are not averaged",
+                    "contradictory feature signal at the same or older observation time",
                     context={
                         "reason": "contradictory_signal",
                         "subject_id": feature.subject_id,
                         "name": feature.name,
                         "existing": existing.value,
                         "incoming": feature.value,
+                        "existing_observed_at": existing.provenance.observed_at,
+                        "incoming_observed_at": feature.provenance.observed_at,
                     },
                 )
 
     def _reject_hypothesis_contradiction(self, hypothesis: Hypothesis) -> None:
+        incoming_features = set(hypothesis.feature_ids)
         for existing in self._hypotheses.values():
             if existing.subject_id != hypothesis.subject_id:
                 continue
-            if existing.polarity != hypothesis.polarity:
-                raise LearningEvidenceError(
-                    "contradictory hypotheses; signals are not averaged",
-                    context={
-                        "reason": "contradictory_signal",
-                        "subject_id": hypothesis.subject_id,
-                        "existing": existing.hypothesis_id,
-                        "incoming": hypothesis.hypothesis_id,
-                    },
-                )
+            if existing.polarity == hypothesis.polarity:
+                continue
+            if incoming_features.isdisjoint(existing.feature_ids):
+                continue
+            raise LearningEvidenceError(
+                "contradictory hypotheses over shared evidence",
+                context={
+                    "reason": "contradictory_signal",
+                    "subject_id": hypothesis.subject_id,
+                    "existing": existing.hypothesis_id,
+                    "incoming": hypothesis.hypothesis_id,
+                },
+            )
 
-    def _commit(self, kind: UpdateKind, target_id: str) -> UpdateRecord:
-        previous = self._version if self._version > 0 else None
-        self._version += 1
+    def _commit(self, kind: UpdateKind, target_id: str, timestamp: float) -> UpdateRecord:
+        next_version = self._version + 1
         record = UpdateRecord(
-            version=self._version,
+            version=next_version,
             kind=kind,
             target_id=target_id,
-            timestamp=self._clock(),
-            previous_version=previous,
+            timestamp=timestamp,
+            previous_version=self._version,
             reversible=True,
         )
+        self._version = next_version
         self._history.append(record)
         self._snapshots[self._version] = self._capture()
         self._prune()
@@ -912,12 +986,14 @@ class LearningEvidenceStore:
 
     def _prune(self) -> None:
         overflow = len(self._history) - self._max_history
-        if overflow <= 0:
-            return
-        evicted = self._history[:overflow]
-        self._history = self._history[overflow:]
-        for record in evicted:
-            self._snapshots.pop(record.version, None)
+        if overflow > 0:
+            self._history = self._history[overflow:]
+        retained_versions = {record.version for record in self._history}
+        if 1 in retained_versions:
+            retained_versions.add(0)
+        for version in tuple(self._snapshots):
+            if version not in retained_versions:
+                self._snapshots.pop(version, None)
 
 
 def make_provenance(
@@ -929,9 +1005,11 @@ def make_provenance(
     clock_version: int = 1,
     parent_ids: tuple[str, ...] = (),
     uri: str | None = None,
+    source_digest: str | None = None,
+    retrieved_at: float | None = None,
+    revision: str | None = None,
 ) -> EvidenceProvenance:
     """Deterministic offline provenance helper for fixtures and callers."""
-
     return EvidenceProvenance(
         source_id=source_id,
         source_kind=source_kind,
@@ -940,4 +1018,7 @@ def make_provenance(
         fingerprint=canonical_fingerprint(payload),
         parent_ids=parent_ids,
         uri=uri,
+        source_digest=source_digest,
+        retrieved_at=retrieved_at,
+        revision=revision,
     )
