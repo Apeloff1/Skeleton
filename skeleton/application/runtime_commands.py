@@ -38,6 +38,22 @@ def _configuration_handler(state: Any):
     return handle
 
 
+def _capabilities_handler(_state: Any):
+    def handle(payload: Mapping[str, Any]) -> Dict[str, Any]:
+        raw_lifecycle = payload.get("lifecycle", False)
+        if raw_lifecycle not in {True, False}:
+            raise CommandError("invalid_argument", "lifecycle must be a boolean")
+        if raw_lifecycle:
+            from .capability_runtime import capability_lifecycle_snapshot
+
+            return capability_lifecycle_snapshot()
+        from .capability_manifest import capability_manifest
+
+        return capability_manifest()
+
+    return handle
+
+
 def _memory_handler(state: Any):
     def handle(payload: Mapping[str, Any]) -> Dict[str, Any]:
         memory = getattr(state, "memory_trinity", None)
@@ -133,6 +149,7 @@ def build_runtime_command_service(state: Any) -> CommandService:
     service = CommandService()
     service.register("status", _status_handler(state))
     service.register("configuration", _configuration_handler(state))
+    service.register("capabilities", _capabilities_handler(state))
     service.register("memory", _memory_handler(state))
     service.register("tool", _tool_handler(state))
     service.register("admin", _admin_handler(state))

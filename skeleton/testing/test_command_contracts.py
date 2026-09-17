@@ -26,7 +26,15 @@ class _FakeState:
 def test_parity_matrix_maps_all_required_operation_families():
     matrix = parity_matrix()
     rows = {row["name"]: row for row in matrix["commands"]}
-    assert set(rows) == {"run", "tool", "memory", "status", "configuration", "admin"}
+    assert set(rows) == {
+        "run",
+        "tool",
+        "memory",
+        "status",
+        "configuration",
+        "capabilities",
+        "admin",
+    }
     assert matrix["full_surface_parity"] is True
     assert all(row["api"] and row["cli"] for row in rows.values())
     assert {name for name, row in rows.items() if row["auth_required"]} == {
@@ -94,6 +102,21 @@ def test_api_status_uses_shared_contract_without_seal(monkeypatch):
     assert response["command"] == "status"
     assert response["ok"] is True
     assert response["data"]["status"] == "healthy"
+
+
+def test_api_capabilities_uses_shared_contract_without_seal(monkeypatch):
+    from skeleton.application import capability_manifest
+
+    def unexpected_seal(_value):
+        raise AssertionError("public capabilities command must not require a seal")
+
+    monkeypatch.setattr(command_routes, "require_seal", unexpected_seal)
+    response = asyncio.run(
+        command_routes.execute_command("capabilities", {}, state=_FakeState(), x_gf_seal=None)
+    )
+    assert response["command"] == "capabilities"
+    assert response["ok"] is True
+    assert response["data"] == capability_manifest()
 
 
 @pytest.mark.parametrize("command", ["run", "tool", "memory", "admin"])

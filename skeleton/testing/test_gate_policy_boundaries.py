@@ -57,6 +57,9 @@ def test_root_open_prefix_is_exact_only() -> None:
         ("/api/v1/cortex/status", "cognition"),
         ("/api/v1/health", "observability"),
         ("/api/v1/metrics", "observability"),
+        ("/api/v1/application", "application"),
+        ("/api/v1/application/capabilities", "application"),
+        ("/api/v1/application/capabilities/lifecycle", "application"),
         ("/cortex/status", "cognition"),
         ("/cockpit", "interface"),
         ("/openapi.json", "interface"),
@@ -71,6 +74,7 @@ def test_governance_domain_matches_exact_routes_and_children(path: str, expected
     [
         "/api/v1/forge-admin",
         "/api/v1/cortexual",
+        "/api/v1/application-admin",
         "/api/governance-backdoor",
         "/api/courtroom",
         "/cockpit-admin",

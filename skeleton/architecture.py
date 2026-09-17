@@ -141,6 +141,8 @@ API_ROUTES: List[Dict[str, Any]] = [
     {"method": "GET", "path": "/api/v1/genesis", "protected": False, "description": "Boot report"},
     {"method": "GET", "path": "/api/v1/genesis/handles", "protected": False, "description": "Wired handles"},
     {"method": "GET", "path": "/api/v1/capabilities", "protected": False, "description": "Capability registry"},
+    {"method": "GET", "path": "/api/v1/application/capabilities", "protected": False, "description": "Curated capability manifest"},
+    {"method": "GET", "path": "/api/v1/application/capabilities/lifecycle", "protected": False, "description": "Capability lifecycle snapshot"},
     {"method": "POST", "path": "/api/v1/retrieval/query", "protected": False, "description": "Multi-plane search"},
     {"method": "POST", "path": "/api/v1/retrieval/ingest", "protected": False, "description": "Document ingestion"},
     {"method": "POST", "path": "/api/v1/retrieval/feedback", "protected": False, "description": "Plane feedback"},

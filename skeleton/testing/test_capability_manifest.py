@@ -14,6 +14,7 @@ from skeleton.application import (
     CAPABILITY_MANIFEST_VERSION,
     CapabilityLoadError,
     CapabilityLoader,
+    capability_lifecycle_snapshot,
     capability_manifest,
     capability_runtime_status,
     get_capability,
@@ -36,6 +37,25 @@ def test_capability_manifest_is_versioned_unique_and_resolvable() -> None:
     assert len(ids) == len(set(ids))
     assert len(modules) == len(set(modules))
     assert {"gameforge", "cortex", "jeeves", "organism", "social", "galaxy"} <= set(ids)
+    assert {
+        "kernel",
+        "memory",
+        "intelligence",
+        "swarm",
+        "retrieval",
+        "pipelines",
+        "vault",
+        "agents",
+        "context",
+        "resilience",
+        "observability",
+        "api",
+        "developer",
+        "deploy",
+        "testing",
+        "config",
+        "content",
+    } <= set(ids)
 
     for capability in capabilities:
         assert set(capability) == {"id", "module", "description"}
@@ -140,3 +160,69 @@ def test_capabilities_cli_matches_python_api(capsys) -> None:
 
     stdout = capsys.readouterr().out
     assert json.loads(stdout) == capability_manifest()
+
+
+def test_capabilities_cli_lifecycle_matches_runtime_snapshot(capsys) -> None:
+    from skeleton.application import CAPABILITY_LOADER
+
+    CAPABILITY_LOADER.clear_cache()
+    assert main(["capabilities", "--lifecycle"]) == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == capability_lifecycle_snapshot()
+    assert payload["kind"] == "lifecycle"
+    assert payload["schema_version"] == CAPABILITY_MANIFEST_VERSION
+    for capability in payload["capabilities"]:
+        assert set(capability) == {"id", "module", "description", "resolvable", "loaded"}
+        assert capability["resolvable"] is True
+        assert capability["loaded"] is False
+
+
+def test_capabilities_cli_rejects_unknown_options(capsys) -> None:
+    assert main(["capabilities", "--dump"]) == 2
+    assert "Unknown capabilities option" in capsys.readouterr().out
+
+
+def test_lifecycle_snapshot_does_not_import_planes(monkeypatch) -> None:
+    from skeleton.application import CAPABILITY_LOADER
+
+    called = False
+
+    def should_not_import(_module_name: str):
+        nonlocal called
+        called = True
+        raise AssertionError("lifecycle must not import capability modules")
+
+    monkeypatch.setattr(
+        "skeleton.application.capability_runtime.import_module",
+        should_not_import,
+    )
+    CAPABILITY_LOADER.clear_cache()
+
+    payload = capability_lifecycle_snapshot()
+    assert called is False
+    assert payload["kind"] == "lifecycle"
+    assert all(row["loaded"] is False for row in payload["capabilities"])
+
+
+def test_shared_command_capabilities_matches_identity_manifest() -> None:
+    from skeleton.application import build_runtime_command_service
+
+    class _State:
+        genesis = None
+
+        def is_healthy(self):
+            return {"overall": True}
+
+    service = build_runtime_command_service(_State())
+    result = service.execute("capabilities")
+    assert result.ok is True
+    assert result.to_payload()["data"] == capability_manifest()
+
+    lifecycle = service.execute("capabilities", {"lifecycle": True})
+    assert lifecycle.ok is True
+    assert lifecycle.to_payload()["data"] == capability_lifecycle_snapshot()
+
+    invalid = service.execute("capabilities", {"lifecycle": "yes"})
+    assert invalid.ok is False
+    assert invalid.to_payload()["error"]["code"] == "invalid_argument"

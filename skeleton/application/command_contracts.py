@@ -65,6 +65,10 @@ _SPECS = (
         "Inspect non-secret runtime configuration metadata.",
     ),
     CommandSpec(
+        "capabilities",
+        "Inspect the curated capability manifest or lifecycle snapshot.",
+    ),
+    CommandSpec(
         "admin",
         "Inspect or perform administrative runtime operations.",
         mutating=True,

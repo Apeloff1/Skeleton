@@ -15,6 +15,7 @@ Commands:
     walk        Prove spawn→extract on the emitted door graph
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
+                Use `capabilities --lifecycle` for resolvable/loaded status
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
@@ -35,10 +36,20 @@ def _cmd_contracts(_rest: List[str]) -> int:
     return 0
 
 
-def _cmd_capabilities(_rest: List[str]) -> int:
-    from skeleton.application import capability_manifest
+def _cmd_capabilities(rest: List[str]) -> int:
+    from skeleton.application import capability_lifecycle_snapshot, capability_manifest
 
-    print(json.dumps(capability_manifest(), indent=2, default=str))
+    flags = {item.strip().lower() for item in rest if item.strip()}
+    unknown = flags - {"--lifecycle", "lifecycle"}
+    if unknown:
+        print(f"Unknown capabilities option: {sorted(unknown)[0]}")
+        return 2
+    payload = (
+        capability_lifecycle_snapshot()
+        if flags & {"--lifecycle", "lifecycle"}
+        else capability_manifest()
+    )
+    print(json.dumps(payload, indent=2, default=str))
     return 0
 
 

@@ -1,6 +1,6 @@
 # Skeleton Backlog — failed-commit register + forward work
 
-Updated 2026-09-16 (F-16 capability discovery pass). Original register dated 2026-09-01. Two sections: things that failed and were recovered
+Updated 2026-09-17 (F-16 CLI/API parity + F-14 speculative RAG). Original register dated 2026-09-01. Two sections: things that failed and were recovered
 (so the failure modes stay visible), and the frontier backlog (what to
 build next, ordered).
 
@@ -31,9 +31,9 @@ Those planes are out-of-scope for this register — audit separately.
 
 ## 2. Frontier backlog — ordered by leverage
 
-Updated 2026-09-16. Tier-1 seams F-1..F-10, the Tier-2 F-6 frontier push,
-and F-13 economic/cascade reconciliation are **landed**; do not re-open them
-without a regression. F-16 is active as the next additive structural slice.
+Updated 2026-09-17. Tier-1 seams F-1..F-10, the Tier-2 F-6 frontier push,
+F-13 economic/cascade reconciliation, F-14 speculative RAG, and F-16
+capability discovery are **landed**; do not re-open them without a regression.
 
 ### Landed (keep visible — failure modes + PR anchors)
 
@@ -50,6 +50,8 @@ without a regression. F-16 is active as the next additive structural slice.
 | F-9 N+1 tool-call suppression | #20 | compose `kernel/dedup.py` |
 | F-10 PromptImproveDriver | #31 | ImproveLoop over prefix variants |
 | F-13 EconomicOptimiser × CascadeRouter | #277 | shared economic model registry, cascade planning, real model IDs, budget/cost accounting |
+| F-14 Speculative RAG | this PR | pipeline planning prefetch via quad + composer; prefetch failures never fail the run |
+| F-16 Unified capability discovery | this PR | CLI/API/command identity payload + additive lifecycle snapshot |
 | P6 policy enforcement | #13 | CodeVerifier + repair/verify gates |
 
 ### Live ops state — resolved blockers, keep green
@@ -84,21 +86,13 @@ remains Mixture-of-*Experts* and is a separate mechanism.
    godot binary to LFS, shim deletion. Local git ops.
 2. **F-12. H5.4 cortex persistence** — genesis twin vs live singleton once
    `$SKELETON_OWN` exists in the container.
-3. **F-14. Speculative RAG** — pre-fetch likely-needed documents during
-   the planning phase of a pipeline run (compose quad + composer).
-   Adjacent: `cortex/speculate.py` is token continuation, not RAG prefetch.
-4. **F-15. Organism/social/galaxy plane audit** — the repo grew three
+3. **F-15. Organism/social/galaxy plane audit** — the repo grew three
    planes while the waves landed (see §1 drift note). Same size-filtered
    read methodology as the deep-cut campaign, when their churn settles.
-5. **F-16. Unified capability discovery — ACTIVE.** Add a versioned,
-   curated Python manifest for canonical subsystems and expose the identical
-   machine-readable payload through `skeleton capabilities`. Contract tests
-   must lock schema version, unique IDs/modules, resolvable package targets,
-   and CLI/API parity. Branch: `backlog/f16-capability-manifest-current-main`.
 
 ## Definition of SOTA (working)
 
-Tier-1 SOTA seams, F-6 Mixture-of-Depths, and F-13 economic/cascade
-reconciliation are landed in code. The former CI-1..CI-3 blockers are resolved
-on main; the remaining structural queue is F-11, F-12, F-14, F-15, with F-16
-active as an additive discoverability slice.
+Tier-1 SOTA seams, F-6 Mixture-of-Depths, F-13 economic/cascade
+reconciliation, F-14 speculative RAG, and F-16 capability discovery are landed
+in code. The former CI-1..CI-3 blockers are resolved
+on main; the remaining structural queue is F-11, F-12, F-15.

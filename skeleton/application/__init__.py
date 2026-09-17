@@ -13,6 +13,7 @@ from .capability_runtime import (
     CapabilityLoadError,
     CapabilityLoader,
     CapabilityRuntimeStatus,
+    capability_lifecycle_snapshot,
     capability_runtime_status,
     load_capability,
 )
@@ -42,6 +43,7 @@ __all__ = [
     "CommandService",
     "CommandSpec",
     "build_runtime_command_service",
+    "capability_lifecycle_snapshot",
     "capability_manifest",
     "capability_runtime_status",
     "command_specs",

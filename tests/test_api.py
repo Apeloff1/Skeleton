@@ -41,6 +41,19 @@ class TestSurface:
         names = {c["name"] for c in client.get("/api/v1/capabilities").json()}
         assert {"npc", "game_logic", "animation"} <= names
 
+    def test_application_capability_manifest_matches_cli(self, client):
+        from skeleton.application import capability_lifecycle_snapshot, capability_manifest
+
+        manifest = client.get("/api/v1/application/capabilities")
+        assert manifest.status_code == 200
+        assert manifest.json() == capability_manifest()
+
+        lifecycle = client.get("/api/v1/application/capabilities/lifecycle")
+        assert lifecycle.status_code == 200
+        body = lifecycle.json()
+        assert body == capability_lifecycle_snapshot()
+        assert body["kind"] == "lifecycle"
+
     def test_npc_pipeline_e2e(self, client):
         res = client.post("/api/v1/pipeline/npc", json={"description": "a weary ferryman"})
         assert res.status_code == 200

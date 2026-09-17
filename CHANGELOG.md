@@ -4,6 +4,19 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-17 — F-16 API/CLI capability parity + F-14 speculative RAG
+
+- Curated capability manifest now covers the remaining canonical packages and
+  exposes the identical payload through `GET /api/v1/application/capabilities`,
+  `python -m skeleton capabilities`, and the shared `capabilities` command.
+- Additive lifecycle snapshot reports resolvable/loaded flags without importing
+  planes (`capabilities --lifecycle`, `/application/capabilities/lifecycle`).
+- Pipeline planning can prefetch likely documents through quad + composer
+  composition; prefetch failures never fail the run.
+- Legacy `GET /api/v1/capabilities` registry listing is unchanged.
+
+---
+
 ## 2026-09-07 — Organism preview + wave kernels
 
 - Galaxy pick screen + /organism show factory spine on T tokens.
