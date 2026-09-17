@@ -186,6 +186,19 @@ def build_snapshot(
     manifolds: tuple[ContactManifold, ...],
     state_digest: str,
 ) -> PhysicsSnapshot:
+    try:
+        body_states = tuple(body_states)
+        contact_cache = tuple(contact_cache)
+        manifolds = tuple(manifolds)
+    except TypeError as exc:
+        raise PhysicsSnapshotError("snapshot collections must be iterable") from exc
+    if not all(isinstance(row, PhysicsBodyState) for row in body_states):
+        raise PhysicsSnapshotError("snapshot contains invalid body state")
+    if not all(isinstance(row, ContactCacheEntry) for row in contact_cache):
+        raise PhysicsSnapshotError("snapshot contains invalid contact cache entry")
+    if not all(isinstance(row, ContactManifold) for row in manifolds):
+        raise PhysicsSnapshotError("snapshot contains invalid manifold")
+
     material = snapshot_material(
         tick=tick,
         configuration_digest=configuration_digest,
