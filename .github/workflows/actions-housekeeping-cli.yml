@@ -157,6 +157,7 @@ jobs:
         run: |
           set -euo pipefail
           cutoff=$(date -u -d "${FAILED_RUN_RETENTION_DAYS} days ago" +%s)
+          cutoff_iso=$(date -u -d "${FAILED_RUN_RETENTION_DAYS} days ago" +%Y-%m-%dT%H:%M:%SZ)
           inventory="$RUNNER_TEMP/runs.tsv"
           : > "$inventory"
 
@@ -165,7 +166,15 @@ jobs:
             local attempt=1 delay=2 status tmp="$RUNNER_TEMP/runs-${status_name}.candidate.tsv"
             while true; do
               : > "$tmp"
-              if gh run list --repo "$REPO" --limit 1000 --status "$status_name" --json databaseId,createdAt,conclusion,name --jq '.[] | [.databaseId, .createdAt, .conclusion, .name] | @tsv' > "$tmp"; then
+              # Query the stale side of the retention boundary directly. Asking
+              # for the newest 1,000 runs first can permanently starve older
+              # runs in a busy repository before local age filtering sees them.
+              if gh run list --repo "$REPO" \
+                --limit "$MAX_RUN_DELETES" \
+                --status "$status_name" \
+                --created "<${cutoff_iso}" \
+                --json databaseId,createdAt,conclusion,name \
+                --jq '.[] | [.databaseId, .createdAt, .conclusion, .name] | @tsv' > "$tmp"; then
                 cat "$tmp" >> "$inventory"
                 rm -f "$tmp"
                 return 0
@@ -186,7 +195,9 @@ jobs:
           for status_name in failure cancelled timed_out action_required stale; do
             fetch_status "$status_name"
           done
-          sort -u -o "$inventory" "$inventory"
+          # Consume the global deletion cap oldest-first across conclusions so a
+          # noisy recent status cannot monopolize every housekeeping pass.
+          sort -t $'\t' -k2,2 -k1,1n -u -o "$inventory" "$inventory"
 
           deleted=0
           failed=0
@@ -195,6 +206,9 @@ jobs:
             [[ -n "${id:-}" && -n "${created:-}" ]] || continue
             [[ "$id" != "$GITHUB_RUN_ID" ]] || continue
             created_epoch=$(date -u -d "$created" +%s)
+            # Keep a local age guard even though the server query is already
+            # bounded, so malformed or unexpectedly broad results cannot delete
+            # a recent run.
             if (( created_epoch >= cutoff || deleted >= MAX_RUN_DELETES )); then
               kept=$((kept + 1))
               continue
@@ -212,4 +226,5 @@ jobs:
             echo "- Run deletion failures: $failed"
             echo "- Unsuccessful-run retention threshold: ${FAILED_RUN_RETENTION_DAYS} days"
             echo "- Per-sweep run deletion cap: ${MAX_RUN_DELETES}"
+            echo "- Server-side stale-run cutoff: <${cutoff_iso}"
           } >> "$GITHUB_STEP_SUMMARY"
