@@ -5,8 +5,9 @@ split into state-space filtering, exact Bayesian parameter uncertainty, online
 Bayesian ensembles, distributional calibration, adaptive and stratified
 conformal calibration, hidden-Markov regime inference, multiscale harmonic
 forecasting, cross-family and delayed multi-horizon arbitration, regime-aware
-multi-horizon uncertainty, paired model comparison, and explicit promotion,
-uncertainty-governance, joint evidence, and target-alignment contracts.
+multi-horizon uncertainty, semantic evidence validation, paired model comparison,
+and explicit promotion, uncertainty-governance, joint evidence, and
+target-alignment contracts.
 """
 
 from .probabilistic_arbitration import (
@@ -111,6 +112,10 @@ from .probabilistic_governance_bundle import (
     evaluate_probabilistic_governance_bundle,
     validate_probabilistic_governance_bundle,
 )
+from .probabilistic_horizon_integrity import (
+    evaluate_multihorizon_conformal,
+    validate_multihorizon_report,
+)
 from .probabilistic_horizon_stratified import (
     HorizonConformalGovernanceEvidence,
     HorizonStratifiedCalibration,
@@ -134,7 +139,6 @@ from .probabilistic_horizons import (
     MultiHorizonConfig,
     MultiHorizonConformalReport,
     MultiHorizonReport,
-    evaluate_multihorizon_conformal,
 )
 from .probabilistic_joint_governance import (
     JointProbabilisticGovernanceDecision,
@@ -323,6 +327,7 @@ __all__ = [
     "validate_calibration_report",
     "validate_conformal_governance_decision",
     "validate_joint_probabilistic_governance_decision",
+    "validate_multihorizon_report",
     "validate_multihorizon_stratified_calibration",
     "validate_probabilistic_governance_bundle",
     "validate_probabilistic_promotion_decision",
