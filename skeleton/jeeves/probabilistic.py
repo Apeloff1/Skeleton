@@ -2,9 +2,10 @@
 
 This module keeps the public import surface compact while the implementation is
 split into state-space filtering, exact Bayesian parameter uncertainty, online
-Bayesian ensembles, distributional calibration, hidden-Markov regime inference,
-multiscale harmonic forecasting, cross-family arbitration, paired model
-comparison, and explicit promotion eligibility contracts.
+Bayesian ensembles, distributional calibration, adaptive conformal calibration,
+hidden-Markov regime inference, multiscale harmonic forecasting, cross-family
+arbitration, paired model comparison, and explicit promotion eligibility
+contracts.
 """
 
 from .probabilistic_arbitration import (
@@ -52,6 +53,20 @@ from .probabilistic_calibration import (
     mixture_cdf,
     mixture_quantile,
     pinball_loss,
+)
+from .probabilistic_conformal import (
+    ConformalConfig,
+    ConformalInterval,
+    ConformalPredictiveDistribution,
+    ConformalReport,
+    ConformalStep,
+    ForecastObservation,
+    conformal_interval,
+    conformal_quantile,
+    conformalize_next_forecast,
+    evaluate_cross_family_conformal,
+    evaluate_prequential_conformal,
+    nonconformity_score,
 )
 from .probabilistic_contracts import (
     ProbabilisticPromotionDecision,
@@ -123,6 +138,11 @@ __all__ = [
     "BayesianTrendFold",
     "CalibrationConfig",
     "CalibrationReport",
+    "ConformalConfig",
+    "ConformalInterval",
+    "ConformalPredictiveDistribution",
+    "ConformalReport",
+    "ConformalStep",
     "CoverageDiagnostic",
     "CrossFamilyArbitrator",
     "CrossFamilyConfig",
@@ -134,6 +154,7 @@ __all__ = [
     "ExpertComponent",
     "ExpertKind",
     "FilterStep",
+    "ForecastObservation",
     "GaussianForecast",
     "GaussianRegime",
     "HACComparison",
@@ -172,9 +193,14 @@ __all__ = [
     "WeightedForecast",
     "calibrate_distributions",
     "central_interval",
+    "conformal_interval",
+    "conformal_quantile",
+    "conformalize_next_forecast",
     "discover_spectral_peaks",
     "evaluate_bayesian_trend",
+    "evaluate_cross_family_conformal",
     "evaluate_predictive_arena",
+    "evaluate_prequential_conformal",
     "evaluate_probabilistic_promotion",
     "evaluate_regime_hmm_prequential",
     "evaluate_spectral_complexities",
@@ -192,6 +218,7 @@ __all__ = [
     "mixture_cdf",
     "mixture_quantile",
     "newey_west_mean_test",
+    "nonconformity_score",
     "pinball_loss",
     "probability_integral_transform",
     "regime_forecast_crps",
