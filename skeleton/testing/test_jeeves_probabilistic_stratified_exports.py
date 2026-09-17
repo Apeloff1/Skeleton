@@ -55,3 +55,15 @@ def test_probabilistic_facade_exports_joint_governance_surface() -> None:
     assert expected.issubset(set(probabilistic.__all__))
     for name in expected:
         assert hasattr(probabilistic, name)
+
+
+def test_probabilistic_facade_exports_governance_bundle_surface() -> None:
+    expected = {
+        "ProbabilisticGovernanceBundle",
+        "ProbabilisticGovernanceBundleGate",
+        "evaluate_probabilistic_governance_bundle",
+        "validate_probabilistic_governance_bundle",
+    }
+    assert expected.issubset(set(probabilistic.__all__))
+    for name in expected:
+        assert hasattr(probabilistic, name)
