@@ -3,6 +3,66 @@
 from .core import Jeeves, Session, SessionMode, SYSTEM_LAWS, Turn
 from .llm_core import JeevesCore, MemoryManager
 from .evidence_core import EvidenceJeevesCore, EvidenceResult
+from .historical_modes import (
+    BASE_MODES,
+    EvaluationReport,
+    HistoricalMode,
+    HistoricalModeError,
+    HistoricalModeLab,
+    HistoricalSeries,
+    Regime,
+    SelectionGate,
+    WalkForwardConfig,
+    classify_regime,
+)
+from .bidirectional_modes import (
+    BidirectionalConfig,
+    BidirectionalDecision,
+    BidirectionalModeLab,
+    BidirectionalReport,
+    DirectionalEvaluation,
+    TemporalDirection,
+    reverse_series,
+)
+from .bidirectional_calibration import (
+    CalibratedBidirectionalModeLab,
+    CalibratedBidirectionalReport,
+    CalibrationDecision,
+    CrossDirectionConfig,
+    ModeCalibration,
+    RankingAgreement,
+)
+from .historical_robustness import (
+    TemporalJackknifeConfig,
+    TemporalJackknifeDecision,
+    TemporalJackknifeModeLab,
+    TemporalJackknifeReport,
+    TemporalViewEvaluation,
+    TemporalViewKind,
+)
+from .historical_uncertainty import (
+    ConformalConfig,
+    ConformalIntervalFold,
+    DirectionalUncertaintyReport,
+    HistoricalUncertaintyModeLab,
+    HistoricalUncertaintyReport,
+    UncertaintyDecision,
+    build_sequential_intervals,
+    conformal_radius,
+)
+from .historical_horizons import (
+    HorizonConsistencyDecision,
+    HorizonEvaluation,
+    HorizonGridConfig,
+    MultiHorizonModeLab,
+    MultiHorizonReport,
+)
+from .historical_evidence import (
+    HistoricalEvidenceBundle,
+    build_historical_evidence,
+    build_uncertainty_evidence,
+    bundle_manifest,
+)
 from .matrices import ClomMatrix, KremMatrix, SamMatrix
 from .matrices_llm import (
     CompressedLearnedOutcomeModel,
@@ -56,6 +116,7 @@ from .troubleshooting import Troubleshooter, TroubleshootingStep
 # neocortex, so a first CORTEX request must use that same lifecycle-bound model.
 _core_think = Jeeves.think
 
+
 def _jeeves_think_lazy_cortex(self, stimulus: str, *, context=None):
     cortex = self.cortex
     if callable(getattr(cortex, "think", None)):
@@ -67,6 +128,7 @@ def _jeeves_think_lazy_cortex(self, stimulus: str, *, context=None):
         })
         return trace
     return _core_think(self, stimulus, context=context)
+
 
 Jeeves.think = _jeeves_think_lazy_cortex
 
@@ -80,6 +142,52 @@ __all__ = [
     "SYSTEM_LAWS",
     "Turn",
     "MemoryManager",
+    "BASE_MODES",
+    "EvaluationReport",
+    "HistoricalMode",
+    "HistoricalModeError",
+    "HistoricalModeLab",
+    "HistoricalSeries",
+    "Regime",
+    "SelectionGate",
+    "WalkForwardConfig",
+    "classify_regime",
+    "BidirectionalConfig",
+    "BidirectionalDecision",
+    "BidirectionalModeLab",
+    "BidirectionalReport",
+    "DirectionalEvaluation",
+    "TemporalDirection",
+    "reverse_series",
+    "CalibratedBidirectionalModeLab",
+    "CalibratedBidirectionalReport",
+    "CalibrationDecision",
+    "CrossDirectionConfig",
+    "ModeCalibration",
+    "RankingAgreement",
+    "TemporalJackknifeConfig",
+    "TemporalJackknifeDecision",
+    "TemporalJackknifeModeLab",
+    "TemporalJackknifeReport",
+    "TemporalViewEvaluation",
+    "TemporalViewKind",
+    "ConformalConfig",
+    "ConformalIntervalFold",
+    "DirectionalUncertaintyReport",
+    "HistoricalUncertaintyModeLab",
+    "HistoricalUncertaintyReport",
+    "UncertaintyDecision",
+    "build_sequential_intervals",
+    "conformal_radius",
+    "HorizonConsistencyDecision",
+    "HorizonEvaluation",
+    "HorizonGridConfig",
+    "MultiHorizonModeLab",
+    "MultiHorizonReport",
+    "HistoricalEvidenceBundle",
+    "build_historical_evidence",
+    "build_uncertainty_evidence",
+    "bundle_manifest",
     "ClomMatrix",
     "KremMatrix",
     "SamMatrix",
