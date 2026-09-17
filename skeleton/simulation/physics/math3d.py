@@ -75,7 +75,7 @@ class Vec3:
 
     def __truediv__(self, scalar: float) -> "Vec3":
         scalar = _finite(scalar, name="scalar")
-        if abs(scalar) <= EPSILON:
+        if abs(scalar) <= NORMAL_EPSILON:
             raise PhysicsValidationError("cannot divide vector by zero")
         inv = 1.0 / scalar
         return self * inv
