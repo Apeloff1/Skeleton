@@ -189,7 +189,9 @@ def test_future_suffix_cannot_change_earlier_fold_predictions() -> None:
         assert a.target_index == b.target_index
         assert a.candidate_mean == pytest.approx(b.candidate_mean, abs=1e-12)
         assert a.candidate_variance == pytest.approx(b.candidate_variance, abs=1e-12)
-        assert a.regime_weights == pytest.approx(b.regime_weights)
+        assert tuple(name for name, _ in a.regime_weights) == tuple(name for name, _ in b.regime_weights)
+        for (_, a_weight), (_, b_weight) in zip(a.regime_weights, b.regime_weights):
+            assert a_weight == pytest.approx(b_weight, abs=1e-12)
 
 
 def test_each_fold_exposes_normalized_regime_weights() -> None:
