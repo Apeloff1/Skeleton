@@ -30,6 +30,7 @@ from typing import Any, Mapping, Sequence
 from .context_pipeline import ContextResolution, LayeredContextResolver
 from .memory import MemoryNamespace
 from .memory_game import InteractionCard
+from .relational_memory import SequenceObservation
 from .semantic_frontier import FrontierLensRouter, FrontierSemanticRegistry, LensCompositionEngine, SemanticComposition
 from .semantic_lenses import LensSelection, SemanticFinding, SemanticObservation
 from .semantic_prediction import SemanticForecast, SemanticPredictionLedger, SemanticPredictiveModel
@@ -70,6 +71,7 @@ class NuanceFrame:
     uncertainty_recommendations: tuple[UncertaintyRecommendation, ...]
     captured_card_id: str | None
     fingerprint: str
+    relation_sequence: SequenceObservation | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -212,6 +214,11 @@ class ScientificNuanceRuntime:
         self.policy = policy or NuanceRuntimePolicy()
         self._frames: dict[str, NuanceFrame] = {}
         self._updates: dict[str, NuanceUpdate] = {}
+        # Streaming chronology is deliberately separate from card timestamps:
+        # re-exposure updates an existing card timestamp and must not rewrite
+        # interaction order. Only the last two ids are needed for pair/triad
+        # learning; durable relation traces remain in the relational index.
+        self._recent_cards: dict[str, tuple[str, ...]] = {}
 
     @staticmethod
     def _observation_from_context(item: Any, position: int) -> SemanticObservation:
@@ -282,7 +289,9 @@ class ScientificNuanceRuntime:
 
         should_capture = self.policy.capture_interactions if capture_interaction is None else bool(capture_interaction)
         captured: InteractionCard | None = None
+        relation_sequence: SequenceObservation | None = None
         if should_capture:
+            prior_cards = self._recent_cards.get(namespace.key, ())
             captured = self.resolver.cards.capture_interaction(
                 namespace,
                 query,
@@ -294,9 +303,22 @@ class ScientificNuanceRuntime:
                 metadata={
                     "captured_after_context_resolution": True,
                     "context_fingerprint": context.fingerprint,
+                    "prior_card_ids": prior_cards,
                     **dict(interaction_metadata or {}),
                 },
             )
+            if self.resolver.relations is not None:
+                # Prequential invariant: context was resolved before the card
+                # existed; the previous->current transition is scored before it
+                # is learned by observe_stream_step.
+                relation_sequence = self.resolver.relations.observe_stream_step(
+                    namespace,
+                    captured.card_id,
+                    previous_card_ids=prior_cards,
+                    context_tags=context_tags,
+                    provenance=interaction_provenance,
+                )
+            self._recent_cards[namespace.key] = (*prior_cards[-1:], captured.card_id)
 
         frame_id = stable_id(
             "nuance-frame",
@@ -317,6 +339,7 @@ class ScientificNuanceRuntime:
                 "lenses": [item.key for item in selection.lenses],
                 "uncertainty": [item.lens.value for item in uncertainty],
                 "captured_card": captured.card_id if captured else None,
+                "relation_sequence": relation_sequence.fingerprint if relation_sequence else None,
             }
         )
         frame = NuanceFrame(
@@ -329,6 +352,7 @@ class ScientificNuanceRuntime:
             uncertainty_recommendations=uncertainty,
             captured_card_id=captured.card_id if captured else None,
             fingerprint=fingerprint,
+            relation_sequence=relation_sequence,
         )
         self._frames[frame_id] = frame
         return frame
