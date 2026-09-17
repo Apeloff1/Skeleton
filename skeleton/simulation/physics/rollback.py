@@ -157,18 +157,29 @@ class PhysicsCommandRollbackSession:
     ) -> PhysicsStepReceipt:
         self._assert_configuration()
         frame = PhysicsCommandFrame.build(self.world.tick + 1, tuple(commands))
+        existing = (
+            self.commands.frame(frame.tick)
+            if frame.tick in self.commands.ticks()
+            else None
+        )
+        if existing is not None and existing != frame:
+            raise PhysicsReplayError(
+                "next tick already has different retained commands; use correction"
+            )
+
+        previous = self.world.capture_snapshot()
         receipt = step_physics_with_commands(self.world, frame)
+        appended = False
         try:
-            self.commands.append(frame)
+            if existing is None:
+                self.commands.append(frame)
+                appended = True
             self.history.append(self.world.capture_snapshot())
         except Exception:
-            # The physics step is valid but evidence retention failed. Restore the
-            # previous retained snapshot so the session remains transactional.
-            previous_tick = receipt.tick - 1
-            previous = self.history.at_tick(previous_tick)
             self.world.restore_snapshot(previous)
-            self.commands.truncate_after(previous_tick)
-            self.history.truncate_after(previous_tick)
+            if appended:
+                self.commands.remove(frame.tick)
+            self.history.truncate_after(previous.tick)
             raise
         return receipt
 
