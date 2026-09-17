@@ -8,7 +8,7 @@ from typing import Any, Mapping
 
 from skeleton.game.ai_policy import run_policy
 from skeleton.game.catalog_data import pack as catalog_pack
-from skeleton.game.extract_loop import step as heat_step
+from skeleton.game.extract_loop import ExtractLoopError, step as heat_step
 from skeleton.game.mechanics import AIBehaviorSpec
 from skeleton.game.token_clock import TOKEN_PERIOD
 from skeleton.game.world_graph import place, walk
@@ -107,10 +107,8 @@ def simulate(*, seed: int = 8847291, ticks: int = 32) -> dict[str, Any]:
     for raw in script:
         try:
             state = apply(state, raw, tick=len(frames) - 1, extract_room=extract_room)
-        except NexusSimError as exc:
-            if "extract requires heat" in str(exc) or "extract only" in str(exc):
-                state = apply(state, {"verb": "heat"}, tick=len(frames) - 1, extract_room=extract_room)
-            elif "craft requires scrap" in str(exc):
+        except (NexusSimError, ExtractLoopError) as exc:
+            if "extract requires heat" in str(exc) or "extract only" in str(exc) or "craft requires scrap" in str(exc):
                 state = apply(state, {"verb": "heat"}, tick=len(frames) - 1, extract_room=extract_room)
             else:
                 raise
