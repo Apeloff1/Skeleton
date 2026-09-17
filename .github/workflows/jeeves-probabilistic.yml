@@ -7,8 +7,10 @@ on:
       - "skeleton/jeeves/probabilistic_state_space.py"
       - "skeleton/jeeves/probabilistic_ensemble.py"
       - "skeleton/jeeves/probabilistic_calibration.py"
+      - "skeleton/jeeves/probabilistic_contracts.py"
       - "skeleton/testing/test_jeeves_probabilistic_state_space.py"
       - "skeleton/testing/test_jeeves_probabilistic_calibration.py"
+      - "skeleton/testing/test_jeeves_probabilistic_contracts.py"
       - "skeleton/testing/test_jeeves_probabilistic_exports.py"
       - ".github/workflows/jeeves-probabilistic.yml"
   workflow_dispatch:
@@ -45,7 +47,8 @@ jobs:
             skeleton/jeeves/probabilistic.py \
             skeleton/jeeves/probabilistic_state_space.py \
             skeleton/jeeves/probabilistic_ensemble.py \
-            skeleton/jeeves/probabilistic_calibration.py
+            skeleton/jeeves/probabilistic_calibration.py \
+            skeleton/jeeves/probabilistic_contracts.py
 
       - name: Ruff probabilistic surfaces
         run: |
@@ -54,8 +57,10 @@ jobs:
             skeleton/jeeves/probabilistic_state_space.py \
             skeleton/jeeves/probabilistic_ensemble.py \
             skeleton/jeeves/probabilistic_calibration.py \
+            skeleton/jeeves/probabilistic_contracts.py \
             skeleton/testing/test_jeeves_probabilistic_state_space.py \
             skeleton/testing/test_jeeves_probabilistic_calibration.py \
+            skeleton/testing/test_jeeves_probabilistic_contracts.py \
             skeleton/testing/test_jeeves_probabilistic_exports.py
 
       - name: Run probabilistic regression suite
@@ -63,4 +68,5 @@ jobs:
           python -m pytest -q \
             skeleton/testing/test_jeeves_probabilistic_state_space.py \
             skeleton/testing/test_jeeves_probabilistic_calibration.py \
+            skeleton/testing/test_jeeves_probabilistic_contracts.py \
             skeleton/testing/test_jeeves_probabilistic_exports.py
