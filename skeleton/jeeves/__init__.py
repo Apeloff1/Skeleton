@@ -24,6 +24,14 @@ from .bidirectional_modes import (
     TemporalDirection,
     reverse_series,
 )
+from .bidirectional_calibration import (
+    CalibratedBidirectionalModeLab,
+    CalibratedBidirectionalReport,
+    CalibrationDecision,
+    CrossDirectionConfig,
+    ModeCalibration,
+    RankingAgreement,
+)
 from .matrices import ClomMatrix, KremMatrix, SamMatrix
 from .matrices_llm import (
     CompressedLearnedOutcomeModel,
@@ -120,6 +128,12 @@ __all__ = [
     "DirectionalEvaluation",
     "TemporalDirection",
     "reverse_series",
+    "CalibratedBidirectionalModeLab",
+    "CalibratedBidirectionalReport",
+    "CalibrationDecision",
+    "CrossDirectionConfig",
+    "ModeCalibration",
+    "RankingAgreement",
     "ClomMatrix",
     "KremMatrix",
     "SamMatrix",
