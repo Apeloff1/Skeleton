@@ -54,6 +54,7 @@ from .snapshots import (
 )
 from .solver import SequentialImpulseSolver, SolverStats
 from .world import PhysicsSettings, PhysicsStepReceipt, PhysicsWorld
+from .rollback import PhysicsRollbackSession, RollbackReceipt
 from .replay import (
     PhysicsReplayFrame,
     PhysicsReplayRecorder,
@@ -97,6 +98,7 @@ __all__ = [
     "PhysicsReplayRecorder",
     "PhysicsReplayTape",
     "PhysicsReplayVerification",
+    "PhysicsRollbackSession",
     "PhysicsSnapshot",
     "PhysicsSnapshotError",
     "PhysicsError",
@@ -111,6 +113,7 @@ __all__ = [
     "Ray",
     "RayHit",
     "RigidBody",
+    "RollbackReceipt",
     "SequentialImpulseSolver",
     "ShapeKind",
     "SolverError",
