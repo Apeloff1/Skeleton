@@ -157,6 +157,15 @@ from .game_engine_legacy import (
     legacy_hardware,
     normalize_legacy_tuning,
 )
+from .game_engine_runtime import (
+    ERA_FAMILY,
+    EngineFamily,
+    ExecutableGameEngineLab,
+    RoutedEngineSandbox,
+    RoutedImprovementResult,
+    build_executable_game_engine,
+    engine_family,
+)
 from .matrices import ClomMatrix, KremMatrix, SamMatrix
 from .matrices_llm import (
     CompressedLearnedOutcomeModel,
@@ -368,6 +377,13 @@ __all__ = [
     "default_legacy_tuning",
     "legacy_hardware",
     "normalize_legacy_tuning",
+    "ERA_FAMILY",
+    "EngineFamily",
+    "ExecutableGameEngineLab",
+    "RoutedEngineSandbox",
+    "RoutedImprovementResult",
+    "build_executable_game_engine",
+    "engine_family",
     "ClomMatrix",
     "KremMatrix",
     "SamMatrix",
