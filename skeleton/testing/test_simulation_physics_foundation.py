@@ -500,3 +500,69 @@ def test_vertical_downward_projectile_solution_hits_target() -> None:
         solution[0].flight_time,
     )
     assert end.almost_equal(target, tolerance=1.0e-8)
+
+
+def test_invalid_world_gravity_type_fails_closed() -> None:
+    with pytest.raises(PhysicsValidationError, match="gravity"):
+        PhysicsSettings(gravity="down")  # type: ignore[arg-type]
+
+
+def test_live_external_force_prevents_sleep_before_accumulator_clear() -> None:
+    world = PhysicsWorld(
+        PhysicsSettings(
+            gravity=Vec3.zero(),
+            fixed_dt=0.1,
+            sleep_linear_speed=100.0,
+            sleep_angular_speed=100.0,
+            sleep_after_seconds=0.1,
+        )
+    )
+    body = RigidBody.dynamic(
+        "body",
+        SphereShape(1.0),
+        linear_damping=0.0,
+        angular_damping=0.0,
+    )
+    body.apply_force(Vec3(1.0, 0.0, 0.0))
+    world.add_body(body)
+    world.step()
+    assert body.awake
+    assert body.force == Vec3.zero()
+
+
+def test_failed_solver_rolls_back_entire_tick_atomically() -> None:
+    world = _zero_gravity_world()
+    body = RigidBody.dynamic(
+        "body",
+        SphereShape(1.0),
+        linear_damping=0.0,
+        angular_damping=0.0,
+    )
+    body.linear_velocity = Vec3(3.0, 1.0, 0.0)
+    body.apply_force(Vec3(2.0, 0.0, 0.0))
+    world.add_body(body)
+
+    before_digest = world.state_digest
+    before_position = body.position
+    before_velocity = body.linear_velocity
+    before_force = body.force
+    before_tick = world.tick
+    before_contacts = world.contacts()
+
+    class _FailingSolver:
+        def solve(self, bodies, manifolds):
+            bodies["body"].position = Vec3(999.0, 999.0, 999.0)
+            bodies["body"].linear_velocity = Vec3(-999.0, 0.0, 0.0)
+            raise RuntimeError("synthetic solver failure")
+
+    world._solver = _FailingSolver()  # type: ignore[assignment]
+
+    with pytest.raises(RuntimeError, match="synthetic solver failure"):
+        world.step()
+
+    assert world.tick == before_tick
+    assert world.state_digest == before_digest
+    assert body.position == before_position
+    assert body.linear_velocity == before_velocity
+    assert body.force == before_force
+    assert world.contacts() == before_contacts
