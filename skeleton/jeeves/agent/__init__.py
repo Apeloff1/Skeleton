@@ -1,10 +1,10 @@
 """Jeeves evidence-first cognitive agent runtime.
 
 Public imports are explicit enough for application code to assemble the runtime
-without reaching through implementation paths.  The package surface now exposes
-both the original bounded runtime and the newer scientific layers: cue-first
-context, typed probability/uncertainty, semantic nuance and calibrated
-prediction, perpendicular tangent continuity, and factorized causal control.
+without reaching through implementation paths. The package surface exposes the
+bounded runtime plus scientific layers for cue-first associative context, typed
+probability and uncertainty, semantic nuance with empirical validation,
+perpendicular tangent continuity, and factorized causal control.
 """
 
 from .action_model import (
@@ -25,6 +25,15 @@ from .action_model import (
     SkillScore,
     SkillSelection,
     SkillSpec,
+)
+from .associative_memory import (
+    AssociationHit,
+    AssociationKind,
+    AssociationPolicy,
+    AssociativeMemoryGameIndex,
+    AssociativeMemoryMesh,
+    MemoryAssociation,
+    SequencePrediction,
 )
 from .cognition import (
     CognitionError,
@@ -100,6 +109,15 @@ from .evaluation import (
     RunEvaluator,
 )
 from .frontier_control_plane import FrontierCognitiveControlPlane
+from .interpretive_science import (
+    DomainCalibration,
+    JuxtapositionTrial,
+    LensOutcomeTrial,
+    ScientificLensLab,
+    ScientificLensPolicy,
+    ScientificLensReport,
+    ScientificLensStatus,
+)
 from .memory import (
     ConsolidationCandidate,
     InMemoryStore,
@@ -157,6 +175,30 @@ from .policy import (
     ExecutionPolicy,
     PolicyContext,
     PolicyDecision,
+)
+from .probability_frontier import (
+    FrontierProbabilityAssessment,
+    FrontierProbabilityLens,
+    FrontierProbabilityWorkbench,
+    anytime_hoeffding_interval,
+    competing_risk_probability,
+    conformal_error_bound,
+    cvar_failure_probability,
+    distribution_shift_bound,
+    frechet_joint_bounds,
+    generalized_pareto_tail_probability,
+    importance_sampling_probability,
+    information_directed_score,
+    log_opinion_pool,
+    model_mixture_probability,
+    partial_identification_interval,
+    poisson_at_least_one,
+    retrieval_competition_probability,
+    robust_ambiguity_probability,
+    sequential_e_value,
+    split_conformal_p_value,
+    system_reliability,
+    uncertainty_decomposition,
 )
 from .probability_lenses import (
     AssessmentShape,
