@@ -13,6 +13,7 @@ on:
       - "skeleton/jeeves/probabilistic_contracts.py"
       - "skeleton/jeeves/probabilistic_governance.py"
       - "skeleton/jeeves/probabilistic_joint_governance.py"
+      - "skeleton/jeeves/probabilistic_governance_bundle.py"
       - "skeleton/jeeves/probabilistic_regimes.py"
       - "skeleton/jeeves/probabilistic_arena.py"
       - "skeleton/jeeves/probabilistic_spectral.py"
@@ -26,6 +27,7 @@ on:
       - "skeleton/testing/test_jeeves_probabilistic_governance.py"
       - "skeleton/testing/test_jeeves_probabilistic_governance_stress.py"
       - "skeleton/testing/test_jeeves_probabilistic_joint_governance.py"
+      - "skeleton/testing/test_jeeves_probabilistic_governance_bundle.py"
       - "skeleton/testing/test_jeeves_probabilistic_regimes.py"
       - "skeleton/testing/test_jeeves_probabilistic_arena.py"
       - "skeleton/testing/test_jeeves_probabilistic_spectral.py"
@@ -73,6 +75,7 @@ jobs:
             skeleton/jeeves/probabilistic_contracts.py \
             skeleton/jeeves/probabilistic_governance.py \
             skeleton/jeeves/probabilistic_joint_governance.py \
+            skeleton/jeeves/probabilistic_governance_bundle.py \
             skeleton/jeeves/probabilistic_regimes.py \
             skeleton/jeeves/probabilistic_arena.py \
             skeleton/jeeves/probabilistic_spectral.py \
@@ -91,6 +94,7 @@ jobs:
             skeleton/jeeves/probabilistic_contracts.py \
             skeleton/jeeves/probabilistic_governance.py \
             skeleton/jeeves/probabilistic_joint_governance.py \
+            skeleton/jeeves/probabilistic_governance_bundle.py \
             skeleton/jeeves/probabilistic_regimes.py \
             skeleton/jeeves/probabilistic_arena.py \
             skeleton/jeeves/probabilistic_spectral.py \
@@ -104,6 +108,7 @@ jobs:
             skeleton/testing/test_jeeves_probabilistic_governance.py \
             skeleton/testing/test_jeeves_probabilistic_governance_stress.py \
             skeleton/testing/test_jeeves_probabilistic_joint_governance.py \
+            skeleton/testing/test_jeeves_probabilistic_governance_bundle.py \
             skeleton/testing/test_jeeves_probabilistic_regimes.py \
             skeleton/testing/test_jeeves_probabilistic_arena.py \
             skeleton/testing/test_jeeves_probabilistic_spectral.py \
@@ -125,6 +130,7 @@ jobs:
             skeleton/testing/test_jeeves_probabilistic_governance.py \
             skeleton/testing/test_jeeves_probabilistic_governance_stress.py \
             skeleton/testing/test_jeeves_probabilistic_joint_governance.py \
+            skeleton/testing/test_jeeves_probabilistic_governance_bundle.py \
             skeleton/testing/test_jeeves_probabilistic_regimes.py \
             skeleton/testing/test_jeeves_probabilistic_arena.py \
             skeleton/testing/test_jeeves_probabilistic_spectral.py \
