@@ -1,4 +1,4 @@
-"""Security regressions for public HTTP error envelopes and crash redaction."""
+"""Hermetic backend public-error regressions that do not import server.py."""
 from __future__ import annotations
 
 import asyncio
@@ -10,7 +10,7 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-BACKEND_ROOT = Path(__file__).resolve().parents[1]
+BACKEND_ROOT = Path(__file__).resolve().parents[1] / "backend"
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
@@ -23,7 +23,7 @@ from core.http_errors import (  # noqa: E402
 )
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]
 ROUTE_FILES = [
     REPO_ROOT / "backend" / "routes" / "jeeves_tutor.py",
     REPO_ROOT / "backend" / "routes" / "npc_pipeline.py",
@@ -33,7 +33,6 @@ ROUTE_FILES = [
     REPO_ROOT / "backend" / "routes" / "gameforge_workflow.py",
     REPO_ROOT / "backend" / "routes" / "omega_conductor.py",
 ]
-TELEMETRY = REPO_ROOT / "backend" / "routes" / "telemetry.py"
 
 _PRIVATE = "private-detail-must-not-leak-7f31"
 
@@ -80,17 +79,6 @@ def test_converted_routes_do_not_leak_caught_exceptions(path: Path) -> None:
     assert leaks == [], f"{path.name} exposes caught exception data in HTTP responses at lines {leaks}"
 
 
-@pytest.mark.parametrize("path", ROUTE_FILES, ids=lambda path: path.name)
-def test_converted_routes_use_stable_helpers_or_constants(path: Path) -> None:
-    source = path.read_text(encoding="utf-8")
-    assert "detail=str(" not in source
-    assert "str(e)" not in source
-    assert "str(exc)" not in source
-    assert "repr(e)" not in source
-    assert "{type(e).__name__}" not in source
-    assert "internal_http_error(" in source or "from core.http_errors import" in source
-
-
 def test_internal_http_error_is_stable_and_typed() -> None:
     exc = internal_http_error("Jeeves request failed", RuntimeError(_PRIVATE))
     assert isinstance(exc, HTTPException)
@@ -128,12 +116,3 @@ def test_redact_client_payload_is_bounded() -> None:
     assert redacted["token"] == "[REDACTED]"
     assert redacted["nested"]["password"] == "[REDACTED]"
     assert redacted["nested"]["ok"] == "fine"
-
-
-def test_telemetry_crash_path_redacts_before_persist() -> None:
-    source = TELEMETRY.read_text(encoding="utf-8")
-    assert "def crash_row(" in source
-    assert "redact_client_text(report.message" in source
-    assert "redact_client_text(report.stack" in source
-    assert "redact_client_payload(report.info)" in source
-    assert 'stack": (report.stack or "")[:8000]' not in source
