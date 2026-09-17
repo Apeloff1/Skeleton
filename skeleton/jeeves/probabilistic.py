@@ -1,8 +1,8 @@
 """Stable Jeeves probabilistic-modeling facade.
 
 This module keeps the public import surface compact while the implementation is
-split into state-space filtering, online Bayesian ensembles, and distributional
-calibration diagnostics.
+split into state-space filtering, online Bayesian ensembles, distributional
+calibration diagnostics, and explicit promotion eligibility contracts.
 """
 
 from .probabilistic_calibration import (
@@ -18,6 +18,11 @@ from .probabilistic_calibration import (
     mixture_cdf,
     mixture_quantile,
     pinball_loss,
+)
+from .probabilistic_contracts import (
+    ProbabilisticPromotionDecision,
+    ProbabilisticPromotionGate,
+    evaluate_probabilistic_promotion,
 )
 from .probabilistic_ensemble import (
     BayesianEnsembleConfig,
@@ -61,6 +66,8 @@ __all__ = [
     "MixtureForecast",
     "OnlineBayesianEnsemble",
     "PitDiagnostic",
+    "ProbabilisticPromotionDecision",
+    "ProbabilisticPromotionGate",
     "RegimePosterior",
     "SeriesValues",
     "StateSpaceConfig",
@@ -72,6 +79,7 @@ __all__ = [
     "WeightedForecast",
     "calibrate_distributions",
     "central_interval",
+    "evaluate_probabilistic_promotion",
     "evaluate_state_space_families",
     "fit_state_space",
     "forecast_state_space",
