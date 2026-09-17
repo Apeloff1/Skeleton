@@ -1,4 +1,4 @@
-"""Named cellar bins."""
+"""Named cellars."""
 
 from __future__ import annotations
 
@@ -9,17 +9,14 @@ class CellarPackError(ValueError):
     pass
 
 
-CELLAR = tuple(f"cl_{i:02d}" for i in range(16))
+CELLAR = tuple(f"cl_{i:02d}" for i in range(8))
 
 
-def stow(state: dict[str, Any], name: str, item: str) -> dict[str, Any]:
+def set_cellar(node: dict[str, Any], name: str, cool: int) -> dict[str, Any]:
     if name not in CELLAR:
         raise CellarPackError(name)
-    nxt = dict(state)
-    cur = dict(nxt.get("cellar") or {})
-    cell = list(cur.get(name) or [])
-    cell.append(item)
-    cur[name] = cell
-    nxt["cellar"] = cur
+    nxt = dict(node)
+    nxt["cellar"] = name
+    nxt["cool"] = max(0, int(cool))
     nxt["stored_prose"] = 0
     return nxt
