@@ -1,6 +1,16 @@
 """Deterministic engine-neutral 3D physics foundation."""
 
 from .body import BodyType, RigidBody
+from .calculations import (
+    PhysicsAggregate,
+    aggregate_physics,
+    angular_momentum,
+    gravitational_potential_energy,
+    impulse_from_force,
+    kinetic_energy,
+    linear_momentum,
+    world_inertia,
+)
 from .collision import (
     BroadPhasePair,
     ContactManifold,
@@ -49,6 +59,7 @@ __all__ = [
     "JumpTuning",
     "MassProperties",
     "Mat3",
+    "PhysicsAggregate",
     "PhysicsError",
     "PhysicsMaterial",
     "PhysicsSettings",
@@ -70,9 +81,16 @@ __all__ = [
     "Transform",
     "UnsupportedCollisionError",
     "Vec3",
+    "aggregate_physics",
+    "angular_momentum",
     "combine_materials",
     "detect_collision",
     "generate_manifolds",
+    "gravitational_potential_energy",
+    "impulse_from_force",
+    "kinetic_energy",
+    "linear_momentum",
     "raycast_body",
     "sphere_cast_body",
+    "world_inertia",
 ]
