@@ -13,7 +13,6 @@ from skeleton.jeeves.game_engine_lab import (
 from skeleton.jeeves.game_engine_runtime import (
     ERA_FAMILY,
     AdversarialEngineEvolution,
-    EngineEvolutionSession,
     EngineFamily,
     ExecutableGameEngineLab,
     RoutedEngineSandbox,
