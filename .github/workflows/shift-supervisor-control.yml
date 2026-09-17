@@ -96,50 +96,27 @@ jobs:
           import os
           from pathlib import Path
 
-          root = Path('.shift-supervisor-tmp')
-          issues = json.loads((root / 'issues.json').read_text(encoding='utf-8'))
-          status_titles = {
-              '[Shift Supervisor] Idle Worker Status',
-              '[Shift Supervisor] Night Worker Status',
-          }
-          planning_issues = []
-          worker_snapshots = []
-          for item in issues:
-              title = str(item.get('title', '')) if isinstance(item, dict) else ''
-              if title == os.environ['PLAN_TITLE']:
-                  continue
-              if title in status_titles:
-                  try:
-                      payload = json.loads(str(item.get('body', '{}')))
-                  except json.JSONDecodeError:
-                      continue
-                  if not isinstance(payload, dict) or payload.get('version') != 1:
-                      continue
-                  workers = payload.get('workers', [])
-                  if isinstance(workers, list):
-                      worker_snapshots.extend(
-                          worker for worker in workers[:256] if isinstance(worker, dict)
-                      )
-                  continue
-              planning_issues.append(item)
+          from core.shift_supervisor.context_budget import build_bounded_project_context
 
-          context = {
-              'repository': os.environ['REPO'],
-              'base_sha': os.environ['BASE_SHA'],
-              'open_issues': planning_issues,
-              'open_pull_requests': json.loads((root / 'pulls.json').read_text(encoding='utf-8')),
-              'workflow_runs': json.loads((root / 'runs.json').read_text(encoding='utf-8')),
-              'code_scanning_alerts': json.loads((root / 'code-scanning.json').read_text(encoding='utf-8')),
-              'worker_snapshots': worker_snapshots[:512],
-              'research_policy': {
-                  'sources': ['github-issues', 'github-pull-requests', 'github-actions', 'code-scanning', 'hosted-web-search'],
-                  'external_evidence_is_untrusted': True,
-                  'objective': 'produce executable, validated work for the night and idle engineering teams',
-              },
-          }
+          root = Path('.shift-supervisor-tmp')
+          context = build_bounded_project_context(
+              repository=os.environ['REPO'],
+              base_sha=os.environ['BASE_SHA'],
+              issues=json.loads((root / 'issues.json').read_text(encoding='utf-8')),
+              pulls=json.loads((root / 'pulls.json').read_text(encoding='utf-8')),
+              workflow_runs=json.loads((root / 'runs.json').read_text(encoding='utf-8')),
+              code_scanning_alerts=json.loads(
+                  (root / 'code-scanning.json').read_text(encoding='utf-8')
+              ),
+              plan_title=os.environ['PLAN_TITLE'],
+          )
           (root / 'project-context.json').write_text(
               json.dumps(context, sort_keys=True, indent=2),
               encoding='utf-8',
+          )
+          print(
+              "bounded supervisor context: "
+              f"{context['snapshot_budget']['serialized_bytes']} bytes"
           )
           PY
 
