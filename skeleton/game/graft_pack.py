@@ -9,15 +9,14 @@ class GraftPackError(ValueError):
     pass
 
 
-GRAFT = tuple(f"gf_{i:02d}" for i in range(16))
+GRAFT = tuple(f"gf_{i:02d}" for i in range(12))
 
 
-def set_graft(node: dict[str, Any], name: str, stock: str) -> dict[str, Any]:
+def join(state: dict[str, Any], name: str) -> dict[str, Any]:
     if name not in GRAFT:
         raise GraftPackError(name)
-    nxt = dict(node)
-    cur = dict(nxt.get("graft") or {})
-    cur[name] = stock
-    nxt["graft"] = cur
+    nxt = dict(state)
+    nxt["graft"] = name
+    nxt["take"] = 1
     nxt["stored_prose"] = 0
     return nxt
