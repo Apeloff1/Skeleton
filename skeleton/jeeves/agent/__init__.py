@@ -26,6 +26,13 @@ from .action_model import (
     SkillSelection,
     SkillSpec,
 )
+from .adaptive_context import (
+    AdaptiveContextGovernor,
+    AdaptiveContextResolution,
+    ContextDescentPolicy,
+    TierBelief,
+    TierDecision,
+)
 from .associative_memory import (
     AssociationHit,
     AssociationKind,
@@ -135,6 +142,15 @@ from .interpretive_science import (
     ScientificLensPolicy,
     ScientificLensReport,
     ScientificLensStatus,
+)
+from .lens_fusion import (
+    LensContribution,
+    LensDependence,
+    LensDependenceKind,
+    LensFusionEngine,
+    LensFusionPolicy,
+    LensFusionResult,
+    LensSignal,
 )
 from .memory import (
     ConsolidationCandidate,
