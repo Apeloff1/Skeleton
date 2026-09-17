@@ -270,6 +270,10 @@ def solve_islands(
     joint_velocity_impulses = 0
     joint_position_corrections = 0
     maximum_joint_error = 0.0
+    distance_joints = 0
+    point_joints = 0
+    spring_joints = 0
+    limit_joints = 0
 
     for island in graph.islands:
         if island.manifolds:
@@ -301,6 +305,10 @@ def solve_islands(
                 maximum_joint_error,
                 joint_stats.maximum_error,
             )
+            distance_joints += joint_stats.distance_joints
+            point_joints += joint_stats.point_joints
+            spring_joints += joint_stats.spring_joints
+            limit_joints += joint_stats.limit_joints
 
     cache.prune(tick=tick)
     return IslandSolveReceipt(
@@ -320,5 +328,9 @@ def solve_islands(
             velocity_impulses=joint_velocity_impulses,
             position_corrections=joint_position_corrections,
             maximum_error=maximum_joint_error,
+            distance_joints=distance_joints,
+            point_joints=point_joints,
+            spring_joints=spring_joints,
+            limit_joints=limit_joints,
         ),
     )
