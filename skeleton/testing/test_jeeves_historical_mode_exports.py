@@ -183,7 +183,12 @@ def test_historical_evidence_bridge_is_available_from_public_surface() -> None:
         modes=(HistoricalMode.LINEAR_TREND,),
     )
     report = lab.evaluate(series)
-    bundle = build_historical_evidence(report, series, subject_id="public-evidence")
+    bundle = build_historical_evidence(
+        report,
+        series,
+        subject_id="public-evidence",
+        observed_at=1_790_000_000.0,
+    )
     assert isinstance(bundle, HistoricalEvidenceBundle)
     assert bundle.features
     assert "report_fingerprint" in bundle_manifest(bundle)
