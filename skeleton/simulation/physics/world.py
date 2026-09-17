@@ -33,6 +33,7 @@ class PhysicsSettings:
     sleep_angular_speed: float = 0.03
     sleep_after_seconds: float = 0.75
     max_bodies: int = 16_384
+    max_pairs: int = 250_000
     velocity_iterations: int = 10
     position_iterations: int = 4
 
@@ -57,6 +58,12 @@ class PhysicsSettings:
             or not 1 <= self.max_bodies <= MAX_WORLD_BODIES
         ):
             raise PhysicsValidationError("max_bodies outside supported range")
+        if (
+            isinstance(self.max_pairs, bool)
+            or not isinstance(self.max_pairs, int)
+            or not 1 <= self.max_pairs <= 1_000_000
+        ):
+            raise PhysicsValidationError("max_pairs outside supported range")
         for name in ("velocity_iterations", "position_iterations"):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 128:
@@ -73,6 +80,7 @@ class PhysicsSettings:
                 "sleep_angular_speed": self.sleep_angular_speed,
                 "sleep_after_seconds": self.sleep_after_seconds,
                 "max_bodies": self.max_bodies,
+                "max_pairs": self.max_pairs,
                 "velocity_iterations": self.velocity_iterations,
                 "position_iterations": self.position_iterations,
             }
@@ -102,7 +110,7 @@ class PhysicsWorld:
         self.settings = settings or PhysicsSettings()
         self._bodies: dict[str, RigidBody] = {}
         self._tick = 0
-        self._broad_phase = SweepAndPruneBroadPhase()
+        self._broad_phase = SweepAndPruneBroadPhase(max_pairs=self.settings.max_pairs)
         self._solver = SequentialImpulseSolver(
             velocity_iterations=self.settings.velocity_iterations,
             position_iterations=self.settings.position_iterations,
@@ -177,7 +185,8 @@ class PhysicsWorld:
                 "friction_rule": body.material.friction_rule.value,
                 "restitution_rule": body.material.restitution_rule.value,
             },
-            "gravity_scale": body.gravity_scale,
+            "local_inertia": body.local_inertia.to_tuple(),
+            "local_inverse_inertia": body.local_inverse_inertia.to_tuple(),
         }
 
     @property
