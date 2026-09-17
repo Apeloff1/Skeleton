@@ -133,7 +133,7 @@ def test_spring_joint_force_limit_bounds_accumulated_impulse() -> None:
     )
 
     momentum_change = body.mass * abs(body.linear_velocity.x)
-    assert momentum_change <= pytest.approx(joint.max_force * dt, abs=1.0e-8)
+    assert momentum_change <= joint.max_force * dt + 1.0e-8
 
 
 def test_distance_limit_upper_bound_pulls_body_inward() -> None:
