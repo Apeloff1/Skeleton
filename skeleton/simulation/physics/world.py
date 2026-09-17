@@ -9,6 +9,7 @@ from .body import BodyType, RigidBody
 from .collision import ContactManifold, SweepAndPruneBroadPhase, generate_manifolds
 from .errors import BodyNotFoundError, DuplicateBodyError, PhysicsValidationError
 from .math3d import AABB, Vec3
+from .queries import Ray, RayHit, raycast_body, sort_hits, sphere_cast_body
 from .shapes import BoxShape, PlaneShape, SphereShape
 from .solver import SequentialImpulseSolver, SolverStats
 
@@ -157,6 +158,46 @@ class PhysicsWorld:
             if body_bounds is not None and body_bounds.overlaps(bounds):
                 matches.append(body.body_id)
         return tuple(matches)
+
+    def raycast(
+        self,
+        ray: Ray,
+        *,
+        ignore: tuple[str, ...] = (),
+    ) -> tuple[RayHit, ...]:
+        ignored = set(ignore)
+        hits = [
+            hit
+            for body in self.bodies()
+            if body.body_id not in ignored
+            if (hit := raycast_body(ray, body)) is not None
+        ]
+        return sort_hits(hits)
+
+    def raycast_closest(
+        self,
+        ray: Ray,
+        *,
+        ignore: tuple[str, ...] = (),
+    ) -> RayHit | None:
+        hits = self.raycast(ray, ignore=ignore)
+        return hits[0] if hits else None
+
+    def sphere_cast(
+        self,
+        ray: Ray,
+        radius: float,
+        *,
+        ignore: tuple[str, ...] = (),
+    ) -> tuple[RayHit, ...]:
+        ignored = set(ignore)
+        hits = [
+            hit
+            for body in self.bodies()
+            if body.body_id not in ignored
+            if (hit := sphere_cast_body(ray, radius, body)) is not None
+        ]
+        return sort_hits(hits)
 
     def _shape_record(self, body: RigidBody) -> dict[str, object]:
         shape = body.shape
