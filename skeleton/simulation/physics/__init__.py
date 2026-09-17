@@ -18,6 +18,15 @@ from .coloring import (
     ConstraintColorStats,
     color_constraints,
 )
+from .convex import (
+    EPAPenetration,
+    GJKResult,
+    SupportVertex,
+    convex_penetration,
+    epa_penetration,
+    gjk_intersection,
+    support_vertex,
+)
 from .collision import (
     BroadPhasePair,
     ContactManifold,
@@ -43,6 +52,7 @@ from .constraints import (
 from .contacts import ContactCache, ContactCacheEntry
 from .errors import (
     BodyNotFoundError,
+    ConvexQueryError,
     DegenerateGeometryError,
     DuplicateBodyError,
     DuplicateJointError,
@@ -73,7 +83,16 @@ from .islands import (
 from .materials import CombineRule, ContactMaterial, PhysicsMaterial, combine_materials
 from .math3d import AABB, Mat3, Quat, Transform, Vec3
 from .queries import Ray, RayHit, raycast_body, sphere_cast_body
-from .shapes import BoxShape, CollisionShape, MassProperties, PlaneShape, ShapeKind, SphereShape
+from .shapes import (
+    BoxShape,
+    CapsuleShape,
+    CollisionShape,
+    CylinderShape,
+    MassProperties,
+    PlaneShape,
+    ShapeKind,
+    SphereShape,
+)
 from .snapshots import (
     PhysicsBodyState,
     PhysicsSnapshot,
@@ -118,10 +137,13 @@ __all__ = [
     "ConstraintColorStats",
     "ConstraintSolver",
     "ConstraintStats",
+    "ConvexQueryError",
     "ContactCache",
     "ContactCacheEntry",
     "ContinuousCollisionDetector",
+    "CylinderShape",
     "DistanceJoint",
+    "EPAPenetration",
     "DistanceLimitJoint",
     "DuplicateJointError",
     "JointConstraint",
@@ -130,6 +152,7 @@ __all__ = [
     "JointKind",
     "JointNotFoundError",
     "BodyType",
+    "CapsuleShape",
     "BoxShape",
     "BroadPhasePair",
     "CollisionShape",
@@ -140,6 +163,7 @@ __all__ = [
     "DegenerateGeometryError",
     "DuplicateBodyError",
     "FixedJoint",
+    "GJKResult",
     "GamePhysicsProfile",
     "GameplayScale",
     "HingeJoint",
@@ -190,6 +214,7 @@ __all__ = [
     "SolverStats",
     "SphereShape",
     "SpringJoint",
+    "SupportVertex",
     "SweepAndPruneBroadPhase",
     "TOIEvent",
     "Transform",
@@ -202,8 +227,11 @@ __all__ = [
     "build_snapshot",
     "color_constraints",
     "combine_materials",
+    "convex_penetration",
     "detect_collision",
+    "epa_penetration",
     "generate_manifolds",
+    "gjk_intersection",
     "gravitational_potential_energy",
     "impulse_from_force",
     "is_joint_constraint",
@@ -214,6 +242,7 @@ __all__ = [
     "replay_physics_commands",
     "solve_islands",
     "sphere_cast_body",
+    "support_vertex",
     "step_physics_with_commands",
     "verify_snapshot",
     "world_inertia",
