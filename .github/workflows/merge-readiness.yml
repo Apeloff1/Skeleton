@@ -118,6 +118,7 @@ jobs:
           tests/test_cross_subsystem_integration.py
           tests/test_frontier_runtime_memory_retrieval.py
           tests/test_model_runtime.py
+          tests/test_model_routing.py
           skeleton/testing/test_frontier_observability_correlation.py
 
   quality_security:
