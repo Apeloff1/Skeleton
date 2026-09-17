@@ -8,13 +8,33 @@ from ..ecs.canonical import digest
 from .body import BodyType, RigidBody
 from .collision import ContactManifold, SweepAndPruneBroadPhase, generate_manifolds
 from .errors import BodyNotFoundError, DuplicateBodyError, PhysicsValidationError
-from .math3d import AABB, Vec3
+from .math3d import AABB, Quat, Vec3
 from .queries import Ray, RayHit, raycast_body, sort_hits, sphere_cast_body
 from .shapes import BoxShape, PlaneShape, SphereShape
 from .solver import SequentialImpulseSolver, SolverStats
 
 MAX_WORLD_BODIES = 100_000
 MAX_STEP_COUNT = 10_000
+
+
+@dataclass(frozen=True, slots=True)
+class _BodyStepState:
+    position: Vec3
+    orientation: Quat
+    linear_velocity: Vec3
+    angular_velocity: Vec3
+    force: Vec3
+    torque: Vec3
+    awake: bool
+    sleep_time: float
+
+
+@dataclass(frozen=True, slots=True)
+class _StepCheckpoint:
+    tick: int
+    body_states: tuple[tuple[str, _BodyStepState], ...]
+    manifolds: tuple[ContactManifold, ...]
+    state_digest: str
 
 
 def _positive(value: float, *, name: str) -> float:
@@ -39,6 +59,8 @@ class PhysicsSettings:
     position_iterations: int = 4
 
     def __post_init__(self) -> None:
+        if not isinstance(self.gravity, Vec3):
+            raise PhysicsValidationError("gravity must be Vec3")
         object.__setattr__(self, "fixed_dt", _positive(self.fixed_dt, name="fixed_dt"))
         object.__setattr__(
             self,
@@ -241,6 +263,48 @@ class PhysicsWorld:
             }
         )
 
+    def _capture_step_checkpoint(self) -> _StepCheckpoint:
+        states = tuple(
+            (
+                body.body_id,
+                _BodyStepState(
+                    position=body.position,
+                    orientation=body.orientation,
+                    linear_velocity=body.linear_velocity,
+                    angular_velocity=body.angular_velocity,
+                    force=body.force,
+                    torque=body.torque,
+                    awake=body.awake,
+                    sleep_time=body.sleep_time,
+                ),
+            )
+            for body in self.bodies()
+        )
+        return _StepCheckpoint(
+            tick=self._tick,
+            body_states=states,
+            manifolds=self._last_manifolds,
+            state_digest=self.state_digest,
+        )
+
+    def _restore_step_checkpoint(self, checkpoint: _StepCheckpoint) -> None:
+        if tuple(body_id for body_id, _ in checkpoint.body_states) != self.body_ids():
+            raise PhysicsValidationError("physics step checkpoint body set changed")
+        for body_id, state in checkpoint.body_states:
+            body = self._bodies[body_id]
+            body.position = state.position
+            body.orientation = state.orientation
+            body.linear_velocity = state.linear_velocity
+            body.angular_velocity = state.angular_velocity
+            body.force = state.force
+            body.torque = state.torque
+            body.awake = state.awake
+            body.sleep_time = state.sleep_time
+        self._tick = checkpoint.tick
+        self._last_manifolds = checkpoint.manifolds
+        if self.state_digest != checkpoint.state_digest:
+            raise PhysicsValidationError("physics step checkpoint failed exact restoration")
+
     def _update_sleep(self, dt: float) -> None:
         linear_limit_sq = self.settings.sleep_linear_speed**2
         angular_limit_sq = self.settings.sleep_angular_speed**2
@@ -261,31 +325,36 @@ class PhysicsWorld:
                 body.sleep_time = 0.0
 
     def _step_once(self) -> PhysicsStepReceipt:
+        checkpoint = self._capture_step_checkpoint()
         dt = self.settings.fixed_dt
-        before = self.state_digest
+        before = checkpoint.state_digest
 
-        for body in self.bodies():
-            body.integrate_forces(dt, self.settings.gravity)
-        for body in self.bodies():
-            body.integrate_velocity(dt)
+        try:
+            for body in self.bodies():
+                body.integrate_forces(dt, self.settings.gravity)
+            for body in self.bodies():
+                body.integrate_velocity(dt)
 
-        pairs = self._broad_phase.compute_pairs(self.bodies())
-        manifolds = generate_manifolds(self._bodies, pairs)
-        solver_stats = self._solver.solve(self._bodies, manifolds)
+            pairs = self._broad_phase.compute_pairs(self.bodies())
+            manifolds = generate_manifolds(self._bodies, pairs)
+            solver_stats = self._solver.solve(self._bodies, manifolds)
 
-        for body in self.bodies():
-            body.clear_accumulators()
-        self._update_sleep(dt)
+            self._update_sleep(dt)
+            for body in self.bodies():
+                body.clear_accumulators()
 
-        self._last_manifolds = manifolds
-        self._tick += 1
-        after = self.state_digest
-        energy = sum(body.kinetic_energy() for body in self.bodies())
-        sleeping = sum(
-            1
-            for body in self.bodies()
-            if body.body_type is BodyType.DYNAMIC and not body.awake
-        )
+            self._last_manifolds = manifolds
+            self._tick += 1
+            after = self.state_digest
+            energy = sum(body.kinetic_energy() for body in self.bodies())
+            sleeping = sum(
+                1
+                for body in self.bodies()
+                if body.body_type is BodyType.DYNAMIC and not body.awake
+            )
+        except Exception:
+            self._restore_step_checkpoint(checkpoint)
+            raise
 
         return PhysicsStepReceipt(
             tick=self._tick,
