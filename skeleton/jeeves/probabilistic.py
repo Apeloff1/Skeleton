@@ -3,9 +3,19 @@
 This module keeps the public import surface compact while the implementation is
 split into state-space filtering, online Bayesian ensembles, distributional
 calibration, hidden-Markov regime inference, multiscale harmonic forecasting,
-and explicit promotion eligibility contracts.
+cross-family arbitration, and explicit promotion eligibility contracts.
 """
 
+from .probabilistic_arbitration import (
+    ArbitratedForecast,
+    CrossFamilyArbitrator,
+    CrossFamilyConfig,
+    CrossFamilyReport,
+    CrossFamilyStep,
+    ExpertComponent,
+    ExpertKind,
+    PredictiveDistribution,
+)
 from .probabilistic_calibration import (
     CalibrationConfig,
     CalibrationReport,
@@ -78,14 +88,21 @@ from .probabilistic_state_space import (
 )
 
 __all__ = [
+    "ArbitratedForecast",
     "BayesianEnsembleConfig",
     "BayesianEnsembleReport",
     "CalibrationConfig",
     "CalibrationReport",
     "CoverageDiagnostic",
+    "CrossFamilyArbitrator",
+    "CrossFamilyConfig",
+    "CrossFamilyReport",
+    "CrossFamilyStep",
     "DistributionObservation",
     "DriftEvent",
     "EnsembleStep",
+    "ExpertComponent",
+    "ExpertKind",
     "FilterStep",
     "GaussianForecast",
     "GaussianRegime",
@@ -94,6 +111,7 @@ __all__ = [
     "MixtureForecast",
     "OnlineBayesianEnsemble",
     "PitDiagnostic",
+    "PredictiveDistribution",
     "ProbabilisticPromotionDecision",
     "ProbabilisticPromotionGate",
     "RegimeForecast",
