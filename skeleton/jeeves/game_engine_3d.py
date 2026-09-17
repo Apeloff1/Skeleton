@@ -969,10 +969,12 @@ class ShaderConsoleMachine(ThreeDMachine):
                     ),
                     (
                         obj.material,
-                        hash(
-                            program.name
-                        )
-                        & 0xFFFF,
+                        int(
+                            hashlib.sha256(
+                                program.name.encode("utf-8")
+                            ).hexdigest()[:8],
+                            16,
+                        ),
                     ),
                     shader=program.name,
                     constants_digest=_digest(
