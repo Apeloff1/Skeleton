@@ -3,6 +3,12 @@
 from .ai_policy import AIPolicyError, next_state, run_policy
 from .arena import ArenaError, run_arena
 from .clock import MAX_TICKS, ClockError, GameClock
+from .doctor import DoctorError, doctor
+from .emit_pack import EmitPackError, default_tree, validate_emit
+from .flake import FlakeError, advance, ledger, open_flake
+from .release_graph import ReleaseGraphError, graph as release_graph
+from .spec import SpecError, compile_spec
+from .token_clock import TokenClockError, tick as token_tick
 from .conductor import STEPS, ConductorError, execute
 from .critique import CritiqueError, critique, improve, monte_carlo
 from .engine import ALLOWED_VERBS, DeterministicEngine, EngineError, WorldState
@@ -41,6 +47,12 @@ __all__ = [
     "AIBehaviorSpec",
     "AIPolicyError",
     "ArenaError",
+    "DoctorError",
+    "EmitPackError",
+    "FlakeError",
+    "ReleaseGraphError",
+    "SpecError",
+    "TokenClockError",
     "ClockError",
     "CombatStyle",
     "CombatSystemSpec",
@@ -74,9 +86,18 @@ __all__ = [
     "bind_era",
     "clip_mass",
     "compare",
+    "advance",
     "compile_intent",
+    "compile_spec",
     "critique",
+    "default_tree",
+    "doctor",
     "execute",
+    "ledger",
+    "open_flake",
+    "release_graph",
+    "token_tick",
+    "validate_emit",
     "improve",
     "load_trace",
     "monte_carlo",
