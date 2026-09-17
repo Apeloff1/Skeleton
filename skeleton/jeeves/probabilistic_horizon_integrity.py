@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import math
 import statistics
-from collections import defaultdict
 from typing import Mapping, Sequence
 
 from .probabilistic_arbitration import ExpertKind
@@ -27,6 +26,7 @@ from .probabilistic_conformal import ConformalConfig
 from .probabilistic_horizons import (
     HorizonSettlement,
     HorizonSummary,
+    MultiHorizonConfig,
     MultiHorizonConformalReport,
     MultiHorizonReport,
     _build_dependence_report,
@@ -124,7 +124,7 @@ def evaluate_multihorizon_conformal(
 def _validate_summary(
     summary: HorizonSummary,
     *,
-    config: object,
+    config: MultiHorizonConfig,
     experts: Sequence[ExpertKind],
 ) -> None:
     _validate_digest("summary_fingerprint", summary.fingerprint)
