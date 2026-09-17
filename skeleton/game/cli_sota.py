@@ -216,6 +216,16 @@ def _cmd_hunt(rest: List[str]) -> int:
     return 0
 
 
+def _cmd_wave4(rest: List[str]) -> int:
+    from skeleton.game.wave4_play import play
+    try:
+        payload = play(seed=_seed(rest))
+    except Exception as exc:
+        return _fail(exc)
+    print(json.dumps({"ok": True, "digest": payload["digest"], "packs": payload["packs"], "extract_count": payload["extract_count"], "sota_ready": payload["sota_ready"], "stored_prose": payload["stored_prose"]}, indent=2))
+    return 0
+
+
 def dispatch(cmd: str, rest: List[str]) -> int | None:
     table = {
         "spec": _cmd_spec, "emit": _cmd_emit, "doctor": _cmd_doctor, "turn": _cmd_turn,
@@ -223,7 +233,7 @@ def dispatch(cmd: str, rest: List[str]) -> int | None:
         "bundles": _cmd_bundles, "catalog": _cmd_catalog, "sim": _cmd_sim,
         "lab": _cmd_lab, "campus": _cmd_campus, "flesh": _cmd_flesh,
         "world": _cmd_world, "warena": _cmd_warena, "monte": _cmd_monte,
-        "bundle": _cmd_bundle, "laws": _cmd_laws, "hunt": _cmd_hunt,
+        "bundle": _cmd_bundle, "laws": _cmd_laws, "hunt": _cmd_hunt, "wave4": _cmd_wave4,
     }
     fn = table.get(cmd)
     return None if fn is None else fn(rest)
