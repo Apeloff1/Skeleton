@@ -91,7 +91,7 @@ def _reference_perpendicular(
         return projected.normalized()
     except Exception as exc:
         raise PhysicsValidationError(
-            f"{name} must not be parallel to hinge axis"
+            f"{name} must not be parallel to joint axis"
         ) from exc
 
 
