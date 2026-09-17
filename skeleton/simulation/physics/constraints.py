@@ -815,6 +815,17 @@ class ConstraintSolver:
         return None
 
     @staticmethod
+    def _hinge_limit_row(
+        joint: HingeJoint,
+        angle: float,
+    ) -> str | None:
+        if joint.lower_angle is not None and angle < joint.lower_angle:
+            return "limit:lower"
+        if joint.upper_angle is not None and angle > joint.upper_angle:
+            return "limit:upper"
+        return None
+
+    @staticmethod
     def _orientation_error_vector(
         world_frame_a: Quat,
         world_frame_b: Quat,
@@ -884,6 +895,23 @@ class ConstraintSolver:
             and translation > joint.upper_translation
         ):
             return translation - joint.upper_translation
+        return None
+
+    @staticmethod
+    def _slider_limit_row(
+        joint: SliderJoint,
+        translation: float,
+    ) -> str | None:
+        if (
+            joint.lower_translation is not None
+            and translation < joint.lower_translation
+        ):
+            return "limit:lower"
+        if (
+            joint.upper_translation is not None
+            and translation > joint.upper_translation
+        ):
+            return "limit:upper"
         return None
 
     @staticmethod
@@ -989,8 +1017,9 @@ class ConstraintSolver:
             axis, length = self._axis_and_length(
                 anchors.anchor_b - anchors.anchor_a
             )
-            if self._limit_error(joint, length) is not None:
-                linear("limit", axis, anchors)
+            row_id = self._distance_limit_row(joint, length)
+            if row_id is not None:
+                linear(row_id, axis, anchors)
 
         elif isinstance(joint, HingeJoint):
             for axis_index in range(3):
@@ -1008,8 +1037,9 @@ class ConstraintSolver:
             tangent_a, tangent_b = self._orthonormal_tangents(axis_a)
             for index, tangent in enumerate((tangent_a, tangent_b)):
                 angular(f"swing:{index}", tangent)
-            if self._hinge_limit_error(joint, angle) is not None:
-                angular("limit", axis_a)
+            row_id = self._hinge_limit_row(joint, angle)
+            if row_id is not None:
+                angular(row_id, axis_a)
             if (
                 joint.motor_speed is not None
                 and joint.max_motor_torque is not None
@@ -1044,9 +1074,10 @@ class ConstraintSolver:
                 )
                 angular(f"swing:{index}", tangent)
             angular("twist", axis_a)
-            if self._slider_limit_error(joint, translation) is not None:
+            row_id = self._slider_limit_row(joint, translation)
+            if row_id is not None:
                 linear(
-                    "limit",
+                    row_id,
                     axis_a,
                     self._anchors(joint, body_a, body_b),
                 )
@@ -1196,6 +1227,17 @@ class ConstraintSolver:
             return length - joint.maximum_length
         return None
 
+    @staticmethod
+    def _distance_limit_row(
+        joint: DistanceLimitJoint,
+        length: float,
+    ) -> str | None:
+        if length < joint.minimum_length:
+            return "limit:lower"
+        if length > joint.maximum_length:
+            return "limit:upper"
+        return None
+
     def _solve_limit_velocity(
         self,
         joint: DistanceLimitJoint,
@@ -1220,7 +1262,7 @@ class ConstraintSolver:
             bias_factor=joint.bias_factor,
             dt=dt,
             row_impulses=row_impulses,
-            row_id="limit",
+            row_id=self._distance_limit_row(joint, length),
         )
         return count, abs(error)
 
@@ -1359,7 +1401,7 @@ class ConstraintSolver:
                 bias_factor=joint.bias_factor,
                 dt=dt,
                 row_impulses=row_impulses,
-                row_id="limit",
+                row_id=self._hinge_limit_row(joint, angle),
             )
             impulses += count
             maximum_error = max(maximum_error, abs(limit_error))
@@ -1511,7 +1553,7 @@ class ConstraintSolver:
                 bias_factor=joint.bias_factor,
                 dt=dt,
                 row_impulses=row_impulses,
-                row_id="limit",
+                row_id=self._slider_limit_row(joint, translation),
             )
             maximum_error = max(maximum_error, abs(limit_error))
 
