@@ -419,8 +419,9 @@ def test_evolution_tournament_discards_invalid_candidate_and_promotes_repair() -
             (
                 (
                     SandboxPatch(
-                        "../escape",
-                        "bad",
+                        path,
+                        "stale candidate",
+                        "0" * 64,
                     ),
                 ),
                 repair,
