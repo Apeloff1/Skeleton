@@ -4,6 +4,20 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-17 — F-20 fail-closed payload types + F-21 HMAC open-prefix audit
+
+- Shared `require_bool` / `require_int` reject bool-as-int (`True→1`), numeric
+  strings, and `bool("false")` coercion. Memory `top_k` and run `repair` use
+  them on the shared command contract. HTTP retrieval `k`/`use_cache`, memory
+  `top_k`, pipeline `dialogue_beats`/`max_level`, forge `repair`/`max_rounds`,
+  and GameForge `overwrite` fail closed the same way.
+- Additive `hmac_open_audit` snapshot compares HMAC `DEFAULT_OPEN_PREFIXES` to
+  `architecture.API_ROUTES` without importing the API package. Probe-only open
+  prefixes stay locked; documented-unprotected routes such as
+  `GET /api/v1/health` remain HMAC-sealed. Combined capability views fail closed.
+- Identical HMAC-audit payload through `capabilities --hmac-audit`,
+  `GET /api/v1/application/hmac/audit`, and the shared `capabilities` command.
+
 ## 2026-09-17 — F-18 pipeline speculative RAG + F-19 API route audit
 
 - NPC, game-logic, and animation `.run()` now plan-prefetch through the same

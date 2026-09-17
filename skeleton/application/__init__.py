@@ -31,6 +31,11 @@ from .api_route_audit import (
     api_route_audit_snapshot,
     get_api_route_audit_row,
 )
+from .hmac_open_audit import (
+    HMAC_OPEN_AUDIT_KIND,
+    get_hmac_open_audit_row,
+    hmac_open_audit_snapshot,
+)
 from .export_audit import EXPORT_AUDIT_KIND, export_audit_snapshot, get_export_audit_row
 from .genesis_boot_audit import (
     GENESIS_BOOT_AUDIT_KIND,
@@ -55,6 +60,7 @@ __all__ = [
     "CONTRACT_VERSION",
     "EXPORT_AUDIT_KIND",
     "GENESIS_BOOT_AUDIT_KIND",
+    "HMAC_OPEN_AUDIT_KIND",
     "PLANE_AUDIT_KIND",
     "Capability",
     "CapabilityLoadError",
@@ -76,7 +82,9 @@ __all__ = [
     "get_capability",
     "get_export_audit_row",
     "get_genesis_boot_audit_row",
+    "get_hmac_open_audit_row",
     "get_plane_audit_row",
+    "hmac_open_audit_snapshot",
     "load_capability",
     "parity_matrix",
     "plane_audit_snapshot",

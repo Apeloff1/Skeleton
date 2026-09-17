@@ -14,6 +14,41 @@ from typing import Any, Callable, Dict, Iterable, Mapping, Optional
 CONTRACT_VERSION = "1.0"
 
 
+def require_bool(payload: Mapping[str, Any], key: str, default: bool = False) -> bool:
+    """Return a real boolean; reject truthy/falsey stand-ins such as ``1`` or ``"false"``."""
+
+    if default is not True and default is not False:
+        raise CommandError("invalid_argument", f"{key} default must be a boolean")
+    if key not in payload:
+        return default is True
+    value = payload[key]
+    if value is not True and value is not False:
+        raise CommandError("invalid_argument", f"{key} must be a boolean")
+    return value is True
+
+
+def require_int(
+    payload: Mapping[str, Any],
+    key: str,
+    default: int,
+    *,
+    minimum: Optional[int] = None,
+    maximum: Optional[int] = None,
+) -> int:
+    """Return a real integer; reject bools, floats, and numeric strings."""
+
+    if isinstance(default, bool) or not isinstance(default, int):
+        raise CommandError("invalid_argument", f"{key} default must be an integer")
+    value: Any = default if key not in payload else payload[key]
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise CommandError("invalid_argument", f"{key} must be an integer")
+    if minimum is not None and value < minimum:
+        raise CommandError("invalid_argument", f"{key} must be >= {minimum}")
+    if maximum is not None and value > maximum:
+        raise CommandError("invalid_argument", f"{key} must be <= {maximum}")
+    return value
+
+
 @dataclass(frozen=True)
 class CommandSpec:
     """Transport-neutral description of one supported operation family."""

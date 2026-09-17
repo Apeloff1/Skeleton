@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Mapping
 
-from .command_contracts import CONTRACT_VERSION, CommandError, CommandService
+from .command_contracts import CONTRACT_VERSION, CommandError, CommandService, require_bool, require_int
 
 APP_VERSION = "16.0.0"
 
@@ -38,17 +38,21 @@ def _configuration_handler(state: Any):
     return handle
 
 
-_CAPABILITY_VIEW_FLAGS = ("lifecycle", "plane_audit", "boot_audit", "export_audit", "route_audit")
+_CAPABILITY_VIEW_FLAGS = (
+    "lifecycle",
+    "plane_audit",
+    "boot_audit",
+    "export_audit",
+    "route_audit",
+    "hmac_audit",
+)
 
 
 def _capability_view_flags(payload: Mapping[str, Any]) -> Dict[str, bool]:
     flags: Dict[str, bool] = {}
     enabled: list[str] = []
     for name in _CAPABILITY_VIEW_FLAGS:
-        value = payload.get(name, False)
-        if value is not True and value is not False:
-            raise CommandError("invalid_argument", f"{name} must be a boolean")
-        flags[name] = value is True
+        flags[name] = require_bool(payload, name, False)
         if flags[name]:
             enabled.append(name)
     if len(enabled) > 1:
@@ -76,6 +80,10 @@ def _lookup_row(payload: Mapping[str, Any], key: str, getter, snapshot):
 def _capabilities_handler(_state: Any):
     def handle(payload: Mapping[str, Any]) -> Dict[str, Any]:
         flags = _capability_view_flags(payload)
+        if flags["hmac_audit"]:
+            from .hmac_open_audit import get_hmac_open_audit_row, hmac_open_audit_snapshot
+
+            return _lookup_row(payload, "route_id", get_hmac_open_audit_row, hmac_open_audit_snapshot)
         if flags["route_audit"]:
             from .api_route_audit import api_route_audit_snapshot, get_api_route_audit_row
 
@@ -111,9 +119,7 @@ def _memory_handler(state: Any):
         query = str(payload.get("query", "")).strip()
         if not query:
             raise CommandError("invalid_argument", "query is required")
-        top_k = int(payload.get("top_k", 3))
-        if top_k < 1:
-            raise CommandError("invalid_argument", "top_k must be >= 1")
+        top_k = require_int(payload, "top_k", 3, minimum=1)
         result = memory.query_unified(
             query,
             top_k_per_tier=top_k,
@@ -184,7 +190,7 @@ def _run_handler(state: Any):
             dict(answers),
             title=payload.get("title"),
             target=payload.get("target", "json"),
-            repair=bool(payload.get("repair", False)),
+            repair=require_bool(payload, "repair", False),
         )
         game = spec.to_dict() if hasattr(spec, "to_dict") else spec
         return {"game": game, "status": "generated"}

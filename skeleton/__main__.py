@@ -20,6 +20,7 @@ Commands:
                 Use `capabilities --boot-audit` for the genesis/BOOT_PHASES audit
                 Use `capabilities --export-audit` for manifest export drift
                 Use `capabilities --route-audit` for main-router API_ROUTES drift
+                Use `capabilities --hmac-audit` for HMAC open-prefix vs API_ROUTES drift
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
@@ -48,6 +49,7 @@ def _cmd_capabilities(rest: List[str]) -> int:
         genesis_boot_audit_snapshot,
         plane_audit_snapshot,
         api_route_audit_snapshot,
+        hmac_open_audit_snapshot,
     )
 
     flags = {item.strip().lower() for item in rest if item.strip()}
@@ -57,6 +59,7 @@ def _cmd_capabilities(rest: List[str]) -> int:
         "boot_audit": {"--boot-audit", "boot-audit", "--boot_audit", "boot_audit"},
         "export_audit": {"--export-audit", "export-audit", "--export_audit", "export_audit"},
         "route_audit": {"--route-audit", "route-audit", "--route_audit", "route_audit"},
+        "hmac_audit": {"--hmac-audit", "hmac-audit", "--hmac_audit", "hmac_audit"},
     }
     allowed = set().union(*aliases.values())
     unknown = flags - allowed
@@ -68,7 +71,9 @@ def _cmd_capabilities(rest: List[str]) -> int:
         print(f"{' and '.join(selected)} are mutually exclusive")
         return 2
     view = selected[0] if selected else ""
-    if view == "route_audit":
+    if view == "hmac_audit":
+        payload = hmac_open_audit_snapshot()
+    elif view == "route_audit":
         payload = api_route_audit_snapshot()
     elif view == "export_audit":
         payload = export_audit_snapshot()

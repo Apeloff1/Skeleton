@@ -309,3 +309,72 @@ def architecture_api_routes() -> list[dict[str, object]]:
             }
         )
     return rows
+
+
+def module_source_path(module: str) -> Path | None:
+    spec = find_spec(module)
+    if spec is None or not spec.origin:
+        return None
+    path = Path(spec.origin)
+    return path if path.is_file() else None
+
+
+def parse_module_tree(module: str) -> ast.AST | None:
+    source = module_source_path(module)
+    if source is None:
+        return None
+    try:
+        return ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
+    except (OSError, SyntaxError):
+        return None
+
+
+def assigned_str_tuple(tree: ast.AST | None, name: str) -> list[str]:
+    if tree is None or not isinstance(tree, ast.Module):
+        return []
+    for node in tree.body:
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == name:
+            return literal_str_list(node.value)
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == name:
+                    return literal_str_list(node.value)
+    return []
+
+
+def path_matches_open_prefix(path: str, prefix: str) -> bool:
+    """Mirror GatePolicy prefix matching without importing the API package."""
+
+    current = path or "/"
+    pref = (prefix or "").rstrip("/") or "/"
+    if pref == "/":
+        return current == "/"
+    return current == pref or current.startswith(pref + "/")
+
+
+def hmac_default_open_prefixes() -> list[str]:
+    return assigned_str_tuple(parse_module_tree("skeleton.api.middleware"), "DEFAULT_OPEN_PREFIXES")
+
+
+def hmac_dev_open_prefixes() -> list[str]:
+    return assigned_str_tuple(parse_module_tree("skeleton.api.server"), "_DEV_OPEN_PREFIXES")
+
+
+def hmac_runtime_root_open() -> bool:
+    tree = parse_module_tree("skeleton.api.server")
+    if tree is None or not isinstance(tree, ast.Module):
+        return False
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef) or node.name != "_gate_open_prefixes":
+            continue
+        for child in ast.walk(node):
+            if not isinstance(child, ast.BinOp) or not isinstance(child.op, ast.Add):
+                continue
+            right = child.right
+            if not isinstance(right, ast.Tuple):
+                continue
+            for element in right.elts:
+                if isinstance(element, ast.Constant) and element.value == "/":
+                    return True
+        return False
+    return False

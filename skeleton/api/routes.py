@@ -30,6 +30,32 @@ def _require(obj: Any, name: str) -> Any:
     return obj
 
 
+def _payload_error(exc: Exception) -> HTTPException:
+    from skeleton.application.command_contracts import CommandError
+
+    if isinstance(exc, CommandError):
+        return HTTPException(status_code=exc.http_status, detail=exc.message)
+    return HTTPException(status_code=422, detail=str(exc))
+
+
+def _int_field(payload: Dict[str, Any], key: str, default: int, *, minimum: int = 1) -> int:
+    from skeleton.application.command_contracts import CommandError, require_int
+
+    try:
+        return require_int(payload, key, default, minimum=minimum)
+    except CommandError as exc:
+        raise _payload_error(exc) from exc
+
+
+def _bool_field(payload: Dict[str, Any], key: str, default: bool = False) -> bool:
+    from skeleton.application.command_contracts import CommandError, require_bool
+
+    try:
+        return require_bool(payload, key, default)
+    except CommandError as exc:
+        raise _payload_error(exc) from exc
+
+
 def _pipeline_prefetch(state: Any, pipeline_name: str, description: Any) -> Dict[str, Any]:
     from skeleton.pipelines.speculative_rag import planning_prefetch_dict
 
@@ -108,8 +134,8 @@ async def retrieval_query(request: Dict[str, Any], state=Depends(_state)) -> Dic
     query = str(request.get("query", ""))
     if not query.strip():
         raise HTTPException(status_code=422, detail="query is required")
-    k = int(request.get("k", 8))
-    results = quad.retrieve(query, k=k, use_cache=bool(request.get("use_cache", True)))
+    k = _int_field(request, "k", 8, minimum=1)
+    results = quad.retrieve(query, k=k, use_cache=_bool_field(request, "use_cache", True))
     return {
         "query": query,
         "results": [
@@ -183,6 +209,27 @@ async def application_api_route_audit() -> Dict[str, Any]:
     from skeleton.application import api_route_audit_snapshot
 
     return api_route_audit_snapshot()
+
+
+@router.get("/application/hmac/audit/{method}/{path:path}")
+async def application_hmac_open_audit_row(method: str, path: str) -> Dict[str, Any]:
+    """Return one HMAC-open audit row by method and path."""
+    from skeleton.application import get_hmac_open_audit_row
+
+    try:
+        return get_hmac_open_audit_row(f"{method} /{path.lstrip('/')}")
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/hmac/audit")
+async def application_hmac_open_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --hmac-audit``."""
+    from skeleton.application import hmac_open_audit_snapshot
+
+    return hmac_open_audit_snapshot()
 
 
 @router.get("/application/planes/audit/{plane_id}")
@@ -332,7 +379,7 @@ async def jeeves_matrices(session_id: str, state=Depends(_state)) -> Dict[str, A
 async def memory_query(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     result = _require(state.memory_trinity, "Memory").query_unified(
         request.get("query", ""),
-        top_k_per_tier=request.get("top_k", 3),
+        top_k_per_tier=_int_field(request, "top_k", 3, minimum=1),
         metadata_filter=request.get("metadata_filter"),
     )
     body: Dict[str, Any] = {
@@ -429,7 +476,7 @@ async def pipeline_npc(request: Dict[str, Any], state=Depends(_state)) -> Dict[s
     spec = _require(state.npc_pipeline, "NPC pipeline").run(
         description,
         name=request.get("name"),
-        dialogue_beats=request.get("dialogue_beats", 3),
+        dialogue_beats=_int_field(request, "dialogue_beats", 3, minimum=1),
         params=request.get("params"),
     )
     return {
@@ -445,7 +492,7 @@ async def pipeline_game_logic(request: Dict[str, Any], state=Depends(_state)) ->
     spec = _require(state.game_logic_pipeline, "Game logic pipeline").run(
         description,
         title=request.get("title", "untitled"),
-        max_level=request.get("max_level", 50),
+        max_level=_int_field(request, "max_level", 50, minimum=1),
         curve=request.get("curve", "quadratic"),
         currency=request.get("currency", "gold"),
     )
@@ -494,8 +541,8 @@ async def forge_materialise(http_request: Request, request: Dict[str, Any], stat
         forge.instantiate(bp, comp["kind"], comp["instance_id"], config=comp.get("config"))
     for wire in request.get("wires", []):
         bp.connect(tuple(wire["from"]), tuple(wire["to"]))
-    repair = bool(request.get("repair", False))
-    max_rounds = int(request.get("max_rounds", 3) or 3)
+    repair = _bool_field(request, "repair", False)
+    max_rounds = _int_field(request, "max_rounds", 3, minimum=1)
     artefact = forge.materialise(
         bp,
         era=request.get("era", "extraction_now"),
@@ -536,8 +583,8 @@ async def forge_archetype(http_request: Request, request: Dict[str, Any], state=
     era = request.get("era", "extraction_now")
     target = request.get("target", "godot")
     bp = default_library().build(forge, name)
-    repair = bool(request.get("repair", target == "godot"))
-    max_rounds = int(request.get("max_rounds", 3) or 3)
+    repair = _bool_field(request, "repair", target == "godot")
+    max_rounds = _int_field(request, "max_rounds", 3, minimum=1)
     artefact = forge.materialise(bp, era=era, target=target, repair=repair, max_rounds=max_rounds)
     response = {
         "blueprint_id": bp.blueprint_id,
@@ -624,7 +671,7 @@ async def gameforge_intake(http_request: Request, request: Dict[str, Any], state
         era=taken.era,
         answers=request.get("answers") or {},
         project_root=request.get("project_root"),
-        overwrite=bool(request.get("overwrite")),
+        overwrite=_bool_field(request, "overwrite", False),
         target=request.get("target", "godot"),
         archetype=request.get("archetype", "extraction"),
     )
