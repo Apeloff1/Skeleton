@@ -32,3 +32,11 @@ class DegenerateGeometryError(PhysicsError):
 
 class SolverError(PhysicsError):
     """Raised when a solver encounters invalid or non-finite state."""
+
+
+class DuplicateJointError(PhysicsError):
+    """Raised when a world receives an already registered joint id."""
+
+
+class JointNotFoundError(PhysicsError, KeyError):
+    """Raised when a requested joint does not exist."""
