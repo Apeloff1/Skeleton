@@ -16,11 +16,12 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Sequence
 
 from .adaptive_runtime import AdaptiveJeevesRuntime
 from .associative_memory import AssociativeMemoryMesh
-from .context_pipeline import LayeredContextResolver, ResolutionPolicy
+from .context_pipeline import ContextSourceAdapter, LayeredContextResolver, ResolutionPolicy
+from .context_repository import ContextRepository
 from .memory import MemoryManager, MemoryNamespace
 from .memory_game import InteractionCard, MemoryGameIndex, MemoryGamePolicy
 from .nuance_runtime import (
@@ -42,6 +43,8 @@ class _ScientificRuntimeMixin:
         memory_cards: MemoryGameIndex | None = None,
         associative_memory: AssociativeMemoryMesh | None = None,
         context_resolver: LayeredContextResolver | None = None,
+        context_repository: ContextRepository | None = None,
+        context_adapters: Sequence[ContextSourceAdapter] = (),
         scientific_context: ScientificContextCompiler | None = None,
         nuance_runtime: ScientificNuanceRuntime | None = None,
         memory_game_policy: MemoryGamePolicy | None = None,
@@ -64,10 +67,17 @@ class _ScientificRuntimeMixin:
             resolver = LayeredContextResolver(
                 cards=cards,
                 memory=shared_memory,
+                repository=context_repository,
                 associations=associations,
+                adapters=context_adapters,
                 policy=resolution_policy,
             )
         else:
+            if context_repository is not None or context_adapters:
+                raise ValueError(
+                    "context_repository/context_adapters are only valid when "
+                    "context_resolver is not supplied"
+                )
             resolver = context_resolver
             if resolver.memory is not shared_memory:
                 raise ValueError(
