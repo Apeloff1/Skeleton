@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
 from .associative_memory import AssociationKind, SequencePrediction
+from .cognition import ContextCompiler, ContextPacket, ContextSection, RunScratchpad
 from .context_pipeline import ContextResolution, ContextTier, LayeredContextResolver
 from .memory import MemoryNamespace
 from .memory_game import InteractionCard
@@ -44,7 +45,20 @@ from .semantic_lenses import (
 from .semantic_prediction import SemanticForecast, SemanticPredictionLedger, SemanticPredictiveModel
 from .semantic_tangent_bridge import SemanticRestartPacket, SemanticTangentBridge
 from .tangent_graph import ExplorationAxis, TangentNode
-from .types import AgentContractError, bounded_text, json_safe, positive_int, probability, stable_fingerprint, stable_id
+from .types import (
+    AgentContractError,
+    Goal,
+    Plan,
+    PlanStep,
+    ToolObservation,
+    bounded_text,
+    canonical_json,
+    json_safe,
+    positive_int,
+    probability,
+    stable_fingerprint,
+    stable_id,
+)
 from .uncertainty_frontier import FrontierLens, FrontierLensContract, FrontierLensRegistry
 
 
@@ -634,5 +648,297 @@ class ScientificNuanceRuntime:
                 "updates": [(key, value.fingerprint) for key, value in sorted(self._updates.items())],
                 "prediction_ledger": self.prediction_ledger.fingerprint,
                 "tangent_graph": self.tangent_bridge.graph.fingerprint,
+            }
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ScientificContextCompilerPolicy:
+    """Prompt-facing bounds for the scientific nuance workbench."""
+
+    maximum_nuance_chars: int = 20_000
+    maximum_juxtapositions: int = 12
+    maximum_lens_questions: int = 3
+    context_priority: int = 68
+
+    def __post_init__(self) -> None:
+        for name in (
+            "maximum_nuance_chars",
+            "maximum_juxtapositions",
+            "maximum_lens_questions",
+            "context_priority",
+        ):
+            object.__setattr__(self, name, positive_int(name, getattr(self, name), maximum=1_000_000))
+
+
+class ScientificContextCompiler:
+    """Runtime-compatible compiler that makes the nuance stack operational.
+
+    The public compile contract matches ContextCompiler and returns a plain
+    ContextPacket. Existing runtime code therefore keeps one control path.
+
+    Retrieval and interpretation remain separated. The resolver decides what
+    prior context is worth surfacing; the nuance runtime selects questions and
+    lenses but cannot create evidence; the base compiler performs final bounded
+    prompt packing.
+
+    This compiler is read-only with respect to interaction memory. Capturing a
+    new user interaction is a separate method so the host can guarantee that the
+    first retrieval for a turn happens before that turn becomes memory.
+    """
+
+    def __init__(
+        self,
+        resolver: LayeredContextResolver,
+        *,
+        nuance: ScientificNuanceRuntime | None = None,
+        base_compiler: ContextCompiler | None = None,
+        policy: ScientificContextCompilerPolicy | None = None,
+    ) -> None:
+        if not isinstance(resolver, LayeredContextResolver):
+            raise TypeError("resolver must be LayeredContextResolver")
+        self.resolver = resolver
+        self.nuance = nuance or ScientificNuanceRuntime(resolver)
+        if self.nuance.resolver is not resolver:
+            raise NuanceRuntimeError("nuance runtime and scientific compiler must share one resolver")
+        self.base = base_compiler or ContextCompiler()
+        self.policy = policy or ScientificContextCompilerPolicy()
+
+    @staticmethod
+    def _query(task_instruction: str, goal: Goal, current_step: PlanStep | None) -> str:
+        parts = [goal.objective, task_instruction]
+        if current_step is not None:
+            parts.extend(
+                (
+                    current_step.title,
+                    current_step.description,
+                    current_step.expected_outcome,
+                )
+            )
+        return " ".join(part for part in parts if part)
+
+    @staticmethod
+    def _context_tags(
+        goal: Goal,
+        plan: Plan | None,
+        current_step: PlanStep | None,
+    ) -> tuple[str, ...]:
+        tags = {"scientific-context", "jeeves"}
+        if current_step is not None:
+            tags.update(("current-step", current_step.risk.value))
+            if current_step.tool:
+                tags.add(f"tool:{current_step.tool}")
+        if plan is not None:
+            tags.add(f"plan-version:{plan.version}")
+        for key in ("domain", "task", "mode"):
+            value = goal.metadata.get(key)
+            if isinstance(value, str) and value.strip():
+                tags.add(value.strip().casefold()[:128])
+        return tuple(sorted(tags))
+
+    def _workbench_section(self, frame: NuanceFrame) -> ContextSection:
+        lens_rows = [
+            {
+                "key": spec.key,
+                "family": spec.family.value,
+                "role": spec.role.value,
+                "lineage_year": spec.lineage_year,
+                "activation": round(
+                    float(frame.lens_selection.activation_scores.get(spec.key, 0.0)),
+                    8,
+                ),
+                "rare": spec.rare,
+                "questions": list(spec.asks[: self.policy.maximum_lens_questions]),
+                "predicts": spec.predicts,
+                "failure_mode": spec.failure_mode,
+            }
+            for spec in frame.lens_selection.lenses
+        ]
+        uncertainty_rows = [
+            {
+                "lens": item.lens.value,
+                "priority": round(item.priority, 8),
+                "reason": item.reason,
+                "quantity": item.contract.quantity.value,
+                "lineage_year": item.contract.lineage_year,
+                "use_when": item.contract.use_when,
+                "invalid_when": item.contract.invalid_when,
+                "assumptions": list(item.contract.assumptions),
+                "implementation": item.contract.implementation.value,
+            }
+            for item in frame.uncertainty_recommendations
+        ]
+        juxtaposition_rows = [
+            {
+                "left": item.left_id,
+                "right": item.right_id,
+                "lexical_overlap": round(item.lexical_overlap, 8),
+                "contrast": round(item.contrast_signal, 8),
+                "novelty": round(item.novelty_signal, 8),
+                "distance": item.sequence_distance,
+                "changed_context": item.changed_context,
+            }
+            for item in frame.juxtaposition_signals[: self.policy.maximum_juxtapositions]
+        ]
+        payload: dict[str, Any] = {
+            "contract": {
+                "interpretive_only": True,
+                "semantic_readings_are_not_evidence": True,
+                "associations_change_priority_not_trust": True,
+                "uncertainty_lenses_require_their_stated_assumptions": True,
+                "conflicting_readings_must_not_be_averaged_implicitly": True,
+                "predictions_must_be_falsifiable_and_scored_later": True,
+            },
+            "frame_id": frame.frame_id,
+            "frame_fingerprint": frame.fingerprint,
+            "context_fingerprint": frame.context.fingerprint,
+            "lenses": lens_rows,
+            "uncertainty": uncertainty_rows,
+            "juxtaposition": juxtaposition_rows,
+            "sequence_prediction": None
+            if frame.sequence_prediction is None
+            else {
+                "prefix": list(frame.sequence_prediction.prefix),
+                "candidates": [list(item) for item in frame.sequence_prediction.candidates],
+                "entropy_bits": frame.sequence_prediction.entropy_bits,
+                "evidence_count": frame.sequence_prediction.evidence_count,
+                "fingerprint": frame.sequence_prediction.fingerprint,
+            },
+        }
+        encoded = canonical_json(payload)
+        if len(encoded) > self.policy.maximum_nuance_chars:
+            payload["lenses"] = [
+                {
+                    "key": row["key"],
+                    "family": row["family"],
+                    "role": row["role"],
+                    "activation": row["activation"],
+                    "rare": row["rare"],
+                }
+                for row in lens_rows
+            ]
+            payload["uncertainty"] = [
+                {
+                    "lens": row["lens"],
+                    "priority": row["priority"],
+                    "quantity": row["quantity"],
+                    "lineage_year": row["lineage_year"],
+                }
+                for row in uncertainty_rows
+            ]
+            payload["truncated_detail"] = True
+            encoded = canonical_json(payload)
+        if len(encoded) > self.policy.maximum_nuance_chars:
+            encoded = canonical_json(
+                {
+                    "contract": payload["contract"],
+                    "frame_id": frame.frame_id,
+                    "frame_fingerprint": frame.fingerprint,
+                    "context_fingerprint": frame.context.fingerprint,
+                    "lens_keys": [item.key for item in frame.lens_selection.lenses],
+                    "uncertainty_lenses": [
+                        item.lens.value for item in frame.uncertainty_recommendations
+                    ],
+                    "truncated_detail": True,
+                }
+            )
+        return ContextSection(
+            name="scientific_nuance_workbench",
+            content=encoded,
+            priority=self.policy.context_priority,
+            required=False,
+            source_ids=(frame.fingerprint,),
+        )
+
+    def compile(
+        self,
+        *,
+        system_instruction: str,
+        task_instruction: str,
+        goal: Goal,
+        namespace: MemoryNamespace,
+        memory: Any,
+        evidence: Any,
+        plan: Plan | None = None,
+        current_step: PlanStep | None = None,
+        observations: Sequence[ToolObservation] = (),
+        scratchpad: RunScratchpad | None = None,
+        extra_sections: Sequence[ContextSection] = (),
+    ) -> ContextPacket:
+        if memory is not self.resolver.memory:
+            raise NuanceRuntimeError(
+                "scientific context compiler must share the runtime MemoryManager; "
+                "split memory planes would make retrieval/replay non-deterministic"
+            )
+        frame = self.nuance.prepare(
+            namespace,
+            self._query(task_instruction, goal, current_step),
+            context_tags=self._context_tags(goal, plan, current_step),
+            capture_interaction=False,
+        )
+        layered = frame.context.sections(maximum_chars=self.resolver.policy.max_total_chars)
+        workbench = self._workbench_section(frame)
+        return self.base.compile(
+            system_instruction=system_instruction,
+            task_instruction=task_instruction,
+            goal=goal,
+            namespace=namespace,
+            memory=memory,
+            evidence=evidence,
+            plan=plan,
+            current_step=current_step,
+            observations=observations,
+            scratchpad=scratchpad,
+            extra_sections=tuple(layered) + (workbench,) + tuple(extra_sections),
+        )
+
+    def capture_user_interaction(
+        self,
+        namespace: MemoryNamespace,
+        content: str,
+        *,
+        context_tags: Sequence[str] = (),
+        provenance: Sequence[str] = (),
+        metadata: Mapping[str, Any] | None = None,
+    ) -> InteractionCard:
+        """Capture after first-turn resolution and wire temporal continuity."""
+        recent = self.resolver.cards.store.namespace_cards(namespace)[:2]
+        card = self.resolver.cards.capture_interaction(
+            namespace,
+            content,
+            context_tags=context_tags,
+            source="user-interaction",
+            trust=1.0,
+            salience=0.72,
+            provenance=provenance,
+            metadata={
+                "captured_by_scientific_context_compiler": True,
+                **dict(metadata or {}),
+            },
+        )
+        if self.resolver.associations is not None and recent:
+            previous_ids = tuple(
+                item.card_id
+                for item in reversed(recent)
+                if item.card_id != card.card_id
+            )
+            if previous_ids:
+                self.resolver.associations.observe_sequence(
+                    namespace,
+                    (*previous_ids, card.card_id),
+                    kind=AssociationKind.TEMPORAL_FORWARD,
+                    evidence_ids=provenance,
+                    tags=context_tags,
+                )
+        return card
+
+    @property
+    def fingerprint(self) -> str:
+        return stable_fingerprint(
+            {
+                "resolver_policy": self.resolver.policy,
+                "nuance": self.nuance.fingerprint,
+                "base_budget": self.base.budget,
+                "policy": self.policy,
             }
         )
