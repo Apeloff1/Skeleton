@@ -223,7 +223,8 @@ class GamePhysicsProfile:
         if horizontal <= EPSILON:
             if vertical <= 0.0:
                 direction = -up
-                time = math.sqrt(max(0.0, -2.0 * vertical / gravity))
+                drop = -vertical
+                time = (-speed + math.sqrt(speed * speed + 2.0 * gravity * drop)) / gravity
                 return (
                     ProjectileSolution(
                         launch_velocity=direction * speed_units,
