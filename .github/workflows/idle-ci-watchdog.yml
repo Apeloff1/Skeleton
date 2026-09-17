@@ -90,7 +90,7 @@ jobs:
             else
               gh issue comment "$issue" --repo "$REPO" --body "CI watchdog could not rerun candidate:${id}; leaving it eligible for a later watchdog pass." >/dev/null || true
             fi
-          done < <(jq -r '.[] | [.databaseId,.name,.status,.conclusion,.createdAt,.url] | @tsv' "$RUNNER_TEMP/runs.json")
+          done < <(jq -r '.[] | [.databaseId,.name,.status,(.conclusion // "none"),.createdAt,.url] | @tsv' "$RUNNER_TEMP/runs.json")
 
           {
             echo '## Idle CI watchdog'
