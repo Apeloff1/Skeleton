@@ -620,3 +620,93 @@ def test_evolution_lineage_verifies_parent_chain_and_detects_forgery() -> None:
         match="parent mismatch",
     ):
         forged.verify_lineage()
+
+
+
+def test_restore_truncates_future_lineage_before_re_evolution() -> None:
+    lab = ExecutableGameEngineLab()
+    sandbox = lab.create(
+        EngineEra.PONG
+    )
+    path = "engine/legacy_tuning.json"
+    payload = json.loads(
+        sandbox.tree.read(path)
+    )
+    payload["paddle_speed"] = 999
+    broken = sandbox.apply(
+        [
+            SandboxPatch(
+                path,
+                json.dumps(payload),
+                sandbox.tree.file_digest(
+                    path
+                ),
+            )
+        ]
+    )
+    evolution = AdversarialEngineEvolution(
+        lab
+    )
+    session = evolution.start(
+        broken
+    )
+    report = lab.evaluate(
+        broken
+    )
+    repair = lab.canonical_repair(
+        broken,
+        report,
+    )
+    promoted, _, _ = (
+        evolution.tournament_round(
+            session,
+            (repair,),
+        )
+    )
+    assert len(
+        promoted.checkpoints
+    ) == 2
+
+    restored = promoted.restore(0)
+
+    assert len(
+        restored.checkpoints
+    ) == 1
+    assert restored.sequence == 1
+    assert (
+        restored.latest_checkpoint.sequence
+        == 0
+    )
+
+    repaired_again = (
+        lab.canonical_repair(
+            restored.sandbox,
+            lab.evaluate(
+                restored.sandbox
+            ),
+        )
+    )
+    repromoted, selected, round_result = (
+        evolution.tournament_round(
+            restored,
+            (repaired_again,),
+        )
+    )
+
+    assert round_result.accepted
+    assert selected.passed
+    assert len(
+        repromoted.checkpoints
+    ) == 2
+    assert (
+        repromoted.checkpoints[1]
+        .sequence
+        == 1
+    )
+    assert (
+        repromoted.checkpoints[1]
+        .parent_digest
+        == repromoted.checkpoints[0]
+        .tree_digest
+    )
+    assert repromoted.verify_lineage()
