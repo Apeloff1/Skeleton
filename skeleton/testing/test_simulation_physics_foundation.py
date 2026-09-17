@@ -566,3 +566,44 @@ def test_failed_solver_rolls_back_entire_tick_atomically() -> None:
     assert body.linear_velocity == before_velocity
     assert body.force == before_force
     assert world.contacts() == before_contacts
+
+
+def test_world_measure_reports_center_of_mass_and_linear_momentum() -> None:
+    world = PhysicsWorld(PhysicsSettings(gravity=Vec3.zero()))
+    left = RigidBody.dynamic(
+        "left",
+        SphereShape(1.0),
+        density=1.0,
+        position=Vec3(-2.0, 0.0, 0.0),
+        linear_damping=0.0,
+        angular_damping=0.0,
+    )
+    right = RigidBody.dynamic(
+        "right",
+        SphereShape(1.0),
+        density=3.0,
+        position=Vec3(2.0, 0.0, 0.0),
+        linear_damping=0.0,
+        angular_damping=0.0,
+    )
+    left.linear_velocity = Vec3(2.0, 0.0, 0.0)
+    right.linear_velocity = Vec3(-1.0, 0.0, 0.0)
+    world.add_body(left)
+    world.add_body(right)
+
+    measure = world.measure()
+    assert measure.dynamic_bodies == 2
+    assert measure.center_of_mass.x == pytest.approx(1.0)
+    expected_px = left.mass * 2.0 - right.mass
+    assert measure.linear_momentum.x == pytest.approx(expected_px)
+
+
+def test_world_measure_potential_energy_uses_gravity_direction() -> None:
+    world = PhysicsWorld(PhysicsSettings(gravity=Vec3(0.0, -10.0, 0.0)))
+    body = RigidBody.dynamic("body", SphereShape(1.0), position=Vec3(0.0, 5.0, 0.0))
+    world.add_body(body)
+    measure = world.measure()
+    assert measure.potential_energy == pytest.approx(body.mass * 10.0 * 5.0)
+    assert measure.mechanical_energy == pytest.approx(
+        measure.kinetic_energy + measure.potential_energy
+    )
