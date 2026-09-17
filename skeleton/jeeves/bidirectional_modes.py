@@ -15,6 +15,8 @@ Rules enforced here:
   holds;
 * each pass remains leakage-safe inside its own temporal coordinate system;
 * model selection is based on a consensus score across both directions;
+* exact consensus ties prefer persistence so zero demonstrated improvement can
+  never promote a more complex mode;
 * promotion requires the same candidate to beat persistence independently in
   both directions and remain within bounded temporal asymmetry;
 * the result is deterministic and offline-only.
@@ -194,6 +196,7 @@ class BidirectionalModeLab:
                 common_modes,
                 key=lambda mode: (
                     _consensus_score(mode, forward.report, backward.report),
+                    0 if mode is HistoricalMode.PERSISTENCE else 1,
                     mode.value,
                 ),
             )
