@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "skeleton/jeeves/game_engine_lab.py"
+      - "skeleton/jeeves/core.py"
       - "skeleton/jeeves/game_engine_legacy.py"
       - "skeleton/jeeves/game_engine_3d.py"
       - "skeleton/jeeves/game_engine_modern.py"
@@ -53,6 +54,7 @@ jobs:
         run: >-
           python -m compileall -q
           skeleton/jeeves/game_engine_lab.py
+          skeleton/jeeves/core.py
           skeleton/jeeves/game_engine_legacy.py
           skeleton/jeeves/game_engine_3d.py
           skeleton/jeeves/game_engine_modern.py
