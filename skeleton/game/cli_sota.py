@@ -79,6 +79,45 @@ def _cmd_doctor(rest: List[str]) -> int:
     return 0
 
 
+def _cmd_turn(rest: List[str]) -> int:
+    from skeleton.game.turn_engine import play
+
+    try:
+        payload = play(seed=_seed(rest), ticks=20)
+    except Exception as exc:
+        return _fail(exc)
+    print(json.dumps({
+        "ok": True,
+        "ticks": payload["ticks"],
+        "tokens": payload["tokens"],
+        "extract_count": payload["extract_count"],
+        "warp_count": payload["warp_count"],
+        "passed": payload["passed"],
+        "sota_ready": False,
+        "stored_prose": payload["stored_prose"],
+    }, indent=2))
+    return 0
+
+
+def _cmd_compose(rest: List[str]) -> int:
+    from skeleton.game.compose import compose
+
+    try:
+        payload = compose(seed=_seed(rest))
+    except Exception as exc:
+        return _fail(exc)
+    print(json.dumps({
+        "ok": True,
+        "digest": payload["digest"],
+        "era": payload["era"],
+        "turn_passed": payload["turn_passed"],
+        "arena_evidence": payload["arena_evidence"],
+        "sota_ready": payload["sota_ready"],
+        "stored_prose": payload["stored_prose"],
+    }, indent=2))
+    return 0
+
+
 def dispatch(cmd: str, rest: List[str]) -> int | None:
     if cmd == "spec":
         return _cmd_spec(rest)
@@ -86,4 +125,8 @@ def dispatch(cmd: str, rest: List[str]) -> int | None:
         return _cmd_emit(rest)
     if cmd == "doctor":
         return _cmd_doctor(rest)
+    if cmd == "turn":
+        return _cmd_turn(rest)
+    if cmd == "compose":
+        return _cmd_compose(rest)
     return None
