@@ -215,7 +215,7 @@ class WorldStatus:
 class WorldSession:
     """Bounded deterministic editing/simulation session.
 
-    ``WorldSession`` never mutates a store outside explicit methods.  Preview is
+    ``WorldSession`` never mutates a store outside explicit methods. Preview is
     clone-only, checkpoints are immutable snapshots, and restore validates the
     checkpoint digest before replacing authoritative state.
     """
@@ -294,17 +294,12 @@ class WorldSession:
 
     @staticmethod
     def _verify_checkpoint(checkpoint: WorldCheckpoint) -> None:
-        expected = digest(
-            {
-                "domain": "skeleton.simulation.ecs.world_checkpoint.v1",
-                "world": None,  # checked by session-specific method below
-            }
-        )
-        del expected  # Keep verifier explicit while avoiding a false generic digest check.
-        if checkpoint.snapshot.state_digest != checkpoint.state_digest:
-            raise SnapshotError("world checkpoint state digest mismatch")
         if checkpoint.snapshot.store.state_digest != checkpoint.state_digest:
             raise SnapshotError("world checkpoint snapshot is corrupt")
+        if checkpoint.snapshot.revision != checkpoint.snapshot.store.revision:
+            raise SnapshotError("world checkpoint revision mismatch")
+        if checkpoint.snapshot.tick != checkpoint.snapshot.store.tick:
+            raise SnapshotError("world checkpoint tick mismatch")
 
     def _expected_checkpoint_digest(self, checkpoint: WorldCheckpoint) -> str:
         return digest(
