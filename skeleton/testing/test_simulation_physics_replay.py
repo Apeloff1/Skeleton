@@ -662,3 +662,30 @@ def test_rewind_step_can_reuse_identical_retained_command_frame() -> None:
     session.step((_impulse_command(0, 2.0),))
     assert session.world.tick == 2
     assert session.world.state_digest == final_digest
+
+
+
+def test_public_snapshot_builder_rejects_non_iterable_collections() -> None:
+    snapshot = _world().capture_snapshot()
+    with pytest.raises(PhysicsSnapshotError, match="iterable"):
+        build_snapshot(
+            tick=snapshot.tick,
+            configuration_digest=snapshot.configuration_digest,
+            body_states=None,  # type: ignore[arg-type]
+            contact_cache=snapshot.contact_cache,
+            manifolds=snapshot.manifolds,
+            state_digest=snapshot.state_digest,
+        )
+
+
+def test_public_snapshot_builder_rejects_wrong_collection_types() -> None:
+    snapshot = _world().capture_snapshot()
+    with pytest.raises(PhysicsSnapshotError, match="invalid body state"):
+        build_snapshot(
+            tick=snapshot.tick,
+            configuration_digest=snapshot.configuration_digest,
+            body_states=(object(),),  # type: ignore[arg-type]
+            contact_cache=snapshot.contact_cache,
+            manifolds=snapshot.manifolds,
+            state_digest=snapshot.state_digest,
+        )
