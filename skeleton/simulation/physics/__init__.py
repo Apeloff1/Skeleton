@@ -42,6 +42,14 @@ from .gameplay import (
     JumpTuning,
     ProjectileSolution,
 )
+from .islands import (
+    IslandGraph,
+    IslandGraphStats,
+    IslandSolveReceipt,
+    PhysicsIsland,
+    build_islands,
+    solve_islands,
+)
 from .materials import CombineRule, ContactMaterial, PhysicsMaterial, combine_materials
 from .math3d import AABB, Mat3, Quat, Transform, Vec3
 from .queries import Ray, RayHit, raycast_body, sphere_cast_body
@@ -105,10 +113,14 @@ __all__ = [
     "DuplicateBodyError",
     "GamePhysicsProfile",
     "GameplayScale",
+    "IslandGraph",
+    "IslandGraphStats",
+    "IslandSolveReceipt",
     "JumpTuning",
     "MassProperties",
     "Mat3",
     "PhysicsAggregate",
+    "PhysicsIsland",
     "PhysicsBodyState",
     "PhysicsCommand",
     "PhysicsCommandFrame",
@@ -153,6 +165,7 @@ __all__ = [
     "aggregate_physics",
     "apply_physics_commands",
     "angular_momentum",
+    "build_islands",
     "build_snapshot",
     "combine_materials",
     "detect_collision",
@@ -164,6 +177,7 @@ __all__ = [
     "raycast_body",
     "replay_physics",
     "replay_physics_commands",
+    "solve_islands",
     "sphere_cast_body",
     "step_physics_with_commands",
     "verify_snapshot",
