@@ -30,6 +30,83 @@ def _require(obj: Any, name: str) -> Any:
     return obj
 
 
+def _payload_error(exc: Exception) -> HTTPException:
+    from skeleton.application.command_contracts import CommandError
+
+    if isinstance(exc, CommandError):
+        return HTTPException(status_code=exc.http_status, detail=exc.message)
+    return HTTPException(status_code=422, detail=str(exc))
+
+
+def _int_field(payload: Dict[str, Any], key: str, default: int, *, minimum: int = 1) -> int:
+    from skeleton.application.command_contracts import CommandError, require_int
+
+    try:
+        return require_int(payload, key, default, minimum=minimum)
+    except CommandError as exc:
+        raise _payload_error(exc) from exc
+
+
+def _float_field(
+    payload: Dict[str, Any],
+    key: str,
+    default: float,
+    *,
+    minimum: float | None = None,
+    maximum: float | None = None,
+) -> float:
+    from skeleton.application.command_contracts import CommandError, require_float
+
+    try:
+        return require_float(payload, key, default, minimum=minimum, maximum=maximum)
+    except CommandError as exc:
+        raise _payload_error(exc) from exc
+
+
+def _text_field(
+    payload: Dict[str, Any],
+    key: str,
+    default: str = "",
+    *,
+    allowed: tuple[str, ...] | None = None,
+) -> str:
+    from skeleton.application.command_contracts import CommandError, require_text
+
+    try:
+        value = require_text(payload, key, default, allowed=allowed)
+    except CommandError as exc:
+        raise _payload_error(exc) from exc
+    return str(value or "")
+
+
+def _bool_field(payload: Dict[str, Any], key: str, default: bool = False) -> bool:
+    from skeleton.application.command_contracts import CommandError, require_bool
+
+    try:
+        return require_bool(payload, key, default)
+    except CommandError as exc:
+        raise _payload_error(exc) from exc
+
+
+def _pipeline_prefetch(state: Any, pipeline_name: str, description: Any) -> Dict[str, Any]:
+    from skeleton.pipelines.speculative_rag import planning_prefetch_dict
+
+    return planning_prefetch_dict(
+        getattr(state, "genesis", None),
+        pipeline_name,
+        {"description": str(description or "")},
+        limit=3,
+    )
+
+
+def _spec_rag(spec: Any, state: Any, pipeline_name: str, description: Any) -> Dict[str, Any]:
+    payload = spec.to_dict() if hasattr(spec, "to_dict") else {}
+    rag = payload.get("speculative_rag") if isinstance(payload, dict) else None
+    if isinstance(rag, dict) and rag.get("pipeline"):
+        return rag
+    return _pipeline_prefetch(state, pipeline_name, description)
+
+
 @router.get("/health")
 async def health(state=Depends(_state)) -> Dict[str, Any]:
     checks = state.is_healthy()
@@ -89,8 +166,8 @@ async def retrieval_query(request: Dict[str, Any], state=Depends(_state)) -> Dic
     query = str(request.get("query", ""))
     if not query.strip():
         raise HTTPException(status_code=422, detail="query is required")
-    k = int(request.get("k", 8))
-    results = quad.retrieve(query, k=k, use_cache=bool(request.get("use_cache", True)))
+    k = _int_field(request, "k", 8, minimum=1)
+    results = quad.retrieve(query, k=k, use_cache=_bool_field(request, "use_cache", True))
     return {
         "query": query,
         "results": [
@@ -121,7 +198,7 @@ async def retrieval_ingest(request: Dict[str, Any], state=Depends(_state)) -> Di
     chunks = quad.ingest_document(
         doc_id, text,
         metadata=request.get("metadata"),
-        salience=float(request.get("salience", 0.5)),
+        salience=_float_field(request, "salience", 0.5, minimum=0.0),
     )
     return {"doc_id": doc_id, "chunks": chunks, "status": "ingested"}
 
@@ -143,6 +220,205 @@ async def retrieval_feedback(request: Dict[str, Any], state=Depends(_state)) -> 
 @router.get("/capabilities")
 async def capabilities(state=Depends(_state)) -> List[Dict[str, Any]]:
     return [cap.to_dict() for cap in _require(state.registry, "Registry").list()]
+
+
+@router.get("/application/routes/audit/{method}/{path:path}")
+async def application_api_route_audit_row(method: str, path: str) -> Dict[str, Any]:
+    """Return one main-router audit row by method and path."""
+    from skeleton.application import get_api_route_audit_row
+
+    try:
+        return get_api_route_audit_row(f"{method} /{path.lstrip('/')}")
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/routes/audit")
+async def application_api_route_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --route-audit``."""
+    from skeleton.application import api_route_audit_snapshot
+
+    return api_route_audit_snapshot()
+
+
+@router.get("/application/hmac/audit/{method}/{path:path}")
+async def application_hmac_open_audit_row(method: str, path: str) -> Dict[str, Any]:
+    """Return one HMAC-open audit row by method and path."""
+    from skeleton.application import get_hmac_open_audit_row
+
+    try:
+        return get_hmac_open_audit_row(f"{method} /{path.lstrip('/')}")
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/hmac/audit")
+async def application_hmac_open_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --hmac-audit``."""
+    from skeleton.application import hmac_open_audit_snapshot
+
+    return hmac_open_audit_snapshot()
+
+
+@router.get("/application/cli/audit/{command_id}")
+async def application_developer_cli_audit_row(command_id: str) -> Dict[str, Any]:
+    """Return one developer-CLI audit row by command name."""
+    from skeleton.application import get_developer_cli_audit_row
+
+    try:
+        return get_developer_cli_audit_row(command_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/cli/audit")
+async def application_developer_cli_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --cli-audit``."""
+    from skeleton.application import developer_cli_audit_snapshot
+
+    return developer_cli_audit_snapshot()
+
+
+@router.get("/application/templates/audit/{template_id}")
+async def application_template_audit_row(template_id: str) -> Dict[str, Any]:
+    """Return one scaffold-template audit row by template ID."""
+    from skeleton.application import get_template_audit_row
+
+    try:
+        return get_template_audit_row(template_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/templates/audit")
+async def application_template_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --template-audit``."""
+    from skeleton.application import template_audit_snapshot
+
+    return template_audit_snapshot()
+
+
+@router.get("/application/sidecars/audit/{method}/{path:path}")
+async def application_sidecar_route_audit_row(method: str, path: str) -> Dict[str, Any]:
+    """Return one sidecar-router audit row by method and path."""
+    from skeleton.application import get_sidecar_route_audit_row
+
+    try:
+        return get_sidecar_route_audit_row(f"{method} /{path.lstrip('/')}")
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/sidecars/audit")
+async def application_sidecar_route_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --sidecar-audit``."""
+    from skeleton.application import sidecar_route_audit_snapshot
+
+    return sidecar_route_audit_snapshot()
+
+
+@router.get("/application/planes/audit/{plane_id}")
+async def application_plane_audit_row(plane_id: str) -> Dict[str, Any]:
+    """Return one F-15 plane audit row by stable ID."""
+    from skeleton.application import get_plane_audit_row
+
+    try:
+        return get_plane_audit_row(plane_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/planes/audit")
+async def application_plane_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --plane-audit``."""
+    from skeleton.application import plane_audit_snapshot
+
+    return plane_audit_snapshot()
+
+
+@router.get("/application/genesis/audit/{phase_id}")
+async def application_genesis_boot_audit_row(phase_id: str) -> Dict[str, Any]:
+    """Return one genesis boot-audit row by phase name."""
+    from skeleton.application import get_genesis_boot_audit_row
+
+    try:
+        return get_genesis_boot_audit_row(phase_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/genesis/audit")
+async def application_genesis_boot_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --boot-audit``."""
+    from skeleton.application import genesis_boot_audit_snapshot
+
+    return genesis_boot_audit_snapshot()
+
+
+@router.get("/application/capabilities/export-audit/{capability_id}")
+async def application_export_audit_row(capability_id: str) -> Dict[str, Any]:
+    """Return one manifest export-audit row by capability ID."""
+    from skeleton.application import get_export_audit_row
+
+    try:
+        return get_export_audit_row(capability_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/capabilities/export-audit")
+async def application_export_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --export-audit``."""
+    from skeleton.application import export_audit_snapshot
+
+    return export_audit_snapshot()
+
+
+@router.get("/application/capabilities/lifecycle")
+async def application_capability_lifecycle() -> Dict[str, Any]:
+    """Return resolvable/loaded status for the curated capability manifest."""
+    from skeleton.application import capability_lifecycle_snapshot
+
+    return capability_lifecycle_snapshot()
+
+
+@router.get("/application/capabilities/{capability_id}")
+async def application_capability(capability_id: str) -> Dict[str, Any]:
+    """Return one curated capability by stable ID."""
+    from dataclasses import asdict
+
+    from skeleton.application import get_capability
+
+    try:
+        return asdict(get_capability(capability_id))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/capabilities")
+async def application_capabilities() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities``."""
+    from skeleton.application import capability_manifest
+
+    return capability_manifest()
 
 
 @router.post("/jeeves/session")
@@ -198,7 +474,7 @@ async def jeeves_matrices(session_id: str, state=Depends(_state)) -> Dict[str, A
 async def memory_query(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     result = _require(state.memory_trinity, "Memory").query_unified(
         request.get("query", ""),
-        top_k_per_tier=request.get("top_k", 3),
+        top_k_per_tier=_int_field(request, "top_k", 3, minimum=1),
         metadata_filter=request.get("metadata_filter"),
     )
     body: Dict[str, Any] = {
@@ -228,7 +504,7 @@ async def swarm_stats(state=Depends(_state)) -> Dict[str, Any]:
 async def swarm_register_agent(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     agent = _require(state.mesh, "Swarm").join(
         set(request.get("specialisations", [])),
-        weight=request.get("weight", 1.0),
+        weight=_float_field(request, "weight", 1.0, minimum=0.0),
         metadata=request.get("metadata"),
     )
     return {"agent_id": str(agent.agent_id), "status": "registered"}
@@ -291,35 +567,50 @@ async def scheduler_stats(state=Depends(_state)) -> Dict[str, Any]:
 
 @router.post("/pipeline/npc")
 async def pipeline_npc(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    description = request.get("description", "")
     spec = _require(state.npc_pipeline, "NPC pipeline").run(
-        request.get("description", ""),
+        description,
         name=request.get("name"),
-        dialogue_beats=request.get("dialogue_beats", 3),
+        dialogue_beats=_int_field(request, "dialogue_beats", 3, minimum=1),
         params=request.get("params"),
     )
-    return {"npc": spec.to_dict(), "status": "generated"}
+    return {
+        "npc": spec.to_dict(),
+        "status": "generated",
+        "speculative_rag": _spec_rag(spec, state, "npc", description),
+    }
 
 
 @router.post("/pipeline/game-logic")
 async def pipeline_game_logic(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
+    description = request.get("description", "")
     spec = _require(state.game_logic_pipeline, "Game logic pipeline").run(
-        request.get("description", ""),
+        description,
         title=request.get("title", "untitled"),
-        max_level=request.get("max_level", 50),
-        curve=request.get("curve", "quadratic"),
-        currency=request.get("currency", "gold"),
+        max_level=_int_field(request, "max_level", 50, minimum=1),
+        curve=_text_field(request, "curve", "quadratic"),
+        currency=_text_field(request, "currency", "gold"),
     )
-    return {"game_logic": spec.to_dict(), "status": "generated"}
+    return {
+        "game_logic": spec.to_dict(),
+        "status": "generated",
+        "speculative_rag": _spec_rag(spec, state, "game_logic", description),
+    }
 
 
 @router.post("/pipeline/animation")
 async def pipeline_animation(request: Dict[str, Any], state=Depends(_state)) -> Dict[str, Any]:
     actions = request.get("actions")
+    description = request.get("description", "humanoid")
     spec = _require(state.animation_pipeline, "Animation pipeline").run(
-        request.get("description", "humanoid"),
+        description,
         actions=tuple(actions) if actions else ("idle", "walk", "run", "attack"),
     )
-    return {"animation": spec.to_dict(), "status": "generated"}
+    return {
+        "animation": spec.to_dict(),
+        "status": "generated",
+        "speculative_rag": _spec_rag(spec, state, "animation", description),
+    }
 
 
 @router.post("/forge/blueprint")
@@ -345,12 +636,14 @@ async def forge_materialise(http_request: Request, request: Dict[str, Any], stat
         forge.instantiate(bp, comp["kind"], comp["instance_id"], config=comp.get("config"))
     for wire in request.get("wires", []):
         bp.connect(tuple(wire["from"]), tuple(wire["to"]))
-    repair = bool(request.get("repair", False))
-    max_rounds = int(request.get("max_rounds", 3) or 3)
+    repair = _bool_field(request, "repair", False)
+    max_rounds = _int_field(request, "max_rounds", 3, minimum=1)
+    from skeleton.application.command_contracts import MATERIALISE_TARGETS
+
     artefact = forge.materialise(
         bp,
         era=request.get("era", "extraction_now"),
-        target=request.get("target", "json"),
+        target=_text_field(request, "target", "json", allowed=MATERIALISE_TARGETS),
         repair=repair,
         max_rounds=max_rounds,
     )
@@ -382,13 +675,15 @@ async def forge_archetype(http_request: Request, request: Dict[str, Any], state=
     if replay is not None:
         return replay  # type: ignore[return-value]
     from skeleton.forge.archetypes import default_library
+    from skeleton.application.command_contracts import MATERIALISE_TARGETS
+
     forge = _require(state.forge, "Forge")
     name = request.get("name", "extraction")
     era = request.get("era", "extraction_now")
-    target = request.get("target", "godot")
+    target = _text_field(request, "target", "godot", allowed=MATERIALISE_TARGETS)
     bp = default_library().build(forge, name)
-    repair = bool(request.get("repair", target == "godot"))
-    max_rounds = int(request.get("max_rounds", 3) or 3)
+    repair = _bool_field(request, "repair", target == "godot")
+    max_rounds = _int_field(request, "max_rounds", 3, minimum=1)
     artefact = forge.materialise(bp, era=era, target=target, repair=repair, max_rounds=max_rounds)
     response = {
         "blueprint_id": bp.blueprint_id,
@@ -445,18 +740,20 @@ async def gameforge_run(http_request: Request, request: Dict[str, Any], state=De
     replay = _idempotency.replay(dict(http_request.headers))
     if replay is not None:
         return replay  # type: ignore[return-value]
+    from skeleton.application.command_contracts import MATERIALISE_TARGETS
+
     runner = _require(state.gameforge, "GameForge")
     out = runner.execute(
         request.get("vision", ""),
         era=request.get("era"),
-        archetype=request.get("archetype", "extraction"),
-        target=request.get("target", "godot"),
+        archetype=_text_field(request, "archetype", "extraction"),
+        target=_text_field(request, "target", "godot", allowed=MATERIALISE_TARGETS),
     )
     # files can be large; keep names in the HTTP body
     files = out.get("files") or {}
     out = dict(out)
     out["file_names"] = sorted(files)
-    if not request.get("include_files"):
+    if not _bool_field(request, "include_files", False):
         out.pop("files", None)
     _idempotency.remember(dict(http_request.headers), out)
     return out
@@ -468,6 +765,8 @@ async def gameforge_intake(http_request: Request, request: Dict[str, Any], state
     if replay is not None:
         return replay  # type: ignore[return-value]
     from skeleton.context.questionnaire import intake
+    from skeleton.application.command_contracts import MATERIALISE_TARGETS
+
     taken = intake(request.get("answers") or {})
     runner = _require(state.gameforge, "GameForge")
     out = runner.execute(
@@ -475,15 +774,15 @@ async def gameforge_intake(http_request: Request, request: Dict[str, Any], state
         era=taken.era,
         answers=request.get("answers") or {},
         project_root=request.get("project_root"),
-        overwrite=bool(request.get("overwrite")),
-        target=request.get("target", "godot"),
-        archetype=request.get("archetype", "extraction"),
+        overwrite=_bool_field(request, "overwrite", False),
+        target=_text_field(request, "target", "godot", allowed=MATERIALISE_TARGETS),
+        archetype=_text_field(request, "archetype", "extraction"),
     )
     files = out.get("files") or {}
     out = dict(out)
     out["intake"] = taken.to_dict()
     out["file_names"] = sorted(files)
-    if not request.get("include_files"):
+    if not _bool_field(request, "include_files", False):
         out.pop("files", None)
     _idempotency.remember(dict(http_request.headers), out)
     return out

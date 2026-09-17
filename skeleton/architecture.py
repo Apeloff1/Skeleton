@@ -7,7 +7,7 @@ It is importable for programmatic access to architecture metadata.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 ARCHITECTURE_VERSION = "16.0.0"
@@ -107,6 +107,21 @@ BOOT_PHASES: List[Dict[str, Any]] = [
 # Package registry with descriptions
 PACKAGES: Dict[str, Dict[str, Any]] = {
     "skeleton.kernel": {"description": "Core primitives", "exports": ["EventBus", "EntropyPool", "VectorClock", "InvariantLattice", "SkeletonError"]},
+    "skeleton.application": {"description": "Shared command contracts", "exports": [
+        "AUDITED_PLANE_IDS", "CAPABILITIES", "CAPABILITIES_BY_ID", "CAPABILITY_LOADER",
+        "CAPABILITY_MANIFEST_VERSION", "CONTRACT_VERSION", "API_ROUTE_AUDIT_KIND", "DEVELOPER_CLI_AUDIT_KIND",
+        "EXPORT_AUDIT_KIND", "GENESIS_BOOT_AUDIT_KIND", "HMAC_OPEN_AUDIT_KIND", "PLANE_AUDIT_KIND",
+        "SIDECAR_ROUTE_AUDIT_KIND", "TEMPLATE_AUDIT_KIND", "Capability", "CapabilityLoadError",
+        "CapabilityLoader", "CapabilityRuntimeStatus", "CommandError", "CommandResult",
+        "CommandService", "CommandSpec", "api_route_audit_snapshot", "build_runtime_command_service",
+        "capability_lifecycle_snapshot", "capability_manifest", "capability_runtime_status",
+        "command_specs", "developer_cli_audit_snapshot", "export_audit_snapshot", "genesis_boot_audit_snapshot",
+        "get_api_route_audit_row", "get_capability", "get_developer_cli_audit_row", "get_export_audit_row",
+        "get_genesis_boot_audit_row", "get_hmac_open_audit_row", "get_plane_audit_row",
+        "get_sidecar_route_audit_row", "get_template_audit_row", "hmac_open_audit_snapshot",
+        "load_capability", "parity_matrix", "plane_audit_snapshot", "sidecar_route_audit_snapshot",
+        "template_audit_snapshot",
+    ]},
     "skeleton.memory": {"description": "Multi-plane storage", "exports": ["InMemoryTFIDFStore", "CAGStore", "MAGStore", "MemoryTrinity", "RepetitionScheduler"]},
     "skeleton.intelligence": {"description": "Reasoning and learning", "exports": ["IntelligenceOrchestrator", "AdaptiveLearner", "MetaGrid"]},
     "skeleton.swarm": {"description": "Agent coordination", "exports": ["SwarmMesh", "PheromoneField", "HiveMind", "CapabilityNegotiator", "Platoons"]},
@@ -118,15 +133,16 @@ PACKAGES: Dict[str, Dict[str, Any]] = {
     "skeleton.developer": {"description": "Developer CLI", "exports": ["ScaffoldEngine", "Wizard", "CommandRegistry"]},
     "skeleton.deploy": {"description": "Deployment harness", "exports": ["Harness", "Config", "get_config"]},
     "skeleton.testing": {"description": "Test framework", "exports": ["TestCase", "TestScaffold", "TestRunner"]},
-    "skeleton.organism": {"description": "Runtime state", "exports": ["OrganismState", "FeatureFlags", "HealthMonitor"]},
+    "skeleton.organism": {"description": "Runtime state", "exports": ["OrganismState", "FeatureFlags", "HealthMonitor", "QualityState", "append_quality"]},
     "skeleton.pipelines": {"description": "Task pipelines", "exports": ["NPCPipeline", "GameLogicPipeline", "AnimationPipeline"]},
     "skeleton.vault": {"description": "Access control", "exports": ["AccessPolicy", "EnvelopeKMS", "Role"]},
     "skeleton.retrieval": {"description": "Search and fusion", "exports": ["Fuser", "FusionStrategy", "ScoredResult", "Ranker"]},
     "skeleton.agents": {"description": "Agent coordination", "exports": ["Coordinator", "AgentPool", "Task"]},
     "skeleton.context": {"description": "Intake system", "exports": ["intake", "Questionnaire", "IntakeResult"]},
     "skeleton.config": {"description": "Configuration", "exports": ["SettingsSnapshotBridge", "ConfigSnapshot"]},
-    "skeleton.galaxy": {"description": "Distributed nodes", "exports": ["GalaxyNode", "FederationMesh", "NodeRegistry"]},
-    "skeleton.social": {"description": "Agent interactions", "exports": ["SocialGraph", "ReputationEngine", "InteractionLog"]},
+    "skeleton.content": {"description": "Domain knowledge packs", "exports": ["LOREBUFFA_AI_PACK", "get_npc_context"]},
+    "skeleton.galaxy": {"description": "Distributed nodes", "exports": ["GalaxyNode", "FederationMesh", "NodeRegistry", "NodeIdentity", "NodeTransport", "ConsensusEngine", "Proposal", "KAGSync", "GalaxyBridge", "RemoteTask", "LeaderElection", "LeadershipState", "FleetCoordinator", "LoadLedger"]},
+    "skeleton.social": {"description": "Agent interactions", "exports": ["SocialGraph", "ReputationEngine", "InteractionLog", "Interaction"]},
     "skeleton.integrations": {"description": "External connectors", "exports": ["ConnectorRegistry", "WebhookHandler", "APICredentials"]},
     "skeleton.acquired": {"description": "Asset management", "exports": ["AssetLibrary", "AssetIngestor", "AssetValidator"]},
     "skeleton.jeeves": {"description": "Conversational AI", "exports": ["JeevesCore", "SessionMode", "Session", "MemoryManager"]},
@@ -141,6 +157,25 @@ API_ROUTES: List[Dict[str, Any]] = [
     {"method": "GET", "path": "/api/v1/genesis", "protected": False, "description": "Boot report"},
     {"method": "GET", "path": "/api/v1/genesis/handles", "protected": False, "description": "Wired handles"},
     {"method": "GET", "path": "/api/v1/capabilities", "protected": False, "description": "Capability registry"},
+    {"method": "GET", "path": "/api/v1/application/capabilities", "protected": False, "description": "Curated capability manifest"},
+    {"method": "GET", "path": "/api/v1/application/capabilities/lifecycle", "protected": False, "description": "Capability lifecycle snapshot"},
+    {"method": "GET", "path": "/api/v1/application/capabilities/{capability_id}", "protected": False, "description": "One curated capability"},
+    {"method": "GET", "path": "/api/v1/application/capabilities/export-audit", "protected": False, "description": "Manifest export-drift audit"},
+    {"method": "GET", "path": "/api/v1/application/capabilities/export-audit/{capability_id}", "protected": False, "description": "One capability export-audit row"},
+    {"method": "GET", "path": "/api/v1/application/planes/audit", "protected": False, "description": "Organism/social/galaxy plane audit"},
+    {"method": "GET", "path": "/api/v1/application/planes/audit/{plane_id}", "protected": False, "description": "One audited plane row"},
+    {"method": "GET", "path": "/api/v1/application/genesis/audit", "protected": False, "description": "Genesis versus BOOT_PHASES audit"},
+    {"method": "GET", "path": "/api/v1/application/genesis/audit/{phase_id}", "protected": False, "description": "One genesis boot-audit row"},
+    {"method": "GET", "path": "/api/v1/application/routes/audit", "protected": False, "description": "Main-router API_ROUTES audit"},
+    {"method": "GET", "path": "/api/v1/application/routes/audit/{method}/{path}", "protected": False, "description": "One main-router audit row"},
+    {"method": "GET", "path": "/api/v1/application/hmac/audit", "protected": False, "description": "HMAC open-prefix versus API_ROUTES audit"},
+    {"method": "GET", "path": "/api/v1/application/hmac/audit/{method}/{path}", "protected": False, "description": "One HMAC open-audit row"},
+    {"method": "GET", "path": "/api/v1/application/cli/audit", "protected": False, "description": "Developer CLI versus CLI_COMMANDS audit"},
+    {"method": "GET", "path": "/api/v1/application/cli/audit/{command_id}", "protected": False, "description": "One developer-CLI audit row"},
+    {"method": "GET", "path": "/api/v1/application/templates/audit", "protected": False, "description": "Scaffold TEMPLATES versus architecture audit"},
+    {"method": "GET", "path": "/api/v1/application/templates/audit/{template_id}", "protected": False, "description": "One scaffold-template audit row"},
+    {"method": "GET", "path": "/api/v1/application/sidecars/audit", "protected": False, "description": "GameForge/command sidecar router audit"},
+    {"method": "GET", "path": "/api/v1/application/sidecars/audit/{method}/{path}", "protected": False, "description": "One sidecar-router audit row"},
     {"method": "POST", "path": "/api/v1/retrieval/query", "protected": False, "description": "Multi-plane search"},
     {"method": "POST", "path": "/api/v1/retrieval/ingest", "protected": False, "description": "Document ingestion"},
     {"method": "POST", "path": "/api/v1/retrieval/feedback", "protected": False, "description": "Plane feedback"},
@@ -167,6 +202,16 @@ API_ROUTES: List[Dict[str, Any]] = [
     {"method": "POST", "path": "/api/v1/forge/archetype", "protected": True, "description": "Build archetype"},
     {"method": "POST", "path": "/api/v1/intelligence/reason", "protected": False, "description": "Reasoning query"},
     {"method": "POST", "path": "/api/v1/resilience/sanitise", "protected": False, "description": "Input sanitization"},
+    {"method": "GET", "path": "/api/v1/resilience/stats", "protected": False, "description": "Resilience statistics"},
+    {"method": "GET", "path": "/api/v1/interface/reranker/stats", "protected": False, "description": "Reranker statistics"},
+    {"method": "GET", "path": "/api/v1/context/snapshot", "protected": False, "description": "Cockpit snapshot"},
+    {"method": "POST", "path": "/api/v1/context/command", "protected": False, "description": "Apply cockpit command"},
+    {"method": "POST", "path": "/api/v1/gameforge/run", "protected": True, "description": "Run GameForge generation"},
+    {"method": "POST", "path": "/api/v1/gameforge/intake", "protected": True, "description": "GameForge intake questionnaire"},
+    {"method": "POST", "path": "/api/v1/swarm/submit", "protected": True, "description": "Submit swarm task"},
+    {"method": "GET", "path": "/api/v1/auth/github", "protected": False, "description": "GitHub auth status"},
+    {"method": "GET", "path": "/api/v1/auth/github/start", "protected": False, "description": "Start GitHub OAuth"},
+    {"method": "GET", "path": "/api/v1/auth/github/callback", "protected": False, "description": "GitHub OAuth callback"},
 ]
 
 # Developer CLI command registry

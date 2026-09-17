@@ -30,7 +30,7 @@ from .distill import Ability, AbilityLedger, ability_from
 from .own import MIN_JACCARD, OwnSystem, RecallHit, Tract, shadow_eval
 from .curriculum import CORE_PAIRS, WALK_PAIRS, default_curriculum, train
 from .neocortex import ControlSurface, CortexSnapshot, CortexTrace, JeevesCortex, local_slots
-from .live import live_cortex, live_jeeves, persist, reset_live
+from .live import CortexPersistenceError, live_cortex, live_jeeves, persist, reset_live
 from .lm import NGramLM, LanguageModelBackend, gameforge_corpus, gameforge_vocab
 from .neural import NeuralLM, NeuralBackend
 from .transformer import TinyTransformer, TransformerBackend
@@ -333,7 +333,7 @@ __all__ = [
     "PrefrontalCortex", "Midbrain", "LeftHemisphere", "RightHemisphere", "ttk_oracle",
     "Ability", "AbilityLedger", "ability_from", "OwnSystem", "RecallHit", "Tract", "shadow_eval",
     "CORE_PAIRS", "WALK_PAIRS", "default_curriculum", "train", "CortexTrace", "CortexSnapshot",
-    "ControlSurface", "JeevesCortex", "local_slots", "live_cortex", "live_jeeves", "persist", "reset_live",
+    "ControlSurface", "JeevesCortex", "local_slots", "CortexPersistenceError", "live_cortex", "live_jeeves", "persist", "reset_live",
     "NGramLM", "LanguageModelBackend", "gameforge_corpus", "gameforge_vocab", "NeuralLM", "NeuralBackend",
     "TinyTransformer", "TransformerBackend", "LearnedWeights", "probe", "resolve", "attach_lm",
     "NumericHead", "BiasHead", "RouteHead", "VetoHead", "PolicyHead", "CorpusCallosum", "ExpertBank",

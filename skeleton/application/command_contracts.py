@@ -8,10 +8,104 @@ registered by adapters in :mod:`skeleton.application.runtime_commands`.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterable, Mapping, Optional
 
 CONTRACT_VERSION = "1.0"
+MATERIALISE_TARGETS = ("json", "yaml", "godot")
+
+
+def require_bool(payload: Mapping[str, Any], key: str, default: bool = False) -> bool:
+    """Return a real boolean; reject truthy/falsey stand-ins such as ``1`` or ``"false"``."""
+
+    if default is not True and default is not False:
+        raise CommandError("invalid_argument", f"{key} default must be a boolean")
+    if key not in payload:
+        return default is True
+    value = payload[key]
+    if value is not True and value is not False:
+        raise CommandError("invalid_argument", f"{key} must be a boolean")
+    return value is True
+
+
+def require_int(
+    payload: Mapping[str, Any],
+    key: str,
+    default: int,
+    *,
+    minimum: Optional[int] = None,
+    maximum: Optional[int] = None,
+) -> int:
+    """Return a real integer; reject bools, floats, and numeric strings."""
+
+    if isinstance(default, bool) or not isinstance(default, int):
+        raise CommandError("invalid_argument", f"{key} default must be an integer")
+    value: Any = default if key not in payload else payload[key]
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise CommandError("invalid_argument", f"{key} must be an integer")
+    if minimum is not None and value < minimum:
+        raise CommandError("invalid_argument", f"{key} must be >= {minimum}")
+    if maximum is not None and value > maximum:
+        raise CommandError("invalid_argument", f"{key} must be <= {maximum}")
+    return value
+
+
+def require_float(
+    payload: Mapping[str, Any],
+    key: str,
+    default: float,
+    *,
+    minimum: Optional[float] = None,
+    maximum: Optional[float] = None,
+) -> float:
+    """Return a finite number; reject bools, numeric strings, NaN, and infinities."""
+
+    if isinstance(default, bool) or not isinstance(default, (int, float)) or not math.isfinite(float(default)):
+        raise CommandError("invalid_argument", f"{key} default must be a finite number")
+    value: Any = default if key not in payload else payload[key]
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise CommandError("invalid_argument", f"{key} must be a number")
+    number = float(value)
+    if not math.isfinite(number):
+        raise CommandError("invalid_argument", f"{key} must be finite")
+    if minimum is not None and number < minimum:
+        raise CommandError("invalid_argument", f"{key} must be >= {minimum}")
+    if maximum is not None and number > maximum:
+        raise CommandError("invalid_argument", f"{key} must be <= {maximum}")
+    return number
+
+
+def require_text(
+    payload: Mapping[str, Any],
+    key: str,
+    default: Optional[str] = "",
+    *,
+    optional: bool = False,
+    allowed: Optional[Iterable[str]] = None,
+) -> Optional[str]:
+    """Return a real string; reject non-strings and values outside an allow-list."""
+
+    if default is not None and not isinstance(default, str):
+        raise CommandError("invalid_argument", f"{key} default must be a string")
+    if key not in payload:
+        if optional:
+            return default
+        value: Any = "" if default is None else default
+    else:
+        value = payload[key]
+        if optional and value is None:
+            return None
+    if not isinstance(value, str):
+        raise CommandError("invalid_argument", f"{key} must be a string")
+    if allowed is not None:
+        allowed_values = tuple(item for item in allowed if isinstance(item, str))
+        if value not in allowed_values:
+            raise CommandError(
+                "invalid_argument",
+                f"{key} must be one of {', '.join(sorted(allowed_values))}",
+            )
+    return value
 
 
 @dataclass(frozen=True)
@@ -63,6 +157,10 @@ _SPECS = (
     CommandSpec(
         "configuration",
         "Inspect non-secret runtime configuration metadata.",
+    ),
+    CommandSpec(
+        "capabilities",
+        "Inspect the curated capability manifest, lifecycle snapshot, or structural audits.",
     ),
     CommandSpec(
         "admin",

@@ -4,7 +4,15 @@ from __future__ import annotations
 
 from typing import Any, Dict, Mapping
 
-from .command_contracts import CONTRACT_VERSION, CommandError, CommandService
+from .command_contracts import (
+    CONTRACT_VERSION,
+    MATERIALISE_TARGETS,
+    CommandError,
+    CommandService,
+    require_bool,
+    require_int,
+    require_text,
+)
 
 APP_VERSION = "16.0.0"
 
@@ -38,6 +46,94 @@ def _configuration_handler(state: Any):
     return handle
 
 
+_CAPABILITY_VIEW_FLAGS = (
+    "lifecycle",
+    "plane_audit",
+    "boot_audit",
+    "export_audit",
+    "route_audit",
+    "hmac_audit",
+    "cli_audit",
+    "template_audit",
+    "sidecar_audit",
+)
+
+
+def _capability_view_flags(payload: Mapping[str, Any]) -> Dict[str, bool]:
+    flags: Dict[str, bool] = {}
+    enabled: list[str] = []
+    for name in _CAPABILITY_VIEW_FLAGS:
+        flags[name] = require_bool(payload, name, False)
+        if flags[name]:
+            enabled.append(name)
+    if len(enabled) > 1:
+        raise CommandError(
+            "invalid_argument",
+            f"{' and '.join(enabled)} are mutually exclusive",
+        )
+    return flags
+
+
+def _lookup_row(payload: Mapping[str, Any], key: str, getter, snapshot):
+    raw_id = payload.get(key, "")
+    if raw_id in {"", None}:
+        return snapshot()
+    if not isinstance(raw_id, str):
+        raise CommandError("invalid_argument", f"{key} must be a string")
+    try:
+        return getter(raw_id)
+    except KeyError as exc:
+        raise CommandError("invalid_argument", str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise CommandError("invalid_argument", str(exc)) from exc
+
+
+def _capabilities_handler(_state: Any):
+    def handle(payload: Mapping[str, Any]) -> Dict[str, Any]:
+        flags = _capability_view_flags(payload)
+        if flags["sidecar_audit"]:
+            from .sidecar_route_audit import get_sidecar_route_audit_row, sidecar_route_audit_snapshot
+
+            return _lookup_row(payload, "route_id", get_sidecar_route_audit_row, sidecar_route_audit_snapshot)
+        if flags["template_audit"]:
+            from .template_audit import get_template_audit_row, template_audit_snapshot
+
+            return _lookup_row(payload, "template_id", get_template_audit_row, template_audit_snapshot)
+        if flags["cli_audit"]:
+            from .developer_cli_audit import developer_cli_audit_snapshot, get_developer_cli_audit_row
+
+            return _lookup_row(payload, "command_id", get_developer_cli_audit_row, developer_cli_audit_snapshot)
+        if flags["hmac_audit"]:
+            from .hmac_open_audit import get_hmac_open_audit_row, hmac_open_audit_snapshot
+
+            return _lookup_row(payload, "route_id", get_hmac_open_audit_row, hmac_open_audit_snapshot)
+        if flags["route_audit"]:
+            from .api_route_audit import api_route_audit_snapshot, get_api_route_audit_row
+
+            return _lookup_row(payload, "route_id", get_api_route_audit_row, api_route_audit_snapshot)
+        if flags["export_audit"]:
+            from .export_audit import export_audit_snapshot, get_export_audit_row
+
+            return _lookup_row(payload, "capability_id", get_export_audit_row, export_audit_snapshot)
+        if flags["boot_audit"]:
+            from .genesis_boot_audit import genesis_boot_audit_snapshot, get_genesis_boot_audit_row
+
+            return _lookup_row(payload, "phase_id", get_genesis_boot_audit_row, genesis_boot_audit_snapshot)
+        if flags["plane_audit"]:
+            from .plane_audit import get_plane_audit_row, plane_audit_snapshot
+
+            return _lookup_row(payload, "plane_id", get_plane_audit_row, plane_audit_snapshot)
+        if flags["lifecycle"]:
+            from .capability_runtime import capability_lifecycle_snapshot
+
+            return capability_lifecycle_snapshot()
+        from .capability_manifest import capability_manifest
+
+        return capability_manifest()
+
+    return handle
+
+
 def _memory_handler(state: Any):
     def handle(payload: Mapping[str, Any]) -> Dict[str, Any]:
         memory = getattr(state, "memory_trinity", None)
@@ -46,9 +142,7 @@ def _memory_handler(state: Any):
         query = str(payload.get("query", "")).strip()
         if not query:
             raise CommandError("invalid_argument", "query is required")
-        top_k = int(payload.get("top_k", 3))
-        if top_k < 1:
-            raise CommandError("invalid_argument", "top_k must be >= 1")
+        top_k = require_int(payload, "top_k", 3, minimum=1)
         result = memory.query_unified(
             query,
             top_k_per_tier=top_k,
@@ -117,9 +211,9 @@ def _run_handler(state: Any):
             raise CommandError("invalid_argument", "answers must be an object")
         spec = gameforge.run(
             dict(answers),
-            title=payload.get("title"),
-            target=payload.get("target", "json"),
-            repair=bool(payload.get("repair", False)),
+            title=require_text(payload, "title", None, optional=True),
+            target=require_text(payload, "target", "json", allowed=MATERIALISE_TARGETS),
+            repair=require_bool(payload, "repair", False),
         )
         game = spec.to_dict() if hasattr(spec, "to_dict") else spec
         return {"game": game, "status": "generated"}
@@ -133,6 +227,7 @@ def build_runtime_command_service(state: Any) -> CommandService:
     service = CommandService()
     service.register("status", _status_handler(state))
     service.register("configuration", _configuration_handler(state))
+    service.register("capabilities", _capabilities_handler(state))
     service.register("memory", _memory_handler(state))
     service.register("tool", _tool_handler(state))
     service.register("admin", _admin_handler(state))

@@ -15,6 +15,15 @@ Commands:
     walk        Prove spawn→extract on the emitted door graph
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
+                Use `capabilities --lifecycle` for resolvable/loaded status
+                Use `capabilities --plane-audit` for the F-15 plane audit
+                Use `capabilities --boot-audit` for the genesis/BOOT_PHASES audit
+                Use `capabilities --export-audit` for manifest export drift
+                Use `capabilities --route-audit` for main-router API_ROUTES drift
+                Use `capabilities --hmac-audit` for HMAC open-prefix vs API_ROUTES drift
+                Use `capabilities --cli-audit` for developer CLI vs CLI_COMMANDS drift
+                Use `capabilities --template-audit` for scaffold TEMPLATES drift
+                Use `capabilities --sidecar-audit` for GameForge/command sidecar routes
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
@@ -35,10 +44,63 @@ def _cmd_contracts(_rest: List[str]) -> int:
     return 0
 
 
-def _cmd_capabilities(_rest: List[str]) -> int:
-    from skeleton.application import capability_manifest
+def _cmd_capabilities(rest: List[str]) -> int:
+    from skeleton.application import (
+        capability_lifecycle_snapshot,
+        capability_manifest,
+        export_audit_snapshot,
+        genesis_boot_audit_snapshot,
+        plane_audit_snapshot,
+        api_route_audit_snapshot,
+        hmac_open_audit_snapshot,
+        developer_cli_audit_snapshot,
+        template_audit_snapshot,
+        sidecar_route_audit_snapshot,
+    )
 
-    print(json.dumps(capability_manifest(), indent=2, default=str))
+    flags = {item.strip().lower() for item in rest if item.strip()}
+    aliases = {
+        "lifecycle": {"--lifecycle", "lifecycle"},
+        "plane_audit": {"--plane-audit", "plane-audit", "--plane_audit", "plane_audit"},
+        "boot_audit": {"--boot-audit", "boot-audit", "--boot_audit", "boot_audit"},
+        "export_audit": {"--export-audit", "export-audit", "--export_audit", "export_audit"},
+        "route_audit": {"--route-audit", "route-audit", "--route_audit", "route_audit"},
+        "hmac_audit": {"--hmac-audit", "hmac-audit", "--hmac_audit", "hmac_audit"},
+        "cli_audit": {"--cli-audit", "cli-audit", "--cli_audit", "cli_audit"},
+        "template_audit": {"--template-audit", "template-audit", "--template_audit", "template_audit"},
+        "sidecar_audit": {"--sidecar-audit", "sidecar-audit", "--sidecar_audit", "sidecar_audit"},
+    }
+    allowed = set().union(*aliases.values())
+    unknown = flags - allowed
+    if unknown:
+        print(f"Unknown capabilities option: {sorted(unknown)[0]}")
+        return 2
+    selected = [name for name, names in aliases.items() if flags & names]
+    if len(selected) > 1:
+        print(f"{' and '.join(selected)} are mutually exclusive")
+        return 2
+    view = selected[0] if selected else ""
+    if view == "sidecar_audit":
+        payload = sidecar_route_audit_snapshot()
+    elif view == "template_audit":
+        payload = template_audit_snapshot()
+    elif view == "cli_audit":
+        payload = developer_cli_audit_snapshot()
+    elif view == "hmac_audit":
+        payload = hmac_open_audit_snapshot()
+    elif view == "route_audit":
+        payload = api_route_audit_snapshot()
+    elif view == "export_audit":
+        payload = export_audit_snapshot()
+    elif view == "boot_audit":
+        payload = genesis_boot_audit_snapshot()
+    elif view == "plane_audit":
+        payload = plane_audit_snapshot()
+    elif view == "lifecycle":
+        payload = capability_lifecycle_snapshot()
+    else:
+        payload = capability_manifest()
+    print(json.dumps(payload, indent=2, default=str))
     return 0
 
 

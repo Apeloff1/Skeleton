@@ -24,6 +24,7 @@ class NPCSpec:
     dialogue_beats: List[str] = field(default_factory=list)
     personality_traits: Dict[str, float] = field(default_factory=dict)
     params: Dict[str, Any] = field(default_factory=dict)
+    speculative_rag: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -32,6 +33,7 @@ class NPCSpec:
             "dialogue_beats": self.dialogue_beats,
             "personality_traits": self.personality_traits,
             "params": self.params,
+            "speculative_rag": dict(self.speculative_rag),
         }
 
 
@@ -44,6 +46,7 @@ class GameLogicSpec:
     currency: str
     mechanics: List[Dict[str, Any]] = field(default_factory=list)
     progression: List[Dict[str, Any]] = field(default_factory=list)
+    speculative_rag: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -53,6 +56,7 @@ class GameLogicSpec:
             "currency": self.currency,
             "mechanics": self.mechanics,
             "progression": self.progression,
+            "speculative_rag": dict(self.speculative_rag),
         }
 
 
@@ -64,6 +68,7 @@ class AnimationSpec:
     skeleton_type: str = "humanoid"
     transitions: List[Dict[str, str]] = field(default_factory=list)
     params: Dict[str, Any] = field(default_factory=dict)
+    speculative_rag: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -72,6 +77,7 @@ class AnimationSpec:
             "skeleton_type": self.skeleton_type,
             "transitions": self.transitions,
             "params": self.params,
+            "speculative_rag": dict(self.speculative_rag),
         }
 
 
@@ -90,6 +96,9 @@ def _release(request: str, candidate: Any, creation_type: str) -> Any:
 class NPCPipeline:
     """Generate NPC specifications from descriptions."""
 
+    def __init__(self, genesis: Any = None) -> None:
+        self._genesis = genesis
+
     def run(
         self,
         description: str,
@@ -98,6 +107,14 @@ class NPCPipeline:
         params: Optional[Dict[str, Any]] = None,
     ) -> NPCSpec:
         """Generate and tri-engine validate an NPC specification."""
+        from skeleton.pipelines.speculative_rag import planning_prefetch_dict
+
+        prefetch = planning_prefetch_dict(
+            self._genesis,
+            "npc",
+            {"description": description},
+            limit=3,
+        )
         beats = [f"Beat {i+1}: {description[:20]}..." for i in range(dialogue_beats)]
         spec = NPCSpec(
             name=name or "Unnamed NPC",
@@ -111,12 +128,16 @@ class NPCPipeline:
                 "neuroticism": 0.3,
             },
             params=params or {},
+            speculative_rag=prefetch,
         )
         return _release(description, spec, "npc")
 
 
 class GameLogicPipeline:
     """Design game mechanics and progression systems."""
+
+    def __init__(self, genesis: Any = None) -> None:
+        self._genesis = genesis
 
     def run(
         self,
@@ -127,6 +148,14 @@ class GameLogicPipeline:
         currency: str = "gold",
     ) -> GameLogicSpec:
         """Generate and tri-engine validate a game-logic specification."""
+        from skeleton.pipelines.speculative_rag import planning_prefetch_dict
+
+        prefetch = planning_prefetch_dict(
+            self._genesis,
+            "game_logic",
+            {"description": description},
+            limit=3,
+        )
         mechanics = [
             {"name": "combat", "type": "turn_based", "description": description[:30]},
             {"name": "progression", "type": "level_up", "max_level": max_level},
@@ -147,6 +176,7 @@ class GameLogicPipeline:
             currency=currency,
             mechanics=mechanics,
             progression=progression[:10],
+            speculative_rag=prefetch,
         )
         return _release(description, spec, "game_logic")
 
@@ -154,8 +184,19 @@ class GameLogicPipeline:
 class AnimationPipeline:
     """Create animation specifications."""
 
+    def __init__(self, genesis: Any = None) -> None:
+        self._genesis = genesis
+
     def run(self, description: str, actions: Optional[tuple] = None) -> AnimationSpec:
         """Generate and tri-engine validate an animation specification."""
+        from skeleton.pipelines.speculative_rag import planning_prefetch_dict
+
+        prefetch = planning_prefetch_dict(
+            self._genesis,
+            "animation",
+            {"description": description},
+            limit=3,
+        )
         default_actions = actions or ("idle", "walk", "run", "attack")
         transitions = []
         for i in range(len(default_actions) - 1):
@@ -176,5 +217,6 @@ class AnimationPipeline:
                 "root_motion": True,
                 "ik_enabled": False,
             },
+            speculative_rag=prefetch,
         )
         return _release(description, spec, "animation")

@@ -4,6 +4,97 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-17 — F-22..F-27 fail-closed numbers/text and CLI/template/sidecar audits
+
+- Shared `require_float` / `require_text` reject bools, numeric strings, NaN/inf,
+  and unknown materialise targets. Run `title`/`target` use them. HTTP salience,
+  swarm weight, curve/currency, GameForge/forge `target`/`archetype`, and
+  `include_files` fail closed the same way.
+- Additive `developer_cli_audit` reports registry persistence commands
+  (`snapshot`/`restore`/`snapshots`) missing from `CLI_COMMANDS`, and help-only
+  `list-templates`/`validate`/`docs` living outside the registry.
+- Additive `template_audit` locks the four scaffold templates against
+  `architecture.TEMPLATES` with zero file drift.
+- Additive `sidecar_route_audit` reports GameForge/command sidecar handlers.
+  Duplicate `POST /gameforge/intake|run` remain unchartered on the sidecar;
+  `/commands/contracts` and `/commands/execute/{command}` stay undocumented.
+- Identical payloads through `--cli-audit` / `--template-audit` / `--sidecar-audit`,
+  matching HTTP audit routes, and the shared `capabilities` command.
+
+## 2026-09-17 — F-20 fail-closed payload types + F-21 HMAC open-prefix audit
+
+- Shared `require_bool` / `require_int` reject bool-as-int (`True→1`), numeric
+  strings, and `bool("false")` coercion. Memory `top_k` and run `repair` use
+  them on the shared command contract. HTTP retrieval `k`/`use_cache`, memory
+  `top_k`, pipeline `dialogue_beats`/`max_level`, forge `repair`/`max_rounds`,
+  and GameForge `overwrite` fail closed the same way.
+- Additive `hmac_open_audit` snapshot compares HMAC `DEFAULT_OPEN_PREFIXES` to
+  `architecture.API_ROUTES` without importing the API package. Probe-only open
+  prefixes stay locked; documented-unprotected routes such as
+  `GET /api/v1/health` remain HMAC-sealed. Combined capability views fail closed.
+- Identical HMAC-audit payload through `capabilities --hmac-audit`,
+  `GET /api/v1/application/hmac/audit`, and the shared `capabilities` command.
+
+## 2026-09-17 — F-18 pipeline speculative RAG + F-19 API route audit
+
+- NPC, game-logic, and animation `.run()` now plan-prefetch through the same
+  fail-closed sidecar used by HTTP. Missing genesis still returns queries;
+  prefetch failures never fail generation. HTTP `/pipeline/*` reuses the spec
+  sidecar instead of prefetching twice. GameForge nested pipelines receive genesis.
+- Additive `api_route_audit` snapshot compares main-router `@router` handlers to
+  `architecture.API_ROUTES` without importing the API package. Charter-gated
+  `POST /swarm/submit` and `POST /gameforge/intake` are documented `protected: true`.
+- Identical route-audit payload through `capabilities --route-audit`,
+  `GET /api/v1/application/routes/audit`, and the shared `capabilities` command.
+
+## 2026-09-17 — F-17 genesis boot audit + manifest export audit
+
+- Additive `genesis_boot_audit` snapshot reports genesis `boot()` order against
+  architecture `BOOT_PHASES` without importing genesis. Foundation, forge,
+  galaxy, contexts, and support remain undocumented in `BOOT_PHASES`; the
+  snapshot locks that split.
+- Additive `manifest_export_audit` snapshot reports `__all__` vs `PACKAGES`
+  export drift for every curated capability. Organism/social/galaxy stay at
+  zero drift; application and content now have matching `PACKAGES` rows.
+- Identical payloads through `capabilities --boot-audit` / `--export-audit`,
+  `GET /api/v1/application/genesis/audit`, `GET /api/v1/application/capabilities/export-audit`,
+  and the shared `capabilities` command. Combined views fail closed.
+- Architecture `API_ROUTES` now documents the previously missing main-router
+  surfaces (reranker stats, resilience stats, cockpit, GameForge, swarm submit,
+  GitHub auth).
+
+## 2026-09-17 — F-15 organism/social/galaxy plane audit
+
+- Additive `plane_audit` snapshot reports public exports, architecture
+  documentation drift, genesis wiring, and boot-phase listing for organism,
+  social, and galaxy without importing those planes.
+- Identical payload through `python -m skeleton capabilities --plane-audit`,
+  `GET /api/v1/application/planes/audit`, and the shared `capabilities`
+  command with `plane_audit: true`. Combined with `--lifecycle` fails closed.
+  `GET /api/v1/application/planes/audit/{plane_id}` looks up one audited plane
+  and fails closed on unknown/empty IDs.
+- Architecture `PACKAGES` export lists now match the public `__all__` for the
+  three planes. Genesis still wires galaxy only; architecture `BOOT_PHASES`
+  still omit all three, and the snapshot locks that split.
+
+## 2026-09-17 — F-16 API/CLI capability parity + F-14 speculative RAG
+
+- Curated capability manifest now covers the remaining canonical packages and
+  exposes the identical payload through `GET /api/v1/application/capabilities`,
+  `python -m skeleton capabilities`, and the shared `capabilities` command.
+- Additive lifecycle snapshot reports resolvable/loaded flags without importing
+  planes (`capabilities --lifecycle`, `/application/capabilities/lifecycle`).
+- `GET /api/v1/application/capabilities/{id}` looks up one curated capability
+  and fails closed on unknown/empty IDs.
+- Pipeline planning can prefetch likely documents through quad + composer
+  composition; GameForge knowledge and `/pipeline/*` responses attach the
+  prefetch bundle. Prefetch failures never fail the run.
+- Configured cortex restore (`SKELETON_OWN`) is fail-closed on corrupt snapshots
+  and no longer loads incidental `.skeleton/own.json` when persistence is unset.
+- Legacy `GET /api/v1/capabilities` registry listing is unchanged.
+
+---
+
 ## 2026-09-07 — Organism preview + wave kernels
 
 - Galaxy pick screen + /organism show factory spine on T tokens.

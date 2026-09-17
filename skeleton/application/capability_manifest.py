@@ -60,6 +60,91 @@ CAPABILITIES: Final[tuple[Capability, ...]] = (
         module="skeleton.galaxy",
         description="Federation, transport, consensus, synchronization, and fleet coordination.",
     ),
+    Capability(
+        id="kernel",
+        module="skeleton.kernel",
+        description="Core primitives, events, identity, and fail-closed error types.",
+    ),
+    Capability(
+        id="memory",
+        module="skeleton.memory",
+        description="Multi-plane storage, fusion, drift detection, and spaced consolidation.",
+    ),
+    Capability(
+        id="intelligence",
+        module="skeleton.intelligence",
+        description="Reasoning orchestration, adaptive learning, and meta-grid control.",
+    ),
+    Capability(
+        id="swarm",
+        module="skeleton.swarm",
+        description="Multi-agent routing, stigmergy, consensus, and platoon coordination.",
+    ),
+    Capability(
+        id="resilience",
+        module="skeleton.resilience",
+        description="Input sanitization, threat detection, and canary rollout control.",
+    ),
+    Capability(
+        id="observability",
+        module="skeleton.observability",
+        description="Metrics, sampling, anomaly detection, and operator diagnostics.",
+    ),
+    Capability(
+        id="api",
+        module="skeleton.api",
+        description="REST transport, HMAC seals, and shared command dispatch.",
+    ),
+    Capability(
+        id="developer",
+        module="skeleton.developer",
+        description="Scaffolding, wizard, health dashboard, and extension generation.",
+    ),
+    Capability(
+        id="deploy",
+        module="skeleton.deploy",
+        description="Deployment harness and environment configuration.",
+    ),
+    Capability(
+        id="testing",
+        module="skeleton.testing",
+        description="In-tree test framework, scaffolds, and contract runners.",
+    ),
+    Capability(
+        id="pipelines",
+        module="skeleton.pipelines",
+        description="NPC, game-logic, and animation generation pipelines.",
+    ),
+    Capability(
+        id="vault",
+        module="skeleton.vault",
+        description="Access control, envelope encryption, and capability grants.",
+    ),
+    Capability(
+        id="retrieval",
+        module="skeleton.retrieval",
+        description="Quad-plane search, fusion, ranking, and speculative prefetch.",
+    ),
+    Capability(
+        id="agents",
+        module="skeleton.agents",
+        description="Agent pools, task assignment, and coordination.",
+    ),
+    Capability(
+        id="context",
+        module="skeleton.context",
+        description="Intake questionnaires, cockpit control, and context tensors.",
+    ),
+    Capability(
+        id="config",
+        module="skeleton.config",
+        description="Layered non-secret configuration snapshots.",
+    ),
+    Capability(
+        id="content",
+        module="skeleton.content",
+        description="Reusable domain knowledge packs and adapters.",
+    ),
 )
 
 CAPABILITIES_BY_ID: Final[Mapping[str, Capability]] = MappingProxyType(

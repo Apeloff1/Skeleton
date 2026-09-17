@@ -1,6 +1,6 @@
 # Skeleton Backlog — failed-commit register + forward work
 
-Updated 2026-09-16 (F-16 capability discovery pass). Original register dated 2026-09-01. Two sections: things that failed and were recovered
+Updated 2026-09-17 (F-18 pipeline RAG + F-19 route audit + F-17 boot/export audits). Original register dated 2026-09-01. Two sections: things that failed and were recovered
 (so the failure modes stay visible), and the frontier backlog (what to
 build next, ordered).
 
@@ -31,9 +31,11 @@ Those planes are out-of-scope for this register — audit separately.
 
 ## 2. Frontier backlog — ordered by leverage
 
-Updated 2026-09-16. Tier-1 seams F-1..F-10, the Tier-2 F-6 frontier push,
-and F-13 economic/cascade reconciliation are **landed**; do not re-open them
-without a regression. F-16 is active as the next additive structural slice.
+Updated 2026-09-17. Tier-1 seams F-1..F-10, the Tier-2 F-6 frontier push,
+F-13 economic/cascade reconciliation, F-14 speculative RAG, F-15
+organism/social/galaxy plane audit, F-16 capability discovery, F-17 genesis/export structural audits, F-18
+pipeline speculative RAG, and F-19 main-router API route audit are
+**landed**; do not re-open them without a regression.
 
 ### Landed (keep visible — failure modes + PR anchors)
 
@@ -49,7 +51,14 @@ without a regression. F-16 is active as the next additive structural slice.
 | F-8 blackboard poison guards | #18 | provenance + quarantine |
 | F-9 N+1 tool-call suppression | #20 | compose `kernel/dedup.py` |
 | F-10 PromptImproveDriver | #31 | ImproveLoop over prefix variants |
+| F-12 Cortex persistence | #1019 | SKELETON_OWN live singleton, fail-closed corrupt restore |
 | F-13 EconomicOptimiser × CascadeRouter | #277 | shared economic model registry, cascade planning, real model IDs, budget/cost accounting |
+| F-14 Speculative RAG | #1019 | pipeline planning prefetch via quad + composer; prefetch failures never fail the run |
+| F-15 Organism/social/galaxy plane audit | #1019 | import-free export/genesis/boot snapshot; architecture public export lists synced |
+| F-16 Unified capability discovery | #1019 | CLI/API/command identity payload + additive lifecycle snapshot |
+| F-17 Genesis/export structural audits | #1019 | import-free boot-phase and manifest export-drift snapshots |
+| F-18 Pipeline speculative RAG | #1019 | NPC/logic/animation `.run()` planning prefetch; HTTP reuses the sidecar |
+| F-19 Main-router API route audit | #1019 | import-free API_ROUTES vs routes.py + charter/protected lock |
 | P6 policy enforcement | #13 | CodeVerifier + repair/verify gates |
 
 ### Live ops state — resolved blockers, keep green
@@ -82,23 +91,12 @@ remains Mixture-of-*Experts* and is a separate mechanism.
 
 1. **F-11. Track E cleanup** — root sprawl moves, SEVEN_BY physical moves,
    godot binary to LFS, shim deletion. Local git ops.
-2. **F-12. H5.4 cortex persistence** — genesis twin vs live singleton once
-   `$SKELETON_OWN` exists in the container.
-3. **F-14. Speculative RAG** — pre-fetch likely-needed documents during
-   the planning phase of a pipeline run (compose quad + composer).
-   Adjacent: `cortex/speculate.py` is token continuation, not RAG prefetch.
-4. **F-15. Organism/social/galaxy plane audit** — the repo grew three
-   planes while the waves landed (see §1 drift note). Same size-filtered
-   read methodology as the deep-cut campaign, when their churn settles.
-5. **F-16. Unified capability discovery — ACTIVE.** Add a versioned,
-   curated Python manifest for canonical subsystems and expose the identical
-   machine-readable payload through `skeleton capabilities`. Contract tests
-   must lock schema version, unique IDs/modules, resolvable package targets,
-   and CLI/API parity. Branch: `backlog/f16-capability-manifest-current-main`.
 
 ## Definition of SOTA (working)
 
-Tier-1 SOTA seams, F-6 Mixture-of-Depths, and F-13 economic/cascade
-reconciliation are landed in code. The former CI-1..CI-3 blockers are resolved
-on main; the remaining structural queue is F-11, F-12, F-14, F-15, with F-16
-active as an additive discoverability slice.
+Tier-1 SOTA seams, F-6 Mixture-of-Depths, F-13 economic/cascade
+reconciliation, F-12 cortex persistence, F-14 speculative RAG, F-15
+organism/social/galaxy plane audit, F-16 capability discovery, F-17
+genesis/export structural audits, F-18 pipeline speculative RAG, and F-19
+main-router API route audit are landed in code. The former CI-1..CI-3
+blockers are resolved on main; the remaining structural queue is F-11.
