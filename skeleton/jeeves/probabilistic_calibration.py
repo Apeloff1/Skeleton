@@ -15,7 +15,7 @@ import hashlib
 import math
 import statistics
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from typing import Sequence
 
 from .probabilistic_ensemble import MixtureForecast, probability_integral_transform
 from .probabilistic_state_space import GaussianForecast, StateSpaceError
