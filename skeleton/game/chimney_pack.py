@@ -9,14 +9,13 @@ class ChimneyPackError(ValueError):
     pass
 
 
-CHIM = tuple(f"cy_{i:02d}" for i in range(16))
+CHIMNEY = tuple(f"ch_{i:02d}" for i in range(12))
 
 
-def vent(node: dict[str, Any], name: str) -> dict[str, Any]:
-    if name not in CHIM:
+def set_chimney(node: dict[str, Any], name: str) -> dict[str, Any]:
+    if name not in CHIMNEY:
         raise ChimneyPackError(name)
     nxt = dict(node)
     nxt["chimney"] = name
-    nxt["los_pen"] = min(8, int(nxt.get("los_pen", 0)) + 1)
     nxt["stored_prose"] = 0
     return nxt
