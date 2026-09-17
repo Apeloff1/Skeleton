@@ -15,6 +15,15 @@ from .historical_modes import (
     WalkForwardConfig,
     classify_regime,
 )
+from .bidirectional_modes import (
+    BidirectionalConfig,
+    BidirectionalDecision,
+    BidirectionalModeLab,
+    BidirectionalReport,
+    DirectionalEvaluation,
+    TemporalDirection,
+    reverse_series,
+)
 from .matrices import ClomMatrix, KremMatrix, SamMatrix
 from .matrices_llm import (
     CompressedLearnedOutcomeModel,
@@ -104,6 +113,13 @@ __all__ = [
     "SelectionGate",
     "WalkForwardConfig",
     "classify_regime",
+    "BidirectionalConfig",
+    "BidirectionalDecision",
+    "BidirectionalModeLab",
+    "BidirectionalReport",
+    "DirectionalEvaluation",
+    "TemporalDirection",
+    "reverse_series",
     "ClomMatrix",
     "KremMatrix",
     "SamMatrix",
