@@ -17,6 +17,7 @@ on:
       - "skeleton/jeeves/probabilistic_spectral.py"
       - "skeleton/jeeves/probabilistic_arbitration.py"
       - "skeleton/jeeves/probabilistic_horizons.py"
+      - "skeleton/jeeves/probabilistic_horizon_stratified.py"
       - "skeleton/testing/test_jeeves_probabilistic_state_space.py"
       - "skeleton/testing/test_jeeves_probabilistic_bayes.py"
       - "skeleton/testing/test_jeeves_probabilistic_calibration.py"
@@ -29,6 +30,7 @@ on:
       - "skeleton/testing/test_jeeves_probabilistic_spectral.py"
       - "skeleton/testing/test_jeeves_probabilistic_arbitration.py"
       - "skeleton/testing/test_jeeves_probabilistic_horizons.py"
+      - "skeleton/testing/test_jeeves_probabilistic_horizon_stratified.py"
       - "skeleton/testing/test_jeeves_probabilistic_exports.py"
       - "skeleton/testing/test_jeeves_probabilistic_stratified_exports.py"
       - ".github/workflows/jeeves-probabilistic.yml"
@@ -75,7 +77,8 @@ jobs:
             skeleton/jeeves/probabilistic_arena.py \
             skeleton/jeeves/probabilistic_spectral.py \
             skeleton/jeeves/probabilistic_arbitration.py \
-            skeleton/jeeves/probabilistic_horizons.py
+            skeleton/jeeves/probabilistic_horizons.py \
+            skeleton/jeeves/probabilistic_horizon_stratified.py
 
       - name: Ruff probabilistic surfaces
         run: |
@@ -94,6 +97,7 @@ jobs:
             skeleton/jeeves/probabilistic_spectral.py \
             skeleton/jeeves/probabilistic_arbitration.py \
             skeleton/jeeves/probabilistic_horizons.py \
+            skeleton/jeeves/probabilistic_horizon_stratified.py \
             skeleton/testing/test_jeeves_probabilistic_state_space.py \
             skeleton/testing/test_jeeves_probabilistic_bayes.py \
             skeleton/testing/test_jeeves_probabilistic_calibration.py \
@@ -106,6 +110,7 @@ jobs:
             skeleton/testing/test_jeeves_probabilistic_spectral.py \
             skeleton/testing/test_jeeves_probabilistic_arbitration.py \
             skeleton/testing/test_jeeves_probabilistic_horizons.py \
+            skeleton/testing/test_jeeves_probabilistic_horizon_stratified.py \
             skeleton/testing/test_jeeves_probabilistic_exports.py \
             skeleton/testing/test_jeeves_probabilistic_stratified_exports.py
 
@@ -126,5 +131,6 @@ jobs:
             skeleton/testing/test_jeeves_probabilistic_spectral.py \
             skeleton/testing/test_jeeves_probabilistic_arbitration.py \
             skeleton/testing/test_jeeves_probabilistic_horizons.py \
+            skeleton/testing/test_jeeves_probabilistic_horizon_stratified.py \
             skeleton/testing/test_jeeves_probabilistic_exports.py \
             skeleton/testing/test_jeeves_probabilistic_stratified_exports.py
