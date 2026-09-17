@@ -378,6 +378,27 @@ class PhysicsWorld:
             }
         raise PhysicsValidationError("unknown shape implementation")
 
+    @staticmethod
+    def _manifold_record(manifold: ContactManifold) -> dict[str, object]:
+        return {
+            "body_a": manifold.body_a,
+            "body_b": manifold.body_b,
+            "normal": manifold.normal.to_tuple(),
+            "points": [
+                {
+                    "position": point.position.to_tuple(),
+                    "penetration": point.penetration,
+                    "feature_id": point.feature_id,
+                }
+                for point in manifold.points
+            ],
+            "material": {
+                "friction": manifold.material.friction,
+                "restitution": manifold.material.restitution,
+                "rolling_friction": manifold.material.rolling_friction,
+            },
+        }
+
     def _body_configuration_record(self, body: RigidBody) -> dict[str, object]:
         return {
             "body_id": body.body_id,
@@ -441,6 +462,10 @@ class PhysicsWorld:
                 "bodies": [self._body_record(body) for body in self.bodies()],
                 "joints": [joint.state_record() for joint in self.joints()],
                 "contact_cache": self._contact_cache.state_record(),
+                "last_manifolds": [
+                    self._manifold_record(manifold)
+                    for manifold in self._last_manifolds
+                ],
             }
         )
 
