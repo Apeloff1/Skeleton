@@ -1,6 +1,7 @@
 """Deterministic engine-neutral 3D physics foundation."""
 
 from .body import BodyType, RigidBody
+from .ccd import CCDHit, ContinuousCollisionDetector
 from .calculations import (
     PhysicsAggregate,
     aggregate_physics,
@@ -19,10 +20,14 @@ from .collision import (
     detect_collision,
     generate_manifolds,
 )
+from .constraints import ConstraintSolver, ConstraintStats, DistanceJoint
+from .contacts import ContactCache, ContactCacheEntry
 from .errors import (
     BodyNotFoundError,
     DegenerateGeometryError,
     DuplicateBodyError,
+    DuplicateJointError,
+    JointNotFoundError,
     PhysicsError,
     PhysicsValidationError,
     SolverError,
@@ -44,6 +49,15 @@ from .world import PhysicsSettings, PhysicsStepReceipt, PhysicsWorld
 __all__ = [
     "AABB",
     "BodyNotFoundError",
+    "CCDHit",
+    "ConstraintSolver",
+    "ConstraintStats",
+    "ContactCache",
+    "ContactCacheEntry",
+    "ContinuousCollisionDetector",
+    "DistanceJoint",
+    "DuplicateJointError",
+    "JointNotFoundError",
     "BodyType",
     "BoxShape",
     "BroadPhasePair",
