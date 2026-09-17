@@ -67,3 +67,22 @@ def test_probabilistic_facade_exports_promotion_contracts() -> None:
     assert expected.issubset(set(probabilistic.__all__))
     for name in expected:
         assert hasattr(probabilistic, name)
+
+
+def test_probabilistic_facade_exports_hidden_markov_regime_surface() -> None:
+    expected = {
+        "GaussianRegime",
+        "RegimeForecast",
+        "RegimeForecastComponent",
+        "RegimeHMMConfig",
+        "RegimeHMMFit",
+        "RegimeHMMModel",
+        "RegimePosteriorStep",
+        "RegimePrequentialScore",
+        "evaluate_regime_hmm_prequential",
+        "fit_regime_hmm",
+        "forecast_regime_hmm",
+    }
+    assert expected.issubset(set(probabilistic.__all__))
+    for name in expected:
+        assert hasattr(probabilistic, name)
