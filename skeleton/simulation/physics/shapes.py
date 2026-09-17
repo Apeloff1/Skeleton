@@ -32,6 +32,8 @@ class ShapeKind(str, Enum):
     SPHERE = "sphere"
     BOX = "box"
     PLANE = "plane"
+    CAPSULE = "capsule"
+    CYLINDER = "cylinder"
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +131,166 @@ class BoxShape:
             (mass / 3.0) * (h.x * h.x + h.y * h.y),
         )
         return MassProperties(mass, Vec3.zero(), Mat3.diagonal(inertia))
+
+
+@dataclass(frozen=True, slots=True)
+class CapsuleShape:
+    """Capsule aligned to local +Y/-Y with cylindrical half-height."""
+
+    radius: float
+    half_height: float
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "radius",
+            _positive(self.radius, name="radius"),
+        )
+        object.__setattr__(
+            self,
+            "half_height",
+            _positive(self.half_height, name="half_height"),
+        )
+
+    @property
+    def kind(self) -> ShapeKind:
+        return ShapeKind.CAPSULE
+
+    def axis(self, transform: Transform) -> Vec3:
+        return transform.transform_vector(Vec3.axis(1)).normalized()
+
+    def segment_endpoints(self, transform: Transform) -> tuple[Vec3, Vec3]:
+        axis = self.axis(transform)
+        offset = axis * self.half_height
+        return transform.position - offset, transform.position + offset
+
+    def aabb(self, transform: Transform) -> AABB:
+        first, second = self.segment_endpoints(transform)
+        radius = Vec3.one() * self.radius
+        return AABB(first.min(second) - radius, first.max(second) + radius)
+
+    def support(self, direction: Vec3, transform: Transform) -> Vec3:
+        world_direction = direction.normalized()
+        axis = self.axis(transform)
+        endpoint = (
+            transform.position + axis * self.half_height
+            if world_direction.dot(axis) >= 0.0
+            else transform.position - axis * self.half_height
+        )
+        return endpoint + world_direction * self.radius
+
+    def mass_properties(self, density: float) -> MassProperties:
+        density = _positive(density, name="density")
+        radius = self.radius
+        half_height = self.half_height
+        cylinder_length = 2.0 * half_height
+
+        cylinder_volume = math.pi * radius * radius * cylinder_length
+        sphere_volume = (4.0 / 3.0) * math.pi * radius**3
+        cylinder_mass = density * cylinder_volume
+        sphere_mass = density * sphere_volume
+        mass = cylinder_mass + sphere_mass
+
+        cylinder_axial = 0.5 * cylinder_mass * radius**2
+        cylinder_transverse = (
+            cylinder_mass
+            * (3.0 * radius**2 + cylinder_length**2)
+            / 12.0
+        )
+
+        # The two hemispheres together have sphere_mass. Each hemisphere's
+        # centroid is 3r/8 beyond its flat face. 83/320 mr^2 is the transverse
+        # inertia of one solid hemisphere about its own centroid.
+        hemisphere_offset = half_height + 3.0 * radius / 8.0
+        cap_axial = (2.0 / 5.0) * sphere_mass * radius**2
+        cap_transverse = sphere_mass * (
+            (83.0 / 320.0) * radius**2
+            + hemisphere_offset**2
+        )
+
+        inertia = Vec3(
+            cylinder_transverse + cap_transverse,
+            cylinder_axial + cap_axial,
+            cylinder_transverse + cap_transverse,
+        )
+        return MassProperties(
+            mass,
+            Vec3.zero(),
+            Mat3.diagonal(inertia),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class CylinderShape:
+    """Finite solid cylinder aligned to local +Y/-Y."""
+
+    radius: float
+    half_height: float
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "radius",
+            _positive(self.radius, name="radius"),
+        )
+        object.__setattr__(
+            self,
+            "half_height",
+            _positive(self.half_height, name="half_height"),
+        )
+
+    @property
+    def kind(self) -> ShapeKind:
+        return ShapeKind.CYLINDER
+
+    def axis(self, transform: Transform) -> Vec3:
+        return transform.transform_vector(Vec3.axis(1)).normalized()
+
+    def aabb(self, transform: Transform) -> AABB:
+        axis = self.axis(transform)
+        values = axis.to_tuple()
+        half = Vec3(
+            abs(values[0]) * self.half_height
+            + self.radius * math.sqrt(max(0.0, 1.0 - values[0] ** 2)),
+            abs(values[1]) * self.half_height
+            + self.radius * math.sqrt(max(0.0, 1.0 - values[1] ** 2)),
+            abs(values[2]) * self.half_height
+            + self.radius * math.sqrt(max(0.0, 1.0 - values[2] ** 2)),
+        )
+        return AABB.from_center_half_extents(transform.position, half)
+
+    def support(self, direction: Vec3, transform: Transform) -> Vec3:
+        local = transform.inverse_transform_vector(direction)
+        axial_sign = 1.0 if local.y >= 0.0 else -1.0
+        radial_sq = local.x * local.x + local.z * local.z
+        if radial_sq <= 1.0e-24:
+            radial_x = 0.0
+            radial_z = 0.0
+        else:
+            inverse = self.radius / math.sqrt(radial_sq)
+            radial_x = local.x * inverse
+            radial_z = local.z * inverse
+        local_point = Vec3(
+            radial_x,
+            axial_sign * self.half_height,
+            radial_z,
+        )
+        return transform.transform_point(local_point)
+
+    def mass_properties(self, density: float) -> MassProperties:
+        density = _positive(density, name="density")
+        length = 2.0 * self.half_height
+        volume = math.pi * self.radius**2 * length
+        mass = density * volume
+        axial = 0.5 * mass * self.radius**2
+        transverse = (
+            mass * (3.0 * self.radius**2 + length**2) / 12.0
+        )
+        return MassProperties(
+            mass,
+            Vec3.zero(),
+            Mat3.diagonal(Vec3(transverse, axial, transverse)),
+        )
 
 
 @dataclass(frozen=True, slots=True)
