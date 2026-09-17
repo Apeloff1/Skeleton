@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+from skeleton.jeeves.core import Jeeves
 from skeleton.jeeves.game_engine_lab import (
     EngineEra,
     GameEngineLabError,
@@ -476,6 +477,73 @@ def test_evolution_loop_reaches_target_with_canonical_proposer() -> None:
     assert result.report.passed
     assert len(result.rounds) == 1
     assert result.rounds[0].accepted
+    assert len(
+        result.session.checkpoints
+    ) == 2
+
+
+
+def test_jeeves_owns_engine_lab_lazily() -> None:
+    jeeves = Jeeves()
+
+    assert jeeves._game_engines is None
+
+    sandbox = jeeves.build_game_engine(
+        EngineEra.PONG,
+        gameplay_dialect="arcade_golden_age",
+    )
+
+    assert jeeves._game_engines is not None
+    assert sandbox.era is EngineEra.PONG
+    assert (
+        sandbox.gameplay_dialect
+        == "arcade_golden_age"
+    )
+    assert (
+        jeeves.evaluate_game_engine(
+            sandbox
+        ).passed
+    )
+
+
+def test_jeeves_evolves_broken_engine_through_checkpoint_loop() -> None:
+    jeeves = Jeeves()
+    sandbox = jeeves.build_game_engine(
+        EngineEra.EIGHT_BIT,
+        gameplay_dialect="platformer",
+    )
+    path = "engine/legacy_tuning.json"
+    payload = json.loads(
+        sandbox.tree.read(path)
+    )
+    payload["jump_impulse"] = 999
+    broken = sandbox.apply(
+        [
+            SandboxPatch(
+                path,
+                json.dumps(payload),
+                sandbox.tree.file_digest(
+                    path
+                ),
+            )
+        ]
+    )
+
+    assert not (
+        jeeves.evaluate_game_engine(
+            broken
+        ).passed
+    )
+
+    result = jeeves.evolve_game_engine(
+        broken,
+        target=1.0,
+        max_rounds=4,
+    )
+
+    assert result.target_met
+    assert result.report.passed
+    assert len(result.rounds) == 1
     assert len(
         result.session.checkpoints
     ) == 2
