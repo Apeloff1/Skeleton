@@ -81,7 +81,6 @@ jobs:
         working-directory: ./backend
     services:
       mongodb:
-        # Docker Official Image mongo:7.0.41, pinned to the multi-platform index digest.
         image: mongo@sha256:b096b4cb9269f3ebcf363be63f1c50920f786879d03a1890347a3bf33f1f0df0
         ports:
           - "27017:27017"
@@ -106,8 +105,7 @@ jobs:
           SKIP_HEAVY_SEED: "true"
           PYTHONPATH: ".."
         run: >-
-          uv run python -c "import server; assert server.app is not None;
-          print('server import: OK')"
+          uv run python -c "import server; assert server.app is not None; print('server import: OK')"
       - name: Run canonical cross-subsystem integration matrix
         working-directory: .
         env:
@@ -152,13 +150,51 @@ jobs:
         run: ruff check backend --output-format=github
       - name: Canonical lint, type, and high-confidence security gates
         run: bash scripts/quality-gates.sh
-      - name: Full-history secret scan
-        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+      - name: Install pinned Gitleaks
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_VERSION: "8.24.3"
-          GITLEAKS_CONFIG: ".gitleaks.toml"
-          GITLEAKS_ENABLE_COMMENTS: "false"
+          GITLEAKS_ARCHIVE: gitleaks_8.24.3_linux_x64.tar.gz
+          GITLEAKS_ARCHIVE_SHA256: 9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bin"
+          archive="$RUNNER_TEMP/$GITLEAKS_ARCHIVE"
+          curl -fsSLo "$archive" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${GITLEAKS_ARCHIVE}"
+          echo "${GITLEAKS_ARCHIVE_SHA256} ${archive}" | sha256sum -c -
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          install -m 0755 "$RUNNER_TEMP/gitleaks" "$RUNNER_TEMP/bin/gitleaks"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      # Contract provenance pin retained for the repository's established Gitleaks policy.
+      # gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e
+      - name: Full-history secret scan on immutable event SHAs
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            base="$PR_BASE_SHA"
+            head="$PR_HEAD_SHA"
+          else
+            base="$PUSH_BEFORE_SHA"
+            head="$CURRENT_SHA"
+          fi
+          [[ "$base" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid secret-scan base SHA" >&2; exit 1; }
+          [[ "$head" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid secret-scan head SHA" >&2; exit 1; }
+          git cat-file -e "${base}^{commit}" 2>/dev/null || git fetch --no-tags --depth=1 origin "$base"
+          git cat-file -e "${head}^{commit}" 2>/dev/null || git fetch --no-tags --depth=1 origin "$head"
+          git cat-file -e "${base}^{commit}" 2>/dev/null || { echo "Secret-scan base commit unavailable" >&2; exit 1; }
+          git cat-file -e "${head}^{commit}" 2>/dev/null || { echo "Secret-scan head commit unavailable" >&2; exit 1; }
+          if [[ "$base" == "$head" ]]; then
+            gitleaks git --redact --config .gitleaks.toml --report-format sarif --report-path results.sarif --exit-code 2 --log-opts="--no-merges -1"
+          else
+            gitleaks git --redact --config .gitleaks.toml --report-format sarif --report-path results.sarif --exit-code 2 --log-opts="--no-merges --first-parent ${base}^..${head}"
+          fi
 
   pr_automation:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
@@ -214,7 +250,6 @@ jobs:
           python - <<'PY'
           import os
           from pathlib import Path
-
           results = {
               "quarantine_policy": os.environ["QUARANTINE_RESULT"],
               "unit": os.environ["UNIT_RESULT"],
@@ -222,44 +257,14 @@ jobs:
               "quality_security": os.environ["QUALITY_RESULT"],
               "pr_automation": os.environ["PR_AUTOMATION_RESULT"],
           }
-          failures = {
-              name: result
-              for name, result in results.items()
-              if result != "success"
-          }
-          rows = [
-              f"| `{name}` | `{result}` |"
-              for name, result in sorted(results.items())
-          ]
-          summary = [
-              "# Merge readiness",
-              "",
-              "| Required gate | Result |",
-              "| --- | --- |",
-              *rows,
-              "",
-          ]
+          failures = {name: result for name, result in results.items() if result != "success"}
+          rows = [f"| `{name}` | `{result}` |" for name, result in sorted(results.items())]
+          summary = ["# Merge readiness", "", "| Required gate | Result |", "| --- | --- |", *rows, ""]
           if failures:
-              summary.append(
-                  "**NOT READY:** "
-                  + ", ".join(
-                      f"{name}={result}" for name, result in failures.items()
-                  )
-              )
+              summary.append("**NOT READY:** " + ", ".join(f"{name}={result}" for name, result in failures.items()))
           else:
-              summary.append(
-                  "**READY:** all repository merge gates passed for this head SHA."
-              )
-
-          Path(os.environ["GITHUB_STEP_SUMMARY"]).write_text(
-              "\n".join(summary) + "\n",
-              encoding="utf-8",
-          )
+              summary.append("**READY:** all repository merge gates passed for this head SHA.")
+          Path(os.environ["GITHUB_STEP_SUMMARY"]).write_text("\n".join(summary) + "\n", encoding="utf-8")
           if failures:
-              raise SystemExit(
-                  "required merge gates failed: "
-                  + ", ".join(
-                      f"{name}={result}" for name, result in failures.items()
-                  )
-              )
+              raise SystemExit("required merge gates failed: " + ", ".join(f"{name}={result}" for name, result in failures.items()))
           PY
