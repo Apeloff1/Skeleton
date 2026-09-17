@@ -1,14 +1,17 @@
 """Cross-family probabilistic arbitration for Jeeves.
 
 This layer compares structurally different forecasting families under one
-prequential custody rule. It combines state-space, multiscale spectral, and
-hidden-Markov regime forecasts without pretending that their internal
-assumptions are interchangeable.
+prequential custody rule. It combines state-space, exact Bayesian trend,
+multiscale spectral, and hidden-Markov regime forecasts without pretending that
+their internal assumptions are interchangeable.
 
 Weights used for target ``t`` are fixed before observing ``t``. Only after the
 realized target has been scored may evidence update weights for later targets.
 The update is tempered and bounded so one numerically overconfident forecast
 cannot irreversibly erase model diversity.
+
+Reports bind both the arbitration policy and every expert-model configuration.
+A report therefore cannot be replayed against silently changed model assumptions.
 """
 
 from __future__ import annotations
@@ -20,6 +23,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Mapping, Protocol, Sequence
 
+from .probabilistic_bayes import BayesianTrendConfig, fit_bayesian_trend
 from .probabilistic_regimes import RegimeHMMConfig, fit_regime_hmm
 from .probabilistic_spectral import SpectralConfig, fit_spectral_model
 from .probabilistic_state_space import (
@@ -49,6 +53,7 @@ class ExpertKind(str, Enum):
     LOCAL_LEVEL = "state_space_local_level"
     LOCAL_LINEAR_TREND = "state_space_local_linear_trend"
     ROBUST_LOCAL_LINEAR_TREND = "state_space_robust_local_linear_trend"
+    BAYESIAN_TREND = "bayesian_trend"
     SPECTRAL = "multiscale_spectral"
     REGIME_HMM = "regime_hmm"
 
@@ -73,7 +78,10 @@ class CrossFamilyConfig:
         ):
             raise StateSpaceError(
                 "min_train_size must be an integer >= 8",
-                context={"reason": "invalid_cross_family_config", "field": "min_train_size"},
+                context={
+                    "reason": "invalid_cross_family_config",
+                    "field": "min_train_size",
+                },
             )
         if isinstance(self.step, bool) or not isinstance(self.step, int) or self.step <= 0:
             raise StateSpaceError(
@@ -81,14 +89,22 @@ class CrossFamilyConfig:
                 context={"reason": "invalid_cross_family_config", "field": "step"},
             )
         _closed_interval("learning_rate", self.learning_rate, 0.0, 8.0)
-        _open_closed_interval("forgetting_factor", self.forgetting_factor, 0.0, 1.0)
+        _open_closed_interval(
+            "forgetting_factor",
+            self.forgetting_factor,
+            0.0,
+            1.0,
+        )
         _closed_interval("prior_strength", self.prior_strength, 0.0, 1.0)
         _closed_interval("min_weight", self.min_weight, 0.0, 0.20)
         gap = _positive("max_log_score_gap", self.max_log_score_gap)
         if gap > 1_000.0:
             raise StateSpaceError(
                 "max_log_score_gap must be <= 1000",
-                context={"reason": "invalid_cross_family_config", "field": "max_log_score_gap"},
+                context={
+                    "reason": "invalid_cross_family_config",
+                    "field": "max_log_score_gap",
+                },
             )
 
 
@@ -156,11 +172,17 @@ class ArbitratedForecast:
 
     @property
     def mean(self) -> float:
-        return sum(component.weight * component.predictive.mean for component in self.components)
+        return sum(
+            component.weight * component.predictive.mean
+            for component in self.components
+        )
 
     @property
     def aleatoric_variance(self) -> float:
-        return sum(component.weight * component.predictive.variance for component in self.components)
+        return sum(
+            component.weight * component.predictive.variance
+            for component in self.components
+        )
 
     @property
     def epistemic_variance(self) -> float:
@@ -223,7 +245,11 @@ class CrossFamilyStep:
     epistemic_share: float
 
     def __post_init__(self) -> None:
-        if isinstance(self.target_index, bool) or not isinstance(self.target_index, int) or self.target_index < 1:
+        if (
+            isinstance(self.target_index, bool)
+            or not isinstance(self.target_index, int)
+            or self.target_index < 1
+        ):
             raise StateSpaceError(
                 "target_index must be positive",
                 context={"reason": "invalid_cross_family_step"},
@@ -254,6 +280,7 @@ class CrossFamilyReport:
 
     config: CrossFamilyConfig
     experts: tuple[ExpertKind, ...]
+    configuration_fingerprint: str
     steps: tuple[CrossFamilyStep, ...]
     final_weights: tuple[tuple[ExpertKind, float], ...]
     mean_log_score: float
@@ -265,7 +292,10 @@ class CrossFamilyReport:
 
     @property
     def selected_expert(self) -> ExpertKind:
-        return max(self.final_weights, key=lambda item: (item[1], item[0].value))[0]
+        return max(
+            self.final_weights,
+            key=lambda item: (item[1], item[0].value),
+        )[0]
 
     def weight_for(self, expert: ExpertKind) -> float:
         for current, weight in self.final_weights:
@@ -273,7 +303,10 @@ class CrossFamilyReport:
                 return weight
         raise StateSpaceError(
             "expert is absent from cross-family report",
-            context={"reason": "missing_cross_family_expert", "expert": expert.value},
+            context={
+                "reason": "missing_cross_family_expert",
+                "expert": expert.value,
+            },
         )
 
 
@@ -286,12 +319,14 @@ class CrossFamilyArbitrator:
         experts: Sequence[ExpertKind] | None = None,
         config: CrossFamilyConfig | None = None,
         state_space_config: StateSpaceConfig | None = None,
+        bayesian_config: BayesianTrendConfig | None = None,
         spectral_config: SpectralConfig | None = None,
         regime_config: RegimeHMMConfig | None = None,
         prior_weights: Mapping[ExpertKind, float] | None = None,
     ) -> None:
         self.config = config or CrossFamilyConfig()
         self.state_space_config = state_space_config or StateSpaceConfig()
+        self.bayesian_config = bayesian_config or BayesianTrendConfig()
         self.spectral_config = spectral_config or SpectralConfig()
         self.regime_config = regime_config or RegimeHMMConfig()
         self.experts = tuple(
@@ -311,9 +346,26 @@ class CrossFamilyArbitrator:
         if self.config.min_weight * len(self.experts) >= 1.0:
             raise StateSpaceError(
                 "min_weight is too large for the number of experts",
-                context={"reason": "invalid_cross_family_config", "field": "min_weight"},
+                context={
+                    "reason": "invalid_cross_family_config",
+                    "field": "min_weight",
+                },
             )
         self._initial_weights = _normalize_prior(self.experts, prior_weights)
+        self._configuration_fingerprint = _configuration_fingerprint(
+            config=self.config,
+            experts=self.experts,
+            state_space_config=self.state_space_config,
+            bayesian_config=self.bayesian_config,
+            spectral_config=self.spectral_config,
+            regime_config=self.regime_config,
+        )
+
+    @property
+    def configuration_fingerprint(self) -> str:
+        """Identity of all policy and expert-model assumptions."""
+
+        return self._configuration_fingerprint
 
     def evaluate(self, series: SeriesValues | Sequence[float]) -> CrossFamilyReport:
         """Evaluate experts prequentially with target-time custody."""
@@ -327,10 +379,18 @@ class CrossFamilyArbitrator:
 
         weights = dict(self._initial_weights)
         steps: list[CrossFamilyStep] = []
-        for target_index in range(self.config.min_train_size, len(values), self.config.step):
+        for target_index in range(
+            self.config.min_train_size,
+            len(values),
+            self.config.step,
+        ):
             training = values[:target_index]
             prior_weights = _sorted_weights(weights)
-            predictive = self._forecast_with_weights(training, horizon=1, weights=weights)
+            predictive = self._forecast_with_weights(
+                training,
+                horizon=1,
+                weights=weights,
+            )
             actual = values[target_index]
             component_scores = {
                 component.expert: component.predictive.log_density(actual)
@@ -342,7 +402,9 @@ class CrossFamilyArbitrator:
                 config=self.config,
             )
             error = predictive.mean - actual
-            epistemic_share = predictive.epistemic_variance / max(_EPSILON, predictive.variance)
+            epistemic_share = (
+                predictive.epistemic_variance / max(_EPSILON, predictive.variance)
+            )
             steps.append(
                 CrossFamilyStep(
                     target_index=target_index,
@@ -361,23 +423,27 @@ class CrossFamilyArbitrator:
 
         final_weights = _sorted_weights(weights)
         fingerprint = _report_fingerprint(
-            config=self.config,
-            experts=self.experts,
+            configuration_fingerprint=self.configuration_fingerprint,
             steps=steps,
             final_weights=final_weights,
         )
         return CrossFamilyReport(
             config=self.config,
             experts=self.experts,
+            configuration_fingerprint=self.configuration_fingerprint,
             steps=tuple(steps),
             final_weights=final_weights,
-            mean_log_score=statistics.fmean(step.mixture_log_score for step in steps),
+            mean_log_score=statistics.fmean(
+                step.mixture_log_score for step in steps
+            ),
             mae=statistics.fmean(step.absolute_error for step in steps),
             rmse=math.sqrt(statistics.fmean(step.squared_error for step in steps)),
             average_effective_expert_count=statistics.fmean(
                 step.predictive.effective_expert_count for step in steps
             ),
-            average_epistemic_share=statistics.fmean(step.epistemic_share for step in steps),
+            average_epistemic_share=statistics.fmean(
+                step.epistemic_share for step in steps
+            ),
             fingerprint=fingerprint,
         )
 
@@ -396,7 +462,11 @@ class CrossFamilyArbitrator:
             if weights is not None
             else self._initial_weights
         )
-        return self._forecast_with_weights(values, horizon=horizon, weights=actual_weights)
+        return self._forecast_with_weights(
+            values,
+            horizon=horizon,
+            weights=actual_weights,
+        )
 
     def forecast_from_report(
         self,
@@ -405,14 +475,22 @@ class CrossFamilyArbitrator:
         *,
         horizon: int = 1,
     ) -> ArbitratedForecast:
-        """Use posterior weights only when report identity matches this arbitrator."""
+        """Use posterior weights only when the full model identity still matches."""
 
-        if report.experts != self.experts or report.config != self.config:
+        if (
+            report.experts != self.experts
+            or report.config != self.config
+            or report.configuration_fingerprint != self.configuration_fingerprint
+        ):
             raise StateSpaceError(
                 "cross-family report does not match arbitrator configuration",
                 context={"reason": "cross_family_report_mismatch"},
             )
-        return self.forecast(series, horizon=horizon, weights=dict(report.final_weights))
+        return self.forecast(
+            series,
+            horizon=horizon,
+            weights=dict(report.final_weights),
+        )
 
     def _forecast_with_weights(
         self,
@@ -430,7 +508,11 @@ class CrossFamilyArbitrator:
             ExpertComponent(
                 expert=expert,
                 weight=weights[expert],
-                predictive=self._expert_distribution(expert, values, horizon=horizon),
+                predictive=self._expert_distribution(
+                    expert,
+                    values,
+                    horizon=horizon,
+                ),
             )
             for expert in self.experts
         )
@@ -447,16 +529,33 @@ class CrossFamilyArbitrator:
         if family is not None:
             fit = fit_state_space(
                 values,
-                config=_state_space_family_config(self.state_space_config, family),
+                config=_state_space_family_config(
+                    self.state_space_config,
+                    family,
+                ),
             )
             return fit.forecast(horizon)
+        if expert is ExpertKind.BAYESIAN_TREND:
+            return fit_bayesian_trend(
+                values,
+                config=self.bayesian_config,
+            ).forecast(horizon)
         if expert is ExpertKind.SPECTRAL:
-            return fit_spectral_model(values, config=self.spectral_config).forecast(horizon)
+            return fit_spectral_model(
+                values,
+                config=self.spectral_config,
+            ).forecast(horizon)
         if expert is ExpertKind.REGIME_HMM:
-            return fit_regime_hmm(values, config=self.regime_config).forecast(horizon)
+            return fit_regime_hmm(
+                values,
+                config=self.regime_config,
+            ).forecast(horizon)
         raise StateSpaceError(
             "unsupported cross-family expert",
-            context={"reason": "unsupported_cross_family_expert", "expert": str(expert)},
+            context={
+                "reason": "unsupported_cross_family_expert",
+                "expert": str(expert),
+            },
         )
 
 
@@ -464,7 +563,9 @@ def _state_space_family(expert: ExpertKind) -> StateSpaceFamily | None:
     mapping = {
         ExpertKind.LOCAL_LEVEL: StateSpaceFamily.LOCAL_LEVEL,
         ExpertKind.LOCAL_LINEAR_TREND: StateSpaceFamily.LOCAL_LINEAR_TREND,
-        ExpertKind.ROBUST_LOCAL_LINEAR_TREND: StateSpaceFamily.ROBUST_LOCAL_LINEAR_TREND,
+        ExpertKind.ROBUST_LOCAL_LINEAR_TREND: (
+            StateSpaceFamily.ROBUST_LOCAL_LINEAR_TREND
+        ),
     }
     return mapping.get(expert)
 
@@ -485,6 +586,27 @@ def _state_space_family_config(
     )
 
 
+def _configuration_fingerprint(
+    *,
+    config: CrossFamilyConfig,
+    experts: Sequence[ExpertKind],
+    state_space_config: StateSpaceConfig,
+    bayesian_config: BayesianTrendConfig,
+    spectral_config: SpectralConfig,
+    regime_config: RegimeHMMConfig,
+) -> str:
+    parts = (
+        "jeeves-cross-family-configuration-v2",
+        repr(config),
+        ",".join(expert.value for expert in experts),
+        repr(state_space_config),
+        repr(bayesian_config),
+        repr(spectral_config),
+        repr(regime_config),
+    )
+    return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
+
+
 def _posterior_weights(
     *,
     prior: Mapping[ExpertKind, float],
@@ -502,13 +624,24 @@ def _posterior_weights(
     uniform = 1.0 / len(prior)
     logits: dict[ExpertKind, float] = {}
     for expert, weight in prior.items():
-        score = max(score_floor, _finite("component_log_score", log_scores[expert]))
-        blended = (1.0 - config.prior_strength) * weight + config.prior_strength * uniform
-        remembered = config.forgetting_factor * math.log(max(_EPSILON, blended))
+        score = max(
+            score_floor,
+            _finite("component_log_score", log_scores[expert]),
+        )
+        blended = (
+            (1.0 - config.prior_strength) * weight
+            + config.prior_strength * uniform
+        )
+        remembered = config.forgetting_factor * math.log(
+            max(_EPSILON, blended)
+        )
         logits[expert] = remembered + config.learning_rate * score
 
     normalizer = _logsumexp(tuple(logits.values()))
-    raw = {expert: math.exp(value - normalizer) for expert, value in logits.items()}
+    raw = {
+        expert: math.exp(value - normalizer)
+        for expert, value in logits.items()
+    }
     return _apply_weight_floor(raw, config.min_weight)
 
 
@@ -519,7 +652,10 @@ def _apply_weight_floor(
     if floor * len(weights) >= 1.0:
         raise StateSpaceError(
             "min_weight is too large for the number of experts",
-            context={"reason": "invalid_cross_family_config", "field": "min_weight"},
+            context={
+                "reason": "invalid_cross_family_config",
+                "field": "min_weight",
+            },
         )
     total = sum(weights.values())
     if not math.isfinite(total) or total <= _EPSILON:
@@ -527,7 +663,10 @@ def _apply_weight_floor(
             "cross-family weights lost all probability mass",
             context={"reason": "numerical_instability"},
         )
-    normalized = {expert: weight / total for expert, weight in weights.items()}
+    normalized = {
+        expert: weight / total
+        for expert, weight in weights.items()
+    }
     if floor <= 0.0:
         return normalized
     free_mass = 1.0 - floor * len(weights)
@@ -564,7 +703,10 @@ def _normalize_prior(
             "prior weights must contain positive mass",
             context={"reason": "invalid_cross_family_prior"},
         )
-    return tuple((expert, clean[expert] / total) for expert in experts)
+    return tuple(
+        (expert, clean[expert] / total)
+        for expert in experts
+    )
 
 
 def _sorted_weights(
@@ -581,15 +723,13 @@ def _sorted_scores(
 
 def _report_fingerprint(
     *,
-    config: CrossFamilyConfig,
-    experts: Sequence[ExpertKind],
+    configuration_fingerprint: str,
     steps: Sequence[CrossFamilyStep],
     final_weights: Sequence[tuple[ExpertKind, float]],
 ) -> str:
     parts = [
-        "jeeves-cross-family-arbitration-v1",
-        repr(config),
-        ",".join(expert.value for expert in experts),
+        "jeeves-cross-family-arbitration-v2",
+        configuration_fingerprint,
     ]
     for step in steps:
         parts.extend(
@@ -657,7 +797,9 @@ def _logsumexp(values: Sequence[float]) -> float:
             "cross-family log weights became non-finite",
             context={"reason": "numerical_instability"},
         )
-    return maximum + math.log(sum(math.exp(value - maximum) for value in values))
+    return maximum + math.log(
+        sum(math.exp(value - maximum) for value in values)
+    )
 
 
 def _finite(name: str, value: object) -> float:
@@ -685,7 +827,12 @@ def _positive(name: str, value: object) -> float:
     return number
 
 
-def _closed_interval(name: str, value: object, minimum: float, maximum: float) -> float:
+def _closed_interval(
+    name: str,
+    value: object,
+    minimum: float,
+    maximum: float,
+) -> float:
     number = _finite(name, value)
     if not minimum <= number <= maximum:
         raise StateSpaceError(
@@ -695,7 +842,12 @@ def _closed_interval(name: str, value: object, minimum: float, maximum: float) -
     return number
 
 
-def _open_closed_interval(name: str, value: object, minimum: float, maximum: float) -> float:
+def _open_closed_interval(
+    name: str,
+    value: object,
+    minimum: float,
+    maximum: float,
+) -> float:
     number = _finite(name, value)
     if not minimum < number <= maximum:
         raise StateSpaceError(
