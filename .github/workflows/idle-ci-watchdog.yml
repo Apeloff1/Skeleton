@@ -51,8 +51,15 @@ jobs:
           retries=0
           inspected=0
 
-          while IFS=$'\t' read -r id name status conclusion created url; do
-            [[ -n "${id:-}" ]] || continue
+          while IFS= read -r run; do
+            [[ -n "${run:-}" ]] || continue
+            id=$(jq -r '.databaseId // empty' <<<"$run")
+            name=$(jq -r '.name // empty' <<<"$run")
+            status=$(jq -r '.status // empty' <<<"$run")
+            conclusion=$(jq -r '.conclusion // "none"' <<<"$run")
+            created=$(jq -r '.createdAt // empty' <<<"$run")
+            url=$(jq -r '.url // empty' <<<"$run")
+            [[ -n "$id" && -n "$created" ]] || continue
             inspected=$((inspected + 1))
             created_epoch=$(date -u -d "$created" +%s)
             (( created_epoch >= cutoff )) || continue
@@ -90,7 +97,7 @@ jobs:
             else
               gh issue comment "$issue" --repo "$REPO" --body "CI watchdog could not rerun candidate:${id}; leaving it eligible for a later watchdog pass." >/dev/null || true
             fi
-          done < <(jq -r '.[] | [.databaseId,.name,.status,(.conclusion // "none"),.createdAt,.url] | @tsv' "$RUNNER_TEMP/runs.json")
+          done < <(jq -c '.[]' "$RUNNER_TEMP/runs.json")
 
           {
             echo '## Idle CI watchdog'

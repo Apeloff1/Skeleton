@@ -34,3 +34,21 @@ def test_watchdog_only_marks_a_run_after_rerun_started() -> None:
     success_marker = text.index('run:${id}', rerun)
     assert success_marker > rerun
     assert "could not rerun candidate:${id}" in text
+
+
+def test_watchdog_parses_each_run_as_a_json_record() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    # Bash treats tab as IFS whitespace and collapses empty TSV fields. GitHub
+    # legitimately returns null/empty values for live runs, so positional TSV
+    # parsing can shift createdAt into the URL column and make `date` fail.
+    # Keep record boundaries in JSON and extract fields by name instead.
+    assert "@tsv" not in text
+    assert "while IFS= read -r run; do" in text
+    assert "done < <(jq -c '.[]'" in text
+    assert "id=$(jq -r '.databaseId // empty'" in text
+    assert "status=$(jq -r '.status // empty'" in text
+    assert "conclusion=$(jq -r '.conclusion // \"none\"'" in text
+    assert "created=$(jq -r '.createdAt // empty'" in text
+    assert "url=$(jq -r '.url // empty'" in text
+    assert '[[ -n "$id" && -n "$created" ]] || continue' in text
