@@ -10,14 +10,21 @@ from .errors import PhysicsValidationError
 from .math3d import AABB, Mat3, Transform, Vec3
 
 
-def _positive(value: float, *, name: str, allow_zero: bool = False) -> float:
+def _finite(value: float, *, name: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise PhysicsValidationError(f"{name} must be numeric")
     value = float(value)
+    if not math.isfinite(value):
+        raise PhysicsValidationError(f"{name} must be finite")
+    return value
+
+
+def _positive(value: float, *, name: str, allow_zero: bool = False) -> float:
+    value = _finite(value, name=name)
     lower_ok = value >= 0.0 if allow_zero else value > 0.0
-    if not math.isfinite(value) or not lower_ok:
+    if not lower_ok:
         qualifier = "non-negative" if allow_zero else "positive"
-        raise PhysicsValidationError(f"{name} must be finite and {qualifier}")
+        raise PhysicsValidationError(f"{name} must be {qualifier}")
     return value
 
 
@@ -133,7 +140,7 @@ class PlaneShape:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "normal", self.normal.normalized())
-        object.__setattr__(self, "offset", _positive(self.offset, name="offset", allow_zero=True))
+        object.__setattr__(self, "offset", _finite(self.offset, name="offset"))
 
     @property
     def kind(self) -> ShapeKind:
