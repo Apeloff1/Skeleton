@@ -117,6 +117,26 @@ class SemanticObservation:
         object.__setattr__(self, "evidence_ids", tuple(sorted({str(x) for x in self.evidence_ids if str(x)})))
         object.__setattr__(self, "metadata", json_safe(dict(self.metadata)))
 
+    @property
+    def fingerprint(self) -> str:
+        """Stable identity of the observation as interpreted by semantic layers.
+
+        Position and source are included because the same content can mean
+        something different when sequencing, focalization, or juxtaposition is
+        under study. Metadata is already JSON-normalized during validation.
+        """
+        return stable_fingerprint(
+            {
+                "observation_id": self.observation_id,
+                "content": self.content,
+                "position": self.position,
+                "source": self.source,
+                "tags": self.tags,
+                "evidence_ids": self.evidence_ids,
+                "metadata": dict(self.metadata),
+            }
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class TangentSeed:
