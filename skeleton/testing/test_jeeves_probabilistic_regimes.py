@@ -130,6 +130,21 @@ def test_fit_prefix_is_immune_to_future_tail_mutation() -> None:
     assert left_prefix.model == right_prefix.model
 
 
+def test_extreme_tail_shock_keeps_scaled_recursion_finite() -> None:
+    common = list(_two_regime_series()[:55])
+    shocked = tuple(common + [200.0 + index for index in range(12)])
+    fit = fit_regime_hmm(
+        shocked,
+        config=RegimeHMMConfig(states=2, max_iterations=25),
+    )
+
+    assert math.isfinite(fit.log_likelihood)
+    assert len(fit.posteriors) == len(shocked) - 1
+    for posterior in fit.posteriors:
+        assert sum(posterior.probabilities) == pytest.approx(1.0)
+        assert all(math.isfinite(value) for value in posterior.probabilities)
+
+
 def test_prequential_score_is_deterministic_and_finite() -> None:
     config = RegimeHMMConfig(states=2, max_iterations=20)
     left = evaluate_regime_hmm_prequential(

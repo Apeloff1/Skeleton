@@ -7,11 +7,16 @@ sharpness, and sequential calibration drift.
 
 All diagnostics operate on already-produced forecasts and realized targets. They
 never mutate model state or feed a target back into the forecast that produced it.
+Calibration reports retain exact target identity, the full PIT sequence, and a
+deterministic fingerprint of the predictive mixtures used for every target. This
+allows downstream governance to verify evidence custody instead of relying on
+equal sample counts or detached aggregate metrics.
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import statistics
 from dataclasses import dataclass
@@ -34,7 +39,11 @@ class DistributionObservation:
 
     def __post_init__(self) -> None:
         _finite("actual", self.actual)
-        if isinstance(self.target_index, bool) or not isinstance(self.target_index, int) or self.target_index < 0:
+        if (
+            isinstance(self.target_index, bool)
+            or not isinstance(self.target_index, int)
+            or self.target_index < 0
+        ):
             raise StateSpaceError(
                 "target_index must be a non-negative integer",
                 context={"reason": "invalid_calibration_observation"},
@@ -96,7 +105,11 @@ class CalibrationConfig:
             )
         for level in self.levels:
             _open_interval("level", level, 0.0, 1.0)
-        if isinstance(self.pit_bins, bool) or not isinstance(self.pit_bins, int) or self.pit_bins < 2:
+        if (
+            isinstance(self.pit_bins, bool)
+            or not isinstance(self.pit_bins, int)
+            or self.pit_bins < 2
+        ):
             raise StateSpaceError(
                 "pit_bins must be an integer >= 2",
                 context={"reason": "invalid_calibration_config", "field": "pit_bins"},
@@ -105,10 +118,17 @@ class CalibrationConfig:
         _non_negative("drift_reference", self.drift_reference)
         _positive("drift_threshold", self.drift_threshold)
         _positive("quantile_tolerance", self.quantile_tolerance)
-        if isinstance(self.quantile_iterations, bool) or not isinstance(self.quantile_iterations, int) or self.quantile_iterations < 10:
+        if (
+            isinstance(self.quantile_iterations, bool)
+            or not isinstance(self.quantile_iterations, int)
+            or self.quantile_iterations < 10
+        ):
             raise StateSpaceError(
                 "quantile_iterations must be an integer >= 10",
-                context={"reason": "invalid_calibration_config", "field": "quantile_iterations"},
+                context={
+                    "reason": "invalid_calibration_config",
+                    "field": "quantile_iterations",
+                },
             )
 
 
@@ -116,6 +136,10 @@ class CalibrationConfig:
 class CalibrationReport:
     config: CalibrationConfig
     observations: int
+    target_pairs: tuple[tuple[int, float], ...]
+    target_fingerprint: str
+    observation_fingerprint: str
+    pits: tuple[float, ...]
     pit: PitDiagnostic
     coverage: tuple[CoverageDiagnostic, ...]
     mean_log_score: float
@@ -123,6 +147,39 @@ class CalibrationReport:
     drift_events: tuple[DriftEvent, ...]
     calibration_score: float
     fingerprint: str
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.observations, bool)
+            or not isinstance(self.observations, int)
+            or self.observations < 1
+        ):
+            raise StateSpaceError(
+                "calibration observations must be a positive integer",
+                context={"reason": "invalid_calibration_report"},
+            )
+        _validate_target_pairs(self.target_pairs, expected_count=self.observations)
+        if not isinstance(self.pits, tuple) or len(self.pits) != self.observations:
+            raise StateSpaceError(
+                "PIT sequence count must equal calibration observations",
+                context={"reason": "invalid_calibration_report"},
+            )
+        for value in self.pits:
+            _unit("pit", value)
+        for name, value in (
+            ("target_fingerprint", self.target_fingerprint),
+            ("observation_fingerprint", self.observation_fingerprint),
+            ("fingerprint", self.fingerprint),
+        ):
+            _validate_digest(name, value)
+        if self.pit.count != self.observations:
+            raise StateSpaceError(
+                "PIT count must equal calibration observations",
+                context={"reason": "invalid_calibration_report"},
+            )
+        _unit("calibration_score", self.calibration_score)
+        _finite("mean_log_score", self.mean_log_score)
+        _non_negative("mean_crps", self.mean_crps)
 
     @property
     def drift_detected(self) -> bool:
@@ -159,13 +216,23 @@ def calibrate_distributions(
             context={"reason": "duplicate_target_index"},
         )
 
-    pits = tuple(probability_integral_transform(item.forecast, item.actual) for item in ordered)
+    target_pairs = tuple((item.target_index, float(item.actual)) for item in ordered)
+    _validate_target_pairs(target_pairs, expected_count=len(ordered))
+    target_fingerprint = _target_fingerprint(target_pairs)
+    observation_fingerprint = calibration_observation_fingerprint(ordered)
+
+    pits = tuple(
+        probability_integral_transform(item.forecast, item.actual)
+        for item in ordered
+    )
     pit = _pit_diagnostic(pits, actual_config)
     coverage = tuple(
         _coverage_diagnostic(ordered, level, actual_config)
         for level in actual_config.levels
     )
-    mean_log_score = statistics.fmean(item.forecast.log_density(item.actual) for item in ordered)
+    mean_log_score = statistics.fmean(
+        item.forecast.log_density(item.actual) for item in ordered
+    )
     mean_crps = statistics.fmean(item.forecast.crps(item.actual) for item in ordered)
     drift_events = _cusum_drift(ordered, pits, actual_config)
 
@@ -186,7 +253,8 @@ def calibrate_distributions(
 
     fingerprint = _report_fingerprint(
         config=actual_config,
-        ordered=ordered,
+        target_fingerprint=target_fingerprint,
+        observation_fingerprint=observation_fingerprint,
         pits=pits,
         coverage=coverage,
         mean_log_score=mean_log_score,
@@ -197,6 +265,10 @@ def calibrate_distributions(
     return CalibrationReport(
         config=actual_config,
         observations=len(ordered),
+        target_pairs=target_pairs,
+        target_fingerprint=target_fingerprint,
+        observation_fingerprint=observation_fingerprint,
+        pits=pits,
         pit=pit,
         coverage=coverage,
         mean_log_score=mean_log_score,
@@ -205,6 +277,80 @@ def calibrate_distributions(
         calibration_score=calibration_score,
         fingerprint=fingerprint,
     )
+
+
+def validate_calibration_report(report: CalibrationReport) -> None:
+    """Reject malformed or tampered distributional-calibration evidence."""
+
+    if not isinstance(report, CalibrationReport):
+        raise StateSpaceError(
+            "report must be a CalibrationReport",
+            context={"reason": "invalid_calibration_report"},
+        )
+    _validate_target_pairs(report.target_pairs, expected_count=report.observations)
+    expected_target_fingerprint = _target_fingerprint(report.target_pairs)
+    if report.target_fingerprint != expected_target_fingerprint:
+        raise StateSpaceError(
+            "calibration target fingerprint mismatch",
+            context={"reason": "calibration_report_identity_mismatch"},
+        )
+    if len(report.pits) != report.observations:
+        raise StateSpaceError(
+            "calibration PIT sequence count mismatch",
+            context={"reason": "calibration_report_identity_mismatch"},
+        )
+    expected_pit = _pit_diagnostic(report.pits, report.config)
+    if report.pit != expected_pit:
+        raise StateSpaceError(
+            "calibration PIT diagnostic mismatch",
+            context={"reason": "calibration_report_identity_mismatch"},
+        )
+    expected_fingerprint = _report_fingerprint(
+        config=report.config,
+        target_fingerprint=report.target_fingerprint,
+        observation_fingerprint=report.observation_fingerprint,
+        pits=report.pits,
+        coverage=report.coverage,
+        mean_log_score=report.mean_log_score,
+        mean_crps=report.mean_crps,
+        drift_events=report.drift_events,
+        calibration_score=report.calibration_score,
+    )
+    if report.fingerprint != expected_fingerprint:
+        raise StateSpaceError(
+            "calibration report fingerprint mismatch",
+            context={"reason": "calibration_report_identity_mismatch"},
+        )
+
+
+def calibration_observation_fingerprint(
+    observations: Sequence[DistributionObservation],
+) -> str:
+    """Fingerprint exact target identities and predictive-mixture geometry."""
+
+    if not observations:
+        raise StateSpaceError(
+            "calibration observation fingerprint requires observations",
+            context={"reason": "empty_calibration_set"},
+        )
+    ordered = tuple(sorted(observations, key=lambda item: item.target_index))
+    if len({item.target_index for item in ordered}) != len(ordered):
+        raise StateSpaceError(
+            "calibration target indices must be unique",
+            context={"reason": "duplicate_target_index"},
+        )
+    payload = {
+        "schema": "jeeves.calibration-observations.v1",
+        "observations": [
+            {
+                "target_index": item.target_index,
+                "actual": float(item.actual),
+                "forecast": _mixture_payload(item.forecast),
+            }
+            for item in ordered
+        ],
+    }
+    return _digest(payload)
 
 
 def mixture_cdf(forecast: MixtureForecast, value: float) -> float:
@@ -230,7 +376,11 @@ def mixture_quantile(
 
     probability = _closed_interval("probability", probability, 0.0, 1.0)
     tolerance = _positive("tolerance", tolerance)
-    if isinstance(max_iterations, bool) or not isinstance(max_iterations, int) or max_iterations < 10:
+    if (
+        isinstance(max_iterations, bool)
+        or not isinstance(max_iterations, int)
+        or max_iterations < 10
+    ):
         raise StateSpaceError(
             "max_iterations must be an integer >= 10",
             context={"reason": "invalid_quantile_config"},
@@ -320,7 +470,9 @@ def _pit_diagnostic(pits: Sequence[float], config: CalibrationConfig) -> PitDiag
     ks_distance = max(d_plus, d_minus)
 
     lower_tail_rate = sum(value <= config.tail_probability for value in pits) / count
-    upper_tail_rate = sum(value >= 1.0 - config.tail_probability for value in pits) / count
+    upper_tail_rate = sum(
+        value >= 1.0 - config.tail_probability for value in pits
+    ) / count
     histogram = [0] * config.pit_bins
     for value in pits:
         index = min(config.pit_bins - 1, int(value * config.pit_bins))
@@ -419,7 +571,8 @@ def _cusum_drift(
 def _report_fingerprint(
     *,
     config: CalibrationConfig,
-    ordered: Sequence[DistributionObservation],
+    target_fingerprint: str,
+    observation_fingerprint: str,
     pits: Sequence[float],
     coverage: Sequence[CoverageDiagnostic],
     mean_log_score: float,
@@ -427,43 +580,128 @@ def _report_fingerprint(
     drift_events: Sequence[DriftEvent],
     calibration_score: float,
 ) -> str:
-    parts = [
-        "jeeves-probabilistic-calibration-v1",
-        repr(config),
-        format(mean_log_score, ".17g"),
-        format(mean_crps, ".17g"),
-        format(calibration_score, ".17g"),
-        ",".join(format(value, ".17g") for value in pits),
-    ]
-    for item in ordered:
-        parts.extend(
-            (
-                str(item.target_index),
-                format(item.actual, ".17g"),
-                format(item.forecast.mean, ".17g"),
-                format(item.forecast.variance, ".17g"),
-            )
+    payload = {
+        "schema": "jeeves.probabilistic-calibration.v2",
+        "config": {
+            "levels": list(config.levels),
+            "pit_bins": config.pit_bins,
+            "tail_probability": config.tail_probability,
+            "drift_reference": config.drift_reference,
+            "drift_threshold": config.drift_threshold,
+            "quantile_tolerance": config.quantile_tolerance,
+            "quantile_iterations": config.quantile_iterations,
+        },
+        "target_fingerprint": target_fingerprint,
+        "observation_fingerprint": observation_fingerprint,
+        "pits": list(pits),
+        "coverage": [
+            {
+                "level": item.level,
+                "expected": item.expected,
+                "empirical": item.empirical,
+                "absolute_gap": item.absolute_gap,
+                "average_width": item.average_width,
+                "median_width": item.median_width,
+                "average_pinball_loss": item.average_pinball_loss,
+            }
+            for item in coverage
+        ],
+        "mean_log_score": mean_log_score,
+        "mean_crps": mean_crps,
+        "drift_events": [
+            {
+                "target_index": event.target_index,
+                "direction": event.direction,
+                "statistic": event.statistic,
+                "pit": event.pit,
+            }
+            for event in drift_events
+        ],
+        "calibration_score": calibration_score,
+    }
+    return _digest(payload)
+
+
+def _mixture_payload(forecast: MixtureForecast) -> dict[str, object]:
+    return {
+        "horizon": forecast.horizon,
+        "components": [
+            {
+                "family": component.family.value,
+                "weight": component.weight,
+                "horizon": component.forecast.horizon,
+                "mean": component.forecast.mean,
+                "variance": component.forecast.variance,
+            }
+            for component in forecast.components
+        ],
+    }
+
+
+def _target_fingerprint(target_pairs: tuple[tuple[int, float], ...]) -> str:
+    return _digest(
+        {
+            "schema": "jeeves.calibration-targets.v1",
+            "targets": [
+                {"target_index": index, "actual": actual}
+                for index, actual in target_pairs
+            ],
+        }
+    )
+
+
+def _validate_target_pairs(
+    pairs: tuple[tuple[int, float], ...],
+    *,
+    expected_count: int,
+) -> None:
+    if not isinstance(pairs, tuple) or len(pairs) != expected_count:
+        raise StateSpaceError(
+            "target_pairs count must equal observations",
+            context={"reason": "invalid_calibration_report"},
         )
-    for item in coverage:
-        parts.extend(
-            (
-                format(item.level, ".17g"),
-                format(item.empirical, ".17g"),
-                format(item.absolute_gap, ".17g"),
-                format(item.average_width, ".17g"),
-                format(item.average_pinball_loss, ".17g"),
+    indices: list[int] = []
+    for pair in pairs:
+        if not isinstance(pair, tuple) or len(pair) != 2:
+            raise StateSpaceError(
+                "target_pairs entries must be (target_index, actual)",
+                context={"reason": "invalid_calibration_report"},
             )
-        )
-    for event in drift_events:
-        parts.extend(
-            (
-                str(event.target_index),
-                event.direction,
-                format(event.statistic, ".17g"),
-                format(event.pit, ".17g"),
+        index, actual = pair
+        if isinstance(index, bool) or not isinstance(index, int) or index < 0:
+            raise StateSpaceError(
+                "calibration target index is invalid",
+                context={"reason": "invalid_calibration_report"},
             )
+        _finite("target_actual", actual)
+        indices.append(index)
+    if tuple(indices) != tuple(sorted(indices)) or len(set(indices)) != len(indices):
+        raise StateSpaceError(
+            "calibration target pairs must have unique increasing indices",
+            context={"reason": "invalid_calibration_report"},
         )
-    return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
+
+
+def _validate_digest(name: str, value: object) -> None:
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(character not in "0123456789abcdef" for character in value)
+    ):
+        raise StateSpaceError(
+            f"{name} must be a sha256 hex digest",
+            context={"reason": "invalid_calibration_report"},
+        )
+
+
+def _digest(payload: object) -> str:
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _normal_cdf(value: float) -> float:
@@ -505,6 +743,16 @@ def _non_negative(name: str, value: object) -> float:
     return number
 
 
+def _unit(name: str, value: object) -> float:
+    number = _finite(name, value)
+    if not 0.0 <= number <= 1.0:
+        raise StateSpaceError(
+            f"{name} must be between 0 and 1",
+            context={"reason": "out_of_range", "field": name},
+        )
+    return number
+
+
 def _open_interval(name: str, value: object, minimum: float, maximum: float) -> float:
     number = _finite(name, value)
     if not minimum < number < maximum:
@@ -533,9 +781,11 @@ __all__ = [
     "DriftEvent",
     "PitDiagnostic",
     "calibrate_distributions",
+    "calibration_observation_fingerprint",
     "central_interval",
     "gaussian_as_mixture",
     "mixture_cdf",
     "mixture_quantile",
     "pinball_loss",
+    "validate_calibration_report",
 ]

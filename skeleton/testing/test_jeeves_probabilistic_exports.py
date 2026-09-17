@@ -74,6 +74,26 @@ def test_probabilistic_facade_exports_calibration_surface() -> None:
         assert hasattr(probabilistic, name)
 
 
+def test_probabilistic_facade_exports_conformal_surface() -> None:
+    expected = {
+        "ConformalConfig",
+        "ConformalInterval",
+        "ConformalPredictiveDistribution",
+        "ConformalReport",
+        "ConformalStep",
+        "ForecastObservation",
+        "conformal_interval",
+        "conformal_quantile",
+        "conformalize_next_forecast",
+        "evaluate_cross_family_conformal",
+        "evaluate_prequential_conformal",
+        "nonconformity_score",
+    }
+    assert expected.issubset(set(probabilistic.__all__))
+    for name in expected:
+        assert hasattr(probabilistic, name)
+
+
 def test_probabilistic_facade_exports_promotion_contracts() -> None:
     expected = {
         "ProbabilisticPromotionDecision",
@@ -116,6 +136,40 @@ def test_probabilistic_facade_exports_paired_arena_surface() -> None:
         "evaluate_predictive_arena",
         "newey_west_mean_test",
         "regime_forecast_crps",
+    }
+    assert expected.issubset(set(probabilistic.__all__))
+    for name in expected:
+        assert hasattr(probabilistic, name)
+
+
+def test_probabilistic_facade_exports_multiscale_spectral_surface() -> None:
+    expected = {
+        "HarmonicComponent",
+        "SpectralConfig",
+        "SpectralFit",
+        "SpectralPeak",
+        "SpectralScore",
+        "SpectralTournament",
+        "discover_spectral_peaks",
+        "evaluate_spectral_complexities",
+        "fit_spectral_model",
+        "forecast_spectral",
+    }
+    assert expected.issubset(set(probabilistic.__all__))
+    for name in expected:
+        assert hasattr(probabilistic, name)
+
+
+def test_probabilistic_facade_exports_cross_family_arbitration_surface() -> None:
+    expected = {
+        "ArbitratedForecast",
+        "CrossFamilyArbitrator",
+        "CrossFamilyConfig",
+        "CrossFamilyReport",
+        "CrossFamilyStep",
+        "ExpertComponent",
+        "ExpertKind",
+        "PredictiveDistribution",
     }
     assert expected.issubset(set(probabilistic.__all__))
     for name in expected:
