@@ -4,8 +4,10 @@ on:
   pull_request:
     paths:
       - "skeleton/jeeves/game_engine_lab.py"
+      - "skeleton/jeeves/game_engine_legacy.py"
       - "skeleton/jeeves/__init__.py"
       - "skeleton/testing/test_jeeves_game_engine_lab.py"
+      - "skeleton/testing/test_jeeves_game_engine_legacy.py"
       - ".github/workflows/jeeves-game-engine-era-lab.yml"
   push:
     branches: [main]
@@ -37,6 +39,9 @@ jobs:
       - name: Install focused test dependency
         run: python -m pip install "pytest>=8,<9"
       - name: Compile game-engine lab
-        run: python -m compileall -q skeleton/jeeves/game_engine_lab.py
+        run: python -m compileall -q skeleton/jeeves/game_engine_lab.py skeleton/jeeves/game_engine_legacy.py
       - name: Run Pong-to-next sandbox regressions
-        run: python -m pytest -q skeleton/testing/test_jeeves_game_engine_lab.py
+        run: >-
+          python -m pytest -q
+          skeleton/testing/test_jeeves_game_engine_lab.py
+          skeleton/testing/test_jeeves_game_engine_legacy.py
