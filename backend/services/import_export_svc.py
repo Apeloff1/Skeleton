@@ -17,101 +17,69 @@ from datetime import datetime
 class ImportExportService:
     """Handle file import/export in multiple formats."""
 
-    SUPPORTED_IMPORT_FORMATS = [
-        "txt", "py", "js", "ts", "cpp", "c", "h", "hpp", "java", "kt", "swift",
-        "rs", "go", "rb", "php", "html", "css", "scss", "json", "yaml", "yml",
-        "xml", "md", "sql", "sh", "bash", "ps1", "r", "jl", "lua", "pl", "ex",
-        "exs", "hs", "ml", "fs", "clj", "scala", "dart", "sol", "v", "vhd",
-        "asm", "s", "wat", "tex", "typ", "toml", "ini", "cfg", "dockerfile",
-        "makefile", "cmake", "gradle", "sbt", "cabal", "cargo", "package",
-    ]
+    SUPPORTED_IMPORT_FORMATS = ["py", "js", "ts", "jsx", "tsx", "html", "css", "json", "md", "txt", "yaml", "yml", "xml", "csv"]
+    SUPPORTED_EXPORT_FORMATS = ["txt", "html", "md", "json"]
 
-    SUPPORTED_EXPORT_FORMATS = ["txt", "html", "pdf", "md", "json", "zip"]
-
-    async def import_file(self, content: str, filename: str, format_hint: str = None) -> dict:
-        """Import a file and detect its language."""
-        extension = filename.split(".")[-1].lower() if "." in filename else (format_hint or "")
-        language  = self._detect_language(content, extension)
-        metadata  = self._extract_metadata(content, language)
+    def import_file(self, filename: str, content: str) -> dict:
+        """Import a file and return parsed metadata."""
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "txt"
+        language_map = {
+            "py": "python", "js": "javascript", "ts": "typescript",
+            "jsx": "javascript", "tsx": "typescript", "html": "html",
+            "css": "css", "json": "json", "md": "markdown",
+            "yaml": "yaml", "yml": "yaml", "xml": "xml", "csv": "csv",
+            "txt": "plaintext",
+        }
         return {
-            "success":     True,
-            "filename":    filename,
-            "language":    language,
-            "content":     content,
-            "metadata":    metadata,
-            "line_count":  len(content.splitlines()),
-            "char_count":  len(content),
+            "filename": filename,
+            "language": language_map.get(ext, "plaintext"),
+            "content": content,
+            "size": len(content),
+            "lines": len(content.splitlines()),
+            "imported_at": datetime.utcnow().isoformat(),
+            "metadata": self._analyze_content(content, language_map.get(ext, "plaintext")),
         }
 
-    async def export_file(self, code: str, language: str, format: str, options: dict = None) -> dict:
-        """Export code in various formats."""
+    def export_file(self, content: str, language: str, format: str = "txt", options: dict | None = None) -> dict:
+        """Export content in the requested format."""
         options = options or {}
-        if format == "txt":
-            return {"content": code, "mime_type": "text/plain", "extension": ".txt"}
         if format == "html":
-            html = self._code_to_html(code, language, options)
-            return {"content": html, "mime_type": "text/html", "extension": ".html"}
-        if format == "md":
-            md = f"```{language}\n{code}\n```"
-            return {"content": md, "mime_type": "text/markdown", "extension": ".md"}
-        if format == "json":
+            exported = self._code_to_html(content, language, options)
+            mime = "text/html"
+        elif format == "md":
+            exported = self._code_to_markdown(content, language)
+            mime = "text/markdown"
+        elif format == "json":
             import json
-            data = {
-                "code":        code,
-                "language":    language,
-                "exported_at": datetime.utcnow().isoformat(),
-                "version":     "9.0.0",
-            }
-            return {"content": json.dumps(data, indent=2), "mime_type": "application/json", "extension": ".json"}
-        return {"error": f"Unsupported format: {format}"}
+            exported = json.dumps({"language": language, "content": content}, indent=2)
+            mime = "application/json"
+        else:
+            exported = content
+            mime = "text/plain"
+        return {"content": exported, "mime_type": mime, "format": format}
 
-    def _detect_language(self, content: str, extension: str) -> str:
-        extension_map = {
-            "py": "python",     "js": "javascript", "ts": "typescript",
-            "cpp": "cpp",       "c": "c",           "h": "c",           "hpp": "cpp",
-            "java": "java",     "kt": "kotlin",     "swift": "swift",
-            "rs": "rust",       "go": "go",         "rb": "ruby",       "php": "php",
-            "html": "html",     "css": "css",       "scss": "scss",
-            "json": "json",     "yaml": "yaml",     "yml": "yaml",
-            "xml": "xml",       "md": "markdown",   "sql": "sql",
-            "sh": "bash",       "bash": "bash",     "ps1": "powershell",
-            "r": "r",           "jl": "julia",      "lua": "lua",       "pl": "perl",
-            "ex": "elixir",     "exs": "elixir",    "hs": "haskell",
-            "ml": "ocaml",      "fs": "f_sharp",    "clj": "clojure",
-            "scala": "scala",   "dart": "dart",     "sol": "solidity",
-            "v": "verilog",     "vhd": "vhdl",      "asm": "assembly_x86",
-            "s": "assembly_arm","wat": "webassembly",
-            "tex": "latex",     "typ": "typst",     "toml": "toml",
-        }
-        if extension in extension_map:
-            return extension_map[extension]
-        # Content-based fallback
-        if content.startswith("#!/usr/bin/env python") or "import " in content[:100]:
-            return "python"
-        if "function " in content[:100] or "const " in content[:100]:
-            return "javascript"
-        if "#include" in content[:100]:
-            return "cpp"
-        return "text"
+    def _code_to_markdown(self, code: str, language: str) -> str:
+        return f"```{language}\n{code}\n```"
 
-    def _extract_metadata(self, content: str, language: str) -> dict:
-        metadata: dict = {
-            "functions":       [],
-            "classes":         [],
-            "imports":         [],
-            "comments_ratio":  0,
+    def _analyze_content(self, content: str, language: str) -> dict:
+        lines = content.splitlines()
+        metadata = {
+            "line_count": len(lines),
+            "char_count": len(content),
+            "functions": [],
+            "classes": [],
+            "comments_ratio": 0,
         }
-        lines         = content.splitlines()
         comment_lines = 0
         for line in lines:
             stripped = line.strip()
-            if language == "python" and stripped.startswith("#"):
-                comment_lines += 1
-            elif language in ("javascript", "typescript", "cpp", "c", "java") and stripped.startswith("//"):
+            if stripped.startswith(("#", "//", "/*", "*")):
                 comment_lines += 1
             if language == "python" and stripped.startswith("def "):
-                metadata["functions"].append(stripped[4:].split("(")[0])
-            elif language == "javascript" and "function " in stripped:
+                m = re.search(r"def\s+(\w+)", stripped)
+                if m:
+                    metadata["functions"].append(m.group(1))
+            if language in ("javascript", "typescript") and "function " in stripped:
                 m = re.search(r"function\s+(\w+)", stripped)
                 if m:
                     metadata["functions"].append(m.group(1))
@@ -131,6 +99,7 @@ class ImportExportService:
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
     <title>CodeDock Export</title>
     <style>
         body {{ background: {bg_color}; color: {text_color}; font-family: 'Fira Code', monospace; padding: 20px; }}
