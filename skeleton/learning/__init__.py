@@ -31,6 +31,7 @@ from .evidence import (
     canonical_fingerprint,
     empty_calibration,
     make_provenance,
+    make_provenance_from_evidence_envelope,
 )
 from .service import LearningService, LearningSnapshot
 
@@ -61,4 +62,5 @@ __all__ = [
     "canonical_fingerprint",
     "empty_calibration",
     "make_provenance",
+    "make_provenance_from_evidence_envelope",
 ]
