@@ -6,7 +6,10 @@ import json
 
 import pytest
 
-from skeleton.jeeves.bidirectional_calibration import CalibratedBidirectionalModeLab
+from skeleton.jeeves.bidirectional_calibration import (
+    CalibratedBidirectionalModeLab,
+    CrossDirectionConfig,
+)
 from skeleton.jeeves.historical_evidence import (
     build_historical_evidence,
     bundle_manifest,
@@ -28,7 +31,7 @@ def _series(values=None, *, label="evidence-series", timestamps=None) -> Histori
     return HistoricalSeries.from_values(data, label=label, timestamps=timestamps)
 
 
-def _report(series: HistoricalSeries):
+def _report(series: HistoricalSeries, *, calibration=None):
     lab = CalibratedBidirectionalModeLab(
         config=WalkForwardConfig(
             min_train_size=8,
@@ -38,6 +41,7 @@ def _report(series: HistoricalSeries):
             reversion_window=6,
         ),
         gate=SelectionGate(min_folds=8, min_relative_improvement=0.02),
+        calibration=calibration,
     )
     return lab.evaluate(series)
 
@@ -49,6 +53,7 @@ def test_bridge_builds_one_fact_root_and_derived_features() -> None:
     assert bundle.observation.subject_id == SUBJECT
     assert bundle.observation.payload["sample_count"] == 40
     assert bundle.observation.payload["series_label"] == series.label
+    assert "report_fingerprint" not in bundle.observation.payload
     assert len(bundle.features) >= 15
     assert all(feature.observation_ids == (bundle.observation.observation_id,) for feature in bundle.features)
 
@@ -71,6 +76,27 @@ def test_series_fingerprint_changes_when_input_changes() -> None:
     second = build_historical_evidence(_report(second_series), second_series, subject_id=SUBJECT)
     assert first.series_fingerprint != second.series_fingerprint
     assert first.observation.observation_id != second.observation.observation_id
+
+
+def test_fact_root_is_invariant_to_analysis_configuration() -> None:
+    series = _series()
+    first_report = _report(series)
+    second_report = _report(
+        series,
+        calibration=CrossDirectionConfig(
+            top_k=2,
+            min_rank_correlation=-1.0,
+            min_top_k_overlap=0.0,
+        ),
+    )
+    first = build_historical_evidence(first_report, series, subject_id=SUBJECT)
+    second = build_historical_evidence(second_report, series, subject_id=SUBJECT)
+    assert first.observation == second.observation
+    assert first.series_fingerprint == second.series_fingerprint
+    assert first.report_fingerprint != second.report_fingerprint
+    assert first.feature_by_name("calibration_fingerprint").value != second.feature_by_name(
+        "calibration_fingerprint"
+    ).value
 
 
 def test_timestamp_fingerprint_is_present_when_clock_exists() -> None:
@@ -170,10 +196,10 @@ def test_manifest_contains_only_identifiers_and_fingerprints() -> None:
     assert manifest["feature_count"] == len(bundle.features)
 
 
-def test_report_fingerprint_is_carried_through_fact_and_feature_planes() -> None:
+def test_report_fingerprint_stays_on_derived_feature_plane() -> None:
     series = _series()
     report = _report(series)
     bundle = build_historical_evidence(report, series, subject_id=SUBJECT)
     assert bundle.report_fingerprint == report.fingerprint
-    assert bundle.observation.payload["report_fingerprint"] == report.fingerprint
+    assert "report_fingerprint" not in bundle.observation.payload
     assert bundle.feature_by_name("calibration_fingerprint").value == report.fingerprint
