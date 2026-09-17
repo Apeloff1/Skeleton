@@ -17,6 +17,8 @@ Commands:
     capabilities Show the stable machine-readable capability manifest
                 Use `capabilities --lifecycle` for resolvable/loaded status
                 Use `capabilities --plane-audit` for the F-15 plane audit
+                Use `capabilities --boot-audit` for the genesis/BOOT_PHASES audit
+                Use `capabilities --export-audit` for manifest export drift
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
@@ -41,30 +43,35 @@ def _cmd_capabilities(rest: List[str]) -> int:
     from skeleton.application import (
         capability_lifecycle_snapshot,
         capability_manifest,
+        export_audit_snapshot,
+        genesis_boot_audit_snapshot,
         plane_audit_snapshot,
     )
 
     flags = {item.strip().lower() for item in rest if item.strip()}
-    allowed = {
-        "--lifecycle",
-        "lifecycle",
-        "--plane-audit",
-        "plane-audit",
-        "--plane_audit",
-        "plane_audit",
+    aliases = {
+        "lifecycle": {"--lifecycle", "lifecycle"},
+        "plane_audit": {"--plane-audit", "plane-audit", "--plane_audit", "plane_audit"},
+        "boot_audit": {"--boot-audit", "boot-audit", "--boot_audit", "boot_audit"},
+        "export_audit": {"--export-audit", "export-audit", "--export_audit", "export_audit"},
     }
+    allowed = set().union(*aliases.values())
     unknown = flags - allowed
     if unknown:
         print(f"Unknown capabilities option: {sorted(unknown)[0]}")
         return 2
-    lifecycle = bool(flags & {"--lifecycle", "lifecycle"})
-    plane_audit = bool(flags & {"--plane-audit", "plane-audit", "--plane_audit", "plane_audit"})
-    if lifecycle and plane_audit:
-        print("lifecycle and plane_audit are mutually exclusive")
+    selected = [name for name, names in aliases.items() if flags & names]
+    if len(selected) > 1:
+        print(f"{' and '.join(selected)} are mutually exclusive")
         return 2
-    if plane_audit:
+    view = selected[0] if selected else ""
+    if view == "export_audit":
+        payload = export_audit_snapshot()
+    elif view == "boot_audit":
+        payload = genesis_boot_audit_snapshot()
+    elif view == "plane_audit":
         payload = plane_audit_snapshot()
-    elif lifecycle:
+    elif view == "lifecycle":
         payload = capability_lifecycle_snapshot()
     else:
         payload = capability_manifest()

@@ -38,34 +38,57 @@ def _configuration_handler(state: Any):
     return handle
 
 
+_CAPABILITY_VIEW_FLAGS = ("lifecycle", "plane_audit", "boot_audit", "export_audit")
+
+
+def _capability_view_flags(payload: Mapping[str, Any]) -> Dict[str, bool]:
+    flags: Dict[str, bool] = {}
+    enabled: list[str] = []
+    for name in _CAPABILITY_VIEW_FLAGS:
+        value = payload.get(name, False)
+        if value is not True and value is not False:
+            raise CommandError("invalid_argument", f"{name} must be a boolean")
+        flags[name] = value is True
+        if flags[name]:
+            enabled.append(name)
+    if len(enabled) > 1:
+        raise CommandError(
+            "invalid_argument",
+            f"{' and '.join(enabled)} are mutually exclusive",
+        )
+    return flags
+
+
+def _lookup_row(payload: Mapping[str, Any], key: str, getter, snapshot):
+    raw_id = payload.get(key, "")
+    if raw_id in {"", None}:
+        return snapshot()
+    if not isinstance(raw_id, str):
+        raise CommandError("invalid_argument", f"{key} must be a string")
+    try:
+        return getter(raw_id)
+    except KeyError as exc:
+        raise CommandError("invalid_argument", str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise CommandError("invalid_argument", str(exc)) from exc
+
+
 def _capabilities_handler(_state: Any):
     def handle(payload: Mapping[str, Any]) -> Dict[str, Any]:
-        raw_lifecycle = payload.get("lifecycle", False)
-        raw_plane_audit = payload.get("plane_audit", False)
-        if raw_lifecycle is not True and raw_lifecycle is not False:
-            raise CommandError("invalid_argument", "lifecycle must be a boolean")
-        if raw_plane_audit is not True and raw_plane_audit is not False:
-            raise CommandError("invalid_argument", "plane_audit must be a boolean")
-        if raw_lifecycle and raw_plane_audit:
-            raise CommandError(
-                "invalid_argument",
-                "lifecycle and plane_audit are mutually exclusive",
-            )
-        if raw_plane_audit:
+        flags = _capability_view_flags(payload)
+        if flags["export_audit"]:
+            from .export_audit import export_audit_snapshot, get_export_audit_row
+
+            return _lookup_row(payload, "capability_id", get_export_audit_row, export_audit_snapshot)
+        if flags["boot_audit"]:
+            from .genesis_boot_audit import genesis_boot_audit_snapshot, get_genesis_boot_audit_row
+
+            return _lookup_row(payload, "phase_id", get_genesis_boot_audit_row, genesis_boot_audit_snapshot)
+        if flags["plane_audit"]:
             from .plane_audit import get_plane_audit_row, plane_audit_snapshot
 
-            raw_plane_id = payload.get("plane_id", "")
-            if raw_plane_id in {"", None}:
-                return plane_audit_snapshot()
-            if not isinstance(raw_plane_id, str):
-                raise CommandError("invalid_argument", "plane_id must be a string")
-            try:
-                return get_plane_audit_row(raw_plane_id)
-            except KeyError as exc:
-                raise CommandError("invalid_argument", str(exc)) from exc
-            except ValueError as exc:
-                raise CommandError("invalid_argument", str(exc)) from exc
-        if raw_lifecycle:
+            return _lookup_row(payload, "plane_id", get_plane_audit_row, plane_audit_snapshot)
+        if flags["lifecycle"]:
             from .capability_runtime import capability_lifecycle_snapshot
 
             return capability_lifecycle_snapshot()

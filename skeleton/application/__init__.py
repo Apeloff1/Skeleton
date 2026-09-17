@@ -26,6 +26,12 @@ from .command_contracts import (
     command_specs,
     parity_matrix,
 )
+from .export_audit import EXPORT_AUDIT_KIND, export_audit_snapshot, get_export_audit_row
+from .genesis_boot_audit import (
+    GENESIS_BOOT_AUDIT_KIND,
+    genesis_boot_audit_snapshot,
+    get_genesis_boot_audit_row,
+)
 from .plane_audit import (
     AUDITED_PLANE_IDS,
     PLANE_AUDIT_KIND,
@@ -41,6 +47,8 @@ __all__ = [
     "CAPABILITY_LOADER",
     "CAPABILITY_MANIFEST_VERSION",
     "CONTRACT_VERSION",
+    "EXPORT_AUDIT_KIND",
+    "GENESIS_BOOT_AUDIT_KIND",
     "PLANE_AUDIT_KIND",
     "Capability",
     "CapabilityLoadError",
@@ -55,7 +63,11 @@ __all__ = [
     "capability_manifest",
     "capability_runtime_status",
     "command_specs",
+    "export_audit_snapshot",
+    "genesis_boot_audit_snapshot",
     "get_capability",
+    "get_export_audit_row",
+    "get_genesis_boot_audit_row",
     "get_plane_audit_row",
     "load_capability",
     "parity_matrix",

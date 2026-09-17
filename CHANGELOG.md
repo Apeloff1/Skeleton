@@ -4,6 +4,22 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-17 — F-17 genesis boot audit + manifest export audit
+
+- Additive `genesis_boot_audit` snapshot reports genesis `boot()` order against
+  architecture `BOOT_PHASES` without importing genesis. Foundation, forge,
+  galaxy, contexts, and support remain undocumented in `BOOT_PHASES`; the
+  snapshot locks that split.
+- Additive `manifest_export_audit` snapshot reports `__all__` vs `PACKAGES`
+  export drift for every curated capability. Organism/social/galaxy stay at
+  zero drift; application and content now have matching `PACKAGES` rows.
+- Identical payloads through `capabilities --boot-audit` / `--export-audit`,
+  `GET /api/v1/application/genesis/audit`, `GET /api/v1/application/capabilities/export-audit`,
+  and the shared `capabilities` command. Combined views fail closed.
+- Architecture `API_ROUTES` now documents the previously missing main-router
+  surfaces (reranker stats, resilience stats, cockpit, GameForge, swarm submit,
+  GitHub auth).
+
 ## 2026-09-17 — F-15 organism/social/galaxy plane audit
 
 - Additive `plane_audit` snapshot reports public exports, architecture

@@ -177,6 +177,48 @@ async def application_plane_audit() -> Dict[str, Any]:
     return plane_audit_snapshot()
 
 
+@router.get("/application/genesis/audit/{phase_id}")
+async def application_genesis_boot_audit_row(phase_id: str) -> Dict[str, Any]:
+    """Return one genesis boot-audit row by phase name."""
+    from skeleton.application import get_genesis_boot_audit_row
+
+    try:
+        return get_genesis_boot_audit_row(phase_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/genesis/audit")
+async def application_genesis_boot_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --boot-audit``."""
+    from skeleton.application import genesis_boot_audit_snapshot
+
+    return genesis_boot_audit_snapshot()
+
+
+@router.get("/application/capabilities/export-audit/{capability_id}")
+async def application_export_audit_row(capability_id: str) -> Dict[str, Any]:
+    """Return one manifest export-audit row by capability ID."""
+    from skeleton.application import get_export_audit_row
+
+    try:
+        return get_export_audit_row(capability_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/capabilities/export-audit")
+async def application_export_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --export-audit``."""
+    from skeleton.application import export_audit_snapshot
+
+    return export_audit_snapshot()
+
+
 @router.get("/application/capabilities/lifecycle")
 async def application_capability_lifecycle() -> Dict[str, Any]:
     """Return resolvable/loaded status for the curated capability manifest."""

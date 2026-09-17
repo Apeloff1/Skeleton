@@ -66,7 +66,7 @@ _SPECS = (
     ),
     CommandSpec(
         "capabilities",
-        "Inspect the curated capability manifest, lifecycle snapshot, or plane audit.",
+        "Inspect the curated capability manifest, lifecycle snapshot, or structural audits.",
     ),
     CommandSpec(
         "admin",
