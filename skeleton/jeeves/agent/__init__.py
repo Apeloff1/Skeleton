@@ -4,6 +4,22 @@ Public imports are kept explicit so application code can build a runtime
 without reaching into implementation modules.
 """
 
+from .cognition import (
+    CognitionError,
+    ContextBudget,
+    ContextCompiler,
+    ContextPacket,
+    ContextSection,
+    EvidenceContextPolicy,
+    FINAL_RESPONSE_SCHEMA,
+    FinalDraft,
+    FinalDraftDecoder,
+    MemoryContextPolicy,
+    PromptCompiler,
+    RunScratchpad,
+    ScratchEntry,
+    approximate_tokens,
+)
 from .evidence import (
     Contradiction,
     EvidenceArtifact,
@@ -104,6 +120,19 @@ from .types import (
     canonical_json,
     stable_fingerprint,
     stable_id,
+)
+from .verification import (
+    CheckSeverity,
+    PredicateRegistry,
+    PredicateRequest,
+    PredicateSpec,
+    StepVerifier,
+    VerificationCheck,
+    VerificationDirectiveParser,
+    VerificationError,
+    VerificationPolicy,
+    VerificationReport,
+    parse_advisory_json,
 )
 
 __all__ = [name for name in globals() if not name.startswith("_")]
