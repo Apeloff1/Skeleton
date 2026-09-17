@@ -11,6 +11,8 @@ from skeleton.jeeves.game_engine_lab import (
 )
 from skeleton.jeeves.game_engine_runtime import (
     ERA_FAMILY,
+    AdversarialEngineEvolution,
+    EngineEvolutionSession,
     EngineFamily,
     ExecutableGameEngineLab,
     RoutedEngineSandbox,
@@ -226,3 +228,253 @@ def test_build_executable_game_engine_is_single_call_surface() -> None:
         "engine/adaptive_policy.json"
         in sandbox.tree.files
     )
+
+
+
+@pytest.mark.parametrize(
+    "era",
+    [
+        EngineEra.PONG,
+        EngineEra.EARLY_3D,
+        EngineEra.NEXT,
+    ],
+)
+def test_evolution_session_snapshots_promotions_and_restores_origin(
+    era: EngineEra,
+) -> None:
+    lab = ExecutableGameEngineLab()
+    sandbox = lab.create(
+        era,
+        "action_adventure",
+    )
+    if era is EngineEra.PONG:
+        path = "engine/legacy_tuning.json"
+        payload = json.loads(
+            sandbox.tree.read(path)
+        )
+        payload["paddle_speed"] = 999
+    elif era is EngineEra.EARLY_3D:
+        path = "engine/3d_tuning.json"
+        payload = json.loads(
+            sandbox.tree.read(path)
+        )
+        payload["near_plane"] = 999
+    else:
+        path = "engine/adaptive_policy.json"
+        payload = json.loads(
+            sandbox.tree.read(path)
+        )
+        payload["coefficients"] = [
+            10,
+            0,
+            0,
+            0,
+        ]
+    broken = sandbox.apply(
+        [
+            SandboxPatch(
+                path,
+                json.dumps(payload),
+                sandbox.tree.file_digest(
+                    path
+                ),
+            )
+        ]
+    )
+    evolution = AdversarialEngineEvolution(
+        lab
+    )
+    session = evolution.start(
+        broken
+    )
+    origin_digest = (
+        session.sandbox.tree.digest
+    )
+    before = lab.evaluate(
+        broken
+    )
+    repair = lab.canonical_repair(
+        broken,
+        before,
+    )
+
+    promoted, report, round_result = (
+        evolution.tournament_round(
+            session,
+            (
+                (
+                    SandboxPatch(
+                        "game/noise.txt",
+                        "no quality change",
+                    ),
+                ),
+                repair,
+            ),
+        )
+    )
+
+    assert round_result.accepted
+    assert report.passed
+    assert len(
+        promoted.checkpoints
+    ) == 2
+    assert (
+        promoted.checkpoints[1]
+        .parent_digest
+        == promoted.checkpoints[0]
+        .tree_digest
+    )
+    assert (
+        promoted.checkpoints[1]
+        .tree_digest
+        == promoted.sandbox.tree.digest
+    )
+
+    restored = promoted.restore(0)
+
+    assert (
+        restored.sandbox.tree.digest
+        == origin_digest
+    )
+    assert not lab.evaluate(
+        restored.sandbox
+    ).passed
+
+
+def test_evolution_tournament_rejects_equal_quality_churn() -> None:
+    lab = ExecutableGameEngineLab()
+    sandbox = lab.create(
+        EngineEra.SIXTEEN_BIT
+    )
+    evolution = AdversarialEngineEvolution(
+        lab
+    )
+    session = evolution.start(
+        sandbox
+    )
+
+    next_session, report, round_result = (
+        evolution.tournament_round(
+            session,
+            (
+                (
+                    SandboxPatch(
+                        "notes/candidate.txt",
+                        "cosmetic mutation",
+                    ),
+                ),
+            ),
+        )
+    )
+
+    assert report.passed
+    assert not round_result.accepted
+    assert (
+        next_session.sandbox.tree.digest
+        == sandbox.tree.digest
+    )
+    assert len(
+        next_session.checkpoints
+    ) == 1
+
+
+def test_evolution_tournament_discards_invalid_candidate_and_promotes_repair() -> None:
+    lab = ExecutableGameEngineLab()
+    sandbox = lab.create(
+        EngineEra.MODERN
+    )
+    path = "engine/modern_tuning.json"
+    payload = json.loads(
+        sandbox.tree.read(path)
+    )
+    payload["stream_radius"] = 999
+    broken = sandbox.apply(
+        [
+            SandboxPatch(
+                path,
+                json.dumps(payload),
+                sandbox.tree.file_digest(
+                    path
+                ),
+            )
+        ]
+    )
+    evolution = AdversarialEngineEvolution(
+        lab
+    )
+    session = evolution.start(
+        broken
+    )
+    report = lab.evaluate(
+        broken
+    )
+    repair = lab.canonical_repair(
+        broken,
+        report,
+    )
+
+    promoted, selected, round_result = (
+        evolution.tournament_round(
+            session,
+            (
+                (
+                    SandboxPatch(
+                        "../escape",
+                        "bad",
+                    ),
+                ),
+                repair,
+            ),
+        )
+    )
+
+    assert round_result.candidate_count == 2
+    assert round_result.accepted
+    assert selected.passed
+    assert len(
+        promoted.checkpoints
+    ) == 2
+
+
+def test_evolution_loop_reaches_target_with_canonical_proposer() -> None:
+    lab = ExecutableGameEngineLab()
+    sandbox = lab.create(
+        EngineEra.SHADER
+    )
+    path = "engine/3d_tuning.json"
+    payload = json.loads(
+        sandbox.tree.read(path)
+    )
+    payload["fov_deg"] = 999
+    broken = sandbox.apply(
+        [
+            SandboxPatch(
+                path,
+                json.dumps(payload),
+                sandbox.tree.file_digest(
+                    path
+                ),
+            )
+        ]
+    )
+    evolution = AdversarialEngineEvolution(
+        lab
+    )
+    session = evolution.start(
+        broken
+    )
+
+    result = evolution.evolve(
+        session,
+        evolution.canonical_candidates,
+        target=1.0,
+        max_rounds=4,
+    )
+
+    assert result.target_met
+    assert result.report.passed
+    assert len(result.rounds) == 1
+    assert result.rounds[0].accepted
+    assert len(
+        result.session.checkpoints
+    ) == 2
