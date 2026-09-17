@@ -62,6 +62,22 @@ from .cortex import (
     JeevesCortex,
     RunCognitiveState,
 )
+from .epistemic_planning import (
+    ActionCandidate,
+    BeliefContribution,
+    BeliefRequirement,
+    CandidateAssessment,
+    DecisionDisposition,
+    DecisionPolicy,
+    EpistemicDecision,
+    EpistemicDecisionBridge,
+    EpistemicDecisionError,
+    ObservationOpportunity,
+    RegretRow,
+    StressKind,
+    StressResult,
+    UtilityInterval,
+)
 from .evidence import (
     Contradiction,
     EvidenceArtifact,
