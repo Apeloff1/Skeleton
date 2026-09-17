@@ -5,7 +5,8 @@ split into state-space filtering, exact Bayesian parameter uncertainty, online
 Bayesian ensembles, distributional calibration, adaptive and stratified
 conformal calibration, hidden-Markov regime inference, multiscale harmonic
 forecasting, cross-family arbitration, paired model comparison, and explicit
-promotion, uncertainty-governance, and joint evidence contracts.
+promotion, uncertainty-governance, joint evidence, and target-alignment
+contracts.
 """
 
 from .probabilistic_arbitration import (
@@ -101,6 +102,12 @@ from .probabilistic_governance import (
     ConformalGovernanceGate,
     evaluate_conformal_governance,
     validate_conformal_governance_decision,
+)
+from .probabilistic_governance_bundle import (
+    ProbabilisticGovernanceBundle,
+    ProbabilisticGovernanceBundleGate,
+    evaluate_probabilistic_governance_bundle,
+    validate_probabilistic_governance_bundle,
 )
 from .probabilistic_joint_governance import (
     JointProbabilisticGovernanceDecision,
@@ -198,6 +205,8 @@ __all__ = [
     "PredictiveArenaDecision",
     "PredictiveArenaReport",
     "PredictiveDistribution",
+    "ProbabilisticGovernanceBundle",
+    "ProbabilisticGovernanceBundleGate",
     "ProbabilisticPromotionDecision",
     "ProbabilisticPromotionGate",
     "RegimeForecast",
@@ -240,6 +249,7 @@ __all__ = [
     "evaluate_joint_probabilistic_governance",
     "evaluate_predictive_arena",
     "evaluate_prequential_conformal",
+    "evaluate_probabilistic_governance_bundle",
     "evaluate_probabilistic_promotion",
     "evaluate_regime_hmm_prequential",
     "evaluate_spectral_complexities",
@@ -264,6 +274,7 @@ __all__ = [
     "regime_forecast_crps",
     "validate_conformal_governance_decision",
     "validate_joint_probabilistic_governance_decision",
+    "validate_probabilistic_governance_bundle",
     "validate_probabilistic_promotion_decision",
     "validate_stratified_conformal_report",
 ]
