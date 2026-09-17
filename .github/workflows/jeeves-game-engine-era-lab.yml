@@ -7,11 +7,13 @@ on:
       - "skeleton/jeeves/game_engine_legacy.py"
       - "skeleton/jeeves/game_engine_3d.py"
       - "skeleton/jeeves/game_engine_modern.py"
+      - "skeleton/jeeves/game_engine_runtime.py"
       - "skeleton/jeeves/__init__.py"
       - "skeleton/testing/test_jeeves_game_engine_lab.py"
       - "skeleton/testing/test_jeeves_game_engine_legacy.py"
       - "skeleton/testing/test_jeeves_game_engine_3d.py"
       - "skeleton/testing/test_jeeves_game_engine_modern.py"
+      - "skeleton/testing/test_jeeves_game_engine_runtime.py"
       - ".github/workflows/jeeves-game-engine-era-lab.yml"
   push:
     branches: [main]
@@ -54,6 +56,7 @@ jobs:
           skeleton/jeeves/game_engine_legacy.py
           skeleton/jeeves/game_engine_3d.py
           skeleton/jeeves/game_engine_modern.py
+          skeleton/jeeves/game_engine_runtime.py
       - name: Run Pong-to-next sandbox regressions
         env:
           PYTHONPATH: "."
@@ -63,3 +66,4 @@ jobs:
           skeleton/testing/test_jeeves_game_engine_legacy.py
           skeleton/testing/test_jeeves_game_engine_3d.py
           skeleton/testing/test_jeeves_game_engine_modern.py
+          skeleton/testing/test_jeeves_game_engine_runtime.py
