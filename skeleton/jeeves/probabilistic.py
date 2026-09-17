@@ -2,7 +2,8 @@
 
 This module keeps the public import surface compact while the implementation is
 split into state-space filtering, online Bayesian ensembles, distributional
-calibration diagnostics, and explicit promotion eligibility contracts.
+calibration, hidden-Markov regime inference, and explicit promotion eligibility
+contracts.
 """
 
 from .probabilistic_calibration import (
@@ -34,6 +35,19 @@ from .probabilistic_ensemble import (
     gaussian_mixture_crps,
     probability_integral_transform,
 )
+from .probabilistic_regimes import (
+    GaussianRegime,
+    RegimeForecast,
+    RegimeForecastComponent,
+    RegimeHMMConfig,
+    RegimeHMMFit,
+    RegimeHMMModel,
+    RegimePosteriorStep,
+    RegimePrequentialScore,
+    evaluate_regime_hmm_prequential,
+    fit_regime_hmm,
+    forecast_regime_hmm,
+)
 from .probabilistic_state_space import (
     FilterStep,
     GaussianForecast,
@@ -62,13 +76,21 @@ __all__ = [
     "EnsembleStep",
     "FilterStep",
     "GaussianForecast",
+    "GaussianRegime",
     "InnovationRegime",
     "MixtureForecast",
     "OnlineBayesianEnsemble",
     "PitDiagnostic",
     "ProbabilisticPromotionDecision",
     "ProbabilisticPromotionGate",
+    "RegimeForecast",
+    "RegimeForecastComponent",
+    "RegimeHMMConfig",
+    "RegimeHMMFit",
+    "RegimeHMMModel",
     "RegimePosterior",
+    "RegimePosteriorStep",
+    "RegimePrequentialScore",
     "SeriesValues",
     "StateSpaceConfig",
     "StateSpaceError",
@@ -80,8 +102,11 @@ __all__ = [
     "calibrate_distributions",
     "central_interval",
     "evaluate_probabilistic_promotion",
+    "evaluate_regime_hmm_prequential",
     "evaluate_state_space_families",
+    "fit_regime_hmm",
     "fit_state_space",
+    "forecast_regime_hmm",
     "forecast_state_space",
     "gaussian_as_mixture",
     "gaussian_mixture_crps",
