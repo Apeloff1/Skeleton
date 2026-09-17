@@ -58,6 +58,26 @@ class RigidBody:
             raise PhysicsValidationError("invalid body_id")
         if not isinstance(self.body_type, BodyType):
             raise PhysicsValidationError("body_type must be BodyType")
+        if not isinstance(self.shape, CollisionShape):
+            raise PhysicsValidationError("shape must satisfy CollisionShape")
+        if not isinstance(self.position, Vec3):
+            raise PhysicsValidationError("position must be Vec3")
+        if not isinstance(self.orientation, Quat):
+            raise PhysicsValidationError("orientation must be Quat")
+        if not isinstance(self.linear_velocity, Vec3):
+            raise PhysicsValidationError("linear_velocity must be Vec3")
+        if not isinstance(self.angular_velocity, Vec3):
+            raise PhysicsValidationError("angular_velocity must be Vec3")
+        if not isinstance(self.force, Vec3):
+            raise PhysicsValidationError("force must be Vec3")
+        if not isinstance(self.torque, Vec3):
+            raise PhysicsValidationError("torque must be Vec3")
+        if not isinstance(self.material, PhysicsMaterial):
+            raise PhysicsValidationError("material must be PhysicsMaterial")
+        if not isinstance(self.local_inertia, Mat3) or not isinstance(self.local_inverse_inertia, Mat3):
+            raise PhysicsValidationError("inertia tensors must be Mat3")
+        if not isinstance(self.awake, bool):
+            raise PhysicsValidationError("awake must be boolean")
         self.orientation = self.orientation.normalized()
         self.linear_damping = _non_negative(self.linear_damping, name="linear_damping")
         self.angular_damping = _non_negative(self.angular_damping, name="angular_damping")
@@ -68,6 +88,15 @@ class RigidBody:
                 raise PhysicsValidationError("dynamic body mass must be finite and positive")
             if not math.isfinite(self.inverse_mass) or self.inverse_mass <= 0.0:
                 raise PhysicsValidationError("dynamic body inverse_mass must be positive")
+            if not math.isclose(
+                self.inverse_mass,
+                1.0 / self.mass,
+                rel_tol=1.0e-9,
+                abs_tol=1.0e-12,
+            ):
+                raise PhysicsValidationError("dynamic body mass and inverse_mass disagree")
+            if abs(self.local_inertia.determinant()) <= 1.0e-12:
+                raise PhysicsValidationError("dynamic body inertia must be invertible")
         else:
             self.mass = math.inf
             self.inverse_mass = 0.0
@@ -89,6 +118,10 @@ class RigidBody:
         gravity_scale: float = 1.0,
     ) -> "RigidBody":
         props = shape.mass_properties(density)
+        if props.center_of_mass != Vec3.zero():
+            raise PhysicsValidationError(
+                "offset centers of mass require explicit compound-body support"
+            )
         inverse_inertia = props.inertia.inverse()
         return cls(
             body_id=body_id,
