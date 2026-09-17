@@ -17,7 +17,13 @@ from .body import BodyType, RigidBody
 from .errors import PhysicsValidationError
 from .math3d import EPSILON, Vec3
 from .queries import Ray, RayHit, sphere_cast_body
-from .shapes import BoxShape, PlaneShape, SphereShape
+from .shapes import (
+    BoxShape,
+    CapsuleShape,
+    CylinderShape,
+    PlaneShape,
+    SphereShape,
+)
 
 MAX_CCD_CHECKS = 1_000_000
 
@@ -231,7 +237,10 @@ class ContinuousCollisionDetector:
 
         if target.body_type is not BodyType.STATIC:
             return None
-        if isinstance(target.shape, (BoxShape, PlaneShape)):
+        if isinstance(
+            target.shape,
+            (BoxShape, CapsuleShape, CylinderShape, PlaneShape),
+        ):
             return self._static_sweep(moving, target, dt)
         return None
 
