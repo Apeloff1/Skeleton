@@ -16,6 +16,7 @@ Commands:
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
     sota        Show the #807 SOTA game-creation program map
+    replay      Record and verify a deterministic mechanics replay
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
@@ -57,6 +58,43 @@ def _cmd_sota(rest: List[str]) -> int:
         print(json.dumps(asdict(lane), indent=2, default=str))
         return 0
     print(json.dumps(sota_program(), indent=2, default=str))
+    return 0
+
+
+def _cmd_replay(rest: List[str]) -> int:
+    from skeleton.game.replay import REPLAY_SCHEMA_VERSION, record, verify
+    from skeleton.vault.tool_fence import inspect_tool
+
+    seed: int | str = 8847291
+    i = 0
+    while i < len(rest):
+        if rest[i] == "--seed" and i + 1 < len(rest):
+            raw = rest[i + 1]
+            seed = int(raw) if raw.isdigit() else raw
+            i += 2
+        else:
+            i += 1
+    inputs = [
+        {"t": 0, "verb": "attack"},
+        {"t": 1, "verb": "defend"},
+        {"t": 2, "verb": "grant_xp"},
+        {"t": 3, "verb": "attack"},
+        {"t": 4, "verb": "wait"},
+    ]
+    try:
+        inspect_tool("replay.record", {"seed": seed})
+        trace = record(seed=seed, inputs=inputs)
+        check = verify(trace.to_dict())
+    except Exception as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}, indent=2))
+        return 2
+    print(json.dumps({
+        "ok": True,
+        "schema_version": REPLAY_SCHEMA_VERSION,
+        "digest": check["digest"],
+        "frames": check["frames"],
+        "seed": trace.seed,
+    }, indent=2))
     return 0
 
 
@@ -283,6 +321,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "contracts": return _cmd_contracts(rest)
     if cmd == "capabilities": return _cmd_capabilities(rest)
     if cmd == "sota": return _cmd_sota(rest)
+    if cmd == "replay": return _cmd_replay(rest)
     if cmd == "command": return _cmd_shared_command(rest)
     if cmd == "status": return _cmd_shared_command(["status"])
     if cmd == "config": return _cmd_shared_command(["configuration"])
