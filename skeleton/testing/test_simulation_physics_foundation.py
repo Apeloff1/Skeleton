@@ -17,6 +17,7 @@ from skeleton.simulation.physics import (
     PhysicsWorld,
     PlaneShape,
     Quat,
+    Ray,
     RigidBody,
     SphereShape,
     SweepAndPruneBroadPhase,
@@ -413,3 +414,75 @@ def test_world_body_bound_fails_closed() -> None:
 def test_invalid_gameplay_scale_rejected() -> None:
     with pytest.raises(PhysicsValidationError):
         GameplayScale(0.0)
+
+
+def test_world_raycast_orders_hits_by_distance_then_id() -> None:
+    world = _zero_gravity_world()
+    world.add_body(RigidBody.static("far", SphereShape(1.0), position=Vec3(5.0, 0.0, 0.0)))
+    world.add_body(RigidBody.static("near", SphereShape(1.0), position=Vec3(2.0, 0.0, 0.0)))
+    hits = world.raycast(Ray(Vec3.zero(), Vec3.axis(0), 10.0))
+    assert tuple(hit.body_id for hit in hits) == ("near", "far")
+    assert hits[0].distance == pytest.approx(1.0)
+    assert hits[1].distance == pytest.approx(4.0)
+
+
+def test_raycast_hits_rotated_box_in_local_frame() -> None:
+    world = _zero_gravity_world()
+    world.add_body(
+        RigidBody.static(
+            "box",
+            BoxShape(Vec3(2.0, 0.5, 0.5)),
+            position=Vec3(0.0, 3.0, 0.0),
+            orientation=Quat.from_axis_angle(Vec3.axis(2), math.pi * 0.5),
+        )
+    )
+    hit = world.raycast_closest(Ray(Vec3.zero(), Vec3.axis(1), 10.0))
+    assert hit is not None
+    assert hit.body_id == "box"
+    assert hit.distance == pytest.approx(1.0, abs=1.0e-9)
+
+
+def test_sphere_cast_expands_target_geometry_for_toi_query() -> None:
+    world = _zero_gravity_world()
+    world.add_body(RigidBody.static("target", SphereShape(1.0), position=Vec3(5.0, 0.0, 0.0)))
+    hits = world.sphere_cast(Ray(Vec3.zero(), Vec3.axis(0), 10.0), 0.5)
+    assert len(hits) == 1
+    assert hits[0].distance == pytest.approx(3.5)
+
+
+def test_world_query_ignore_set_is_respected() -> None:
+    world = _zero_gravity_world()
+    world.add_body(RigidBody.static("a", SphereShape(1.0), position=Vec3(2.0, 0.0, 0.0)))
+    world.add_body(RigidBody.static("b", SphereShape(1.0), position=Vec3(4.0, 0.0, 0.0)))
+    hit = world.raycast_closest(Ray(Vec3.zero(), Vec3.axis(0), 10.0), ignore=("a",))
+    assert hit is not None
+    assert hit.body_id == "b"
+
+
+def test_state_digest_changes_with_accumulated_force_and_sleep_timer() -> None:
+    left = _zero_gravity_world()
+    right = _zero_gravity_world()
+    body_left = RigidBody.dynamic("body", SphereShape(1.0))
+    body_right = RigidBody.dynamic("body", SphereShape(1.0))
+    left.add_body(body_left)
+    right.add_body(body_right)
+    assert left.state_digest == right.state_digest
+
+    body_left.apply_force(Vec3(1.0, 0.0, 0.0))
+    assert left.state_digest != right.state_digest
+
+    body_left.clear_accumulators()
+    assert left.state_digest == right.state_digest
+
+    body_left.sleep_time = 0.25
+    assert left.state_digest != right.state_digest
+
+
+def test_broadphase_pair_budget_fails_closed() -> None:
+    broad = SweepAndPruneBroadPhase(max_pairs=1)
+    bodies = tuple(
+        RigidBody.dynamic(str(index), SphereShape(10.0), position=Vec3(float(index), 0.0, 0.0))
+        for index in range(3)
+    )
+    with pytest.raises(PhysicsValidationError, match="pair bound"):
+        broad.compute_pairs(bodies)
