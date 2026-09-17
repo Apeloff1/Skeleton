@@ -9,10 +9,10 @@ class IngotPackError(ValueError):
     pass
 
 
-INGOT = tuple(f"ig_{i:02d}" for i in range(28))
+INGOT = tuple(f"ig_{i:02d}" for i in range(16))
 
 
-def cast(state: dict[str, Any], name: str) -> dict[str, Any]:
+def pour(state: dict[str, Any], name: str) -> dict[str, Any]:
     if name not in INGOT:
         raise IngotPackError(name)
     nxt = dict(state)

@@ -1,4 +1,4 @@
-"""Named fluxes."""
+"""Named flux lots."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ class FluxPackError(ValueError):
     pass
 
 
-FLUX = tuple(f"fx_{i:02d}" for i in range(24))
+FLUX = tuple(f"fx_{i:02d}" for i in range(12))
 
 
 def add(state: dict[str, Any], name: str) -> dict[str, Any]:
