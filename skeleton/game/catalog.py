@@ -41,7 +41,7 @@ def validate_recipe(raw: Mapping[str, Any] | None) -> dict[str, Any]:
     return {
         "id": recipe_id,
         "inputs": dict(sorted(clean_in.items())),
-        "outputs": dict(sorted(clean_out.values()) and sorted(clean_out.items())),
+        "outputs": dict(sorted(clean_out.items())),
         "stored_prose": 0,
     }
 
