@@ -231,21 +231,48 @@ class Mat3:
             + self.m02 * (self.m10 * self.m21 - self.m11 * self.m20)
         )
 
-    def inverse(self) -> "Mat3":
-        det = self.determinant()
-        if abs(det) <= EPSILON:
+    def _scale_normalized(self) -> tuple["Mat3", float]:
+        scale = max(abs(value) for value in self.to_tuple())
+        if scale == 0.0:
             raise DegenerateGeometryError("matrix is singular")
+        normalized = Mat3(*(value / scale for value in self.to_tuple()))
+        return normalized, scale
+
+    def is_invertible(self, *, relative_tolerance: float = NORMAL_EPSILON) -> bool:
+        relative_tolerance = _finite(
+            relative_tolerance,
+            name="relative_tolerance",
+        )
+        if relative_tolerance < 0.0:
+            raise PhysicsValidationError(
+                "relative_tolerance must be non-negative"
+            )
+        scale = max(abs(value) for value in self.to_tuple())
+        if scale == 0.0:
+            return False
+        normalized = Mat3(*(value / scale for value in self.to_tuple()))
+        return abs(normalized.determinant()) > relative_tolerance
+
+    def inverse(self) -> "Mat3":
+        normalized, scale = self._scale_normalized()
+        det = normalized.determinant()
+        if abs(det) <= NORMAL_EPSILON:
+            raise DegenerateGeometryError("matrix is singular")
+
         inv = 1.0 / det
+        normalized_inverse = Mat3(
+            (normalized.m11 * normalized.m22 - normalized.m12 * normalized.m21) * inv,
+            (normalized.m02 * normalized.m21 - normalized.m01 * normalized.m22) * inv,
+            (normalized.m01 * normalized.m12 - normalized.m02 * normalized.m11) * inv,
+            (normalized.m12 * normalized.m20 - normalized.m10 * normalized.m22) * inv,
+            (normalized.m00 * normalized.m22 - normalized.m02 * normalized.m20) * inv,
+            (normalized.m02 * normalized.m10 - normalized.m00 * normalized.m12) * inv,
+            (normalized.m10 * normalized.m21 - normalized.m11 * normalized.m20) * inv,
+            (normalized.m01 * normalized.m20 - normalized.m00 * normalized.m21) * inv,
+            (normalized.m00 * normalized.m11 - normalized.m01 * normalized.m10) * inv,
+        )
         return Mat3(
-            (self.m11 * self.m22 - self.m12 * self.m21) * inv,
-            (self.m02 * self.m21 - self.m01 * self.m22) * inv,
-            (self.m01 * self.m12 - self.m02 * self.m11) * inv,
-            (self.m12 * self.m20 - self.m10 * self.m22) * inv,
-            (self.m00 * self.m22 - self.m02 * self.m20) * inv,
-            (self.m02 * self.m10 - self.m00 * self.m12) * inv,
-            (self.m10 * self.m21 - self.m11 * self.m20) * inv,
-            (self.m01 * self.m20 - self.m00 * self.m21) * inv,
-            (self.m00 * self.m11 - self.m01 * self.m10) * inv,
+            *(value / scale for value in normalized_inverse.to_tuple())
         )
 
     def to_tuple(self) -> tuple[float, ...]:
