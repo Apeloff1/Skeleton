@@ -23,6 +23,7 @@ from __future__ import annotations
 import ast
 import re
 import sys
+import warnings
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -393,7 +394,9 @@ def _parse(path: Path, cache: dict[Path, ast.AST | str] | None = None) -> ast.AS
         result: ast.AST | str = "unreadable"
     else:
         try:
-            result = ast.parse(text, filename=str(path))
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", SyntaxWarning)
+                result = ast.parse(text, filename=str(path))
         except SyntaxError as exc:
             result = f"SyntaxError: {exc}"
     if cache is not None:
