@@ -7,10 +7,12 @@ on:
     paths:
       - 'skeleton/jeeves/historical_modes.py'
       - 'skeleton/jeeves/bidirectional_modes.py'
+      - 'skeleton/jeeves/bidirectional_calibration.py'
       - 'skeleton/jeeves/__init__.py'
       - 'skeleton/learning/evidence.py'
       - 'skeleton/testing/test_jeeves_historical_modes.py'
       - 'skeleton/testing/test_jeeves_bidirectional_modes.py'
+      - 'skeleton/testing/test_jeeves_bidirectional_calibration.py'
       - 'skeleton/testing/test_jeeves_historical_mode_exports.py'
       - 'skeleton/testing/test_learning_evidence.py'
       - '.github/workflows/jeeves-bidirectional.yml'
@@ -19,10 +21,12 @@ on:
     paths:
       - 'skeleton/jeeves/historical_modes.py'
       - 'skeleton/jeeves/bidirectional_modes.py'
+      - 'skeleton/jeeves/bidirectional_calibration.py'
       - 'skeleton/jeeves/__init__.py'
       - 'skeleton/learning/evidence.py'
       - 'skeleton/testing/test_jeeves_historical_modes.py'
       - 'skeleton/testing/test_jeeves_bidirectional_modes.py'
+      - 'skeleton/testing/test_jeeves_bidirectional_calibration.py'
       - 'skeleton/testing/test_jeeves_historical_mode_exports.py'
       - 'skeleton/testing/test_learning_evidence.py'
       - '.github/workflows/jeeves-bidirectional.yml'
@@ -68,12 +72,14 @@ jobs:
           python -m compileall -q \
             skeleton/jeeves/historical_modes.py \
             skeleton/jeeves/bidirectional_modes.py \
+            skeleton/jeeves/bidirectional_calibration.py \
             skeleton/learning/evidence.py
 
-      - name: Run forward backward and evidence regressions
+      - name: Run forward backward calibration and evidence regressions
         run: |
           python -m pytest -q \
             skeleton/testing/test_jeeves_historical_modes.py \
             skeleton/testing/test_jeeves_bidirectional_modes.py \
+            skeleton/testing/test_jeeves_bidirectional_calibration.py \
             skeleton/testing/test_jeeves_historical_mode_exports.py \
             skeleton/testing/test_learning_evidence.py
