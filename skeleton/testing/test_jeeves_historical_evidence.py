@@ -59,7 +59,7 @@ def _build(report, series, **kwargs):
 def test_bridge_requires_explicit_observation_time() -> None:
     series = _series()
     with pytest.raises(LearningEvidenceError) as caught:
-        _build(_report(series), series)
+        build_historical_evidence(_report(series), series, subject_id=SUBJECT)
     assert caught.value.context == {"reason": "missing_observed_at", "field": "observed_at"}
 
 
