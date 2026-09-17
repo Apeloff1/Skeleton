@@ -32,7 +32,7 @@ def dispatch(cmd: str, rest: List[str]) -> int | None:
         "world": _cmd_world, "warena": _cmd_warena, "monte": _cmd_monte,
         "bundle": _cmd_bundle, "laws": _cmd_laws, "hunt": _cmd_hunt,
         "wave4": _cmd_wave4, "backlog": _cmd_backlog, "wave5": _cmd_wave5,
-        "wave6": _cmd_wave6,
+        "wave6": _cmd_wave6, "wave7": _cmd_wave7,
     }
     fn = table.get(cmd)
     return None if fn is None else fn(rest)
@@ -274,6 +274,19 @@ def _cmd_wave6(rest: List[str]) -> int:
     try:
         first = play(seed=seed)
         second = more(seed=seed)
+    except Exception as exc:
+        return _fail(exc)
+    print(json.dumps({"ok": True, "digest": first["digest"], "more": second["digest"], "packs": first["packs"], "sota_ready": False, "stored_prose": 0}, indent=2))
+    return 0
+
+
+def _cmd_wave7(rest: List[str]) -> int:
+    from skeleton.game.wave7_more import play as more
+    from skeleton.game.wave7_play import play
+    seed = _seed(rest)
+    try:
+        first = play(seed=seed)
+        second = more(seed=seed, digest=str(first.get("digest") or "d"))
     except Exception as exc:
         return _fail(exc)
     print(json.dumps({"ok": True, "digest": first["digest"], "more": second["digest"], "packs": first["packs"], "sota_ready": False, "stored_prose": 0}, indent=2))
