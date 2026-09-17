@@ -855,3 +855,31 @@ def test_body_referenced_by_joint_cannot_be_removed_silently() -> None:
 def test_distance_joint_rejects_singular_zero_rest_length() -> None:
     with pytest.raises(PhysicsValidationError, match="rest_length"):
         DistanceJoint("singular", "a", "b", rest_length=0.0)
+
+
+
+def test_state_digest_binds_observable_contact_manifolds() -> None:
+    left = PhysicsWorld(
+        PhysicsSettings(
+            fixed_dt=1.0 / 120.0,
+            sleep_after_seconds=10.0,
+        )
+    )
+    right = PhysicsWorld(left.settings)
+    for world in (left, right):
+        world.add_body(RigidBody.static("ground", PlaneShape()))
+        world.add_body(
+            RigidBody.dynamic(
+                "ball",
+                SphereShape(0.5),
+                position=Vec3(0.0, 0.5, 0.0),
+                linear_damping=0.0,
+                angular_damping=0.0,
+            )
+        )
+        world.step()
+    assert left.state_digest == right.state_digest
+    assert left.contacts() == right.contacts()
+    right._last_manifolds = ()  # type: ignore[attr-defined]
+    assert left.get_body("ball").state_record() == right.get_body("ball").state_record()
+    assert left.state_digest != right.state_digest
