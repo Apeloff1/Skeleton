@@ -1,5 +1,5 @@
 """Engine-neutral deterministic simulation primitives."""
 
-from . import ecs
+from . import ecs, physics
 
-__all__ = ["ecs"]
+__all__ = ["ecs", "physics"]
