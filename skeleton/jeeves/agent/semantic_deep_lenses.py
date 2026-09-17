@@ -240,7 +240,7 @@ def deep_semantic_lenses() -> tuple[SemanticLensSpec, ...]:
             minimum=2, sequential=True,
         ),
         _lens(
-            "possible_world_accessibility", LensFamily.NARRATIVE, SemanticRole.SYSTEM, 1970,
+            "possible_world_accessibility", LensFamily.NARRATIVE, SemanticRole.STRUCTURE, 1970,
             "Alternative worlds can be related by explicit accessibility constraints rather than loose similarity.",
             ("possible world", "alternate", "counterpart", "world", "accessible", "parallel"),
             ("Which transitions between worlds are permitted by the representation's rules?",),
@@ -336,7 +336,7 @@ def deep_semantic_lenses() -> tuple[SemanticLensSpec, ...]:
             "Converting a defeasible pragmatic inference into literal semantic content.",
         ),
         _lens(
-            "speech_act_force", LensFamily.RHETORIC, SemanticRole.SYSTEM, 1962,
+            "speech_act_force", LensFamily.RHETORIC, SemanticRole.STRUCTURE, 1962,
             "The same propositional content can perform different actions such as request, promise, warning, or assertion.",
             ("request", "promise", "warn", "ask", "order", "offer", "say"),
             ("What action is the utterance performing in this interaction, beyond its literal proposition?",),
@@ -382,7 +382,7 @@ def deep_semantic_lenses() -> tuple[SemanticLensSpec, ...]:
 
         # --- Games: executable rules, player history, information and metagame ---
         _lens(
-            "ergodic_traversal", LensFamily.GAME, SemanticRole.SYSTEM, 1997,
+            "ergodic_traversal", LensFamily.GAME, SemanticRole.STRUCTURE, 1997,
             "Access to content can require nontrivial user traversal rather than passive sequential reception.",
             ("traverse", "path", "navigate", "choice", "nonlinear", "ergodic"),
             ("Which user operations are required to make this state or text available?",),
@@ -407,7 +407,7 @@ def deep_semantic_lenses() -> tuple[SemanticLensSpec, ...]:
             minimum=2,
         ),
         _lens(
-            "operational_logic", LensFamily.GAME, SemanticRole.SYSTEM, 2010,
+            "operational_logic", LensFamily.GAME, SemanticRole.STRUCTURE, 2010,
             "Low-level executable logics such as collision, persistence, selection, chance, or linking compose higher mechanics.",
             ("collision", "persistence", "selection", "chance", "control", "logic", "mechanic"),
             ("Which primitive operation actually produces the observed mechanic?",),
@@ -478,7 +478,7 @@ def deep_semantic_lenses() -> tuple[SemanticLensSpec, ...]:
             minimum=2,
         ),
         _lens(
-            "mechanism_incentive_compatibility", LensFamily.GAME, SemanticRole.SYSTEM, 1972,
+            "mechanism_incentive_compatibility", LensFamily.GAME, SemanticRole.STRUCTURE, 1972,
             "A mechanism can be tested for whether desired truthful/target behavior is individually advantageous.",
             ("incentive", "mechanism", "truthful", "report", "auction", "reward"),
             ("Can an actor improve its outcome by strategically misreporting or deviating?",),
@@ -531,7 +531,7 @@ def deep_semantic_lenses() -> tuple[SemanticLensSpec, ...]:
             minimum=3, sequential=True,
         ),
         _lens(
-            "dialogue_optionality_pragmatic_act", LensFamily.GAME, SemanticRole.SYSTEM, 2025,
+            "dialogue_optionality_pragmatic_act", LensFamily.GAME, SemanticRole.STRUCTURE, 2025,
             "Dialogue options can differ by pragmatic action, not merely by proposition or branch destination.",
             ("dialogue option", "accept", "decline", "threaten", "promise", "ask", "choice"),
             ("What speech act does each option enable, and which acts are absent from the possibility space?",),
@@ -656,7 +656,7 @@ def deep_semantic_lenses() -> tuple[SemanticLensSpec, ...]:
             minimum=2,
         ),
         _lens(
-            "boundary_object_translation", LensFamily.SOCIAL, SemanticRole.SYSTEM, 1989,
+            "boundary_object_translation", LensFamily.SOCIAL, SemanticRole.STRUCTURE, 1989,
             "One artifact can coordinate communities while carrying partially different local meanings.",
             ("shared artifact", "teams", "different meaning", "interface", "boundary", "translation"),
             ("What minimum structure is stable across communities, and what changes locally?",),
