@@ -21,6 +21,7 @@ on:
       - "skeleton/testing/test_jeeves_probabilistic_state_space.py"
       - "skeleton/testing/test_jeeves_probabilistic_bayes.py"
       - "skeleton/testing/test_jeeves_probabilistic_calibration.py"
+      - "skeleton/testing/test_jeeves_probabilistic_evidence_identity.py"
       - "skeleton/testing/test_jeeves_probabilistic_conformal.py"
       - "skeleton/testing/test_jeeves_probabilistic_conformal_stratified.py"
       - "skeleton/testing/test_jeeves_probabilistic_contracts.py"
@@ -102,6 +103,7 @@ jobs:
             skeleton/testing/test_jeeves_probabilistic_state_space.py \
             skeleton/testing/test_jeeves_probabilistic_bayes.py \
             skeleton/testing/test_jeeves_probabilistic_calibration.py \
+            skeleton/testing/test_jeeves_probabilistic_evidence_identity.py \
             skeleton/testing/test_jeeves_probabilistic_conformal.py \
             skeleton/testing/test_jeeves_probabilistic_conformal_stratified.py \
             skeleton/testing/test_jeeves_probabilistic_contracts.py \
@@ -124,6 +126,7 @@ jobs:
             skeleton/testing/test_jeeves_probabilistic_state_space.py \
             skeleton/testing/test_jeeves_probabilistic_bayes.py \
             skeleton/testing/test_jeeves_probabilistic_calibration.py \
+            skeleton/testing/test_jeeves_probabilistic_evidence_identity.py \
             skeleton/testing/test_jeeves_probabilistic_conformal.py \
             skeleton/testing/test_jeeves_probabilistic_conformal_stratified.py \
             skeleton/testing/test_jeeves_probabilistic_contracts.py \
