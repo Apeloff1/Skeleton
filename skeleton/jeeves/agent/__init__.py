@@ -1,8 +1,10 @@
 """Jeeves evidence-first cognitive agent runtime.
 
-Public imports are kept explicit so application code can assemble the runtime,
-epistemic world model, empirical skill learner, metacognitive controller, and
-high-level cortex without reaching into implementation modules.
+Public imports are explicit enough for application code to assemble the runtime
+without reaching through implementation paths.  The package surface now exposes
+both the original bounded runtime and the newer scientific layers: cue-first
+context, typed probability/uncertainty, semantic nuance and calibrated
+prediction, perpendicular tangent continuity, and factorized causal control.
 """
 
 from .action_model import (
@@ -40,6 +42,18 @@ from .cognition import (
     ScratchEntry,
     approximate_tokens,
 )
+from .context_pipeline import (
+    ContextResolution,
+    ContextSourceAdapter,
+    ContextSourceKind,
+    ContextTier,
+    LayeredContextCompiler,
+    LayeredContextResolver,
+    ResolutionPolicy,
+    ResolutionStage,
+    ResolvedItem,
+    SourceRecord,
+)
 from .cortex import (
     CortexCheckpointAssessment,
     CortexConfig,
@@ -69,6 +83,7 @@ from .evaluation import (
     EvaluationSuite,
     RunEvaluator,
 )
+from .frontier_control_plane import FrontierCognitiveControlPlane
 from .memory import (
     ConsolidationCandidate,
     InMemoryStore,
@@ -80,6 +95,15 @@ from .memory import (
     MemoryRecord,
     MemoryRetriever,
     RetrievalWeights,
+)
+from .memory_game import (
+    CardHit as MemoryGameCardHit,
+    IndexCardStore,
+    InteractionCard,
+    MemoryGameError,
+    MemoryGameIndex,
+    MemoryGamePolicy,
+    RecallFeedback,
 )
 from .metacognition import (
     ActionSignals,
@@ -118,6 +142,22 @@ from .policy import (
     PolicyContext,
     PolicyDecision,
 )
+from .probability_lenses import (
+    AssessmentShape,
+    ProbabilityAssessment,
+    ProbabilityError,
+    ProbabilityLens,
+    ProbabilityWorkbench,
+    calibrated_forecast_probability,
+    dempster_shafer_support,
+    empirical_game_probability,
+    fair_dice_sum_probability,
+    hazard_survival_probability,
+    imprecise_probability,
+    memory_retrieval_probability,
+    possibility_necessity_support,
+    transition_probability,
+)
 from .provider import (
     CircuitBreaker,
     CircuitState,
@@ -134,6 +174,54 @@ from .runtime import (
     JeevesAgentRuntime,
     RunCheckpoint,
     RunInputs,
+)
+from .semantic_frontier import (
+    FrontierLensRouter,
+    FrontierSemanticRegistry,
+    LensCompositionEngine,
+    LensInteraction,
+    LensInteractionKind,
+    LensInteractionRule,
+    SemanticComposition,
+    default_interaction_rules,
+    frontier_semantic_lenses,
+)
+from .semantic_lenses import (
+    JuxtapositionAnalyzer,
+    JuxtapositionSignal,
+    LensFamily,
+    LensSelection,
+    ReadingStatus,
+    SemanticFinding,
+    SemanticLensRegistry,
+    SemanticLensRouter,
+    SemanticLensSpec,
+    SemanticObservation,
+    SemanticRole,
+    TangentSeed,
+)
+from .semantic_prediction import (
+    PredictionEvaluation,
+    PredictionPolicy,
+    PredictionStatus,
+    SemanticForecast,
+    SemanticPredictionLedger,
+    SemanticPredictiveModel,
+    log_odds_pool,
+)
+from .semantic_tangent_bridge import (
+    SemanticRestartPacket,
+    SemanticTangentBridge,
+    TangentBridgePolicy,
+)
+from .tangent_graph import (
+    ExplorationAxis,
+    FrontierSelection,
+    RestartContinuityBundle,
+    TangentGraph,
+    TangentNode,
+    TangentPolicy,
+    TangentStatus,
 )
 from .telemetry import MetricsRegistry, SpanRecord, TraceEvent, TraceLedger, Tracer
 from .tools import (
@@ -170,6 +258,25 @@ from .types import (
     canonical_json,
     stable_fingerprint,
     stable_id,
+)
+from .uncertainty_frontier import (
+    BayesianCategorical,
+    DecisionCalibration,
+    DependenceDiagnostics,
+    FrontierLens,
+    FrontierLensContract,
+    FrontierLensRegistry,
+    FrontierMeasurement,
+    FrontierUncertaintyError,
+    GameProbability,
+    IdentificationDiagnostics,
+    ImplementationStatus,
+    InfluenceDiagnostics,
+    MemoryUncertainty,
+    MonteCarloDiagnostics,
+    QuantityKind,
+    SequentialInference,
+    frontier_lens_contracts,
 )
 from .verification import (
     CheckSeverity,
