@@ -12,6 +12,9 @@ from skeleton.jeeves import (
     HistoricalSeries,
     SelectionGate,
     TemporalDirection,
+    TemporalJackknifeConfig,
+    TemporalJackknifeModeLab,
+    TemporalViewKind,
     WalkForwardConfig,
     build_historical_evidence,
     bundle_manifest,
@@ -63,6 +66,25 @@ def test_calibrated_bidirectional_lab_is_available_from_public_surface() -> None
     assert report.ranking_agreement.common_modes >= 2
     assert report.decision.candidate is report.base.decision.candidate
     assert report.by_mode(HistoricalMode.PERSISTENCE).mode is HistoricalMode.PERSISTENCE
+
+
+def test_temporal_jackknife_lab_is_available_from_public_surface() -> None:
+    lab = TemporalJackknifeModeLab(
+        config=WalkForwardConfig(min_train_size=4),
+        gate=SelectionGate(min_folds=2, min_relative_improvement=0.0),
+        jackknife=TemporalJackknifeConfig(
+            trim_fraction=0.10,
+            max_trim=2,
+            min_views=2,
+            min_acceptance_rate=0.0,
+            min_candidate_support_rate=0.0,
+            max_candidate_mae_spread=100.0,
+        ),
+        modes=(HistoricalMode.LINEAR_TREND,),
+    )
+    report = lab.evaluate(HistoricalSeries.from_values(range(1, 21)))
+    assert report.by_view(TemporalViewKind.FULL).start == 0
+    assert report.decision.total_views >= 2
 
 
 def test_historical_evidence_bridge_is_available_from_public_surface() -> None:
