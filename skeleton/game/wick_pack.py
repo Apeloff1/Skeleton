@@ -12,11 +12,12 @@ class WickPackError(ValueError):
 WICK = tuple(f"wk_{i:02d}" for i in range(16))
 
 
-def light(state: dict[str, Any], name: str) -> dict[str, Any]:
+def set_wick(state: dict[str, Any], name: str) -> dict[str, Any]:
     if name not in WICK:
         raise WickPackError(name)
     nxt = dict(state)
-    nxt["wick"] = name
-    nxt["heat"] = min(16, int(nxt.get("heat", 0)) + 1)
+    have = list(nxt.get("wick") or [])
+    have.append(name)
+    nxt["wick"] = have
     nxt["stored_prose"] = 0
     return nxt
