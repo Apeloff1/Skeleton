@@ -135,6 +135,14 @@ class PhysicsCommandTape:
         self._frames[frame.tick] = frame
         return frame
 
+    def replace(self, frame: PhysicsCommandFrame) -> PhysicsCommandFrame:
+        if not isinstance(frame, PhysicsCommandFrame):
+            raise PhysicsReplayError("command tape requires PhysicsCommandFrame")
+        if frame.tick not in self._frames:
+            raise PhysicsReplayError("cannot replace missing command frame")
+        self._frames[frame.tick] = frame
+        return frame
+
     def frame(self, tick: int) -> PhysicsCommandFrame:
         if isinstance(tick, bool) or not isinstance(tick, int) or tick <= 0:
             raise PhysicsReplayError("command tape tick must be positive integer")
@@ -142,6 +150,14 @@ class PhysicsCommandTape:
 
     def ticks(self) -> tuple[int, ...]:
         return tuple(sorted(self._frames))
+
+    def truncate_after(self, tick: int) -> int:
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
+            raise PhysicsReplayError("command tape tick must be non-negative integer")
+        future = [value for value in self._frames if value > tick]
+        for value in sorted(future):
+            del self._frames[value]
+        return len(future)
 
     @property
     def tape_digest(self) -> str:
