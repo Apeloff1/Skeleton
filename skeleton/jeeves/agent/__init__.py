@@ -220,8 +220,7 @@ from .tangent_graph import (
     RestartContinuityBundle,
     TangentGraph,
     TangentNode,
-    TangentPolicy,
-    TangentStatus,
+    TangentState,
 )
 from .telemetry import MetricsRegistry, SpanRecord, TraceEvent, TraceLedger, Tracer
 from .tools import (
