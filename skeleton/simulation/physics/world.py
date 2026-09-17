@@ -14,7 +14,12 @@ from .collision import (
     detect_collision,
     generate_manifolds,
 )
-from .constraints import ConstraintSolver, ConstraintStats, DistanceJoint
+from .constraints import (
+    ConstraintSolver,
+    ConstraintStats,
+    JointConstraint,
+    is_joint_constraint,
+)
 from .contacts import ContactCache, ContactCacheEntry
 from .errors import (
     BodyNotFoundError,
@@ -230,7 +235,7 @@ class PhysicsWorld:
             raise PhysicsValidationError("settings must be PhysicsSettings")
         self.settings = settings or PhysicsSettings()
         self._bodies: dict[str, RigidBody] = {}
-        self._joints: dict[str, DistanceJoint] = {}
+        self._joints: dict[str, JointConstraint] = {}
         self._tick = 0
         self._broad_phase = SweepAndPruneBroadPhase(max_pairs=self.settings.max_pairs)
         self._solver = SequentialImpulseSolver(
@@ -298,18 +303,18 @@ class PhysicsWorld:
     def joint_ids(self) -> tuple[str, ...]:
         return tuple(sorted(self._joints))
 
-    def joints(self) -> tuple[DistanceJoint, ...]:
+    def joints(self) -> tuple[JointConstraint, ...]:
         return tuple(self._joints[joint_id] for joint_id in self.joint_ids())
 
-    def get_joint(self, joint_id: str) -> DistanceJoint:
+    def get_joint(self, joint_id: str) -> JointConstraint:
         try:
             return self._joints[joint_id]
         except KeyError as exc:
             raise JointNotFoundError(joint_id) from exc
 
-    def add_joint(self, joint: DistanceJoint) -> DistanceJoint:
-        if not isinstance(joint, DistanceJoint):
-            raise PhysicsValidationError("joint must be DistanceJoint")
+    def add_joint(self, joint: JointConstraint) -> JointConstraint:
+        if not is_joint_constraint(joint):
+            raise PhysicsValidationError("unsupported joint constraint")
         if joint.joint_id in self._joints:
             raise DuplicateJointError(joint.joint_id)
         if len(self._joints) >= self.settings.max_joints:
@@ -321,7 +326,7 @@ class PhysicsWorld:
         self._joints[joint.joint_id] = joint
         return joint
 
-    def remove_joint(self, joint_id: str) -> DistanceJoint:
+    def remove_joint(self, joint_id: str) -> JointConstraint:
         try:
             return self._joints.pop(joint_id)
         except KeyError as exc:
