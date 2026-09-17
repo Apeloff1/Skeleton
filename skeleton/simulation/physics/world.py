@@ -24,7 +24,7 @@ from .errors import (
     PhysicsSnapshotError,
     PhysicsValidationError,
 )
-from .math3d import AABB, Quat, Vec3
+from .math3d import EPSILON, AABB, Quat, Vec3
 from .queries import Ray, RayHit, raycast_body, sort_hits, sphere_cast_body
 from .shapes import BoxShape, PlaneShape, SphereShape
 from .snapshots import (
@@ -177,7 +177,7 @@ class PhysicsSettings:
     def fingerprint(self) -> str:
         return digest(
             {
-                "domain": "skeleton.simulation.physics.settings.v2",
+                "domain": "skeleton.simulation.physics.settings.v3",
                 "fixed_dt": self.fixed_dt,
                 "gravity": self.gravity.to_tuple(),
                 "sleep_linear_speed": self.sleep_linear_speed,
@@ -484,7 +484,7 @@ class PhysicsWorld:
     def state_digest(self) -> str:
         return digest(
             {
-                "domain": "skeleton.simulation.physics.world_state.v2",
+                "domain": "skeleton.simulation.physics.world_state.v3",
                 "settings": self.settings.fingerprint,
                 "tick": self._tick,
                 "bodies": [self._body_record(body) for body in self.bodies()],
