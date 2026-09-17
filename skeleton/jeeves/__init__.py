@@ -32,6 +32,14 @@ from .bidirectional_calibration import (
     ModeCalibration,
     RankingAgreement,
 )
+from .historical_robustness import (
+    TemporalJackknifeConfig,
+    TemporalJackknifeDecision,
+    TemporalJackknifeModeLab,
+    TemporalJackknifeReport,
+    TemporalViewEvaluation,
+    TemporalViewKind,
+)
 from .historical_evidence import (
     HistoricalEvidenceBundle,
     build_historical_evidence,
@@ -139,6 +147,12 @@ __all__ = [
     "CrossDirectionConfig",
     "ModeCalibration",
     "RankingAgreement",
+    "TemporalJackknifeConfig",
+    "TemporalJackknifeDecision",
+    "TemporalJackknifeModeLab",
+    "TemporalJackknifeReport",
+    "TemporalViewEvaluation",
+    "TemporalViewKind",
     "HistoricalEvidenceBundle",
     "build_historical_evidence",
     "bundle_manifest",
