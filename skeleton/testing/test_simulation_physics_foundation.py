@@ -653,9 +653,12 @@ def test_contact_cache_is_part_of_authoritative_state_digest() -> None:
                 angular_damping=0.0,
             )
         )
+        world.step()
     assert left.state_digest == right.state_digest
-    left.step()
     assert left.contact_cache_size() >= 1
+    right._contact_cache.restore(())  # type: ignore[attr-defined]
+    assert left.tick == right.tick
+    assert left.get_body("ball").state_record() == right.get_body("ball").state_record()
     assert left.state_digest != right.state_digest
 
 
