@@ -8,7 +8,6 @@ import pytest
 from skeleton.simulation.physics import (
     BoxShape,
     CapsuleShape,
-    ConvexQueryError,
     CylinderShape,
     PhysicsSettings,
     PhysicsValidationError,
@@ -99,7 +98,7 @@ def test_cylinder_support_aabb_and_principal_inertia_are_analytic() -> None:
 
     assert radial == pytest.approx(radius)
     assert support.y == pytest.approx(half_height)
-    assert shape.aabb(body.transform).half_extents == Vec3(radius, half_height, radius)
+    assert shape.aabb(body.transform).half_extents() == Vec3(radius, half_height, radius)
     assert props.mass == pytest.approx(expected_mass)
     assert props.inertia.m11 == pytest.approx(0.5 * expected_mass * radius**2)
     assert props.inertia.m00 == pytest.approx(
