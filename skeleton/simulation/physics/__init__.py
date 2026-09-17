@@ -1,7 +1,7 @@
 """Deterministic engine-neutral 3D physics foundation."""
 
 from .body import BodyType, RigidBody
-from .ccd import CCDHit, ContinuousCollisionDetector
+from .ccd import CCDHit, ContinuousCollisionDetector, TOIEvent
 from .calculations import (
     PhysicsAggregate,
     aggregate_physics,
@@ -146,6 +146,7 @@ __all__ = [
     "SolverStats",
     "SphereShape",
     "SweepAndPruneBroadPhase",
+    "TOIEvent",
     "Transform",
     "UnsupportedCollisionError",
     "Vec3",
