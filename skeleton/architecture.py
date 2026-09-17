@@ -145,6 +145,7 @@ API_ROUTES: List[Dict[str, Any]] = [
     {"method": "GET", "path": "/api/v1/application/capabilities/lifecycle", "protected": False, "description": "Capability lifecycle snapshot"},
     {"method": "GET", "path": "/api/v1/application/capabilities/{capability_id}", "protected": False, "description": "One curated capability"},
     {"method": "GET", "path": "/api/v1/application/planes/audit", "protected": False, "description": "Organism/social/galaxy plane audit"},
+    {"method": "GET", "path": "/api/v1/application/planes/audit/{plane_id}", "protected": False, "description": "One audited plane row"},
     {"method": "POST", "path": "/api/v1/retrieval/query", "protected": False, "description": "Multi-plane search"},
     {"method": "POST", "path": "/api/v1/retrieval/ingest", "protected": False, "description": "Document ingestion"},
     {"method": "POST", "path": "/api/v1/retrieval/feedback", "protected": False, "description": "Plane feedback"},

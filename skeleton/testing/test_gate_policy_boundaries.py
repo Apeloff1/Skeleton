@@ -61,6 +61,7 @@ def test_root_open_prefix_is_exact_only() -> None:
         ("/api/v1/application/capabilities", "application"),
         ("/api/v1/application/capabilities/lifecycle", "application"),
         ("/api/v1/application/planes/audit", "application"),
+        ("/api/v1/application/planes/audit/galaxy", "application"),
         ("/cortex/status", "cognition"),
         ("/cockpit", "interface"),
         ("/openapi.json", "interface"),

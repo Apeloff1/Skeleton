@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from skeleton.__main__ import main
 from skeleton.application import (
     AUDITED_PLANE_IDS,
@@ -112,9 +114,26 @@ def test_capabilities_cli_rejects_combined_lifecycle_and_plane_audit(capsys) -> 
 def test_http_application_plane_audit_matches_cli_payload() -> None:
     import asyncio
 
-    from skeleton.api import routes
+    from fastapi import HTTPException
 
-    assert asyncio.run(routes.application_plane_audit()) == plane_audit_snapshot()
+    from skeleton.api import routes
+    from skeleton.application import get_plane_audit_row
+
+    snapshot = plane_audit_snapshot()
+    assert asyncio.run(routes.application_plane_audit()) == snapshot
+
+    galaxy = asyncio.run(routes.application_plane_audit_row(" Galaxy "))
+    assert galaxy == get_plane_audit_row("galaxy")
+    assert galaxy["id"] == "galaxy"
+    assert galaxy["genesis_wired"] is True
+
+    with pytest.raises(HTTPException) as missing:
+        asyncio.run(routes.application_plane_audit_row("missing"))
+    assert missing.value.status_code == 404
+
+    with pytest.raises(HTTPException) as empty:
+        asyncio.run(routes.application_plane_audit_row("   "))
+    assert empty.value.status_code == 422
 
 
 def test_shared_command_plane_audit_matches_snapshot_and_stays_fail_closed() -> None:
@@ -143,3 +162,17 @@ def test_shared_command_plane_audit_matches_snapshot_and_stays_fail_closed() -> 
     assert both.ok is False
     assert both.to_payload()["error"]["code"] == "invalid_argument"
     assert "mutually exclusive" in both.to_payload()["error"]["message"]
+
+    from skeleton.application import get_plane_audit_row
+
+    galaxy = service.execute("capabilities", {"plane_audit": True, "plane_id": "galaxy"})
+    assert galaxy.ok is True
+    assert galaxy.to_payload()["data"] == get_plane_audit_row("galaxy")
+
+    unknown = service.execute("capabilities", {"plane_audit": True, "plane_id": "missing"})
+    assert unknown.ok is False
+    assert unknown.to_payload()["error"]["code"] == "invalid_argument"
+
+    not_string = service.execute("capabilities", {"plane_audit": True, "plane_id": 1})
+    assert not_string.ok is False
+    assert not_string.to_payload()["error"]["code"] == "invalid_argument"

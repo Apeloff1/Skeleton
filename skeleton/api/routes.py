@@ -156,6 +156,19 @@ async def capabilities(state=Depends(_state)) -> List[Dict[str, Any]]:
     return [cap.to_dict() for cap in _require(state.registry, "Registry").list()]
 
 
+@router.get("/application/planes/audit/{plane_id}")
+async def application_plane_audit_row(plane_id: str) -> Dict[str, Any]:
+    """Return one F-15 plane audit row by stable ID."""
+    from skeleton.application import get_plane_audit_row
+
+    try:
+        return get_plane_audit_row(plane_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @router.get("/application/planes/audit")
 async def application_plane_audit() -> Dict[str, Any]:
     """Return the identical payload as ``python -m skeleton capabilities --plane-audit``."""

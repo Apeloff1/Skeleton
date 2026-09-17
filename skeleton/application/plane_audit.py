@@ -191,3 +191,19 @@ def plane_audit_snapshot() -> dict[str, object]:
         "kind": PLANE_AUDIT_KIND,
         "planes": rows,
     }
+
+
+def get_plane_audit_row(plane_id: str) -> dict[str, object]:
+    """Return one audited plane row without importing the plane package."""
+
+    if not isinstance(plane_id, str):
+        raise TypeError("plane_id must be a string")
+    normalized = plane_id.strip().lower()
+    if not normalized:
+        raise ValueError("plane_id must not be empty")
+    if normalized not in AUDITED_PLANE_IDS:
+        raise KeyError(f"unknown plane: {normalized}")
+    for row in plane_audit_snapshot()["planes"]:
+        if row["id"] == normalized:
+            return dict(row)
+    raise KeyError(f"unknown plane: {normalized}")

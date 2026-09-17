@@ -52,9 +52,19 @@ def _capabilities_handler(_state: Any):
                 "lifecycle and plane_audit are mutually exclusive",
             )
         if raw_plane_audit:
-            from .plane_audit import plane_audit_snapshot
+            from .plane_audit import get_plane_audit_row, plane_audit_snapshot
 
-            return plane_audit_snapshot()
+            raw_plane_id = payload.get("plane_id", "")
+            if raw_plane_id in {"", None}:
+                return plane_audit_snapshot()
+            if not isinstance(raw_plane_id, str):
+                raise CommandError("invalid_argument", "plane_id must be a string")
+            try:
+                return get_plane_audit_row(raw_plane_id)
+            except KeyError as exc:
+                raise CommandError("invalid_argument", str(exc)) from exc
+            except ValueError as exc:
+                raise CommandError("invalid_argument", str(exc)) from exc
         if raw_lifecycle:
             from .capability_runtime import capability_lifecycle_snapshot
 

@@ -12,6 +12,8 @@ All notable changes to Skeleton.
 - Identical payload through `python -m skeleton capabilities --plane-audit`,
   `GET /api/v1/application/planes/audit`, and the shared `capabilities`
   command with `plane_audit: true`. Combined with `--lifecycle` fails closed.
+  `GET /api/v1/application/planes/audit/{plane_id}` looks up one audited plane
+  and fails closed on unknown/empty IDs.
 - Architecture `PACKAGES` export lists now match the public `__all__` for the
   three planes. Genesis still wires galaxy only; architecture `BOOT_PHASES`
   still omit all three, and the snapshot locks that split.

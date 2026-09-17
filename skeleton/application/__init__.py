@@ -26,7 +26,12 @@ from .command_contracts import (
     command_specs,
     parity_matrix,
 )
-from .plane_audit import AUDITED_PLANE_IDS, PLANE_AUDIT_KIND, plane_audit_snapshot
+from .plane_audit import (
+    AUDITED_PLANE_IDS,
+    PLANE_AUDIT_KIND,
+    get_plane_audit_row,
+    plane_audit_snapshot,
+)
 from .runtime_commands import build_runtime_command_service
 
 __all__ = [
@@ -51,6 +56,7 @@ __all__ = [
     "capability_runtime_status",
     "command_specs",
     "get_capability",
+    "get_plane_audit_row",
     "load_capability",
     "parity_matrix",
     "plane_audit_snapshot",
