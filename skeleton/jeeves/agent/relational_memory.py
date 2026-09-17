@@ -540,7 +540,7 @@ class RelationalMemoryIndex:
                 support_count=trace.occurrence_count,
                 trust=trace.trust,
                 conditional_entropy=entropy,
-                closed_support=True,
+                closed_support=False,
             )
             for trace, p in probs
         ]
