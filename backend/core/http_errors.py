@@ -78,11 +78,22 @@ def redact_client_payload(value: Any, *, depth: int = 0, max_depth: int = 4) -> 
     return redact_client_text(str(value), max_len=200)
 
 
+def public_http_error(
+    status_code: int,
+    public_detail: str,
+    exc: BaseException | None = None,
+) -> HTTPException:
+    """Stable public HTTP error. Logs the exception type, never the text."""
+    if exc is not None:
+        log.warning(
+            "public failure %s (%s): %s", status_code, public_detail, type(exc).__name__
+        )
+    return HTTPException(status_code=status_code, detail=public_detail)
+
+
 def internal_http_error(public_detail: str, exc: BaseException | None = None) -> HTTPException:
     """Stable 500 for caught failures. Logs the exception type, never the text."""
-    if exc is not None:
-        log.warning("internal failure (%s): %s", public_detail, type(exc).__name__)
-    return HTTPException(status_code=500, detail=public_detail)
+    return public_http_error(500, public_detail, exc)
 
 
 def install_public_error_handlers(app: FastAPI) -> None:

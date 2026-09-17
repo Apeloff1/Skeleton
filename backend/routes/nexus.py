@@ -16,6 +16,8 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from core.http_errors import public_http_error
+
 from core.curiosity_service import curiosity_service
 from core.truth_verifier import EvidenceItem, EvidenceKind
 from core.truth_watch import TruthEventKind
@@ -307,7 +309,7 @@ async def curiosity_verify_claim(body: VerifyClaimBody):
 async def curiosity_research_now():
     try: return await curiosity_service().run_now()
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"curiosity research unavailable: {type(exc).__name__}: {exc}"[:1000]) from exc
+        raise public_http_error(503, "curiosity_research_unavailable", exc) from None
 
 
 @router.post("/curiosity/boost")

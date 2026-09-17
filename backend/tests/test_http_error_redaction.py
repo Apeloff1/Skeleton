@@ -18,6 +18,7 @@ from core.http_errors import (  # noqa: E402
     PUBLIC_INTERNAL_ERROR,
     install_public_error_handlers,
     internal_http_error,
+    public_http_error,
     redact_client_payload,
     redact_client_text,
 )
@@ -61,6 +62,18 @@ ROUTE_FILES = [
     REPO_ROOT / "backend" / "routes" / "worldforge.py",
     REPO_ROOT / "backend" / "routes" / "worldforge_publish.py",
 ]
+SERVER_ERROR_FILES = [
+    REPO_ROOT / "backend" / "routes" / "ops.py",
+    REPO_ROOT / "backend" / "routes" / "deployment_checkpoint_trust.py",
+    REPO_ROOT / "backend" / "routes" / "nexus.py",
+    REPO_ROOT / "backend" / "routes" / "galaxy_studio.py",
+]
+JSON_ENVELOPE_FILES = [
+    REPO_ROOT / "backend" / "routes" / "asset_genesis.py",
+    REPO_ROOT / "backend" / "routes" / "galaxy_studio_files.py",
+    REPO_ROOT / "backend" / "routes" / "jeeves_master_build.py",
+    REPO_ROOT / "backend" / "routes" / "galaxy_studio.py",
+]
 TELEMETRY = REPO_ROOT / "backend" / "routes" / "telemetry.py"
 
 _PRIVATE = "private-detail-must-not-leak-7f31"
@@ -102,6 +115,33 @@ def _broad_failure_http_leaks(path: Path) -> list[int]:
     return leaks
 
 
+def _http_status_code(call: ast.Call) -> int | None:
+    for keyword in call.keywords:
+        if keyword.arg == "status_code" and isinstance(keyword.value, ast.Constant):
+            value = keyword.value.value
+            if isinstance(value, int):
+                return value
+    if call.args:
+        first = call.args[0]
+        if isinstance(first, ast.Constant) and isinstance(first.value, int):
+            return first.value
+    return None
+
+
+def _server_error_http_leaks(path: Path) -> list[int]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    leaks: list[int] = []
+    for handler in (node for node in ast.walk(tree) if isinstance(node, ast.ExceptHandler)):
+        if not handler.name:
+            continue
+        for statement in handler.body:
+            for call in _http_exception_calls(statement):
+                status = _http_status_code(call)
+                if status is not None and status >= 500 and _references_name(call, handler.name):
+                    leaks.append(call.lineno)
+    return leaks
+
+
 @pytest.mark.parametrize("path", ROUTE_FILES, ids=lambda path: path.name)
 def test_converted_routes_do_not_leak_caught_exceptions(path: Path) -> None:
     leaks = _broad_failure_http_leaks(path)
@@ -119,11 +159,39 @@ def test_converted_routes_use_stable_helpers_or_constants(path: Path) -> None:
     assert "internal_http_error(" in source or "from core.http_errors import" in source
 
 
+@pytest.mark.parametrize("path", SERVER_ERROR_FILES, ids=lambda path: path.name)
+def test_mixed_routes_do_not_leak_server_errors(path: Path) -> None:
+    leaks = _server_error_http_leaks(path)
+    assert leaks == [], f"{path.name} exposes caught exception data in 5xx responses at lines {leaks}"
+    source = path.read_text(encoding="utf-8")
+    assert "internal_http_error(" in source or "public_http_error(" in source
+
+
+@pytest.mark.parametrize("path", JSON_ENVELOPE_FILES, ids=lambda path: path.name)
+def test_json_envelopes_do_not_stringify_caught_exceptions(path: Path) -> None:
+    source = path.read_text(encoding="utf-8")
+    assert '"error": str(e)' not in source
+    assert '"message": str(e)' not in source
+    assert "persist failed: {e}" not in source
+    assert "APK toolchain unavailable:" not in source
+    assert "Failed to load build:" not in source
+    assert "Failed to launch build task:" not in source
+    assert "curiosity research unavailable:" not in source
+
+
 def test_internal_http_error_is_stable_and_typed() -> None:
     exc = internal_http_error("Jeeves request failed", RuntimeError(_PRIVATE))
     assert isinstance(exc, HTTPException)
     assert exc.status_code == 500
     assert exc.detail == "Jeeves request failed"
+    assert _PRIVATE not in str(exc.detail)
+
+
+def test_public_http_error_keeps_status_and_hides_exception_text() -> None:
+    exc = public_http_error(503, "curiosity_research_unavailable", RuntimeError(_PRIVATE))
+    assert isinstance(exc, HTTPException)
+    assert exc.status_code == 503
+    assert exc.detail == "curiosity_research_unavailable"
     assert _PRIVATE not in str(exc.detail)
 
 
