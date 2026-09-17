@@ -7,8 +7,13 @@ from dataclasses import dataclass
 from ..ecs.canonical import digest
 from .body import BodyType, RigidBody
 from .calculations import PhysicsAggregate, aggregate_physics
-from .ccd import CCDHit, ContinuousCollisionDetector
-from .collision import ContactManifold, SweepAndPruneBroadPhase, generate_manifolds
+from .ccd import ContinuousCollisionDetector, TOIEvent
+from .collision import (
+    ContactManifold,
+    SweepAndPruneBroadPhase,
+    detect_collision,
+    generate_manifolds,
+)
 from .constraints import ConstraintSolver, ConstraintStats, DistanceJoint
 from .contacts import ContactCache, ContactCacheEntry
 from .errors import (
@@ -88,6 +93,8 @@ class PhysicsSettings:
     ccd_enabled: bool = True
     ccd_motion_threshold: float = 0.5
     ccd_contact_slop: float = 1.0e-7
+    ccd_max_substeps: int = 8
+    ccd_min_advance_fraction: float = 1.0e-6
     max_ccd_checks: int = 65_536
     constraint_velocity_iterations: int = 8
     constraint_position_iterations: int = 4
@@ -116,6 +123,20 @@ class PhysicsSettings:
         ):
             raise PhysicsValidationError("ccd_contact_slop must be finite and non-negative")
         object.__setattr__(self, "ccd_contact_slop", float(self.ccd_contact_slop))
+        if (
+            isinstance(self.ccd_min_advance_fraction, bool)
+            or not isinstance(self.ccd_min_advance_fraction, (int, float))
+            or not math.isfinite(float(self.ccd_min_advance_fraction))
+            or not 0.0 < float(self.ccd_min_advance_fraction) <= 0.1
+        ):
+            raise PhysicsValidationError(
+                "ccd_min_advance_fraction must be in (0, 0.1]"
+            )
+        object.__setattr__(
+            self,
+            "ccd_min_advance_fraction",
+            float(self.ccd_min_advance_fraction),
+        )
         for name in ("sleep_linear_speed", "sleep_angular_speed"):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -139,6 +160,11 @@ class PhysicsSettings:
             maximum=10_000,
         )
         _bounded_int(self.max_ccd_checks, name="max_ccd_checks", maximum=1_000_000)
+        _bounded_int(
+            self.ccd_max_substeps,
+            name="ccd_max_substeps",
+            maximum=128,
+        )
         for name in (
             "velocity_iterations",
             "position_iterations",
@@ -167,6 +193,8 @@ class PhysicsSettings:
                 "ccd_enabled": self.ccd_enabled,
                 "ccd_motion_threshold": self.ccd_motion_threshold,
                 "ccd_contact_slop": self.ccd_contact_slop,
+                "ccd_max_substeps": self.ccd_max_substeps,
+                "ccd_min_advance_fraction": self.ccd_min_advance_fraction,
                 "max_ccd_checks": self.max_ccd_checks,
                 "constraint_velocity_iterations": self.constraint_velocity_iterations,
                 "constraint_position_iterations": self.constraint_position_iterations,
@@ -576,20 +604,99 @@ class PhysicsWorld:
         if self.state_digest != checkpoint.state_digest:
             raise PhysicsValidationError("physics step checkpoint failed exact restoration")
 
-    def _integrate_velocity_phase(self, dt: float) -> tuple[CCDHit, ...]:
-        bodies = self.bodies()
-        hits: list[CCDHit] = []
-        for body in bodies:
-            hit = None
-            if self.settings.ccd_enabled:
-                hit = self._ccd.sweep(body, bodies, dt)
-            if hit is None:
-                body.integrate_velocity(dt)
-                continue
-            body.position = hit.center - hit.normal * self.settings.ccd_contact_slop
-            body.integrate_orientation(dt)
-            hits.append(hit)
-        return tuple(hits)
+    def _advance_all_bodies(self, dt: float) -> None:
+        if dt <= 0.0:
+            return
+        for body in self.bodies():
+            body.integrate_velocity(dt)
+
+    def _nudge_toi_pair(self, event: TOIEvent) -> None:
+        slop = self.settings.ccd_contact_slop
+        if slop <= 0.0:
+            return
+        body_a = self._bodies[event.body_a]
+        body_b = self._bodies[event.body_b]
+        inverse_mass_sum = body_a.inverse_mass + body_b.inverse_mass
+        if inverse_mass_sum <= 0.0:
+            return
+        if body_a.inverse_mass > 0.0:
+            weight_a = body_a.inverse_mass / inverse_mass_sum
+            body_a.position = body_a.position + event.normal * (slop * weight_a)
+            body_a.wake()
+        if body_b.inverse_mass > 0.0:
+            weight_b = body_b.inverse_mass / inverse_mass_sum
+            body_b.position = body_b.position - event.normal * (slop * weight_b)
+            body_b.wake()
+
+    def _resolve_toi_event(self, event: TOIEvent, *, tick: int) -> None:
+        self._nudge_toi_pair(event)
+        manifold = detect_collision(
+            self._bodies[event.body_a],
+            self._bodies[event.body_b],
+        )
+        if manifold is None:
+            raise PhysicsValidationError(
+                "CCD TOI failed to produce a resolvable contact manifold"
+            )
+        # Do not persist interim impulses into the frame cache. The final
+        # discrete solve owns next-frame warm-start state; caching here would
+        # re-apply the same impact impulse later in this tick.
+        self._solver.solve(
+            self._bodies,
+            (manifold,),
+            cache=None,
+            tick=tick,
+        )
+
+    def _integrate_velocity_phase(
+        self,
+        dt: float,
+        *,
+        tick: int,
+    ) -> tuple[TOIEvent, ...]:
+        if not self.settings.ccd_enabled:
+            self._advance_all_bodies(dt)
+            return ()
+
+        remaining = dt
+        events: list[TOIEvent] = []
+        minimum_advance = dt * self.settings.ccd_min_advance_fraction
+
+        for _ in range(self.settings.ccd_max_substeps):
+            if remaining <= EPSILON:
+                remaining = 0.0
+                break
+
+            event = self._ccd.earliest_event(self.bodies(), remaining)
+            if event is None:
+                self._advance_all_bodies(remaining)
+                remaining = 0.0
+                break
+
+            advance = event.time
+            if advance > 0.0:
+                self._advance_all_bodies(advance)
+                remaining = max(0.0, remaining - advance)
+
+            self._resolve_toi_event(event, tick=tick)
+            events.append(event)
+
+            if remaining <= EPSILON:
+                remaining = 0.0
+                break
+
+            if advance <= minimum_advance:
+                escape = min(remaining, minimum_advance)
+                self._advance_all_bodies(escape)
+                remaining = max(0.0, remaining - escape)
+
+        if remaining > EPSILON:
+            pending = self._ccd.earliest_event(self.bodies(), remaining)
+            if pending is not None:
+                raise PhysicsValidationError("CCD substep bound exceeded")
+            self._advance_all_bodies(remaining)
+
+        return tuple(events)
 
     def _update_sleep(self, dt: float) -> None:
         linear_limit_sq = self.settings.sleep_linear_speed**2
@@ -619,7 +726,7 @@ class PhysicsWorld:
         try:
             for body in self.bodies():
                 body.integrate_forces(dt, self.settings.gravity)
-            ccd_hits = self._integrate_velocity_phase(dt)
+            ccd_hits = self._integrate_velocity_phase(dt, tick=next_tick)
 
             pairs = self._broad_phase.compute_pairs(self.bodies())
             manifolds = generate_manifolds(self._bodies, pairs)
