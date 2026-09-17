@@ -46,6 +46,20 @@ ROUTE_FILES = [
     REPO_ROOT / "backend" / "routes" / "logic_engine.py",
     REPO_ROOT / "backend" / "routes" / "world_engine.py",
     REPO_ROOT / "backend" / "routes" / "behaviour_npc_memory_pipeline.py",
+    REPO_ROOT / "backend" / "routes" / "world_models_pipeline.py",
+    REPO_ROOT / "backend" / "routes" / "testing_qa_pipeline.py",
+    REPO_ROOT / "backend" / "routes" / "server_backend_pipeline.py",
+    REPO_ROOT / "backend" / "routes" / "world_management_pipeline.py",
+    REPO_ROOT / "backend" / "routes" / "vfx_materials_pipeline.py",
+    REPO_ROOT / "backend" / "routes" / "monetization_pipeline.py",
+    REPO_ROOT / "backend" / "routes" / "neural_rendering_pipeline.py",
+    REPO_ROOT / "backend" / "routes" / "hardware_optimization_pipeline.py",
+    REPO_ROOT / "backend" / "routes" / "economy_pipeline.py",
+    REPO_ROOT / "backend" / "routes" / "director_pipeline.py",
+    REPO_ROOT / "backend" / "routes" / "bot_persona_pipeline.py",
+    REPO_ROOT / "backend" / "routes" / "action_gameplay_pipeline.py",
+    REPO_ROOT / "backend" / "routes" / "worldforge.py",
+    REPO_ROOT / "backend" / "routes" / "worldforge_publish.py",
 ]
 TELEMETRY = REPO_ROOT / "backend" / "routes" / "telemetry.py"
 

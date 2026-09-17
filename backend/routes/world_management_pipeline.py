@@ -13,6 +13,7 @@
 """
 
 from fastapi import APIRouter, HTTPException
+from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 from enum import Enum
@@ -441,7 +442,7 @@ async def ai_generate_world_region(request: AIWorldRegionRequest):
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI world region generation failed: {str(e)}")
+        raise internal_http_error("AI world region generation failed", e) from None
 
 
 @router.post("/ai/level/design")
@@ -480,4 +481,4 @@ async def ai_design_level(request: AILevelDesignRequest):
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI level design failed: {str(e)}")
+        raise internal_http_error("AI level design failed", e) from None
