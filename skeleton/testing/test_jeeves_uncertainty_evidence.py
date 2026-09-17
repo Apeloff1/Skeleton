@@ -71,7 +71,10 @@ def test_uncertainty_evidence_requires_explicit_observation_time() -> None:
     series = _series()
     with pytest.raises(LearningEvidenceError) as caught:
         build_uncertainty_evidence(_report(series), series, subject_id=SUBJECT)
-    assert caught.value.context == {\n        "reason": "missing_observed_at",\n        "field": "observed_at",\n    }
+    assert caught.value.context == {
+        "reason": "missing_observed_at",
+        "field": "observed_at",
+    }
 
 
 def test_uncertainty_evidence_reuses_same_series_fact_root() -> None:
