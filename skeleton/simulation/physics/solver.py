@@ -148,8 +148,13 @@ class SequentialImpulseSolver:
                 if entry is not None:
                     state.accumulated_normal = entry.normal_impulse
                     if entry.tangent.length_squared() > EPSILON * EPSILON:
-                        state.tangent = entry.tangent
-                        state.accumulated_tangent = entry.tangent_impulse
+                        projected = (
+                            entry.tangent
+                            - manifold.normal * entry.tangent.dot(manifold.normal)
+                        )
+                        if projected.length_squared() > EPSILON * EPSILON:
+                            state.tangent = projected.normalized()
+                            state.accumulated_tangent = entry.tangent_impulse
 
                     both_quiet = (
                         (not body_a.dynamic_body or not body_a.awake)
