@@ -48,7 +48,7 @@ LANES: Final[tuple[SotaLane, ...]] = (
         owner_issue=942,
         status="contract",
         evidence="structural",
-        module="skeleton.developer",
+        module="skeleton.game.intent",
         next_contract="intent compiler + approval boundary",
     ),
     SotaLane(
@@ -76,19 +76,19 @@ LANES: Final[tuple[SotaLane, ...]] = (
         first_batch="B041",
         last_batch="B050",
         owner_issue=945,
-        status="blocked",
+        status="contract",
         evidence="structural",
-        module="skeleton.galaxy",
-        next_contract="wait on gameplay replay contract",
+        module="skeleton.game.world_graph",
+        next_contract="place+prefill walk extract-once",
     ),
     SotaLane(
         id="assets",
         first_batch="B051",
         last_batch="B060",
         owner_issue=946,
-        status="blocked",
+        status="contract",
         evidence="structural",
-        module="skeleton.content",
+        module="skeleton.game.rights",
         next_contract="manifest/provenance + rights release gate",
     ),
     SotaLane(
@@ -99,7 +99,7 @@ LANES: Final[tuple[SotaLane, ...]] = (
         status="blocked",
         evidence="structural",
         module="skeleton.swarm",
-        next_contract="wait on deterministic time + replay",
+        next_contract="occupied #1027 replication; do not fork",
     ),
     SotaLane(
         id="quality",
@@ -109,7 +109,7 @@ LANES: Final[tuple[SotaLane, ...]] = (
         status="contract",
         evidence="structural",
         module="skeleton.game.replay",
-        next_contract="replay evidence + flake lifecycle",
+        next_contract="replay evidence + flake lifecycle; harness is #1030",
     ),
     SotaLane(
         id="security",
@@ -119,7 +119,7 @@ LANES: Final[tuple[SotaLane, ...]] = (
         status="contract",
         evidence="structural",
         module="skeleton.vault.tool_fence",
-        next_contract="generated-code sandbox + prompt/tool injection",
+        next_contract="generated-code sandbox + injection; corpus is #1029",
     ),
     SotaLane(
         id="platform",
@@ -128,8 +128,8 @@ LANES: Final[tuple[SotaLane, ...]] = (
         owner_issue=950,
         status="blocked",
         evidence="structural",
-        module="skeleton.forge",
-        next_contract="Godot artifact plane #1008 then B100 arena",
+        module="skeleton.game.arena",
+        next_contract="Godot artifact plane #1008 then B100 arena eval",
     ),
 )
 
@@ -169,8 +169,10 @@ def sota_program() -> dict[str, object]:
         "lanes": [asdict(lane) for lane in LANES],
         "high_leverage": [
             "B021/B071/B072 deterministic mechanics + replay",
+            "B011 intent compiler + B043 world graph extract-once",
+            "B043/B044 critique cockpit without live retune",
             "B082/B086 generated-code sandbox + injection boundary",
             "B006/B091 Godot binary off git onto artifact plane",
-            "B100 only after major lanes have eval evidence",
+            "B100 arena is eval-partial until Godot plane lands",
         ],
     }
