@@ -40,6 +40,16 @@ from .historical_robustness import (
     TemporalViewEvaluation,
     TemporalViewKind,
 )
+from .historical_uncertainty import (
+    ConformalConfig,
+    ConformalIntervalFold,
+    DirectionalUncertaintyReport,
+    HistoricalUncertaintyModeLab,
+    HistoricalUncertaintyReport,
+    UncertaintyDecision,
+    build_sequential_intervals,
+    conformal_radius,
+)
 from .historical_evidence import (
     HistoricalEvidenceBundle,
     build_historical_evidence,
@@ -153,6 +163,14 @@ __all__ = [
     "TemporalJackknifeReport",
     "TemporalViewEvaluation",
     "TemporalViewKind",
+    "ConformalConfig",
+    "ConformalIntervalFold",
+    "DirectionalUncertaintyReport",
+    "HistoricalUncertaintyModeLab",
+    "HistoricalUncertaintyReport",
+    "UncertaintyDecision",
+    "build_sequential_intervals",
+    "conformal_radius",
     "HistoricalEvidenceBundle",
     "build_historical_evidence",
     "bundle_manifest",
