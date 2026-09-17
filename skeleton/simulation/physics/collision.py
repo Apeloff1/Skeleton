@@ -33,10 +33,18 @@ class BroadPhasePair:
 class ContactPoint:
     position: Vec3
     penetration: float
+    feature_id: str = "primary"
 
     def __post_init__(self) -> None:
         if not math.isfinite(self.penetration) or self.penetration < 0.0:
             raise PhysicsValidationError("contact penetration must be finite and non-negative")
+        if (
+            not isinstance(self.feature_id, str)
+            or not self.feature_id
+            or len(self.feature_id) > 128
+            or any(ord(char) < 32 for char in self.feature_id)
+        ):
+            raise PhysicsValidationError("invalid contact feature_id")
 
 
 @dataclass(frozen=True, slots=True)
