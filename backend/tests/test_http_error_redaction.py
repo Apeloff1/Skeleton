@@ -205,6 +205,13 @@ def test_json_envelopes_do_not_stringify_caught_exceptions(path: Path) -> None:
     assert "curiosity research unavailable:" not in source
 
 
+
+def test_json_envelopes_do_not_expose_upstream_response_bodies() -> None:
+    source = (REPO_ROOT / "backend" / "routes" / "game_command_agents.py").read_text(encoding="utf-8")
+    assert "response.text" not in source
+    assert "Image generation unavailable (" not in source
+
+
 def test_internal_http_error_is_stable_and_typed() -> None:
     exc = internal_http_error("Jeeves request failed", RuntimeError(_PRIVATE))
     assert isinstance(exc, HTTPException)
