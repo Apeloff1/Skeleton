@@ -304,6 +304,7 @@ class TransitionFeedback:
     predicted_probability: float
     surprise: float
     brier_error: float
+    prediction_available: bool
     relation_id: str
     relation_fingerprint: str
 
@@ -581,19 +582,25 @@ class RelationalMemoryIndex:
         source = require_id("source_card_id", source_card_id)
         target = require_id("observed_target_card_id", observed_target_card_id)
         existing_predictions = self.predictions(namespace, source, limit=1000)
+        prediction_available = bool(existing_predictions)
         probability_before = next(
             (item.probability for item in existing_predictions if item.target_card_id == target),
             0.0,
         )
-        if probability_before <= 0.0:
+        if prediction_available and probability_before <= 0.0:
             outgoing_support = sum(item.support_weight for item in existing_predictions)
             k = len(existing_predictions)
-            if k:
-                alpha = self.policy.dirichlet_alpha
-                probability_before = alpha / (outgoing_support + alpha * (k + 1))
-        probability_before = max(_EPS, min(1.0, probability_before))
-        surprise = min(1.0, -math.log(probability_before) / 27.631021115928547)
-        brier = (1.0 - probability_before) ** 2
+            alpha = self.policy.dirichlet_alpha
+            probability_before = alpha / (outgoing_support + alpha * (k + 1))
+        if prediction_available:
+            probability_before = max(_EPS, min(1.0, probability_before))
+            surprise = min(1.0, -math.log(probability_before) / 27.631021115928547)
+            brier = (1.0 - probability_before) ** 2
+        else:
+            # No forecast existed, so there is no forecast error to score.
+            probability_before = 0.5
+            surprise = 0.0
+            brier = 0.0
 
         with self._lock:
             for prediction in existing_predictions:
@@ -634,6 +641,7 @@ class RelationalMemoryIndex:
             predicted_probability=probability_before,
             surprise=surprise,
             brier_error=min(1.0, brier),
+            prediction_available=prediction_available,
             relation_id=learned.relation_id,
             relation_fingerprint=learned.fingerprint,
         )
@@ -795,7 +803,7 @@ class RelationalMemoryIndex:
             )
             created.append(trace.relation_id)
 
-        if feedback.surprise >= self.policy.event_boundary_surprise:
+        if feedback.prediction_available and feedback.surprise >= self.policy.event_boundary_surprise:
             boundary = self.link(
                 namespace,
                 RelationKind.EVENT_BOUNDARY,
@@ -808,6 +816,7 @@ class RelationalMemoryIndex:
                 metadata={
                     "prediction_error_boundary": True,
                     "predicted_probability": feedback.predicted_probability,
+                    "prediction_available": feedback.prediction_available,
                     "brier_error": feedback.brier_error,
                 },
             )
@@ -862,6 +871,7 @@ class RelationalMemoryIndex:
                     "history": history[-2:],
                     "current": current,
                     "predicted_probability": feedback.predicted_probability,
+                    "prediction_available": feedback.prediction_available,
                     "surprise": feedback.surprise,
                     "brier": feedback.brier_error,
                     "created": sorted(set(created)),
