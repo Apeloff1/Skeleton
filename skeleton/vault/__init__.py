@@ -9,6 +9,7 @@ Exports:
 - Predefined roles: ROLE_GUEST, ROLE_USER, ROLE_OPERATOR, ROLE_ADMIN
 - AuditLog / WORM refuse-on-boot helpers (AuditChainBroken, verify_chain_or_refuse)
 - ShamirSeal: secret sharing seal
+- inspect_tool: bounded tool/prompt fence
 """
 
 from skeleton.vault.access import (
@@ -29,6 +30,7 @@ from skeleton.vault.audit import (
     verify_chain_or_refuse,
 )
 from skeleton.vault.shamir import ShamirSeal
+from skeleton.vault.tool_fence import FenceDecision, ToolFenceError, inspect_tool
 
 __all__ = [
     "AccessPolicy",
@@ -45,4 +47,7 @@ __all__ = [
     "AuditLog",
     "verify_chain_or_refuse",
     "ShamirSeal",
+    "FenceDecision",
+    "ToolFenceError",
+    "inspect_tool",
 ]
