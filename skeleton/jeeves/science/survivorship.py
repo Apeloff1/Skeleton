@@ -570,6 +570,14 @@ class HistoricalSurvivorshipEngine:
         end_year: int,
         standards: Sequence[MetricStandard],
     ) -> tuple[YearFacetFrontier, ...]:
+        """Replay the frontier year by year and reconsider maturing challengers.
+
+        Eligibility and promotion are intentionally separate. A method can exist
+        for years in shadow mode until enough forward evidence accumulates. At
+        most one challenger is promoted in a given year: the strongest
+        complexity-adjusted candidate against the incumbent at the start of that
+        year. This removes iteration-order effects.
+        """
         if end_year < start_year:
             raise AgentContractError("end_year precedes start_year")
         active: str | None = None
@@ -578,42 +586,62 @@ class HistoricalSurvivorshipEngine:
 
         for year in range(start_year, end_year + 1):
             eligible = self.methods(facet, through_year=year)
-            comparisons: list[MethodComparison] = []
             if active is None and eligible:
                 active = eligible[0].method_id
                 role_map.setdefault(active, set()).add(SurvivorRole.ACTIVE)
 
-            for challenger in eligible:
-                if active is None or challenger.method_id == active:
-                    continue
-                if challenger.available_year != year:
-                    continue
-                comparison = self.compare(
-                    active,
-                    challenger.method_id,
-                    year=year,
-                    standards=standards,
+            comparisons: list[MethodComparison] = []
+            promotable: list[tuple[float, int, str, MethodComparison]] = []
+            incumbent_at_start = active
+            if incumbent_at_start is not None:
+                for challenger in eligible:
+                    if challenger.method_id == incumbent_at_start:
+                        continue
+                    comparison = self.compare(
+                        incumbent_at_start,
+                        challenger.method_id,
+                        year=year,
+                        standards=standards,
+                    )
+                    comparisons.append(comparison)
+                    if comparison.decision is HistoricalDecision.PROMOTE:
+                        promotable.append(
+                            (
+                                comparison.complexity_adjusted_gain,
+                                -challenger.complexity_rank,
+                                challenger.method_id,
+                                comparison,
+                            )
+                        )
+                    elif comparison.decision is HistoricalDecision.SHADOW:
+                        role_map.setdefault(challenger.method_id, set()).add(
+                            SurvivorRole.SHADOW
+                        )
+                    elif comparison.decision in {
+                        HistoricalDecision.INVARIANT_REJECTED,
+                        HistoricalDecision.LEAKAGE_REJECTED,
+                    }:
+                        role_map.setdefault(challenger.method_id, set()).add(
+                            SurvivorRole.REJECTED
+                        )
+                    elif comparison.decision is HistoricalDecision.HOLD:
+                        role_map.setdefault(challenger.method_id, set()).update(
+                            challenger.survives_as
+                        )
+
+            if promotable and incumbent_at_start is not None:
+                _, _, winner_id, _ = max(
+                    promotable,
+                    key=lambda row: (row[0], row[1], row[2]),
                 )
-                comparisons.append(comparison)
-                if comparison.decision is HistoricalDecision.PROMOTE:
-                    old = active
-                    role_map.setdefault(old, set()).discard(SurvivorRole.ACTIVE)
-                    role_map.setdefault(old, set()).update(
-                        self._methods[old].survives_as
-                    )
-                    active = challenger.method_id
-                    role_map.setdefault(active, set()).add(SurvivorRole.ACTIVE)
-                elif comparison.decision is HistoricalDecision.SHADOW:
-                    role_map.setdefault(challenger.method_id, set()).add(SurvivorRole.SHADOW)
-                elif comparison.decision in {
-                    HistoricalDecision.INVARIANT_REJECTED,
-                    HistoricalDecision.LEAKAGE_REJECTED,
-                }:
-                    role_map.setdefault(challenger.method_id, set()).add(SurvivorRole.REJECTED)
-                else:
-                    role_map.setdefault(challenger.method_id, set()).update(
-                        challenger.survives_as
-                    )
+                old = incumbent_at_start
+                role_map.setdefault(old, set()).discard(SurvivorRole.ACTIVE)
+                role_map.setdefault(old, set()).update(self._methods[old].survives_as)
+                active = winner_id
+                winner_roles = role_map.setdefault(winner_id, set())
+                winner_roles.discard(SurvivorRole.SHADOW)
+                winner_roles.discard(SurvivorRole.REJECTED)
+                winner_roles.add(SurvivorRole.ACTIVE)
 
             survivor_roles = {
                 method_id: tuple(sorted(roles, key=lambda role: role.value))
@@ -739,25 +767,18 @@ def default_historical_methods() -> tuple[HistoricalMethod, ...]:
         ("causal_reinforcement_learning", 2020, "Causal reinforcement learning", ScientificFacet.CAUSALITY,
          "Exploit autonomous causal mechanisms and interventions for transfer and decision making", EvidenceGrade.EMERGING, 9),
     )
-    methods: list[HistoricalMethod] = []
-    by_facet_last: dict[ScientificFacet, str] = {}
-    for method_id, year, name, facet, principle, grade, complexity in rows:
-        predecessors = ()
-        # A predecessor edge is used only when it is conceptually the same
-        # evolving strand; cross-facet chronology remains independent.
-        if facet in by_facet_last:
-            predecessors = (by_facet_last[facet],)
-        methods.append(
-            HistoricalMethod(
-                method_id=method_id,
-                available_year=year,
-                name=name,
-                facet=facet,
-                retained_principle=principle,
-                evidence_grade=grade,
-                complexity_rank=complexity,
-                predecessors=predecessors,
-            )
+    # Chronological adjacency is not intellectual descent. Predecessor edges are
+    # therefore left empty here unless a future curated record can justify a
+    # specific inheritance/supersession claim.
+    return tuple(
+        HistoricalMethod(
+            method_id=method_id,
+            available_year=year,
+            name=name,
+            facet=facet,
+            retained_principle=principle,
+            evidence_grade=grade,
+            complexity_rank=complexity,
         )
-        by_facet_last[facet] = method_id
-    return tuple(methods)
+        for method_id, year, name, facet, principle, grade, complexity in rows
+    )
