@@ -26,6 +26,11 @@ from .command_contracts import (
     command_specs,
     parity_matrix,
 )
+from .api_route_audit import (
+    API_ROUTE_AUDIT_KIND,
+    api_route_audit_snapshot,
+    get_api_route_audit_row,
+)
 from .export_audit import EXPORT_AUDIT_KIND, export_audit_snapshot, get_export_audit_row
 from .genesis_boot_audit import (
     GENESIS_BOOT_AUDIT_KIND,
@@ -41,6 +46,7 @@ from .plane_audit import (
 from .runtime_commands import build_runtime_command_service
 
 __all__ = [
+    "API_ROUTE_AUDIT_KIND",
     "AUDITED_PLANE_IDS",
     "CAPABILITIES",
     "CAPABILITIES_BY_ID",
@@ -58,6 +64,7 @@ __all__ = [
     "CommandResult",
     "CommandService",
     "CommandSpec",
+    "api_route_audit_snapshot",
     "build_runtime_command_service",
     "capability_lifecycle_snapshot",
     "capability_manifest",
@@ -65,6 +72,7 @@ __all__ = [
     "command_specs",
     "export_audit_snapshot",
     "genesis_boot_audit_snapshot",
+    "get_api_route_audit_row",
     "get_capability",
     "get_export_audit_row",
     "get_genesis_boot_audit_row",

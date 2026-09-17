@@ -146,6 +146,33 @@ def prefetch_from_genesis(
     )
 
 
+def planning_prefetch_dict(
+    genesis: Any,
+    pipeline_name: str,
+    context: Optional[Mapping[str, Any]] = None,
+    *,
+    limit: int = 3,
+) -> dict[str, Any]:
+    """Return a JSON sidecar for pipeline ``.run()``. Prefetch never fails the run."""
+
+    try:
+        return prefetch_from_genesis(
+            genesis,
+            pipeline_name,
+            context,
+            limit=limit,
+        ).to_dict()
+    except Exception:  # noqa: BLE001 — planning prefetch is fail-closed
+        name = _normalize_pipeline_name(pipeline_name) or pipeline_name or "pipeline"
+        return {
+            "pipeline": name,
+            "queries": [],
+            "failures": ["prefetch"],
+            "prepared_queries": [],
+            "document_ids": [],
+        }
+
+
 def bind_quad_search_pipeline(quad: QuadRetriever) -> SearchPipeline:
     """Register the quad retriever on a planner used for speculative prefetch."""
 

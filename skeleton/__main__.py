@@ -19,6 +19,7 @@ Commands:
                 Use `capabilities --plane-audit` for the F-15 plane audit
                 Use `capabilities --boot-audit` for the genesis/BOOT_PHASES audit
                 Use `capabilities --export-audit` for manifest export drift
+                Use `capabilities --route-audit` for main-router API_ROUTES drift
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
@@ -46,6 +47,7 @@ def _cmd_capabilities(rest: List[str]) -> int:
         export_audit_snapshot,
         genesis_boot_audit_snapshot,
         plane_audit_snapshot,
+        api_route_audit_snapshot,
     )
 
     flags = {item.strip().lower() for item in rest if item.strip()}
@@ -54,6 +56,7 @@ def _cmd_capabilities(rest: List[str]) -> int:
         "plane_audit": {"--plane-audit", "plane-audit", "--plane_audit", "plane_audit"},
         "boot_audit": {"--boot-audit", "boot-audit", "--boot_audit", "boot_audit"},
         "export_audit": {"--export-audit", "export-audit", "--export_audit", "export_audit"},
+        "route_audit": {"--route-audit", "route-audit", "--route_audit", "route_audit"},
     }
     allowed = set().union(*aliases.values())
     unknown = flags - allowed
@@ -65,7 +68,9 @@ def _cmd_capabilities(rest: List[str]) -> int:
         print(f"{' and '.join(selected)} are mutually exclusive")
         return 2
     view = selected[0] if selected else ""
-    if view == "export_audit":
+    if view == "route_audit":
+        payload = api_route_audit_snapshot()
+    elif view == "export_audit":
         payload = export_audit_snapshot()
     elif view == "boot_audit":
         payload = genesis_boot_audit_snapshot()

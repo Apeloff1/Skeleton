@@ -4,6 +4,18 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-09-17 — F-18 pipeline speculative RAG + F-19 API route audit
+
+- NPC, game-logic, and animation `.run()` now plan-prefetch through the same
+  fail-closed sidecar used by HTTP. Missing genesis still returns queries;
+  prefetch failures never fail generation. HTTP `/pipeline/*` reuses the spec
+  sidecar instead of prefetching twice. GameForge nested pipelines receive genesis.
+- Additive `api_route_audit` snapshot compares main-router `@router` handlers to
+  `architecture.API_ROUTES` without importing the API package. Charter-gated
+  `POST /swarm/submit` and `POST /gameforge/intake` are documented `protected: true`.
+- Identical route-audit payload through `capabilities --route-audit`,
+  `GET /api/v1/application/routes/audit`, and the shared `capabilities` command.
+
 ## 2026-09-17 — F-17 genesis boot audit + manifest export audit
 
 - Additive `genesis_boot_audit` snapshot reports genesis `boot()` order against

@@ -38,7 +38,7 @@ def _configuration_handler(state: Any):
     return handle
 
 
-_CAPABILITY_VIEW_FLAGS = ("lifecycle", "plane_audit", "boot_audit", "export_audit")
+_CAPABILITY_VIEW_FLAGS = ("lifecycle", "plane_audit", "boot_audit", "export_audit", "route_audit")
 
 
 def _capability_view_flags(payload: Mapping[str, Any]) -> Dict[str, bool]:
@@ -76,6 +76,10 @@ def _lookup_row(payload: Mapping[str, Any], key: str, getter, snapshot):
 def _capabilities_handler(_state: Any):
     def handle(payload: Mapping[str, Any]) -> Dict[str, Any]:
         flags = _capability_view_flags(payload)
+        if flags["route_audit"]:
+            from .api_route_audit import api_route_audit_snapshot, get_api_route_audit_row
+
+            return _lookup_row(payload, "route_id", get_api_route_audit_row, api_route_audit_snapshot)
         if flags["export_audit"]:
             from .export_audit import export_audit_snapshot, get_export_audit_row
 

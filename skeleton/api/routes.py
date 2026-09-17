@@ -31,14 +31,22 @@ def _require(obj: Any, name: str) -> Any:
 
 
 def _pipeline_prefetch(state: Any, pipeline_name: str, description: Any) -> Dict[str, Any]:
-    from skeleton.pipelines.speculative_rag import prefetch_from_genesis
+    from skeleton.pipelines.speculative_rag import planning_prefetch_dict
 
-    return prefetch_from_genesis(
+    return planning_prefetch_dict(
         getattr(state, "genesis", None),
         pipeline_name,
         {"description": str(description or "")},
         limit=3,
-    ).to_dict()
+    )
+
+
+def _spec_rag(spec: Any, state: Any, pipeline_name: str, description: Any) -> Dict[str, Any]:
+    payload = spec.to_dict() if hasattr(spec, "to_dict") else {}
+    rag = payload.get("speculative_rag") if isinstance(payload, dict) else None
+    if isinstance(rag, dict) and rag.get("pipeline"):
+        return rag
+    return _pipeline_prefetch(state, pipeline_name, description)
 
 
 @router.get("/health")
@@ -154,6 +162,27 @@ async def retrieval_feedback(request: Dict[str, Any], state=Depends(_state)) -> 
 @router.get("/capabilities")
 async def capabilities(state=Depends(_state)) -> List[Dict[str, Any]]:
     return [cap.to_dict() for cap in _require(state.registry, "Registry").list()]
+
+
+@router.get("/application/routes/audit/{method}/{path:path}")
+async def application_api_route_audit_row(method: str, path: str) -> Dict[str, Any]:
+    """Return one main-router audit row by method and path."""
+    from skeleton.application import get_api_route_audit_row
+
+    try:
+        return get_api_route_audit_row(f"{method} /{path.lstrip('/')}")
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/application/routes/audit")
+async def application_api_route_audit() -> Dict[str, Any]:
+    """Return the identical payload as ``python -m skeleton capabilities --route-audit``."""
+    from skeleton.application import api_route_audit_snapshot
+
+    return api_route_audit_snapshot()
 
 
 @router.get("/application/planes/audit/{plane_id}")
@@ -406,7 +435,7 @@ async def pipeline_npc(request: Dict[str, Any], state=Depends(_state)) -> Dict[s
     return {
         "npc": spec.to_dict(),
         "status": "generated",
-        "speculative_rag": _pipeline_prefetch(state, "npc", description),
+        "speculative_rag": _spec_rag(spec, state, "npc", description),
     }
 
 
@@ -423,7 +452,7 @@ async def pipeline_game_logic(request: Dict[str, Any], state=Depends(_state)) ->
     return {
         "game_logic": spec.to_dict(),
         "status": "generated",
-        "speculative_rag": _pipeline_prefetch(state, "game_logic", description),
+        "speculative_rag": _spec_rag(spec, state, "game_logic", description),
     }
 
 
@@ -438,7 +467,7 @@ async def pipeline_animation(request: Dict[str, Any], state=Depends(_state)) -> 
     return {
         "animation": spec.to_dict(),
         "status": "generated",
-        "speculative_rag": _pipeline_prefetch(state, "animation", description),
+        "speculative_rag": _spec_rag(spec, state, "animation", description),
     }
 
 

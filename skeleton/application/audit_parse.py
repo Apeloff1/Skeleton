@@ -204,3 +204,108 @@ def boot_phase_catalog() -> dict[str, list[str]]:
                 subsystems.append(subsystem_name)
         catalog[name] = subsystems
     return catalog
+
+
+_HTTP_METHODS = {"get": "GET", "post": "POST", "put": "PUT", "delete": "DELETE", "patch": "PATCH"}
+_API_PREFIX = "/api/v1"
+
+
+def _is_require_charter(node: ast.AST) -> bool:
+    if not isinstance(node, ast.Call):
+        return False
+    func = node.func
+    if isinstance(func, ast.Name) and func.id == "require_charter":
+        return True
+    return isinstance(func, ast.Attribute) and func.attr == "require_charter"
+
+
+def _decorator_route(decorator: ast.AST) -> tuple[str, str] | None:
+    if not isinstance(decorator, ast.Call) or not isinstance(decorator.func, ast.Attribute):
+        return None
+    if not isinstance(decorator.func.value, ast.Name) or decorator.func.value.id != "router":
+        return None
+    method = _HTTP_METHODS.get(decorator.func.attr.lower())
+    if method is None or not decorator.args:
+        return None
+    path_node = decorator.args[0]
+    if not isinstance(path_node, ast.Constant) or not isinstance(path_node.value, str):
+        return None
+    return method, path_node.value
+
+
+def _charter_gated(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    defaults = list(fn.args.defaults) + [item for item in fn.args.kw_defaults if item is not None]
+    for default in defaults:
+        if _is_require_charter(default):
+            return True
+        if (
+            isinstance(default, ast.Call)
+            and isinstance(default.func, ast.Name)
+            and default.func.id == "Depends"
+            and default.args
+            and _is_require_charter(default.args[0])
+        ):
+            return True
+    return False
+
+
+def routes_source_path() -> Path | None:
+    spec = find_spec("skeleton.api.routes")
+    if spec is None or not spec.origin:
+        return None
+    path = Path(spec.origin)
+    return path if path.is_file() else None
+
+
+def main_router_handlers() -> list[dict[str, object]]:
+    source = routes_source_path()
+    if source is None:
+        return []
+    try:
+        tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
+    except (OSError, SyntaxError):
+        return []
+    rows: list[dict[str, object]] = []
+    seen: set[tuple[str, str]] = set()
+    for node in tree.body if isinstance(tree, ast.Module) else []:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for decorator in node.decorator_list:
+            parsed = _decorator_route(decorator)
+            if parsed is None:
+                continue
+            method, path = parsed
+            full_path = path if path.startswith(_API_PREFIX) else f"{_API_PREFIX}{path}"
+            full_path = full_path.replace(":path", "").replace(":int", "").replace(":float", "").replace(":uuid", "")
+            key = (method, full_path)
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(
+                {
+                    "method": method,
+                    "path": full_path,
+                    "handler": node.name,
+                    "charter_gated": _charter_gated(node),
+                }
+            )
+    return rows
+
+
+def architecture_api_routes() -> list[dict[str, object]]:
+    from skeleton.architecture import API_ROUTES
+
+    rows: list[dict[str, object]] = []
+    for route in API_ROUTES:
+        method = route.get("method")
+        path = route.get("path")
+        if not isinstance(method, str) or not isinstance(path, str):
+            continue
+        rows.append(
+            {
+                "method": method.upper(),
+                "path": path,
+                "protected": bool(route.get("protected")),
+            }
+        )
+    return rows

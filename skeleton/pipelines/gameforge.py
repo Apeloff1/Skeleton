@@ -187,7 +187,7 @@ class GameForge:
 
     def _generate_npcs(self, intake_result: Any, title: str) -> List[Dict[str, Any]]:
         from skeleton.pipelines import NPCPipeline
-        pipeline = NPCPipeline()
+        pipeline = NPCPipeline(genesis=self._genesis)
         roles = [
             ("quest giver", f"A {intake_result.genre} quest giver in the world of {title}"),
             ("rival", f"A rival who challenges the player in {title}"),
@@ -196,12 +196,12 @@ class GameForge:
 
     def _generate_logic(self, intake_result: Any, title: str) -> Dict[str, Any]:
         from skeleton.pipelines import GameLogicPipeline
-        pipeline = GameLogicPipeline()
+        pipeline = GameLogicPipeline(genesis=self._genesis)
         return pipeline.run(intake_result.vision, title=title).to_dict()
 
     def _generate_animation(self, answers: Dict[str, Any]) -> Dict[str, Any]:
         from skeleton.pipelines import AnimationPipeline
-        pipeline = AnimationPipeline()
+        pipeline = AnimationPipeline(genesis=self._genesis)
         perspective = answers.get("perspective", "third-person")
         return pipeline.run(f"{perspective} humanoid").to_dict()
 

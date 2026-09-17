@@ -186,9 +186,9 @@ class ServerState:
         self.resilience = genesis.handles.get("fortress")
 
         from skeleton.pipelines import AnimationPipeline, GameForge, GameLogicPipeline, NPCPipeline
-        self.npc_pipeline = NPCPipeline()
-        self.game_logic_pipeline = GameLogicPipeline()
-        self.animation_pipeline = AnimationPipeline()
+        self.npc_pipeline = NPCPipeline(genesis=genesis)
+        self.game_logic_pipeline = GameLogicPipeline(genesis=genesis)
+        self.animation_pipeline = AnimationPipeline(genesis=genesis)
         self.gameforge = GameForge(genesis=genesis, bus=genesis.bus)
 
         from skeleton.jeeves import JeevesCore

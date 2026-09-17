@@ -178,3 +178,35 @@ def test_prepared_mapping_is_immutable() -> None:
 
     with pytest.raises(TypeError):
         bundle.prepared["npc"] = bundle.prepared["a spy"]  # type: ignore[index]
+
+
+def test_pipeline_run_attaches_planning_prefetch_without_blocking() -> None:
+    from skeleton.pipelines.generation import AnimationPipeline, GameLogicPipeline, NPCPipeline
+
+    generation = NPCPipeline().run("a spy")
+    rag = generation.to_dict()["speculative_rag"]
+    assert rag["pipeline"] == "npc"
+    assert rag["queries"] == list(plan_pipeline_queries("npc", {"description": "a spy"}, limit=3))
+    assert rag["failures"] == []
+
+    logic = GameLogicPipeline().run("closed economy")
+    assert logic.to_dict()["speculative_rag"]["pipeline"] == "game_logic"
+
+    animation = AnimationPipeline().run("humanoid")
+    assert animation.to_dict()["speculative_rag"]["pipeline"] == "animation"
+
+
+def test_pipeline_run_prefetch_failure_does_not_fail_generation() -> None:
+    from skeleton.pipelines.generation import NPCPipeline
+    from skeleton.pipelines.speculative_rag import planning_prefetch_dict
+
+    class BrokenGenesis:
+        @property
+        def handles(self):
+            raise RuntimeError("quad unavailable")
+
+    sidecar = planning_prefetch_dict(BrokenGenesis(), "npc", {"description": "a spy"}, limit=3)
+    assert sidecar["failures"] == ["prefetch"]
+    spec = NPCPipeline(genesis=BrokenGenesis()).run("a spy")
+    assert spec.to_dict()["name"]
+    assert spec.to_dict()["speculative_rag"]["failures"] == ["prefetch"]
