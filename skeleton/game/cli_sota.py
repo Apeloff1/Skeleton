@@ -226,6 +226,19 @@ def _cmd_wave4(rest: List[str]) -> int:
     return 0
 
 
+def _cmd_backlog(rest: List[str]) -> int:
+    from skeleton.game.backlog_more import play as more
+    from skeleton.game.backlog_play import play
+    seed = _seed(rest)
+    try:
+        first = play(seed=seed)
+        second = more(seed=seed, digest=str(first.get("digest") or ""))
+    except Exception as exc:
+        return _fail(exc)
+    print(json.dumps({"ok": True, "digest": first["digest"], "more": second["digest"], "extract_count": first["extract_count"], "saved": second["saved"], "sota_ready": False, "stored_prose": 0}, indent=2))
+    return 0
+
+
 def dispatch(cmd: str, rest: List[str]) -> int | None:
     table = {
         "spec": _cmd_spec, "emit": _cmd_emit, "doctor": _cmd_doctor, "turn": _cmd_turn,
@@ -233,7 +246,8 @@ def dispatch(cmd: str, rest: List[str]) -> int | None:
         "bundles": _cmd_bundles, "catalog": _cmd_catalog, "sim": _cmd_sim,
         "lab": _cmd_lab, "campus": _cmd_campus, "flesh": _cmd_flesh,
         "world": _cmd_world, "warena": _cmd_warena, "monte": _cmd_monte,
-        "bundle": _cmd_bundle, "laws": _cmd_laws, "hunt": _cmd_hunt, "wave4": _cmd_wave4,
+        "bundle": _cmd_bundle, "laws": _cmd_laws, "hunt": _cmd_hunt,
+        "wave4": _cmd_wave4, "backlog": _cmd_backlog,
     }
     fn = table.get(cmd)
     return None if fn is None else fn(rest)
