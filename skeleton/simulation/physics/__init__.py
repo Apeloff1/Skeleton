@@ -26,6 +26,7 @@ from .gameplay import (
 )
 from .materials import CombineRule, ContactMaterial, PhysicsMaterial, combine_materials
 from .math3d import AABB, Mat3, Quat, Transform, Vec3
+from .queries import Ray, RayHit, raycast_body, sphere_cast_body
 from .shapes import BoxShape, CollisionShape, MassProperties, PlaneShape, ShapeKind, SphereShape
 from .solver import SequentialImpulseSolver, SolverStats
 from .world import PhysicsSettings, PhysicsStepReceipt, PhysicsWorld
@@ -57,6 +58,8 @@ __all__ = [
     "PlaneShape",
     "ProjectileSolution",
     "Quat",
+    "Ray",
+    "RayHit",
     "RigidBody",
     "SequentialImpulseSolver",
     "ShapeKind",
@@ -70,4 +73,6 @@ __all__ = [
     "combine_materials",
     "detect_collision",
     "generate_manifolds",
+    "raycast_body",
+    "sphere_cast_body",
 ]
