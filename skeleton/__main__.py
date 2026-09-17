@@ -15,6 +15,7 @@ Commands:
     walk        Prove spawn→extract on the emitted door graph
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
+    sota        Show the #807 SOTA game-creation program map
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
@@ -39,6 +40,23 @@ def _cmd_capabilities(_rest: List[str]) -> int:
     from skeleton.application import capability_manifest
 
     print(json.dumps(capability_manifest(), indent=2, default=str))
+    return 0
+
+
+def _cmd_sota(rest: List[str]) -> int:
+    from dataclasses import asdict
+
+    from skeleton.application import get_lane, sota_program
+
+    if rest:
+        try:
+            lane = get_lane(rest[0])
+        except (KeyError, TypeError, ValueError) as exc:
+            print(json.dumps({"ok": False, "error": str(exc)}, indent=2))
+            return 2
+        print(json.dumps(asdict(lane), indent=2, default=str))
+        return 0
+    print(json.dumps(sota_program(), indent=2, default=str))
     return 0
 
 
@@ -264,6 +282,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "walk": return _cmd_walk(rest)
     if cmd == "contracts": return _cmd_contracts(rest)
     if cmd == "capabilities": return _cmd_capabilities(rest)
+    if cmd == "sota": return _cmd_sota(rest)
     if cmd == "command": return _cmd_shared_command(rest)
     if cmd == "status": return _cmd_shared_command(["status"])
     if cmd == "config": return _cmd_shared_command(["configuration"])
