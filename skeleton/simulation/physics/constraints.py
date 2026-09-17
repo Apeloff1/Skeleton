@@ -33,7 +33,7 @@ class DistanceJoint:
     body_b: str
     local_anchor_a: Vec3 = Vec3()
     local_anchor_b: Vec3 = Vec3()
-    rest_length: float = 0.0
+    rest_length: float = 1.0
     bias_factor: float = 0.2
 
     def __post_init__(self) -> None:
@@ -43,11 +43,12 @@ class DistanceJoint:
             raise PhysicsValidationError("distance joint requires distinct body ids")
         if not isinstance(self.local_anchor_a, Vec3) or not isinstance(self.local_anchor_b, Vec3):
             raise PhysicsValidationError("joint anchors must be Vec3")
-        object.__setattr__(
-            self,
-            "rest_length",
-            _non_negative(self.rest_length, name="rest_length"),
-        )
+        rest_length = _non_negative(self.rest_length, name="rest_length")
+        if rest_length <= EPSILON:
+            raise PhysicsValidationError(
+                "distance joint rest_length must be positive; use a point constraint for zero length"
+            )
+        object.__setattr__(self, "rest_length", rest_length)
         bias = _non_negative(self.bias_factor, name="bias_factor")
         if bias > 1.0:
             raise PhysicsValidationError("bias_factor must be in [0, 1]")
