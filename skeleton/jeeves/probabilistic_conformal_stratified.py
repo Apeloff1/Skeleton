@@ -34,7 +34,7 @@ from .probabilistic_conformal import (
 from .probabilistic_state_space import StateSpaceError
 
 
-@dataclass(frozen=True, slots=True, order=True)
+@dataclass(frozen=True, slots=True)
 class ConformalStratumKey:
     """Identity for one calibration bucket."""
 
@@ -51,17 +51,7 @@ class ConformalStratumKey:
                 "stratum horizon must be a positive integer",
                 context={"reason": "invalid_conformal_stratum"},
             )
-        if self.regime is not None:
-            if not isinstance(self.regime, str) or not self.regime.strip():
-                raise StateSpaceError(
-                    "stratum regime must be a non-empty string",
-                    context={"reason": "invalid_conformal_stratum"},
-                )
-            if self.regime != self.regime.strip():
-                raise StateSpaceError(
-                    "stratum regime must not contain surrounding whitespace",
-                    context={"reason": "invalid_conformal_stratum"},
-                )
+        _validate_regime(self.regime, field="stratum_regime")
 
     @property
     def is_regime_specific(self) -> bool:
@@ -125,17 +115,7 @@ class StratifiedForecastObservation:
             )
         _finite("actual", self.actual)
         _validate_predictive(self.predictive)
-        if self.regime is not None:
-            if not isinstance(self.regime, str) or not self.regime.strip():
-                raise StateSpaceError(
-                    "regime must be a non-empty string when supplied",
-                    context={"reason": "invalid_stratified_observation"},
-                )
-            if self.regime != self.regime.strip():
-                raise StateSpaceError(
-                    "regime must not contain surrounding whitespace",
-                    context={"reason": "invalid_stratified_observation"},
-                )
+        _validate_regime(self.regime, field="regime")
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,6 +135,7 @@ class StratifiedConformalStep:
         _finite("actual", self.actual)
         _non_negative("nonconformity_score", self.nonconformity_score)
         _non_negative("interval_score", self.interval_score)
+        _validate_regime(self.requested_regime, field="requested_regime")
         if not isinstance(self.used_fallback, bool) or not isinstance(self.missed, bool):
             raise StateSpaceError(
                 "stratified conformal flags must be booleans",
@@ -213,6 +194,13 @@ class ConformalBucketState:
                 "bucket fingerprint must be a sha256 hex digest",
                 context={"reason": "invalid_conformal_bucket"},
             )
+        try:
+            int(self.fingerprint, 16)
+        except ValueError as exc:
+            raise StateSpaceError(
+                "bucket fingerprint must be hexadecimal",
+                context={"reason": "invalid_conformal_bucket"},
+            ) from exc
 
     @property
     def empirical_coverage(self) -> float | None:
@@ -272,6 +260,27 @@ class StratifiedForecastInterval:
     requested_regime: str | None
     used_fallback: bool
 
+    def __post_init__(self) -> None:
+        _validate_regime(self.requested_regime, field="requested_regime")
+        if not isinstance(self.used_fallback, bool):
+            raise StateSpaceError(
+                "used_fallback must be a boolean",
+                context={"reason": "invalid_stratified_forecast"},
+            )
+        if self.interval.horizon != self.stratum.horizon:
+            raise StateSpaceError(
+                "future interval horizon must match selected stratum",
+                context={"reason": "invalid_stratified_forecast"},
+            )
+        expected_fallback = (
+            self.requested_regime is not None and self.stratum.regime is None
+        )
+        if self.used_fallback != expected_fallback:
+            raise StateSpaceError(
+                "future interval fallback flag disagrees with selected stratum",
+                context={"reason": "invalid_stratified_forecast"},
+            )
+
 
 @dataclass(slots=True)
 class _MutableBucket:
@@ -318,14 +327,17 @@ def evaluate_stratified_conformal(
                 effective_alpha=bucket.effective_alpha,
             )
             missed = not interval.contains(observation.actual)
+            requested_regime = (
+                observation.regime if actual_config.condition_on_regime else None
+            )
             steps.append(
                 StratifiedConformalStep(
                     actual=observation.actual,
                     interval=interval,
                     stratum=selected,
-                    requested_regime=observation.regime,
+                    requested_regime=requested_regime,
                     used_fallback=(
-                        observation.regime is not None and selected.regime is None
+                        requested_regime is not None and selected.regime is None
                     ),
                     nonconformity_score=score,
                     missed=missed,
@@ -366,20 +378,30 @@ def evaluate_stratified_conformal(
 
     final_buckets = tuple(
         _freeze_bucket(key, state, config=actual_config)
-        for key, state in sorted(buckets.items(), key=lambda item: item[0])
+        for key, state in sorted(
+            buckets.items(),
+            key=lambda item: (
+                item[0].horizon,
+                item[0].regime is not None,
+                item[0].regime or "",
+            ),
+        )
     )
     widths = [step.interval.width for step in steps]
     coverage = statistics.fmean(0.0 if step.missed else 1.0 for step in steps)
     fallback_rate = statistics.fmean(1.0 if step.used_fallback else 0.0 for step in steps)
     configuration_fingerprint = _configuration_fingerprint(actual_config)
+    mean_width = statistics.fmean(widths)
+    median_width = statistics.median(widths)
+    mean_interval_score = statistics.fmean(step.interval_score for step in steps)
     fingerprint = _report_fingerprint(
         configuration_fingerprint=configuration_fingerprint,
         steps=steps,
         buckets=final_buckets,
         empirical_coverage=coverage,
-        mean_width=statistics.fmean(widths),
-        median_width=statistics.median(widths),
-        mean_interval_score=statistics.fmean(step.interval_score for step in steps),
+        mean_width=mean_width,
+        median_width=median_width,
+        mean_interval_score=mean_interval_score,
         fallback_rate=fallback_rate,
     )
     return StratifiedConformalReport(
@@ -388,9 +410,9 @@ def evaluate_stratified_conformal(
         steps=tuple(steps),
         buckets=final_buckets,
         empirical_coverage=coverage,
-        mean_width=statistics.fmean(widths),
-        median_width=statistics.median(widths),
-        mean_interval_score=statistics.fmean(step.interval_score for step in steps),
+        mean_width=mean_width,
+        median_width=median_width,
+        mean_interval_score=mean_interval_score,
         fallback_rate=fallback_rate,
         fingerprint=fingerprint,
     )
@@ -416,13 +438,12 @@ def conformalize_next_stratified_forecast(
             "target_index must be a positive integer",
             context={"reason": "invalid_stratified_forecast"},
         )
-    if regime is not None:
-        if not isinstance(regime, str) or not regime.strip() or regime != regime.strip():
-            raise StateSpaceError(
-                "regime must be a trimmed non-empty string when supplied",
-                context={"reason": "invalid_stratified_forecast"},
-            )
-    if report.config.condition_on_regime and not report.config.fallback_to_horizon and regime is None:
+    _validate_regime(regime, field="regime")
+    if (
+        report.config.condition_on_regime
+        and not report.config.fallback_to_horizon
+        and regime is None
+    ):
         raise StateSpaceError(
             "a pre-target regime is required when horizon fallback is disabled",
             context={"reason": "missing_pre_target_regime"},
@@ -454,6 +475,7 @@ def conformalize_next_stratified_forecast(
             },
         )
 
+    requested_regime = regime if report.config.condition_on_regime else None
     interval = conformal_interval(
         predictive,
         selected.calibration_scores,
@@ -464,8 +486,8 @@ def conformalize_next_stratified_forecast(
     return StratifiedForecastInterval(
         interval=interval,
         stratum=selected.key,
-        requested_regime=regime,
-        used_fallback=(regime is not None and selected.key.regime is None),
+        requested_regime=requested_regime,
+        used_fallback=(requested_regime is not None and selected.key.regime is None),
     )
 
 
@@ -489,15 +511,37 @@ def validate_stratified_conformal_report(report: StratifiedConformalReport) -> N
             context={"reason": "invalid_stratified_conformal_report"},
         )
 
+    seen_keys: set[ConformalStratumKey] = set()
     for state in report.buckets:
+        if state.key in seen_keys:
+            raise StateSpaceError(
+                "stratified conformal report contains duplicate bucket keys",
+                context={"reason": "stratified_conformal_identity_mismatch"},
+            )
+        seen_keys.add(state.key)
         if len(state.calibration_scores) > report.config.conformal.calibration_window:
             raise StateSpaceError(
                 "stratified conformal bucket exceeds calibration window",
                 context={"reason": "stratified_conformal_identity_mismatch"},
             )
-        if not report.config.conformal.min_alpha <= state.effective_alpha <= report.config.conformal.max_alpha:
+        if not (
+            report.config.conformal.min_alpha
+            <= state.effective_alpha
+            <= report.config.conformal.max_alpha
+        ):
             raise StateSpaceError(
                 "stratified conformal bucket alpha is outside configured bounds",
+                context={"reason": "stratified_conformal_identity_mismatch"},
+            )
+        bucket_steps = tuple(step for step in report.steps if step.stratum == state.key)
+        if state.issued_intervals != len(bucket_steps):
+            raise StateSpaceError(
+                "stratified conformal bucket issuance count disagrees with steps",
+                context={"reason": "stratified_conformal_identity_mismatch"},
+            )
+        if state.misses != sum(int(step.missed) for step in bucket_steps):
+            raise StateSpaceError(
+                "stratified conformal bucket miss count disagrees with steps",
                 context={"reason": "stratified_conformal_identity_mismatch"},
             )
         expected_bucket = _bucket_fingerprint(
@@ -513,6 +557,12 @@ def validate_stratified_conformal_report(report: StratifiedConformalReport) -> N
                 "stratified conformal bucket fingerprint mismatch",
                 context={"reason": "stratified_conformal_identity_mismatch"},
             )
+
+    if any(step.stratum not in seen_keys for step in report.steps):
+        raise StateSpaceError(
+            "stratified conformal step references an absent bucket",
+            context={"reason": "stratified_conformal_identity_mismatch"},
+        )
 
     calculated_coverage = statistics.fmean(
         0.0 if step.missed else 1.0 for step in report.steps
@@ -820,6 +870,27 @@ def _validate_predictive(predictive: ConformalPredictiveDistribution) -> None:
             "predictive variance must be positive",
             context={"reason": "invalid_stratified_predictive"},
         )
+
+
+def _validate_regime(value: object, *, field: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise StateSpaceError(
+            f"{field} must be a non-empty string when supplied",
+            context={"reason": "invalid_stratified_regime", "field": field},
+        )
+    if value != value.strip():
+        raise StateSpaceError(
+            f"{field} must not contain surrounding whitespace",
+            context={"reason": "invalid_stratified_regime", "field": field},
+        )
+    if len(value) > 128:
+        raise StateSpaceError(
+            f"{field} must be at most 128 characters",
+            context={"reason": "invalid_stratified_regime", "field": field},
+        )
+    return value
 
 
 def _finite(name: str, value: object) -> float:
