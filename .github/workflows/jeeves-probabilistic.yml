@@ -1,0 +1,91 @@
+name: Jeeves Probabilistic Modeling
+
+on:
+  pull_request:
+    paths:
+      - "skeleton/jeeves/probabilistic.py"
+      - "skeleton/jeeves/probabilistic_state_space.py"
+      - "skeleton/jeeves/probabilistic_bayes.py"
+      - "skeleton/jeeves/probabilistic_ensemble.py"
+      - "skeleton/jeeves/probabilistic_calibration.py"
+      - "skeleton/jeeves/probabilistic_contracts.py"
+      - "skeleton/jeeves/probabilistic_regimes.py"
+      - "skeleton/jeeves/probabilistic_arena.py"
+      - "skeleton/testing/test_jeeves_probabilistic_state_space.py"
+      - "skeleton/testing/test_jeeves_probabilistic_bayes.py"
+      - "skeleton/testing/test_jeeves_probabilistic_calibration.py"
+      - "skeleton/testing/test_jeeves_probabilistic_contracts.py"
+      - "skeleton/testing/test_jeeves_probabilistic_regimes.py"
+      - "skeleton/testing/test_jeeves_probabilistic_arena.py"
+      - "skeleton/testing/test_jeeves_probabilistic_exports.py"
+      - ".github/workflows/jeeves-probabilistic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jeeves-probabilistic-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  probabilistic-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.16"
+
+      - name: Install canonical quality dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "ruff==0.9.10" "pytest>=8,<9"
+
+      - name: Compile probabilistic surfaces
+        run: |
+          python -m py_compile \
+            skeleton/jeeves/probabilistic.py \
+            skeleton/jeeves/probabilistic_state_space.py \
+            skeleton/jeeves/probabilistic_bayes.py \
+            skeleton/jeeves/probabilistic_ensemble.py \
+            skeleton/jeeves/probabilistic_calibration.py \
+            skeleton/jeeves/probabilistic_contracts.py \
+            skeleton/jeeves/probabilistic_regimes.py \
+            skeleton/jeeves/probabilistic_arena.py
+
+      - name: Ruff probabilistic surfaces
+        run: |
+          ruff check \
+            skeleton/jeeves/probabilistic.py \
+            skeleton/jeeves/probabilistic_state_space.py \
+            skeleton/jeeves/probabilistic_bayes.py \
+            skeleton/jeeves/probabilistic_ensemble.py \
+            skeleton/jeeves/probabilistic_calibration.py \
+            skeleton/jeeves/probabilistic_contracts.py \
+            skeleton/jeeves/probabilistic_regimes.py \
+            skeleton/jeeves/probabilistic_arena.py \
+            skeleton/testing/test_jeeves_probabilistic_state_space.py \
+            skeleton/testing/test_jeeves_probabilistic_bayes.py \
+            skeleton/testing/test_jeeves_probabilistic_calibration.py \
+            skeleton/testing/test_jeeves_probabilistic_contracts.py \
+            skeleton/testing/test_jeeves_probabilistic_regimes.py \
+            skeleton/testing/test_jeeves_probabilistic_arena.py \
+            skeleton/testing/test_jeeves_probabilistic_exports.py
+
+      - name: Run probabilistic regression suite
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          python -m pytest -q --noconftest \
+            skeleton/testing/test_jeeves_probabilistic_state_space.py \
+            skeleton/testing/test_jeeves_probabilistic_bayes.py \
+            skeleton/testing/test_jeeves_probabilistic_calibration.py \
+            skeleton/testing/test_jeeves_probabilistic_contracts.py \
+            skeleton/testing/test_jeeves_probabilistic_regimes.py \
+            skeleton/testing/test_jeeves_probabilistic_arena.py \
+            skeleton/testing/test_jeeves_probabilistic_exports.py
