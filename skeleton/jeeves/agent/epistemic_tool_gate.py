@@ -2,20 +2,20 @@
 
 The epistemic planner may recommend an action and the decision authorizer may
 issue a fresh one-time permit, but neither should bypass the existing host tool
-security model.  This module composes both boundaries.
+security model. This module composes both boundaries.
 
-A :class:`ToolExecutionIntent` binds an abstract action to the exact tool name,
-arguments, run and trace before the action is assessed.  The intent fingerprint
-is carried in ``AbstractAction.metadata`` and therefore becomes part of the
-candidate/decision fingerprint.  At execution time the gate:
+A :class:`ToolExecutionIntent` binds an abstract action to the exact call id,
+tool name, arguments, user, run and trace before the action is assessed. The
+intent fingerprint is carried in ``AbstractAction.metadata`` and therefore
+becomes part of the candidate/decision fingerprint. At execution time the gate:
 
 1. consumes the one-time epistemic authorization token;
 2. verifies that the resulting permit still names the pre-bound intent;
-3. verifies exact tool/argument/context identity; and
+3. verifies exact tool/call/argument/user/context identity; and
 4. delegates to ``ToolExecutor``, which independently enforces trusted host
    grants, risk, call budgets, schema validation, timeouts and evidence output.
 
-A binding failure burns the authorization token.  This is deliberate: a token
+A binding failure burns the authorization token. This is deliberate: a token
 that has been presented for a different call is treated as compromised/replayed
 rather than returned to circulation.
 """
@@ -56,8 +56,10 @@ class AuthorizedToolDenied(AuthorizedToolError):
 class ToolExecutionIntent:
     intent_id: str
     action_id: str
+    call_id: str
     tool_name: str
     argument_fingerprint: str
+    user_id: str
     run_id: str
     trace_id: str
     fingerprint: str
@@ -66,7 +68,9 @@ class ToolExecutionIntent:
     def __post_init__(self) -> None:
         object.__setattr__(self, "intent_id", require_id("intent_id", self.intent_id))
         object.__setattr__(self, "action_id", require_id("action_id", self.action_id))
+        object.__setattr__(self, "call_id", require_id("call_id", self.call_id))
         object.__setattr__(self, "tool_name", require_tool_name(self.tool_name))
+        object.__setattr__(self, "user_id", require_id("user_id", self.user_id))
         object.__setattr__(self, "run_id", require_id("run_id", self.run_id))
         object.__setattr__(self, "trace_id", require_id("trace_id", self.trace_id))
         for name in ("argument_fingerprint", "fingerprint"):
@@ -82,8 +86,10 @@ class ToolExecutionIntent:
     def canonical_payload(self) -> Mapping[str, Any]:
         return {
             "action_id": self.action_id,
+            "call_id": self.call_id,
             "tool_name": self.tool_name,
             "argument_fingerprint": self.argument_fingerprint,
+            "user_id": self.user_id,
             "run_id": self.run_id,
             "trace_id": self.trace_id,
             "metadata": self.metadata,
@@ -107,8 +113,10 @@ class ToolExecutionIntent:
         argument_fingerprint = stable_fingerprint(call.arguments)
         payload = {
             "action_id": action_id,
+            "call_id": call.call_id,
             "tool_name": call.name,
             "argument_fingerprint": argument_fingerprint,
+            "user_id": context.user_id,
             "run_id": context.run_id,
             "trace_id": context.trace_id,
             "metadata": clean_metadata,
@@ -117,8 +125,10 @@ class ToolExecutionIntent:
         return cls(
             intent_id=stable_id("tool_intent", {"fingerprint": fingerprint}),
             action_id=action_id,
+            call_id=call.call_id,
             tool_name=call.name,
             argument_fingerprint=argument_fingerprint,
+            user_id=context.user_id,
             run_id=context.run_id,
             trace_id=context.trace_id,
             fingerprint=fingerprint,
@@ -193,7 +203,7 @@ class PermitBoundToolExecutor:
         if not isinstance(context, ToolExecutionContext):
             raise TypeError("context must be ToolExecutionContext")
 
-        # Consume first.  Any later mismatch intentionally burns the token.
+        # Consume first. Any later mismatch intentionally burns the token.
         authorization = self.authorizer.consume(
             token,
             action_id=intent.action_id,
@@ -221,6 +231,7 @@ class PermitBoundToolExecutor:
                 "call_id": call.call_id,
                 "tool_name": call.name,
                 "arguments": call.arguments,
+                "user_id": context.user_id,
                 "run_id": context.run_id,
                 "trace_id": context.trace_id,
             }
@@ -274,10 +285,14 @@ class PermitBoundToolExecutor:
         bound_fingerprint = permit.action.metadata.get(cls.INTENT_METADATA_KEY)
         if bound_fingerprint != intent.fingerprint:
             mismatches.append("action_intent_fingerprint")
+        if intent.call_id != call.call_id:
+            mismatches.append("call_id")
         if intent.tool_name != call.name:
             mismatches.append("tool_name")
         if intent.argument_fingerprint != stable_fingerprint(call.arguments):
             mismatches.append("arguments")
+        if intent.user_id != context.user_id:
+            mismatches.append("user_id")
         if intent.run_id != context.run_id:
             mismatches.append("run_id")
         if intent.trace_id != context.trace_id:
@@ -299,6 +314,8 @@ def bind_intent_metadata(
         raise AgentContractError("metadata already binds a different tool intent")
     value[PermitBoundToolExecutor.INTENT_METADATA_KEY] = intent.fingerprint
     value["tool_intent_id"] = intent.intent_id
+    value["tool_call_id"] = intent.call_id
     value["tool_name"] = intent.tool_name
     value["tool_argument_fingerprint"] = intent.argument_fingerprint
+    value["tool_user_id"] = intent.user_id
     return json_safe(value)
