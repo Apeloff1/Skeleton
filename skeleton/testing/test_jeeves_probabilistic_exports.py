@@ -86,3 +86,21 @@ def test_probabilistic_facade_exports_hidden_markov_regime_surface() -> None:
     assert expected.issubset(set(probabilistic.__all__))
     for name in expected:
         assert hasattr(probabilistic, name)
+
+
+def test_probabilistic_facade_exports_multiscale_spectral_surface() -> None:
+    expected = {
+        "HarmonicComponent",
+        "SpectralConfig",
+        "SpectralFit",
+        "SpectralPeak",
+        "SpectralScore",
+        "SpectralTournament",
+        "discover_spectral_peaks",
+        "evaluate_spectral_complexities",
+        "fit_spectral_model",
+        "forecast_spectral",
+    }
+    assert expected.issubset(set(probabilistic.__all__))
+    for name in expected:
+        assert hasattr(probabilistic, name)
