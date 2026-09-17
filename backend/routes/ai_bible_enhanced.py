@@ -14,6 +14,7 @@
 """
 
 from fastapi import APIRouter, HTTPException
+from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 import uuid
@@ -762,7 +763,7 @@ Provide:
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI explanation failed: {str(e)}")
+        raise internal_http_error("AI explanation failed", e) from None
 
 
 @router.post("/ai/project")
@@ -827,7 +828,7 @@ Generate JSON with:
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI project generation failed: {str(e)}")
+        raise internal_http_error("AI project generation failed", e) from None
 
 
 @router.post("/ai/quiz")
@@ -880,7 +881,7 @@ Generate JSON with:
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI quiz generation failed: {str(e)}")
+        raise internal_http_error("AI quiz generation failed", e) from None
 
 
 @router.post("/ai/mentor")
@@ -918,7 +919,7 @@ Keep responses concise but helpful."""
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI mentor chat failed: {str(e)}")
+        raise internal_http_error("AI mentor chat failed", e) from None
 
 
 @router.get("/ai/learning-path")
@@ -987,4 +988,4 @@ Generate JSON with:
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Learning path generation failed: {str(e)}")
+        raise internal_http_error("Learning path generation failed", e) from None

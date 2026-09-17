@@ -32,6 +32,20 @@ ROUTE_FILES = [
     REPO_ROOT / "backend" / "routes" / "export_github.py",
     REPO_ROOT / "backend" / "routes" / "gameforge_workflow.py",
     REPO_ROOT / "backend" / "routes" / "omega_conductor.py",
+    REPO_ROOT / "backend" / "routes" / "interactive_education.py",
+    REPO_ROOT / "backend" / "routes" / "ai_bible_enhanced.py",
+    REPO_ROOT / "backend" / "routes" / "animation_pipeline.py",
+    REPO_ROOT / "backend" / "routes" / "game_logic_pipeline.py",
+    REPO_ROOT / "backend" / "routes" / "code_to_app_pipeline.py",
+    REPO_ROOT / "backend" / "routes" / "hybrid_pipeline.py",
+    REPO_ROOT / "backend" / "routes" / "interactive_narrative_pipeline.py",
+    REPO_ROOT / "backend" / "routes" / "lafs.py",
+    REPO_ROOT / "backend" / "routes" / "galaxy_studio_catalogs.py",
+    REPO_ROOT / "backend" / "routes" / "galaxy_studio_vault_admin.py",
+    REPO_ROOT / "backend" / "routes" / "narrative_engine.py",
+    REPO_ROOT / "backend" / "routes" / "logic_engine.py",
+    REPO_ROOT / "backend" / "routes" / "world_engine.py",
+    REPO_ROOT / "backend" / "routes" / "behaviour_npc_memory_pipeline.py",
 ]
 
 _PRIVATE = "private-detail-must-not-leak-7f31"
