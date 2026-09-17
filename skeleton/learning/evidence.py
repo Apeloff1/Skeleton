@@ -24,9 +24,10 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any
 
 from skeleton.kernel.errors import KernelError
 from skeleton.retrieval.provenance import ProvenanceEntry
@@ -134,9 +135,9 @@ def _positive_int(name: str, value: Any) -> int:
 
 
 def _json_scalar(name: str, value: Any) -> object:
-    if value is None or isinstance(value, bool) or isinstance(value, str):
+    if value is None or isinstance(value, (bool, str)):
         return value
-    if isinstance(value, int) and not isinstance(value, bool):
+    if isinstance(value, int):
         return int(value)
     if isinstance(value, float):
         if not math.isfinite(value):
@@ -840,18 +841,21 @@ class LearningEvidenceStore:
                 context={"reason": "contradictory_signal", "feature_id": feature.feature_id},
             )
         for existing in self._features.values():
-            if existing.subject_id == feature.subject_id and existing.name == feature.name:
-                if not _values_equal(existing.value, feature.value):
-                    raise LearningEvidenceError(
-                        "contradictory feature signal; values are not averaged",
-                        context={
-                            "reason": "contradictory_signal",
-                            "subject_id": feature.subject_id,
-                            "name": feature.name,
-                            "existing": existing.value,
-                            "incoming": feature.value,
-                        },
-                    )
+            if (
+                existing.subject_id == feature.subject_id
+                and existing.name == feature.name
+                and not _values_equal(existing.value, feature.value)
+            ):
+                raise LearningEvidenceError(
+                    "contradictory feature signal; values are not averaged",
+                    context={
+                        "reason": "contradictory_signal",
+                        "subject_id": feature.subject_id,
+                        "name": feature.name,
+                        "existing": existing.value,
+                        "incoming": feature.value,
+                    },
+                )
 
     def _reject_hypothesis_contradiction(self, hypothesis: Hypothesis) -> None:
         for existing in self._hypotheses.values():

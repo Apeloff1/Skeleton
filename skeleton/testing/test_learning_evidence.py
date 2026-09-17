@@ -24,7 +24,6 @@ from skeleton.learning import (
 )
 from skeleton.retrieval.provenance import ProvenanceEntry
 
-
 NOW = 1_000.0
 SUBJECT = "skill-python"
 
@@ -68,7 +67,6 @@ def _feature_payload(name: str, value: object, subject_id: str = SUBJECT) -> dic
 
 
 def _feature(
-    store: LearningEvidenceStore,
     *,
     feature_id: str = "feat-1",
     name: str = "score",
@@ -98,7 +96,7 @@ def _seed_observation(store: LearningEvidenceStore, **kwargs) -> Observation:
 def _seed_feature(store: LearningEvidenceStore, **kwargs) -> Feature:
     if "obs-1" not in store.facts():
         _seed_observation(store)
-    feature = _feature(store, **kwargs)
+    feature = _feature(**kwargs)
     store.record_feature(feature)
     return feature
 
@@ -451,7 +449,7 @@ def test_feature_without_parent_provenance_is_rejected() -> None:
 def test_unknown_observation_parent_is_rejected() -> None:
     store = _store()
     with pytest.raises(LearningEvidenceError) as caught:
-        store.record_feature(_feature(store, observation_ids=("obs-missing",)))
+        store.record_feature(_feature(observation_ids=("obs-missing",)))
     assert caught.value.context["reason"] == "unknown_parent"
 
 
