@@ -19,6 +19,7 @@ on:
       - 'skeleton/testing/test_jeeves_historical_robustness.py'
       - 'skeleton/testing/test_jeeves_historical_uncertainty.py'
       - 'skeleton/testing/test_jeeves_historical_evidence.py'
+      - 'skeleton/testing/test_jeeves_uncertainty_evidence.py'
       - 'skeleton/testing/test_jeeves_historical_mode_exports.py'
       - 'skeleton/testing/test_learning_evidence.py'
       - '.github/workflows/jeeves-bidirectional.yml'
@@ -39,6 +40,7 @@ on:
       - 'skeleton/testing/test_jeeves_historical_robustness.py'
       - 'skeleton/testing/test_jeeves_historical_uncertainty.py'
       - 'skeleton/testing/test_jeeves_historical_evidence.py'
+      - 'skeleton/testing/test_jeeves_uncertainty_evidence.py'
       - 'skeleton/testing/test_jeeves_historical_mode_exports.py'
       - 'skeleton/testing/test_learning_evidence.py'
       - '.github/workflows/jeeves-bidirectional.yml'
@@ -99,5 +101,6 @@ jobs:
             skeleton/testing/test_jeeves_historical_robustness.py \
             skeleton/testing/test_jeeves_historical_uncertainty.py \
             skeleton/testing/test_jeeves_historical_evidence.py \
+            skeleton/testing/test_jeeves_uncertainty_evidence.py \
             skeleton/testing/test_jeeves_historical_mode_exports.py \
             skeleton/testing/test_learning_evidence.py
