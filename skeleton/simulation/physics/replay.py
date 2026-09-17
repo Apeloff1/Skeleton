@@ -1,9 +1,4 @@
-"""Tamper-evident deterministic replay for autonomous physics steps.
-
-The initial replay contract records deterministic fixed steps from an initial
-snapshot. External gameplay inputs/commands are intentionally not fabricated:
-input-bearing replay will layer an explicit command tape on this foundation.
-"""
+"""Tamper-evident deterministic replay for physics simulation."""
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
@@ -28,12 +23,20 @@ def _sha256_text(value: str, *, name: str) -> str:
     return value
 
 
+def _initial_chain(snapshot: PhysicsSnapshot) -> str:
+    return chained_digest(
+        _ZERO_CHAIN,
+        {"initial_snapshot_digest": snapshot.snapshot_digest},
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class PhysicsReplayFrame:
+    """One autonomous fixed-step transition."""
+
     index: int
     tick: int
     before_digest: str
-    simulation_before_digest: str
     after_digest: str
     receipt_digest: str
 
@@ -43,10 +46,6 @@ class PhysicsReplayFrame:
         if isinstance(self.tick, bool) or not isinstance(self.tick, int) or self.tick < 0:
             raise PhysicsReplayError("replay frame tick must be non-negative integer")
         _sha256_text(self.before_digest, name="before_digest")
-        _sha256_text(
-            self.simulation_before_digest,
-            name="simulation_before_digest",
-        )
         _sha256_text(self.after_digest, name="after_digest")
         _sha256_text(self.receipt_digest, name="receipt_digest")
 
@@ -60,10 +59,15 @@ class PhysicsReplayTape:
     def __post_init__(self) -> None:
         if not isinstance(self.initial, PhysicsSnapshot):
             raise PhysicsReplayError("replay tape initial must be PhysicsSnapshot")
-        object.__setattr__(self, "frames", tuple(self.frames))
+        try:
+            frames = tuple(self.frames)
+        except TypeError as exc:
+            raise PhysicsReplayError("replay tape frames must be iterable") from exc
+        object.__setattr__(self, "frames", frames)
         _sha256_text(self.chain_digest, name="chain_digest")
+
         previous_digest = self.initial.state_digest
-        for index, frame in enumerate(self.frames):
+        for index, frame in enumerate(frames):
             if not isinstance(frame, PhysicsReplayFrame):
                 raise PhysicsReplayError("replay tape contains invalid frame")
             if frame.index != index:
@@ -87,24 +91,22 @@ def _frame_from_receipt(index: int, receipt: PhysicsStepReceipt) -> PhysicsRepla
     return PhysicsReplayFrame(
         index=index,
         tick=receipt.tick,
-        before_digest=before_digest,
-        simulation_before_digest=receipt.before_digest,
+        before_digest=receipt.before_digest,
         after_digest=receipt.after_digest,
         receipt_digest=digest(asdict(receipt)),
     )
 
 
 class PhysicsReplayRecorder:
+    """Record autonomous deterministic fixed steps."""
+
     def __init__(self, world: PhysicsWorld) -> None:
         if not isinstance(world, PhysicsWorld):
             raise PhysicsReplayError("recorder requires PhysicsWorld")
         self.world = world
         self.initial = world.capture_snapshot()
         self._frames: list[PhysicsReplayFrame] = []
-        self._chain = chained_digest(
-            _ZERO_CHAIN,
-            {"initial_snapshot_digest": self.initial.snapshot_digest},
-        )
+        self._chain = _initial_chain(self.initial)
 
     def step(self) -> PhysicsStepReceipt:
         receipt = self.world.step()[0]
@@ -135,10 +137,7 @@ def replay_physics(
         raise PhysicsReplayError("world_factory must return PhysicsWorld")
     world.restore_snapshot(tape.initial)
 
-    chain = chained_digest(
-        _ZERO_CHAIN,
-        {"initial_snapshot_digest": tape.initial.snapshot_digest},
-    )
+    chain = _initial_chain(tape.initial)
     for expected in tape.frames:
         receipt = world.step()[0]
         actual = _frame_from_receipt(expected.index, receipt)
@@ -159,13 +158,15 @@ def replay_physics(
     )
 
 
-
 @dataclass(frozen=True, slots=True)
 class PhysicsCommandReplayFrame:
+    """One complete gameplay-input → physics-step transition."""
+
     index: int
     tick: int
     commands: PhysicsCommandFrame
     before_digest: str
+    simulation_before_digest: str
     after_digest: str
     receipt_digest: str
 
@@ -179,6 +180,10 @@ class PhysicsCommandReplayFrame:
         if self.commands.tick != self.tick:
             raise PhysicsReplayError("command replay frame/tick mismatch")
         _sha256_text(self.before_digest, name="before_digest")
+        _sha256_text(
+            self.simulation_before_digest,
+            name="simulation_before_digest",
+        )
         _sha256_text(self.after_digest, name="after_digest")
         _sha256_text(self.receipt_digest, name="receipt_digest")
 
@@ -212,7 +217,7 @@ class PhysicsCommandReplayTape:
             previous_digest = frame.after_digest
 
 
-def _command_replay_chain_material(frame: PhysicsCommandReplayFrame) -> dict[str, object]:
+def _command_chain_material(frame: PhysicsCommandReplayFrame) -> dict[str, object]:
     return {
         "index": frame.index,
         "tick": frame.tick,
@@ -235,14 +240,15 @@ def _command_frame_from_receipt(
         index=index,
         tick=receipt.tick,
         commands=commands,
-        before_digest=receipt.before_digest,
+        before_digest=before_digest,
+        simulation_before_digest=receipt.before_digest,
         after_digest=receipt.after_digest,
         receipt_digest=digest(asdict(receipt)),
     )
 
 
 class PhysicsCommandReplayRecorder:
-    """Record deterministic game-input commands together with physics evidence."""
+    """Record deterministic gameplay commands and resulting physics evidence."""
 
     def __init__(self, world: PhysicsWorld) -> None:
         if not isinstance(world, PhysicsWorld):
@@ -250,10 +256,7 @@ class PhysicsCommandReplayRecorder:
         self.world = world
         self.initial = world.capture_snapshot()
         self._frames: list[PhysicsCommandReplayFrame] = []
-        self._chain = chained_digest(
-            _ZERO_CHAIN,
-            {"initial_snapshot_digest": self.initial.snapshot_digest},
-        )
+        self._chain = _initial_chain(self.initial)
 
     def step(
         self,
@@ -270,7 +273,7 @@ class PhysicsCommandReplayRecorder:
         )
         self._chain = chained_digest(
             self._chain,
-            _command_replay_chain_material(replay_frame),
+            _command_chain_material(replay_frame),
         )
         self._frames.append(replay_frame)
         return receipt
@@ -297,10 +300,7 @@ def replay_physics_commands(
         raise PhysicsReplayError("world_factory must return PhysicsWorld")
     world.restore_snapshot(tape.initial)
 
-    chain = chained_digest(
-        _ZERO_CHAIN,
-        {"initial_snapshot_digest": tape.initial.snapshot_digest},
-    )
+    chain = _initial_chain(tape.initial)
     for expected in tape.frames:
         before_digest = world.state_digest
         receipt = step_physics_with_commands(world, expected.commands)
@@ -314,7 +314,7 @@ def replay_physics_commands(
             raise PhysicsReplayDivergenceError(
                 f"physics command replay diverged at frame {expected.index}"
             )
-        chain = chained_digest(chain, _command_replay_chain_material(actual))
+        chain = chained_digest(chain, _command_chain_material(actual))
 
     if chain != tape.chain_digest:
         raise PhysicsReplayDivergenceError(
