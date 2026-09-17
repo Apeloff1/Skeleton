@@ -1,14 +1,14 @@
-"""Provenance-ready evidence bridge for calibrated Jeeves historical reports.
+"""Provenance-ready evidence bridge for Jeeves historical reports.
 
-This bridge is intentionally *construction only*.  It creates an immutable root
+This bridge is intentionally *construction only*. It creates an immutable root
 observation describing the supplied historical series and feature records
-containing calibrated bidirectional evaluation measurements.  It never receives
-or mutates a ``LearningEvidenceStore`` and therefore cannot silently promote a
-model or self-update Jeeves.
+containing derived evaluation measurements. It never receives or mutates a
+``LearningEvidenceStore`` and therefore cannot silently promote a model or
+self-update Jeeves.
 
 The root observation stays factual: label, sample count, endpoint values,
-timestamp presence, and deterministic content fingerprints.  Evaluation output
-is represented as derived ``Feature`` records grounded in that observation.
+timestamp presence, and deterministic content fingerprints. Evaluation output,
+including uncertainty calibration, remains on the derived ``Feature`` plane.
 Callers that want persistence must explicitly record the returned objects in an
 evidence store.
 """
@@ -29,11 +29,12 @@ from skeleton.learning.evidence import (
 
 from .bidirectional_calibration import CalibratedBidirectionalReport
 from .historical_modes import HistoricalModeError, HistoricalSeries
+from .historical_uncertainty import HistoricalUncertaintyReport
 
 
 @dataclass(frozen=True, slots=True)
 class HistoricalEvidenceBundle:
-    """Fact root plus derived calibrated measurements ready for explicit storage."""
+    """Fact root plus derived historical measurements ready for explicit storage."""
 
     observation: Observation
     features: tuple[Feature, ...]
@@ -61,19 +62,13 @@ def build_historical_evidence(
     source_kind: str = "historical-evaluation",
     uri: str | None = None,
 ) -> HistoricalEvidenceBundle:
-    """Construct factual/feature evidence without mutating any evidence store.
-
-    The report and series labels are checked in both temporal orientations so a
-    report cannot accidentally be attached to a differently named fixture.  A
-    deterministic series fingerprint binds the returned fact root to the exact
-    values and timestamps supplied by the caller.
-    """
+    """Construct factual/feature evidence without mutating any evidence store."""
 
     _require_report_series_alignment(report, series)
     series_fingerprint = _series_fingerprint(series)
     report_fingerprint = report.fingerprint
 
-    # The root fact identity depends only on the supplied series.  Analysis
+    # The root fact identity depends only on the supplied series. Analysis
     # configuration/report identity belongs on the derived feature plane.
     observation_id = f"histobs-{series_fingerprint[:32]}"
     observation_payload: dict[str, object] = {
@@ -130,10 +125,62 @@ def build_historical_evidence(
     )
 
 
+def build_uncertainty_evidence(
+    report: HistoricalUncertaintyReport,
+    series: HistoricalSeries,
+    *,
+    subject_id: str,
+    observed_at: float = 1_000.0,
+    clock_version: int = 1,
+    source_id: str = "jeeves-historical-lab",
+    source_kind: str = "historical-evaluation",
+    uri: str | None = None,
+) -> HistoricalEvidenceBundle:
+    """Extend calibrated evidence with conformal uncertainty measurements.
+
+    The same series-only observation is reused. Uncertainty diagnostics are
+    additional derived features and cannot alter factual identity.
+    """
+
+    base = build_historical_evidence(
+        report.robustness.full,
+        series,
+        subject_id=subject_id,
+        observed_at=observed_at,
+        clock_version=clock_version,
+        source_id=source_id,
+        source_kind=source_kind,
+        uri=uri,
+    )
+    uncertainty_values = _uncertainty_feature_values(report)
+    extras = tuple(
+        _make_feature(
+            index=len(base.features) + index,
+            name=name,
+            value=value,
+            subject_id=subject_id,
+            observation_id=base.observation.observation_id,
+            report_fingerprint=report.fingerprint,
+            source_id=source_id,
+            source_kind=source_kind,
+            observed_at=observed_at,
+            clock_version=clock_version,
+            uri=uri,
+        )
+        for index, (name, value) in enumerate(uncertainty_values.items(), start=1)
+    )
+    return HistoricalEvidenceBundle(
+        observation=base.observation,
+        features=base.features + extras,
+        report_fingerprint=report.fingerprint,
+        series_fingerprint=base.series_fingerprint,
+    )
+
+
 def _feature_values(report: CalibratedBidirectionalReport) -> dict[str, object]:
     payload = report.as_payload()
     candidate = report.decision.candidate_diagnostics
-    values: dict[str, object] = {
+    return {
         "selected_mode": payload["selected_mode"],
         "calibration_accepted": payload["calibration_accepted"],
         "base_bidirectional_accepted": payload["base_bidirectional_accepted"],
@@ -157,7 +204,26 @@ def _feature_values(report: CalibratedBidirectionalReport) -> dict[str, object]:
         "forward_evaluation_fingerprint": report.base.forward.report.fingerprint,
         "backward_evaluation_fingerprint": report.base.backward.report.fingerprint,
     }
-    return values
+
+
+def _uncertainty_feature_values(report: HistoricalUncertaintyReport) -> dict[str, object]:
+    payload = report.as_payload()
+    return {
+        "uncertainty_selected_mode": payload["selected_mode"],
+        "uncertainty_accepted": payload["uncertainty_accepted"],
+        "uncertainty_robustness_accepted": payload["robustness_accepted"],
+        "uncertainty_nominal_coverage": payload["nominal_coverage"],
+        "uncertainty_forward_coverage": payload["forward_coverage"],
+        "uncertainty_backward_coverage": payload["backward_coverage"],
+        "uncertainty_coverage_gap": payload["coverage_gap"],
+        "uncertainty_forward_average_width": payload["forward_average_width"],
+        "uncertainty_backward_average_width": payload["backward_average_width"],
+        "uncertainty_width_asymmetry": payload["width_asymmetry"],
+        "uncertainty_forward_calibrated_folds": report.forward.calibrated_folds,
+        "uncertainty_backward_calibrated_folds": report.backward.calibrated_folds,
+        "uncertainty_fingerprint": report.fingerprint,
+        "robustness_fingerprint": report.robustness.fingerprint,
+    }
 
 
 def _make_feature(
@@ -195,13 +261,13 @@ def _make_feature(
 
 
 def _series_fingerprint(series: HistoricalSeries) -> str:
-    payload = {
-        "label": series.label,
-        "values": series.values,
-        "timestamps": series.timestamps,
-    }
-    # canonical_fingerprint is already the evidence subsystem's custody hash.
-    return canonical_fingerprint(payload)
+    return canonical_fingerprint(
+        {
+            "label": series.label,
+            "values": series.values,
+            "timestamps": series.timestamps,
+        }
+    )
 
 
 def _require_report_series_alignment(
