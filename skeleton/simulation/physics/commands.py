@@ -135,6 +135,14 @@ class PhysicsCommandTape:
         self._frames[frame.tick] = frame
         return frame
 
+    def remove(self, tick: int) -> PhysicsCommandFrame:
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick <= 0:
+            raise PhysicsReplayError("command tape tick must be positive integer")
+        try:
+            return self._frames.pop(tick)
+        except KeyError as exc:
+            raise PhysicsReplayError("cannot remove missing command frame") from exc
+
     def replace(self, frame: PhysicsCommandFrame) -> PhysicsCommandFrame:
         if not isinstance(frame, PhysicsCommandFrame):
             raise PhysicsReplayError("command tape requires PhysicsCommandFrame")
