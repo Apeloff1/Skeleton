@@ -1,9 +1,29 @@
-"""Jeeves evidence-first agent runtime.
+"""Jeeves evidence-first cognitive agent runtime.
 
-Public imports are kept explicit so application code can build a runtime
-without reaching into implementation modules.
+Public imports are kept explicit so application code can assemble the runtime,
+epistemic world model, empirical skill learner, metacognitive controller, and
+high-level cortex without reaching into implementation modules.
 """
 
+from .action_model import (
+    ActionEpisode,
+    ActionModelError,
+    BetaPosterior,
+    CompositeSkillPlan,
+    CompositeStep,
+    ContextPerformance,
+    ContextSignature,
+    OutcomeKind,
+    RunningStats,
+    SelectionWeights,
+    SkillComposer,
+    SkillKind,
+    SkillLibrary,
+    SkillProfile,
+    SkillScore,
+    SkillSelection,
+    SkillSpec,
+)
 from .cognition import (
     CognitionError,
     ContextBudget,
@@ -19,6 +39,14 @@ from .cognition import (
     RunScratchpad,
     ScratchEntry,
     approximate_tokens,
+)
+from .cortex import (
+    CortexCheckpointAssessment,
+    CortexConfig,
+    CortexError,
+    CortexRunReport,
+    JeevesCortex,
+    RunCognitiveState,
 )
 from .evidence import (
     Contradiction,
@@ -52,6 +80,28 @@ from .memory import (
     MemoryRecord,
     MemoryRetriever,
     RetrievalWeights,
+)
+from .metacognition import (
+    ActionSignals,
+    BudgetPressure,
+    CognitiveMode,
+    EpistemicSignals,
+    LoopDetector,
+    LoopSignals,
+    MetaController,
+    MetaCognitionError,
+    MetaDecision,
+    MetaPolicy,
+    MetaReason,
+    MetaState,
+    MetaStateBuilder,
+    ModeScore,
+    ProgressSignals,
+    RiskSignals,
+    action_signals,
+    budget_pressure,
+    epistemic_signals,
+    progress_signals,
 )
 from .planning import (
     ModelPlanParser,
@@ -133,6 +183,29 @@ from .verification import (
     VerificationPolicy,
     VerificationReport,
     parse_advisory_json,
+)
+from .world_model import (
+    BeliefConflict,
+    BeliefEdge,
+    BeliefGraph,
+    BeliefRevision,
+    BeliefState,
+    BeliefUpdate,
+    ContradictionGroup,
+    CounterfactualProbe,
+    EdgeKind,
+    Hypothesis,
+    HypothesisStatus,
+    Proposition,
+    RevisionKind,
+    TransactionResult,
+    WorldModel,
+    WorldModelError,
+    WorldSnapshot,
+    binary_entropy,
+    clamp_probability,
+    proposition_from_artifact,
+    reliability_to_likelihood_ratio,
 )
 
 __all__ = [name for name in globals() if not name.startswith("_")]
