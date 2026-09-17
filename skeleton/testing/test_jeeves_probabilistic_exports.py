@@ -56,3 +56,14 @@ def test_probabilistic_facade_exports_calibration_surface() -> None:
     assert expected.issubset(set(probabilistic.__all__))
     for name in expected:
         assert hasattr(probabilistic, name)
+
+
+def test_probabilistic_facade_exports_promotion_contracts() -> None:
+    expected = {
+        "ProbabilisticPromotionDecision",
+        "ProbabilisticPromotionGate",
+        "evaluate_probabilistic_promotion",
+    }
+    assert expected.issubset(set(probabilistic.__all__))
+    for name in expected:
+        assert hasattr(probabilistic, name)
