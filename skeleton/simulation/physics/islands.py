@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from .body import BodyType, RigidBody
 from .collision import ContactManifold
-from .constraints import ConstraintSolver, ConstraintStats, DistanceJoint
+from .constraints import ConstraintSolver, ConstraintStats, JointConstraint
 from .contacts import ContactCache
 from .errors import BodyNotFoundError, PhysicsValidationError
 from .solver import SequentialImpulseSolver, SolverStats
@@ -24,7 +24,7 @@ class PhysicsIsland:
     dynamic_bodies: tuple[str, ...]
     anchors: tuple[str, ...]
     manifolds: tuple[ContactManifold, ...]
-    joints: tuple[DistanceJoint, ...]
+    joints: tuple[JointConstraint, ...]
     awake: bool
 
     def __post_init__(self) -> None:
@@ -146,7 +146,7 @@ def _body(
 def build_islands(
     bodies: dict[str, RigidBody],
     manifolds: tuple[ContactManifold, ...],
-    joints: tuple[DistanceJoint, ...],
+    joints: tuple[JointConstraint, ...],
 ) -> IslandGraph:
     dynamic_ids = tuple(
         sorted(
