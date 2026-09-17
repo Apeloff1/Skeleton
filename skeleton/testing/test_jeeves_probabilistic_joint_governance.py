@@ -99,10 +99,14 @@ def _child_decisions(*, point_min_folds: int = 1, conformal_min_steps: int = 1):
             min_scored_steps=conformal_min_steps,
             max_absolute_coverage_gap=1.0,
             max_bucket_coverage_gap=1.0,
+            max_horizon_coverage_gap=1.0,
             max_fallback_rate=1.0,
             max_unevidenced_step_rate=1.0,
+            max_unevidenced_horizon_step_rate=1.0,
             min_evidenced_buckets=0,
             min_bucket_uses=1,
+            min_evidenced_horizons=1,
+            min_horizon_steps=1,
         ),
     )
     return point, uncertainty
@@ -118,6 +122,7 @@ def test_child_decisions_are_independently_self_verifying() -> None:
     assert len(point.gate_fingerprint) == 64
     assert len(uncertainty.report_fingerprint) == 64
     assert len(uncertainty.gate_fingerprint) == 64
+    assert uncertainty.evidenced_horizons == 1
 
 
 def test_joint_gate_requires_both_evidence_planes_by_default() -> None:
