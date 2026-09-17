@@ -96,6 +96,9 @@ JSON_ENVELOPE_FILES = [
     REPO_ROOT / "backend" / "routes" / "playable.py",
     REPO_ROOT / "backend" / "routes" / "discourse.py",
     REPO_ROOT / "backend" / "routes" / "jeeves_core.py",
+    REPO_ROOT / "backend" / "routes" / "jeeves_voice.py",
+    REPO_ROOT / "backend" / "routes" / "jeeves_game_builder.py",
+    REPO_ROOT / "backend" / "routes" / "game_command_agents.py",
 ]
 
 _PRIVATE = "private-detail-must-not-leak-7f31"
