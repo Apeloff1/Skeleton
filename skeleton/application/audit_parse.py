@@ -389,17 +389,25 @@ def _is_named_call(node: ast.AST, name: str) -> bool:
     return isinstance(func, ast.Attribute) and func.attr == name
 
 
+def _is_named_ref(node: ast.AST, name: str) -> bool:
+    if isinstance(node, ast.Name) and node.id == name:
+        return True
+    if isinstance(node, ast.Attribute) and node.attr == name:
+        return True
+    return _is_named_call(node, name)
+
+
 def _depends_named(fn: ast.FunctionDef | ast.AsyncFunctionDef, name: str) -> bool:
     defaults = list(fn.args.defaults) + [item for item in fn.args.kw_defaults if item is not None]
     for default in defaults:
-        if _is_named_call(default, name):
+        if _is_named_ref(default, name):
             return True
         if (
             isinstance(default, ast.Call)
             and isinstance(default.func, ast.Name)
             and default.func.id == "Depends"
             and default.args
-            and _is_named_call(default.args[0], name)
+            and _is_named_ref(default.args[0], name)
         ):
             return True
     return False
