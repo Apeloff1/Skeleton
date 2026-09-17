@@ -130,6 +130,8 @@ class PhysicsStepReceipt:
 
 class PhysicsWorld:
     def __init__(self, settings: PhysicsSettings | None = None) -> None:
+        if settings is not None and not isinstance(settings, PhysicsSettings):
+            raise PhysicsValidationError("settings must be PhysicsSettings")
         self.settings = settings or PhysicsSettings()
         self._bodies: dict[str, RigidBody] = {}
         self._tick = 0
@@ -157,6 +159,8 @@ class PhysicsWorld:
             raise BodyNotFoundError(body_id) from exc
 
     def add_body(self, body: RigidBody) -> RigidBody:
+        if not isinstance(body, RigidBody):
+            raise PhysicsValidationError("body must be RigidBody")
         if body.body_id in self._bodies:
             raise DuplicateBodyError(body.body_id)
         if len(self._bodies) >= self.settings.max_bodies:
