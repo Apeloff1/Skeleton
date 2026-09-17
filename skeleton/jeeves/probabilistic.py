@@ -2,8 +2,8 @@
 
 This module keeps the public import surface compact while the implementation is
 split into state-space filtering, online Bayesian ensembles, distributional
-calibration, hidden-Markov regime inference, and explicit promotion eligibility
-contracts.
+calibration, hidden-Markov regime inference, multiscale harmonic forecasting,
+and explicit promotion eligibility contracts.
 """
 
 from .probabilistic_calibration import (
@@ -48,6 +48,18 @@ from .probabilistic_regimes import (
     fit_regime_hmm,
     forecast_regime_hmm,
 )
+from .probabilistic_spectral import (
+    HarmonicComponent,
+    SpectralConfig,
+    SpectralFit,
+    SpectralPeak,
+    SpectralScore,
+    SpectralTournament,
+    discover_spectral_peaks,
+    evaluate_spectral_complexities,
+    fit_spectral_model,
+    forecast_spectral,
+)
 from .probabilistic_state_space import (
     FilterStep,
     GaussianForecast,
@@ -77,6 +89,7 @@ __all__ = [
     "FilterStep",
     "GaussianForecast",
     "GaussianRegime",
+    "HarmonicComponent",
     "InnovationRegime",
     "MixtureForecast",
     "OnlineBayesianEnsemble",
@@ -92,6 +105,11 @@ __all__ = [
     "RegimePosteriorStep",
     "RegimePrequentialScore",
     "SeriesValues",
+    "SpectralConfig",
+    "SpectralFit",
+    "SpectralPeak",
+    "SpectralScore",
+    "SpectralTournament",
     "StateSpaceConfig",
     "StateSpaceError",
     "StateSpaceFamily",
@@ -101,12 +119,16 @@ __all__ = [
     "WeightedForecast",
     "calibrate_distributions",
     "central_interval",
+    "discover_spectral_peaks",
     "evaluate_probabilistic_promotion",
     "evaluate_regime_hmm_prequential",
+    "evaluate_spectral_complexities",
     "evaluate_state_space_families",
     "fit_regime_hmm",
+    "fit_spectral_model",
     "fit_state_space",
     "forecast_regime_hmm",
+    "forecast_spectral",
     "forecast_state_space",
     "gaussian_as_mixture",
     "gaussian_mixture_crps",
