@@ -16,6 +16,7 @@ from typing import TypeAlias
 
 from .body import BodyType, RigidBody
 from .errors import BodyNotFoundError, PhysicsValidationError
+from .joint_cache import JointImpulseCache
 from .math3d import EPSILON, Quat, Vec3
 
 _JOINT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
@@ -604,6 +605,8 @@ class ConstraintStats:
     hinge_joints: int = 0
     fixed_joints: int = 0
     slider_joints: int = 0
+    warm_started_rows: int = 0
+    cached_rows: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -729,6 +732,8 @@ class ConstraintSolver:
         target_speed: float = 0.0,
         accumulated_impulse: float = 0.0,
         maximum_impulse: float | None = None,
+        row_impulses: dict[str, float] | None = None,
+        row_id: str | None = None,
     ) -> tuple[int, float]:
         denominator = (
             self._angular_effective_mass(body_a, axis)
@@ -744,13 +749,20 @@ class ConstraintSolver:
         delta_impulse = -(
             relative_speed - target_speed + bias
         ) / denominator
-        new_impulse = accumulated_impulse + delta_impulse
+        previous = (
+            accumulated_impulse
+            if row_impulses is None or row_id is None
+            else row_impulses.get(row_id, accumulated_impulse)
+        )
+        new_impulse = previous + delta_impulse
         if maximum_impulse is not None:
             new_impulse = min(
                 maximum_impulse,
                 max(-maximum_impulse, new_impulse),
             )
-        applied = new_impulse - accumulated_impulse
+        applied = new_impulse - previous
+        if row_impulses is not None and row_id is not None:
+            row_impulses[row_id] = new_impulse
         if not math.isfinite(applied):
             raise PhysicsValidationError(
                 "joint produced non-finite angular impulse"
@@ -906,6 +918,10 @@ class ConstraintSolver:
         error: float,
         bias_factor: float,
         dt: float,
+        row_impulses: dict[str, float] | None = None,
+        row_id: str | None = None,
+        maximum_impulse: float | None = None,
+        target_speed: float = 0.0,
     ) -> int:
         denominator = self._denominator(
             body_a,
@@ -921,17 +937,34 @@ class ConstraintSolver:
             anchors,
         ).dot(axis)
         bias = bias_factor * error / dt
-        impulse_magnitude = -(relative_speed + bias) / denominator
-        if not math.isfinite(impulse_magnitude):
+        delta_impulse = -(
+            relative_speed - target_speed + bias
+        ) / denominator
+        if not math.isfinite(delta_impulse):
             raise PhysicsValidationError(
                 "joint produced non-finite scalar impulse"
             )
-        if abs(impulse_magnitude) <= EPSILON:
+
+        previous = (
+            0.0
+            if row_impulses is None or row_id is None
+            else row_impulses.get(row_id, 0.0)
+        )
+        accumulated = previous + delta_impulse
+        if maximum_impulse is not None:
+            accumulated = min(
+                maximum_impulse,
+                max(-maximum_impulse, accumulated),
+            )
+        applied = accumulated - previous
+        if row_impulses is not None and row_id is not None:
+            row_impulses[row_id] = accumulated
+        if abs(applied) <= EPSILON:
             return 0
         self._apply_impulse(
             body_a,
             body_b,
-            axis * impulse_magnitude,
+            axis * applied,
             anchors,
         )
         return 1
@@ -943,6 +976,7 @@ class ConstraintSolver:
         body_b: RigidBody,
         *,
         dt: float,
+        row_impulses: dict[str, float],
     ) -> tuple[int, float]:
         anchors = self._anchors(joint, body_a, body_b)
         delta = anchors.anchor_b - anchors.anchor_a
@@ -956,6 +990,8 @@ class ConstraintSolver:
             error=error,
             bias_factor=joint.bias_factor,
             dt=dt,
+            row_impulses=row_impulses,
+            row_id="distance",
         )
         return count, abs(error)
 
@@ -966,6 +1002,7 @@ class ConstraintSolver:
         body_b: RigidBody,
         *,
         dt: float,
+        row_impulses: dict[str, float],
     ) -> tuple[int, float]:
         impulses = 0
         anchors = self._anchors(joint, body_a, body_b)
@@ -986,6 +1023,8 @@ class ConstraintSolver:
                 error=delta.dot(axis),
                 bias_factor=joint.bias_factor,
                 dt=dt,
+                row_impulses=row_impulses,
+                row_id=f"point:{axis_index}",
             )
         return impulses, maximum_error
 
@@ -1007,6 +1046,7 @@ class ConstraintSolver:
         body_b: RigidBody,
         *,
         dt: float,
+        row_impulses: dict[str, float],
     ) -> tuple[int, float]:
         anchors = self._anchors(joint, body_a, body_b)
         delta = anchors.anchor_b - anchors.anchor_a
@@ -1022,6 +1062,8 @@ class ConstraintSolver:
             error=error,
             bias_factor=joint.bias_factor,
             dt=dt,
+            row_impulses=row_impulses,
+            row_id="limit",
         )
         return count, abs(error)
 
@@ -1032,8 +1074,8 @@ class ConstraintSolver:
         body_b: RigidBody,
         *,
         dt: float,
-        accumulated_impulse: float,
-    ) -> tuple[int, float, float]:
+        row_impulses: dict[str, float],
+    ) -> tuple[int, float]:
         anchors = self._anchors(joint, body_a, body_b)
         delta = anchors.anchor_b - anchors.anchor_a
         axis, length = self._axis_and_length(delta)
@@ -1044,8 +1086,9 @@ class ConstraintSolver:
             anchors,
             axis,
         )
+        accumulated_impulse = row_impulses.get("spring", 0.0)
         if denominator <= EPSILON:
-            return 0, abs(error), accumulated_impulse
+            return 0, abs(error)
 
         softness_denominator = dt * (
             joint.damping + dt * joint.stiffness
@@ -1081,8 +1124,9 @@ class ConstraintSolver:
             raise PhysicsValidationError(
                 "spring joint produced non-finite impulse"
             )
+        row_impulses["spring"] = new_impulse
         if abs(applied) <= EPSILON:
-            return 0, abs(error), new_impulse
+            return 0, abs(error)
 
         self._apply_impulse(
             body_a,
@@ -1090,7 +1134,7 @@ class ConstraintSolver:
             axis * applied,
             anchors,
         )
-        return 1, abs(error), new_impulse
+        return 1, abs(error)
 
     def _solve_hinge_velocity(
         self,
@@ -1099,8 +1143,8 @@ class ConstraintSolver:
         body_b: RigidBody,
         *,
         dt: float,
-        motor_impulse: float,
-    ) -> tuple[int, float, float]:
+        row_impulses: dict[str, float],
+    ) -> tuple[int, float]:
         impulses = 0
 
         # Three translational rows keep hinge anchors coincident.
@@ -1118,6 +1162,8 @@ class ConstraintSolver:
                 error=delta.to_tuple()[axis_index],
                 bias_factor=joint.bias_factor,
                 dt=dt,
+                row_impulses=row_impulses,
+                row_id=f"linear:{axis_index}",
             )
 
         axis_a, axis_b, _, _, angle = self._hinge_geometry(
@@ -1129,7 +1175,7 @@ class ConstraintSolver:
         # Two angular rows remove swing and preserve twist around the hinge axis.
         swing_error = axis_a.cross(axis_b)
         tangent_a, tangent_b = self._orthonormal_tangents(axis_a)
-        for tangent in (tangent_a, tangent_b):
+        for tangent_index, tangent in enumerate((tangent_a, tangent_b)):
             count, _ = self._solve_angular_scalar(
                 body_a,
                 body_b,
@@ -1137,6 +1183,8 @@ class ConstraintSolver:
                 error=swing_error.dot(tangent),
                 bias_factor=joint.bias_factor,
                 dt=dt,
+                row_impulses=row_impulses,
+                row_id=f"swing:{tangent_index}",
             )
             impulses += count
         axis_misalignment = math.acos(
@@ -1153,6 +1201,8 @@ class ConstraintSolver:
                 error=limit_error,
                 bias_factor=joint.bias_factor,
                 dt=dt,
+                row_impulses=row_impulses,
+                row_id="limit",
             )
             impulses += count
             maximum_error = max(maximum_error, abs(limit_error))
@@ -1169,12 +1219,13 @@ class ConstraintSolver:
                 bias_factor=0.0,
                 dt=dt,
                 target_speed=joint.motor_speed,
-                accumulated_impulse=motor_impulse,
                 maximum_impulse=joint.max_motor_torque * dt,
+                row_impulses=row_impulses,
+                row_id="motor",
             )
             impulses += count
 
-        return impulses, maximum_error, motor_impulse
+        return impulses, maximum_error
 
     def _solve_fixed_velocity(
         self,
@@ -1183,6 +1234,7 @@ class ConstraintSolver:
         body_b: RigidBody,
         *,
         dt: float,
+        row_impulses: dict[str, float],
     ) -> tuple[int, float]:
         impulses = 0
         anchors = self._anchors(joint, body_a, body_b)
@@ -1200,6 +1252,8 @@ class ConstraintSolver:
                 error=current_delta.to_tuple()[axis_index],
                 bias_factor=joint.bias_factor,
                 dt=dt,
+                row_impulses=row_impulses,
+                row_id=f"linear:{axis_index}",
             )
 
         frame_a = (body_a.orientation * joint.local_frame_a).normalized()
@@ -1215,6 +1269,8 @@ class ConstraintSolver:
                 error=orientation_error.to_tuple()[axis_index],
                 bias_factor=joint.bias_factor,
                 dt=dt,
+                row_impulses=row_impulses,
+                row_id=f"angular:{axis_index}",
             )
             impulses += count
         return impulses, maximum_error
@@ -1226,8 +1282,8 @@ class ConstraintSolver:
         body_b: RigidBody,
         *,
         dt: float,
-        motor_impulse: float,
-    ) -> tuple[int, float, float]:
+        row_impulses: dict[str, float],
+    ) -> tuple[int, float]:
         impulses = 0
         axis_a, axis_b, reference_a, reference_b, translation, delta = (
             self._slider_geometry(joint, body_a, body_b)
@@ -1235,7 +1291,7 @@ class ConstraintSolver:
         tangent_a, tangent_b = self._orthonormal_tangents(axis_a)
 
         # Only the two perpendicular linear rows are locked.
-        for tangent in (tangent_a, tangent_b):
+        for tangent_index, tangent in enumerate((tangent_a, tangent_b)):
             anchors = self._anchors(joint, body_a, body_b)
             current_delta = anchors.anchor_b - anchors.anchor_a
             impulses += self._solve_scalar_velocity(
@@ -1246,11 +1302,13 @@ class ConstraintSolver:
                 error=current_delta.dot(tangent),
                 bias_factor=joint.bias_factor,
                 dt=dt,
+                row_impulses=row_impulses,
+                row_id=f"linear:{tangent_index}",
             )
 
         # Lock all rotational DOFs: two swing rows plus twist around slider axis.
         swing_error = axis_a.cross(axis_b)
-        for tangent in (tangent_a, tangent_b):
+        for tangent_index, tangent in enumerate((tangent_a, tangent_b)):
             count, _ = self._solve_angular_scalar(
                 body_a,
                 body_b,
@@ -1258,6 +1316,8 @@ class ConstraintSolver:
                 error=swing_error.dot(tangent),
                 bias_factor=joint.bias_factor,
                 dt=dt,
+                row_impulses=row_impulses,
+                row_id=f"swing:{tangent_index}",
             )
             impulses += count
 
@@ -1271,6 +1331,8 @@ class ConstraintSolver:
             error=twist_error,
             bias_factor=joint.bias_factor,
             dt=dt,
+            row_impulses=row_impulses,
+            row_id="twist",
         )
         impulses += count
 
@@ -1291,6 +1353,8 @@ class ConstraintSolver:
                 error=limit_error,
                 bias_factor=joint.bias_factor,
                 dt=dt,
+                row_impulses=row_impulses,
+                row_id="limit",
             )
             maximum_error = max(maximum_error, abs(limit_error))
 
@@ -1299,43 +1363,21 @@ class ConstraintSolver:
             and joint.max_motor_force is not None
         ):
             anchors = self._anchors(joint, body_a, body_b)
-            denominator = self._denominator(
+            impulses += self._solve_scalar_velocity(
                 body_a,
                 body_b,
                 anchors,
                 axis_a,
+                error=0.0,
+                bias_factor=0.0,
+                dt=dt,
+                row_impulses=row_impulses,
+                row_id="motor",
+                maximum_impulse=joint.max_motor_force * dt,
+                target_speed=joint.motor_speed,
             )
-            if denominator > EPSILON:
-                relative_speed = self._relative_velocity(
-                    body_a,
-                    body_b,
-                    anchors,
-                ).dot(axis_a)
-                delta_impulse = -(
-                    relative_speed - joint.motor_speed
-                ) / denominator
-                new_impulse = motor_impulse + delta_impulse
-                maximum_impulse = joint.max_motor_force * dt
-                new_impulse = min(
-                    maximum_impulse,
-                    max(-maximum_impulse, new_impulse),
-                )
-                applied = new_impulse - motor_impulse
-                if not math.isfinite(applied):
-                    raise PhysicsValidationError(
-                        "slider motor produced non-finite impulse"
-                    )
-                if abs(applied) > EPSILON:
-                    self._apply_impulse(
-                        body_a,
-                        body_b,
-                        axis_a * applied,
-                        anchors,
-                    )
-                    impulses += 1
-                motor_impulse = new_impulse
 
-        return impulses, maximum_error, motor_impulse
+        return impulses, maximum_error
 
     def _translate_position(
         self,
