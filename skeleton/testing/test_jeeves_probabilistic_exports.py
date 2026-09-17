@@ -74,6 +74,26 @@ def test_probabilistic_facade_exports_calibration_surface() -> None:
         assert hasattr(probabilistic, name)
 
 
+def test_probabilistic_facade_exports_conformal_surface() -> None:
+    expected = {
+        "ConformalConfig",
+        "ConformalInterval",
+        "ConformalPredictiveDistribution",
+        "ConformalReport",
+        "ConformalStep",
+        "ForecastObservation",
+        "conformal_interval",
+        "conformal_quantile",
+        "conformalize_next_forecast",
+        "evaluate_cross_family_conformal",
+        "evaluate_prequential_conformal",
+        "nonconformity_score",
+    }
+    assert expected.issubset(set(probabilistic.__all__))
+    for name in expected:
+        assert hasattr(probabilistic, name)
+
+
 def test_probabilistic_facade_exports_promotion_contracts() -> None:
     expected = {
         "ProbabilisticPromotionDecision",
