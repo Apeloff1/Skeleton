@@ -7,6 +7,14 @@ import math
 
 import pytest
 
+from skeleton.frontier.model_routing import (
+    ModelRouter,
+    ModelRouteRequest,
+    ProviderMetadataError,
+    RouteBudget,
+    RouteEvalCase,
+    RouteEvalContract,
+)
 from skeleton.frontier.model_runtime import (
     ChatResponse,
     ModelCapability,
@@ -15,17 +23,7 @@ from skeleton.frontier.model_runtime import (
     TokenUsage,
     TransientProviderError,
 )
-from skeleton.frontier.model_routing import (
-    ModelRouteRequest,
-    ModelRouter,
-    ProviderMetadata,
-    ProviderMetadataError,
-    RouteBudget,
-    RouteEvalCase,
-    RouteEvalContract,
-)
 from skeleton.observability.redaction import REDACTED
-
 
 _SECRET = "super-secret-routing-token"
 

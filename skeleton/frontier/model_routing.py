@@ -30,10 +30,16 @@ from skeleton.frontier.model_runtime import (
     TokenUsage,
     ToolDefinition,
 )
-from skeleton.observability.redaction import REDACTED, redact_payload, safe_exception_text
-
+from skeleton.observability.redaction import (
+    REDACTED,
+    redact_payload,
+    safe_exception_text,
+)
 
 _EXECUTION_CAPABILITIES = frozenset(capability.value for capability in ModelCapability)
+_SENSITIVE_TRACE_KEYS = frozenset(
+    {"api_key", "token", "secret", "password", "authorization"}
+)
 _METADATA_REQUIRED_KEYS = frozenset(
     {
         "provider_id",
@@ -145,7 +151,7 @@ def _redact_trace(value: Any) -> Any:
     return redact_payload(value)
 
 
-def _usage_cost(metadata: "ProviderMetadata", usage: TokenUsage) -> float:
+def _usage_cost(metadata: ProviderMetadata, usage: TokenUsage) -> float:
     return (
         usage.input_tokens * metadata.input_cost_per_million
         + usage.output_tokens * metadata.output_cost_per_million
@@ -153,7 +159,7 @@ def _usage_cost(metadata: "ProviderMetadata", usage: TokenUsage) -> float:
 
 
 def _estimate_cost(
-    metadata: "ProviderMetadata",
+    metadata: ProviderMetadata,
     *,
     input_tokens: int,
     output_tokens: int,
@@ -242,7 +248,7 @@ class ProviderMetadata:
         )
 
     @classmethod
-    def from_mapping(cls, data: object) -> "ProviderMetadata":
+    def from_mapping(cls, data: object) -> ProviderMetadata:
         if not isinstance(data, Mapping):
             raise ProviderMetadataError("provider metadata must be a mapping")
         keys = _mapping_keys(data)
@@ -267,11 +273,9 @@ class ProviderMetadata:
                 output_cost_per_million=data["output_cost_per_million"],
                 timeout_seconds=data["timeout_seconds"],
                 priority=data["priority"],
-                enabled=data["enabled"] if "enabled" in data else True,
-                max_attempts=data["max_attempts"] if "max_attempts" in data else 2,
-                backoff_seconds=(
-                    data["backoff_seconds"] if "backoff_seconds" in data else 0.0
-                ),
+                enabled=data.get("enabled", True),
+                max_attempts=data.get("max_attempts", 2),
+                backoff_seconds=data.get("backoff_seconds", 0.0),
             )
         except (TypeError, ValueError) as exc:
             raise ProviderMetadataError(str(exc)) from exc
@@ -626,24 +630,20 @@ class RouteEvalContract:
             if fragment and fragment in haystack:
                 reasons.append("secret material leaked into result traces")
                 break
-        if REDACTED not in haystack and any(
-            key in repr(case.request.metadata).lower()
-            for key in ("api_key", "token", "secret", "password", "authorization")
-        ):
-            # Caller metadata contained a sensitive key; traces must show redaction.
-            if "api_key" in case.request.metadata or any(
-                str(key).lower().replace("-", "_")
-                in {"api_key", "token", "secret", "password", "authorization"}
-                for key in case.request.metadata
-            ):
-                trace_meta = result.trace.get("caller_metadata", {})
-                if isinstance(trace_meta, Mapping) and any(
-                    value != REDACTED
-                    and str(key).lower().replace("-", "_")
-                    in {"api_key", "token", "secret", "password", "authorization"}
-                    for key, value in trace_meta.items()
-                ):
-                    reasons.append("caller metadata was not redacted")
+        caller_keys = {
+            str(key).lower().replace("-", "_") for key in case.request.metadata
+        }
+        trace_meta = result.trace.get("caller_metadata", {})
+        leaked_metadata = caller_keys & _SENSITIVE_TRACE_KEYS and (
+            not isinstance(trace_meta, Mapping)
+            or any(
+                str(key).lower().replace("-", "_") in _SENSITIVE_TRACE_KEYS
+                and value != REDACTED
+                for key, value in trace_meta.items()
+            )
+        )
+        if leaked_metadata:
+            reasons.append("caller metadata was not redacted")
         return RouteEvalVerdict(
             case_id=case.case_id,
             passed=not reasons,
@@ -653,7 +653,7 @@ class RouteEvalContract:
 
     async def run(
         self,
-        router: "ModelRouter",
+        router: ModelRouter,
         cases: Sequence[RouteEvalCase],
     ) -> RouteEvalReport:
         if not isinstance(router, ModelRouter):
