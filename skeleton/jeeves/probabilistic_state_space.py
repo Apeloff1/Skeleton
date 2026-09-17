@@ -1,19 +1,22 @@
 """Probabilistic state-space forecasting primitives for Jeeves.
 
 This module provides deterministic, offline mathematical forecasting utilities for
-scalar time series.  It intentionally avoids provider calls, market-data fetching,
+scalar time series. It intentionally avoids provider calls, market-data fetching,
 order execution, and mutable learning state.
 
-The design goals are:
+Design goals:
 - explicit uncertainty rather than point forecasts only,
 - numerically stable local-level/local-trend filtering,
 - robust innovation handling for outliers,
 - deterministic multi-step predictive distributions,
 - online regime probabilities derived from observable innovation statistics,
+- leakage-safe expanding-window family tournaments,
 - reproducible fingerprints for evidence and regression tests.
 
 The implementation is dependency-light on purpose so it can live inside the core
-Jeeves evaluation surface without requiring NumPy/SciPy at import time.
+Jeeves evaluation surface without requiring NumPy/SciPy at import time. Objects
+with a ``values`` attribute are accepted structurally, so the engine composes with
+Jeeves historical-series contracts without importing an in-flight branch.
 """
 
 from __future__ import annotations
@@ -23,13 +26,26 @@ import math
 import statistics
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable, Sequence
+from typing import Iterable, Protocol, Sequence
 
-from .historical_modes import HistoricalModeError, HistoricalSeries
+from skeleton.kernel.errors import KernelError
 
 _EPSILON = 1e-12
 _MIN_VARIANCE = 1e-12
 _MAX_VARIANCE = 1e18
+
+
+class StateSpaceError(KernelError):
+    """Fail-closed error for Jeeves probabilistic state-space operations."""
+
+    code = "JEEVES.STATE_SPACE"
+    http_status = 422
+
+
+class SeriesValues(Protocol):
+    """Structural adapter for existing Jeeves series containers."""
+
+    values: Sequence[float]
 
 
 class StateSpaceFamily(str, Enum):
@@ -54,8 +70,8 @@ class StateSpaceConfig:
     """Configuration for structural state-space filtering.
 
     Variances are expressed in the same squared units as the observed series.
-    The defaults are intentionally conservative and are scaled to the supplied
-    data by ``fit_state_space`` when ``scale_variances=True``.
+    When ``scale_variances`` is enabled the values are multiplied by a robust
+    empirical scale squared, making one configuration portable across magnitudes.
     """
 
     family: StateSpaceFamily = StateSpaceFamily.ROBUST_LOCAL_LINEAR_TREND
@@ -72,13 +88,14 @@ class StateSpaceConfig:
         _non_negative_finite("level_variance", self.level_variance)
         _non_negative_finite("trend_variance", self.trend_variance)
         _positive_finite("initial_variance", self.initial_variance)
-        if not 1.0 <= _positive_finite("robust_clip_sigma", self.robust_clip_sigma) <= 20.0:
-            raise HistoricalModeError(
+        clip = _positive_finite("robust_clip_sigma", self.robust_clip_sigma)
+        if not 1.0 <= clip <= 20.0:
+            raise StateSpaceError(
                 "robust_clip_sigma must be between 1 and 20",
                 context={"reason": "invalid_state_space_config", "field": "robust_clip_sigma"},
             )
         if isinstance(self.regime_window, bool) or not isinstance(self.regime_window, int) or self.regime_window < 3:
-            raise HistoricalModeError(
+            raise StateSpaceError(
                 "regime_window must be an integer >= 3",
                 context={"reason": "invalid_state_space_config", "field": "regime_window"},
             )
@@ -94,7 +111,7 @@ class GaussianForecast:
 
     def __post_init__(self) -> None:
         if isinstance(self.horizon, bool) or not isinstance(self.horizon, int) or self.horizon <= 0:
-            raise HistoricalModeError(
+            raise StateSpaceError(
                 "forecast horizon must be positive",
                 context={"reason": "invalid_horizon"},
             )
@@ -111,6 +128,11 @@ class GaussianForecast:
         z = _positive_finite("z", z)
         radius = z * self.standard_deviation
         return self.mean - radius, self.mean + radius
+
+    def log_density(self, actual: float) -> float:
+        """Proper logarithmic score contribution for one realized target."""
+
+        return _gaussian_log_density(_finite("actual", actual) - self.mean, self.variance)
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,7 +156,7 @@ class FilterStep:
 
     def __post_init__(self) -> None:
         if isinstance(self.index, bool) or not isinstance(self.index, int) or self.index < 0:
-            raise HistoricalModeError(
+            raise StateSpaceError(
                 "filter index must be a non-negative integer",
                 context={"reason": "invalid_filter_step"},
             )
@@ -155,7 +177,7 @@ class FilterStep:
         ):
             _finite(name, getattr(self, name))
         if self.innovation_variance <= 0.0 or self.level_variance < 0.0 or self.trend_variance < 0.0:
-            raise HistoricalModeError(
+            raise StateSpaceError(
                 "filter variances must remain valid",
                 context={"reason": "invalid_filter_step_variance"},
             )
@@ -173,12 +195,12 @@ class RegimePosterior:
     def __post_init__(self) -> None:
         values = (self.calm, self.trending, self.turbulent, self.shock)
         if any(not math.isfinite(value) or value < 0.0 for value in values):
-            raise HistoricalModeError(
+            raise StateSpaceError(
                 "regime probabilities must be finite and non-negative",
                 context={"reason": "invalid_regime_posterior"},
             )
         if abs(sum(values) - 1.0) > 1e-9:
-            raise HistoricalModeError(
+            raise StateSpaceError(
                 "regime probabilities must sum to one",
                 context={"reason": "invalid_regime_posterior"},
             )
@@ -237,12 +259,12 @@ class StateSpaceFit:
     def forecast_path(self, horizons: Iterable[int]) -> tuple[GaussianForecast, ...]:
         requested = tuple(horizons)
         if not requested:
-            raise HistoricalModeError(
+            raise StateSpaceError(
                 "at least one forecast horizon is required",
                 context={"reason": "empty_horizon_grid"},
             )
         if len(set(requested)) != len(requested):
-            raise HistoricalModeError(
+            raise StateSpaceError(
                 "forecast horizons must be unique",
                 context={"reason": "duplicate_horizon"},
             )
@@ -276,29 +298,29 @@ class StateSpaceTournament:
         for score in self.scores:
             if score.family is family:
                 return score
-        raise HistoricalModeError(
+        raise StateSpaceError(
             "family was not evaluated",
             context={"reason": "missing_family", "family": family.value},
         )
 
 
 def fit_state_space(
-    series: HistoricalSeries | Sequence[float],
+    series: SeriesValues | Sequence[float],
     *,
     config: StateSpaceConfig | None = None,
 ) -> StateSpaceFit:
     """Fit a deterministic structural state-space model.
 
-    For the robust family, standardized innovations are clipped before the
-    posterior correction is applied.  The predictive variance and likelihood
-    continue to use the unmodified innovation covariance, preserving a clear
-    distinction between uncertainty and robust state correction.
+    For the robust family, standardized innovations are clipped before posterior
+    correction. Predictive variance and likelihood still use the unmodified
+    innovation covariance, preserving a clear separation between uncertainty
+    representation and robust state correction.
     """
 
     actual_config = config or StateSpaceConfig()
     values = _coerce_values(series)
     if len(values) < 2:
-        raise HistoricalModeError(
+        raise StateSpaceError(
             "state-space fitting requires at least two observations",
             context={"reason": "insufficient_history"},
         )
@@ -324,20 +346,21 @@ def fit_state_space(
             prior_p00 = p00 + process_level_variance
             prior_p01 = p01
             prior_p11 = p11 + process_trend_variance
+        elif actual_config.family is StateSpaceFamily.LOCAL_LEVEL:
+            prior_level = level
+            prior_trend = 0.0
+            prior_p00 = p00 + process_level_variance
+            prior_p01 = 0.0
+            prior_p11 = 0.0
         else:
-            if actual_config.family is StateSpaceFamily.LOCAL_LEVEL:
-                prior_level = level
-                prior_trend = 0.0
-                prior_p00 = p00 + process_level_variance
-                prior_p01 = 0.0
-                prior_p11 = 0.0
-            else:
-                prior_level = level + trend
-                prior_trend = trend
-                prior_p00 = p00 + 2.0 * p01 + p11 + process_level_variance
-                prior_p01 = p01 + p11
-                prior_p11 = p11 + process_trend_variance
+            prior_level = level + trend
+            prior_trend = trend
+            prior_p00 = p00 + 2.0 * p01 + p11 + process_level_variance
+            prior_p01 = p01 + p11
+            prior_p11 = p11 + process_trend_variance
 
+        prior_p00 = _bounded_variance(prior_p00)
+        prior_p11 = _bounded_non_negative(prior_p11)
         innovation = observed - prior_level
         innovation_variance = _bounded_variance(prior_p00 + observation_variance)
         innovation_std = math.sqrt(innovation_variance)
@@ -354,10 +377,9 @@ def fit_state_space(
         level = prior_level + k0 * effective_innovation
         trend = prior_trend + k1 * effective_innovation
 
-        # Joseph-equivalent scalar-observation covariance update simplified for H=[1,0].
         p00 = _bounded_variance((1.0 - k0) * prior_p00)
         p01 = (1.0 - k0) * prior_p01
-        p11 = _bounded_variance(prior_p11 - k1 * prior_p01)
+        p11 = _bounded_non_negative(prior_p11 - k1 * prior_p01)
         if actual_config.family is StateSpaceFamily.LOCAL_LEVEL:
             p01 = 0.0
             p11 = 0.0
@@ -423,7 +445,7 @@ def forecast_state_space(fit: StateSpaceFit, *, horizon: int = 1) -> GaussianFor
     """Project one fitted state posterior forward without future observations."""
 
     if isinstance(horizon, bool) or not isinstance(horizon, int) or horizon <= 0:
-        raise HistoricalModeError(
+        raise StateSpaceError(
             "forecast horizon must be a positive integer",
             context={"reason": "invalid_horizon"},
         )
@@ -446,7 +468,7 @@ def forecast_state_space(fit: StateSpaceFit, *, horizon: int = 1) -> GaussianFor
 
 
 def evaluate_state_space_families(
-    series: HistoricalSeries | Sequence[float],
+    series: SeriesValues | Sequence[float],
     *,
     min_train_size: int = 16,
     step: int = 1,
@@ -456,23 +478,23 @@ def evaluate_state_space_families(
     """Run leakage-safe expanding-window prequential evaluation.
 
     Every target is scored using a model fitted only on the prefix ending before
-    that target.  Ranking prefers mean log score, then RMSE, MAE, interval width,
-    and finally the stable family name.
+    that target. Ranking prefers proper mean log score, then RMSE, MAE, interval
+    width, and finally the stable family name.
     """
 
     values = _coerce_values(series)
     if isinstance(min_train_size, bool) or not isinstance(min_train_size, int) or min_train_size < 3:
-        raise HistoricalModeError(
+        raise StateSpaceError(
             "min_train_size must be an integer >= 3",
             context={"reason": "invalid_tournament_config"},
         )
     if isinstance(step, bool) or not isinstance(step, int) or step <= 0:
-        raise HistoricalModeError(
+        raise StateSpaceError(
             "step must be a positive integer",
             context={"reason": "invalid_tournament_config"},
         )
     if len(values) <= min_train_size:
-        raise HistoricalModeError(
+        raise StateSpaceError(
             "series is too short for state-space tournament",
             context={"reason": "insufficient_history"},
         )
@@ -486,7 +508,7 @@ def evaluate_state_space_families(
         )
     )
     if not requested or len(set(requested)) != len(requested):
-        raise HistoricalModeError(
+        raise StateSpaceError(
             "state-space families must be non-empty and unique",
             context={"reason": "invalid_family_set"},
         )
@@ -518,7 +540,7 @@ def evaluate_state_space_families(
             error = forecast.mean - actual
             errors.append(abs(error))
             squared_errors.append(error * error)
-            log_scores.append(_gaussian_log_density(actual - forecast.mean, forecast.variance))
+            log_scores.append(forecast.log_density(actual))
             lower, upper = forecast.interval()
             coverage.append(1.0 if lower <= actual <= upper else 0.0)
             widths.append(upper - lower)
@@ -623,8 +645,6 @@ def _series_scale(values: Sequence[float]) -> float:
 
 
 def _trend_process_accumulation(horizon: int) -> float:
-    # Sum of squared trend-noise exposure coefficients for local linear trend.
-    # For horizon h: 1^2 + 2^2 + ... + h^2.
     h = float(horizon)
     return h * (h + 1.0) * (2.0 * h + 1.0) / 6.0
 
@@ -634,13 +654,26 @@ def _gaussian_log_density(error: float, variance: float) -> float:
     return -0.5 * (math.log(2.0 * math.pi * variance) + (error * error) / variance)
 
 
-def _coerce_values(series: HistoricalSeries | Sequence[float]) -> tuple[float, ...]:
-    if isinstance(series, HistoricalSeries):
-        values = series.values
+def _coerce_values(series: SeriesValues | Sequence[float]) -> tuple[float, ...]:
+    raw: object
+    if hasattr(series, "values"):
+        raw = getattr(series, "values")
     else:
-        values = tuple(series)
+        raw = series
+    if isinstance(raw, (str, bytes)):
+        raise StateSpaceError(
+            "state-space series must be numeric",
+            context={"reason": "invalid_series"},
+        )
+    try:
+        values = tuple(raw)  # type: ignore[arg-type]
+    except TypeError as exc:
+        raise StateSpaceError(
+            "state-space series must be iterable",
+            context={"reason": "invalid_series"},
+        ) from exc
     if not values:
-        raise HistoricalModeError(
+        raise StateSpaceError(
             "state-space series cannot be empty",
             context={"reason": "empty_series"},
         )
@@ -714,7 +747,7 @@ def _sigmoid(value: float) -> float:
 
 def _bounded_variance(value: float) -> float:
     if not math.isfinite(value):
-        raise HistoricalModeError(
+        raise StateSpaceError(
             "variance became non-finite",
             context={"reason": "numerical_instability"},
         )
@@ -723,7 +756,7 @@ def _bounded_variance(value: float) -> float:
 
 def _bounded_non_negative(value: float) -> float:
     if not math.isfinite(value):
-        raise HistoricalModeError(
+        raise StateSpaceError(
             "variance became non-finite",
             context={"reason": "numerical_instability"},
         )
@@ -732,13 +765,13 @@ def _bounded_non_negative(value: float) -> float:
 
 def _finite(name: str, value: object) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise HistoricalModeError(
+        raise StateSpaceError(
             f"{name} must be numeric",
             context={"reason": "invalid_number", "field": name},
         )
     number = float(value)
     if not math.isfinite(number):
-        raise HistoricalModeError(
+        raise StateSpaceError(
             f"{name} must be finite",
             context={"reason": "invalid_number", "field": name},
         )
@@ -748,7 +781,7 @@ def _finite(name: str, value: object) -> float:
 def _positive_finite(name: str, value: object) -> float:
     number = _finite(name, value)
     if number <= 0.0:
-        raise HistoricalModeError(
+        raise StateSpaceError(
             f"{name} must be positive",
             context={"reason": "invalid_state_space_config", "field": name},
         )
@@ -758,7 +791,7 @@ def _positive_finite(name: str, value: object) -> float:
 def _non_negative_finite(name: str, value: object) -> float:
     number = _finite(name, value)
     if number < 0.0:
-        raise HistoricalModeError(
+        raise StateSpaceError(
             f"{name} must be non-negative",
             context={"reason": "invalid_state_space_config", "field": name},
         )
@@ -770,7 +803,9 @@ __all__ = [
     "GaussianForecast",
     "InnovationRegime",
     "RegimePosterior",
+    "SeriesValues",
     "StateSpaceConfig",
+    "StateSpaceError",
     "StateSpaceFamily",
     "StateSpaceFit",
     "StateSpaceScore",
