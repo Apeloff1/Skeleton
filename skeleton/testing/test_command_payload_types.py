@@ -221,4 +221,3 @@ def test_http_ingest_and_include_files_reject_coerced_types() -> None:
     assert "files" not in stripped
     with pytest.raises(HTTPException):
         asyncio.run(routes.gameforge_run(type("R", (), {"headers": {}})(), {"include_files": "false"}, _GameState()))
-
