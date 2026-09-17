@@ -129,8 +129,17 @@ def test_box_face_manifold_is_deterministic_for_identical_geometry() -> None:
 
 
 def test_box_face_features_survive_small_in_face_translation_when_topology_stable() -> None:
-    left = _box("a", position=Vec3.zero(), static=True)
-    right = _box("b", position=Vec3(0.9, 0.0, 0.0))
+    left = _box(
+        "a",
+        position=Vec3.zero(),
+        half=Vec3(0.5, 1.0, 1.0),
+        static=True,
+    )
+    right = _box(
+        "b",
+        position=Vec3(0.9, 0.0, 0.0),
+        half=Vec3(0.5, 0.4, 0.4),
+    )
     first = detect_collision(left, right)
     assert first is not None
     assert len(first.points) == 4
@@ -142,7 +151,7 @@ def test_box_face_features_survive_small_in_face_translation_when_topology_stabl
 
     first_features = {point.feature_id for point in first.points}
     second_features = {point.feature_id for point in second.points}
-    assert len(first_features & second_features) >= 2
+    assert second_features == first_features
 
 
 def test_rotated_face_contact_remains_bounded_and_unique() -> None:
