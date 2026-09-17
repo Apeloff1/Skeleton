@@ -7,6 +7,7 @@ from skeleton.automation.repair_intake import (
     INTAKE_SKIP_DUPLICATE,
     INTAKE_SKIP_FAMILY,
     INTAKE_SKIP_INVALID,
+    INTAKE_SKIP_RECOVERED,
     INTAKE_SKIP_SUPERSEDED,
     INTAKE_SKIP_UNREADABLE,
     classify_intake,
@@ -16,6 +17,7 @@ from skeleton.automation.repair_intake import (
     issue_family_marker,
     issue_marker,
     resolve_branch_tip,
+    workflow_sha_recovered,
 )
 
 
@@ -162,6 +164,54 @@ def test_classify_intake_preempts_storms_and_ambiguous_state() -> None:
         )
         == INTAKE_SKIP_INVALID
     )
+    assert (
+        classify_intake(
+            sha_record_exists=False,
+            family_open_exists=False,
+            branch_lookup="ok",
+            branch_tip=head,
+            head_sha=head,
+            recovered=True,
+        )
+        == INTAKE_SKIP_RECOVERED
+    )
+
+
+def test_workflow_sha_recovered_ignores_cancelled_and_foreign_workflows() -> None:
+    payload = {
+        "workflow_runs": [
+            {"name": "Malware Gate", "conclusion": "cancelled"},
+            {"name": "Merge Readiness", "conclusion": "failure"},
+            {"name": "Merge Readiness", "conclusion": "success"},
+        ]
+    }
+    assert (
+        workflow_sha_recovered(
+            "Apeloff1/Skeleton",
+            "Merge Readiness",
+            "abc123",
+            opener=lambda _path: (200, payload),
+        )
+        is True
+    )
+    assert (
+        workflow_sha_recovered(
+            "Apeloff1/Skeleton",
+            "Malware Gate",
+            "abc123",
+            opener=lambda _path: (200, payload),
+        )
+        is False
+    )
+    assert (
+        workflow_sha_recovered(
+            "Apeloff1/Skeleton",
+            "Merge Readiness",
+            "abc123",
+            opener=lambda _path: (500, None),
+        )
+        is None
+    )
 
 
 def test_workflow_run_consumer_never_checks_out_triggering_code() -> None:
@@ -182,6 +232,8 @@ def test_workflow_preempts_superseded_sha_and_open_family_records() -> None:
     assert "skip_superseded" in workflow
     assert "skip_family" in workflow
     assert "skip_unreadable" in workflow
+    assert "skip_recovered" in workflow
+    assert "head_sha=" in workflow
     assert "--state open" in workflow
     assert "repair-intake:family=" in workflow
     assert "User-Agent': 'skeleton-repair-intake'" in workflow or 'User-Agent": "skeleton-repair-intake"' in workflow or "skeleton-repair-intake" in workflow

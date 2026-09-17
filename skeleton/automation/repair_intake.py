@@ -18,6 +18,7 @@ INTAKE_SKIP_SUPERSEDED: Final = "skip_superseded"
 INTAKE_SKIP_FAMILY: Final = "skip_family"
 INTAKE_SKIP_INVALID: Final = "skip_invalid"
 INTAKE_SKIP_UNREADABLE: Final = "skip_unreadable"
+INTAKE_SKIP_RECOVERED: Final = "skip_recovered"
 
 FAMILY_DISCRIMINATOR: Final = "family"
 
@@ -144,6 +145,47 @@ def resolve_branch_tip(
         return "unreadable", None
 
 
+def workflow_sha_recovered(
+    repo: str,
+    workflow: str,
+    head_sha: str,
+    *,
+    opener: HttpOpener,
+) -> bool | None:
+    """Return whether the same workflow later succeeded on this SHA.
+
+    ``True`` means a completed success exists, so the failure observation is
+    stale. ``False`` means no success was found. ``None`` means the lookup was
+    unreadable; callers must not treat that as recovery.
+    """
+
+    repository = _required_text(repo, "repo")
+    if repository.count("/") != 1:
+        raise ValueError("repo must be owner/name")
+    name = _required_text(workflow, "workflow").lower()
+    sha = _required_ref(head_sha, "head_sha")
+    path = f"/repos/{repository}/actions/runs?head_sha={quote(sha, safe='')}&status=completed&per_page=30"
+    try:
+        status, payload = opener(path)
+    except Exception:
+        return None
+    if status != 200 or not isinstance(payload, Mapping):
+        return None
+    runs = payload.get("workflow_runs")
+    if not isinstance(runs, list):
+        return None
+    for run in runs:
+        if not isinstance(run, Mapping):
+            continue
+        run_name = run.get("name")
+        conclusion = run.get("conclusion")
+        if not isinstance(run_name, str) or not isinstance(conclusion, str):
+            continue
+        if run_name.strip().lower() == name and conclusion.strip().lower() == "success":
+            return True
+    return False
+
+
 def classify_intake(
     *,
     sha_record_exists: bool,
@@ -151,6 +193,7 @@ def classify_intake(
     branch_lookup: str,
     branch_tip: str | None,
     head_sha: str,
+    recovered: bool = False,
 ) -> str:
     """Return the pre-emptive intake action for one failure observation.
 
@@ -162,6 +205,8 @@ def classify_intake(
         raise TypeError("sha_record_exists must be a bool")
     if not isinstance(family_open_exists, bool):
         raise TypeError("family_open_exists must be a bool")
+    if not isinstance(recovered, bool):
+        raise TypeError("recovered must be a bool")
     if branch_lookup not in {"ok", "missing", "unreadable"}:
         raise ValueError("branch_lookup must be ok, missing, or unreadable")
 
@@ -184,6 +229,8 @@ def classify_intake(
         return INTAKE_SKIP_UNREADABLE
     if tip != current_sha:
         return INTAKE_SKIP_SUPERSEDED
+    if recovered:
+        return INTAKE_SKIP_RECOVERED
     if family_open_exists:
         return INTAKE_SKIP_FAMILY
     return INTAKE_CREATE

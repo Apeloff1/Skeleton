@@ -37,7 +37,8 @@ Intake is pre-emptive about merge storms. Before opening a new issue the trusted
 1. Looks up the current same-repo branch tip through the GitHub API. It never checks out the triggering head.
 2. Skips superseded SHAs whose branch tip has already moved, and skips deleted branches.
 3. Skips when the branch tip cannot be read unambiguously. Creating another issue is the privileged mutation, so uncertainty does not open a record.
-4. Groups remaining current-head failures by a workflow + branch family fingerprint. One open family record is enough; later current-head failures on that same live branch correlate instead of multiplying.
+4. Skips when the same workflow later succeeded on that SHA. Cancelled or timed-out peer runs are not success and do not count as recovery.
+5. Groups remaining current-head failures by a workflow + branch family fingerprint. One open family record is enough; later current-head failures on that same live branch correlate instead of multiplying.
 
 Branch names and all later repository/issue text remain untrusted data even when the head repository is the same repository. Branch names are hashed for family identity and percent-encoded for the branches API. Control characters and oversized refs fail closed.
 
@@ -57,6 +58,7 @@ A repair proposal must retain the triggering commit SHA and relevant finding/run
 
 - Duplicate workflow/head failure: correlate to the existing intake record.
 - Superseded SHA, deleted branch, or unreadable branch tip: skip intake rather than opening a storm of stale records.
+- Same workflow later succeeded on this SHA: skip as recovered. Cancelled peer runs are not recovery.
 - Open workflow+branch family record already exists: correlate; do not open a second issue.
 - Stale SHA or changed base: discard/recompute the old repair plan.
 - Invalid or non-canonical path: classify high risk and require review.
