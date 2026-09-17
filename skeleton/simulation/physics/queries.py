@@ -165,6 +165,63 @@ def raycast_body(ray: Ray, body: RigidBody) -> RayHit | None:
     raise PhysicsValidationError("unsupported raycast shape")
 
 
+def _sphere_cast_box(
+    ray: Ray,
+    radius: float,
+    body: RigidBody,
+    shape: BoxShape,
+) -> RayHit | None:
+    # Slab against the expanded OBB is a cheap conservative prefilter.  We then
+    # advance using exact point-to-OBB distance, eliminating expanded-box corner
+    # false positives that would otherwise pin fast spheres outside geometry.
+    coarse = _box_intersection(ray, body, shape, expansion=radius)
+    if coarse is None:
+        return None
+
+    local_origin = body.transform.inverse_transform_point(ray.origin)
+    local_direction = body.transform.inverse_transform_vector(ray.direction).normalized()
+    half = shape.half_extents
+    distance_along_ray = max(0.0, coarse.distance)
+    tolerance = max(1.0e-9, radius * 1.0e-8)
+
+    for _ in range(64):
+        if distance_along_ray > ray.max_distance:
+            return None
+        center = local_origin + local_direction * distance_along_ray
+        closest = center.clamp(-half, half)
+        delta = center - closest
+        separation = delta.length()
+
+        if separation <= radius + tolerance:
+            if separation > EPSILON:
+                local_normal = delta / separation
+            else:
+                face_distances = (
+                    half.x - abs(center.x),
+                    half.y - abs(center.y),
+                    half.z - abs(center.z),
+                )
+                axis_index = min(range(3), key=lambda index: (face_distances[index], index))
+                sign = 1.0 if center.to_tuple()[axis_index] >= 0.0 else -1.0
+                local_normal = Vec3.axis(axis_index) * sign
+            normal = body.transform.transform_vector(local_normal).normalized()
+            return RayHit(
+                body.body_id,
+                distance_along_ray,
+                ray.point_at(distance_along_ray),
+                normal,
+            )
+
+        # Euclidean distance to a closed convex set is 1-Lipschitz, so advancing
+        # by the current clearance cannot cross the first radius-offset surface.
+        advance = separation - radius
+        if advance <= tolerance:
+            advance = tolerance
+        distance_along_ray += advance
+
+    return None
+
+
 def sphere_cast_body(
     ray: Ray,
     radius: float,
@@ -186,7 +243,7 @@ def sphere_cast_body(
             body.body_id,
         )
     if isinstance(shape, BoxShape):
-        return _box_intersection(ray, body, shape, expansion=radius)
+        return _sphere_cast_box(ray, radius, body, shape)
     if isinstance(shape, PlaneShape):
         normal, offset = shape.world_equation(body.transform)
         signed_origin = normal.dot(ray.origin) - offset
