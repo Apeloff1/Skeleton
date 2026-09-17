@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, Callable, Mapping
 
 from .adaptive_runtime import AdaptiveJeevesRuntime
 from .associative_memory import AssociativeMemoryMesh
