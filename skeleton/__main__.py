@@ -2,31 +2,6 @@
 
 Usage:
     python -m skeleton <command> [options]
-
-Commands:
-    run         Start the skeleton runtime / GameForge vision run
-    forge       Blueprint compilation and materialization
-    test        Run test suites
-    dev         Developer CLI (scaffold, wizard, health, visualize)
-    eras        List GameForge era dialects
-    generations List hardware generations
-    plan        Jeeves BuildPlan for a vision / era
-    cockpit     Apply one cockpit command
-    walk        Prove spawn→extract on the emitted door graph
-    contracts   Show the shared API/CLI feature-parity contract
-    capabilities Show the stable machine-readable capability manifest
-    sota        Show the #807 SOTA game-creation program map
-    replay      Record and verify a deterministic mechanics replay
-    session     Compose replay + AI + harbor + mass + era bind
-    conductor   Run the 7-step GameForge conductor cards
-    arena       Run the B100 structural sealed-replay arena
-    spec        Compile a Game Spec card from a vision
-    emit        Validate the emit-pack tree (no Godot binary)
-    doctor      Run one doctor cycle on the weakest critique axis
-    command     Execute a shared command: command <name> ['{...json...}']
-    status      Shared runtime status command
-    config      Shared non-secret configuration command
-    help        Show this help message
 """
 
 from __future__ import annotations
@@ -38,23 +13,19 @@ from typing import List, Optional
 
 def _cmd_contracts(_rest: List[str]) -> int:
     from skeleton.application import parity_matrix
-
     print(json.dumps(parity_matrix(), indent=2, default=str))
     return 0
 
 
 def _cmd_capabilities(_rest: List[str]) -> int:
     from skeleton.application import capability_manifest
-
     print(json.dumps(capability_manifest(), indent=2, default=str))
     return 0
 
 
 def _cmd_sota(rest: List[str]) -> int:
     from dataclasses import asdict
-
     from skeleton.application import get_lane, sota_program
-
     if rest:
         try:
             lane = get_lane(rest[0])
@@ -83,7 +54,6 @@ def _parse_seed(rest: List[str]) -> int | str:
 def _cmd_replay(rest: List[str]) -> int:
     from skeleton.game.replay import REPLAY_SCHEMA_VERSION, record, verify
     from skeleton.vault.tool_fence import inspect_tool
-
     seed = _parse_seed(rest)
     inputs = [
         {"t": 0, "verb": "attack"},
@@ -111,7 +81,6 @@ def _cmd_replay(rest: List[str]) -> int:
 
 def _cmd_session(rest: List[str]) -> int:
     from skeleton.game.session import run_session
-
     seed = _parse_seed(rest)
     inputs = [{"t": 0, "verb": "attack"}, {"t": 1, "verb": "wait"}]
     try:
@@ -132,7 +101,6 @@ def _cmd_session(rest: List[str]) -> int:
 
 def _cmd_conductor(rest: List[str]) -> int:
     from skeleton.game.conductor import execute
-
     seed = _parse_seed(rest)
     try:
         payload = execute(seed=int(seed) if str(seed).isdigit() else 8847291)
@@ -153,7 +121,6 @@ def _cmd_conductor(rest: List[str]) -> int:
 
 def _cmd_arena(rest: List[str]) -> int:
     from skeleton.game.arena import run_arena
-
     try:
         payload = run_arena()
     except Exception as exc:
@@ -174,7 +141,6 @@ def _cmd_arena(rest: List[str]) -> int:
 def _cmd_shared_command(rest: List[str]) -> int:
     from skeleton.api.server import get_state
     from skeleton.application import CONTRACT_VERSION, build_runtime_command_service
-
     if not rest:
         print(json.dumps({
             "contract_version": CONTRACT_VERSION,
@@ -183,7 +149,6 @@ def _cmd_shared_command(rest: List[str]) -> int:
             "error": {"code": "invalid_command", "message": "command name is required"},
         }, indent=2))
         return 2
-
     command = rest[0].strip().lower()
     payload = {}
     if len(rest) > 1:
@@ -207,13 +172,10 @@ def _cmd_shared_command(rest: List[str]) -> int:
             }, indent=2))
             return 2
         payload = decoded
-
     state = get_state()
     if command in {"run", "tool", "memory", "admin"} and state.genesis is None:
         from skeleton.genesis import Genesis
-
         state.wire_from_genesis(Genesis(seed=42).boot())
-
     result = build_runtime_command_service(state).execute(command, payload)
     print(json.dumps(result.to_payload(), indent=2, default=str))
     return result.exit_code
@@ -353,7 +315,6 @@ def _cmd_gameforge_run(rest: List[str]) -> int:
 
 
 def _cmd_test(_rest: List[str]) -> int:
-    """Run the configured pytest suite, with unittest discovery as a fallback."""
     try:
         import pytest
     except ImportError:
@@ -369,7 +330,6 @@ def main(argv: Optional[List[str]] = None) -> int:
     if not args:
         print(__doc__)
         return 0
-
     cmd = args[0]
     rest = args[1:]
     if cmd == "run": return _cmd_gameforge_run(rest)
@@ -398,6 +358,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "session": return _cmd_session(rest)
     if cmd == "conductor": return _cmd_conductor(rest)
     if cmd == "arena": return _cmd_arena(rest)
+    from skeleton.game.cli_hook import try_wave
+    hooked = try_wave(cmd, rest)
+    if hooked is not None:
+        return hooked
     from skeleton.game.cli_sota import dispatch
     extra = dispatch(cmd, rest)
     if extra is not None:
