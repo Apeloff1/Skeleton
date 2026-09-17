@@ -33,6 +33,7 @@ from .context_repository import ContextRepository, RetrievalHit
 from .evidence import EvidenceLedger
 from .memory import MemoryHit, MemoryManager, MemoryNamespace
 from .memory_game import CardHit, InteractionCard, MemoryGameIndex
+from .relational_memory import RelationalHit, RelationalMemoryIndex
 from .types import AgentContractError, Goal, Plan, PlanStep, ToolObservation, bounded_text, json_safe, positive_int, probability, stable_fingerprint
 
 
@@ -267,12 +268,16 @@ class LayeredContextResolver:
         *,
         cards: MemoryGameIndex,
         memory: MemoryManager,
+        relations: RelationalMemoryIndex | None = None,
         repository: ContextRepository | None = None,
         adapters: Sequence[ContextSourceAdapter] = (),
         policy: ResolutionPolicy | None = None,
     ) -> None:
         self.cards = cards
         self.memory = memory
+        if relations is not None and relations.cards is not cards:
+            raise AgentContractError("relational memory must use the same MemoryGameIndex as resolver")
+        self.relations = relations
         self.repository = repository
         self.adapters = tuple(sorted(adapters, key=lambda item: (item.tier, item.priority, item.name)))
         self.policy = policy or ResolutionPolicy()
@@ -329,6 +334,29 @@ class LayeredContextResolver:
             trust=hit.card.trust,
             evidence_ids=hit.card.provenance,
             metadata={"activation": hit.activation, "lexical": hit.lexical, "context_match": hit.context_match},
+        )
+
+    @staticmethod
+    def _relation_item(hit: RelationalHit) -> ResolvedItem:
+        return ResolvedItem(
+            item_id=hit.trace.relation_id,
+            tier=ContextTier.INDEX_CARD,
+            source="relational_memory",
+            content=hit.content,
+            score=hit.score,
+            confidence=hit.retrieval_confidence,
+            trust=hit.trace.trust,
+            evidence_ids=hit.evidence_ids,
+            metadata={
+                "kind": hit.trace.kind.value,
+                "card_ids": hit.trace.card_ids,
+                "occurrences": hit.trace.occurrence_count,
+                "cue_match": hit.cue_match,
+                "lexical": hit.lexical,
+                "support": hit.support,
+                "transition_probability": hit.transition_probability,
+                "context_match": hit.context_match,
+            },
         )
 
     @staticmethod
@@ -406,6 +434,32 @@ class LayeredContextResolver:
         items.extend(self._card_item(hit) for hit in card_hits if hit.score >= self.policy.minimum_item_score)
         card_native_ready = self.cards.fast_path_ready(text, card_hits)
         stop = measure(ContextTier.INDEX_CARD, "memory_game", len(card_hits), "fast cue-card lookup")
+
+        # L0b: expand strong cue hits through learned pair/triad structure before
+        # touching durable memory. This keeps juxtaposition, motifs, transitions,
+        # and prediction-error boundaries on the same cheap retrieval path.
+        relation_hits: tuple[RelationalHit, ...] = ()
+        if self.relations is not None and card_hits:
+            relation_hits = self.relations.search(
+                namespace,
+                text,
+                card_hits,
+                context_tags=context_tags,
+                limit=self.policy.card_limit,
+                include_parent=True,
+            )
+            items.extend(
+                self._relation_item(hit)
+                for hit in relation_hits
+                if hit.score >= self.policy.minimum_item_score
+            )
+            stop = measure(
+                ContextTier.INDEX_CARD,
+                "relational_memory",
+                len(relation_hits),
+                "cue-card relational expansion",
+            )
+
         if card_native_ready and stop:
             coverage, missing = self._coverage(text, items)
             confidence, trust = self._aggregate(items)
