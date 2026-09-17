@@ -175,6 +175,56 @@ def test_adaptive_ensemble_is_always_in_report() -> None:
     assert report.by_mode(HistoricalMode.ADAPTIVE_ENSEMBLE).metrics.folds > 0
 
 
+def test_adaptive_ensemble_current_target_cannot_change_its_own_prediction() -> None:
+    values = [
+        1,
+        4,
+        2,
+        7,
+        3,
+        9,
+        5,
+        12,
+        8,
+        14,
+        9,
+        16,
+        11,
+        18,
+        12,
+        21,
+        13,
+        23,
+        15,
+        25,
+        16,
+        27,
+        18,
+        30,
+        19,
+        31,
+        21,
+        34,
+        22,
+        36,
+        24,
+        39,
+    ]
+    target_index = 20
+    changed = list(values)
+    changed[target_index] += 10_000
+
+    original = _lab().evaluate(_series(values)).by_mode(HistoricalMode.ADAPTIVE_ENSEMBLE)
+    mutated = _lab().evaluate(_series(changed)).by_mode(HistoricalMode.ADAPTIVE_ENSEMBLE)
+    original_fold = next(fold for fold in original.folds if fold.target_index == target_index)
+    mutated_fold = next(fold for fold in mutated.folds if fold.target_index == target_index)
+
+    assert original_fold.train_end == mutated_fold.train_end
+    assert original_fold.regime is mutated_fold.regime
+    assert original_fold.predicted == pytest.approx(mutated_fold.predicted)
+    assert original_fold.actual != mutated_fold.actual
+
+
 def test_perfect_linear_history_promotes_a_non_persistence_mode() -> None:
     lab = HistoricalModeLab(
         config=WalkForwardConfig(min_train_size=8, rolling_window=4, seasonal_period=4),

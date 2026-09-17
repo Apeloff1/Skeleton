@@ -11,9 +11,9 @@ from skeleton.jeeves.historical_evidence import (
 from skeleton.jeeves.historical_modes import HistoricalSeries, SelectionGate, WalkForwardConfig
 from skeleton.jeeves.historical_uncertainty import ConformalConfig, HistoricalUncertaintyModeLab
 from skeleton.jeeves.historical_robustness import TemporalJackknifeConfig
-from skeleton.learning import LearningEvidenceStore
+from skeleton.learning import LearningEvidenceError, LearningEvidenceStore
 
-NOW = 1_000.0
+NOW = 1_790_000_000.0
 SUBJECT = "uncertainty-evidence"
 
 
@@ -47,15 +47,41 @@ def _report(series: HistoricalSeries):
     return lab.evaluate(series)
 
 
+def _build_uncertainty(report, series, **kwargs):
+    return build_uncertainty_evidence(
+        report,
+        series,
+        subject_id=SUBJECT,
+        observed_at=NOW,
+        **kwargs,
+    )
+
+
+def _build_historical(report, series, **kwargs):
+    return build_historical_evidence(
+        report,
+        series,
+        subject_id=SUBJECT,
+        observed_at=NOW,
+        **kwargs,
+    )
+
+
+def test_uncertainty_evidence_requires_explicit_observation_time() -> None:
+    series = _series()
+    with pytest.raises(LearningEvidenceError) as caught:
+        build_uncertainty_evidence(_report(series), series, subject_id=SUBJECT)
+    assert caught.value.context == {
+        "reason": "missing_observed_at",
+        "field": "observed_at",
+    }
+
+
 def test_uncertainty_evidence_reuses_same_series_fact_root() -> None:
     series = _series()
     report = _report(series)
-    uncertainty = build_uncertainty_evidence(report, series, subject_id=SUBJECT)
-    calibrated = build_historical_evidence(
-        report.robustness.full,
-        series,
-        subject_id=SUBJECT,
-    )
+    uncertainty = _build_uncertainty(report, series)
+    calibrated = _build_historical(report.robustness.full, series)
     assert uncertainty.observation == calibrated.observation
     assert uncertainty.series_fingerprint == calibrated.series_fingerprint
     assert uncertainty.report_fingerprint == report.fingerprint
@@ -65,7 +91,7 @@ def test_uncertainty_evidence_reuses_same_series_fact_root() -> None:
 def test_uncertainty_metrics_remain_on_derived_feature_plane() -> None:
     series = _series()
     report = _report(series)
-    bundle = build_uncertainty_evidence(report, series, subject_id=SUBJECT)
+    bundle = _build_uncertainty(report, series)
     assert "uncertainty_accepted" not in bundle.observation.payload
     assert "uncertainty_fingerprint" not in bundle.observation.payload
     assert bundle.feature_by_name("uncertainty_accepted").value is report.decision.accepted
@@ -76,7 +102,7 @@ def test_uncertainty_metrics_remain_on_derived_feature_plane() -> None:
 def test_uncertainty_bundle_contains_base_calibration_and_interval_features() -> None:
     series = _series()
     report = _report(series)
-    bundle = build_uncertainty_evidence(report, series, subject_id=SUBJECT)
+    bundle = _build_uncertainty(report, series)
     assert bundle.feature_by_name("calibration_fingerprint").value == report.robustness.full.fingerprint
     assert bundle.feature_by_name("robustness_fingerprint").value == report.robustness.fingerprint
     assert bundle.feature_by_name("uncertainty_forward_calibrated_folds").value > 0
@@ -86,13 +112,7 @@ def test_uncertainty_bundle_contains_base_calibration_and_interval_features() ->
 def test_uncertainty_bundle_can_be_explicitly_persisted() -> None:
     series = _series()
     report = _report(series)
-    bundle = build_uncertainty_evidence(
-        report,
-        series,
-        subject_id=SUBJECT,
-        observed_at=NOW,
-        clock_version=1,
-    )
+    bundle = _build_uncertainty(report, series, clock_version=1)
     store = LearningEvidenceStore(
         clock=lambda: NOW,
         clock_version=1,
@@ -111,6 +131,6 @@ def test_building_uncertainty_bundle_has_no_implicit_store_side_effect() -> None
     report = _report(series)
     store = LearningEvidenceStore(clock=lambda: NOW, clock_version=1)
     before = store.facts()
-    bundle = build_uncertainty_evidence(report, series, subject_id=SUBJECT)
+    bundle = _build_uncertainty(report, series)
     assert bundle.features
     assert store.facts() == before
