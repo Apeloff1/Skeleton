@@ -119,6 +119,8 @@ class ContactCache:
         *,
         tick: int,
     ) -> ContactCacheEntry | None:
+        if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
+            raise PhysicsValidationError("contact cache tick must be non-negative integer")
         key = self.key_for(manifold, point)
         entry = self._entries.get(key)
         if entry is None:
