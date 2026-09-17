@@ -13,6 +13,7 @@
 """
 
 from fastapi import APIRouter, HTTPException
+from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 from enum import Enum
@@ -450,7 +451,7 @@ async def ai_generate_story_branch(request: AIStoryBranchRequest):
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI story branch generation failed: {str(e)}")
+        raise internal_http_error("AI story branch generation failed", e) from None
 
 
 @router.post("/ai/quest/generate")
@@ -483,7 +484,7 @@ async def ai_generate_quest(request: AIQuestRequest):
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI quest generation failed: {str(e)}")
+        raise internal_http_error("AI quest generation failed", e) from None
 
 
 @router.post("/ai/dialogue/tree")
@@ -518,4 +519,4 @@ async def ai_generate_dialogue_tree(request: AIDialogueTreeRequest):
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI dialogue tree generation failed: {str(e)}")
+        raise internal_http_error("AI dialogue tree generation failed", e) from None

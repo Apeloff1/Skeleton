@@ -15,6 +15,7 @@ from typing import Optional, Literal
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
+from core.http_errors import internal_http_error
 import uuid
 import base64
 import asyncio
@@ -136,8 +137,8 @@ async def generate_with_openai(prompt: str, size: str, quality: str, count: int)
             "images": images,
             "status": "success"
         }
-    except Exception as e:
-        return {"provider": "openai", "error": str(e), "status": "failed"}
+    except Exception:
+        return {"provider": "openai", "error": "image generation failed", "status": "failed"}
 
 async def generate_with_gemini(prompt: str, style: Optional[str] = None) -> dict:
     """Generate REAL images using Gemini Nano Banana (gemini-3.1-flash-image-preview)
@@ -177,8 +178,8 @@ async def generate_with_gemini(prompt: str, style: Optional[str] = None) -> dict
         # No image came back — surface as failed so callers can fall back.
         return {"provider": "gemini", "status": "failed",
                 "error": "no image returned", "note": (text or "")[:200]}
-    except Exception as e:
-        return {"provider": "gemini", "error": str(e), "status": "failed"}
+    except Exception:
+        return {"provider": "gemini", "error": "image generation failed", "status": "failed"}
 
 async def generate_with_grok(prompt: str, style: Optional[str] = None) -> dict:
     """Generate images using Grok Imagine API"""
@@ -214,7 +215,7 @@ async def generate_with_grok(prompt: str, style: Optional[str] = None) -> dict:
             "images": images,
             "status": "success"
         }
-    except Exception as e:
+    except Exception:
         # Fallback: Use Grok for prompt enhancement, then OpenAI for generation
         try:
             from openai import AsyncOpenAI
@@ -242,8 +243,8 @@ async def generate_with_grok(prompt: str, style: Optional[str] = None) -> dict:
                 
         except Exception:
             pass
-            
-        return {"provider": "grok", "error": str(e), "status": "failed"}
+
+        return {"provider": "grok", "error": "image generation failed", "status": "failed"}
 
 # ============================================================================
 # API ENDPOINTS
@@ -352,7 +353,7 @@ async def generate_images(request: ImageGenerationRequest):
             "style": request.style,
             "style_preset": request.style_preset,
         },
-        "error": result.get("error"),
+        "error": None if result.get("status") == "success" else "image generation failed",
         "timestamp": datetime.utcnow().isoformat()
     }
 
@@ -429,7 +430,7 @@ async def generate_cover(request: CoverRequest):
         "model": result.get("model"), "pid": request.pid, "stored": stored,
         "cached": bool(result.get("cached")), "style_preset": request.style_preset,
         "title": request.title, "images": images, "prompt": prompt,
-        "error": result.get("error"),
+        "error": None if result.get("status") == "success" else "image generation failed",
     }
 
 @router.post("/variation")
@@ -466,7 +467,7 @@ async def create_variation(request: ImageVariationRequest):
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Image generation failed", e) from None
 
 @router.post("/edit")
 async def edit_image(request: ImageEditRequest):
@@ -504,7 +505,7 @@ async def edit_image(request: ImageEditRequest):
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Image generation failed", e) from None
 
 @router.post("/enhance-prompt")
 async def enhance_prompt(prompt: str, style: Optional[str] = None, provider: str = "grok"):
@@ -558,4 +559,4 @@ Output only the enhanced prompt, no explanations."""
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Image generation failed", e) from None

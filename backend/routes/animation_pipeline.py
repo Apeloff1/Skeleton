@@ -13,6 +13,7 @@
 """
 
 from fastapi import APIRouter, HTTPException
+from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal, Tuple
 from datetime import datetime
@@ -769,7 +770,7 @@ async def generate_rig(request: RigGenerationRequest):
         }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Animation request failed", e) from None
 
 @router.post("/animation/generate")
 async def generate_animation(request: AnimationGenerationRequest):
@@ -797,7 +798,7 @@ async def generate_animation(request: AnimationGenerationRequest):
         }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise internal_http_error("Animation request failed", e) from None
 
 @router.post("/blend-tree/generate")
 async def generate_blend_tree(request: BlendTreeRequest):
@@ -924,7 +925,7 @@ async def ai_generate_animation(request: AIAnimationRequest):
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI animation generation failed: {str(e)}")
+        raise internal_http_error("AI animation generation failed", e) from None
 
 
 @router.post("/ai/vfx/generate")
@@ -959,4 +960,4 @@ async def ai_generate_vfx(request: AIVFXRequest):
             }
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI VFX generation failed: {str(e)}")
+        raise internal_http_error("AI VFX generation failed", e) from None

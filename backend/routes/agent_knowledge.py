@@ -595,8 +595,8 @@ async def scrapers_run_now():
     try:
         from services.live_scrapers import run_scrapers_once
         return await run_scrapers_once(_db)
-    except Exception as e:
-        return {"error": str(e)[:240]}
+    except Exception:
+        return {"error": "scraper_run_failed"}
 
 
 # ═══ Training-recipes shortcut endpoints (Cross-Entropy, LoRA, ICL log-probs) ═══

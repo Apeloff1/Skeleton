@@ -15,6 +15,8 @@ import os
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from core.http_errors import internal_http_error
+
 from core.deployment_checkpoint_pin_diagnostics import diagnose_deployment_checkpoint_pins
 from core.deployment_checkpoint_pin_ledger import (
     DeploymentCheckpointPinLedgerError,
@@ -109,7 +111,7 @@ async def checkpoint_witness_status(token: str = Query("")):
     try:
         return _runtime().status()
     except (DeploymentCheckpointPinLedgerError, ValueError) as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise internal_http_error("deployment_checkpoint_trust_failed", exc) from None
 
 
 @router.get("/diagnostics")
@@ -118,7 +120,7 @@ async def checkpoint_witness_diagnostics(token: str = Query("")):
     try:
         return asdict(diagnose_deployment_checkpoint_pins(_runtime()))
     except (DeploymentCheckpointPinLedgerError, ValueError) as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise internal_http_error("deployment_checkpoint_trust_failed", exc) from None
 
 
 @router.get("/policy")
@@ -147,7 +149,7 @@ async def checkpoint_witness_bundle(
     except DeploymentCheckpointPinRejected as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except (DeploymentCheckpointPinLedgerError, ValueError) as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise internal_http_error("deployment_checkpoint_trust_failed", exc) from None
 
 
 @router.get("/trust-advance")

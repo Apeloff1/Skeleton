@@ -3221,6 +3221,8 @@ app = FastAPI(
     version=SYSTEM_VERSION,
     lifespan=lifespan
 )
+from core.http_errors import install_public_error_handlers as _install_public_error_handlers
+_install_public_error_handlers(app)
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 # CORS origins configurable via env (required by deployment pipeline).
