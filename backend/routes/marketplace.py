@@ -316,8 +316,8 @@ async def stripe_webhook(request: Request):
     sc = _checkout(str(request.base_url))
     try:
         ev = await sc.handle_webhook(body, sig)
-    except Exception as e:
-        return {"received": False, "error": str(e)[:200]}
+    except Exception:
+        return {"received": False, "error": "webhook_rejected"}
     if ev.session_id:
         await _db.payment_transactions.update_one(
             {"session_id": ev.session_id},

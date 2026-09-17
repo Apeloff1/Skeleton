@@ -41,8 +41,8 @@ async def _do_polish(pid: str, job_id: str) -> dict:
         }})
         try:
             res = await fn(pid)
-        except Exception as e:  # a single step failing must not abort the chain
-            res = {"applied": False, "error": str(e)[:160]}
+        except Exception:  # a single step failing must not abort the chain
+            res = {"applied": False, "error": "polish_step_failed"}
         ok = bool(res.get("applied"))
         (applied if ok else skipped).append(kind)
         if ok:

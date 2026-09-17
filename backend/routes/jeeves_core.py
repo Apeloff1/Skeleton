@@ -1305,8 +1305,8 @@ class JeevesMemoryRAG:
             return {"status": "initialized", "collection": "jeeves_memories"}
         except ImportError:
             return {"status": "chromadb_not_installed", "message": "pip install chromadb"}
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
+        except Exception:
+            return {"status": "error", "message": "memory_init_failed"}
     
     async def store_memory(self, memory_type: str, content: str, metadata: Dict[str, Any] = None):
         """Store a memory in the RAG system."""

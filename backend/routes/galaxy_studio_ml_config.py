@@ -39,8 +39,8 @@ async def get_ml_config(build_id: str):
             "matrix_dial_count":   b.get("matrix_dial_count", 0),
             "matrix_keys":         b.get("matrix_keys", []),
         }
-    except Exception as e:
-        return {"error": str(e)[:200], "build_id": build_id}
+    except Exception:
+        return {"error": "ml_config_unavailable", "build_id": build_id}
 
 
 @router.post("/build/{build_id}/ml-config")
@@ -163,8 +163,8 @@ async def update_ml_config(build_id: str, patch: dict):
             "rejected":  rejected,
             "ml_config": (b or {}).get("ml_config", {}),
         }
-    except Exception as e:
-        return {"error": str(e)[:200], "build_id": build_id}
+    except Exception:
+        return {"error": "ml_config_unavailable", "build_id": build_id}
 
 
 @router.get("/ml-config/schema")
@@ -211,5 +211,5 @@ async def preview_build_prompt(build_id: str):
             "matrix_keys_active":      sorted((ctx.get("matrices")  or {}).keys()),
             "ml_config_keys":          sorted((ctx.get("ml_config") or {}).keys()),
         }
-    except Exception as e:
-        return {"error": str(e)[:200], "build_id": build_id}
+    except Exception:
+        return {"error": "ml_config_unavailable", "build_id": build_id}
