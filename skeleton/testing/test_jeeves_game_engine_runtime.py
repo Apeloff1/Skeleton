@@ -546,3 +546,77 @@ def test_jeeves_evolves_broken_engine_through_checkpoint_loop() -> None:
     assert len(
         result.session.checkpoints
     ) == 2
+
+
+
+def test_evolution_lineage_verifies_parent_chain_and_detects_forgery() -> None:
+    lab = ExecutableGameEngineLab()
+    sandbox = lab.create(
+        EngineEra.PONG
+    )
+    path = "engine/legacy_tuning.json"
+    payload = json.loads(
+        sandbox.tree.read(path)
+    )
+    payload["paddle_speed"] = 999
+    broken = sandbox.apply(
+        [
+            SandboxPatch(
+                path,
+                json.dumps(payload),
+                sandbox.tree.file_digest(
+                    path
+                ),
+            )
+        ]
+    )
+    evolution = AdversarialEngineEvolution(
+        lab
+    )
+    session = evolution.start(
+        broken
+    )
+    report = lab.evaluate(
+        broken
+    )
+    repair = lab.canonical_repair(
+        broken,
+        report,
+    )
+    promoted, _, _ = (
+        evolution.tournament_round(
+            session,
+            (repair,),
+        )
+    )
+
+    assert promoted.verify_lineage()
+    assert len(
+        promoted.lineage_digest
+    ) == 64
+
+    first, second = (
+        promoted.checkpoints
+    )
+    forged_second = type(second)(
+        second.schema_version,
+        second.era,
+        second.sequence,
+        "0" * 64,
+        second.tree_digest,
+        second.files,
+    )
+    forged = type(promoted)(
+        promoted.sandbox,
+        (
+            first,
+            forged_second,
+        ),
+        promoted.sequence,
+    )
+
+    with pytest.raises(
+        GameEngineLabError,
+        match="parent mismatch",
+    ):
+        forged.verify_lineage()
