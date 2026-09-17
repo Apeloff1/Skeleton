@@ -5,7 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 
-PACKS = ("graft_pack", "prune_pack", "harvest_pack", "cellar_pack")
+PACKS = (
+    "graft_pack", "prune_pack", "harvest_pack", "cellar_pack",
+    "press_pack", "cask_pack", "must_pack",
+)
 
 
 def census() -> dict[str, Any]:
