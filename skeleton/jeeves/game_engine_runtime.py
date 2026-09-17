@@ -143,11 +143,16 @@ class ExecutableGameEngineLab:
         EngineFamily,
         Any,
     ]:
-        key = (
-            era
-            if isinstance(era, EngineEra)
-            else EngineEra(str(era))
-        )
+        try:
+            key = (
+                era
+                if isinstance(era, EngineEra)
+                else EngineEra(str(era))
+            )
+        except ValueError as exc:
+            raise GameEngineLabError(
+                f"unknown engine era: {era!r}"
+            ) from exc
         family = engine_family(key)
         if family is EngineFamily.LEGACY:
             lab = self.legacy
