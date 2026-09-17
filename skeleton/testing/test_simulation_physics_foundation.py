@@ -846,3 +846,9 @@ def test_body_referenced_by_joint_cannot_be_removed_silently() -> None:
     world.add_joint(DistanceJoint("joint", "a", "b", rest_length=2.0))
     with pytest.raises(PhysicsValidationError, match="referenced by joint"):
         world.remove_body("a")
+
+
+
+def test_distance_joint_rejects_singular_zero_rest_length() -> None:
+    with pytest.raises(PhysicsValidationError, match="rest_length"):
+        DistanceJoint("singular", "a", "b", rest_length=0.0)
