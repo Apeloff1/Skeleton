@@ -71,6 +71,16 @@ from .cortex import (
     JeevesCortex,
     RunCognitiveState,
 )
+from .epistemic_authorization import (
+    AuthorizationAuditEvent,
+    AuthorizationError,
+    AuthorizationFailure,
+    AuthorizationPolicy,
+    AuthorizationResult,
+    AuthorizationToken,
+    DecisionAuthorizer,
+    ExecutionPermit,
+)
 from .epistemic_planning import (
     ActionCandidate,
     BeliefContribution,
