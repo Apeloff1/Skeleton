@@ -275,6 +275,8 @@ def solve_islands(
     spring_joints = 0
     limit_joints = 0
     hinge_joints = 0
+    fixed_joints = 0
+    slider_joints = 0
 
     for island in graph.islands:
         if island.manifolds:
@@ -311,6 +313,8 @@ def solve_islands(
             spring_joints += joint_stats.spring_joints
             limit_joints += joint_stats.limit_joints
             hinge_joints += joint_stats.hinge_joints
+            fixed_joints += joint_stats.fixed_joints
+            slider_joints += joint_stats.slider_joints
 
     cache.prune(tick=tick)
     return IslandSolveReceipt(
@@ -335,5 +339,7 @@ def solve_islands(
             spring_joints=spring_joints,
             limit_joints=limit_joints,
             hinge_joints=hinge_joints,
+            fixed_joints=fixed_joints,
+            slider_joints=slider_joints,
         ),
     )
