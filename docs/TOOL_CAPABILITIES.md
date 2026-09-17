@@ -49,3 +49,17 @@ This keeps authorization decisions attached to the orchestration run that made t
 New tools that touch the filesystem, network, subprocesses, secrets, or repository mutation must declare the matching capability when they are registered. Existing capability-free tools do not need to change until they cross one of those sensitive boundaries.
 
 Do not bypass this contract by performing sensitive work in an undeclared handler or by adding a parallel tool-execution path outside the canonical orchestrator.
+
+## Generated-code sandbox
+
+Generated source, prompts, and tool JSON are untrusted data. `skeleton.security.generated_code_sandbox.GeneratedCodeSandbox` mediates filesystem, network, process, and secret effects:
+
+- runs start with no generated-code capabilities;
+- trusted callers grant a closed `SandboxCapability` set and then `seal()` it;
+- untrusted text cannot grant, revoke, or widen that snapshot;
+- paths must stay inside the workspace root even when `filesystem` is granted;
+- network and process effects additionally require an explicit host/executable allowlist and still reject loopback, link-local/metadata, private, and non-HTTP(S) targets;
+- secret-bearing paths and environment reads require `secrets`;
+- parse failures, oversized payloads, dynamic `eval`/`exec`/`getattr`/`__import__`, and scanner errors fail closed.
+
+The deterministic injection corpus in `skeleton.security.injection_corpus` covers prompt injection, tool escalation, path escape, secret exfiltration, unsafe subprocess requests, network pivots, and capability widening. Fixtures are synthetic placeholders only.

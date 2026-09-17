@@ -17,7 +17,7 @@ This map separates repository-controlled security controls from GitHub/deploymen
 | Malware / IOC detection | canonical malware workflow and tests | Malware Gate | Implemented |
 | Artifact admission | `.github/workflows/artifact-policy.yml`, `docs/ARTIFACT_POLICY.md` | Artifact Policy | Implemented |
 | Provenance validation | consolidation manifest/evidence runner and provenance workflow | Provenance Policy | Implemented for declared canonical components; broader promotion coverage remains ongoing |
-| Tool capability isolation | `docs/TOOL_CAPABILITIES.md` and capability regressions | quality/integration security tests | Implemented deny-by-default contract |
+| Tool capability isolation | `docs/TOOL_CAPABILITIES.md`, generated-code sandbox, and capability regressions | quality/integration security tests plus `tests/test_generated_code_sandbox.py` | Implemented deny-by-default contract |
 | Provider failure sanitization / bounded retry | `docs/PROVIDER_RUNTIME.md`, `docs/PROVIDER_STREAM_RELIABILITY.md` and focused tests | Backend Quality / Merge Readiness | Implemented on canonical runtime |
 | Durable-state recovery / idempotency | `docs/DURABLE_RUN_STATE.md`, storage chaos/reliability tests | Durable State / canonical quality checks | Implemented on canonical state path |
 | Observability redaction / correlation | `docs/OBSERVABILITY.md` and observability regressions | Backend Quality / Integration Smoke | Implemented on canonical execution path |

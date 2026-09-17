@@ -7,6 +7,7 @@ The matrix is implementation-neutral: each regression should exercise the produc
 | Surface | Adversarial case | Required assertion |
 |---|---|---|
 | Path handling | `../` traversal, absolute paths, mixed separators, encoded traversal | Reject or normalize before filesystem access; never escape the allowed root |
+| Generated code / tools | prompt injection, tool self-grant, path escape, secret exfil, unsafe subprocess, network pivot, capability widening | `GeneratedCodeSandbox` denies the bounded corpus; sealed policy cannot change; scanner/test failures fail closed |
 | Archives | zip-slip names, absolute archive members, excessive expansion | Reject unsafe members and enforce bounded extraction |
 | Network | loopback, RFC1918, link-local/metadata addresses, non-HTTP(S) schemes, redirects | Reject disallowed destinations and unsafe redirects |
 | Commands | shell metacharacters, newline injection, option injection | Treat untrusted values as data; no shell interpretation |
