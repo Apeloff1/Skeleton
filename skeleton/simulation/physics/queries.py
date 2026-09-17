@@ -7,7 +7,13 @@ from dataclasses import dataclass
 from .body import RigidBody
 from .errors import PhysicsValidationError
 from .math3d import EPSILON, Vec3
-from .shapes import BoxShape, PlaneShape, SphereShape
+from .shapes import (
+    BoxShape,
+    CapsuleShape,
+    CylinderShape,
+    PlaneShape,
+    SphereShape,
+)
 
 
 def _distance(value: float, *, name: str, allow_zero: bool = False) -> float:
@@ -154,6 +160,175 @@ def _box_intersection(
     return RayHit(body.body_id, distance, ray.point_at(distance), normal)
 
 
+def _local_sphere_roots(
+    origin: Vec3,
+    direction: Vec3,
+    center: Vec3,
+    radius: float,
+) -> tuple[float, ...]:
+    relative = origin - center
+    projected = relative.dot(direction)
+    c = relative.length_squared() - radius * radius
+    discriminant = projected * projected - c
+    if discriminant < 0.0:
+        return ()
+    root = math.sqrt(max(0.0, discriminant))
+    return tuple(sorted((-projected - root, -projected + root)))
+
+
+def _capsule_intersection(
+    ray: Ray,
+    body: RigidBody,
+    shape: CapsuleShape,
+) -> RayHit | None:
+    origin = body.transform.inverse_transform_point(ray.origin)
+    direction = body.transform.inverse_transform_vector(ray.direction).normalized()
+    radius = shape.radius
+    half_height = shape.half_height
+
+    closest_y = min(half_height, max(-half_height, origin.y))
+    inside_delta = origin - Vec3(0.0, closest_y, 0.0)
+    if inside_delta.length_squared() <= radius * radius:
+        normal = body.transform.transform_vector(-direction).normalized()
+        return RayHit(body.body_id, 0.0, ray.origin, normal)
+
+    candidates: list[tuple[float, int, Vec3]] = []
+
+    radial_a = direction.x * direction.x + direction.z * direction.z
+    if radial_a > EPSILON * EPSILON:
+        radial_b = 2.0 * (
+            origin.x * direction.x + origin.z * direction.z
+        )
+        radial_c = origin.x * origin.x + origin.z * origin.z - radius * radius
+        discriminant = radial_b * radial_b - 4.0 * radial_a * radial_c
+        if discriminant >= 0.0:
+            root = math.sqrt(max(0.0, discriminant))
+            inverse = 0.5 / radial_a
+            for distance in sorted(
+                (
+                    (-radial_b - root) * inverse,
+                    (-radial_b + root) * inverse,
+                )
+            ):
+                if distance < 0.0 or distance > ray.max_distance:
+                    continue
+                point = origin + direction * distance
+                if -half_height - EPSILON <= point.y <= half_height + EPSILON:
+                    local_normal = Vec3(point.x, 0.0, point.z).normalized_or_zero()
+                    if local_normal.length_squared() > EPSILON * EPSILON:
+                        candidates.append((distance, 0, local_normal))
+
+    for cap_sign, priority in ((1.0, 1), (-1.0, 2)):
+        center = Vec3(0.0, cap_sign * half_height, 0.0)
+        for distance in _local_sphere_roots(
+            origin,
+            direction,
+            center,
+            radius,
+        ):
+            if distance < 0.0 or distance > ray.max_distance:
+                continue
+            point = origin + direction * distance
+            if (
+                cap_sign > 0.0
+                and point.y < half_height - EPSILON
+            ) or (
+                cap_sign < 0.0
+                and point.y > -half_height + EPSILON
+            ):
+                continue
+            local_normal = (point - center).normalized_or_zero()
+            if local_normal.length_squared() > EPSILON * EPSILON:
+                candidates.append((distance, priority, local_normal))
+                break
+
+    if not candidates:
+        return None
+    distance, _, local_normal = min(
+        candidates,
+        key=lambda row: (row[0], row[1]),
+    )
+    normal = body.transform.transform_vector(local_normal).normalized()
+    return RayHit(
+        body.body_id,
+        distance,
+        ray.point_at(distance),
+        normal,
+    )
+
+
+def _cylinder_intersection(
+    ray: Ray,
+    body: RigidBody,
+    shape: CylinderShape,
+) -> RayHit | None:
+    origin = body.transform.inverse_transform_point(ray.origin)
+    direction = body.transform.inverse_transform_vector(ray.direction).normalized()
+    radius = shape.radius
+    half_height = shape.half_height
+    radial_sq = origin.x * origin.x + origin.z * origin.z
+
+    if radial_sq <= radius * radius and abs(origin.y) <= half_height:
+        normal = body.transform.transform_vector(-direction).normalized()
+        return RayHit(body.body_id, 0.0, ray.origin, normal)
+
+    candidates: list[tuple[float, int, Vec3]] = []
+    radial_a = direction.x * direction.x + direction.z * direction.z
+    if radial_a > EPSILON * EPSILON:
+        radial_b = 2.0 * (
+            origin.x * direction.x + origin.z * direction.z
+        )
+        radial_c = radial_sq - radius * radius
+        discriminant = radial_b * radial_b - 4.0 * radial_a * radial_c
+        if discriminant >= 0.0:
+            root = math.sqrt(max(0.0, discriminant))
+            inverse = 0.5 / radial_a
+            for distance in sorted(
+                (
+                    (-radial_b - root) * inverse,
+                    (-radial_b + root) * inverse,
+                )
+            ):
+                if distance < 0.0 or distance > ray.max_distance:
+                    continue
+                point = origin + direction * distance
+                if -half_height - EPSILON <= point.y <= half_height + EPSILON:
+                    normal = Vec3(point.x, 0.0, point.z).normalized_or_zero()
+                    if normal.length_squared() > EPSILON * EPSILON:
+                        candidates.append((distance, 0, normal))
+
+    if abs(direction.y) > EPSILON:
+        for cap_sign, priority in ((1.0, 1), (-1.0, 2)):
+            distance = (
+                cap_sign * half_height - origin.y
+            ) / direction.y
+            if distance < 0.0 or distance > ray.max_distance:
+                continue
+            point = origin + direction * distance
+            if point.x * point.x + point.z * point.z <= radius * radius + EPSILON:
+                candidates.append(
+                    (
+                        distance,
+                        priority,
+                        Vec3(0.0, cap_sign, 0.0),
+                    )
+                )
+
+    if not candidates:
+        return None
+    distance, _, local_normal = min(
+        candidates,
+        key=lambda row: (row[0], row[1]),
+    )
+    normal = body.transform.transform_vector(local_normal).normalized()
+    return RayHit(
+        body.body_id,
+        distance,
+        ray.point_at(distance),
+        normal,
+    )
+
+
 def raycast_body(ray: Ray, body: RigidBody) -> RayHit | None:
     shape = body.shape
     if isinstance(shape, SphereShape):
@@ -162,6 +337,10 @@ def raycast_body(ray: Ray, body: RigidBody) -> RayHit | None:
         return _plane_intersection(ray, body, shape)
     if isinstance(shape, BoxShape):
         return _box_intersection(ray, body, shape)
+    if isinstance(shape, CapsuleShape):
+        return _capsule_intersection(ray, body, shape)
+    if isinstance(shape, CylinderShape):
+        return _cylinder_intersection(ray, body, shape)
     raise PhysicsValidationError("unsupported raycast shape")
 
 
@@ -265,6 +444,112 @@ def _sphere_cast_box(
             low = middle
     return make_hit(high)
 
+def _sphere_cast_cylinder(
+    ray: Ray,
+    radius: float,
+    body: RigidBody,
+    shape: CylinderShape,
+) -> RayHit | None:
+    """First sphere-center hit against the exact finite-cylinder distance field."""
+
+    origin = body.transform.inverse_transform_point(ray.origin)
+    direction = body.transform.inverse_transform_vector(ray.direction).normalized()
+    target_radius = shape.radius
+    half_height = shape.half_height
+    expanded = Vec3(
+        target_radius + radius,
+        half_height + radius,
+        target_radius + radius,
+    )
+
+    t_min = 0.0
+    t_max = ray.max_distance
+    origins = origin.to_tuple()
+    directions = direction.to_tuple()
+    extents = expanded.to_tuple()
+    for axis in range(3):
+        axis_origin = origins[axis]
+        axis_direction = directions[axis]
+        extent = extents[axis]
+        if abs(axis_direction) <= EPSILON:
+            if axis_origin < -extent or axis_origin > extent:
+                return None
+            continue
+        inverse = 1.0 / axis_direction
+        near = (-extent - axis_origin) * inverse
+        far = (extent - axis_origin) * inverse
+        if near > far:
+            near, far = far, near
+        t_min = max(t_min, near)
+        t_max = min(t_max, far)
+        if t_min > t_max:
+            return None
+
+    tolerance = max(1.0e-9, radius * 1.0e-8)
+
+    def closest_point(center: Vec3) -> Vec3:
+        radial = math.hypot(center.x, center.z)
+        if radial > target_radius and radial > EPSILON:
+            scale = target_radius / radial
+            closest_x = center.x * scale
+            closest_z = center.z * scale
+        else:
+            closest_x = center.x
+            closest_z = center.z
+        closest_y = min(half_height, max(-half_height, center.y))
+        return Vec3(closest_x, closest_y, closest_z)
+
+    def separation_at(distance: float) -> float:
+        center = origin + direction * distance
+        return (center - closest_point(center)).length()
+
+    def make_hit(distance: float) -> RayHit:
+        center = origin + direction * distance
+        delta = center - closest_point(center)
+        separation = delta.length()
+        local_normal = (
+            delta / separation
+            if separation > EPSILON
+            else -direction
+        )
+        normal = body.transform.transform_vector(local_normal).normalized()
+        return RayHit(
+            body.body_id,
+            distance,
+            ray.point_at(distance),
+            normal,
+        )
+
+    if separation_at(t_min) <= radius + tolerance:
+        return make_hit(t_min)
+    if t_max <= t_min:
+        return None
+
+    low = t_min
+    high = t_max
+    for _ in range(64):
+        third = (high - low) / 3.0
+        left = low + third
+        right = high - third
+        if separation_at(left) <= separation_at(right):
+            high = right
+        else:
+            low = left
+    minimum_t = (low + high) * 0.5
+    if separation_at(minimum_t) > radius + tolerance:
+        return None
+
+    low = t_min
+    high = minimum_t
+    for _ in range(64):
+        middle = (low + high) * 0.5
+        if separation_at(middle) <= radius + tolerance:
+            high = middle
+        else:
+            low = middle
+    return make_hit(high)
+
+
 def sphere_cast_body(
     ray: Ray,
     radius: float,
@@ -287,6 +572,14 @@ def sphere_cast_body(
         )
     if isinstance(shape, BoxShape):
         return _sphere_cast_box(ray, radius, body, shape)
+    if isinstance(shape, CapsuleShape):
+        expanded = CapsuleShape(
+            shape.radius + radius,
+            shape.half_height,
+        )
+        return _capsule_intersection(ray, body, expanded)
+    if isinstance(shape, CylinderShape):
+        return _sphere_cast_cylinder(ray, radius, body, shape)
     if isinstance(shape, PlaneShape):
         normal, offset = shape.world_equation(body.transform)
         signed_origin = normal.dot(ray.origin) - offset
