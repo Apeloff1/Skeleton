@@ -313,6 +313,7 @@ class PhysicsWorld:
         except KeyError as exc:
             raise BodyNotFoundError(body_id) from exc
         self._contact_cache.remove_body(body_id)
+        self._joint_cache.remove_body(body_id)
         self._last_manifolds = tuple(
             row
             for row in self._last_manifolds
@@ -550,7 +551,6 @@ class PhysicsWorld:
             configuration_digest=self.configuration_digest,
             body_states=body_states,
             contact_cache=self._contact_cache.snapshot(),
-            joint_cache=self._joint_cache.snapshot(),
             manifolds=self._last_manifolds,
             state_digest=self.state_digest,
             joint_cache=self._joint_cache.snapshot(),
@@ -617,6 +617,7 @@ class PhysicsWorld:
             tick=self._tick,
             body_states=states,
             contact_cache=self._contact_cache.snapshot(),
+            joint_cache=self._joint_cache.snapshot(),
             manifolds=self._last_manifolds,
             state_digest=self.state_digest,
         )
