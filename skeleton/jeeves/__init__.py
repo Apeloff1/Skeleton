@@ -159,7 +159,11 @@ from .game_engine_legacy import (
 )
 from .game_engine_runtime import (
     ERA_FAMILY,
+    AdversarialEngineEvolution,
+    EngineEvolutionSession,
     EngineFamily,
+    EvolutionResult,
+    EvolutionRound,
     ExecutableGameEngineLab,
     RoutedEngineSandbox,
     RoutedImprovementResult,
@@ -378,7 +382,11 @@ __all__ = [
     "legacy_hardware",
     "normalize_legacy_tuning",
     "ERA_FAMILY",
+    "AdversarialEngineEvolution",
+    "EngineEvolutionSession",
     "EngineFamily",
+    "EvolutionResult",
+    "EvolutionRound",
     "ExecutableGameEngineLab",
     "RoutedEngineSandbox",
     "RoutedImprovementResult",
