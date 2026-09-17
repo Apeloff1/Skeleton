@@ -64,6 +64,20 @@ from .assurance import (
     ProvenanceAudit,
 )
 
+
+from .validation_frontier import (
+    AssuranceConsensus,
+    AssuranceConsensusEngine,
+    AssuranceConsensusPolicy,
+    AssuranceConsensusStatus,
+    IndependenceGroupAssessment,
+    InternalValidationFactory,
+    ValidationEvidence,
+    ValidationFrontierError,
+    ValidationVerdict,
+    ValidatorKind,
+)
+
 __all__ = [
     "AbstractState",
     "AbstractValue",
@@ -114,4 +128,14 @@ __all__ = [
     "TranslationValidator",
     "ValidationStatus",
     "VerificationReport",
+    "AssuranceConsensus",
+    "AssuranceConsensusEngine",
+    "AssuranceConsensusPolicy",
+    "AssuranceConsensusStatus",
+    "IndependenceGroupAssessment",
+    "InternalValidationFactory",
+    "ValidationEvidence",
+    "ValidationFrontierError",
+    "ValidationVerdict",
+    "ValidatorKind",
 ]
