@@ -12,6 +12,7 @@ from skeleton.simulation.physics import (
     DistanceJoint,
     GamePhysicsProfile,
     GameplayScale,
+    Mat3,
     PhysicsMaterial,
     PhysicsSettings,
     PhysicsValidationError,
@@ -883,3 +884,47 @@ def test_state_digest_binds_observable_contact_manifolds() -> None:
     right._last_manifolds = ()  # type: ignore[attr-defined]
     assert left.get_body("ball").state_record() == right.get_body("ball").state_record()
     assert left.state_digest != right.state_digest
+
+
+
+def test_matrix_inverse_is_scale_invariant_for_small_well_conditioned_tensor() -> None:
+    matrix = Mat3.diagonal(Vec3(1.0e-6, 2.0e-6, 4.0e-6))
+    inverse = matrix.inverse()
+    identity = matrix.mul_mat(inverse)
+    assert identity.m00 == pytest.approx(1.0, abs=1.0e-12)
+    assert identity.m11 == pytest.approx(1.0, abs=1.0e-12)
+    assert identity.m22 == pytest.approx(1.0, abs=1.0e-12)
+    assert identity.m01 == pytest.approx(0.0, abs=1.0e-12)
+    assert identity.m02 == pytest.approx(0.0, abs=1.0e-12)
+    assert identity.m10 == pytest.approx(0.0, abs=1.0e-12)
+    assert identity.m12 == pytest.approx(0.0, abs=1.0e-12)
+    assert identity.m20 == pytest.approx(0.0, abs=1.0e-12)
+    assert identity.m21 == pytest.approx(0.0, abs=1.0e-12)
+
+
+def test_small_dynamic_sphere_has_valid_inertia_tensor() -> None:
+    body = RigidBody.dynamic(
+        "small",
+        SphereShape(0.1),
+        linear_damping=0.0,
+        angular_damping=0.0,
+    )
+    assert body.mass > 0.0
+    assert body.local_inertia.is_invertible()
+    product = body.local_inertia.mul_mat(body.local_inverse_inertia)
+    assert product.m00 == pytest.approx(1.0, abs=1.0e-12)
+    assert product.m11 == pytest.approx(1.0, abs=1.0e-12)
+    assert product.m22 == pytest.approx(1.0, abs=1.0e-12)
+
+
+def test_matrix_invertibility_is_relative_not_absolute_determinant() -> None:
+    small = Mat3.diagonal(Vec3(1.0e-12, 2.0e-12, 3.0e-12))
+    large = Mat3.diagonal(Vec3(1.0e12, 2.0e12, 3.0e12))
+    singular = Mat3(
+        1.0e-12, 2.0e-12, 3.0e-12,
+        2.0e-12, 4.0e-12, 6.0e-12,
+        0.0, 0.0, 0.0,
+    )
+    assert small.is_invertible()
+    assert large.is_invertible()
+    assert not singular.is_invertible()
