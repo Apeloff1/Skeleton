@@ -18,6 +18,8 @@ Commands:
     sota        Show the #807 SOTA game-creation program map
     replay      Record and verify a deterministic mechanics replay
     session     Compose replay + AI + harbor + mass + era bind
+    conductor   Run the 7-step GameForge conductor cards
+    arena       Run the B100 structural sealed-replay arena
     command     Execute a shared command: command <name> ['{...json...}']
     status      Shared runtime status command
     config      Shared non-secret configuration command
@@ -120,6 +122,47 @@ def _cmd_session(rest: List[str]) -> int:
         "replay_digest": payload["replay_digest"],
         "frames": payload["frames"],
         "era": payload["reference"]["era"],
+        "stored_prose": payload["stored_prose"],
+    }, indent=2))
+    return 0
+
+
+def _cmd_conductor(rest: List[str]) -> int:
+    from skeleton.game.conductor import execute
+
+    seed = _parse_seed(rest)
+    try:
+        payload = execute(seed=int(seed) if str(seed).isdigit() else 8847291)
+    except Exception as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}, indent=2))
+        return 2
+    print(json.dumps({
+        "ok": True,
+        "seed": payload["seed"],
+        "steps": len(payload["steps"]),
+        "weakest": payload["weakest"],
+        "era": payload["reference"]["era"],
+        "sota_ready": payload["sota_ready"],
+        "stored_prose": payload["stored_prose"],
+    }, indent=2))
+    return 0
+
+
+def _cmd_arena(rest: List[str]) -> int:
+    from skeleton.game.arena import run_arena
+
+    try:
+        payload = run_arena()
+    except Exception as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}, indent=2))
+        return 2
+    print(json.dumps({
+        "ok": True,
+        "n": payload["n"],
+        "unique_digests": payload["unique_digests"],
+        "extract_ok": payload["extract_ok"],
+        "evidence": payload["evidence"],
+        "sota_ready": payload["sota_ready"],
         "stored_prose": payload["stored_prose"],
     }, indent=2))
     return 0
@@ -350,6 +393,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "sota": return _cmd_sota(rest)
     if cmd == "replay": return _cmd_replay(rest)
     if cmd == "session": return _cmd_session(rest)
+    if cmd == "conductor": return _cmd_conductor(rest)
+    if cmd == "arena": return _cmd_arena(rest)
     if cmd == "command": return _cmd_shared_command(rest)
     if cmd == "status": return _cmd_shared_command(["status"])
     if cmd == "config": return _cmd_shared_command(["configuration"])
