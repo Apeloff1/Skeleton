@@ -154,3 +154,29 @@ def test_probabilistic_facade_exports_cross_family_arbitration_surface() -> None
     assert expected.issubset(set(probabilistic.__all__))
     for name in expected:
         assert hasattr(probabilistic, name)
+
+
+def test_probabilistic_facade_exports_conformal_surface() -> None:
+    expected = {
+        "ConformalCalibrationState",
+        "ConformalConfig",
+        "ConformalInterval",
+        "ConformalObservation",
+        "ConformalReport",
+        "ConformalStep",
+        "LocationScaleForecast",
+        "attainable_miscoverage_floor",
+        "conformal_interval_from_scores",
+        "evaluate_conformal_observations",
+        "finite_sample_conformal_quantile",
+        "forecast_scale",
+        "nonconformity_score",
+        "observations_from_cross_family_report",
+        "required_calibration_size",
+        "state_from_report",
+        "verify_report_integrity",
+        "verify_state_integrity",
+    }
+    assert expected.issubset(set(probabilistic.__all__))
+    for name in expected:
+        assert hasattr(probabilistic, name)
