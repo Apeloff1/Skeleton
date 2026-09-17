@@ -35,6 +35,7 @@ def dispatch(cmd: str, rest: List[str]) -> int | None:
         "wave6": _cmd_wave6, "wave7": _cmd_wave7, "wave8": _cmd_wave8,
         "wave9": _cmd_wave9, "wave10": _cmd_wave10, "wave11": _cmd_wave11,
         "wave12": _cmd_wave12, "wave13": _cmd_wave13, "wave14": _cmd_wave14,
+        "wave15": _cmd_wave15,
     }
     fn = table.get(cmd)
     return None if fn is None else fn(rest)
@@ -376,6 +377,19 @@ def _cmd_wave13(rest: List[str]) -> int:
 def _cmd_wave14(rest: List[str]) -> int:
     from skeleton.game.wave14_more import play as more
     from skeleton.game.wave14_play import play
+    seed = _seed(rest)
+    try:
+        first = play(seed=seed)
+        second = more(seed=seed)
+    except Exception as exc:
+        return _fail(exc)
+    print(json.dumps({"ok": True, "digest": first["digest"], "more": second["digest"], "packs": first["packs"], "sota_ready": False, "stored_prose": 0}, indent=2))
+    return 0
+
+
+def _cmd_wave15(rest: List[str]) -> int:
+    from skeleton.game.wave15_more import play as more
+    from skeleton.game.wave15_play import play
     seed = _seed(rest)
     try:
         first = play(seed=seed)
