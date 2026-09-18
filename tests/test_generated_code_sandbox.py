@@ -229,6 +229,27 @@ def test_network_and_process_grants_still_fail_closed_outside_allowlist(tmp_path
         box.attempt(Operation(OperationKind.PROCESS, "python", SandboxCapability.PROCESS, "python; rm -rf /"))
 
 
+@pytest.mark.parametrize(
+    "source",
+    [
+        'import ctypes\nctypes.CDLL("libc.so.6")\n',
+        'from ctypes import CDLL\nCDLL("libc.so.6")\n',
+        'import multiprocessing\nmultiprocessing.Process(target=print).start()\n',
+        'from multiprocessing import Process\nProcess(target=print).start()\n',
+        'import pty\npty.spawn("/bin/sh")\n',
+        'from pty import spawn\nspawn("/bin/sh")\n',
+    ],
+)
+def test_ffi_and_process_construction_require_process_capability(
+    tmp_path: Path,
+    source: str,
+) -> None:
+    decision = _sandbox(tmp_path).admit(source, kind=PayloadKind.PYTHON)
+    assert decision.allowed is False
+    assert decision.operation is not None
+    assert decision.operation.kind is OperationKind.PROCESS
+
+
 def test_parse_failure_fails_closed_and_does_not_pass(tmp_path: Path) -> None:
     decision = _sandbox(tmp_path).admit("def broken(:\n", kind=PayloadKind.PYTHON)
     assert decision.allowed is False
