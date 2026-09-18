@@ -12,9 +12,9 @@ Unknown stores, unknown families, and incomplete classification fail closed.
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 TASK_KEY = "reserve-S171-durable-state-inventory"
 CONFLICT_DOMAIN = "reliability.readonly.state_inventory"

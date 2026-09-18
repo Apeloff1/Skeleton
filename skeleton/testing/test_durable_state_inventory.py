@@ -20,7 +20,6 @@ from skeleton.reliability.state_inventory import (
     require_store,
 )
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
