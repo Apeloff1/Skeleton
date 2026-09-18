@@ -235,11 +235,13 @@ def test_topology_learning_revision_invalidates_bound_semantic_advisory() -> Non
     snapshot = _snapshot(runtime)
     runtime.bind_semantic_reasoning_snapshot(state.run_id, snapshot)
 
-    candidate = runtime.semantic_plane.topology.bridge_candidates(
+    scoped_plane = runtime.semantic_plane_for(inputs)
+    candidate = scoped_plane.topology.bridge_candidates(
         limit=1,
         minimum_score=0.0,
     )[0]
-    runtime.declare_semantic_topology_candidate_prediction(
+    runtime.declare_scoped_semantic_topology_candidate_prediction(
+        inputs,
         candidate.candidate_id,
         kind=LensInteractionKind.REINFORCES,
         predicted_probability=0.70,
