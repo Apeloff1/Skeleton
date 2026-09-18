@@ -27,6 +27,7 @@ from .lens_system import (
     LensFamily as GovernedLensFamily,
 )
 from .semantic_extreme_lenses import LensMaturity, rare_semantic_definitions
+from .semantic_depth_lenses import depth_semantic_definitions
 from .semantic_lenses import (
     LensFamily,
     LensSelection,
@@ -76,6 +77,7 @@ def semantic_maturity_index() -> Mapping[str, LensMaturity]:
         rare_semantic_definitions(),
         research_semantic_definitions(),
         plane_semantic_definitions(),
+        depth_semantic_definitions(),
     ):
         for definition in definitions:
             result.setdefault(definition.spec.key, definition.maturity)

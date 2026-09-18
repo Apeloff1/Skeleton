@@ -439,6 +439,14 @@ from .semantic_extreme_lenses import (
     rare_semantic_specs,
     register_rare_lenses,
 )
+from .semantic_depth_lenses import (
+    DEPTH_CATALOG_VERSION,
+    depth_catalog_fingerprint,
+    depth_definitions_by_family,
+    depth_semantic_definitions,
+    depth_semantic_specs,
+    register_depth_lenses,
+)
 from .semantic_research_lenses import (
     CATALOG_VERSION as RESEARCH_LENS_CATALOG_VERSION,
     register_research_lenses,
@@ -459,12 +467,24 @@ from .semantic_plane_interactions import (
     plane_interaction_keys,
     plane_interaction_rules,
 )
+from .semantic_depth_interactions import (
+    depth_interaction_keys,
+    depth_interaction_rules,
+)
 from .semantic_governance_bridge import (
     SemanticGovernanceBridge,
     SemanticGovernanceSnapshot,
     governed_family,
     semantic_maturity_index,
     semantic_spec_to_definition,
+)
+
+from .semantic_lens_topology import (
+    LensBridgeCandidate,
+    LensTopologyEdge,
+    LensTopologyNode,
+    SemanticLensTopology,
+    SemanticTopologySnapshot,
 )
 
 from .semantic_deep_lenses import DeepLensLineage, deep_lens_lineage, deep_semantic_lenses
