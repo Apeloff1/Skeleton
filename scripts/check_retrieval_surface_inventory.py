@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 
-TASK_KEY = "reserve-S121-retrieval-surface-inventory"
+TASK_ID = "reserve-S121-retrieval-surface-inventory"
 CONFLICT_DOMAIN = "rag.readonly.surface_inventory"
 INVENTORY_VERSION = 1
 
@@ -906,7 +906,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         counts[classification] = counts.get(classification, 0) + 1
     print(
         "retrieval-surface-inventory: OK "
-        f"(task={TASK_KEY} domain={CONFLICT_DOMAIN} version={INVENTORY_VERSION} "
+        f"(task={TASK_ID} domain={CONFLICT_DOMAIN} version={INVENTORY_VERSION} "
         f"surfaces={len(rows)} capabilities={','.join(sorted(capabilities))} "
         f"canonical={counts['canonical']} legacy_adapter={counts['legacy_adapter']} "
         f"overlapping={counts['overlapping']} unknown={counts['unknown']})"
