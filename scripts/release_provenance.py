@@ -13,6 +13,7 @@ import argparse
 import gzip
 import hashlib
 import importlib.metadata
+import importlib.util
 import json
 import os
 import platform
@@ -21,6 +22,7 @@ import sys
 import tarfile
 import tempfile
 import tomllib
+import types
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -267,24 +269,56 @@ def compare_provenance(args: argparse.Namespace) -> int:
     return 0
 
 
-def _load_release_evidence():
-    """Import the canonical evidence gate without coupling v1 emit to it.
+def _ensure_namespace(name: str, path: Path) -> None:
+    """Register a package without executing its ``__init__`` (avoids pydantic)."""
 
-    Reproducible Release runs pytest from the parent of the checkout without
-    setting PYTHONPATH, so locate the package from this script's repository
-    root instead of assuming ``skeleton`` is already importable.
+    if name in sys.modules:
+        return
+    module = types.ModuleType(name)
+    module.__path__ = [str(path)]  # type: ignore[attr-defined]
+    module.__file__ = str(path / "__init__.py")
+    module.__package__ = name
+    sys.modules[name] = module
+
+
+def _load_file_module(name: str, file_path: Path) -> types.ModuleType:
+    existing = sys.modules.get(name)
+    if existing is not None:
+        return existing
+    spec = importlib.util.spec_from_file_location(name, file_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(name)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_release_evidence():
+    """Import the evidence gate without loading ``skeleton.__init__``.
+
+    Reproducible Release pytest has neither PYTHONPATH nor pydantic. A normal
+    ``import skeleton.release.evidence`` executes the root package, which
+    imports settings and fails. Load kernel.errors and evidence.py by path.
     """
 
-    root = str(Path(__file__).resolve().parents[1])
-    if root not in sys.path:
-        sys.path.insert(0, root)
+    root = Path(__file__).resolve().parents[1]
+    evidence_path = root / "skeleton" / "release" / "evidence.py"
+    errors_path = root / "skeleton" / "kernel" / "errors.py"
+    if not evidence_path.is_file() or not errors_path.is_file():
+        raise ValueError(
+            "release evidence commands require the skeleton.release.evidence package"
+        )
     try:
-        from skeleton.release import evidence as release_evidence
-    except ImportError as exc:  # pragma: no cover - package layout is required for evidence
+        _ensure_namespace("skeleton", root / "skeleton")
+        _ensure_namespace("skeleton.kernel", root / "skeleton" / "kernel")
+        _ensure_namespace("skeleton.release", root / "skeleton" / "release")
+        _load_file_module("skeleton.kernel.errors", errors_path)
+        return _load_file_module("skeleton.release.evidence", evidence_path)
+    except Exception as exc:
         raise ValueError(
             "release evidence commands require the skeleton.release.evidence package"
         ) from exc
-    return release_evidence
 
 
 def _load_json_records(paths: Iterable[str]) -> list[dict[str, Any]]:

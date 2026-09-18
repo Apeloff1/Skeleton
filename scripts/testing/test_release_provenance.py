@@ -228,18 +228,31 @@ def test_evidence_loader_does_not_require_preexisting_pythonpath() -> None:
     """Reproducible Release pytest runs from the parent of the checkout."""
 
     root = str(REPO_ROOT.resolve())
-    original = list(sys.path)
+    original_path = list(sys.path)
+    original_modules = {
+        name: module
+        for name, module in sys.modules.items()
+        if name == "pydantic"
+        or name.startswith("pydantic.")
+        or name == "skeleton"
+        or name.startswith("skeleton.")
+    }
     sys.path[:] = [
         entry
         for entry in sys.path
         if entry not in {"", ".", root}
         and Path(entry).resolve() != REPO_ROOT.resolve()
     ]
+    for name in list(original_modules):
+        sys.modules.pop(name, None)
     try:
         module = release_provenance._load_release_evidence()
         assert module.SCHEMA_ID == "skeleton.release.evidence"
+        assert "pydantic" not in sys.modules
+        assert "skeleton.config.settings" not in sys.modules
     finally:
-        sys.path[:] = original
+        sys.path[:] = original_path
+        sys.modules.update(original_modules)
 
 
 def test_evidence_adapter_gates_missing_tests_and_binds_digests(tmp_path: Path) -> None:
