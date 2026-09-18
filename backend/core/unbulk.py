@@ -42,7 +42,13 @@ _LOCK = threading.Lock()
 
 # ── decompress-on-demand LRU cache (hash → decoded object) ───────────────────
 _CACHE: "OrderedDict[str, Any]" = OrderedDict()
-_CACHE_MAX = int(os.environ.get("UNBULK_CACHE_MAX", "512"))
+_CACHE_SIZES: dict[str, int] = {}
+_CACHE_MAX = max(0, int(os.environ.get("UNBULK_CACHE_MAX", "512")))
+_CACHE_MAX_BYTES = max(
+    0,
+    int(os.environ.get("UNBULK_CACHE_MAX_BYTES", str(16 * 1024 * 1024))),
+)
+_CACHE_BYTES = 0
 
 
 def pack(obj: Any) -> str:
@@ -117,10 +123,21 @@ def unpack(blob: Any) -> Any:
     raw = _decode_packed_payload(blob)
     obj = json.loads(raw)
     with _LOCK:
-        _CACHE[key] = obj
-        _CACHE.move_to_end(key)
-        while len(_CACHE) > _CACHE_MAX:
-            _CACHE.popitem(last=False)
+        global _CACHE_BYTES
+        raw_size = len(raw)
+        if _CACHE_MAX > 0 and _CACHE_MAX_BYTES > 0 and raw_size <= _CACHE_MAX_BYTES:
+            prior_size = _CACHE_SIZES.pop(key, 0)
+            _CACHE_BYTES = max(0, _CACHE_BYTES - prior_size)
+            _CACHE[key] = obj
+            _CACHE_SIZES[key] = raw_size
+            _CACHE_BYTES += raw_size
+            _CACHE.move_to_end(key)
+            while len(_CACHE) > _CACHE_MAX or _CACHE_BYTES > _CACHE_MAX_BYTES:
+                victim, _ = _CACHE.popitem(last=False)
+                _CACHE_BYTES = max(
+                    0,
+                    _CACHE_BYTES - _CACHE_SIZES.pop(victim, 0),
+                )
         _STATS["unpacked"] += 1
     return obj
 
@@ -318,8 +335,14 @@ def savings() -> dict:
         },
         "namespaces": namespaces,
         "codec": st,
-        "cache": {"size": len(_CACHE), "max": _CACHE_MAX,
-                  "hits": st["cache_hits"], "misses": st["cache_misses"]},
+        "cache": {
+            "size": len(_CACHE),
+            "max": _CACHE_MAX,
+            "raw_bytes": _CACHE_BYTES,
+            "max_raw_bytes": _CACHE_MAX_BYTES,
+            "hits": st["cache_hits"],
+            "misses": st["cache_misses"],
+        },
         "api_response_gzip": True,  # GZipMiddleware active (minimum_size=1000)
     }
 
@@ -362,7 +385,10 @@ def sweep(manifest_min_bytes: int = 50_000, freeze_cold: bool = True,
 
 
 def purge_cache() -> int:
+    global _CACHE_BYTES
     with _LOCK:
         n = len(_CACHE)
         _CACHE.clear()
+        _CACHE_SIZES.clear()
+        _CACHE_BYTES = 0
     return n
