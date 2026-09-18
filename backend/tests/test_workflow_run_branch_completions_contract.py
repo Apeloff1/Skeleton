@@ -103,6 +103,15 @@ def test_rejects_repair_intake_without_commit_oid_canonicalization() -> None:
     assert "40-hex commit OID" in messages
 
 
+def test_idle_studio_single_sources_workflow_run_trust_boundary() -> None:
+    source = IDLE.read_text(encoding="utf-8")
+    guard = "github.event.workflow_run.head_repository.full_name == github.repository"
+
+    assert source.count(guard) == 1
+    assert "needs.pressure.result == 'success'" in source
+    assert "needs.pressure.outputs.proceed == 'true'" in source
+
+
 def test_rejects_idle_studio_without_same_repository_head() -> None:
     source = _replace_once(
         IDLE.read_text(encoding="utf-8"),
