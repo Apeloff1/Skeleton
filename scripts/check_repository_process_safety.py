@@ -58,7 +58,7 @@ def display_path(path: Path) -> Path:
 
 
 def _definitely_string_command(node: ast.AST) -> bool:
-    """Return True only when the AST proves a subprocess command is string-like."""
+    """Return True only when the AST proves a subprocess command is string/bytes-like."""
     if isinstance(node, ast.Constant):
         return isinstance(node.value, (str, bytes))
     if isinstance(node, ast.JoinedStr):
@@ -69,10 +69,27 @@ def _definitely_string_command(node: ast.AST) -> bool:
             # yields a string/bytes command (otherwise Python raises before spawn).
             return _definitely_string_command(node.left) or _definitely_string_command(node.right)
         if isinstance(node.op, ast.Mod):
-            # Percent-formatting a literal/f-string-like left operand yields text.
+            # Percent-formatting a string-shaped left operand yields text.
             return _definitely_string_command(node.left)
-    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-        if node.func.attr in {"format", "join"}:
+    if isinstance(node, ast.Call):
+        if isinstance(node.func, ast.Name) and node.func.id in {"str", "bytes", "repr", "ascii"}:
+            return True
+        if isinstance(node.func, ast.Attribute) and node.func.attr in {
+            "format",
+            "format_map",
+            "join",
+            "strip",
+            "lstrip",
+            "rstrip",
+            "replace",
+            "lower",
+            "upper",
+            "casefold",
+            "removeprefix",
+            "removesuffix",
+            "encode",
+            "decode",
+        }:
             return _definitely_string_command(node.func.value)
     return False
 
