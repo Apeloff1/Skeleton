@@ -1001,52 +1001,57 @@ class KinematicCapsuleController:
             )
         dt = _finite_positive(dt, name="dt")
         self._validate_bodies(bodies)
+        checkpoint = self.capture_state()
         start = self.position
 
-        if recover_overlaps:
-            recovery = self.recover_overlaps(
+        try:
+            if recover_overlaps:
+                recovery = self.recover_overlaps(
+                    bodies,
+                    ignore=ignore,
+                )
+            else:
+                recovery = CharacterRecoveryResult(
+                    start_position=self.position,
+                    position=self.position,
+                    displacement=Vec3.zero(),
+                    recovered=False,
+                    iterations=0,
+                    body_ids=(),
+                )
+
+            pre_ground = self.ground_probe(
                 bodies,
+                dt=dt,
                 ignore=ignore,
             )
-        else:
-            recovery = CharacterRecoveryResult(
-                start_position=self.position,
-                position=self.position,
-                displacement=Vec3.zero(),
-                recovered=False,
-                iterations=0,
-                body_ids=(),
+            support_velocity = (
+                self.support_velocity(pre_ground, bodies)
+                if carry_support
+                else Vec3.zero()
             )
-
-        pre_ground = self.ground_probe(
-            bodies,
-            dt=dt,
-            ignore=ignore,
-        )
-        support_velocity = (
-            self.support_velocity(pre_ground, bodies)
-            if carry_support
-            else Vec3.zero()
-        )
-        carry = support_velocity * dt
-        input_displacement = requested_velocity * dt
-        move = self.move(
-            carry + input_displacement,
-            bodies,
-            dt=dt,
-            ignore=ignore,
-        )
-        return CharacterRuntimeResult(
-            start_position=start,
-            position=self.position,
-            requested_velocity=requested_velocity,
-            support_velocity=support_velocity,
-            carry_displacement=carry,
-            input_displacement=input_displacement,
-            recovery=recovery,
-            move=move,
-            ground=move.ground,
-        )
+            carry = support_velocity * dt
+            input_displacement = requested_velocity * dt
+            move = self.move(
+                carry + input_displacement,
+                bodies,
+                dt=dt,
+                ignore=ignore,
+            )
+            return CharacterRuntimeResult(
+                start_position=start,
+                position=self.position,
+                requested_velocity=requested_velocity,
+                support_velocity=support_velocity,
+                carry_displacement=carry,
+                input_displacement=input_displacement,
+                recovery=recovery,
+                move=move,
+                ground=move.ground,
+            )
+        except Exception:
+            self.restore_state(checkpoint)
+            raise
 
     def move(
         self,
