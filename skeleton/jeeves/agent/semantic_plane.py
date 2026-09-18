@@ -22,7 +22,7 @@ separate evidence/causal layer establishes them.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Mapping, Sequence
 
 from .epistemic_frontier import KnowledgeObligation
@@ -582,6 +582,90 @@ class SemanticLensPlane:
                 )
             )
         return tuple(signals)
+
+    def reasoning_signals(
+        self,
+        snapshot: SemanticPlaneSnapshot,
+        *,
+        limit: int = 24,
+    ) -> tuple[LensSignal, ...]:
+        """Return custody-checked semantic signals for inference escalation.
+
+        These signals are advisory and escalation-only. They may cause frontier
+        reasoning to deliberate, seek evidence, or abstain when semantic
+        forecasts conflict or are sensitive. They cannot increase factual
+        evidence quality or independently authorize a commit.
+        """
+
+        if not isinstance(snapshot, SemanticPlaneSnapshot):
+            raise TypeError("snapshot must be SemanticPlaneSnapshot")
+        maximum = positive_int("limit", limit, maximum=1_000)
+        if (
+            snapshot.factual_assertion_authorized
+            or snapshot.causal_assertion_authorized
+        ):
+            raise AgentContractError(
+                "semantic reasoning signals cannot carry factual/causal authority"
+            )
+
+        open_forecasts: list[SemanticForecast] = []
+        for forecast in snapshot.forecasts:
+            stored = self.prediction_ledger.get(forecast.forecast_id)
+            if stored is None:
+                raise AgentContractError(
+                    "semantic reasoning forecast is missing from prediction custody"
+                )
+            if stored.fingerprint != forecast.fingerprint:
+                raise AgentContractError(
+                    "semantic reasoning forecast differs from prediction custody"
+                )
+            if stored.status is not PredictionStatus.OPEN:
+                continue
+            open_forecasts.append(stored)
+
+        signals = self._signals(
+            tuple(open_forecasts[:maximum]),
+            snapshot.governance,
+        )
+        return tuple(
+            replace(
+                signal,
+                metadata={
+                    **dict(signal.metadata),
+                    "semantic_snapshot_fingerprint": snapshot.fingerprint,
+                    "semantic_governance_fingerprint": (
+                        snapshot.governance.fingerprint
+                    ),
+                    "semantic_topology_learning_fingerprint": (
+                        snapshot.topology_learning.fingerprint
+                    ),
+                    "inference_authority": "escalation_only",
+                    "may_increase_evidence_quality": False,
+                    "may_authorize_commit": False,
+                    "factual_assertion_authorized": False,
+                    "causal_assertion_authorized": False,
+                },
+            )
+            for signal in signals
+        )
+
+    def reasoning_signal_is_current(
+        self,
+        signal: LensSignal,
+    ) -> bool:
+        """Check that an advisory still points at the same open forecast."""
+
+        if not isinstance(signal, LensSignal):
+            return False
+        if signal.metadata.get("inference_authority") != "escalation_only":
+            return False
+        stored = self.prediction_ledger.get(signal.signal_id)
+        if stored is None or stored.status is not PredictionStatus.OPEN:
+            return False
+        return (
+            signal.metadata.get("forecast_fingerprint")
+            == stored.fingerprint
+        )
 
     def _seed_family(self, seed: TangentSeed) -> LensFamily | None:
         key = seed.lens_key.strip().casefold()
