@@ -662,3 +662,145 @@ def test_jeeves_owns_game_loop_advance_and_replay_boundary() -> None:
     assert result.timing.simulation_steps == 1
     assert verification.passed
     assert loop.machine.tick == 1
+
+
+
+def test_modern_step_failure_restores_clock_machine_and_prior_rollback_history() -> None:
+    loop = build_game_loop(
+        ExecutableGameEngineLab()
+        .create(
+            EngineEra.MODERN
+        )
+    )
+    delta = _one_step_delta(
+        loop
+    )
+    for _ in range(3):
+        loop.advance(
+            delta
+        )
+
+    before_machine = (
+        loop.machine.fingerprint()
+    )
+    before_clock = (
+        loop.clock.snapshot()
+    )
+    before_chain = (
+        loop.chain_digest
+    )
+    before_history = (
+        loop.history
+    )
+    before_rollback = (
+        loop.machine.rollback_depth
+    )
+    original_step = (
+        loop.machine.step
+    )
+
+    def fail_on_second(
+        frame: InputFrame,
+    ):
+        if frame.tick == 4:
+            raise GameEngineLabError(
+                "injected step failure"
+            )
+        return original_step(
+            frame
+        )
+
+    loop.machine.step = fail_on_second
+
+    with pytest.raises(
+        GameEngineLabError,
+        match="injected step failure",
+    ):
+        loop.advance(
+            delta * 2
+        )
+
+    loop.machine.step = original_step
+    assert (
+        loop.machine.fingerprint()
+        == before_machine
+    )
+    assert loop.clock.snapshot() == before_clock
+    assert loop.chain_digest == before_chain
+    assert loop.history == before_history
+    assert (
+        loop.machine.rollback_depth
+        == before_rollback
+    )
+
+
+def test_legacy_post_step_failure_restores_pre_advance_snapshot() -> None:
+    loop = build_game_loop(
+        ExecutableGameEngineLab()
+        .create(
+            EngineEra.EIGHT_BIT
+        )
+    )
+    before_machine = (
+        loop.machine.fingerprint()
+    )
+    before_clock = (
+        loop.clock.snapshot()
+    )
+    original_step = (
+        loop.machine.step
+    )
+
+    def mutate_then_fail(
+        frame: InputFrame,
+    ):
+        original_step(
+            frame
+        )
+        raise GameEngineLabError(
+            "post-step failure"
+        )
+
+    loop.machine.step = mutate_then_fail
+
+    with pytest.raises(
+        GameEngineLabError,
+        match="post-step failure",
+    ):
+        loop.advance(
+            _one_step_delta(
+                loop
+            )
+        )
+
+    loop.machine.step = original_step
+    assert (
+        loop.machine.fingerprint()
+        == before_machine
+    )
+    assert loop.clock.snapshot() == before_clock
+    assert loop.machine.tick == 0
+    assert loop.clock.simulation_tick == 0
+    assert loop.history == ()
+
+
+def test_malformed_clock_object_in_combined_snapshot_fails_closed() -> None:
+    loop = build_game_loop(
+        ExecutableGameEngineLab()
+        .create(
+            EngineEra.MODERN
+        )
+    )
+    snapshot = loop.snapshot()
+    forged = replace(
+        snapshot,
+        clock_snapshot=object(),
+    )
+
+    with pytest.raises(
+        GameEngineLabError,
+        match="snapshot contract mismatch",
+    ):
+        loop.restore(
+            forged
+        )
