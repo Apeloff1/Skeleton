@@ -30,7 +30,12 @@ from skeleton.jeeves.agent.semantic_lenses import (
     SemanticFinding,
     SemanticObservation,
 )
-from skeleton.jeeves.agent.types import Goal, RiskTier, stable_fingerprint
+from skeleton.jeeves.agent.types import (
+    AgentContractError,
+    Goal,
+    RiskTier,
+    stable_fingerprint,
+)
 
 
 class TickClock:
@@ -123,8 +128,13 @@ def _finding(
     )
 
 
-def _snapshot(runtime: AdaptiveJeevesRuntime):
-    return runtime.semantic_plane.analyze(
+def _snapshot(
+    runtime: AdaptiveJeevesRuntime,
+    *,
+    plane=None,
+):
+    semantic_plane = plane or runtime.semantic_plane
+    return semantic_plane.analyze(
         _observations(),
         findings=(
             _finding(
@@ -181,10 +191,11 @@ def test_semantic_reasoning_signals_are_escalation_only_and_in_custody() -> None
     )
 
     assert runtime.semantic_plane.reasoning_signal_is_current(first) is False
-    refreshed = runtime.semantic_plane.reasoning_signals(snapshot)
-    assert first.signal_id not in {
-        item.signal_id for item in refreshed
-    }
+    with pytest.raises(
+        AgentContractError,
+        match="state revision is stale",
+    ):
+        runtime.semantic_plane.reasoning_signals(snapshot)
 
 
 def test_adaptive_runtime_binds_semantic_snapshot_to_live_run() -> None:
@@ -192,7 +203,8 @@ def test_adaptive_runtime_binds_semantic_snapshot_to_live_run() -> None:
     runtime = _runtime(clock)
     inputs = _inputs("run-semantic-bind")
     state = runtime._new_state(inputs.run_id, inputs)
-    snapshot = _snapshot(runtime)
+    scoped_plane = runtime.semantic_plane_for(inputs)
+    snapshot = _snapshot(runtime, plane=scoped_plane)
 
     signals = runtime.bind_semantic_reasoning_snapshot(
         state.run_id,
@@ -232,10 +244,10 @@ def test_topology_learning_revision_invalidates_bound_semantic_advisory() -> Non
     runtime = _runtime(clock)
     inputs = _inputs("run-semantic-stale")
     state = runtime._new_state(inputs.run_id, inputs)
-    snapshot = _snapshot(runtime)
+    scoped_plane = runtime.semantic_plane_for(inputs)
+    snapshot = _snapshot(runtime, plane=scoped_plane)
     runtime.bind_semantic_reasoning_snapshot(state.run_id, snapshot)
 
-    scoped_plane = runtime.semantic_plane_for(inputs)
     candidate = scoped_plane.topology.bridge_candidates(
         limit=1,
         minimum_score=0.0,
